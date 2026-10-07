@@ -109,5 +109,52 @@ class TestHoursGuardEveryPath(unittest.TestCase):
         self.assertEqual(once, twice)
 
 
+# [LOCAL-616 item 1] The every-path finalization guard also removes a duplicated
+# paragraph (the orientation block printed twice when the orchestrator folds the
+# D611 opening into Stop 1 after the inner QA ran — the live Granet/Groeninge
+# runs showed exactly this).
+_ORIENT = ("You are about to explore the Musée Granet in Aix-en-Provence, home to "
+           "an array of artistic treasures spanning many periods and styles, a rich "
+           "collection shaped by generations of patronage and care.")
+_TOUR_WITH_DUP_ORIENTATION = (
+    "Step-by-Step Audio Guided Tour: Musée Granet, Aix-en-Provence, France\n"
+    "Tour-Category: museum\n\n"
+    "Stop 1: Mon musée à la maison\n\n"
+    "Address: Place Saint-Jean de Malte, 13100 Aix-en-Provence, France\n\n"
+    f"Orientation: {_ORIENT}\n\n"
+    f"{_ORIENT}\n\n"
+    "The display itself is digital, echoing the museum's pale limestone halls.\n"
+)
+
+
+class TestDuplicateParagraphGuardEveryPath(unittest.TestCase):
+    def setUp(self):
+        self._saved = getattr(gtt, "_LAST_VENUE_PREFLIGHT", {})
+        gtt._LAST_VENUE_PREFLIGHT = {}  # no hours → isolate the dedupe behaviour
+
+    def tearDown(self):
+        gtt._LAST_VENUE_PREFLIGHT = self._saved
+
+    def test_duplicate_orientation_removed(self):
+        folded, _o, _c = gtt._apply_delivery_hours_guard(
+            (_TOUR_WITH_DUP_ORIENTATION, None, (None, None)))
+        # The orientation body must appear exactly once now.
+        self.assertEqual(folded.count(_ORIENT), 1)
+
+    def test_output_file_rewritten_on_dedupe(self):
+        fd, path = tempfile.mkstemp(suffix=".txt")
+        os.close(fd)
+        try:
+            with open(path, "w", encoding="utf-8") as f:
+                f.write(_TOUR_WITH_DUP_ORIENTATION)
+            folded, _o, _c = gtt._apply_delivery_hours_guard(
+                (_TOUR_WITH_DUP_ORIENTATION, path, (None, None)))
+            on_disk = open(path, encoding="utf-8").read()
+            self.assertEqual(on_disk, folded)
+            self.assertEqual(on_disk.count(_ORIENT), 1)
+        finally:
+            os.unlink(path)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

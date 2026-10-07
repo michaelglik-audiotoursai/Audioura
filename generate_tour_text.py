@@ -7340,23 +7340,30 @@ except Exception as _cap_err:  # pragma: no cover
 
 
 def _apply_delivery_hours_guard(result):
-    """[LOCAL-616 item 1] Run the LOCAL-615 belt-and-braces hours guard on the
-    FINAL delivered text of EVERY delivery path — not just the fresh/first-tour
-    path that already called it inline.
+    """[LOCAL-616 item 1] Run the belt-and-braces delivery guards on the FINAL
+    delivered text of EVERY delivery path — not just the fresh/first-tour path
+    that already called them inline.
 
-    D-fabre (tour 414): the critique found "Check opening hours and admission on
-    museefabre.fr before you go." still in Stop 1 even though the LOCAL-603
-    preflight had real hours. 414 was delivered by the POOL path
-    (``_LAST_DELIVERY_PATH == 'pool'``), whose return in this wrapper never ran
-    ``stop_pool_orchestrator._fold_preflight_hours_into_text``. The guard only
-    fired on the first-tour branch inside the orchestrator; pool reuse, cache,
-    by_reference and overview all shipped the raw fallback.
+    Two guards, both idempotent and non-fatal, applied here at the single wrapper
+    choke point every path returns through, to BOTH the returned text and the
+    on-disk output file (the service reads the delivered tour from the file, not
+    the return value):
 
-    This wrapper is the single choke point every path returns through, so apply
-    the guard here to BOTH the returned text and the on-disk output file (the
-    service reads the delivered tour from the file, not the return value). The
-    guard is idempotent and non-fatal: when the preflight has no hours, or the
-    fallback is absent, the text is unchanged (never invent hours).
+      1. ``stop_pool_orchestrator._fold_preflight_hours_into_text`` — the LOCAL-615
+         hours guard. D-fabre (tour 414): "Check opening hours and admission on
+         museefabre.fr before you go." shipped in Stop 1 though the LOCAL-603
+         preflight had real hours. 414 was delivered by the POOL path, whose return
+         never ran the guard (it only fired on the first-tour branch inside the
+         orchestrator; pool reuse, cache, by_reference and overview all shipped the
+         raw fallback). When the preflight has no hours, the text is unchanged
+         (never invent hours).
+      2. ``paragraph_dedupe.dedupe_paragraphs`` — the LOCAL-615 duplicated-paragraph
+         removal. On the pool / first-tour delivery the orchestrator folds the D611
+         opening section into Stop 1 AFTER the inner generator's QA ran, so the
+         orientation paragraph is duplicated verbatim in the DELIVERED text (the
+         live Granet/Groeninge runs showed Stop 1's orientation block printed
+         twice). The inner QA could not see it; this final pass removes the second
+         copy on every path.
 
     ``result`` is the ``(text, output_file, coords)`` tuple returned by a path.
     Returns the possibly-rewritten tuple. A ``None`` text (refusal) is passed
@@ -7368,20 +7375,34 @@ def _apply_delivery_hours_guard(result):
         text, out_file, coords = result
         if not text or not isinstance(text, str):
             return result
-        import stop_pool_orchestrator as _orch
-        folded = _orch._fold_preflight_hours_into_text(text)
-        if folded != text and out_file:
+        final = text
+        # 1. Fold preflight hours into any surviving "check … on <domain>" fallback.
+        try:
+            import stop_pool_orchestrator as _orch
+            final = _orch._fold_preflight_hours_into_text(final)
+        except Exception as _he:  # pragma: no cover
+            _import_logger.error(f"[LOCAL-616] hours fold skipped: {_he}")
+        # 2. Drop duplicated paragraphs (e.g. the twice-printed orientation block).
+        try:
+            import paragraph_dedupe as _pd
+            final, _removed = _pd.dedupe_paragraphs(final)
+            if _removed:
+                print(f"  [LOCAL-616] removed {len(_removed)} duplicated paragraph(s) "
+                      f"from delivered text (every-path guard)", flush=True)
+        except Exception as _de:  # pragma: no cover
+            _import_logger.error(f"[LOCAL-616] paragraph dedupe skipped: {_de}")
+        if final != text and out_file:
             # Rewrite the delivered file so the service (which reads the file,
-            # not the return value) ships the folded text on every path.
+            # not the return value) ships the cleaned text on every path.
             try:
                 with open(out_file, "w", encoding="utf-8") as _f:
-                    _f.write(folded)
+                    _f.write(final)
             except Exception as _we:  # pragma: no cover
                 _import_logger.error(
-                    f"[LOCAL-616] could not rewrite {out_file} after hours fold: {_we}")
-        return (folded, out_file, coords)
+                    f"[LOCAL-616] could not rewrite {out_file} after delivery guards: {_we}")
+        return (final, out_file, coords)
     except Exception as _ge:  # pragma: no cover
-        _import_logger.error(f"[LOCAL-616] delivery hours guard skipped: {_ge}")
+        _import_logger.error(f"[LOCAL-616] delivery guards skipped: {_ge}")
         return result
 
 

@@ -51,6 +51,27 @@ class TestLanguageDetector(unittest.TestCase):
     def test_short_fragment_not_judged(self):
         self.assertTrue(lg.is_in_tour_language("Le musée", "en"))
 
+    def test_english_sentence_naming_french_titled_work_kept(self):
+        # [LOCAL-616 live] An English sentence that merely names a French-titled
+        # painting must NOT be flagged — the French articles are inside a
+        # Title-Cased proper noun, not foreign prose. (Live Groeningemuseum run
+        # surfaced these as a harness false positive before hardening.)
+        for s in (
+            "Your first stop is La Mort de la Vierge.",
+            "Directions: Your final stop in Groeningemuseum: La Vierge au "
+            "chanoine Van der Paele.",
+            "The painting La Vue du village hangs in the gallery.",
+        ):
+            self.assertTrue(lg.is_in_tour_language(s, "en"),
+                            f"wrongly flagged English-with-French-title: {s!r}")
+
+    def test_french_prose_with_titlecase_opener_still_caught(self):
+        # Genuine French prose is still caught even when it starts with a capital
+        # (sentence-initial), because its function words are lowercase mid-sentence.
+        self.assertFalse(lg.is_in_tour_language(
+            "Le musée expose une collection de peintures et de sculptures anciennes.",
+            "en"))
+
 
 class TestFilterDropsForeign(unittest.TestCase):
     def setUp(self):
