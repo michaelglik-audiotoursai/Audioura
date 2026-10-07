@@ -283,3 +283,105 @@ SPA venue** that delivers and say which: **Meow Wolf, Santa Fe, NM.**
   tour-wide passes.
 - `tests/test_local602_r2_*.py` (6 new files); `run_local602b_moic.py` +
   `run_local602b_live.sh` (isolated live-run harness).
+
+
+## r3
+
+**Branch:** `LOCAL-602-chain-spa-venue` (rebased on `origin/subscribed` @ `2b5706c`,
+which carries the merged r2 plus LEAD's live-packer URL-strip; base ancestry
+`git merge-base --is-ancestor 52170a2 HEAD` → exit 0).
+
+### Why
+r2 is merged and good (address-verified coordinates, D617 spoken-text). But the
+junk filter was a **block-list** — a page became a stop *unless* a path segment was
+on `NON_STOP_SEGMENTS`. A block-list can only reject the junk it has already seen,
+so the Meow Wolf Santa Fe **live** run (r2) delivered two pages whose junk words
+were simply not on the list:
+
+- `Stop 1: Adulti-Verse at Meow Wolf Santa Fe | 21+ Night Out` — `/adulti-verse/santa-fe` (an event)
+- `Stop 2: Santa Fe City Guide: Top Attractions & Restaurants Near …` — `/destinations/santa-fe-city-guide` (a blog/guide)
+
+### 1. Allow-list, not block-list (positive identification)
+A page becomes a stop **only when positively identified** as an exhibit /
+installation / room / work. The new authority is `exhibition_site_js.is_exhibit_stop`
+(and `reject_non_stop_urls`, which now runs it); evidence is any ONE of three
+deterministic, local signals:
+
+- **URL path segment** in `STOP_PATH_SEGMENTS` — `/installations/`, `/installation/`,
+  `/exhibits/`, `/exhibit/`, `/exhibitions/`, `/exhibition/`, `/rooms/`, `/room/`,
+  `/artworks/`, `/artwork/`, `/works/`, `/collection/`, `/collections/`,
+  `/galleries/`, `/gallery/`, …;
+- **JSON-LD `@type`** in `EXHIBIT_JSONLD_TYPES` — `ExhibitionEvent`, `VisualArtwork`,
+  `Artwork`, `Installation`, `CreativeWork`, `Exhibition` — or a `Place`/`Room` type
+  **on the venue's own domain** (a room within the venue, never an external place).
+  `extract_embedded_json` now propagates each item's `jsonld_type` so this signal is
+  available on the live path;
+- **Heading pattern** — the item carries `from_exhibit_heading` / an `exhibit_heading`
+  string that `is_exhibit_heading` recognises (`Installations`, `Current Exhibitions`,
+  `On View`, `Rooms`, `Galleries`, …), i.e. it was lifted from the branch page's own
+  exhibit-list heading.
+
+Events, "nights", guides, blogs, press, tickets and "destinations" are excluded by
+**not matching** — nothing has to be enumerated. An item with **no URL** and no
+type/heading evidence is still kept (judged elsewhere — the r2 contract). r2's
+`is_stop_url` / `NON_STOP_SEGMENTS` are retained unchanged so the r2 suite's
+deterministic path-only rejection keeps passing; the allow-list runs first and is the
+r3 authority. Wired into the **live** packer: `exhibition_site_first.build_site_first_candidates`
+calls `reject_non_stop_urls(raw_items, city, venue_domain=domain)`.
+
+Fixtures: `tests/test_local602_r3_exhibit_allowlist.py` uses the **exact Meow Wolf r2
+candidates** — both junk pages are dropped (match no positive signal); real exhibits
+(by URL segment and by `VisualArtwork`/`Installation` JSON-LD type) survive.
+
+### 2. Shortfall → preflight highlights → honest shortfall
+When fewer than N positive stops remain, the existing LOCAL-603 **Plan B** path (wired
+immediately after the site-first candidates in `generate_tour_text.py`) tops up from the
+venue preflight's `current_exhibitions_or_highlights`, **each carrying its grounding
+source URL**, then the D616 honest shortfall. The r3 allow-list is upstream of this, so a
+thin positive set flows straight into the sourced fallback — never filled with junk.
+
+### 3. Test exits (re-run)
+- `python3 -m pytest tests/test_local602*.py -q` → **91 passed** (exit 0) — the six r2
+  suites + the new r3 allow-list suite.
+- `python3 -m pytest tests/test_local60[3-6]*.py -q` → **40 passed** (exit 0).
+- `python3 -m pytest tests/test_local602*.py tests/test_local60[3-6]*.py -q` →
+  **131 passed, 1 warning** (exit 0).
+
+### 4. Live run (isolated container, Meow Wolf Santa Fe, 5 stops, cap $1.50)
+`./run_local602c_live.sh` — disposable `local602c-gen` / `local602c-pg` on a disposable
+network with a throwaway Postgres (`docker run --rm`); no `audioura-*` container or
+shared DB touched. `COST_HARD_LIMIT_USD=1.50`, `LOCAL603_PREFLIGHT=1`, tour cache off.
+
+- **The allow-list fired on the live path:** `[LOCAL-602] stop allow-list dropped 12
+  page(s) not positively identified as an exhibit (events/guides/blogs/tickets/branch-index/…)`.
+  The entire Serper `site:meowwolf.com Santa Fe` result set (10) plus embedded-JSON
+  candidates were dropped — **the Adulti-Verse event and the Santa Fe City Guide blog
+  among them** — because none was positively an exhibit. With zero positive site-first
+  stops, the run fell through to the sourced story/grounding path (preflight returned
+  `highlights: 6`).
+- **Stop titles with URLs (delivered):**
+  - `Stop 1: Care Manual House Of Eternal Return` — the Meow Wolf flagship installation
+    (*House of Eternal Return*), grounded on `meowwolf.com` + public reference pages
+    (`claims=1, sourced=1, unsourced=0`).
+  - `Stop 2: Portal Pass` — a work within the installation, grounded
+    (`claims=1, sourced=1, unsourced=0`).
+  - **Neither r2 junk page appears.** No event, no city-guide/blog, no ticket page.
+- `Tour total: $0.2573` (OpenAI $0.2573) — **well under the $1.50 cap**; wall 320.9s.
+- Coordinates `35.6342, -105.9632` (Santa Fe, NM). *(An address-label inconsistency in
+  the delivered text — `2103 Lyons Ave` vs the resolved `1352 Rufina Cir` — is the r2
+  address-verification surface, out of r3's allow-list scope; noted for follow-up.)*
+
+### Scope / safety
+- No DELETE of any data; no GCloud. The live run used a disposable Postgres; the stop
+  pool was isolated (`POOL STORE: 2 stop(s)` in the throwaway DB only).
+- No edits to `DECISIONS.md`, `CLAUDE.md`, `BACKLOG.md`, `WORK_QUEUE.md`,
+  `.continuous_dev/STATUS.md`.
+
+### Files changed (r3)
+- `exhibition_site_js.py` — allow-list: `is_exhibit_stop`, `is_exhibit_heading`,
+  `STOP_PATH_SEGMENTS`, `EXHIBIT_JSONLD_TYPES`; `reject_non_stop_urls` now positive;
+  `_walk_json` / `extract_embedded_json` propagate `jsonld_type`.
+- `exhibition_site_first.py` — live packer wired to the allow-list with `venue_domain`.
+- `tests/test_local602_r3_exhibit_allowlist.py` — new (Meow Wolf r2 candidate fixtures).
+- `run_local602c_meowwolf.py` + `run_local602c_live.sh` — isolated r3 live-run harness
+  (Meow Wolf Santa Fe, cap $1.50).
