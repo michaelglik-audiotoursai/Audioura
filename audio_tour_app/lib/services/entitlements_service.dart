@@ -144,6 +144,13 @@ class Entitlements {
   /// [LOCAL-604] A live, unclaimed queue offer code the device holds, or null.
   final String? pendingOfferCode;
 
+  /// [LOCAL-610 req 3] The current level's inactivity window in days, as the
+  /// user-api reports it under `inactivity_days` (straight from
+  /// plans.inactivity_days — the same column the seat-eviction job reads).
+  /// null when the server did not send it (older payload) or the level has no
+  /// inactivity rule. The Free rule copy uses this instead of a hardcoded 7.
+  final int? inactivityDays;
+
   const Entitlements({
     required this.level,
     required this.displayName,
@@ -155,6 +162,7 @@ class Entitlements {
     required this.canSell,
     required this.queuePosition,
     required this.pendingOfferCode,
+    required this.inactivityDays,
   });
 
   /// Safe default used when the user-api is unreachable: install level, no
@@ -171,6 +179,7 @@ class Entitlements {
     canSell: false,
     queuePosition: null,
     pendingOfferCode: null,
+    inactivityDays: null,
   );
 
   factory Entitlements.fromJson(Map<String, dynamic> json) {
@@ -209,6 +218,7 @@ class Entitlements {
       canSell: json['can_sell'] == true,
       queuePosition: asInt(json['queue_position']),
       pendingOfferCode: offerCode,
+      inactivityDays: asInt(json['inactivity_days']),
     );
   }
 

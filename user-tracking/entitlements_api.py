@@ -303,6 +303,12 @@ def _me_payload(cur, user_id, now=None):
         # hardcodes nothing.
         'display_name': (plan.get('display_name') if plan else None) or state['level'],
         'levels': _visible_levels(cur),
+        # [LOCAL-610 req 3] The current level's inactivity window, straight from
+        # plans.inactivity_days (the SAME column l2_seat_job reads to evict idle
+        # L2 devices). Passthrough only — no behaviour changes here. The plan
+        # page shows "After N days without a visit…" using this N instead of a
+        # hardcoded 7, so the copy can never drift from the DB value.
+        'inactivity_days': (plan.get('inactivity_days') if plan else None),
         'anniversary_at': ann.isoformat() if ann else None,
         'allowances_left': _allowances_left(cur, state, plan),
         'warn_renewal': _warn_renewal(ann, now),
