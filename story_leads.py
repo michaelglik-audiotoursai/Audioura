@@ -109,6 +109,50 @@ YEAR | what happened, in one clause
 _GROUNDING_REQUESTS = 0
 _GROUNDING_QUERIES = 0
 
+# [LOCAL-613] Per-task hard spend cap for ISOLATED test runs.
+# ----------------------------------------------------------------------------
+# $14 of Gemini was burned overnight by ~20 Kiro tasks' isolated live runs with
+# no ledger rows and no cap. From now on an isolated run installs a cap guard
+# (tests/live_run_meter.install_grounding_cap) which registers a callback here.
+# This module is where every billable Gemini search query is counted, so this is
+# the one place that can stop a run the instant it would cross the line — the
+# ticket's requirement that the cap be "enforced by the grounding counter".
+#
+# The guard is OFF by default: ordinary generation (the live stack, and any run
+# that does not install a cap) never sees it. Only an isolated harness that opts
+# in installs it. The cap applies to ALL PROVIDERS COMBINED (openai + gemini
+# grounding + gemini tokens + serper + preflight): the callback returns the
+# combined running spend INCLUDING the gemini grounding counted here, and if that
+# meets or exceeds the task's cap, the next grounded step raises so the run stops
+# before issuing the query that would cross the line.
+_GROUNDING_CAP_CALLBACK = None  # Optional[Callable[[], None]] — raises if over cap
+
+
+class TestRunCapExceeded(RuntimeError):
+    """[LOCAL-613] Raised at the grounding counter when a task's isolated-run
+    spend cap (TEST_GEMINI_MAX_USD, all providers combined) is reached. Stops the
+    run before the next grounded Gemini query is issued."""
+
+
+def set_grounding_cap_callback(callback) -> None:
+    """[LOCAL-613] Install (or clear, with None) the per-run cap guard.
+
+    `callback` is a zero-arg callable invoked right before a grounded request is
+    issued and right after a grounded response's queries are counted. It must
+    raise (typically TestRunCapExceeded) when the combined running spend has
+    reached the task cap, and return normally otherwise. Installed only by an
+    isolated test harness via tests/live_run_meter.install_grounding_cap; never by
+    production generation."""
+    global _GROUNDING_CAP_CALLBACK
+    _GROUNDING_CAP_CALLBACK = callback
+
+
+def _enforce_grounding_cap() -> None:
+    """Invoke the installed cap guard, if any. No-op when none is installed."""
+    cb = _GROUNDING_CAP_CALLBACK
+    if cb is not None:
+        cb()
+
 
 def reset_grounding_requests() -> None:
     """Zero the grounded-request AND grounded-query counters. Call at the start
@@ -134,6 +178,11 @@ def _count_grounding_request() -> None:
     """Record one grounded request actually issued. Called only from the two
     grounded-request sites, guarded by grounded=True and a present API key."""
     global _GROUNDING_REQUESTS
+    # [LOCAL-613] Last chance to stop BEFORE this grounded request is issued: if
+    # the task's combined spend cap is already reached, raise now so the query
+    # that would cross the line is never sent. No-op unless a harness installed a
+    # cap guard.
+    _enforce_grounding_cap()
     _GROUNDING_REQUESTS += 1
 
 
@@ -203,6 +252,11 @@ def _count_grounding_queries(web_search_queries) -> None:
         _GROUNDING_QUERIES += len(web_search_queries or [])
     except TypeError:
         pass
+    # [LOCAL-613] The queries just issued are now on the counter, so the combined
+    # running spend the cap guard reads is current. If this response pushed the
+    # task over its cap, raise now so no FURTHER grounded step runs. No-op unless
+    # a harness installed a cap guard.
+    _enforce_grounding_cap()
 
 
 # ── providers ────────────────────────────────────────────────────────────────
