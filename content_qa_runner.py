@@ -933,6 +933,13 @@ def run_qa(tour_text, tour_file="", story_elements=None, venue_context=None):
             check("G4 Prolog/epilog claims trace to story elements (FACTUAL)",
                   False, "STORIED mode: claims present but story_elements unavailable — fail-closed")
             FACTUAL_FAIL_COUNT += 1
+            # [LEAD 2026-10-07] Fail closed on the CLAIMS, not on the tour: with no
+            # elements to check against, every dated/causal prolog/epilog sentence is
+            # unverifiable, so hand them all to the service's G4 corrective action
+            # (remove them, re-check). The tour's stops were verified by their own
+            # gates; an unverifiable introduction sentence is not a reason to
+            # discard them (Vietnam National Museum of Fine Arts, 2026-10-07).
+            G4_UNGROUNDED_SENTENCES.extend(_claim_sentences)
     else:
         check("G4 Prolog/epilog claims trace to story elements (FACTUAL)",
               True, "(no story_elements available or no dated/causal claims — skipped)")
