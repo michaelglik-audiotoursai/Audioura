@@ -66,10 +66,13 @@ the generator can decide how many exhibition stops to still request.
 """
 from __future__ import annotations
 
+import logging
 import re
 from dataclasses import dataclass, field
 from typing import Callable, List, Optional, Tuple
 from urllib.parse import urlparse
+
+logger = logging.getLogger(__name__)
 
 __all__ = [
     "AboutStop",
@@ -719,11 +722,11 @@ def _compose_about_narration(
         parts.append("A word about the building you are standing in.")
         parts.extend(body_arch)
 
-    # Honest sourcing close.
-    if domain:
-        parts.append(
-            f"This account is drawn from the museum's own pages on {domain}"
-            + (" and public reference sources." if wiki_summary else "."))
+    # [LOCAL-616 item 2 / D617] NO spoken sourcing sentence. The old close —
+    # "This account is drawn from the museum's own pages on <domain> and public
+    # reference sources." — named a domain in narration, exactly what D617 forbids
+    # (the kiro-cli critique of tour 414 flagged it as spoken). The sourcing lives
+    # only in the TEXT-view Sources line, composed from AboutStop.sources.
 
     text = " ".join(p.strip() for p in parts if p and p.strip())
     return _trim_to_word_band(text)
@@ -813,6 +816,17 @@ def build_about_stop(
                 _add_source(url)
 
     story_sentences = _collect_story_sentences(text, venue_name) if text else []
+    # [LOCAL-616 item 3] Story sentences are lifted VERBATIM from the venue's own
+    # pages, which may be in the venue's local language (tour 414: Musée Fabre's
+    # French pages leaked "de Cherbourg, le musée Fabre expose une œuvre de
+    # jeunesse…" into an English tour). Every scraped sentence must be in the tour
+    # language — translate it (cheap LLM) or drop it. English is the shipping
+    # default tour language.
+    try:
+        import language_guard as _lg
+        story_sentences = _lg.filter_scraped_sentences(story_sentences, "en")
+    except Exception as _lge:
+        logger.info(f"[LOCAL-616] story-sentence language guard skipped ({_lge})")
 
     # 2. Optional Wikipedia/Wikidata enrichment.
     wiki_summary = ""
@@ -845,7 +859,14 @@ def build_about_stop(
     if wants_arch:
         if wiki_arch_sentence:
             arch_sentences.append(wiki_arch_sentence)
-        arch_sentences.extend(_collect_architecture_sentences(text) if text else [])
+        _scraped_arch = _collect_architecture_sentences(text) if text else []
+        # [LOCAL-616 item 3] Same language guard for scraped architecture prose.
+        try:
+            import language_guard as _lg
+            _scraped_arch = _lg.filter_scraped_sentences(_scraped_arch, "en")
+        except Exception as _lge:
+            logger.info(f"[LOCAL-616] arch-sentence language guard skipped ({_lge})")
+        arch_sentences.extend(_scraped_arch)
 
     # 4. Compose; reject any narration that drifts into artwork framing.
     narration = _compose_about_narration(
@@ -1098,13 +1119,13 @@ def _visiting_fallback_sentence(domain: str) -> str:
     """[LOCAL-592 r2] The one-sentence website pointer used when the venue's own
     pages yield NO hours/admission the gate will pass.
 
-    Michael (D611): opening hours and admission are "very important". When they
-    cannot be sourced we must NOT invent them (D584) — we say so in a single
-    sentence that points the listener at the venue's site, e.g.
-    "Check opening hours and admission on bostonathenaeum.org before you go."
-    With no known domain the pointer stays generic ("…on the museum's website…").
+    [LOCAL-616 item 2 / D617] NO source domain is spoken. Even this honest pointer
+    must not read a domain aloud — the kiro-cli Groeninge run flagged "Opening
+    hours are listed on museabrugge.be" / this fallback's "…on <domain>…" as a URL
+    in narration. We always point generically to "the museum's website"; the
+    specific domain lives only in the text-view Sources line.
     """
-    where = domain.strip() if domain and domain.strip() else "the museum's website"
+    where = "the museum's website"
     return f"Check opening hours and admission on {where} before you go."
 
 
@@ -1142,8 +1163,10 @@ def _partial_pointer_sentence(facts: str, domain: str) -> str:
     - neither known                   → "" (the caller uses the full fallback)
 
     Never repeats a field we already stated, and never invents a value (D584).
+    [LOCAL-616 item 2 / D617] Points generically to "the museum's website" — never
+    reads a source domain aloud (the domain lives only in the text-view Sources).
     """
-    where = domain.strip() if domain and domain.strip() else "the museum's website"
+    where = "the museum's website"
     has_hours = _facts_state_hours(facts)
     has_adm = _facts_state_admission(facts)
     if has_hours and not has_adm:

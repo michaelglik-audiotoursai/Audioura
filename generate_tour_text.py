@@ -7339,6 +7339,86 @@ except Exception as _cap_err:  # pragma: no cover
     _import_logger.error(f"[LOCAL-562] executor context propagation unavailable: {_cap_err}")
 
 
+def _apply_delivery_hours_guard(result):
+    """[LOCAL-616 item 1] Run the belt-and-braces delivery guards on the FINAL
+    delivered text of EVERY delivery path — not just the fresh/first-tour path
+    that already called them inline.
+
+    Two guards, both idempotent and non-fatal, applied here at the single wrapper
+    choke point every path returns through, to BOTH the returned text and the
+    on-disk output file (the service reads the delivered tour from the file, not
+    the return value):
+
+      1. ``stop_pool_orchestrator._fold_preflight_hours_into_text`` — the LOCAL-615
+         hours guard. D-fabre (tour 414): "Check opening hours and admission on
+         museefabre.fr before you go." shipped in Stop 1 though the LOCAL-603
+         preflight had real hours. 414 was delivered by the POOL path, whose return
+         never ran the guard (it only fired on the first-tour branch inside the
+         orchestrator; pool reuse, cache, by_reference and overview all shipped the
+         raw fallback). When the preflight has no hours, the text is unchanged
+         (never invent hours).
+      2. ``paragraph_dedupe.dedupe_paragraphs`` — the LOCAL-615 duplicated-paragraph
+         removal. On the pool / first-tour delivery the orchestrator folds the D611
+         opening section into Stop 1 AFTER the inner generator's QA ran, so the
+         orientation paragraph is duplicated verbatim in the DELIVERED text (the
+         live Granet/Groeninge runs showed Stop 1's orientation block printed
+         twice). The inner QA could not see it; this final pass removes the second
+         copy on every path.
+
+    ``result`` is the ``(text, output_file, coords)`` tuple returned by a path.
+    Returns the possibly-rewritten tuple. A ``None`` text (refusal) is passed
+    through untouched.
+    """
+    try:
+        if not isinstance(result, tuple) or len(result) != 3:
+            return result
+        text, out_file, coords = result
+        if not text or not isinstance(text, str):
+            return result
+        final = text
+        # 1. Fold preflight hours into any surviving "check … on <domain>" fallback.
+        try:
+            import stop_pool_orchestrator as _orch
+            final = _orch._fold_preflight_hours_into_text(final)
+        except Exception as _he:  # pragma: no cover
+            _import_logger.error(f"[LOCAL-616] hours fold skipped: {_he}")
+        # 2. Drop duplicated paragraphs (e.g. the twice-printed orientation block).
+        try:
+            import paragraph_dedupe as _pd
+            final, _removed = _pd.dedupe_paragraphs(final)
+            if _removed:
+                print(f"  [LOCAL-616] removed {len(_removed)} duplicated paragraph(s) "
+                      f"from delivered text (every-path guard)", flush=True)
+        except Exception as _de:  # pragma: no cover
+            _import_logger.error(f"[LOCAL-616] paragraph dedupe skipped: {_de}")
+        # 3. Drop (or translate) any genuinely-foreign spoken sentence wherever it
+        #    entered the pipeline — the fresh-path closing recap leaked untranslated
+        #    French ("La galerie a été construite entre 1929 et 1930…"). English is
+        #    the shipping tour language. Uses the hardened detector so an English
+        #    sentence naming a French-titled work is never dropped.
+        try:
+            import language_guard as _lg
+            final, _foreign = _lg.filter_foreign_sentences_in_text(final, "en")
+            if _foreign:
+                print(f"  [LOCAL-616] dropped {len(_foreign)} foreign spoken "
+                      f"sentence(s) from delivered text (every-path guard)", flush=True)
+        except Exception as _fe:  # pragma: no cover
+            _import_logger.error(f"[LOCAL-616] foreign-sentence sweep skipped: {_fe}")
+        if final != text and out_file:
+            # Rewrite the delivered file so the service (which reads the file,
+            # not the return value) ships the cleaned text on every path.
+            try:
+                with open(out_file, "w", encoding="utf-8") as _f:
+                    _f.write(final)
+            except Exception as _we:  # pragma: no cover
+                _import_logger.error(
+                    f"[LOCAL-616] could not rewrite {out_file} after delivery guards: {_we}")
+        return (final, out_file, coords)
+    except Exception as _ge:  # pragma: no cover
+        _import_logger.error(f"[LOCAL-616] delivery guards skipped: {_ge}")
+        return result
+
+
 def generate_tour_text(location, tour_type, output_file=None, total_stops=None, persona=None, user_id=None, job_id=None, forced_stops=None, harness=False, exclude_titles=None, mode=None):
     """[LOCAL-562] Public entry: run one tour inside its own cost scope.
 
@@ -7438,7 +7518,8 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                   f"research_reused=${result.get('research_cost_reused', 0.0):.4f} "
                   f"grounding(requests={_g.get('requests', 0)}, queries={_g.get('queries', 0)})")
             _LAST_DELIVERY_PATH = 'by_reference'
-            return result["text"], output_file, (None, None)
+            return _apply_delivery_hours_guard(
+                (result["text"], output_file, (None, None)))
 
         # Refusal — hand the structured no-material error to the service layer.
         _LAST_CLEAN_FAIL_EVIDENCE = {
@@ -7613,7 +7694,8 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                           f"(pool held {_pool_out.get('pooled_before')}); "
                           f"research reused ${_pool_reused_research:.4f}")
                     _LAST_DELIVERY_PATH = 'pool'
-                    return _pool_out["text"], output_file, (None, None)
+                    return _apply_delivery_hours_guard(
+                        (_pool_out["text"], output_file, (None, None)))
             except Exception as _pool_err:
                 print(f"  [LOCAL-590] pool path error (falling back to normal gen): {_pool_err}")
 
@@ -7623,11 +7705,11 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
         _cost_accumulator = None
 
     if _cost_accumulator is None:
-        return _generate_tour_text_impl(
+        return _apply_delivery_hours_guard(_generate_tour_text_impl(
             location, tour_type, output_file, total_stops,
             persona=persona, user_id=user_id, job_id=job_id, forced_stops=forced_stops, harness=harness,
             exclude_titles=exclude_titles,
-        )
+        ))
 
     with _cost_accumulator.tour_scope(job_id=job_id) as _acc:
         result = _generate_tour_text_impl(
@@ -7641,7 +7723,9 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
     # captured preflight bucket into the reconciled record so a direct (non-pool)
     # museum tour also meters the preflight and shows it in the breakdown.
     _fold_preflight_cost_into_record(_LAST_GENERATION_COST, _outer_preflight_cost)
-    return result
+    # [LOCAL-616 item 1] Final hours guard on the delivered text/file for the
+    # fresh / cache / overview paths that funnel through _generate_tour_text_impl.
+    return _apply_delivery_hours_guard(result)
 
 
 def _fold_preflight_cost_into_record(rec, preflight_cost):

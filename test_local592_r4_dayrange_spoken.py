@@ -232,8 +232,12 @@ class TestAthenaeumSpokenDayGroups(unittest.TestCase):
         self.assertIn("friday", low)
         self.assertIn("8 pm", low)
         self.assertIn("5 pm", low)
-        # Source + month honesty signal present.
-        self.assertIn("bostonathenaeum.org", section)
+        # [LOCAL-616 item 2 / D617] The month honesty stamp is spoken, but the
+        # source DOMAIN is not — it lives in the text-view Sources line only. (This
+        # assertion previously required "bostonathenaeum.org" in the spoken section,
+        # which the now-removed "This account is drawn from … on <domain>" sentence
+        # supplied; that violated D617 and was the tour-414 defect.)
+        self.assertNotIn("bostonathenaeum.org", section)
         self.assertIn("October 2026", section)
 
     def test_free_admission_spoken_without_invented_price(self):
