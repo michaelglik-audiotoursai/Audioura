@@ -67,13 +67,13 @@ class TestExtractStoryBeats(unittest.TestCase):
             f"Broder not found in extracted people: {people}"
         )
 
-    def test_finds_mourlot(self):
-        """Mourlot Frères (printer) is found."""
-        people = {b['person'].lower() for b in self.beats}
-        self.assertTrue(
-            any('mourlot' in p for p in people),
-            f"Mourlot not found in extracted people: {people}"
-        )
+    def test_no_possessive_authorship_fabrication(self):
+        """[D628] Mourlot was only ever 'found' by the possessive rule, which labelled
+        the printer an author ("authored the text that was illustrated"). That rule
+        fabricated authors elsewhere (Noah, an Egyptian scribe) and is removed; no beat
+        may carry that invented action."""
+        self.assertFalse(any(b.get('action') == 'authored the text that was illustrated'
+                             for b in self.beats))
 
     def test_finds_fridman(self):
         """Boris Fridman (donor) is found."""

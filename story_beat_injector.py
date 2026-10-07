@@ -289,30 +289,11 @@ def extract_story_beats(page_text: str) -> List[Dict[str, str]]:
                 })
                 seen_people.add(person.lower())
 
-        # --- Possessive authorship: "PERSON's TITLE" → person authored the text ---
-        for m in _POSSESSIVE_WORK.finditer(fragment):
-            raw_person = m.group(1)  # includes the 's
-            # Strip possessive suffix
-            person = re.sub(r"(?:'s|\u2019s)$", '', raw_person).strip()
-            if person.lower() not in seen_people and _is_valid_beat_subject(person):
-                # Avoid common non-person possessives
-                if person.lower() in ('today', 'museum', 'gallery', 'exhibition',
-                                       'artist', 'visitor', 'world', 'century',
-                                       'publisher', 'artiste'):
-                    continue
-                # Check if this is just a surname of someone already found
-                _already_found = any(person.lower() in existing for existing in seen_people)
-                if _already_found:
-                    continue
-                # Find what they authored from context after the match
-                after_text = fragment[m.end():min(m.end()+60, len(fragment))].split(';')[0].strip()
-                beats.append({
-                    'person': person,
-                    'action': f"authored the text that was illustrated",
-                    'source_sentence': fragment.strip(),
-                    'role': 'author',
-                })
-                seen_people.add(person.lower())
+        # [LEAD 2026-10-07, D628] The "Possessive authorship" rule ("PERSON's TITLE" →
+        # "PERSON authored the text that was illustrated") was written for one artist-book
+        # exhibition (LOCAL-383) and fabricates on everything else: "Noah's Ark" became
+        # "the biblical episode authored by Noah", an Egyptian scribe "authored a text that
+        # inspired" a Delacroix. Removed — a possessive is not evidence of authorship.
 
     # --- Special: "Rarely on view" as a circumstance beat ---
     if re.search(r'rarely\s+on\s+view', page_text, re.IGNORECASE):
