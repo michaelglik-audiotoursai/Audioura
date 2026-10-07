@@ -301,12 +301,29 @@ def fetch_venue_works(venue_qid: str, language: str = "en") -> List[Dict]:
     """
     
     try:
-        resp = requests.get(
-            _SPARQL_ENDPOINT,
-            params={"query": query, "format": "json"},
-            headers={"User-Agent": _USER_AGENT, "Accept": "application/sparql-results+json"},
-            timeout=15,
-        )
+        # [LEAD 2026-10-07] One Wikidata timeout turned Musée Fabre (125 works) into a
+        # 1-stop tour ("0 documented works"). Retry with a longer timeout before
+        # concluding the venue has no catalogue; a transient endpoint stall is not data.
+        import time as _t
+        resp = None
+        for _attempt, _to in enumerate((20, 40, 60)):
+            try:
+                resp = requests.get(
+                    _SPARQL_ENDPOINT,
+                    params={"query": query, "format": "json"},
+                    headers={"User-Agent": _USER_AGENT, "Accept": "application/sparql-results+json"},
+                    timeout=_to,
+                )
+                if resp.status_code == 200:
+                    break
+                if resp.status_code not in (429, 500, 502, 503, 504):
+                    break
+            except requests.exceptions.RequestException as _sq_err:
+                logger.warning(f"SPARQL attempt {_attempt + 1} failed: {_sq_err}")
+                resp = None
+            _t.sleep(2 * (_attempt + 1))
+        if resp is None:
+            raise RuntimeError("SPARQL unavailable after 3 attempts")
         if resp.status_code != 200:
             logger.warning(f"SPARQL error: {resp.status_code}")
             return []
