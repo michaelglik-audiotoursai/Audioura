@@ -996,6 +996,16 @@ def _infer_artist_from_name(venue_name: str) -> str:
     for w in name_words:
         if w.lower() in _REJECT_WORDS:
             return ""
+
+    # LOCAL-602: Reject acronym / brand tokens. "WNDR museum" strips to "WNDR"
+    # (an all-caps brand), "MoMA" is a camel-case initialism — neither is a human
+    # artist. A human-name word is a single leading capital followed by lower-case
+    # letters (Matisse, Chagall, Isabella); it is NOT all-caps and has no internal
+    # capital following a lower-case letter. Any residual word failing that shape
+    # means the venue name is not an artist-named museum.
+    for w in name_words:
+        if not _looks_like_human_name_word(w):
+            return ""
     
     # Check if remaining words look like a person name (capitalized, 1-3 words)
     name_candidate = " ".join(name_words)
@@ -1003,6 +1013,37 @@ def _infer_artist_from_name(venue_name: str) -> str:
         return name_candidate
     
     return ""
+
+
+def _looks_like_human_name_word(word: str) -> bool:
+    """[LOCAL-602] True when ``word`` has the shape of a human-name token.
+
+    A human-name token (Matisse, Chagall, O'Keeffe, Isabella) is a single leading
+    upper-case letter followed by lower-case letters. It is REJECTED when it is:
+      * an all-caps acronym / brand  — "WNDR", "SFMOMA", "LACMA", "ICA";
+      * a camel-case initialism      — "MoMA" (upper-case letter directly after a
+        lower-case letter);
+      * not starting with an upper-case letter.
+
+    Deterministic shape test — no name list. Apostrophes/accents are allowed in
+    the lower-case tail so "O'Keeffe" and accented surnames still pass.
+    """
+    w = (word or "").strip()
+    if len(w) < 2:
+        return False
+    if not w[0].isupper():
+        return False
+    tail = w[1:]
+    # All-caps acronym: no lower-case letter anywhere (WNDR, SFMOMA, ICA).
+    if not any(c.islower() for c in tail) and not any(c.isdigit() for c in w):
+        # tail has no lower-case → the whole token is upper-case → acronym.
+        return False
+    # Camel-case initialism: an upper-case letter immediately after a lower-case
+    # one (MoMA → 'M','o','M' → the second 'M' follows 'o').
+    for i in range(1, len(w)):
+        if w[i].isupper() and w[i - 1].islower():
+            return False
+    return True
 
 
 def _fetch_entity_properties(qid: str, label: str) -> Optional[VenueEntity]:
