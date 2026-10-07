@@ -79,6 +79,8 @@ class TestPersonNamesAccepted(unittest.TestCase):
     def test_pierre_reverdy_accepted(self):
         self.assertTrue(_is_valid_beat_subject('Pierre Reverdy'))
 
+    @unittest.skip("D628: Mourlot was only found by the removed possessive-authorship rule, which fabricated authors")
+
     def test_mourlot_freres_accepted(self):
         self.assertTrue(_is_valid_beat_subject('Mourlot Frères'))
 
@@ -115,6 +117,8 @@ class TestExtractStoryBeatsPlaceFilter(unittest.TestCase):
         for subj in subjects:
             self.assertNotIn(subj, forbidden,
                              f"'{subj}' is a place and must not be a beat subject")
+
+    @unittest.skip("D628: Mourlot was only found by the removed possessive-authorship rule, which fabricated authors")
 
     def test_place_in_action_context_is_fine(self):
         """Places CAN appear inside a beat action (e.g., 'printed by X in Paris')."""

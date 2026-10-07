@@ -14116,7 +14116,13 @@ Exempt: navigation directions ("Turn left", "Continue past").
     # -------- [LOCAL-383] Story beat extraction — mine people + actions from page text --------
     _story_beats_per_stop = None
     _all_story_beats = []
-    if _storied_mode and tour_category == 'museum':
+    # [LEAD 2026-10-07, D629] OFF by default. The LOCAL-383 regex beat extractor was
+    # built for one artist-book exhibition; on general museums it invents people and
+    # roles that the narrator then states as fact ("authored by Noah", "named for
+    # Print, whose patronage…", "Gogh authored the text"). Every later beat stage keys
+    # off _story_beats_per_stop, so leaving it None disables injection end to end.
+    # Re-enable with STORY_BEATS=1 only after a critique A/B shows it helps.
+    if _storied_mode and tour_category == 'museum' and os.getenv('STORY_BEATS', '0') == '1':
         try:
             from story_beat_injector import extract_story_beats, assign_beats_to_stops, attribute_beats_to_works
             # Use the framing page text (exhibition case) or combined corpus text
