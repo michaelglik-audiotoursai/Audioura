@@ -140,17 +140,22 @@ def _venue_slice_query(country_qid: str, kind: str, offset: int, limit: int) -> 
         type_clause = f"?item wdt:P31/wdt:P279* wd:{cls} ."
     else:
         type_clause = f"?item wdt:P31 wd:{cls} ."
-    # ?sitelinks via wikibase:sitelinks on the item. P856 presence → ?site.
+    # Lighter than a GROUP BY: SELECT DISTINCT over just item + sitelinks +
+    # optional coord/site, with NO P131 (admin-location) join. The P131 join was
+    # the main cartesian-product multiplier AND, combined with subclass closure,
+    # pushed the query past the 60s WDQS ceiling. City is nice-to-have, not
+    # required (the location string falls back to label+country), so we drop it
+    # here and let DISTINCT + the client-side seen_qids set keep rows unique.
+    # coord/site are single-valued-in-practice, so DISTINCT collapses the rare
+    # duplicate cleanly.
     return (
-        "SELECT ?item ?itemLabel ?countryLabel ?locLabel ?coord ?sitelinks ?site WHERE {\n"
+        "SELECT DISTINCT ?item ?itemLabel ?sitelinks ?coord ?site WHERE {\n"
         f"  ?item wdt:P17 wd:{country_qid} .\n"
         f"  {type_clause}\n"
         "  ?item wikibase:sitelinks ?sitelinks .\n"
         "  OPTIONAL { ?item wdt:P625 ?coord. }\n"
         "  OPTIONAL { ?item wdt:P856 ?site. }\n"
-        f"  BIND(wd:{country_qid} AS ?country)\n"
-        "  OPTIONAL { ?item wdt:P131 ?loc. }\n"
-        '  SERVICE wikibase:label { bd:serviceParam wikibase:language "en". }\n'
+        "  OPTIONAL { ?item rdfs:label ?itemLabel. FILTER(LANG(?itemLabel)='en') }\n"
         "}\n"
         f"ORDER BY DESC(?sitelinks) ?item\n"
         f"LIMIT {limit} OFFSET {offset}\n"
@@ -176,6 +181,15 @@ def _parse_coord(wkt: Optional[str]):
         return None, None
 
 
+def _bval(b: dict, *keys) -> str:
+    """Return the first present binding value among keys, else ''."""
+    for k in keys:
+        v = b.get(k, {}).get("value")
+        if v is not None:
+            return v
+    return ""
+
+
 def _rows_from_bindings(bindings: Iterable[dict], kind: str) -> List[dict]:
     rows = []
     for b in bindings:
@@ -183,20 +197,21 @@ def _rows_from_bindings(bindings: Iterable[dict], kind: str) -> List[dict]:
         qid = _qid_from_uri(item_uri)
         if not qid:
             continue
-        label = b.get("itemLabel", {}).get("value", "") or ""
-        # WDQS returns the Q-id as the label when no label exists; drop those.
+        # GROUP BY aliases end in 'S'; fall back to the plain names for
+        # compatibility with the pre-GROUP-BY query shape (and test stubs).
+        label = _bval(b, "itemLabelS", "itemLabel") or ""
         if label == qid:
             label = ""
-        country = b.get("countryLabel", {}).get("value", "") or ""
-        city = b.get("locLabel", {}).get("value", "") or ""
+        country = _bval(b, "countryLabelS", "countryLabel") or ""
+        city = _bval(b, "locLabelS", "locLabel") or ""
         if city == country:
             city = ""
-        lat, lng = _parse_coord(b.get("coord", {}).get("value"))
+        lat, lng = _parse_coord(_bval(b, "coordS", "coord") or None)
         try:
-            sitelinks = int(b.get("sitelinks", {}).get("value", "0") or "0")
+            sitelinks = int(_bval(b, "sitelinksS", "sitelinks") or "0")
         except (TypeError, ValueError):
             sitelinks = 0
-        has_site = bool(b.get("site", {}).get("value"))
+        has_site = bool(_bval(b, "siteS", "site"))
         rows.append(
             {
                 "qid": qid,
