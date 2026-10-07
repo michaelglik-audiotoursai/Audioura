@@ -95,12 +95,22 @@ def is_in_tour_language(sentence: str, tour_language: str = "en") -> bool:
     """
     if (tour_language or "en").split("-")[0].lower() != "en":
         return True
-    toks = _tokens(sentence)
+    raw = _WORD_RE.findall(sentence or "")
+    toks = [_deaccent(t.lower()) for t in raw]
     if len(toks) < 4:
         # Too short to judge — a title fragment or label; leave it to other guards.
         return True
     en_hits = sum(1 for t in toks if t in _EN_STOPWORDS)
-    fr_hits = sum(1 for t in toks if t in _FOREIGN_STOPWORDS)
+    # [LOCAL-616] Count a FOREIGN function word as evidence ONLY when its original
+    # token is lowercase. A French article inside a Title-Cased work name
+    # ("La Mort de la Vierge", "La Vierge au chanoine Van der Paele") is a proper
+    # noun, not foreign prose — if counted, a normal English sentence that merely
+    # names a French-titled painting ("Your first stop is La Mort de la Vierge")
+    # would be wrongly flagged. Genuine foreign prose (the tour-414 fragment
+    # "de Cherbourg, le musée Fabre expose une œuvre…") carries its function words
+    # in lowercase, between lowercase content words, so it is still caught.
+    fr_hits = sum(1 for orig, t in zip(raw, toks)
+                  if t in _FOREIGN_STOPWORDS and orig[:1].islower())
     # Clear foreign dominance → not English.
     if fr_hits >= 2 and fr_hits >= en_hits + 2:
         return False
