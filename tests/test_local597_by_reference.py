@@ -78,11 +78,18 @@ import l2_by_reference as l2
 import stop_pool_store as pool
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Throwaway-schema isolation (r2)
+# Throwaway-schema isolation (r2) — now via the shared helper (LOCAL-601)
 # ─────────────────────────────────────────────────────────────────────────────
-# Tables the brief requires to end with identical row counts, plus stop_pool
-# (the shared pool r1 polluted) and stop_metrics (audio_tours CASCADE target, so
-# the schema copy is self-contained for any cascade).
+# The create-schema / clone-tables / PGOPTIONS / drop-schema / before-after-proof
+# mechanism this suite pioneered (r2) is extracted to tests/_isolated_db.py so
+# every DB-touching suite shares one implementation. The table lists are
+# unchanged: clone stop_pool + the audio_tours CASCADE neighbours the code
+# writes, and prove the four tables the brief names are unchanged in public.
+from _isolated_db import IsolatedSchema
+
+# Tables cloned into the throwaway schema. stop_pool (the shared pool r1
+# polluted) + stop_metrics (audio_tours CASCADE target) make the copy
+# self-contained for any cascade.
 _ISOLATED_TABLES = [
     "audio_tours", "stop_pool", "device_entitlement",
     "tour_requests", "users", "stop_metrics",
@@ -90,117 +97,35 @@ _ISOLATED_TABLES = [
 # The four tables the brief asks to prove unchanged in production.
 _PROOF_TABLES = ["audio_tours", "stop_pool", "device_entitlement", "tour_requests"]
 
-_SCHEMA = None            # the throwaway schema name, set in setUpModule
-_PREV_PGOPTIONS = None    # saved PGOPTIONS to restore in tearDownModule
-_COUNTS_BEFORE = {}       # public.<t> row counts captured before any test ran
+_ISO = IsolatedSchema(
+    prefix="t597",
+    clone_tables=_ISOLATED_TABLES,
+    proof_tables=_PROOF_TABLES,
+    db_url=DB_URL,          # same DB the by-reference module + caps check use
+    banner="LOCAL-597 r2",
+)
 
 
 def _admin_connect():
     """A connection with the DEFAULT search_path (public), for schema admin and
-    for reading public row counts. Deliberately does NOT inherit PGOPTIONS."""
-    cfg = get_db_config()
-    env = dict(os.environ)
-    # Strip PGOPTIONS so this admin connection sees `public`, not the schema.
-    opts = env.pop("PGOPTIONS", None)
-    saved = os.environ.pop("PGOPTIONS", None)
-    try:
-        return psycopg2.connect(
-            host=cfg["host"], port=cfg["port"], dbname=cfg["dbname"],
-            user=cfg["user"], password=cfg["password"], connect_timeout=5,
-        )
-    finally:
-        if saved is not None:
-            os.environ["PGOPTIONS"] = saved
-
-
-def _public_counts():
-    """Row counts of the proof tables in the PUBLIC schema (shared/production-shape)."""
-    counts = {}
-    conn = _admin_connect()
-    try:
-        with conn.cursor() as cur:
-            for t in _PROOF_TABLES:
-                cur.execute(f"SELECT COUNT(*) FROM public.{t}")
-                counts[t] = cur.fetchone()[0]
-    finally:
-        conn.close()
-    return counts
+    for reading public row counts. Deliberately does NOT inherit PGOPTIONS.
+    Delegates to the shared helper so there is one implementation."""
+    return _ISO._admin_connect()
 
 
 def _db_up():
-    try:
-        c = _admin_connect()
-        c.close()
-        return True
-    except Exception:
-        return False
+    return _ISO.db_up()
 
 
 def setUpModule():
     """Create the throwaway schema, mirror the tables into it, and route every
     connection in this process at it via PGOPTIONS. Capture public counts first."""
-    global _SCHEMA, _PREV_PGOPTIONS, _COUNTS_BEFORE
-    if not _db_up():
-        return  # DB classes will SKIP; nothing to set up.
-
-    _COUNTS_BEFORE = _public_counts()
-
-    _SCHEMA = "t597_" + uuid.uuid4().hex[:12]
-    conn = _admin_connect()
-    try:
-        with conn.cursor() as cur:
-            cur.execute(f'CREATE SCHEMA "{_SCHEMA}"')
-            for t in _ISOLATED_TABLES:
-                # INCLUDING ALL copies columns, defaults, PK/unique/indexes so the
-                # schema copy accepts the exact INSERTs the code issues (notably
-                # device_entitlement's unique user_id for ON CONFLICT).
-                cur.execute(
-                    f'CREATE TABLE "{_SCHEMA}".{t} '
-                    f'(LIKE public.{t} INCLUDING ALL)'
-                )
-        conn.commit()  # explicit — conftest's guarded connection wrapper does not
-                       # delegate the `autocommit` attribute to the real connection.
-    finally:
-        conn.close()
-
-    # Route EVERY subsequent connection (db_url-based and env-var-based) at the
-    # throwaway schema. public stays first-fallback so shared types/functions
-    # resolve, but our five tables shadow public.
-    _PREV_PGOPTIONS = os.environ.get("PGOPTIONS")
-    os.environ["PGOPTIONS"] = f"-c search_path={_SCHEMA},public"
+    _ISO.setup()
 
 
 def tearDownModule():
     """Drop the throwaway schema and PROVE public row counts are unchanged."""
-    global _SCHEMA
-    # Restore PGOPTIONS first so the admin connection targets public.
-    if _PREV_PGOPTIONS is None:
-        os.environ.pop("PGOPTIONS", None)
-    else:
-        os.environ["PGOPTIONS"] = _PREV_PGOPTIONS
-
-    if _SCHEMA is None:
-        return  # DB was down; nothing created.
-
-    conn = _admin_connect()
-    try:
-        with conn.cursor() as cur:
-            cur.execute(f'DROP SCHEMA IF EXISTS "{_SCHEMA}" CASCADE')
-        conn.commit()
-    finally:
-        conn.close()
-    _SCHEMA = None
-
-    after = _public_counts()
-    print("\n[LOCAL-597 r2] public row counts before/after (must be identical):")
-    drift = {}
-    for t in _PROOF_TABLES:
-        b, a = _COUNTS_BEFORE.get(t), after.get(t)
-        print(f"  public.{t:20} before={b:<8} after={a}")
-        if b != a:
-            drift[t] = (b, a)
-    assert not drift, f"PRODUCTION ROW DRIFT (D141 violation): {drift}"
-    print("[LOCAL-597 r2] OK — zero shared/production writes.")
+    _ISO.teardown()
 
 
 def _seed_tour(venue_title, titles):
