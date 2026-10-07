@@ -68,6 +68,21 @@ DB = {
     "password": os.environ.get("DB_PASSWORD", "password123"),
 }
 
+# cost_meter and other imported service modules default DB_HOST to the
+# container-internal name 'postgres-2', which does not resolve from the host.
+# Export the host-mapped values into the environment so a ledger lookup from
+# this runner hits the SAME database the orchestrator wrote to (localhost:5433).
+os.environ.setdefault("DB_HOST", DB["host"])
+os.environ.setdefault("DB_PORT", DB["port"])
+os.environ.setdefault("DB_NAME", DB["dbname"])
+os.environ.setdefault("DB_USER", DB["user"])
+os.environ.setdefault("DB_PASSWORD", DB["password"])
+# cost_meter prefers DATABASE_URL when present; build it from the host values.
+os.environ.setdefault(
+    "DATABASE_URL",
+    f"postgresql://{DB['user']}:{DB['password']}@{DB['host']}:{DB['port']}/{DB['dbname']}",
+)
+
 # The known-good set (D625). Configurable via canary/known_venues.json or env.
 DEFAULT_KNOWN_VENUES = [
     {"location": "Phu Quoc, Vietnam", "tour_type": ""},
@@ -511,10 +526,10 @@ def main(argv=None):
         "results": results,
         "pool_meta": vp.load_meta(),
     }
-    rpt.append_canary_report(summary)
+    rpt.append_canary_report(summary, path=rpt.CANARY_MD)
     n_fail = sum(1 for r in results if not r["success"])
     if n_fail or budget_stopped:
-        rpt.write_alert(summary)
+        rpt.write_alert(summary, path=rpt.ALERTS_MD)
 
     history = rpt.pass_rate_history(rpt.CANARY_MD, last=10)
     log(f"Pass-rate history (last 10 runs): {history}")

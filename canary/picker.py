@@ -121,6 +121,23 @@ def _usable(row: dict) -> bool:
     return bool((row.get("label") or "").strip())
 
 
+def _tourable(row: dict) -> bool:
+    """A row the generator has a chance with: a real label AND coordinates.
+
+    Wikidata has many label-less or coordinate-less stubs (e.g. a bare
+    "Former Granary") that the live pipeline cleanly-fails on ("no stops could
+    be generated"). Requiring coordinates keeps picks to real, locatable places
+    so the canary measures the pipeline, not Wikidata noise. Famous venues
+    (high sitelinks) are allowed through even without coords, since fame is a
+    strong signal the place is real and well-documented.
+    """
+    if not _usable(row):
+        return False
+    if row.get("sitelinks", 0) >= FAMOUS_SITELINKS:
+        return True
+    return row.get("lat") is not None and row.get("lng") is not None
+
+
 def _as_selection(row: dict, stratum: str, subkind: Optional[str] = None) -> dict:
     sel = {
         "key": row["qid"],
@@ -187,7 +204,7 @@ def _synth_walking_route(pool: List[dict], tried: Set[str], rng: random.Random) 
 # Stratum selectors
 # --------------------------------------------------------------------------- #
 def _pick_famous(pool, tried, exclude, rng):
-    cand = [r for r in pool if _usable(r) and r["qid"] not in tried
+    cand = [r for r in pool if _tourable(r) and r["qid"] not in tried
             and r["qid"] not in exclude and r.get("sitelinks", 0) >= FAMOUS_SITELINKS]
     if not cand:
         return None
@@ -195,7 +212,7 @@ def _pick_famous(pool, tried, exclude, rng):
 
 
 def _pick_obscure(pool, tried, exclude, rng):
-    cand = [r for r in pool if _usable(r) and r["qid"] not in tried
+    cand = [r for r in pool if _tourable(r) and r["qid"] not in tried
             and r["qid"] not in exclude and r.get("sitelinks", 0) <= OBSCURE_SITELINKS]
     if not cand:
         return None
@@ -208,10 +225,10 @@ def _pick_rotating(pool, tried, exclude, rng, subkind):
             [r for r in pool if r["qid"] not in exclude], tried, rng)
         return sel
     if subkind == "no_site":
-        cand = [r for r in pool if _usable(r) and r["qid"] not in tried
+        cand = [r for r in pool if _tourable(r) and r["qid"] not in tried
                 and r["qid"] not in exclude and not r.get("has_site", False)]
     else:  # non_english
-        cand = [r for r in pool if _usable(r) and r["qid"] not in tried
+        cand = [r for r in pool if _tourable(r) and r["qid"] not in tried
                 and r["qid"] not in exclude and not _is_english_country(r)]
     if not cand:
         return None
@@ -278,7 +295,7 @@ def pick_new_venues(
     # If strata came up short (small/filtered pool), backfill with ANY untried
     # venue so a run still exercises `n` new venues when the pool allows it.
     if len(out) < n:
-        backfill = [r for r in pool if _usable(r) and r["qid"] not in tried
+        backfill = [r for r in pool if _tourable(r) and r["qid"] not in tried
                     and r["qid"] not in exclude]
         rng.shuffle(backfill)
         for r in backfill:

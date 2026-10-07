@@ -38,19 +38,23 @@ def _make_pool():
     for i in range(40):
         pool.append({"qid": f"QF{i}", "label": f"Famous {i}", "city": "New York City",
                      "country": "United States", "country_qid": "Q30",
-                     "sitelinks": 45, "has_site": True, "kind": "museum"})
+                     "sitelinks": 45, "has_site": True, "kind": "museum",
+                     "lat": 40.7 + i * 0.01, "lng": -74.0 - i * 0.01})
     for i in range(40):
         pool.append({"qid": f"QO{i}", "label": f"Obscure {i}", "city": "Lyon",
                      "country": "France", "country_qid": "Q142",
-                     "sitelinks": 1, "has_site": False, "kind": "church"})
+                     "sitelinks": 1, "has_site": False, "kind": "church",
+                     "lat": 45.7 + i * 0.01, "lng": 4.8 + i * 0.01})
     for i in range(40):
         pool.append({"qid": f"QN{i}", "label": f"Galerie {i}", "city": "Lyon",
                      "country": "France", "country_qid": "Q142",
-                     "sitelinks": 12, "has_site": True, "kind": "gallery"})
+                     "sitelinks": 12, "has_site": True, "kind": "gallery",
+                     "lat": 45.75 + i * 0.01, "lng": 4.85 + i * 0.01})
     for i in range(10):
         pool.append({"qid": f"QS{i}", "label": f"Rue {i}", "city": "Paris",
                      "country": "France", "country_qid": "Q142",
-                     "sitelinks": 4, "has_site": False, "kind": "street"})
+                     "sitelinks": 4, "has_site": False, "kind": "street",
+                     "lat": 48.85 + i * 0.01, "lng": 2.35 + i * 0.01})
     return pool
 
 
