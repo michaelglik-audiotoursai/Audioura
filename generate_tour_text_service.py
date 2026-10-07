@@ -293,6 +293,22 @@ def generate_tour_async(job_id, location, tour_type, total_stops=10, user_id=Non
                         _error_extra["suggestion"] = _LAST_CLEAN_FAIL_EVIDENCE.get("suggestion", "")
                         _error_extra["nearby_tours"] = _LAST_CLEAN_FAIL_EVIDENCE.get("nearby_tours", [])
                         _error_extra["_by_reference_terminal"] = True
+                    # [LOCAL-603 / D618] Venue preflight closure gate: the one
+                    # grounded Gemini question found the venue permanently (or
+                    # indefinitely) closed. Surface the actionable refusal verbatim
+                    # — a stable error_code, the plain WHY naming the venue, and the
+                    # next step. Terminal and self-contained (carries its own
+                    # fields), so it skips the actionable_failure mapping below.
+                    elif _LAST_CLEAN_FAIL_EVIDENCE.get("error_type") == "venue_closed":
+                        _error_msg = _LAST_CLEAN_FAIL_EVIDENCE.get(
+                            "message", "This venue is closed.")
+                        _error_extra["error_code"] = "venue_closed"
+                        _error_extra["message"] = _error_msg
+                        _error_extra["suggestion"] = _LAST_CLEAN_FAIL_EVIDENCE.get("suggestion", "")
+                        _error_extra["status"] = _LAST_CLEAN_FAIL_EVIDENCE.get("status", "")
+                        _error_extra["closed_since"] = _LAST_CLEAN_FAIL_EVIDENCE.get("closed_since", "")
+                        _error_extra["sources"] = _LAST_CLEAN_FAIL_EVIDENCE.get("sources", [])
+                        _error_extra["_venue_closed_terminal"] = True
                     else:
                         # [LOCAL-485 / D564] The catch-all must describe the CATCH-ALL case.
                         # It previously borrowed the museum "not enough works" wording, so
@@ -327,6 +343,14 @@ def generate_tour_async(job_id, location, tour_type, total_stops=10, user_id=Non
                     _svc_logger.info(
                         f"[LOCAL-597] clean-fail error_code=by_reference_no_material "
                         f"nearby={len(_error_extra.get('nearby_tours', []))}")
+                elif _error_extra.get("_venue_closed_terminal"):
+                    # [LOCAL-603] Already carries its own error_code=venue_closed +
+                    # message + suggestion + sources — do not remap.
+                    _error_extra.pop("_venue_closed_terminal", None)
+                    _svc_logger.info(
+                        f"[LOCAL-603] clean-fail error_code=venue_closed "
+                        f"status={_error_extra.get('status')} "
+                        f"closed_since={_error_extra.get('closed_since')}")
                 else:
                     from actionable_failure import build_actionable_failure
                     _af = build_actionable_failure(
