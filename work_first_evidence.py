@@ -71,6 +71,8 @@ __all__ = [
     "recompute_shortfall_on_delivered",
     "institutional_share",
     "filter_tour_text_work_first",
+    "reconcile_shortfall_in_text",
+    "count_delivered_stops",
 ]
 
 
@@ -736,3 +738,100 @@ def filter_tour_text_work_first(tour_text: str,
     report["institutional_dropped"] = total_dropped
     report["changed"] = total_dropped > 0
     return "".join(out), report
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# item 5/6 — reconcile a stale shortfall sentence against the DELIVERED count
+# ─────────────────────────────────────────────────────────────────────────────
+
+def count_delivered_stops(tour_text: str) -> int:
+    """Count the real ``Stop N:`` headers in a delivered tour."""
+    if not tour_text:
+        return 0
+    return len(_STOP_HEADER_RE.findall(tour_text))
+
+
+# A shortfall sentence from build_shortfall_sentence, so we can rewrite its
+# delivered-count clause: "… this tour has <N> stop(s) rather than the <R> you
+# asked for."
+_SHORTFALL_TAIL_RE = re.compile(
+    r"(?i)(this tour has\s+)(\d+)(\s+stops?\s+rather than the\s+)(\d+)(\s+you asked for)")
+# The outdoor confirm clause: "We could confirm <N> stop(s) along this route, so …"
+_CONFIRM_RE = re.compile(
+    r"(?i)(we could confirm\s+)(\d+)(\s+stops?\s+along this route)")
+
+
+def reconcile_shortfall_in_text(tour_text: str,
+                                final_delivered_stops: Optional[int] = None
+                                ) -> Tuple[str, Dict]:
+    """[LOCAL-617 item 5/6] Correct a stale shortfall sentence to the real count.
+
+    When a LATE gate drops a stop after the shortfall sentence was composed (the
+    Granet case: the sentence said "3 stops" but only 2 shipped), the delivered
+    count in the tour text contradicts the stops actually present. This rewrites
+    the "this tour has N stops rather than the R you asked for" clause (and the
+    outdoor "we could confirm N stops" clause) to the real delivered count. If the
+    corrected delivered count now EQUALS or EXCEEDS the requested count (the ask
+    was met after all), the whole shortfall sentence is removed so the tour never
+    claims a shortfall it did not have.
+
+    Pure string→string. ``final_delivered_stops`` defaults to the real Stop-header
+    count in the text. Returns (new_text, report).
+    """
+    report = {"delivered": 0, "rewritten": False, "removed": False}
+    if not tour_text:
+        return tour_text, report
+    delivered = (final_delivered_stops if final_delivered_stops is not None
+                 else count_delivered_stops(tour_text))
+    report["delivered"] = delivered
+    if delivered <= 0:
+        return tour_text, report
+
+    text = tour_text
+
+    m = _SHORTFALL_TAIL_RE.search(text)
+    if m:
+        stated_delivered = int(m.group(2))
+        requested = int(m.group(4))
+        if delivered >= requested:
+            # ask met after late changes → remove the whole shortfall sentence.
+            text = _remove_sentence_containing(text, m.start())
+            report["removed"] = True
+            report["rewritten"] = True
+        elif stated_delivered != delivered:
+            stop_word = "stop" if delivered == 1 else "stops"
+            # rebuild "<delivered> <stops> rather than the <requested>"
+            replacement = (f"{m.group(1)}{delivered} {stop_word} rather than the "
+                           f"{requested}{m.group(5)}")
+            text = text[:m.start()] + replacement + text[m.end():]
+            report["rewritten"] = True
+
+    m2 = _CONFIRM_RE.search(text)
+    if m2:
+        stated = int(m2.group(2))
+        if stated != delivered:
+            stop_word = "stop" if delivered == 1 else "stops"
+            replacement = f"{m2.group(1)}{delivered} {stop_word} along this route"
+            text = text[:m2.start()] + replacement + text[m2.end():]
+            report["rewritten"] = True
+
+    return text, report
+
+
+def _remove_sentence_containing(text: str, idx: int) -> str:
+    """Remove the single sentence that contains character offset ``idx``."""
+    # sentence starts after the previous terminator, ends at the next one.
+    start = idx
+    while start > 0 and text[start - 1] not in ".!?\n":
+        start -= 1
+    end = idx
+    while end < len(text) and text[end] not in ".!?\n":
+        end += 1
+    if end < len(text):
+        end += 1  # include the terminator
+    removed = text[start:end]
+    out = (text[:start] + text[end:])
+    # tidy double spaces / stray leading space left behind
+    out = re.sub(r"[ \t]{2,}", " ", out)
+    out = re.sub(r"\n[ \t]+\n", "\n\n", out)
+    return out

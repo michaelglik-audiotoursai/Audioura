@@ -287,6 +287,84 @@ class TestTourLevelFilter(unittest.TestCase):
         self.assertIn("Welcome to the tour.", new_tour)
 
 
+class TestShortfallReconciliation(unittest.TestCase):
+    def test_corrects_stale_delivered_count(self):
+        # Granet: sentence said 3, but only 2 Stop headers survived a late gate.
+        tour = (
+            "Welcome.\n"
+            "Stop 1: About\n"
+            "Musee Granet currently has 3 exhibitions on view, so this tour has 3 "
+            "stops rather than the 3 you asked for.\n"
+            "The canvas depicts a landscape.\n\n"
+            "Stop 2: Second work\n"
+            "Bellini renders the figure in muted blues.\n"
+        )
+        # NB build_shortfall_sentence never emits delivered==requested, but a stale
+        # sentence can; the reconciler fixes the clause to the real delivered count.
+        new_tour, rep = wf.reconcile_shortfall_in_text(tour)
+        self.assertEqual(rep["delivered"], 2)
+        # 2 delivered < 3 requested → rewritten to "2 stops rather than the 3"
+        self.assertIn("2 stops rather than the 3", new_tour)
+        self.assertNotIn("3 stops rather than the 3", new_tour)
+
+    def test_removes_sentence_when_ask_met(self):
+        tour = (
+            "Stop 1: A\nFirst work body.\n\n"
+            "Stop 2: B\nSecond work body.\n\n"
+            "Stop 3: C\nThird. This tour has 2 stops rather than the 3 you asked for.\n"
+        )
+        # 3 delivered >= 3 requested → shortfall removed
+        new_tour, rep = wf.reconcile_shortfall_in_text(tour)
+        self.assertEqual(rep["delivered"], 3)
+        self.assertTrue(rep["removed"])
+        self.assertNotIn("rather than the 3 you asked for", new_tour)
+
+    def test_outdoor_confirm_clause_rewritten(self):
+        tour = (
+            "Stop 1: A\nbody.\n\n"
+            "We could confirm 5 stops along this route, so this tour has 5 stops "
+            "rather than the 7 you asked for.\n"
+        )
+        new_tour, rep = wf.reconcile_shortfall_in_text(tour)
+        self.assertEqual(rep["delivered"], 1)
+        self.assertIn("confirm 1 stop along this route", new_tour)
+
+    def test_count_delivered_stops(self):
+        tour = "pre\nStop 1: a\nx\nStop 2: b\ny\nStop 3: c\nz\n"
+        self.assertEqual(wf.count_delivered_stops(tour), 3)
+
+
+class TestConclusionNamesOnlyDelivered(unittest.TestCase):
+    """item 6 — the recap must name only delivered stops, never a dropped one."""
+
+    def test_recap_names_only_delivered_stops(self):
+        import generate_tour_text as g
+        delivered = [
+            {"name": "Two Venetian Ladies",
+             "description": ("The composition shows two Venetian ladies on a "
+                             "terrace. Carpaccio painted this around 1495."),
+             "latitude": 45.43, "longitude": 12.33},
+            {"name": "La Crocifissione",
+             "description": ("Bellini renders the crucifixion in muted blues around "
+                             "1455. The light falls softly across the figures."),
+             "latitude": 45.44, "longitude": 12.34},
+        ]
+        # A ranked fact for a stop that was DROPPED must never appear.
+        ranked = [
+            {"stop": "Two Venetian Ladies",
+             "best_fact": "Carpaccio painted this around 1495.",
+             "reason": "date"},
+            {"stop": "A Dropped Stop",  # not in delivered → must be excluded
+             "best_fact": "This never shipped.", "reason": "x"},
+        ]
+        recap = g._build_closing_recap(delivered, ranked, api_key=None)
+        self.assertNotIn("A Dropped Stop", recap)
+        self.assertNotIn("This never shipped", recap)
+        # names only delivered stops; states the delivered count
+        if recap:
+            self.assertIn("2 stops", recap)
+
+
 class TestShortfallRecompute(unittest.TestCase):
     def test_recompute_on_final_count(self):
         # Granet: shortfall logic ran at 3, a late gate dropped to 2.

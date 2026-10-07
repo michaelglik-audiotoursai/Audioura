@@ -16012,6 +16012,26 @@ MANDATORY INCLUSION — work this surprising detail into the description natural
                 poi_name, _exhibition_checklist_result.works)
             if _matched_work:
                 _credit_line_for_stop = (_matched_work.get('credit_line') or '').strip()
+                # [LOCAL-617 item 4] ATTRIBUTION CHECK. The stop's spoken artist
+                # must match the work's catalogue/SPARQL creator. LOCAL-616's
+                # Groeningemuseum run said "Johannes van Eyck" for a Memling. On a
+                # real surname mismatch, the catalogue creator wins and the
+                # conflicting attribution is corrected before any prose is written.
+                try:
+                    import work_first_evidence as _wfe_attr
+                    _cat_creator = (_matched_work.get('artist') or '').strip()
+                    if _cat_creator and (artist or '').strip():
+                        _attr = _wfe_attr.check_attribution(artist, _cat_creator)
+                        if _attr['mismatch']:
+                            print(f"  [LOCAL-617] ATTRIBUTION MISMATCH on '{poi_name}': "
+                                  f"stop artist '{artist}' != catalogue creator "
+                                  f"'{_cat_creator}' — using catalogue creator")
+                            artist = _attr['use']
+                        elif _attr['use'] and _attr['use'] != artist:
+                            # a fuller/variant form — adopt the catalogue spelling
+                            artist = _attr['use']
+                except Exception as _attr_err:
+                    print(f"  [LOCAL-617] attribution check skipped: {_attr_err}")
         description_prompt += build_provenance_block(_credit_line_for_stop)
 
         # [LOCAL-379/381] WORK IDENTITY BLOCK: Inject artist, date, medium, publisher
@@ -23016,6 +23036,25 @@ RULES:
                       f"({_wf_body_report['stops']} stops scanned)")
         except Exception as _wf_body_err:
             print(f"  [LOCAL-617] Work-first stop-body filter error (non-fatal): {_wf_body_err}")
+
+    # -------- [LOCAL-617 item 5/6] Fresh-path shortfall reconciliation --------
+    # When a LATE gate drops a stop AFTER the D616/D612 shortfall sentence was
+    # composed (Granet delivered 2/3 while the sentence already said 3), the
+    # delivered-count clause contradicts the stops actually in the tour, and the
+    # conclusion then claims a stop the tour did not make. Recompute the clause on
+    # the FINAL delivered count (the real Stop-header count), or remove the
+    # sentence entirely if the ask turned out to be met. Runs on ALL tour types.
+    try:
+        import work_first_evidence as _wfe_sf
+        complete_tour, _sf_rec = _wfe_sf.reconcile_shortfall_in_text(complete_tour)
+        if _sf_rec.get('removed'):
+            print(f"  [LOCAL-617] Shortfall sentence REMOVED — ask met on final count "
+                  f"({_sf_rec['delivered']} delivered)")
+        elif _sf_rec.get('rewritten'):
+            print(f"  [LOCAL-617] Shortfall sentence recomputed to final delivered "
+                  f"count ({_sf_rec['delivered']})")
+    except Exception as _sf_rec_err:
+        print(f"  [LOCAL-617] Shortfall reconciliation error (non-fatal): {_sf_rec_err}")
 
     # -------- [LOCAL-36] Practical facts QA gate --------
     # Verify provenance of every practical claim before delivery.
