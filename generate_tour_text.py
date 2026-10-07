@@ -7439,7 +7439,20 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                 _pf_city = ''
                 if ',' in location:
                     _pf_city = ','.join(p.strip() for p in location.split(',')[1:]).strip()
-                _pf = _vpf.safe_preflight(_pf_venue, _pf_city)
+                # [LOCAL-609] Attribute this preflight call's Gemini usage (tokens
+                # + grounding queries) to the PREFLIGHT bucket, so it appears on
+                # its own ledger line rather than folded into the main gemini
+                # channels. The preflight is a grounded Gemini call via
+                # story_leads.gemini_with_sources; preflight_scope makes
+                # add_gemini_call route it to acc.preflight.
+                try:
+                    import cost_accumulator as _ca_pf
+                    _pf_ctx = _ca_pf.preflight_scope()
+                except Exception:
+                    import contextlib as _ctxlib
+                    _pf_ctx = _ctxlib.nullcontext()
+                with _pf_ctx:
+                    _pf = _vpf.safe_preflight(_pf_venue, _pf_city)
                 _LAST_VENUE_PREFLIGHT = _pf
                 if _pf.get('skipped'):
                     print(f"  [LOCAL-603] preflight skipped ({_pf['skipped']})")

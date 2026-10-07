@@ -63,10 +63,12 @@ import cost_rates
 __all__ = [
     "CostAccumulator",
     "tour_scope",
+    "preflight_scope",
     "current_accumulator",
     "add_llm_usage",
     "add_grounding_requests",
     "add_gemini_tokens",
+    "add_gemini_call",
     "add_preflight",
     "add_search_queries",
     "add_tts_characters",
@@ -370,6 +372,66 @@ class CostAccumulator:
 _current: "contextvars.ContextVar[Optional[CostAccumulator]]" = contextvars.ContextVar(
     "cost_accumulator_current", default=None
 )
+
+# [LOCAL-609] When True in the current context, Gemini usage made inside this
+# dynamic scope is attributed to the PREFLIGHT bucket (the LOCAL-603 venue
+# preflight call) instead of the ordinary gemini_tokens + gemini_grounding
+# channels — so the ledger can show preflight on its own line (ticket LOCAL-609).
+# The preflight is a grounded Gemini call that would otherwise be indistinguishable
+# from any other grounded call in the token/grounding totals.
+_preflight_active: "contextvars.ContextVar[bool]" = contextvars.ContextVar(
+    "cost_accumulator_preflight_active", default=False
+)
+
+
+@contextlib.contextmanager
+def preflight_scope():
+    """[LOCAL-609] Mark the dynamic scope of the LOCAL-603 venue preflight call.
+
+    Gemini usage (tokens + grounding queries) metered via ``add_gemini_call``
+    inside this ``with`` block lands in the accumulator's PREFLIGHT bucket, so the
+    tour_generate ledger row can report preflight separately. Nests cleanly and
+    is a no-op for attribution outside a tour scope.
+    """
+    token = _preflight_active.set(True)
+    try:
+        yield
+    finally:
+        _preflight_active.reset(token)
+
+
+def add_gemini_call(input_tokens: int = 0, output_tokens: int = 0,
+                    num_queries: int = 0, grounded: bool = False,
+                    num_requests: int = 1) -> float:
+    """[LOCAL-609] Attribute ONE Gemini call to the current tour scope, routing by
+    whether we are inside a ``preflight_scope``.
+
+    This is the single entry point the two Gemini HTTP sites (story_leads._gemini
+    and story_leads.gemini_with_sources) call after they parse a response. It:
+
+      * adds the Flash input/output TOKENS (always — every Gemini call burns
+        tokens), and
+      * adds the grounding SEARCH QUERIES when ``grounded`` (the dollar unit Google
+        invoices), tracking the request for the LOCAL-594 cap.
+
+    When a ``preflight_scope`` is active, BOTH the tokens and the queries land in
+    the preflight bucket instead, so preflight shows on its own ledger line and is
+    not double-counted in gemini_tokens/gemini_grounding. No-op outside a tour
+    scope. Returns the dollars added.
+    """
+    acc = _current.get()
+    if acc is None:
+        return 0.0
+    if _preflight_active.get():
+        return acc.add_preflight(
+            num_queries=(num_queries if grounded else 0),
+            input_tokens=input_tokens,
+            output_tokens=output_tokens,
+        )
+    cost = acc.add_gemini_tokens(input_tokens, output_tokens)
+    if grounded:
+        cost += acc.add_grounding(num_requests=num_requests, num_queries=num_queries)
+    return cost
 
 
 def current_accumulator() -> Optional[CostAccumulator]:
