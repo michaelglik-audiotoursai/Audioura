@@ -31,6 +31,19 @@ from urllib.parse import urljoin, urlparse
 from exhibition_discovery import (extract_current_exhibitions,
                                   extract_classified_exhibitions)
 
+# [LOCAL-602] JS-only / chain-venue helpers (identical-shell detection, sitemap/
+# robots URLs, branch-page pick, embedded-JSON + Serper fallbacks, no-other-city
+# filter). Imported defensively so a missing module degrades to the pre-602
+# behaviour rather than crashing a tour.
+try:
+    import exhibition_site_js as _js
+    _shell_fingerprint = _js.shell_fingerprint
+except Exception:                                   # pragma: no cover
+    _js = None
+
+    def _shell_fingerprint(html):
+        return ''
+
 __all__ = ['discover_site_exhibitions', 'build_site_first_candidates',
            'discover_classified_exhibitions', 'SiteFirstResult']
 
@@ -205,7 +218,7 @@ def _fetch_with_retry(url: str, fetch, diagnostics: dict,
             'url': url, 'status': meta.get('status', 0),
             'bytes': meta.get('bytes', 0), 'seconds': meta.get('seconds', 0.0),
             'error': meta.get('error', ''), 'kind': 'listing' if is_listing else 'detail',
-            'attempt': 1,
+            'attempt': 1, 'fingerprint': _shell_fingerprint(html),
         })
     failed = (not html) and (meta.get('status', 0) in _RETRYABLE_STATUSES)
     if is_listing and failed:
@@ -221,6 +234,7 @@ def _fetch_with_retry(url: str, fetch, diagnostics: dict,
                 'url': url, 'status': meta.get('status', 0),
                 'bytes': meta.get('bytes', 0), 'seconds': meta.get('seconds', 0.0),
                 'error': meta.get('error', ''), 'kind': 'listing', 'attempt': 2,
+                'fingerprint': _shell_fingerprint(html),
             })
     return html, links, meta
 
@@ -512,6 +526,8 @@ def build_site_first_candidates(
     fetch_detail_pages: bool = True,
     diagnostics: Optional[Dict] = None,
     today=None,
+    city: str = '',
+    serper: Optional[Callable] = None,
 ) -> List[Dict]:
     """Build site-first candidate stops for an exhibition museum, filled toward N.
 
@@ -684,6 +700,18 @@ def build_site_first_candidates(
         _append(_mk_exhibition_candidate(upcoming[0], label_upcoming=True))
 
     if not candidates:
+        # [LOCAL-602] The structural extractor found nothing. For a JS-only site
+        # (every path returns the same client-side shell) or a CHAIN venue (branch
+        # pages per city), try the no-headless fallbacks before giving up:
+        # branch page → sitemap/robots URLs → embedded JSON → Serper site:<domain>.
+        js_candidates = _build_js_fallback_candidates(
+            base_site_url, city, total_stops, fetch, serper, diagnostics)
+        if js_candidates:
+            diagnostics['reason'] = 'ok'
+            diagnostics['fetch_failed'] = False
+            diagnostics['candidate_count'] = len(js_candidates)
+            diagnostics['via'] = 'js_fallback'
+            return js_candidates
         # reason/fetch_failed already set by discover_classified_exhibitions.
         return []
 
@@ -700,6 +728,139 @@ def build_site_first_candidates(
     assert diagnostics['status_counts']['past'] == 0, \
         "LOCAL-599C: past exhibition leaked into site-first candidates"
     return candidates
+
+
+def _build_js_fallback_candidates(base_site_url, city, total_stops, fetch,
+                                  serper, diagnostics) -> List[Dict]:
+    """[LOCAL-602] Candidates for a JS-only / chain venue, no headless browser.
+
+    Only runs when the structural extractor found nothing. In order:
+      1. If a CHAIN with a known ``city``, find the branch page (sitemap or
+         conventional slug) and read the EMBEDDED JSON it ships.
+      2. Read embedded JSON from the shell(s) already fetched (via a re-fetch of
+         the root / branch page).
+      3. Serper ``site:<domain> <city>`` — each organic result is a candidate with
+         its own URL as the source.
+    Every candidate is passed through the no-other-city filter so a Boston tour
+    never carries a Chicago-only installation. Returns [] (never raises) when the
+    JS helpers are unavailable or nothing is found. Diagnostics record the path.
+    """
+    if _js is None or not base_site_url:
+        return []
+    diagnostics.setdefault('fetches', [])
+    identical = _js.detect_identical_shell(diagnostics.get('fetches', []))
+    diagnostics['identical_shell'] = identical
+    root = _js._root_of(base_site_url)
+    domain = urlparse(root).netloc.lower()
+    if domain.startswith('www.'):
+        domain = domain[4:]
+
+    seeds_tried: List[str] = []
+    raw_items: List[Dict] = []
+
+    # 1 + 2. Branch page (city) and the root shell → embedded JSON.
+    branch_url = ''
+    if city:
+        try:
+            sm = _js.sitemap_urls(base_site_url, fetch)
+        except Exception:
+            sm = []
+        if sm:
+            diagnostics['sitemap_url_count'] = len(sm)
+        try:
+            branch_url = _js.pick_branch_url(base_site_url, city, sm)
+        except Exception:
+            branch_url = ''
+
+    # Build the ordered list of shell pages to read embedded JSON from: branch
+    # page first (its JSON is the city's), then the conventional branch seeds,
+    # then the root.
+    json_pages: List[str] = []
+    if branch_url:
+        json_pages.append(branch_url)
+    if city:
+        try:
+            json_pages.extend(_js.branch_url_seeds(base_site_url, city))
+        except Exception:
+            pass
+    json_pages.append(root)
+    # De-dup, keep order, cap the number of fetches.
+    seen_pg = set()
+    json_pages = [u for u in json_pages
+                  if not (u in seen_pg or seen_pg.add(u))][:6]
+
+    for pg in json_pages:
+        html, _, _ = _fetch_with_retry(pg, fetch, diagnostics, is_listing=False)
+        if not html:
+            continue
+        seeds_tried.append(pg)
+        try:
+            items = _js.extract_embedded_json(html, pg, city=city)
+        except Exception:
+            items = []
+        if items:
+            if pg == branch_url and branch_url:
+                diagnostics['branch_url'] = branch_url
+                print(f"  [LOCAL-602] branch page for {city!r}: {branch_url} "
+                      f"→ {len(items)} embedded-JSON item(s)")
+            raw_items.extend(items)
+            # A branch page with several items is authoritative; stop early.
+            if len([i for i in raw_items]) >= max(total_stops, 2):
+                break
+
+    # 3. Serper site:<domain> <city> — only if we still need more and have a key.
+    if len(raw_items) < total_stops and city and serper is not None:
+        try:
+            serp_items = _js.serper_site_city(domain, city, serper,
+                                              max_results=total_stops * 2)
+        except Exception:
+            serp_items = []
+        if serp_items:
+            diagnostics['serper_hit'] = len(serp_items)
+            print(f"  [LOCAL-602] Serper site:{domain} {city} → "
+                  f"{len(serp_items)} result(s)")
+            raw_items.extend(serp_items)
+
+    if not raw_items:
+        diagnostics['js_fallback'] = 'empty'
+        return []
+
+    # No-other-city filter: drop anything attested only on another branch.
+    if city:
+        before = len(raw_items)
+        raw_items = _js.filter_other_city(raw_items, city)
+        if len(raw_items) != before:
+            print(f"  [LOCAL-602] no-other-city filter dropped "
+                  f"{before - len(raw_items)} item(s) attested only off-{city}")
+
+    # Materialise candidates (de-dup by title), capped at ~2x N.
+    cap = max(total_stops * 2, total_stops)
+    out: List[Dict] = []
+    names = set()
+    for it in raw_items:
+        if len(out) >= cap:
+            break
+        title = (it.get('title') or '').strip()
+        if not title:
+            continue
+        key = title.lower()
+        if key in names:
+            continue
+        names.add(key)
+        src = it.get('source_url') or it.get('detail_url') or branch_url or root
+        out.append({
+            'name': title,
+            'detail_url': it.get('detail_url', '') or src,
+            'source_url': src,
+            'page_text': it.get('snippet', '') or '',
+            'source': it.get('source', 'js_fallback'),
+            'kind': 'exhibition',
+            'status': 'on_view',
+            'dates': '',
+        })
+    diagnostics['js_fallback'] = diagnostics.get('via', 'js_fallback')
+    diagnostics['js_candidate_count'] = len(out)
+    return out
 
 
 # Pages whose named sections make honest "museum space" stops (lobby, galleries by

@@ -8865,11 +8865,27 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
         try:
             from exhibition_site_first import build_site_first_candidates, SiteFirstResult
             _sf_diagnostics = {}
+            # [LOCAL-602] Pass the requested city (from the location tail) and a
+            # Serper caller so a JS-only / chain venue can be read from its branch
+            # page / embedded JSON / site:<domain> <city> instead of failing.
+            _sf_city = ''
+            try:
+                _loc_parts = [p.strip() for p in (location or '').split(',')[1:] if p.strip()]
+                if _loc_parts:
+                    _sf_city = _loc_parts[0]
+            except Exception:
+                _sf_city = ''
+            try:
+                from exhibition_site_js import default_serper as _sf_serper
+            except Exception:
+                _sf_serper = None
             _sf_candidates = build_site_first_candidates(
                 base_site_url=_museum_site_url,
                 venue_language=_museum_site_language,
                 total_stops=total_stops,
                 diagnostics=_sf_diagnostics,
+                city=_sf_city,
+                serper=_sf_serper,
             )
             if _sf_candidates:
                 poi_list = [_new_poi(c['name'], page_sourced=True) for c in _sf_candidates]
