@@ -868,6 +868,72 @@ def generate_tour_async(job_id, location, tour_type, total_stops=10, user_id=Non
         except Exception as _kind_err:
             _svc_logger.error(f"[LOCAL-582] tour_kind surfacing failed (non-fatal): {_kind_err}")
 
+        # [LOCAL-605] Resolve REAL tour-level coordinates for EVERY delivery path.
+        # generate_tour_text returns (None, None) for the pool fast-path (first-tour
+        # and pooled reuse), the by-reference short-circuit (LOCAL-597) and the
+        # site-first/overview path (LOCAL-582); only the fresh path parses Stop 1.
+        # The orchestrator stores whatever it receives and tours-near filters on
+        # lat/lng, so a (None, None) tour is invisible in "tours near me" with no
+        # map pin. Resolve the venue's own coordinates for a contained venue
+        # (resolver P625 / D611 address) else Stop 1's Coordinates line — then
+        # FAIL CLOSED: a delivered tour with no resolvable coordinates is an error,
+        # logged with its path name. We never deliver silently without them.
+        _coord_path = getattr(_gtt_kind, "_LAST_DELIVERY_PATH", None) \
+            if "_gtt_kind" in dir() else None
+        if not _coord_path:
+            try:
+                import generate_tour_text as _gtt_path
+                _coord_path = getattr(_gtt_path, "_LAST_DELIVERY_PATH", None)
+            except Exception:
+                _coord_path = None
+        _coord_path = _coord_path or _l582_extra.get("tour_kind") or "generate"
+        try:
+            from tour_coordinates import resolve_tour_coordinates, coordinates_present
+            (_rlat, _rlng), _coord_source = resolve_tour_coordinates(
+                tour_content_str or "", location, coordinates, path=_coord_path)
+            if coordinates_present((_rlat, _rlng)):
+                coordinates = [_rlat, _rlng]
+                _svc_logger.info(
+                    f"[LOCAL-605] tour coordinates resolved: ({_rlat}, {_rlng}) "
+                    f"source={_coord_source} path={_coord_path} location={location!r}")
+            else:
+                # FAIL CLOSED — log the path, surface the error, do NOT deliver
+                # a tour with no coordinates.
+                _svc_logger.error(
+                    f"[LOCAL-605] FAIL-CLOSED: tour delivered with no resolvable "
+                    f"coordinates — path={_coord_path} location={location!r} "
+                    f"generator_coords={coordinates!r}")
+                ACTIVE_JOBS.update(
+                    job_id, status="error",
+                    error=(f"Tour delivered without coordinates (path={_coord_path}). "
+                           f"A tour must carry a real location to appear in "
+                           f"'tours near me' and on the map."),
+                    error_code="missing_tour_coordinates",
+                    coordinate_path=_coord_path)
+                if os.path.exists(temp_path):
+                    try:
+                        os.unlink(temp_path)
+                    except Exception:
+                        pass
+                return
+        except Exception as _coord_err:
+            # Resolution itself failing is also fail-closed: a tour with unknown
+            # coordinates must not be delivered silently.
+            _svc_logger.error(
+                f"[LOCAL-605] coordinate resolution error (fail-closed) — "
+                f"path={_coord_path} location={location!r}: {_coord_err}")
+            ACTIVE_JOBS.update(
+                job_id, status="error",
+                error=f"Tour coordinate resolution failed (path={_coord_path}): {_coord_err}",
+                error_code="missing_tour_coordinates",
+                coordinate_path=_coord_path)
+            if os.path.exists(temp_path):
+                try:
+                    os.unlink(temp_path)
+                except Exception:
+                    pass
+            return
+
         ACTIVE_JOBS.update(job_id, status="completed",
                           progress="Tour text generation completed successfully!",
                           output_file=output_filename,
