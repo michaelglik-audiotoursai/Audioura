@@ -132,6 +132,9 @@ _INSTITUTIONAL_RE = re.compile(
     r"emerged\s+from\s+(?:the\s+)?(?:sweeping\s+)?(?:cultural\s+)?reforms|"
     r"cultural\s+reforms\s+of\s+the\s+period|"
     r"ecclesiastical\s+confiscations|secularis|secular[iz]ation|"
+    r"relocat(?:ed|ion)\s+of\s+(?:\w+\s+){0,3}(?:artworks?|works?|paintings?|collection)|"
+    r"(?:artworks?|works?|paintings?)\s+(?:were\s+)?relocated|"
+    r"confiscated\s+ecclesiastical|government\s+decree\s+that\s+confiscat|"
     r"evacuat(?:ed|ion)\s+(?:during|by|to)|"
     r"part\s+of\s+(?:the\s+)?(?:city'?s?|museum'?s?)\s+(?:rich\s+)?"
     r"(?:artistic\s+)?heritage|"
@@ -944,6 +947,21 @@ _STAFF_ROLE_RE = re.compile(
     r"(?i)\b(assistent(?:in)?|wissenschaftlich|kurator(?:in)?|curator|"
     r"conservateur|conservatrice|docent|guide|r[ée]f[ée]rent)\b")
 
+# Museum PROGRAMME / EVENT names (multilingual) that a calendar feed exposes
+# alongside works. The Kunstmuseum Basel run made "Europäischer Tag der
+# Restaurierung", "Mitmach-Mittwoch", "Familientag" and a "Tango Salon" into
+# artwork stops — events, days, workshops and family programmes, not works.
+_EVENT_NAME_RE = re.compile(
+    r"(?i)\b("
+    r"tag\s+der\s+\w+|europ[äa]ischer\s+tag|mitmach|familientag|familiensonntag|"
+    r"kindertag|offene\s+werkstatt|werkstatt|workshop|atelier\s+f[üu]r|"
+    r"ferienworkshop|mittwoch|sonntag[s]?f[üu]hrung|"
+    r"restaurierung|tag\s+des\s+offenen|lange\s+nacht|nuit\s+des\s+mus[ée]es|"
+    r"d[íi]a\s+(?:de\s+la\s+familia|internacional)|jornada|"
+    r"tango\s+salon|soir[ée]e|matin[ée]e|vernissage|finissage|"
+    r"family\s+day|open\s+day|late\s+night|members?\s+(?:evening|day)"
+    r")\b")
+
 
 def looks_like_non_artwork_listing(title: str) -> bool:
     """True when a candidate stop title is a price/hours/event listing, not a work.
@@ -973,6 +991,9 @@ def looks_like_non_artwork_listing(title: str) -> bool:
         return True
     # event / guided-tour listing
     if _EVENT_LISTING_RE.search(t):
+        return True
+    # museum programme / event name (restoration day, family day, workshop, salon)
+    if _EVENT_NAME_RE.search(t):
         return True
     # a short "title" that opens with "Mit/Avec/With/Con" AND names a staff role
     if _STAFF_ROLE_RE.search(t) and re.match(r"(?i)^\s*(mit|avec|with|con)\b", t):

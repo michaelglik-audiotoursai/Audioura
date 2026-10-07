@@ -431,8 +431,21 @@ class TestNonArtworkListing(unittest.TestCase):
             "Retrato de Jorge Manuel Theotocopuli",
             "The Night Watch",
             "Two Venetian Ladies",
+            "The Tango Lesson",
+            "The Salon of 1824",
         ]:
             self.assertFalse(wf.looks_like_non_artwork_listing(t), msg=t)
+
+    def test_museum_event_names_rejected(self):
+        for t in [
+            "Europäischer Tag der Restaurierung 2026",
+            "Mitmach-Mittwoch",
+            "Familientag",
+            "Dübi-Müller Tango Salon",
+            "Offene Werkstatt",
+            "Lange Nacht der Museen",
+        ]:
+            self.assertTrue(wf.looks_like_non_artwork_listing(t), msg=t)
 
     def test_wired_into_chrome_gate(self):
         import exhibition_discovery as ed
