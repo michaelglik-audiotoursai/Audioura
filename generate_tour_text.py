@@ -4310,6 +4310,15 @@ _LAST_STOP_COUNT_NOTICE = {}
 # short — each with its grounding source URL (never unsourced).
 _LAST_VENUE_PREFLIGHT = {}
 
+# [LOCAL-615 item 4] Module-level: the COST of the LAST venue preflight — the
+# preflight bucket snapshot ({usd, calls, queries, input_tokens, output_tokens})
+# from the dedicated tour_scope the wrapper opens around the preflight call. {}
+# when no preflight ran (cache hit, non-single-venue request, or no accumulator).
+# The delivering path (pool or normal generation) folds this into the tour's
+# _LAST_GENERATION_COST so the preflight is metered and appears in the breakdown —
+# before this it ran OUTSIDE any accumulator scope and the ledger showed calls:0.
+_LAST_PREFLIGHT_COST = {}
+
 
 def _preflight_venue_from_location(location):
     """[LOCAL-603] Extract a single-venue NAME from the request's location string
@@ -7354,7 +7363,7 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
     to the by_reference_no_material refusal (with nearby tours) and returns None,
     so the service surfaces the actionable refusal — never a fresh generation.
     """
-    global _LAST_GENERATION_COST, _LAST_CLEAN_FAIL_EVIDENCE, _LAST_VENUE_PREFLIGHT, _LAST_DELIVERY_PATH
+    global _LAST_GENERATION_COST, _LAST_CLEAN_FAIL_EVIDENCE, _LAST_VENUE_PREFLIGHT, _LAST_DELIVERY_PATH, _LAST_PREFLIGHT_COST
 
     # [LOCAL-605] Default: this call is a fresh generation unless a short-circuit
     # path below overwrites it. The service's fail-closed coordinate assertion
@@ -7454,6 +7463,7 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
     # grounded call flows through gemini_with_sources so the LOCAL-594 meter counts
     # it, and a 7-day (venue, city) cache makes a repeat request free.
     _LAST_VENUE_PREFLIGHT = {}
+    _LAST_PREFLIGHT_COST = {}
     if (tour_type == 'museum' and not exclude_titles and not harness
             and os.environ.get('LOCAL603_PREFLIGHT', '1') != '0'):
         try:
@@ -7469,14 +7479,37 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                 # channels. The preflight is a grounded Gemini call via
                 # story_leads.gemini_with_sources; preflight_scope makes
                 # add_gemini_call route it to acc.preflight.
+                # [LOCAL-615 item 4] The preflight runs HERE, in the wrapper, before
+                # the per-generation tour_scope opens — so before this fix its
+                # add_gemini_call saw no active accumulator and the ledger showed
+                # preflight calls:0 / $0 even though it ran and spent. Open a short
+                # tour_scope JUST around the preflight so its Gemini tokens +
+                # grounding queries are counted, snapshot that scope's preflight
+                # bucket into module-level _LAST_PREFLIGHT_COST, and fold it into
+                # the delivering path's _LAST_GENERATION_COST below (pool and normal
+                # both). nullcontext fallback keeps a keyless/accumulator-less run
+                # working exactly as before.
+                _LAST_PREFLIGHT_COST = {}
                 try:
                     import cost_accumulator as _ca_pf
+                    _pf_acc = _ca_pf.CostAccumulator(job_id=job_id)
+                    _pf_scope = _ca_pf.tour_scope(job_id=job_id, accumulator=_pf_acc)
                     _pf_ctx = _ca_pf.preflight_scope()
                 except Exception:
                     import contextlib as _ctxlib
+                    _pf_acc = None
+                    _pf_scope = _ctxlib.nullcontext()
                     _pf_ctx = _ctxlib.nullcontext()
-                with _pf_ctx:
-                    _pf = _vpf.safe_preflight(_pf_venue, _pf_city)
+                with _pf_scope:
+                    with _pf_ctx:
+                        _pf = _vpf.safe_preflight(_pf_venue, _pf_city)
+                if _pf_acc is not None:
+                    try:
+                        _pf_snap = _pf_acc.snapshot()
+                        _LAST_PREFLIGHT_COST = (_pf_snap.get("provider_breakdown") or {}).get(
+                            "preflight", {}) or {}
+                    except Exception:
+                        _LAST_PREFLIGHT_COST = {}
                 _LAST_VENUE_PREFLIGHT = _pf
                 if _pf.get('skipped'):
                     print(f"  [LOCAL-603] preflight skipped ({_pf['skipped']})")
@@ -7505,6 +7538,12 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
         except Exception as _pf_err:
             print(f"  [LOCAL-603] preflight error (non-fatal): {_pf_err}")
             _LAST_VENUE_PREFLIGHT = {}
+
+    # [LOCAL-615 item 4] Snapshot the preflight cost into a LOCAL now, before the
+    # pool fast-path's recursive generate_fn call (which re-enters this wrapper and
+    # overwrites the module-level _LAST_PREFLIGHT_COST with its own — a cache hit,
+    # $0). The delivering path below folds THIS captured figure into the ledger.
+    _outer_preflight_cost = dict(_LAST_PREFLIGHT_COST or {})
 
     # [LOCAL-590] Stop-pool fast path. When a tour of this venue was already
     # delivered, reuse the pooled stops and generate only the new ones (Michael's
@@ -7559,6 +7598,14 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                         "about_stops": _pool_out.get("about_stops", 0),
                         "breakdown": _pool_breakdown,
                     }
+                    # [LOCAL-615 item 4] Meter the preflight on the POOL/first-tour
+                    # delivery too. The preflight ran once in THIS wrapper (above),
+                    # outside the inner generate_fn's scope, so neither _pool_new_cost
+                    # nor _pool_breakdown includes it. Fold the captured preflight
+                    # bucket into tour_total_cost and the breakdown's preflight line
+                    # so the ledger shows preflight calls/queries/$ (not calls:0).
+                    _fold_preflight_cost_into_record(_LAST_GENERATION_COST,
+                                                     _outer_preflight_cost)
                     print(f"  [LOCAL-590] POOL DELIVERY: reused={_pool_out.get('reused_stops')} "
                           f"new={_pool_out.get('new_stops')} "
                           f"rewritten_transitions={_pool_out.get('rewritten_transitions')} "
@@ -7589,7 +7636,53 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
             exclude_titles=exclude_titles,
         )
         _reconcile_cost_record_from_accumulator(_acc)
+    # [LOCAL-615 item 4] The venue preflight ran in THIS wrapper, BEFORE the scope
+    # above opened, so the reconcile (which reads _acc) did not see it. Fold the
+    # captured preflight bucket into the reconciled record so a direct (non-pool)
+    # museum tour also meters the preflight and shows it in the breakdown.
+    _fold_preflight_cost_into_record(_LAST_GENERATION_COST, _outer_preflight_cost)
     return result
+
+
+def _fold_preflight_cost_into_record(rec, preflight_cost):
+    """[LOCAL-615 item 4] Add the venue preflight's counted cost to a tour's cost
+    record so the preflight is metered and visible in the breakdown.
+
+    The preflight runs in the generate_tour_text wrapper BEFORE any per-generation
+    accumulator scope opens, so neither the reconcile (normal path) nor the pool
+    orchestrator's new-stop breakdown includes it — the ledger showed
+    ``preflight: calls 0 / $0`` even though the grounded Gemini call ran and spent
+    (D626). ``preflight_cost`` is the preflight bucket snapshot captured by the
+    wrapper ({usd, calls, queries, input_tokens, output_tokens}).
+
+    Mutates ``rec`` in place: adds the preflight dollars to ``tour_total_cost`` and
+    writes/updates ``breakdown['preflight']`` with the counted units. Idempotent in
+    effect for a $0 preflight (cache hit) — adds nothing and still records the zero
+    line so the row's shape is uniform. Non-fatal; a bad input leaves rec untouched.
+    """
+    try:
+        if not isinstance(rec, dict) or not rec:
+            return
+        pf = preflight_cost or {}
+        pf_usd = float(pf.get("usd", 0.0) or 0.0)
+        # Record the preflight line in the breakdown regardless of $ (0 on a cache
+        # hit) so every row carries it; add the dollars to the delivery total.
+        bd = rec.get("breakdown")
+        if isinstance(bd, dict):
+            bd = dict(bd)
+            bd["preflight"] = {
+                "usd": pf_usd,
+                "calls": int(pf.get("calls", 0) or 0),
+                "queries": int(pf.get("queries", 0) or 0),
+                "input_tokens": int(pf.get("input_tokens", 0) or 0),
+                "output_tokens": int(pf.get("output_tokens", 0) or 0),
+            }
+            rec["breakdown"] = bd
+        rec["preflight_cost"] = pf_usd
+        if pf_usd:
+            rec["tour_total_cost"] = float(rec.get("tour_total_cost", 0.0) or 0.0) + pf_usd
+    except Exception as _fold_err:  # pragma: no cover
+        _import_logger.error(f"[LOCAL-615] preflight-cost fold skipped: {_fold_err}")
 
 
 def _reconcile_cost_record_from_accumulator(acc):
