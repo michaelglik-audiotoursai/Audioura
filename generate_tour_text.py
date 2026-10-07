@@ -22723,6 +22723,30 @@ RULES:
         complete_tour = '\n'.join(_sanitized_lines)
         print(f"  [LOCAL-22] Final sanitization: removed {_corruption_fixed} fake Stop N: header(s)")
 
+    # -------- [LOCAL-615 item 1] Duplicated-paragraph dedupe --------
+    # D626 (tours 403 Lyon, 405 Bilbao): Stop 1's entire orientation paragraph was
+    # printed TWICE, verbatim — the D611 opening fold plus the generator's own
+    # orientation body both emitted it on the FRESH path. Rather than chase which
+    # emitter produced the second copy, drop any paragraph >= 80 chars that appears
+    # a second time, keeping the first (Michael's binding spec). The matching QA
+    # check "No duplicated paragraph" in content_qa_runner uses the same detector,
+    # so a tour that reaches delivery with a surviving duplicate still FAILs style.
+    try:
+        from paragraph_dedupe import dedupe_paragraphs as _dedupe_paras
+        complete_tour, _dup_removed = _dedupe_paras(complete_tour)
+        if _dup_removed:
+            for _dr in _dup_removed:
+                print(f"  [LOCAL-615] DUPLICATED PARAGRAPH removed ({len(_dr)} chars): "
+                      f"{_dr[:80]!r}")
+            print(f"  [LOCAL-615] {len(_dup_removed)} duplicated paragraph(s) removed")
+        else:
+            print(f"  [LOCAL-615] No duplicated paragraphs")
+    except ImportError:
+        _import_logger.error("[LOCAL-615] MISSING: paragraph_dedupe — duplicated-"
+                             "paragraph removal DISABLED")
+    except Exception as _dup_err:
+        print(f"  [LOCAL-615] Duplicated-paragraph dedupe error (non-fatal): {_dup_err}")
+
     # -------- [LOCAL-36] Practical facts QA gate --------
     # Verify provenance of every practical claim before delivery.
     # Claims without traceable source are DROPPED — silence is correct.
