@@ -3764,6 +3764,28 @@ def _assemble_overview_tour_text(venue_name, location, tour_type, overview,
     print(f"  [LOCAL-602] overview stop coordinates: {_coords} "
           f"(from {'address' if getattr(overview, 'address', '') else 'location'})")
 
+    # [LOCAL-602 r2] Verify the chosen coordinate against the geocode of the
+    # venue's own street address and REJECT it when it is > 300 m away — the WNDR
+    # Boston defect, where the chain's point sat ~1.9 km from the venue address
+    # yet passed the 50 km tour-radius guard. When the address is known and the
+    # coordinate is too far, re-derive the point from the address itself.
+    _addr_for_check = (getattr(overview, 'address', '') or '').strip()
+    if _addr_for_check and _COORD_PAIR_RE.search(_coords):
+        try:
+            from tour_coordinates import (parse_coordinates_text,
+                                          verify_against_address)
+            _cand = parse_coordinates_text(_coords)
+            (_vlat, _vlng), _vsrc = verify_against_address(_cand, _addr_for_check)
+            if _vsrc == "address_corrected" and _vlat is not None:
+                _coords = f"{_vlat:.6f}, {_vlng:.6f}"
+                print(f"  [LOCAL-602 r2] overview coordinate was off its address "
+                      f"(>300 m) — corrected to the address geocode: {_coords}")
+            elif _vsrc == "address_ok":
+                print(f"  [LOCAL-602 r2] overview coordinate verified within 300 m "
+                      f"of its address.")
+        except Exception as _ve:
+            print(f"  [LOCAL-602 r2] address verification skipped: {_ve}")
+
     # The single orientation stop. Keep the "Stop 1:" shape the whole pipeline
     # (and the live runner's `^\s*Stop\s+\d+\s*[:\-]` regex) expects.
     lines.append(f"Stop 1: {_vn} — Overview")

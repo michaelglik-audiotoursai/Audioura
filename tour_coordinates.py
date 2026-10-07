@@ -41,8 +41,21 @@ __all__ = [
     "resolve_venue_coordinates",
     "resolve_tour_coordinates",
     "coordinates_present",
+    "verify_against_address",
+    "ADDRESS_MATCH_RADIUS_M",
     "MissingTourCoordinates",
 ]
+
+# [LOCAL-602 r2] A delivered stop's coordinate must sit on the BUILDING named by
+# its street address, not merely somewhere in the same city. The r1 WNDR Boston
+# run shipped all 7 stops at the chain's Seaport-area point (42.3393, -71.0402)
+# while the venue address geocodes ~1.9 km away: wrong by the width of downtown
+# Boston, yet well inside the 50 km tour-radius guard, so nothing caught it. A
+# coordinate further than this from the geocode of its own address is rejected
+# and re-derived from the address. 300 m is a city-block scale — tight enough to
+# reject "same city, wrong neighbourhood", loose enough to tolerate a geocoder
+# landing on the far corner of a large building or its parcel centroid.
+ADDRESS_MATCH_RADIUS_M = float(os.getenv("COORD_ADDRESS_RADIUS_M", "300"))
 
 
 class MissingTourCoordinates(Exception):
@@ -281,6 +294,91 @@ def resolve_tour_coordinates(
             return (venue, "venue")
 
     return ((None, None), "none")
+
+
+# ── address-match verification (LOCAL-602 r2) ─────────────────────────────────
+
+def _haversine_m(a: Coord, b: Coord) -> Optional[float]:
+    """Great-circle metres between two (lat, lng) pairs, or None if unusable.
+
+    Prefers geocode_stops.haversine_m (the project's measured implementation);
+    falls back to an inline haversine so this stays usable with no imports.
+    """
+    if not coordinates_present(a) or not coordinates_present(b):
+        return None
+    try:
+        from geocode_stops import haversine_m as _hv
+        return float(_hv((float(a[0]), float(a[1])), (float(b[0]), float(b[1]))))
+    except Exception:
+        pass
+    import math
+    R = 6371000.0
+    lat1, lng1 = math.radians(float(a[0])), math.radians(float(a[1]))
+    lat2, lng2 = math.radians(float(b[0])), math.radians(float(b[1]))
+    h = (math.sin((lat2 - lat1) / 2) ** 2
+         + math.cos(lat1) * math.cos(lat2) * math.sin((lng2 - lng1) / 2) ** 2)
+    return 2 * R * math.asin(math.sqrt(h))
+
+
+def verify_against_address(
+    coord: Optional[Coord],
+    address: str,
+    *,
+    radius_m: float = ADDRESS_MATCH_RADIUS_M,
+    geocoder=None,
+) -> Tuple[Coord, str]:
+    """Verify a candidate coordinate against the geocode of its street address.
+
+    This is the LOCAL-602 r2 fix for the WNDR Boston defect: a coordinate inside
+    the right city but on the wrong building passes every other guard. We geocode
+    the street ADDRESS — text, which is what geocoders are for — and:
+
+      * if the address does not geocode, we have no second opinion → keep ``coord``
+        unchanged, source ``"unverified"`` (never fail a tour on a geocoder miss);
+      * if ``coord`` is within ``radius_m`` of the address geocode → keep it,
+        source ``"address_ok"``;
+      * if ``coord`` is further than ``radius_m`` (or absent) → REJECT it and
+        return the address geocode instead, source ``"address_corrected"``.
+
+    ``geocoder(address) -> (lat, lng) | None`` is injectable so tests run offline;
+    it defaults to geocode_stops.geocode (Nominatim). Pure except for that call,
+    which is guarded. Returns ``((lat, lng), source)``; the coordinate is always a
+    real pair unless BOTH inputs were unusable (then ``((None, None), "none")``).
+    """
+    addr = (address or "").strip()
+    if geocoder is None:
+        try:
+            from geocode_stops import geocode as _g
+            geocoder = _g
+        except Exception:
+            geocoder = None
+
+    addr_coord: Coord = (None, None)
+    if addr and geocoder is not None:
+        try:
+            addr_coord = _coord_from_any(geocoder(addr))
+        except Exception:
+            addr_coord = (None, None)
+
+    have_addr = coordinates_present(addr_coord)
+    have_coord = coordinates_present(coord)
+
+    if not have_addr:
+        # No independent opinion from the address — keep what we have.
+        if have_coord:
+            return ((float(coord[0]), float(coord[1])), "unverified")
+        return ((None, None), "none")
+
+    if not have_coord:
+        # No candidate at all — the address geocode IS the answer.
+        return (addr_coord, "address_corrected")
+
+    dist = _haversine_m((float(coord[0]), float(coord[1])), addr_coord)
+    if dist is not None and dist <= radius_m:
+        return ((float(coord[0]), float(coord[1])), "address_ok")
+
+    # Too far from its own address → the candidate is for the wrong place.
+    return (addr_coord, "address_corrected")
 
 
 def _is_contained_venue(location: str) -> bool:
