@@ -36,17 +36,22 @@ two products as "managed products", and server verification through the Play Dev
   edit (LOCAL-606 replaces in place).
 
 ## 3. Price tiers and what the curator receives (shown on the "Sell this tour" screen)
-| Tier | Buyer pays | Store fee (15%) | Remaining | Audioura (30% of remaining) | **Curator gets** |
+Michael, 2026-10-07: **Audioura takes 10%.** The store takes its fee first (15% under the Small
+Business Program; 30% if not enrolled), and Audioura's 10% is taken from what remains.
+
+| Tier | Buyer pays | Store fee (15%) | Remaining | Audioura (10% of remaining) | **Curator gets** |
 |---|---|---|---|---|---|
-| T1 | $1.99 | $0.30 | $1.69 | $0.51 | **$1.18** |
-| T2 | $2.99 | $0.45 | $2.54 | $0.76 | **$1.78** |
-| T3 | $4.99 | $0.75 | $4.24 | $1.27 | **$2.97** |
-| T4 | $7.99 | $1.20 | $6.79 | $2.04 | **$4.75** |
-| T5 | $9.99 | $1.50 | $8.49 | $2.55 | **$5.94** |
+| T1 | $1.99 | $0.30 | $1.69 | $0.17 | **$1.52** |
+| T2 | $2.99 | $0.45 | $2.54 | $0.25 | **$2.29** |
+| T3 | $4.99 | $0.75 | $4.24 | $0.42 | **$3.82** |
+| T4 | $7.99 | $1.20 | $6.79 | $0.68 | **$6.11** |
+| T5 | $9.99 | $1.50 | $8.49 | $0.85 | **$7.64** |
+
+The curator receives ≈ 76.5% of the list price (≈ 63% if the store fee is 30%).
 
 The screen says: "You receive about $X per sale. Sales taxes and VAT, where the store collects
 them, come off before the split, so the amount can be a little lower in some countries." The split
-(30%) and the tiers are rows in a table, not code. Michael sets them.
+(10%) and the tiers are rows in a table, not code. Michael sets them.
 
 ## 4. Paying curators
 - Apple and Google pay **Audioura**, monthly, net of their fee (Apple pays within about 45 days of
