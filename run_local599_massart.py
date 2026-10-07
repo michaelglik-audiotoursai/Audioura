@@ -13,6 +13,22 @@ venue_corpus / stop_pool row counts for this venue (the only DB writes allowed).
 Usage (inside the isolated container):
     python3 run_local599_container.py
 """
+
+# [LOCAL-613] Meter + cap this isolated run. auto_meter installs the per-task
+# TEST_GEMINI_MAX_USD cap (default $1.00, ALL providers combined) at the grounding
+# counter and writes ONE cost_ledger row (user_id='LOCAL-599', description='test run')
+# at process exit — even if the cap or any error stops the run. One line; every
+# future harness should do the same.
+import os as _os613  # noqa: E402
+import sys as _sys613  # noqa: E402
+_sys613.path.insert(0, _os613.path.join(
+    _os613.path.dirname(_os613.path.abspath(__file__)), 'tests'))
+try:
+    import live_run_meter as _live_run_meter  # noqa: E402
+    _live_run_meter.auto_meter('LOCAL-599')
+except Exception as _meter_err:  # metering must never break a run
+    print(f"[LOCAL-613] live_run_meter unavailable ({_meter_err}): "
+          f"run will not be metered/capped")
 import os
 import re
 import sys

@@ -385,3 +385,45 @@ def install_grounding_cap(task_id, cap_usd=None, job_id=None):
     Equivalent to ``LiveRunMeter(task_id, cap_usd, job_id)`` — named so a harness
     reads intent at the call site: 'install the grounding cap for this task'."""
     return LiveRunMeter(task_id, cap_usd=cap_usd, job_id=job_id, install_cap=True)
+
+
+def auto_meter(task_id, cap_usd=None, job_id=None):
+    """One-line opt-in for a harness: install the cap now AND register an atexit
+    hook that reads the LAST generation's cost and writes the ``TEST-*`` ledger
+    row when the process ends — even if the run is stopped by the cap or any other
+    exception.
+
+    This is the whole integration a harness needs:
+
+        import live_run_meter
+        live_run_meter.auto_meter("LOCAL-613")   # cap installed; row on exit
+        ...call generate_tour_text as usual...
+
+    The atexit hook calls ``add_generation()`` (reading
+    ``generate_tour_text._LAST_GENERATION_COST`` and the live grounding counters)
+    unless the harness already recorded by hand. Returns the LiveRunMeter so a
+    caller that wants the richer API (per-provider adds, summary()) still can."""
+    import atexit
+
+    meter = LiveRunMeter(task_id, cap_usd=cap_usd, job_id=job_id, install_cap=True)
+
+    def _finalize():
+        if meter._recorded:
+            meter.uninstall()
+            return
+        try:
+            import generate_tour_text  # noqa: F401
+            meter.add_generation(generate_tour_text)
+        except Exception:
+            pass  # no generation happened (or module unavailable) — still record
+        try:
+            row_id = meter.record()
+            print(meter.summary())
+            if row_id:
+                print(f"[LIVE_RUN_METER] cost_ledger row {row_id} "
+                      f"(user_id={meter.user_id}, description='{TEST_RUN_DESCRIPTION}')")
+        finally:
+            meter.uninstall()
+
+    atexit.register(_finalize)
+    return meter
