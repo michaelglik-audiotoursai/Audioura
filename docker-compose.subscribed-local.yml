@@ -18,6 +18,14 @@ services:
       - TOUR_STORY_MODEL=gpt-4.1
   tour-orchestrator:
     build: {context: /Users/micha/audioura-subscribed-local, dockerfile: Dockerfile.orchestrator}
+    environment:
+      - L2_SEAT_JOB_ENABLED=true          # LOCAL-596 hourly L2 eviction/offer job
+  user-api-2:                             # LOCAL-595/596/598 entitlements, queue, IAP verify
+    build: {context: /Users/micha/audioura-subscribed-local/user-tracking}
+    environment:
+      IAP_VERIFY_MODE: apple
+      APPLE_IAP_ENVIRONMENT: Sandbox
+      ALLOW_UNAUTHENTICATED_ENTITLEMENTS: "true"   # LOCAL ONLY (LOCAL-598B); no GATEWAY_API_KEY on the Mac Mini
   tour-generation-modernized-1:
     build: {context: /Users/micha/audioura-subscribed-local, dockerfile: Dockerfile.modernized}
   polly-tts-1:
