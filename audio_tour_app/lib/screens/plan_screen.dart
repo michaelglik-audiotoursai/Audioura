@@ -4,7 +4,7 @@
 //   • the current level (plain words),
 //   • the allowances left,
 //   • the anniversary date,
-//   • buy buttons for L3 ($10 pack) and L4 ($25 round) — iOS only; the Android
+//   • buy buttons for L3 ($10 Pack) and L4 (Curator, $25) — iOS only; the Android
 //     buttons are hidden behind kAndroidBillingEnabled (Google Play is out of
 //     scope for LOCAL-598),
 //   • the five-level table in plain words.
@@ -215,7 +215,7 @@ class _PlanScreenState extends State<PlanScreen> {
                   onPressed: _buying ? null : () => _buy(IapProduct.l3Pack),
                   style: ElevatedButton.styleFrom(
                       padding: const EdgeInsets.symmetric(vertical: 14)),
-                  child: const Text('\$10 pack — 5 fresh tours, up to 10 stops'),
+                  child: const Text('\$10 Pack — 5 new tours + 5 edits, up to 10 stops'),
                 ),
               ),
               const SizedBox(height: 10),
@@ -226,7 +226,7 @@ class _PlanScreenState extends State<PlanScreen> {
                   style: ElevatedButton.styleFrom(
                       padding: const EdgeInsets.symmetric(vertical: 14)),
                   child: const Text(
-                      '\$25 round — 25 operations, up to 25 stops'),
+                      'Curator (\$25) — 25 tours or edits, up to 25 stops, sell your tours'),
                 ),
               ),
               if (_buying)
@@ -241,10 +241,27 @@ class _PlanScreenState extends State<PlanScreen> {
     );
   }
 
-  // [LOCAL-604 D619] The Free card: ask for a queue place (with an email) OR
-  // enter a code. One text box accepts any of the three code kinds; the server
-  // decides which it is.
+  // [LOCAL-610 req 1] The Free/code card is LEVEL-AWARE. The code box is always
+  // present (it is how any level switches level with a level code, and how a
+  // friend's invitation or a queue offer is redeemed), but the queue and the
+  // "Get the Free plan" framing only make sense for the install level:
+  //
+  //   • l1 (Introduction): the only level that can still JOIN the free queue.
+  //     Title "Get the Free plan", show BOTH the queue action and the code box.
+  //   • l2 (Free): already has a free seat — never invite it to "get" the Free
+  //     plan. Title "Have a code?", code box ONLY, no queue.
+  //   • paid (l3/l4), tester, admin: title "Have a code?", code box ONLY, no
+  //     queue and no "Get the Free plan".
+  //
+  // One text box accepts any of the three code kinds; the server decides which.
   Widget _freeCard() {
+    final isIntroduction = _ent.level == 'l1';
+    return isIntroduction ? _freeCardIntroduction() : _codeOnlyCard();
+  }
+
+  // l1 only: the full card — ask for a queue place (with an email) OR enter a
+  // code. [LOCAL-604 D619]
+  Widget _freeCardIntroduction() {
     final pos = _ent.queuePosition;
     final pending = _ent.pendingOfferCode;
     return Card(
@@ -294,36 +311,74 @@ class _PlanScreenState extends State<PlanScreen> {
               ),
             ),
             const SizedBox(height: 16),
-            const Text('I have a code',
-                style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
-            const SizedBox(height: 8),
-            TextField(
-              controller: _codeController,
-              enabled: !_claiming,
-              textCapitalization: TextCapitalization.characters,
-              decoration: const InputDecoration(
-                hintText: 'Enter your code',
-                border: OutlineInputBorder(),
-                isDense: true,
-              ),
-            ),
-            const SizedBox(height: 10),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: _claiming ? null : _submitCode,
-                style: ElevatedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 14)),
-                child: _claiming
-                    ? const SizedBox(
-                        height: 18, width: 18,
-                        child: CircularProgressIndicator(strokeWidth: 2))
-                    : const Text('Use code'),
-              ),
-            ),
+            _codeBox(withHeading: true),
           ],
         ),
       ),
+    );
+  }
+
+  // l2 / paid / tester / admin: a small "Have a code?" card with the code box
+  // only. No queue, no "Get the Free plan".
+  Widget _codeOnlyCard() {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Have a code?',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 8),
+            const Text(
+              'Enter a level code, a friend\u2019s invitation, or a queue code. '
+              'This is how you switch levels.',
+              style: TextStyle(fontSize: 13, height: 1.3),
+            ),
+            const SizedBox(height: 12),
+            _codeBox(withHeading: false),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // The shared code box + "Use code" button. [withHeading] adds the
+  // "I have a code" label used on the l1 card above the queue action.
+  Widget _codeBox({required bool withHeading}) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (withHeading) ...[
+          const Text('I have a code',
+              style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
+          const SizedBox(height: 8),
+        ],
+        TextField(
+          controller: _codeController,
+          enabled: !_claiming,
+          textCapitalization: TextCapitalization.characters,
+          decoration: const InputDecoration(
+            hintText: 'Enter your code',
+            border: OutlineInputBorder(),
+            isDense: true,
+          ),
+        ),
+        const SizedBox(height: 10),
+        SizedBox(
+          width: double.infinity,
+          child: ElevatedButton(
+            onPressed: _claiming ? null : _submitCode,
+            style: ElevatedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(vertical: 14)),
+            child: _claiming
+                ? const SizedBox(
+                    height: 18, width: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2))
+                : const Text('Use code'),
+          ),
+        ),
+      ],
     );
   }
 
@@ -448,9 +503,55 @@ class _PlanScreenState extends State<PlanScreen> {
               'level.',
               style: TextStyle(fontSize: 12, color: Colors.black54),
             ),
+            // [LOCAL-610 req 3] Plain rules under the levels. The Free
+            // inactivity number comes from the API (plans.inactivity_days), not
+            // a constant. The pack/Curator rule states the one-month, no-carry,
+            // early-purchase-replaces behaviour (subscription_levels.grant_pack,
+            // D613) in plain words; it changes nothing server-side.
+            const Divider(height: 24),
+            _rulesText(),
           ],
         ),
       ),
+    );
+  }
+
+  // [LOCAL-610 req 3] The two plain-words rules shown under the level list.
+  Widget _rulesText() {
+    final days = _ent.freeInactivityDays;
+    final ann = _ent.anniversary;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text('Free',
+            style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+        const SizedBox(height: 2),
+        Text(
+          'Stay active: open Audioura at least once a week. After $days days '
+          'without a visit your Free plan returns to Introduction, and you can '
+          'rejoin the queue.',
+          style: const TextStyle(fontSize: 13, height: 1.3),
+        ),
+        const SizedBox(height: 12),
+        const Text('\$10 Pack and Curator',
+            style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+        const SizedBox(height: 2),
+        const Text(
+          'Each purchase is good for one month. Anything unused after a month '
+          'expires, and you can buy another pack at any time. Buying early '
+          'starts a new month and replaces what\u2019s left. Nothing renews '
+          'automatically.',
+          style: TextStyle(fontSize: 13, height: 1.3),
+        ),
+        if (ann != null) ...[
+          const SizedBox(height: 6),
+          Text(
+            'Your current month ends on ${_formatDate(ann)}.',
+            style: const TextStyle(
+                fontSize: 13, height: 1.3, fontWeight: FontWeight.w600),
+          ),
+        ],
+      ],
     );
   }
 

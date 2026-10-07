@@ -209,7 +209,8 @@ def _visible_levels(cur):
     cur.execute("""
         SELECT plan_id, display_name, price_usd, can_sell,
                referrals_allowed, referral_period, max_stops,
-               tours_per_day, tours_per_month, fresh_per_pack, ops_per_pack
+               tours_per_day, tours_per_month, fresh_per_pack, ops_per_pack,
+               inactivity_days
         FROM plans
         WHERE COALESCE(hidden, FALSE) = FALSE
         ORDER BY CASE plan_id
@@ -221,7 +222,7 @@ def _visible_levels(cur):
     out = []
     for r in cur.fetchall():
         (plan_id, display_name, price_usd, can_sell, referrals_allowed,
-         referral_period, max_stops, tpd, tpm, fpp, opp) = r
+         referral_period, max_stops, tpd, tpm, fpp, opp, inactivity_days) = r
         out.append({
             'plan_id': plan_id,
             'display_name': display_name or plan_id,
@@ -234,6 +235,10 @@ def _visible_levels(cur):
             'tours_per_month': tpm,
             'fresh_per_pack': fpp,
             'ops_per_pack': opp,
+            # [LOCAL-610 req 3] passthrough so the plan page can show the Free
+            # inactivity rule ("After N days…") with the Free level's own N even
+            # when the current device is on another level.
+            'inactivity_days': inactivity_days,
         })
     return out
 

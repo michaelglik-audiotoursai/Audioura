@@ -77,6 +77,11 @@ class PlanLevel {
   final String? referralPeriod; // 'lifetime' | 'month' | null
   final int? maxStops;
 
+  /// [LOCAL-610 req 3] The level's inactivity window in days (plans.inactivity_
+  /// days). Non-null for the Free level (design 7); null elsewhere. The Free
+  /// rule copy reads this from the Free level so the number tracks the DB.
+  final int? inactivityDays;
+
   const PlanLevel({
     required this.planId,
     required this.displayName,
@@ -85,6 +90,7 @@ class PlanLevel {
     required this.referralsAllowed,
     required this.referralPeriod,
     required this.maxStops,
+    required this.inactivityDays,
   });
 
   factory PlanLevel.fromJson(Map<String, dynamic> json) {
@@ -103,6 +109,7 @@ class PlanLevel {
       referralPeriod:
           json['referral_period'] is String ? json['referral_period'] as String : null,
       maxStops: asInt(json['max_stops']),
+      inactivityDays: asInt(json['inactivity_days']),
     );
   }
 }
@@ -229,6 +236,22 @@ class Entitlements {
     return DateTime.tryParse(a);
   }
 
+  /// [LOCAL-610 req 3] The Free level's inactivity window, in days, for the
+  /// plan-page rule copy. Preference order, all server-sourced:
+  ///   1. the Free (l2) level in the visible-levels list;
+  ///   2. the current level's inactivity_days (when the device IS on Free this
+  ///      is the same value);
+  ///   3. a last-resort 7 only if the server sent neither (older payload), so
+  ///      the copy still reads sensibly offline.
+  int get freeInactivityDays {
+    for (final l in levels) {
+      if (l.planId == 'l2' && l.inactivityDays != null) {
+        return l.inactivityDays!;
+      }
+    }
+    return inactivityDays ?? 7;
+  }
+
   /// Human-facing plan name for the levels model.
   String get levelLabel {
     switch (level) {
@@ -237,9 +260,9 @@ class Entitlements {
       case 'l2':
         return 'Free';
       case 'l3':
-        return '\$10 pack';
+        return '\$10 Pack';
       case 'l4':
-        return '\$25 round';
+        return 'Curator';
       case 'tester':
         return 'Tester';
       default:
