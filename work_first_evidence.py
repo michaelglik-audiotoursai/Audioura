@@ -1,0 +1,651 @@
+#!/usr/bin/env python3
+"""work_first_evidence.py — LOCAL-617: make museum stops work-first.
+
+Michael's ruling (2026-10-07): museum tours "spend a lot of time repeating the
+significance of the art works for the museum and college and donations… not as
+much about the actual work, and the painters, and what people said about the
+paintings… something that provides emotional context."
+
+The independent critic (``critique.sh``) scored tours 399, 403–417 and the
+LOCAL-616 runs at 2.5–4/10 and, on every one, the dominant Critical/Major defect
+is criterion 1: a stop talks about the museum — donors, bequests, provenance,
+founding, renovations, loans, the curator's tenure — instead of the WORK, the
+ARTIST, what critics said, and the human/emotional reading.
+
+This module is the deterministic lever against that defect. It is pure (no
+network, no LLM, no DB) so every rule is unit-testable and cannot drift at
+runtime. It provides:
+
+  classify_sentence(sentence, venue_tokens=…, work_subject=…) -> str
+      one of 'work' | 'artist' | 'reception' | 'emotion' | 'institutional'
+      | 'other'. Deterministic lexicon + light subject detection.
+
+  is_institutional(sentence, …) -> bool
+      convenience: classify_sentence(...) == 'institutional'.
+
+  is_own_acquisition(sentence, work_subject=…) -> bool
+      True when an institutional sentence IS this work's own acquisition story
+      (a gift/bequest/purchase/acquisition OF the work in front of the listener),
+      which the contract allows at most once per stop.
+
+  filter_snippets_work_first(snippets, work_subject=…, venue_tokens=…) -> (kept, report)
+      the EVIDENCE FILTER (item 2): classify each snippet, drop snippets whose
+      sentences are purely institutional, pass at most ONE institutional snippet
+      per stop and only when it is the work's own acquisition story.
+
+  filter_stop_body_work_first(body, …, is_opening_section=False) -> (new_body, report)
+      the NARRATION ENFORCEMENT (item 2/3): on the delivered stop prose, keep at
+      most ONE institutional sentence per stop (the own-acquisition one if
+      present), and only drop when the stop still has work/artist/reception/
+      emotion substance to stand on. The Stop-1 opening section (D611, the
+      "About <museum>" story) is exempt and returned unchanged.
+
+  narration_contract_instruction(...) -> str
+      the per-stop prompt block for item 3 (what the work shows; the artist at
+      that moment; one attributed reception item IF present; the emotional
+      reading; no invented quotes; write less when thin).
+
+  check_attribution(stop_artist, catalogue_creator) -> dict
+      item 4: the stop's spoken artist must match the catalogue/SPARQL creator;
+      on a real mismatch, report the correction and which sentence to drop.
+
+  recompute_shortfall_on_delivered(...) -> str
+      item 5: recompute the honest shortfall sentence on the FINAL delivered
+      count, so a late gate that drops a stop never leaves a stale "has N stops"
+      claim behind.
+"""
+from __future__ import annotations
+
+import re
+from typing import Dict, List, Optional, Sequence, Tuple
+
+__all__ = [
+    "classify_sentence",
+    "is_institutional",
+    "is_own_acquisition",
+    "split_sentences",
+    "filter_snippets_work_first",
+    "filter_stop_body_work_first",
+    "narration_contract_instruction",
+    "check_attribution",
+    "recompute_shortfall_on_delivered",
+    "institutional_share",
+]
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Lexicon. Grounded in the real criterion-1 defects the critic flagged on tours
+# 414/415/416/417: founding, donor/bequest, acquisition/accession, renovation
+# budgets, loans, the museum's mission, the curator's tenure, civic/family
+# history of the collection's namesake.
+# ─────────────────────────────────────────────────────────────────────────────
+
+# INSTITUTIONAL — about the museum / college / collection as an institution, its
+# money, its people, its building, its policies — NOT about the work or the artist.
+_INSTITUTIONAL_RE = re.compile(
+    r"(?i)\b("
+    # founding / establishment of the institution
+    r"founded|founding|co-?founded|established|establishment|incorporated|"
+    r"chartered|inaugurat(?:ed|ion)|opened\s+(?:its|in)\s|"
+    # donors / gifts / bequests / philanthropy (the collection's benefactors)
+    r"donor|donors|donat(?:ed|ion|ions)|benefactor|philanthrop|bequeath(?:ed)?|"
+    r"bequest|endow(?:ed|ment)|gift\s+of|generous\s+(?:gift|donation)|"
+    r"patron(?:age)?|trustee|board\s+of\s+(?:directors|trustees)|"
+    # acquisition / accession / provenance of the collection
+    r"accession(?:ed|\s+number)?|acquisition|provenance|"
+    r"gifted\s+(?:the|this|it)|donated\s+(?:the|this|it)|"
+    r"(?:gift(?:ed)?|bequeath(?:ed)?|donat(?:ed|ion))\s+(?:the\s+)?"
+    r"(?:painting|work|piece|sculpture|print|canvas|drawing|portrait)\s+to|"
+    # money / building / renovation / budget
+    r"renovat(?:ed|ion)|refurbish(?:ed|ment)|expansion|wing\s+(?:was|opened)|"
+    r"budget|million\s+(?:euro|dollar|pound)|\u20ac\s?\d|\$\s?\d|"
+    r"square\s+(?:feet|metres|meters)|"
+    # loans / institutional exchange
+    r"on\s+loan|loaned\s+(?:to|from|by)|lent\s+(?:to|by)|loan\s+from\s+the|"
+    # mission / institutional identity statements
+    r"mission\s+(?:of|is|to)|the\s+museum'?s?\s+(?:mission|collection|holdings|"
+    r"decision|growth|history)|non-?profit|501\(c\)|"
+    # the museum / college / institution as the sentence's topic verbs
+    r"museum\s+(?:was|acquired|purchased|received|holds?|houses?|owns?|"
+    r"redistribut(?:ed|e))|"
+    r"collection\s+(?:was|grew|includes?|comprises?|now\s+(?:holds|numbers))|"
+    # civic / state redistribution (the 1811 French State example)
+    r"the\s+(?:french\s+)?state\s+(?:decided|redistribut)|"
+    # curator / director tenure as institutional history
+    r"conservateur|curator\s+(?:of\s+the\s+museum|from\s+\d{4})|"
+    r"director\s+(?:of\s+the\s+museum|from\s+\d{4})|"
+    # a benefactor's death / legacy — the collection's namesake, not the work
+    r"passed\s+away,?\s+leaving|leaving\s+behind\s+a\s+(?:significant\s+)?legacy|"
+    r"legacy\s+(?:of\s+generosity|continues?|lives?\s+on)"
+    r")\b"
+)
+
+# OWN-ACQUISITION — the sentence is an institutional one BUT it tells the
+# acquisition story of THIS work (allowed once per stop). It must name an
+# acquisition verb AND point at the work (this/the painting/the work/it).
+_ACQUISITION_VERB_RE = re.compile(
+    r"(?i)\b(gift(?:ed)?(?:\s+(?:of|to|by))?|donat(?:ed|ion)|bequeath(?:ed)?|bequest|"
+    r"purchas(?:ed|e)|acquir(?:ed|ition)|accession(?:ed)?|"
+    r"entered\s+the\s+collection|came\s+to\s+the\s+museum|"
+    r"was\s+given\s+to|presented\s+to|left\s+to\s+the)\b"
+)
+_WORK_DEICTIC_RE = re.compile(
+    r"(?i)\b(this\s+(?:work|painting|piece|sculpture|print|canvas|drawing|"
+    r"photograph|portrait|panel)|the\s+(?:work|painting|piece|sculpture|print|"
+    r"canvas|drawing|photograph|portrait|panel)|\bit\s+was\b|\bit\s+entered\b)"
+)
+
+# RECEPTION — what a critic, historian, or contemporary said about the work.
+# These are the attributed-opinion sentences Michael wants ("what people said").
+_RECEPTION_RE = re.compile(
+    r"(?i)\b("
+    r"critic|critics|reviewer|historian|scholar|contemporaries|"
+    r"wrote\s+(?:that|of|about)|described\s+(?:it|the\s+work|the\s+painting)\s+as|"
+    r"called\s+(?:it|the\s+work|the\s+painting)|hailed|praised|dismissed|"
+    r"denounced|celebrated\s+(?:as|for)|regarded\s+as|considered\s+(?:a|one\s+of|"
+    r"to\s+be)|acclaim(?:ed)?|controvers|scandal|caused\s+a\s+stir|"
+    r"according\s+to|in\s+the\s+words\s+of|observed\s+that|noted\s+that"
+    r")\b"
+)
+
+# EMOTION / human reading — the felt, sensory, bodily, human-meaning layer.
+_EMOTION_RE = re.compile(
+    r"(?i)\b("
+    r"feel|feels|felt|feeling|grief|grieving|joy|joyful|tender|tenderness|"
+    r"longing|loneliness|lonely|intimacy|intimate|tension|unease|"
+    r"melancholy|sorrow|anguish|despair|hope|hopeful|serene|serenity|"
+    r"you\s+(?:sense|feel|notice|might\s+feel|cannot\s+help)|"
+    r"invites?\s+you\s+to\s+(?:feel|linger|pause|reflect)|"
+    r"the\s+(?:eyes?|gaze|hands?|face|body|posture)\s+(?:seem|appear|betray|"
+    r"suggest|hold)|"
+    r"as\s+if|a\s+sense\s+of|haunt(?:ed|ing)|aching|yearning|"
+    r"stillness|silence\s+of|the\s+(?:quiet|hush)"
+    r")\b"
+)
+
+# ARTIST — the maker, their life, their circumstances at the moment of making.
+_ARTIST_RE = re.compile(
+    r"(?i)\b("
+    r"paint(?:ed|er|ing)\s+(?:this|it|the\s+work)|the\s+artist|"
+    r"he\s+(?:was|had|painted|made|created|began|returned|moved|struggled|died)|"
+    r"she\s+(?:was|had|painted|made|created|began|returned|moved|struggled|died)|"
+    r"at\s+the\s+(?:age|time)\s+of|at\s+(?:this\s+)?(?:point|moment)\s+in\s+(?:his|her)\s+(?:life|career)|"
+    r"(?:his|her)\s+(?:studio|wife|husband|lover|brother|sister|father|mother|"
+    r"patron|rival|teacher|student|final\s+years|early\s+(?:career|work)|"
+    r"breakdown|exile|illness|death|hand)|"
+    r"commissioned\s+(?:him|her|the\s+artist|by)|"
+    r"(?:just|only|shortly)\s+(?:before|after)\s+(?:he|she)"
+    r")\b"
+)
+
+# WORK — the object itself: what it shows, its composition, technique, materials,
+# the depicted figures, colour, light, form. The ekphrasis Michael DOES want
+# (unlike the About stop's artwork-framing ban, here describing the work is good).
+_WORK_RE = re.compile(
+    r"(?i)\b("
+    r"depicts?|depicted|portrays?|shows?\s+(?:a|an|the|two|three|us)|"
+    r"in\s+the\s+(?:foreground|background|centre|center|distance)|"
+    r"the\s+composition|brushwork|brushstrokes?|palette|colou?r|light|shadow|"
+    r"chiaroscuro|impasto|canvas|oil\s+on|tempera|fresco|bronze|marble|"
+    r"lithograph|etching|drypoint|woodcut|watercolou?r|charcoal|"
+    r"figure|figures|the\s+(?:woman|man|child|saint|virgin|madonna|angel|"
+    r"sitter|subject)\s+(?:holds?|wears?|gazes?|stands?|sits?|looks?|turns?)|"
+    r"gesture|drapery|folds?\s+of|the\s+(?:scene|landscape|still\s+life|interior)|"
+    r"rendered|modelled|modeled|textured|luminous|muted|vivid"
+    r")\b"
+)
+
+
+def split_sentences(text: str) -> List[str]:
+    """Abbreviation-safe sentence split, reusing the shared helper when present."""
+    if not text:
+        return []
+    try:  # prefer the project's splitter so behaviour matches the rest of the pipeline
+        from sentence_split import split_sentences as _ss
+        return [s.strip() for s in _ss(text) if s and s.strip()]
+    except Exception:
+        return [s.strip() for s in re.split(r"(?<=[.!?])\s+", text) if s and s.strip()]
+
+
+def _mentions_venue(sentence: str, venue_tokens: Optional[Sequence[str]]) -> bool:
+    if not venue_tokens:
+        return False
+    low = sentence.lower()
+    return any(tok and len(tok) >= 3 and tok.lower() in low for tok in venue_tokens)
+
+
+def classify_sentence(sentence: str,
+                      venue_tokens: Optional[Sequence[str]] = None,
+                      work_subject: str = "") -> str:
+    """Classify ONE sentence into the work-first taxonomy.
+
+    Returns one of: 'work', 'artist', 'reception', 'emotion', 'institutional',
+    'other'. Deterministic. Priority order matters:
+
+      1. own-acquisition institutional sentences classify as 'institutional'
+         (so the caller can keep at most one), BUT a sentence that is mainly a
+         reception/emotion/work statement with an incidental institutional word
+         is not stolen into 'institutional'.
+      2. reception (attributed opinion) outranks the rest — it is the rarest and
+         most valuable signal and often co-occurs with emotion words.
+      3. then work, then artist, then emotion, then institutional, then other.
+
+    ``work_subject`` (the work's title/figures) and ``venue_tokens`` (the museum
+    name words) sharpen the institutional-vs-work decision: a sentence whose
+    subject is the venue leans institutional; one whose subject is the work leans
+    work/artist.
+    """
+    s = (sentence or "").strip()
+    if not s:
+        return "other"
+
+    inst = bool(_INSTITUTIONAL_RE.search(s))
+    recep = bool(_RECEPTION_RE.search(s))
+    work = bool(_WORK_RE.search(s))
+    artist = bool(_ARTIST_RE.search(s))
+    emotion = bool(_EMOTION_RE.search(s))
+
+    # An attributed opinion is reception even if it also carries emotion words.
+    if recep and not _is_institutional_dominant(s, inst, recep, work, artist, emotion):
+        return "reception"
+
+    # An own-acquisition sentence (gift/bequest/purchase OF this work) is the one
+    # institutional sentence the contract permits — classify it institutional so
+    # the caller can keep exactly one, even when it names a person (which could
+    # otherwise read as 'other').
+    if is_own_acquisition(s, work_subject) and not (work or artist):
+        return "institutional"
+
+    # A clearly institutional sentence (donor/founding/acquisition/budget/loan)
+    # with NO competing work/artist substance is institutional.
+    if inst and _is_institutional_dominant(s, inst, recep, work, artist, emotion):
+        return "institutional"
+
+    if work:
+        return "work"
+    if artist:
+        return "artist"
+    if emotion:
+        return "emotion"
+    if inst:
+        # institutional signal present but something else also matched weakly:
+        # treat as institutional only if nothing richer was found above.
+        return "institutional"
+    return "other"
+
+
+def _is_institutional_dominant(s: str, inst: bool, recep: bool, work: bool,
+                               artist: bool, emotion: bool) -> bool:
+    """Decide whether institutional content DOMINATES the sentence.
+
+    Institutional wins when the institutional signal is present AND the sentence
+    does not primarily describe the work or the artist. Reception/emotion alone
+    do NOT rescue a donor sentence ("Frizzoni bequeathed the painting, a tender
+    gift" is still provenance), but a sentence that actually describes the work
+    or the artist's life is not stolen into institutional.
+    """
+    if not inst:
+        return False
+    # If the sentence substantively describes the work or the artist, it is not
+    # institutional-dominant — the museum word is incidental.
+    if work or artist:
+        return False
+    return True
+
+
+def is_institutional(sentence: str,
+                     venue_tokens: Optional[Sequence[str]] = None,
+                     work_subject: str = "") -> bool:
+    return classify_sentence(sentence, venue_tokens, work_subject) == "institutional"
+
+
+def is_own_acquisition(sentence: str, work_subject: str = "") -> bool:
+    """True when an institutional sentence is THIS work's own acquisition story.
+
+    Requires an acquisition verb (gift/bequest/purchase/acquired/accessioned)
+    AND a deictic pointing at the work (this painting / the work / it entered …),
+    OR an explicit mention of the work's subject/title. This is the one
+    institutional sentence the contract permits per stop.
+    """
+    s = (sentence or "").strip()
+    if not s:
+        return False
+    if not _ACQUISITION_VERB_RE.search(s):
+        return False
+    if _WORK_DEICTIC_RE.search(s):
+        return True
+    if work_subject:
+        subj = work_subject.lower()
+        # match any significant word of the work subject
+        for w in re.findall(r"\b\w{4,}\b", subj):
+            if w in s.lower():
+                return True
+    return False
+
+
+def institutional_share(text: str,
+                        venue_tokens: Optional[Sequence[str]] = None,
+                        work_subject: str = "") -> float:
+    """Fraction of sentences in ``text`` classified institutional (for measurement)."""
+    sents = split_sentences(text)
+    if not sents:
+        return 0.0
+    inst = sum(1 for s in sents
+               if classify_sentence(s, venue_tokens, work_subject) == "institutional")
+    return inst / len(sents)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# item 2 — EVIDENCE FILTER (snippets, before narration)
+# ─────────────────────────────────────────────────────────────────────────────
+
+def _snippet_is_institutional(snip: Dict,
+                              work_subject: str,
+                              venue_tokens: Optional[Sequence[str]]) -> Tuple[bool, bool]:
+    """Return (is_institutional_snippet, is_own_acquisition_snippet).
+
+    A snippet is institutional when the MAJORITY of its classifiable sentences
+    are institutional and none describe the work or artist. It is own-acquisition
+    when any sentence is this work's own acquisition story.
+    """
+    text = f"{snip.get('title', '')}. {snip.get('snippet', '')}".strip()
+    sents = split_sentences(text) or [text]
+    labels = [classify_sentence(s, venue_tokens, work_subject) for s in sents]
+    inst = sum(1 for l in labels if l == "institutional")
+    rich = sum(1 for l in labels if l in ("work", "artist", "reception", "emotion"))
+    own_acq = any(is_own_acquisition(s, work_subject) for s in sents)
+    is_inst = inst > 0 and rich == 0
+    return is_inst, own_acq
+
+
+def filter_snippets_work_first(snippets: List[Dict],
+                               work_subject: str = "",
+                               venue_tokens: Optional[Sequence[str]] = None
+                               ) -> Tuple[List[Dict], Dict]:
+    """[LOCAL-617 item 2] Keep work-first evidence; cap institutional snippets.
+
+    Rules:
+      • A snippet with ANY work/artist/reception/emotion sentence is KEPT (it
+        carries the material the narration needs).
+      • A purely-institutional snippet is DROPPED, except at most ONE is kept and
+        only when it is this work's OWN acquisition story.
+      • Order is preserved (the caller already ranked them).
+
+    Returns (kept_snippets, report).
+    """
+    kept: List[Dict] = []
+    dropped_institutional = 0
+    kept_own_acquisition = False
+    report = {
+        "input": len(snippets),
+        "dropped_institutional": 0,
+        "kept_own_acquisition": False,
+        "output": 0,
+    }
+    for snip in snippets:
+        is_inst, own_acq = _snippet_is_institutional(snip, work_subject, venue_tokens)
+        if not is_inst:
+            kept.append(snip)
+            continue
+        # purely institutional snippet
+        if own_acq and not kept_own_acquisition:
+            kept.append(snip)
+            kept_own_acquisition = True
+            continue
+        dropped_institutional += 1
+    report["dropped_institutional"] = dropped_institutional
+    report["kept_own_acquisition"] = kept_own_acquisition
+    report["output"] = len(kept)
+    return kept, report
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# item 2/3 — NARRATION ENFORCEMENT (delivered stop prose)
+# ─────────────────────────────────────────────────────────────────────────────
+
+def filter_stop_body_work_first(body: str,
+                                venue_tokens: Optional[Sequence[str]] = None,
+                                work_subject: str = "",
+                                is_opening_section: bool = False
+                                ) -> Tuple[str, Dict]:
+    """[LOCAL-617 item 2/3] Enforce at most ONE institutional sentence per stop.
+
+    On the delivered stop prose, drop institutional sentences, keeping at most
+    one — the work's own-acquisition sentence if present, otherwise none. The
+    stop is only trimmed when it RETAINS work/artist/reception/emotion substance,
+    so we never strip a stop down to nothing (D577: never turn a working stop
+    into no stop).
+
+    The Stop-1 opening section (D611 — the sourced "About <museum>" story) is
+    EXEMPT: ``is_opening_section=True`` returns the body unchanged. The caller is
+    responsible for passing that flag only for the opening section, not the
+    work-stop body that follows it.
+
+    Returns (new_body, report).
+    """
+    report = {
+        "institutional_total": 0,
+        "institutional_kept": 0,
+        "institutional_dropped": 0,
+        "exempt_opening": bool(is_opening_section),
+        "changed": False,
+    }
+    if is_opening_section or not body or not body.strip():
+        return body, report
+
+    sents = split_sentences(body)
+    if len(sents) <= 1:
+        return body, report
+
+    labels = [classify_sentence(s, venue_tokens, work_subject) for s in sents]
+    inst_idx = [i for i, l in enumerate(labels) if l == "institutional"]
+    rich_idx = [i for i, l in enumerate(labels)
+                if l in ("work", "artist", "reception", "emotion")]
+    report["institutional_total"] = len(inst_idx)
+
+    if not inst_idx:
+        return body, report
+
+    # Nothing rich to stand on → leave the stop unchanged (never empty a stop).
+    if not rich_idx:
+        report["institutional_kept"] = len(inst_idx)
+        return body, report
+
+    # Choose the ONE institutional sentence to keep: the own-acquisition one.
+    keep_i = None
+    for i in inst_idx:
+        if is_own_acquisition(sents[i], work_subject):
+            keep_i = i
+            break
+
+    kept_sents: List[str] = []
+    dropped = 0
+    kept_inst = 0
+    for i, s in enumerate(sents):
+        if i in inst_idx:
+            if i == keep_i and kept_inst == 0:
+                kept_sents.append(s)
+                kept_inst += 1
+            else:
+                dropped += 1
+            continue
+        kept_sents.append(s)
+
+    report["institutional_kept"] = kept_inst
+    report["institutional_dropped"] = dropped
+    new_body = " ".join(kept_sents).strip()
+    report["changed"] = (dropped > 0)
+    # Belt-and-braces: never return empty.
+    if not new_body:
+        return body, report
+    return new_body, report
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# item 3 — NARRATION CONTRACT (prompt instruction)
+# ─────────────────────────────────────────────────────────────────────────────
+
+def narration_contract_instruction(work_title: str = "",
+                                   artist: str = "",
+                                   has_reception_evidence: bool = False) -> str:
+    """[LOCAL-617 item 3] The per-stop narration contract, as a prompt block.
+
+    Order: (a) what the work shows and how; (b) the artist at that moment of
+    their life; (c) ONE attributed reception item only if present in the
+    evidence; (d) the emotional/human reading. No invented quotes. When the
+    evidence for (b) or (c) is thin, write LESS, not filler.
+    """
+    _title = work_title.strip() or "this work"
+    _artist = artist.strip()
+    reception_clause = (
+        "  (c) ONE thing a named critic or historian said about it — ATTRIBUTED "
+        "to that person — but ONLY because the reference material contains it. "
+        "Do NOT invent a quotation or a critic.\n"
+        if has_reception_evidence else
+        "  (c) SKIP any 'critics said' sentence — the reference material contains "
+        "no attributed reception. Do NOT invent a critic, a quotation, or a "
+        "reaction.\n"
+    )
+    return f"""
+NARRATION CONTRACT (LOCAL-617 — museum stop, in THIS order):
+  (a) What {_title} SHOWS and HOW — the figures, the composition, the colour and
+      light, the technique. Put the listener in front of the object first.
+  (b) {('Where ' + _artist + ' was in life at the moment this was made') if _artist else 'Where the artist was in life at the moment this was made'}
+      — the circumstance, not a résumé. One or two sentences.
+{reception_clause}  (d) The emotional or human reading — what it is like to stand before it,
+      what it is about as human experience.
+
+DO NOT narrate the MUSEUM instead of the work: no donor, bequest, acquisition,
+accession, provenance, founding, renovation, budget, loan, or mission sentences.
+(At most ONE sentence may tell THIS work's own acquisition story, and only if it
+is genuinely about this object.) When the evidence for (b) or (c) is thin, write
+LESS — a shorter, true stop beats padded institutional history. NEVER invent a
+quotation, a critic's name, a date, or a reaction the sources do not state.
+"""
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# item 4 — ATTRIBUTION CHECK
+# ─────────────────────────────────────────────────────────────────────────────
+
+# Known given-name variants so "Johannes van Eyck" vs "Jan van Eyck" is a match,
+# not a mismatch, while "van Eyck" vs "Memling" is a real mismatch.
+_NAME_VARIANTS = {
+    "johannes": {"jan", "john", "johann"},
+    "jan": {"johannes", "john", "johann"},
+    "john": {"johannes", "jan", "johann"},
+    "pieter": {"peter", "pietro"},
+    "peter": {"pieter", "pietro"},
+    "guillaume": {"william", "willem"},
+    "william": {"guillaume", "willem"},
+    "francesco": {"francis", "franz"},
+    "giovanni": {"john", "jean"},
+}
+
+_NAME_NOISE = re.compile(
+    r"(?i)\b(attributed\s+to|workshop\s+of|circle\s+of|follower\s+of|after|"
+    r"studio\s+of|school\s+of|the\s+younger|the\s+elder|van|von|de|della|del|"
+    r"di|le|la|du|des|der)\b")
+
+
+def _name_tokens(name: str) -> List[str]:
+    n = _NAME_NOISE.sub(" ", (name or ""))
+    return [t for t in re.findall(r"[A-Za-zÀ-ÿ'\-]{2,}", n.lower())]
+
+
+def _surname(name: str) -> str:
+    toks = _name_tokens(name)
+    return toks[-1] if toks else ""
+
+
+def check_attribution(stop_artist: str, catalogue_creator: str) -> Dict:
+    """[LOCAL-617 item 4] Verify the stop's artist matches the catalogue creator.
+
+    The spoken stop artist (what the narration says) must match the work's
+    catalogue/SPARQL creator. On a real mismatch (different surname, not a mere
+    given-name/spelling variant), the catalogue creator wins and the conflicting
+    sentence must be dropped.
+
+    Returns:
+      {
+        'match': bool,            # True if they agree (or either is unknown)
+        'use': str,               # the name to use (catalogue creator on mismatch)
+        'mismatch': bool,         # True on a real surname mismatch
+        'drop_conflicting': bool, # True → caller drops the sentence naming stop_artist
+        'reason': str,
+      }
+    """
+    sa = (stop_artist or "").strip()
+    cc = (catalogue_creator or "").strip()
+    # Unknown on either side → nothing to reconcile; keep what we have.
+    if not sa or not cc:
+        return {"match": True, "use": sa or cc, "mismatch": False,
+                "drop_conflicting": False, "reason": "insufficient data"}
+
+    sa_sur, cc_sur = _surname(sa), _surname(cc)
+    if sa_sur and sa_sur == cc_sur:
+        # same surname — a given-name/spelling variant or a subset. Prefer the
+        # fuller (catalogue) name so a bare surname upgrades to the full name.
+        fuller = cc if len(_name_tokens(cc)) >= len(_name_tokens(sa)) else sa
+        return {"match": True, "use": fuller, "mismatch": False,
+                "drop_conflicting": False, "reason": "surname match"}
+
+    # Given-name variant with same surname is handled above (same surname).
+    # If surnames differ, check whether the WHOLE names are variant-equivalent
+    # (e.g. one-name artists "Memling" vs "Hans Memling").
+    sa_toks, cc_toks = set(_name_tokens(sa)), set(_name_tokens(cc))
+    if sa_toks and cc_toks:
+        if sa_toks <= cc_toks or cc_toks <= sa_toks:
+            # subset-equivalent (e.g. "Memling" vs "Hans Memling") — prefer the
+            # fuller name, which is normally the catalogue creator.
+            fuller = cc if len(cc_toks) >= len(sa_toks) else sa
+            return {"match": True, "use": fuller, "mismatch": False,
+                    "drop_conflicting": False, "reason": "subset match"}
+        # given-name variant equivalence on an otherwise shared surname
+        if sa_sur == cc_sur:
+            return {"match": True, "use": cc, "mismatch": False,
+                    "drop_conflicting": False, "reason": "name variant"}
+
+    # Real mismatch: catalogue creator wins; drop the conflicting sentence.
+    return {
+        "match": False,
+        "use": cc,
+        "mismatch": True,
+        "drop_conflicting": True,
+        "reason": f"stop artist '{sa}' != catalogue creator '{cc}'",
+    }
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# item 5 — FRESH-PATH SHORTFALL RECOMPUTE
+# ─────────────────────────────────────────────────────────────────────────────
+
+def recompute_shortfall_on_delivered(venue_name: str,
+                                     exhibitions_on_view: int,
+                                     final_delivered_stops: int,
+                                     requested_stops: Optional[int],
+                                     mode: str = "museum") -> str:
+    """[LOCAL-617 item 5] Rebuild the honest shortfall sentence on the FINAL count.
+
+    D616/D612 build the shortfall sentence from the count known when the
+    shortfall logic runs. If a LATE gate then drops a stop (e.g. Granet delivered
+    2/3 after the sentence already said 3), the stale sentence contradicts the
+    delivered tour. This recomputes it from ``final_delivered_stops`` — the count
+    actually shipped — so the sentence can never claim a stop the tour did not
+    make.
+
+    Delegates to about_museum_stop.build_shortfall_sentence so there is ONE
+    builder (never a second). Returns the (possibly empty) sentence; empty when
+    the ask was met on the final count.
+    """
+    try:
+        from about_museum_stop import build_shortfall_sentence
+    except Exception:
+        return ""
+    return build_shortfall_sentence(
+        venue_name=venue_name,
+        exhibitions_on_view=exhibitions_on_view,
+        delivered_stops=final_delivered_stops,
+        requested_stops=requested_stops,
+        mode=mode,
+    )
