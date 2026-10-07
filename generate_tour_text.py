@@ -4273,6 +4273,18 @@ _LAST_SITE_FIRST_SOURCES = []  # [{'name','source_url','status','kind'}, ...]
 # {} when the last run took no site-first path.
 _LAST_SITE_FIRST_COUNTS = {}
 
+# [LOCAL-612] When True, the main delivery loop does NOT inject its own inline
+# D616 shortfall sentence into Stop 1. The stop-pool orchestrator sets this around
+# the nested generate_fn call it makes for a CONTAINED venue: the orchestrator
+# re-assembles the tour afterwards and folds the shortfall sentence into Stop 1's
+# opening section itself (about_museum_stop.build_opening_section), so letting the
+# main loop also inject it would double-emit. Direct (non-orchestrated) runs leave
+# this False, so a fresh museum / walking / biking / by-reference tour generated
+# straight through the main loop still carries the honest sentence exactly once.
+# This is a DEDICATED flag — DISABLE_STOP_POOL is NOT a safe discriminator because
+# live runners set it for legitimate direct runs.
+_SUPPRESS_INLINE_SHORTFALL = False
+
 # [LOCAL-540] Module-level: the before/after score record from the last generation
 # (see score_and_retry in scorer_retry.py). None on a cache hit or if scoring was
 # skipped. Exposed so a caller can read the defect the scorer saw, whether a retry
@@ -22090,6 +22102,70 @@ RULES:
         print(f"  [D530] ⚠️  LISTENER ASKED FOR {_d530_requested} STOP(S), DELIVERING "
               f"{len(poi_list)} — source='{_exhibition_stops_source}'")
 
+    # [LOCAL-612 / D616] THE HONEST SHORTFALL SENTENCE ON EVERY TOUR TYPE.
+    #
+    # D616 (LOCAL-600) emitted the "…so this tour has X stops rather than the Y you
+    # asked for" sentence only on the site-first/exhibition museum path (through the
+    # stop-pool orchestrator and the overview path). Vietnam #402 (4 of 5) and
+    # Harvard #400 (6 of 7) delivered fewer stops with NO explanation because they
+    # flow through THIS main delivery loop (a verified-works museum, source
+    # 'checklist'/'partial'), not the site-first path — and so did every walking /
+    # biking / by-reference tour that fell short.
+    #
+    # This is the universal chokepoint: `_requested_stop_count_original` (captured
+    # before any gate) is the listener's ask and `len(poi_list)` is what we are
+    # about to deliver. When delivered < requested we build ONE sentence from those
+    # real counts, reusing about_museum_stop.build_shortfall_sentence (the single
+    # builder — no second one), and lead Stop 1 with it below.
+    #
+    # Two emitters must never both fire:
+    #   * the site-first path (`_exhibition_stops_source == 'site_exhibition'`) is
+    #     owned by the orchestrator / overview, which fold the sentence into Stop 1's
+    #     opening section themselves — the main loop stays silent for it; and
+    #   * when the orchestrator runs THIS loop as its nested generation for a
+    #     contained venue it sets `_SUPPRESS_INLINE_SHORTFALL`, because it
+    #     re-assembles and injects the sentence afterwards.
+    # Both guards below keep the sentence appearing exactly once.
+    _inline_shortfall = ""
+    try:
+        _sf_asked = int(_requested_stop_count_original) if _requested_stop_count_original else 0
+    except (TypeError, ValueError):
+        _sf_asked = 0
+    _sf_delivered = len(poi_list)
+    if (not globals().get('_SUPPRESS_INLINE_SHORTFALL', False)
+            and _exhibition_stops_source != 'site_exhibition'
+            and _sf_asked and _sf_delivered and _sf_delivered < _sf_asked):
+        try:
+            from about_museum_stop import build_shortfall_sentence as _bss
+            if tour_category in ('museum', 'facility'):
+                # Verified-works museum (checklist/partial/catalogue): count the
+                # distinct delivered works as the "exhibitions" number so the museum
+                # phrasing is honest; name the venue.
+                _sf_venue = (_museum_venue_name or venue_name or location
+                             or 'this museum')
+                _inline_shortfall = _bss(
+                    venue_name=_sf_venue,
+                    exhibitions_on_view=_sf_delivered,
+                    delivered_stops=_sf_delivered,
+                    requested_stops=_sf_asked,
+                    mode='museum')
+            else:
+                # Outdoor (walking/biking/driving) and any other non-museum type:
+                # the route phrasing, no museum vocabulary.
+                _inline_shortfall = _bss(
+                    venue_name=(location or ''),
+                    exhibitions_on_view=0,
+                    delivered_stops=_sf_delivered,
+                    requested_stops=_sf_asked,
+                    mode='outdoor')
+        except Exception as _sf_e:
+            print(f"  [LOCAL-612] inline shortfall sentence skipped ({_sf_e})")
+            _inline_shortfall = ""
+        if _inline_shortfall:
+            print(f"  [LOCAL-612] D616 shortfall sentence folded into Stop 1 "
+                  f"(main loop, category='{tour_category}', "
+                  f"source='{_exhibition_stops_source}'): {_inline_shortfall!r}")
+
     # [LOCAL-361] Track actually-rendered headers for D2 and heading-count invariant
     _rendered_headers = []
 
@@ -22199,6 +22275,13 @@ RULES:
         
         # Add orientation section
         _orientation_prefix = "Orientation: "
+        # [LOCAL-612 / D616] Lead Stop 1's opening section with the honest shortfall
+        # sentence (computed once, above). It sits right after the "Orientation:"
+        # label (which the verbalization/translation layer keys on — LOCAL-264) and
+        # BEFORE the prolog, so the listener hears the scope of the tour up front.
+        # Empty on every stop but the first, and whenever the ask was met.
+        if i == 0 and _inline_shortfall:
+            _orientation_prefix += _inline_shortfall.strip() + " "
         _entrance_directive = ""
         if i == 0:
             # For the first POI, include directions from the entrance

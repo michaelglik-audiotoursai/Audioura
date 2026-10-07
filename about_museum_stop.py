@@ -1342,14 +1342,31 @@ def _compose_visiting_sentences(facts: str, venue_name: str, domain: str,
 
 def build_shortfall_sentence(venue_name: str, exhibitions_on_view: int,
                              delivered_stops: int,
-                             requested_stops: Optional[int]) -> str:
-    """[LOCAL-600 / D616] One plain sentence telling the listener, honestly, why a
-    site-first exhibition tour delivers fewer stops than they asked for.
+                             requested_stops: Optional[int],
+                             mode: str = "museum") -> str:
+    """[LOCAL-600 / D616; LOCAL-612] One plain sentence telling the listener,
+    honestly, why a tour delivers fewer stops than they asked for.
 
     LEAD (D616): "When verified on-view material can't reach N, deliver the verified
     stops and say so in Stop 1's opening section. One plain sentence, from the real
     counts: 'MassArt Art Museum currently has 3 exhibitions on view, so this tour
     has 5 stops rather than the 7 you asked for.'"
+
+    LOCAL-612 widens this one builder (never a second) to EVERY tour type, not only
+    site-first exhibition museums. ``mode`` chooses the phrasing of the reason
+    clause while the tail ("…so this tour has X stops rather than the Y you asked
+    for.") is identical on every path:
+
+      * mode="museum"  (default) — the exhibition phrasing D616 pinned:
+          "<Museum> currently has 3 exhibitions on view, so this tour has 5 stops
+           rather than the 7 you asked for."
+        Backwards-compatible: existing museum callers (LOCAL-600/602) are
+        unchanged — the default keeps the exact wording the LOCAL-600 suite asserts.
+      * mode="outdoor" — a walking/biking/driving route delivers fewer stops:
+          "We could confirm 4 stops along this route, so this tour has 4 stops
+           rather than the 5 you asked for."
+        No exhibition/museum vocabulary (there is no museum), and the honest
+        "4 stops along this route" phrasing LOCAL-612 asked for.
 
     Returns that sentence, or "" when there is no shortfall to announce:
       * ``requested_stops`` is unknown/zero, or
@@ -1359,7 +1376,8 @@ def build_shortfall_sentence(venue_name: str, exhibitions_on_view: int,
 
     Pure and deterministic; no network, no LLM. The venue name is used as given
     (its ', City, ST' tail trimmed) so the sentence names the museum, not the raw
-    request string.
+    request string. For mode="outdoor" the venue/area name is not required and is
+    ignored by the phrasing.
     """
     try:
         req = int(requested_stops) if requested_stops is not None else 0
@@ -1371,6 +1389,19 @@ def build_shortfall_sentence(venue_name: str, exhibitions_on_view: int,
         return ""
     if delivered >= req:
         return ""  # the ask was met — D611 exact N, no sentence
+    stop_word_d = "stop" if delivered == 1 else "stops"
+    tail = (f"this tour has {delivered} {stop_word_d} "
+            f"rather than the {req} you asked for.")
+
+    if (mode or "museum").strip().lower() == "outdoor":
+        # [LOCAL-612] Outdoor route: no museum/exhibition language. State, honestly,
+        # how many stops the route could be confirmed for — the delivered count —
+        # then the identical shortfall tail. "stop" / "stops" agrees with delivered.
+        confirmed_word = "stop" if delivered == 1 else "stops"
+        return (f"We could confirm {delivered} {confirmed_word} along this route, so "
+                + tail)
+
+    # mode == "museum" (default): the D616 exhibition phrasing, unchanged.
     vn = _venue_core(venue_name) or (venue_name or "").strip() or "This museum"
     # "has 1 exhibition on view" / "has 3 exhibitions on view"
     if shows >= 1:
@@ -1380,9 +1411,7 @@ def build_shortfall_sentence(venue_name: str, exhibitions_on_view: int,
         # No distinct on-view show count available: still be honest about the gap
         # without inventing a show count.
         show_clause = f"{vn} has a limited number of exhibitions on view, so "
-    stop_word_d = "stop" if delivered == 1 else "stops"
-    return (f"{show_clause}this tour has {delivered} {stop_word_d} "
-            f"rather than the {req} you asked for.")
+    return f"{show_clause}{tail}"
 
 
 def build_opening_section(about: Optional["AboutStop"],

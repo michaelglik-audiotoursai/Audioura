@@ -27,12 +27,41 @@ Opt-in: `maybe_generate_with_pool` returns None when pooling does not apply (no
 DB, pooling disabled, or an empty pool with a full-size request), so the caller
 falls back to the normal single generation path unchanged.
 """
+import contextlib
 import logging
 import os
 import re
 from typing import Optional, Tuple, List, Dict
 
 logger = logging.getLogger(__name__)
+
+
+@contextlib.contextmanager
+def _suppress_inline_shortfall():
+    """[LOCAL-612] Suppress the main delivery loop's inline D616 shortfall sentence
+    for the duration of a nested generate_fn call.
+
+    The orchestrator re-assembles the tour after this nested call and folds the
+    honest shortfall sentence into Stop 1 itself (the museum opening section, or
+    the outdoor opening section via assemble_outdoor_tour), so the inner main loop
+    must NOT also inject it — that would double-emit. A dedicated module flag on
+    generate_tour_text is used (DISABLE_STOP_POOL is set by legitimate direct
+    runners too, so it is not a safe discriminator). Best-effort: if the module is
+    unavailable the context is a no-op.
+    """
+    gtt = None
+    prev = None
+    try:
+        import generate_tour_text as gtt
+        prev = getattr(gtt, "_SUPPRESS_INLINE_SHORTFALL", False)
+        gtt._SUPPRESS_INLINE_SHORTFALL = True
+    except Exception:
+        gtt = None
+    try:
+        yield
+    finally:
+        if gtt is not None:
+            gtt._SUPPRESS_INLINE_SHORTFALL = bool(prev)
 
 
 def _is_contained(tour_category: str) -> bool:
@@ -221,11 +250,16 @@ def maybe_generate_with_pool(
             # fast-path, recursing). Disable the pool just for this nested call.
             _prev_disable = os.environ.get("DISABLE_STOP_POOL")
             os.environ["DISABLE_STOP_POOL"] = "1"
+            # [LOCAL-612] This nested run is a CONTAINED venue the orchestrator will
+            # re-assemble with an opening section that folds in the shortfall
+            # sentence itself. Suppress the main loop's own inline injection so the
+            # sentence is emitted exactly once (not twice).
             try:
-                gen_text, _out, _coords = generate_fn(
-                    location, tour_type, None, N,
-                    user_id=user_id, job_id=job_id, exclude_titles=[],
-                )
+                with _suppress_inline_shortfall():
+                    gen_text, _out, _coords = generate_fn(
+                        location, tour_type, None, N,
+                        user_id=user_id, job_id=job_id, exclude_titles=[],
+                    )
             finally:
                 if _prev_disable is None:
                     os.environ.pop("DISABLE_STOP_POOL", None)
@@ -353,10 +387,14 @@ def maybe_generate_with_pool(
     print(f"  [LOCAL-590] generating {new_n} NEW stop(s) (excluding {K} pooled); "
           f"reusing {K} pooled narration(s)")
 
-    gen_text, _out, _coords = generate_fn(
-        location, tour_type, None, new_n,
-        user_id=user_id, job_id=job_id, exclude_titles=pooled_titles,
-    )
+    # [LOCAL-612] The orchestrator folds the shortfall into Stop 1 after this nested
+    # call (museum opening section, or outdoor opening section below), so suppress
+    # the main loop's inline injection to avoid double-emission.
+    with _suppress_inline_shortfall():
+        gen_text, _out, _coords = generate_fn(
+            location, tour_type, None, new_n,
+            user_id=user_id, job_id=job_id, exclude_titles=pooled_titles,
+        )
     if not gen_text:
         # [LOCAL-600 / D616] For a CONTAINED exhibition museum, "no new stops" means
         # the venue has no more verified on-view material beyond the K already
@@ -487,12 +525,32 @@ def maybe_generate_with_pool(
             from directions_generator import generate_walking_directions as _dir_fn
         except Exception:
             _dir_fn = None
+        # [LOCAL-612 / D616] Outdoor (walking/biking/driving) pool reuse: when the
+        # route (pooled + new) delivers fewer stops than asked, lead Stop 1 with the
+        # honest shortfall sentence — the outdoor phrasing, no museum vocabulary.
+        _outdoor_delivered = len(new_units) + len(pooled_units)
+        _outdoor_shortfall = ""
+        if _outdoor_delivered < N:
+            try:
+                from about_museum_stop import build_shortfall_sentence
+                _outdoor_shortfall = build_shortfall_sentence(
+                    venue_name=location or "",
+                    exhibitions_on_view=0,
+                    delivered_stops=_outdoor_delivered,
+                    requested_stops=N,
+                    mode='outdoor')
+            except Exception as _of_e:
+                logger.info(f"[LOCAL-612] outdoor N>K shortfall skipped ({_of_e})")
+            if _outdoor_shortfall:
+                print(f"  [LOCAL-612] D616 shortfall sentence folded into Stop 1 "
+                      f"(outdoor N>K path): {_outdoor_shortfall!r}")
         result = asm.assemble_outdoor_tour(
             location, tour_type, tour_category, header_cat, display_cat,
             new_stops=new_units, pooled_stops=pooled_units,
             transport_mode=_transport_mode(tour_type),
             sources_block=sources_block,
             directions_fn=_dir_fn, api_key=api_key,
+            shortfall_sentence=_outdoor_shortfall,
         )
 
     _emit_result(output_file, result)
