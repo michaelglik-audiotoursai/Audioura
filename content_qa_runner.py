@@ -122,6 +122,9 @@ def extract_g4_proper_nouns(claim_text: str, venue_context: dict = None,
     return _claim_proper_nouns
 
 
+G4_UNGROUNDED_SENTENCES = []
+
+
 def check(name, condition, detail=""):
     global PASS_COUNT, FAIL_COUNT
     if condition:
@@ -766,7 +769,27 @@ def run_qa(tour_text, tour_file="", story_elements=None, venue_context=None):
         except Exception:
             pass
     
+    # [LEAD 2026-10-06, D611 x G4] Stop 1's opening section (About + visiting facts) is
+    # built from the venue's own pages / Wikipedia by about_museum_stop, with its own
+    # provenance. The orientation that follows legitimately restates it ("from Devlin
+    # Hall to Brighton"), and G4 failed those true, sourced claims on every McMullen
+    # reuse. The opening section's paragraphs count as elements a prolog claim may
+    # trace to. Fabrications that appear in NEITHER still fail.
+    if _stop1_match and _story_elements_list is not None:
+        _s1_body = _stop1_match.group(0)
+        _pre_orient = _s1_body.split('Orientation:', 1)[0]
+        _opening_paras = [
+            _p.strip() for _p in re.split(r'\n\n+', _pre_orient)
+            if len(_p.strip()) >= 40
+            and not re.match(r'^(Stop\s+\d+:|Address:|Coordinates:|Directions:)', _p.strip())
+        ]
+        if _opening_paras:
+            _story_elements_list = list(_story_elements_list) + [
+                {'text': _p, 'type': 'opening_section', 'source': 'd611_opening'} for _p in _opening_paras]
+
     # --- Check claims against elements ---
+    global G4_UNGROUNDED_SENTENCES
+    G4_UNGROUNDED_SENTENCES = []   # full text of each ungrounded prolog/epilog claim (LEAD, for corrective removal)
     _ungrounded_claims = []
     _is_storied = os.environ.get("STORIED_MODE") == "true"
     
@@ -815,7 +838,7 @@ def run_qa(tour_text, tour_file="", story_elements=None, venue_context=None):
                         break
                 
                 if not _matched_element:
-                    _ungrounded_claims.append(claim[:80])
+                    _ungrounded_claims.append(claim[:80]); G4_UNGROUNDED_SENTENCES.append(claim)
                     continue
                 
                 # B7: Proper nouns — delegate to module-level extraction function
@@ -831,7 +854,7 @@ def run_qa(tour_text, tour_file="", story_elements=None, venue_context=None):
                         if pn not in _elem_text_lower:
                             _missing_pn.append(pn)
                     if _missing_pn:
-                        _ungrounded_claims.append(f"{claim[:60]}... (proper noun '{_missing_pn[0]}' not in element)")
+                        _ungrounded_claims.append(f"{claim[:60]}... (proper noun '{_missing_pn[0]}' not in element)"); G4_UNGROUNDED_SENTENCES.append(claim)
                         continue
                     
                     # Also check: the SPECIFIC causal verb from the claim must exist in the
@@ -858,7 +881,7 @@ def run_qa(tour_text, tour_file="", story_elements=None, venue_context=None):
                                 _any_causal_matches = True
                                 break
                         if not _any_causal_matches:
-                            _ungrounded_claims.append(f"{claim[:60]}... (causal verb '{_claim_causal[0]}' not in matched element)")
+                            _ungrounded_claims.append(f"{claim[:60]}... (causal verb '{_claim_causal[0]}' not in matched element)"); G4_UNGROUNDED_SENTENCES.append(claim)
                             continue
         
         elif _is_storied and _claim_sentences:
