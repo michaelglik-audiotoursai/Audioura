@@ -864,6 +864,18 @@ def _serp_search(query: str) -> Tuple[List[Dict], float]:
         print(f"  [SQ-S2] No SERP_API_KEY — skipping query")
         return [], 0.0
 
+    # [LOCAL-609] Meter this Serper query. We are past the by-reference guard and
+    # the key check, so a query IS about to go on the wire ($0.001 each,
+    # cost_rates.SERPER_COST_PER_QUERY). Count it here — the one real Serper call
+    # site in work_story_searcher — so `serper` in the ledger is no longer always
+    # 0.0. No-op outside a tour cost scope (ad-hoc scripts/tests). Metering must
+    # never break the query, so it is wrapped.
+    try:
+        import cost_accumulator as _ca
+        _ca.add_search_queries(1)
+    except Exception:
+        pass
+
     start = time.time()
     payload = {"q": query, "num": 8}
     try:

@@ -7384,25 +7384,37 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
             return None, output_file, (None, None)
 
         if result.get("allowed"):
+            # [LOCAL-609] A by-reference delivery is zero-research (reuses stored
+            # material, zero Serper/grounded Gemini). Carry the full 7-key provider
+            # breakdown (all $0 — nothing new was generated), the grounding counts
+            # (0), and research_cost_reused = sum of the reused stops' original
+            # research cost.
+            _br_grounding = result.get("grounding", {"requests": 0, "queries": 0}) or {}
+            _br_breakdown = _provider_breakdown_skeleton(
+                grounding_usd=0.0,
+                grounding_queries=_br_grounding.get("queries", 0),
+                grounding_requests=_br_grounding.get("requests", 0),
+            )
             _LAST_GENERATION_COST = {
                 "total_cost": 0.0,
                 "total_tokens": 0,
                 "cache_hit": False,
                 "pool_reuse": True,
                 "by_reference": True,
-                "grounding": result.get("grounding", {"requests": 0, "queries": 0}),
-                "breakdown": {
-                    "llm": 0.0, "tts": 0.0, "search": 0.0,
-                    "reused_stops": result.get("reused_stops", 0),
-                    "new_stops": 0,
-                    "rewritten_transitions": result.get("rewritten_transitions", 0),
-                    "about_stops": result.get("about_stops", 0),
-                },
+                "tour_total_cost": 0.0,
+                "research_cost_reused": result.get("research_cost_reused", 0.0) or 0.0,
+                "grounding": _br_grounding,
+                "reused_stops": result.get("reused_stops", 0),
+                "new_stops": 0,
+                "rewritten_transitions": result.get("rewritten_transitions", 0),
+                "about_stops": result.get("about_stops", 0),
+                "breakdown": _br_breakdown,
             }
             _g = result.get("grounding", {})
             print(f"  [LOCAL-597] BY-REFERENCE DELIVERY: reused={result.get('reused_stops')} "
                   f"rewritten_transitions={result.get('rewritten_transitions')} "
                   f"about_stops={result.get('about_stops', 0)} "
+                  f"research_reused=${result.get('research_cost_reused', 0.0):.4f} "
                   f"grounding(requests={_g.get('requests', 0)}, queries={_g.get('queries', 0)})")
             _LAST_DELIVERY_PATH = 'by_reference'
             return result["text"], output_file, (None, None)
@@ -7439,7 +7451,20 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                 _pf_city = ''
                 if ',' in location:
                     _pf_city = ','.join(p.strip() for p in location.split(',')[1:]).strip()
-                _pf = _vpf.safe_preflight(_pf_venue, _pf_city)
+                # [LOCAL-609] Attribute this preflight call's Gemini usage (tokens
+                # + grounding queries) to the PREFLIGHT bucket, so it appears on
+                # its own ledger line rather than folded into the main gemini
+                # channels. The preflight is a grounded Gemini call via
+                # story_leads.gemini_with_sources; preflight_scope makes
+                # add_gemini_call route it to acc.preflight.
+                try:
+                    import cost_accumulator as _ca_pf
+                    _pf_ctx = _ca_pf.preflight_scope()
+                except Exception:
+                    import contextlib as _ctxlib
+                    _pf_ctx = _ctxlib.nullcontext()
+                with _pf_ctx:
+                    _pf = _vpf.safe_preflight(_pf_venue, _pf_city)
                 _LAST_VENUE_PREFLIGHT = _pf
                 if _pf.get('skipped'):
                     print(f"  [LOCAL-603] preflight skipped ({_pf['skipped']})")
@@ -7493,25 +7518,41 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                 )
                 if _pool_out is not None:
                     # Record the ledger cost with reuse metering (LOCAL-590 step 6).
+                    # [LOCAL-609] A pool delivery's `breakdown` carries the SAME
+                    # 7 provider keys as a fresh row (the new stops' counted
+                    # breakdown, if any new stops were generated; all-zero on a
+                    # pool-only delivery), PLUS research_cost_reused — the sum of
+                    # the reused stops' original research cost (what the reuse
+                    # saved). pool_reuse/reused_stops/etc. are kept for callers.
+                    _pool_new_cost = _pool_out.get("new_cost", 0.0) or 0.0
+                    _pool_reused_research = _pool_out.get("research_cost_reused", 0.0) or 0.0
+                    _pool_breakdown = _pool_out.get("new_breakdown") or {}
+                    if not _pool_breakdown:
+                        _pool_breakdown = _provider_breakdown_skeleton()
+                        # Reflect the scalar new_cost on the OpenAI line when we
+                        # have no richer per-provider split for the new stops.
+                        if _pool_new_cost and isinstance(_pool_breakdown.get("openai"), dict):
+                            _pool_breakdown["openai"]["usd"] = _pool_new_cost
                     _LAST_GENERATION_COST = {
-                        "total_cost": _pool_out.get("new_cost", 0.0),
+                        "total_cost": _pool_new_cost,
                         "total_tokens": 0,
                         "cache_hit": False,
                         "pool_reuse": True,
-                        "breakdown": {
-                            "llm": _pool_out.get("new_cost", 0.0),
-                            "tts": 0.0, "search": 0.0,
-                            "reused_stops": _pool_out.get("reused_stops", 0),
-                            "new_stops": _pool_out.get("new_stops", 0),
-                            "rewritten_transitions": _pool_out.get("rewritten_transitions", 0),
-                            "about_stops": _pool_out.get("about_stops", 0),
-                        },
+                        "tour_total_cost": _pool_new_cost,
+                        # [LOCAL-609] reused-research total, reported on the row
+                        "research_cost_reused": _pool_reused_research,
+                        "reused_stops": _pool_out.get("reused_stops", 0),
+                        "new_stops": _pool_out.get("new_stops", 0),
+                        "rewritten_transitions": _pool_out.get("rewritten_transitions", 0),
+                        "about_stops": _pool_out.get("about_stops", 0),
+                        "breakdown": _pool_breakdown,
                     }
                     print(f"  [LOCAL-590] POOL DELIVERY: reused={_pool_out.get('reused_stops')} "
                           f"new={_pool_out.get('new_stops')} "
                           f"rewritten_transitions={_pool_out.get('rewritten_transitions')} "
                           f"about_stops={_pool_out.get('about_stops', 0)} "
-                          f"(pool held {_pool_out.get('pooled_before')})")
+                          f"(pool held {_pool_out.get('pooled_before')}); "
+                          f"research reused ${_pool_reused_research:.4f}")
                     _LAST_DELIVERY_PATH = 'pool'
                     return _pool_out["text"], output_file, (None, None)
             except Exception as _pool_err:
@@ -7560,32 +7601,95 @@ def _reconcile_cost_record_from_accumulator(acc):
             return
 
         snap = acc.snapshot()
+        provider = snap.get("provider_breakdown") or {}
         counted_llm = snap["breakdown"]["llm"]
         counted_search = snap["breakdown"]["search"]
         counted_tts = snap["breakdown"]["tts"]
         counted_tokens = snap["llm"]["input_tokens"] + snap["llm"]["output_tokens"]
 
-        # Grounding is already counted via story_leads.get_grounding_requests() and
-        # folded in by the impl; keep whatever it put there (it is the same per-
-        # request channel, counted at its own single chokepoint).
-        grounding = rec.get("grounding_cost", rec.get("breakdown", {}).get("grounding", 0.0)) or 0.0
+        # [LOCAL-609] The accumulator is now the single source of truth for EVERY
+        # provider channel — including Gemini grounding (per-query) and Gemini Flash
+        # tokens and the preflight call — because story_leads._meter_gemini_call
+        # feeds cost_accumulator.add_gemini_call at the one Gemini chokepoint, the
+        # same place story_leads.get_grounding_queries() counts. So we read the
+        # grounding dollars from the accumulator rather than the impl's hand-count,
+        # which keeps a single counted figure and avoids drift.
+        _acc_grounding = (provider.get("gemini_grounding") or {}).get("usd", 0.0) or 0.0
+        _acc_gemini_tokens = (provider.get("gemini_tokens") or {}).get("usd", 0.0) or 0.0
+        _acc_preflight = (provider.get("preflight") or {}).get("usd", 0.0) or 0.0
 
-        breakdown = dict(rec.get("breakdown") or {})
-        breakdown["llm"] = counted_llm
-        breakdown["search"] = counted_search
-        breakdown["tts"] = counted_tts
-        breakdown["grounding"] = grounding
+        # Fallback: if the accumulator saw no grounding (e.g. an older code path
+        # that counted grounding only via story_leads), fall back to the impl's
+        # hand-counted grounding so we never UNDER-report. Max picks the counted one.
+        _impl_grounding = rec.get("grounding_cost", 0.0) or 0.0
+        grounding = max(_acc_grounding, _impl_grounding)
+
+        # [LOCAL-609] The breakdown Michael asked for: provider × ($, units),
+        # counted not estimated. Keep this the canonical shape of the ledger row.
+        if provider:
+            breakdown = dict(provider)
+            # If we fell back to the impl's grounding (accumulator missed it),
+            # reflect that dollar figure in the breakdown too so the row is honest.
+            if grounding != _acc_grounding and isinstance(breakdown.get("gemini_grounding"), dict):
+                breakdown["gemini_grounding"] = dict(breakdown["gemini_grounding"])
+                breakdown["gemini_grounding"]["usd"] = grounding
+                if not breakdown["gemini_grounding"].get("queries"):
+                    breakdown["gemini_grounding"]["queries"] = rec.get("grounding_queries", 0) or 0
+                    breakdown["gemini_grounding"]["requests"] = rec.get("grounding_requests", 0) or 0
+        else:
+            # Defensive: no provider breakdown (should not happen) — keep legacy keys.
+            breakdown = dict(rec.get("breakdown") or {})
+            breakdown["llm"] = counted_llm
+            breakdown["search"] = counted_search
+            breakdown["tts"] = counted_tts
+            breakdown["grounding"] = grounding
 
         rec["breakdown"] = breakdown
+        # [LOCAL-609] Preserve the legacy scalar fields some callers/tests still
+        # read, now sourced from the counted accumulator.
+        rec["grounding_cost"] = grounding
+        rec["grounding_requests"] = (provider.get("gemini_grounding") or {}).get(
+            "requests", rec.get("grounding_requests", 0)) or 0
+        rec["grounding_queries"] = (provider.get("gemini_grounding") or {}).get(
+            "queries", rec.get("grounding_queries", 0)) or 0
+        rec["gemini_tokens_cost"] = _acc_gemini_tokens
+        rec["preflight_cost"] = _acc_preflight
         # total_cost historically meant "OpenAI token cost" (the LLM channel);
-        # keep that meaning but now counted from every call site. Search/TTS have
-        # their own breakdown keys and roll into tour_total_cost.
+        # keep that meaning but now counted from every call site.
         rec["total_cost"] = counted_llm
         rec["total_tokens"] = counted_tokens
-        rec["tour_total_cost"] = counted_llm + counted_search + counted_tts + grounding
+        # [LOCAL-609] tour_total_cost is the delivery total across ALL counted
+        # provider channels: OpenAI + Serper + TTS + Gemini grounding + Gemini
+        # Flash tokens + preflight. This is the our_cost_usd the ledger stores.
+        rec["tour_total_cost"] = (
+            counted_llm + counted_search + counted_tts
+            + grounding + _acc_gemini_tokens + _acc_preflight
+        )
         rec["cost_accumulator"] = snap  # full debug snapshot for traceability
     except Exception as _rec_err:  # pragma: no cover
         _import_logger.error(f"[LOCAL-562] cost reconcile skipped: {_rec_err}")
+
+
+def _provider_breakdown_skeleton(grounding_usd=0.0, grounding_queries=0,
+                                 grounding_requests=0):
+    """[LOCAL-609] A zero-cost provider breakdown with the full 7-key shape, used
+    by the cache-hit and overview records so EVERY tour row carries the same
+    provider keys. On a cache hit nothing is generated, so every channel is $0 and
+    preflight.calls is 0 — the report reads this and says 'preflight: $0 (cache
+    hit, preflight did not run)'. A cache hit may still carry a grounding figure
+    if the cache-check path counted queries, so that is passed through."""
+    return {
+        "openai": {"usd": 0.0, "calls": 0, "input_tokens": 0, "output_tokens": 0,
+                   "by_model": {}},
+        "gemini_grounding": {"usd": float(grounding_usd or 0.0),
+                             "requests": int(grounding_requests or 0),
+                             "queries": int(grounding_queries or 0)},
+        "gemini_tokens": {"usd": 0.0, "calls": 0, "input_tokens": 0, "output_tokens": 0},
+        "serper": {"usd": 0.0, "queries": 0},
+        "preflight": {"usd": 0.0, "calls": 0, "queries": 0,
+                      "input_tokens": 0, "output_tokens": 0},
+        "tts": {"usd": 0.0, "engine": "", "characters": 0, "calls": 0},
+    }
 
 
 def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=None, persona=None, user_id=None, job_id=None, forced_stops=None, harness=False, exclude_titles=None):
@@ -7838,8 +7942,16 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
                         "grounding_requests": _cache_gr,
                         "grounding_queries": _cache_gq,
                         "tour_total_cost": 0.0 + _cache_gr_cost,
-                        "breakdown": {"llm": 0.0, "tts": 0.0, "search": 0.0,
-                                      "grounding": _cache_gr_cost},
+                        # [LOCAL-609] Full 7-key provider breakdown so every row
+                        # has the same shape. A cache hit ran no preflight
+                        # (preflight.calls=0), generated no OpenAI/Serper/TTS, and
+                        # issued no new Gemini tokens; only the cache-check
+                        # grounding (usually 0) is carried.
+                        "breakdown": _provider_breakdown_skeleton(
+                            grounding_usd=_cache_gr_cost,
+                            grounding_queries=_cache_gq,
+                            grounding_requests=_cache_gr,
+                        ),
                     }
                     # Return cached tour immediately
                     if output_file:
@@ -23192,11 +23304,36 @@ RULES:
                     _pool_qid = _pool_ident[4:] if _pool_ident.startswith("qid:") else None
                 except Exception:
                     _pool_qid = None
+                # [LOCAL-609] Attribute this fresh tour's one-time RESEARCH cost
+                # across its stops, so each pooled stop carries its share. Research
+                # = every counted provider channel EXCEPT TTS (TTS is per-delivery
+                # audio, re-paid on each delivery; research is the write-once cost
+                # a reuse avoids). Read it from the live per-tour accumulator (we
+                # are still inside tour_scope here; reconcile has not run yet).
+                _research_per_stop = 0.0
+                try:
+                    import cost_accumulator as _ca_rc
+                    _acc_now = _ca_rc.current_accumulator()
+                    if _acc_now is not None:
+                        _snap_now = _acc_now.snapshot()
+                        _research_total = (_snap_now.get("total_usd", 0.0)
+                                           - (_snap_now.get("tts", {}) or {}).get("usd", 0.0))
+                        _n_stops = 0
+                        try:
+                            _n_stops = len(_pool.parse_delivered_stops(complete_tour))
+                        except Exception:
+                            _n_stops = 0
+                        if _n_stops > 0 and _research_total > 0:
+                            _research_per_stop = _research_total / _n_stops
+                except Exception:
+                    _research_per_stop = 0.0
                 _pool_written = _pool.store_delivered_tour(
                     location, tour_type, complete_tour, _db_url,
                     qid=_pool_qid, sources=_pool_sources,
+                    research_cost_usd_per_stop=_research_per_stop,
                 )
-                print(f"  [LOCAL-590] POOL STORE: {_pool_written} stop(s) pooled for {location} / {tour_type}")
+                print(f"  [LOCAL-590] POOL STORE: {_pool_written} stop(s) pooled for {location} / {tour_type}"
+                      f" (research ${_research_per_stop:.4f}/stop)")
             except ImportError:
                 _import_logger.error("[LOCAL-590] MISSING: stop_pool_store — stop pooling DISABLED")
             except Exception as _pool_store_err:

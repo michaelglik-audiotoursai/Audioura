@@ -151,6 +151,44 @@ def _raise_if_grounding_forbidden(what: str) -> None:
 
 
 
+def _meter_gemini_call(d: dict, grounded: bool) -> None:
+    """[LOCAL-609] Price one Gemini response into the per-tour cost accumulator.
+
+    Reads the token counts from ``usageMetadata`` (promptTokenCount /
+    candidatesTokenCount — the Flash TOKEN channel) and the grounded search-query
+    count from ``candidates[0].groundingMetadata.webSearchQueries`` (the grounding
+    channel, Google's billing unit). Delegates routing (ordinary vs preflight
+    bucket) to ``cost_accumulator.add_gemini_call``. A no-op when the accumulator
+    module is unavailable or there is no active tour scope. NEVER raises into a
+    real generation — callers wrap it, and this is defensive on top.
+    """
+    try:
+        import cost_accumulator as _ca
+    except Exception:
+        return
+    um = (d or {}).get('usageMetadata', {}) or {}
+    # Gemini reports promptTokenCount (input) and candidatesTokenCount (output).
+    # thoughtsTokenCount, when present, is billed as output too; include it so the
+    # token dollars match the invoice. Missing fields default to 0.
+    in_tok = int(um.get('promptTokenCount', 0) or 0)
+    out_tok = int(um.get('candidatesTokenCount', 0) or 0)
+    out_tok += int(um.get('thoughtsTokenCount', 0) or 0)
+    num_queries = 0
+    if grounded:
+        try:
+            cand = (d.get('candidates') or [{}])[0]
+            gm = cand.get('groundingMetadata', {}) or {}
+            num_queries = len(gm.get('webSearchQueries', []) or [])
+        except Exception:
+            num_queries = 0
+    _ca.add_gemini_call(
+        input_tokens=in_tok,
+        output_tokens=out_tok,
+        num_queries=num_queries,
+        grounded=grounded,
+    )
+
+
 def _count_grounding_queries(web_search_queries) -> None:
     """[LOCAL-594] Record the Google search queries a grounded response reported.
 
@@ -238,6 +276,15 @@ def _gemini(prompt: str, model: str = None, grounded: bool = False) -> str:
         timeout=90)
     r.raise_for_status()
     d = r.json()
+    # [LOCAL-609] Meter this Gemini call: Flash input/output TOKENS (always) plus
+    # the grounding search QUERIES (when grounded). usageMetadata carries the token
+    # counts; webSearchQueries carries the query count. Routed to the preflight
+    # bucket automatically when inside a preflight_scope. Wrapped so metering never
+    # breaks a real generation; no-op outside a tour cost scope.
+    try:
+        _meter_gemini_call(d, grounded)
+    except Exception:
+        pass
     try:
         cand = d['candidates'][0]
         # [LOCAL-594] Count the Google search queries this grounded response
@@ -322,6 +369,15 @@ def gemini_with_sources(prompt: str, model: str = None,
     except Exception as e:
         out['error'] = f'{type(e).__name__}: {e}'
         return out
+
+    # [LOCAL-609] Meter this Gemini call (tokens always; grounding queries when
+    # grounded). Routed to preflight bucket when inside a preflight_scope — the
+    # LOCAL-603 preflight flows through here (grounded=True). Wrapped; no-op
+    # outside a tour cost scope.
+    try:
+        _meter_gemini_call(d, grounded)
+    except Exception:
+        pass
 
     try:
         cand = d['candidates'][0]

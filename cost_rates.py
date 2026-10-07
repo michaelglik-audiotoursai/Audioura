@@ -93,6 +93,67 @@ def grounding_cost(num_requests: int) -> float:
     fans out into several queries — so it is no longer the figure Michael sees."""
     return max(0, int(num_requests)) * GROUNDING_COST_PER_QUERY
 
+# --- Gemini Flash tokens (the token channel, separate from grounding) ---
+# [LOCAL-609]
+# Source: https://ai.google.dev/gemini-api/docs/pricing  (Read: 2026-10-06)
+# plus corroborating trade trackers read the same day:
+#   https://www.morphllm.com/gemini-api-pricing  (Read: 2026-10-06)
+#   https://rapidevelopers.com/ai-api-limits-performance-matrix/gemini-2-5-flash
+#     (Read: 2026-10-06)
+#
+# The deployed model is `gemini-flash-latest` (story_leads.GEMINI_MODEL default),
+# which resolves to the Gemini 2.5 Flash family. Its paid token rate as invoiced
+# today (raised 2026-07-02) is $0.30 / 1M input tokens and $2.50 / 1M output
+# tokens. These are the TOKEN prices only — the Grounding-with-Google-Search
+# charge is a SEPARATE line (GROUNDING_COST_PER_QUERY above), billed per search
+# query, and must not be conflated with the token cost. A grounded Gemini call
+# therefore has TWO costs: its input/output tokens (this channel) and the search
+# queries it issued (the grounding channel).
+#
+# Why this exists: before LOCAL-609 the Gemini Flash token spend was metered
+# NOWHERE. The ledger carried grounding (per-query) but never the tokens the same
+# calls burned, so Michael's per-tour figure silently omitted the Flash token
+# line entirely. We price the unit Google invoices.
+GEMINI_FLASH_INPUT_PER_1M = 0.30
+GEMINI_FLASH_OUTPUT_PER_1M = 2.50
+GEMINI_FLASH_INPUT_PER_TOKEN = GEMINI_FLASH_INPUT_PER_1M / 1_000_000
+GEMINI_FLASH_OUTPUT_PER_TOKEN = GEMINI_FLASH_OUTPUT_PER_1M / 1_000_000
+
+
+def gemini_tokens_cost(input_tokens: int = 0, output_tokens: int = 0) -> float:
+    """[LOCAL-609] Cost in USD of Gemini Flash token usage.
+
+    This is the TOKEN channel only (promptTokenCount + candidatesTokenCount from
+    the response's usageMetadata). The grounding search-query charge is priced
+    separately via grounding_query_cost(). Returns $0.00 for zero tokens — an
+    ungrounded cache hit that made no Gemini call costs nothing here.
+    """
+    input_tokens = max(0, int(input_tokens or 0))
+    output_tokens = max(0, int(output_tokens or 0))
+    return (input_tokens * GEMINI_FLASH_INPUT_PER_TOKEN
+            + output_tokens * GEMINI_FLASH_OUTPUT_PER_TOKEN)
+
+
+# --- Preflight (LOCAL-603 venue preflight) ---
+# [LOCAL-609]
+# The LOCAL-603 preflight is a single grounded Gemini call made BEFORE the main
+# generation to read a venue's hours/admission. It is not a distinct provider —
+# its dollars are Gemini grounding search queries plus Gemini Flash tokens — but
+# Michael asked for it as its OWN ledger line because it is "its own call, not
+# visible per job" (the ticket's words). So the preflight channel is reported
+# separately in the breakdown; its dollar figure is computed with the SAME rates
+# as the grounding + token channels (no new rate), via preflight_cost(). On a
+# cache hit the preflight does not run, so this channel is $0.00 and we say so.
+def preflight_cost(num_queries: int = 0, input_tokens: int = 0,
+                   output_tokens: int = 0) -> float:
+    """[LOCAL-609] Cost in USD of one venue preflight: its grounding search
+    queries priced at GROUNDING_COST_PER_QUERY plus its Gemini Flash tokens priced
+    at the Flash token rates. Uses no new rate — the preflight is a grounded
+    Gemini call, reported on its own line for visibility (ticket LOCAL-609)."""
+    return (grounding_query_cost(num_queries)
+            + gemini_tokens_cost(input_tokens, output_tokens))
+
+
 # --- TTS (AWS Polly) ---
 # Source: https://aws.amazon.com/polly/pricing/
 # Read: 2026-08-06

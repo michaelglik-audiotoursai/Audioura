@@ -408,12 +408,21 @@ def _ensure_table(conn) -> None:
                 generated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
                 hit_count INTEGER DEFAULT 0,
                 order_seq INTEGER DEFAULT 0,
+                research_cost_usd NUMERIC(12, 6) DEFAULT 0,
                 PRIMARY KEY (pool_key, title_norm)
             )
         """)
         # Migration path for a table created before order_seq existed.
         cur.execute("""
             ALTER TABLE stop_pool ADD COLUMN IF NOT EXISTS order_seq INTEGER DEFAULT 0
+        """)
+        # [LOCAL-609] Additive migration: per-stop research cost, stored when a
+        # stop is first pooled. Lets a pool/cache delivery report
+        # `research_cost_reused` (the sum over the reused stops) so a listener's
+        # price can be shown as "this delivery" plus "share of research". Additive
+        # only — never DELETE/DROP (ticket LOCAL-609).
+        cur.execute("""
+            ALTER TABLE stop_pool ADD COLUMN IF NOT EXISTS research_cost_usd NUMERIC(12, 6) DEFAULT 0
         """)
         cur.execute("""
             CREATE INDEX IF NOT EXISTS idx_stop_pool_key
@@ -437,6 +446,7 @@ def store_delivered_tour(
     qid: Optional[str] = None,
     sources: Optional[List[str]] = None,
     story_elements_by_title: Optional[Dict[str, dict]] = None,
+    research_cost_usd_per_stop: float = 0.0,
 ) -> int:
     """Parse a delivered tour and UPSERT each stop into the pool.
 
@@ -445,6 +455,14 @@ def store_delivered_tour(
     `generated_at`; no row is ever removed. `sources` (tour-level source URLs)
     are stored on each stop as a reasonable default; `story_elements_by_title`
     (keyed by bare title) overrides per stop when the caller has them.
+
+    [LOCAL-609] `research_cost_usd_per_stop` is the one-time research cost
+    attributed to EACH stop of this delivery (the caller divides the tour's
+    non-TTS generation cost across its stops). It is written only when a stop is
+    FIRST pooled — on a conflict the earlier (original) value is kept (COALESCE to
+    the greater of 0 so a later $0 re-pool never erases a real original cost). A
+    later pool/cache delivery reports `research_cost_reused` by summing this
+    column over the stops it reuses.
     """
     identity = venue_identity(location, qid)
     pool_key = _pool_key(identity, tour_type)
@@ -480,8 +498,8 @@ def store_delivered_tour(
                         title, artist, year, narration, raw_block,
                         address, coordinates, type_specialty, specific_examples,
                         operational_details, sources_json, story_elements_json,
-                        order_seq, generated_at
-                    ) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,NOW())
+                        order_seq, research_cost_usd, generated_at
+                    ) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,NOW())
                     ON CONFLICT (pool_key, title_norm) DO UPDATE SET
                         title = EXCLUDED.title,
                         artist = EXCLUDED.artist,
@@ -496,6 +514,13 @@ def store_delivered_tour(
                         sources_json = COALESCE(EXCLUDED.sources_json, stop_pool.sources_json),
                         story_elements_json = COALESCE(EXCLUDED.story_elements_json, stop_pool.story_elements_json),
                         order_seq = LEAST(stop_pool.order_seq, EXCLUDED.order_seq),
+                        -- [LOCAL-609] Keep the ORIGINAL research cost on re-pool
+                        -- (first-pooled semantics): only adopt the new value when
+                        -- the stored one is 0/NULL (never seen a real cost yet).
+                        research_cost_usd = CASE
+                            WHEN COALESCE(stop_pool.research_cost_usd, 0) > 0
+                            THEN stop_pool.research_cost_usd
+                            ELSE EXCLUDED.research_cost_usd END,
                         generated_at = NOW()
                     """,
                     (
@@ -505,6 +530,7 @@ def store_delivered_tour(
                         u["address"], u["coordinates"], u["type_specialty"],
                         u["specific_examples"], u["operational_details"],
                         sources_json_default, se_json, base_seq + seq_i,
+                        float(research_cost_usd_per_stop or 0.0),
                     ),
                 )
                 written += 1
@@ -558,7 +584,7 @@ def get_pool_stops(
                 SELECT title, artist, year, narration, raw_block,
                        address, coordinates, type_specialty, specific_examples,
                        operational_details, sources_json, story_elements_json,
-                       generated_at, hit_count, title_norm
+                       generated_at, hit_count, title_norm, research_cost_usd
                 FROM stop_pool
                 WHERE pool_key = ANY(%s)
                 ORDER BY order_seq ASC, generated_at ASC, title_norm ASC
@@ -600,6 +626,9 @@ def get_pool_stops(
             "story_elements": json.loads(r[11]) if r[11] else None,
             "generated_at": r[12].isoformat() if r[12] else None,
             "hit_count": r[13] or 0,
+            # [LOCAL-609] the one-time research cost stored when this stop was
+            # first pooled; summed into research_cost_reused on reuse.
+            "research_cost_usd": float(r[15]) if r[15] is not None else 0.0,
         })
     logger.info(f"[POOL] {len(stops)} pooled stop(s) across keys {keys}")
     return stops

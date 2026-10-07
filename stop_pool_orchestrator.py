@@ -286,6 +286,9 @@ def maybe_generate_with_pool(
                 "pooled_before": 0,
                 "served_from_pool_only": False,
                 "new_cost": first_cost,
+                # [LOCAL-609] first-ever tour of this venue — nothing reused
+                "research_cost_reused": 0.0,
+                "new_breakdown": _new_breakdown_from_last(),
             }
         except Exception as e:
             logger.info(f"[LOCAL-592] first-tour opening-section fold failed ({e}); normal gen")
@@ -339,6 +342,9 @@ def maybe_generate_with_pool(
             "pooled_before": K,
             "served_from_pool_only": True,
             "new_cost": 0.0,
+            # [LOCAL-609] sum of the reused stops' original research cost
+            "research_cost_reused": _sum_research_cost(chosen),
+            "new_breakdown": {},
         }
 
     # ─── N > K : generate only the N-K new stops, excluding pooled titles ─────
@@ -402,6 +408,9 @@ def maybe_generate_with_pool(
             "pooled_before": K,
             "served_from_pool_only": True,
             "new_cost": 0.0,
+            # [LOCAL-609] every pooled stop is reused here
+            "research_cost_reused": _sum_research_cost(pooled_rows),
+            "new_breakdown": {},
         }
 
     # Capture the cost of the new-stop generation BEFORE we touch the pool again.
@@ -410,6 +419,8 @@ def maybe_generate_with_pool(
         new_cost = float((_new_cost_rec or {}).get("total_cost", 0.0))
     except Exception:
         new_cost = 0.0
+    # [LOCAL-609] Also capture the new stops' per-provider breakdown.
+    _new_breakdown = _new_breakdown_from_last()
 
     parsed_new = pool.parse_delivered_stops(gen_text)
     # De-dup: never let a freshly generated stop collide with a pooled title.
@@ -498,6 +509,9 @@ def maybe_generate_with_pool(
         "pooled_before": K,
         "served_from_pool_only": False,
         "new_cost": new_cost,
+        # [LOCAL-609] the K pooled stops are reused alongside the new ones
+        "research_cost_reused": _sum_research_cost(pooled_rows),
+        "new_breakdown": _new_breakdown,
     }
 
 
@@ -513,6 +527,39 @@ def maybe_generate_with_pool(
 # different text and therefore gets NEW audio. `audio_reuse_identity` makes that
 # contract explicit and testable: equal identities ⇒ audio is reusable.
 _POLLY_NEURAL_VOICES = frozenset(["Joanna", "Matthew", "Amy", "Brian"])
+
+
+def _sum_research_cost(rows) -> float:
+    """[LOCAL-609] Sum the one-time research cost of the pooled stops being reused.
+
+    Each pooled row carries `research_cost_usd` — the share of the ORIGINAL
+    generation cost attributed to that stop when it was first pooled. A pool/cache
+    delivery reuses these stops and pays ~nothing to generate them again; this sum
+    is what that reuse SAVED, reported on the delivery row as `research_cost_reused`
+    so a listener's price can later be shown as "this delivery" + "share of
+    research". Robust to rows lacking the key (pre-LOCAL-609 rows -> 0)."""
+    total = 0.0
+    for r in (rows or []):
+        try:
+            total += float(r.get("research_cost_usd", 0.0) or 0.0)
+        except (TypeError, ValueError, AttributeError):
+            pass
+    return total
+
+
+def _new_breakdown_from_last() -> dict:
+    """[LOCAL-609] The provider breakdown of the just-finished NEW-stop generation.
+
+    The inner generate_fn call records its own counted 7-key breakdown in
+    generate_tour_text._LAST_GENERATION_COST. Reading it here lets a pool delivery
+    report WHAT the new stops cost per provider (not just a scalar new_cost).
+    Returns {} when unavailable."""
+    try:
+        from generate_tour_text import _LAST_GENERATION_COST as _nc
+        bd = (_nc or {}).get("breakdown")
+        return dict(bd) if isinstance(bd, dict) else {}
+    except Exception:
+        return {}
 
 
 def audio_reuse_identity(stop_text: str, voice_id: str = "Joanna",

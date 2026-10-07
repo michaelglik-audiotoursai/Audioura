@@ -63,9 +63,13 @@ import cost_rates
 __all__ = [
     "CostAccumulator",
     "tour_scope",
+    "preflight_scope",
     "current_accumulator",
     "add_llm_usage",
     "add_grounding_requests",
+    "add_gemini_tokens",
+    "add_gemini_call",
+    "add_preflight",
     "add_search_queries",
     "add_tts_characters",
     "run_in_tour_context",
@@ -82,16 +86,30 @@ class CostAccumulator:
     description calls, gate calls) that all share the one accumulator.
     """
 
-    __slots__ = ("_lock", "job_id", "llm", "grounding", "search", "tts")
+    __slots__ = (
+        "_lock", "job_id", "llm", "grounding", "search", "tts",
+        # [LOCAL-609] new provider-split buckets
+        "llm_by_model", "gemini_tokens", "preflight",
+    )
 
     def __init__(self, job_id: Optional[str] = None):
         self._lock = threading.Lock()
         self.job_id = job_id
         # Each bucket: usd plus type-appropriate counters.
         self.llm = {"usd": 0.0, "calls": 0, "input_tokens": 0, "output_tokens": 0}
-        self.grounding = {"usd": 0.0, "requests": 0}
+        self.grounding = {"usd": 0.0, "requests": 0, "queries": 0}
         self.search = {"usd": 0.0, "queries": 0}
         self.tts = {"usd": 0.0, "characters": 0, "calls": 0}
+        # [LOCAL-609] OpenAI usage split per model, so a tour_generate row can show
+        # gpt-4o vs gpt-4o-mini separately. Keyed by model string on the wire.
+        self.llm_by_model: dict = {}
+        # [LOCAL-609] Gemini Flash TOKEN channel (separate from the grounding
+        # search-query channel). usageMetadata prompt/candidates token counts.
+        self.gemini_tokens = {"usd": 0.0, "calls": 0, "input_tokens": 0, "output_tokens": 0}
+        # [LOCAL-609] LOCAL-603 venue preflight — reported on its own line. Holds
+        # the preflight call's grounding queries and Flash tokens and their $.
+        self.preflight = {"usd": 0.0, "calls": 0, "queries": 0,
+                          "input_tokens": 0, "output_tokens": 0}
 
     # ---- mutation ---------------------------------------------------------
     def add_llm(self, input_tokens: int, output_tokens: int, model: str) -> float:
@@ -114,15 +132,72 @@ class CostAccumulator:
             self.llm["calls"] += 1
             self.llm["input_tokens"] += input_tokens
             self.llm["output_tokens"] += output_tokens
+            # [LOCAL-609] per-model split
+            _mkey = model or "gpt-3.5-turbo"
+            _m = self.llm_by_model.get(_mkey)
+            if _m is None:
+                _m = {"usd": 0.0, "calls": 0, "input_tokens": 0, "output_tokens": 0}
+                self.llm_by_model[_mkey] = _m
+            _m["usd"] += cost
+            _m["calls"] += 1
+            _m["input_tokens"] += input_tokens
+            _m["output_tokens"] += output_tokens
         return cost
 
-    def add_grounding(self, num_requests: int = 1) -> float:
-        """Add ``num_requests`` grounded Google-Search Gemini requests (per-request bill)."""
+    def add_grounding(self, num_requests: int = 1, num_queries: int = 0) -> float:
+        """Add grounded Google-Search Gemini usage.
+
+        [LOCAL-609] The dollar figure follows the SEARCH QUERIES (the unit Google
+        invoices — "Generate content search query gemini 3 paid"), priced via
+        cost_rates.grounding_query_cost. ``num_requests`` is tracked only to
+        enforce the LOCAL-594 "<= 1 grounded request per stop" cap; it does not
+        drive the dollars. When ``num_queries`` is 0 the request searched nothing
+        and costs $0.00 on this channel — exactly what Google bills.
+
+        Backwards-compat: callers that pass only ``num_requests`` (the pre-609
+        signature) still work; with no query count they add 0 dollars (which is
+        correct — a request that reported no webSearchQueries is free here).
+        """
         num_requests = int(num_requests or 0)
-        cost = cost_rates.grounding_cost(num_requests)
+        num_queries = int(num_queries or 0)
+        cost = cost_rates.grounding_query_cost(num_queries)
         with self._lock:
             self.grounding["usd"] += cost
             self.grounding["requests"] += num_requests
+            self.grounding["queries"] += num_queries
+        return cost
+
+    def add_gemini_tokens(self, input_tokens: int = 0, output_tokens: int = 0) -> float:
+        """[LOCAL-609] Add one Gemini Flash call's TOKEN usage (the token channel,
+        separate from the grounding search-query channel). Priced with
+        cost_rates.gemini_tokens_cost. Before LOCAL-609 this spend was metered
+        nowhere, so the ledger silently omitted it."""
+        input_tokens = int(input_tokens or 0)
+        output_tokens = int(output_tokens or 0)
+        cost = cost_rates.gemini_tokens_cost(input_tokens, output_tokens)
+        with self._lock:
+            self.gemini_tokens["usd"] += cost
+            self.gemini_tokens["calls"] += 1
+            self.gemini_tokens["input_tokens"] += input_tokens
+            self.gemini_tokens["output_tokens"] += output_tokens
+        return cost
+
+    def add_preflight(self, num_queries: int = 0, input_tokens: int = 0,
+                      output_tokens: int = 0) -> float:
+        """[LOCAL-609] Add the LOCAL-603 venue preflight call, reported on its own
+        ledger line. Its dollars are grounding search queries + Flash tokens
+        (cost_rates.preflight_cost); no new rate. On a cache hit the preflight
+        does not run, so this stays $0.00 / 0 calls and the report says so."""
+        num_queries = int(num_queries or 0)
+        input_tokens = int(input_tokens or 0)
+        output_tokens = int(output_tokens or 0)
+        cost = cost_rates.preflight_cost(num_queries, input_tokens, output_tokens)
+        with self._lock:
+            self.preflight["usd"] += cost
+            self.preflight["calls"] += 1
+            self.preflight["queries"] += num_queries
+            self.preflight["input_tokens"] += input_tokens
+            self.preflight["output_tokens"] += output_tokens
         return cost
 
     def add_search(self, num_queries: int = 1) -> float:
@@ -147,15 +222,27 @@ class CostAccumulator:
             self.tts["usd"] += cost
             self.tts["characters"] += char_count
             self.tts["calls"] += 1
+            # [LOCAL-609] remember the engine for the breakdown's engine field.
+            self.tts["engine"] = engine
         return cost
 
     # ---- read-out ---------------------------------------------------------
     def total_usd(self) -> float:
         with self._lock:
-            return self.llm["usd"] + self.grounding["usd"] + self.search["usd"] + self.tts["usd"]
+            return self._total_usd_locked()
+
+    def _total_usd_locked(self) -> float:
+        """Sum of every billable channel. Caller must hold the lock.
+        [LOCAL-609] includes gemini_tokens and preflight alongside the original
+        llm/grounding/search/tts channels."""
+        return (
+            self.llm["usd"] + self.grounding["usd"] + self.search["usd"]
+            + self.tts["usd"] + self.gemini_tokens["usd"] + self.preflight["usd"]
+        )
 
     def breakdown(self) -> dict:
-        """The four-key breakdown the cost ledger stores."""
+        """The original four-key breakdown (kept for backwards compatibility with
+        pre-LOCAL-609 callers/tests that read llm/grounding/search/tts)."""
         with self._lock:
             return {
                 "llm": self.llm["usd"],
@@ -164,23 +251,115 @@ class CostAccumulator:
                 "tts": self.tts["usd"],
             }
 
-    def snapshot(self) -> dict:
-        """A full debug snapshot: breakdown plus per-bucket counters and total."""
+    def provider_breakdown(self) -> dict:
+        """[LOCAL-609] The per-provider breakdown Michael asked for — every channel
+        with its dollars AND its unit counts, counted (not estimated). This is the
+        dict written into the tour_generate ledger row's `breakdown`.
+
+        Keys (ticket LOCAL-609):
+          openai            — $ and tokens, split per model under `by_model`
+          gemini_grounding  — $, grounded requests, search queries
+          gemini_tokens     — $, Flash input/output tokens
+          serper            — $, queries
+          preflight         — $, queries + Flash tokens (0 on a cache hit)
+          tts               — engine, chars, $ (Kokoro is $0 by rate)
+        A translation row carries its own `translation` key (added by the
+        translation service), not here.
+        """
         with self._lock:
             return {
+                "openai": {
+                    "usd": self.llm["usd"],
+                    "calls": self.llm["calls"],
+                    "input_tokens": self.llm["input_tokens"],
+                    "output_tokens": self.llm["output_tokens"],
+                    "by_model": {
+                        m: dict(v) for m, v in self.llm_by_model.items()
+                    },
+                },
+                "gemini_grounding": {
+                    "usd": self.grounding["usd"],
+                    "requests": self.grounding["requests"],
+                    "queries": self.grounding["queries"],
+                },
+                "gemini_tokens": {
+                    "usd": self.gemini_tokens["usd"],
+                    "calls": self.gemini_tokens["calls"],
+                    "input_tokens": self.gemini_tokens["input_tokens"],
+                    "output_tokens": self.gemini_tokens["output_tokens"],
+                },
+                "serper": {
+                    "usd": self.search["usd"],
+                    "queries": self.search["queries"],
+                },
+                "preflight": {
+                    "usd": self.preflight["usd"],
+                    "calls": self.preflight["calls"],
+                    "queries": self.preflight["queries"],
+                    "input_tokens": self.preflight["input_tokens"],
+                    "output_tokens": self.preflight["output_tokens"],
+                },
+                "tts": {
+                    "usd": self.tts["usd"],
+                    "engine": self.tts.get("engine", ""),
+                    "characters": self.tts["characters"],
+                    "calls": self.tts["calls"],
+                },
+            }
+
+    def snapshot(self) -> dict:
+        """A full debug snapshot: breakdown plus per-bucket counters and total.
+
+        [LOCAL-609] carries both the legacy four-key ``breakdown`` and the new
+        seven-key ``provider_breakdown`` so old readers and the new report both
+        work, and the total now includes gemini_tokens and preflight.
+        """
+        with self._lock:
+            total = self._total_usd_locked()
+            provider = {
+                "openai": {
+                    "usd": self.llm["usd"], "calls": self.llm["calls"],
+                    "input_tokens": self.llm["input_tokens"],
+                    "output_tokens": self.llm["output_tokens"],
+                    "by_model": {m: dict(v) for m, v in self.llm_by_model.items()},
+                },
+                "gemini_grounding": {
+                    "usd": self.grounding["usd"],
+                    "requests": self.grounding["requests"],
+                    "queries": self.grounding["queries"],
+                },
+                "gemini_tokens": {
+                    "usd": self.gemini_tokens["usd"], "calls": self.gemini_tokens["calls"],
+                    "input_tokens": self.gemini_tokens["input_tokens"],
+                    "output_tokens": self.gemini_tokens["output_tokens"],
+                },
+                "serper": {"usd": self.search["usd"], "queries": self.search["queries"]},
+                "preflight": {
+                    "usd": self.preflight["usd"], "calls": self.preflight["calls"],
+                    "queries": self.preflight["queries"],
+                    "input_tokens": self.preflight["input_tokens"],
+                    "output_tokens": self.preflight["output_tokens"],
+                },
+                "tts": {
+                    "usd": self.tts["usd"], "engine": self.tts.get("engine", ""),
+                    "characters": self.tts["characters"], "calls": self.tts["calls"],
+                },
+            }
+            return {
                 "job_id": self.job_id,
-                "total_usd": (
-                    self.llm["usd"] + self.grounding["usd"]
-                    + self.search["usd"] + self.tts["usd"]
-                ),
+                "total_usd": total,
                 "breakdown": {
                     "llm": self.llm["usd"],
                     "grounding": self.grounding["usd"],
                     "search": self.search["usd"],
                     "tts": self.tts["usd"],
                 },
+                "provider_breakdown": provider,
                 "llm": dict(self.llm),
+                "llm_by_model": {m: dict(v) for m, v in self.llm_by_model.items()},
                 "grounding": dict(self.grounding),
+                "gemini_tokens": dict(self.gemini_tokens),
+                "preflight": dict(self.preflight),
                 "search": dict(self.search),
                 "tts": dict(self.tts),
             }
@@ -193,6 +372,66 @@ class CostAccumulator:
 _current: "contextvars.ContextVar[Optional[CostAccumulator]]" = contextvars.ContextVar(
     "cost_accumulator_current", default=None
 )
+
+# [LOCAL-609] When True in the current context, Gemini usage made inside this
+# dynamic scope is attributed to the PREFLIGHT bucket (the LOCAL-603 venue
+# preflight call) instead of the ordinary gemini_tokens + gemini_grounding
+# channels — so the ledger can show preflight on its own line (ticket LOCAL-609).
+# The preflight is a grounded Gemini call that would otherwise be indistinguishable
+# from any other grounded call in the token/grounding totals.
+_preflight_active: "contextvars.ContextVar[bool]" = contextvars.ContextVar(
+    "cost_accumulator_preflight_active", default=False
+)
+
+
+@contextlib.contextmanager
+def preflight_scope():
+    """[LOCAL-609] Mark the dynamic scope of the LOCAL-603 venue preflight call.
+
+    Gemini usage (tokens + grounding queries) metered via ``add_gemini_call``
+    inside this ``with`` block lands in the accumulator's PREFLIGHT bucket, so the
+    tour_generate ledger row can report preflight separately. Nests cleanly and
+    is a no-op for attribution outside a tour scope.
+    """
+    token = _preflight_active.set(True)
+    try:
+        yield
+    finally:
+        _preflight_active.reset(token)
+
+
+def add_gemini_call(input_tokens: int = 0, output_tokens: int = 0,
+                    num_queries: int = 0, grounded: bool = False,
+                    num_requests: int = 1) -> float:
+    """[LOCAL-609] Attribute ONE Gemini call to the current tour scope, routing by
+    whether we are inside a ``preflight_scope``.
+
+    This is the single entry point the two Gemini HTTP sites (story_leads._gemini
+    and story_leads.gemini_with_sources) call after they parse a response. It:
+
+      * adds the Flash input/output TOKENS (always — every Gemini call burns
+        tokens), and
+      * adds the grounding SEARCH QUERIES when ``grounded`` (the dollar unit Google
+        invoices), tracking the request for the LOCAL-594 cap.
+
+    When a ``preflight_scope`` is active, BOTH the tokens and the queries land in
+    the preflight bucket instead, so preflight shows on its own ledger line and is
+    not double-counted in gemini_tokens/gemini_grounding. No-op outside a tour
+    scope. Returns the dollars added.
+    """
+    acc = _current.get()
+    if acc is None:
+        return 0.0
+    if _preflight_active.get():
+        return acc.add_preflight(
+            num_queries=(num_queries if grounded else 0),
+            input_tokens=input_tokens,
+            output_tokens=output_tokens,
+        )
+    cost = acc.add_gemini_tokens(input_tokens, output_tokens)
+    if grounded:
+        cost += acc.add_grounding(num_requests=num_requests, num_queries=num_queries)
+    return cost
 
 
 def current_accumulator() -> Optional[CostAccumulator]:
@@ -308,11 +547,33 @@ def add_llm_usage(input_tokens: int, output_tokens: int, model: str) -> float:
     return acc.add_llm(input_tokens, output_tokens, model)
 
 
-def add_grounding_requests(num_requests: int = 1) -> float:
+def add_grounding_requests(num_requests: int = 1, num_queries: int = 0) -> float:
+    """[LOCAL-609] Attribute grounded Gemini usage to the current scope. ``num_queries``
+    (the webSearchQueries count) drives the dollars; ``num_requests`` is tracked
+    for the LOCAL-594 per-stop cap. No-op outside a tour scope."""
     acc = _current.get()
     if acc is None:
         return 0.0
-    return acc.add_grounding(num_requests)
+    return acc.add_grounding(num_requests, num_queries)
+
+
+def add_gemini_tokens(input_tokens: int = 0, output_tokens: int = 0) -> float:
+    """[LOCAL-609] Attribute one Gemini Flash call's token usage to the current
+    scope (the token channel, separate from grounding). No-op outside a scope."""
+    acc = _current.get()
+    if acc is None:
+        return 0.0
+    return acc.add_gemini_tokens(input_tokens, output_tokens)
+
+
+def add_preflight(num_queries: int = 0, input_tokens: int = 0,
+                  output_tokens: int = 0) -> float:
+    """[LOCAL-609] Attribute the LOCAL-603 venue preflight call to the current
+    scope, on its own ledger line. No-op outside a scope."""
+    acc = _current.get()
+    if acc is None:
+        return 0.0
+    return acc.add_preflight(num_queries, input_tokens, output_tokens)
 
 
 def add_search_queries(num_queries: int = 1) -> float:

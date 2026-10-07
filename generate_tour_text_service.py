@@ -387,6 +387,16 @@ def generate_tour_async(job_id, location, tour_type, total_stops=10, user_id=Non
             _grounding = _cost_info.get("grounding_cost", 0.0) or 0.0
             _our_cost = _cost_info.get("tour_total_cost", _llm_cost + _grounding)
             _breakdown = _cost_info.get("breakdown", {})
+            # [LOCAL-609] Carry research_cost_reused into the stored breakdown JSONB
+            # so tour_cost_report.py can report the reused-research total for a pool
+            # or cache delivery. Also carry pool/reuse metadata when present.
+            if isinstance(_breakdown, dict):
+                _breakdown = dict(_breakdown)
+                if "research_cost_reused" in _cost_info:
+                    _breakdown["research_cost_reused"] = _cost_info.get("research_cost_reused", 0.0) or 0.0
+                for _k in ("pool_reuse", "by_reference", "reused_stops", "new_stops"):
+                    if _k in _cost_info:
+                        _breakdown[_k] = _cost_info[_k]
             record_operation(
                 operation_type=_op_type,
                 our_cost_usd=_our_cost,

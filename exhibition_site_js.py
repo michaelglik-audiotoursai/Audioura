@@ -565,6 +565,14 @@ def default_serper(query: str) -> Dict:
     key = os.environ.get('SERP_API_KEY')
     if not key:
         return {}
+    # [LOCAL-609] Meter this Serper query — a query is about to go on the wire
+    # ($0.001 each). JS/chain fallback Serper call site. No-op outside a tour cost
+    # scope; wrapped so metering never breaks the query.
+    try:
+        import cost_accumulator as _ca
+        _ca.add_search_queries(1)
+    except Exception:
+        pass
     try:
         import json as _json
         import urllib.request

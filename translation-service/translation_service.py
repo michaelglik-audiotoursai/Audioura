@@ -845,6 +845,17 @@ class TranslationService:
                     "tts_metered_separately": True,
                     "tts_engine": tts_engine,
                     "chars": tts_chars,
+                    # [LOCAL-609] provider-shaped translation row so
+                    # tour_cost_report.py renders engine, chars and $ for the
+                    # translation of this tour (ticket LOCAL-609).
+                    "translation": {
+                        "usd": round(total_cost, 6),
+                        "engine": tts_engine or "aws_translate+polly",
+                        "characters": tts_chars,
+                        "llm_usd": round(llm_cost, 6),
+                        "tts_usd": round(tts_cost, 6),
+                        "stops": n_stops,
+                    },
                     "source_tour_id": source_tour_id,
                     "translated_tour_id": translated_tour_id,
                     "target_language": target_language,
