@@ -168,6 +168,20 @@ def run_qa(tour_text, tour_file="", story_elements=None, venue_context=None):
     except ImportError:
         check("No cross-stop repetition (>0.85)", True, "(unavailable — skipped)")
 
+    # 2b. [LOCAL-607 defect 3] No repeated STORY across stops. The >0.85 whole-text
+    # similarity check above misses a donor/founding story REWORDED per stop (same
+    # fact, different sentences). This fingerprint-level check counts facts (year +
+    # proper noun, or a donor/acquisition verb) that survive in MORE THAN ONE stop.
+    try:
+        from cross_stop_fact_dedupe import count_repeated_facts_across_stops
+        _repeats = count_repeated_facts_across_stops(tour_text)
+        check("No repeated story across stops", len(_repeats) == 0,
+              f"{len(_repeats)} fact(s) repeated across stops: "
+              f"{[ (r['stops'], r['fingerprint']) for r in _repeats[:3] ]}")
+    except ImportError:
+        check("No repeated story across stops", True,
+              "(cross_stop_fact_dedupe unavailable — skipped)")
+
     # 3. All stops have distinct opening sentences
     stops = re.split(r"Stop\s+\d+[:\.]", tour_text)[1:]  # skip pre-stop content
     openers = []

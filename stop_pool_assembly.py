@@ -105,6 +105,8 @@ class AssemblyResult:
     rewritten_transitions: int = 0
     order: List[str] = field(default_factory=list)  # delivered stop titles, in order
     about_stops: int = 0  # [LOCAL-592] 1 when an About+practical opening SECTION was folded into Stop 1 (adds ZERO stops)
+    dedupe_dropped: int = 0  # [LOCAL-607] cross-stop fact sentences removed
+    dedupe_log: List[str] = field(default_factory=list)  # [LOCAL-607] human-readable dedupe lines
 
 
 # ── Stop-unit helpers ────────────────────────────────────────────────────────
@@ -417,6 +419,17 @@ def assemble_building_tour(
                 fixed.append(s2)
             ordered = fixed
 
+    # [LOCAL-607 defect 3] Cross-stop FACT dedupe (deterministic, no LLM): the
+    # donor/founding/relocation story was retold in stops 1,2,3,7. Keep the first
+    # telling in tour order; museum-history facts belong to Stop 1's opening
+    # section and are removed from later stops (one acquisition sentence about a
+    # stop's OWN work is allowed). Runs on the stop NARRATION bodies only.
+    try:
+        from cross_stop_fact_dedupe import dedupe_stop_units as _dd_units
+        ordered, _dd_dropped = _dd_units(ordered, stop1_owns_history=True)
+    except Exception as _dd_e:  # pragma: no cover
+        logger.info(f"[LOCAL-607] fact dedupe skipped ({_dd_e})")
+        _dd_dropped = []
     # [LOCAL-592] Resolve the opening-section text. Prefer the explicit
     # ``opening_section``; fall back to folding a legacy ``about_stop`` unit's
     # narration (+ practical facts) so no caller path can resurrect an extra stop.
@@ -474,6 +487,10 @@ def assemble_building_tour(
         rewritten_transitions=0,  # building directions are templates, not LLM rewrites
         order=[s["title"] for s in ordered],
         about_stops=1 if folded_opening else 0,
+        dedupe_dropped=len(_dd_dropped),
+        dedupe_log=[
+            f"[LOCAL-607] dedupe: dropped from Stop {d['stop']} "
+            f"({d['reason']}): \"{d['sentence'][:90]}\"" for d in _dd_dropped],
     )
 
 
@@ -552,6 +569,17 @@ def assemble_outdoor_tour(
     # Stops whose NARRATION is reused verbatim = pooled stops that are not new.
     reused_narration = sum(1 for s in ordered if s["title"] not in new_titles)
 
+    # [LOCAL-607 defect 3] Cross-stop FACT dedupe over the walked order. For an
+    # outdoor tour there is no single-building "Stop 1 owns the history" rule, so
+    # only cross-stop REPEATS are removed (first occurrence in walked order kept);
+    # museum-history stripping is left off (stop1_owns_history=False).
+    try:
+        from cross_stop_fact_dedupe import dedupe_stop_units as _dd_units
+        ordered, _dd_dropped = _dd_units(ordered, stop1_owns_history=False)
+    except Exception as _dd_e:  # pragma: no cover
+        logger.info(f"[LOCAL-607] fact dedupe skipped ({_dd_e})")
+        _dd_dropped = []
+
     body = _title_line(location, tour_type, header_category, display_category)
     rewritten = 0
     for i, stop in enumerate(ordered):
@@ -582,6 +610,10 @@ def assemble_outdoor_tour(
         new_stops=len(new_stops),
         rewritten_transitions=rewritten,
         order=[s["title"] for s in ordered],
+        dedupe_dropped=len(_dd_dropped),
+        dedupe_log=[
+            f"[LOCAL-607] dedupe: dropped from Stop {d['stop']} "
+            f"({d['reason']}): \"{d['sentence'][:90]}\"" for d in _dd_dropped],
     )
 
 
