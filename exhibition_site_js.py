@@ -44,6 +44,7 @@ __all__ = [
     'shell_fingerprint', 'detect_identical_shell', 'sitemap_urls',
     'pick_branch_url', 'extract_embedded_json', 'serper_site_city',
     'filter_other_city', 'slug_variants', 'US_CHAIN_CITIES', 'default_serper',
+    'is_stop_url', 'reject_non_stop_urls', 'NON_STOP_SEGMENTS',
 ]
 
 # Cities where immersive-art / experience chains commonly have branches. Used ONLY
@@ -443,6 +444,111 @@ def _mentions_city(haystack: str, city: str) -> bool:
         if re.search(r'(?<![a-z0-9])' + re.escape(v) + r'(?![a-z0-9])', haystack):
             return True
     return False
+
+
+# ── 7. junk-stop rejection (a stop must be a thing you look at) ───────────────
+#
+# The r1 live run (tour 397, WNDR Boston) delivered two pages that are not stops:
+#
+#     Stop 6: Buy Gift Cards - WNDR Boston   /tickets/boston/gift-cards
+#     Stop 2: WNDR Museum Boston             /location/boston   (the branch page)
+#
+# A stop must be an installation, work, room or exhibition — something a listener
+# stands in front of. Tickets, gift cards, the shop, membership, events, FAQ and
+# the location index page are transactional/navigational, not stops. The embedded
+# JSON and the site:<domain> <city> Serper results both surface them because they
+# are real URLs on the venue's own domain; nothing earlier distinguishes a thing
+# to see from a page to click. This does.
+#
+# The rule is deterministic and reads only the URL path — no fetch, no model:
+#   * reject when ANY path segment is in NON_STOP_SEGMENTS (tickets, gift-cards,
+#     shop, membership, events, faq, visit, contact, about, cart, checkout,
+#     account, careers, press, blog, news, privacy, terms, search, donate, …);
+#   * reject the branch INDEX page itself — a path whose only non-"location(s)"
+#     segments are the city slug (``/location/boston``, ``/boston``), because that
+#     is the venue's own landing page, not an exhibit within it.
+# A URL with no path (the bare domain) is also rejected: it is the home page.
+
+# Path segments that mark a transactional / navigational / informational page
+# rather than a thing-to-see. Compared case-insensitively; '-' and '_' are
+# normalised so 'gift-cards' and 'gift_cards' both match 'gift-cards'.
+NON_STOP_SEGMENTS = frozenset({
+    'tickets', 'ticket', 'gift-cards', 'gift-card', 'giftcard', 'giftcards',
+    'shop', 'store', 'merch', 'merchandise', 'membership', 'member', 'members',
+    'events', 'event', 'faq', 'faqs', 'locations', 'location', 'visit',
+    'plan-your-visit', 'directions', 'hours', 'contact', 'contact-us', 'about',
+    'about-us', 'cart', 'checkout', 'account', 'login', 'signin', 'sign-in',
+    'register', 'careers', 'jobs', 'press', 'media', 'blog', 'news',
+    'newsletter', 'privacy', 'terms', 'policy', 'policies', 'search', 'donate',
+    'give', 'giving', 'support', 'book', 'booking', 'buy', 'rentals', 'rental',
+    'private-events', 'groups', 'group', 'birthday', 'birthdays', 'parties',
+    'party', 'faq-page', 'sitemap', 'home', 'index',
+})
+
+# "location(s)" are structural wrappers around a city slug (``/locations/boston``);
+# a path made only of these plus the city is the branch index, never a stop.
+_BRANCH_WRAPPER_SEGMENTS = frozenset({'locations', 'location', 'cities', 'city'})
+
+
+def _path_segments(url: str) -> List[str]:
+    """Lower-cased, '-'/'_'-normalised path segments of a URL (no query/fragment)."""
+    if not url:
+        return []
+    u = url if '://' in url else 'https://' + url
+    path = urlparse(u).path or ''
+    out = []
+    for seg in path.split('/'):
+        seg = seg.strip().lower()
+        if not seg:
+            continue
+        out.append(seg.replace('_', '-'))
+    return out
+
+
+def is_stop_url(url: str, city: str = '') -> bool:
+    """True when ``url`` could be a real STOP (installation/work/room/exhibition).
+
+    Deterministic, path-only. Returns False for:
+      * the bare domain / home / index page (no meaningful path);
+      * any URL with a NON_STOP_SEGMENTS segment (tickets, gift-cards, shop,
+        membership, events, faq, visit, contact, about, …);
+      * the city BRANCH INDEX page — a path whose only segments are branch
+        wrappers (locations/location/cities/city) and/or the requested city slug.
+
+    Everything else (``/installations/boston/flex``, ``/exhibitions/mirror-room``)
+    is allowed through — this gate only removes what is provably not a stop, it
+    never invents one. An empty/missing URL returns True so a candidate that
+    carries no URL is judged by other means, not dropped here.
+    """
+    if not url or not str(url).strip():
+        return True
+    segs = _path_segments(url)
+    if not segs:
+        return False  # bare domain / home page
+    if any(seg in NON_STOP_SEGMENTS for seg in segs):
+        return False
+    # Branch index: nothing left once wrappers and the city slug are removed.
+    city_slugs = set(slug_variants(city)) if city else set()
+    residual = [s for s in segs
+                if s not in _BRANCH_WRAPPER_SEGMENTS and s not in city_slugs]
+    if not residual:
+        return False
+    return True
+
+
+def reject_non_stop_urls(items: List[Dict], city: str = '') -> List[Dict]:
+    """Drop candidate dicts whose ``detail_url``/``source_url`` is not a stop.
+
+    Reads ``detail_url`` first, then ``source_url``. An item with neither URL is
+    KEPT (judged elsewhere). Order preserved; deterministic; nothing fetched.
+    """
+    kept: List[Dict] = []
+    for it in items or []:
+        url = (it.get('detail_url') or it.get('source_url') or '').strip()
+        if url and not is_stop_url(url, city):
+            continue
+        kept.append(it)
+    return kept
 
 
 # ── default Serper caller (project key SERP_API_KEY) ─────────────────────────
