@@ -209,7 +209,8 @@ def _visible_levels(cur):
     cur.execute("""
         SELECT plan_id, display_name, price_usd, can_sell,
                referrals_allowed, referral_period, max_stops,
-               tours_per_day, tours_per_month, fresh_per_pack, ops_per_pack
+               tours_per_day, tours_per_month, fresh_per_pack, ops_per_pack,
+               inactivity_days
         FROM plans
         WHERE COALESCE(hidden, FALSE) = FALSE
         ORDER BY CASE plan_id
@@ -221,7 +222,7 @@ def _visible_levels(cur):
     out = []
     for r in cur.fetchall():
         (plan_id, display_name, price_usd, can_sell, referrals_allowed,
-         referral_period, max_stops, tpd, tpm, fpp, opp) = r
+         referral_period, max_stops, tpd, tpm, fpp, opp, inactivity_days) = r
         out.append({
             'plan_id': plan_id,
             'display_name': display_name or plan_id,
@@ -234,6 +235,10 @@ def _visible_levels(cur):
             'tours_per_month': tpm,
             'fresh_per_pack': fpp,
             'ops_per_pack': opp,
+            # [LOCAL-610 req 3] passthrough so the plan page can show the Free
+            # inactivity rule ("After N days…") with the Free level's own N even
+            # when the current device is on another level.
+            'inactivity_days': inactivity_days,
         })
     return out
 
@@ -303,6 +308,12 @@ def _me_payload(cur, user_id, now=None):
         # hardcodes nothing.
         'display_name': (plan.get('display_name') if plan else None) or state['level'],
         'levels': _visible_levels(cur),
+        # [LOCAL-610 req 3] The current level's inactivity window, straight from
+        # plans.inactivity_days (the SAME column l2_seat_job reads to evict idle
+        # L2 devices). Passthrough only — no behaviour changes here. The plan
+        # page shows "After N days without a visit…" using this N instead of a
+        # hardcoded 7, so the copy can never drift from the DB value.
+        'inactivity_days': (plan.get('inactivity_days') if plan else None),
         'anniversary_at': ann.isoformat() if ann else None,
         'allowances_left': _allowances_left(cur, state, plan),
         'warn_renewal': _warn_renewal(ann, now),
