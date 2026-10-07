@@ -18,7 +18,14 @@ import '../services/entitlements_service.dart';
 import '../services/iap_service.dart';
 
 class PlanScreen extends StatefulWidget {
-  const PlanScreen({super.key});
+  const PlanScreen({super.key, this.initialEntitlements});
+
+  /// [LOCAL-610] Test seam only: when provided, the screen renders this
+  /// snapshot immediately and skips the network load, so widget tests can
+  /// exercise the level-aware Free/code card and the rules text at any level
+  /// without a running user-api. Null in production (the default), where the
+  /// screen loads from EntitlementsService.me() as before.
+  final Entitlements? initialEntitlements;
 
   @override
   State<PlanScreen> createState() => _PlanScreenState();
@@ -42,7 +49,14 @@ class _PlanScreenState extends State<PlanScreen> {
   @override
   void initState() {
     super.initState();
-    _load();
+    final seed = widget.initialEntitlements;
+    if (seed != null) {
+      // Test seam: render the injected snapshot without any network call.
+      _ent = seed;
+      _loading = false;
+    } else {
+      _load();
+    }
   }
 
   Future<void> _load() async {

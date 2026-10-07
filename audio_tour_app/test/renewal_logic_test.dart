@@ -135,9 +135,11 @@ void main() {
     });
 
     test('levelLabel is plain words', () {
+      // [LOCAL-610 req 2] user-facing labels: no "round"; l4 is "Curator".
       expect(_ent(level: 'l1').levelLabel, contains('Free'));
-      expect(_ent(level: 'l3').levelLabel, contains('\$10'));
-      expect(_ent(level: 'l4').levelLabel, contains('\$25'));
+      expect(_ent(level: 'l3').levelLabel, '\$10 Pack');
+      expect(_ent(level: 'l4').levelLabel, 'Curator');
+      expect(_ent(level: 'l4').levelLabel.toLowerCase(), isNot(contains('round')));
       expect(_ent(level: 'tester').levelLabel, 'Tester');
     });
   });
