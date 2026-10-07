@@ -488,7 +488,97 @@ def _release_generation_reservation(user_id, job_id, reason):
         print(f"[QUOTA] WARNING: could not release reservation for {user_id} (job={job_id}): {_e}")
 
 
-def store_audio_tour(tour_name, request_string, zip_path, lat, lng, tour_content=None, stops_count=None, is_test=None, tour_kind=None):
+# [LOCAL-606] The columns captured in a version snapshot. Centralised so the
+# ensure-table DDL, the snapshot INSERT in store_audio_tour and the restore
+# helper (restore_tour_version.py) all agree on the exact set.
+AUDIO_TOUR_VERSION_COLUMNS = (
+    "tour_content", "zip_filename", "stops_count", "lat", "lng",
+)
+
+
+def _ensure_versioning_objects(cur):
+    """[LOCAL-606] Self-healing DDL for the replace-on-change rule (D622).
+
+    Mirrors the self-healing pattern already used in store_audio_tour for
+    audio_tour/lat/number_requested/track/tour_kind: additive, idempotent, and
+    safe to run on any Postgres (Cloud SQL, Mac Mini local dev, a fresh checkout,
+    or a throwaway test schema) regardless of whether a migration SQL file has
+    been applied yet.
+
+    Creates:
+      * audio_tours.translation_stale BOOLEAN DEFAULT FALSE — a translation row
+        (original_tour_id = some id) is flipped TRUE when its original is
+        replaced, so the next translation request regenerates it. Never deletes
+        the stale translation.
+      * audio_tour_versions — the additive, append-only archive of every
+        superseded original-row content. Each replacement inserts the OLD values
+        here first, so every replacement is reversible via restore_tour_version.py.
+    """
+    # Additive stale flag on audio_tours.
+    cur.execute("""
+        SELECT column_name FROM information_schema.columns
+        WHERE table_name = 'audio_tours' AND column_name = 'translation_stale'
+    """)
+    if cur.fetchone() is None:
+        print("[LOCAL-606] Adding audio_tours.translation_stale column...")
+        cur.execute(
+            "ALTER TABLE audio_tours "
+            "ADD COLUMN translation_stale BOOLEAN NOT NULL DEFAULT FALSE"
+        )
+
+    # Append-only version archive. version_no is per-tour (1,2,3,…). The row
+    # keeps the OLD content/zip/stops/lat/lng that was replaced, plus when and by
+    # which job. No FK to audio_tours.id on purpose: the archive must survive
+    # even if a tour row is later removed by some other process, and tests clone
+    # tables individually. The (tour_id, version_no) pair is unique.
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS audio_tour_versions (
+            id SERIAL PRIMARY KEY,
+            tour_id INTEGER NOT NULL,
+            version_no INTEGER NOT NULL,
+            tour_content TEXT,
+            zip_filename VARCHAR(512),
+            stops_count INTEGER,
+            lat DOUBLE PRECISION,
+            lng DOUBLE PRECISION,
+            replaced_at TIMESTAMP WITHOUT TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+            replaced_by_job VARCHAR(128),
+            CONSTRAINT uq_audio_tour_versions_tour_version UNIQUE (tour_id, version_no)
+        )
+    """)
+
+
+def _rename_superseded_zip(old_zip_filename, version_no):
+    """[LOCAL-606] Rename a replaced tour's ZIP on disk to ``<name>.v<N>.zip`` so
+    it is kept, never deleted, and every replacement stays reversible.
+
+    Returns the archived basename (what was written to audio_tour_versions), or
+    the original basename unchanged if the file could not be found on disk (the
+    DB row still records what the name was). Best-effort on the filesystem; the
+    DB transaction is the source of truth.
+    """
+    if not old_zip_filename:
+        return old_zip_filename
+    base = os.path.basename(old_zip_filename)
+    # Strip a trailing .zip (case-insensitive) and append .v<N>.zip.
+    stem = base[:-4] if base.lower().endswith(".zip") else base
+    archived = f"{stem}.v{version_no}.zip"
+    try:
+        src = os.path.join(TOURS_DIR, base)
+        dst = os.path.join(TOURS_DIR, archived)
+        if os.path.exists(src) and not os.path.exists(dst):
+            os.rename(src, dst)
+            print(f"[LOCAL-606] Renamed superseded ZIP {base} -> {archived}")
+        elif not os.path.exists(src):
+            print(f"[LOCAL-606] Superseded ZIP {base} not on disk; "
+                  f"recording archived name {archived} in version row only")
+    except Exception as _e:
+        print(f"[LOCAL-606] WARNING: could not rename superseded ZIP "
+              f"{base} -> {archived}: {_e}")
+    return archived
+
+
+def store_audio_tour(tour_name, request_string, zip_path, lat, lng, tour_content=None, stops_count=None, is_test=None, tour_kind=None, job_id=None):
     """Store the audio tour in the database with original tour content.
 
     Returns:
@@ -660,45 +750,157 @@ def store_audio_tour(tour_name, request_string, zip_path, lat, lng, tour_content
         if _tour_kind_value not in ('full', 'overview'):
             _tour_kind_value = 'full'
         
+        # [LOCAL-606] Make sure the versioning archive + stale flag exist before
+        # we may need them in the existing-row branch. Self-healing, additive.
+        _ensure_versioning_objects(cur)
+        conn.commit()
+
         # [LOCAL-156] Check if tour already exists using the SAME logic as the unique index:
         # lower(tour_name) WHERE original_tour_id IS NULL.
         # Previously this checked (tour_name, request_string) with case-sensitive match,
         # which diverged from the partial unique index uq_audio_tours_original_name.
+        # [LOCAL-606] Also pull the stored content/zip/stops/lat/lng so the
+        # existing-row branch can decide: replace (text differs) vs increment
+        # (byte-identical cache hit).
         print(f"Checking if tour already exists (case-insensitive, matching unique index)...")
         cur.execute(
-            "SELECT id FROM audio_tours WHERE lower(tour_name) = lower(%s) AND original_tour_id IS NULL",
+            "SELECT id, tour_content, zip_filename, stops_count, lat, lng "
+            "FROM audio_tours WHERE lower(tour_name) = lower(%s) AND original_tour_id IS NULL",
             (tour_name,)
         )
         existing_tour = cur.fetchone()
-        print(f"Existing tour (unique-index-aware check): {existing_tour}")
+        print(f"Existing tour (unique-index-aware check): {existing_tour[0] if existing_tour else None}")
 
-        # [LOCAL-156] If an original tour with this name already exists, reuse it.
-        # Per Michael: "it cost us and our clients nothing when they download a tour
-        # already pre-created". Increment number_requested and return the existing ID.
+        # [LOCAL-50] persist zip_filename for deterministic resolution
+        zip_filename = os.path.basename(zip_path)
+
+        # [LOCAL-606 / D622] Existing-row branch: a fresh/newly-assembled delivery
+        # whose text DIFFERS from the stored row REPLACES the row's content, ZIP
+        # and stops_count (and sets lat/lng if they are NULL). The old version is
+        # archived first and the old ZIP is renamed <name>.v<N>.zip — never
+        # deleted — so the replacement is reversible. A byte-identical cache hit
+        # keeps the pre-606 behaviour: just increment number_requested.
+        # Share code (shared_tours) and the tour id are untouched, so curator
+        # links keep working and point at the improved tour.
         if existing_tour:
-            existing_id = existing_tour[0]
-            print(f"[LOCAL-156] Tour already exists (id={existing_id}). "
-                  f"Incrementing number_requested; no new row needed.")
-            cur.execute(
-                "UPDATE audio_tours SET number_requested = number_requested + 1 WHERE id = %s",
-                (existing_id,)
-            )
-            conn.commit()
-            cur.close()
-            conn.close()
-            print(f"==== AUDIO TOUR ALREADY EXISTS — REUSING id={existing_id} ====")
-            return _result(success=True, action="already_exists", existing_tour_id=existing_id)
-        
-        # Read the ZIP file as binary data
+            (existing_id, old_content, old_zip, old_stops,
+             old_lat, old_lng) = existing_tour
+
+            # Normalise for the byte-identical comparison. Treat NULL stored
+            # content as "no content yet" → always a replacement so a row that
+            # predates tour_content gets healed.
+            _new_text = tour_content if tour_content is not None else ""
+            _old_text = old_content if old_content is not None else None
+            text_identical = (_old_text is not None and _old_text == _new_text)
+
+            if text_identical:
+                print(f"[LOCAL-156] Tour already exists (id={existing_id}) and text is "
+                      f"byte-identical. Incrementing number_requested; no replacement.")
+                cur.execute(
+                    "UPDATE audio_tours SET number_requested = number_requested + 1 WHERE id = %s",
+                    (existing_id,)
+                )
+                conn.commit()
+                cur.close()
+                conn.close()
+                print(f"==== AUDIO TOUR ALREADY EXISTS — REUSING id={existing_id} ====")
+                return _result(success=True, action="already_exists", existing_tour_id=existing_id)
+
+            # --- Replacement path (text differs or stored content was NULL) ---
+            print(f"[LOCAL-606] Tour id={existing_id} regenerated with DIFFERENT text "
+                  f"(old_len={len(_old_text) if _old_text is not None else 'NULL'}, "
+                  f"new_len={len(_new_text)}). Replacing stored content; archiving old version.")
+
+            # Read the new ZIP as binary data for the row update.
+            print(f"Reading ZIP file: {zip_path}")
+            print(f"File exists: {os.path.exists(zip_path)}")
+            print(f"File size: {os.path.getsize(zip_path) if os.path.exists(zip_path) else 'N/A'}")
+            with open(zip_path, "rb") as f:
+                zip_data = f.read()
+            print(f"Read {len(zip_data)} bytes from ZIP file")
+
+            _job_id = job_id or os.getenv('CURRENT_JOB_ID') or request_string
+
+            try:
+                # Single transaction: version insert + row update + stale flag.
+                # Next version number for this tour.
+                cur.execute(
+                    "SELECT COALESCE(MAX(version_no), 0) + 1 "
+                    "FROM audio_tour_versions WHERE tour_id = %s",
+                    (existing_id,)
+                )
+                next_version = cur.fetchone()[0]
+
+                # Rename the superseded ZIP on disk to <name>.v<N>.zip and record
+                # the archived name in the version row (best-effort on disk; the
+                # DB row is authoritative).
+                archived_zip = _rename_superseded_zip(old_zip, next_version)
+
+                # Archive the OLD content first — reversibility invariant.
+                cur.execute(
+                    """
+                    INSERT INTO audio_tour_versions
+                        (tour_id, version_no, tour_content, zip_filename,
+                         stops_count, lat, lng, replaced_by_job)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                    """,
+                    (existing_id, next_version, old_content, archived_zip,
+                     old_stops, old_lat, old_lng, str(_job_id)[:128])
+                )
+
+                # Replace the row's content/zip/stops_count; set lat/lng only if
+                # they were NULL (D622: "sets lat/lng if they are NULL"). Keep
+                # id, tour_name, share code, original_tour_id unchanged, and bump
+                # number_requested like any served delivery.
+                cur.execute(
+                    """
+                    UPDATE audio_tours
+                    SET tour_content = %s,
+                        audio_tour = %s,
+                        zip_filename = %s,
+                        stops_count = %s,
+                        lat = COALESCE(lat, %s),
+                        lng = COALESCE(lng, %s),
+                        number_requested = number_requested + 1
+                    WHERE id = %s
+                    """,
+                    (tour_content, psycopg2.Binary(zip_data), zip_filename,
+                     stops_count, lat, lng, existing_id)
+                )
+
+                # Flag translations (original_tour_id = this id) stale so the next
+                # translation request regenerates them. Never deleted.
+                cur.execute(
+                    "UPDATE audio_tours SET translation_stale = TRUE "
+                    "WHERE original_tour_id = %s",
+                    (existing_id,)
+                )
+                stale_count = cur.rowcount
+
+                conn.commit()
+                print(f"[LOCAL-606] Replaced tour id={existing_id} content "
+                      f"(version {next_version} archived, old ZIP -> {archived_zip}, "
+                      f"{stale_count} translation(s) flagged stale).")
+                cur.close()
+                conn.close()
+                print(f"==== AUDIO TOUR CONTENT REPLACED — id={existing_id} ====")
+                return _result(success=True, action="replaced", existing_tour_id=existing_id)
+            except Exception as _replace_err:
+                conn.rollback()
+                print(f"[LOCAL-606] ERROR during replacement of id={existing_id}: {_replace_err}")
+                print(f"Traceback: {traceback.format_exc()}")
+                cur.close()
+                conn.close()
+                return _result(success=False, action="error", existing_tour_id=existing_id,
+                               error=str(_replace_err))
+
+        # Read the ZIP file as binary data (new-insert path)
         print(f"Reading ZIP file: {zip_path}")
         print(f"File exists: {os.path.exists(zip_path)}")
         print(f"File size: {os.path.getsize(zip_path) if os.path.exists(zip_path) else 'N/A'}")
         with open(zip_path, "rb") as f:
             zip_data = f.read()
         print(f"Read {len(zip_data)} bytes from ZIP file")
-
-        # LOCAL-50: persist zip_filename for deterministic resolution
-        zip_filename = os.path.basename(zip_path)
 
         # Insert new tour (existing_tour case already returned above)
         print(f"Inserting new tour...")
@@ -1297,7 +1499,7 @@ def orchestrate_tour_async(job_id, location, tour_type, total_stops, user_id=Non
                 print(f"[USER_INDEX] Non-fatal error: {idx_err}")
 
         # Store in database with tour content
-        store_result = store_audio_tour(tour_name, request_string or location, zip_path, lat, lng, tour_content, stops_count=ACTIVE_JOBS[job_id].get("actual_stops"), is_test=is_test, tour_kind=ACTIVE_JOBS[job_id].get("tour_kind"))
+        store_result = store_audio_tour(tour_name, request_string or location, zip_path, lat, lng, tour_content, stops_count=ACTIVE_JOBS[job_id].get("actual_stops"), is_test=is_test, tour_kind=ACTIVE_JOBS[job_id].get("tour_kind"), job_id=job_id)
         
         # [LOCAL-156] store_audio_tour now returns a dict:
         #   {"success": bool, "action": str, "existing_tour_id": int|None, "error": str|None}
