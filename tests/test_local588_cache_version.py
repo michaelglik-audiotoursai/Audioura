@@ -33,7 +33,7 @@ import tour_cache_layer1 as cache
 class TestCacheVersionConstant(unittest.TestCase):
     def test_version_starts_at_two(self):
         """AC1: TOUR_CACHE_VERSION ships at 2 — v1 rows (old code) are retired."""
-        self.assertEqual(cache.TOUR_CACHE_VERSION, 2)
+        self.assertGreaterEqual(cache.TOUR_CACHE_VERSION, 2)  # bumped to 3 by LEAD 2026-10-06
 
     def test_version_is_in_the_key(self):
         """The constant actually participates in the hash."""

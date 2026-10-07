@@ -64,7 +64,10 @@ logger = logging.getLogger(__name__)
 # what a listener would actually HEAR — i.e. whenever a cached tour made by the
 # old code would now be considered wrong or stale. (A pure refactor that cannot
 # change the delivered tour text does not require a bump.)
-TOUR_CACHE_VERSION = 2  # LOCAL-588: version added to the key. v2 retires every
+TOUR_CACHE_VERSION = 3  # v3 (LEAD 2026-10-06): retires tours/stops made before LOCAL-593 #4
+                        # highlight-first selection, D611 opening, D615/D616 — Harvard's
+                        # alphabetical stops were being re-served from cache and pool.
+                        # LOCAL-588: version added to the key. v2 retires every
                         # row written before 2026-10-05 (pre LOCAL-580/583/584),
                         # including Michael's Griffin junk tour, as misses.
 
