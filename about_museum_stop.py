@@ -202,6 +202,36 @@ _STORY_SIGNAL_RE = re.compile(
     r"opened|incorporated|charter|history)\b"
 )
 
+# [LOCAL-614 item 3] ACADEMIC-PROGRAM / ADMISSIONS / COURSE / CATALOG boilerplate
+# that is NOT the museum's story. tour 399's About lifted a Boston College
+# degree-program page — "the history major offers a robust grounding in the
+# contemporary practice of history" — because it carries a story verb ("offers")
+# and a signal word ("history"). These sentences describe a university's academic
+# offerings (majors, minors, degrees, courses, admissions, the course catalog),
+# not the museum. A deterministic CONTENT rule: a sentence that talks about a
+# degree/major/minor/course/admissions/curriculum is dropped UNLESS it states the
+# museum's OWN identity (names the venue AND a museum-kind word) — so a real
+# "<Venue> is the university art museum of <College>" is never caught.
+_ACADEMIC_PROGRAM_RE = re.compile(
+    r"(?i)\b("
+    r"(?:history|art\s+history|studio\s+art|biology|english|philosophy|"
+    r"economics|chemistry|physics|psychology|sociology|mathematics|"
+    r"\w+)\s+(?:major|minor)\b|"            # "the history major", "a studio art minor"
+    r"majors?\s+(?:in|and\s+minors?)\b|minors?\s+in\b|"
+    r"(?:under)?graduate\s+(?:program|degree|admission|studies|students?)\b|"
+    r"\badmissions?\b|\bapplicants?\b|\benroll(?:ment|ed|s)?\b|"
+    r"\bcurriculum\b|\bcoursework\b|\bprerequisite|\bsyllabus\b|"
+    r"\bcourse\s+catalog(?:ue)?\b|\bcatalog(?:ue)?\s+of\s+courses\b|"
+    r"\bthis\s+course\b|\bthe\s+course\b|\brequired\s+courses?\b|"
+    r"\belective\s+courses?\b|complete\s+(?:six|two|three|four|\d+)\s+courses?\b|"
+    r"\b(?:bachelor|master|doctoral|m\.?a\.?|b\.?a\.?|ph\.?d\.?)\b.*\bdegree|"
+    r"\bdegrees?\s+(?:in|including)\b|"
+    r"capstone\s+(?:thesis|project)|senior\s+(?:thesis|year)|"
+    r"liberal\s+arts\s+tradition|academic\s+(?:program|offerings?)\b|"
+    r"prepare\s+you\s+to\s+address\s+the\s+challenges"
+    r")")
+
+
 # Architecture signal words for building sentences.
 _ARCH_SIGNAL_RE = re.compile(
     r"(?i)\b(architect|designed\s+by|building\s+was|edifice|fa\u00e7ade|facade|"
@@ -542,6 +572,14 @@ def _is_story_sentence(sent: str, venue_core: str, venue_first: str) -> bool:
     # "community") and must be excluded BEFORE the signal/verb check, or the land
     # acknowledgment is lifted as the museum's story (the r2 defect).
     if _NON_STORY_RE.search(s):
+        return False
+    # [LOCAL-614 item 3] Reject ACADEMIC-PROGRAM / ADMISSIONS / COURSE / CATALOG
+    # boilerplate (a degree/major/minor/course/admissions page), UNLESS the
+    # sentence states the MUSEUM'S own identity (names the venue AND a museum-kind
+    # word). tour 399 lifted "the history major offers a robust grounding in the
+    # contemporary practice of history" — a BC degree-program page — because it
+    # carries a story verb and a signal word. A sentence must be about the museum.
+    if _ACADEMIC_PROGRAM_RE.search(s) and not _states_museum_identity(s, venue_first):
         return False
     # [LOCAL-602 r2 / D617 item 11] Reject a FOUNDER BIOGRAPHY sentence: one whose
     # subject is a PERSON (the founder) and that describes the person, not the
@@ -1263,12 +1301,21 @@ def _default_month_stamp() -> str:
 
 
 def _source_month_signal(domain: str, as_of: str) -> str:
-    """The D584/D582 honesty signal, spoken: 'as listed on <domain> in <month>'."""
-    where = domain.strip() if domain and domain.strip() else "the museum's website"
+    """The honesty signal, SPOKEN without a source domain (D617 / LOCAL-614 item 4).
+
+    The kiro-cli critique of tour 399 flagged a spoken source tag ("Admission is
+    free, as listed on bc.edu in October 2026."). Per D617 no domain is spoken —
+    the source domain lives in the TEXT view only. The honesty stamp (the month
+    the facts were current) stays, phrased without the domain:
+
+        "as published by the museum in October 2026"
+
+    ``domain`` is accepted (callers still pass it) but is deliberately NOT spoken.
+    """
     stamp = (as_of or "").strip()
     if stamp:
-        return f"as listed on {where} in {stamp}"
-    return f"as listed on {where}"
+        return f"as published by the museum in {stamp}"
+    return "as published by the museum"
 
 
 def _compose_visiting_sentences(facts: str, venue_name: str, domain: str,

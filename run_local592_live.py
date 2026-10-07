@@ -154,7 +154,12 @@ def run_case(tag, location, tour_type, stops, expect_architecture):
     day_bound = bool(re.search(
         r"(monday|tuesday|wednesday|thursday|friday|saturday|sunday|daily)", low_v))
     has_time = bool(re.search(r"\d\s*(?:am|pm)|noon|midnight", low_v))
-    source_month = bool(re.search(r"as listed on .+ in [a-z]+ \d{4}", low_v))
+    # [LOCAL-614 item 4 / D617] The honesty signal is spoken WITHOUT a domain:
+    # "as published by the museum in <month> <year>" (older runs used "as listed
+    # on <domain> in <month>"; accept either so the audit is not brittle).
+    source_month = bool(re.search(
+        r"as published by the museum in [a-z]+ \d{4}"
+        r"|as listed on .+ in [a-z]+ \d{4}", low_v))
     reads_as_note = "a few practical notes" in low
     print(f"\nCASE {tag} r4 AUDIT:")
     print(f"   visiting reads as a sentence (is open/closed) : {states_hours}")
@@ -195,6 +200,7 @@ def _extract_visiting_sentences(stop1_full: str) -> str:
                 or re.search(r"admission prices? (?:are|is) listed", sl)
                 or re.search(r"opening hours (?:are|is) listed", sl)
                 or re.search(r"check (?:opening )?hours|check opening hours and admission", sl)
+                or re.search(r"\bas published by the museum\b", sl)
                 or re.search(r"\bas listed on\b.+\bin [a-z]+ \d{4}", sl)):
             keep.append(s.strip())
     return " ".join(keep).strip()
