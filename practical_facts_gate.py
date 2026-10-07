@@ -802,6 +802,66 @@ def gate_and_fix(
 
 
 # ---------------------------------------------------------------------------
+# [LOCAL-602 r2 / D617 item 10] "check the website" at most once, tour-wide
+# ---------------------------------------------------------------------------
+#
+# Hours and admission are spoken when the venue publishes them (handled upstream
+# by the visiting-sentence composers). When a field is NOT published we point the
+# listener at the venue's site — but that pointer must appear AT MOST ONCE in the
+# whole tour, and only for the genuinely-missing field. On the overview path the
+# overview narration and the Stop-1 opening section each carry their own pointer,
+# so a 1-stop WNDR overview could say "check the website" twice. This is a
+# deterministic post-pass over the ASSEMBLED tour text: keep the FIRST
+# website-pointer sentence, drop every later one. It never adds a pointer and
+# never removes a sentence that states a real fact.
+
+# A sentence that merely points the listener at the website for hours/admission.
+# Each alternative is one of the pipeline's pointer templates; all share the
+# "<verb> … <site> … (before you go/visit | are/were listed/not listed)" shape.
+_WEBSITE_POINTER_SENT_RE = re.compile(
+    r'(?is)(?<![^.\s])'                       # at a sentence start
+    r'('
+    r'check\s+[^.?!]*?\b(?:website|\.[a-z]{2,})[^.?!]*?before\s+you\s+(?:go|visit)[^.?!]*?[.?!]'
+    r'|(?:opening\s+hours?|admission(?:\s+prices?)?)\s+(?:are|were)\s+(?:listed|not\s+listed)[^.?!]*?[.?!]'
+    r'|please\s+check\s+[^.?!]*?before\s+you\s+(?:go|visit)[^.?!]*?[.?!]'
+    r'|admission\s+prices?\s+were\s+not\s+listed[^.?!]*?[.?!]'
+    r')'
+)
+
+
+def is_website_pointer_sentence(sentence: str) -> bool:
+    """True when ``sentence`` is only a 'check the website for hours/admission'
+    pointer (states no concrete hour or price itself)."""
+    return bool(_WEBSITE_POINTER_SENT_RE.search((sentence or "").strip()))
+
+
+def collapse_website_pointers(text: str) -> Tuple[str, int]:
+    """Keep the FIRST website-pointer sentence in ``text``; drop every later one.
+
+    Returns ``(cleaned, n_removed)``. Deterministic, pure. A tour that publishes
+    hours and admission has no pointer and is returned unchanged (n_removed == 0).
+    Only whole pointer SENTENCES are removed — a sentence that also states a real
+    fact does not match the pointer templates and is left alone.
+    """
+    if not text:
+        return text or "", 0
+    matches = list(_WEBSITE_POINTER_SENT_RE.finditer(text))
+    if len(matches) <= 1:
+        return text, 0
+    # Remove all but the first, back-to-front so indices stay valid.
+    out = text
+    removed = 0
+    for m in matches[:0:-1]:          # every match except matches[0], reversed
+        out = out[:m.start()] + out[m.end():]
+        removed += 1
+    # Tidy the double spaces / blank lines a removal can leave behind.
+    out = re.sub(r'[ \t]{2,}', ' ', out)
+    out = re.sub(r'[ \t]+\n', '\n', out)
+    out = re.sub(r'\n{3,}', '\n\n', out)
+    return out, removed
+
+
+# ---------------------------------------------------------------------------
 # CLI: run gate on a tour file
 # ---------------------------------------------------------------------------
 

@@ -3830,7 +3830,18 @@ def _assemble_overview_tour_text(venue_name, location, tour_type, overview,
             lines.append(f"  - {_u}")
         lines.append("")
 
-    return "\n".join(lines).rstrip() + "\n"
+    _ov = "\n".join(lines).rstrip() + "\n"
+    # [LOCAL-602 r2 / D617 item 10] The overview narration and the opening section
+    # can each carry a "check the website" pointer; keep at most one tour-wide.
+    try:
+        from practical_facts_gate import collapse_website_pointers as _collapse_ptr
+        _ov, _n_ptr = _collapse_ptr(_ov)
+        if _n_ptr:
+            print(f"  [LOCAL-602 r2] overview: collapsed {_n_ptr} duplicate "
+                  f"'check the website' pointer(s).")
+    except Exception as _ptr_e:
+        print(f"  [LOCAL-602 r2] overview pointer collapse skipped: {_ptr_e}")
+    return _ov
 
 
 def _try_deliver_museum_overview(venue_name, location, tour_type, site_url,
@@ -22782,6 +22793,20 @@ RULES:
         complete_tour, _d523_rep = _d523_clean(complete_tour, verbose=True)
     except Exception as _d523_e:
         print(f"  [D523] spoken-text hygiene skipped (non-fatal): {_d523_e}")
+
+    # [LOCAL-602 r2 / D617 item 10] "check the website" at most once, tour-wide.
+    # Hours/admission are spoken when published; when a field is unpublished we
+    # point at the venue site, but the pointer must appear ONCE across the whole
+    # tour (the overview narration and the Stop-1 opening section could each add
+    # one). Keep the first, drop later duplicates. Deterministic, never invents.
+    try:
+        from practical_facts_gate import collapse_website_pointers as _collapse_ptr
+        complete_tour, _n_ptr = _collapse_ptr(complete_tour)
+        if _n_ptr:
+            print(f"  [LOCAL-602 r2] collapsed {_n_ptr} duplicate "
+                  f"'check the website' pointer(s) — at most one remains.")
+    except Exception as _ptr_e:
+        print(f"  [LOCAL-602 r2] website-pointer collapse skipped (non-fatal): {_ptr_e}")
 
     # -------- [D523] Facts we have already paid to verify --------
     #
