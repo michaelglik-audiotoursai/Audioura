@@ -3486,8 +3486,21 @@ def _build_closing_offer(poi_list, tour_category, transport_mode, location, sent
 
     # ─── Fallback: one-sentence factual summary ─────────────────────────
     # Tour should not end mid-thought. Summarize what was covered.
-    _stop_names_str = " and ".join(p['name'] for p in poi_list[-2:]) if len(poi_list) >= 2 else poi_list[0]['name']
-    fallback = f"This tour covered {_stop_names_str}."
+    # [LOCAL-617] Name ALL delivered stops, not just the last two. The old
+    # poi_list[-2:] produced a self-contradiction the critic flagged on tours
+    # 419/421: the recap says "That's 3 stops" and this line then said "This tour
+    # covered <stop2> and <stop3>", omitting stop 1 — reading as "covered only 2
+    # of 3". The conclusion must name only, and all, the delivered stops.
+    _names = [p['name'] for p in poi_list if p.get('name')]
+    if len(_names) >= 3:
+        _stop_names_str = ", ".join(_names[:-1]) + f", and {_names[-1]}"
+    elif len(_names) == 2:
+        _stop_names_str = f"{_names[0]} and {_names[1]}"
+    elif _names:
+        _stop_names_str = _names[0]
+    else:
+        _stop_names_str = ""
+    fallback = f"This tour covered {_stop_names_str}." if _stop_names_str else ""
     print(f"  [LOCAL-275] Closing offer fallback (no verification passed)")
     return fallback
 
@@ -23055,6 +23068,20 @@ RULES:
                   f"count ({_sf_rec['delivered']})")
     except Exception as _sf_rec_err:
         print(f"  [LOCAL-617] Shortfall reconciliation error (non-fatal): {_sf_rec_err}")
+
+    # -------- [LOCAL-617 item 6] Conclusion de-duplication --------
+    # Never ship two recaps that can disagree. The critic flagged tours whose
+    # ending had both "That's N stops — …" and a "This tour covered X and Y."
+    # line naming a different set — a self-contradiction. Keep the richer recap,
+    # drop the redundant "This tour covered …" sentence.
+    try:
+        import work_first_evidence as _wfe_concl
+        complete_tour, _concl_rep = _wfe_concl.dedupe_conclusion(complete_tour)
+        if _concl_rep.get('removed_redundant_covered'):
+            print(f"  [LOCAL-617] Conclusion de-dup: removed redundant "
+                  f"'This tour covered …' line (recap kept)")
+    except Exception as _concl_err:
+        print(f"  [LOCAL-617] Conclusion de-dup error (non-fatal): {_concl_err}")
 
     # -------- [LOCAL-36] Practical facts QA gate --------
     # Verify provenance of every practical claim before delivery.

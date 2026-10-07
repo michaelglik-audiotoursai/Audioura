@@ -440,5 +440,20 @@ class TestNonArtworkListing(unittest.TestCase):
         self.assertFalse(ed.is_chrome_title("Madonna of the Napkin", "Museo de Bellas Artes"))
 
 
+class TestDedupeConclusion(unittest.TestCase):
+    def test_removes_redundant_covered_when_recap_present(self):
+        text = ("That's 3 stops — A, B, and C. This tour covered B and C.\n")
+        new, rep = wf.dedupe_conclusion(text)
+        self.assertTrue(rep["removed_redundant_covered"])
+        self.assertNotIn("This tour covered", new)
+        self.assertIn("That's 3 stops", new)
+
+    def test_keeps_covered_when_no_recap(self):
+        text = "This tour covered A and B."
+        new, rep = wf.dedupe_conclusion(text)
+        self.assertFalse(rep["removed_redundant_covered"])
+        self.assertEqual(new, text)
+
+
 if __name__ == "__main__":
     unittest.main()

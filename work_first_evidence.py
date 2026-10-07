@@ -75,6 +75,7 @@ __all__ = [
     "count_delivered_stops",
     "is_institutional_theme",
     "looks_like_non_artwork_listing",
+    "dedupe_conclusion",
 ]
 
 
@@ -121,7 +122,20 @@ _INSTITUTIONAL_RE = re.compile(
     r"director\s+(?:of\s+the\s+museum|from\s+\d{4})|"
     # a benefactor's death / legacy — the collection's namesake, not the work
     r"passed\s+away,?\s+leaving|leaving\s+behind\s+a\s+(?:significant\s+)?legacy|"
-    r"legacy\s+(?:of\s+generosity|continues?|lives?\s+on)"
+    r"legacy\s+(?:of\s+generosity|continues?|lives?\s+on)|"
+    # softer provenance / transfer phrasing the critic flagged (tours 418/421):
+    r"municipally\s+owned|publicly\s+(?:owned|accessible)|"
+    r"(?:the\s+)?(?:painting|work|artwork|piece)'?s?\s+location\s+changed|"
+    r"this\s+transfer\s+(?:preserved|allowed|brought|made)|"
+    r"transferred\s+to\s+(?:the\s+)?(?:museum|collection|state)|"
+    r"(?:museum|collection|gallery)'?s?\s+(?:dedication|commitment)\s+to|"
+    r"emerged\s+from\s+(?:the\s+)?(?:sweeping\s+)?(?:cultural\s+)?reforms|"
+    r"cultural\s+reforms\s+of\s+the\s+period|"
+    r"ecclesiastical\s+confiscations|secularis|secular[iz]ation|"
+    r"evacuat(?:ed|ion)\s+(?:during|by|to)|"
+    r"part\s+of\s+(?:the\s+)?(?:city'?s?|museum'?s?)\s+(?:rich\s+)?"
+    r"(?:artistic\s+)?heritage|"
+    r"became\s+(?:a\s+)?(?:pivotal\s+)?part\s+of\s+(?:the\s+)?(?:museum|collection)"
     r")\b"
 )
 
@@ -964,3 +978,31 @@ def looks_like_non_artwork_listing(title: str) -> bool:
     if _STAFF_ROLE_RE.search(t) and re.match(r"(?i)^\s*(mit|avec|with|con)\b", t):
         return True
     return False
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# item 6 — conclusion de-duplication (never two recaps that can disagree)
+# ─────────────────────────────────────────────────────────────────────────────
+
+_RECAP_THATS_RE = re.compile(r"(?i)that'?s\s+\d+\s+stops?\b")
+_TOUR_COVERED_RE = re.compile(r"(?i)this\s+tour\s+covered\b[^.!?]*[.!?]")
+
+
+def dedupe_conclusion(tour_text: str) -> Tuple[str, Dict]:
+    """[LOCAL-617 item 6] Keep ONE conclusion, never two recaps that can disagree.
+
+    The critic flagged tours whose ending had BOTH a "That's N stops — …" recap
+    AND a "This tour covered X and Y." line that named a different set of stops —
+    a self-contradiction (tour 419/421). When both are present, drop the plain
+    "This tour covered …" sentence and keep the richer recap. Pure string→string.
+    """
+    report = {"removed_redundant_covered": False}
+    if not tour_text:
+        return tour_text, report
+    if _RECAP_THATS_RE.search(tour_text) and _TOUR_COVERED_RE.search(tour_text):
+        new_text = _TOUR_COVERED_RE.sub("", tour_text)
+        new_text = re.sub(r"[ \t]{2,}", " ", new_text)
+        new_text = re.sub(r"\n[ \t]+", "\n", new_text)
+        report["removed_redundant_covered"] = True
+        return new_text, report
+    return tour_text, report
