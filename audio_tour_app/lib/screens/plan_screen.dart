@@ -28,6 +28,16 @@ class _PlanScreenState extends State<PlanScreen> {
   Entitlements _ent = Entitlements.unknown;
   bool _loading = true;
   bool _buying = false;
+  bool _claiming = false;
+
+  // [LOCAL-604] The single code box on the Free card.
+  final TextEditingController _codeController = TextEditingController();
+
+  @override
+  void dispose() {
+    _codeController.dispose();
+    super.dispose();
+  }
 
   @override
   void initState() {
@@ -103,6 +113,8 @@ class _PlanScreenState extends State<PlanScreen> {
                 children: [
                   _currentPlanCard(),
                   const SizedBox(height: 16),
+                  _freeCard(),
+                  const SizedBox(height: 16),
                   _buyCard(),
                   const SizedBox(height: 16),
                   _levelTableCard(),
@@ -137,7 +149,7 @@ class _PlanScreenState extends State<PlanScreen> {
               children: [
                 const Icon(Icons.workspace_premium, color: Colors.indigo),
                 const SizedBox(width: 10),
-                Text('Current plan: ${_ent.levelLabel}',
+                Text('Current plan: ${_ent.displayName}',
                     style: const TextStyle(
                         fontSize: 18, fontWeight: FontWeight.bold)),
               ],
@@ -229,31 +241,207 @@ class _PlanScreenState extends State<PlanScreen> {
     );
   }
 
-  Widget _levelTableCard() {
+  // [LOCAL-604 D619] The Free card: ask for a queue place (with an email) OR
+  // enter a code. One text box accepts any of the three code kinds; the server
+  // decides which it is.
+  Widget _freeCard() {
+    final pos = _ent.queuePosition;
+    final pending = _ent.pendingOfferCode;
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('The five levels',
+            const Text('Get the Free plan',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 8),
+            const Text(
+              'Ask for a place in the queue, or enter a code. The code arrives '
+              'by email and is valid for 10 minutes once the queue reaches you — '
+              'or it can be an invitation from a friend on a paid plan.',
+              style: TextStyle(fontSize: 13, height: 1.3),
+            ),
+            const SizedBox(height: 14),
+            if (pending != null) ...[
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFE8F5E9),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Text(
+                  'A seat is ready for you. Your code: $pending\n'
+                  'Enter it below within 10 minutes to claim the Free plan.',
+                  style: const TextStyle(fontSize: 13),
+                ),
+              ),
+              const SizedBox(height: 12),
+            ] else if (pos != null) ...[
+              Text('You are #$pos in the queue. We will email you a code when a '
+                  'seat frees.',
+                  style: const TextStyle(fontSize: 13, color: Colors.black54)),
+              const SizedBox(height: 12),
+            ],
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton(
+                onPressed: _claiming ? null : _promptJoinQueue,
+                style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 14)),
+                child: Text(pos != null ? 'Update my queue email' : 'Join the queue'),
+              ),
+            ),
+            const SizedBox(height: 16),
+            const Text('I have a code',
+                style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
+            const SizedBox(height: 8),
+            TextField(
+              controller: _codeController,
+              enabled: !_claiming,
+              textCapitalization: TextCapitalization.characters,
+              decoration: const InputDecoration(
+                hintText: 'Enter your code',
+                border: OutlineInputBorder(),
+                isDense: true,
+              ),
+            ),
+            const SizedBox(height: 10),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: _claiming ? null : _submitCode,
+                style: ElevatedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 14)),
+                child: _claiming
+                    ? const SizedBox(
+                        height: 18, width: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2))
+                    : const Text('Use code'),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _promptJoinQueue() async {
+    final controller = TextEditingController();
+    final email = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Join the queue'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'We will email you a code when a free seat opens up. The code is '
+              'valid for 10 minutes once the queue reaches you.',
+              style: TextStyle(fontSize: 13),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: controller,
+              keyboardType: TextInputType.emailAddress,
+              autofocus: true,
+              decoration: const InputDecoration(
+                labelText: 'Email address',
+                border: OutlineInputBorder(),
+                isDense: true,
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, controller.text.trim()),
+            child: const Text('Join'),
+          ),
+        ],
+      ),
+    );
+    if (email == null || email.isEmpty) return;
+    if (!_looksLikeEmail(email)) {
+      _snack('Please enter a valid email address.', Colors.red);
+      return;
+    }
+    setState(() => _claiming = true);
+    final updated = await EntitlementsService.joinQueue(email);
+    if (!mounted) return;
+    setState(() {
+      _claiming = false;
+      if (updated != null) _ent = updated;
+    });
+    _snack(
+      updated != null
+          ? 'You are in the queue. We will email a code when a seat frees.'
+          : 'Could not join the queue. Please try again.',
+      updated != null ? Colors.green : Colors.red,
+    );
+  }
+
+  Future<void> _submitCode() async {
+    final code = _codeController.text.trim();
+    if (code.isEmpty) {
+      _snack('Enter a code first.', Colors.red);
+      return;
+    }
+    setState(() => _claiming = true);
+    final result = await EntitlementsService.claim(code);
+    if (!mounted) return;
+    if (result.ok) {
+      // Refresh from the server so the whole screen (level, allowances,
+      // display name) reflects the new plan.
+      _codeController.clear();
+      await _load();
+      if (!mounted) return;
+      setState(() => _claiming = false);
+      _snack('Your plan is now: ${_ent.displayName}.', Colors.green);
+    } else {
+      setState(() => _claiming = false);
+      _snack(result.message, Colors.red);
+    }
+  }
+
+  static bool _looksLikeEmail(String s) =>
+      RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(s);
+
+  void _snack(String msg, Color color) {
+    ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(msg), backgroundColor: color));
+  }
+
+  Widget _levelTableCard() {
+    // [LOCAL-604 D619] Render only the VISIBLE levels the server returned, in
+    // plan order, with their display names. Tester and Administrator are hidden
+    // server-side and never appear here. If the server sent no levels (older
+    // payload), fall back to a short note rather than hardcoding a stale table.
+    final levels = _ent.levels;
+    final rows = <Widget>[];
+    for (final lvl in levels) {
+      rows.add(_levelRow(lvl.displayName, _levelBullets(lvl)));
+    }
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('The plans',
                 style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
             const SizedBox(height: 12),
-            _levelRow('Install (free)',
-                'Listen, download, read articles, reuse translations and '
-                're-voice edits. No new tours.'),
-            _levelRow('Free',
-                '1 new tour a day, 3 a month, up to 5 stops, from material '
-                'that already exists (no fresh research). Everything the '
-                'install level has.'),
-            _levelRow('\$10 pack',
-                '5 fresh tours, up to 10 stops each, and 5 stop-adding edits. '
-                'One-time purchase.'),
-            _levelRow('\$25 round',
-                '25 operations (new tours or edits, any mix), up to 25 stops '
-                'each. One-time purchase.'),
-            _levelRow('Tester',
-                'By invitation: 10 tours a day, 50 a month, up to 5 stops.'),
+            if (rows.isEmpty)
+              const Text(
+                'Plan details are briefly unavailable. Pull to refresh.',
+                style: TextStyle(fontSize: 13, color: Colors.black54),
+              )
+            else
+              ...rows,
             const SizedBox(height: 8),
             const Text(
               'Edits that only re-voice existing text are always free at every '
@@ -265,6 +453,47 @@ class _PlanScreenState extends State<PlanScreen> {
       ),
     );
   }
+
+  // Build the plain-words bullet list for a level. The headline feature leads;
+  // Curator's first bullet is selling. Pack and Curator show the invitations
+  // line. Everything else is derived from the server-sent fields.
+  List<String> _levelBulletList(PlanLevel lvl) {
+    final bullets = <String>[];
+    switch (lvl.planId) {
+      case 'l1': // Introduction
+        bullets.add(
+            'Listen, download, read articles, reuse translations and re-voice '
+            'edits. No new tours.');
+        break;
+      case 'l2': // Free
+        bullets.add(
+            '1 new tour a day, 3 a month, up to ${lvl.maxStops ?? 5} stops, from '
+            'material that already exists. Everything the Introduction has.');
+        break;
+      case 'l3': // $10 Pack
+        bullets.add(
+            '5 fresh tours, up to ${lvl.maxStops ?? 10} stops each, and 5 '
+            'stop-adding edits. One-time purchase.');
+        break;
+      case 'l4': // Curator — selling is the headline feature.
+        if (lvl.canSell) bullets.add('Create tours for sale.');
+        bullets.add(
+            '25 operations (new tours or edits, any mix), up to '
+            '${lvl.maxStops ?? 25} stops each. One-time purchase.');
+        break;
+      default:
+        bullets.add('${lvl.displayName} plan.');
+    }
+    // Pack and Curator can send free-subscription invitations.
+    if (lvl.referralsAllowed > 0 && (lvl.planId == 'l3' || lvl.planId == 'l4')) {
+      bullets.add('Send free-subscription invitations (3 lifetime / 5 per month).');
+    }
+    return bullets;
+  }
+
+  String _levelBullets(PlanLevel lvl) => _levelBulletList(lvl)
+      .map((b) => '• $b')
+      .join('\n');
 
   Widget _levelRow(String name, String desc) {
     return Padding(

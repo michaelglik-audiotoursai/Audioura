@@ -49,7 +49,8 @@ def get_settings(cur):
     missing (migration 015 not applied), raise — callers must not silently fall
     back to a hardcoded number."""
     cur.execute("""
-        SELECT auto_grant_threshold, offer_expiry_hours, max_offer_misses
+        SELECT auto_grant_threshold, offer_expiry_hours, max_offer_misses,
+               offer_ttl_minutes
         FROM l2_settings WHERE id = TRUE
     """)
     row = cur.fetchone()
@@ -59,6 +60,10 @@ def get_settings(cur):
         'auto_grant_threshold': row[0],
         'offer_expiry_hours': row[1],
         'max_offer_misses': row[2],
+        # [LOCAL-604 D619] Offer TTL in MINUTES (default 10, migration 016). The
+        # old offer_expiry_hours column is retained but no longer used for the
+        # offer window — offer_free_seats reads offer_ttl_minutes.
+        'offer_ttl_minutes': row[3],
     }
 
 
@@ -180,10 +185,16 @@ def grant_on_install(cur, user_id):
 # ───────────────────────────────────────────────────────────────────────────
 # Queue join / leave  (API surface)
 # ───────────────────────────────────────────────────────────────────────────
-def join_queue(cur, user_id):
+def join_queue(cur, user_id, email=None):
     """Add a device to the FIFO queue (idempotent). Only L1 devices may join —
     the caller is expected to have checked the level, but we also refuse here if
     the device already holds an L2 seat.
+
+    [LOCAL-604 D619] `email` is stored on the queue row so the offer code can be
+    emailed when a seat frees. It is held ONLY while the device is queued or
+    holds an unclaimed offer, and is nulled on claim, leave and expiry. Passing
+    None leaves any existing stored email unchanged on a re-join (so a device
+    that re-joins without re-entering its address keeps it).
 
     Returns a dict: {'joined': bool, 'status': str, 'position': int|None,
                      'reason': str|None}.
@@ -201,18 +212,24 @@ def join_queue(cur, user_id):
     cur.execute("SELECT status FROM l2_queue WHERE user_id = %s", (user_id,))
     existing = cur.fetchone()
     if existing and existing[0] in ('waiting', 'offered'):
-        # Already in line (or holding an offer) — idempotent no-op.
+        # Already in line (or holding an offer) — idempotent no-op, but refresh
+        # the stored email if a new one was supplied.
+        if email is not None:
+            cur.execute("UPDATE l2_queue SET email = %s, updated_at = NOW() WHERE user_id = %s",
+                        (email, user_id))
         return {'joined': True, 'status': existing[0],
                 'position': queue_position(cur, user_id), 'reason': None}
 
     # New row, or re-join after a terminal state → fresh waiting row at the tail.
+    # COALESCE keeps a previously-stored email when the caller passes None.
     cur.execute("""
-        INSERT INTO l2_queue (user_id, joined_at, status, offer_misses)
-        VALUES (%s, NOW(), 'waiting', 0)
+        INSERT INTO l2_queue (user_id, joined_at, status, offer_misses, email)
+        VALUES (%s, NOW(), 'waiting', 0, %s)
         ON CONFLICT (user_id) DO UPDATE SET
             status = 'waiting', joined_at = NOW(), offer_misses = 0,
+            email = COALESCE(EXCLUDED.email, l2_queue.email),
             updated_at = NOW()
-    """, (user_id,))
+    """, (user_id, email))
     return {'joined': True, 'status': 'waiting',
             'position': queue_position(cur, user_id), 'reason': None}
 
@@ -220,9 +237,10 @@ def join_queue(cur, user_id):
 def leave_queue(cur, user_id):
     """Mark a device's queue row 'left' (idempotent). Any live offer it holds is
     expired too, so the seat it was offered is freed for the next waiter on the
-    next job run. Returns {'left': bool}."""
+    next job run. [LOCAL-604 D619] The stored email is nulled — a device that
+    has left is neither queued nor holding an offer. Returns {'left': bool}."""
     cur.execute("""
-        UPDATE l2_queue SET status = 'left', updated_at = NOW()
+        UPDATE l2_queue SET status = 'left', email = NULL, updated_at = NOW()
         WHERE user_id = %s AND status IN ('waiting', 'offered')
     """, (user_id,))
     left = cur.rowcount > 0
@@ -322,7 +340,8 @@ def claim_seat(cur, user_id, code):
         UPDATE l2_offers SET status = 'claimed', claimed_at = NOW() WHERE code = %s
     """, (code,))
     cur.execute("""
-        UPDATE l2_queue SET status = 'claimed', updated_at = NOW() WHERE user_id = %s
+        UPDATE l2_queue SET status = 'claimed', email = NULL, updated_at = NOW()
+        WHERE user_id = %s
     """, (user_id,))
     return {'ok': True, 'code': CLAIM_OK, 'message': 'Seat claimed. Welcome to the free level.'}
 
@@ -394,13 +413,17 @@ def expire_offers(cur):
         misses = row[0]
         if misses >= max_misses:
             cur.execute("""
-                UPDATE l2_queue SET status = 'expired', updated_at = NOW()
+                UPDATE l2_queue SET status = 'expired', email = NULL, updated_at = NOW()
                 WHERE user_id = %s
             """, (user_id,))
             dropped.append(user_id)
         else:
+            # [LOCAL-604 D619] The offer expired, so the device no longer holds
+            # an unclaimed offer — null the stored email. It goes back to the
+            # tail as 'waiting'; a re-join from the app re-supplies the address.
             cur.execute("""
-                UPDATE l2_queue SET status = 'waiting', joined_at = NOW(), updated_at = NOW()
+                UPDATE l2_queue SET status = 'waiting', joined_at = NOW(),
+                                    email = NULL, updated_at = NOW()
                 WHERE user_id = %s
             """, (user_id,))
             requeued.append(user_id)
@@ -410,7 +433,14 @@ def expire_offers(cur):
 def offer_free_seats(cur):
     """For each currently free seat under the cap, offer the first waiting device
     a claim. Each offer gets a unique code and an expires_at = NOW() + the
-    offer-expiry setting (72 h). The device's queue row flips to 'offered'.
+    offer-TTL setting ([LOCAL-604 D619] offer_ttl_minutes, default 10 MINUTES).
+    The device's queue row flips to 'offered'.
+
+    [LOCAL-604 D619] If the device gave an email when it joined, the code is
+    emailed to it via email_sender (behind EMAIL_MODE; default 'log' writes it
+    to the log — the app also shows the pending offer in-app, so nothing depends
+    on email being configured). Email delivery is best-effort and never aborts
+    the offer: it runs after the DB writes and swallows its own errors.
 
     Only devices with NO live offer are offered (a device already holding an
     'offered' row occupies no seat but is waiting on its own offer, so it is not
@@ -422,7 +452,7 @@ def offer_free_seats(cur):
     """
     _acquire_seat_lock(cur)
     settings = get_settings(cur)
-    expiry_hours = settings['offer_expiry_hours']
+    ttl_minutes = settings['offer_ttl_minutes']
     cap = get_seat_cap(cur)
     if cap is None:
         return []
@@ -437,25 +467,39 @@ def offer_free_seats(cur):
         return []
 
     cur.execute("""
-        SELECT user_id FROM l2_queue
+        SELECT user_id, email FROM l2_queue
         WHERE status = 'waiting'
         ORDER BY joined_at ASC
         LIMIT %s
     """, (free,))
-    waiters = [r[0] for r in cur.fetchall()]
+    waiters = cur.fetchall()
 
     offered = []
-    for user_id in waiters:
+    to_email = []
+    for user_id, email in waiters:
         code = new_offer_code()
         cur.execute("""
             INSERT INTO l2_offers (user_id, code, offered_at, expires_at, status)
-            VALUES (%s, %s, NOW(), NOW() + (%s || ' hours')::interval, 'offered')
-        """, (user_id, code, expiry_hours))
+            VALUES (%s, %s, NOW(), NOW() + (%s || ' minutes')::interval, 'offered')
+        """, (user_id, code, ttl_minutes))
         cur.execute("""
             UPDATE l2_queue SET status = 'offered', updated_at = NOW()
             WHERE user_id = %s
         """, (user_id,))
         offered.append((user_id, code))
+        if email:
+            to_email.append((email, code))
+
+    # Best-effort email AFTER the DB writes. email_sender never raises; guard
+    # the import too so a deployment without the module still offers seats.
+    if to_email:
+        try:
+            import email_sender
+            for email, code in to_email:
+                email_sender.send_offer_email(email, code, expires_minutes=ttl_minutes)
+        except Exception as e:  # pragma: no cover - defensive
+            logger.warning(f"[LOCAL-604] offer email step skipped: {e}")
+
     return offered
 
 
