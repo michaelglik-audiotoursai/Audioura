@@ -543,7 +543,33 @@ def generate_tour_async(job_id, location, tour_type, total_stops=10, user_id=Non
                         _serving_story_elements = _json.load(_ef)
                     print(f"[BLOCKER4c] Loaded {len(_serving_story_elements)} story elements for G4 check")
                 else:
-                    print(f"[BLOCKER4c] No story_elements file at {_elem_path} — G4 will use fail-closed")
+                    # [LEAD 2026-10-06] Cache hits and stop-pool deliveries (LOCAL-590) never
+                    # write the per-run elements file, so G4 failed closed on EVERY reused
+                    # museum tour (Harvard + McMullen validation runs). The venue's mined
+                    # elements are persisted in venue_corpus (LOCAL-21); use them.
+                    try:
+                        import psycopg2 as _pg_se
+                        _se_conn = _pg_se.connect(
+                            host=os.getenv('DB_HOST', 'postgres-2'), database=os.getenv('DB_NAME', 'audiotours'),
+                            user=os.getenv('DB_USER', 'admin'), password=os.getenv('DB_PASSWORD', 'password123'),
+                            port=os.getenv('DB_PORT', '5432'), connect_timeout=5)
+                        with _se_conn.cursor() as _se_cur:
+                            _se_cur.execute(
+                                "SELECT story_elements_json FROM venue_corpus "
+                                "WHERE story_elements_json IS NOT NULL AND (venue_name = %s OR venue_name ILIKE %s) "
+                                "ORDER BY created_at DESC LIMIT 1",
+                                (location, location.split(',')[0].strip() + ',%'))
+                            _se_row = _se_cur.fetchone()
+                        _se_conn.close()
+                        if _se_row and _se_row[0]:
+                            _se_val = _se_row[0] if isinstance(_se_row[0], list) else _json.loads(_se_row[0])
+                            if _se_val:
+                                _serving_story_elements = _se_val
+                                print(f"[BLOCKER4c] Loaded {len(_se_val)} story elements from venue_corpus for G4 (reused delivery)")
+                    except Exception as _se_err:
+                        print(f"[BLOCKER4c] venue_corpus story_elements fallback error: {_se_err}")
+                    if not _serving_story_elements:
+                        print(f"[BLOCKER4c] No story_elements file at {_elem_path} — G4 will use fail-closed")
             except Exception as _elem_err:
                 print(f"[BLOCKER4c] story_elements load error: {_elem_err}")
             
