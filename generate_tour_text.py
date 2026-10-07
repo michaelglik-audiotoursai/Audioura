@@ -4188,6 +4188,14 @@ _LAST_SCORE_RECORD = None
 # Keys: requested, delivered, reason, source.
 _LAST_STOP_COUNT_NOTICE = {}
 
+# [LOCAL-603 / D618] Module-level: the venue preflight result from the LAST
+# single-venue generation (venue_preflight.preflight). {} when no preflight ran
+# (not a single-venue request, or an L2 by-reference build). The Plan B wiring
+# reads it to fold preflight hours/admission into the D611 opening section when
+# the site gave none, and to top up stop candidates when our own extraction fell
+# short — each with its grounding source URL (never unsourced).
+_LAST_VENUE_PREFLIGHT = {}
+
 
 def _set_stop_count_notice(requested, delivered, source, reason):
     """[D536] Record the listener's ask vs what shipped.
@@ -8162,6 +8170,63 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
                 # Looks like a proper venue name — use it (title-cased)
                 _museum_venue_name = _first_segment.title()
                 print(f"  [BLOCKER4a] venue_name from location fallback: '{_museum_venue_name}'")
+
+        # ──── [LOCAL-603 / D618] VENUE PREFLIGHT — ONE GROUNDED CALL BEFORE WE BUILD ────
+        # Every single-venue request starts with one grounded Gemini question (open?
+        # closed? hours, admission, what's on). It is the only reliable early guard
+        # against the most expensive embarrassment — a full tour of a closed place
+        # (WNDR Museum Boston, closed 2026-08-30, which we shipped). The answer is a
+        # GATE (closed -> refuse before any further spend) and PLAN B MATERIAL (its
+        # sourced hours/admission/highlights fill gaps our own sources leave).
+        #
+        # It runs ONLY for a single named venue (_museum_venue_name set). The call
+        # flows through gemini_with_sources(grounded=True) so the LOCAL-594 meter
+        # counts it; a 7-day (venue, city) cache makes a repeat request free. An L2
+        # by-reference build returns far above (mode='by_reference'), so we are
+        # always on the fresh path here — but safe_preflight also treats the L2
+        # GroundingForbiddenError as "skip" defensively.
+        global _LAST_VENUE_PREFLIGHT
+        _LAST_VENUE_PREFLIGHT = {}
+        if _museum_venue_name and os.environ.get('LOCAL603_PREFLIGHT', '1') != '0':
+            try:
+                import venue_preflight as _vpf
+                _pf_city = ''
+                if ',' in location:
+                    _pf_city = ','.join(p.strip() for p in location.split(',')[1:]).strip()
+                _pf = _vpf.safe_preflight(_museum_venue_name, _pf_city)
+                _LAST_VENUE_PREFLIGHT = _pf
+                if _pf.get('skipped'):
+                    print(f"  [LOCAL-603] preflight skipped ({_pf['skipped']})")
+                elif _pf.get('error'):
+                    print(f"  [LOCAL-603] preflight unavailable ({_pf['error']}) — continuing")
+                else:
+                    print(f"  [LOCAL-603] preflight status={_pf.get('status')} "
+                          f"hours={'y' if _pf.get('hours') else 'n'} "
+                          f"admission={'y' if _pf.get('admission') else 'n'} "
+                          f"highlights={len(_pf.get('current_exhibitions_or_highlights') or [])}")
+                    _gate = _vpf.gate(_museum_venue_name, _pf_city, _pf)
+                    if _gate:
+                        # Closed venue — stop before any further spend. Actionable
+                        # refusal; the known_closed corpus has already been taught
+                        # inside preflight() so the next request skips the call.
+                        print(f"  [LOCAL-603] VENUE CLOSED GATE: {_gate['message']}")
+                        _LAST_CLEAN_FAIL_EVIDENCE = {
+                            "error_type": "venue_closed",
+                            "error_code": "venue_closed",
+                            "message": _gate['message'],
+                            "suggestion": _gate['suggestion'],
+                            "venue": _museum_venue_name,
+                            "locality": _pf_city,
+                            "status": _gate.get('status', ''),
+                            "closed_since": _gate.get('closed_since', ''),
+                            "sources": _gate.get('sources', []),
+                        }
+                        return None, output_file, (None, None)
+            except Exception as _pf_err:
+                # Preflight is a guard, never a new way for generation to break.
+                print(f"  [LOCAL-603] preflight error (non-fatal): {_pf_err}")
+                _LAST_VENUE_PREFLIGHT = {}
+
         if _museum_venue_name:
             _museum_venue_constraint = (
                 f"\nCRITICAL CONSTRAINT — THIS IS A SINGLE-VENUE MUSEUM TOUR (WORKS-FIRST):\n"
@@ -8907,6 +8972,55 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
                       f"{len(poi_list)} current exhibition(s) from the venue site)")
                 for _poi in poi_list:
                     print(f"   - {_poi['name']} [SITE EXHIBITION {_poi.get('detail_url','')}]")
+
+                # ──── [LOCAL-603 / D618] PLAN B STOP CANDIDATES — preflight tops up a short list ────
+                # Our own site extraction yielded fewer than the requested stops.
+                # Rather than invent (D589) or silently deliver a thin tour, seed
+                # the shortfall from the venue preflight's current exhibitions /
+                # highlights — each carrying its grounding source URL, so the stop
+                # still goes through the normal story pipeline from a SOURCED seed
+                # (never unsourced, D618). Deduped against what the site already gave.
+                try:
+                    if (len(poi_list) < (total_stops or 0)
+                            and _LAST_VENUE_PREFLIGHT
+                            and not _LAST_VENUE_PREFLIGHT.get('error')
+                            and not _LAST_VENUE_PREFLIGHT.get('skipped')):
+                        import venue_preflight as _vpf
+                        from story_miner import _normalize as _pf_norm
+                        _planb_cands = _vpf.plan_b_stop_candidates(
+                            _LAST_VENUE_PREFLIGHT,
+                            have=len(poi_list), want=(total_stops or 0),
+                            min_stops=(total_stops or 0))
+                        _existing_norm = {_pf_norm(p['name']) for p in poi_list}
+                        _added = 0
+                        for _cand in _planb_cands:
+                            if _pf_norm(_cand['name']) in _existing_norm:
+                                continue
+                            _np = _new_poi(_cand['name'], page_sourced=True)
+                            _np['detail_url'] = _cand['source_url']
+                            _np['source'] = 'preflight_seed'
+                            _np['_sf_kind'] = 'exhibition'
+                            _np['_sf_status'] = ''
+                            _np['_sf_group_key'] = (_cand['source_url'] or '').strip()
+                            _np['_sf_order'] = len(poi_list)
+                            _np['_preflight_seed'] = True
+                            poi_list.append(_np)
+                            _LAST_SITE_FIRST_SOURCES.append({
+                                'name': _cand['name'],
+                                'source_url': _cand['source_url'],
+                                'status': '',
+                                'kind': 'highlight',
+                            })
+                            _existing_norm.add(_pf_norm(_cand['name']))
+                            _added += 1
+                        if _added:
+                            print(f"  [LOCAL-603] Plan B seeded {_added} stop "
+                                  f"candidate(s) from preflight (site gave "
+                                  f"{len(poi_list) - _added} < {total_stops} requested)")
+                            for _np in poi_list[-_added:]:
+                                print(f"   - {_np['name']} [PREFLIGHT SEED {_np.get('detail_url','')}]")
+                except Exception as _planb_c_err:
+                    print(f"  [LOCAL-603] Plan B stop-candidate error (non-fatal): {_planb_c_err}")
             else:
                 _sf_reason = _sf_diagnostics.get('reason', 'no_listing_found')
                 _sf_fetch_failed = bool(_sf_diagnostics.get('fetch_failed'))
@@ -12083,6 +12197,50 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
                 print(f"  [LOCAL-355] osm_venue_facts not available — operational details unchanged")
             except Exception as _osm_err:
                 print(f"  [LOCAL-355] OSM venue facts error (non-fatal): {_osm_err}")
+
+        # ──── [LOCAL-603 / D618] PLAN B PRACTICALS — preflight fills what the site/OSM left blank ────
+        # When our own sources (official site, OSM) produced NO hours/admission for
+        # the museum, fold the venue preflight's sourced hours/admission into the
+        # opening section instead of leaving the listener with nothing. D617: the
+        # facts are SPOKEN; their source lives in the text view only (never read
+        # aloud). Only runs for a single-venue museum tour where the preflight
+        # succeeded and we have at least one stop to attach the venue facts to.
+        if (tour_category == 'museum' and poi_list and _museum_venue_name
+                and _LAST_VENUE_PREFLIGHT and not _LAST_VENUE_PREFLIGHT.get('error')
+                and not _LAST_VENUE_PREFLIGHT.get('skipped')):
+            try:
+                import venue_preflight as _vpf
+                # Did our OWN sources already supply hours/admission anywhere?
+                _have_practicals = any(p.get('operational_details') for p in poi_list)
+                if not _have_practicals:
+                    _planb = _vpf.plan_b_opening_practicals(_LAST_VENUE_PREFLIGHT)
+                    if _planb.get('speak'):
+                        # Attach the SPOKEN sentence to Stop 1 (the D611 opening
+                        # section lives at the start of Stop 1). The source note is
+                        # recorded for the text view only — it is NOT part of what
+                        # is spoken (D617).
+                        poi_list[0]['operational_details'] = _planb['speak']
+                        poi_list[0]['_planb_practicals_source'] = _planb['source_note']
+                        # Carry the preflight's source text/url so the practical-
+                        # facts gate recognises these as SOURCED claims (D538).
+                        _pf_src_urls = []
+                        for _f in ('hours', 'admission'):
+                            for _u in (_LAST_VENUE_PREFLIGHT.get('sources', {}) or {}).get(_f, []) or []:
+                                if _u not in _pf_src_urls:
+                                    _pf_src_urls.append(_u)
+                        if _pf_src_urls:
+                            _planb_src_text = (f"Venue preflight (grounded): "
+                                               f"{_planb['speak']} "
+                                               f"[sources: {', '.join(_pf_src_urls)}]")
+                            if _visitor_info_source_text:
+                                _visitor_info_source_text += "\n\n" + _planb_src_text
+                            else:
+                                _visitor_info_source_text = _planb_src_text
+                                _visitor_info_source_url = ", ".join(_pf_src_urls[:3])
+                        print(f"  [LOCAL-603] Plan B practicals folded into Stop 1 "
+                              f"(site/OSM gave none): {_planb['speak']}")
+            except Exception as _planb_err:
+                print(f"  [LOCAL-603] Plan B practicals error (non-fatal): {_planb_err}")
 
         # -------- Coordinates fallback: request for any stop missing coordinates --------
         # PHASE 3B sometimes omits coordinates for one or more stops. Request them
