@@ -26,7 +26,8 @@ from collections import defaultdict
 
 __all__ = ['clean_spoken_text', 'MISSING_SPACE_RE', 'TEMPLATE_SEAM_RE',
            'DANGLING_PHRASE_RE', 'normalize_proper_noun_spellings',
-           'strip_sources_and_urls', 'SOURCES_HEADING_RE', 'URL_RE']
+           'strip_sources_and_urls', 'SOURCES_HEADING_RE', 'URL_RE',
+           'strip_degenerate_from_to_recap']
 
 # "At this work:", "in the stop:", "At this piece:" — the preposition keeps its
 # original case, because replacing with a literal "At " produced "Then, At Au
@@ -317,6 +318,49 @@ def strip_sources_and_urls(text: str) -> tuple:
     out = re.sub(r'\n{3,}', '\n\n', out)
     out = out.strip()
     return (out + '\n') if ends_nl else out, report
+
+
+# -------- [LOCAL-602 r2 / D617 item 12] No "From X to X" recap under 2 stops ---
+#
+# The single-story recap reads "From {first} to {last}, you have followed the
+# thread of a single story." With ONE stop first == last and it becomes "From
+# WNDR Museum — Overview to WNDR Museum — Overview, you have followed …" — a
+# nonsense sentence the r1 overview shipped. The assembler-level guards
+# (stop_pool_assembly._closing_recap, tour_cache_layer1._repair_recap) prevent it
+# at the source; this is a tour-wide safety net for any path that still emits it:
+# remove the whole recap sentence when its two endpoints are the SAME stop.
+
+_FROM_TO_RECAP_RE = re.compile(
+    r'(?is)(?<![^.\s])From\s+(.+?)\s+to\s+(.+?),\s*you have followed[^.?!]*[.?!]')
+
+
+def _norm_endpoint(s: str) -> str:
+    return re.sub(r'\s+', ' ', (s or '')).strip().lower().rstrip('.')
+
+
+def strip_degenerate_from_to_recap(text: str) -> tuple:
+    """Remove a 'From X to Y, you have followed …' recap when X == Y.
+
+    Returns ``(cleaned, n_removed)``. Deterministic, pure. A genuine multi-stop
+    recap (X != Y) is left untouched.
+    """
+    if not text:
+        return text or '', 0
+    removed = 0
+
+    def _sub(m):
+        nonlocal removed
+        if _norm_endpoint(m.group(1)) == _norm_endpoint(m.group(2)):
+            removed += 1
+            return ''
+        return m.group(0)
+
+    out = _FROM_TO_RECAP_RE.sub(_sub, text)
+    if removed:
+        out = re.sub(r'[ \t]+\n', '\n', out)
+        out = re.sub(r'\n{3,}', '\n\n', out)
+        out = out.strip() + ('\n' if text.endswith('\n') else '')
+    return out, removed
 
 
 def clean_spoken_text(text: str, verbose: bool = False) -> tuple:

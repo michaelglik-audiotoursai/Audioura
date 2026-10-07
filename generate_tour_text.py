@@ -22808,6 +22808,17 @@ RULES:
     except Exception as _ptr_e:
         print(f"  [LOCAL-602 r2] website-pointer collapse skipped (non-fatal): {_ptr_e}")
 
+    # [LOCAL-602 r2 / D617 item 12] Remove a "From X to X" single-story recap when
+    # the two endpoints are the same stop (a 1-stop tour). Tour-wide safety net.
+    try:
+        from spoken_text_hygiene import strip_degenerate_from_to_recap as _strip_recap
+        complete_tour, _n_recap = _strip_recap(complete_tour)
+        if _n_recap:
+            print(f"  [LOCAL-602 r2] removed {_n_recap} degenerate 'From X to X' "
+                  f"recap sentence(s) (fewer than 2 stops).")
+    except Exception as _recap_e:
+        print(f"  [LOCAL-602 r2] From-to recap strip skipped (non-fatal): {_recap_e}")
+
     # -------- [D523] Facts we have already paid to verify --------
     #
     # The 12:23 tour asserted "Moses was an Egyptian priest" — Freud argued

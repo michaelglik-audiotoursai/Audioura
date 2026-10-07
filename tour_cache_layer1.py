@@ -321,6 +321,18 @@ def _repair_recap(recap_block, first_name, last_name, target_stops):
     """
     out = recap_block
 
+    # [LOCAL-602 r2 / D617 item 12] A "From {first} to {last}" recap needs TWO or
+    # more stops; trimmed to one, first == last and the sentence is nonsense.
+    # Replace the whole From→to recap sentence with a plain single-stop count.
+    if target_stops is not None and target_stops < 2:
+        out = _RECAP_FROM_TO.sub(
+            f"That's {target_stops} stop: {first_name}. You have followed",
+            out, count=1)
+        # Fold the now-redundant "That's N stops" count sentence that followed.
+        out = _RECAP_COUNT.sub("", out, count=1)
+        out = re.sub(r"\n{3,}", "\n\n", out)
+        return out.strip()
+
     # 1. Fix the From→to endpoints.
     def _fix_from_to(m):
         return f"From {first_name} to {last_name}, you have followed the thread"
