@@ -63,11 +63,64 @@ class Allowances {
       opsLeft == null;
 }
 
+/// [LOCAL-604 D619] One visible plan level, as the user-api reports it under
+/// `levels` in /entitlements/me. The app renders these rows and hardcodes
+/// nothing — the display name, price, selling flag and referral allowance all
+/// come from the server (which reads them from the `plans` table). Hidden
+/// levels (tester, admin) are never in this list.
+class PlanLevel {
+  final String planId; // 'l1' | 'l2' | 'l3' | 'l4'
+  final String displayName; // 'Introduction' | 'Free' | '$10 Pack' | 'Curator'
+  final double priceUsd;
+  final bool canSell; // Curator: may generate tours for sale
+  final int referralsAllowed; // free-subscription invitations
+  final String? referralPeriod; // 'lifetime' | 'month' | null
+  final int? maxStops;
+
+  const PlanLevel({
+    required this.planId,
+    required this.displayName,
+    required this.priceUsd,
+    required this.canSell,
+    required this.referralsAllowed,
+    required this.referralPeriod,
+    required this.maxStops,
+  });
+
+  factory PlanLevel.fromJson(Map<String, dynamic> json) {
+    double asDouble(dynamic v) =>
+        v is num ? v.toDouble() : (v is String ? (double.tryParse(v) ?? 0.0) : 0.0);
+    int? asInt(dynamic v) => v is int ? v : (v is num ? v.toInt() : null);
+    final id = json['plan_id'];
+    return PlanLevel(
+      planId: id is String ? id : '',
+      displayName: json['display_name'] is String && (json['display_name'] as String).isNotEmpty
+          ? json['display_name'] as String
+          : (id is String ? id : ''),
+      priceUsd: asDouble(json['price_usd']),
+      canSell: json['can_sell'] == true,
+      referralsAllowed: asInt(json['referrals_allowed']) ?? 0,
+      referralPeriod:
+          json['referral_period'] is String ? json['referral_period'] as String : null,
+      maxStops: asInt(json['max_stops']),
+    );
+  }
+}
+
 /// The device's entitlement snapshot. Parsed from /entitlements/me and
 /// /entitlements/app-open (identical payload shape).
 class Entitlements {
   /// 'l1' | 'l2' | 'l3' | 'l4' | 'tester'. Defaults to 'l1' (install level).
   final String level;
+
+  /// [LOCAL-604] The current level's human display name from the server
+  /// (falls back to the level id if absent).
+  final String displayName;
+
+  /// [LOCAL-604] The ordered visible levels for the plan page (hidden levels
+  /// excluded). Empty if the server did not send them (older payload); the UI
+  /// then falls back to the built-in level labels.
+  final List<PlanLevel> levels;
 
   /// ISO-8601 string of the anniversary, or null if the device has no pack.
   final String? anniversaryAt;
@@ -84,13 +137,24 @@ class Entitlements {
   /// Whether this level may sell tours (L4 only, flag-gated feature).
   final bool canSell;
 
+  /// [LOCAL-604] The device's 1-based place in the free-seat queue, or null if
+  /// it is not waiting.
+  final int? queuePosition;
+
+  /// [LOCAL-604] A live, unclaimed queue offer code the device holds, or null.
+  final String? pendingOfferCode;
+
   const Entitlements({
     required this.level,
+    required this.displayName,
+    required this.levels,
     required this.anniversaryAt,
     required this.allowances,
     required this.warnRenewal,
     required this.renewalPrompt,
     required this.canSell,
+    required this.queuePosition,
+    required this.pendingOfferCode,
   });
 
   /// Safe default used when the user-api is unreachable: install level, no
@@ -98,17 +162,41 @@ class Entitlements {
   /// about" so a transient network error never pops a sheet or blocks the UI.
   static const Entitlements unknown = Entitlements(
     level: 'l1',
+    displayName: 'Introduction',
+    levels: <PlanLevel>[],
     anniversaryAt: null,
     allowances: Allowances.empty,
     warnRenewal: false,
     renewalPrompt: false,
     canSell: false,
+    queuePosition: null,
+    pendingOfferCode: null,
   );
 
   factory Entitlements.fromJson(Map<String, dynamic> json) {
     final lvl = json['level'];
+    final level = (lvl is String && lvl.isNotEmpty) ? lvl : 'l1';
+    final rawLevels = json['levels'];
+    final levels = <PlanLevel>[];
+    if (rawLevels is List) {
+      for (final e in rawLevels) {
+        if (e is Map<String, dynamic>) {
+          final pl = PlanLevel.fromJson(e);
+          if (pl.planId.isNotEmpty) levels.add(pl);
+        }
+      }
+    }
+    final offer = json['pending_offer'];
+    final offerCode = (offer is Map<String, dynamic> && offer['code'] is String)
+        ? offer['code'] as String
+        : null;
+    int? asInt(dynamic v) => v is int ? v : (v is num ? v.toInt() : null);
     return Entitlements(
-      level: (lvl is String && lvl.isNotEmpty) ? lvl : 'l1',
+      level: level,
+      displayName: json['display_name'] is String && (json['display_name'] as String).isNotEmpty
+          ? json['display_name'] as String
+          : level,
+      levels: levels,
       anniversaryAt: json['anniversary_at'] is String
           ? json['anniversary_at'] as String
           : null,
@@ -119,6 +207,8 @@ class Entitlements {
       warnRenewal: json['warn_renewal'] == true,
       renewalPrompt: json['renewal_prompt'] == true,
       canSell: json['can_sell'] == true,
+      queuePosition: asInt(json['queue_position']),
+      pendingOfferCode: offerCode,
     );
   }
 
@@ -224,4 +314,85 @@ class EntitlementsService {
       return false;
     }
   }
+
+  /// [LOCAL-604 D619] POST /l2/queue/join — ask for a place in the free-seat
+  /// queue, with the email the offer code will be sent to. Returns the refreshed
+  /// snapshot on success, or null on failure (the caller shows a message).
+  static Future<Entitlements?> joinQueue(String email) async {
+    final userId = await _userId();
+    if (userId.isEmpty) return null;
+    try {
+      final resp = await Endpoints.post(
+        Service.userDb,
+        '/l2/queue/join',
+        body: {'user_id': userId, 'email': email},
+        timeout: const Duration(seconds: 15),
+      );
+      if (resp.statusCode == 200) {
+        return Entitlements.fromJson(
+            jsonDecode(resp.body) as Map<String, dynamic>);
+      }
+      await DebugLogHelper.addDebugLog(
+          'ENTITLEMENTS: queue/join non-200 ${resp.statusCode}');
+      return null;
+    } catch (e) {
+      await DebugLogHelper.addDebugLog('ENTITLEMENTS: queue/join error: $e');
+      return null;
+    }
+  }
+
+  /// [LOCAL-604 D619] POST /l2/claim — the single code box. Accepts a
+  /// queue-offer code, a friend's invitation code, or a level code; the server
+  /// decides which it is and either switches the level/seat or returns a
+  /// structured refusal. Returns a [ClaimResult]: on success it carries the
+  /// refreshed snapshot so the caller can show the new level immediately.
+  static Future<ClaimResult> claim(String code) async {
+    final userId = await _userId();
+    if (userId.isEmpty) {
+      return const ClaimResult(ok: false, message: 'This device has no id yet.');
+    }
+    try {
+      final resp = await Endpoints.post(
+        Service.userDb,
+        '/l2/claim',
+        body: {'user_id': userId, 'code': code},
+        timeout: const Duration(seconds: 15),
+      );
+      final body = (() {
+        try {
+          final d = jsonDecode(resp.body);
+          return d is Map<String, dynamic> ? d : <String, dynamic>{};
+        } catch (_) {
+          return <String, dynamic>{};
+        }
+      })();
+      if (resp.statusCode == 200) {
+        return ClaimResult(
+          ok: true,
+          entitlements: Entitlements.fromJson(body),
+          message: 'Your plan is updated.',
+        );
+      }
+      final msg = body['message'] is String
+          ? body['message'] as String
+          : 'That code could not be used.';
+      await DebugLogHelper.addDebugLog(
+          'ENTITLEMENTS: claim non-200 ${resp.statusCode} ${body['error_code']}');
+      return ClaimResult(ok: false, message: msg);
+    } catch (e) {
+      await DebugLogHelper.addDebugLog('ENTITLEMENTS: claim error: $e');
+      return const ClaimResult(
+          ok: false, message: 'Could not reach the server. Please try again.');
+    }
+  }
+}
+
+/// Result of [EntitlementsService.claim]. On success [entitlements] holds the
+/// refreshed snapshot; on failure [message] explains why.
+class ClaimResult {
+  final bool ok;
+  final Entitlements? entitlements;
+  final String message;
+
+  const ClaimResult({required this.ok, this.entitlements, required this.message});
 }
