@@ -455,6 +455,15 @@ def assemble_building_tour(
     except Exception as _spr_e:  # pragma: no cover
         logger.info(f"[LOCAL-616] phantom-reference guard skipped ({_spr_e})")
         _phantom_dropped = []
+    # [LOCAL-616 item 5] Drop era-contradicting sentences: a stop whose work date
+    # is known must not carry a century/year claim >150y away unless framed as an
+    # earlier tradition (414 Stop 3: "In the 13th century…" about a 1782 object).
+    try:
+        from wrong_era_guard import strip_wrong_era_sentences as _wes
+        ordered, _era_dropped = _wes(ordered)
+    except Exception as _wes_e:  # pragma: no cover
+        logger.info(f"[LOCAL-616] wrong-era guard skipped ({_wes_e})")
+        _era_dropped = []
     # [LOCAL-592] Resolve the opening-section text. Prefer the explicit
     # ``opening_section``; fall back to folding a legacy ``about_stop`` unit's
     # narration (+ practical facts) so no caller path can resurrect an extra stop.
@@ -512,14 +521,17 @@ def assemble_building_tour(
         rewritten_transitions=0,  # building directions are templates, not LLM rewrites
         order=[s["title"] for s in ordered],
         about_stops=1 if folded_opening else 0,
-        dedupe_dropped=len(_dd_dropped) + len(_phantom_dropped),
+        dedupe_dropped=len(_dd_dropped) + len(_phantom_dropped) + len(_era_dropped),
         dedupe_log=[
             f"[LOCAL-607] dedupe: dropped from Stop {d['stop']} "
             f"({d['reason']}): \"{d['sentence'][:90]}\"" for d in _dd_dropped]
         + [
             f"[LOCAL-616] phantom-ref: dropped from Stop {d['stop']} "
             f"(names {d['phantom']!r}, not in tour): \"{d['sentence'][:90]}\""
-            for d in _phantom_dropped],
+            for d in _phantom_dropped]
+        + [
+            f"[LOCAL-616] wrong-era: dropped from Stop {d['stop']} "
+            f"({d['reason']}): \"{d['sentence'][:90]}\"" for d in _era_dropped],
     )
 
 
@@ -625,6 +637,14 @@ def assemble_outdoor_tour(
         logger.info(f"[LOCAL-616] phantom-reference guard skipped ({_spr_e})")
         _phantom_dropped = []
 
+    # [LOCAL-616 item 5] Drop era-contradicting sentences for the outdoor route too.
+    try:
+        from wrong_era_guard import strip_wrong_era_sentences as _wes
+        ordered, _era_dropped = _wes(ordered)
+    except Exception as _wes_e:  # pragma: no cover
+        logger.info(f"[LOCAL-616] wrong-era guard skipped ({_wes_e})")
+        _era_dropped = []
+
     # [LOCAL-612 / D616] Lead Stop 1 with the honest shortfall sentence when the
     # route delivered fewer stops than asked. It is placed on the first walked
     # stop's dedicated opening-section field, so _render_stop_block renders it
@@ -666,14 +686,17 @@ def assemble_outdoor_tour(
         new_stops=len(new_stops),
         rewritten_transitions=rewritten,
         order=[s["title"] for s in ordered],
-        dedupe_dropped=len(_dd_dropped) + len(_phantom_dropped),
+        dedupe_dropped=len(_dd_dropped) + len(_phantom_dropped) + len(_era_dropped),
         dedupe_log=[
             f"[LOCAL-607] dedupe: dropped from Stop {d['stop']} "
             f"({d['reason']}): \"{d['sentence'][:90]}\"" for d in _dd_dropped]
         + [
             f"[LOCAL-616] phantom-ref: dropped from Stop {d['stop']} "
             f"(names {d['phantom']!r}, not in tour): \"{d['sentence'][:90]}\""
-            for d in _phantom_dropped],
+            for d in _phantom_dropped]
+        + [
+            f"[LOCAL-616] wrong-era: dropped from Stop {d['stop']} "
+            f"({d['reason']}): \"{d['sentence'][:90]}\"" for d in _era_dropped],
     )
 
 
