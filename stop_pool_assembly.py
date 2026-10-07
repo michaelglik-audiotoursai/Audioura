@@ -539,6 +539,7 @@ def assemble_outdoor_tour(
     sources_block: str = "",
     directions_fn: Optional[Callable] = None,
     api_key: str = "",
+    shortfall_sentence: str = "",
 ) -> AssemblyResult:
     """Assemble an outdoor tour: route-order pooled + new, rewrite only neighbours.
 
@@ -549,6 +550,14 @@ def assemble_outdoor_tour(
        Every other stop's narration AND its directions are reused verbatim.
     3. Rewrite only the marked transitions — with directions_fn (LLM) when
        available, else a deterministic "Continue to {name}." template.
+
+    [LOCAL-612 / D616] ``shortfall_sentence`` — when the walked route delivers
+    fewer stops than the listener asked for, the caller passes the one honest
+    sentence from about_museum_stop.build_shortfall_sentence(mode='outdoor')
+    ("We could confirm 4 stops along this route, so this tour has 4 stops rather
+    than the 5 you asked for."). It leads Stop 1's opening section (rendered before
+    the Orientation line, exactly like the museum opening section). Empty string
+    (the default, and whenever the ask was met) adds nothing.
 
     Returns counts: reused_stops (untouched narration), new_stops, and
     rewritten_transitions (how many directions lines were regenerated).
@@ -594,6 +603,17 @@ def assemble_outdoor_tour(
     except Exception as _dd_e:  # pragma: no cover
         logger.info(f"[LOCAL-607] fact dedupe skipped ({_dd_e})")
         _dd_dropped = []
+
+    # [LOCAL-612 / D616] Lead Stop 1 with the honest shortfall sentence when the
+    # route delivered fewer stops than asked. It is placed on the first walked
+    # stop's dedicated opening-section field, so _render_stop_block renders it
+    # before the Orientation line (identical mechanism to the museum opening
+    # section) and it is never confused with the stop's own narration.
+    _sf = (shortfall_sentence or "").strip()
+    if _sf and ordered:
+        _existing_open = (ordered[0].get("_opening_section") or "").strip()
+        ordered[0]["_opening_section"] = (
+            f"{_sf}\n\n{_existing_open}" if _existing_open else _sf)
 
     body = _title_line(location, tour_type, header_category, display_category)
     rewritten = 0
