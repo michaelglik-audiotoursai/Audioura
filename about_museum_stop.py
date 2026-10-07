@@ -719,11 +719,11 @@ def _compose_about_narration(
         parts.append("A word about the building you are standing in.")
         parts.extend(body_arch)
 
-    # Honest sourcing close.
-    if domain:
-        parts.append(
-            f"This account is drawn from the museum's own pages on {domain}"
-            + (" and public reference sources." if wiki_summary else "."))
+    # [LOCAL-616 item 2 / D617] NO spoken sourcing sentence. The old close —
+    # "This account is drawn from the museum's own pages on <domain> and public
+    # reference sources." — named a domain in narration, exactly what D617 forbids
+    # (the kiro-cli critique of tour 414 flagged it as spoken). The sourcing lives
+    # only in the TEXT-view Sources line, composed from AboutStop.sources.
 
     text = " ".join(p.strip() for p in parts if p and p.strip())
     return _trim_to_word_band(text)
