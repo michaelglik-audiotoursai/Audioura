@@ -200,25 +200,137 @@ def _title_line(location: str, tour_type: str, header_category: str,
     return tour_title + "\n" + f"Tour-Category: {header_category}" + "\n\n"
 
 
-def _closing_recap(order_titles: List[str], walk_back_titles: Optional[List[str]] = None) -> str:
-    """Deterministic closing recap in the generator's LOCAL-280 wording.
+def _first_recap_sentence(stop: Dict) -> str:
+    """Pick ONE short clause that recaps a stop, naming the work.
 
-    The generator composes highlight clauses with an LLM; here we reuse the stable
-    skeleton ("From {first} to {last}, you have followed the thread … That's N
-    stops") so the recap names only delivered stops and never references a stop
-    that is not present. A walk-back line is appended for building tours whose
-    pooled stops now sit after the new ones.
+    Deterministic, no LLM. The clause names the stop's work and states its single
+    most concrete fact — preferring a sentence that mentions the artist, a medium,
+    a date, or what the work shows, and skipping museum-history / donation
+    sentences (those belong to Stop 1, not the recap). Falls back to the stop's
+    title alone when no suitable sentence is found, so the recap always names a
+    real, delivered stop and never fabricates.
     """
-    if not order_titles:
+    title = (stop.get("title") or "").strip()
+    narration = (stop.get("narration") or "").strip()
+    if not narration:
+        return title
+
+    sentences = re.split(r'(?<=[.!?])\s+', narration)
+    # Museum-history / money / boilerplate openers we do NOT want to echo.
+    _history_re = re.compile(
+        r'\b(donat|renam|reloc|found|gift|bequest|acquir|'
+        r'museum of art|boston college|devlin|mcmullen|lynch|'
+        r'this account is drawn|public reference sources|check opening hours|'
+        r'before we look|stand before|stand at|observe|position yourself|'
+        r'from this vantage|take a moment)\b', re.IGNORECASE)
+    # A good recap sentence describes the WORK: medium, subject, maker, date.
+    _work_re = re.compile(
+        r'\b(depict|portray|shows?|captur|paint|canvas|oil|scene|figure|'
+        r'landscape|portrait|created|rendered|composition|measures|'
+        r'immerses|biblical|surrealist|retrospective|mosaic|exhibition)\b',
+        re.IGNORECASE)
+    # Dangling openers: a recap line must stand alone, so reject sentences that
+    # begin with a pronoun/connective whose antecedent is in a prior sentence.
+    _dangling_re = re.compile(
+        r'^(however|this|that|these|those|it|they|he|she|here|'
+        r'such|moreover|thus|hence|as a result|before this)\b', re.IGNORECASE)
+
+    best = ""
+    for s in sentences:
+        s = s.strip()
+        if len(s) < 30 or len(s) > 220:
+            continue
+        if _history_re.search(s) or _dangling_re.match(s):
+            continue
+        if _work_re.search(s):
+            best = s
+            break
+    if not best:
+        # Second pass: first self-contained non-history sentence.
+        for s in sentences:
+            s = s.strip()
+            if (30 <= len(s) <= 220 and not _history_re.search(s)
+                    and not _dangling_re.match(s)):
+                best = s
+                break
+    if not best:
+        return title
+    # One line, naming the stop: "{Title}: {clause}".
+    clause = best.rstrip('.')
+    # Avoid repeating the title if the sentence already opens with it.
+    if clause.lower().startswith(title.lower()):
+        return clause + "."
+    return f"{title}: {clause}."
+
+
+def _recap_pick_three(stops: List[Dict]) -> List[Dict]:
+    """Choose up to 3 stops to recap, spread across the tour (first, middle, last).
+
+    Recapping every stop reads as a list; Michael's rule is three, one line each.
+    For <=3 stops all are used; for more, the first, a middle, and the last are
+    taken so the recap spans the whole tour.
+    """
+    n = len(stops)
+    if n <= 3:
+        return list(stops)
+    return [stops[0], stops[n // 2], stops[-1]]
+
+
+def _closing_recap(ordered_stops: List[Dict],
+                   venue_name: str = "",
+                   walk_back_titles: Optional[List[str]] = None,
+                   restaurant_offer: bool = True) -> str:
+    """[LOCAL-607 defect 2] A real conclusion for an assembled tour.
+
+    Michael heard the old stub ("…you have followed the thread of a single story.
+    That's N stops.") as "started and abruptly stopped" — no thread named, no
+    stops recapped. This replaces it with a conclusion that, in order:
+
+      1. NAMES the tour's thread — the venue's own collection, so the listener
+         hears what held the stops together ("the collection of {venue}").
+      2. RECAPS three stops, ONE LINE each, naming the work and its single most
+         concrete fact (``_first_recap_sentence``), spread across the tour.
+      3. Ends with the RESTAURANT OFFER as the very last sentence — the same house
+         wording fresh tours use (generate_tour_text ``_build_closing_offer``),
+         so a pooled tour closes exactly like a freshly generated one.
+
+    Deterministic, no LLM: every recapped fact is lifted verbatim from a delivered
+    stop's narration, so the conclusion can never reference a stop that is not
+    present or state a fact the tour did not deliver (the D177 rule). A walk-back
+    line for building tours whose pooled stops sit after the new ones is kept.
+
+    ``ordered_stops`` are the delivered stop units (dicts with title + narration),
+    in delivered order.
+    """
+    if not ordered_stops:
         return ""
-    first, last = order_titles[0], order_titles[-1]
-    n = len(order_titles)
+    titles = [(s.get("title") or "").strip() for s in ordered_stops]
+    first, last = titles[0], titles[-1]
+    n = len(ordered_stops)
     stop_word = "stop" if n == 1 else "stops"
+
+    venue = (venue_name or "").strip()
+    thread = f"the collection of {venue}" if venue else "a single collection"
+
     lines = [
-        f"From {first} to {last}, you have followed the thread of a single story.",
+        f"From {first} to {last}, you have followed the thread of {thread}.",
         "",
-        f"That's {n} {stop_word}.",
+        f"That's {n} {stop_word} in all.",
     ]
+
+    # One-line recap of three stops.
+    recap_stops = _recap_pick_three(ordered_stops)
+    recap_lines = []
+    for s in recap_stops:
+        clause = _first_recap_sentence(s)
+        if clause:
+            recap_lines.append(clause)
+    if recap_lines:
+        lines.append("")
+        lines.append("Along the way:")
+        for rl in recap_lines:
+            lines.append(f"- {rl}")
+
     if walk_back_titles:
         names = ", ".join(walk_back_titles)
         lines += [
@@ -226,6 +338,15 @@ def _closing_recap(order_titles: List[str], walk_back_titles: Optional[List[str]
             f"If you have toured this place before, the later stops — {names} — "
             f"may already be familiar; feel free to walk back to them at your own pace.",
         ]
+
+    # [LOCAL-607] The restaurant offer is the VERY LAST sentence — the exact house
+    # wording fresh tours use (generate_tour_text._build_closing_offer).
+    if restaurant_offer:
+        lines += [
+            "",
+            "If you would like to eat nearby we can build you a restaurant tour.",
+        ]
+
     return "\n".join(lines)
 
 
@@ -339,7 +460,8 @@ def assemble_building_tour(
         body += _render_stop_block(stop, i + 1, tour_category, directions)
 
     walk_back = [s["title"] for s in pooled_stops] if pooled_stops and new_stops else None
-    recap = _closing_recap([s["title"] for s in ordered], walk_back_titles=walk_back)
+    recap = _closing_recap(ordered, venue_name=_venue_name(venue_name or location),
+                           walk_back_titles=walk_back)
     tail = recap
     if sources_block.strip():
         tail += ("\n\n" if tail else "") + sources_block.strip()
@@ -448,7 +570,7 @@ def assemble_outdoor_tour(
             directions = None
         body += _render_stop_block(stop, i + 1, tour_category, directions)
 
-    recap = _closing_recap([s["title"] for s in ordered])
+    recap = _closing_recap(ordered, venue_name=_venue_name(location))
     tail = recap
     if sources_block.strip():
         tail += ("\n\n" if tail else "") + sources_block.strip()
