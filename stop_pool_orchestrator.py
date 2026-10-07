@@ -269,7 +269,19 @@ def maybe_generate_with_pool(
                 return None
             try:
                 from generate_tour_text import _LAST_GENERATION_COST as _nc
-                first_cost = float((_nc or {}).get("total_cost", 0.0))
+                # [LOCAL-615 item 3] The first-tour delivery cost MUST be the sum of
+                # ALL provider channels (OpenAI + Serper + TTS + Gemini grounding +
+                # Gemini Flash tokens + preflight), not OpenAI alone. The inner
+                # generate_fn ran the NORMAL path (DISABLE_STOP_POOL=1), whose
+                # reconcile sets _LAST_GENERATION_COST['tour_total_cost'] to exactly
+                # that counted sum. Reading 'total_cost' here (OpenAI only) is what
+                # made cost_ledger.our_cost_usd undercount by the whole grounding +
+                # Flash + Serper bill on a first tour (D626: $0.5237 OpenAI-only vs
+                # the real total). Prefer tour_total_cost; fall back to total_cost
+                # only if the richer field is absent.
+                first_cost = float(
+                    (_nc or {}).get("tour_total_cost",
+                                    (_nc or {}).get("total_cost", 0.0)) or 0.0)
             except Exception:
                 first_cost = 0.0
             parsed = pool.parse_delivered_stops(gen_text)
