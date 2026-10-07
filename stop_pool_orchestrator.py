@@ -830,6 +830,38 @@ def _build_opening_section(location: str, tour_type: str, request_text: str,
     # correct — never invent hours/prices).
     practical_facts = _source_practical_facts(venue, site_url, address)
 
+    # [LOCAL-607 defect 5] When live site extraction gives NO hours/admission, fold
+    # in the LOCAL-603 venue-preflight Plan B practicals (Michael: "LOCAL-603's
+    # preflight now supplies hours"). The preflight ran once in the wrapper BEFORE
+    # the pool path and stored its result on generate_tour_text._LAST_VENUE_PREFLIGHT;
+    # its spoken sentence is the SAME real hours the non-pool path folds into Stop 1.
+    # This replaces the generic "Check opening hours … on <site> before you go."
+    # fallback with the actual hours whenever the preflight has them.
+    if not (practical_facts or "").strip():
+        try:
+            import generate_tour_text as _gtt
+            import venue_preflight as _vpf
+            _pf = getattr(_gtt, "_LAST_VENUE_PREFLIGHT", None) or {}
+            if _pf and not _pf.get("skipped") and not _pf.get("error"):
+                _planb = _vpf.plan_b_opening_practicals(_pf)
+                # Pass the RAW hours/admission segments (not the pre-composed
+                # "The museum is open …" sentence) in the same ". "-joined shape
+                # _source_practical_facts returns, so about_museum_stop composes a
+                # single clean spoken sentence (no "is open … is open …" seam).
+                _bits = []
+                _h = (_planb or {}).get("hours", "").strip()
+                _a = (_planb or {}).get("admission", "").strip()
+                if _h:
+                    _bits.append(_h)
+                if _a:
+                    _bits.append(_a)
+                if _bits:
+                    practical_facts = ". ".join(_bits)
+                    print(f"  [LOCAL-607] Stop-1 hours from LOCAL-603 preflight: "
+                          f"{practical_facts!r}")
+        except Exception as _pf_e:
+            logger.info(f"[LOCAL-607] preflight practicals fold skipped ({_pf_e})")
+
     try:
         about = build_about_stop(
             venue_name=venue,

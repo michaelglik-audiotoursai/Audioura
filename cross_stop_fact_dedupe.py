@@ -61,14 +61,29 @@ _DONOR_VERB_RE = re.compile(
     r'renam\w*|reloc\w*|found|founded|founding|founder|founders|'
     r'establish\w*|moved)\b', re.IGNORECASE)
 
-# Museum-history markers: a fact about the INSTITUTION (not the work) — founding,
-# renaming, relocation, the donors/patrons behind it. These belong to Stop 1.
-# NOTE: 'found'/'founded'/'founding' are matched explicitly so the common noun
-# 'foundation' (meaning a base) is NOT mistaken for an institutional founding.
+# Museum-history markers: a fact about the INSTITUTION (not the work, not the
+# artist) — founding, renaming, relocation, the donors/patrons behind it. These
+# belong to Stop 1. NOTE: 'found'/'founded'/'founding' are matched explicitly so
+# the common noun 'foundation' (a base) is NOT mistaken for an institutional
+# founding; and 'relocate'/'moved'/'found' only count as MUSEUM history when the
+# sentence also names the INSTITUTION — otherwise "Subleyras relocated to Rome"
+# (the artist's life) or "Peale found inspiration" would be wrongly stripped.
 _HISTORY_VERB_RE = re.compile(
     r'\b(renam\w*|reloc\w*|found|founded|founding|establish\w*|moved|'
     r'donat\w*|gift\w*|bequeath\w*|bequest|patron|patronage|benefactor)\b',
     re.IGNORECASE)
+# An institution reference: the sentence is about the venue/organisation, not a
+# person. Required for a sentence to count as MUSEUM history.
+_INSTITUTION_RE = re.compile(
+    r'\b(museum|college|university|gallery|galleries|institution|institute|'
+    r'collection|campus|hall|the\s+mcmullen|boston\s+college|foundation\s+of\s+the)\b',
+    re.IGNORECASE)
+# Donor/acquisition verbs are institutional regardless of an explicit venue noun
+# (a work being donated/gifted/bequeathed/acquired IS the museum's acquisition
+# history); relocation/founding/moving need the institution reference above.
+_ACQUISITION_VERB_RE = re.compile(
+    r'\b(donat\w*|gift\w*|bequeath\w*|bequest|acquir\w*|acquisition|'
+    r'renam\w*|patron|patronage|benefactor)\b', re.IGNORECASE)
 
 # A proper noun: a capitalised word not at sentence start, or a known multi-word
 # name. We take capitalised tokens length >= 3 and drop a leading-word artefact.
@@ -140,13 +155,24 @@ def fact_fingerprint(sentence: str) -> Optional[Tuple]:
 
 
 def is_museum_history(sentence: str) -> bool:
-    """True when a sentence states a MUSEUM-HISTORY fact (institution, not work).
+    """True when a sentence states a MUSEUM-HISTORY fact (institution, not artist).
 
-    Founding / renaming / relocation / donor-patron sentences are museum history
-    and belong in Stop 1's opening section, so they are stripped from stops 2…N
-    (unless the stop's own work was the donated object — handled by the caller).
+    Two ways a sentence qualifies as institutional history that belongs in Stop 1:
+      * it carries an ACQUISITION verb (donated / gifted / bequeathed / acquired /
+        renamed / patron …) — a work entering the museum IS the museum's history; or
+      * it carries a FOUNDING / RELOCATION / MOVED verb AND names the INSTITUTION
+        (museum, college, gallery, collection, campus, hall) — so the artist's own
+        life ("Subleyras relocated to Rome in 1728", "Peale found inspiration in
+        her teacher's work") is NOT mistaken for the museum relocating or founding.
     """
-    return bool(_HISTORY_VERB_RE.search(sentence or ""))
+    s = sentence or ""
+    if _ACQUISITION_VERB_RE.search(s):
+        return True
+    _FOUNDING_RELOC_RE = re.compile(
+        r'\b(reloc\w*|found|founded|founding|establish\w*|moved)\b', re.IGNORECASE)
+    if _FOUNDING_RELOC_RE.search(s) and _INSTITUTION_RE.search(s):
+        return True
+    return False
 
 
 # ── Stop parsing (narration body only) ───────────────────────────────────────
