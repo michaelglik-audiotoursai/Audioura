@@ -129,22 +129,58 @@ def _donor_verb_lemmas(sentence: str) -> List[str]:
     return sorted(lemmas)
 
 
+# [LOCAL-614 item 5] Museum-history KEY NOUNS. A sentence that carries a YEAR and
+# one of these (relocat* / renam* / donat* / found* / open*) states a repeatable
+# museum-history fact whose IDENTITY is (year, key-noun) — independent of wording
+# and of which proper nouns happen to appear. tour 399 told the 2016 relocation
+# four times, each worded differently (2101 Commonwealth Avenue / Brighton Campus
+# / "doubled exhibition capacity"), and one of them carried NO proper noun at all,
+# so the (year, proper-nouns) fingerprint missed the repeats. Keying history
+# facts on (year, key-noun) collapses every retelling of the same event.
+_HISTORY_KEY_NOUN_RE = re.compile(
+    r'\b(relocat\w*|renam\w*|donat\w*|found\w*|open\w*)\b', re.IGNORECASE)
+
+
+def _history_key_noun(sentence: str) -> Optional[str]:
+    """Return the canonical museum-history key-noun lemma in a sentence, or None.
+
+    Maps relocat*/renam*/donat*/found*/open* to a single stable lemma so differently
+    inflected forms ("relocation", "relocated", "relocating") share one key.
+    """
+    m = _HISTORY_KEY_NOUN_RE.search(sentence or "")
+    if not m:
+        return None
+    tok = m.group(1).lower()
+    for pref in ("relocat", "renam", "donat", "found", "open"):
+        if tok.startswith(pref):
+            return pref
+    return None
+
+
 def fact_fingerprint(sentence: str) -> Optional[Tuple]:
     """Return a repeatable fact fingerprint for a sentence, or None.
 
-    A sentence carries a repeatable fact when it has:
-      * a YEAR plus at least one proper noun  → (year, proper-nouns…), or
-      * a donor/acquisition verb              → (verb-lemmas…, key proper nouns)
+    A sentence carries a repeatable fact when it has, in priority order:
+      * a YEAR plus a museum-history KEY NOUN (relocat*/renam*/donat*/found*/open*)
+        → ("hist", year, key-noun)  — wording- and proper-noun-INDEPENDENT, so
+        every retelling of the same dated event (the 2016 relocation, the 1993
+        opening, the 1996 renaming) collapses to one fingerprint [LOCAL-614 item 5];
+      * a YEAR plus at least one proper noun  → ("year", year, proper-nouns…); or
+      * a donor/acquisition verb              → ("verb", verb-lemmas…, proper nouns).
 
-    The fingerprint is wording-independent: it is built from the year, the sorted
-    distinctive proper nouns, and/or the donor-verb lemmas. Two differently worded
-    sentences that assert the same institutional fact produce the SAME fingerprint.
-    Returns None for a sentence that carries no such fact (it is never deduped).
+    The fingerprint is wording-independent: two differently worded sentences that
+    assert the same institutional fact produce the SAME fingerprint. Returns None
+    for a sentence that carries no such fact (it is never deduped).
     """
     years = _YEAR_RE.findall(sentence or "")
     propers = _proper_nouns(sentence or "")
     verbs = _donor_verb_lemmas(sentence or "")
 
+    if years:
+        key_noun = _history_key_noun(sentence or "")
+        if key_noun:
+            # Dated museum-history event: identity is (year, key-noun) only.
+            return ("hist", years[0], key_noun)
     if years and propers:
         # Year-anchored institutional fact: key on (first-year, up to 3 propers).
         return ("year", years[0], tuple(propers[:3]))
