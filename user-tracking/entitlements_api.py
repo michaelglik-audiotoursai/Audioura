@@ -90,14 +90,50 @@ def _get_db():
     return psycopg2.connect(DATABASE_URL)
 
 
+def _unauthenticated_entitlements_allowed():
+    """[LOCAL-598B] True iff the local-only unauthenticated bypass is engaged.
+
+    Read live (not cached at import) so tests can toggle it. The flag is only
+    ever consulted when GATEWAY_API_KEY is empty — see _require_api_key."""
+    return os.getenv('ALLOW_UNAUTHENTICATED_ENTITLEMENTS', '').lower() in ('true', '1', 'yes')
+
+
 def _require_api_key():
-    """X-API-Key header check — identical pattern to referral_endpoints."""
+    """X-API-Key header check — identical pattern to referral_endpoints.
+
+    [LOCAL-598B] The Mac Mini LOCAL stack has no GATEWAY_API_KEY, and the app in
+    local server mode sends no X-API-Key (endpoints.dart apiHeaders only adds
+    Content-Type locally). So every entitlements/queue call returned 503
+    service_misconfigured and the Plan screen, app-open and queue could not be
+    tested on Michael's phone against the Mac Mini.
+
+    Following the ST-4 ALLOW_UNAUTHENTICATED_SHARING precedent exactly: when —
+    and ONLY when — GATEWAY_API_KEY is empty, honour ALLOW_UNAUTHENTICATED_
+    ENTITLEMENTS=true to serve the request unauthenticated. This is NOT a silent
+    fail-open: the bypass opens only when someone has explicitly set the flag,
+    it is documented as local development only, it is set in the LOCAL compose
+    file and nowhere else, and it NEVER defaults on. Cloud has a real
+    GATEWAY_API_KEY, so this branch is never reached there and the fail-closed
+    503 remains for any deployment that is genuinely misconfigured."""
     if not API_KEY:
+        if _unauthenticated_entitlements_allowed():
+            return None
         return jsonify({"error": "service_misconfigured"}), 503
     client_key = request.headers.get('X-API-Key', '')
     if not client_key or not hmac.compare_digest(client_key, API_KEY):
         return jsonify({"error": "unauthorized"}), 401
     return None
+
+
+# [LOCAL-598B] Loud startup warning when the local-only bypass is engaged, so an
+# operator who leaves it on in the wrong place sees it immediately in the logs.
+# Only fires in the exact bypass condition: no key AND flag on.
+if not API_KEY and _unauthenticated_entitlements_allowed():
+    logger.warning(
+        "[LOCAL-598B] ALLOW_UNAUTHENTICATED_ENTITLEMENTS is ON and "
+        "GATEWAY_API_KEY is empty: the entitlements/queue API is serving "
+        "UNAUTHENTICATED requests. This is for LOCAL DEVELOPMENT ONLY. Never "
+        "enable this where the API is reachable from untrusted networks.")
 
 
 # ───────────────────────────────────────────────────────────────────────────
