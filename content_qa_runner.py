@@ -757,6 +757,24 @@ def run_qa(tour_text, tour_file="", story_elements=None, venue_context=None):
         except Exception:
             pass
     
+    # [LEAD 2026-10-06, D611 x G4] Stop 1's opening section (About + visiting facts) is
+    # built from the venue's own pages / Wikipedia by about_museum_stop, with its own
+    # provenance. The orientation that follows legitimately restates it ("from Devlin
+    # Hall to Brighton"), and G4 failed those true, sourced claims on every McMullen
+    # reuse. The opening section's paragraphs count as elements a prolog claim may
+    # trace to. Fabrications that appear in NEITHER still fail.
+    if _stop1_match and _story_elements_list is not None:
+        _s1_body = _stop1_match.group(0)
+        _pre_orient = _s1_body.split('Orientation:', 1)[0]
+        _opening_paras = [
+            _p.strip() for _p in re.split(r'\n\n+', _pre_orient)
+            if len(_p.strip()) >= 40
+            and not re.match(r'^(Stop\s+\d+:|Address:|Coordinates:|Directions:)', _p.strip())
+        ]
+        if _opening_paras:
+            _story_elements_list = list(_story_elements_list) + [
+                {'text': _p, 'type': 'opening_section', 'source': 'd611_opening'} for _p in _opening_paras]
+
     # --- Check claims against elements ---
     _ungrounded_claims = []
     _is_storied = os.environ.get("STORIED_MODE") == "true"
