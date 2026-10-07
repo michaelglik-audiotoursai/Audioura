@@ -7339,6 +7339,52 @@ except Exception as _cap_err:  # pragma: no cover
     _import_logger.error(f"[LOCAL-562] executor context propagation unavailable: {_cap_err}")
 
 
+def _apply_delivery_hours_guard(result):
+    """[LOCAL-616 item 1] Run the LOCAL-615 belt-and-braces hours guard on the
+    FINAL delivered text of EVERY delivery path — not just the fresh/first-tour
+    path that already called it inline.
+
+    D-fabre (tour 414): the critique found "Check opening hours and admission on
+    museefabre.fr before you go." still in Stop 1 even though the LOCAL-603
+    preflight had real hours. 414 was delivered by the POOL path
+    (``_LAST_DELIVERY_PATH == 'pool'``), whose return in this wrapper never ran
+    ``stop_pool_orchestrator._fold_preflight_hours_into_text``. The guard only
+    fired on the first-tour branch inside the orchestrator; pool reuse, cache,
+    by_reference and overview all shipped the raw fallback.
+
+    This wrapper is the single choke point every path returns through, so apply
+    the guard here to BOTH the returned text and the on-disk output file (the
+    service reads the delivered tour from the file, not the return value). The
+    guard is idempotent and non-fatal: when the preflight has no hours, or the
+    fallback is absent, the text is unchanged (never invent hours).
+
+    ``result`` is the ``(text, output_file, coords)`` tuple returned by a path.
+    Returns the possibly-rewritten tuple. A ``None`` text (refusal) is passed
+    through untouched.
+    """
+    try:
+        if not isinstance(result, tuple) or len(result) != 3:
+            return result
+        text, out_file, coords = result
+        if not text or not isinstance(text, str):
+            return result
+        import stop_pool_orchestrator as _orch
+        folded = _orch._fold_preflight_hours_into_text(text)
+        if folded != text and out_file:
+            # Rewrite the delivered file so the service (which reads the file,
+            # not the return value) ships the folded text on every path.
+            try:
+                with open(out_file, "w", encoding="utf-8") as _f:
+                    _f.write(folded)
+            except Exception as _we:  # pragma: no cover
+                _import_logger.error(
+                    f"[LOCAL-616] could not rewrite {out_file} after hours fold: {_we}")
+        return (folded, out_file, coords)
+    except Exception as _ge:  # pragma: no cover
+        _import_logger.error(f"[LOCAL-616] delivery hours guard skipped: {_ge}")
+        return result
+
+
 def generate_tour_text(location, tour_type, output_file=None, total_stops=None, persona=None, user_id=None, job_id=None, forced_stops=None, harness=False, exclude_titles=None, mode=None):
     """[LOCAL-562] Public entry: run one tour inside its own cost scope.
 
@@ -7438,7 +7484,8 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                   f"research_reused=${result.get('research_cost_reused', 0.0):.4f} "
                   f"grounding(requests={_g.get('requests', 0)}, queries={_g.get('queries', 0)})")
             _LAST_DELIVERY_PATH = 'by_reference'
-            return result["text"], output_file, (None, None)
+            return _apply_delivery_hours_guard(
+                (result["text"], output_file, (None, None)))
 
         # Refusal — hand the structured no-material error to the service layer.
         _LAST_CLEAN_FAIL_EVIDENCE = {
@@ -7613,7 +7660,8 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                           f"(pool held {_pool_out.get('pooled_before')}); "
                           f"research reused ${_pool_reused_research:.4f}")
                     _LAST_DELIVERY_PATH = 'pool'
-                    return _pool_out["text"], output_file, (None, None)
+                    return _apply_delivery_hours_guard(
+                        (_pool_out["text"], output_file, (None, None)))
             except Exception as _pool_err:
                 print(f"  [LOCAL-590] pool path error (falling back to normal gen): {_pool_err}")
 
@@ -7623,11 +7671,11 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
         _cost_accumulator = None
 
     if _cost_accumulator is None:
-        return _generate_tour_text_impl(
+        return _apply_delivery_hours_guard(_generate_tour_text_impl(
             location, tour_type, output_file, total_stops,
             persona=persona, user_id=user_id, job_id=job_id, forced_stops=forced_stops, harness=harness,
             exclude_titles=exclude_titles,
-        )
+        ))
 
     with _cost_accumulator.tour_scope(job_id=job_id) as _acc:
         result = _generate_tour_text_impl(
@@ -7641,7 +7689,9 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
     # captured preflight bucket into the reconciled record so a direct (non-pool)
     # museum tour also meters the preflight and shows it in the breakdown.
     _fold_preflight_cost_into_record(_LAST_GENERATION_COST, _outer_preflight_cost)
-    return result
+    # [LOCAL-616 item 1] Final hours guard on the delivered text/file for the
+    # fresh / cache / overview paths that funnel through _generate_tour_text_impl.
+    return _apply_delivery_hours_guard(result)
 
 
 def _fold_preflight_cost_into_record(rec, preflight_cost):
