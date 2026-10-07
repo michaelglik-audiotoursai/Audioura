@@ -70,6 +70,7 @@ __all__ = [
     "check_attribution",
     "recompute_shortfall_on_delivered",
     "institutional_share",
+    "filter_tour_text_work_first",
 ]
 
 
@@ -649,3 +650,89 @@ def recompute_shortfall_on_delivered(venue_name: str,
         requested_stops=requested_stops,
         mode=mode,
     )
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# tour-level application: filter each stop body, exempt the Stop-1 opening section
+# ─────────────────────────────────────────────────────────────────────────────
+
+# Markers of the D611 opening section (the sourced "About <museum>" story and the
+# practical-notes/shortfall prolog of Stop 1). Any paragraph that opens with one
+# of these is the opening section and is left untouched.
+_OPENING_MARKERS = re.compile(
+    r"(?i)^\s*(before we look at anything|here is the story of|"
+    r"before you go in|a word about the building|"
+    r"you are at |this opening stop is about|"
+    r".{0,80}\b(is open|admission is|opening hours|check opening hours)\b|"
+    r".{0,120}\b(currently has \d+ exhibition|stops? rather than the \d+ you asked for))"
+)
+
+_STOP_HEADER_RE = re.compile(r"(?mi)^(Stop\s+\d+\s*[:\-][^\n]*)$")
+
+
+def _is_opening_paragraph(paragraph: str) -> bool:
+    return bool(_OPENING_MARKERS.search(paragraph.strip()))
+
+
+def filter_tour_text_work_first(tour_text: str,
+                                venue_tokens: Optional[Sequence[str]] = None,
+                                stop_subjects: Optional[Dict[int, str]] = None
+                                ) -> Tuple[str, Dict]:
+    """[LOCAL-617 item 2/3] Apply the stop-body filter across a whole delivered tour.
+
+    Splits the tour on real ``Stop N:`` headers, and for each stop's body:
+      • Paragraphs that ARE the D611 opening section (About story, practical
+        notes, shortfall) are kept verbatim (exempt).
+      • Every other paragraph is run through ``filter_stop_body_work_first`` so at
+        most one institutional sentence (the own-acquisition one) survives per
+        stop — and only when the stop still has work/artist/reception/emotion
+        substance to stand on.
+
+    Pure string→string. Preamble before the first Stop header (and the conclusion
+    after the last stop body) is left untouched. Returns (new_text, report).
+
+    ``stop_subjects`` optionally maps 1-based stop index → work subject/title to
+    sharpen own-acquisition detection.
+    """
+    report = {"stops": 0, "institutional_dropped": 0, "changed": False}
+    if not tour_text or not tour_text.strip():
+        return tour_text, report
+
+    parts = _STOP_HEADER_RE.split(tour_text)
+    # parts = [preamble, header1, body1, header2, body2, ...]
+    if len(parts) < 3:
+        return tour_text, report  # no stop headers → nothing to do
+
+    out = [parts[0]]
+    i = 1
+    stop_index = 0
+    total_dropped = 0
+    while i < len(parts):
+        header = parts[i]
+        body = parts[i + 1] if i + 1 < len(parts) else ""
+        stop_index += 1
+        report["stops"] += 1
+        subject = (stop_subjects or {}).get(stop_index, "")
+
+        # Split the body into paragraphs; keep opening-section paragraphs intact.
+        paras = re.split(r"(\n\s*\n)", body)  # keep separators
+        new_paras: List[str] = []
+        for seg in paras:
+            if seg.strip() == "" or re.fullmatch(r"\n\s*\n", seg):
+                new_paras.append(seg)
+                continue
+            if stop_index == 1 and _is_opening_paragraph(seg):
+                new_paras.append(seg)  # exempt opening section
+                continue
+            filtered, prep = filter_stop_body_work_first(
+                seg, venue_tokens=venue_tokens, work_subject=subject,
+                is_opening_section=False)
+            total_dropped += prep.get("institutional_dropped", 0)
+            new_paras.append(filtered)
+        out.append(header)
+        out.append("".join(new_paras))
+        i += 2
+
+    report["institutional_dropped"] = total_dropped
+    report["changed"] = total_dropped > 0
+    return "".join(out), report

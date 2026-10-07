@@ -241,6 +241,52 @@ class TestAttribution(unittest.TestCase):
         self.assertEqual(r["use"], "Hans Memling")
 
 
+class TestTourLevelFilter(unittest.TestCase):
+    def test_opening_section_kept_work_stops_filtered(self):
+        tour = (
+            "Stop 1: About the Museo Correr\n"
+            "Before we look at anything on the walls, here is the story of the "
+            "Museo Correr — who created it, why it exists.\n\n"
+            "The composition shows two Venetian ladies on a terrace, their gaze "
+            "averted. In 1830, Teodoro Correr passed away, leaving behind a "
+            "significant legacy. A 61.2 million euro renovation modernised the "
+            "galleries. You cannot help but feel the loneliness in their eyes.\n\n"
+            "Stop 2: La Crocifissione\n"
+            "Bellini renders the figure in muted blues, the light soft on the "
+            "hands. Founded in 1927, the collection grew through major donations. "
+            "There is a quiet grief here that invites you to pause.\n"
+        )
+        new_tour, report = wf.filter_tour_text_work_first(
+            tour, venue_tokens=["museo", "correr"])
+        # opening section line survives
+        self.assertIn("here is the story of the Museo Correr", new_tour)
+        # work-stop institutional sentences stripped
+        self.assertNotIn("61.2 million", new_tour)
+        self.assertNotIn("Founded in 1927", new_tour)
+        self.assertNotIn("Teodoro Correr passed away", new_tour)
+        # work/emotion content preserved in both stops
+        self.assertIn("two Venetian ladies", new_tour)
+        self.assertIn("muted blues", new_tour)
+        self.assertIn("quiet grief", new_tour)
+        self.assertTrue(report["changed"])
+        self.assertGreaterEqual(report["institutional_dropped"], 3)
+
+    def test_no_stop_headers_unchanged(self):
+        text = "Just some prose with no stops. Founded in 1927."
+        new_text, report = wf.filter_tour_text_work_first(text)
+        self.assertEqual(new_text, text)
+        self.assertEqual(report["stops"], 0)
+
+    def test_preamble_and_conclusion_untouched(self):
+        tour = (
+            "Welcome to the tour.\n"
+            "Stop 1: Work\n"
+            "The canvas depicts a storm. It was bequeathed to the museum in 1919.\n"
+        )
+        new_tour, _ = wf.filter_tour_text_work_first(tour, venue_tokens=["museum"])
+        self.assertIn("Welcome to the tour.", new_tour)
+
+
 class TestShortfallRecompute(unittest.TestCase):
     def test_recompute_on_final_count(self):
         # Granet: shortfall logic ran at 3, a late gate dropped to 2.

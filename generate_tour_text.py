@@ -16210,7 +16210,39 @@ MANDATORY INCLUSION — work this surprising detail into the description natural
                 # Replace unranked list with ranked+capped list for injection
                 _stop_snippets = _ranked_snippets
 
-                # [LOCAL-407] Extract candidate specifics from snippet text.
+                # [LOCAL-617 item 2] WORK-FIRST EVIDENCE FILTER. The critic's top
+                # defect on every museum tour is institutional material (donors,
+                # acquisitions, renovations, provenance) crowding out the work and
+                # artist. Classify each ranked snippet and drop the purely
+                # institutional ones, passing at most ONE and only when it is this
+                # work's own acquisition story. Museum stops only; other tour types
+                # are untouched. Belt-and-suspenders: never let it empty the stop.
+                if tour_category == 'museum':
+                    try:
+                        import work_first_evidence as _wfe
+                        try:
+                            _wf_venue = _museum_venue_name or location or ''
+                        except NameError:
+                            _wf_venue = location or ''
+                        _venue_tokens_wf = [w for w in re.split(r'[\s,\-]+', _wf_venue)
+                                            if len(w) >= 3]
+                        _wf_kept, _wf_report = _wfe.filter_snippets_work_first(
+                            _stop_snippets, work_subject=poi_name or '',
+                            venue_tokens=_venue_tokens_wf)
+                        if _wf_kept:  # never strip a stop's evidence to nothing
+                            _stop_snippets = _wf_kept
+                            print(f"  [LOCAL-617] Stop {stop_num} evidence filter: "
+                                  f"input={_wf_report['input']} "
+                                  f"dropped_institutional={_wf_report['dropped_institutional']} "
+                                  f"kept_own_acquisition={_wf_report['kept_own_acquisition']} "
+                                  f"output={_wf_report['output']}")
+                        elif _wf_report['dropped_institutional']:
+                            print(f"  [LOCAL-617] Stop {stop_num} evidence filter: all "
+                                  f"{_wf_report['input']} snippets institutional — kept as-is "
+                                  f"(never empty a stop)")
+                    except Exception as _wf_err:
+                        print(f"  [LOCAL-617] evidence filter skipped: {_wf_err}")
+
                 # These are concrete, checkable facts — numbers, named materials,
                 # named techniques, named literary forms — that the prose MUST prefer
                 # over general claims like "revolutionized" or "had no precedent".
@@ -16286,6 +16318,29 @@ MANDATORY INCLUSION — work this surprising detail into the description natural
                 description_prompt += _snippet_block
                 _local402_snippets_injected = True
                 print(f"  [LOCAL-402] Stop {stop_num}: injected {len(_stop_snippets)} snippets as reference material")
+
+                # [LOCAL-617 item 3] NARRATION CONTRACT. Order the museum stop:
+                # (a) what the work shows, (b) the artist at that moment, (c) ONE
+                # attributed reception item ONLY if the evidence has it, (d) the
+                # emotional/human reading. No invented quotes; write less when thin.
+                # Reception is offered only when a surviving snippet actually
+                # carries an attributed opinion, so the model is never nudged to
+                # fabricate a critic.
+                if tour_category == 'museum':
+                    try:
+                        import work_first_evidence as _wfe_c
+                        _has_reception = any(
+                            _wfe_c.classify_sentence(_s) == 'reception'
+                            for _snip in _stop_snippets
+                            for _s in _wfe_c.split_sentences(
+                                f"{_snip.get('title','')}. {_snip.get('snippet','')}"))
+                        description_prompt += _wfe_c.narration_contract_instruction(
+                            work_title=poi_name or '', artist=artist or '',
+                            has_reception_evidence=_has_reception)
+                        print(f"  [LOCAL-617] Stop {stop_num}: narration contract injected "
+                              f"(reception_evidence={_has_reception})")
+                    except Exception as _wfc_err:
+                        print(f"  [LOCAL-617] narration contract skipped: {_wfc_err}")
 
         # [B6] Scored story elements → generation wiring (per-status phrasing)
         # Reads ranked elements from work_stories cache and injects them with
@@ -22929,6 +22984,38 @@ RULES:
                              "paragraph removal DISABLED")
     except Exception as _dup_err:
         print(f"  [LOCAL-615] Duplicated-paragraph dedupe error (non-fatal): {_dup_err}")
+
+    # -------- [LOCAL-617 item 2/3] Work-first stop-body filter --------
+    # The critic's dominant defect on every museum tour is institutional material
+    # (donors, bequests, acquisitions, renovations, provenance, loans, the museum's
+    # mission) crowding out the WORK and ARTIST. On the DELIVERED spoken text,
+    # keep at most ONE institutional sentence per stop — the work's own acquisition
+    # story if present — and only when the stop still has work/artist/reception/
+    # emotion substance to stand on. The Stop-1 opening section (D611 About story +
+    # practical notes + honest shortfall) is exempt. Museum tours only; the filter
+    # never empties a stop (D577).
+    if tour_category == 'museum':
+        try:
+            import work_first_evidence as _wfe_body
+            _wf_body_tokens = [w for w in re.split(r'[\s,\-]+', (location or ''))
+                               if len(w) >= 3]
+            _wf_subjects = {}
+            try:
+                for _si, _sp in enumerate(poi_list, 1):
+                    _wf_subjects[_si] = _sp.get('name', '') or ''
+            except Exception:
+                pass
+            complete_tour, _wf_body_report = _wfe_body.filter_tour_text_work_first(
+                complete_tour, venue_tokens=_wf_body_tokens, stop_subjects=_wf_subjects)
+            if _wf_body_report.get('changed'):
+                print(f"  [LOCAL-617] Work-first stop-body filter: dropped "
+                      f"{_wf_body_report['institutional_dropped']} institutional "
+                      f"sentence(s) across {_wf_body_report['stops']} stops")
+            else:
+                print(f"  [LOCAL-617] Work-first stop-body filter: no change "
+                      f"({_wf_body_report['stops']} stops scanned)")
+        except Exception as _wf_body_err:
+            print(f"  [LOCAL-617] Work-first stop-body filter error (non-fatal): {_wf_body_err}")
 
     # -------- [LOCAL-36] Practical facts QA gate --------
     # Verify provenance of every practical claim before delivery.
