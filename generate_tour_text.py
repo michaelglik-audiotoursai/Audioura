@@ -4104,6 +4104,12 @@ _LAST_CLEAN_FAIL_EVIDENCE = {}
 # return signature — the same pattern as _LAST_GENERATION_COST / _LAST_CLEAN_FAIL_EVIDENCE.
 _LAST_TOUR_KIND = 'full'
 
+# [LOCAL-605] Module-level: the delivery path that produced the LAST tour, so the
+# service's fail-closed coordinate assertion can name WHICH path delivered a tour
+# without coordinates. One of: 'fresh', 'cache', 'pool', 'by_reference',
+# 'overview'. Set at each return site; defaults to 'fresh'.
+_LAST_DELIVERY_PATH = 'fresh'
+
 # [LOCAL-582] Module-level: the LOCAL-580 actionable suggestion carried on an
 # overview job (the locality walking-tour alternative). Empty dict when none.
 _LAST_TOUR_SUGGESTION = {}
@@ -7208,7 +7214,12 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
     to the by_reference_no_material refusal (with nearby tours) and returns None,
     so the service surfaces the actionable refusal — never a fresh generation.
     """
-    global _LAST_GENERATION_COST, _LAST_CLEAN_FAIL_EVIDENCE
+    global _LAST_GENERATION_COST, _LAST_CLEAN_FAIL_EVIDENCE, _LAST_DELIVERY_PATH
+
+    # [LOCAL-605] Default: this call is a fresh generation unless a short-circuit
+    # path below overwrites it. The service's fail-closed coordinate assertion
+    # reads this to name the delivering path.
+    _LAST_DELIVERY_PATH = 'fresh'
 
     # [LOCAL-597] L2 by-reference path. Terminal: it either delivers a tour built
     # entirely from reused material (zero grounding / zero SERP, enforced by the
@@ -7265,6 +7276,7 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                   f"rewritten_transitions={result.get('rewritten_transitions')} "
                   f"about_stops={result.get('about_stops', 0)} "
                   f"grounding(requests={_g.get('requests', 0)}, queries={_g.get('queries', 0)})")
+            _LAST_DELIVERY_PATH = 'by_reference'
             return result["text"], output_file, (None, None)
 
         # Refusal — hand the structured no-material error to the service layer.
@@ -7322,6 +7334,7 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                           f"rewritten_transitions={_pool_out.get('rewritten_transitions')} "
                           f"about_stops={_pool_out.get('about_stops', 0)} "
                           f"(pool held {_pool_out.get('pooled_before')})")
+                    _LAST_DELIVERY_PATH = 'pool'
                     return _pool_out["text"], output_file, (None, None)
             except Exception as _pool_err:
                 print(f"  [LOCAL-590] pool path error (falling back to normal gen): {_pool_err}")
@@ -7574,6 +7587,7 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
     global _LAST_OVERVIEW_SOURCES  # [LOCAL-582] venue-own-domain source URLs for an overview
     global _LAST_POI_LIST  # [LOCAL-326] needed for partial-tour early returns
     global _DIRECT_SNIPPETS_PER_STOP  # [LOCAL-410] Allow generation path to populate search results
+    global _LAST_DELIVERY_PATH  # [LOCAL-605] delivery path for the fail-closed coord assertion
 
     # [LOCAL-582] Reset per-generation delivery kind. Defaults to 'full'; only the
     # rung-3 overview path flips it to 'overview'. Reset here so a prior overview
@@ -7653,6 +7667,7 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
                     if output_file:
                         with open(output_file, "w", encoding="utf-8") as _cf:
                             _cf.write(_cache_hit)
+                    _LAST_DELIVERY_PATH = 'cache'
                     return _cache_hit, output_file, (None, None)
                 else:
                     print(f"CACHE MISS: {location} / {tour_type} / {total_stops}")
@@ -8939,6 +8954,7 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
                         output_file=output_file,
                         entity_resolved=True, site_reachable=True)
                     if _ov_text is not None:
+                        _LAST_DELIVERY_PATH = 'overview'
                         return _ov_text, output_file, (None, None)
                     # Overview could not be built either (site truly unreachable).
                     # Clean-fail with structured evidence — still no invention.
@@ -9769,6 +9785,7 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
                         output_file=output_file,
                         entity_resolved=True, site_reachable=True)
                     if _ov_text is not None:
+                        _LAST_DELIVERY_PATH = 'overview'
                         return _ov_text, output_file, (None, None)
                     # No usable site -> rung 4: record structured evidence so the
                     # service layer surfaces the LOCAL-580 error + locality suggestion.
@@ -10036,6 +10053,7 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
                             entity_resolved=_d1v2_result.entity_resolved,
                             site_reachable=_d1v2_result.site_reachable)
                         if _ov_text is not None:
+                            _LAST_DELIVERY_PATH = 'overview'
                             return _ov_text, output_file, (None, None)
 
                         # RUNG 4: no usable site (or overview empty) — clean fail with
