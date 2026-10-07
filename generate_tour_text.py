@@ -7391,6 +7391,19 @@ def _apply_delivery_hours_guard(result):
                       f"from delivered text (every-path guard)", flush=True)
         except Exception as _de:  # pragma: no cover
             _import_logger.error(f"[LOCAL-616] paragraph dedupe skipped: {_de}")
+        # 3. Drop (or translate) any genuinely-foreign spoken sentence wherever it
+        #    entered the pipeline — the fresh-path closing recap leaked untranslated
+        #    French ("La galerie a été construite entre 1929 et 1930…"). English is
+        #    the shipping tour language. Uses the hardened detector so an English
+        #    sentence naming a French-titled work is never dropped.
+        try:
+            import language_guard as _lg
+            final, _foreign = _lg.filter_foreign_sentences_in_text(final, "en")
+            if _foreign:
+                print(f"  [LOCAL-616] dropped {len(_foreign)} foreign spoken "
+                      f"sentence(s) from delivered text (every-path guard)", flush=True)
+        except Exception as _fe:  # pragma: no cover
+            _import_logger.error(f"[LOCAL-616] foreign-sentence sweep skipped: {_fe}")
         if final != text and out_file:
             # Rewrite the delivered file so the service (which reads the file,
             # not the return value) ships the cleaned text on every path.

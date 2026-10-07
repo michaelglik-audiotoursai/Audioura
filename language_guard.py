@@ -22,7 +22,7 @@ from __future__ import annotations
 
 import os
 import re
-from typing import List, Optional
+from typing import List, Optional, Tuple
 
 try:  # module-level logger, non-fatal if logging unconfigured
     import logging
@@ -194,3 +194,67 @@ def filter_scraped_sentences(sentences: List[str], tour_language: str = "en",
                 _logger.info(
                     f"[LOCAL-616] dropped non-{tour_language} scraped sentence: {s[:60]!r}")
     return out
+
+
+# Structural one-liners in a delivered tour that must never be language-judged.
+_STRUCT_LINE_RE = re.compile(
+    r"(?i)^(Stop\s+\d+:|Address:|Coordinates:|Directions:|Sources?:|"
+    r"Tour-Category:|Type/?Specialty:|Specific Examples?:|Operational Details:|"
+    r"Museum Information:|Orientation:|Step-by-Step)")
+
+
+def filter_foreign_sentences_in_text(text: str, tour_language: str = "en",
+                                     translate: bool = False) -> Tuple[str, List[str]]:
+    """[LOCAL-616 item 3] Sweep a DELIVERED tour's spoken text and drop (or
+    translate) any genuinely-foreign sentence, wherever in the pipeline it entered
+    (story corpus, closing recap, …). Returns (new_text, dropped).
+
+    Operates paragraph-by-paragraph, sentence-by-sentence. Structural one-liners
+    (Stop/Address/Coordinates/Directions/Sources/…) are passed through untouched —
+    they are never judged. Prose paragraphs keep their English sentences and drop
+    foreign ones. Conservative: uses the hardened detector, so an English sentence
+    naming a French-titled work is kept; only true foreign prose is removed. The
+    optional ``Orientation: `` prefix on a paragraph is preserved.
+    """
+    if not text:
+        return text, []
+    dropped: List[str] = []
+    out_blocks: List[str] = []
+    # Split on blank-line boundaries, keeping separators to rebuild spacing.
+    parts = re.split(r"(\n\s*\n)", text)
+    for part in parts:
+        if re.fullmatch(r"\n\s*\n", part or ""):
+            out_blocks.append(part)
+            continue
+        stripped = (part or "").strip()
+        if not stripped or _STRUCT_LINE_RE.match(stripped.split("\n", 1)[0].strip()):
+            out_blocks.append(part)
+            continue
+        # Preserve a leading "Orientation:" label on the block, judge the rest.
+        prefix = ""
+        body = stripped
+        m = re.match(r"(?i)^(Orientation:\s*)(.*)$", stripped, re.DOTALL)
+        if m:
+            prefix, body = m.group(1), m.group(2)
+        sentences = re.split(r"(?<=[.!?])\s+", body)
+        kept = []
+        for sent in sentences:
+            if not sent.strip():
+                continue
+            if is_in_tour_language(sent, tour_language):
+                kept.append(sent)
+                continue
+            rendered = translate_to_english(sent) if translate else None
+            if rendered:
+                kept.append(rendered)
+            else:
+                dropped.append(sent.strip())
+                if _logger:
+                    _logger.info(
+                        f"[LOCAL-616] dropped foreign spoken sentence: {sent[:60]!r}")
+        new_body = " ".join(kept).strip()
+        out_blocks.append((prefix + new_body) if new_body else prefix.strip())
+    new_text = "".join(b for b in out_blocks)
+    # Collapse any blank-line runs we may have opened by emptying a block.
+    new_text = re.sub(r"\n{3,}", "\n\n", new_text)
+    return new_text, dropped
