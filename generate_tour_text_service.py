@@ -639,6 +639,15 @@ def generate_tour_async(job_id, location, tour_type, total_stops=10, user_id=Non
                     # suggestion the LOCAL-581 "Edit request" button can pre-fill
                     # (a smaller same-venue tour, which has a real chance of passing).
                     print(f"[BLOCKER4c] FACTUAL QA FAILED (round {_qa_round}): {content_qa_runner.FACTUAL_FAIL_COUNT} factual failure(s)")
+                    # [LEAD 2026-10-06] Keep the rejected text for diagnosis — a blocked tour
+                    # otherwise leaves nothing to inspect (temp file is deleted below).
+                    try:
+                        _qa_dir = '/app/tours/qa_failed'
+                        os.makedirs(_qa_dir, exist_ok=True)
+                        with open(os.path.join(_qa_dir, f"{job_id}_r{_qa_round}.txt"), 'w') as _qf:
+                            _qf.write(tour_text)
+                    except Exception as _qf_err:
+                        print(f"[BLOCKER4c] could not save rejected text: {_qf_err}")
                     _fi_venue = (location or "this museum").split(',')[0].strip() or "this museum"
                     _fi_message = (
                         f'We couldn\u2019t verify enough facts about {_fi_venue} to '
