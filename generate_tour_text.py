@@ -15150,11 +15150,28 @@ Exempt: navigation directions ("Turn left", "Continue past").
 {_stop_context_line}{_unconfirmed_line}{_visited_line}{_claims_line}
 Start with a brief orientation that names "{poi_name}" specifically (not "the exhibit" or "this piece") and tells the listener WHERE to stand or look AND WHY — what becomes visible, legible, or striking from that position that they would miss otherwise.
 
-Then provide a detailed description of the exhibit. Include:
-- What the work physically depicts or consists of — what the visitor sees
-- One specific technique, material choice, or compositional decision and WHY it matters
-- One piece of historical or cultural context that changes how the visitor understands it
-- If relevant: how this piece connects to the broader collection or {tour_type}
+Then provide a detailed description of the exhibit, in THIS ORDER OF PRIORITY
+(LOCAL-607 — spend your words on the WORK and the ARTIST, not on how the museum
+acquired it):
+
+(a) THE WORK ITSELF — lead with it and give it the most words: what it shows or
+    consists of, how it was made (one specific technique, material, or
+    compositional choice and WHY it matters), why it was made, what it means, and
+    what critics or scholars have said about it. This is what the listener is
+    standing in front of.
+(b) THE ARTIST — the maker's life and the turning point this work marks for them:
+    where they were, what had just happened to them, what they were trying to do
+    at this moment in their career. Name the artist and anchor the work in their life.
+(c) THE EMOTIONAL READING — one or two sentences on what the work makes a viewer
+    feel or notice, grounded in (a) and (b), never free-floating.
+
+ACQUISITION / DONATION IS CAPPED AT ONE SENTENCE (hard limit): how the museum came
+to own the work (donor, gift, bequest, purchase, the collection it belongs to) may
+occupy AT MOST ONE sentence, and only if it is genuinely about THIS work. Do NOT
+retell the museum's founding, renaming, relocation, or the donors behind the
+building — that belongs to the tour's opening, not to a work's stop. If you have
+nothing to say about the work or the artist, write less; do not pad with provenance.
+Also include, when relevant: how this piece connects to the broader collection or {tour_type}.
 
 NAME THE OBJECT, AND SAY WHAT IT COST (D468-D471 — the two rules that moved the score):
 - AT LEAST ONE SENTENCE MUST NAME A PHYSICAL PROPERTY OF THE THING IN FRONT OF THE
