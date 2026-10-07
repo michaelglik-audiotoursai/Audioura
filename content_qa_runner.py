@@ -658,6 +658,15 @@ def run_qa(tour_text, tour_file="", story_elements=None, venue_context=None):
             # [LOCAL-593 r2 (a)] Remove the Stop 1 opening/About section from the scan.
             if _si == 0 and _opening_section:
                 _content_only = _content_only.replace(_opening_section, ' ')
+            # [LEAD 2026-10-06, D612 r3] Drift is about WHERE a stop is, not what its
+            # prose mentions. In an address-contained tour (all stops at the venue's
+            # address), a stop that is at that address has not drifted, however many
+            # museums its provenance names ("donated to the Fogg", "lent by the MFA").
+            # Harvard was refused 4/6 on exactly that.
+            _stop_addr = re.search(r'^Address:\s*(.+)$', stop, re.MULTILINE)
+            if (_is_contained and _stop_addr
+                    and _stop_addr.group(1).strip().lower()[:30] in _unique_addrs):
+                continue
             _foreign_refs = _NAMED_VENUE_PATTERN.findall(_content_only)
             _has_foreign = False
             for ref in _foreign_refs:
