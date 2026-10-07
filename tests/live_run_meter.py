@@ -278,9 +278,46 @@ class LiveRunMeter:
 
         cost = dict(getattr(gen_module, "_LAST_GENERATION_COST", {}) or {})
         breakdown = dict(cost.get("breakdown", {}) or {})
-        # llm == OpenAI dollars; search == Serper dollars (both named by LOCAL-60).
-        self.add_openai(breakdown.get("llm", 0.0))
-        self.serper_usd += max(0.0, float(breakdown.get("search", 0.0) or 0.0))
+
+        # [LOCAL-615 item 3] Read the LOCAL-609 per-provider breakdown shape
+        # (openai / serper / gemini_tokens / gemini_grounding / preflight), where a
+        # line is EITHER a scalar usd OR a {"usd": ...} dict. The pre-615 code only
+        # read the legacy flat keys ``llm`` and ``search`` — which the LOCAL-609
+        # breakdown no longer carries — so a live run recorded openai=$0 / serper=$0
+        # even on a tour that spent dollars on both (D626: the TEST-* row showed
+        # only grounding). Fall back to the legacy keys when the new ones are absent
+        # so older records still read correctly.
+        def _usd(val):
+            if isinstance(val, dict):
+                return float(val.get("usd", 0.0) or 0.0)
+            try:
+                return float(val or 0.0)
+            except (TypeError, ValueError):
+                return 0.0
+
+        _openai = _usd(breakdown.get("openai")) if "openai" in breakdown \
+            else _usd(breakdown.get("llm", 0.0))
+        _serper = _usd(breakdown.get("serper")) if "serper" in breakdown \
+            else _usd(breakdown.get("search", 0.0))
+        _gtok = _usd(breakdown.get("gemini_tokens", 0.0))
+        self.add_openai(_openai)
+        self.serper_usd += max(0.0, _serper)
+        self.gemini_tokens_usd += max(0.0, _gtok)
+        # The preflight line (LOCAL-615 item 4) carries its own $; surface it.
+        _pf_line = breakdown.get("preflight", {})
+        self.preflight_usd += max(0.0, _usd(_pf_line))
+
+        # Grounded Gemini spend: prefer the breakdown's counted grounding, else the
+        # live story_leads counters (the invoice unit).
+        _bd_grounding = breakdown.get("gemini_grounding") if "gemini_grounding" in breakdown \
+            else breakdown.get("grounding")
+        if isinstance(_bd_grounding, dict):
+            self.gemini_grounding_requests = max(
+                self.gemini_grounding_requests, int(_bd_grounding.get("requests", 0) or 0))
+            self.gemini_grounding_queries = max(
+                self.gemini_grounding_queries, int(_bd_grounding.get("queries", 0) or 0))
+            self.gemini_grounding_usd = max(
+                self.gemini_grounding_usd, float(_bd_grounding.get("usd", 0.0) or 0.0))
 
         # Grounded Gemini spend from the live counters (the invoice unit).
         try:

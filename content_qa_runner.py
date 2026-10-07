@@ -182,6 +182,21 @@ def run_qa(tour_text, tour_file="", story_elements=None, venue_context=None):
         check("No repeated story across stops", True,
               "(cross_stop_fact_dedupe unavailable — skipped)")
 
+    # 2c. [LOCAL-615 item 1] No duplicated paragraph. D626 (tours 403/405): Stop 1's
+    # whole orientation paragraph was printed twice, verbatim. Any paragraph
+    # >= 80 chars appearing a second time is a STYLE failure (the generator's
+    # paragraph_dedupe pass removes the second copy before delivery, so a surviving
+    # duplicate here means that pass did not run or regressed).
+    try:
+        from paragraph_dedupe import find_duplicate_paragraphs
+        _dupe_paras = find_duplicate_paragraphs(tour_text)
+        check("No duplicated paragraph", len(_dupe_paras) == 0,
+              f"{len(_dupe_paras)} paragraph(s) appear twice: "
+              f"{[p[:60] for p in _dupe_paras[:2]]}")
+    except ImportError:
+        check("No duplicated paragraph", True,
+              "(paragraph_dedupe unavailable — skipped)")
+
     # 3. All stops have distinct opening sentences
     stops = re.split(r"Stop\s+\d+[:\.]", tour_text)[1:]  # skip pre-stop content
     openers = []
