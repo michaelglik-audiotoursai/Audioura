@@ -52,6 +52,12 @@ APPLE_ROOT_CA_PATH = os.getenv(
     os.path.join(os.path.dirname(os.path.abspath(__file__)), 'apple_root_ca_g3.pem'),
 )
 
+# [LOCAL-598B] Expected StoreKit environment. The signed transaction carries an
+# `environment` claim; a Sandbox transaction must never grant on Production and
+# vice-versa. 'Sandbox' locally, 'Production' once live. Empty disables the
+# check (we pass None), which keeps older stub tests working.
+APPLE_IAP_ENVIRONMENT = os.getenv('APPLE_IAP_ENVIRONMENT', '')
+
 # product -> level mapping. Data, not logic: a new product is one dict entry.
 # Keys are the SERVER product keys.
 PRODUCT_LEVELS = {
@@ -84,14 +90,50 @@ def _get_db():
     return psycopg2.connect(DATABASE_URL)
 
 
+def _unauthenticated_entitlements_allowed():
+    """[LOCAL-598B] True iff the local-only unauthenticated bypass is engaged.
+
+    Read live (not cached at import) so tests can toggle it. The flag is only
+    ever consulted when GATEWAY_API_KEY is empty — see _require_api_key."""
+    return os.getenv('ALLOW_UNAUTHENTICATED_ENTITLEMENTS', '').lower() in ('true', '1', 'yes')
+
+
 def _require_api_key():
-    """X-API-Key header check — identical pattern to referral_endpoints."""
+    """X-API-Key header check — identical pattern to referral_endpoints.
+
+    [LOCAL-598B] The Mac Mini LOCAL stack has no GATEWAY_API_KEY, and the app in
+    local server mode sends no X-API-Key (endpoints.dart apiHeaders only adds
+    Content-Type locally). So every entitlements/queue call returned 503
+    service_misconfigured and the Plan screen, app-open and queue could not be
+    tested on Michael's phone against the Mac Mini.
+
+    Following the ST-4 ALLOW_UNAUTHENTICATED_SHARING precedent exactly: when —
+    and ONLY when — GATEWAY_API_KEY is empty, honour ALLOW_UNAUTHENTICATED_
+    ENTITLEMENTS=true to serve the request unauthenticated. This is NOT a silent
+    fail-open: the bypass opens only when someone has explicitly set the flag,
+    it is documented as local development only, it is set in the LOCAL compose
+    file and nowhere else, and it NEVER defaults on. Cloud has a real
+    GATEWAY_API_KEY, so this branch is never reached there and the fail-closed
+    503 remains for any deployment that is genuinely misconfigured."""
     if not API_KEY:
+        if _unauthenticated_entitlements_allowed():
+            return None
         return jsonify({"error": "service_misconfigured"}), 503
     client_key = request.headers.get('X-API-Key', '')
     if not client_key or not hmac.compare_digest(client_key, API_KEY):
         return jsonify({"error": "unauthorized"}), 401
     return None
+
+
+# [LOCAL-598B] Loud startup warning when the local-only bypass is engaged, so an
+# operator who leaves it on in the wrong place sees it immediately in the logs.
+# Only fires in the exact bypass condition: no key AND flag on.
+if not API_KEY and _unauthenticated_entitlements_allowed():
+    logger.warning(
+        "[LOCAL-598B] ALLOW_UNAUTHENTICATED_ENTITLEMENTS is ON and "
+        "GATEWAY_API_KEY is empty: the entitlements/queue API is serving "
+        "UNAUTHENTICATED requests. This is for LOCAL DEVELOPMENT ONLY. Never "
+        "enable this where the API is reachable from untrusted networks.")
 
 
 # ───────────────────────────────────────────────────────────────────────────
@@ -286,6 +328,7 @@ def verify_purchase(store, transaction_id, product, signed_transaction=None):
                 expected_bundle_id=APPLE_BUNDLE_ID,
                 expected_product_id=expected_store_product,
                 required_type='Consumable',
+                expected_environment=(APPLE_IAP_ENVIRONMENT or None),
             )
         except JwsVerificationError as e:
             logger.warning(f"[LOCAL-598] apple verify failed: {e.code}")
