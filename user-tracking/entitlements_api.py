@@ -182,7 +182,7 @@ def _get_device_state(cur, user_id):
 _PLAN_COLS = ['plan_id', 'tours_per_day', 'tours_per_month', 'fresh_per_pack',
               'edits_per_pack', 'ops_per_pack', 'max_stops', 'max_new_stops_per_edit',
               'by_reference_only', 'referrals_allowed', 'referral_period', 'seat_cap',
-              'can_sell', 'price_usd', 'inactivity_days']
+              'can_sell', 'price_usd', 'inactivity_days', 'display_name', 'hidden']
 
 
 def _get_plan(cur, level):
@@ -190,11 +190,52 @@ def _get_plan(cur, level):
         SELECT plan_id, tours_per_day, tours_per_month, fresh_per_pack,
                edits_per_pack, ops_per_pack, max_stops, max_new_stops_per_edit,
                by_reference_only, referrals_allowed, referral_period, seat_cap,
-               can_sell, price_usd, inactivity_days
+               can_sell, price_usd, inactivity_days, display_name, hidden
         FROM plans WHERE plan_id = %s
     """, (level,))
     row = cur.fetchone()
     return dict(zip(_PLAN_COLS, row)) if row else None
+
+
+def _visible_levels(cur):
+    """[LOCAL-604 D619] The ordered list of VISIBLE plans for the plan page:
+    only rows with hidden=false, in plan order (l1, l2, l3, l4; tester and admin
+    are hidden). Each entry carries the fields the app needs to render a level
+    row without hardcoding any of them:
+        plan_id, display_name, price_usd, can_sell, referrals_allowed,
+        referral_period, max_stops.
+    Ordering: by a fixed plan rank so the app always shows Introduction, Free,
+    $10 Pack, Curator in that order regardless of row insertion order."""
+    cur.execute("""
+        SELECT plan_id, display_name, price_usd, can_sell,
+               referrals_allowed, referral_period, max_stops,
+               tours_per_day, tours_per_month, fresh_per_pack, ops_per_pack
+        FROM plans
+        WHERE COALESCE(hidden, FALSE) = FALSE
+        ORDER BY CASE plan_id
+                     WHEN 'l1' THEN 1 WHEN 'l2' THEN 2
+                     WHEN 'l3' THEN 3 WHEN 'l4' THEN 4
+                     ELSE 99 END,
+                 plan_id
+    """)
+    out = []
+    for r in cur.fetchall():
+        (plan_id, display_name, price_usd, can_sell, referrals_allowed,
+         referral_period, max_stops, tpd, tpm, fpp, opp) = r
+        out.append({
+            'plan_id': plan_id,
+            'display_name': display_name or plan_id,
+            'price_usd': float(price_usd) if price_usd is not None else 0.0,
+            'can_sell': bool(can_sell),
+            'referrals_allowed': referrals_allowed or 0,
+            'referral_period': referral_period,
+            'max_stops': max_stops,
+            'tours_per_day': tpd,
+            'tours_per_month': tpm,
+            'fresh_per_pack': fpp,
+            'ops_per_pack': opp,
+        })
+    return out
 
 
 def _allowances_left(cur, state, plan):
@@ -256,6 +297,12 @@ def _me_payload(cur, user_id, now=None):
     return {
         'user_id': user_id,
         'level': state['level'],
+        # [LOCAL-604 D619] The current level's human display name (falls back to
+        # the plan_id if unset), and the ordered list of VISIBLE levels for the
+        # plan page (tester/admin excluded). The app renders names from here and
+        # hardcodes nothing.
+        'display_name': (plan.get('display_name') if plan else None) or state['level'],
+        'levels': _visible_levels(cur),
         'anniversary_at': ann.isoformat() if ann else None,
         'allowances_left': _allowances_left(cur, state, plan),
         'warn_renewal': _warn_renewal(ann, now),
@@ -547,10 +594,13 @@ def purchases_verify():
 def l2_queue_join():
     """Join the FIFO queue for a free L2 seat.
 
-    Body: {"user_id": "..."}
+    Body: {"user_id": "...", "email": "..."}
     L1 only (a device already holding an L2 seat is refused). Idempotent: a
     device already waiting/holding an offer gets its current position back.
-    Returns 200 {queue_position, status} on success, 409 if already L2.
+    [LOCAL-604 D619] An optional email is stored on the queue row so the offer
+    code can be emailed when a seat frees; it is held only while queued/offered
+    and nulled on claim, leave or expiry. Returns 200 {queue_position, status}
+    on success, 409 if already L2.
     """
     err = _require_api_key()
     if err:
@@ -559,12 +609,15 @@ def l2_queue_join():
     user_id = data.get('user_id')
     if not user_id:
         return jsonify({"error": "user_id is required"}), 400
+    email = data.get('email')
+    if email is not None:
+        email = str(email).strip() or None
 
     import l2_seats
     conn = _get_db()
     try:
         cur = conn.cursor()
-        result = l2_seats.join_queue(cur, user_id)
+        result = l2_seats.join_queue(cur, user_id, email=email)
         conn.commit()
         if not result['joined'] and result.get('reason') == 'already_l2':
             cur.close()
@@ -607,16 +660,113 @@ def l2_queue_leave():
         conn.close()
 
 
+def _claim_referral(cur, user_id, code):
+    """[LOCAL-604 D619] Cursor-based friend-invitation (referral) redemption for
+    the single claim box. Mirrors referral_engine.redeem_referral_for_seat's
+    checks (self, duplicate, referrer allowance by period, 100-seat cap) but
+    composes inside the caller's transaction and cursor so the claim route works
+    in the user-api container, whose build context cannot import repo-root
+    referral_engine. The repo-root engine remains the authority for the
+    /referral/redeem HTTP path; this is the same rules, cursor-style.
+
+    Returns {'ok': bool, 'code': str, 'message': str, 'matched': bool}. matched
+    is False when the code is not a referral code at all (so the caller can tell
+    'no such code' from 'a referral code that was refused').
+    """
+    import l2_seats
+    if not code or not str(code).strip():
+        return {'ok': False, 'code': 'claim_invalid_code', 'matched': False,
+                'message': 'No code was provided.'}
+
+    # Referral codes live in referral_codes.code. Absent table (never created on
+    # a fresh DB) → treat as "not a referral code".
+    try:
+        cur.execute("SELECT referrer_user_id FROM referral_codes WHERE code = %s", (code,))
+    except Exception:
+        return {'ok': False, 'code': 'claim_invalid_code', 'matched': False,
+                'message': 'Not a referral code.'}
+    row = cur.fetchone()
+    if not row:
+        return {'ok': False, 'code': 'claim_invalid_code', 'matched': False,
+                'message': 'Not a referral code.'}
+    referrer_user_id = row[0]
+
+    if user_id == referrer_user_id:
+        return {'ok': False, 'code': 'referral_self', 'matched': True,
+                'message': 'You cannot redeem your own invitation code.'}
+
+    cur.execute("""
+        SELECT 1 FROM referral_redemptions
+        WHERE referral_code = %s AND new_user_id = %s
+    """, (code, user_id))
+    if cur.fetchone():
+        return {'ok': False, 'code': 'referral_duplicate', 'matched': True,
+                'message': 'You have already used this invitation code.'}
+
+    # Referrer allowance from the referrer's plan row.
+    cur.execute("SELECT level FROM device_entitlement WHERE user_id = %s", (referrer_user_id,))
+    lrow = cur.fetchone()
+    ref_level = lrow[0] if lrow else 'l1'
+    cur.execute("SELECT referrals_allowed, referral_period FROM plans WHERE plan_id = %s",
+                (ref_level,))
+    arow = cur.fetchone()
+    allowed = (arow[0] or 0) if arow else 0
+    period = arow[1] if arow else None
+    if allowed <= 0:
+        return {'ok': False, 'code': 'referral_allowance_spent', 'matched': True,
+                'message': 'This invitation code can no longer grant seats.'}
+    window = "AND rr.redeemed_at >= date_trunc('month', CURRENT_DATE)" if period == 'month' else ""
+    cur.execute(f"""
+        SELECT COUNT(*) FROM referral_redemptions rr
+        JOIN referral_codes rc ON rc.code = rr.referral_code
+        WHERE rc.referrer_user_id = %s {window}
+    """, (referrer_user_id,))
+    if cur.fetchone()[0] >= allowed:
+        return {'ok': False, 'code': 'referral_allowance_spent', 'matched': True,
+                'message': 'This inviter has used all of their invitations.'}
+
+    # Seat free under the cap (referral seats count against the 100 cap).
+    l2_seats._acquire_seat_lock(cur)
+    cap = l2_seats.get_seat_cap(cur)
+    cur.execute("SELECT level FROM device_entitlement WHERE user_id = %s", (user_id,))
+    de = cur.fetchone()
+    already_l2 = de is not None and de[0] == 'l2'
+    if not already_l2 and cap is not None and l2_seats.seats_in_use(cur) >= cap:
+        return {'ok': False, 'code': 'referral_seats_full', 'matched': True,
+                'message': 'The free level is full right now, so this invite can’t be used yet.'}
+
+    cur.execute("UPDATE referral_codes SET redemption_count = redemption_count + 1 WHERE code = %s",
+                (code,))
+    cur.execute("INSERT INTO referral_redemptions (referral_code, new_user_id) VALUES (%s, %s)",
+                (code, user_id))
+    cur.execute("""
+        INSERT INTO device_entitlement (user_id, level, last_activity_at)
+        VALUES (%s, 'l2', NOW())
+        ON CONFLICT (user_id) DO UPDATE SET level = 'l2', updated_at = NOW()
+    """, (user_id,))
+    return {'ok': True, 'code': 'ok', 'matched': True,
+            'message': 'Invitation redeemed — you now have a free seat.'}
+
+
 @entitlements_bp.route('/l2/claim', methods=['POST'])
 def l2_claim():
-    """Claim an L2 seat with an offer code.
+    """Claim a level/seat with a single code box ([LOCAL-604 D619]).
 
     Body: {"user_id": "...", "code": "..."}
-    Grants L2 if the code is valid, unexpired, belongs to THIS device, and a
-    seat is free under the 100 cap. Returns 200 with the refreshed /me payload
-    on success, or a structured 4xx refusal (LOCAL-580 contract) otherwise:
-       claim_invalid_code (400), claim_wrong_device (403),
-       claim_expired (409), claim_seats_full (409).
+    The server decides which of THREE code kinds the code is, in this order:
+      1. LEVEL CODE (level_codes, sha256 hash) — LEAD's code that moves the
+         device to ANY level (incl. tester/admin), reusable, revocable. A level
+         switch to l3/l4 starts a test pack. 200 on success; a revoked level
+         code is refused 403 (level_code_revoked).
+      2. QUEUE-OFFER CODE (l2_offers) — the queue claim offer. Grants L2 under
+         the cap. Structured refusals: claim_wrong_device (403),
+         claim_expired (409), claim_seats_full (409).
+      3. FRIEND INVITATION (referral) CODE (referral_codes) — grants L2 under
+         the cap, gated by the referrer's allowance. Refusals: referral_self
+         (403), referral_duplicate (409), referral_allowance_spent (409),
+         referral_seats_full (409).
+    If the code matches none, 400 claim_invalid_code.
+    On success returns the refreshed /me payload with claimed=true.
     """
     err = _require_api_key()
     if err:
@@ -628,14 +778,45 @@ def l2_claim():
         return jsonify({"error": "user_id is required"}), 400
 
     import l2_seats
+    import level_codes
     conn = _get_db()
     try:
         cur = conn.cursor()
+
+        # ── 1. Level code (checked first) ──────────────────────────────────
+        lc = level_codes.claim_level_code(cur, user_id, code)
+        if lc['ok']:
+            conn.commit()
+            payload = _me_payload(cur, user_id)
+            payload['claimed'] = True
+            payload['claim_kind'] = 'level_code'
+            payload['granted_level'] = lc['level']
+            cur.close()
+            return jsonify(payload), 200
+        if lc['code'] == level_codes.LEVEL_REVOKED:
+            conn.rollback()
+            cur.close()
+            return jsonify({
+                "error": lc['code'], "error_code": lc['code'],
+                "message": lc['message'],
+            }), 403
+        # LEVEL_NOT_FOUND → fall through to the offer path.
+
+        # ── 2. Queue-offer code ────────────────────────────────────────────
         result = l2_seats.claim_seat(cur, user_id, code)
-        if not result['ok']:
+        if result['ok']:
+            conn.commit()
+            payload = _me_payload(cur, user_id)
+            payload['claimed'] = True
+            payload['claim_kind'] = 'offer'
+            cur.close()
+            return jsonify(payload), 200
+        # A genuine offer code that failed for a reason OTHER than "no such
+        # code" is a real offer refusal — return it. CLAIM_BAD_CODE means the
+        # code is not an offer code, so fall through to the referral path.
+        if result['code'] != l2_seats.CLAIM_BAD_CODE:
             conn.rollback()
             status_map = {
-                l2_seats.CLAIM_BAD_CODE: 400,
                 l2_seats.CLAIM_WRONG_DEVICE: 403,
                 l2_seats.CLAIM_EXPIRED: 409,
                 l2_seats.CLAIM_SEATS_FULL: 409,
@@ -643,14 +824,41 @@ def l2_claim():
             http = status_map.get(result['code'], 400)
             cur.close()
             return jsonify({
-                "error": result['code'],
-                "error_code": result['code'],
+                "error": result['code'], "error_code": result['code'],
                 "message": result['message'],
             }), http
-        conn.commit()
-        payload = _me_payload(cur, user_id)
-        payload['claimed'] = True
+
+        # ── 3. Friend invitation (referral) code ───────────────────────────
+        ref = _claim_referral(cur, user_id, code)
+        if ref['ok']:
+            conn.commit()
+            payload = _me_payload(cur, user_id)
+            payload['claimed'] = True
+            payload['claim_kind'] = 'referral'
+            cur.close()
+            return jsonify(payload), 200
+        if ref['matched']:
+            conn.rollback()
+            status_map = {
+                'referral_self': 403,
+                'referral_duplicate': 409,
+                'referral_allowance_spent': 409,
+                'referral_seats_full': 409,
+            }
+            http = status_map.get(ref['code'], 400)
+            cur.close()
+            return jsonify({
+                "error": ref['code'], "error_code": ref['code'],
+                "message": ref['message'],
+            }), http
+
+        # ── Matched nothing ────────────────────────────────────────────────
+        conn.rollback()
         cur.close()
-        return jsonify(payload), 200
+        return jsonify({
+            "error": l2_seats.CLAIM_BAD_CODE,
+            "error_code": l2_seats.CLAIM_BAD_CODE,
+            "message": "That code is not valid.",
+        }), 400
     finally:
         conn.close()
