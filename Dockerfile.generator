@@ -11,6 +11,10 @@ COPY templates/ /app/templates/
 # `from db_connection import ...` resolves; the tests/ sys.path.insert above
 # them is a no-op here because /app/tests does not exist.
 COPY tests/db_connection.py tests/stop_anchor_detector_v2.py /app/
+# [LOCAL-613 / LOCAL-614] The isolated-run meter + $1 cap. An isolated live-run
+# harness imports it (sys.path has /app), so it must be in the image or the cap
+# silently does not install.
+COPY tests/live_run_meter.py /app/
 # [D542] Read at runtime by known_bad_venue() — a venue a human confirmed dead
 # must not depend on a model answering the same way twice.
 COPY tests/known_closed_venues.json /app/tests/
