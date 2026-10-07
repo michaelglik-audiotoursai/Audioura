@@ -4197,6 +4197,30 @@ _LAST_STOP_COUNT_NOTICE = {}
 _LAST_VENUE_PREFLIGHT = {}
 
 
+def _preflight_venue_from_location(location):
+    """[LOCAL-603] Extract a single-venue NAME from the request's location string
+    for the preflight gate, or '' when the request names no venue.
+
+    Deliberately conservative and deterministic (no LLM): the preflight gate runs
+    in the wrapper before intent is resolved, so we reuse the signal the BLOCKER4a
+    fallback uses — the first comma-segment, accepted only when it contains a venue
+    word (museum, gallery, …) and is at least two words. A city-wide request
+    ('museums in Boston') names no venue → '' → no gate.
+    """
+    import re as _re
+    if not location:
+        return ''
+    _first = location.split(',')[0].strip()
+    _venue_words = _re.compile(
+        r'(?i)\b(mus[ée]+e?|museum|gallery|galerie|palais|villa|ch[aâ]teau|chateau|'
+        r'library|institute|institut|collection|foundation|fondation|'
+        r'center|centre|house|hall|memorial|monument|cathedral|basilica|'
+        r'observatory|aquarium|zoo|garden|arboretum)\b')
+    if _venue_words.search(_first) and len(_first.split()) >= 2:
+        return _first
+    return ''
+
+
 def _set_stop_count_notice(requested, delivered, source, reason):
     """[D536] Record the listener's ask vs what shipped.
 
@@ -7216,7 +7240,7 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
     to the by_reference_no_material refusal (with nearby tours) and returns None,
     so the service surfaces the actionable refusal — never a fresh generation.
     """
-    global _LAST_GENERATION_COST, _LAST_CLEAN_FAIL_EVIDENCE
+    global _LAST_GENERATION_COST, _LAST_CLEAN_FAIL_EVIDENCE, _LAST_VENUE_PREFLIGHT
 
     # [LOCAL-597] L2 by-reference path. Terminal: it either delivers a tour built
     # entirely from reused material (zero grounding / zero SERP, enforced by the
@@ -7286,6 +7310,56 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
         print(f"  [LOCAL-597] BY-REFERENCE REFUSED: {result.get('message')} "
               f"(nearby={len(result.get('nearby_tours', []))})")
         return None, output_file, (None, None)
+
+    # ──── [LOCAL-603 / D618] VENUE PREFLIGHT GATE — before ANY generation path ────
+    # The one grounded Gemini question runs here, in the wrapper, BEFORE the
+    # stop-pool fast path and before _generate_tour_text_impl — so a closed venue
+    # is refused before any spend on pooling, site fetches or story generation
+    # (the WNDR embarrassment). It runs only for a top-level single-venue request
+    # (a museum tour_type that names a venue, and NOT the pool's own recursive
+    # new-stop generation, which sets exclude_titles). L2 by-reference returns far
+    # above; safe_preflight also treats the L2 guard as "skip" defensively. The
+    # grounded call flows through gemini_with_sources so the LOCAL-594 meter counts
+    # it, and a 7-day (venue, city) cache makes a repeat request free.
+    _LAST_VENUE_PREFLIGHT = {}
+    if (tour_type == 'museum' and not exclude_titles and not harness
+            and os.environ.get('LOCAL603_PREFLIGHT', '1') != '0'):
+        try:
+            import venue_preflight as _vpf
+            _pf_venue = _preflight_venue_from_location(location)
+            if _pf_venue:
+                _pf_city = ''
+                if ',' in location:
+                    _pf_city = ','.join(p.strip() for p in location.split(',')[1:]).strip()
+                _pf = _vpf.safe_preflight(_pf_venue, _pf_city)
+                _LAST_VENUE_PREFLIGHT = _pf
+                if _pf.get('skipped'):
+                    print(f"  [LOCAL-603] preflight skipped ({_pf['skipped']})")
+                elif _pf.get('error'):
+                    print(f"  [LOCAL-603] preflight unavailable ({_pf['error']}) — continuing")
+                else:
+                    print(f"  [LOCAL-603] preflight venue='{_pf_venue}' status={_pf.get('status')} "
+                          f"hours={'y' if _pf.get('hours') else 'n'} "
+                          f"admission={'y' if _pf.get('admission') else 'n'} "
+                          f"highlights={len(_pf.get('current_exhibitions_or_highlights') or [])}")
+                    _gate = _vpf.gate(_pf_venue, _pf_city, _pf)
+                    if _gate:
+                        print(f"  [LOCAL-603] VENUE CLOSED GATE: {_gate['message']}")
+                        _LAST_CLEAN_FAIL_EVIDENCE = {
+                            "error_type": "venue_closed",
+                            "error_code": "venue_closed",
+                            "message": _gate['message'],
+                            "suggestion": _gate['suggestion'],
+                            "venue": _pf_venue,
+                            "locality": _pf_city,
+                            "status": _gate.get('status', ''),
+                            "closed_since": _gate.get('closed_since', ''),
+                            "sources": _gate.get('sources', []),
+                        }
+                        return None, output_file, (None, None)
+        except Exception as _pf_err:
+            print(f"  [LOCAL-603] preflight error (non-fatal): {_pf_err}")
+            _LAST_VENUE_PREFLIGHT = {}
 
     # [LOCAL-590] Stop-pool fast path. When a tour of this venue was already
     # delivered, reuse the pooled stops and generate only the new ones (Michael's
@@ -8171,61 +8245,13 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
                 _museum_venue_name = _first_segment.title()
                 print(f"  [BLOCKER4a] venue_name from location fallback: '{_museum_venue_name}'")
 
-        # ──── [LOCAL-603 / D618] VENUE PREFLIGHT — ONE GROUNDED CALL BEFORE WE BUILD ────
-        # Every single-venue request starts with one grounded Gemini question (open?
-        # closed? hours, admission, what's on). It is the only reliable early guard
-        # against the most expensive embarrassment — a full tour of a closed place
-        # (WNDR Museum Boston, closed 2026-08-30, which we shipped). The answer is a
-        # GATE (closed -> refuse before any further spend) and PLAN B MATERIAL (its
-        # sourced hours/admission/highlights fill gaps our own sources leave).
-        #
-        # It runs ONLY for a single named venue (_museum_venue_name set). The call
-        # flows through gemini_with_sources(grounded=True) so the LOCAL-594 meter
-        # counts it; a 7-day (venue, city) cache makes a repeat request free. An L2
-        # by-reference build returns far above (mode='by_reference'), so we are
-        # always on the fresh path here — but safe_preflight also treats the L2
-        # GroundingForbiddenError as "skip" defensively.
-        global _LAST_VENUE_PREFLIGHT
-        _LAST_VENUE_PREFLIGHT = {}
-        if _museum_venue_name and os.environ.get('LOCAL603_PREFLIGHT', '1') != '0':
-            try:
-                import venue_preflight as _vpf
-                _pf_city = ''
-                if ',' in location:
-                    _pf_city = ','.join(p.strip() for p in location.split(',')[1:]).strip()
-                _pf = _vpf.safe_preflight(_museum_venue_name, _pf_city)
-                _LAST_VENUE_PREFLIGHT = _pf
-                if _pf.get('skipped'):
-                    print(f"  [LOCAL-603] preflight skipped ({_pf['skipped']})")
-                elif _pf.get('error'):
-                    print(f"  [LOCAL-603] preflight unavailable ({_pf['error']}) — continuing")
-                else:
-                    print(f"  [LOCAL-603] preflight status={_pf.get('status')} "
-                          f"hours={'y' if _pf.get('hours') else 'n'} "
-                          f"admission={'y' if _pf.get('admission') else 'n'} "
-                          f"highlights={len(_pf.get('current_exhibitions_or_highlights') or [])}")
-                    _gate = _vpf.gate(_museum_venue_name, _pf_city, _pf)
-                    if _gate:
-                        # Closed venue — stop before any further spend. Actionable
-                        # refusal; the known_closed corpus has already been taught
-                        # inside preflight() so the next request skips the call.
-                        print(f"  [LOCAL-603] VENUE CLOSED GATE: {_gate['message']}")
-                        _LAST_CLEAN_FAIL_EVIDENCE = {
-                            "error_type": "venue_closed",
-                            "error_code": "venue_closed",
-                            "message": _gate['message'],
-                            "suggestion": _gate['suggestion'],
-                            "venue": _museum_venue_name,
-                            "locality": _pf_city,
-                            "status": _gate.get('status', ''),
-                            "closed_since": _gate.get('closed_since', ''),
-                            "sources": _gate.get('sources', []),
-                        }
-                        return None, output_file, (None, None)
-            except Exception as _pf_err:
-                # Preflight is a guard, never a new way for generation to break.
-                print(f"  [LOCAL-603] preflight error (non-fatal): {_pf_err}")
-                _LAST_VENUE_PREFLIGHT = {}
+        # [LOCAL-603 / D618] The venue preflight + closure gate runs in the wrapper
+        # (generate_tour_text), BEFORE this impl and before the stop-pool fast path,
+        # so a closed venue is refused with zero spend. Its result is published on
+        # the module-level _LAST_VENUE_PREFLIGHT, which the Plan B wiring below reads
+        # to fill hours/admission (D617) and to seed stop candidates when our own
+        # extraction falls short. No preflight CALL is made here — only the already-
+        # computed result is consumed.
 
         if _museum_venue_name:
             _museum_venue_constraint = (

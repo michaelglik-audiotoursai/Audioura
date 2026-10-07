@@ -77,9 +77,9 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 # can hallucinate "closed"; the source must back it. "temporarily closed" and
 # "permanently closed" are matched by the single word "closed".
 _CLOSURE_WORDS = re.compile(
-    r'(?i)\b(closed|closure|closing|shut(?:\s+down|tered)?|'
-    r'permanently\s+closed|temporarily\s+closed|ceased\s+operations?|'
-    r'out\s+of\s+business|no\s+longer\s+(?:open|operating|in\s+business))\b'
+    r'(?i)(close[ds]?|closing|closure|shut(?:\s+down|tered)?|'
+    r'permanently[\s_-]+closed|temporarily[\s_-]+closed|ceased\s+operations?|'
+    r'out\s+of\s+business|no\s+longer\s+(?:open|operating|in\s+business))'
 )
 
 # Statuses that STOP generation (the gate). temporarily_closed only gates when it
@@ -105,37 +105,57 @@ def _fold(s: str) -> str:
 
 
 # ── the grounded prompt ──────────────────────────────────────────────────────
-_PREFLIGHT_PROMPT = """\
-You are a factual research assistant for an audio-tour builder. Before we spend
-money building a tour of a specific venue, answer ONE question with CURRENT,
-sourced facts from Google Search.
+# ── the two prompts ──────────────────────────────────────────────────────────
+# WHY TWO PROMPTS, ONE GROUNDED CALL. Measured against gemini-flash-latest
+# (2026-10-06): a prompt that DEMANDS a JSON object makes the model answer from
+# memory and NOT invoke Google Search — webSearchQueries is empty, no grounding
+# chunks, and it even hallucinated WNDR's closure year as 2024. A natural-language
+# question ("using Google Search, tell me …") reliably triggers 2–3 searches and
+# returns 8 grounding chunks with real source URLs. So the ONE grounded call asks
+# the natural-language question (this is the billable Google-Search call the
+# ruling mandates and the LOCAL-594 meter counts), and a cheap UNGROUNDED second
+# call turns that grounded prose into strict JSON. The grounded answer's SOURCES
+# are what the closure guard checks — exactly the ">= 1 grounding source with a
+# closure word" the ticket requires.
+_GROUNDED_QUESTION = """\
+Using Google Search, tell me the CURRENT visitor status of this venue, and cite \
+your sources:
 
 Venue: {venue}
 City: {city}
 
-Return ONLY a single JSON object, no prose, with EXACTLY these keys:
+Report, based on what the search returns right now:
+- Is it OPEN, TEMPORARILY CLOSED (renovation/seasonal), or PERMANENTLY CLOSED? \
+If closed, since when (date)?
+- Its street address.
+- Its opening hours, with days.
+- Its admission / ticket prices.
+- Up to 6 exhibitions or highlights a visitor can see NOW (title, artist if any, \
+a short note).
 
+Answer in a few short sentences grounded in the sources — do not guess; if \
+something is not in the sources, say it is not stated.
+"""
+
+_EXTRACT_PROMPT = """\
+Convert the following venue report into a single strict JSON object. Use ONLY \
+facts stated in the report; leave a field empty (or status "unknown") if the \
+report does not state it. Output the JSON object and NOTHING else.
+
+REPORT:
+{report}
+
+JSON keys (exactly these):
 {{
   "status": "open" | "temporarily_closed" | "permanently_closed" | "unknown",
-  "closed_since": "<date or empty if open/unknown>",
+  "closed_since": "<date or empty>",
   "address": "<street address or empty>",
-  "hours": "<opening hours WITH DAYS, e.g. 'Tue-Sun 10am-5pm, closed Mon', or empty>",
-  "admission": "<admission/ticket prices, e.g. '$29.99 adult / $26.99 child', or empty>",
+  "hours": "<opening hours with days, or empty>",
+  "admission": "<admission/ticket prices, or empty>",
   "current_exhibitions_or_highlights": [
-    {{"title": "<name>", "artist": "<artist if any, else empty>", "note": "<one short clause>"}}
+    {{"title": "<name>", "artist": "<artist or empty>", "note": "<short clause>"}}
   ]
 }}
-
-Rules:
-- Base every field on what Google Search returns NOW. If a fact is not supported,
-  leave it empty (or status "unknown"); do NOT guess.
-- "status" is "permanently_closed" ONLY if the venue has shut for good; use
-  "temporarily_closed" for a renovation/seasonal closure and put any reopening
-  date in "closed_since".
-- "current_exhibitions_or_highlights": up to 6 of what a visitor can see NOW
-  (current exhibitions, or — for a venue with a permanent collection — its
-  signature highlights). Empty list if none are findable.
-- Output the JSON object and nothing else.
 """
 
 
@@ -206,11 +226,15 @@ def _source_urls(sources: List[Dict]) -> List[str]:
     return out
 
 
-def _closure_source_present(text: str, sources: List[Dict]) -> bool:
-    """True if a closure word appears in the answer text OR in any grounding
-    source's title/url. This is the ">= 1 closure-word source" requirement."""
-    if _CLOSURE_WORDS.search(text or ''):
-        return True
+def _closure_source_present(sources: List[Dict]) -> bool:
+    """True if a closure word appears in any GROUNDING SOURCE's title/url.
+
+    [D618] The requirement is ">= 1 grounding source whose snippet/title contains
+    a closure word" — so we deliberately do NOT consult the model's own answer
+    text here. The model's JSON always contains the status word ("permanently_
+    closed"), which would make the check vacuous; the whole point is independent
+    corroboration from a SOURCE the engine actually read. A closed status with no
+    such source is downgraded to unknown by the caller."""
     for s in sources or []:
         if not isinstance(s, dict):
             continue
@@ -290,7 +314,7 @@ def _shape_result(parsed: Optional[dict], call_sources: List[Dict],
     # [D618] False-closure guard. A closed status survives only with >= 1 closure
     # source; otherwise downgrade to unknown and let generation continue.
     if res['status'] in _CLOSED_STATUSES:
-        if not _closure_source_present(call_text, call_sources):
+        if not _closure_source_present(call_sources):
             res['_downgraded_from'] = res['status']
             res['status'] = 'unknown'
             res['closed_since'] = ''
@@ -535,12 +559,15 @@ def preflight(venue: str, city: str = '', db_url: Optional[str] = None,
         if hit is not None:
             return hit
 
-    from story_leads import gemini_with_sources
-    prompt = _PREFLIGHT_PROMPT.format(venue=venue or '(unspecified)',
-                                      city=city or '(unspecified)')
-    # grounded=True: the one call the ruling mandates. GroundingForbiddenError
-    # (L2 guard) propagates by design.
-    call = gemini_with_sources(prompt, grounded=True)
+    from story_leads import gemini_with_sources, _gemini
+
+    # STEP 1 — the ONE grounded call: a natural-language question that reliably
+    # triggers Google Search (JSON-demand prompts do not). GroundingForbiddenError
+    # (L2 guard) propagates by design. This is the billable call the LOCAL-594
+    # meter counts.
+    question = _GROUNDED_QUESTION.format(venue=venue or '(unspecified)',
+                                         city=city or '(unspecified)')
+    call = gemini_with_sources(question, grounded=True)
 
     if call.get('error'):
         res = _blank_result()
@@ -548,8 +575,27 @@ def preflight(venue: str, city: str = '', db_url: Optional[str] = None,
         res['grounding_sources'] = call.get('sources', [])
         return res
 
-    parsed = _extract_json(call.get('text', ''))
-    res = _shape_result(parsed, call.get('sources', []), call.get('text', ''))
+    report_text = call.get('text', '') or ''
+    call_sources = call.get('sources', []) or []
+
+    # STEP 2 — turn the grounded prose into strict JSON. This is UNGROUNDED
+    # (grounded=False): it costs only Flash tokens, nothing on the Google-Search
+    # channel, and the LOCAL-594 grounding meter does not count it. It never
+    # introduces new facts — it only reshapes STEP 1's grounded answer.
+    parsed = None
+    if report_text.strip():
+        try:
+            extract = _gemini(_EXTRACT_PROMPT.format(report=report_text[:6000]),
+                              grounded=False)
+            parsed = _extract_json(extract)
+        except Exception:
+            parsed = None
+    # Fallback: if the formatting call failed, try to parse any JSON that might
+    # already be in the grounded answer itself.
+    if parsed is None:
+        parsed = _extract_json(report_text)
+
+    res = _shape_result(parsed, call_sources, report_text)
 
     # Persist a real answer for 7 days (errors are not cached).
     if use_cache and not res.get('error'):

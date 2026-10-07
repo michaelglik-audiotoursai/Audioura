@@ -48,35 +48,38 @@ def _run(label, location, stops):
     print(f"stops    : {stops} (requested)", flush=True)
     print(f"git_sha  : {GIT_SHA}", flush=True)
 
-    # Reset the grounding meter so the figure we read reflects THIS generation.
-    story_leads.reset_grounding_requests()
-
-    # Measure the preflight in isolation by calling it directly FIRST (its answer
-    # is cached for 7 days, so the subsequent generate_tour_text run reads the
-    # cache and does not pay a second time — proving the "about $0.02–0.05" claim).
+    # ---- Measure the preflight in ISOLATION (fresh, no cache) ----
+    # This is the "measured preflight cost per call" the ticket asks for: one
+    # grounded request through gemini_with_sources, its webSearchQueries priced by
+    # cost_rates. use_cache=False so the figure reflects a real call every time.
     import venue_preflight as vpf
+    story_leads.reset_grounding_requests()
     _city = ','.join(p.strip() for p in location.split(',')[1:]).strip()
     _venue = location.split(',')[0].strip()
     _pf_t0 = time.time()
-    pf = vpf.safe_preflight(_venue, _city)
+    pf = vpf.safe_preflight(_venue, _city, use_cache=False)
     _pf_dt = time.time() - _pf_t0
-    pf_reqs, pf_qs = _preflight_meter_snapshot()
+    pf_reqs = story_leads.get_grounding_requests()
+    pf_qs = story_leads.get_grounding_queries()
     pf_cost = grounding_query_cost(pf_qs)
-    print(f"\n--- PREFLIGHT (measured) ---", flush=True)
-    print(f"  status      : {pf.get('status')}", flush=True)
+    print(f"\n--- PREFLIGHT (measured, isolated) ---", flush=True)
+    print(f"  status       : {pf.get('status')}", flush=True)
+    print(f"  closed_since : {pf.get('closed_since') or '(n/a)'}", flush=True)
     print(f"  hours        : {pf.get('hours') or '(none)'}", flush=True)
     print(f"  admission    : {pf.get('admission') or '(none)'}", flush=True)
     print(f"  highlights   : {len(pf.get('current_exhibitions_or_highlights') or [])}", flush=True)
     print(f"  grounding sources: {len(pf.get('grounding_sources') or [])}", flush=True)
+    for s in (pf.get('grounding_sources') or [])[:5]:
+        print(f"      - {s.get('url')}", flush=True)
     print(f"  PREFLIGHT COST: requests={pf_reqs} queries={pf_qs} "
           f"${pf_cost:.4f}  ({_pf_dt:.1f}s)", flush=True)
 
     g = vpf.gate(_venue, _city, pf)
     if g:
         print(f"  GATE: {g['error_code']} — {g['message']}", flush=True)
+        print(f"        suggestion: {g['suggestion']}", flush=True)
 
-    # Now the full generation path (reads the cached preflight; its gate, if any,
-    # fires and refuses before any further spend).
+    # ---- Full generation path (reads the cached preflight; TTL default) ----
     out = f"/app/tours/LOCAL603_{re.sub(r'[^A-Za-z0-9]+', '_', _venue)[:30]}.txt"
     t0 = time.time()
     text, out_file, _ = generate_tour_text(location, 'museum', out, stops)
