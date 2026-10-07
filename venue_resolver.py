@@ -1258,6 +1258,14 @@ def _serper_search(query: str, api_key: str = "", num: int = 10) -> List[Dict]:
     if not key:
         print("  [LOCAL-599] No SERP_API_KEY — web-search discovery skipped")
         return []
+    # [LOCAL-609] Meter this Serper query — a query is about to go on the wire
+    # ($0.001 each). This is the venue-resolver Serper call site. No-op outside a
+    # tour cost scope; wrapped so metering never breaks the query.
+    try:
+        import cost_accumulator as _ca
+        _ca.add_search_queries(1)
+    except Exception:
+        pass
     payload = _json.dumps({"q": query, "num": num}, ensure_ascii=False).encode('utf-8')
     try:
         req = urllib.request.Request(
