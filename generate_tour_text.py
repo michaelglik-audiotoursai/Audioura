@@ -3714,7 +3714,8 @@ def _build_unclassifiable_evidence(location, tour_type):
 
 
 
-def _assemble_overview_tour_text(venue_name, location, tour_type, overview):
+def _assemble_overview_tour_text(venue_name, location, tour_type, overview,
+                                 coord_fetch=None, headers=None):
     """[LOCAL-582] Render a museum OVERVIEW (rung 3) as a finished, single-stop tour.
 
     The venue resolved and its own site was reachable, but no works/exhibitions
@@ -3737,11 +3738,43 @@ def _assemble_overview_tour_text(venue_name, location, tour_type, overview):
     tour_title = f"Step-by-Step Audio Guided Tour: {location} - {_display_category} Overview"
     lines = [tour_title, "Tour-Category: Museum", ""]
 
+    # [LOCAL-602] A delivered stop MUST carry coordinates (LOCAL-591 #4), including
+    # on this overview path. Use the coordinates the overview already carries, else
+    # geocode the venue's own address (preferred — it binds to the BUILDING), else
+    # the location string. If no coordinate can be produced, return None so the
+    # caller clean-fails rather than shipping a map-less, tours-near-invisible tour.
+    _coords = (getattr(overview, 'coordinates', '') or '').strip()
+    if not _COORD_PAIR_RE.search(_coords):
+        _addr = (getattr(overview, 'address', '') or '').strip()
+        _poi = {'name': _vn, 'address': _addr}
+        try:
+            n_fixed, _still, _tok = _geocode_missing_coordinates(
+                [_poi], _addr or location, headers=headers or {},
+                coord_fetch=coord_fetch)
+        except Exception as _ce:
+            print(f"  [LOCAL-602] overview coordinate geocode failed: {_ce}")
+            n_fixed = 0
+        _coords = (_poi.get('coordinates', '') or '').strip()
+        if n_fixed <= 0 or not _COORD_PAIR_RE.search(_coords):
+            print(f"  [LOCAL-602] overview for {_vn!r} could not be geocoded "
+                  f"(addr={_addr!r}) — clean-failing rather than delivering a tour "
+                  f"with no coordinates (LOCAL-591 #4).")
+            return None
+    print(f"  [LOCAL-602] overview stop coordinates: {_coords} "
+          f"(from {'address' if getattr(overview, 'address', '') else 'location'})")
+
     # The single orientation stop. Keep the "Stop 1:" shape the whole pipeline
     # (and the live runner's `^\s*Stop\s+\d+\s*[:\-]` regex) expects.
     lines.append(f"Stop 1: {_vn} — Overview")
     lines.append("")
     lines.append(overview.narration.strip())
+    lines.append("")
+
+    # [LOCAL-602] The map point for this stop. Address line too when the venue
+    # stated one (binds the stop to the building, D611).
+    if getattr(overview, 'address', ''):
+        lines.append(f"Address: {overview.address}")
+    lines.append(f"Coordinates: {_coords}")
     lines.append("")
 
     # Mirror the sourced practical sentence onto a Museum Information line so the
@@ -3806,7 +3839,20 @@ def _try_deliver_museum_overview(venue_name, location, tour_type, site_url,
     if overview is None or overview.is_empty():
         return None
 
-    ov_text = _assemble_overview_tour_text(venue_name or location, location, tour_type, overview)
+    # [LOCAL-602] Build OpenAI headers for the coordinate geocode (the overview
+    # stop must ship a map point — LOCAL-591 #4). Overview delivery clean-fails if
+    # no coordinate can be produced (ov_text is None).
+    _ov_headers = {
+        "Content-Type": "application/json",
+        "Authorization": f"Bearer {os.environ.get('OPENAI_API_KEY', '')}",
+    }
+    ov_text = _assemble_overview_tour_text(
+        venue_name or location, location, tour_type, overview,
+        headers=_ov_headers)
+    if ov_text is None:
+        print(f"  [LOCAL-602] overview delivery aborted (no coordinates) — "
+              f"falling to rung 4 so the tour never ships without a map point.")
+        return None
     _LAST_TOUR_KIND = 'overview'
     _LAST_OVERVIEW_SOURCES = list(overview.sources)
     try:

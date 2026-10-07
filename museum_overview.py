@@ -69,6 +69,11 @@ class MuseumOverview:
     exhibitions: List[str] = field(default_factory=list)
     as_of: str = ''
     facts_line: str = ''
+    # [LOCAL-602] The venue's own street address (from its /visit|/contact page)
+    # and a "lat, lng" string geocoded from it. Used so the single overview stop
+    # ships with a real map point (LOCAL-591 #4) instead of NULL coordinates.
+    address: str = ''
+    coordinates: str = ''
 
     def is_empty(self) -> bool:
         return not self.narration.strip()
@@ -533,6 +538,16 @@ def build_museum_overview(
     _add_source(facts_source)
     sources = sources[:6]
 
+    # [LOCAL-602] Lift the venue's own street address from the corpus so the single
+    # overview stop can carry a real map point (coordinates are geocoded by the
+    # caller). Best-effort: "" when the pages state no address.
+    address = ''
+    try:
+        from about_museum_stop import extract_venue_address
+        address = extract_venue_address(corpus_text, locality=locality) or ''
+    except Exception:
+        address = ''
+
     return MuseumOverview(
         narration=narration,
         sources=sources,
@@ -541,4 +556,5 @@ def build_museum_overview(
         exhibitions=exhibitions,
         as_of=as_of,
         facts_line=facts_line,
+        address=address,
     )
