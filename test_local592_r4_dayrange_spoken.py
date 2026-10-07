@@ -18,7 +18,8 @@ Why r3 bounced (LEAD review, 2026-10-06 11:0x):
      teachers), never inventing one:
        "The Griffin is open Tuesday through Sunday, noon to 4 PM, and closed on
         Mondays and major holidays. Admission is $12 for adults and $8 for seniors,
-        students and teachers, as listed on griffinmuseum.org in October 2026."
+        students and teachers, as published by the museum in October 2026."
+        (D617 / LOCAL-614 item 4: no source domain is spoken.)
 
 These tests are OFFLINE and deterministic. They are RED on 7bba912 (the r3
 extractor stores no day range; the r3 composer emits note fragments) and GREEN
@@ -150,10 +151,11 @@ class TestSpokenVisitingComposition(unittest.TestCase):
     def test_source_and_month_present(self):
         section = self._section(
             "Open Tuesday through Sunday, Noon–4 PM. $12 for adults, $8 for seniors")
-        self.assertIn("griffinmuseum.org", section)
         self.assertIn("October 2026", section)
-        # The honesty signal reads naturally ("as listed on <domain> in <month>").
-        self.assertRegex(section, r"(?i)as listed on griffinmuseum\.org in October 2026")
+        # [LOCAL-614 item 4 / D617] No source DOMAIN is spoken in the visiting
+        # signal. The honesty stamp keeps the month, without the domain.
+        self.assertRegex(section, r"(?i)as published by the museum in October 2026")
+        self.assertNotRegex(section, r"(?i)as listed on griffinmuseum\.org")
 
     def test_admission_categories_kept_never_invented(self):
         section = self._section(
@@ -170,7 +172,8 @@ class TestSpokenVisitingComposition(unittest.TestCase):
 
     def test_griffin_sentence_shape_end_to_end(self):
         # The LEAD's target shape (content, not exact wording): open <days>, <time>,
-        # closed <day>; admission <price> for <cats>, as listed on <domain> in <month>.
+        # closed <day>; admission <price> for <cats>, as published by the museum in
+        # <month>  (D617 / LOCAL-614 item 4: no source domain is spoken).
         section = self._section(
             "Open Tuesday through Sunday, Noon–4 PM. Closed on Monday. "
             "$12 for adults, $8 for seniors, students and teachers")
@@ -180,10 +183,9 @@ class TestSpokenVisitingComposition(unittest.TestCase):
         i_time = low.index("4 pm")
         i_closed = low.index("closed")
         i_adm = section.index("$12")
-        # The source signal we mean is the visiting one ("as listed on <domain>
-        # in <month>") — not the About narration's own sourcing close, which may
-        # also name the domain earlier. Anchor on the dated signal.
-        m_src = re.search(r"(?i)as listed on griffinmuseum\.org in October 2026", section)
+        # The visiting source signal is now domain-free ("as published by the
+        # museum in <month>"). Anchor the ordering check on the dated signal.
+        m_src = re.search(r"(?i)as published by the museum in October 2026", section)
         self.assertIsNotNone(m_src, f"visiting source signal missing: {section!r}")
         i_src = m_src.start()
         # open → days → time all in the hours sentence; closed stated; then

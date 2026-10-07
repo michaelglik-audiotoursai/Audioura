@@ -1301,12 +1301,21 @@ def _default_month_stamp() -> str:
 
 
 def _source_month_signal(domain: str, as_of: str) -> str:
-    """The D584/D582 honesty signal, spoken: 'as listed on <domain> in <month>'."""
-    where = domain.strip() if domain and domain.strip() else "the museum's website"
+    """The honesty signal, SPOKEN without a source domain (D617 / LOCAL-614 item 4).
+
+    The kiro-cli critique of tour 399 flagged a spoken source tag ("Admission is
+    free, as listed on bc.edu in October 2026."). Per D617 no domain is spoken —
+    the source domain lives in the TEXT view only. The honesty stamp (the month
+    the facts were current) stays, phrased without the domain:
+
+        "as published by the museum in October 2026"
+
+    ``domain`` is accepted (callers still pass it) but is deliberately NOT spoken.
+    """
     stamp = (as_of or "").strip()
     if stamp:
-        return f"as listed on {where} in {stamp}"
-    return f"as listed on {where}"
+        return f"as published by the museum in {stamp}"
+    return "as published by the museum"
 
 
 def _compose_visiting_sentences(facts: str, venue_name: str, domain: str,
