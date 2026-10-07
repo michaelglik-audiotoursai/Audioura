@@ -392,7 +392,11 @@ class TestVisitingInfoFallback(unittest.TestCase):
         about = self._about_no_facts(_BASE)
         section = am.build_opening_section(about)
         self.assertIn("Check opening hours and admission on", section)
-        self.assertIn("griffinmuseum.org", section)
+        # [LOCAL-616 item 2 / D617] The pointer is domain-free — it points to
+        # "the museum's website", never a spoken domain (which lives only in the
+        # text-view Sources line).
+        self.assertNotIn("griffinmuseum.org", section)
+        self.assertIn("the museum's website", section)
         self.assertIn("before you go", section)
 
     def test_fallback_never_invents_hours_or_prices(self):
@@ -644,7 +648,9 @@ class TestPartialPointerOnlyForMissing(unittest.TestCase):
         about = self._about("")
         section = am.build_opening_section(about)
         self.assertIn("Check opening hours and admission on", section)
-        self.assertIn("griffinmuseum.org", section)
+        # [LOCAL-616 item 2 / D617] domain-free pointer.
+        self.assertNotIn("griffinmuseum.org", section)
+        self.assertIn("the museum's website", section)
 
 
 # ── 10. [r3] Extractor captures day-schedule hours, ignores phone/year digits ─
