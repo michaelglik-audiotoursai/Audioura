@@ -171,14 +171,19 @@ class LiveRunMeter:
         """The run's spend across ALL providers combined — the figure the cap is
         measured against. Includes the live grounding spend counted in
         story_leads since the last reset, so the guard sees the query that is
-        about to push the run over the line."""
+        about to push the run over the line.
+
+        preflight is NOT added here: a venue preflight is itself a grounded Gemini
+        call, so its queries are already inside the grounding counter. The
+        ``preflight`` field is a labelled SUBSET of gemini_grounding surfaced for
+        visibility — adding it again would double-count."""
         live_grounding = self._live_grounding_usd()
         # Use the larger of the live counter and the amount already folded into
         # our accumulator, so neither double-counts nor under-counts across a
         # mid-run add_generation().
         grounding = max(self.gemini_grounding_usd, live_grounding)
         return (self.openai_usd + grounding + self.gemini_tokens_usd
-                + self.serper_usd + self.preflight_usd)
+                + self.serper_usd)
 
     def _live_grounding_usd(self):
         """Dollar value of grounded queries counted in story_leads right now."""
@@ -312,10 +317,11 @@ class LiveRunMeter:
 
     def total_usd(self):
         """Total our-cost for the ledger row. Equals the combined provider spend
-        (the capped figure) — grounding counted once."""
+        (the capped figure) — grounding counted once, preflight NOT re-added
+        (it is a subset of grounding)."""
         grounding = max(self.gemini_grounding_usd, self._live_grounding_usd())
         return round(self.openai_usd + grounding + self.gemini_tokens_usd
-                     + self.serper_usd + self.preflight_usd, 6)
+                     + self.serper_usd, 6)
 
     def record(self, operation_type="tour_generate", cache_hit=False):
         """Write ONE cost_ledger row for this run and return its id (or None).
