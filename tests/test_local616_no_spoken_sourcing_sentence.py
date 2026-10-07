@@ -83,5 +83,33 @@ class TestSourcingPreservedInTextView(unittest.TestCase):
         self.assertNotIn("This account is drawn from", unit["narration"])
 
 
+class TestVisitingPointersAreDomainFree(unittest.TestCase):
+    """[LOCAL-616 item 2 / D617] The website pointers used when hours/admission
+    can't be sourced must NOT speak a source domain (the Groeninge live run flagged
+    'Opening hours are listed on museabrugge.be'). They point generically to
+    'the museum's website'."""
+
+    def test_full_fallback_pointer_has_no_domain(self):
+        s = am._visiting_fallback_sentence("museabrugge.be")
+        self.assertNotIn("museabrugge.be", s)
+        self.assertIn("the museum's website", s)
+        # Must still match the hours-fold regex so the preflight can replace it.
+        import stop_pool_orchestrator as orch
+        self.assertRegex(s, orch._CHECK_HOURS_FALLBACK_RE)
+
+    def test_partial_pointer_hours_missing_no_domain(self):
+        # admission known, hours missing → "Opening hours are listed on <generic>."
+        s = am._partial_pointer_sentence("Admission is free", "museabrugge.be")
+        self.assertNotIn("museabrugge.be", s)
+        self.assertIn("Opening hours are listed on the museum's website", s)
+
+    def test_partial_pointer_admission_missing_no_domain(self):
+        # hours known, admission missing → "Admission prices are listed on <generic>."
+        s = am._partial_pointer_sentence("Open Monday to Friday, 10 AM to 5 PM",
+                                         "bc.edu")
+        self.assertNotIn("bc.edu", s)
+        self.assertIn("Admission prices are listed on the museum's website", s)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

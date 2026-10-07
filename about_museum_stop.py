@@ -1119,13 +1119,13 @@ def _visiting_fallback_sentence(domain: str) -> str:
     """[LOCAL-592 r2] The one-sentence website pointer used when the venue's own
     pages yield NO hours/admission the gate will pass.
 
-    Michael (D611): opening hours and admission are "very important". When they
-    cannot be sourced we must NOT invent them (D584) — we say so in a single
-    sentence that points the listener at the venue's site, e.g.
-    "Check opening hours and admission on bostonathenaeum.org before you go."
-    With no known domain the pointer stays generic ("…on the museum's website…").
+    [LOCAL-616 item 2 / D617] NO source domain is spoken. Even this honest pointer
+    must not read a domain aloud — the kiro-cli Groeninge run flagged "Opening
+    hours are listed on museabrugge.be" / this fallback's "…on <domain>…" as a URL
+    in narration. We always point generically to "the museum's website"; the
+    specific domain lives only in the text-view Sources line.
     """
-    where = domain.strip() if domain and domain.strip() else "the museum's website"
+    where = "the museum's website"
     return f"Check opening hours and admission on {where} before you go."
 
 
@@ -1163,8 +1163,10 @@ def _partial_pointer_sentence(facts: str, domain: str) -> str:
     - neither known                   → "" (the caller uses the full fallback)
 
     Never repeats a field we already stated, and never invents a value (D584).
+    [LOCAL-616 item 2 / D617] Points generically to "the museum's website" — never
+    reads a source domain aloud (the domain lives only in the text-view Sources).
     """
-    where = domain.strip() if domain and domain.strip() else "the museum's website"
+    where = "the museum's website"
     has_hours = _facts_state_hours(facts)
     has_adm = _facts_state_admission(facts)
     if has_hours and not has_adm:
