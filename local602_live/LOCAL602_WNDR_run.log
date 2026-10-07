@@ -1,0 +1,1665 @@
+=== LOCAL-602 isolated live run ===
+location : WNDR museum, Boston, MA
+stops    : 7 (requested)
+model    : gpt-4o   cap: $2.00
+git_sha  : unknown
+
+======================================================================
+CALL #001 | 01:27:46.625 | GENERATE_TOUR_TEXT_FUNCTION_ENTRY
+======================================================================
+  location: WNDR museum, Boston, MA
+  tour_type: museum
+  total_stops_parameter: 7
+  output_file: /out/LOCAL602_WNDR_RUN.txt
+
+  [LOCAL-245] Stop-existence gate mode: LOG_ONLY
+
+======================================================================
+CALL #002 | 01:27:46.630 | TOTAL_STOPS_FINALIZED
+======================================================================
+  location: WNDR museum, Boston, MA
+  total_stops_final: 7
+  source: parameter
+
+
+PHASE 1: Analyzing tour intent with AI...
+Intent analysis response: ```json
+{
+    "poi_type": "museums",
+    "location": "Boston, MA",
+    "theme_type": "STANDARD",
+    "theme_name": null,
+    "requirements": null,
+    "business_hours_relevant": false,
+    "accessibility_mentioned": false,
+    "needs_research": false,
+    "venue_name": "WNDR Museum",
+    "geographic_scope": "Boston, MA",
+    "named_places": [],
+    "scope_precision": "CITY",
+    "transport_mode": "on_foot",
+    "country_scope": "USA"
+}
+```
+  [INTENT] Stripped LLM fences from response
+  [TRANSPORT] mode=on_foot, country_scope=USA (keyword=on_foot, intent=on_foot)
+✅ Intent Analysis Results:
+   POI Type: museums
+   Location: Boston, MA
+   Requirements: None
+   Business Hours Relevant: False
+   Accessibility Mentioned: False
+   Venue Name: WNDR Museum
+  [venue_name sanity] 'WNDR Museum' OK
+  [S15] Forced tour_category=museum from venue_name='WNDR Museum'
+[TIMING] phase=intent elapsed=1.7s cumulative=1.7s
+[LOCAL-474] tour_type='museum' → category='museum' (source=explicit)
+
+Detected tour category: MUSEUM
+Using museum template for WNDR museum, Boston, MA - museum
+
+======================================================================
+CALL #003 | 01:27:48.371 | GENERATING_PROMPT
+======================================================================
+  location: WNDR museum, Boston, MA
+  user_request: WNDR museum, Boston, MA
+  total_stops: 7
+
+
+PHASE 3A: Fetching 7 candidate POI(s) for WNDR museum, Boston, MA...
+  [Museum constraint] Venue from intent='WNDR Museum'
+  [venue_resolver] Name variants: ['WNDR Museum']
+  [venue_resolver] Single candidate Q112081342 (WNDR Museum) failed city validation for 'Boston'
+  [venue_resolver] Resolved: 'WNDR Museum' → Q112081342 (WNDR Museum)
+    URL: https://www.wndrmuseum.com/
+    Coords: 41.88055555555555, -87.65597222222222
+    Language: en
+  [venue_resolver] SPARQL: 0 works found for Q112081342
+  [S17] no scope_constraint (precision='CITY', scope='Boston, MA')
+  [venue_resolver] Name variants: ['WNDR Museum']
+  [venue_resolver] Single candidate Q112081342 (WNDR Museum) failed city validation for 'Boston'
+  [venue_resolver] Resolved: 'WNDR Museum' → Q112081342 (WNDR Museum)
+    URL: https://www.wndrmuseum.com/
+    Coords: 41.88055555555555, -87.65597222222222
+    Language: en
+  [venue_cache] ERROR: container default DB unreachable: could not translate host name "postgres-2" to address: Name or service not known
+
+  [venue_resolver] SPARQL: 0 works found for Q112081342
+  [LOCAL-30] Deterministic selection: 0 documented works (0 catalogue, 0 SPARQL; 0 site/cache canonical title(s) are NOT documented)
+  [LOCAL-580] 0 documented works for 'WNDR Museum' — exhibition-museum site-first path ELIGIBLE (site='https://www.wndrmuseum.com/')
+  [LOCAL-30] Documented works (0) < total_stops (7) — will use documented as base, GPT fills remainder
+[TIMING] phase=poi_selection elapsed=5.0s cumulative=6.7s
+  [LOCAL-589][fetch] https://www.wndrmuseum.com/current-exhibitions -> status=200 bytes=210318 0.24s
+  [LOCAL-589][fetch] https://www.wndrmuseum.com/current-exhibitions/ -> status=200 bytes=210318 0.23s
+  [LOCAL-589][fetch] https://www.wndrmuseum.com/exhibitions -> status=200 bytes=210318 0.17s
+  [LOCAL-589][fetch] https://www.wndrmuseum.com/exhibitions/current -> status=200 bytes=210318 0.19s
+  [LOCAL-589][fetch] https://www.wndrmuseum.com/exhibition -> status=200 bytes=210318 0.18s
+  [LOCAL-589][fetch] https://www.wndrmuseum.com/whats-on -> status=200 bytes=210318 0.19s
+  [LOCAL-589][fetch] https://www.wndrmuseum.com/on-view -> status=200 bytes=210318 0.17s
+  [LOCAL-589][fetch] https://www.wndrmuseum.com/on-display -> status=200 bytes=210318 0.19s
+  [LOCAL-589][fetch] https://www.wndrmuseum.com/visit -> status=200 bytes=210318 0.18s
+  [LOCAL-589][fetch] https://www.wndrmuseum.com/plan-your-visit -> status=200 bytes=210318 0.19s
+  [LOCAL-589][fetch] https://www.wndrmuseum.com/about -> status=200 bytes=210318 0.18s
+  [LOCAL-589][fetch] https://www.wndrmuseum.com/about-us -> status=200 bytes=210318 0.17s
+  [LOCAL-589][fetch] https://www.wndrmuseum.com/the-building -> status=200 bytes=210318 0.18s
+  [LOCAL-589][fetch] https://www.wndrmuseum.com/architecture -> status=200 bytes=210318 0.19s
+  [LOCAL-589][fetch] https://www.wndrmuseum.com/galleries -> status=200 bytes=210318 0.21s
+  [LOCAL-589][fetch] https://www.wndrmuseum.com/floor-plan -> status=200 bytes=210318 0.37s
+  [LOCAL-589][fetch] https://www.wndrmuseum.com/robots.txt -> status=200 bytes=210318 0.19s
+  [LOCAL-589][fetch] https://www.wndrmuseum.com/sitemap.xml -> status=200 bytes=210318 0.19s
+  [LOCAL-589][fetch] https://www.wndrmuseum.com/boston -> status=200 bytes=210318 0.17s
+  [LOCAL-589][fetch] https://www.wndrmuseum.com/locations/boston -> status=200 bytes=210318 0.19s
+  [LOCAL-589][fetch] https://www.wndrmuseum.com/location/boston -> status=200 bytes=210318 0.19s
+  [LOCAL-589][fetch] https://www.wndrmuseum.com/visit/boston -> status=200 bytes=210318 0.21s
+  [LOCAL-589][fetch] https://www.wndrmuseum.com/cities/boston -> status=200 bytes=210318 0.23s
+  [LOCAL-589][fetch] https://www.wndrmuseum.com/boston/ -> status=200 bytes=210318 0.23s
+  [LOCAL-602] Serper site:wndrmuseum.com Boston → 10 result(s)
+
+PHASE 3A: SKIPPED (LOCAL-580 site-first — 10 current exhibition(s) from the venue site)
+   - We Are All Artists (If Only We Knew?) [SITE EXHIBITION https://www.wndrmuseum.com/installations/boston/we-are-all-artists-boston]
+   - Flex | WNDR Museum Boston [SITE EXHIBITION https://app.wndrmuseum.com/installations/boston/flex?_gl=1*dm9oxv*_gcl_au*MTg1MDkyODk4OC4xNzUwMTAwMTE0*_ga*MTIyMzgxODMzMS4xNzM0MzYxNzQx*_ga_Y3MT569NSP*czE3NTUxMDE1NzQkbzE5MSRnMSR0MTc1NTEwNDE3MyRqNTIkbDAkaDA.*_ga_9L9NEPRPHD*czE3NTUxMDE1NzQkbzM5MyRnMSR0MTc1NTEwNDE3MyRqNTMkbDAkaDg0NjIyOTczOA..&utm_source=Vesta&utm_medium=Referral]
+   - WNDR Museum Boston [SITE EXHIBITION https://www.wndrmuseum.com/location/boston?ref=blkchicago.com]
+   - Speak Up! | WNDR Museum Boston [SITE EXHIBITION https://www.wndrmuseum.com/installations/boston/speak-up]
+   - Lake Shore Drive (LSD) | WNDR Museum Boston [SITE EXHIBITION https://www.wndrmuseum.com/installations/boston/lake-shore-drive-lsd-boston]
+   - MPO-1 (Time Machine) | WNDR Museum Boston [SITE EXHIBITION https://www.wndrmuseum.com/installations/boston/mpo-1-time-machine]
+   - Boston Events [SITE EXHIBITION https://www.wndrmuseum.com/tickets/boston/events?gad_source=1&gad_campaignid=22722101921&gbraid=0AAAAABW_ivPc8kqBok0OGCZ0NKkEQwYla&gclid=CjwKCAiAvaLLBhBFEiwAYCNTf3n1i43LlDpgP5pPX3crNNqQpW3FN1JLbbua9ABSWtbxzzOIkcAyRRoCAoAQAvD_BwE]
+   - Buy Gift Cards - WNDR Boston [SITE EXHIBITION https://www.wndrmuseum.com/tickets/boston/gift-cards?gad_source=1&gad_campaignid=22722101921&gbraid=0AAAAABW_ivPc8kqBok0OGCZ0NKkEQwYla&gclid=CjwKCAiAvaLLBhBFEiwAYCNTf3n1i43LlDpgP5pPX3crNNqQpW3FN1JLbbua9ABSWtbxzzOIkcAyRRoCAoAQAvD_BwE]
+   - WNDRWall | WNDR Museum Boston [SITE EXHIBITION https://www.wndrmuseum.com/installations/boston/wndrwall]
+   - INSIDEOUT | WNDR Museum Boston [SITE EXHIBITION https://www.wndrmuseum.com/installations/boston/insideout-boston]
+[TIMING] phase=site_first_exhibitions elapsed=6.9s cumulative=13.6s
+  [R4] Museum tour: asking for 14 candidates (2x for D1v2 filtering)
+
+PHASE 3A: SKIPPED (deterministic fill from 10 documented works)
+OK PHASE 3A parsed 10 candidate POI(s):
+   - We Are All Artists (If Only We Knew?)
+   - Flex | WNDR Museum Boston
+   - WNDR Museum Boston
+   - Speak Up! | WNDR Museum Boston
+   - Lake Shore Drive (LSD) | WNDR Museum Boston
+   - MPO-1 (Time Machine) | WNDR Museum Boston
+   - Boston Events
+   - Buy Gift Cards - WNDR Boston
+   - WNDRWall | WNDR Museum Boston
+   - INSIDEOUT | WNDR Museum Boston
+  [D1/LOCAL-372] Exhibition path (site_exhibition) — D1v2 checks the PERMANENT collection; a temporary show is not in it
+  [D532] Provenance: 10 page-sourced, 0 knowledge-proposed
+  [D1/LOCAL-372] DROPPED 2 stop(s) absent from the exhibition page (not extracted from it — likely invented):
+      - We Are All Artists (If Only We Knew?)
+      - Boston Events
+  [D532] 8 stop(s): 8 confirmed by the venue page, 0 unconfirmed and labelled
+  [R4] Target reached: 8/7 stops
+  [LOCAL-16 GATE] All 8 stops cleared the gate ✓
+
+PHASE 4.5: Validating AI knowledge for WNDR museum, Boston, MA...
+OK Knowledge validation passed: Knowledge validation passed
+
+PHASE 4: skipped (tour_category='museum', no type-verification required)
+  [venue_cache] ERROR: container default DB unreachable: could not translate host name "postgres-2" to address: Name or service not known
+
+  [LOCAL-230] ERROR: Coverage selection DB connect failed (direct): OperationalError: connection to server at "localhost" (::1), port 5433 failed: Connection refused
+	Is the server running on that host and accepting TCP/IP connections?
+connection to server at "localhost" (127.0.0.1), port 5433 failed: Connection refused
+	Is the server running on that host and accepting TCP/IP connections?
+
+  [LOCAL-212] Coverage selection: DB connection FAILED — falling back to position order
+  [LOCAL-437] EXISTENCE-GATE: EXEMPT — stops sourced from exhibition site_exhibition (already grounded against venue page by LOCAL-372)
+  [LOCAL-589] site-first fill headroom: carrying 8 real exhibition(s) through narration for a 7-stop request (spare 1 covers an empty-narration drop)
+
+PHASE 3B: Requesting structured details and walking directions for 8 stop(s)...
+
+======================================================================
+CALL #004 | 01:28:00.282 | PHASE_3B_REQUEST
+======================================================================
+  location: WNDR museum, Boston, MA
+  stop_count: 8
+
+[LOCAL-197] llm_cost() called with total_tokens (deprecated) by /app/generate_tour_text.py:11736. Caller should supply input_tokens and output_tokens separately.
+[LOCAL-197] llm_cost() called with total_tokens (deprecated) by /app/generate_tour_text.py:11737. Caller should supply input_tokens and output_tokens separately.
+PHASE 3B API call cost: $0.0056 (1175 tokens)
+OK PHASE 3B: ordered 7 stop(s) with structured details and directions
+  [LOCAL-39] No visitor info sourced — Museum Information field OMITTED
+  [LOCAL-355] [LOCAL-583] Exhibit-museum: querying OSM ONCE for the museum building 'WNDR Museum' (not per-exhibition — a show has no OSM node)
+[OSM-VENUE] Overpass ConnectionError for 'WNDR Museum' (attempt 1/2)
+[OSM-VENUE] Overpass ConnectionError for 'WNDR Museum' (attempt 2/2)
+  [LOCAL-355] museum building: no practical facts in OSM
+   Coords cluster detected: 7 stops share '42.3467, -71.0420', refetching...
+[LOCAL-197] llm_cost() called with total_tokens (deprecated) by /app/generate_tour_text.py:12231. Caller should supply input_tokens and output_tokens separately.
+   Cluster refetch OK 'Speak Up! | WNDR Museum Boston': 42.3393, -71.0505
+   Cluster refetch OK 'MPO-1 (Time Machine) | WNDR Museum Boston': 42.3421, -71.0523
+   Cluster refetch OK 'Lake Shore Drive (LSD) | WNDR Museum Boston': 42.3403, -71.0504
+   Cluster refetch OK 'Flex | WNDR Museum Boston': 42.3393, -71.0402
+   Cluster refetch OK 'WNDR Museum Boston': 42.3398, -71.0502
+   Cluster refetch OK 'Buy Gift Cards - WNDR Boston': 42.3314, -71.0427
+   Cluster refetch OK 'WNDRWall | WNDR Museum Boston': 42.3393, -71.0426
+Extracted first POI coordinates: (42.3393, -71.0402)
+  [D4] Museum single-coordinate: all stops set to (42.3393, -71.0402) (source: model (fallback))
+
+=== Extracted POI Information ===
+1. Flex | WNDR Museum Boston
+   Address: 404 E. 1st St, Boston, MA 02127
+   Coordinates: 42.3393, -71.0402
+   Directions: From South Boston's Broadway T station, head southeast on Broadway toward E 1st ...
+2. WNDR Museum Boston
+   Address: 404 E. 1st St, Boston, MA 02127
+   Coordinates: 42.3393, -71.0402
+   Directions: Exit Flex and turn left onto E 1st St. Walk straight for about 100 feet until yo...
+3. Speak Up! | WNDR Museum Boston
+   Address: 404 E. 1st St, Boston, MA 02127
+   Coordinates: 42.3393, -71.0402
+   Directions: From WNDR Museum, head straight through the main exhibit area, then take a right...
+4. Lake Shore Drive (LSD) | WNDR Museum Boston
+   Address: 404 E. 1st St, Boston, MA 02127
+   Coordinates: 42.3393, -71.0402
+   Directions: Exit Speak Up! and turn left, following the path around the corner to the Lake S...
+5. MPO-1 (Time Machine) | WNDR Museum Boston
+   Address: 404 E. 1st St, Boston, MA 02127
+   Coordinates: 42.3393, -71.0402
+   Directions: From Lake Shore Drive, continue straight and take the first left into the MPO-1 ...
+6. Buy Gift Cards - WNDR Boston
+   Address: 404 E. 1st St, Boston, MA 02127
+   Coordinates: 42.3393, -71.0402
+   Directions: Leave the MPO-1 area and walk back toward the main entrance, then take a right t...
+7. WNDRWall | WNDR Museum Boston
+   Address: 404 E. 1st St, Boston, MA 02127
+   Coordinates: 42.3393, -71.0402
+   Directions: From the gift shop, exit and head left toward the WNDRWall installation. You may...
+================================
+
+
+[Storied] STORIED_MODE=true — generating spine + fact sheets...
+  [LOCAL-37] Three-class retrieval: 7 stops processed, 0 with category
+  [SQ-S6b] Insufficient data for thread discovery (elements=0, stops=7)
+  [SQ-S6b] Thread discovery: mode=mosaic, threads=0
+  [§3] No story elements available — spine will use invented arc (mode=invented)
+SPINE_COST: category=museum venue=WNDR Museum model=gpt-4o tokens=1649 (in=752 out=897) cost=$0.0109 latency=6.2s
+[COST_METER] FRESH | spine_generate | $0.010850 | user=None | job=None
+  [LOCAL-278] Spine cost folded into total: $0.0109
+  [LOCAL-111] Spine quality: 4/4 | {'climax_position': True, 'unique_emotional_beats': True, 'valid_callbacks': True, 'closing_revelation_length': True}
+  [Storied] Spine generated: 7 arc entries (mode=invented)
+  [venue_cache] ERROR: container default DB unreachable: could not translate host name "postgres-2" to address: Name or service not known
+
+  [LOCAL-183] stop_corpus: DB connection unavailable — skipping
+  [LOCAL-198] Corpus gate: ENABLED — checking stop coverage...
+  [CORPUS-GATE] stop='Flex | WNDR Museum Boston' verdict=EMPTY action=EMPTY_RESTRICTED
+  [CORPUS-GATE] stop='WNDR Museum Boston' verdict=EMPTY action=EMPTY_RESTRICTED
+  [CORPUS-GATE] stop='Speak Up! | WNDR Museum Boston' verdict=EMPTY action=EMPTY_RESTRICTED
+  [CORPUS-GATE] stop='Lake Shore Drive (LSD) | WNDR Museum Boston' verdict=EMPTY action=EMPTY_RESTRICTED
+  [CORPUS-GATE] stop='MPO-1 (Time Machine) | WNDR Museum Boston' verdict=EMPTY action=EMPTY_RESTRICTED
+  [CORPUS-GATE] stop='Buy Gift Cards - WNDR Boston' verdict=EMPTY action=EMPTY_RESTRICTED
+  [CORPUS-GATE] stop='WNDRWall | WNDR Museum Boston' verdict=EMPTY action=EMPTY_RESTRICTED
+  [LOCAL-198] Corpus gate: 0 PASSED, 0 CREATOR_ONLY, 7 EMPTY, 0 SHORTENED
+DB-first lookup failed for 'Flex | WNDR Museum Boston': relation "stop_corpus" does not exist
+LINE 3:             FROM stop_corpus
+                         ^
+
+DB-first lookup failed for 'WNDR Museum Boston': relation "stop_corpus" does not exist
+LINE 3:             FROM stop_corpus
+                         ^
+
+DB-first lookup failed for 'Lake Shore Drive (LSD) | WNDR Museum Boston': relation "stop_corpus" does not exist
+LINE 3:             FROM stop_corpus
+                         ^
+
+DB-first lookup failed for 'Speak Up! | WNDR Museum Boston': relation "stop_corpus" does not exist
+LINE 3:             FROM stop_corpus
+                         ^
+
+DB-first lookup failed for 'MPO-1 (Time Machine) | WNDR Museum Boston': relation "stop_corpus" does not exist
+LINE 3:             FROM stop_corpus
+                         ^
+
+DB-first lookup failed for 'WNDR Museum': relation "stop_corpus" does not exist
+LINE 3:             FROM stop_corpus
+                         ^
+
+DB-first lookup failed for 'WNDR Museum': relation "stop_corpus" does not exist
+LINE 3:             FROM stop_corpus
+                         ^
+
+DB-first lookup failed for 'WNDR Museum': relation "stop_corpus" does not exist
+LINE 3:             FROM stop_corpus
+                         ^
+
+DB-first lookup failed for 'WNDR Museum': relation "stop_corpus" does not exist
+LINE 3:             FROM stop_corpus
+                         ^
+
+[LOCAL-197] llm_cost() called with total_tokens (deprecated) by /app/fact_extractor.py:220. Caller should supply input_tokens and output_tokens separately.
+DB-first lookup failed for 'WNDR um': relation "stop_corpus" does not exist
+LINE 3:             FROM stop_corpus
+                         ^
+
+DB-first lookup failed for 'WNDR um': relation "stop_corpus" does not exist
+LINE 3:             FROM stop_corpus
+                         ^
+
+DB-first lookup failed for 'WNDR um': relation "stop_corpus" does not exist
+LINE 3:             FROM stop_corpus
+                         ^
+
+DB-first lookup failed for 'WNDR um': relation "stop_corpus" does not exist
+LINE 3:             FROM stop_corpus
+                         ^
+
+DB-first lookup failed for 'Buy Gift Cards - WNDR Boston': relation "stop_corpus" does not exist
+LINE 3:             FROM stop_corpus
+                         ^
+
+DB-first lookup failed for 'WNDR Museum': relation "stop_corpus" does not exist
+LINE 3:             FROM stop_corpus
+                         ^
+
+DB-first lookup failed for 'WNDRWall | WNDR Museum Boston': relation "stop_corpus" does not exist
+LINE 3:             FROM stop_corpus
+                         ^
+
+DB-first lookup failed for 'WNDR Museum': relation "stop_corpus" does not exist
+LINE 3:             FROM stop_corpus
+                         ^
+
+DB-first lookup failed for 'WNDR um': relation "stop_corpus" does not exist
+LINE 3:             FROM stop_corpus
+                         ^
+
+  [Storied] Fact sheets: 7/7 generated
+  [S25] Story types assigned: ['art', 'history', 'anecdote', 'art', 'history', 'art', 'history']
+  [work_stories] Read error: could not translate host name "postgres-2" to address: Name or service not known
+
+  [work_stories] Read error: could not translate host name "postgres-2" to address: Name or service not known
+
+  [work_stories] Read error: could not translate host name "postgres-2" to address: Name or service not known
+
+  [work_stories] Read error: could not translate host name "postgres-2" to address: Name or service not known
+
+  [work_stories] Read error: could not translate host name "postgres-2" to address: Name or service not known
+
+  [work_stories] Read error: could not translate host name "postgres-2" to address: Name or service not known
+
+  [work_stories] Read error: could not translate host name "postgres-2" to address: Name or service not known
+
+  [LOCAL-37] Tour diversity: no swaps needed (naturally balanced)
+  [LOCAL-188] Style constraints ACTIVE (declarative prose rules injected)
+[TIMING] phase=fact_sheets elapsed=13.4s cumulative=41.1s
+
+PHASE 5: Generating detailed descriptions for each POI (parallel)...
+
+  [LOCAL-382] framing=none source='-'
+
+  [LOCAL-383] No page text available for story beat extraction
+[TIMING] phase=narration elapsed=0.0s cumulative=41.1s
+  [D495] venue domain seeded tier1: wndrmuseum.com
+
+  [LOCAL-410] SERP search wiring — searching for stories on 7 stops...
+  [work_stories] Read error: could not translate host name "postgres-2" to address: Name or service not known
+
+  [work_stories] Read error: could not translate host name "postgres-2" to address: Name or service not known
+  [work_stories] Read error: could not translate host name "postgres-2" to address: Name or service not known
+  [work_stories] Read error: could not translate host name "postgres-2" to address: Name or service not known
+
+  [work_stories] Read error: could not translate host name "postgres-2" to address: Name or service not known
+
+
+
+  [LOCAL-441] Batch P856 check: 5 domains, budget=20.0s, pool=10
+  [LOCAL-441] Batch P856 check: 7 domains, budget=20.0s, pool=10
+  [LOCAL-441] Batch P856 check: 8 domains, budget=20.0s, pool=10
+  [LOCAL-441] Batch P856 check: 9 domains, budget=20.0s, pool=10
+  [LOCAL-441] Batch P856 check: 9 domains, budget=20.0s, pool=10
+  [DEAD-HOST] Marked cold: wikimedia (timeout/network error for blockclubchicago.org: The read operation timed out)
+  [SQ-S2] Wikidata P856 check failed for blockclubchicago.org: The read operation timed out
+  [SQ-S2] Wikidata P856 check failed for chicagoplannermagazine.com: The read operation timed out
+  [SQ-S2] Wikidata P856 check failed for cbsnews.com: The read operation timed out
+  [SQ-S2] Wikidata P856 check failed for boston.com: The read operation timed out
+  [SQ-S2] Wikidata P856 check failed for sdnhm.org: The read operation timed out
+  [LOCAL-441] Batch complete: 3.1s, 0 tier1, 5 unverified, 0 budget-expired
+  [work_stories] Read error: could not translate host name "postgres-2" to address: Name or service not known
+
+  [SQ-S2] Wikidata P856 check failed for cbsnews.com: The read operation timed out
+  [SQ-S2] Wikidata P856 check failed for bizjournals.com: The read operation timed out
+  [SQ-S2] Wikidata P856 check failed for wickedlocal.com: The read operation timed out
+  [SQ-S2] Wikidata P856 check failed for blockclubchicago.org: The read operation timed out
+  [SQ-S2] Wikidata P856 check failed for socialworkschi.org: The read operation timed out
+  [SQ-S2] Wikidata P856 check failed for berkeleybeacon.com: The read operation timed out
+  [SQ-S2] Wikidata P856 check failed for sdnhm.org: The read operation timed out
+  [LOCAL-441] Batch complete: 3.1s, 0 tier1, 7 unverified, 0 budget-expired
+  [work_stories] Read error: could not translate host name "postgres-2" to address: Name or service not known
+
+  [SQ-S2] Wikidata P856 check failed for cbsnews.com: The read operation timed out  [SQ-S2] Wikidata P856 check failed for blockclubchicago.org: The read operation timed out
+
+  [SQ-S2] Wikidata P856 check failed for bostonnewsroom.com: The read operation timed out
+  [SQ-S2] Wikidata P856 check failed for wgntv.com: The read operation timed out  [SQ-S2] Wikidata P856 check failed for boston.com: The read operation timed out
+  [SQ-S2] Wikidata P856 check failed for saludadepotmuseum.org: The read operation timed out  [SQ-S2] Wikidata P856 check failed for sdnhm.org: The read operation timed out
+
+
+  [SQ-S2] Wikidata P856 check failed for berkeleybeacon.com: The read operation timed out
+  [LOCAL-441] Batch complete: 3.2s, 0 tier1, 8 unverified, 0 budget-expired
+  [SQ-S2] Wikidata P856 check failed for msn.com: The read operation timed out
+  [SQ-S2] Wikidata P856 check failed for bostonnewsroom.com: The read operation timed out
+  [SQ-S2] Wikidata P856 check failed for cbsnews.com: The read operation timed out
+  [SQ-S2] Wikidata P856 check failed for boston.com: The read operation timed out
+  [SQ-S2] Wikidata P856 check failed for blockclubchicago.org: The read operation timed out
+  [SQ-S2] Wikidata P856 check failed for sdnhm.org: The read operation timed out
+  [SQ-S2] Wikidata P856 check failed for socialworkschi.org: The read operation timed out
+  [SQ-S2] Wikidata P856 check failed for wgntv.com: The read operation timed out
+  [SQ-S2] Wikidata P856 check failed for berkeleybeacon.com: The read operation timed out
+  [LOCAL-441] Batch complete: 3.1s, 0 tier1, 9 unverified, 0 budget-expired
+  [SQ-S2] Wikidata P856 check failed for bostonnewsroom.com: The read operation timed out  [SQ-S2] Wikidata P856 check failed for blockclubchicago.org: The read operation timed out  [SQ-S2] Wikidata P856 check failed for cbsnews.com: The read operation timed out
+
+
+  [SQ-S2] Wikidata P856 check failed for bostoneventguide.com: The read operation timed out
+  [SQ-S2] Wikidata P856 check failed for newmediamuseum.org: The read operation timed out
+  [SQ-S2] Wikidata P856 check failed for socialworkschi.org: The read operation timed out
+  [SQ-S2] Wikidata P856 check failed for chicagoplannermagazine.com: The read operation timed out  [SQ-S2] Wikidata P856 check failed for sdnhm.org: The read operation timed out
+
+  [SQ-S2] Wikidata P856 check failed for boston.com: The read operation timed out
+  [LOCAL-441] Batch complete: 3.1s, 0 tier1, 9 unverified, 0 budget-expired
+  [LOCAL-441] Batch P856 check: 3 domains, budget=20.0s, pool=10
+  [LOCAL-441] Batch complete: 0.0s, 0 tier1, 3 unverified, 0 budget-expired
+  [LOCAL-441] Batch P856 check: 5 domains, budget=20.0s, pool=10
+  [LOCAL-441] Batch complete: 0.0s, 0 tier1, 5 unverified, 0 budget-expired
+    [D500] Stop 1: placeholder cleared from ['publisher', 'credit_line', 'medium', 'artist'] — unknown, not 'Not specified'
+    [LOCAL-486] Stop 1 worthiness: score=1/4 mine=True — has specific_title
+    [D489] material kind: stop='Flex | WNDR Museum Boston' kind=active volume=COVERED sentences=17 active=3 staked=0 eventful=0 passive=0  <-- DISAGREE: enough material, wrong kind
+         best: "The organization is also closing its Boston location on Aug. 30, which opened in 2022."
+    [LOCAL-489] Stop 1 needs more material (eventless): 8 passages, 1541 chars, verdict=COVERED
+      [LOCAL-489] +8 from: "Flex | WNDR Museum Boston" "WNDR Museum" provenance
+      [LOCAL-498] after replenishment: kind active -> active, 1541 -> 2721 chars, eventful=0 (NO CHANGE — the round bought more of the same)
+         best now: "The organization is also closing its Boston location on Aug. 30, which opened in 2022."
+    [LOCAL-488] providers ['openai'] span fewer than two model families — cross-model agreement needs two; set GEMINI_API_KEY
+    Stop 1 'Flex | WNDR Museum Boston': queries=3 serp_results=8 snippets=16
+      → Flex. Artist: Austin Watson, Pedro Neves. In this tactile dance with the unknown, what stories lie beneath the surface, 
+      → To every guest who visited, every artist who shared their work, and every team member who helped make WNDR what it was —
+    [D500] Stop 2: placeholder cleared from ['publisher', 'credit_line', 'medium', 'artist'] — unknown, not 'Not specified'
+    [LOCAL-486] Stop 2 worthiness: score=1/4 mine=True — has specific_title
+    [D489] material kind: stop='WNDR Museum Boston' kind=eventful volume=VENUE_ONLY sentences=34 active=5 staked=1 eventful=0 passive=0
+         best: "Museum organizers announced that this is the "final chapter" for the interactive museum, which first opened in the city in 2018. The goal of the WNDR Museum is to not only have guests get hands-on exp"
+    [LOCAL-489] Stop 2 needs more material (uncovered): 14 passages, 2755 chars, verdict=VENUE_ONLY
+      [LOCAL-489] +8 from: "WNDR Museum Boston" "WNDR Museum" provenance
+      [LOCAL-498] after replenishment: kind eventful -> eventful, 2755 -> 3935 chars, eventful=0 (NO CHANGE — the round bought more of the same)
+         best now: "Museum organizers announced that this is the "final chapter" for the interactive museum, which first opened in"
+    [LOCAL-488] providers ['openai'] span fewer than two model families — cross-model agreement needs two; set GEMINI_API_KEY
+    Stop 2 'WNDR Museum Boston': queries=3 serp_results=14 snippets=22
+      → The immersive WNDR Museum in Boston's Downtown Crossing is set to close down just two years after it opened. Its last da
+      → More than a museum WNDR Boston is a playful journey that awakens creativity, cultivates community, and leaves you wonder
+    [D500] Stop 3: placeholder cleared from ['publisher', 'credit_line', 'medium', 'artist'] — unknown, not 'Not specified'
+    [LOCAL-486] Stop 3 worthiness: score=1/4 mine=True — has specific_title
+    [D489] material kind: stop='Speak Up! | WNDR Museum Boston' kind=active volume=VENUE_ONLY sentences=21 active=3 staked=0 eventful=0 passive=0
+         best: "Founded in 2018, WNDR set out to transform the way we engage with art, play, and connection."
+    [LOCAL-489] Stop 3 needs more material (uncovered+eventless): 12 passages, 2531 chars, verdict=VENUE_ONLY
+      [LOCAL-489] +7 from: "Speak Up! | WNDR Museum Boston" "WNDR Museum" provenance
+      [LOCAL-498] after replenishment: kind active -> active, 2531 -> 4295 chars, eventful=0 (NO CHANGE — the round bought more of the same)
+         best now: "Founded in 2018, WNDR set out to transform the way we engage with art, play, and connection."
+    [LOCAL-488] providers ['openai'] span fewer than two model families — cross-model agreement needs two; set GEMINI_API_KEY
+    Stop 3 'Speak Up! | WNDR Museum Boston': queries=3 serp_results=12 snippets=19
+      → Founded in 2018, WNDR set out to transform the way we engage with art, play, and connection. Experience WNDR in Chicago 
+      → The WNDR Museum, located at 500 Washington St. in Downtown Boston, will close Aug. 30, the company announced Monday.
+    [D500] Stop 4: placeholder cleared from ['publisher', 'credit_line', 'medium', 'artist'] — unknown, not 'Not specified'
+    [LOCAL-486] Stop 4 worthiness: score=1/4 mine=True — has specific_title
+    [D489] material kind: stop='Lake Shore Drive (LSD) | WNDR Museum B' kind=active volume=VENUE_ONLY sentences=23 active=5 staked=1 eventful=0 passive=0
+         best: "Founded in 2018, WNDR set out to transform the way we engage with art, play, and connection."
+    [LOCAL-489] Stop 4 needs more material (uncovered+eventless): 13 passages, 2842 chars, verdict=VENUE_ONLY
+      [LOCAL-489] +7 from: "Lake Shore Drive (LSD) | WNDR Museum Boston" "WNDR Museum" provenance
+      [LOCAL-498] after replenishment: kind active -> active, 2842 -> 4155 chars, eventful=0 (NO CHANGE — the round bought more of the same)
+         best now: "Founded in 2018, WNDR set out to transform the way we engage with art, play, and connection."
+    [LOCAL-488] providers ['openai'] span fewer than two model families — cross-model agreement needs two; set GEMINI_API_KEY
+    Stop 4 'Lake Shore Drive (LSD) | WNDR Museum Boston': queries=3 serp_results=13 snippets=20
+      → Based on your movement, your silhouette separates the neurons from the vacuum. Founded in 2018, WNDR set out to transfor
+      → The WNDR Museum, located at 500 Washington St. in Downtown Boston, will close Aug. 30, the company announced Monday.
+    [D500] Stop 5: placeholder cleared from ['publisher', 'credit_line', 'medium', 'artist'] — unknown, not 'Not specified'
+    [LOCAL-486] Stop 5 worthiness: score=1/4 mine=True — has specific_title
+    [D489] material kind: stop='MPO-1 (Time Machine) | WNDR Museum Bos' kind=active volume=COVERED sentences=29 active=6 staked=0 eventful=0 passive=0  <-- DISAGREE: enough material, wrong kind
+         best: "WNDR Museum Tickets After years of curiosity, creativity, connection, and countless unforgettable moments, WNDR Museum has closed its doors."
+    [LOCAL-489] Stop 5 needs more material (eventless): 13 passages, 3506 chars, verdict=COVERED
+      [LOCAL-489] +7 from: "MPO-1 (Time Machine) | WNDR Museum Boston" "WNDR Museum" provenance
+      [LOCAL-498] after replenishment: kind active -> active, 3506 -> 5093 chars, eventful=0 (NO CHANGE — the round bought more of the same)
+         best now: "WNDR Museum Tickets After years of curiosity, creativity, connection, and countless unforgettable moments, WND"
+    [LOCAL-488] providers ['openai'] span fewer than two model families — cross-model agreement needs two; set GEMINI_API_KEY
+    Stop 5 'MPO-1 (Time Machine) | WNDR Museum Boston': queries=3 serp_results=13 snippets=20
+      → MPO-1 (Time Machine) Artist: Joshua Ellingson MPO-1 (Time Machine) was created by San Francisco-based artist Joshua Elli
+      → The WNDR Museum, located at 500 Washington St. in Downtown Boston, will close Aug. 30, the company announced Monday.
+    [D500] Stop 6: placeholder cleared from ['publisher', 'credit_line', 'medium', 'artist'] — unknown, not 'Not specified'
+    [LOCAL-486] Stop 6 worthiness: score=1/4 mine=True — has specific_title
+    [D489] material kind: stop='Buy Gift Cards - WNDR Boston' kind=active volume=COVERED sentences=28 active=4 staked=1 eventful=0 passive=0  <-- DISAGREE: enough material, wrong kind
+         best: "WNDR has since expanded to include WNDR Museum locations in San Diego, Seattle, and Boston, and had announced plans for further expansion. ["
+    [LOCAL-489] Stop 6 needs more material (eventless): 13 passages, 3096 chars, verdict=COVERED
+      [LOCAL-489] +7 from: "Buy Gift Cards - WNDR Boston" "WNDR Museum" provenance
+      [LOCAL-498] after replenishment: kind active -> active, 3096 -> 4828 chars, eventful=0 (NO CHANGE — the round bought more of the same)
+         best now: "WNDR has since expanded to include WNDR Museum locations in San Diego, Seattle, and Boston, and had announced "
+    [LOCAL-488] providers ['openai'] span fewer than two model families — cross-model agreement needs two; set GEMINI_API_KEY
+    Stop 6 'Buy Gift Cards - WNDR Boston': queries=3 serp_results=13 snippets=20
+      → WNDR is an ever-evolving experience featuring awe-inspiring interactive art. Buy gift cards for WNDR Boston.
+      → The WNDR Museum, located at 500 Washington St. in Downtown Boston, will close Aug. 30, the company announced Monday.
+    [D500] Stop 7: placeholder cleared from ['publisher', 'credit_line', 'medium', 'artist'] — unknown, not 'Not specified'
+    [LOCAL-486] Stop 7 worthiness: score=1/4 mine=True — has specific_title
+    [D489] material kind: stop='WNDRWall | WNDR Museum Boston' kind=active volume=VENUE_ONLY sentences=24 active=8 staked=0 eventful=0 passive=0
+         best: "Founded in 2018, WNDR set out to transform the way we engage with art, play, and connection."
+    [LOCAL-489] Stop 7 needs more material (uncovered+eventless): 12 passages, 2081 chars, verdict=VENUE_ONLY
+      [LOCAL-489] +0 from: "WNDRWall | WNDR Museum Boston" "WNDR Museum" provenance
+      [LOCAL-498] after replenishment: kind active -> active, 2081 -> 2081 chars, eventful=0 (NO CHANGE — the round bought more of the same)
+         best now: "Founded in 2018, WNDR set out to transform the way we engage with art, play, and connection."
+    [LOCAL-488] providers ['openai'] span fewer than two model families — cross-model agreement needs two; set GEMINI_API_KEY
+    Stop 7 'WNDRWall | WNDR Museum Boston': queries=3 serp_results=12 snippets=12
+      → Founded in 2018, WNDR set out to transform the way we engage with art, play, and connection. Experience WNDR in Chicago 
+      → WNDR Museum opened its Downtown Crossing location at Lafayette City Center, 500 Washington St., in 2024. The museum’s Ch
+
+  [LOCAL-410] SERP search complete: 28 queries, 129 results, 129 total snippets
+  [LOCAL-411] Snippet ranking+capping enabled: cap=5/stop, 129 raw → max 35 injected
+
+  [LOCAL-410] CHAIN INSTRUMENTATION:
+    Flex | WNDR Museum Boston: serp_results=8 elements_extracted=- beats_injected=- (measured post-generation)
+    WNDR Museum Boston: serp_results=14 elements_extracted=- beats_injected=- (measured post-generation)
+    Speak Up! | WNDR Museum Boston: serp_results=12 elements_extracted=- beats_injected=- (measured post-generation)
+    Lake Shore Drive (LSD) | WNDR Museum Boston: serp_results=13 elements_extracted=- beats_injected=- (measured post-generation)
+    MPO-1 (Time Machine) | WNDR Museum Boston: serp_results=13 elements_extracted=- beats_injected=- (measured post-generation)
+    Buy Gift Cards - WNDR Boston: serp_results=13 elements_extracted=- beats_injected=- (measured post-generation)
+    WNDRWall | WNDR Museum Boston: serp_results=12 elements_extracted=- beats_injected=- (measured post-generation)
+  [D534] Stop 1 has 16 snippet(s) but they are VENUE-level only — fetching object-level facts
+  [D533] Stop 1 'Flex | WNDR Museum Boston' has 16 snippet(s) — asking the knowledge fallback
+  [D533] +1 fact(s) via openai+web(8) (1 high-confidence) — stop will be labelled aloud
+      [high] The artwork 'Flex' at WNDR Museum Boston is created by artists Austin Watson and Pedro Neves.
+  [D534] Stop 2 has 22 snippet(s) but they are VENUE-level only — fetching object-level facts
+  [D533] Stop 2 'WNDR Museum Boston' has 22 snippet(s) — asking the knowledge fallback
+  [D533] +4 fact(s) via openai+web(16) (4 high-confidence) — stop will be labelled aloud
+      [high] WNDR Museum Boston opened in 2022.
+      [high] The museum is located in Boston's Downtown Crossing.
+      [high] WNDR Museum Boston is set to close on August 30.
+      [high] WNDR Museum Boston features more than 20 interactive exhibits.
+  [D534] Stop 3 has 19 snippet(s) but they are VENUE-level only — fetching object-level facts
+  [D533] Stop 3 'Speak Up! | WNDR Museum Boston' has 19 snippet(s) — asking the knowledge fallback
+  [D533] fallback returned nothing: model returned no facts
+  [D534] Stop 4 has 20 snippet(s) but they are VENUE-level only — fetching object-level facts
+  [D533] Stop 4 'Lake Shore Drive (LSD) | WNDR Museum Boston' has 20 snippet(s) — asking the knowledge fallback
+  [D533] fallback returned nothing: model returned no facts
+  [D534] Stop 5 has 20 snippet(s) but they are VENUE-level only — fetching object-level facts
+  [D533] Stop 5 'MPO-1 (Time Machine) | WNDR Museum Boston' has 20 snippet(s) — asking the knowledge fallback
+  [D533] +6 fact(s) via openai+web(7) (6 high-confidence) — stop will be labelled aloud
+      [high] MPO-1 (Time Machine) was created by San Francisco-based artist Joshua Ellingson.
+      [high] The installation utilizes the illusion technique of Pepper’s Ghost.
+      [high] MPO-1 is an audiovisual installation initially created for the WNDR Museum’s Boston location.
+      [high] The installation responds to the presence of a theremin, a device controlled by hand gestures near an antenna.
+      [high] MPO-1 is currently on display at the WNDR Museum in Boston.
+      [high] A duplicate of the setup exists at Joshua Ellingson's home studio for testing and prototyping.
+  [D534] Stop 6 has 20 snippet(s) but they are VENUE-level only — fetching object-level facts
+  [D533] Stop 6 'Buy Gift Cards - WNDR Boston' has 20 snippet(s) — asking the knowledge fallback
+  [D533] +4 fact(s) via openai+web(8) (4 high-confidence) — stop will be labelled aloud
+      [high] The WNDR Museum in Boston offers gift cards that can be used to experience its interactive art installations.
+      [high] The WNDR Museum was founded in 2018.
+      [high] The WNDR Museum in Boston is located in Downtown Crossing.
+      [high] Gift cards for the WNDR Museum in Boston can be purchased for up to $1,000.
+  [D534] Stop 7 has 12 snippet(s) but they are VENUE-level only — fetching object-level facts
+  [D533] Stop 7 'WNDRWall | WNDR Museum Boston' has 12 snippet(s) — asking the knowledge fallback
+  [D533] +3 fact(s) via openai+web(7) (3 high-confidence) — stop will be labelled aloud
+      [high] The WNDRWall is one of the 20 distinct installations at the WNDR Museum in Boston.
+      [high] The WNDR Museum in Boston, where the WNDRWall is located, was founded in 2022.
+      [high] The WNDR Museum in Boston is set to close on August 30, 2026.
+  [D533] Knowledge fallback filled 5 starved stop(s)
+[TIMING] phase=external_lookups elapsed=61.2s cumulative=102.3s
+
+Generating description for Stop 1: Flex | WNDR Museum Boston by , ...
+
+Generating description for Stop 2: WNDR Museum Boston by , ...
+
+Generating description for Stop 3: Speak Up! | WNDR Museum Boston by , ...
+
+Generating description for Stop 4: Lake Shore Drive (LSD) | WNDR Museum Boston by , ...
+
+Generating description for Stop 5: MPO-1 (Time Machine) | WNDR Museum Boston by , ...
+  [LOCAL-381] stop='Flex | WNDR Museum Boston' matched_work=False medium='' work_identity_chars=0  [LOCAL-381] stop='WNDR Museum Boston' matched_work=False medium='' work_identity_chars=0  [LOCAL-381] stop='Speak Up! | WNDR Museum Boston' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-381] stop='Lake Shore Drive (LSD) | WNDR Museum Boston' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-411] Stop 1 snippet ranking: input=17 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=5 output=5 usable=5 (t1t2=0, t3=0, market=0)
+  [LOCAL-381] stop='MPO-1 (Time Machine) | WNDR Museum Boston' matched_work=False medium='' work_identity_chars=0
+    [LOCAL-469] CONSEQUENCE RESCUE: 'The goal of the WNDR Museum is to not only have guests get h' let through (score 10) — no surviving snippet carried a stakes marker
+  [LOCAL-411] Stop 3 snippet ranking: input=19 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=5 output=5 usable=5 (t1t2=1, t3=0, market=0)    Top scores: [("POV: You finally visited WNDR Boston and now you'r", 15, ''), ('What if touching art at a museum was highly encour', 15, ''), ('WNDR Museum Closing After 8 Years - Block Club Chi', 14, 'unverified')]
+
+
+    [LOCAL-469] CONSEQUENCE RESCUE: 'The goal of the WNDR Museum is to not only have guests get h' let through (score 10) — no surviving snippet carried a stakes marker  [LOCAL-411] Stop 2 snippet ranking: input=26 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=5 output=5 usable=5 (t1t2=3, t3=0, market=0)
+    Top scores: [('Speak Up! | WNDR Museum Boston', 20, 'tier1'), ('Speak Up! | WNDR Museum Boston', 19, ''), ('WNDR Museum: Interactive Art Museum & Immersive Ar', 17, '')]
+  [LOCAL-411] Stop 5 snippet ranking: input=26 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=5 output=5 usable=5 (t1t2=4, t3=0, market=0)  [LOCAL-402] Stop 1: injected 5 snippets as reference material
+
+  [D533] Stop 1 corpus-gate restriction LIFTED — 17 source item(s) arrived after the gate ran
+
+  [LOCAL-411] Stop 4 snippet ranking: input=20 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=5 output=5 usable=5 (t1t2=3, t3=0, market=0)    Top scores: [('WNDRWall | WNDR Museum Boston', 18, 'tier1'), ('WNDR Museum: Interactive Art Museum & Immersive Ar', 18, 'tier1'), ('The WNDR Story - WNDR Museum', 18, 'tier1')]
+    Top scores: [('MPO-1 (Time Machine) | WNDR Museum Boston', 20, 'tier1'), ('WNDR Museum: Interactive Art Museum & Immersive Ar', 18, 'tier1'), ('WNDR Museum: Interactive Art Museum & Immersive Ar', 18, 'tier1')]  [LOCAL-402] Stop 3: injected 5 snippets as reference material
+
+  [LOCAL-411] Stop 1 prompt size: before_snippets=8615 after=20228 (+11613 from snippets+instructions, facts_first=no)
+    Top scores: [('Lake Shore Drive (LSD) | WNDR Museum Boston', 20, 'tier1'), ('WNDR Museum: Interactive Art Museum & Immersive Ar', 18, 'tier1'), ('The WNDR Story - WNDR Museum', 18, 'tier1')]
+  [LOCAL-402] Stop 2: injected 5 snippets as reference material
+  [LOCAL-402] Stop 5: injected 5 snippets as reference material
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (20228)  [D533] Stop 3 corpus-gate restriction LIFTED — 19 source item(s) arrived after the gate ran
+  [LOCAL-402] Stop 4: injected 5 snippets as reference material
+
+  [D533] Stop 4 corpus-gate restriction LIFTED — 20 source item(s) arrived after the gate ran
+
+  [D533] Stop 2 corpus-gate restriction LIFTED — 26 source item(s) arrived after the gate ran
+  [D533] Stop 5 corpus-gate restriction LIFTED — 26 source item(s) arrived after the gate ran
+
+  [LOCAL-411] Stop 3 prompt size: before_snippets=9854 after=21389 (+11535 from snippets+instructions, facts_first=no)  [LOCAL-411] Stop 2 prompt size: before_snippets=9626 after=20920 (+11294 from snippets+instructions, facts_first=no)  [LOCAL-411] Stop 5 prompt size: before_snippets=9944 after=21526 (+11582 from snippets+instructions, facts_first=no)
+
+  [LOCAL-411] Stop 4 prompt size: before_snippets=9987 after=21688 (+11701 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (21526)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (21688)  [LOCAL-411] WARNING: prompt exceeds 20K chars (21389)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (20920)
+  [D498] Stop 1 matrix: 3/9 slots filled — empty: ['artist', 'publisher', 'printed_by', 'medium', 'credit_line', 'focus_fact']
+  [D498] Stop 5 matrix: 3/9 slots filled — empty: ['artist', 'publisher', 'printed_by', 'medium', 'credit_line', 'focus_fact']  [D498] Stop 3 matrix: 3/9 slots filled — empty: ['artist', 'publisher', 'printed_by', 'medium', 'credit_line', 'focus_fact']  [D498] Stop 4 matrix: 3/9 slots filled — empty: ['artist', 'publisher', 'printed_by', 'medium', 'credit_line', 'focus_fact']
+
+
+
+
+  [D498] Stop 2 matrix: 3/9 slots filled — empty: ['artist', 'publisher', 'printed_by', 'medium', 'credit_line', 'focus_fact']
+  [D500] agents 0/3: hero=—, sponsor=—, builder=—  [D500] agents 0/3: hero=—, sponsor=—, builder=—
+  [D500] agents 0/3: hero=—, sponsor=—, builder=—
+  [D500] agents 0/3: hero=—, sponsor=—, builder=—  [D500] agents 0/3: hero=—, sponsor=—, builder=—
+
+
+  [LOCAL-490] Stop 2 story pass: ok=False (model returned NO_STORY — material did not support one), $0.0038
+  [LOCAL-490] Stop 4 story pass: ok=True (4 sentences), $0.0050
+    story: "WNDR Museum, founded in 2018, set out to transform the way people engage with art by creating immersive, hands-on experiences. In 2022, the museum exp"
+  [LOCAL-490] Stop 5 story pass: ok=True (3 sentences), $0.0048
+    story: "Joshua Ellingson, a San Francisco-based artist, created MPO-1 (Time Machine) using the illusion technique of Pepper's Ghost. This technique, developed"
+  [LOCAL-490] Stop 1 story pass: ok=True (3 sentences), $0.0044
+    story: "The WNDR Museum opened its Boston location in 2022, offering an immersive and interactive art experience. However, just a year later, organizers annou"
+  [LOCAL-408] Prompt dump written to: /app/prompt_dump_stop1.txt
+  [LOCAL-490] Stop 3 story pass: ok=True (3 sentences), $0.0047
+    story: "WNDR Museum opened its Boston location in 2024, aiming to bring creativity and curiosity to life with more than 20 interactive exhibits. However, just"
+[LOCAL-197] llm_cost() called with total_tokens (deprecated) by /app/generate_tour_text.py:16582. Caller should supply input_tokens and output_tokens separately.
+Stop 1 API call cost: $0.0244 (5139 tokens, model=gpt-4o)
+  [LOCAL-569] Stop 1 attempt 1/5 story_count=0 words=98
+  [LOCAL-393] Stop 1: WORD FLOOR — 98 words < 120, retrying (attempt 2/5)
+Stop 3 API call cost: $0.0270 (5692 tokens, model=gpt-4o)
+  [LOCAL-569] Stop 3 attempt 1/5 story_count=1 words=307
+  [LOCAL-432] Stop 3: STORY RETRY — story_count=1 < 3, need 2 more, retrying (attempt 2/5)
+Stop 4 API call cost: $0.0275 (5784 tokens, model=gpt-4o)
+  [LOCAL-569] Stop 4 attempt 1/5 story_count=1 words=294
+  [LOCAL-432] Stop 4: STORY RETRY — story_count=1 < 3, need 2 more, retrying (attempt 2/5)
+Stop 1 API call cost: $0.0249 (5248 tokens, model=gpt-4o)
+  [LOCAL-569] Stop 1 attempt 2/5 story_count=0 words=124
+  [LOCAL-432] Stop 1: STORY RETRY — story_count=0 < 3, need 3 more, retrying (attempt 3/5)
+Stop 2 API call cost: $0.0264 (5557 tokens, model=gpt-4o)
+  [LOCAL-569] Stop 2 attempt 1/5 story_count=1 words=183
+  [LOCAL-432] Stop 2: STORY RETRY — story_count=1 < 3, need 2 more, retrying (attempt 2/5)
+Stop 5 API call cost: $0.0271 (5696 tokens, model=gpt-4o)
+  [LOCAL-569] Stop 5 attempt 1/5 story_count=0 words=271
+  [LOCAL-432] Stop 5: STORY RETRY — story_count=0 < 3, need 3 more, retrying (attempt 2/5)
+Stop 1 API call cost: $0.0266 (5592 tokens, model=gpt-4o)
+  [LOCAL-569] Stop 1 attempt 3/5 story_count=0 words=114
+  [LOCAL-393] Stop 1: WORD FLOOR — 114 words < 120, retrying (attempt 4/5)
+Stop 2 API call cost: $0.0278 (5861 tokens, model=gpt-4o)
+  [LOCAL-569] Stop 2 attempt 2/5 story_count=0 words=140
+  [LOCAL-417] Stop 2: POSITIVE GATE FAILED — ['no concrete fact (date, measurement, material, or provenance)']
+  [LOCAL-417]   verbatim: "The WNDRWall at WNDR Museum Boston is a dynamic installation that transforms with each visitor's interaction. Bradley A. Keywell, a visionary behind the founding of the museum, imagined this space as an intersection of art and technology. His involvement in multiple industries, notably through his c"
+  [LOCAL-417] Stop 2: retrying (attempt 2, temp=1.00)...
+Stop 3 API call cost: $0.0286 (6025 tokens, model=gpt-4o)
+  [LOCAL-569] Stop 3 attempt 2/5 story_count=1 words=275
+  [LOCAL-432] Stop 3: STORY RETRY — story_count=1 < 3, need 2 more, retrying (attempt 3/5)
+Stop 4 API call cost: $0.0292 (6139 tokens, model=gpt-4o)
+  [LOCAL-569] Stop 4 attempt 2/5 story_count=2 words=257
+  [LOCAL-432] Stop 4: STORY RETRY — story_count=2 < 3, need 1 more, retrying (attempt 3/5)
+Stop 1 API call cost: $0.0269 (5670 tokens, model=gpt-4o)
+  [LOCAL-569] Stop 1 attempt 4/5 story_count=0 words=113
+  [LOCAL-393] Stop 1: WORD FLOOR — 113 words < 120, retrying (attempt 5/5)
+Stop 5 API call cost: $0.0288 (6065 tokens, model=gpt-4o)
+  [LOCAL-569] Stop 5 attempt 2/5 story_count=3 words=244
+Stop 5 description word count: 244 words
+  [LOCAL-407] Stop 5: snippets injected but no candidate specifics extracted
+  [LOCAL-414] Stop 5: SCRUBBED banned phrases from output: ['invites contemplation']
+
+Generating description for Stop 6: Buy Gift Cards - WNDR Boston by , ...
+  [LOCAL-381] stop='Buy Gift Cards - WNDR Boston' matched_work=False medium='' work_identity_chars=0
+    [LOCAL-469] CONSEQUENCE RESCUE: 'The goal of the WNDR Museum is to not only have guests get h' let through (score 9) — no surviving snippet carried a stakes marker
+  [LOCAL-411] Stop 6 snippet ranking: input=24 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=5 output=5 usable=5 (t1t2=0, t3=0, market=0)
+    Top scores: [('Buy Gift Cards - WNDR Boston', 19, ''), ('WNDR Museum to Close Boston and Chicago Locations ', 13, 'unverified'), ('WNDR Museum closing after 8 years in Chicago - CBS', 12, 'unverified')]
+  [LOCAL-402] Stop 6: injected 5 snippets as reference material
+  [D533] Stop 6 corpus-gate restriction LIFTED — 24 source item(s) arrived after the gate ran
+  [LOCAL-411] Stop 6 prompt size: before_snippets=9715 after=21204 (+11489 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (21204)
+  [D498] Stop 6 matrix: 3/9 slots filled — empty: ['artist', 'publisher', 'printed_by', 'medium', 'credit_line', 'focus_fact']
+  [D500] agents 0/3: hero=—, sponsor=—, builder=—
+  [LOCAL-490] Stop 6 story pass: ok=True (3 sentences), $0.0046
+    story: "The WNDR Museum opened its doors in Chicago in 2018, offering an interactive experience with art pieces from around the world. However, after eight ye"
+Stop 2 API call cost: $0.0279 (5873 tokens, model=gpt-4o)
+  [LOCAL-569] Stop 2 attempt 3/5 story_count=2 words=146
+  [LOCAL-432] Stop 2: STORY RETRY — story_count=2 < 3, need 1 more, retrying (attempt 4/5)
+Stop 1 API call cost: $0.0270 (5685 tokens, model=gpt-4o)
+  [LOCAL-569] Stop 1 attempt 5/5 story_count=0 words=83
+  [LOCAL-394] stop='Flex | WNDR Museum Boston' below_floor words=83 — kept (never dropped)
+Stop 1 description word count: 83 words
+  [LOCAL-407] Stop 1: snippets injected but no candidate specifics extracted
+
+Generating description for Stop 7: WNDRWall | WNDR Museum Boston by , ...
+  [LOCAL-381] stop='WNDRWall | WNDR Museum Boston' matched_work=False medium='' work_identity_chars=0
+    [LOCAL-469] CONSEQUENCE RESCUE: 'Founded in 2018, WNDR set out to transform the way we engage' let through (score 12) — no surviving snippet carried a stakes marker
+  [LOCAL-411] Stop 7 snippet ranking: input=15 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=5 output=5 usable=5 (t1t2=3, t3=0, market=0)
+    Top scores: [('WNDRWall | WNDR Museum Boston', 20, 'tier1'), ('WNDRWall | WNDR Museum Boston', 19, ''), ('The WNDR Story - WNDR Museum', 18, 'tier1')]
+  [LOCAL-402] Stop 7: injected 5 snippets as reference material
+  [D533] Stop 7 corpus-gate restriction LIFTED — 15 source item(s) arrived after the gate ran
+  [LOCAL-411] Stop 7 prompt size: before_snippets=9973 after=21208 (+11235 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (21208)
+  [D498] Stop 7 matrix: 3/9 slots filled — empty: ['artist', 'publisher', 'printed_by', 'medium', 'credit_line', 'focus_fact']
+  [D500] agents 0/3: hero=—, sponsor=—, builder=—
+Stop 3 API call cost: $0.0302 (6348 tokens, model=gpt-4o)
+  [LOCAL-569] Stop 3 attempt 3/5 story_count=0 words=222
+  [LOCAL-432] Stop 3: STORY RETRY — story_count=0 < 3, need 3 more, retrying (attempt 4/5)
+Stop 4 API call cost: $0.0307 (6463 tokens, model=gpt-4o)
+  [LOCAL-569] Stop 4 attempt 3/5 story_count=1 words=208
+  [LOCAL-432] Stop 4: STORY RETRY — story_count=1 < 3, need 2 more, retrying (attempt 4/5)
+  [LOCAL-490] Stop 7 story pass: ok=True (3 sentences), $0.0045
+    story: "In 2018, WNDR set out with a mission to transform the way people engage with art, fostering creativity and curiosity. This vision led to the establish"
+Stop 2 API call cost: $0.0299 (6291 tokens, model=gpt-4o)
+  [LOCAL-569] Stop 2 attempt 4/5 story_count=0 words=196
+  [LOCAL-432] Stop 2: STORY RETRY — story_count=0 < 3, need 3 more, retrying (attempt 5/5)
+Stop 6 API call cost: $0.0266 (5604 tokens, model=gpt-4o)Stop 4 API call cost: $0.0328 (6896 tokens, model=gpt-4o)
+
+  [LOCAL-569] Stop 4 attempt 4/5 story_count=2 words=250  [LOCAL-569] Stop 6 attempt 1/5 story_count=0 words=280
+
+  [LOCAL-432] Stop 6: STORY RETRY — story_count=0 < 3, need 3 more, retrying (attempt 2/5)  [LOCAL-432] Stop 4: STORY RETRY — story_count=2 < 3, need 1 more, retrying (attempt 5/5)
+
+Stop 3 API call cost: $0.0320 (6746 tokens, model=gpt-4o)
+  [LOCAL-569] Stop 3 attempt 4/5 story_count=2 words=224
+  [LOCAL-432] Stop 3: STORY RETRY — story_count=2 < 3, need 1 more, retrying (attempt 5/5)
+Stop 2 API call cost: $0.0313 (6593 tokens, model=gpt-4o)
+  [LOCAL-569] Stop 2 attempt 5/5 story_count=0 words=135
+  [LOCAL-417] Stop 2: POSITIVE GATE FAILED — ['no concrete fact (date, measurement, material, or provenance)']
+  [LOCAL-417]   verbatim: 'The WNDRWall epitomizes the vision of Bradley A. Keywell, the entrepreneurial force behind the WNDR Museum and known for co-founding Groupon. Keywell sought to create a museum space where technology and creativity merge seamlessly. This inspiration led him to establish the WNDRWall, transforming it '
+  [LOCAL-417] Stop 2: GATE FAILED after 5 attempts — using fallback (never shipping operator-directed text)
+  [LOCAL-422] Stop 2: resolved final description (196 words)
+Stop 2 description word count: 196 words
+  [LOCAL-407] Stop 2: snippets injected but no candidate specifics extracted
+Stop 6 API call cost: $0.0283 (5955 tokens, model=gpt-4o)
+  [LOCAL-569] Stop 6 attempt 2/5 story_count=1 words=234
+  [LOCAL-432] Stop 6: STORY RETRY — story_count=1 < 3, need 2 more, retrying (attempt 3/5)
+Stop 7 API call cost: $0.0271 (5712 tokens, model=gpt-4o)
+  [LOCAL-569] Stop 7 attempt 1/5 story_count=1 words=322
+  [LOCAL-432] Stop 7: STORY RETRY — story_count=1 < 3, need 2 more, retrying (attempt 2/5)
+Stop 4 API call cost: $0.0346 (7290 tokens, model=gpt-4o)
+  [LOCAL-569] Stop 4 attempt 5/5 story_count=1 words=254
+Stop 4 description word count: 254 words
+  [LOCAL-407] Stop 4: snippets injected but no candidate specifics extracted
+Stop 3 API call cost: $0.0338 (7109 tokens, model=gpt-4o)
+  [LOCAL-569] Stop 3 attempt 5/5 story_count=1 words=233
+Stop 3 description word count: 233 words
+  [LOCAL-407] Stop 3: snippets injected but no candidate specifics extracted
+Stop 6 API call cost: $0.0302 (6357 tokens, model=gpt-4o)
+  [LOCAL-569] Stop 6 attempt 3/5 story_count=0 words=249
+  [LOCAL-432] Stop 6: STORY RETRY — story_count=0 < 3, need 3 more, retrying (attempt 4/5)
+Stop 7 API call cost: $0.0287 (6042 tokens, model=gpt-4o)
+  [LOCAL-569] Stop 7 attempt 2/5 story_count=1 words=273
+  [LOCAL-432] Stop 7: STORY RETRY — story_count=1 < 3, need 2 more, retrying (attempt 3/5)
+Stop 6 API call cost: $0.0319 (6723 tokens, model=gpt-4o)
+  [LOCAL-569] Stop 6 attempt 4/5 story_count=1 words=248
+  [LOCAL-432] Stop 6: STORY RETRY — story_count=1 < 3, need 2 more, retrying (attempt 5/5)
+Stop 7 API call cost: $0.0307 (6471 tokens, model=gpt-4o)
+  [LOCAL-569] Stop 7 attempt 3/5 story_count=0 words=293
+  [LOCAL-432] Stop 7: STORY RETRY — story_count=0 < 3, need 3 more, retrying (attempt 4/5)
+Stop 6 API call cost: $0.0338 (7114 tokens, model=gpt-4o)
+  [LOCAL-569] Stop 6 attempt 5/5 story_count=1 words=247
+Stop 6 description word count: 247 words
+  [LOCAL-407] Stop 6: snippets injected but no candidate specifics extracted
+Stop 7 API call cost: $0.0321 (6750 tokens, model=gpt-4o)
+  [LOCAL-569] Stop 7 attempt 4/5 story_count=0 words=216
+  [LOCAL-432] Stop 7: STORY RETRY — story_count=0 < 3, need 3 more, retrying (attempt 5/5)
+Stop 7 API call cost: $0.0339 (7132 tokens, model=gpt-4o)
+  [LOCAL-569] Stop 7 attempt 5/5 story_count=1 words=213
+Stop 7 description word count: 213 words
+  [LOCAL-407] Stop 7: snippets injected but no candidate specifics extracted
+  [LOCAL-414] Stop 7: SCRUBBED banned phrases from output: ['a testament to']
+
+  [LOCAL-439] STORY GATE: checking story-units per stop (D394)...
+    ✗ FAIL stop='Flex | WNDR Museum Boston': story_units=0, entities_ok=True, thesis_ok=True
+      → story_units=0: no candidate story-unit of ≥3 sentences passes classification (need at least 1 with named person, real actions, arc)
+    ✗ FAIL stop='WNDR Museum Boston': story_units=0, entities_ok=True, thesis_ok=True
+      → story_units=0: no candidate story-unit of ≥3 sentences passes classification (need at least 1 with named person, real actions, arc)
+    ✓ PASS stop='Speak Up! | WNDR Museum Boston': story_units=1, entities_ok=True, thesis_ok=True
+      interest: emotional=3, new_info=2, deduction=1, total=4
+    ✗ FAIL stop='Lake Shore Drive (LSD) | WNDR Museum Boston': story_units=0, entities_ok=True, thesis_ok=True
+      → story_units=0: no candidate story-unit of ≥3 sentences passes classification (need at least 1 with named person, real actions, arc)
+    ✗ FAIL stop='MPO-1 (Time Machine) | WNDR Museum Boston': story_units=0, entities_ok=True, thesis_ok=True
+      → story_units=0: no candidate story-unit of ≥3 sentences passes classification (need at least 1 with named person, real actions, arc)
+    ✗ FAIL stop='Buy Gift Cards - WNDR Boston': story_units=0, entities_ok=True, thesis_ok=True
+      → story_units=0: no candidate story-unit of ≥3 sentences passes classification (need at least 1 with named person, real actions, arc)
+    ✗ FAIL stop='WNDRWall | WNDR Museum Boston': story_units=0, entities_ok=True, thesis_ok=True
+      → story_units=0: no candidate story-unit of ≥3 sentences passes classification (need at least 1 with named person, real actions, arc)
+  [LOCAL-439] Classification cost: $0.005065 (input=20337, output=3357)
+  [LOCAL-439] STORY GATE: SOME STOPS FAILED (informational — does not block delivery)
+
+  [LOCAL-423] STORY VERIFICATION: checking claims against sources...
+    [LOCAL-427] Venue page text injected as verification source (venue source, 1524 chars from )
+    ✓ PASS stop='Flex | WNDR Museum Boston': claims=2, sourced=2, unsourced=0, contradicted=0
+      evidence (2 sourced claims):
+        claim='in 2022' ← https://blockclubchicago.org/2026/08/19/wndr-museum-closing-
+        claim='The Boston space became a dynamic platform for artist' ← 
+    ✗ FAIL stop='WNDR Museum Boston': claims=0, sourced=0, unsourced=0, contradicted=0
+      → VACUOUS: 0 claims extracted — nothing was verified
+    ✓ PASS stop='Speak Up! | WNDR Museum Boston': claims=1, sourced=1, unsourced=0, contradicted=0
+      evidence (1 sourced claims):
+        claim='2024' ← https://www.cbsnews.com/boston/news/wndr-museum-boston-closi
+    ✓ PASS stop='Lake Shore Drive (LSD) | WNDR Museum Boston': claims=2, sourced=2, unsourced=0, contradicted=0
+      evidence (2 sourced claims):
+        claim='in 2018' ← 
+        claim='2022' ← https://www.wndrmuseum.com/
+    ✓ PASS stop='MPO-1 (Time Machine) | WNDR Museum Boston': claims=2, sourced=2, unsourced=0, contradicted=0
+      evidence (2 sourced claims):
+        claim='Joshua Ellingson, an artist hailing from San Francisco' ← 
+        claim='in 1862' ← https://www.wndrmuseum.com/installations/boston/mpo-1-time-m
+    ✓ PASS stop='Buy Gift Cards - WNDR Boston': claims=1, sourced=1, unsourced=0, contradicted=0
+      evidence (1 sourced claims):
+        claim='in 2018' ← 
+    ✓ PASS stop='WNDRWall | WNDR Museum Boston': claims=1, sourced=1, unsourced=0, contradicted=0
+      evidence (1 sourced claims):
+        claim='2018' ← 
+  [LOCAL-423] STORY VERIFICATION: SOME STOPS HAVE UNSOURCED CLAIMS
+  [LOCAL-423] Unsourced claims will be stripped from delivered text
+  [LOCAL-394] stop='Flex | WNDR Museum Boston' below_floor words=83 — kept (never dropped)
+
+  [LOCAL-192] PHASE 5.1: Style validation + per-paragraph retry...
+[LOCAL-197] llm_cost() called with total_tokens (deprecated) by /app/generate_tour_text.py:17980. Caller should supply input_tokens and output_tokens separately.
+  [LOCAL-192] Stop 2 para 3: retry FAILED — keeping original (R10_UNFULFILLED_PROMISE)
+  [LOCAL-192] Stop 3 para 1: retry IMPROVED (2→1 errors)
+  [LOCAL-192] Stop 3 para 3: retry IMPROVED (3→1 errors)
+  [LOCAL-192] Stop 4 para 4: retry FIXED (R2_QUESTION)
+  [LOCAL-192] Stop 5 para 1: retry FIXED (R1_IMPERATIVE)
+  [LOCAL-192] Stop 5 para 2: retry FIXED (R1_IMPERATIVE)
+  [LOCAL-192] Stop 6 para 1: retry FIXED (R1_IMPERATIVE)
+  [LOCAL-192] Stop 6 para 2: retry FAILED — keeping original (R1_IMPERATIVE)
+  [LOCAL-192] Stop 6 para 3: retry FIXED (R10_UNFULFILLED_PROMISE, R2_QUESTION)
+  [LOCAL-192] Stop 7 para 1: retry FIXED (R10_UNFULFILLED_PROMISE)
+  [LOCAL-192] Style retry summary: 10 paragraphs retried, 8 fixed/improved, 2 kept original
+  [LOCAL-192] Retry cost: $0.0220 (4627 tokens)
+
+  [LOCAL-255] PHASE 5.13: R1 imperative rewrite...
+  [LOCAL-255] R1 summary: 0 rewritten, 0 deleted, 0 stops affected, LLM tokens: 0 ($0.0000)
+
+  [LOCAL-251] PHASE 5.14: R7 hallucinated-sensory deletion...
+  [LOCAL-251] R7 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-261] PHASE 5.141: R2 question deletion...
+  [LOCAL-261] R2 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-261] PHASE 5.142: R3 suggestive-exploration deletion...
+  [LOCAL-261] R3 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-261] PHASE 5.143: R4 prescribed-feeling deletion...
+  [LOCAL-261] R4 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-261] PHASE 5.144: R8 prompt-leakage deletion...
+  [LOCAL-261] R8 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-216] PHASE 5.15: R9 generic-sentence deletion...
+  [LOCAL-216] R9 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-235] PHASE 5.155: R10 unfulfilled-promise deletion...
+  [LOCAL-235] Stop 2 'WNDR Museum Boston': 1 sentence(s) deleted, 0 paragraph(s) emptied
+  [LOCAL-235] Stop 3 'Speak Up! | WNDR Museum Boston': 1 sentence(s) deleted, 0 paragraph(s) emptied
+  [LOCAL-235] R10 summary: 2 sentences deleted, 0 paragraphs emptied, 2 stops affected
+
+  [LOCAL-472] PHASE 5.152: Stop-specificity gate...
+  [LOCAL-472] Stop-specificity gate summary:
+    Stops checked: 7
+    Paragraphs checked: 20
+    Transferable (high, removed): 4
+    Transferable (low conf, kept): 0
+    Last-paragraph protected: 0
+    Ungrounded named entities: 6
+    Stops affected: 4
+    [LOCAL-472] REMOVED transferable paragraph stop='WNDR Museum Boston' conf=high reason='Generic claims applicable to any art museum.': "Through this endeavor, the museum does not only present art but fosters a living canvas, reflecting individuality within"
+    [LOCAL-472] REMOVED transferable paragraph stop='Speak Up! | WNDR Museum Boston' conf=high reason='Generic dialogue and engagement claims apply to any art museum.': "In "Speak Up!," visitors engage in a transformative dialogue, contributing to an ever-changing tapestry that listens and"
+    [LOCAL-472] REMOVED transferable paragraph stop='MPO-1 (Time Machine) | WNDR Museum Boston' conf=high reason='Generic claims about curiosity and creativity apply to any art museum.': "Ellingson's creation is emblematic of the museum's mission to blend curiosity with creativity, offering visitors an expl"
+    [LOCAL-472] REMOVED transferable paragraph stop='Buy Gift Cards - WNDR Boston' conf=high reason='Generic claims about art apply universally.': "The importance of such a piece lies not just in its function but in what it represents—a connector, a link from one pers"
+    [LOCAL-472] UNGROUNDED entity stop='Speak Up! | WNDR Museum Boston' entity='Uptake Technologies' reason='No concrete link to the stop is provided.' in: "In 2024, Bradley A. Keywell opened the WNDR Museum in Boston as part of his venture to explore the i"
+    [LOCAL-472] UNGROUNDED entity stop='Speak Up! | WNDR Museum Boston' entity='Speak Up!,' reason='No concrete link to the stop is provided.' in: "In "Speak Up!," visitors engage in a transformative dialogue, contributing to an ever-changing tapes"
+    [LOCAL-472] UNGROUNDED entity stop='MPO-1 (Time Machine) | WNDR Museum Boston' entity='Joshua Ellingson' reason='It does not specify how Ellingson is directly linked to the stop.' in: "Joshua Ellingson, an artist from San Francisco, conceived MPO-1 (Time Machine) using the historic il"
+    [LOCAL-472] UNGROUNDED entity stop='MPO-1 (Time Machine) | WNDR Museum Boston' entity='San Francisco' reason='No concrete link between San Francisco and the stop is provided.' in: "Joshua Ellingson, an artist from San Francisco, conceived MPO-1 (Time Machine) using the historic il"
+    [LOCAL-472] UNGROUNDED entity stop='MPO-1 (Time Machine) | WNDR Museum Boston' entity='John Henry Pepper' reason='It does not specify how Pepper is directly linked to the MPO-1 (Time Machine) stop.' in: "Joshua Ellingson, an artist from San Francisco, conceived MPO-1 (Time Machine) using the historic il"
+    [LOCAL-472] UNGROUNDED entity stop='Buy Gift Cards - WNDR Boston' entity='Lafayette City Center' reason='It does not specify how Keywell relates to Lafayette City Center.' in: "The WNDR Museum opened in Chicago in 2018, founded by entrepreneur Bradley A. Keywell. The museum ai"
+
+  [LOCAL-263] PHASE 5.156: Unsupported-claim gate...
+  [LOCAL-263] Unsupported-claim gate summary:
+    Sentences removed: 0
+    Sentences kept (substantiated): 0
+    By type: PROMISE=0, SENSORY=0, FEELING=0, QUALITY=0
+    Escalation calls: 0
+    Stops affected: 0
+    Deletion rate: 0.0% (0/59)
+
+  [LOCAL-269] PHASE 5.157: Unglossed-reference gate...
+  [LOCAL-479] stop='WNDR Museum Boston' cut orphaned dependant of a removed introduction — subject 'commitment/innovation': "The commitment to innovation ensured that technology and art could intertwine ef"
+  [LOCAL-269] Unglossed-reference gate summary (LOCAL-287: compose, not splice):
+    References detected: 9
+    Glossed (composed): 1
+    Suppressed (already explained): 2
+    Degraded (name dropped): 5
+    Guard failures: 0
+    Known (skipped): 1
+    Triage: 1796 tokens, $0.0004, 5.2s
+    Gloss: 1098 tokens, $0.0002, 3.5s
+    Compose: 1458 tokens, $0.0002, 1.9s
+    Total added cost: $0.0008
+    Stops affected: 4
+    Glosses applied:
+      • Bradley → DEGRADED (name dropped)
+      • Keywell → DEGRADED (name dropped)
+      • Keywell → DEGRADED (name dropped)
+      • Uptake Technologies → "a data analytics company focused on industrial IoT" [source: model]
+      • Keywell → SUPPRESSED (already explained)
+      • Pepper → DEGRADED (name dropped)
+      • Keywell → SUPPRESSED (already explained)
+      • Lafayette City Center → DEGRADED (name dropped)
+
+  [LOCAL-385] PHASE 5.158: Prose entity grounding gate (scans all prose fields)...
+  [LOCAL-385] ungrounded person 'Lake Michigan' — will remove all mentions
+  [LOCAL-385] ungrounded person 'Uptake Technologies' — will remove all mentions
+  [LOCAL-385] field=description stop='Speak Up! | WNDR Museum Boston' ungrounded person 'Uptake Technologies' — dropping sentence: "He had established companies like Groupon and Uptake Technologies, a data analyt..."
+  [LOCAL-385] field=description stop='Lake Shore Drive (LSD) | WNDR ' ungrounded person 'Uptake Technologies' — dropping sentence: "Keywell, an entrepreneur known for founding companies like Groupon, also investe..."
+  [LOCAL-385] field=orientation stop='Lake Shore Drive (LSD) | WNDR ' ungrounded person 'Lake Michigan' — dropping sentence: "Position yourself at the southeast corner of the room to fully experience "Lake ..."
+  [LOCAL-385] field=orientation stop='Lake Shore Drive (LSD) | WNDR ' emptied after person removal — omitting orientation
+  [LOCAL-385] Prose entity grounding gate summary:
+    Persons detected: 7
+    Persons grounded: 5
+    Persons ungrounded: 2
+    Sentences dropped: 3
+    Stops affected: 6
+    Ungrounded: ['Lake Michigan', 'Uptake Technologies']
+
+  [LOCAL-458] PHASE 5.158b: Role-claim gate...
+  [LOCAL-458] entity gate: corpus=1524 chars, 2 role claims, 2 entities, 2 dropped
+    [LOCAL-458] field=description stop='Lake Shore Drive (LSD) | WNDR ' role=credit_line agent='Keywell' reason='record empty, absent from corpus'
+      dropped: "WNDR Museum, founded by Keywell in 2018, set out to revolutionize art engagement through immersive, "
+      dropped: "This concept is evident as you consider the various possibilities showcased through Keywell's vision"
+    [LOCAL-458] field=description stop='Buy Gift Cards - WNDR Boston' role=credit_line agent='entrepreneur Bradley A' reason='record empty, absent from corpus'
+      dropped: "The WNDR Museum opened in Chicago in 2018, founded by entrepreneur Bradley A."
+
+  [LOCAL-479] PHASE 5.158c: Organisation grounding gate (corpus 72370 chars)...
+  [LOCAL-479] orgs detected=10 grounded=9 ungrounded=1 sentences_dropped=2
+    [LOCAL-479] field=description stop='MPO-1 (Time Machine) | WNDR Mu' org='WNDR Museum's' — ungrounded
+      dropped: "Keywell, a key figure in the founding of the WNDR Museum's immersive experiences, has consistently s"
+      dropped: "In the context of the WNDR Museum's broader collection, this piece resonates with the technological "
+
+  [LOCAL-385] Form-claim gate SKIPPED (no exhibition scope — unscoped museum tours are not gated)
+
+  [LOCAL-389] PHASE 5.160: Numeric-claim gate (scans all prose fields)...
+  [LOCAL-389] Numeric-claim gate summary:
+    Claims detected: 0
+    Grounded (identity block): 0
+    Grounded (page text): 0
+    Ungrounded (dropped): 0
+    Sentences dropped: 0
+    Stops affected: 0
+
+  [LOCAL-402] PHASE 5.161: Temporal coherence gate (impossible relations)...
+  [LOCAL-402] Temporal coherence gate summary:
+    Relations checked: 64
+    Relations rejected: 0
+    Sentences removed: 0
+    Stops affected: 0
+
+  [LOCAL-229] PHASE 5.16: CONTRADICTED claim block (D100 enforcement)...
+  [LOCAL-229] CONTRADICTED block summary: 0 group(s) blocked, 0 stop(s) affected
+
+PHASE 5.5a: Post-description knowledge validation (all tour types)...
+OK Post-description validation passed: Knowledge validation passed
+
+PHASE 5.5b: Validating descriptions are inside 'WNDR Museum'...
+   Authority: 6 D1v2-verified (kept unconditionally), 0 unverified (will check)
+   Pre-filter: 0 clean, 0 suspect (will call OpenAI for suspect only)
+OK PHASE 5.5b: 7 stop(s) passed venue description validation
+OK PHASE 5.7: Dangling-reference scrub complete (7 stops)
+
+  [LOCAL-318] PHASE 5.7b: Dangling-demonstrative scrub...
+  [LOCAL-318] Dangling-demonstrative scrub summary:
+    Detected: 9
+    Repaired (name substituted): 0
+    Deleted (unrepairable): 9
+    Stops affected: 7
+    [1] DELETED: 'This abrupt' in: This abrupt end marked the museum's brief but impactful presence.
+    [2] DELETED: 'This ambition' in: This ambition materialized in a wall embedded with sophisticated sensors, captur
+    [3] DELETED: 'This interactive' in: This interactive installation features sleek, responsive screens that capture an
+    [4] DELETED: 'This decision' in: This decision marked the end of its journey in Boston, leaving behind a legacy o
+    [4] DELETED: 'This technology' in: This technology allows the installation to shift mood and form as you move throu
+    [4] DELETED: 'This investment' in: This investment allowed the project to push boundaries in digital art presentati
+    [5] DELETED: 'This visual' in: This visual spectacle draws upon Pepper's original scientific explorations, high
+    [6] DELETED: 'These sleek' in: These sleek interfaces, bathed in a soft luminescent glow, reflect WNDR's commit
+    [7] DELETED: 'This installation' in: This installation aligns with WNDR's overarching goal to foster connection and e
+OK PHASE 5.7b: Dangling-demonstrative scrub complete
+
+PHASE 5.8: Type/prose contradiction check (LOCAL-27)...
+  [LOCAL-27] No type/prose contradictions detected
+
+PHASE 5.9: Audio-native cleanup (LOCAL-41)...
+  [LOCAL-41] Stripped 0 trailing question(s), removed 0 'broader context' instance(s)
+
+  [D498] step 7c: most valuable stop is 3 'Speak Up! | WNDR Museum Boston' (index 41) — allowance 5 -> 7 sentences on regeneration, story currently 3 sentence(s)
+
+  [LOCAL-487] step 7a: 6 stop(s) have NO VALID STORY by Michael's bar (3+ consecutive sentences, one person, an action and something at stake)
+    stop 1 'Flex | WNDR Museum Boston': longest qualifying run is 1 sentence(s); the bar is 3 consecutive sentences about one subject, carrying an act
+    stop 2 'WNDR Museum Boston': longest qualifying run is 2 sentence(s); the bar is 3 consecutive sentences about one subject, carrying an act
+    stop 4 'Lake Shore Drive (LSD) | WNDR Museum B': longest qualifying run is 2 sentence(s); the bar is 3 consecutive sentences about one subject, carrying an act
+    stop 5 'MPO-1 (Time Machine) | WNDR Museum Bos': longest qualifying run is 2 sentence(s); the bar is 3 consecutive sentences about one subject, carrying an act
+    stop 6 'Buy Gift Cards - WNDR Boston': the longest run (3 sentences, Boston) has agency=0 stakes=1 — someone is described, but nothing is risked, ref
+    stop 7 'WNDRWall | WNDR Museum Boston': longest qualifying run is 1 sentence(s); the bar is 3 consecutive sentences about one subject, carrying an act
+    [LOCAL-487] cap=1: retrying only the weakest — stop 5 'MPO-1 (Time Machine) | WNDR Museum' (index 30)
+  [D534] Stop 4 repeats 2 thing(s) said earlier — will regenerate with them banned
+      already told: The WNDR Museum opened its Boston location in 2022, offering an immersive and interactive art experi
+      already told: However, only two years later, due to unspecified challenges, Keywell decided to close the Boston si
+  [D534] Stop 6 repeats 2 thing(s) said earlier — will regenerate with them banned
+      already told: However, only two years later, due to unspecified challenges, Keywell decided to close the Boston si
+      already told: Despite the initial excitement, WNDR Museum announced that it would close its Boston location by Aug
+
+  [LOCAL-474] PHASE 5.17: retry 'Flex | WNDR Museum Boston' — 83w → 73w after gates, 1 sentence(s) removed
+    removed: "This abrupt end marked the museum's brief but impactful presence."
+    [LOCAL-491] step 7b: rotating to the venue fact — institutional context; weakest, but it scopes the search
+      focus: "Flex | WNDR Museum Boston is held at WNDR Museum."
+
+  [LOCAL-474] PHASE 5.17: retry 'WNDR Museum Boston' — 196w → 80w after gates, 6 sentence(s) removed
+    removed: "The WNDRWall is not merely an art installation but a dynamic fusion of creativity and technology fou"
+    removed: "This ambition materialized in a wall embedded with sophisticated sensors, capturing the movements of"
+    removed: "Keywell’s commitment to innovation ensured that technology and art could intertwine effortlessly, of"
+    removed: "The collaborative nature of WNDR's vision extends to its broader collection, inviting artists, techn"
+    removed: "Through this endeavor, the museum does not only present art but fosters a living canvas, reflecting "
+    removed: "This moment asks us not just to witness but to participate—an invitation to contemplate how our coll"
+    [LOCAL-491] step 7b: rotating to the venue fact — institutional context; weakest, but it scopes the search
+      focus: "WNDR Museum Boston is held at WNDR Museum."
+
+  [LOCAL-474] PHASE 5.17: retry 'Speak Up! | WNDR Museum Boston' — 233w → 119w after gates, 7 sentence(s) removed
+    removed: "Keywell opened the WNDR Museum in Boston, an extension of his ambitious venture to explore the inter"
+    removed: "Known for establishing companies like Groupon and Uptake Technologies, Keywell wanted to create a sp"
+    removed: "Yet, only two years later, due to unspecified challenges, Keywell decided to close the Boston site b"
+    removed: "This interactive installation features sleek, responsive screens that capture and transform spoken w"
+    removed: "The ethos driving Keywell's vision for the WNDR Museum reflects his entrepreneurial spirit, which ha"
+    removed: "Here in "Speak Up!," visitors participate in a transformative dialogue, contributing to an ever-chan"
+    removed: "As you consider the echoes of voices past and present, ponder the enduring question: Can a single vo"
+    [LOCAL-491] step 7b: rotating to the venue fact — institutional context; weakest, but it scopes the search
+      focus: "Speak Up! | WNDR Museum Boston is held at WNDR Museum."
+
+  [LOCAL-474] PHASE 5.17: retry 'Lake Shore Drive (LSD) | WNDR Museum Boston' — 254w → 137w after gates, 7 sentence(s) removed
+    removed: "WNDR Museum, founded by Keywell in 2018, set out to revolutionize art engagement through immersive, "
+    removed: "This decision marked the end of its journey in Boston, leaving behind a legacy of creativity and con"
+    removed: "This technology allows the installation to shift mood and form as you move through it, recalling the"
+    removed: "Keywell, an entrepreneur known for founding companies like Groupon, also invested in the immersive t"
+    removed: "This investment allowed the project to push boundaries in digital art presentation."
+    removed: "What if the future is a canvas painted by our memories?"
+    removed: "This question lingers in the air as you contemplate the fluid possibilities that Keywell's vision an"
+    [LOCAL-491] step 7b: rotating to the venue fact — institutional context; weakest, but it scopes the search
+      focus: "Lake Shore Drive (LSD) | WNDR Museum Boston is held at WNDR Museum."
+
+  [LOCAL-474] PHASE 5.17: retry 'MPO-1 (Time Machine) | WNDR Museum Boston' — 225w → 120w after gates, 10 sentence(s) removed
+    removed: "Joshua Ellingson, an artist hailing from San Francisco, conceived MPO-1 (Time Machine) using the his"
+    removed: "First developed by John Henry Pepper in 1862, this technique employs a cleverly positioned mirror to"
+    removed: "A key figure in the founding of the WNDR Museum's immersive experiences, Bradley A."
+    removed: "Keywell has consistently supported innovative projects like this one."
+    removed: "Known for his entrepreneurial prowess, Keywell's involvement has brought diverse artistic visions to"
+    removed: "His versatile achievements, from founding Groupon to being an early investor in Tempus AI, underscor"
+    removed: "This visual spectacle draws upon Pepper's original scientific explorations, highlighting a fascinati"
+    removed: "In the context of the WNDR Museum's broader collection, this piece resonates with the technological "
+    removed: "Ellingson's creation is emblematic of the museum's mission to blend curiosity with creativity, offer"
+    removed: "In doing so, it raises intriguing questions about our role in shaping the future."
+    [LOCAL-491] step 7b: rotating to the venue fact — institutional context; weakest, but it scopes the search
+      focus: "MPO-1 (Time Machine) | WNDR Museum Boston is held at WNDR Museum."
+
+  [LOCAL-474] PHASE 5.17: retry 'Buy Gift Cards - WNDR Boston' — 247w → 129w after gates, 9 sentence(s) removed
+    removed: "The WNDR Museum opened its doors in Chicago in 2018, conceived by Bradley A."
+    removed: "Keywell, an entrepreneur who sought to fuse art with technology to create immersive experiences."
+    removed: "Keywell established this innovative institution with the vision of making art tangible and interacti"
+    removed: "The museum's approach was so compelling that it expanded to Boston, taking residence in the Lafayett"
+    removed: "However, despite its success and appeal, this chapter will soon close; both the Boston and Chicago l"
+    removed: "Here, "Buy Gift Cards - WNDR Boston" is more than a transaction—it's an invitation to share the adve"
+    removed: "These sleek interfaces, bathed in a soft luminescent glow, reflect WNDR's commitment to blending art"
+    removed: "The importance of such a piece lies not just in its function but in what it represents—a connector, "
+    removed: "What stories will you gift to others as you depart this unique institution?"
+    [LOCAL-491] step 7b: rotating to the venue fact — institutional context; weakest, but it scopes the search
+      focus: "Buy Gift Cards - WNDR Boston is held at WNDR Museum."
+
+  [LOCAL-474] PHASE 5.17: retry 'WNDRWall | WNDR Museum Boston' — 187w → 118w after gates, 5 sentence(s) removed
+    removed: "Keywell, notable for co-founding Groupon and various other companies, embarked on a visionary journe"
+    removed: "With his innovative spirit, Keywell founded the WNDR Museum to blend creativity with technology, cre"
+    removed: "Created to capture and project the essence of visitor engagement, this interactive wall embodies the"
+    removed: "Through intricate technology and design, the WNDRWall converts simple gestures into ever-shifting pa"
+    removed: "This installation aligns with WNDR's overarching goal to foster connection and exploration in new wa"
+    [LOCAL-491] step 7b: rotating to the venue fact — institutional context; weakest, but it scopes the search
+      focus: "WNDRWall | WNDR Museum Boston is held at WNDR Museum."
+
+  [LOCAL-526] PHASE 5.17: regenerating 7 eligible stop(s) concurrently (max_workers=5)
+
+Generating description for Stop 1: Flex | WNDR Museum Boston by , ...
+
+Generating description for Stop 2: WNDR Museum Boston by , ...  [LOCAL-381] stop='Flex | WNDR Museum Boston' matched_work=False medium='' work_identity_chars=0
+
+Generating description for Stop 3: Speak Up! | WNDR Museum Boston by , ...
+  [LOCAL-411] Stop 1 snippet ranking: input=17 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=5 output=5 usable=5 (t1t2=0, t3=0, market=0)
+Generating description for Stop 4: Lake Shore Drive (LSD) | WNDR Museum Boston by , ...
+
+
+Generating description for Stop 5: MPO-1 (Time Machine) | WNDR Museum Boston by , ...  [LOCAL-381] stop='Lake Shore Drive (LSD) | WNDR Museum Boston' matched_work=False medium='' work_identity_chars=0
+
+
+  [LOCAL-381] stop='Speak Up! | WNDR Museum Boston' matched_work=False medium='' work_identity_chars=0    Top scores: [("POV: You finally visited WNDR Boston and now you'r", 15, ''), ('What if touching art at a museum was highly encour', 15, ''), ('WNDR Museum Closing After 8 Years - Block Club Chi', 14, 'unverified')]    [LOCAL-469] CONSEQUENCE RESCUE: 'The goal of the WNDR Museum is to not only have guests get h' let through (score 10) — no surviving snippet carried a stakes marker
+
+  [LOCAL-381] stop='WNDR Museum Boston' matched_work=False medium='' work_identity_chars=0  [LOCAL-381] stop='MPO-1 (Time Machine) | WNDR Museum Boston' matched_work=False medium='' work_identity_chars=0  [LOCAL-411] Stop 4 snippet ranking: input=20 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=5 output=5 usable=5 (t1t2=3, t3=0, market=0)
+
+  [LOCAL-411] Stop 3 snippet ranking: input=19 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=5 output=5 usable=5 (t1t2=1, t3=0, market=0)
+
+
+  [LOCAL-402] Stop 1: injected 5 snippets as reference material    [LOCAL-469] CONSEQUENCE RESCUE: 'The goal of the WNDR Museum is to not only have guests get h' let through (score 10) — no surviving snippet carried a stakes marker    Top scores: [('Speak Up! | WNDR Museum Boston', 20, 'tier1'), ('Speak Up! | WNDR Museum Boston', 19, ''), ('WNDR Museum: Interactive Art Museum & Immersive Ar', 17, '')]
+  [LOCAL-411] Stop 5 snippet ranking: input=26 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=5 output=5 usable=5 (t1t2=4, t3=0, market=0)
+    Top scores: [('Lake Shore Drive (LSD) | WNDR Museum Boston', 20, 'tier1'), ('WNDR Museum: Interactive Art Museum & Immersive Ar', 18, 'tier1'), ('The WNDR Story - WNDR Museum', 18, 'tier1')]
+
+
+  [LOCAL-411] Stop 2 snippet ranking: input=26 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=5 output=5 usable=5 (t1t2=3, t3=0, market=0)    Top scores: [('MPO-1 (Time Machine) | WNDR Museum Boston', 20, 'tier1'), ('WNDR Museum: Interactive Art Museum & Immersive Ar', 18, 'tier1'), ('WNDR Museum: Interactive Art Museum & Immersive Ar', 18, 'tier1')]  [LOCAL-402] Stop 4: injected 5 snippets as reference material  [D533] Stop 1 corpus-gate restriction LIFTED — 17 source item(s) arrived after the gate ran  [LOCAL-402] Stop 3: injected 5 snippets as reference material
+
+    Top scores: [('WNDRWall | WNDR Museum Boston', 18, 'tier1'), ('WNDR Museum: Interactive Art Museum & Immersive Ar', 18, 'tier1'), ('The WNDR Story - WNDR Museum', 18, 'tier1')]
+
+
+  [D533] Stop 3 corpus-gate restriction LIFTED — 19 source item(s) arrived after the gate ran
+  [LOCAL-402] Stop 5: injected 5 snippets as reference material  [D533] Stop 4 corpus-gate restriction LIFTED — 20 source item(s) arrived after the gate ran
+  [LOCAL-411] Stop 1 prompt size: before_snippets=8615 after=20228 (+11613 from snippets+instructions, facts_first=no)
+  [LOCAL-402] Stop 2: injected 5 snippets as reference material
+
+  [LOCAL-411] Stop 3 prompt size: before_snippets=9854 after=21389 (+11535 from snippets+instructions, facts_first=no)
+
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (20228)  [LOCAL-411] Stop 4 prompt size: before_snippets=9987 after=21688 (+11701 from snippets+instructions, facts_first=no)
+  [D533] Stop 2 corpus-gate restriction LIFTED — 26 source item(s) arrived after the gate ran
+  [D533] Stop 5 corpus-gate restriction LIFTED — 26 source item(s) arrived after the gate ran
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (21389)
+
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (21688)  [LOCAL-411] Stop 2 prompt size: before_snippets=9626 after=20920 (+11294 from snippets+instructions, facts_first=no)
+  [LOCAL-411] Stop 5 prompt size: before_snippets=9944 after=21526 (+11582 from snippets+instructions, facts_first=no)
+  [D498] Stop 3 matrix: 4/9 slots filled — empty: ['artist', 'publisher', 'printed_by', 'medium', 'credit_line']
+  [D498] Stop 1 matrix: 4/9 slots filled — empty: ['artist', 'publisher', 'printed_by', 'medium', 'credit_line']
+
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (20920)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (21526)
+  [D500] agents 0/3: hero=—, sponsor=—, builder=—
+  [D500] agents 0/3: hero=—, sponsor=—, builder=—  [D498] Stop 4 matrix: 4/9 slots filled — empty: ['artist', 'publisher', 'printed_by', 'medium', 'credit_line']  [D498] Stop 2 matrix: 4/9 slots filled — empty: ['artist', 'publisher', 'printed_by', 'medium', 'credit_line']  [D498] Stop 5 matrix: 4/9 slots filled — empty: ['artist', 'publisher', 'printed_by', 'medium', 'credit_line']
+
+  [D500] agents 0/3: hero=—, sponsor=—, builder=—
+  [D500] agents 0/3: hero=—, sponsor=—, builder=—
+
+  [D500] agents 0/3: hero=—, sponsor=—, builder=—
+
+  [LOCAL-490] Stop 5 story pass: ok=False (model returned NO_STORY — material did not support one), $0.0056
+  [LOCAL-490] Stop 2 story pass: ok=True (4 sentences), $0.0059
+    story: "WNDR Museum Boston opened its doors in 2022, bringing immersive art and interactive exhibits to downtown Boston. This expansion was a significant step"
+  [LOCAL-490] Stop 3 story pass: ok=True (5 sentences), $0.0064
+    story: "In 2024, the WNDR Museum opened its doors in Boston's Downtown Crossing, introducing more than 20 interactive exhibits to the city. This expansion aim"
+  [LOCAL-490] Stop 1 story pass: ok=True (5 sentences), $0.0057
+  [LOCAL-490] Stop 4 story pass: ok=True (4 sentences), $0.0068
+    story: "The WNDR Museum first opened its doors in Chicago in 2018, establishing an interactive art experience in the city's West Loop. Over the years, it expa"
+    story: "The WNDR Museum, since its establishment in 2018, aimed to transform the interaction with art through immersive experiences. In 2022, it expanded to B"
+  [LOCAL-408] Prompt dump written to: /app/prompt_dump_stop1.txt
+Stop 1 API call cost: $0.0258 (5434 tokens, model=gpt-4o)
+  [LOCAL-569] Stop 1 attempt 1/5 story_count=0 words=84
+  [LOCAL-393] Stop 1: WORD FLOOR — 84 words < 120, retrying (attempt 2/5)
+Stop 3 API call cost: $0.0292 (6155 tokens, model=gpt-4o)
+  [LOCAL-569] Stop 3 attempt 1/5 story_count=1 words=300
+  [LOCAL-432] Stop 3: STORY RETRY — story_count=1 < 3, need 2 more, retrying (attempt 2/5)
+Stop 2 API call cost: $0.0281 (5919 tokens, model=gpt-4o)
+  [LOCAL-569] Stop 2 attempt 1/5 story_count=0 words=231
+  [LOCAL-432] Stop 2: STORY RETRY — story_count=0 < 3, need 3 more, retrying (attempt 2/5)
+Stop 5 API call cost: $0.0305 (6424 tokens, model=gpt-4o)
+  [LOCAL-569] Stop 5 attempt 1/5 story_count=2 words=285
+  [LOCAL-432] Stop 5: STORY RETRY — story_count=2 < 3, need 1 more, retrying (attempt 2/5)
+Stop 1 API call cost: $0.0262 (5509 tokens, model=gpt-4o)
+  [LOCAL-569] Stop 1 attempt 2/5 story_count=1 words=94
+  [LOCAL-393] Stop 1: WORD FLOOR — 94 words < 120, retrying (attempt 3/5)
+Stop 4 API call cost: $0.0306 (6436 tokens, model=gpt-4o)
+  [LOCAL-569] Stop 4 attempt 1/5 story_count=0 words=322
+  [LOCAL-432] Stop 4: STORY RETRY — story_count=0 < 3, need 3 more, retrying (attempt 2/5)
+Stop 1 API call cost: $0.0264 (5547 tokens, model=gpt-4o)
+  [LOCAL-569] Stop 1 attempt 3/5 story_count=0 words=90
+  [LOCAL-393] Stop 1: WORD FLOOR — 90 words < 120, retrying (attempt 4/5)
+Stop 2 API call cost: $0.0296 (6237 tokens, model=gpt-4o)
+  [LOCAL-569] Stop 2 attempt 2/5 story_count=2 words=199
+  [LOCAL-432] Stop 2: STORY RETRY — story_count=2 < 3, need 1 more, retrying (attempt 3/5)
+Stop 3 API call cost: $0.0310 (6522 tokens, model=gpt-4o)
+  [LOCAL-569] Stop 3 attempt 2/5 story_count=0 words=280
+  [LOCAL-432] Stop 3: STORY RETRY — story_count=0 < 3, need 3 more, retrying (attempt 3/5)
+Stop 5 API call cost: $0.0321 (6760 tokens, model=gpt-4o)
+  [LOCAL-569] Stop 5 attempt 2/5 story_count=1 words=230
+  [LOCAL-432] Stop 5: STORY RETRY — story_count=1 < 3, need 2 more, retrying (attempt 3/5)
+Stop 4 API call cost: $0.0322 (6768 tokens, model=gpt-4o)
+  [LOCAL-569] Stop 4 attempt 2/5 story_count=2 words=289
+  [LOCAL-432] Stop 4: STORY RETRY — story_count=2 < 3, need 1 more, retrying (attempt 3/5)
+Stop 1 API call cost: $0.0271 (5694 tokens, model=gpt-4o)
+  [LOCAL-569] Stop 1 attempt 4/5 story_count=0 words=155
+  [LOCAL-432] Stop 1: STORY RETRY — story_count=0 < 3, need 3 more, retrying (attempt 5/5)
+Stop 2 API call cost: $0.0313 (6586 tokens, model=gpt-4o)
+  [LOCAL-569] Stop 2 attempt 3/5 story_count=2 words=151
+  [LOCAL-432] Stop 2: STORY RETRY — story_count=2 < 3, need 1 more, retrying (attempt 4/5)
+Stop 3 API call cost: $0.0326 (6863 tokens, model=gpt-4o)
+  [LOCAL-569] Stop 3 attempt 3/5 story_count=1 words=225
+  [LOCAL-432] Stop 3: STORY RETRY — story_count=1 < 3, need 2 more, retrying (attempt 4/5)
+Stop 1 API call cost: $0.0287 (6035 tokens, model=gpt-4o)
+Stop 4 API call cost: $0.0336 (7082 tokens, model=gpt-4o)  [LOCAL-569] Stop 1 attempt 5/5 story_count=0 words=126
+
+Stop 1 description word count: 126 words  [LOCAL-569] Stop 4 attempt 3/5 story_count=1 words=213
+
+  [LOCAL-432] Stop 4: STORY RETRY — story_count=1 < 3, need 2 more, retrying (attempt 4/5)
+  [LOCAL-407] Stop 1: snippets injected but no candidate specifics extracted
+
+Generating description for Stop 6: Buy Gift Cards - WNDR Boston by , ...
+  [LOCAL-381] stop='Buy Gift Cards - WNDR Boston' matched_work=False medium='' work_identity_chars=0
+    [LOCAL-469] CONSEQUENCE RESCUE: 'The goal of the WNDR Museum is to not only have guests get h' let through (score 9) — no surviving snippet carried a stakes marker
+  [LOCAL-411] Stop 6 snippet ranking: input=24 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=5 output=5 usable=5 (t1t2=0, t3=0, market=0)
+    Top scores: [('Buy Gift Cards - WNDR Boston', 19, ''), ('WNDR Museum to Close Boston and Chicago Locations ', 13, 'unverified'), ('WNDR Museum closing after 8 years in Chicago - CBS', 12, 'unverified')]
+  [LOCAL-402] Stop 6: injected 5 snippets as reference material
+  [D533] Stop 6 corpus-gate restriction LIFTED — 24 source item(s) arrived after the gate ran
+  [LOCAL-411] Stop 6 prompt size: before_snippets=9715 after=21204 (+11489 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (21204)
+  [D498] Stop 6 matrix: 4/9 slots filled — empty: ['artist', 'publisher', 'printed_by', 'medium', 'credit_line']
+  [D500] agents 0/3: hero=—, sponsor=—, builder=—
+Stop 2 API call cost: $0.0331 (6958 tokens, model=gpt-4o)
+  [LOCAL-569] Stop 2 attempt 4/5 story_count=1 words=163
+  [LOCAL-432] Stop 2: STORY RETRY — story_count=1 < 3, need 2 more, retrying (attempt 5/5)
+Stop 5 API call cost: $0.0341 (7178 tokens, model=gpt-4o)
+  [LOCAL-569] Stop 5 attempt 3/5 story_count=3 words=246
+Stop 5 description word count: 246 words
+  [LOCAL-407] Stop 5: snippets injected but no candidate specifics extracted
+  [LOCAL-414] Stop 5: SCRUBBED banned phrases from output: ['invites contemplation']
+
+Generating description for Stop 7: WNDRWall | WNDR Museum Boston by , ...
+  [LOCAL-381] stop='WNDRWall | WNDR Museum Boston' matched_work=False medium='' work_identity_chars=0
+    [LOCAL-469] CONSEQUENCE RESCUE: 'Founded in 2018, WNDR set out to transform the way we engage' let through (score 12) — no surviving snippet carried a stakes marker
+  [LOCAL-411] Stop 7 snippet ranking: input=15 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=5 output=5 usable=5 (t1t2=3, t3=0, market=0)
+    Top scores: [('WNDRWall | WNDR Museum Boston', 20, 'tier1'), ('WNDRWall | WNDR Museum Boston', 19, ''), ('The WNDR Story - WNDR Museum', 18, 'tier1')]
+  [LOCAL-402] Stop 7: injected 5 snippets as reference material
+  [D533] Stop 7 corpus-gate restriction LIFTED — 15 source item(s) arrived after the gate ran
+  [LOCAL-411] Stop 7 prompt size: before_snippets=9973 after=21208 (+11235 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (21208)
+  [D498] Stop 7 matrix: 4/9 slots filled — empty: ['artist', 'publisher', 'printed_by', 'medium', 'credit_line']
+  [D500] agents 0/3: hero=—, sponsor=—, builder=—
+  [LOCAL-490] Stop 7 story pass: ok=True (3 sentences), $0.0055
+    story: "The WNDR Museum in Boston was established in 2022 as a new venue for creative engagement. In 2024, the museum relocated its Downtown Crossing location"
+  [LOCAL-490] Stop 6 story pass: ok=True (4 sentences), $0.0068
+    story: "The WNDR Museum opened in 2018 with the mission to provide hands-on experiences with art pieces, aiming to rekindle the childhood excitement and awe o"
+Stop 3 API call cost: $0.0347 (7294 tokens, model=gpt-4o)
+  [LOCAL-569] Stop 3 attempt 4/5 story_count=4 words=256
+Stop 3 description word count: 256 words
+  [LOCAL-407] Stop 3: snippets injected but no candidate specifics extracted
+  [LOCAL-414] Stop 3: SCRUBBED banned phrases from output: ['a testament to']
+Stop 2 API call cost: $0.0344 (7246 tokens, model=gpt-4o)
+  [LOCAL-569] Stop 2 attempt 5/5 story_count=0 words=100
+  [LOCAL-394] stop='WNDR Museum Boston' below_floor words=100 — kept (never dropped)
+Stop 2 description word count: 100 words
+  [LOCAL-407] Stop 2: snippets injected but no candidate specifics extracted
+Stop 4 API call cost: $0.0355 (7476 tokens, model=gpt-4o)
+  [LOCAL-569] Stop 4 attempt 4/5 story_count=2 words=219
+  [LOCAL-432] Stop 4: STORY RETRY — story_count=2 < 3, need 1 more, retrying (attempt 5/5)
+Stop 6 API call cost: $0.0300 (6315 tokens, model=gpt-4o)
+  [LOCAL-569] Stop 6 attempt 1/5 story_count=0 words=235
+  [LOCAL-432] Stop 6: STORY RETRY — story_count=0 < 3, need 3 more, retrying (attempt 2/5)
+Stop 7 API call cost: $0.0287 (6046 tokens, model=gpt-4o)
+  [LOCAL-569] Stop 7 attempt 1/5 story_count=1 words=273
+  [LOCAL-432] Stop 7: STORY RETRY — story_count=1 < 3, need 2 more, retrying (attempt 2/5)
+Stop 4 API call cost: $0.0375 (7886 tokens, model=gpt-4o)
+  [LOCAL-569] Stop 4 attempt 5/5 story_count=3 words=257
+Stop 4 description word count: 257 words
+  [LOCAL-407] Stop 4: snippets injected but no candidate specifics extracted
+  [LOCAL-414] Stop 4: SCRUBBED banned phrases from output: ['a testament to']
+Stop 6 API call cost: $0.0317 (6669 tokens, model=gpt-4o)
+  [LOCAL-569] Stop 6 attempt 2/5 story_count=1 words=227
+  [LOCAL-432] Stop 6: STORY RETRY — story_count=1 < 3, need 2 more, retrying (attempt 3/5)
+Stop 7 API call cost: $0.0303 (6375 tokens, model=gpt-4o)
+  [LOCAL-569] Stop 7 attempt 2/5 story_count=1 words=232
+  [LOCAL-432] Stop 7: STORY RETRY — story_count=1 < 3, need 2 more, retrying (attempt 3/5)
+Stop 6 API call cost: $0.0335 (7048 tokens, model=gpt-4o)
+  [LOCAL-569] Stop 6 attempt 3/5 story_count=1 words=221
+  [LOCAL-432] Stop 6: STORY RETRY — story_count=1 < 3, need 2 more, retrying (attempt 4/5)
+Stop 7 API call cost: $0.0323 (6797 tokens, model=gpt-4o)
+  [LOCAL-569] Stop 7 attempt 3/5 story_count=1 words=266
+  [LOCAL-432] Stop 7: STORY RETRY — story_count=1 < 3, need 2 more, retrying (attempt 4/5)
+Stop 6 API call cost: $0.0349 (7338 tokens, model=gpt-4o)
+  [LOCAL-569] Stop 6 attempt 4/5 story_count=0 words=145
+  [LOCAL-432] Stop 6: STORY RETRY — story_count=0 < 3, need 3 more, retrying (attempt 5/5)
+Stop 7 API call cost: $0.0338 (7111 tokens, model=gpt-4o)
+  [LOCAL-569] Stop 7 attempt 4/5 story_count=1 words=220
+  [LOCAL-432] Stop 7: STORY RETRY — story_count=1 < 3, need 2 more, retrying (attempt 5/5)
+Stop 6 API call cost: $0.0370 (7784 tokens, model=gpt-4o)
+  [LOCAL-569] Stop 6 attempt 5/5 story_count=1 words=190
+Stop 6 description word count: 190 words
+  [LOCAL-407] Stop 6: snippets injected but no candidate specifics extracted
+Stop 7 API call cost: $0.0357 (7507 tokens, model=gpt-4o)
+  [LOCAL-569] Stop 7 attempt 5/5 story_count=2 words=251
+Stop 7 description word count: 251 words
+  [LOCAL-407] Stop 7: snippets injected but no candidate specifics extracted
+  [LOCAL-526] PHASE 5.17 regeneration wall: 33.0s for 7 stop(s) at max_workers=5
+    [LOCAL-474] regenerated and re-gated: 126w (was 73w)
+    [LOCAL-474] regenerated and re-gated: 100w (was 80w)
+    [LOCAL-474] regenerated and re-gated: 222w (was 119w)
+    [LOCAL-474] regenerated and re-gated: 202w (was 137w)
+    [LOCAL-487] retry judged on the story bar, not on length: cleared=False
+    [LOCAL-474] retry not better after re-gating — keeping the original gated text
+    [LOCAL-474] regenerated and re-gated: 183w (was 129w)
+    [LOCAL-474] regenerated and re-gated: 251w (was 118w)
+      [PERSON-CAP] stop 7: 'technologies' already carries two stops — cut: Bradley A. Keywell, who co-founded Groupon and Uptake Technologies, envisioned a
+  [D534] removed 1 repeated sentence(s) the capped retries could not reach:
+      stop 4: Keywell's involvement with diverse companies like Uptake Technologies and Tempus AI reflec
+
+  [LOCAL-474] retry summary: 7 eligible, 7 retried, 6 improved, 1 kept original
+  [LOCAL-487] triggers: 3 hollowed by gates, 1 storyless (step 7a — Michael's bar, independent of length), 0 top-value (step 7c — larger allowance), 2 repeating an earlier stop (D534), 7 thin enough for another story (D534, floor=300w). Triggers overlap and are counted separately; they do not sum to 'eligible'.
+  [LOCAL-474] each regenerated stop was re-gated before being accepted; a retry can only replace text it beats after gating.
+
+PHASE 5.10: Anti-preaching cleanup (LOCAL-44)...
+  [LOCAL-44] Stripped 0 preaching closer(s)
+
+  [LOCAL-444] Obligation audit DISABLED by L444_OBLIGATION_AUDIT=false
+  [LOCAL-427] HTTP 429 from https://www.metmuseum.org/perspectives/series/materials-and-techniques — retrying in 1.4s (attempt 1, 30s budget remaining)
+  [LOCAL-427] HTTP 429 from https://www.metmuseum.org/perspectives/series/materials-and-techniques — retrying in 2.9s (attempt 2, 28s budget remaining)
+  [LOCAL-427] HTTP 429 from https://www.metmuseum.org/perspectives/series/materials-and-techniques — retrying in 7.5s (attempt 3, 25s budget remaining)
+  [LOCAL-427] HTTP 429 from https://www.metmuseum.org/perspectives/series/materials-and-techniques — budget exhausted after 4 attempt(s), 30s elapsed
+  [LOCAL-427] HTTP 200 from https://www.youtube.com/watch?v=wogKeYH2wEE (attempt 1)
+  [LOCAL-427] HTTP 200 from https://gelpress.com/blogs/art-and-inspiration/printmaking-techniques?srsltid=AU7gw4XNnJuqmZU_4z2HohxGF9ruQAXGi935oqW3L03yACc_Pvn8FhxV (attempt 1)
+  [LOCAL-459] R5: Fetched 1846 chars from https://gelpress.com/blogs/art-and-inspiration/pri
+  [LOCAL-427] HTTP 200 from https://blog.dma.org/tag/printmaking/ (attempt 1)
+  [LOCAL-459] R5: Fetched 1736 chars from https://blog.dma.org/tag/printmaking/
+  [LOCAL-427] HTTP 200 from https://artshow.com/resources/printmaking.html (attempt 1)
+  [LOCAL-459] R5: Fetched 1266 chars from https://artshow.com/resources/printmaking.html
+  [LOCAL-427] HTTP 200 from https://www.facebook.com/metmuseum/videos/insider-insightsmaking-prints-and-drawings/1660378830826671/ (attempt 1)
+  [LOCAL-427] HTTP 200 from https://www.khanacademy.org/humanities/special-topics-art-history/creating-conserving/printmaking/v/moma-printmaking-01 (attempt 1)
+  [LOCAL-459] R5: Fetched 323 chars from https://www.khanacademy.org/humanities/special-top
+  [LOCAL-427] HTTP 200 from https://www.clarkart.edu/microsites/impressionist-line/about/printmaking-techniques (attempt 1)
+  [LOCAL-459] R5: Fetched 1756 chars from https://www.clarkart.edu/microsites/impressionist-
+  [D512] verb discovery: query='WNDR Museum printmaking process how it is made technique step by' -> 5 new verb(s): coated, experienced, required, covered, proceed
+  [D512] _AGENCY_VERB widened by 5 discovered verb(s)
+
+  [D511] PHASE 5.20: credit_line loop — object record, seeds, challenge, adjudicate, gate
+    [D501] no object record for 'Speak Up! | WNDR Museum Boston' — matrix unchanged
+    [D501] no object record for 'MPO-1 (Time Machine) | WNDR Museum Boston' — matrix unchanged
+    [D511] 4 credit_line(s) to try (0 from the matrix, 4 from the text)    [D511] 4 credit_line(s) to try (0 from the matrix, 4 from the text)
+
+    [D511] examined 4 credit_line(s), no story passed, ~$0.024, 0s    [D511] examined 4 credit_line(s), no story passed, ~$0.024, 0s
+
+    [D501] no object record for 'WNDR Museum Boston' — matrix unchanged
+    [D511] 4 credit_line(s) to try (0 from the matrix, 4 from the text)
+    [D511] examined 4 credit_line(s), no story passed, ~$0.024, 1s
+    [D501] no object record for 'Lake Shore Drive (LSD) | WNDR Museum Boston' — matrix unchanged
+    [D511] 4 credit_line(s) to try (0 from the matrix, 4 from the text)
+    [D511] examined 4 credit_line(s), no story passed, ~$0.024, 1s
+    [D501] no object record for 'Flex | WNDR Museum Boston' — matrix unchanged
+    [D511] 2 credit_line(s) to try (0 from the matrix, 2 from the text)
+    [D511] examined 2 credit_line(s), no story passed, ~$0.012, 1s
+    [D501] no object record for 'Buy Gift Cards - WNDR Boston' — matrix unchanged
+    [D511] 4 credit_line(s) to try (0 from the matrix, 4 from the text)
+    [D511] examined 4 credit_line(s), no story passed, ~$0.024, 0s
+    [D501] no object record for 'WNDRWall | WNDR Museum Boston' — matrix unchanged
+    [D511] 4 credit_line(s) to try (0 from the matrix, 4 from the text)
+    [D511] examined 4 credit_line(s), no story passed, ~$0.024, 0s
+
+  [D511] stop 1: Flex | WNDR Museum Boston
+    [D511] no story passed the gate — stop keeps its descriptive text and publishes no story
+
+  [D511] stop 2: WNDR Museum Boston
+    [D511] no story passed the gate — stop keeps its descriptive text and publishes no story
+
+  [D511] stop 3: Speak Up! | WNDR Museum Boston
+    [D511] no story passed the gate — stop keeps its descriptive text and publishes no story
+
+  [D511] stop 4: Lake Shore Drive (LSD) | WNDR Museum Boston
+    [D511] no story passed the gate — stop keeps its descriptive text and publishes no story
+
+  [D511] stop 5: MPO-1 (Time Machine) | WNDR Museum Boston
+    [D511] no story passed the gate — stop keeps its descriptive text and publishes no story
+
+  [D511] stop 6: Buy Gift Cards - WNDR Boston
+    [D511] no story passed the gate — stop keeps its descriptive text and publishes no story
+
+  [D511] stop 7: WNDRWall | WNDR Museum Boston
+    [D511] no story passed the gate — stop keeps its descriptive text and publishes no story
+
+  [D511] PHASE 5.20 summary: 0/7 stops got a gated story (0 with multiple stories), ~$0.156, [D518] 0 duplicated prose sentence(s) replaced
+
+  [LOCAL-485] PHASE 5.21: Story valuation index (report only, never gates)...
+     #  stop                                      idx  hist  detl   soc
+     1  Flex | WNDR Museum Boston                  42    50     0    12
+     2  WNDR Museum Boston                         43    58     0     0
+     3  Speak Up! | WNDR Museum Boston             50    56     0    38
+     4  Lake Shore Drive (LSD) | WNDR Museum Bos   25    24     0    30
+     5  MPO-1 (Time Machine) | WNDR Museum Bosto   30    12     7    45
+     6  Buy Gift Cards - WNDR Boston               46    34     0    15
+     7  WNDRWall | WNDR Museum Boston              24    24     8    30
+    [LOCAL-485] index mean 37.1 over 7 stop(s), range 24-50
+    [LOCAL-485] weakest: 'WNDRWall | WNDR Museum Boston' at 24
+[TIMING] phase=story_first elapsed=196.9s cumulative=299.2s
+
+PHASE 6: Assembling the complete tour...
+  [R2] Prolog saved for Stop 1 (96 words)
+
+  [LOCAL-244] PHASE 5.9: Prolog gating (R9, R10, subject routine)...
+  [LOCAL-244] Prolog before gates: 96 words
+  [LOCAL-244] Prolog R9: 0 deletions
+  [LOCAL-286] Prolog R7: 0 deletions
+  [LOCAL-244] Prolog R10: 0 deletions
+  [LOCAL-244] Prolog subject: 0 expanded, 0 deleted, cost=$0.0000
+  [LOCAL-244] Prolog after gates: 96 words (delta: 0)
+
+  [LOCAL-246] PHASE 5.95: Orientation gating (R9, R10)...
+    Stop 3 orientation R10: 1 sentence(s) deleted
+  [LOCAL-246] Orientation gating summary:
+    Words before: 261
+    Words after:  237
+    Delta: -24
+    Stops affected: 1/7
+    Deletions (1):
+      [Stop 3][R10_UNFULFILLED_PROMISE] "From this vantage point, you can fully appreciate how your spoken words become part of an evolving a..."
+
+  [LOCAL-270] PHASE 5.96: Composing Part 4 (forward connection) from delivered narrations...
+    Stops with delivered content: 7/7
+    [LOCAL-276] Intrigue ranking completed: 4.6s, $0.0148, 2105 tokens
+    [LOCAL-276] Ranked 7 stops:
+      [Flex | WNDR Museum Boston] (dated_event): However, in 2023, the organization announced the closure of its Boston location ...
+      [WNDR Museum Boston] (reversal): Despite its closure, the museum's impact persisted, redefining how art could be ...
+      [Speak Up! | WNDR Museum Boston] (dated_event): Despite its initial success, Keywell decided to close the Boston site just two y...
+      [Lake Shore Drive (LSD) | WNDR Museum Boston] (dated_event): By September 2026, however, WNDR announced the closure of its Boston location, s...
+      [MPO-1 (Time Machine) | WNDR Museum Boston] (mystery): As a result, MPO-1 (Time Machine) merges the past and present, presenting a mesm...
+      [Buy Gift Cards - WNDR Boston] (cause): By doing so, Keywell created a network where individual inspirations could devel...
+      [WNDRWall | WNDR Museum Boston] (mystery): At the very heart of this interactive journey stands the WNDRWall....
+    [LOCAL-276] 7 intriguing / 0 excluded (celebrity_trivia)
+    [LOCAL-276] Using ranked facts for composition (7 stops)
+    Part 4 LLM cost: $0.0045 (762 tokens) [attempt 1]
+    ✗ Part 4 attempt 1 FAILED verification:
+      Candidate: "As you continue on the tour, you will learn about the closure of WNDR Museum Boston on August 30th, 2023, and its subsequent impact on the city's art scene. By August 2026, WNDR Museum Boston announced its closure, marking the end of its mission to merge art with hands-on experiences in this city."
+      FAIL: date '2023' attributed to 'WNDR Museum Boston' but belongs to a different stop
+      FAIL: date '2026' attributed to 'WNDR Museum Boston' but belongs to a different stop
+    Part 4 LLM cost: $0.0044 (753 tokens) [attempt 2]
+    ✓ Part 4 composed and verified (44 words):
+      "As you continue on this tour, you will discover the closure of WNDR Museum Boston on August 30th, 2023, after six years at Flex | WNDR Museum Boston, and its final closure in September 2026 at Lake Shore Drive (LSD) | WNDR Museum Boston."
+      Stops referenced: 7
+    Part 4 total cost: $0.0089
+
+  [LOCAL-286] PHASE 5.97: Prolog-body deduplication (≥8 word overlap)...
+  [LOCAL-286] Deduplication: 0 sentence(s) removed from stop bodies
+
+  [LOCAL-292] Empty stop removal gate: PASSED (all 7 stops have narration)
+  [LOCAL-600] site-first counts: exhibitions_on_view=0 delivered=7 requested=7
+  [LOCAL-394] Stop count invariant: OK (7 selected == 7 delivered)
+  [D536] Listener asked for 7 stop(s), delivering 7 — request met
+  DEBUG - POI 1 content includes:
+    Specific Examples: False
+    Operational Details: False
+    Walking Directions: True
+  [T4] Transition to Stop 2: Continue through WNDR Museum — next is WNDR Museum Boston....
+  DEBUG - POI 2 content includes:
+    Specific Examples: False
+    Operational Details: False
+    Walking Directions: True
+  [T4] Transition to Stop 3: Next: Speak Up! | WNDR Museum Boston....
+  DEBUG - POI 3 content includes:
+    Specific Examples: False
+    Operational Details: False
+    Walking Directions: True
+  [T4] Transition to Stop 4: Proceed to Lake Shore Drive (LSD) | WNDR Museum Boston....
+  DEBUG - POI 4 content includes:
+    Specific Examples: False
+    Operational Details: False
+    Walking Directions: True
+  [T4] Transition to Stop 5: Continue to MPO-1 (Time Machine) | WNDR Museum Boston....
+  DEBUG - POI 5 content includes:
+    Specific Examples: False
+    Operational Details: False
+    Walking Directions: True
+  [T4] Transition to Stop 6: Next: Buy Gift Cards - WNDR Boston....
+  DEBUG - POI 6 content includes:
+    Specific Examples: False
+    Operational Details: False
+    Walking Directions: True
+  [T4] Transition to Stop 7: Your final stop in WNDR Museum: WNDRWall | WNDR Museum Bosto...
+  DEBUG - POI 7 content includes:
+    Specific Examples: False
+    Operational Details: False
+    Walking Directions: True
+  [LOCAL-280] Recap: D177 FAILED for 'WNDR Museum Boston': fact not in delivered text
+    Fact: "Despite its closure, the museum's impact persisted, redefining how art could be ..."
+  [LOCAL-280] Recap: D177 FAILED for 'MPO-1 (Time Machine) | WNDR Museum Boston': fact not in delivered text
+    Fact: "As a result, MPO-1 (Time Machine) merges the past and present, presenting a mesm..."
+  [LOCAL-280] Recap: D177 FAILED for 'WNDRWall | WNDR Museum Boston': fact not in delivered text
+    Fact: "At the very heart of this interactive journey stands the WNDRWall...."
+  [LOCAL-280] Recap: D177 FAILED for 'Speak Up! | WNDR Museum Boston': fact not in delivered text
+    Fact: "Despite its initial success, Keywell decided to close the Boston site just two y..."
+  [LOCAL-280] Recap: D177 FAILED for 'Lake Shore Drive (LSD) | WNDR Museum Boston': fact not in delivered text
+    Fact: "By September 2026, however, WNDR announced the closure of its Boston location, s..."
+  [LOCAL-280] Recap composition: 0.9s, $0.0025, 427 tokens
+  [LOCAL-280] Recap built: 27 words, 2 composed clauses (5 D177 rejected, 0 navigation rejected)
+    [Buy Gift Cards - WNDR Boston] (cause): "By doing so, Keywell created a network where individual inspirations could devel..."
+      → composed: "WNDR Boston, where Keywell fostered a network for collective discoveries"
+    [Flex | WNDR Museum Boston] (dated_event): "However, in 2023, the organization announced the closure of its Boston location ..."
+      → composed: "WNDR Museum Boston, closing in 2023 as part of a broader shutdown"
+    D177 verified: all 2 source facts present in delivered text
+  [LOCAL-280] Recap added: "That's 7 stops — WNDR Boston, where Keywell fostered a network for collective discoveries and WNDR Museum Boston, closing in 2023 as part of a broader shutdown."
+  [LOCAL-273] Part 1 error: relation "venue_corpus" does not exist
+LINE 2:                 SELECT venue_name, qid FROM venue_corpus
+                                                    ^
+
+  [LOCAL-275] Part 2 error: current transaction is aborted, commands ignored until end of transaction block
+
+  [LOCAL-275] Closing offer fallback (no verification passed)
+  [EPILOG] Journey epilog added to last stop
+  [S27] No cross-stop repetition detected
+  [D533] REPEATED FACT kept in stop 2 (2022/boston) — next sentence refers back to it ("This expansion was a significant step fo...")
+  [D533] REPEATED FACT removed from stop 2 (first told at stop 1, 2018/museum): This expansion was a significant step for the WNDR Museum, which had initially s
+  [D533] REPEATED FACT removed from stop 4 (first told at stop 1, 2018/museum): The WNDR Museum, established in 2018, embarked on a mission to revolutionize art
+  [D533] REPEATED FACT removed from stop 4 (first told at stop 3, 2026/september): By September 2026, however, WNDR announced the closure of its Boston location, s
+  [D533] REPEATED FACT removed from stop 6 (first told at stop 1, 2018/opened): The WNDR Museum opened in 2018 with a mission to provide hands-on experiences wi
+  [D533] REPEATED FACT removed from stop 7 (first told at stop 1, 2022/boston): The WNDR Museum in Boston, established in 2022, marked its presence as a beacon 
+  [D533] 5 repeated fact(s) removed, 1 kept
+  [D533] Person-year role guard: no corpus available — check SKIPPED
+
+  [LOCAL-36] Practical Facts Gate:
+    Claims found: 0
+    Verified: 0
+    Dropped: 0
+    AUDIT: NO_CLAIMS | (none) | (none) | PASS — no practical claims to verify
+  [LOCAL-36] No practical claims found to verify (informational for tour_category='museum')
+  [D523] spoken-text hygiene: 0 template seam(s), 1 missing space(s), 0 spoken label(s), 0 dangling phrase(s) removed
+
+  [LOCAL-260] PROLOG STRUCTURE VALIDATION: 4 error(s), 0 warning(s)
+    [ERROR] Part 1: PART1_MISSING — Part 1 (Tour name and transportation mode) is not present.
+    [ERROR] Part 4: PARTS_OUT_OF_ORDER — Part 4 appears before Part 3 (sentence 2 vs 6).
+    [ERROR] Part 2: PART2_INSUFFICIENT_SUBSTANCE — Part 2 has only 1 route indicator(s) (endpoints); need at least 2 of: endpoints, distance, terrain, duration.
+    [ERROR] Part 0: DUPLICATE_TOUR_DESCRIPTION — Tour contains 7 tour-level descriptions (must be exactly 1). Passages found:
+  [1] "You are about to explore the WNDR Museum Boston, a hub of interactive art and technology. Within its..."
+  [2] "Stand close to the installation titled "Speak Up! | WNDR Museum Boston," where your voice can be cap..."
+  [3] "Bradley Keywell, a co-founder of Groupon, played a pivotal role in this vision by founding WNDR, whi..."
+  [4] "Stand slightly to the left of "MPO-1 (Time Machine) | WNDR Museum Boston" to witness the full effect..."
+  [5] "Stand near "Buy Gift Cards - WNDR Boston" to appreciate its role in making the WNDR Museum's interac..."
+  [6] "Central to this mission was "Buy Gift Cards - WNDR Boston," an installation designed to extend the m..."
+  [7] "That's 7 stops — WNDR Boston, where Keywell fostered a network for collective discoveries and WNDR M..."
+
+=== Word Count Statistics ===
+Stop 1: Flex | WNDR Museum Boston - 83 words
+Stop 2: WNDR Museum Boston - 196 words
+Stop 3: Speak Up! | WNDR Museum Boston - 233 words
+Stop 4: Lake Shore Drive (LSD) | WNDR Museum Boston - 254 words
+Stop 5: MPO-1 (Time Machine) | WNDR Museum Boston - 244 words
+Stop 6: Buy Gift Cards - WNDR Boston - 247 words
+Stop 7: WNDRWall | WNDR Museum Boston - 213 words
+===========================
+
+  [LOCAL-540] scorer ran on assembled tour (11089 chars, 7/7 stops)
+  [LOCAL-540] defects seen: ['dangling_reference']
+  [LOCAL-540]   dangling_reference [REQUIRED_CLEAN]: 4 dangling pronoun reference(s), e.g. 'He previously founded companies such as Groupon and Uptake T'
+  [LOCAL-540] REQUIRED_CLEAN defect present (['dangling_reference']) — issuing ONE retry over 1 section(s)
+  [LOCAL-540] retry: regenerating stop (stop 3) for ['dangling_reference']
+[LOCAL-197] llm_cost() called with total_tokens (deprecated) by /app/generate_tour_text.py:22769. Caller should supply input_tokens and output_tokens separately.
+  [LOCAL-540] retry rewrite: 1104 tokens, $0.005250 (gpt-4o)
+  [LOCAL-540] rescored after retry: defects ['dangling_reference'] -> ['dangling_reference', 'thin']
+  [LOCAL-540] retry did NOT remove: ['dangling_reference'] — shipping with defect recorded (D577)
+
+Total API cost: $0.6583 (62497 tokens)
+Grounding:      $0.0000 (0 queries, 0 requests)
+Tour total:     $0.6583
+Provenance:     4/39 factual sentences sourced, 35 unsourced (4 corpus, 0 grounded, 35 parametric)
+
+Tour text generated successfully!
+  [LOCAL-230] ⚠ NETWORK FAILURES: 1 API call(s) failed during this generation — tour may be degraded
+Saved to: /out/LOCAL602_WNDR_RUN.txt
+  [C5-5] Evidence (provenance-only) persisted: /out/LOCAL602_WNDR_RUN_evidence.json
+
+Preview of the generated tour:
+
+Step-by-Step Audio Guided Tour: WNDR museum, Boston, MA
+Tour-Category: museum
+
+Stop 1: Flex | WNDR Museum Boston
+
+Address: 404 E. 1st St, Boston, MA 02127
+
+Coordinates: 42.3393, -71.0402
+
+Orientation: You are about to explore the WNDR Museum Boston, a hub of interactive art and technology. Within its walls, you will encounter 7 distinct works: Flex, Speak Up!, Lake Shore Drive (LSD), MPO-1 (Time Machine), Buy Gift Cards - WNDR Boston, and WNDRWall. Each piece offers a unique perspective on the t...
+
+
+========================================================================
+  [LOCAL-410] CHAIN INSTRUMENTATION (post-generation)
+========================================================================
+    Flex | WNDR Museum Boston: serp_results=8 snippets_injected=16 beats_in_delivered_text=0
+    WNDR Museum Boston: serp_results=14 snippets_injected=22 beats_in_delivered_text=0
+    Speak Up! | WNDR Museum Boston: serp_results=12 snippets_injected=19 beats_in_delivered_text=0
+    Lake Shore Drive (LSD) | WNDR Museum Boston: serp_results=13 snippets_injected=20 beats_in_delivered_text=0
+    MPO-1 (Time Machine) | WNDR Museum Boston: serp_results=13 snippets_injected=20 beats_in_delivered_text=1
+    Buy Gift Cards - WNDR Boston: serp_results=13 snippets_injected=20 beats_in_delivered_text=0
+    WNDRWall | WNDR Museum Boston: serp_results=12 snippets_injected=12 beats_in_delivered_text=0
+========================================================================
+[TIMING] phase=packing elapsed=11.6s cumulative=310.8s
+[TIMING] phase=verification elapsed=0.0s cumulative=310.8s
+[TIMING] TOTAL wall=310.8s phases: story_first=196.9s, external_lookups=61.2s, fact_sheets=13.4s, packing=11.6s, site_first_exhibitions=6.9s, poi_selection=5.0s, intent=1.7s, narration=0.0s, verification=0.0s
+
+================ RESULT ================
+TIER: exhibit_museum   TOUR_KIND: full
+OUTCOME: TOUR DELIVERED — 10805 chars, 6 stops
+
+STOP TITLES + SOURCE URLS:
+   Stop 1: Flex | WNDR Museum Boston
+        source: https://app.wndrmuseum.com/installations/boston/flex?_gl=1*dm9oxv*_gcl_au*MTg1MDkyODk4OC4xNzUwMTAwMTE0*_ga*MTIyMzgxODMzMS4xNzM0MzYxNzQx*_ga_Y3MT569NSP*czE3NTUxMDE1NzQkbzE5MSRnMSR0MTc1NTEwNDE3MyRqNTIkbDAkaDA.*_ga_9L9NEPRPHD*czE3NTUxMDE1NzQkbzM5MyRnMSR0MTc1NTEwNDE3MyRqNTMkbDAkaDg0NjIyOTczOA..&utm_source=Vesta&utm_medium=Referral  [exhibition/on_view]
+   Stop 2: WNDR Museum Boston
+        source: https://www.wndrmuseum.com/location/boston?ref=blkchicago.com  [exhibition/on_view]
+   Stop 3: Speak Up! | WNDR Museum Boston
+        source: https://www.wndrmuseum.com/installations/boston/speak-up  [exhibition/on_view]
+   Stop 5: MPO-1 (Time Machine) | WNDR Museum Boston
+        source: https://www.wndrmuseum.com/installations/boston/mpo-1-time-machine  [exhibition/on_view]
+   Stop 6: Buy Gift Cards - WNDR Boston
+        source: https://www.wndrmuseum.com/tickets/boston/gift-cards?gad_source=1&gad_campaignid=22722101921&gbraid=0AAAAABW_ivPc8kqBok0OGCZ0NKkEQwYla&gclid=CjwKCAiAvaLLBhBFEiwAYCNTf3n1i43LlDpgP5pPX3crNNqQpW3FN1JLbbua9ABSWtbxzzOIkcAyRRoCAoAQAvD_BwE  [exhibition/on_view]
+   Stop 7: WNDRWall | WNDR Museum Boston
+        source: https://www.wndrmuseum.com/installations/boston/wndrwall  [exhibition/on_view]
+
+SITE-FIRST SOURCES (recorded during generation):
+   - We Are All Artists (If Only We Knew?)  →  https://www.wndrmuseum.com/installations/boston/we-are-all-artists-boston  [exhibition/on_view]
+   - Flex | WNDR Museum Boston  →  https://app.wndrmuseum.com/installations/boston/flex?_gl=1*dm9oxv*_gcl_au*MTg1MDkyODk4OC4xNzUwMTAwMTE0*_ga*MTIyMzgxODMzMS4xNzM0MzYxNzQx*_ga_Y3MT569NSP*czE3NTUxMDE1NzQkbzE5MSRnMSR0MTc1NTEwNDE3MyRqNTIkbDAkaDA.*_ga_9L9NEPRPHD*czE3NTUxMDE1NzQkbzM5MyRnMSR0MTc1NTEwNDE3MyRqNTMkbDAkaDg0NjIyOTczOA..&utm_source=Vesta&utm_medium=Referral  [exhibition/on_view]
+   - WNDR Museum Boston  →  https://www.wndrmuseum.com/location/boston?ref=blkchicago.com  [exhibition/on_view]
+   - Speak Up! | WNDR Museum Boston  →  https://www.wndrmuseum.com/installations/boston/speak-up  [exhibition/on_view]
+   - Lake Shore Drive (LSD) | WNDR Museum Boston  →  https://www.wndrmuseum.com/installations/boston/lake-shore-drive-lsd-boston  [exhibition/on_view]
+   - MPO-1 (Time Machine) | WNDR Museum Boston  →  https://www.wndrmuseum.com/installations/boston/mpo-1-time-machine  [exhibition/on_view]
+   - Boston Events  →  https://www.wndrmuseum.com/tickets/boston/events?gad_source=1&gad_campaignid=22722101921&gbraid=0AAAAABW_ivPc8kqBok0OGCZ0NKkEQwYla&gclid=CjwKCAiAvaLLBhBFEiwAYCNTf3n1i43LlDpgP5pPX3crNNqQpW3FN1JLbbua9ABSWtbxzzOIkcAyRRoCAoAQAvD_BwE  [exhibition/on_view]
+   - Buy Gift Cards - WNDR Boston  →  https://www.wndrmuseum.com/tickets/boston/gift-cards?gad_source=1&gad_campaignid=22722101921&gbraid=0AAAAABW_ivPc8kqBok0OGCZ0NKkEQwYla&gclid=CjwKCAiAvaLLBhBFEiwAYCNTf3n1i43LlDpgP5pPX3crNNqQpW3FN1JLbbua9ABSWtbxzzOIkcAyRRoCAoAQAvD_BwE  [exhibition/on_view]
+   - WNDRWall | WNDR Museum Boston  →  https://www.wndrmuseum.com/installations/boston/wndrwall  [exhibition/on_view]
+   - INSIDEOUT | WNDR Museum Boston  →  https://www.wndrmuseum.com/installations/boston/insideout-boston  [exhibition/on_view]
+
+================ STOP 1 (opening section, full) ================
+Stop 1: Flex | WNDR Museum Boston
+
+Address: 404 E. 1st St, Boston, MA 02127
+
+Coordinates: 42.3393, -71.0402
+
+Orientation: You are about to explore the WNDR Museum Boston, a hub of interactive art and technology. Within its walls, you will encounter 7 distinct works: Flex, Speak Up!, Lake Shore Drive (LSD), MPO-1 (Time Machine), Buy Gift Cards - WNDR Boston, and WNDRWall. Each piece offers a unique perspective on the theme of perception and innovation. Delve into this world where creativity and technology intersect, sparking new ideas and challenging conventional thinking. Explore how art and technology collaborate to redefine our understanding of the world around us, all within the dynamic space of WNDR Museum Boston. As you continue on this tour, you will discover the closure of WNDR Museum Boston on August 30th, 2023, after six years at Flex | WNDR Museum Boston, and its final closure in September 2026 at Lake Shore Drive (LSD) | WNDR Museum Boston. Your first stop is Flex | WNDR Museum Boston. As you step into the WNDR Museum Boston space, pause at the beginning of the Flex installation to see the dance of light and shadows come alive. The interplay of dynamic motion and illumination invites you into a realm where perception shifts continuously.
+
+The WNDR Museum opened its doors in Chicago in 2018, establishing an interactive art experience in the city's West Loop. Over the years, this innovative museum expanded to Boston, where it introduced its captivating mix of light and motion in 2022. However, in 2023, the organization announced the closure of its Boston location on August 30th, as part of a broader closure of its original Chicago site after six years. This closure marked a shift in the museum's presence, leaving behind a legacy of interactive art experiences designed to engage the viewer actively. Flex, with its kinetic art, exemplifies this legacy, as it transforms rigid perceptions into fluid realities. The installation's use of motion and light echoes the museum's core mission of blending art and technology.
+
+
+Directions: Continue through WNDR Museum — next is WNDR Museum Boston.
+
+================ COORDINATES ================
+  Coordinates: lines found: 7 / 6 stop(s)
+    42.3393, -71.0402
+    42.3393, -71.0402
+    42.3393, -71.0402
+    42.3393, -71.0402
+    42.3393, -71.0402
+    42.3393, -71.0402
+    42.3393, -71.0402
+
+================ BLOCKER 3 (content-QA factual gate) ================
+  PASS: No forbidden phrases
+  PASS: No cross-stop repetition (>0.85)
+  PASS: Distinct opening sentences
+  PASS: No compass bearings (museum)
+  PASS: No standalone Introduction block (R2)
+  PASS: Final stop has substantial content
+  PASS: Word count per stop (200-500 middle, 150-800 first/last)
+  PASS: Total length reasonable (1000-8000 words for 7 stop(s))
+  PASS: D3(a) Stop-title sanity
+  PASS: D3(b) Coordinate scatter (museum <200m)
+  FAIL: D3(c) No boilerplate shingles (4-word in 3+ stops) — 1 repeated shingle(s): ['gift cards wndr boston']
+  PASS: D3(c2) No unearned adjectives (explain or cut) [LOCAL-40]
+  PASS: D3(d) Grounding assertion (titles look like real entities)
+  PASS: D3(e) No duplicate stops (same work under different labels) (FACTUAL)
+  PASS: T6 No splice corruption (mid-token dots, stray Stop N refs)
+  PASS: R3 Orientation substance (no generic filler in museum)
+  PASS: Single-venue consistency (no other NAMED venues)
+  PASS: Attribution grounding (consistent with venue)
+  PASS: Venue coherence (stops reference correct venue)
+  PASS: G4 Prolog/epilog claims trace to story elements (FACTUAL)
+  [LOCAL-36] No practical claims in tour (OK — omission is safe)
+  BLOCKER 3 line 1 — PASS checks:          19
+  BLOCKER 3 line 2 — style FAIL checks:    1
+  BLOCKER 3 line 3 — FACTUAL FAIL checks:  0
+
+Tour total: $1.3082  cache_hit=False  wall_time=310.8s
+OUT: /out/LOCAL602_WNDR_RUN.txt
+CONTAINER_EXIT=0
