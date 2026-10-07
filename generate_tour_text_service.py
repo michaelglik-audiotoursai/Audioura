@@ -575,6 +575,7 @@ def generate_tour_async(job_id, location, tour_type, total_stops=10, user_id=Non
             
             _QA_MAX_ROUNDS = 3
             _qa_passed = False
+            _g4_corrected_text = None
             
             for _qa_round in range(1, _QA_MAX_ROUNDS + 1):
                 # Run QA with story_elements passed in-memory
@@ -630,6 +631,19 @@ def generate_tour_async(job_id, location, tour_type, total_stops=10, user_id=Non
                     _qa_passed = True
                     print(f"[BLOCKER4c] QA PASSED (round {_qa_round}): all checks clean")
                     break
+                elif (content_qa_runner.FACTUAL_FAIL_COUNT == 1
+                      and getattr(content_qa_runner, 'G4_UNGROUNDED_SENTENCES', None)
+                      and _qa_round < _QA_MAX_ROUNDS
+                      and all(_g4s in tour_text for _g4s in content_qa_runner.G4_UNGROUNDED_SENTENCES)):
+                    # [LEAD 2026-10-06] The only factual failure is G4: specific prolog/
+                    # epilog sentences (orientation prose) that trace to no story element.
+                    # Corrective action, same rule as LOCAL-423: remove those sentences
+                    # and re-check, instead of throwing away a tour whose stops are sound.
+                    for _g4s in content_qa_runner.G4_UNGROUNDED_SENTENCES:
+                        tour_text = tour_text.replace(_g4s, '').replace('  ', ' ')
+                        print(f"[BLOCKER4c] G4 corrective: removed ungrounded sentence: {_g4s[:100]!r}")
+                    _g4_corrected_text = tour_text
+                    continue
                 elif content_qa_runner.FACTUAL_FAIL_COUNT > 0:
                     # Factual failure — reject entirely (upstream pipeline bug, not fixable here)
                     # [LOCAL-593 #5] The internal failure count stays in the LOG.
@@ -692,6 +706,19 @@ def generate_tour_async(job_id, location, tour_type, total_stops=10, user_id=Non
                         )
                     # Loop continues — will re-run QA on corrected text
             
+            # [LEAD 2026-10-06] Corrections made inside the QA loop (style phrase removal,
+            # G4 sentence removal) edit `tour_text`, but delivery copies temp_path. Write
+            # the corrected text back so what passed QA is what the listener gets.
+            try:
+                # Only the G4 removal is written back: the style regexes delete phrase
+                # fragments mid-sentence and were never delivered before; keep it so.
+                if _g4_corrected_text and os.path.exists(temp_path):
+                    tour_text = _g4_corrected_text
+                    with open(temp_path, 'w', encoding='utf-8') as _wb:
+                        _wb.write(tour_text)
+            except Exception as _wb_err:
+                print(f"[BLOCKER4c] could not write corrected text back: {_wb_err}")
+
             if not _qa_passed:
                 # After max rounds, style issues remain — but QA DID complete successfully
                 # (factual gates passed, only style checks failed). Deliver with warning.

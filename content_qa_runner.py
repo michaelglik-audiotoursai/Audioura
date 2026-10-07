@@ -122,6 +122,9 @@ def extract_g4_proper_nouns(claim_text: str, venue_context: dict = None,
     return _claim_proper_nouns
 
 
+G4_UNGROUNDED_SENTENCES = []
+
+
 def check(name, condition, detail=""):
     global PASS_COUNT, FAIL_COUNT
     if condition:
@@ -776,6 +779,8 @@ def run_qa(tour_text, tour_file="", story_elements=None, venue_context=None):
                 {'text': _p, 'type': 'opening_section', 'source': 'd611_opening'} for _p in _opening_paras]
 
     # --- Check claims against elements ---
+    global G4_UNGROUNDED_SENTENCES
+    G4_UNGROUNDED_SENTENCES = []   # full text of each ungrounded prolog/epilog claim (LEAD, for corrective removal)
     _ungrounded_claims = []
     _is_storied = os.environ.get("STORIED_MODE") == "true"
     
@@ -824,7 +829,7 @@ def run_qa(tour_text, tour_file="", story_elements=None, venue_context=None):
                         break
                 
                 if not _matched_element:
-                    _ungrounded_claims.append(claim[:80])
+                    _ungrounded_claims.append(claim[:80]); G4_UNGROUNDED_SENTENCES.append(claim)
                     continue
                 
                 # B7: Proper nouns — delegate to module-level extraction function
@@ -840,7 +845,7 @@ def run_qa(tour_text, tour_file="", story_elements=None, venue_context=None):
                         if pn not in _elem_text_lower:
                             _missing_pn.append(pn)
                     if _missing_pn:
-                        _ungrounded_claims.append(f"{claim[:60]}... (proper noun '{_missing_pn[0]}' not in element)")
+                        _ungrounded_claims.append(f"{claim[:60]}... (proper noun '{_missing_pn[0]}' not in element)"); G4_UNGROUNDED_SENTENCES.append(claim)
                         continue
                     
                     # Also check: the SPECIFIC causal verb from the claim must exist in the
@@ -867,7 +872,7 @@ def run_qa(tour_text, tour_file="", story_elements=None, venue_context=None):
                                 _any_causal_matches = True
                                 break
                         if not _any_causal_matches:
-                            _ungrounded_claims.append(f"{claim[:60]}... (causal verb '{_claim_causal[0]}' not in matched element)")
+                            _ungrounded_claims.append(f"{claim[:60]}... (causal verb '{_claim_causal[0]}' not in matched element)"); G4_UNGROUNDED_SENTENCES.append(claim)
                             continue
         
         elif _is_storied and _claim_sentences:
