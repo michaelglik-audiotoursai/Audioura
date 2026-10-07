@@ -184,7 +184,22 @@ _FIELD_OR_SEQ = re.compile(
 
 
 def _split_sentences(text: str) -> List[str]:
-    return [s.strip() for s in re.split(r'(?<=[.!?])\s+', text.strip()) if s.strip()]
+    """Split narration into sentences using the ONE shared splitter.
+
+    [LOCAL-614 item 1] The old body here was ``re.split(r'(?<=[.!?])\\s+', …)``,
+    which treats an initial's full stop ("Isabella V.", "Gail L.") as a sentence
+    boundary. A later dedupe drop then kept only half the sentence, shipping
+    "…named The Charles S. and Isabella V.This transition…" and "…along with Gail
+    L. The expertise…". ``sentence_split.split_sentences`` already guards a single
+    capital letter + period (an initial) and common abbreviations, so delegating
+    to it means a name's initial is never a split point. One shared splitter.
+    """
+    try:
+        from sentence_split import split_sentences as _shared
+    except Exception:  # pragma: no cover - shared module always present in repo
+        return [s.strip() for s in re.split(r'(?<=[.!?])\s+', (text or "").strip())
+                if s.strip()]
+    return _shared(text or "")
 
 
 @dataclass
