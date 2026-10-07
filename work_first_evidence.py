@@ -73,6 +73,8 @@ __all__ = [
     "filter_tour_text_work_first",
     "reconcile_shortfall_in_text",
     "count_delivered_stops",
+    "is_institutional_theme",
+    "looks_like_non_artwork_listing",
 ]
 
 
@@ -835,3 +837,130 @@ def _remove_sentence_containing(text: str, idx: int) -> str:
     out = re.sub(r"[ \t]{2,}", " ", out)
     out = re.sub(r"\n[ \t]+\n", "\n\n", out)
     return out
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# institutional THEME guard — a tour theme that frames the stops around the
+# museum/collection/donations rather than the works and artists.
+# ─────────────────────────────────────────────────────────────────────────────
+
+# A theme NAME/description is institutional when it is ABOUT the institution,
+# its money, its acquisitions, its founding, its policies — the exact framing the
+# critic flagged ("19th-Century Institutional Foundations", "the museum's growth",
+# "donor legacy", "expropriation and the collection").
+_INSTITUTIONAL_THEME_RE = re.compile(
+    r"(?i)\b("
+    r"institution(?:al)?|founding|foundations?|donor|donation|benefactor|"
+    r"bequest|acquisition|accession|provenance|collection'?s?\s+(?:growth|history|"
+    r"formation|origins?)|museum'?s?\s+(?:growth|history|mission|founding)|"
+    r"expropriation|confiscation|desamortiz|nationaliz|redistribut|"
+    r"patronage|philanthrop|endowment|the\s+making\s+of\s+(?:a|the)\s+(?:museum|"
+    r"collection)"
+    r")\b"
+)
+
+# Signals that keep an otherwise-institutional-sounding theme if it is really
+# about the ART (so "foundations of modern abstraction" is not caught).
+_THEME_ART_RESCUE_RE = re.compile(
+    r"(?i)\b(abstraction|portrait|landscape|still\s+life|colou?r|light|form|"
+    r"brushwork|devotion|faith|myth|identity|exile|grief|love|war|nature|body|"
+    r"movement|realism|impressionism|surrealism|baroque|modernism)\b"
+)
+
+
+def is_institutional_theme(theme_name: str, theme_description: str = "") -> bool:
+    """True when a tour THEME frames the stops institutionally, not around the art.
+
+    The critic flagged themes like "19th-Century Institutional Foundations" that
+    drag donor/confiscation/collection history into every stop. A theme is
+    institutional when its name or description carries an institutional term and
+    is NOT rescued by an art-subject term.
+    """
+    text = f"{theme_name or ''} {theme_description or ''}".strip()
+    if not text:
+        return False
+    if not _INSTITUTIONAL_THEME_RE.search(text):
+        return False
+    # If the theme is really about the art despite an institutional word, keep it.
+    if _THEME_ART_RESCUE_RE.search(theme_name or ""):
+        return False
+    return True
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# NON-ARTWORK LISTING guard — a candidate "stop title" that is actually a price,
+# an opening-hours line, or an event/guided-tour listing scraped from a calendar
+# or pricing feed, in ANY language. The Kunstmuseum Basel run (tour 418) made
+# "Kosten: Eintritt Sammlung" (German "Cost: Collection admission") and "Mit der
+# wissenschaftlichen Assistentin Amélie Joller" (a guided-tour listing) into
+# artwork stops — the critic's two Critical defects. These are a different KIND
+# of thing from an artwork, caught structurally rather than by any one language's
+# vocabulary.
+# ─────────────────────────────────────────────────────────────────────────────
+
+# Price / admission labels in several European languages the pipeline meets.
+_PRICE_LABEL_RE = re.compile(
+    r"(?i)^\s*("
+    r"kosten|eintritt|preis|preise|tarif|tarife|tarifs?|precio|precios|"
+    r"prix|entr[ée]e|entrada|admission|price|cost|fee|fees|ticket[s]?|"
+    r"gratuit|gratis|free\s+admission"
+    r")\b")
+_PRICE_VALUE_RE = re.compile(
+    r"(?i)([$€£]\s?\d|\bchf\s?\d|\d+\s?(?:eur|usd|gbp|chf|dollars?|euros?|francs?)\b)")
+
+# Opening-hours listing.
+_HOURS_LISTING_RE = re.compile(
+    r"(?i)^\s*("
+    r"[öo]ffnungszeiten|horaires?|horario|opening\s+hours|hours|"
+    r"geschlossen|closed\s+(?:on|mon|tue|wed)|ferm[ée]"
+    r")\b")
+
+# Guided-tour / event listing: starts with a "with <role/person>" preposition in
+# a European language, or names a staff role joined to a tour/talk.
+_EVENT_LISTING_RE = re.compile(
+    r"(?i)^\s*("
+    r"mit\s+(?:der|dem|den|die)\s|avec\s+|con\s+(?:el|la|los)\s|with\s+(?:the\s+)?"
+    r"(?:curator|assistant|guide|director|lecturer)|"
+    r"f[üu]hrung|visite\s+guid[ée]e|visita\s+guiada|guided\s+tour|"
+    r"workshop|vortrag|conf[ée]rence|lecture\s+by|talk\s+by|gespr[äa]ch"
+    r")\b")
+# A staff/academic role token that, inside a short "title", marks an event
+# listing rather than a work ("wissenschaftlichen Assistentin" = research assistant).
+_STAFF_ROLE_RE = re.compile(
+    r"(?i)\b(assistent(?:in)?|wissenschaftlich|kurator(?:in)?|curator|"
+    r"conservateur|conservatrice|docent|guide|r[ée]f[ée]rent)\b")
+
+
+def looks_like_non_artwork_listing(title: str) -> bool:
+    """True when a candidate stop title is a price/hours/event listing, not a work.
+
+    Deterministic and multilingual-by-structure. Catches:
+      • price/admission lines: "Kosten: Eintritt Sammlung", "Prix: 15 €",
+        "Admission", "Eintritt CHF 26";
+      • opening-hours lines: "Öffnungszeiten", "Opening hours", "Geschlossen …";
+      • event / guided-tour listings: "Mit der wissenschaftlichen Assistentin
+        Amélie Joller", "Visite guidée", "Führung", "Lecture by …".
+
+    A genuine artwork title ("Madonna of the Napkin", "San Francisco abrazando a
+    Cristo en la Cruz") is never caught: it opens with neither a price/hours label
+    nor an event preposition, and carries no price value or staff-role token.
+    """
+    t = (title or "").strip()
+    if not t:
+        return False
+    # price / admission
+    if _PRICE_LABEL_RE.search(t):
+        return True
+    if _PRICE_VALUE_RE.search(t) and len(t.split()) <= 8:
+        # a short line dominated by a price value is a pricing row, not a work
+        return True
+    # opening hours
+    if _HOURS_LISTING_RE.search(t):
+        return True
+    # event / guided-tour listing
+    if _EVENT_LISTING_RE.search(t):
+        return True
+    # a short "title" that opens with "Mit/Avec/With/Con" AND names a staff role
+    if _STAFF_ROLE_RE.search(t) and re.match(r"(?i)^\s*(mit|avec|with|con)\b", t):
+        return True
+    return False

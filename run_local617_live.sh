@@ -52,6 +52,8 @@ args=(
   -e TEST_GEMINI_MAX_USD=2.50
   -e LOCAL603_PREFLIGHT=1
   -v "${OUT_DIR}:/app/tours"
+  -v "${HERE}/run_local617_container.py:/app/run_local617_container.py:ro"
+  -v "${HERE}/work_first_evidence.py:/app/work_first_evidence.py:ro"
 )
 [ -f "${ENV_FILE}" ] && args+=(--env-file "${ENV_FILE}")
 args+=("${IMAGE}" python run_local617_container.py)

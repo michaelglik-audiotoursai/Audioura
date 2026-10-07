@@ -367,7 +367,6 @@ class TestConclusionNamesOnlyDelivered(unittest.TestCase):
 
 class TestShortfallRecompute(unittest.TestCase):
     def test_recompute_on_final_count(self):
-        # Granet: shortfall logic ran at 3, a late gate dropped to 2.
         s = wf.recompute_shortfall_on_delivered(
             venue_name="Musée Granet, Aix-en-Provence, France",
             exhibitions_on_view=2, final_delivered_stops=2, requested_stops=3)
@@ -387,6 +386,58 @@ class TestShortfallRecompute(unittest.TestCase):
             final_delivered_stops=1, requested_stops=3)
         self.assertIn("1 stop ", s)
         self.assertNotIn("1 stops", s)
+
+
+class TestInstitutionalTheme(unittest.TestCase):
+    def test_institutional_themes_rejected(self):
+        for name in [
+            "19th-Century Institutional Foundations",
+            "The Making of a Museum: Donors and Benefactors",
+            "Expropriation and the Collection",
+            "The Desamortización and the Museum's Growth",
+            "A Legacy of Patronage",
+        ]:
+            self.assertTrue(wf.is_institutional_theme(name), msg=name)
+
+    def test_art_themes_kept(self):
+        for name in [
+            "Devotion and the Human Body in Baroque Seville",
+            "From Early Realism to Late Abstraction",
+            "Light, Shadow, and the Sacred",
+            "El Greco and His Workshop",
+            "Foundations of Modern Abstraction",  # 'foundations' but art-rescued
+        ]:
+            self.assertFalse(wf.is_institutional_theme(name), msg=name)
+
+
+class TestNonArtworkListing(unittest.TestCase):
+    def test_price_and_event_listings_rejected(self):
+        for t in [
+            "Kosten: Eintritt Sammlung",
+            "Mit der wissenschaftlichen Assistentin Amélie Joller",
+            "Öffnungszeiten",
+            "Prix: 15 €",
+            "Admission",
+            "Eintritt CHF 26",
+            "Visite guidée avec le conservateur",
+            "Führung",
+        ]:
+            self.assertTrue(wf.looks_like_non_artwork_listing(t), msg=t)
+
+    def test_real_artwork_titles_kept(self):
+        for t in [
+            "Madonna of the Napkin",
+            "San Francisco abrazando a Cristo en la Cruz",
+            "Retrato de Jorge Manuel Theotocopuli",
+            "The Night Watch",
+            "Two Venetian Ladies",
+        ]:
+            self.assertFalse(wf.looks_like_non_artwork_listing(t), msg=t)
+
+    def test_wired_into_chrome_gate(self):
+        import exhibition_discovery as ed
+        self.assertTrue(ed.is_chrome_title("Kosten: Eintritt Sammlung", "Kunstmuseum Basel"))
+        self.assertFalse(ed.is_chrome_title("Madonna of the Napkin", "Museo de Bellas Artes"))
 
 
 if __name__ == "__main__":
