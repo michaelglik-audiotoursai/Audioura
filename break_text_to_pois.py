@@ -4,6 +4,15 @@ Process tour text files and create directory structure with POI audio text files
 import os
 import re
 
+# [LOCAL-602 r2 / D617 item 9] The spoken text a listener hears must contain NO
+# URL and NO "Sources" block — a synthesiser would read them aloud. The strip is
+# a deterministic pass in spoken_text_hygiene; imported defensively so a missing
+# module degrades to the pre-602 behaviour rather than crashing the packer.
+try:
+    from spoken_text_hygiene import strip_sources_and_urls as _strip_spoken
+except Exception:  # pragma: no cover - defensive
+    _strip_spoken = None
+
 def process_tour_file(filename):
     # Get the absolute path of the script directory
     script_dir = os.path.dirname(os.path.abspath(__file__))
@@ -42,6 +51,16 @@ def process_tour_file(filename):
         stop_num = match.group(1)
         poi_name = match.group(2).strip()
         poi_content = match.group(3).strip()
+
+        # [LOCAL-602 r2 / D617 item 9] Strip URLs and any "Sources:" block so the
+        # SPOKEN audio file never reads a web address aloud. The full-text / web
+        # view (generated separately) keeps its Sources line.
+        if _strip_spoken is not None:
+            poi_content, _rep = _strip_spoken(poi_content)
+            if _rep.get('urls') or _rep.get('sources_blocks'):
+                print(f"   [LOCAL-602] stop {stop_num} spoken-text: stripped "
+                      f"{_rep.get('urls', 0)} URL(s), "
+                      f"{_rep.get('sources_blocks', 0)} Sources block(s)")
         
         # Create filename from POI name
         file_name = f"audio_{stop_num}_" + re.sub(r'[^a-z0-9]', '_', poi_name.lower())

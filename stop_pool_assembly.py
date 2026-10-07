@@ -214,6 +214,23 @@ def _closing_recap(order_titles: List[str], walk_back_titles: Optional[List[str]
     first, last = order_titles[0], order_titles[-1]
     n = len(order_titles)
     stop_word = "stop" if n == 1 else "stops"
+    # [LOCAL-602 r2 / D617 item 12] A "From {first} to {last}" recap only makes
+    # sense across TWO OR MORE stops. With a single stop first == last, so the
+    # generator shipped "From WNDR Museum — Overview to WNDR Museum — Overview,
+    # you have followed the thread of a single story." — a nonsense sentence. For
+    # a 1-stop tour, state the single stop plainly with no From→to clause (this
+    # mirrors generate_tour_text._build_closing_recap, which skips the recap for
+    # n_delivered < 2).
+    if n < 2:
+        lines = [f"That's {n} {stop_word}: {first}."]
+        if walk_back_titles:
+            names = ", ".join(walk_back_titles)
+            lines += [
+                "",
+                f"If you have toured this place before, the later stops — {names} — "
+                f"may already be familiar; feel free to walk back to them at your own pace.",
+            ]
+        return "\n".join(lines)
     lines = [
         f"From {first} to {last}, you have followed the thread of a single story.",
         "",

@@ -459,6 +459,75 @@ def _split_sentences(text: str) -> List[str]:
     return [s.strip() for s in re.split(r"(?<=[.!?])\s+|\n+", text or "") if s.strip()]
 
 
+# [LOCAL-602 r2 / D617 item 11] A FOUNDER-BIOGRAPHY sentence describes a PERSON,
+# not the museum. The About stop must describe the institution. Two deterministic
+# helpers decide: is the sentence's SUBJECT a person, and does the sentence state
+# the MUSEUM'S OWN identity? Only the second rescues a person-subject sentence.
+
+# Words that mark the kind of thing a museum IS — used to tell an institutional
+# identity statement ("<Venue> is a contemporary art museum") from a person
+# biography ("<Person> is an entrepreneur").
+_MUSEUM_KIND_RE = re.compile(
+    r"(?i)\b(museum|gallery|galleries|exhibition|experience|art\s+space|"
+    r"installation|collection|library|archive|athenaeum|institute|institution|"
+    r"foundation|center|centre|attraction|exhibit|exhibits|nonprofit|non-?profit|"
+    r"organization|organisation)\b")
+
+# A role/biography noun that marks the sentence subject as a PERSON (a founder,
+# artist, executive), not an institution. "entrepreneur", "co-founder", "CEO" …
+_PERSON_ROLE_RE = re.compile(
+    r"(?i)\b(entrepreneur|businessman|businesswoman|investor|philanthropist|"
+    r"founder|co-?founder|artist|designer|architect|collector|curator|director|"
+    r"ceo|chief\s+executive|chairman|chairwoman|chairperson|president|"
+    r"he\s+was|she\s+was|he\s+is|she\s+is|born\s+in|grew\s+up|"
+    r"graduated|studied|earned\s+(?:a|his|her)\s+degree)\b")
+
+# A trailing-honorific / given-name shape used to recognise a person as the
+# leading subject: one-to-three Capitalised tokens, or a leading honorific.
+_PERSON_SUBJECT_LEAD_RE = re.compile(
+    r"^\s*(?:Mr|Mrs|Ms|Dr|Sir|Dame|Prof)\.?\s+[A-Z][a-z]+"
+    r"|^\s*[A-Z][a-z]+\s+[A-Z][a-z]+(?:\s+[A-Z][a-z]+)?\b")
+
+
+def _subject_is_person(sent: str, venue_first: str) -> bool:
+    """Best-effort: is the sentence's grammatical SUBJECT a PERSON (not the venue)?
+
+    Deterministic and conservative. True when the sentence LEADS with a
+    person-name shape (optionally an honorific) that is NOT the venue's leading
+    word, OR when it carries an explicit person-role / biography marker
+    ("entrepreneur", "co-founder", "he was", "grew up", "studied") while NOT
+    opening with the venue name. Used only to reject a founder biography that
+    carries a story verb; a false negative merely leaves the existing behaviour.
+    """
+    s = (sent or "").strip()
+    if not s:
+        return False
+    first = s.split()[0] if s.split() else ""
+    vf = (venue_first or "").strip().lower()
+    opens_with_venue = bool(vf and first.lower().strip(",.;:") == vf)
+    if opens_with_venue:
+        return False  # the venue is the subject — not a person
+    lead_is_person = bool(_PERSON_SUBJECT_LEAD_RE.match(s))
+    has_person_role = bool(_PERSON_ROLE_RE.search(s))
+    # A participial founder lead ("Founded by Bradley Keywell, …") still describes
+    # the museum's founding, so it is NOT a person subject by itself; require an
+    # actual person lead or a biography marker.
+    return lead_is_person or has_person_role
+
+
+def _states_museum_identity(sent: str, venue_first: str) -> bool:
+    """True when the sentence states the MUSEUM'S identity: it names the venue AND
+    links it to a museum-kind word ("<Venue> is an immersive art museum").
+
+    This is what rescues a sentence that also mentions a person — a genuine
+    institutional identity statement is kept even if a founder is named in it.
+    """
+    s = (sent or "").strip()
+    vf = (venue_first or "").strip().lower()
+    names_venue = bool(vf and vf in s.lower())
+    return names_venue and bool(_MUSEUM_KIND_RE.search(s))
+
+
 def _is_story_sentence(sent: str, venue_core: str, venue_first: str) -> bool:
     s = sent
     if not (40 <= len(s) <= 300):
@@ -473,6 +542,17 @@ def _is_story_sentence(sent: str, venue_core: str, venue_first: str) -> bool:
     # "community") and must be excluded BEFORE the signal/verb check, or the land
     # acknowledgment is lifted as the museum's story (the r2 defect).
     if _NON_STORY_RE.search(s):
+        return False
+    # [LOCAL-602 r2 / D617 item 11] Reject a FOUNDER BIOGRAPHY sentence: one whose
+    # subject is a PERSON (the founder) and that describes the person, not the
+    # museum. WNDR's About page was the Bradley Keywell biography — "Bradley
+    # Keywell is a serial entrepreneur …", "Keywell co-founded …" — every such
+    # sentence carries a story verb ("founded") yet says nothing about what the
+    # MUSEUM is. The About stop describes an institution, not a person. A sentence
+    # is kept only if it states the museum's own identity (names the venue AND an
+    # institutional "is a/the <museum-kind>"); a person-subject sentence that does
+    # not is dropped here, before the signal/verb check can rescue it on "founded".
+    if _subject_is_person(s, venue_first) and not _states_museum_identity(s, venue_first):
         return False
     # Must be grammatically ABOUT the institution: either names the venue (or its
     # leading word) OR carries an institutional story verb. This keeps a stray

@@ -833,6 +833,17 @@ def _build_js_fallback_candidates(base_site_url, city, total_stops, fetch,
             print(f"  [LOCAL-602] no-other-city filter dropped "
                   f"{before - len(raw_items)} item(s) attested only off-{city}")
 
+    # Junk-stop filter: a stop must be a thing you look at, not a ticket / gift-card
+    # / shop / membership / events / FAQ / contact page or the branch INDEX page
+    # itself. Deterministic path-only rule (LOCAL-602 r2 — the r1 run shipped
+    # "/tickets/boston/gift-cards" and "/location/boston" as stops).
+    before = len(raw_items)
+    raw_items = _js.reject_non_stop_urls(raw_items, city)
+    if len(raw_items) != before:
+        diagnostics['non_stop_dropped'] = before - len(raw_items)
+        print(f"  [LOCAL-602] junk-stop filter dropped {before - len(raw_items)} "
+              f"non-stop page(s) (tickets/gift-cards/shop/branch-index/…)")
+
     # Materialise candidates (de-dup by title), capped at ~2x N.
     cap = max(total_stops * 2, total_stops)
     out: List[Dict] = []
