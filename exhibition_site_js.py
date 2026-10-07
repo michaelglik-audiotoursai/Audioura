@@ -45,6 +45,8 @@ __all__ = [
     'pick_branch_url', 'extract_embedded_json', 'serper_site_city',
     'filter_other_city', 'slug_variants', 'US_CHAIN_CITIES', 'default_serper',
     'is_stop_url', 'reject_non_stop_urls', 'NON_STOP_SEGMENTS',
+    'is_exhibit_stop', 'is_exhibit_heading', 'STOP_PATH_SEGMENTS',
+    'EXHIBIT_JSONLD_TYPES',
 ]
 
 # Cities where immersive-art / experience chains commonly have branches. Used ONLY
@@ -272,11 +274,15 @@ _EXHIBIT_TYPES = ('exhibitionevent', 'exhibition', 'visualartwork', 'event',
                   'installation')
 
 
-def _walk_json(node, out: List[Tuple[str, str]], depth: int = 0):
-    """Collect (title, url) pairs from a decoded JSON tree. Conservative: a title
-    is a string value under a title-like key on an object that also looks like a
-    content/place node (has a type/url/description), so navigation labels are not
-    swept in."""
+def _walk_json(node, out: List[Tuple[str, str, str]], depth: int = 0):
+    """Collect (title, url, jsonld_type) triples from a decoded JSON tree.
+
+    Conservative: a title is a string value under a title-like key on an object
+    that also looks like a content/place node (has a type/url/description), so
+    navigation labels are not swept in. The object's ``@type``/``type`` is kept
+    (lower-cased, '' when absent) so the allow-list in ``is_exhibit_stop`` can use
+    a JSON-LD type as positive evidence that the item is an exhibit/work/room —
+    [LOCAL-602 r3]."""
     if depth > 8:
         return
     if isinstance(node, dict):
@@ -298,7 +304,7 @@ def _walk_json(node, out: List[Tuple[str, str]], depth: int = 0):
             typ in _EXHIBIT_TYPES or url or lowered.get('description')
             or lowered.get('startdate') or lowered.get('image'))
         if title and looks_like_content and 3 <= len(title) <= 120:
-            out.append((title, url))
+            out.append((title, url, typ))
         for v in node.values():
             _walk_json(v, out, depth + 1)
     elif isinstance(node, list):
@@ -327,7 +333,7 @@ def extract_embedded_json(html: str, base_url: str,
     for m in _INITIAL_STATE_RE.finditer(html):
         blobs.append(m.group(1))
 
-    pairs: List[Tuple[str, str]] = []
+    pairs: List[Tuple[str, str, str]] = []
     for blob in blobs:
         blob = blob.strip()
         if not blob:
@@ -344,7 +350,7 @@ def extract_embedded_json(html: str, base_url: str,
 
     out: List[Dict] = []
     seen = set()
-    for title, url in pairs:
+    for title, url, typ in pairs:
         key = title.lower()
         if key in seen:
             continue
@@ -355,6 +361,7 @@ def extract_embedded_json(html: str, base_url: str,
             'detail_url': detail_url,
             'source_url': detail_url or base_url,
             'source': 'embedded_json',
+            'jsonld_type': typ,  # [LOCAL-602 r3] positive-ID evidence
             'city': city,
         })
     return out
@@ -446,31 +453,65 @@ def _mentions_city(haystack: str, city: str) -> bool:
     return False
 
 
-# ── 7. junk-stop rejection (a stop must be a thing you look at) ───────────────
+# ── 7. stop identification — ALLOW-LIST (a stop must be positively an exhibit) ─
 #
-# The r1 live run (tour 397, WNDR Boston) delivered two pages that are not stops:
+# [LOCAL-602 r3] r2 shipped a BLOCK-list: a page became a stop unless a path
+# segment was in NON_STOP_SEGMENTS. A block-list can only ever reject the junk it
+# has already seen, so the Meow Wolf live run shipped two pages whose junk words
+# were simply not on the list:
 #
-#     Stop 6: Buy Gift Cards - WNDR Boston   /tickets/boston/gift-cards
-#     Stop 2: WNDR Museum Boston             /location/boston   (the branch page)
+#     Stop 1: Adulti-Verse at Meow Wolf Santa Fe | 21+ Night Out
+#             /adulti-verse/santa-fe          (an event — "adulti-verse" unlisted)
+#     Stop 2: Santa Fe City Guide: Top Attractions & Restaurants Near …
+#             /destinations/santa-fe-city-guide   (a blog/guide — "destinations" unlisted)
 #
-# A stop must be an installation, work, room or exhibition — something a listener
-# stands in front of. Tickets, gift cards, the shop, membership, events, FAQ and
-# the location index page are transactional/navigational, not stops. The embedded
-# JSON and the site:<domain> <city> Serper results both surface them because they
-# are real URLs on the venue's own domain; nothing earlier distinguishes a thing
-# to see from a page to click. This does.
+# r3 inverts the rule: a page becomes a stop ONLY when it is POSITIVELY identified
+# as an exhibit / installation / room / work. Everything that is not positively an
+# exhibit is excluded by NOT MATCHING — events, "nights", guides, blogs, press,
+# tickets and "destinations" fall away without having to be enumerated. The three
+# kinds of positive evidence (any one suffices), all deterministic and local:
 #
-# The rule is deterministic and reads only the URL path — no fetch, no model:
-#   * reject when ANY path segment is in NON_STOP_SEGMENTS (tickets, gift-cards,
-#     shop, membership, events, faq, visit, contact, about, cart, checkout,
-#     account, careers, press, blog, news, privacy, terms, search, donate, …);
-#   * reject the branch INDEX page itself — a path whose only non-"location(s)"
-#     segments are the city slug (``/location/boston``, ``/boston``), because that
-#     is the venue's own landing page, not an exhibit within it.
-# A URL with no path (the bare domain) is also rejected: it is the home page.
+#   1. URL PATH SEGMENT — a path segment in STOP_PATH_SEGMENTS: /installations/,
+#      /installation/, /exhibits/, /exhibit/, /exhibitions/, /exhibition/,
+#      /rooms/, /room/, /artworks/, /artwork/, /works/, /collection/,
+#      /collections/, /galleries/, /gallery/, /art/, /piece/, /pieces/.
+#   2. JSON-LD @type — the item's ``jsonld_type`` (set by extract_embedded_json)
+#      is one of EXHIBIT_JSONLD_TYPES: ExhibitionEvent, VisualArtwork, Artwork,
+#      Installation, CreativeWork, or Place (a Place is accepted only when it is
+#      ON the venue's own domain, i.e. a room within the venue, never an external
+#      "place").
+#   3. HEADING PATTERN — the item carries ``from_exhibit_heading=True`` (or an
+#      ``exhibit_heading`` string), meaning it was lifted from the branch page's
+#      own exhibit-list heading section by the caller.
+#
+# An item that carries NO URL and no type/heading evidence is still KEPT and left
+# to be judged elsewhere (the r2 contract: a candidate with no URL is not dropped
+# by this gate). The block-list NON_STOP_SEGMENTS / is_stop_url are retained below
+# so the deterministic path-only rejection the r2 suite pins keeps working; the
+# allow-list simply runs FIRST and is the authority on what becomes a stop.
+
+# Path segments that POSITIVELY mark a page as an exhibit / installation / room /
+# work. Compared case-insensitively; '-'/'_' normalised. Any ONE such segment
+# anywhere in the path is sufficient positive evidence.
+STOP_PATH_SEGMENTS = frozenset({
+    'installations', 'installation', 'exhibits', 'exhibit', 'exhibitions',
+    'exhibition', 'rooms', 'room', 'artworks', 'artwork', 'works', 'work',
+    'collection', 'collections', 'galleries', 'gallery', 'art', 'artwork',
+    'piece', 'pieces', 'object', 'objects', 'exhibitionevent',
+})
+
+# JSON-LD @type values that POSITIVELY mark an item as an exhibit / work / room.
+# 'place' is conditional (venue-domain only) and handled in is_exhibit_stop.
+EXHIBIT_JSONLD_TYPES = frozenset({
+    'exhibitionevent', 'exhibition', 'visualartwork', 'artwork', 'installation',
+    'creativework', 'collection', 'exhibit',
+})
+# A Place/Room JSON-LD type is positive ONLY when the URL is on the venue domain.
+_PLACE_JSONLD_TYPES = frozenset({'place', 'room', 'touristattraction'})
 
 # Path segments that mark a transactional / navigational / informational page
-# rather than a thing-to-see. Compared case-insensitively; '-' and '_' are
+# rather than a thing-to-see. Retained for the deterministic path-only rejection
+# the r2 suite pins (is_stop_url). Compared case-insensitively; '-' and '_' are
 # normalised so 'gift-cards' and 'gift_cards' both match 'gift-cards'.
 NON_STOP_SEGMENTS = frozenset({
     'tickets', 'ticket', 'gift-cards', 'gift-card', 'giftcard', 'giftcards',
@@ -482,7 +523,8 @@ NON_STOP_SEGMENTS = frozenset({
     'newsletter', 'privacy', 'terms', 'policy', 'policies', 'search', 'donate',
     'give', 'giving', 'support', 'book', 'booking', 'buy', 'rentals', 'rental',
     'private-events', 'groups', 'group', 'birthday', 'birthdays', 'parties',
-    'party', 'faq-page', 'sitemap', 'home', 'index',
+    'party', 'faq-page', 'sitemap', 'home', 'index', 'destinations',
+    'destination', 'adulti-verse', 'nights', 'night',
 })
 
 # "location(s)" are structural wrappers around a city slug (``/locations/boston``);
@@ -505,10 +547,82 @@ def _path_segments(url: str) -> List[str]:
     return out
 
 
-def is_stop_url(url: str, city: str = '') -> bool:
-    """True when ``url`` could be a real STOP (installation/work/room/exhibition).
+def _url_has_stop_segment(url: str) -> bool:
+    """True when any path segment of ``url`` is in STOP_PATH_SEGMENTS."""
+    return any(seg in STOP_PATH_SEGMENTS for seg in _path_segments(url))
 
-    Deterministic, path-only. Returns False for:
+
+EXHIBIT_HEADING_RE = re.compile(
+    r'\b(installations?|exhibit(?:ion)?s?|current\s+(?:shows?|exhibit(?:ion)?s?)|'
+    r'on\s+view|galler(?:y|ies)|rooms?|artworks?|collection)\b', re.IGNORECASE)
+
+
+def is_exhibit_heading(text: str) -> bool:
+    """True when a branch-page section heading announces an exhibit list.
+
+    Lets the caller mark items it lifted from the venue's own exhibit-list
+    heading (``Installations``, ``Current Exhibitions``, ``On View``, ``Rooms``…)
+    as positively identified. Deterministic, no fetch.
+    """
+    return bool(text and EXHIBIT_HEADING_RE.search(str(text)))
+
+
+def is_exhibit_stop(item: Dict, city: str = '', venue_domain: str = '') -> bool:
+    """True when ``item`` is POSITIVELY identified as an exhibit / work / room.
+
+    [LOCAL-602 r3] ALLOW-LIST. An item is a stop only when at least one positive
+    signal is present:
+
+      * its ``detail_url``/``source_url`` contains a STOP_PATH_SEGMENTS segment
+        (``/installations/…``, ``/exhibitions/…``, ``/rooms/…``, …); OR
+      * its ``jsonld_type`` is an EXHIBIT_JSONLD_TYPES value (ExhibitionEvent,
+        VisualArtwork, Installation, …), or a Place/Room type on the venue's own
+        domain; OR
+      * it carries ``from_exhibit_heading`` truthy, or an ``exhibit_heading``
+        string that ``is_exhibit_heading`` recognises.
+
+    An item with NO URL and no type/heading evidence is KEPT (returns True) so a
+    candidate carrying no URL is judged by other means — the r2 contract. An item
+    that HAS a URL but matches no positive signal is NOT a stop (returns False):
+    this is what rejects the Meow Wolf ``/adulti-verse/santa-fe`` event and
+    ``/destinations/santa-fe-city-guide`` guide that a block-list let through.
+    """
+    url = (item.get('detail_url') or item.get('source_url') or '').strip()
+
+    # 1. URL path segment is the strongest, cheapest positive signal.
+    if url and _url_has_stop_segment(url):
+        return True
+
+    # 2. JSON-LD @type positive evidence.
+    typ = str(item.get('jsonld_type') or '').strip().lower()
+    if typ:
+        if typ in EXHIBIT_JSONLD_TYPES:
+            return True
+        if typ in _PLACE_JSONLD_TYPES:
+            # A Place/Room is an exhibit only when it is ON the venue's domain.
+            if venue_domain:
+                host = urlparse(url if '://' in url else 'https://' + url).netloc
+                if venue_domain.lower().lstrip('www.') in host.lower().lstrip('www.'):
+                    return True
+            elif url:  # no venue domain supplied → on-domain by construction
+                return True
+
+    # 3. Heading-pattern evidence from the branch page's own exhibit list.
+    if item.get('from_exhibit_heading') or is_exhibit_heading(item.get('exhibit_heading', '')):
+        return True
+
+    # No URL at all and no other evidence → judged elsewhere (r2 contract: keep).
+    if not url:
+        return True
+
+    # Has a URL but no positive exhibit evidence → not a stop.
+    return False
+
+
+def is_stop_url(url: str, city: str = '') -> bool:
+    """Deterministic path-only rejection (retained from r2 for the r2 suite).
+
+    Returns False for:
       * the bare domain / home / index page (no meaningful path);
       * any URL with a NON_STOP_SEGMENTS segment (tickets, gift-cards, shop,
         membership, events, faq, visit, contact, about, …);
@@ -516,9 +630,10 @@ def is_stop_url(url: str, city: str = '') -> bool:
         wrappers (locations/location/cities/city) and/or the requested city slug.
 
     Everything else (``/installations/boston/flex``, ``/exhibitions/mirror-room``)
-    is allowed through — this gate only removes what is provably not a stop, it
-    never invents one. An empty/missing URL returns True so a candidate that
-    carries no URL is judged by other means, not dropped here.
+    is allowed through. An empty/missing URL returns True so a candidate that
+    carries no URL is judged by other means, not dropped here. NOTE: this is the
+    r2 block-list; r3's authority on what becomes a stop is ``is_exhibit_stop`` /
+    ``reject_non_stop_urls`` (allow-list), which runs first in the live packer.
     """
     if not url or not str(url).strip():
         return True
@@ -536,18 +651,23 @@ def is_stop_url(url: str, city: str = '') -> bool:
     return True
 
 
-def reject_non_stop_urls(items: List[Dict], city: str = '') -> List[Dict]:
-    """Drop candidate dicts whose ``detail_url``/``source_url`` is not a stop.
+def reject_non_stop_urls(items: List[Dict], city: str = '',
+                         venue_domain: str = '') -> List[Dict]:
+    """Keep only candidates POSITIVELY identified as exhibits — [LOCAL-602 r3].
 
-    Reads ``detail_url`` first, then ``source_url``. An item with neither URL is
-    KEPT (judged elsewhere). Order preserved; deterministic; nothing fetched.
+    ALLOW-LIST: an item survives only when ``is_exhibit_stop`` finds positive
+    evidence (exhibit URL path segment, exhibit JSON-LD type, or an exhibit-list
+    heading). Items with no URL and no type/heading evidence are kept (judged
+    elsewhere — the r2 contract). Order preserved; deterministic; nothing fetched.
+
+    This replaces the r2 block-list behaviour: a page is dropped because it was
+    never shown to be an exhibit, NOT because its junk word happened to be on a
+    list. ``venue_domain`` scopes the conditional Place/Room JSON-LD type.
     """
     kept: List[Dict] = []
     for it in items or []:
-        url = (it.get('detail_url') or it.get('source_url') or '').strip()
-        if url and not is_stop_url(url, city):
-            continue
-        kept.append(it)
+        if is_exhibit_stop(it, city, venue_domain):
+            kept.append(it)
     return kept
 
 
