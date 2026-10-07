@@ -273,6 +273,75 @@ def strip_opening_section(text: str) -> str:
     return "\n\n".join(kept).strip()
 
 
+# ── Orientation / preview stripping (LOCAL-614 item 2) ───────────────────────
+#
+# A tour-OPENING orientation and the "what you'll see next" preview belong to
+# Stop 1's opening only. The kiro-cli critique of tour 399 found a full opening
+# orientation misfiled mid-tour (critique Stop 6): "You are about to explore …
+# Prepare to encounter seven distinct works … In the upcoming stops, you will see
+# 'Meal at the House of Simon' … Your first stop is Dura-Europos …". That block
+# was stored with the stop and reused. LOCAL-607 already strips a leaked epilog
+# and the opening About section at store/read; this extends the SAME layer to the
+# opening / preview orientation.
+#
+# Deterministic PATTERN SET — a sentence is an opening/preview leftover when it
+# OPENS with one of these cues. Matching only at a sentence start (not anywhere
+# in the sentence) keeps a normal narration sentence that happens to use a word
+# like "stop" or "explore" ("The painting stops the eye", "visitors explore the
+# gallery") untouched.
+_ORIENTATION_PREVIEW_CUES = (
+    r"Prepare to (?:encounter|see|explore|discover|view)",
+    r"In the upcoming stops?",
+    r"In the (?:next|following) stops?",
+    r"You are about to (?:explore|encounter|see|discover|begin)",
+    r"Your first stop is\b",
+    r"On this tour,? you will\b",
+    r"Over the (?:next|following|course of)\b.*?\byou(?:'ll| will)\b",
+    r"Throughout (?:this|the) tour,? you will\b",
+    r"We will (?:begin|start) (?:our|the|this) (?:tour|journey)\b",
+    r"Before we begin,? (?:our|the|this)\b",
+    r"This tour will take you\b",
+    r"Get ready to (?:encounter|explore|see|discover)",
+    r"As you (?:move|continue) (?:through|on) (?:the|this) tour\b",
+)
+# A sentence that STARTS (after optional opening quote/paren) with a cue.
+_ORIENTATION_PREVIEW_RE = re.compile(
+    r'(?i)^[\s"“\'(]*(?:' + "|".join(_ORIENTATION_PREVIEW_CUES) + r')')
+
+
+def strip_orientation_preview(text: str) -> str:
+    """Remove tour-OPENING orientation / preview sentences from a narration body.
+
+    [LOCAL-614 item 2] Splits the text into sentences with the ONE shared
+    splitter and drops every sentence that OPENS with a deterministic orientation
+    / preview cue (``_ORIENTATION_PREVIEW_CUES``) — "Prepare to encounter …",
+    "In the upcoming stops …", "You are about to explore …", "Your first stop is
+    …", etc. A sentence that merely CONTAINS such a word elsewhere ("The painting
+    stops the eye") is kept, because the cue must be at the sentence start.
+
+    Operates paragraph by paragraph so paragraph structure is preserved. Pure,
+    deterministic and idempotent; safe on text that has no preview block.
+    """
+    if not text:
+        return text
+    try:
+        from sentence_split import split_sentences as _shared
+    except Exception:  # pragma: no cover
+        _shared = lambda t: [s.strip() for s in re.split(r'(?<=[.!?])\s+', t or "")
+                             if s.strip()]
+    paras = re.split(r'\n{2,}', text)
+    out_paras = []
+    for para in paras:
+        ps = para.strip()
+        if not ps:
+            continue
+        sentences = _shared(ps)
+        kept = [s for s in sentences if not _ORIENTATION_PREVIEW_RE.search(s)]
+        if kept:
+            out_paras.append(" ".join(kept))
+    return "\n\n".join(out_paras).strip()
+
+
 def _strip_title_decorations(raw_title: str) -> str:
     """Return the bare stop title from a 'Stop N:' header value.
 
@@ -369,6 +438,10 @@ def parse_delivered_stops(tour_content: str) -> List[Dict]:
         # stop's own narration. Keeping it would duplicate the About and speak a
         # stale "Check … bc.edu" pointer when real hours are now supplied.
         narration = strip_opening_section(narration)
+        # [LOCAL-614 item 2] Strip any tour-OPENING orientation / preview block
+        # that leaked into the body ("Prepare to encounter … In the upcoming
+        # stops … Your first stop is …") — it belongs to Stop 1's opening only.
+        narration = strip_orientation_preview(narration)
         unit["narration"] = re.sub(r'\n{3,}', '\n\n', narration).strip()
 
         units.append(unit)
