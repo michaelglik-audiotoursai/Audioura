@@ -111,5 +111,59 @@ class TestOrchestratorReadsFullTotal(unittest.TestCase):
         self.assertGreater(first_cost, _nc["total_cost"])
 
 
+class TestLiveRunMeterReads7KeyBreakdown(unittest.TestCase):
+    """[LOCAL-615 item 3] tests/live_run_meter.add_generation must read the
+    LOCAL-609 per-provider breakdown (openai/serper/gemini_tokens/
+    gemini_grounding/preflight), not only the legacy flat llm/search keys — a live
+    run otherwise records openai=$0 / serper=$0 even when it spent on both (D626
+    TEST-* row showed grounding only)."""
+
+    def test_add_generation_reads_provider_keys(self):
+        import types
+        sys.path.insert(0, os.path.join(
+            os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "tests"))
+        import live_run_meter as lrm
+
+        fake = types.SimpleNamespace()
+        fake._LAST_GENERATION_COST = {
+            "cache_hit": False,
+            "tour_total_cost": 0.4042,
+            "breakdown": {
+                "openai": {"usd": 0.2541},
+                "serper": {"usd": 0.0400},
+                "gemini_tokens": {"usd": 0.0261},
+                "gemini_grounding": {"usd": 0.0840, "requests": 6, "queries": 6},
+                "preflight": {"usd": 0.0, "calls": 0, "queries": 0},
+                "tts": {"usd": 0.0},
+            },
+        }
+        m = lrm.LiveRunMeter("LOCAL-615", install_cap=False)
+        m.add_generation(fake)
+        self.assertAlmostEqual(m.openai_usd, 0.2541, places=6)
+        self.assertAlmostEqual(m.serper_usd, 0.0400, places=6)
+        self.assertAlmostEqual(m.gemini_tokens_usd, 0.0261, places=6)
+        self.assertAlmostEqual(m.gemini_grounding_usd, 0.0840, places=6)
+        # total == sum of provider lines (grounding counted once, preflight is a
+        # labelled subset not re-added).
+        self.assertAlmostEqual(m.total_usd(), 0.2541 + 0.0840 + 0.0261 + 0.0400,
+                               places=6)
+        bd = m.breakdown()
+        self.assertAlmostEqual(bd["openai"], 0.2541, places=6)
+        self.assertAlmostEqual(bd["serper"], 0.0400, places=6)
+
+    def test_add_generation_legacy_keys_still_work(self):
+        import types
+        import live_run_meter as lrm
+        fake = types.SimpleNamespace()
+        fake._LAST_GENERATION_COST = {
+            "cache_hit": False,
+            "breakdown": {"llm": 0.30, "search": 0.02, "grounding": 0.05},
+        }
+        m = lrm.LiveRunMeter("LOCAL-615", install_cap=False)
+        m.add_generation(fake)
+        self.assertAlmostEqual(m.openai_usd, 0.30, places=6)
+        self.assertAlmostEqual(m.serper_usd, 0.02, places=6)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
