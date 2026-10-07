@@ -1,0 +1,9 @@
+{
+  "built_at": "2026-10-07T18:33:54.198021+00:00",
+  "rows": 302396,
+  "countries": 205,
+  "path": "/Volumes/AudiouraSSD/audioura-worktrees/LOCAL-611/canary/venue_pool.jsonl",
+  "min_rows": 20000,
+  "min_countries": 60,
+  "meets_min": true
+}

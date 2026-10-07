@@ -79,3 +79,11 @@ tools/.venv-play/
 .pytest_cache/
 .venue_parts_cache.json
 .git_sha
+
+# LOCAL-611 canary: the Wikidata venue pool is a large (~57MB), weekly-rebuilt
+# cache — regenerable with `python3 canary/venue_pool.py`. The meta sidecar
+# (venue_pool.meta.json) IS committed as proof of the last build (row/country
+# counts). The tried-venues ledger is machine-local run state.
+canary/venue_pool.jsonl
+canary/venue_pool.jsonl.tmp
+canary/tried_venues.jsonl
