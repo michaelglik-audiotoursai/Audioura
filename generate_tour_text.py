@@ -5250,7 +5250,7 @@ def _verify_works_v2(poi_list, venue_name, exhibition_scope=None):
     sparql_works = [] if not _cache_hit else sparql_works
     if _venue_entity and _venue_entity.qid and not _cache_hit:
         try:
-            sparql_works = fetch_venue_works(_venue_entity.qid, _language)
+            sparql_works = fetch_venue_works(_venue_entity.qid, _language, venue_name=_venue_entity.name)
             sparql_titles = build_canonical_titles_from_works(sparql_works)
             print(f"  [D1v2] SPARQL source: {len(sparql_titles)} canonical titles")
         except Exception as e:
@@ -8899,7 +8899,7 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
                     _city_hint = parts[1] if len(parts) >= 2 else ""
                 _pre_entity = resolve_venue(_museum_venue_name, _city_hint)
                 if _pre_entity and _pre_entity.qid:
-                    _pre_works = fetch_venue_works(_pre_entity.qid, _pre_entity.language)
+                    _pre_works = fetch_venue_works(_pre_entity.qid, _pre_entity.language, venue_name=_pre_entity.name)
                     _pre_titles = build_canonical_titles_from_works(_pre_works)
                     if _pre_titles:
                         # Deduplicate by QID: one title per work (prefer local language label)
@@ -9054,7 +9054,7 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
                         _det_seen_titles_norm.add(_tn)
                 
                 # Source 2: SPARQL works (Wikidata-verified, second highest)
-                _det_sparql = fetch_venue_works(_det_entity.qid, _det_entity.language)
+                _det_sparql = fetch_venue_works(_det_entity.qid, _det_entity.language, venue_name=_det_entity.name)
                 _det_sparql_seen_qids = set()
                 for w in _det_sparql:
                     _wqid = w.get('qid', '')
@@ -10028,7 +10028,7 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
                             _det_seen_titles_norm.add(_tn)
 
                     # Source 2: SPARQL works (includes creator via LOCAL-362)
-                    _det_sparql = fetch_venue_works(_det_entity.qid, _det_entity.language)
+                    _det_sparql = fetch_venue_works(_det_entity.qid, _det_entity.language, venue_name=_det_entity.name)
                     _det_sparql_seen_qids = set()
                     for w in _det_sparql:
                         _wqid = w.get('qid', '')
@@ -10135,7 +10135,7 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
 
                 _det_entity = resolve_venue(_scope_venue, _det_city_hint)
                 if _det_entity and _det_entity.qid:
-                    _det_sparql = fetch_venue_works(_det_entity.qid, _det_entity.language)
+                    _det_sparql = fetch_venue_works(_det_entity.qid, _det_entity.language, venue_name=_det_entity.name)
                     if _det_sparql and _exhibition_scope_artists:
                         # Same creator-filter as LOCAL-362
                         _scope_artists_norm = []
@@ -10209,7 +10209,7 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
                         _det_seen_titles_norm.add(_tn)
                 
                 # Source 2: SPARQL works (Wikidata-verified, second highest)
-                _det_sparql = fetch_venue_works(_det_entity.qid, _det_entity.language)
+                _det_sparql = fetch_venue_works(_det_entity.qid, _det_entity.language, venue_name=_det_entity.name)
                 _det_sparql_seen_qids = set()
                 for w in _det_sparql:
                     _wqid = w.get('qid', '')
