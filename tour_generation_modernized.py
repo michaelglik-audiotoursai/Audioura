@@ -26,6 +26,7 @@ import threading
 
 # Labels stripped from TTS audio (kept in .txt files for mobile app parsing)
 # Matches all 5 structured metadata fields — same set as translation_service._NAV_FIELD_PREFIXES
+_SPOKEN_LABEL_RE = re.compile(r'^\s*(Museum Information|Orientation|Directions)\s*:\s*', re.IGNORECASE)
 _NAV_LABEL_RE = re.compile(
     r'^\s*(Address|Coordinates|Type/Specialty|Specific Examples|Operational Details)\s*:',
     re.IGNORECASE | re.MULTILINE
@@ -37,7 +38,11 @@ def _strip_nav_fields_for_tts(text):
     Strips: Address, Coordinates, Type/Specialty, Specific Examples, Operational Details.
     The .txt files are written from the original text and remain unchanged."""
     lines = text.split('\n')
-    return '\n'.join(l for l in lines if not _NAV_LABEL_RE.match(l))
+    kept = [l for l in lines if not _NAV_LABEL_RE.match(l)]
+    # [LEAD 2026-10-08] Speak the content, not the field label: "Museum Information:
+    # The museum is open…" was read aloud label-first (critic criterion 3 on every
+    # canary). The .txt keeps the label for the app's text view.
+    return '\n'.join(_SPOKEN_LABEL_RE.sub('', l) for l in kept)
 
 from job_store import get_job_store
 
