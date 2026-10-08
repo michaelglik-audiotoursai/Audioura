@@ -7589,33 +7589,6 @@ def _apply_delivery_hours_guard(result):
                       f"sentence(s) from delivered text (every-path guard)", flush=True)
         except Exception as _fe:  # pragma: no cover
             _import_logger.error(f"[LOCAL-616] foreign-sentence sweep skipped: {_fe}")
-        # 3b. [LOCAL-628 / LEAD D637] THE FINAL PER-STOP EDITOR PASS on EVERY
-        #     delivery path (pool, cache, by_reference, overview — and the fresh
-        #     path too, where it is a no-op because the inner pipeline already
-        #     edited and marked the text before caching/pooling). One gpt-4.1
-        #     copy-edit per stop, run here as the LAST content pass BEFORE the
-        #     conclusion step below. It adds NO fact: each edit is validated by
-        #     claim_check.check_paragraph against the ORIGINAL stop body + its
-        #     passages; a new unsupported/contradicted claim, a length move past
-        #     ±25 %, or any new proper noun → the edit is rejected and the original
-        #     stop kept. The hidden idempotence marker makes this a no-op (and
-        #     NO re-spend) when the text was already edited — which it is for any
-        #     stop stored by post-628 code, so a pool/cache hit of edited stops
-        #     costs nothing. A tour cached by PRE-628 code (no marker) is edited
-        #     once here. Gated behind STOP_EDITOR (default ON). Guarded; non-fatal.
-        try:
-            import stop_editor as _stop_editor_guard
-            if (_stop_editor_guard.is_enabled()
-                    and not _stop_editor_guard.already_edited(final)):
-                _ed_venue = _recover_tour_venue(final)
-                final = _stop_editor_guard.edit_tour_text(
-                    final, venue_name=_ed_venue,
-                    api_key=os.environ.get("OPENAI_API_KEY", ""))
-        except ImportError:
-            _import_logger.error("[LOCAL-628] MISSING: stop_editor — editor pass "
-                                 "SKIPPED on delivery guard")
-        except Exception as _ege:  # pragma: no cover
-            _import_logger.error(f"[LOCAL-628] editor pass skipped (guard): {_ege}")
         # 4. [LOCAL-619] THE ONE CONCLUSION — built from the FINAL delivered text,
         #    as the LAST step on EVERY path (fresh, pool, cache, by_reference,
         #    overview), after every other gate above. This is the single choke
