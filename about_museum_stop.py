@@ -1117,6 +1117,59 @@ _STREET_ADDRESS_RE = re.compile(
 # word (the regex above is IGNORECASE so "Street"/"street" both match).
 _SUFFIX_WORDS = frozenset(_STREET_SUFFIX.split("|"))
 
+# [LOCAL-623 defect 3] Lowercase function words that can never be a street-name
+# word. The _STREET_ADDRESS_RE is IGNORECASE, so its "[A-Z] street word"
+# requirement is void — "acquired in 1922 by way of a joint initiative" matched
+# as house-number 1922 + street "by" + suffix "way", shipping
+# "Address: 1922 by way, Essen, Germany" on tour 468. A genuine street name has
+# at least one Capitalised word that is not a function word, and its house number
+# is not a four-digit YEAR.
+_ADDRESS_FUNCTION_WORDS = frozenset({
+    "by", "of", "the", "a", "an", "in", "on", "to", "for", "with", "and", "or",
+    "at", "as", "from", "that", "which", "where", "when", "into", "via", "per",
+})
+
+
+def is_valid_street_address(candidate: str) -> bool:
+    """True when ``candidate`` is a genuine street address, not a mis-parsed
+    narrative fragment (the "1922 by way" defect).
+
+    Rejects:
+      • a house number that is a four-digit YEAR (1500–2099) — "1922 by way";
+      • a street-name run whose only words are lowercase function words ("by",
+        "of", "in") with no genuine Capitalised street-name token.
+
+    Accepts a normal "<number> <Capitalised Name> <suffix>" address. Pure.
+    """
+    s = (candidate or "").strip()
+    if not s:
+        return False
+    m = re.match(r"\s*(\d{1,5})(?:\s*\u00bd|\s*1/2|\s*[-–/]\s*\d{1,4})?\s*(.*)$", s)
+    if not m:
+        return False
+    number, rest = m.group(1), m.group(2)
+    # Four-digit year as a "house number" is a narrative year, not an address.
+    if len(number) == 4 and 1500 <= int(number) <= 2099:
+        return False
+    # The words between the number and the street suffix must include at least one
+    # genuine Capitalised street-name word (not a lowercase function word).
+    # Take the words up to (and excluding) the first street suffix.
+    words = re.findall(r"[A-Za-zà-ÿ0-9.'’]+", rest)
+    name_words = []
+    for w in words:
+        if w.lower().rstrip(".") in _SUFFIX_WORDS:
+            break
+        name_words.append(w)
+    if not name_words:
+        return False
+    for w in name_words:
+        wl = w.lower().rstrip(".")
+        if wl in _ADDRESS_FUNCTION_WORDS:
+            continue
+        if w[:1].isupper():
+            return True  # a genuine Capitalised street-name word
+    return False
+
 
 def extract_venue_address(page_text: str, locality: str = "") -> str:
     """Lift the venue's OWN street address from its page text, or "".
@@ -1135,7 +1188,14 @@ def extract_venue_address(page_text: str, locality: str = "") -> str:
     """
     if not page_text:
         return ""
-    m = _STREET_ADDRESS_RE.search(page_text)
+    # [LOCAL-623 defect 3] Walk every candidate and take the FIRST that validates
+    # as a real street address — so a narrative "…acquired in 1922 by way of…"
+    # (which the IGNORECASE regex matches as "1922 by way") is skipped, not shipped.
+    m = None
+    for cand in _STREET_ADDRESS_RE.finditer(page_text):
+        if is_valid_street_address(cand.group(1) or ""):
+            m = cand
+            break
     if not m:
         return ""
     street = re.sub(r"\s+", " ", (m.group(1) or "")).strip().rstrip(",")
