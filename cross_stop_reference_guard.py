@@ -191,11 +191,14 @@ def strip_phantom_references(
 # "you were just there" callbacks that must never appear.
 _PREV_STOP_RECAP_RE = re.compile(
     r"(?i)("
-    r"you\s+(?:stopped\s+at|saw|viewed|visited|passed|left|were\s+at)\b[^.?!]*"
-    r"\b(?:a\s+moment\s+ago|just\s+now|moments?\s+ago|earlier|previously|"
-    r"a\s+(?:few\s+)?(?:moments?|minutes?)\s+ago)\b|"
+    r"you\s+(?:previously\s+|just\s+|already\s+)?"
+    r"(?:stopped\s+at|saw|viewed|visited|passed|left|were\s+at|encountered|"
+    r"observed|glimpsed|paused\s+at|looked\s+at)\b"
+    r"[^.?!]*?\b(?:a\s+moment\s+ago|just\s+now|moments?\s+ago|earlier|previously|"
+    r"a\s+(?:few\s+)?(?:moments?|minutes?)\s+ago)?\b|"
     r"\b(?:a\s+moment\s+ago|just\s+a\s+moment\s+ago|moments?\s+ago)\b|"
-    r"(?:which|that)\s+(?:we|you)\s+just\s+(?:saw|left|visited|passed)|"
+    r"(?:which|that)\s+(?:we|you)\s+(?:just|previously|earlier)\s+"
+    r"(?:saw|left|visited|passed|encountered|observed)|"
     r"\bjust\s+(?:saw|left|visited|passed)\s+(?:a\s+moment\s+ago)?"
     r")")
 
@@ -264,3 +267,65 @@ def limit_thematic_bridges(
         nu["narration"] = "\n\n".join(p for p in out_paras if p.strip()).strip()
         new_units.append(nu)
     return new_units, dropped
+
+
+# ─── [LOCAL-627 defect 9] Text-level recap guard (normal delivery path) ───────
+#
+# limit_thematic_bridges operates on stop-unit dicts in the POOL assembly. The
+# normal generate_tour_text path delivers assembled TEXT (never units), so a
+# previous-stop recap on that path ("…his 'Leda col cigno' that you previously
+# encountered", "…you observed earlier") was not caught. This text-level guard
+# walks the delivered tour stop by stop and applies the SAME policy: drop every
+# previous-stop recap sentence and every thematic bridge beyond the first.
+
+_TEXT_STOP_HEADER_RE = re.compile(r'(?mi)^(Stop\s+\d+:\s*.+)$')
+_TEXT_FIELD_LINE_RE = re.compile(
+    r'(?mi)^(?:Address|Coordinates|Directions|Sources|Museum Information|'
+    r'Type/Specialty|Specific Examples|Operational Details):')
+
+
+def limit_thematic_bridges_in_text(tour_text: str,
+                                   max_bridges: int = 1) -> Tuple[str, int]:
+    """Apply the recap / one-bridge policy to a delivered tour's TEXT.
+
+    Returns ``(cleaned_text, n_dropped)``. Walks each stop's prose paragraphs
+    (field/header lines preserved verbatim), drops every previous-stop recap
+    sentence, and keeps at most ``max_bridges`` thematic bridges tour-wide.
+    Deterministic; the Orientation line's prose is included (a recap can live
+    there too), but structured field lines are untouched.
+    """
+    if not tour_text:
+        return tour_text or "", 0
+    bridges_kept = 0
+    dropped = 0
+    out_lines: List[str] = []
+    for raw in tour_text.split("\n"):
+        stripped = raw.strip()
+        if (not stripped or _TEXT_STOP_HEADER_RE.match(stripped)
+                or _TEXT_FIELD_LINE_RE.match(stripped)):
+            out_lines.append(raw)
+            continue
+        # A prose line (may be an "Orientation: ..." lead or a narration paragraph).
+        lead = ""
+        body = raw
+        om = re.match(r'(?i)^(\s*orientation:\s*)', raw)
+        if om:
+            lead = raw[:om.end()]
+            body = raw[om.end():]
+        kept_sents: List[str] = []
+        for sent in _split_sentences(body):
+            if _PREV_STOP_RECAP_RE.search(sent):
+                dropped += 1
+                continue
+            if _THEMATIC_BRIDGE_RE.search(sent):
+                if bridges_kept >= max_bridges:
+                    dropped += 1
+                    continue
+                bridges_kept += 1
+            kept_sents.append(sent)
+        new_body = " ".join(kept_sents).strip()
+        if lead or new_body:
+            out_lines.append((lead + new_body).rstrip())
+    out = "\n".join(out_lines)
+    out = re.sub(r"\n{3,}", "\n\n", out)
+    return out, dropped

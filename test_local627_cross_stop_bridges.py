@@ -64,5 +64,41 @@ class TestLimitThematicBridges(unittest.TestCase):
         self.assertIn("A second work.", new[1]["narration"])
 
 
+class TestLimitThematicBridgesInText(unittest.TestCase):
+    """[LOCAL-627 defect 9] The text-level guard catches recaps on the normal
+    (non-pool) delivery path — the EXACT shapes the live Uffizi tour shipped."""
+
+    UFFIZI_TEXT = (
+        "Stop 1: Leda col cigno\n\n"
+        "Coordinates: 43.7, 11.2\n\n"
+        "Melzi reproduced Leonardo's lost Leda. It is oil on canvas.\n\n"
+        "Stop 2: Adorazione dei Magi\n\n"
+        "Orientation: Stand close to Leonardo's unfinished panel.\n\n"
+        "Botticelli integrated a self-portrait, much like his \"Leda col cigno\" "
+        "that you previously encountered, where divine and earthly realms "
+        "intertwined. Leonardo left the panel unfinished.\n\n"
+        "Stop 3: The Annunciation\n\n"
+        "This divine encounter completes our journey, echoing themes seen in the "
+        "\"Adorazione dei Magi\" you observed earlier. Gabriel kneels before Mary."
+    )
+
+    def test_live_recaps_dropped(self):
+        cleaned, dropped = g.limit_thematic_bridges_in_text(self.UFFIZI_TEXT)
+        self.assertGreaterEqual(dropped, 1)
+        self.assertNotIn("you previously encountered", cleaned)
+        self.assertNotIn("you observed earlier", cleaned)
+        # Real narration + headers + field lines survive.
+        self.assertIn("Stop 2: Adorazione dei Magi", cleaned)
+        self.assertIn("Leonardo left the panel unfinished.", cleaned)
+        self.assertIn("Gabriel kneels before Mary.", cleaned)
+        self.assertIn("Coordinates: 43.7, 11.2", cleaned)
+
+    def test_clean_text_unchanged(self):
+        clean = ("Stop 1: A\n\nA quiet still life.\n\n"
+                 "Stop 2: B\n\nA portrait in black.")
+        cleaned, dropped = g.limit_thematic_bridges_in_text(clean)
+        self.assertEqual(dropped, 0)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

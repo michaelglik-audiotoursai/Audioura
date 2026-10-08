@@ -7522,6 +7522,19 @@ def _apply_delivery_hours_guard(result):
                       f"single admission sentence", flush=True)
         except Exception as _fte:  # pragma: no cover
             _import_logger.error(f"[LOCAL-627] fare-table collapse skipped: {_fte}")
+        # 1c. [LOCAL-627 defect 9] Drop previous-stop recaps and extra thematic
+        #     bridges on the DELIVERED TEXT — the pool assembly guard
+        #     (limit_thematic_bridges) runs on units, but the normal delivery path
+        #     emits text; tour 488 shipped "…his 'Leda col cigno' that you
+        #     previously encountered" / "…you observed earlier" on this path.
+        try:
+            import cross_stop_reference_guard as _csrg
+            final, _n_recap = _csrg.limit_thematic_bridges_in_text(final, max_bridges=1)
+            if _n_recap:
+                print(f"  [LOCAL-627 #9] dropped {_n_recap} previous-stop recap / "
+                      f"extra-bridge sentence(s) from delivered text", flush=True)
+        except Exception as _rce:  # pragma: no cover
+            _import_logger.error(f"[LOCAL-627] text recap guard skipped: {_rce}")
         # 2. Drop duplicated paragraphs (e.g. the twice-printed orientation block).
         try:
             import paragraph_dedupe as _pd
