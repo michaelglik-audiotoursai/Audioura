@@ -147,6 +147,14 @@ def _normalise_offer(offer: Optional[str]) -> str:
     return (offer + sep + RESTAURANT_OFFER).strip()
 
 
+def _ensure_period(s: str) -> str:
+    """Return the clause terminated by a single sentence-ending mark."""
+    s = (s or "").strip()
+    if not s:
+        return s
+    return s if s.endswith((".", "!", "?")) else s + "."
+
+
 # Degenerate / placeholder narration that must never become a recap "fact".
 # A stop whose narration failed generation can carry an apology or placeholder;
 # the recap must name the work, not echo an error, so such a clause is reduced
@@ -217,38 +225,38 @@ def build_conclusion(
 
     lines: List[str] = []
 
-    # 1. The thread paragraph + 2. the count, counted from the delivered text.
+    # 1. The thread sentence + 2. the count, counted from the delivered text.
+    #    These open the single closing paragraph.
     if n < 2:
-        # A single-stop tour: no "From X to X" (it would be nonsense). Name the
-        # thread, then the single-stop count.
-        lines.append(
-            f"On this tour you have followed the thread of {thread_phrase}."
-        )
-        lines.append("")
-        lines.append(f"That's {n} stop in all.")
+        para = [f"On this tour you have followed the thread of {thread_phrase}.",
+                f"That's {n} stop in all."]
     else:
-        lines.append(
-            f"From {first} to {last}, you have followed the thread of {thread_phrase}."
-        )
-        lines.append("")
-        lines.append(f"That's {n} stops in all.")
+        para = [f"From {first} to {last}, you have followed the thread of "
+                f"{thread_phrase}.",
+                f"That's {n} stops in all."]
 
-    # 3. One-line recap of up to 3 stops, naming the work + one delivered fact.
-    # Skipped for a 1-stop tour: recapping the only stop is redundant with the
-    # thread sentence, and (overview path) the single stop is the venue itself.
+    # 3. A one-line recap of up to 3 stops, woven into PROSE (not a bulleted list,
+    #    which read as leftover scaffolding). Each clause names the work plus one
+    #    concrete, already-delivered fact (reusing _first_recap_sentence); the
+    #    clauses are joined into flowing sentences so the close reads as a
+    #    conclusion. Skipped for a 1-stop tour (recapping the only stop is
+    #    redundant with the thread sentence; the overview's single stop is the
+    #    venue itself).
     if n >= 2:
         recap_stops = _recap_pick_three(stops)
-        recap_lines = []
+        recap_clauses = []
         for s in recap_stops:
             clause = _first_recap_sentence(s)
             clause = _clean_recap_clause(clause, (s.get("title") or "").strip())
             if clause:
-                recap_lines.append(clause)
-        if recap_lines:
-            lines.append("")
-            lines.append("Along the way:")
-            for rl in recap_lines:
-                lines.append(f"- {rl}")
+                # _first_recap_sentence returns "Title: fact." — keep it as a
+                # self-contained sentence in the prose recap.
+                recap_clauses.append(clause.rstrip())
+        if recap_clauses:
+            para.append("Along the way, a few moments stand out. "
+                        + " ".join(_ensure_period(c) for c in recap_clauses))
+
+    lines.append(" ".join(para))
 
     # 4. The restaurant offer as the VERY LAST sentence.
     if restaurant_offer:
