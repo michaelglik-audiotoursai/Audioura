@@ -20,7 +20,7 @@ OPENAI = {  # longest key wins
     "text-embedding-ada-002": (0.10, 0.0, 0.10),
 }
 GEMINI_IN, GEMINI_OUT, GROUNDING_PER_QUERY, SERPER_PER_QUERY = 0.75, 3.75, 0.014, 0.001
-GROUNDED_REQUEST_USD = 0.028  # per grounded Gemini response, calibrated 2026-10-08 (see below)
+GROUNDED_REQUEST_USD = 0.0107  # per search-enabled Gemini request; calibrated 2026-10-08 on a clean 1-tour window ($0.32 billed, 26 requests)
 
 def _host_kind(url):
     u = url or ""
@@ -81,7 +81,12 @@ def _record(url, status, body, req_body=None):
             # took $10.25 while per-QUERY pricing metered $2.12 over 349 grounded calls
             # (only 109 reported queries). Google bills per grounded REQUEST: ~$0.028 each
             # implied. Charge whichever is larger until the SKU report pins it exactly.
-            g = max(q * GROUNDING_PER_QUERY, GROUNDED_REQUEST_USD if grounded else 0.0)
+            # [LEAD 2026-10-08 r2] Clean single-tour window (Courtauld, tour 485): Google took
+            # $0.32 while only 3 of 26 search-enabled requests returned groundingMetadata.
+            # Google bills every request that ENABLES the search tool. So charge per request
+            # whose body carries tools:[{google_search}], at the rate that window implies.
+            tool_on = isinstance(req_body, dict) and "google_search" in json.dumps(req_body.get("tools") or [])
+            g = GROUNDED_REQUEST_USD if (tool_on or grounded) else 0.0
             usd = (pin * GEMINI_IN + pout * GEMINI_OUT) / 1e6 + g
             rec.update(model=url.split("/models/")[-1].split(":")[0] if "/models/" in url else "",
                        tokens_in=pin, tokens_out=pout, search_queries=q, usd=usd if status == 200 else 0.0)
