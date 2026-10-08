@@ -20,6 +20,10 @@ OPENAI = {  # longest key wins
     "text-embedding-ada-002": (0.10, 0.0, 0.10),
 }
 GEMINI_IN, GEMINI_OUT, GROUNDING_PER_QUERY, SERPER_PER_QUERY = 0.75, 3.75, 0.014, 0.001
+# RATE_TAG names the price card every record was costed with (Michael 2026-10-08: "keep the tag
+# on the price we are using"). Bump it whenever any rate below changes; the history of tags and the
+# bill reconciliation behind each lives in .continuous_dev/PRICE_CARD.md.
+RATE_TAG = "2026-10-08-r3"
 GROUNDED_REQUEST_USD = 0.0107  # per search-enabled Gemini request; calibrated 2026-10-08 on a clean 1-tour window ($0.32 billed, 26 requests)
 
 def _host_kind(url):
@@ -53,7 +57,7 @@ def _openai_cost(model, usage):
 def _record(url, status, body, req_body=None):
     kind = _host_kind(url)
     if not kind: return
-    rec = {"ts": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()), "kind": kind, "status": status,
+    rec = {"ts": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()), "kind": kind, "status": status, "rate_tag": RATE_TAG,
            "service": SERVICE, "caller": _caller(), "url": (url or "").split("?")[0][-120:],
            "job": os.environ.get("METER_JOB", ""), "usd": None}
     try:
