@@ -28,7 +28,8 @@ __all__ = ['clean_spoken_text', 'MISSING_SPACE_RE', 'TEMPLATE_SEAM_RE',
            'DANGLING_PHRASE_RE', 'normalize_proper_noun_spellings',
            'strip_sources_and_urls', 'SOURCES_HEADING_RE', 'URL_RE',
            'strip_degenerate_from_to_recap',
-           'flag_sentence', 'grammar_splice_lint']
+           'flag_sentence', 'grammar_splice_lint', 'strip_citation_tails',
+           'CITATION_TAIL_RE', 'AS_OF_TAIL_RE']
 
 # "At this work:", "in the stop:", "At this piece:" — the preposition keeps its
 # original case, because replacing with a literal "At " produced "Then, At Au
@@ -68,6 +69,55 @@ DANGLING_PHRASE_RE = re.compile(
 # Directions stay, "because they let listeners know that they are not part of the
 # stop description" — so they are deliberately absent here.
 SPOKEN_LABEL_RE = re.compile(r'\b(?:Closing|Narration|Body|Summary)\s*:\s*')
+
+
+# -------- [LOCAL-623 defect 4] Strip provenance / citation tails from speech ---
+#
+# Tour 468 spoke "An optional climate contribution ticket can be added for €1, as
+# published by the museum in October 2026." — a source-citation tail a listener
+# hears aloud. Provenance (what source stated the fact, and when) belongs in the
+# TEXT-view Sources line, never in speech (the same rule D617 used to move the
+# source DOMAIN out of narration). This strips the trailing clause, keeping the
+# fact: "…added for €1."  The patterns match the honesty-stamp phrasings the
+# pipeline emits ("as published/listed/stated/noted by the museum in <month> <yr>",
+# with or without the month) and are collapsed to the preceding sentence end.
+CITATION_TAIL_RE = re.compile(
+    r'\s*[,;]?\s*as\s+(?:published|listed|stated|noted|reported|confirmed|'
+    r'recorded|advertised|shown|given)\s+'
+    r'(?:by|on|in|at|per)\s+'
+    r'(?:[^.?!]|\.(?=[A-Za-z0-9]))*?'   # tolerate domain dots ("griffinmuseum.org")
+    r'(?:in\s+[A-Z][a-z]+\s+\d{4}|\d{4})?\s*'
+    r'(?=[.?!](?:\s|$|["”\')])|$)',     # a SENTENCE terminator, not a domain dot
+    re.IGNORECASE)
+
+# A bare "(as of October 2026)" / ", as of October 2026" dateline tail.
+AS_OF_TAIL_RE = re.compile(
+    r'\s*[,(]?\s*as\s+of\s+(?:[A-Z][a-z]+\s+)?\d{4}\s*\)?(?=[.?!]|$)',
+    re.IGNORECASE)
+
+
+def strip_citation_tails(text: str) -> tuple:
+    """Remove spoken provenance/citation tails ("as published by the museum in
+    October 2026", "as of October 2026") from narration, keeping the fact itself.
+
+    Returns ``(cleaned, n_removed)``. Deterministic and pure. Only the trailing
+    attribution clause is removed; the sentence's terminal punctuation is kept.
+    """
+    if not text:
+        return text or '', 0
+    removed = 0
+
+    def _sub(m):
+        nonlocal removed
+        removed += 1
+        return ''
+
+    out = CITATION_TAIL_RE.sub(_sub, text)
+    out = AS_OF_TAIL_RE.sub(_sub, out)
+    if removed:
+        out = re.sub(r'\s+([.,;:!?])', r'\1', out)
+        out = re.sub(r'  +', ' ', out)
+    return out, removed
 
 
 # -------- [LOCAL-529] One name, four spellings --------------------------------
@@ -591,6 +641,12 @@ def clean_spoken_text(text: str, verbose: bool = False) -> tuple:
 
     report['labels'] = len(SPOKEN_LABEL_RE.findall(out))
     out = SPOKEN_LABEL_RE.sub('', out)
+
+    # [LOCAL-623 defect 4] Strip spoken provenance/citation tails ("as published
+    # by the museum in October 2026") — the fact stays, the source attribution is
+    # for the text-view Sources, not for speech.
+    out, _cit = strip_citation_tails(out)
+    report['citation_tails'] = _cit
 
     # [LOCAL-529] One name, four spellings — make the tour agree with itself.
     out, _name_rep = normalize_proper_noun_spellings(out)

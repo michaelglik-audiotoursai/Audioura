@@ -159,7 +159,23 @@ def _render_stop_block(stop: Dict, stop_num: int, tour_category: str,
             parts.append(f"{label}: {v}")
             parts.append("")
 
-    _field("Address", "address")
+    # [LOCAL-623 defect 3] Validate the Address before rendering. A mis-parsed
+    # narrative fragment ("1922 by way, Essen, Germany" — a year + preposition,
+    # not a street) must never reach the listener. If the address slot does not
+    # hold a genuine street address, omit the Address line entirely rather than
+    # ship garbage (the task's fallback-or-omit rule; the venue/corpus address is
+    # resolved upstream by venue_bound_address when available).
+    _addr = (stop.get("address") or "").strip()
+    if _addr:
+        try:
+            from about_museum_stop import is_valid_street_address as _ivsa
+            if not _ivsa(_addr):
+                _addr = ""
+        except Exception:
+            pass
+    if _addr:
+        parts.append(f"Address: {_addr}")
+        parts.append("")
     _field("Coordinates", "coordinates")
     if tour_category not in ("museum", "facility"):
         _field("Type/Specialty", "type_specialty")

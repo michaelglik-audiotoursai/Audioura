@@ -280,6 +280,87 @@ _US_STATE_ABBR = {
 }
 
 
+# [LOCAL-623 defect 2 / D634] FORBIDDEN museum boilerplate in the stop-1 opening
+# section: a founding-DATE-only line (no named founder), a merger of predecessor
+# institutions, and the building / renovation / architecture of the museum. Tour
+# 468's About narration landed all three in Stop 1 ("established in 1922 by
+# merging … founded in 1906", "the new building designed by David Chipperfield
+# Architects"). Per D634 these are boilerplate and must NOT appear in a stop body.
+# The ONE thing D634 keeps is a REAL founder/collector STORY — a sentence that
+# NAMES the founder/collector (a person) — so the Griffin's "founded in 1992 by
+# the photographer Arthur Griffin, dedicated to promoting photography" is kept
+# while Folkwang's institution-merger and Chipperfield building are dropped.
+
+# A merger of predecessor institutions — always boilerplate (names no human story).
+_D634_MERGER_RE = re.compile(
+    r"(?i)\b(by\s+merging|merger\s+of|merging\s+(?:the\s+|of\s+)|"
+    r"formed\s+(?:the\s+basis|by\s+(?:merging|the\s+union))|"
+    r"predecessor\s+(?:museum|institution|collection))\b")
+
+# The building / architecture / renovation of the museum — always boilerplate
+# (unless the listener asked for architecture, handled by the caller).
+_D634_BUILDING_RE = re.compile(
+    r"(?i)\b("
+    r"new\s+building|the\s+building\s+(?:was|designed|opened)|"
+    r"designed\s+by\s+[A-Z]|architect(?:s|ure|ural)?\b|"
+    r"renovat(?:ed|ion)|refurbish|expansion|extension\s+(?:was|opened)|"
+    r"additional\s+exhibition\s+spaces?|striking\s+appearance|wing\s+(?:was|opened)"
+    r")\b")
+
+# A bare founding / establishment statement with a year.
+_D634_FOUNDING_RE = re.compile(
+    r"(?i)\b(founded|established|incorporated|inaugurated|chartered)\b"
+    r"[^.]*\b\d{3,4}\b|\b(?:was|were)\s+(?:founded|established|incorporated)\b")
+
+# A named person (First Last) — a founder/collector the founding sentence may name.
+_D634_NAMED_PERSON_RE = re.compile(
+    r"\b[A-ZÀ-Þ][a-zà-ÿ]+(?:\s+(?:van|von|de|della|del|di|du|des|der|la|le)\b)?"
+    r"\s+[A-ZÀ-Þ][a-zà-ÿ]+")
+
+
+def is_forbidden_museum_boilerplate(sentence: str) -> bool:
+    """True when a sentence is founding/merger/building/renovation boilerplate
+    that D634 forbids in a stop body.
+
+    Forbidden:
+      • a MERGER of predecessor institutions (names no human story);
+      • the museum's BUILDING / architecture / renovation / exhibition-space
+        expansion;
+      • a bare FOUNDING-date line that does NOT name a founder (a person).
+
+    Kept (returns False):
+      • a REAL founder/collector story — the founding sentence NAMES the
+        founder/collector (a person) — e.g. "founded in 1992 by the photographer
+        Arthur Griffin, dedicated to promoting photography";
+      • a plain identity statement ("<Venue> is a museum of 20th-century art");
+      • anything ``story_type_classes.is_real_collector_story`` already rescues.
+    """
+    s = (sentence or "").strip()
+    if not s:
+        return False
+    try:
+        import story_type_classes as _stc
+        if _stc.is_real_collector_story(s):
+            return False
+    except Exception:
+        pass
+    # Merger and building are boilerplate regardless of a named person.
+    if _D634_MERGER_RE.search(s) or _D634_BUILDING_RE.search(s):
+        return True
+    # A founding statement is boilerplate ONLY when no founder (person) is named.
+    if _D634_FOUNDING_RE.search(s) and not _D634_NAMED_PERSON_RE.search(s):
+        return True
+    return False
+
+
+def filter_museum_boilerplate(sentences: List[str]) -> List[str]:
+    """Drop founding/merger/building/renovation boilerplate (D634) from a list of
+    About-narration sentences, keeping real founder/collector stories and
+    everything that is not boilerplate. Order is preserved.
+    """
+    return [s for s in sentences if not is_forbidden_museum_boilerplate(s)]
+
+
 def has_dangling_object_sentence(text: str) -> bool:
     """True when ANY sentence in `text` ends mid-thought (object was cut).
 
@@ -712,6 +793,15 @@ def _compose_about_narration(
     # the history (story) and the building (architecture) section is spoken once.
     wiki_sents = _hygiene_split(wiki_summary.strip()) if wiki_summary else []
     body_story = dedupe_sentences(wiki_sents + list(story_sentences))
+    # [LOCAL-623 defect 2 / D634] Drop founding-date-only, merger-of-predecessor,
+    # and building/renovation boilerplate from the About body. Only a REAL
+    # collector story (named person + motive/consequence) survives this filter;
+    # the opening section is still a stop body and D634 forbids that boilerplate.
+    # If the filter would empty the body (nothing but boilerplate was sourced),
+    # keep the pre-filter body rather than ship an empty About (D577).
+    _filtered_story = filter_museum_boilerplate(body_story)
+    if _filtered_story:
+        body_story = _filtered_story
     seen_body = {_dedup_key(s) for s in body_story}
     body_arch = [s for s in dedupe_sentences(list(arch_sentences))
                  if _dedup_key(s) not in seen_body]
@@ -1027,6 +1117,59 @@ _STREET_ADDRESS_RE = re.compile(
 # word (the regex above is IGNORECASE so "Street"/"street" both match).
 _SUFFIX_WORDS = frozenset(_STREET_SUFFIX.split("|"))
 
+# [LOCAL-623 defect 3] Lowercase function words that can never be a street-name
+# word. The _STREET_ADDRESS_RE is IGNORECASE, so its "[A-Z] street word"
+# requirement is void — "acquired in 1922 by way of a joint initiative" matched
+# as house-number 1922 + street "by" + suffix "way", shipping
+# "Address: 1922 by way, Essen, Germany" on tour 468. A genuine street name has
+# at least one Capitalised word that is not a function word, and its house number
+# is not a four-digit YEAR.
+_ADDRESS_FUNCTION_WORDS = frozenset({
+    "by", "of", "the", "a", "an", "in", "on", "to", "for", "with", "and", "or",
+    "at", "as", "from", "that", "which", "where", "when", "into", "via", "per",
+})
+
+
+def is_valid_street_address(candidate: str) -> bool:
+    """True when ``candidate`` is a genuine street address, not a mis-parsed
+    narrative fragment (the "1922 by way" defect).
+
+    Rejects:
+      • a house number that is a four-digit YEAR (1500–2099) — "1922 by way";
+      • a street-name run whose only words are lowercase function words ("by",
+        "of", "in") with no genuine Capitalised street-name token.
+
+    Accepts a normal "<number> <Capitalised Name> <suffix>" address. Pure.
+    """
+    s = (candidate or "").strip()
+    if not s:
+        return False
+    m = re.match(r"\s*(\d{1,5})(?:\s*\u00bd|\s*1/2|\s*[-–/]\s*\d{1,4})?\s*(.*)$", s)
+    if not m:
+        return False
+    number, rest = m.group(1), m.group(2)
+    # Four-digit year as a "house number" is a narrative year, not an address.
+    if len(number) == 4 and 1500 <= int(number) <= 2099:
+        return False
+    # The words between the number and the street suffix must include at least one
+    # genuine Capitalised street-name word (not a lowercase function word).
+    # Take the words up to (and excluding) the first street suffix.
+    words = re.findall(r"[A-Za-zà-ÿ0-9.'’]+", rest)
+    name_words = []
+    for w in words:
+        if w.lower().rstrip(".") in _SUFFIX_WORDS:
+            break
+        name_words.append(w)
+    if not name_words:
+        return False
+    for w in name_words:
+        wl = w.lower().rstrip(".")
+        if wl in _ADDRESS_FUNCTION_WORDS:
+            continue
+        if w[:1].isupper():
+            return True  # a genuine Capitalised street-name word
+    return False
+
 
 def extract_venue_address(page_text: str, locality: str = "") -> str:
     """Lift the venue's OWN street address from its page text, or "".
@@ -1045,7 +1188,14 @@ def extract_venue_address(page_text: str, locality: str = "") -> str:
     """
     if not page_text:
         return ""
-    m = _STREET_ADDRESS_RE.search(page_text)
+    # [LOCAL-623 defect 3] Walk every candidate and take the FIRST that validates
+    # as a real street address — so a narrative "…acquired in 1922 by way of…"
+    # (which the IGNORECASE regex matches as "1922 by way") is skipped, not shipped.
+    m = None
+    for cand in _STREET_ADDRESS_RE.finditer(page_text):
+        if is_valid_street_address(cand.group(1) or ""):
+            m = cand
+            break
     if not m:
         return ""
     street = re.sub(r"\s+", " ", (m.group(1) or "")).strip().rstrip(",")
@@ -1393,19 +1543,19 @@ def _compose_visiting_sentences(facts: str, venue_name: str, domain: str,
     venue_full = _full_venue_for_hours(venue_name)
     hours_sentence = _compose_hours_sentence(venue_full, hours_segs, closed_segs)
     adm_sentence = _compose_admission_sentence(admission_segs)
-    signal = _source_month_signal(domain, as_of)
 
+    # [LOCAL-623 defect 4] NO spoken provenance / citation tail. The month stamp
+    # ("as published by the museum in October 2026") was attached to the spoken
+    # admission/hours sentence as an honesty signal, but the critique flagged it as
+    # a citation leftover a listener hears aloud (tour 468). Provenance belongs in
+    # the TEXT-view Sources, exactly as D617 moved the source domain out of speech;
+    # the spoken sentence states only the fact. The AboutStop still carries
+    # ``as_of`` for the text view — this only stops it being spoken.
     out_sentences: List[str] = []
     if hours_sentence:
         out_sentences.append(hours_sentence)
     if adm_sentence:
-        # Attach the honesty signal to the admission sentence (it carries the price,
-        # the most volatile fact). "… teachers, as listed on <domain> in <month>."
-        adm_sentence = adm_sentence.rstrip(".") + f", {signal}."
         out_sentences.append(adm_sentence)
-    elif hours_sentence:
-        # No admission to carry the signal → attach it to the hours sentence.
-        out_sentences[-1] = out_sentences[-1].rstrip(".") + f", {signal}."
     composed = " ".join(out_sentences).strip()
     # The visiting block opens its own paragraph — capitalise its first letter
     # ("the Griffin is open" → "The Griffin is open") without touching a leading

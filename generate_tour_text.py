@@ -23229,6 +23229,57 @@ RULES:
         except Exception as _wf_body_err:
             print(f"  [LOCAL-620] Story-balance stop-body policy error (non-fatal): {_wf_body_err}")
 
+    # -------- [LOCAL-623 defect 1] Same-title / wrong-artist bleed filter -----
+    # Tour 468 Stop 1 (Daumier's unfinished *Ecce Homo*) also narrated Lovis
+    # Corinth's 1925 *Ecce Homo* — a DIFFERENT work by a DIFFERENT artist, pulled
+    # in by a bare-title web search and never bound to the stop's own artist. Bind
+    # each stop to its {title, artist} and drop any sentence that attributes the
+    # stop's title to a different hand, that names a wrong artist's creation, or
+    # that dangles on a wrong artist just removed. Museum tours only; never empties
+    # a stop (D577). Pure/deterministic.
+    if tour_category == 'museum':
+        try:
+            import same_title_bleed_guard as _stbg
+            _st_titles, _st_artists = {}, {}
+            try:
+                for _si, _sp in enumerate(poi_list, 1):
+                    _st_titles[_si] = _sp.get('name', '') or ''
+                    _st_artists[_si] = _sp.get('artist', '') or ''
+            except Exception:
+                pass
+            complete_tour, _stbg_rep = _stbg.filter_tour_text_same_title(
+                complete_tour, stop_titles=_st_titles, stop_artists=_st_artists)
+            if _stbg_rep.get('changed'):
+                print(f"  [LOCAL-623] Same-title bleed filter: dropped "
+                      f"{_stbg_rep['dropped']} wrong-artist sentence(s) "
+                      f"(bled: {_stbg_rep['bled']}) across {_stbg_rep['stops']} stops")
+            else:
+                print(f"  [LOCAL-623] Same-title bleed filter: no change "
+                      f"({_stbg_rep['stops']} stops scanned)")
+        except Exception as _stbg_err:
+            print(f"  [LOCAL-623] Same-title bleed filter error (non-fatal): {_stbg_err}")
+
+    # -------- [LOCAL-623 defect 2 / D634] Recurring museum-motif filter -------
+    # Tour 468 wove an abstract "museum story of preservation and renewal /
+    # concealment and revelation" refrain through BOTH stop bodies. Per D634 the
+    # museum motif must NOT recur across stops, and this vague institutional
+    # framing does not belong in a stop body at all. Drop the museum-endurance
+    # motif sentences from every stop body (the Stop-1 About opening section — the
+    # museum's real story — is exempt). Museum tours only; never empties a stop.
+    if tour_category == 'museum':
+        try:
+            import museum_motif_guard as _mmg
+            complete_tour, _mmg_rep = _mmg.filter_tour_text_museum_motif(complete_tour)
+            if _mmg_rep.get('changed'):
+                print(f"  [LOCAL-623] Museum-motif filter: dropped "
+                      f"{_mmg_rep['dropped']} endurance-motif sentence(s) across "
+                      f"{_mmg_rep['stops']} stops")
+            else:
+                print(f"  [LOCAL-623] Museum-motif filter: no change "
+                      f"({_mmg_rep['stops']} stops scanned)")
+        except Exception as _mmg_err:
+            print(f"  [LOCAL-623] Museum-motif filter error (non-fatal): {_mmg_err}")
+
     # -------- [LOCAL-617 item 5/6] Fresh-path shortfall reconciliation --------
     # When a LATE gate drops a stop AFTER the D616/D612 shortfall sentence was
     # composed (Granet delivered 2/3 while the sentence already said 3), the
