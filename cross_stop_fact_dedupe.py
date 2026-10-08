@@ -211,6 +211,62 @@ def is_museum_history(sentence: str) -> bool:
     return False
 
 
+# ── [LOCAL-630 item 6] Template / boilerplate provenance ─────────────────────
+#
+# NG 495 Stops 2 AND 3 both carried the SAME generic provenance shape:
+#   "The transfer of the painting to the National Gallery transformed its status;
+#    once a private treasure, it became accessible to the public."
+# It names no collector, no date and no motive — a template, not a story. D634
+# keeps REAL collector stories (a named person who acquired/gave the work, with a
+# date or a motive); this drops the templated stand-in, and its fingerprint
+# collapses the SHAPE so it can never be told in two stops.
+_TEMPLATE_PROVENANCE_RE = re.compile(
+    r"(?i)("
+    r"transfer\s+of\s+the\s+(?:painting|work|piece)\b[^.?!]*\b(?:transform|elevat|chang)\w*\s+its\s+status|"
+    r"\btransformed\s+its\s+status\b|"
+    r"once\s+a\s+private\s+(?:treasure|possession|collection)\b|"
+    r"became\s+accessible\s+to\s+the\s+public\b|"
+    r"entered\s+(?:the\s+)?public\s+(?:hands|ownership|domain)\b|"
+    r"from\s+(?:a\s+)?private\s+(?:treasure|hands|collection)\s+to\s+public\b"
+    r")")
+
+_INSTITUTION_WORDS = {
+    "national", "gallery", "museum", "collection", "tate", "louvre", "the",
+    "britain", "kunsthistorisches", "belvedere", "prado", "uffizi",
+}
+
+
+def _names_a_collector(sentence: str) -> bool:
+    """True when the sentence names a specific PERSON (a plausible collector) —
+    two adjacent capitalised tokens, neither an institution word."""
+    for m in re.finditer(r'\b([A-Z][a-z]+)\s+([A-Z][a-z]+)\b', sentence or ""):
+        a, b = m.group(1).lower(), m.group(2).lower()
+        if a in _INSTITUTION_WORDS or b in _INSTITUTION_WORDS:
+            continue
+        return True
+    return False
+
+
+def is_template_provenance(sentence: str) -> bool:
+    """[LOCAL-630 item 6] True when a sentence is TEMPLATE provenance to drop: the
+    boilerplate transfer/"transformed its status"/"private treasure → public"
+    shape AND no named collector, no date and no concrete motive. A real collector
+    story (named person + a date OR a motive) is kept. Pure, deterministic."""
+    s = sentence or ""
+    if not _TEMPLATE_PROVENANCE_RE.search(s):
+        return False
+    has_person = _names_a_collector(s)
+    has_date = bool(_YEAR_RE.search(s))
+    has_motive = bool(re.search(
+        r"(?i)\b(in\s+lieu\s+of\s+tax|death\s+dut(?:y|ies)|bequest\s+of|"
+        r"on\s+condition|to\s+settle|sold\s+to\s+the\s+nation|"
+        r"acquired\s+(?:with|through)\s+(?:funds|a\s+grant)|"
+        r"under\s+the\s+terms\s+of)\b", s))
+    if has_person and (has_date or has_motive):
+        return False
+    return True
+
+
 # ── Stop parsing (narration body only) ───────────────────────────────────────
 
 _STOP_HEADER = re.compile(r'^(Stop (\d+):\s*.+?)\s*$', re.M)
@@ -322,11 +378,22 @@ def dedupe_tour_facts(tour_text: str,
                 continue
             # A prose paragraph: dedupe sentence by sentence.
             sentences = _split_sentences(stripped)
-            if len(sentences) <= 1 and not fact_fingerprint(stripped):
+            if (len(sentences) <= 1 and not fact_fingerprint(stripped)
+                    and not is_template_provenance(stripped)):
                 out_lines.append(line)
                 continue
             kept_sentences = []
             for sent in sentences:
+                # [LOCAL-630 item 6] Template/boilerplate provenance (no named
+                # collector + date/motive) is dropped on sight — it is not a real
+                # story, and dropping it also prevents the same shape appearing in
+                # two stops.
+                if is_template_provenance(sent):
+                    dropped.append({
+                        "stop": stop_num,
+                        "reason": "template provenance (no named person/date/motive)",
+                        "sentence": sent})
+                    continue
                 fp = fact_fingerprint(sent)
                 drop = False
                 reason = ""
@@ -407,6 +474,13 @@ def dedupe_stop_units(ordered_units: List[Dict],
                 continue
             kept = []
             for sent in sentences:
+                # [LOCAL-630 item 6] Drop template/boilerplate provenance on sight.
+                if is_template_provenance(sent):
+                    dropped.append({
+                        "stop": stop_num,
+                        "reason": "template provenance (no named person/date/motive)",
+                        "sentence": sent})
+                    continue
                 fp = fact_fingerprint(sent)
                 drop = False
                 reason = ""
