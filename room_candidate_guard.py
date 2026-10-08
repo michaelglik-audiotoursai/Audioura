@@ -94,6 +94,21 @@ _FLOOR_SEG_RE = re.compile(
 )
 
 
+# [LOCAL-625] A "<space-noun> <number>" unit occurring ANYWHERE in the title —
+# whatever precedes it (abbreviations, arrows, punctuation: "AP OG -> Kabinett 4",
+# "Alte Pinakothek, OG, Saal IIa"). A real artwork title does not contain a room
+# noun glued to a bare room number, so this is safe. The number is REQUIRED (an
+# unnumbered "… Gallery" could be part of a work title), as is a word boundary
+# before the space noun so "Hall" inside "Marshall 3" is not matched.
+_SPACE_UNIT_RE = re.compile(
+    r"(?<![A-Za-zÀ-ÿ])(?:" + _SPACE_NOUNS + r")"
+    r"[\s:.\-–—]*(?:no\.?\s*)?(?:\d+[a-z]?|[ivxlcdm]+[a-z]?)"
+    r"(?:\s*[-–—&,]\s*(?:\d+[a-z]?|[ivxlcdm]+[a-z]?))*"
+    r"(?![A-Za-zÀ-ÿ])",
+    re.IGNORECASE,
+)
+
+
 def _strip_venue_and_floor_qualifiers(title: str, venue_name: str = "") -> str:
     """Drop a leading venue name and any floor/level qualifier segments so the
     remaining head is the actual space (or work) designation.
@@ -146,6 +161,11 @@ def is_room_or_space_title(title: str, venue_name: str = "") -> bool:
     # ("AP OG Kabinett 5", "2. OG Raum 3") — test the ORIGINAL title too, since the
     # abbreviations ("AP OG") are not comma-separated and survive the stripper.
     if _SPACE_TAIL_RE.match(title) or _SPACE_TAIL_RE.match(head):
+        return True
+    # [LOCAL-625] A "<space-noun> <number>" unit ANYWHERE (any separators before
+    # it: "AP OG -> Kabinett 4"). Wikidata stores these cabinets under many alias
+    # surface forms; this catches them all without enumerating separators.
+    if _SPACE_UNIT_RE.search(title):
         return True
     return False
 
