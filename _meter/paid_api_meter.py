@@ -23,8 +23,8 @@ GEMINI_IN, GEMINI_OUT, GROUNDING_PER_QUERY, SERPER_PER_QUERY = 0.75, 3.75, 0.014
 # RATE_TAG names the price card every record was costed with (Michael 2026-10-08: "keep the tag
 # on the price we are using"). Bump it whenever any rate below changes; the history of tags and the
 # bill reconciliation behind each lives in .continuous_dev/PRICE_CARD.md.
-RATE_TAG = "2026-10-08-r3"
-GROUNDED_REQUEST_USD = 0.0107  # per search-enabled Gemini request; calibrated 2026-10-08 on a clean 1-tour window ($0.32 billed, 26 requests)
+RATE_TAG = "2026-10-08-r4"
+GROUNDED_REQUEST_USD = 0.035  # per search-enabled Gemini request = Google list price ($35/1000 grounded prompts); fitted 2026-10-08 on the 11:55-16:12 window ($3.10 billed)
 
 def _host_kind(url):
     u = url or ""
