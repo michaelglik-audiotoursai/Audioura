@@ -1,4 +1,7 @@
 FROM python:3.9-slim
+# [D635] network-level paid-API meter in every process (sitecustomize)
+COPY _meter/ /opt/meter/
+ENV PYTHONPATH=/opt/meter
 WORKDIR /app
 COPY requirements_orchestrator.txt /app/requirements.txt
 RUN pip install --no-cache-dir -r requirements.txt

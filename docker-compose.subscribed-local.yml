@@ -13,13 +13,23 @@ services:
   tour-generator:
     build: {context: /Users/micha/audioura-subscribed-local, dockerfile: Dockerfile.generator}
     environment:
+      - PYTHONPATH=/opt/meter
+      - PAID_API_LOG=/meterlogs/paid_api_calls.jsonl
       - STORY_RETRY_KEEP_BEST=1
       - STORY_RETRY_EARLY_STOP=1
       - TOUR_STORY_MODEL=gpt-4.1
+    volumes:
+      - /Users/micha/audioura-subscribed-local/_meter:/opt/meter:ro
+      - /Users/micha/Audioura/meterlogs:/meterlogs
   tour-orchestrator:
     build: {context: /Users/micha/audioura-subscribed-local, dockerfile: Dockerfile.orchestrator}
     environment:
+      - PYTHONPATH=/opt/meter
+      - PAID_API_LOG=/meterlogs/paid_api_calls.jsonl
       - L2_SEAT_JOB_ENABLED=true          # LOCAL-596 hourly L2 eviction/offer job
+    volumes:
+      - /Users/micha/audioura-subscribed-local/_meter:/opt/meter:ro
+      - /Users/micha/Audioura/meterlogs:/meterlogs
   user-api-2:                             # LOCAL-595/596/598 entitlements, queue, IAP verify
     build: {context: /Users/micha/audioura-subscribed-local/user-tracking}
     environment:
@@ -28,12 +38,35 @@ services:
       ALLOW_UNAUTHENTICATED_ENTITLEMENTS: "true"   # LOCAL ONLY (LOCAL-598B); no GATEWAY_API_KEY on the Mac Mini
   tour-generation-modernized-1:
     build: {context: /Users/micha/audioura-subscribed-local, dockerfile: Dockerfile.modernized}
+    environment:
+      - PYTHONPATH=/opt/meter
+      - PAID_API_LOG=/meterlogs/paid_api_calls.jsonl
+    volumes:
+      - /Users/micha/audioura-subscribed-local/_meter:/opt/meter:ro
+      - /Users/micha/Audioura/meterlogs:/meterlogs
   polly-tts-1:
     build: {context: /Users/micha/audioura-subscribed-local, dockerfile: Dockerfile.polly-tts}
     environment:
+      - PYTHONPATH=/opt/meter
+      - PAID_API_LOG=/meterlogs/paid_api_calls.jsonl
       - TTS_ENGINE=kokoro
       - KOKORO_URL=http://host.docker.internal:5181/render
+    volumes:
+      - /Users/micha/audioura-subscribed-local/_meter:/opt/meter:ro
+      - /Users/micha/Audioura/meterlogs:/meterlogs
   translation-service:
     build: {context: /Users/micha/audioura-subscribed-local/translation-service, dockerfile: Dockerfile}
     environment:
+      - PYTHONPATH=/opt/meter
+      - PAID_API_LOG=/meterlogs/paid_api_calls.jsonl
       - TRANSLATION_ENGINE=llm
+    volumes:
+      - /Users/micha/audioura-subscribed-local/_meter:/opt/meter:ro
+      - /Users/micha/Audioura/meterlogs:/meterlogs
+  tour-editing-phase2:
+    environment:
+      - PYTHONPATH=/opt/meter
+      - PAID_API_LOG=/meterlogs/paid_api_calls.jsonl
+    volumes:
+      - /Users/micha/audioura-subscribed-local/_meter:/opt/meter:ro
+      - /Users/micha/Audioura/meterlogs:/meterlogs

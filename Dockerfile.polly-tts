@@ -6,6 +6,9 @@
 # original lean Polly-only build (r1's torch/kokoro/weights bake is reverted).
 FROM python:3.9-slim
 
+# [D635] network-level paid-API meter in every process (sitecustomize)
+COPY _meter/ /opt/meter/
+ENV PYTHONPATH=/opt/meter
 WORKDIR /app
 
 RUN pip install flask boto3 requests psycopg2-binary
