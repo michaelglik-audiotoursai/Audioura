@@ -7897,7 +7897,18 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
     # it, and a 7-day (venue, city) cache makes a repeat request free.
     _LAST_VENUE_PREFLIGHT = {}
     _LAST_PREFLIGHT_COST = {}
-    if (tour_type == 'museum' and not exclude_titles and not harness
+    # [LOCAL-629 item 4] The gate used to fire ONLY when tour_type == 'museum'.
+    # The Van Gogh Museum request arrived as tour_type='walking' (category was
+    # forced to 'museum' later, INSIDE _generate_tour_text_impl), so the wrapper
+    # skipped the preflight entirely (calls:0) and the famous museum's hours were
+    # never fetched — then the "hours not spoken" guard said nothing because the
+    # preflight had not confirmed them unpublished. Fire the preflight whenever the
+    # request NAMES A SINGLE VENUE (museum tour_type OR a location whose first
+    # segment carries a venue word), so a walking/standard request for a named
+    # museum still gets its closure check and its spoken hours.
+    _pf_named_venue = _preflight_venue_from_location(location)
+    _pf_single_venue = (tour_type == 'museum') or bool(_pf_named_venue)
+    if (_pf_single_venue and not exclude_titles and not harness
             and os.environ.get('LOCAL603_PREFLIGHT', '1') != '0'):
         try:
             import venue_preflight as _vpf
@@ -7905,7 +7916,7 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
             # venue even when its name has no English venue word: "Museo Correr",
             # "Kunsthaus Zürich", "Rijksmuseum Twenthe", "Ateneum" were all skipped,
             # so no closure check and no spoken hours. Fall back to the first segment.
-            _pf_venue = (_preflight_venue_from_location(location)
+            _pf_venue = (_pf_named_venue
                          or (location.split(',')[0].strip() if location else ''))
             if _pf_venue:
                 _pf_city = ''
