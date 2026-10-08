@@ -4,10 +4,15 @@
 Runs TWO venues that have NEVER been generated before (verified against
 ``audio_tours`` by name) through the REAL generation path with the LOCAL-624
 branch code baked into the image, metered + hard-capped at $1.00 COMBINED (all
-providers, via tests/live_run_meter.py):
+providers, via tests/live_run_meter.py).
 
-    1. Wallraf-Richartz Museum, Cologne, Germany   (2 stops)
-    2. Nationalmuseum, Stockholm, Sweden           (2 stops)
+Two acceptance runs were performed (combined $0.75, under the $1.00 cap):
+  run 1 (commit 024211a): Wallraf-Richartz Museum, Cologne (id 473) +
+                          Nationalmuseum, Stockholm (id 475)
+  run 2 (commit 2d92a79): Lenbachhaus, Munich (id 478) +
+                          Groeningemuseum, Bruges (id 480)
+The VENUES list below holds run 2; swap in fresh venues (count 0 in
+audio_tours) to re-run.
 
 Each is a FRESH museum tour (tour cache OFF). For every delivered tour it checks
 the LOCAL-624 defect classes on the SPOKEN text:
@@ -45,8 +50,8 @@ os.environ.setdefault('LOCAL603_PREFLIGHT', '1')
 os.environ.setdefault('STORY_PREFS', '1')
 
 VENUES = [
-    ('Wallraf-Richartz Museum, Cologne, Germany', 2, 'WALLRAF'),
-    ('Nationalmuseum, Stockholm, Sweden', 2, 'NATIONALMUSEUM'),
+    ('Lenbachhaus, Munich, Germany', 2, 'LENBACHHAUS'),
+    ('Groeningemuseum, Bruges, Belgium', 2, 'GROENINGEMUSEUM'),
 ]
 
 print("=== LOCAL-624 isolated live run (two FRESH museums, 2 stops each) ===",
