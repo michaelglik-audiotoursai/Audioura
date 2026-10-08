@@ -510,6 +510,19 @@ def assemble_building_tour(
     except Exception as _wes_e:  # pragma: no cover
         logger.info(f"[LOCAL-616] wrong-era guard skipped ({_wes_e})")
         _era_dropped = []
+    # [LOCAL-627 defect 6] FINAL first-sentence dangling-OPENER guard: a prior pass
+    # (fact dedupe / phantom guard) can remove the sentence that was a stop's
+    # opening demonstrative's antecedent, leaving "This move ensured…" dangling as
+    # the first sentence (tour 488 Stop 3). Drop such an opener now, after those
+    # removals, so no stop body opens on an unresolved This/That/These + noun.
+    try:
+        from dangling_demonstrative_gate import strip_dangling_openers as _sdo
+        ordered, _opener_dropped = _sdo(ordered)
+        if _opener_dropped:
+            logger.info(f"[LOCAL-627] dropped {len(_opener_dropped)} dangling opener(s)")
+    except Exception as _sdo_e:  # pragma: no cover
+        logger.info(f"[LOCAL-627] dangling-opener guard skipped ({_sdo_e})")
+        _opener_dropped = []
     # [LOCAL-592] Resolve the opening-section text. Prefer the explicit
     # ``opening_section``; fall back to folding a legacy ``about_stop`` unit's
     # narration (+ practical facts) so no caller path can resurrect an extra stop.
@@ -690,6 +703,15 @@ def assemble_outdoor_tour(
     except Exception as _wes_e:  # pragma: no cover
         logger.info(f"[LOCAL-616] wrong-era guard skipped ({_wes_e})")
         _era_dropped = []
+    # [LOCAL-627 defect 6] First-sentence dangling-opener guard (outdoor route too).
+    try:
+        from dangling_demonstrative_gate import strip_dangling_openers as _sdo
+        ordered, _opener_dropped = _sdo(ordered)
+        if _opener_dropped:
+            logger.info(f"[LOCAL-627] dropped {len(_opener_dropped)} dangling opener(s)")
+    except Exception as _sdo_e:  # pragma: no cover
+        logger.info(f"[LOCAL-627] dangling-opener guard skipped ({_sdo_e})")
+        _opener_dropped = []
 
     # [LOCAL-612 / D616] Lead Stop 1 with the honest shortfall sentence when the
     # route delivered fewer stops than asked. It is placed on the first walked
