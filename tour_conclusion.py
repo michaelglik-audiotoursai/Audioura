@@ -91,13 +91,40 @@ _TRAILING_OFFER_PATTERNS = (
 )
 
 
+# A ``Stop N:`` header that got glued onto the end of the previous sentence —
+# e.g. a final-stop transition "…: Atelierwand.Stop 3: Atelierwand" where the
+# newline before the header was lost. The counter and parser key on a line-start
+# header, so a glued header silently vanishes from the count (the listener still
+# hears the stop). Match a sentence-ending punctuation immediately followed by a
+# "Stop N:" header and re-break the line.
+_GLUED_STOP_HEADER = re.compile(r'(?<=[.!?])\s*(Stop\s+\d+:\s)')
+
+
+def normalise_stop_headers(tour_text: str) -> str:
+    """Restore a line break before any ``Stop N:`` header glued to prior text.
+
+    Deterministic and idempotent. A header already at line-start is untouched.
+    This makes the stop COUNT reflect every stop the listener actually hears,
+    even when an upstream render lost the newline before a header (the live
+    '…Atelierwand.Stop 3: Atelierwand' defect).
+    """
+    if not tour_text:
+        return tour_text
+    out = _GLUED_STOP_HEADER.sub(r'\n\n\1', tour_text)
+    # Collapse any 3+ newline run the re-break may create.
+    out = re.sub(r'\n{3,}', '\n\n', out)
+    return out
+
+
 def count_delivered_stops(tour_text: str) -> int:
     """Return the number of ``Stop N:`` headers actually present in the text.
 
     This is the authoritative stop count AFTER every gate — the number the
     conclusion, ``stops_count`` and the shortfall sentence must all agree with.
+    A header glued onto a prior sentence is first re-broken so it is counted
+    (see ``normalise_stop_headers``).
     """
-    return len(_STOP_HEADER.findall(tour_text or ""))
+    return len(_STOP_HEADER.findall(normalise_stop_headers(tour_text or "")))
 
 
 def _normalise_offer(offer: Optional[str]) -> str:
@@ -173,6 +200,7 @@ def build_conclusion(
     Returns the conclusion block (no trailing Sources), or "" when there are no
     delivered stops.
     """
+    tour_text = normalise_stop_headers(tour_text)
     stops = parse_delivered_stops(tour_text)
     n = count_delivered_stops(tour_text)
     if n <= 0 or not stops:
@@ -297,6 +325,9 @@ def rebuild_conclusion(
     """
     if not tour_text or not tour_text.strip():
         return tour_text
+    # Recover any ``Stop N:`` header glued onto a prior sentence so the count and
+    # the parsed stop list reflect every stop the listener actually hears.
+    tour_text = normalise_stop_headers(tour_text)
     if count_delivered_stops(tour_text) <= 0:
         return tour_text
 

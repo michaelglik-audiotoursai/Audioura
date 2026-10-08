@@ -56,20 +56,31 @@ class TestFixturesPresentAndBroken(unittest.TestCase):
             self.assertTrue(os.path.exists(os.path.join(_FIX_DIR, f"tour_{tid}.txt")),
                             f"missing fixture tour_{tid}.txt")
 
-    def test_fixtures_each_deliver_two_stops(self):
+    def test_fixtures_each_deliver_three_stops(self):
+        # Each tour delivers THREE stops. In the raw stored text one header is
+        # GLUED onto the prior sentence (a lost newline), so a naive line-start
+        # count sees only 2 — the exact miscount this ticket fixes. The builder's
+        # header normalisation recovers the true count of 3.
         for tid in _FIXTURES:
-            self.assertEqual(tc.count_delivered_stops(_load(tid)), 2,
-                             f"tour {tid} should deliver exactly 2 stops")
+            raw = len(re.findall(r'(?m)^Stop \d+:', _load(tid)))
+            self.assertEqual(raw, 2,
+                             f"tour {tid}: raw line-start count should be the "
+                             f"broken 2 (one header is glued)")
+            self.assertEqual(tc.count_delivered_stops(_load(tid)), 3,
+                             f"tour {tid} should deliver exactly 3 stops once the "
+                             f"glued header is recovered")
 
-    def test_fixtures_originally_miscount(self):
-        # Every original fixture stated "That's 3 stops" while delivering 2 — the
-        # exact defect this ticket fixes. (Guards against a fixture that is already
-        # clean, which would make the fix tests vacuous.)
+    def test_fixtures_originally_had_a_broken_count(self):
+        # The stored tours shipped a count that disagreed with the true delivered
+        # stop list: a bare line-start count saw 2 while 3 were delivered. (Guards
+        # against a fixture that is already clean, which would make the fix tests
+        # vacuous.)
         for tid in _FIXTURES:
-            m = _COUNT_RE.search(_load(tid))
-            self.assertIsNotNone(m, f"tour {tid}: no 'That's N stops' in original")
-            self.assertEqual(m.group(1), "3",
-                             f"tour {tid}: expected the stale count 3 in the original")
+            raw = len(re.findall(r'(?m)^Stop \d+:', _load(tid)))
+            true_n = tc.count_delivered_stops(_load(tid))
+            self.assertNotEqual(raw, true_n,
+                                f"tour {tid}: fixture is not broken (raw {raw} == "
+                                f"true {true_n}) — fix tests would be vacuous")
 
 
 class TestConclusionCriteria(unittest.TestCase):
@@ -87,7 +98,7 @@ class TestConclusionCriteria(unittest.TestCase):
             self.assertEqual(int(m.group(1)), delivered,
                              f"tour {tid}: conclusion count {m.group(1)} != "
                              f"delivered {delivered}")
-            self.assertEqual(delivered, 2, f"tour {tid}: should be 2 stops")
+            self.assertEqual(delivered, 3, f"tour {tid}: should be 3 stops")
 
     def test_2_no_splice_survives(self):
         for tid in _FIXTURES:
@@ -144,34 +155,46 @@ class TestLateGateDropUpdatesAllCounts(unittest.TestCase):
         return kept
 
     def test_drop_updates_conclusion_count(self):
-        tid = 442  # Rouen: has a "From X to Y" + a first-stop orientation name
+        tid = 442  # Rouen
         text = tc.rebuild_conclusion(_load(tid), venue_name=_FIXTURES[tid])
-        self.assertEqual(tc.count_delivered_stops(text), 2)
+        self.assertEqual(tc.count_delivered_stops(text), 3)
 
         dropped = self._drop_first_stop(text)
         rebuilt = tc.rebuild_conclusion(dropped, venue_name=_FIXTURES[tid])
 
-        # (a) conclusion count now 1
+        # (a) conclusion count now 2 (one stop dropped from 3)
         delivered = tc.count_delivered_stops(rebuilt)
-        self.assertEqual(delivered, 1)
+        self.assertEqual(delivered, 2)
         m = _COUNT_RE.search(rebuilt)
         self.assertIsNotNone(m)
-        self.assertEqual(int(m.group(1)), 1)
-        # (b) a 1-stop tour has no "From X to Y" recap (would be nonsense)
-        self.assertNotRegex(rebuilt, r"\bFrom\s+.+?\s+to\s+.+?,\s+you have followed")
+        self.assertEqual(int(m.group(1)), 2)
+        # (b) the From→to endpoints now span the remaining first/last stops
+        self.assertEqual(len(_THREAD_RE.findall(rebuilt)), 1)
         # (c) restaurant offer still last
         body = re.split(r'(?mi)^\s*Sources:', rebuilt)[0].strip()
         last_line = [ln for ln in body.splitlines() if ln.strip()][-1]
         self.assertTrue(_RESTAURANT_RE.search(last_line))
+
+    def test_drop_to_single_stop_has_no_from_to(self):
+        # Dropping two stops from a 3-stop tour leaves ONE: no "From X to Y".
+        tid = 442
+        text = tc.rebuild_conclusion(_load(tid), venue_name=_FIXTURES[tid])
+        once = self._drop_first_stop(text)
+        twice = self._drop_first_stop(tc.rebuild_conclusion(once, venue_name=_FIXTURES[tid]))
+        rebuilt = tc.rebuild_conclusion(twice, venue_name=_FIXTURES[tid])
+        self.assertEqual(tc.count_delivered_stops(rebuilt), 1)
+        m = _COUNT_RE.search(rebuilt)
+        self.assertEqual(int(m.group(1)), 1)
+        self.assertNotRegex(rebuilt, r"\bFrom\s+.+?\s+to\s+.+?,\s+you have followed")
 
     def test_stops_count_recomputed_from_final_text(self):
         # stops_count (what the orchestrator persists) is count_delivered_stops of
         # the FINAL text — never a stale generation-time value.
         for tid in _FIXTURES:
             out = tc.rebuild_conclusion(_load(tid), venue_name=_FIXTURES[tid])
-            self.assertEqual(tc.count_delivered_stops(out), 2)
+            self.assertEqual(tc.count_delivered_stops(out), 3)
             dropped = self._drop_first_stop(out)
-            self.assertEqual(tc.count_delivered_stops(dropped), 1)
+            self.assertEqual(tc.count_delivered_stops(dropped), 2)
 
     def test_orientation_first_stop_follows_delivered_text(self):
         # fix_orientation_first_stop rewrites a "Your first stop is X" pointer to
@@ -204,6 +227,44 @@ class TestLateGateDropUpdatesAllCounts(unittest.TestCase):
         self.assertIn("Your first stop is Beta", fixed)
         self.assertNotIn("Your first stop is Alpha", fixed)
         self.assertEqual(tc.first_stop_name(fixed), "Beta")
+
+
+class TestGluedStopHeaderRecovered(unittest.TestCase):
+    """A ``Stop N:`` header glued onto a prior sentence (a lost newline) must
+    still be counted, so the conclusion reflects every stop the listener hears.
+
+    This reproduces the live tour 448 defect: a final-stop transition ran into
+    the next header ("…: Atelierwand.Stop 3: Atelierwand"), so the raw line-start
+    count saw 2 while the listener heard 3, and the conclusion said "2 stops".
+    """
+
+    GLUED = (
+        "Step-by-step audio guided tour of the Demo Museum in Town, Country, is a museum tour.\n\n"
+        "Stop 1: Nana\n\n"
+        "Nana depicts an actress at her mirror, painted in oil in 1877.\n\n"
+        "Stop 2: Das Eismeer\n\n"
+        "Das Eismeer shows an ice-locked sea, painted between 1823 and 1824. "
+        "Your final stop in Demo Museum: Atelierwand.Stop 3: Atelierwand\n\n"
+        "Atelierwand studies the wall of the artist's studio in close detail.\n\n"
+        "From Nana to Das Eismeer, you have followed the thread of the collection of Demo Museum.\n\n"
+        "That's 2 stops in all.\n\n"
+        "If you would like to eat nearby we can build you a restaurant tour.\n"
+    )
+
+    def test_glued_header_counted(self):
+        # Raw line-start count misses the glued header; normalised count sees it.
+        self.assertEqual(len(re.findall(r'(?m)^Stop \d+:', self.GLUED)), 2)
+        self.assertEqual(tc.count_delivered_stops(self.GLUED), 3)
+
+    def test_rebuild_recovers_three_stops(self):
+        out = tc.rebuild_conclusion(self.GLUED, venue_name="Demo Museum")
+        # All three headers are now at line-start.
+        self.assertEqual(len(re.findall(r'(?m)^Stop \d+:', out)), 3)
+        # The conclusion count is 3, not the stale 2.
+        m = _COUNT_RE.search(out)
+        self.assertEqual(int(m.group(1)), 3)
+        # Idempotent.
+        self.assertEqual(out, tc.rebuild_conclusion(out, venue_name="Demo Museum"))
 
 
 if __name__ == "__main__":
