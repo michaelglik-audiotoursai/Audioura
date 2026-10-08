@@ -7725,6 +7725,19 @@ def _apply_delivery_hours_guard(result):
                       f"extra-bridge sentence(s) from delivered text", flush=True)
         except Exception as _rce:  # pragma: no cover
             _import_logger.error(f"[LOCAL-627] text recap guard skipped: {_rce}")
+        # 1d. [LOCAL-634] Drop any callback that tells the listener they already
+        #     saw an artist/work NOT delivered in this tour. Reina Sofía (tour 505)
+        #     shipped "Picasso and Braque, whose works you have already seen" with
+        #     no Braque stop. D636 still allows real callbacks; this only removes
+        #     the ones naming an UNDELIVERED artist/title. Deterministic.
+        try:
+            import cross_stop_reference_guard as _csrg2
+            final, _n_unseen = _csrg2.strip_unseen_callbacks_in_text(final)
+            if _n_unseen:
+                print(f"  [LOCAL-634] dropped {_n_unseen} callback(s) to an "
+                      f"artist/work not delivered in this tour", flush=True)
+        except Exception as _uce:  # pragma: no cover
+            _import_logger.error(f"[LOCAL-634] unseen-callback guard skipped: {_uce}")
         # 2. Drop duplicated paragraphs (e.g. the twice-printed orientation block).
         try:
             import paragraph_dedupe as _pd
