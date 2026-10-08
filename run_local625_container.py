@@ -101,9 +101,10 @@ def _report_facts(text):
     bad = []
     for m in re.finditer(r"(?mi)^Museum Information:\s*(.+)$", text):
         val = m.group(1)
-        for seg in re.split(r"[;,.]\s*", val):
+        # Split only on ';' and ',' — NOT '.' (that is a European clock separator,
+        # e.g. "10.00"). A correct "10.00–18.00" must stay one segment.
+        for seg in re.split(r"[;,]\s*", val):
             seg = seg.strip()
-            # a bare "HH-HH" segment with no colon/dot minute marker
             if re.fullmatch(r"\d{1,2}\s*[–-]\s*\d{1,2}", seg):
                 bad.append(seg)
     if bad:

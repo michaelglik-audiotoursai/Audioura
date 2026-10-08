@@ -46,13 +46,14 @@ _SPACE_NOUNS = (
     r"b[âa]timent|rez-de-chauss[ée]e|niveau"
 )
 
-# A numbering/ordinal tail a space often carries: "1-2", "II", "No. 3", "3",
-# "A", "1a", roman numerals, "1 & 2".
+# A numbering/ordinal tail a space often carries: "1-2", "II", "IIa", "No. 3",
+# "3", "A", "1a", roman numerals (optionally with a trailing letter: "Saal IIa"),
+# "1 & 2".
 _NUM_TAIL = (
     r"(?:[\s:.\-–—]*"
     r"(?:no\.?\s*)?"
-    r"(?:\d+[a-z]?|[ivxlcdm]+|[a-z])"
-    r"(?:\s*[-–—&,]\s*(?:\d+[a-z]?|[ivxlcdm]+|[a-z]))*"
+    r"(?:\d+[a-z]?|[ivxlcdm]+[a-z]?|[a-z])"
+    r"(?:\s*[-–—&,]\s*(?:\d+[a-z]?|[ivxlcdm]+[a-z]?|[a-z]))*"
     r")?"
 )
 
