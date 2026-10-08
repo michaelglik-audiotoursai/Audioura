@@ -9201,6 +9201,8 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
     # resolved for the LOCAL-30 fill) and consumed just below, where
     # _exhibition_stops_source exists.
     _museum_site_first_eligible = False  # True only when 0 documented works
+    # [LOCAL-632] Full verified/guarded candidate reserve for replacement-until-N.
+    _museum_verified_reserve = []
     _museum_site_url = ''
     _museum_site_language = 'en'
     _museum_resolved_locality = ''       # for the D4 actionable-failure suggestion
@@ -9381,6 +9383,7 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
                         total_stops)
 
                     # Take total_stops * 2 (D1v2 will filter, so give it room)
+                    _museum_verified_reserve = [d['title'] for d in _det_documented]  # [LOCAL-632]
                     _det_take = min(len(_det_documented), total_stops * 2)
                     poi_list = [_new_poi(d['title']) for d in _det_documented[:_det_take]]
                     
@@ -10583,6 +10586,7 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
                         total_stops)
 
                     # Take total_stops * 2 (D1v2 will filter, so give it room)
+                    _museum_verified_reserve = [d['title'] for d in _det_documented]  # [LOCAL-632]
                     _det_take = min(len(_det_documented), total_stops * 2)
                     poi_list = [_new_poi(d['title']) for d in _det_documented[:_det_take]]
                     
@@ -13468,6 +13472,38 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
                     p['coordinates'] = f"{_venue_coord[0]}, {_venue_coord[1]}"
                 _source = "geocoded" if _geocoded_coord else "model (fallback)"
                 print(f"  [D4] Museum single-coordinate: all stops set to {_venue_coord} (source: {_source})")
+
+        # [LOCAL-632] Replacement-until-N for a documented museum. A famous museum
+        # must deliver N stops when its verified corpus holds >= N works. If any
+        # gate between selection and here dropped a candidate below the request,
+        # backfill from the verified reserve (never inventing) before descriptions
+        # are generated, and log the honest shortfall when the reserve still cannot
+        # reach N. Only runs on the museum path with a reserve (the deterministic/
+        # creator-filter bypass captured it); other tour kinds are untouched.
+        if (tour_category == 'museum' and _museum_venue_name
+                and _museum_verified_reserve and total_stops):
+            try:
+                from shortfall_reconcile import reconcile_to_n, shortfall_log_line
+                _deliverable = [p for p in poi_list]
+                if len(_deliverable) < total_stops:
+                    _reserve_pois = [_new_poi(t) for t in _museum_verified_reserve]
+                    _reconciled, _sf = reconcile_to_n(
+                        _deliverable, _reserve_pois, total_stops, title_key='name')
+                    _added = len(_reconciled) - len(_deliverable)
+                    if _added > 0:
+                        # Renumber the backfilled POIs so stop_number stays 1..k.
+                        poi_list = _reconciled
+                        for _ri, _rp in enumerate(poi_list):
+                            _rp['stop_number'] = _ri + 1
+                        print(f"  [LOCAL-632] replacement-until-N: added {_added} "
+                              f"verified work(s) from reserve "
+                              f"({len(_museum_verified_reserve)} available) → "
+                              f"{len(poi_list)} stop(s) for request of {total_stops}")
+                    if _sf:
+                        print(shortfall_log_line(
+                            _sf['requested'], _sf['delivered'], _sf['reasons']))
+            except Exception as _sf_err:
+                print(f"  [LOCAL-632] replacement-until-N skipped (non-fatal): {_sf_err}")
 
         # Print extracted POI information
         print("\n=== Extracted POI Information ===")
