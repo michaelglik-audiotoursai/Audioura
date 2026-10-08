@@ -7801,12 +7801,16 @@ def _apply_delivery_hours_guard(result):
             from tour_conclusion import (
                 rebuild_conclusion as _rebuild_concl,
                 fix_orientation_first_stop as _fix_first_stop,
+                fix_orientation_work_mismatch as _fix_orient_work,
                 count_delivered_stops as _count_delivered,
                 has_thematic_conclusion as _has_thematic,
             )
             if _count_delivered(final) > 0:
                 _concl_venue = _recover_tour_venue(final)
                 final = _fix_first_stop(final)
+                # [LOCAL-630 item 4] Each Orientation must describe its OWN stop's
+                # work — repair any that names another delivered stop's title.
+                final = _fix_orient_work(final)
                 # [LOCAL-619B] If a correct THEMATIC conclusion is already present
                 # (the fresh path built one, possibly LLM-written and theme-aware),
                 # PRESERVE it — rebuilding here would overwrite the discovered
@@ -24538,6 +24542,7 @@ RULES:
         from tour_conclusion import (
             rebuild_conclusion as _rebuild_concl,
             fix_orientation_first_stop as _fix_first_stop,
+            fix_orientation_work_mismatch as _fix_orient_work,
             count_delivered_stops as _count_delivered,
         )
         # Venue name for the thread sentence: the resolved museum venue when we
@@ -24581,6 +24586,8 @@ RULES:
         # Late-gate consistency: the orientation's "first stop" name must match
         # the real first delivered stop (a late gate may have dropped it).
         complete_tour = _fix_first_stop(complete_tour)
+        # [LOCAL-630 item 4] Each Orientation must describe its OWN stop's work.
+        complete_tour = _fix_orient_work(complete_tour)
         # [LOCAL-619B] FIRST thematic build on the fresh path, with the discovered
         # theme (SQ-S6b) preferred as the thread and the cheap LLM writing the
         # body (a)+(b) from the delivered stops' text only. The LLM draft is
