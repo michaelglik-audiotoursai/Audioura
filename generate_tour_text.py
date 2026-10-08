@@ -16373,38 +16373,39 @@ MANDATORY INCLUSION — work this surprising detail into the description natural
                 # Replace unranked list with ranked+capped list for injection
                 _stop_snippets = _ranked_snippets
 
-                # [LOCAL-617 item 2] WORK-FIRST EVIDENCE FILTER. The critic's top
-                # defect on every museum tour is institutional material (donors,
-                # acquisitions, renovations, provenance) crowding out the work and
-                # artist. Classify each ranked snippet and drop the purely
-                # institutional ones, passing at most ONE and only when it is this
-                # work's own acquisition story. Museum stops only; other tour types
-                # are untouched. Belt-and-suspenders: never let it empty the stop.
+                # [LOCAL-620 item 2 / D634] WORK-FIRST + BALANCE EVIDENCE POLICY.
+                # Keep work/artist/reception/emotion snippets; also KEEP real
+                # collector/museum STORY snippets (named person + motive/
+                # consequence) up to ~25% (more when rich evidence is thin) so the
+                # only stories some museums have about their holdings survive and
+                # feed the preference learner; DROP pure boilerplate. Museum stops
+                # only; never strip a stop's evidence to nothing.
                 if tour_category == 'museum':
                     try:
-                        import work_first_evidence as _wfe
+                        import story_balance as _sbal_ev
                         try:
                             _wf_venue = _museum_venue_name or location or ''
                         except NameError:
                             _wf_venue = location or ''
                         _venue_tokens_wf = [w for w in re.split(r'[\s,\-]+', _wf_venue)
                                             if len(w) >= 3]
-                        _wf_kept, _wf_report = _wfe.filter_snippets_work_first(
+                        _wf_kept, _wf_report = _sbal_ev.balance_snippets_work_first(
                             _stop_snippets, work_subject=poi_name or '',
                             venue_tokens=_venue_tokens_wf)
                         if _wf_kept:  # never strip a stop's evidence to nothing
                             _stop_snippets = _wf_kept
-                            print(f"  [LOCAL-617] Stop {stop_num} evidence filter: "
+                            print(f"  [LOCAL-620] Stop {stop_num} evidence balance: "
                                   f"input={_wf_report['input']} "
-                                  f"dropped_institutional={_wf_report['dropped_institutional']} "
-                                  f"kept_own_acquisition={_wf_report['kept_own_acquisition']} "
+                                  f"kept_rich={_wf_report['kept_rich']} "
+                                  f"kept_story={_wf_report['kept_story']} "
+                                  f"dropped_boilerplate={_wf_report['dropped_boilerplate']} "
                                   f"output={_wf_report['output']}")
-                        elif _wf_report['dropped_institutional']:
-                            print(f"  [LOCAL-617] Stop {stop_num} evidence filter: all "
-                                  f"{_wf_report['input']} snippets institutional — kept as-is "
+                        elif _wf_report['dropped_boilerplate']:
+                            print(f"  [LOCAL-620] Stop {stop_num} evidence balance: all "
+                                  f"{_wf_report['input']} snippets boilerplate — kept as-is "
                                   f"(never empty a stop)")
                     except Exception as _wf_err:
-                        print(f"  [LOCAL-617] evidence filter skipped: {_wf_err}")
+                        print(f"  [LOCAL-620] evidence balance skipped: {_wf_err}")
 
                 # These are concrete, checkable facts — numbers, named materials,
                 # named techniques, named literary forms — that the prose MUST prefer
@@ -23174,17 +23175,20 @@ RULES:
         print(f"  [LOCAL-615] Duplicated-paragraph dedupe error (non-fatal): {_dup_err}")
 
     # -------- [LOCAL-617 item 2/3] Work-first stop-body filter --------
-    # The critic's dominant defect on every museum tour is institutional material
-    # (donors, bequests, acquisitions, renovations, provenance, loans, the museum's
-    # mission) crowding out the WORK and ARTIST. On the DELIVERED spoken text,
-    # keep at most ONE institutional sentence per stop — the work's own acquisition
-    # story if present — and only when the stop still has work/artist/reception/
-    # emotion substance to stand on. The Stop-1 opening section (D611 About story +
-    # practical notes + honest shortfall) is exempt. Museum tours only; the filter
-    # never empties a stop (D577).
+    # [LOCAL-620 / D634] BALANCE policy, not a hard cap. The critic's dominant
+    # defect was institutional material crowding out the WORK and ARTIST, but
+    # Michael (D634) does not want donor/museum sentences dismissed outright —
+    # the real collector/museum STORIES are the only stories some museums have
+    # about their holdings, and they feed the preference learner. So on the
+    # DELIVERED spoken text we now: keep every work/artist/reception/emotion
+    # sentence; keep REAL collector/museum stories (named person + motive or
+    # consequence) up to ~25% of a stop, and more when the work's own evidence is
+    # thin; still DROP pure boilerplate (budgets, square metres, hours, bare
+    # founding, mission) and bare transfers of title. The D611 opening section is
+    # exempt. Museum tours only; never empties a stop (D577).
     if tour_category == 'museum':
         try:
-            import work_first_evidence as _wfe_body
+            import story_balance as _sbal
             _wf_body_tokens = [w for w in re.split(r'[\s,\-]+', (location or ''))
                                if len(w) >= 3]
             _wf_subjects = {}
@@ -23193,17 +23197,19 @@ RULES:
                     _wf_subjects[_si] = _sp.get('name', '') or ''
             except Exception:
                 pass
-            complete_tour, _wf_body_report = _wfe_body.filter_tour_text_work_first(
+            complete_tour, _wf_body_report = _sbal.balance_tour_text_work_first(
                 complete_tour, venue_tokens=_wf_body_tokens, stop_subjects=_wf_subjects)
             if _wf_body_report.get('changed'):
-                print(f"  [LOCAL-617] Work-first stop-body filter: dropped "
-                      f"{_wf_body_report['institutional_dropped']} institutional "
-                      f"sentence(s) across {_wf_body_report['stops']} stops")
+                print(f"  [LOCAL-620] Story-balance stop-body policy: dropped "
+                      f"{_wf_body_report['boilerplate_dropped']} boilerplate + "
+                      f"{_wf_body_report['transfer_dropped']} bare-transfer sentence(s), "
+                      f"kept {_wf_body_report['story_kept']} collector story sentence(s) "
+                      f"across {_wf_body_report['stops']} stops")
             else:
-                print(f"  [LOCAL-617] Work-first stop-body filter: no change "
+                print(f"  [LOCAL-620] Story-balance stop-body policy: no change "
                       f"({_wf_body_report['stops']} stops scanned)")
         except Exception as _wf_body_err:
-            print(f"  [LOCAL-617] Work-first stop-body filter error (non-fatal): {_wf_body_err}")
+            print(f"  [LOCAL-620] Story-balance stop-body policy error (non-fatal): {_wf_body_err}")
 
     # -------- [LOCAL-617 item 5/6] Fresh-path shortfall reconciliation --------
     # When a LATE gate drops a stop AFTER the D616/D612 shortfall sentence was
