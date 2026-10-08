@@ -30,6 +30,17 @@ LLM_RATES = {
         "input_per_1m": 2.50,
         "output_per_1m": 10.00,
     },
+    # [LEAD 2026-10-08] gpt-4.1 is the main narration model. It was missing, so every gpt-4.1 call was
+    # priced at the "most expensive" gpt-4o rate: the ledger overstated OpenAI (LOCAL-626 harness $1.72
+    # vs network meter $0.85). List price; matches PRICE_CARD.md tag 2026-10-08-r3.
+    "gpt-4.1-mini": {
+        "input_per_1m": 0.40,
+        "output_per_1m": 1.60,
+    },
+    "gpt-4.1": {
+        "input_per_1m": 2.00,
+        "output_per_1m": 8.00,
+    },
     "gpt-4o-mini": {
         "input_per_1m": 0.15,
         "output_per_1m": 0.60,
