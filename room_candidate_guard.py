@@ -68,6 +68,21 @@ _SPACE_ONLY_RE = re.compile(
     re.IGNORECASE,
 )
 
+# [LOCAL-625] A space designation sitting at the TAIL of the title, after any run
+# of qualifier words/abbreviations ("AP OG Kabinett 5", "Alte Pinakothek Saal IIa",
+# "2. OG Raum 3"). The whole title is just <qualifiers> <space-noun> <number>, so
+# the number tail is REQUIRED here (an unnumbered "… Gallery" at the tail could be
+# part of a work title) and the lead qualifier words must be short tokens
+# (abbreviations/venue words), never a sentence.
+_SPACE_TAIL_RE = re.compile(
+    r"^\s*(?:[\w.&'’-]+\s+){0,6}"
+    r"(?:" + _SPACE_NOUNS + r")"
+    r"(?:[\s:.\-–—]*(?:no\.?\s*)?(?:\d+[a-z]?|[ivxlcdm]+[a-z]?)"
+    r"(?:\s*[-–—&,]\s*(?:\d+[a-z]?|[ivxlcdm]+[a-z]?))*)"
+    r"\s*$",
+    re.IGNORECASE,
+)
+
 # Floor/level qualifier segments that commonly PREFIX the real space designation
 # on German/French pages ("Obergeschoss, Kabinett 1-2"; "1er étage, Salle 5").
 _FLOOR_SEG_RE = re.compile(
@@ -126,6 +141,11 @@ def is_room_or_space_title(title: str, venue_name: str = "") -> bool:
         return True
     # Also catch the case where stripping left only a floor qualifier.
     if _FLOOR_SEG_RE.match(head):
+        return True
+    # [LOCAL-625] A numbered space at the TAIL after qualifier words/abbreviations
+    # ("AP OG Kabinett 5", "2. OG Raum 3") — test the ORIGINAL title too, since the
+    # abbreviations ("AP OG") are not comma-separated and survive the stripper.
+    if _SPACE_TAIL_RE.match(title) or _SPACE_TAIL_RE.match(head):
         return True
     return False
 
