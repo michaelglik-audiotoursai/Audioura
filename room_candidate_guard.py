@@ -24,7 +24,8 @@ rejected: those are only rejected when the title is JUST the space designation
 
 import re
 
-__all__ = ["is_room_or_space_title", "filter_out_room_candidates"]
+__all__ = ["is_room_or_space_title", "is_venue_itself_title",
+           "filter_out_room_candidates"]
 
 # Space / room / building nouns. English + German (Saal, Raum, Kabinett, Flügel,
 # Geschoss/Obergeschoss/Erdgeschoss, Gebäude, Halle) + French (salle, aile,
@@ -170,11 +171,83 @@ def is_room_or_space_title(title: str, venue_name: str = "") -> bool:
     return False
 
 
+# [LOCAL-626 item 1] Generic institution-type nouns that, trailing a venue's
+# proper name, still name the WHOLE institution ("Courtauld Gallery", "Prado
+# Museum", "the Collection"). A stop carrying only these is the museum itself,
+# never an artwork.
+_INSTITUTION_NOUNS = {
+    "museum", "gallery", "galleries", "collection", "collections",
+    "institute", "foundation", "trust", "centre", "center", "haus",
+    "musee", "musée", "museo", "pinakothek", "kunsthalle", "kunstmuseum",
+    "gemaldegalerie", "gemäldegalerie", "galerie", "fundacion", "fundación",
+}
+
+# Leading articles across the live-venue languages.
+_LEAD_ARTICLE_RE = re.compile(
+    r"(?i)^\s*(?:the|le|la|les|das|der|die|il|lo|el|los|las|l[''])\s+")
+
+
+def _norm_venue(text: str) -> str:
+    """Lowercase, drop a leading article, collapse punctuation/whitespace."""
+    t = (text or "").strip()
+    if not t:
+        return ""
+    t = _LEAD_ARTICLE_RE.sub("", t)
+    t = re.sub(r"[^\w\s]", " ", t, flags=re.UNICODE)
+    return " ".join(t.lower().split())
+
+
+def is_venue_itself_title(title: str, venue_name: str = "") -> bool:
+    """[LOCAL-626 item 1] True when a stop title names the VENUE ITSELF — the
+    museum/gallery as its own stop — rather than an artwork inside it.
+
+    Tour 485's Stop 1 was literally "Courtauld Gallery", carrying the museum's
+    founding/relocation history as its narration body: the about-museum opening
+    is already folded into Stop 1 (LOCAL-592) and must never ALSO consume an
+    artwork slot, or a request for N stops delivers N-1 works. The venue slips the
+    room/space guard because "Courtauld Gallery" has no room NUMBER.
+
+    Matches (pure, deterministic, no I/O):
+      * exact venue name (article- and punctuation-insensitive);
+      * the venue name with/without a trailing institution noun
+        ("Prado" vs "Prado Museum", "Courtauld" vs "Courtauld Gallery");
+      * a bare institution noun alone ("The Collection", "The Museum").
+    A real artwork whose title merely begins with the venue name but continues
+    with more words ("Courtauld Gallery Interior, 1935" — a painting OF it) is
+    NOT matched, because its normalised head carries words beyond the venue name
+    and its institution suffix.
+    """
+    nt = _norm_venue(title)
+    if not nt:
+        return False
+    nv = _norm_venue(venue_name)
+
+    def _strip_institution_tail(s: str) -> str:
+        toks = s.split()
+        while len(toks) > 1 and toks[-1] in _INSTITUTION_NOUNS:
+            toks = toks[:-1]
+        return " ".join(toks)
+
+    # A bare institution noun on its own is the venue ("The Collection").
+    if nt in _INSTITUTION_NOUNS:
+        return True
+
+    if nv:
+        if nt == nv:
+            return True
+        # Compare with trailing institution nouns stripped from BOTH sides, so
+        # "Courtauld" == "Courtauld Gallery" == venue "The Courtauld Gallery".
+        if _strip_institution_tail(nt) == _strip_institution_tail(nv) and \
+                _strip_institution_tail(nt) != "":
+            return True
+    return False
+
+
 def filter_out_room_candidates(candidates, venue_name: str = "",
                                title_key: str = "title"):
     """Return (kept, dropped): candidates split by whether their title names a
-    room/space. ``candidates`` is a list of dicts; ``title_key`` selects the title
-    field. Order-preserving and pure.
+    room/space OR the venue itself. ``candidates`` is a list of dicts;
+    ``title_key`` selects the title field. Order-preserving and pure.
     """
     kept, dropped = [], []
     for c in candidates or []:
@@ -183,7 +256,8 @@ def filter_out_room_candidates(candidates, venue_name: str = "",
             title = (c.get(title_key) or c.get("name") or "").strip()
         else:
             title = str(c or "").strip()
-        if title and is_room_or_space_title(title, venue_name):
+        if title and (is_room_or_space_title(title, venue_name)
+                      or is_venue_itself_title(title, venue_name)):
             dropped.append(c)
         else:
             kept.append(c)

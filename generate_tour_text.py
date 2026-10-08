@@ -5407,6 +5407,25 @@ def _verify_works_v2(poi_list, venue_name, exhibition_scope=None):
         except Exception as _rg_err:
             print(f"  [LOCAL-625] room-title canonical filter skipped ({_rg_err})")
 
+    # [LOCAL-626 item 1] Reject the VENUE ITSELF from the canonical SET at the same
+    # chokepoint. Tour 485 shipped "Courtauld Gallery" as Stop 1 — the museum as
+    # its own artwork stop, carrying building history. The about-museum opening is
+    # already folded into Stop 1 (LOCAL-592); the venue must never also hold a work
+    # slot or N stops deliver N-1 works. Always on (no ALLOW_* opt-out: a space
+    # tour still is not a tour OF the institution-as-an-object).
+    if canonical_titles:
+        try:
+            from room_candidate_guard import is_venue_itself_title as _is_venue_canon
+            _venue_dropped = sorted(t for t in canonical_titles
+                                    if _is_venue_canon(t, venue_name))
+            if _venue_dropped:
+                canonical_titles = set(t for t in canonical_titles
+                                       if t not in _venue_dropped)
+                print(f"  [LOCAL-626] rejected venue-itself title(s) from canonical "
+                      f"SET for '{venue_name}': dropped {_venue_dropped}")
+        except Exception as _ve_err:
+            print(f"  [LOCAL-626] venue-itself canonical filter skipped ({_ve_err})")
+
     # Store classification in corpus_result for downstream audit
     # CRITICAL: Also update corpus_result['canonical_titles'] so R4 replenishment
     # uses the FILTERED set (prevents excluded titles from being re-verified via R4)
@@ -9131,6 +9150,21 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
                     # Apply bare-noun filter (shouldn't be needed but defence-in-depth)
                     from story_miner import is_bare_generic_noun
                     _det_documented = [d for d in _det_documented if not is_bare_generic_noun(d['title'])]
+                    # [LOCAL-626 item 1] Drop any candidate that names the VENUE
+                    # ITSELF ("The Courtauld Gallery") BEFORE truncation, so a real
+                    # artwork fills its slot and N stops stay N works. The about-
+                    # museum section already carries the venue's story (LOCAL-592);
+                    # the venue must never also be an artwork stop.
+                    try:
+                        from room_candidate_guard import is_venue_itself_title as _is_venue
+                        _before_v = len(_det_documented)
+                        _det_documented = [d for d in _det_documented
+                                           if not _is_venue(d['title'], _museum_venue_name)]
+                        if len(_det_documented) != _before_v:
+                            print(f"  [LOCAL-626] dropped venue-itself candidate(s) from "
+                                  f"documented works for '{_museum_venue_name}'")
+                    except Exception as _ve:
+                        print(f"  [LOCAL-626] venue-itself filter skipped ({_ve})")
                     
                     # Take total_stops * 2 (D1v2 will filter, so give it room)
                     _det_take = min(len(_det_documented), total_stops * 2)
@@ -10305,6 +10339,21 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
                     # Apply bare-noun filter (shouldn't be needed but defence-in-depth)
                     from story_miner import is_bare_generic_noun
                     _det_documented = [d for d in _det_documented if not is_bare_generic_noun(d['title'])]
+                    # [LOCAL-626 item 1] Drop any candidate that names the VENUE
+                    # ITSELF ("The Courtauld Gallery") BEFORE truncation, so a real
+                    # artwork fills its slot and N stops stay N works. The about-
+                    # museum section already carries the venue's story (LOCAL-592);
+                    # the venue must never also be an artwork stop.
+                    try:
+                        from room_candidate_guard import is_venue_itself_title as _is_venue
+                        _before_v = len(_det_documented)
+                        _det_documented = [d for d in _det_documented
+                                           if not _is_venue(d['title'], _museum_venue_name)]
+                        if len(_det_documented) != _before_v:
+                            print(f"  [LOCAL-626] dropped venue-itself candidate(s) from "
+                                  f"documented works for '{_museum_venue_name}'")
+                    except Exception as _ve:
+                        print(f"  [LOCAL-626] venue-itself filter skipped ({_ve})")
                     
                     # Take total_stops * 2 (D1v2 will filter, so give it room)
                     _det_take = min(len(_det_documented), total_stops * 2)
