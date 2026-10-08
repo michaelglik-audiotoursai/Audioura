@@ -7510,6 +7510,18 @@ def _apply_delivery_hours_guard(result):
             final = _orch._fold_preflight_hours_into_text(final)
         except Exception as _he:  # pragma: no cover
             _import_logger.error(f"[LOCAL-616] hours fold skipped: {_he}")
+        # 1b. [LOCAL-627 defect 2] Collapse any RAW spoken fare table (a verbatim
+        #     multi-ticket price list that leaked into a stop body/orientation) to
+        #     one clean 'A ticket is <price>.' sentence — practical facts are spoken
+        #     once, as at most two short sentences, never a pasted price table.
+        try:
+            import practical_facts_gate as _pfg_ft
+            final, _n_fare = _pfg_ft.collapse_fare_table(final)
+            if _n_fare:
+                print(f"  [LOCAL-627 #2] collapsed {_n_fare} raw fare table(s) to a "
+                      f"single admission sentence", flush=True)
+        except Exception as _fte:  # pragma: no cover
+            _import_logger.error(f"[LOCAL-627] fare-table collapse skipped: {_fte}")
         # 2. Drop duplicated paragraphs (e.g. the twice-printed orientation block).
         try:
             import paragraph_dedupe as _pd
@@ -7528,10 +7540,26 @@ def _apply_delivery_hours_guard(result):
         #     Runs AFTER the dedupe so it cannot defeat duplicate-orientation removal.
         try:
             import practical_facts_gate as _pfg
-            final, _added_hours_line = _pfg.ensure_unpublished_hours_line(final)
+            # [LOCAL-627 defect 2] Only assert "hours weren't published" when the
+            # hours preflight RAN successfully and genuinely returned no hours. If
+            # the preflight errored or was skipped (a transient failure — the Prado
+            # publishes hours but tour 487's preflight failed), say NOTHING instead
+            # of a false claim.
+            _pf_state = _LAST_VENUE_PREFLIGHT or {}
+            _hours_genuinely_absent = bool(
+                _pf_state
+                and not _pf_state.get('error')
+                and not _pf_state.get('skipped')
+                and not _pf_state.get('hours'))
+            final, _added_hours_line = _pfg.ensure_unpublished_hours_line(
+                final, hours_genuinely_absent=_hours_genuinely_absent)
             if _added_hours_line:
                 print("  [LOCAL-618 #4] no hours were published — said so once "
                       "('Opening hours weren't published where we could read them')",
+                      flush=True)
+            elif not _hours_genuinely_absent and not _pfg.tour_speaks_hours(final):
+                print("  [LOCAL-627 #2] hours not spoken, but preflight did not "
+                      "confirm they are unpublished — saying nothing (not a false claim)",
                       flush=True)
         except Exception as _uh:  # pragma: no cover
             _import_logger.error(f"[LOCAL-618] unpublished-hours line skipped: {_uh}")
