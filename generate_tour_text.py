@@ -23403,6 +23403,62 @@ RULES:
     except Exception as _d523_e:
         print(f"  [D523] spoken-text hygiene skipped (non-fatal): {_d523_e}")
 
+    # [LOCAL-618 #2] Deterministic grammar & splice lint on the FINAL spoken text.
+    # Flags unbalanced quotes/parens, "…-" splices, verbless sentences and repeated
+    # word pairs, then drops the flagged sentence — or hands exactly ONE flagged
+    # sentence to a cheap, metered LLM rewrite. Guarded; never fatal.
+    try:
+        from spoken_text_hygiene import grammar_splice_lint as _gs_lint
+
+        def _gs_rewrite(sentence):
+            """Cheap, metered single-sentence rewrite. Returns '' on any failure so
+            the lint falls back to dropping the sentence."""
+            nonlocal total_cost, total_tokens
+            try:
+                _gs_prompt = (
+                    "Rewrite this one sentence from an audio tour as a single, "
+                    "grammatical, natural spoken sentence. Keep every fact; invent "
+                    "nothing; add no new names or dates. Fix broken punctuation, "
+                    "spliced words, missing verbs, and repeated words. Return ONLY "
+                    "the corrected sentence.\n\nSENTENCE: " + sentence
+                )
+                _gs_resp = requests.post(
+                    "https://api.openai.com/v1/chat/completions",
+                    headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
+                    json={
+                        "model": _check_model(),
+                        "messages": [
+                            {"role": "system", "content": "You repair a single spoken sentence. You never add facts."},
+                            {"role": "user", "content": _gs_prompt},
+                        ],
+                        "temperature": 0.0,
+                        "max_tokens": 120,
+                    },
+                    timeout=20,
+                )
+                if _gs_resp.status_code != 200:
+                    return ''
+                _gs_json = _gs_resp.json()
+                _gs_usage = _gs_json.get("usage", {})
+                _gs_cost = (_gs_usage.get("prompt_tokens", 0) / 1000 * 0.005) + \
+                           (_gs_usage.get("completion_tokens", 0) / 1000 * 0.015)
+                total_cost += _gs_cost
+                total_tokens += _gs_usage.get("total_tokens", 0)
+                _gs_out = _gs_json["choices"][0]["message"]["content"].strip()
+                if _gs_out.startswith('"') and _gs_out.endswith('"'):
+                    _gs_out = _gs_out[1:-1].strip()
+                return _gs_out
+            except Exception:
+                return ''
+
+        complete_tour, _gs_rep = _gs_lint(complete_tour, rewrite_fn=_gs_rewrite, verbose=True)
+        if _gs_rep.get('flagged'):
+            print(f"  [LOCAL-618 #2] grammar/splice lint: {_gs_rep['flagged']} flagged, "
+                  f"{_gs_rep['dropped']} dropped, {_gs_rep['rewritten']} rewritten "
+                  f"by_code={_gs_rep['by_code']}")
+    except Exception as _gs_e:
+        print(f"  [LOCAL-618 #2] grammar/splice lint skipped (non-fatal): {_gs_e}")
+
     # [LOCAL-602 r2 / D617 item 10] "check the website" at most once, tour-wide.
     # Hours/admission are spoken when published; when a field is unpublished we
     # point at the venue site, but the pointer must appear ONCE across the whole

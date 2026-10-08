@@ -27,7 +27,8 @@ from collections import defaultdict
 __all__ = ['clean_spoken_text', 'MISSING_SPACE_RE', 'TEMPLATE_SEAM_RE',
            'DANGLING_PHRASE_RE', 'normalize_proper_noun_spellings',
            'strip_sources_and_urls', 'SOURCES_HEADING_RE', 'URL_RE',
-           'strip_degenerate_from_to_recap']
+           'strip_degenerate_from_to_recap',
+           'flag_sentence', 'grammar_splice_lint']
 
 # "At this work:", "in the stop:", "At this piece:" — the preposition keeps its
 # original case, because replacing with a literal "At " produced "Then, At Au
@@ -361,6 +362,215 @@ def strip_degenerate_from_to_recap(text: str) -> tuple:
         out = re.sub(r'\n{3,}', '\n\n', out)
         out = out.strip() + ('\n' if text.endswith('\n') else '')
     return out, removed
+
+
+# -------- [LOCAL-618 #2] Deterministic grammar & splice lint ------------------
+#
+# The critic's Sevilla runs shipped garbled clauses: "Gertrud Dübi…-Müller first
+# came into the world" (an ellipsis-hyphen splice), sentences with no verb,
+# dangling fragments, and a stray opening quote with no close. No gate was reading
+# the FINAL spoken text as grammar. This lint flags four deterministic defect
+# classes per sentence, then DROPS the flagged sentence (or hands exactly one to a
+# cheap, metered LLM rewrite if a rewrite_fn is supplied). Pure except for the
+# optional injected rewrite_fn, so the rules are unit-tested offline.
+
+# An ellipsis / stray dots fused to a hyphen inside or between words:
+#   "Dübi…-Müller", "Dübi...-Müller", "text .-and"
+_SPLICE_RE = re.compile(r'(?:\u2026|\.{2,})\s*-|-\s*(?:\u2026|\.{2,})')
+
+# A finite-verb signal. If a sentence of real length contains none of these, it is
+# almost certainly a dangling fragment (a caption, a stray noun phrase). Kept
+# deliberately broad to avoid false drops: common auxiliaries, copulas, modals,
+# and the regular -ed / -s verb endings are all treated as "has a verb".
+_VERB_HINTS = {
+    'is', 'are', 'was', 'were', 'be', 'been', 'being', 'am',
+    'has', 'have', 'had', 'do', 'does', 'did',
+    'will', 'would', 'shall', 'should', 'can', 'could', 'may', 'might', 'must',
+    'make', 'makes', 'made', 'show', 'shows', 'see', 'stand', 'look', 'hold',
+    'holds', 'held', 'paint', 'paints', 'painted', 'depict', 'depicts', 'come',
+    'came', 'became', 'turns', 'turn', 'began', 'begin', 'find', 'finds',
+    'carry', 'carries', 'carried', 'remains', 'remain', 'remained', 'sits',
+    'sit', 'sat', 'lies', 'lie', 'rises', 'rose', 'took', 'take', 'takes',
+    'gives', 'give', 'gave', 'tells', 'tell', 'told', 'wrote', 'write', 'writes',
+    'built', 'build', 'opened', 'open', 'closed', 'founded', 'created', 'explore',
+    'explores', 'reveals', 'reveal', 'captures', 'capture', 'offers', 'offer',
+    # Common irregular past tenses — these have no -ed ending and would otherwise
+    # read as "verbless" false positives (observed: "kept", "stood", "hung").
+    'kept', 'keep', 'keeps', 'stood', 'hung', 'hangs', 'hang', 'went', 'go',
+    'goes', 'ran', 'run', 'runs', 'won', 'win', 'lost', 'lose', 'sold', 'sell',
+    'bought', 'buy', 'brought', 'bring', 'taught', 'teach', 'caught', 'catch',
+    'left', 'leave', 'met', 'meet', 'set', 'put', 'cut', 'let', 'spent', 'spend',
+    'sent', 'send', 'drew', 'draw', 'draws', 'drawn', 'grew', 'grow', 'grows',
+    'knew', 'know', 'knows', 'saw', 'seen', 'fell', 'fall', 'falls', 'rose',
+    'risen', 'spoke', 'speak', 'speaks', 'broke', 'break', 'breaks', 'chose',
+    'choose', 'drove', 'drive', 'held', 'led', 'lead', 'leads', 'fled', 'flee',
+    'became', 'becomes', 'become', 'stands', 'depicting', 'portrays', 'portray',
+}
+
+
+def _balanced(text: str) -> bool:
+    """Parentheses and double-quote marks are balanced in `text`."""
+    depth = 0
+    for ch in text:
+        if ch == '(':
+            depth += 1
+        elif ch == ')':
+            depth -= 1
+            if depth < 0:
+                return False
+    if depth != 0:
+        return False
+    # Straight double quotes must be even; curly open/close must match.
+    if text.count('"') % 2 != 0:
+        return False
+    if text.count('\u201c') != text.count('\u201d'):
+        return False
+    return True
+
+
+def _has_verb(sentence: str) -> bool:
+    words = re.findall(r"[A-Za-zà-ÿ']+", sentence.lower())
+    if not words:
+        return False
+    for w in words:
+        if w in _VERB_HINTS:
+            return True
+        # Regular past-tense/participle ending on a word of real length. A bare
+        # "-ing" gerund ("painting", "frame") is NOT counted — it is just as often
+        # a noun, and counting it masks genuine verbless fragments.
+        if len(w) > 3 and w.endswith('ed'):
+            return True
+        # 3rd-person-singular present ("serves", "fosters", "ranges", "invites").
+        # Accept any -s word of real length that is not an obvious plural-only /
+        # possessive form; a false accept (missing a true verbless fragment) is far
+        # safer than a false reject (dropping a grammatical sentence).
+        if len(w) > 3 and w.endswith('s') and not w.endswith('ss') and not w.endswith("'s"):
+            return True
+    return False
+
+
+# A line that is practical-facts / structured data, not a prose sentence: hours,
+# prices, GPS coordinates, admission lines. These legitimately lack a finite verb
+# and legitimately repeat tokens (AM/PM, day names); the lint must leave them be.
+_STRUCTURED_LINE_RE = re.compile(
+    r'(?i)(\d{1,2}:\d{2}|\bGPS\b|coordinates|\$\d|admission|\bAM\b|\bPM\b|'
+    r'\bopen\b.*\b(?:mon|tue|wed|thu|fri|sat|sun)|closed\s+(?:mon|tue|wed|thu|fri|sat|sun))')
+
+
+def _repeated_word_pair(sentence: str) -> bool:
+    """A consecutive repeated bigram: 'the the', 'came into came into'.
+
+    Skipped entirely on structured/practical lines (hours, prices, coordinates),
+    where day-name and AM/PM repetition is legitimate.
+    """
+    if _STRUCTURED_LINE_RE.search(sentence):
+        return False
+    words = [w.lower() for w in re.findall(r"[A-Za-zà-ÿ']+", sentence)]
+    # Immediate single-word doubling.
+    for i in range(len(words) - 1):
+        if words[i] == words[i + 1] and len(words[i]) > 1:
+            return True
+    # Repeated adjacent bigram: w0 w1 w0 w1.
+    for i in range(len(words) - 3):
+        if words[i] == words[i + 2] and words[i + 1] == words[i + 3] and len(words[i]) > 1:
+            return True
+    return False
+
+
+def flag_sentence(sentence: str) -> list:
+    """Return a list of defect codes for a single sentence (empty = clean).
+
+    Codes: 'splice', 'unbalanced', 'verbless', 'repeated_pair'. Short sentences
+    (< 5 words) are exempt from the verbless check — labels, exclamations and
+    one-clause pointers legitimately lack a finite verb.
+    """
+    codes = []
+    s = sentence.strip()
+    if not s:
+        return codes
+    if _SPLICE_RE.search(s):
+        codes.append('splice')
+    if not _balanced(s):
+        codes.append('unbalanced')
+    _nwords = len(re.findall(r"[A-Za-zà-ÿ']+", s))
+    if _nwords >= 5 and not _STRUCTURED_LINE_RE.search(s) and not _has_verb(s):
+        codes.append('verbless')
+    if _repeated_word_pair(s):
+        codes.append('repeated_pair')
+    return codes
+
+
+def grammar_splice_lint(text: str, rewrite_fn=None, verbose: bool = False) -> tuple:
+    """Flag and repair garbled sentences in FINAL spoken text.
+
+    For each sentence, `flag_sentence` reports deterministic defects. A flagged
+    sentence is DROPPED, unless `rewrite_fn` is supplied — then exactly ONE flagged
+    sentence (the first) is handed to the cheap LLM rewrite; if the rewrite comes
+    back clean it replaces the original, otherwise the sentence is dropped. The
+    rewrite is metered by the caller (rewrite_fn owns cost accounting).
+
+    Returns ``(cleaned, report)`` where report = {
+        'flagged': n, 'dropped': n, 'rewritten': n, 'by_code': {code: n}
+    }. Deterministic given a deterministic rewrite_fn; pure when rewrite_fn is None.
+    """
+    report = {'flagged': 0, 'dropped': 0, 'rewritten': 0, 'by_code': {}}
+    if not text or not text.strip():
+        return text or '', report
+
+    ends_nl = text.endswith('\n')
+    # Work paragraph by paragraph so structure (labels, blank lines) is preserved.
+    paragraphs = text.split('\n\n')
+    out_paragraphs = []
+    _rewrite_used = False
+
+    for para in paragraphs:
+        # Keep a leading structural label (Orientation:, Directions:) attached.
+        label = ''
+        body = para
+        m = re.match(r'^([A-Z][a-z]+:\s*)', para)
+        if m:
+            label, body = m.group(1), para[m.end():]
+
+        sentences = re.split(r'(?<=[.!?])\s+', body)
+        kept = []
+        for sent in sentences:
+            codes = flag_sentence(sent)
+            if not codes:
+                kept.append(sent)
+                continue
+            report['flagged'] += 1
+            for c in codes:
+                report['by_code'][c] = report['by_code'].get(c, 0) + 1
+            # Try a single cheap LLM rewrite, if offered and not yet used.
+            if rewrite_fn is not None and not _rewrite_used:
+                _rewrite_used = True
+                try:
+                    fixed = (rewrite_fn(sent) or '').strip()
+                except Exception:
+                    fixed = ''
+                if fixed and not flag_sentence(fixed):
+                    kept.append(fixed)
+                    report['rewritten'] += 1
+                    continue
+            # Otherwise drop the flagged sentence.
+            report['dropped'] += 1
+
+        new_body = ' '.join(k.strip() for k in kept if k.strip())
+        rebuilt = (label + new_body).strip()
+        # Never let a repair empty a paragraph that had content: if everything was
+        # dropped, keep the original paragraph rather than ship a hole.
+        if not rebuilt and para.strip():
+            rebuilt = para.strip()
+            report['dropped'] = max(0, report['dropped'] - len(sentences))
+        out_paragraphs.append(rebuilt)
+
+    cleaned = '\n\n'.join(p for p in out_paragraphs)
+    cleaned = re.sub(r'\n{3,}', '\n\n', cleaned).strip()
+    if verbose and report['flagged']:
+        print(f"  [LOCAL-618 #2] grammar/splice lint: {report['flagged']} flagged, "
+              f"{report['dropped']} dropped, {report['rewritten']} rewritten "
+              f"({report['by_code']})")
+    return (cleaned + '\n') if ends_nl else cleaned, report
 
 
 def clean_spoken_text(text: str, verbose: bool = False) -> tuple:
