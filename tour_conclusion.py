@@ -180,6 +180,14 @@ def has_thematic_conclusion(tour_text: str) -> bool:
     text = normalise_stop_headers(tour_text or "")
     headers = list(_STOP_HEADER.finditer(text))
     search_from = headers[-1].end() if headers else 0
+    # [LEAD 2026-10-08] A thematic opener FOLLOWED (or preceded) by a legacy
+    # enumerating recap is NOT a correct conclusion: the pool path
+    # (stop_pool_assembly._closing_recap) appended "From X to Y… That's N stops…
+    # Along the way:" after the fresh thematic one, and the guard preserved both
+    # (Museum Folkwang canary, tour 468). Any legacy marker → rebuild.
+    if (_LEGACY_THREAD_OPENER.search(text, search_from)
+            or re.search(r'(?im)^Along the way:', text[search_from:])):
+        return False
     return _THEMATIC_OPENER.search(text, search_from) is not None
 
 
