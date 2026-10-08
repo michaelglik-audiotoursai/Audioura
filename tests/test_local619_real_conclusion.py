@@ -267,5 +267,66 @@ class TestGluedStopHeaderRecovered(unittest.TestCase):
         self.assertEqual(out, tc.rebuild_conclusion(out, venue_name="Demo Museum"))
 
 
+class TestRecapAvoidsAccessionAndVerbatimOpener(unittest.TestCase):
+    """[LOCAL-619 #critic] After the count was fixed, the live critique's residual
+    in-scope complaint was that the recap (a) led with a dry accession/provenance
+    line and (b) echoed the stop's opening sentence verbatim, so the close read as
+    "re-read the dullest line of each stop" rather than a conclusion.
+
+    This reproduces the live Kunsthalle Stop-1 shape — a stop whose delivered
+    narration OPENS with an accession sentence and later tells the work's story —
+    and asserts the recap clause skips the accession opener and lifts the story.
+    """
+
+    TOUR = (
+        "Step-by-step audio guided tour of the Demo Kunsthalle in City, Country, is a museum tour.\n\n"
+        "Stop 1: Das Eismeer\n\n"
+        'In 1905, "Das Eismeer" was acquired by the Demo Kunsthalle from a private collector '
+        "and entered the permanent collection. "
+        "Because buyers rejected the composition, it stayed completely unsold throughout the "
+        "artist's entire lifetime until his death in 1840.\n\n"
+        "Stop 2: Nana\n\n"
+        "In 1877, Manet submitted this painting of a courtesan to the Salon. "
+        "The jury refused to exhibit the piece, so Manet placed it in a gallery window instead.\n\n"
+        "If you would like to eat nearby we can build you a restaurant tour.\n"
+    )
+
+    def setUp(self):
+        self.out = tc.rebuild_conclusion(self.TOUR, venue_name="Demo Kunsthalle")
+        m = re.search(r'Along the way.*?(?=\n\nIf you would like|\Z)',
+                      self.out, re.DOTALL)
+        self.recap = (m.group(0) if m else "")
+
+    def test_recap_present(self):
+        self.assertIn("Along the way", self.recap)
+
+    def test_recap_skips_accession_opener(self):
+        # The accession opener ("…was acquired by… entered the permanent
+        # collection") must NOT be the recapped fact for Das Eismeer.
+        self.assertNotIn("was acquired by the Demo Kunsthalle", self.recap)
+        self.assertNotIn("entered the permanent collection", self.recap)
+
+    def test_recap_lifts_the_story(self):
+        # It should instead carry the work's STORY sentence.
+        self.assertIn("stayed completely unsold", self.recap)
+
+    def test_recap_does_not_echo_stop_opening_sentence_verbatim(self):
+        # The first delivered sentence of each stop must not be copied verbatim.
+        for opener in ('In 1905, "Das Eismeer" was acquired',
+                       "In 1877, Manet submitted this painting of a courtesan to the Salon."):
+            self.assertNotIn(opener, self.recap)
+
+    def test_still_one_conclusion_count_matches_restaurant_last(self):
+        # The structural contracts still hold after the recap change.
+        self.assertEqual(len(_THREAD_RE.findall(self.out)), 1)
+        m = _COUNT_RE.search(self.out)
+        self.assertEqual(int(m.group(1)), tc.count_delivered_stops(self.out))
+        self.assertTrue(self.out.rstrip().endswith(
+            "we can build you a restaurant tour."))
+        # Idempotent.
+        self.assertEqual(self.out,
+                         tc.rebuild_conclusion(self.out, venue_name="Demo Kunsthalle"))
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

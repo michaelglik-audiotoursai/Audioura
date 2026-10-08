@@ -182,6 +182,112 @@ def _clean_recap_clause(clause: str, title: str) -> str:
     return clause
 
 
+# [LOCAL-619 #critic] Provenance / accession / institutional-history openers that
+# must NOT become the recap "fact". The shared ``_first_recap_sentence`` tries to
+# skip these, but its stem list is wrapped as ``\b(acquir|donat|…)\b`` — the
+# TRAILING ``\b`` makes each stem fail on the inflected forms that actually occur
+# ("acquired", "donated", "founded"), so an accession sentence ("In 1905 … was
+# acquired by the museum from …") leaked in as the lead recap fact on the live
+# Thyssen/Kunsthalle tours and the critic flagged it (criterion 1/6). This stem
+# list has NO trailing boundary, so it matches the inflected forms, and it is
+# applied HERE (in the LOCAL-619 module) so the shared pool-path helper and its
+# 590/607 tests are untouched.
+_PROVENANCE_LEAD = re.compile(
+    r'\b(acquir\w*|donat\w*|bequeath\w*|bequest|gifted|gift of|'
+    r'reloca\w*|renam\w*|founded|establish\w*|'
+    r'entered the\s+\w+\s+collection|part of\s+\w+(?:\'s)?\s+'
+    r'(?:private\s+)?collection|accession\w*)\b', re.IGNORECASE)
+
+# A recap sentence should describe the WORK or tell its STORY, not recite
+# dimensions/dates alone. Dimensions-only sentences ("…dimensions of 111 by 79
+# centimetres") read as filler in a closing (criterion 6) and are deprioritised.
+_DIMENSIONS_ONLY = re.compile(
+    r'\bdimensions?\b|\bmeasures?\b|\d+\s*(?:by|x|×)\s*\d+\s*(?:cm|centimet)',
+    re.IGNORECASE)
+
+# Orientation / viewing-instruction sentences address the LISTENER in the gallery
+# ("stand before …", "position yourself …", "as you step closer …"). They belong
+# in the stop body, not in a backward-looking recap, so they are rejected here.
+_VIEWING_INSTRUCTION = re.compile(
+    r'\b(stand before|stand at|position yourself|as you (?:stand|step|approach|'
+    r'move|look|enter)|take in the|lean in|from this vantage|look (?:up|closer)|'
+    r'notice how|observe the|take a moment)\b', re.IGNORECASE)
+
+_DANGLING_LEAD = re.compile(
+    r'^(however|this|that|these|those|it|they|he|she|here|'
+    r'such|moreover|thus|hence|as a result|before this|also|and|but)\b',
+    re.IGNORECASE)
+
+
+def _pick_recap_clause(stop: Dict) -> str:
+    """Pick ONE recap clause for a stop that NAMES the work and tells its most
+    concrete STORY — not an accession/provenance line, and NOT a verbatim copy of
+    the stop's own opening sentence.
+
+    The critic's residual complaint after the count was fixed was that the recap
+    (a) led with a dry accession fact and (b) repeated the stop's opening sentence
+    verbatim, so the close read as a "re-read the dullest line of each stop" list
+    rather than a conclusion. This picker:
+
+      1. skips provenance/accession/institutional-history sentences (corrected
+         stem matching — see ``_PROVENANCE_LEAD``);
+      2. skips the stop's OWN first delivered sentence (kills the verbatim repeat);
+      3. skips dangling-pronoun openers (a recap line must stand alone);
+      4. prefers a sentence that reads as a story/description; dimensions-only
+         sentences are taken only as a last resort;
+      5. falls back to the shared ``_first_recap_sentence`` then the bare title,
+         so the recap ALWAYS names a real, delivered stop and never fabricates.
+
+    Returns a self-contained "{Title}: {clause}." string (or the title alone).
+    """
+    title = (stop.get("title") or "").strip()
+    narration = (stop.get("narration") or "").strip()
+    if not narration:
+        return title
+
+    sentences = [s.strip() for s in re.split(r'(?<=[.!?])\s+', narration)
+                 if s.strip()]
+    lead = sentences[0] if sentences else ""
+
+    def _norm(s: str) -> str:
+        return re.sub(r'\s+', ' ', s or '').strip().lower().rstrip('.')
+
+    lead_norm = _norm(lead)
+
+    best = ""
+    fallback_dims = ""
+    for s in sentences:
+        if not (30 <= len(s) <= 220):
+            continue
+        if _norm(s) == lead_norm:           # (2) never echo the stop's opener
+            continue
+        if _PROVENANCE_LEAD.search(s):      # (1) no accession/provenance lead
+            continue
+        if _DANGLING_LEAD.match(s):         # (3) must stand alone
+            continue
+        if _VIEWING_INSTRUCTION.search(s):  # (3b) not a gallery instruction
+            continue
+        if _DIMENSIONS_ONLY.search(s):      # (4) dimensions-only → last resort
+            if not fallback_dims:
+                fallback_dims = s
+            continue
+        best = s
+        break
+
+    if not best:
+        best = fallback_dims
+
+    if not best:
+        # (5) fall back to the shared picker, then title.
+        shared = _first_recap_sentence(stop)
+        return _clean_recap_clause(shared, title)
+
+    clause = best.rstrip('.')
+    if clause.lower().startswith(title.lower()):
+        return _clean_recap_clause(clause + ".", title)
+    return _clean_recap_clause(f"{title}: {clause}.", title)
+
+
 def build_conclusion(
     tour_text: str,
     *,
@@ -245,13 +351,20 @@ def build_conclusion(
     if n >= 2:
         recap_stops = _recap_pick_three(stops)
         recap_clauses = []
+        _seen = set()
         for s in recap_stops:
-            clause = _first_recap_sentence(s)
+            clause = _pick_recap_clause(s)
             clause = _clean_recap_clause(clause, (s.get("title") or "").strip())
-            if clause:
-                # _first_recap_sentence returns "Title: fact." — keep it as a
-                # self-contained sentence in the prose recap.
-                recap_clauses.append(clause.rstrip())
+            if not clause:
+                continue
+            # Guard against two stops yielding the same clause text (e.g. both
+            # fell back to a near-identical title line) so the recap never
+            # repeats a sentence (criterion 2).
+            key = re.sub(r'\s+', ' ', clause).strip().lower().rstrip('.')
+            if key in _seen:
+                continue
+            _seen.add(key)
+            recap_clauses.append(clause.rstrip())
         if recap_clauses:
             para.append("Along the way, a few moments stand out. "
                         + " ".join(_ensure_period(c) for c in recap_clauses))
