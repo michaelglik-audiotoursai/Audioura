@@ -98,11 +98,42 @@ class TestItem1CollectionMembership(unittest.TestCase):
         self.assertIn("Death and the Maiden", kept_titles)
         self.assertIn("Madonna del Prato", dropped_titles)
 
-    def test_no_reference_collection_never_strands(self):
-        # Sparse venue (no SPARQL, no site titles) → keep every candidate.
+    def test_ophelia_dropped_even_when_in_sparql_set(self):
+        # Live NG tour 500 defect: a Wikidata P276 row leaked *Ophelia* into the
+        # National Gallery SPARQL set, so the collection check alone KEPT it. The
+        # known-misattribution guard must drop it regardless of the SPARQL match.
+        sparql = [
+            {"label_en": "The Toilet of Venus", "aliases": ["The Rokeby Venus"]},
+            {"label_en": "Ophelia", "creator": "John Everett Millais"},
+            {"label_en": "The Supper at Emmaus"},
+        ]
+        cands = [
+            {"title": "The Toilet of Venus"},
+            {"title": "Ophelia", "creator": "John Everett Millais"},
+            {"title": "The Supper at Emmaus"},
+        ]
         kept, dropped = asg.enforce_collection_membership(
-            NG_CANDIDATES, sparql_works=[], site_titles=[])
-        self.assertEqual(len(kept), len(NG_CANDIDATES))
+            cands, sparql_works=sparql, venue_name="The National Gallery")
+        self.assertNotIn("Ophelia", {k["title"] for k in kept})
+        self.assertIn("Ophelia", {d["title"] for d in dropped})
+
+    def test_ophelia_kept_at_its_true_home_tate(self):
+        kept, _ = asg.enforce_collection_membership(
+            [{"title": "Ophelia"}], sparql_works=[{"label_en": "Ophelia"}],
+            venue_name="Tate Britain")
+        self.assertIn("Ophelia", {k["title"] for k in kept})
+
+    def test_no_reference_collection_never_strands(self):
+        # Sparse venue (no SPARQL, no site titles) → keep every candidate that is
+        # not a KNOWN misattribution. Use titles absent from the curated home map.
+        plain = [
+            {"title": "The Arnolfini Portrait", "creator": "Jan van Eyck"},
+            {"title": "The Toilet of Venus", "creator": "Diego Velázquez"},
+            {"title": "The Supper at Emmaus", "creator": "Caravaggio"},
+        ]
+        kept, dropped = asg.enforce_collection_membership(
+            plain, sparql_works=[], site_titles=[], venue_name="Some Small Museum")
+        self.assertEqual(len(kept), len(plain))
         self.assertEqual(dropped, [])
 
 
