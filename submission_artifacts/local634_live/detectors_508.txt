@@ -1,0 +1,2 @@
+FAIL stop_count: 2 delivered vs 3 requested
+508: 1 detector failure(s)
