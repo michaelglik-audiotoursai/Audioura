@@ -332,6 +332,10 @@ def enforce_artworks_only(
                                            is_venue_itself_title as _is_venue)
     except Exception:  # pragma: no cover
         _is_room = _is_venue = None
+    try:
+        from junk_title_guard import is_junk_page_title as _is_junk
+    except Exception:  # pragma: no cover
+        _is_junk = None
 
     kept: List[Dict] = []
     dropped: List[Dict] = []
@@ -351,6 +355,13 @@ def enforce_artworks_only(
         # 1. hard class reject
         if is_nonartwork_instance(inst):
             _reject(entry, f"nonartwork_class ({','.join(_qids(inst))})")
+            continue
+
+        # 1b. [LOCAL-632] web-page / CMS / nav title (a scraped page <title> or
+        # section label such as "Profile « The ALBERTINA Museum Vienna") → reject
+        # at intake, whatever the class says.
+        if _is_junk is not None and title and _is_junk(title, venue_name):
+            _reject(entry, "junk_page_title")
             continue
 
         has_artwork_class = is_artwork_instance(inst)

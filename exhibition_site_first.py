@@ -529,6 +529,7 @@ def build_site_first_candidates(
     today=None,
     city: str = '',
     serper: Optional[Callable] = None,
+    venue_name: str = '',
 ) -> List[Dict]:
     """Build site-first candidate stops for an exhibition museum, filled toward N.
 
@@ -659,16 +660,31 @@ def build_site_first_candidates(
         from room_candidate_guard import is_room_or_space_title as _is_room
     except Exception:  # pragma: no cover
         _is_room = None
+    # [LOCAL-632] A scraped exhibition/work heading is sometimes the venue's own
+    # page <title> or a nav/section label ("Profile « The ALBERTINA Museum
+    # Vienna", "Home", "Visit"). Reject those at intake so a real on-view show or
+    # work fills the slot instead — the Albertina tour-497 defect.
+    try:
+        from junk_title_guard import is_junk_page_title as _is_junk
+    except Exception:  # pragma: no cover
+        _is_junk = None
 
     def _append(c: Optional[Dict]) -> bool:
         if not c or len(candidates) >= cap:
+            return False
+        _ctitle = c.get('name', '') or c.get('title', '')
+        # [LOCAL-632] Web-page / CMS / nav title → never a stop. Applied before
+        # the room guard so page chrome ("Profile « …") is dropped at intake.
+        if _is_junk is not None and _ctitle and _is_junk(_ctitle, venue_name):
+            diagnostics['junk_titles_rejected'] = \
+                diagnostics.get('junk_titles_rejected', 0) + 1
             return False
         # [LOCAL-625 item 3] Never accept a room/gallery/wing/floor/building as an
         # artwork stop (the "Kabinett 1-2" defect). A scraped exhibition/work title
         # that is really a space is dropped so the corpus fill replaces it.
         if (not _allow_spaces and _is_room is not None
                 and c.get('kind') != 'museum_space'
-                and _is_room(c.get('name', '') or c.get('title', ''))):
+                and _is_room(_ctitle)):
             diagnostics['rooms_rejected'] = diagnostics.get('rooms_rejected', 0) + 1
             return False
         key = c['name'].lower()
@@ -729,7 +745,8 @@ def build_site_first_candidates(
         # pages per city), try the no-headless fallbacks before giving up:
         # branch page → sitemap/robots URLs → embedded JSON → Serper site:<domain>.
         js_candidates = _build_js_fallback_candidates(
-            base_site_url, city, total_stops, fetch, serper, diagnostics)
+            base_site_url, city, total_stops, fetch, serper, diagnostics,
+            venue_name=venue_name)
         if js_candidates:
             diagnostics['reason'] = 'ok'
             diagnostics['fetch_failed'] = False
@@ -755,7 +772,7 @@ def build_site_first_candidates(
 
 
 def _build_js_fallback_candidates(base_site_url, city, total_stops, fetch,
-                                  serper, diagnostics) -> List[Dict]:
+                                  serper, diagnostics, venue_name='') -> List[Dict]:
     """[LOCAL-602] Candidates for a JS-only / chain venue, no headless browser.
 
     Only runs when the structural extractor found nothing. In order:
@@ -872,11 +889,22 @@ def _build_js_fallback_candidates(base_site_url, city, total_stops, fetch,
     cap = max(total_stops * 2, total_stops)
     out: List[Dict] = []
     names = set()
+    # [LOCAL-632] Reject a web-page / CMS / nav title that slipped through the
+    # path-only URL filter above (embedded-JSON and Serper items carry a scraped
+    # <title> / heading, e.g. "Profile « The ALBERTINA Museum Vienna").
+    try:
+        from junk_title_guard import is_junk_page_title as _is_junk
+    except Exception:  # pragma: no cover
+        _is_junk = None
+    _junk_dropped = 0
     for it in raw_items:
         if len(out) >= cap:
             break
         title = (it.get('title') or '').strip()
         if not title:
+            continue
+        if _is_junk is not None and _is_junk(title, venue_name):
+            _junk_dropped += 1
             continue
         key = title.lower()
         if key in names:
@@ -895,6 +923,11 @@ def _build_js_fallback_candidates(base_site_url, city, total_stops, fetch,
         })
     diagnostics['js_fallback'] = diagnostics.get('via', 'js_fallback')
     diagnostics['js_candidate_count'] = len(out)
+    if _junk_dropped:
+        diagnostics['junk_titles_rejected'] = \
+            diagnostics.get('junk_titles_rejected', 0) + _junk_dropped
+        print(f"  [LOCAL-632] junk-title filter dropped {_junk_dropped} "
+              f"web-page/nav title(s) from JS-fallback candidates")
     return out
 
 

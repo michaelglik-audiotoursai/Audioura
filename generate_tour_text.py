@@ -9829,6 +9829,7 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
                 diagnostics=_sf_diagnostics,
                 city=_sf_city,
                 serper=_sf_serper,
+                venue_name=_museum_venue_name,
             )
             if _sf_candidates:
                 poi_list = [_new_poi(c['name'], page_sourced=True) for c in _sf_candidates]
