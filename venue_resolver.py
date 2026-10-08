@@ -621,7 +621,8 @@ def fetch_venue_works(venue_qid: str, language: str = "en",
       OPTIONAL {{ ?work rdfs:label ?workLabel_en. FILTER(LANG(?workLabel_en) = "en") }}
       SERVICE wikibase:label {{ bd:serviceParam wikibase:language "{language},en". }}
     }}
-    LIMIT 200
+    ORDER BY DESC(?sitelinks)
+    LIMIT 400
     """
     
     try:
