@@ -99,8 +99,13 @@ class TestHoursGuardEveryPath(unittest.TestCase):
         gtt._LAST_VENUE_PREFLIGHT = {"hours": "", "admission": "", "sources": {}}
         folded, _o, _c = gtt._apply_delivery_hours_guard(
             (_FABRE_414_STOP1, None, (None, None)))
-        # Never invent: the honest pointer stays unchanged.
-        self.assertEqual(folded, _FABRE_414_STOP1)
+        # Never invent HOURS: the guard must not fabricate opening hours when the
+        # preflight has none. (The guard also rebuilds the conclusion per LOCAL-619,
+        # so the whole text is no longer byte-identical — assert the hours no-op.)
+        self.assertNotIn("Monday, Thursday, Friday: 12:00 PM", folded)
+        self.assertNotIn("10:00 AM – 6:00 PM", folded)
+        # The venue's Stop 1 story is untouched.
+        self.assertIn("here is the story of Musée Fabre", folded)
 
     def test_idempotent(self):
         once, _o, _c = gtt._apply_delivery_hours_guard(

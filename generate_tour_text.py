@@ -7362,6 +7362,35 @@ except Exception as _cap_err:  # pragma: no cover
     _import_logger.error(f"[LOCAL-562] executor context propagation unavailable: {_cap_err}")
 
 
+def _recover_tour_venue(tour_text):
+    """[LOCAL-619] Recover the venue name for the conclusion thread, from the
+    final tour text alone (the delivery guard has only the text).
+
+    Prefers an existing "Your final stop in {venue}:" / "Continue through {venue}
+    — next is" transition line (the generator's own wording), then the title line
+    ("…Audio Guided Tour: {venue}, {city}…"). Returns "" when nothing recovers.
+    """
+    import re as _re
+    for pat in (r'Your final stop in (.+?):',
+                r'Continue through (.+?) — next is'):
+        m = _re.search(pat, tour_text or "")
+        if m:
+            return m.group(1).strip()
+    # Title line, two shapes:
+    #   "…Audio Guided Tour: {venue}, {city}…"                 (older)
+    #   "Step-by-step audio guided tour of the {venue} in {city}, …"  (current)
+    first_line = (tour_text or "").split("\n", 1)[0]
+    m = _re.search(r'(?i)\btour of (?:the\s+)?(.+?)\s+in\s+[A-Z]', first_line)
+    if m:
+        return m.group(1).strip()
+    m = _re.search(r'(?mi)^Step-by-[Ss]tep[^:\n]*[Tt]our[^:\n]*:\s*(.+?)\s*$',
+                   tour_text or "")
+    if m:
+        # Title is "{venue}, {city}, {country}" — keep the leading venue phrase.
+        return m.group(1).split(',')[0].strip()
+    return ""
+
+
 def _apply_delivery_hours_guard(result):
     """[LOCAL-616 item 1] Run the belt-and-braces delivery guards on the FINAL
     delivered text of EVERY delivery path — not just the fresh/first-tour path
@@ -7443,6 +7472,35 @@ def _apply_delivery_hours_guard(result):
                       f"sentence(s) from delivered text (every-path guard)", flush=True)
         except Exception as _fe:  # pragma: no cover
             _import_logger.error(f"[LOCAL-616] foreign-sentence sweep skipped: {_fe}")
+        # 4. [LOCAL-619] THE ONE CONCLUSION — built from the FINAL delivered text,
+        #    as the LAST step on EVERY path (fresh, pool, cache, by_reference,
+        #    overview), after every other gate above. This is the single choke
+        #    point the ticket asks for: whatever trailing recap/stub a path left
+        #    (the "That's N stops —" splice, a stale count from a late-gate drop,
+        #    or a pool/overview closing) is replaced by one deterministic
+        #    conclusion — thread + "That's N stops" counted from THIS text + up to
+        #    3 recap lines + the restaurant offer last. It runs here, after the
+        #    paragraph-dedupe and foreign-sentence sweep, so no later pass can
+        #    collapse the recap bullets. Also recomputes the orientation's "first
+        #    stop" name from the final text. Idempotent; guarded; never fatal.
+        try:
+            from tour_conclusion import (
+                rebuild_conclusion as _rebuild_concl,
+                fix_orientation_first_stop as _fix_first_stop,
+                count_delivered_stops as _count_delivered,
+            )
+            if _count_delivered(final) > 0:
+                _concl_venue = _recover_tour_venue(final)
+                final = _fix_first_stop(final)
+                final = _rebuild_concl(final, venue_name=_concl_venue)
+                print(f"  [LOCAL-619] conclusion rebuilt from final text "
+                      f"(every-path guard): {_count_delivered(final)} delivered "
+                      f"stop(s), venue={_concl_venue!r}", flush=True)
+        except ImportError:
+            _import_logger.error("[LOCAL-619] MISSING: tour_conclusion — the "
+                                 "trailing recap stub is NOT replaced")
+        except Exception as _ce:  # pragma: no cover
+            _import_logger.error(f"[LOCAL-619] conclusion rebuild skipped: {_ce}")
         if final != text and out_file:
             # Rewrite the delivered file so the service (which reads the file,
             # not the return value) ships the cleaned text on every path.
