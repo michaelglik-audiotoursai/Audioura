@@ -685,6 +685,61 @@ def gate(venue: str, city: str, result: Dict) -> Optional[Dict]:
 # ─────────────────────────────────────────────────────────────────────────────
 # PLAN B HELPERS (consumed by the generator)
 # ─────────────────────────────────────────────────────────────────────────────
+
+# [LOCAL-628 / task 5] "Open daily" vs a named closed day. The KHM
+# (Kunsthistorisches Museum) is closed on Mondays outside summer, but a grounded
+# report that leads with "Open daily, 10:00–18:00" (summer phrasing, or a loose
+# source) made the spoken Stop-1 sentence say the museum is open "daily" — a
+# false claim on a Monday. The hours string is free text from the report; when it
+# BOTH asserts daily/every-day AND names a closed weekday, the two contradict.
+# Resolve in favour of the specific closed-day fact: drop the "daily"/"every day"
+# claim so the spoken sentence never says the museum is open every day while the
+# same text says it is closed on some day. Never invents a day or a range; if the
+# text only says "daily" with no closed-day, it is left unchanged (we do not
+# second-guess a genuine 7-day venue).
+_CLOSED_DAY_RE = re.compile(
+    r"(?i)\b(?:closed|except|not\s+open)\b[^.;\n]*?\b(mon|tue|wed|thu|fri|sat|sun)"
+    r"(?:day|s|days|nesday|rsday|urday)?\b")
+_DAILY_RE = re.compile(r"(?i)\b(?:open\s+)?(?:daily|every\s*day|all\s+days?)\b")
+
+
+def _hours_names_closed_day(hours: str) -> bool:
+    """True when the hours text names a specific closed weekday."""
+    return bool(_CLOSED_DAY_RE.search(hours or ""))
+
+
+def reconcile_daily_with_closed_days(hours: str) -> str:
+    """Return `hours` with any "daily"/"every day" claim removed WHEN the same
+    text also names a closed weekday. Otherwise `hours` is returned unchanged.
+
+    Examples::
+
+        "Open daily, 10:00–18:00, closed Mondays"  -> "10:00–18:00, closed Mondays"
+        "Open daily 10:00–18:00"                   -> "Open daily 10:00–18:00"  (unchanged)
+        "Tue–Sun 10:00–18:00, closed Monday"       -> unchanged (no "daily")
+    """
+    h = (hours or "").strip()
+    if not h:
+        return h
+    if not _DAILY_RE.search(h) or not _hours_names_closed_day(h):
+        return h
+    # The "every day except <weekday>" idiom is self-qualifying and TRUTHFUL — it
+    # does not falsely claim the venue is open every day; it names the exception.
+    # Leave it intact (stripping it would produce ungrammatical text and lose the
+    # exception). Only a daily claim that is NOT immediately qualified by "except"
+    # is the false one we remove.
+    if re.search(r"(?i)\b(?:daily|every\s*day|all\s+days?)\s*,?\s*except\b", h):
+        return h
+    # Drop the daily phrase (and a trailing comma/space it leaves behind) so the
+    # closed-day fact stands alone. Collapse the whitespace/punctuation seam.
+    out = _DAILY_RE.sub("", h)
+    out = re.sub(r"\s{2,}", " ", out)
+    out = re.sub(r"^[\s,;–-]+", "", out)          # leading junk
+    out = re.sub(r"\s+([,;.])", r"\1", out)        # space before punctuation
+    out = re.sub(r"([,;])\s*([,;])", r"\1", out)   # doubled separators
+    return out.strip().strip(",;").strip()
+
+
 def plan_b_opening_practicals(result: Dict) -> Dict:
     """Hours/admission to fold into the D611 opening section WHEN THE SITE GAVE
     NONE. Returns {hours, admission, speak, source_note}:
@@ -697,6 +752,10 @@ def plan_b_opening_practicals(result: Dict) -> Dict:
     Empty strings when the preflight has neither. The caller only calls this when
     its own site extraction produced no hours/admission."""
     hours = (result.get('hours') or '').strip()
+    # [LOCAL-628 task 5] Never speak "open daily" when the hours text itself names
+    # a closed weekday (the KHM closed-Monday defect). Resolve in favour of the
+    # specific closed-day fact. A genuine 7-day "daily" with no closed day is kept.
+    hours = reconcile_daily_with_closed_days(hours)
     admission = (result.get('admission') or '').strip()
     spoken_bits = []
     if hours:
