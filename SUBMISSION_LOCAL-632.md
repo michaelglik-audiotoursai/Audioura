@@ -206,3 +206,60 @@ integrity guard. Out of scope (other tickets, left untouched): the hours/admissi
 duplication (`practical_facts_gate.py`, LOCAL-630) and the stop-editor marker
 (LOCAL-628). Each step was committed separately;
 `git rev-list --count origin/subscribed..HEAD` ≥ 1.
+
+---
+
+## LEAD update (2026-10-08 16:36) — items 6 & 7
+
+### Item 6 — a work belongs to a venue by its COLLECTION (P195), not a hard-coded list
+
+Merged `origin/subscribed @ fb662e8` (LOCAL-630) into the branch first — `2e79f7f`
+is an ancestor of `fb662e8`, a clean forward merge (no conflicts; my LOCAL-632 code
+and LOCAL-630's `_KNOWN_WORK_HOME` both survived). Then replaced the hard-coded map
+as *production* logic with collection-based membership:
+
+- `venue_resolver.fetch_venue_works` now runs a **GROUPed** SPARQL query (one row
+  per work via `GROUP BY` + `GROUP_CONCAT` of P170 / P31 / **P195** and `SAMPLE`
+  of sitelinks / inception). This carries every P195 collection QID per work AND
+  fixes a row-multiplication regression the added `?collection` OPTIONAL caused
+  (the Albertina fell to 27 works under `LIMIT 400`; grouped, it returns **328**).
+- `artwork_selection_guard._work_collection_excludes_venue` + the new
+  `venue_qid` / `parent_qids` path in `enforce_collection_membership` implement the
+  rule: **if a work has P195 and none of its values is the venue (or a parent), it
+  is REJECTED, whatever P276 says**; a work with no P195 is governed by the
+  existing title-set / site-listed check. `_KNOWN_WORK_HOME` is kept only as a
+  last-ditch fixture.
+- `_apply_artwork_guards` enriches `collection_qids` onto candidates and threads
+  `venue_qid` (= `_det_entity.qid`) from both bypass call sites.
+
+**Verified (resolver run on the real Albertina):** 328 works, 320 with P195 =
+Albertina; *Young Hare* / *Praying Hands* / *Great Piece of Turf* survive; only the
+P276-leak works (P195 = a different museum) drop. **Tests** use the real Wikidata
+claims: *Ophelia* (P195 = Tate) rejected from the National Gallery; *Madonna del
+Prato* (P195 = KHM) rejected from the Belvedere; a venue/parent P195 is kept; a
+no-P195 work is left to the title check.
+
+### Item 7 — tourism-board chrome as a stop
+
+Art Institute of Chicago tour 496 Stop 1 was `Chicago: a challenge for your taste
+buds | Choose Chicago`. The junk-title guard (item 1) catches it on the `|`
+separator and **already runs on every candidate path** — the site-first `_append`
+and the JS-fallback materialise loop, not only the documented path. Added
+regression tests asserting both the rejection and the site-first wiring.
+
+### Tests after the LEAD update
+
+`test_local632_junk_and_shortfall.py` is now **25 tests (OK)**;
+`test_local630_venue_truth.py` **23 tests (OK)**; the `tests/test_local60*/61*/62*`
++ root `test_local62*` + `test_local590_*` + `test_sq4_merge.py` suites are green.
+`tests/test_local616_hours_guard_every_path.py::test_idempotent` is intermittently
+flaky (it makes a live LLM conclusion call and compares two outputs for equality);
+it is pre-existing LLM nondeterminism from the merged LOCAL-615 code, not touched
+by LOCAL-632 (`about_museum_stop.py` was last changed by a LOCAL-630 commit).
+
+### Live note
+
+The two live tours (503 Albertina, 504 Rijksmuseum) were run before the LEAD
+update; the item-6/7 code is verified by the resolver run above and the unit tests.
+Re-running live was not done, to respect the $1.50 combined cap (already $1.22).
+
