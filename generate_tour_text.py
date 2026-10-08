@@ -7404,6 +7404,22 @@ def _apply_delivery_hours_guard(result):
                       f"from delivered text (every-path guard)", flush=True)
         except Exception as _de:  # pragma: no cover
             _import_logger.error(f"[LOCAL-616] paragraph dedupe skipped: {_de}")
+        # 2b. [LOCAL-618 #4] If — after the fold — the tour still speaks NO hours
+        #     (the venue published none, so there was nothing to fold), say the
+        #     honest line once. The fresh museum path does not always build the
+        #     About opening section that carries this sentence, so three live
+        #     critiques flagged "hours never spoken"; this guarantees it on every
+        #     museum path. Never invents hours; a no-op when hours are addressed.
+        #     Runs AFTER the dedupe so it cannot defeat duplicate-orientation removal.
+        try:
+            import practical_facts_gate as _pfg
+            final, _added_hours_line = _pfg.ensure_unpublished_hours_line(final)
+            if _added_hours_line:
+                print("  [LOCAL-618 #4] no hours were published — said so once "
+                      "('Opening hours weren't published where we could read them')",
+                      flush=True)
+        except Exception as _uh:  # pragma: no cover
+            _import_logger.error(f"[LOCAL-618] unpublished-hours line skipped: {_uh}")
         # 3. Drop (or translate) any genuinely-foreign spoken sentence wherever it
         #    entered the pipeline — the fresh-path closing recap leaked untranslated
         #    French ("La galerie a été construite entre 1929 et 1930…"). English is
@@ -22156,6 +22172,31 @@ RULES:
     elif not _saved_prolog:
         print(f"\n  [LOCAL-270] PHASE 5.96: No prolog — skipping Part 4 composition")
 
+    # -------- [LOCAL-618 #1] PHASE 5.96b: Strip later-stop facts from the orientation --------
+    # The Stop-1 orientation (the folded prolog, Part 4 included) must not pre-tell
+    # the whole tour. Deterministically drop any orientation sentence that delivers
+    # a dated event or proper noun belonging to a LATER stop (and not to Stop 1
+    # itself). The connecting thread and the "your first stop is X" pointer survive.
+    # Guarded; never fatal, never empties the orientation.
+    if _saved_prolog and poi_list and len(poi_list) > 1:
+        try:
+            from orientation_pretell import strip_later_stop_facts as _strip_pretell
+            _later_names = [p.get("name", "") for p in poi_list[1:]]
+            _later_texts = [p.get("description", "") for p in poi_list[1:]]
+            _stop1_name = poi_list[0].get("name", "")
+            _stop1_text = poi_list[0].get("description", "")
+            _pretell_cleaned, _pretell_dropped = _strip_pretell(
+                _saved_prolog, _later_names, _later_texts, _stop1_name, _stop1_text
+            )
+            if _pretell_dropped > 0:
+                print(f"  [LOCAL-618 #1] Orientation pre-tell guard: dropped {_pretell_dropped} "
+                      f"sentence(s) carrying later-stop facts")
+                _saved_prolog = _pretell_cleaned
+            else:
+                print(f"  [LOCAL-618 #1] Orientation pre-tell guard: no later-stop facts in orientation")
+        except Exception as _pretell_err:
+            print(f"  [LOCAL-618 #1] Orientation pre-tell guard skipped (non-fatal): {_pretell_err}")
+
     # -------- [LOCAL-286] PHASE 5.97: Prolog-body deduplication --------
     # If the prolog (including Part 4) repeats a clause ≥8 consecutive words
     # in any stop body, the listener hears the same thing twice within 90 seconds.
@@ -23377,6 +23418,62 @@ RULES:
         complete_tour, _d523_rep = _d523_clean(complete_tour, verbose=True)
     except Exception as _d523_e:
         print(f"  [D523] spoken-text hygiene skipped (non-fatal): {_d523_e}")
+
+    # [LOCAL-618 #2] Deterministic grammar & splice lint on the FINAL spoken text.
+    # Flags unbalanced quotes/parens, "…-" splices, verbless sentences and repeated
+    # word pairs, then drops the flagged sentence — or hands exactly ONE flagged
+    # sentence to a cheap, metered LLM rewrite. Guarded; never fatal.
+    try:
+        from spoken_text_hygiene import grammar_splice_lint as _gs_lint
+
+        def _gs_rewrite(sentence):
+            """Cheap, metered single-sentence rewrite. Returns '' on any failure so
+            the lint falls back to dropping the sentence."""
+            nonlocal total_cost, total_tokens
+            try:
+                _gs_prompt = (
+                    "Rewrite this one sentence from an audio tour as a single, "
+                    "grammatical, natural spoken sentence. Keep every fact; invent "
+                    "nothing; add no new names or dates. Fix broken punctuation, "
+                    "spliced words, missing verbs, and repeated words. Return ONLY "
+                    "the corrected sentence.\n\nSENTENCE: " + sentence
+                )
+                _gs_resp = requests.post(
+                    "https://api.openai.com/v1/chat/completions",
+                    headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
+                    json={
+                        "model": _check_model(),
+                        "messages": [
+                            {"role": "system", "content": "You repair a single spoken sentence. You never add facts."},
+                            {"role": "user", "content": _gs_prompt},
+                        ],
+                        "temperature": 0.0,
+                        "max_tokens": 120,
+                    },
+                    timeout=20,
+                )
+                if _gs_resp.status_code != 200:
+                    return ''
+                _gs_json = _gs_resp.json()
+                _gs_usage = _gs_json.get("usage", {})
+                _gs_cost = (_gs_usage.get("prompt_tokens", 0) / 1000 * 0.005) + \
+                           (_gs_usage.get("completion_tokens", 0) / 1000 * 0.015)
+                total_cost += _gs_cost
+                total_tokens += _gs_usage.get("total_tokens", 0)
+                _gs_out = _gs_json["choices"][0]["message"]["content"].strip()
+                if _gs_out.startswith('"') and _gs_out.endswith('"'):
+                    _gs_out = _gs_out[1:-1].strip()
+                return _gs_out
+            except Exception:
+                return ''
+
+        complete_tour, _gs_rep = _gs_lint(complete_tour, rewrite_fn=_gs_rewrite, verbose=True)
+        if _gs_rep.get('flagged'):
+            print(f"  [LOCAL-618 #2] grammar/splice lint: {_gs_rep['flagged']} flagged, "
+                  f"{_gs_rep['dropped']} dropped, {_gs_rep['rewritten']} rewritten "
+                  f"by_code={_gs_rep['by_code']}")
+    except Exception as _gs_e:
+        print(f"  [LOCAL-618 #2] grammar/splice lint skipped (non-fatal): {_gs_e}")
 
     # [LOCAL-602 r2 / D617 item 10] "check the website" at most once, tour-wide.
     # Hours/admission are spoken when published; when a field is unpublished we

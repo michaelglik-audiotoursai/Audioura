@@ -1115,18 +1115,23 @@ def _address_supported_by_page(address: str, page_text: str) -> bool:
 _PRACTICAL_LEAD = "Before you go in, a few practical notes."
 
 
-def _visiting_fallback_sentence(domain: str) -> str:
-    """[LOCAL-592 r2] The one-sentence website pointer used when the venue's own
-    pages yield NO hours/admission the gate will pass.
+_UNPUBLISHED_HOURS_SENTENCE = (
+    "Opening hours weren't published where we could read them."
+)
 
-    [LOCAL-616 item 2 / D617] NO source domain is spoken. Even this honest pointer
-    must not read a domain aloud — the kiro-cli Groeninge run flagged "Opening
-    hours are listed on museabrugge.be" / this fallback's "…on <domain>…" as a URL
-    in narration. We always point generically to "the museum's website"; the
-    specific domain lives only in the text-view Sources line.
+
+def _visiting_fallback_sentence(domain: str) -> str:
+    """[LOCAL-592 r2] The one sentence used when the venue's own pages yield NO
+    hours/admission the gate will pass.
+
+    [LOCAL-618 #4] When the preflight / own-pages return NONE, we no longer send
+    the listener to "check the website before you go" — a dead-end pointer that
+    told them nothing. We say, once, the honest truth: the hours were not published
+    anywhere we could read. No domain is ever spoken (D617), and the sentence is
+    collapsed to at most one occurrence tour-wide by
+    practical_facts_gate.collapse_website_pointers.
     """
-    where = "the museum's website"
-    return f"Check opening hours and admission on {where} before you go."
+    return _UNPUBLISHED_HOURS_SENTENCE
 
 
 # [LOCAL-592 r3] What a gated practical-facts string already STATES, so the website

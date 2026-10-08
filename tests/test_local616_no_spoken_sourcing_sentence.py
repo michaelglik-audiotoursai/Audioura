@@ -92,7 +92,8 @@ class TestVisitingPointersAreDomainFree(unittest.TestCase):
     def test_full_fallback_pointer_has_no_domain(self):
         s = am._visiting_fallback_sentence("museabrugge.be")
         self.assertNotIn("museabrugge.be", s)
-        self.assertIn("the museum's website", s)
+        # [LOCAL-618 #4] The fallback is now the honest unpublished-hours line.
+        self.assertIn("Opening hours weren't published where we could read them", s)
         # Must still match the hours-fold regex so the preflight can replace it.
         import stop_pool_orchestrator as orch
         self.assertRegex(s, orch._CHECK_HOURS_FALLBACK_RE)

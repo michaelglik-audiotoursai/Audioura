@@ -391,13 +391,11 @@ class TestVisitingInfoFallback(unittest.TestCase):
     def test_fallback_sentence_present_when_no_facts(self):
         about = self._about_no_facts(_BASE)
         section = am.build_opening_section(about)
-        self.assertIn("Check opening hours and admission on", section)
-        # [LOCAL-616 item 2 / D617] The pointer is domain-free — it points to
-        # "the museum's website", never a spoken domain (which lives only in the
-        # text-view Sources line).
+        # [LOCAL-618 #4] When the preflight returns none, say the honest line, not
+        # a dead-end "check the website" pointer. No domain is ever spoken.
+        self.assertIn("Opening hours weren't published where we could read them", section)
         self.assertNotIn("griffinmuseum.org", section)
-        self.assertIn("the museum's website", section)
-        self.assertIn("before you go", section)
+        self.assertNotRegex(section, r"(?i)check .*before you go")
 
     def test_fallback_never_invents_hours_or_prices(self):
         about = self._about_no_facts(_BASE)
@@ -647,10 +645,9 @@ class TestPartialPointerOnlyForMissing(unittest.TestCase):
     def test_neither_known_full_pointer(self):
         about = self._about("")
         section = am.build_opening_section(about)
-        self.assertIn("Check opening hours and admission on", section)
-        # [LOCAL-616 item 2 / D617] domain-free pointer.
+        # [LOCAL-618 #4] Honest unpublished-hours line, domain-free, no "check …".
+        self.assertIn("Opening hours weren't published where we could read them", section)
         self.assertNotIn("griffinmuseum.org", section)
-        self.assertIn("the museum's website", section)
 
 
 # ── 10. [r3] Extractor captures day-schedule hours, ignores phone/year digits ─
