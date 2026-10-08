@@ -50,6 +50,12 @@ VENUES = [
     ('Albertina, Vienna, Austria', 3, 'ALBERTINA'),
     ('Rijksmuseum, Amsterdam, Netherlands', 3, 'RIJKSMUSEUM'),
 ]
+# [LOCAL-632] Optional single-venue selector so the second tour can be run on its
+# own against the REMAINING combined budget (the first tour already spent part of
+# the $1.50 cap). LOCAL632_ONLY=RIJKSMUSEUM runs just that venue.
+_only = (os.environ.get('LOCAL632_ONLY') or '').strip().upper()
+if _only:
+    VENUES = [v for v in VENUES if v[2] == _only] or VENUES
 
 print("=== LOCAL-632 isolated live run (Albertina + Rijksmuseum, 3 stops each) ===", flush=True)
 print(f"host  : {HOST}", flush=True)
