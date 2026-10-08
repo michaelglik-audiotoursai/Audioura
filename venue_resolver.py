@@ -511,7 +511,13 @@ def resolve_venue(venue_string: str, city: str = "") -> Optional[VenueEntity]:
 # dropped from the candidate set (unless the venue is itself a cast/reproduction
 # collection, which the caller signals).
 _REPRODUCTION_INSTANCE_QIDS = frozenset({
-    "Q11060274",   # print (reproduction) — context dependent; included defensively
+    # [LOCAL-632] Q11060274 ("print") REMOVED. A print — an etching, engraving,
+    # woodcut, drypoint — is an ORIGINAL artwork medium, not a reproduction. It was
+    # here "defensively" and silently dropped the Albertina's graphic-arts corpus
+    # (Dürer's prints: 29 works rejected as "reproductions", leaving the works
+    # intake short and forcing the junk web-page-title site-first fallback). A
+    # genuine reproduction PRINT is still caught by the P31 replica/copy/facsimile
+    # QIDs below and by _REPRODUCTION_TEXT_RE ("reproduction/copy of/after …").
     "Q1278452",    # replica
     "Q16919298",   # plaster cast
     "Q2342621",    # facsimile

@@ -81,8 +81,8 @@ _ARTWORK_INSTANCE_QIDS = frozenset({
     "Q3305213",    # painting
     "Q860861",     # sculpture
     "Q93184",      # drawing
-    "Q11060274",   # print
-    "Q18761202",   # engraving / etching family (print subclass)
+    "Q11060274",   # print (original: etching/engraving/woodcut — an artwork)
+    "Q18761202",   # watercolor painting
     "Q838948",     # work of art (the superclass)
     "Q4502142",    # visual artwork
     "Q110304307",  # artwork (object) — modern alias
@@ -92,10 +92,29 @@ _ARTWORK_INSTANCE_QIDS = frozenset({
     "Q207628",     # decorative/painted panel — polyptych panels
     "Q22669857",   # tapestry (decorative-arts object)
     "Q46100",      # fresco
-    "Q184811",     # watercolor painting
+    "Q184811",     # watercolor painting (alt QID)
     "Q18674739",   # decorative arts object
     "Q2576062",    # mural
     "Q106857709",  # porcelain object (decorative arts)
+    # [LOCAL-632] GRAPHIC-ARTS subclasses. The Albertina (tour 497) is one of the
+    # world's great works-on-paper collections: Dürer's Young Hare, Praying Hands,
+    # Great Piece of Turf, and ~14 copper engravings / 8 woodcuts / etchings. These
+    # P31 classes were absent, so a print/drawing WITHOUT a creator was dropped by
+    # enforce_artworks_only step 4 ("no artwork class and no creator"), starving the
+    # works intake and triggering the junk web-page-title fallback. Each is a
+    # stand-in-front-of-it artwork medium a museum catalogues.
+    "Q18887969",   # copper engraving print
+    "Q18218093",   # etching print
+    "Q18219090",   # woodcut print
+    "Q1396354",    # color woodcut
+    "Q23657281",   # drypoint print
+    "Q21281546",   # gouache painting
+    "Q12043905",   # pastel artwork
+    "Q2647254",    # study (a finished drawing/sketch a museum shows as a work)
+    "Q133067",     # engraving (general)
+    "Q189207",     # etching (medium alias)
+    "Q11835431",   # lithograph (print)
+    "Q22669539",   # aquatint (print)
 })
 
 # NON-ARTWORK classes — a work whose P31 is any of these is NOT a museum artwork
