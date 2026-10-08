@@ -138,7 +138,9 @@ _INSTITUTIONAL_RE = re.compile(
     r"evacuat(?:ed|ion)\s+(?:during|by|to)|"
     r"part\s+of\s+(?:the\s+)?(?:city'?s?|museum'?s?)\s+(?:rich\s+)?"
     r"(?:artistic\s+)?heritage|"
-    r"became\s+(?:a\s+)?(?:pivotal\s+)?part\s+of\s+(?:the\s+)?(?:museum|collection)"
+    r"became\s+(?:a\s+)?(?:pivotal\s+)?part\s+of\s+(?:the\s+)?(?:museum|collection)|"
+    r"enter(?:ed|ing)\s+the\s+collection|removed\s+from\s+its\s+(?:religious\s+)?setting|"
+    r"removed\s+from\s+(?:its|the)\s+(?:original\s+)?(?:church|convent|chapel|altar)"
     r")\b"
 )
 
@@ -148,13 +150,26 @@ _INSTITUTIONAL_RE = re.compile(
 _ACQUISITION_VERB_RE = re.compile(
     r"(?i)\b(gift(?:ed)?(?:\s+(?:of|to|by))?|donat(?:ed|ion)|bequeath(?:ed)?|bequest|"
     r"purchas(?:ed|e)|acquir(?:ed|ition)|accession(?:ed)?|"
-    r"entered\s+the\s+collection|came\s+to\s+the\s+museum|"
+    r"enter(?:ed|ing)\s+the\s+collection|came\s+to\s+the\s+museum|"
+    r"removed\s+from\s+its\s+(?:religious\s+)?setting|"
     r"was\s+given\s+to|presented\s+to|left\s+to\s+the)\b"
 )
+
+# A sentence that opens with a demonstrative pointing at a PRIOR sentence — if
+# that antecedent was an institutional sentence we dropped, this one is left
+# dangling ("This event resulted in…", "This transfer brought…").
+_DANGLING_REF_RE = re.compile(
+    r"(?i)^\s*(this|that|these|those)\s+"
+    r"(event|transfer|revelation|initiative|confiscation|expropriation|"
+    r"relocation|decree|acquisition|donation|gift|move|change|decision|process)\b")
+
+
+def _opens_with_dangling_ref(sentence: str) -> bool:
+    return bool(_DANGLING_REF_RE.search(sentence or ""))
 _WORK_DEICTIC_RE = re.compile(
     r"(?i)\b(this\s+(?:work|painting|piece|sculpture|print|canvas|drawing|"
-    r"photograph|portrait|panel)|the\s+(?:work|painting|piece|sculpture|print|"
-    r"canvas|drawing|photograph|portrait|panel)|\bit\s+was\b|\bit\s+entered\b)"
+    r"photograph|portrait|panel|artwork)|the\s+(?:work|painting|piece|sculpture|print|"
+    r"canvas|drawing|photograph|portrait|panel|artwork)|\bit\s+was\b|\bit\s+entered\b)"
 )
 
 # RECEPTION — what a critic, historian, or contemporary said about the work.
@@ -473,10 +488,13 @@ def filter_stop_body_work_first(body: str,
         report["institutional_kept"] = len(inst_idx)
         return body, report
 
-    # Choose the ONE institutional sentence to keep: the own-acquisition one.
+    # Choose the ONE institutional sentence to keep: the own-acquisition one,
+    # but NOT one that opens with a demonstrative pointing at a dropped sentence
+    # ("This event resulted in…", "This transfer…") — keeping it would leave a
+    # dangling reference once its antecedent institutional sentence is removed.
     keep_i = None
     for i in inst_idx:
-        if is_own_acquisition(sents[i], work_subject):
+        if is_own_acquisition(sents[i], work_subject) and not _opens_with_dangling_ref(sents[i]):
             keep_i = i
             break
 
@@ -490,6 +508,14 @@ def filter_stop_body_work_first(body: str,
                 kept_inst += 1
             else:
                 dropped += 1
+            continue
+        # A surviving sentence that opens with a demonstrative referring to a
+        # dropped institutional antecedent is now dangling — drop it too, but only
+        # if it is not itself rich (we never drop a work/artist/reception/emotion
+        # sentence). "This event resulted in the artwork entering the collection."
+        if (_opens_with_dangling_ref(s) and i not in rich_idx
+                and dropped > 0 and (i - 1) in inst_idx and (i - 1) != keep_i):
+            dropped += 1
             continue
         kept_sents.append(s)
 
