@@ -408,6 +408,146 @@ def _new_proper_nouns(edited: str, original: str) -> List[str]:
     return new
 
 
+# ─────────────────────────────────────────────────────────────────────────────
+# [LOCAL-634] Dropped-word detection & repair
+# ─────────────────────────────────────────────────────────────────────────────
+#
+# The deterministic splice/removal passes that run before the editor can delete a
+# word from the MIDDLE of a sentence and leave the surrounding tokens stitched
+# into an ungrammatical shape. Bench R1 showed two concrete shapes:
+#
+#   * tour 505: "Gris, working in Paris at the outbreak of was at a crossroads"
+#       — the NOUN after a preposition ("the outbreak of WAR") was removed, so a
+#       preposition is immediately followed by a finite verb / another preposition.
+#   * tour 495: "This painting w. Velázquez, the leading painter…"
+#       — a word was truncated to a bare one/two-letter fragment followed by a
+#       period ("w."), an orphan initial that is not a real abbreviation.
+#
+# These patterns are deterministic to DETECT. The editor's job is to repair them;
+# this module both (a) REJECTS an edit whose body still contains one (so the LLM
+# copy-edit cannot ship the defect), and (b) applies a conservative deterministic
+# repair as a last resort, so a stop whose LLM edit was rejected (or where the
+# editor is off) still does not ship the raw dropped-word prose.
+
+# A preposition / article immediately followed by a finite verb or another
+# preposition, with no noun phrase between them: "the outbreak of was",
+# "at the end of became", "with the of". The removed head noun left a hole.
+_DANGLING_PREP_VERBS = (
+    "was", "were", "is", "are", "has", "had", "have", "became", "would",
+    "will", "could", "should", "began", "stood", "sat", "came", "went",
+    "remained", "seemed", "appeared",
+)
+_DROPPED_PREP_RE = re.compile(
+    r"(?i)\b(?:of|at|in|on|for|from|to|with|by|the|a|an)\s+(?:" +
+    "|".join(_DANGLING_PREP_VERBS) + r")\b")
+
+# A bare truncated-word fragment: a lone 1–2 letter token ending in a period that
+# is NOT a legitimate abbreviation/initial. A real initial ("J. Arrowsmith") is a
+# single UPPERCASE letter followed by a Capitalised surname; a real abbreviation
+# ("St.", "Mt.") is on an allow-list. A dropped word is a LOWERCASE 1–2 letter
+# fragment ("painting w. Velázquez"), or a single capital not followed by a
+# capitalised word.
+_ALLOWED_SHORT_ABBREV = frozenset((
+    "st", "mt", "dr", "mr", "ms", "jr", "sr", "no", "ca", "cf", "vs", "pp",
+    "ed", "al", "op", "ft", "in", "cm", "mm", "km",
+))
+# Match a lone 1–2 letter token + period, capturing the token and whether a
+# capitalised word follows (an initial) for the discriminator in the helper.
+_DROPPED_FRAGMENT_RE = re.compile(
+    r"(?<![A-Za-z.])\b([A-Za-z]{1,2})\.(\s+)([A-Za-z]*)")
+
+
+def _dropped_fragment_hits(text: str) -> List[str]:
+    hits = []
+    for m in _DROPPED_FRAGMENT_RE.finditer(text or ""):
+        tok = m.group(1)
+        follow = m.group(3) or ""
+        if tok.lower() in _ALLOWED_SHORT_ABBREV:
+            continue
+        # A real initial is a SINGLE uppercase letter followed by a Capitalised
+        # surname ("J. Arrowsmith"). Keep it.
+        if len(tok) == 1 and tok.isupper() and follow[:1].isupper():
+            continue
+        hits.append(tok + ".")
+    return hits
+
+
+def detect_dropped_word(text: str) -> Optional[str]:
+    """Return a short description of the FIRST dropped-word defect in ``text``,
+    or None when the text is clean. Deterministic; no network.
+
+    Two shapes (both seen in Bench R1):
+      * a preposition/article immediately followed by a finite verb (a removed
+        head noun: "the outbreak of was");
+      * a bare 1–2 letter truncated-word fragment ("painting w. Velázquez").
+    """
+    if not text:
+        return None
+    m = _DROPPED_PREP_RE.search(text)
+    if m:
+        return f"dangling preposition before verb: '{m.group(0).strip()}'"
+    frags = _dropped_fragment_hits(text)
+    if frags:
+        return f"truncated word fragment: '{frags[0]}'"
+    return None
+
+
+def repair_dropped_words(text: str) -> Tuple[str, int]:
+    """Conservatively repair dropped-word shapes in ``text`` WITHOUT inventing a
+    word. Returns ``(repaired, n_repaired)``.
+
+    The only grammatical repair that adds no fact is to DELETE the broken clause
+    and rejoin the sentence, because the removed word cannot be recovered. We do
+    this at the sentence granularity: a sentence that still matches a dropped-word
+    pattern after a light in-place fix is dropped, so the stop ships clean prose
+    rather than a visible hole. Deterministic; adds no new word, number or name.
+    """
+    if not text:
+        return text or "", 0
+    # In-place fix for the truncated fragment shape: the orphan 1–2 letter token
+    # plus its period is simply removed ("painting w. Velázquez" → "painting
+    # Velázquez"), because the fragment carries no recoverable content and the
+    # surrounding words are already present and correct.
+    def _strip_frag(m: "re.Match") -> str:
+        tok = m.group(1)
+        ws = m.group(2) or " "
+        follow = m.group(3) or ""
+        if tok.lower() in _ALLOWED_SHORT_ABBREV:
+            return m.group(0)
+        if len(tok) == 1 and tok.isupper() and follow[:1].isupper():
+            return m.group(0)  # a real initial — keep
+        return ws + follow  # drop the orphan fragment + its period, keep spacing
+    repaired = _DROPPED_FRAGMENT_RE.sub(_strip_frag, text)
+    repaired = re.sub(r"\s{2,}", " ", repaired)
+
+    # The dangling-preposition shape ("the outbreak of was at a crossroads") has
+    # a hole that cannot be filled without inventing the missing noun. Drop the
+    # whole sentence rather than ship the hole or guess the word.
+    n = 0
+    out_paras = []
+    for para in re.split(r"\n{2,}", repaired):
+        try:
+            from sentence_split import split_sentences as _ss
+            sents = _ss(para)
+        except Exception:
+            sents = [s.strip() for s in re.split(r"(?<=[.!?])\s+", para.strip())
+                     if s.strip()]
+        if not sents:
+            out_paras.append(para)
+            continue
+        kept = []
+        for s in sents:
+            if _DROPPED_PREP_RE.search(s):
+                n += 1
+                continue
+            kept.append(s)
+        out_paras.append(" ".join(kept).strip())
+    repaired = "\n\n".join(p for p in out_paras if p.strip()).strip()
+    # Count the fragment removals too.
+    n += len(_dropped_fragment_hits(text))
+    return repaired, n
+
+
 def validate_edit(
     edited_body: str,
     original_body: str,
@@ -421,6 +561,8 @@ def validate_edit(
       * it is non-empty;
       * its length is within ±25 % of the original body;
       * it introduces no proper noun absent from the original body;
+      * it contains NO dropped-word pattern (a removed-mid-sentence word that
+        left a dangling preposition or a truncated fragment) — [LOCAL-634];
       * ``claim_check.check_paragraph`` finds NO new UNSUPPORTED/CONTRADICTED
         claim against the ORIGINAL body (+ any passages) as the evidence corpus —
         the same gate LOCAL-619B uses for the conclusion.
@@ -444,6 +586,14 @@ def validate_edit(
     new_names = _new_proper_nouns(e, o)
     if new_names:
         return (False, f"new proper noun: {new_names[0]}")
+
+    # [LOCAL-634] Dropped-word guard. An edit that STILL contains a dropped-word
+    # pattern (the editor was asked to repair these; an output that keeps one is
+    # a failed edit) is REJECTED so the original — or the deterministic repair in
+    # edit_stop — ships instead of the visible hole.
+    dropped = detect_dropped_word(e)
+    if dropped:
+        return (False, f"dropped word: {dropped}")
 
     # Claim/G4 guard — ORIGINAL body (+ passages) is the evidence corpus.
     try:
@@ -512,6 +662,24 @@ def edit_stop(
     edited_body = (edited_body or "").strip().strip('"').strip()
     if not edited_body:
         reason = "empty llm output"
+        # [LOCAL-634] Even with no usable LLM edit, do not ship a dropped-word
+        # hole: apply the deterministic repair to the original body.
+        if detect_dropped_word(body):
+            repaired_body, n_fixed = repair_dropped_words(body)
+            if (n_fixed > 0 and repaired_body.strip()
+                    and not detect_dropped_word(repaired_body)):
+                ok0, _r0 = validate_edit(
+                    repaired_body, body, stop_title=title,
+                    venue_name=venue_name, passages=passages)
+                if ok0:
+                    new_block = _reassemble_block(
+                        stop_block, header_line, preserved_meta,
+                        repaired_body, tail_meta)
+                    if log:
+                        log(f"[LOCAL-628] stop {stop_number}: dropped-word "
+                            f"repaired deterministically ({n_fixed} fixed; "
+                            f"no LLM edit)")
+                    return (new_block, True, "dropped-word-repaired")
         if log:
             log(f"[LOCAL-628] stop {stop_number}: rejected({reason})")
         return (stop_block, False, reason)
@@ -539,11 +707,46 @@ def edit_stop(
         except Exception:
             pass
     if not ok:
+        # [LOCAL-634] Last-resort deterministic dropped-word repair. The LLM edit
+        # was rejected (which includes the new dropped-word guard, or a transient
+        # claim_check failure). If the ORIGINAL body itself carries a dropped-word
+        # pattern, we must not ship that hole either. Apply the conservative
+        # deterministic repair (removes an orphan fragment; drops a sentence with
+        # an unrecoverable hole) to the ORIGINAL body. The repaired body adds no
+        # word/number/name, so it is validated and shipped; otherwise the original
+        # is kept exactly as before.
+        if detect_dropped_word(body):
+            repaired_body, n_fixed = repair_dropped_words(body)
+            if (n_fixed > 0 and repaired_body.strip()
+                    and not detect_dropped_word(repaired_body)):
+                ok2, reason2 = validate_edit(
+                    repaired_body, body, stop_title=title,
+                    venue_name=venue_name, passages=passages)
+                if ok2:
+                    new_block = _reassemble_block(
+                        stop_block, header_line, preserved_meta,
+                        repaired_body, tail_meta)
+                    if log:
+                        log(f"[LOCAL-628] stop {stop_number}: dropped-word "
+                            f"repaired deterministically ({n_fixed} fixed)")
+                    return (new_block, True, "dropped-word-repaired")
         if log:
             log(f"[LOCAL-628] stop {stop_number}: rejected({reason})")
         return (stop_block, False, reason)
 
     # Reassemble: preserved prefix + edited body + preserved tail.
+    new_block = _reassemble_block(
+        stop_block, header_line, preserved_meta, edited_body, tail_meta)
+    if log:
+        log(f"[LOCAL-628] stop {stop_number}: edited")
+    return (new_block, True, "edited")
+
+
+def _reassemble_block(stop_block: str, header_line: str, preserved_meta: str,
+                      body: str, tail_meta: str) -> str:
+    """Reassemble a stop block from its preserved prefix + body + preserved tail,
+    keeping the block's own trailing-whitespace shape so stop separation in the
+    whole-tour text is unchanged."""
     parts = []
     if header_line:
         parts.append(header_line)
@@ -551,19 +754,14 @@ def edit_stop(
         parts.append("")
         parts.append(preserved_meta)
     parts.append("")
-    parts.append(edited_body)
+    parts.append(body)
     if tail_meta:
         parts.append("")
         parts.append("")
         parts.append(tail_meta)
     new_block = "\n".join(parts)
-    # Preserve the block's own trailing whitespace shape so stop separation in
-    # the whole-tour text is unchanged.
     trailing = stop_block[len(stop_block.rstrip("\n")):]
-    new_block = new_block.rstrip("\n") + trailing
-    if log:
-        log(f"[LOCAL-628] stop {stop_number}: edited")
-    return (new_block, True, "edited")
+    return new_block.rstrip("\n") + trailing
 
 
 # ─────────────────────────────────────────────────────────────────────────────
