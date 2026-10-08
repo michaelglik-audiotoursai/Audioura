@@ -29,7 +29,8 @@ __all__ = ['clean_spoken_text', 'MISSING_SPACE_RE', 'TEMPLATE_SEAM_RE',
            'strip_sources_and_urls', 'SOURCES_HEADING_RE', 'URL_RE',
            'strip_degenerate_from_to_recap',
            'flag_sentence', 'grammar_splice_lint', 'strip_citation_tails',
-           'CITATION_TAIL_RE', 'AS_OF_TAIL_RE']
+           'CITATION_TAIL_RE', 'AS_OF_TAIL_RE',
+           'strip_recruitment_sentences', 'RECRUITMENT_SENTENCE_RE']
 
 # "At this work:", "in the stop:", "At this piece:" — the preposition keeps its
 # original case, because replacing with a literal "At " produced "Then, At Au
@@ -64,6 +65,55 @@ MISSING_SPACE_RE = re.compile(
 DANGLING_PHRASE_RE = re.compile(
     r',\s*[a-zà-ÿ]+ed\s+(?:in|at|on|by|for|from)\s+(?=(?:are|is|was|were)\b)',
     re.IGNORECASE)
+
+# [LOCAL-626 item 3] SECOND-PERSON MARKETING / RECRUITMENT register, stripped from
+# the WHOLE spoken tour (about-museum opening AND every stop body). Tour 485 spoke
+# the Courtauld Institute admissions page in Stop 1: "You'll learn from leaders …
+# forge a career in the wider professional art world and beyond."; "Study in the
+# heart of London with world-renowned specialists …". This mirrors the narrower
+# about_museum_stop._RECRUITMENT_RE but runs on the FINAL text, so the same copy
+# can never survive in a stop body the About gate does not screen. Kept narrow
+# (second person + a recruitment object) so tour second-person framing ("as you
+# look closer", "you can see the brushwork") is never dropped.
+RECRUITMENT_SENTENCE_RE = re.compile(
+    r"(?i)("
+    r"\byou(?:'ll|\s+will|\s+can)?\s+(?:learn|study|gain|develop|acquire|"
+    r"join|forge|build|launch|pursue|master|train|graduate|enrol|enroll|apply)\b|"
+    r"\bstudy\s+(?:with|at|under|alongside|in\s+the\s+heart\s+of)\b|"
+    r"\bforge\s+a\s+career\b|\blaunch\s+your\s+career\b|\bbuild\s+a\s+career\b|"
+    r"\bcareer\s+in\s+the\b|"
+    r"\b(?:enrol|enroll|apply)\s+(?:now|today|on(?:line)?)\b|"
+    r"\bapply\s+for\s+(?:a|our|the)\b|"
+    r"\bour\s+(?:world-?renowned|leading|flagship|degree)?\s*programmes?\b|"
+    r"\bworld-?renowned\s+programmes?\b|"
+    r"\bjoin\s+(?:us|our\s+community|a\s+community\s+of)\b"
+    r")")
+
+
+def strip_recruitment_sentences(text: str) -> tuple:
+    """[LOCAL-626 item 3] Drop whole sentences in second-person marketing /
+    recruitment register. Returns (cleaned_text, dropped_count). Pure: splits on
+    sentence boundaries, drops any sentence RECRUITMENT_SENTENCE_RE matches, and
+    rejoins — paragraph structure (blank lines) is preserved."""
+    if not text or not RECRUITMENT_SENTENCE_RE.search(text):
+        return text or "", 0
+    dropped = 0
+    out_paras = []
+    for para in text.split("\n\n"):
+        # Split into sentences keeping the terminator with each sentence.
+        parts = re.split(r'(?<=[.!?])\s+', para)
+        kept = []
+        for p in parts:
+            if p.strip() and RECRUITMENT_SENTENCE_RE.search(p):
+                dropped += 1
+                continue
+            kept.append(p)
+        out_paras.append(" ".join(k for k in kept if k is not None).strip()
+                         if parts and len(parts) > 1 else "".join(kept))
+    cleaned = "\n\n".join(out_paras)
+    # Collapse any doubled spaces introduced by the drop.
+    cleaned = re.sub(r"[ \t]{2,}", " ", cleaned)
+    return cleaned, dropped
 
 # Labels that are structure, not speech. Michael, 2026-08-24: Orientation and
 # Directions stay, "because they let listeners know that they are not part of the
@@ -647,6 +697,12 @@ def clean_spoken_text(text: str, verbose: bool = False) -> tuple:
     # for the text-view Sources, not for speech.
     out, _cit = strip_citation_tails(out)
     report['citation_tails'] = _cit
+
+    # [LOCAL-626 item 3] Drop second-person marketing/recruitment sentences from
+    # the whole spoken tour (about-museum opening AND stop bodies) — the Courtauld
+    # Institute admissions copy that reached tour 485.
+    out, _recruit = strip_recruitment_sentences(out)
+    report['recruitment'] = _recruit
 
     # [LOCAL-529] One name, four spellings — make the tour agree with itself.
     out, _name_rep = normalize_proper_noun_spellings(out)
