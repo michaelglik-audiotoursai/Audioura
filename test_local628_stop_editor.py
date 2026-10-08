@@ -304,5 +304,87 @@ class TestTour490Bodies(unittest.TestCase):
         self.assertEqual(len(se._split_tour_into_stops(out)), 2)
 
 
+# ─────────────────────────────────────────────────────────────────────────────
+# [LOCAL-634] Dropped-word detection, rejection and deterministic repair
+# ─────────────────────────────────────────────────────────────────────────────
+class TestDroppedWord(unittest.TestCase):
+    """The two Bench R1 shapes:
+      * 505 "…at the outbreak of was at a crossroads" — a removed head noun left
+        a preposition immediately before a finite verb.
+      * 495 "This painting w. Velázquez…" — a truncated one-letter fragment.
+    """
+
+    def test_detect_dangling_preposition_before_verb(self):
+        s = ("Juan Gris, working in Paris at the outbreak of was at a crossroads "
+             "of competing styles.")
+        d = se.detect_dropped_word(s)
+        self.assertIsNotNone(d)
+        self.assertIn("of was", d)
+
+    def test_detect_truncated_fragment(self):
+        s = "This painting w. Velazquez, the leading painter, admired closely."
+        d = se.detect_dropped_word(s)
+        self.assertIsNotNone(d)
+        self.assertIn("w.", d)
+
+    def test_real_initial_not_flagged(self):
+        # "J. Arrowsmith" is an initial, not a dropped word.
+        self.assertIsNone(se.detect_dropped_word("The dealer J. Arrowsmith bought it."))
+
+    def test_abbreviation_not_flagged(self):
+        self.assertIsNone(se.detect_dropped_word("The chapel of St. Peter is nearby."))
+
+    def test_clean_prose_not_flagged(self):
+        self.assertIsNone(se.detect_dropped_word(
+            "Juan Gris worked in Paris during the war and reached a crossroads."))
+
+    def test_validate_edit_rejects_dropped_word(self):
+        # Edit still contains the 505 hole → rejected with a 'dropped word' reason.
+        original = ("Juan Gris worked in Paris during the First World War and "
+                    "stood at a crossroads of competing styles that year.")
+        edited = ("Juan Gris, working in Paris at the outbreak of was at a "
+                  "crossroads of competing styles that year now.")
+        ok, reason = se.validate_edit(edited, original, stop_title="Juan Gris",
+                                      venue_name="Reina Sofia")
+        self.assertFalse(ok)
+        self.assertIn("dropped word", reason)
+
+    def test_repair_removes_truncated_fragment(self):
+        repaired, n = se.repair_dropped_words(
+            "This painting w. Velazquez admired closely.")
+        self.assertGreaterEqual(n, 1)
+        self.assertNotIn("w.", repaired)
+        self.assertIn("Velazquez", repaired)
+        self.assertIsNone(se.detect_dropped_word(repaired))
+
+    def test_repair_drops_unrecoverable_hole_sentence(self):
+        # The dangling-preposition hole cannot be filled without inventing the
+        # missing noun; the sentence is dropped, the clean sentence kept.
+        text = ("The work entered the collection in 1921. Juan Gris, working in "
+                "Paris at the outbreak of was at a crossroads.")
+        repaired, n = se.repair_dropped_words(text)
+        self.assertGreaterEqual(n, 1)
+        self.assertIn("entered the collection in 1921", repaired)
+        self.assertIsNone(se.detect_dropped_word(repaired))
+
+    def test_edit_stop_deterministic_repair_on_empty_llm(self):
+        # The LLM returns nothing usable; the original body has a dropped word.
+        # edit_stop must ship the deterministic repair, not the raw hole.
+        body = ("This panel w. the collector who gave it to the museum. The work "
+                "entered the collection in 1921.")
+        block = (f"Stop 1: A Panel\n\nOrientation: Stand close.\n\n{body}\n\n"
+                 "Directions: Continue.\n")
+        new_block, edited, reason = se.edit_stop(
+            block, stop_number=1, venue_name="Reina Sofia",
+            llm_fn=lambda p, k: "")  # empty LLM output
+        self.assertTrue(edited, f"deterministic repair should ship; reason={reason}")
+        self.assertEqual(reason, "dropped-word-repaired")
+        self.assertNotIn(" w. ", new_block)
+        self.assertIsNone(se.detect_dropped_word(new_block))
+        # Structure preserved.
+        self.assertIn("Orientation: Stand close.", new_block)
+        self.assertIn("Directions: Continue.", new_block)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
