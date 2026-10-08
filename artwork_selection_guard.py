@@ -431,9 +431,14 @@ def cap_artist_variety(
 
     eff_cap = cap if cap is not None else max(1, math.ceil(n_stops / 3))
 
-    # Single-artist (or too-few-artists) venue: don't strand the tour. If distinct
-    # artists < n_stops, enforcing the cap could not fill n_stops, so skip it.
-    if _distinct_artist_count(works) < n_stops:
+    # Single-artist (or too-few-artists) venue: don't strand the tour. Skip the cap
+    # ONLY when applying it could not fill n_stops — i.e. when the catalogue does
+    # not have enough distinct artists to supply n_stops works at eff_cap each
+    # (distinct_artists * eff_cap < n_stops). A one-artist house museum (a Van Gogh
+    # / Matisse venue) hits this and keeps all its works; a multi-artist catalogue
+    # that CAN satisfy the cap has it enforced.
+    _distinct = _distinct_artist_count(works)
+    if _distinct <= 1 or _distinct * eff_cap < n_stops:
         return works, []
 
     kept: List[Dict] = []
