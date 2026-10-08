@@ -497,6 +497,25 @@ def edit_stop(
     ok, reason = validate_edit(
         edited_body, body, stop_title=title, venue_name=venue_name,
         passages=passages)
+    # [LOCAL-628] Optional, zero-cost before/after capture for live evidence.
+    # Writes <dump_dir>/stop_<N>_{before,after,result}.txt when STOP_EDITOR_DUMP_DIR
+    # is set. Never changes behaviour; purely diagnostic. Guarded.
+    _dump_dir = os.environ.get("STOP_EDITOR_DUMP_DIR", "").strip()
+    if _dump_dir:
+        try:
+            os.makedirs(_dump_dir, exist_ok=True)
+            with open(os.path.join(_dump_dir, f"stop_{stop_number}_before.txt"),
+                      "w", encoding="utf-8") as _bf:
+                _bf.write(body)
+            with open(os.path.join(_dump_dir, f"stop_{stop_number}_after.txt"),
+                      "w", encoding="utf-8") as _af:
+                _af.write(edited_body)
+            with open(os.path.join(_dump_dir, f"stop_{stop_number}_result.txt"),
+                      "w", encoding="utf-8") as _rf:
+                _rf.write(f"edited={ok} reason={reason} "
+                          f"len_before={len(body)} len_after={len(edited_body)}")
+        except Exception:
+            pass
     if not ok:
         if log:
             log(f"[LOCAL-628] stop {stop_number}: rejected({reason})")
