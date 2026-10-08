@@ -1211,7 +1211,7 @@ def orchestrate_tour_async(job_id, location, tour_type, total_stops, user_id=Non
                     # as "the generator is alive and working". updated_at is the
                     # stronger signal (DB-backed store) but may be absent, so the
                     # progress-string change is the always-available fallback.
-                    _marker = (progress, status_data.get('updated_at'))
+                    _marker = (progress, status_data.get('updated_at'), status_data.get('heartbeat_at'))  # heartbeat: worker thread alive (LEAD 2026-10-08)
                     if _marker != _last_progress_marker:
                         _last_progress_marker = _marker
                         _last_progress_at = datetime.now()

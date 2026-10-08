@@ -1110,6 +1110,7 @@ def generate_tour():
     )
     thread.daemon = True
     thread.start()
+    JOB_THREADS[job_id] = thread
     
     return jsonify({"job_id": job_id, "status": "queued"})
 
@@ -1146,6 +1147,9 @@ def cancel_job(job_id):
     return jsonify({"job_id": job_id, "cancelled": True})
 
 
+JOB_THREADS = {}  # job_id -> worker thread (liveness for /status heartbeat_at)
+
+
 @app.route('/status/<job_id>', methods=['GET'])
 def get_job_status(job_id):
     """Get job status."""
@@ -1169,6 +1173,14 @@ def get_job_status(job_id):
     # fallback signal the orchestrator always has.
     if job.get("updated_at"):
         response["updated_at"] = job["updated_at"]
+    # [LEAD 2026-10-08] Liveness heartbeat. The pipeline sets progress only at start
+    # and end, so LOCAL-622's 5-minute no-progress rule killed every fresh tour that
+    # took >5 min (Museum Folkwang canary, 2026-10-08 04:02 EDT: "ran 5.0 min, last
+    # progress 5.0 min ago"). While the worker thread is alive the generation IS
+    # progressing; only the orchestrator's 40-minute absolute cap may stop it.
+    _t = JOB_THREADS.get(job_id)
+    if _t is not None and _t.is_alive():
+        response["heartbeat_at"] = datetime.now().isoformat()
     if job.get("cancel_requested"):
         response["cancel_requested"] = True
     
