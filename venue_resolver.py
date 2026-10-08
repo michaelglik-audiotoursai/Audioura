@@ -511,7 +511,13 @@ def resolve_venue(venue_string: str, city: str = "") -> Optional[VenueEntity]:
 # dropped from the candidate set (unless the venue is itself a cast/reproduction
 # collection, which the caller signals).
 _REPRODUCTION_INSTANCE_QIDS = frozenset({
-    "Q11060274",   # print (reproduction) — context dependent; included defensively
+    # [LOCAL-632] Q11060274 ("print") REMOVED. A print — an etching, engraving,
+    # woodcut, drypoint — is an ORIGINAL artwork medium, not a reproduction. It was
+    # here "defensively" and silently dropped the Albertina's graphic-arts corpus
+    # (Dürer's prints: 29 works rejected as "reproductions", leaving the works
+    # intake short and forcing the junk web-page-title site-first fallback). A
+    # genuine reproduction PRINT is still caught by the P31 replica/copy/facsimile
+    # QIDs below and by _REPRODUCTION_TEXT_RE ("reproduction/copy of/after …").
     "Q1278452",    # replica
     "Q16919298",   # plaster cast
     "Q2342621",    # facsimile
@@ -609,18 +615,33 @@ def fetch_venue_works(venue_qid: str, language: str = "en",
     """
     if is_modern_art_museum is None:
         is_modern_art_museum = venue_is_modern_art(venue_name)
+    # [LOCAL-632] GROUP the multi-valued properties (creator, instance_of,
+    # collection) with GROUP_CONCAT so each work is ONE row. Before this, adding
+    # the P195 ?collection OPTIONAL multiplied rows (creator × instance_of ×
+    # collection) and the LIMIT truncated large catalogues (the Albertina fell from
+    # 123 works to 27). One row per work keeps the full catalogue AND carries every
+    # P195 collection QID for the membership gate.
     query = f"""
-    SELECT ?work ?workLabel ?workAltLabel ?workLabel_en ?creatorLabel ?creator ?sitelinks ?inception ?instanceOf WHERE {{
+    SELECT ?work ?workLabel ?workAltLabel ?workLabel_en
+           (SAMPLE(?sitelinks) AS ?sitelinks) (SAMPLE(?inception) AS ?inception)
+           (GROUP_CONCAT(DISTINCT ?creatorLabel; separator="||") AS ?creators)
+           (GROUP_CONCAT(DISTINCT ?creator; separator="||") AS ?creatorQids)
+           (GROUP_CONCAT(DISTINCT ?instanceOf; separator="||") AS ?instanceOfs)
+           (GROUP_CONCAT(DISTINCT ?collection; separator="||") AS ?collections)
+    WHERE {{
       {{ ?work wdt:P195 wd:{venue_qid}. }}
       UNION
       {{ ?work wdt:P276 wd:{venue_qid}. }}
-      OPTIONAL {{ ?work wdt:P170 ?creator. }}
+      OPTIONAL {{ ?work wdt:P170 ?creator. ?creator rdfs:label ?creatorLabel.
+                 FILTER(LANG(?creatorLabel) = "{language}" || LANG(?creatorLabel) = "en") }}
       OPTIONAL {{ ?work wikibase:sitelinks ?sitelinks. }}
       OPTIONAL {{ ?work wdt:P571 ?inception. }}
       OPTIONAL {{ ?work wdt:P31 ?instanceOf. }}
+      OPTIONAL {{ ?work wdt:P195 ?collection. }}
       OPTIONAL {{ ?work rdfs:label ?workLabel_en. FILTER(LANG(?workLabel_en) = "en") }}
       SERVICE wikibase:label {{ bd:serviceParam wikibase:language "{language},en". }}
     }}
+    GROUP BY ?work ?workLabel ?workAltLabel ?workLabel_en
     ORDER BY DESC(?sitelinks)
     LIMIT 400
     """
@@ -658,79 +679,71 @@ def fetch_venue_works(venue_qid: str, language: str = "en",
         
         works = []
         _seen_qids = set()
+
+        def _split_concat(binding_key):
+            raw = r.get(binding_key, {}).get("value", "") or ""
+            return [p for p in raw.split("||") if p]
+
         for r in results:
             work_uri = r.get("work", {}).get("value", "")
             work_qid = work_uri.split("/")[-1] if work_uri else ""
             label = r.get("workLabel", {}).get("value", "")
             label_en = r.get("workLabel_en", {}).get("value", "") or label
             alt_label = r.get("workAltLabel", {}).get("value", "")
-            creator_label = r.get("creatorLabel", {}).get("value", "")
-            creator_uri = r.get("creator", {}).get("value", "")
-            creator_qid = creator_uri.split("/")[-1] if creator_uri else ""
-            # [LOCAL-593 #4] Prominence signal: number of Wikipedia/Wikimedia
-            # sitelinks the work's Wikidata item carries. A famous work (many
-            # language editions) outranks an obscure one at the same source tier.
+            if not (work_qid and label and not label.startswith("Q")):
+                continue
+            if work_qid in _seen_qids:
+                continue  # GROUP BY already made one row per work
+            _seen_qids.add(work_qid)
+
+            # [LOCAL-593 #4] Prominence signal (SAMPLEd in the grouped query).
             try:
                 _sitelinks = int(r.get("sitelinks", {}).get("value", "0") or "0")
             except (TypeError, ValueError):
                 _sitelinks = 0
 
-            # [LOCAL-627 defect 4] Inception year (P571) and instance-of (P31). A
-            # work may yield several rows (multiple creators / instance_of values);
-            # we capture both and merge across the rows for the same QID below.
+            # [LOCAL-627 d4] Inception year (P571), SAMPLEd.
             _inception_year = None
             _inc_raw = r.get("inception", {}).get("value", "") or ""
             if _inc_raw:
-                _m = re.search(r"(-?\d{3,4})", _inc_raw)  # ISO date or year
+                _m = re.search(r"(-?\d{3,4})", _inc_raw)
                 if _m:
                     try:
                         _inception_year = int(_m.group(1))
                     except (TypeError, ValueError):
                         _inception_year = None
-            _inst_uri = r.get("instanceOf", {}).get("value", "") or ""
-            _inst_qid = _inst_uri.split("/")[-1] if _inst_uri else ""
-            
-            # Deduplicate: same work may appear multiple times with different creators
-            # (works with multiple creators) — keep first occurrence but merge creator info
-            if work_qid and label and not label.startswith("Q"):  # Skip unresolved QIDs
-                if work_qid in _seen_qids:
-                    # Merge creator into existing entry
-                    for existing in works:
-                        if existing['qid'] == work_qid:
-                            if creator_label and creator_label not in existing.get('creators', []):
-                                existing.setdefault('creators', []).append(creator_label)
-                            # [LOCAL-593 #4] Keep the strongest prominence seen.
-                            if _sitelinks > existing.get('sitelinks', 0):
-                                existing['sitelinks'] = _sitelinks
-                            # [LOCAL-627 d4] Merge instance_of and keep earliest inception.
-                            if _inst_qid and _inst_qid not in existing.setdefault('instance_of', []):
-                                existing['instance_of'].append(_inst_qid)
-                            if _inception_year is not None:
-                                _cur = existing.get('inception_year')
-                                if _cur is None or _inception_year < _cur:
-                                    existing['inception_year'] = _inception_year
-                            break
-                    continue
-                _seen_qids.add(work_qid)
-                entry = {
-                    "qid": work_qid,
-                    "label_en": label_en,
-                    "label_local": label,
-                    # [LOCAL-627 defect 4] The SPOKEN title has its trailing
-                    # parenthetical disambiguator removed ("Wrestlers (sculpture,
-                    # 2021)" → "Wrestlers", "The Three Graces (painting)" → "The
-                    # Three Graces"); the full label is kept above and in aliases
-                    # so title MATCHING is unaffected.
-                    "display_title": strip_parenthetical_disambiguator(label_en),
-                    "aliases": [a.strip() for a in alt_label.split(",") if a.strip()] if alt_label else [],
-                    "creator": creator_label if creator_label and not creator_label.startswith("Q") else "",
-                    "creator_qid": creator_qid if creator_label and not creator_label.startswith("Q") else "",
-                    "creators": [creator_label] if creator_label and not creator_label.startswith("Q") else [],
-                    "sitelinks": _sitelinks,  # [LOCAL-593 #4] prominence signal
-                    "inception_year": _inception_year,   # [LOCAL-627 d4]
-                    "instance_of": [_inst_qid] if _inst_qid else [],  # [LOCAL-627 d4]
-                }
-                works.append(entry)
+
+            # Creators (GROUP_CONCAT of P170 labels) + their QIDs.
+            _creator_labels = [c for c in _split_concat("creators")
+                               if c and not c.startswith("Q")]
+            _creator_qid_uris = _split_concat("creatorQids")
+            _creator_qids = [u.split("/")[-1] for u in _creator_qid_uris
+                             if "/" in u or re.fullmatch(r"Q\d+", u)]
+            _primary_creator = _creator_labels[0] if _creator_labels else ""
+            _primary_creator_qid = _creator_qids[0] if (_creator_labels and _creator_qids) else ""
+
+            # [LOCAL-627 d4] instance_of (P31) QIDs (GROUP_CONCAT).
+            _inst_qids = [u.split("/")[-1] for u in _split_concat("instanceOfs")
+                          if u]
+            # [LOCAL-632] P195 collection QIDs (GROUP_CONCAT) — one work's full set.
+            _coll_qids = [u.split("/")[-1] for u in _split_concat("collections")
+                          if u]
+
+            entry = {
+                "qid": work_qid,
+                "label_en": label_en,
+                "label_local": label,
+                "display_title": strip_parenthetical_disambiguator(label_en),
+                "aliases": [a.strip() for a in alt_label.split(",") if a.strip()] if alt_label else [],
+                "creator": _primary_creator,
+                "creator_qid": _primary_creator_qid,
+                "creators": list(_creator_labels),
+                "sitelinks": _sitelinks,              # [LOCAL-593 #4]
+                "inception_year": _inception_year,    # [LOCAL-627 d4]
+                "instance_of": _inst_qids,            # [LOCAL-627 d4]
+                "collection_qids": _coll_qids,        # [LOCAL-632]
+            }
+            works.append(entry)
 
         # [LOCAL-627 defect 4] Reject reproductions / casts / copies / replicas and
         # works whose inception is after the modern cutoff — UNLESS the venue is a
