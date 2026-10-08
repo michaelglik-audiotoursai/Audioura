@@ -507,7 +507,7 @@ def assemble_building_tour(
     # bridge beyond the first.
     try:
         from cross_stop_reference_guard import limit_thematic_bridges as _ltb
-        ordered, _bridge_dropped = _ltb(ordered, max_bridges=1)
+        ordered, _bridge_dropped = _ltb(ordered)  # D636 budget by stop count
         if _bridge_dropped:
             logger.info(f"[LOCAL-627] dropped {len(_bridge_dropped)} recap/extra-bridge sentence(s)")
     except Exception as _ltb_e:  # pragma: no cover
@@ -711,7 +711,7 @@ def assemble_outdoor_tour(
     # (outdoor route too).
     try:
         from cross_stop_reference_guard import limit_thematic_bridges as _ltb
-        ordered, _bridge_dropped = _ltb(ordered, max_bridges=1)
+        ordered, _bridge_dropped = _ltb(ordered)  # D636 budget by stop count
         if _bridge_dropped:
             logger.info(f"[LOCAL-627] dropped {len(_bridge_dropped)} recap/extra-bridge sentence(s)")
     except Exception as _ltb_e:  # pragma: no cover

@@ -22,9 +22,23 @@ class TestLimitThematicBridges(unittest.TestCase):
                            "stopped at a moment ago, with its calm gaze.")},
         ]
         new, dropped = g.limit_thematic_bridges(units)
-        self.assertTrue(any(d["reason"] == "previous-stop recap" for d in dropped))
+        self.assertTrue(any(d["reason"] == "stock recency callback" for d in dropped))
         self.assertNotIn("a moment ago", new[1]["narration"])
         self.assertIn("Goya shows an execution.", new[1]["narration"])
+
+    def test_budget_scales_with_stops_D636(self):
+        """D636: a couple of callbacks per tour are continuity: budget = max(1, (n+1)//3)."""
+        self.assertEqual(g.callback_budget(3), 1)
+        self.assertEqual(g.callback_budget(5), 2)
+        self.assertEqual(g.callback_budget(8), 3)
+        units = [{"title": t, "narration": "Work %s." % t} for t in "ABCDE"]
+        units[1]["narration"] += " Earlier on this tour you met a gentler mood."
+        units[3]["narration"] += " Like the earlier stop, it uses shadow."
+        units[4]["narration"] += " Recall the still life and its glass."
+        new, dropped = g.limit_thematic_bridges(units)   # 5 stops -> budget 2
+        self.assertIn("Earlier on this tour", new[1]["narration"])
+        self.assertIn("Like the earlier stop", new[3]["narration"])
+        self.assertNotIn("Recall the still life", new[4]["narration"])
 
     def test_at_most_one_bridge_kept(self):
         units = [
@@ -39,7 +53,7 @@ class TestLimitThematicBridges(unittest.TestCase):
         new, dropped = g.limit_thematic_bridges(units, max_bridges=1)
         # First bridge kept, second dropped.
         self.assertIn("Earlier on this tour", new[1]["narration"])
-        self.assertTrue(any(d["reason"] == "more than one thematic bridge"
+        self.assertTrue(any(d["reason"] == "callback over the per-tour budget"
                             for d in dropped))
         self.assertNotIn("Like the earlier stop", new[2]["narration"])
 
@@ -84,8 +98,10 @@ class TestLimitThematicBridgesInText(unittest.TestCase):
 
     def test_live_recaps_dropped(self):
         cleaned, dropped = g.limit_thematic_bridges_in_text(self.UFFIZI_TEXT)
-        self.assertGreaterEqual(dropped, 1)
-        self.assertNotIn("you previously encountered", cleaned)
+        # D636: 3 stops -> budget 1. The first named callback is kept (continuity),
+        # the second is over budget and dropped.
+        self.assertEqual(dropped, 1)
+        self.assertIn("you previously encountered", cleaned)
         self.assertNotIn("you observed earlier", cleaned)
         # Real narration + headers + field lines survive.
         self.assertIn("Stop 2: Adorazione dei Magi", cleaned)

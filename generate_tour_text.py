@@ -7529,7 +7529,7 @@ def _apply_delivery_hours_guard(result):
         #     previously encountered" / "…you observed earlier" on this path.
         try:
             import cross_stop_reference_guard as _csrg
-            final, _n_recap = _csrg.limit_thematic_bridges_in_text(final, max_bridges=1)
+            final, _n_recap = _csrg.limit_thematic_bridges_in_text(final)  # D636 budget by stop count
             if _n_recap:
                 print(f"  [LOCAL-627 #9] dropped {_n_recap} previous-stop recap / "
                       f"extra-bridge sentence(s) from delivered text", flush=True)

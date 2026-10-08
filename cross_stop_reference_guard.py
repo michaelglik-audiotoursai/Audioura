@@ -26,7 +26,7 @@ from __future__ import annotations
 
 import re
 import unicodedata
-from typing import Dict, List, Tuple
+from typing import Optional, Dict, List, Tuple
 
 
 def _split_sentences(text: str) -> List[str]:
@@ -215,9 +215,25 @@ _THEMATIC_BRIDGE_RE = re.compile(
     r")")
 
 
+# [D636, Michael 2026-10-08] Callbacks to earlier stops are CONTINUITY, welcome in moderation:
+# "if it is done in a couple of instances in a tour, it provides continuity". The Uffizi 488
+# defect was frequency plus stock wording, not the callbacks. Policy:
+#   * stock recency phrasing ("a moment ago", "just now", "you just saw") is always dropped;
+#   * any other callback (a named earlier work, a thematic echo) is kept up to a per-tour
+#     budget of max(1, (n_stops + 1) // 3): 3 stops → 1, 5 → 2, 8 → 3.
+_STOCK_RECENCY_RE = re.compile(
+    r"(?i)\b(?:a\s+moment\s+ago|just\s+a\s+moment\s+ago|moments?\s+ago|just\s+now|"
+    r"a\s+(?:few\s+)?minutes?\s+ago|you\s+just\s+(?:saw|left|visited|passed|stopped\s+at)|"
+    r"(?:which|that)\s+(?:we|you)\s+just\s+(?:saw|left|visited|passed))\b")
+
+
+def callback_budget(n_stops: int) -> int:
+    return max(1, (int(n_stops or 0) + 1) // 3)
+
+
 def limit_thematic_bridges(
         ordered_units: List[Dict],
-        max_bridges: int = 1) -> Tuple[List[Dict], List[Dict]]:
+        max_bridges: Optional[int] = None) -> Tuple[List[Dict], List[Dict]]:
     """[LOCAL-627 defect 9] Allow at most ``max_bridges`` light thematic bridges
     across the whole tour and drop EVERY previous-stop recap sentence.
 
@@ -230,6 +246,8 @@ def limit_thematic_bridges(
     recaps) are kept. Returns (new_units, dropped). Pure and deterministic; mirrors
     strip_phantom_references' shape.
     """
+    if max_bridges is None:
+        max_bridges = callback_budget(len(ordered_units))
     bridges_kept = 0
     dropped: List[Dict] = []
     new_units: List[Dict] = []
@@ -248,18 +266,18 @@ def limit_thematic_bridges(
                 continue
             kept: List[str] = []
             for sent in sentences:
-                is_recap = bool(_PREV_STOP_RECAP_RE.search(sent))
-                is_bridge = bool(_THEMATIC_BRIDGE_RE.search(sent))
-                if is_recap:
+                if _STOCK_RECENCY_RE.search(sent):
                     dropped.append({
                         "stop": stop_num, "sentence": sent.strip(),
-                        "reason": "previous-stop recap"})
+                        "reason": "stock recency callback"})
                     continue
-                if is_bridge:
+                is_callback = bool(_PREV_STOP_RECAP_RE.search(sent)
+                                   or _THEMATIC_BRIDGE_RE.search(sent))
+                if is_callback:
                     if bridges_kept >= max_bridges:
                         dropped.append({
                             "stop": stop_num, "sentence": sent.strip(),
-                            "reason": "more than one thematic bridge"})
+                            "reason": "callback over the per-tour budget"})
                         continue
                     bridges_kept += 1
                 kept.append(sent)
@@ -285,7 +303,7 @@ _TEXT_FIELD_LINE_RE = re.compile(
 
 
 def limit_thematic_bridges_in_text(tour_text: str,
-                                   max_bridges: int = 1) -> Tuple[str, int]:
+                                   max_bridges: Optional[int] = None) -> Tuple[str, int]:
     """Apply the recap / one-bridge policy to a delivered tour's TEXT.
 
     Returns ``(cleaned_text, n_dropped)``. Walks each stop's prose paragraphs
@@ -296,6 +314,8 @@ def limit_thematic_bridges_in_text(tour_text: str,
     """
     if not tour_text:
         return tour_text or "", 0
+    if max_bridges is None:
+        max_bridges = callback_budget(len(_TEXT_STOP_HEADER_RE.findall(tour_text)))
     bridges_kept = 0
     dropped = 0
     out_lines: List[str] = []
@@ -314,10 +334,10 @@ def limit_thematic_bridges_in_text(tour_text: str,
             body = raw[om.end():]
         kept_sents: List[str] = []
         for sent in _split_sentences(body):
-            if _PREV_STOP_RECAP_RE.search(sent):
+            if _STOCK_RECENCY_RE.search(sent):
                 dropped += 1
                 continue
-            if _THEMATIC_BRIDGE_RE.search(sent):
+            if _PREV_STOP_RECAP_RE.search(sent) or _THEMATIC_BRIDGE_RE.search(sent):
                 if bridges_kept >= max_bridges:
                     dropped += 1
                     continue
