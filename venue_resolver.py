@@ -684,16 +684,32 @@ def build_canonical_titles_from_works(works: List[Dict]) -> Set[str]:
     Returns a set of canonical title strings.
     """
     titles = set()
+    # [LOCAL-625] A museum stop must be an ARTWORK — never a room/gallery/wing. The
+    # Alte Pinakothek's Wikidata catalogue stores its "Kabinett 1-2 … 23" cabinets
+    # as entities, which the deterministic documented-works fill shipped as stops
+    # (tour 471/474 Stop 2). Drop any label/alias that is just a space designation.
+    try:
+        from room_candidate_guard import is_room_or_space_title as _is_room
+    except Exception:  # pragma: no cover
+        _is_room = None
+
+    def _ok(t: str) -> bool:
+        if not t or t.startswith("Q") or len(t) < 3:
+            return False
+        if _is_room is not None and _is_room(t):
+            return False
+        return True
+
     for work in works:
         label_en = work.get("label_en", "")
-        if label_en and not label_en.startswith("Q") and len(label_en) >= 3:
+        if _ok(label_en):
             titles.add(label_en)
         local_label = work.get("label_local", "")
-        if local_label and local_label != label_en and not local_label.startswith("Q") and len(local_label) >= 3:
+        if local_label != label_en and _ok(local_label):
             titles.add(local_label)
         # Also add aliases as canonical titles (they're valid names)
         for alias in work.get("aliases", []):
-            if alias and len(alias) >= 3 and not alias.startswith("Q"):
+            if _ok(alias):
                 titles.add(alias)
     return titles
 

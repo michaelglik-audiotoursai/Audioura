@@ -94,8 +94,18 @@ def _report_facts(text):
     # Stop titles
     for m in re.finditer(r"(?mi)^Stop\s+\d+:\s*(.+)$", text):
         print(f"  STOP TITLE: {m.group(1).strip()}", flush=True)
-    # Garbage-hours probe (the exact 471 defect: a bare HH–HH with no day/colon)
-    bad = re.findall(r"(?m)\b0\d\s*[–-]\s*\d\d\b", text)
+    # Garbage-hours probe: the exact 471 defect is a bare "HH–HH" with NO
+    # colon/dot minutes anywhere in the Museum Information value (midnight-start
+    # fragments like "00–18; 00–20"). A correct "10.00–18.00" / "13:00–18:00" has
+    # minutes and must NOT be flagged.
+    bad = []
+    for m in re.finditer(r"(?mi)^Museum Information:\s*(.+)$", text):
+        val = m.group(1)
+        for seg in re.split(r"[;,.]\s*", val):
+            seg = seg.strip()
+            # a bare "HH-HH" segment with no colon/dot minute marker
+            if re.fullmatch(r"\d{1,2}\s*[–-]\s*\d{1,2}", seg):
+                bad.append(seg)
     if bad:
         print(f"  !! GARBAGE-HOURS PROBE FOUND: {bad}", flush=True)
     else:

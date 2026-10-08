@@ -5351,6 +5351,26 @@ def _verify_works_v2(poi_list, venue_name, exhibition_scope=None):
         # Preserve set type (downstream does set algebra on canonical_titles).
         canonical_titles = set(_canonical_kept)
 
+    # [LOCAL-625 item 3] Reject room/gallery/wing/floor/building titles from the
+    # canonical SET at this single chokepoint — it covers the fresh build, the
+    # 30-day venue_cache HIT, AND the corpus-mined titles. The Alte Pinakothek's
+    # Wikidata catalogue stores its "Kabinett 1-2 … 23" cabinets as works, which
+    # the deterministic documented-works fill shipped as Stop 2 (tour 471/474). A
+    # museum stop must be an artwork; rooms are dropped so the fill uses real works.
+    if canonical_titles and os.environ.get("ALLOW_MUSEUM_SPACE_STOPS", "").strip() != "1":
+        try:
+            from room_candidate_guard import is_room_or_space_title as _is_room_canon
+            _room_before = len(canonical_titles)
+            _rooms_dropped = sorted(t for t in canonical_titles
+                                    if _is_room_canon(t, venue_name))
+            if _rooms_dropped:
+                canonical_titles = set(t for t in canonical_titles
+                                       if t not in _rooms_dropped)
+                print(f"  [LOCAL-625] rejected room/space titles from canonical SET: "
+                      f"{_room_before} → {len(canonical_titles)} — dropped {_rooms_dropped}")
+        except Exception as _rg_err:
+            print(f"  [LOCAL-625] room-title canonical filter skipped ({_rg_err})")
+
     # Store classification in corpus_result for downstream audit
     # CRITICAL: Also update corpus_result['canonical_titles'] so R4 replenishment
     # uses the FILTERED set (prevents excluded titles from being re-verified via R4)
