@@ -29,9 +29,22 @@ def load_tour(path):
         return f.read()
 
 
-PASS_COUNT = 0
-FAIL_COUNT = 0
-FACTUAL_FAIL_COUNT = 0
+# [LOCAL-631] These four QA counters are PER-JOB results: run_qa() writes them
+# and generate_tour_text_service.py reads them back (FACTUAL_FAIL_COUNT,
+# FAIL_COUNT, G4_UNGROUNDED_SENTENCES) after run_qa returns. As plain module
+# globals they were ONE object shared by every concurrent job thread, so two
+# tours QA'd at the same moment overwrote each other's counts (a Rodin tour could
+# read the Rijksmuseum tour's factual-fail state). They are now backed by a
+# per-job contextvars scope: each service job-thread sees its own counters.
+# Cross-module reads (content_qa_runner.FACTUAL_FAIL_COUNT) and the engine's
+# `_J.NAME` access both route to the current job's value. See job_scoped_state.py.
+import job_scoped_state as _jss
+_J = _jss.attach_to_module(__name__, {
+    "PASS_COUNT": lambda: 0,
+    "FAIL_COUNT": lambda: 0,
+    "FACTUAL_FAIL_COUNT": lambda: 0,
+    "G4_UNGROUNDED_SENTENCES": list,
+})
 
 
 # ---------------------------------------------------------------------------
@@ -122,17 +135,16 @@ def extract_g4_proper_nouns(claim_text: str, venue_context: dict = None,
     return _claim_proper_nouns
 
 
-G4_UNGROUNDED_SENTENCES = []
+# [LOCAL-631] G4_UNGROUNDED_SENTENCES is job-scoped (registered above).
 
 
 def check(name, condition, detail=""):
-    global PASS_COUNT, FAIL_COUNT
     if condition:
         print(f"  PASS: {name}")
-        PASS_COUNT += 1
+        _J.PASS_COUNT += 1
     else:
         print(f"  FAIL: {name} — {detail}")
-        FAIL_COUNT += 1
+        _J.FAIL_COUNT += 1
 
 
 def run_qa(tour_text, tour_file="", story_elements=None, venue_context=None):
@@ -146,9 +158,11 @@ def run_qa(tour_text, tour_file="", story_elements=None, venue_context=None):
                        Keys: 'venue_tokens' (set of lowercase words from venue name),
                              'city' (str), 'region' (str), 'artist' (str)
     """
-    global PASS_COUNT, FAIL_COUNT
-    # Store elements for G4 check access
-    run_qa._story_elements_override = story_elements
+    # [LOCAL-631] PASS_COUNT/FAIL_COUNT are job-scoped (see _J); no `global` needed.
+    # [LOCAL-631] story_elements is a parameter and stays a local — the old
+    # `run_qa._story_elements_override` function attribute was a process-shared
+    # slot that two concurrent jobs raced on (one job's elements could be read by
+    # another). The parameter is read directly below instead.
 
     # 1. No forbidden phrases from master list
     try:
@@ -276,8 +290,8 @@ def run_qa(tour_text, tour_file="", story_elements=None, venue_context=None):
 
     # -------- [BLOCKER 3] Factual integrity checks --------
     # These are RELEASE-GATING: any factual failure → exit 1 regardless of style score.
-    global FACTUAL_FAIL_COUNT
-    FACTUAL_FAIL_COUNT = 0
+    # [LOCAL-631] FACTUAL_FAIL_COUNT is job-scoped (see _J).
+    _J.FACTUAL_FAIL_COUNT = 0
 
     # -------- [D3] New deterministic checks --------
     
@@ -416,7 +430,7 @@ def run_qa(tour_text, tour_file="", story_elements=None, venue_context=None):
           len(_ungrounded) == 0,
           f"{len(_ungrounded)} suspicious title(s): {_ungrounded[:3]}")
     if _ungrounded:
-        FACTUAL_FAIL_COUNT += 1
+        _J.FACTUAL_FAIL_COUNT += 1
 
     # D3(e) Duplicate-stop detection: no two stops may be the same work under different labels
     # Catches: "Resurrection" / "Résurrection", "Le Roi David" / "King David"
@@ -441,7 +455,7 @@ def run_qa(tour_text, tour_file="", story_elements=None, venue_context=None):
           _passed_dedup,
           f"{len(_duplicate_stops)} duplicate(s): {_duplicate_stops[:3]}")
     if not _passed_dedup:
-        FACTUAL_FAIL_COUNT += 1
+        _J.FACTUAL_FAIL_COUNT += 1
 
     # [T6] Splice check: detect mid-token splices and malformed transitions
     _splice_issues = []
@@ -730,7 +744,7 @@ def run_qa(tour_text, tour_file="", story_elements=None, venue_context=None):
               _passed_11,
               f"{_drifted_stops}/{len(stops)} stops reference a foreign venue (threshold: >{_drift_threshold})")
         if not _passed_11:
-            FACTUAL_FAIL_COUNT += 1
+            _J.FACTUAL_FAIL_COUNT += 1
     else:
         check("Venue coherence (stops reference correct venue)", True, "(not a museum tour)")
 
@@ -781,9 +795,10 @@ def run_qa(tour_text, tour_file="", story_elements=None, venue_context=None):
     _story_elements_list = None  # List of element dicts
     
     # Priority 1: in-memory param (from run_qa(story_elements=...))
-    # This is set by the serving gate which has the elements from the current job
-    if hasattr(run_qa, '_story_elements_override') and run_qa._story_elements_override:
-        _story_elements_list = run_qa._story_elements_override
+    # This is the elements from the CURRENT job, passed as a parameter (LOCAL-631:
+    # was a process-shared function attribute that raced across concurrent jobs).
+    if story_elements:
+        _story_elements_list = story_elements
     
     # Priority 2: CLI — match tour's exact filename stem
     if _story_elements_list is None and tour_file:
@@ -817,8 +832,8 @@ def run_qa(tour_text, tour_file="", story_elements=None, venue_context=None):
                 {'text': _p, 'type': 'opening_section', 'source': 'd611_opening'} for _p in _opening_paras]
 
     # --- Check claims against elements ---
-    global G4_UNGROUNDED_SENTENCES
-    G4_UNGROUNDED_SENTENCES = []   # full text of each ungrounded prolog/epilog claim (LEAD, for corrective removal)
+    # [LOCAL-631] G4_UNGROUNDED_SENTENCES is job-scoped (see _J).
+    _J.G4_UNGROUNDED_SENTENCES = []   # full text of each ungrounded prolog/epilog claim (LEAD, for corrective removal)
     _ungrounded_claims = []
     _is_storied = os.environ.get("STORIED_MODE") == "true"
     
@@ -867,7 +882,7 @@ def run_qa(tour_text, tour_file="", story_elements=None, venue_context=None):
                         break
                 
                 if not _matched_element:
-                    _ungrounded_claims.append(claim[:80]); G4_UNGROUNDED_SENTENCES.append(claim)
+                    _ungrounded_claims.append(claim[:80]); _J.G4_UNGROUNDED_SENTENCES.append(claim)
                     continue
                 
                 # B7: Proper nouns — delegate to module-level extraction function
@@ -883,7 +898,7 @@ def run_qa(tour_text, tour_file="", story_elements=None, venue_context=None):
                         if pn not in _elem_text_lower:
                             _missing_pn.append(pn)
                     if _missing_pn:
-                        _ungrounded_claims.append(f"{claim[:60]}... (proper noun '{_missing_pn[0]}' not in element)"); G4_UNGROUNDED_SENTENCES.append(claim)
+                        _ungrounded_claims.append(f"{claim[:60]}... (proper noun '{_missing_pn[0]}' not in element)"); _J.G4_UNGROUNDED_SENTENCES.append(claim)
                         continue
                     
                     # Also check: the SPECIFIC causal verb from the claim must exist in the
@@ -910,7 +925,7 @@ def run_qa(tour_text, tour_file="", story_elements=None, venue_context=None):
                                 _any_causal_matches = True
                                 break
                         if not _any_causal_matches:
-                            _ungrounded_claims.append(f"{claim[:60]}... (causal verb '{_claim_causal[0]}' not in matched element)"); G4_UNGROUNDED_SENTENCES.append(claim)
+                            _ungrounded_claims.append(f"{claim[:60]}... (causal verb '{_claim_causal[0]}' not in matched element)"); _J.G4_UNGROUNDED_SENTENCES.append(claim)
                             continue
         
         elif _is_storied and _claim_sentences:
@@ -923,7 +938,7 @@ def run_qa(tour_text, tour_file="", story_elements=None, venue_context=None):
               _passed_g4,
               f"{len(_ungrounded_claims)} ungrounded claim(s): {_ungrounded_claims[:2]}")
         if not _passed_g4:
-            FACTUAL_FAIL_COUNT += 1
+            _J.FACTUAL_FAIL_COUNT += 1
     elif _is_storied and _claim_sentences and not _story_elements_list:
         # Fail-closed: STORIED mode, claims present, no elements → FACTUAL FAIL
         # EXCEPT: walking tours and exhibit_museum tours structurally never have story_elements.
@@ -947,14 +962,14 @@ def run_qa(tour_text, tour_file="", story_elements=None, venue_context=None):
             # Rich/medium/thin museum tour — story_elements SHOULD exist; fail-closed
             check("G4 Prolog/epilog claims trace to story elements (FACTUAL)",
                   False, "STORIED mode: claims present but story_elements unavailable — fail-closed")
-            FACTUAL_FAIL_COUNT += 1
+            _J.FACTUAL_FAIL_COUNT += 1
             # [LEAD 2026-10-07] Fail closed on the CLAIMS, not on the tour: with no
             # elements to check against, every dated/causal prolog/epilog sentence is
             # unverifiable, so hand them all to the service's G4 corrective action
             # (remove them, re-check). The tour's stops were verified by their own
             # gates; an unverifiable introduction sentence is not a reason to
             # discard them (Vietnam National Museum of Fine Arts, 2026-10-07).
-            G4_UNGROUNDED_SENTENCES.extend(_claim_sentences)
+            _J.G4_UNGROUNDED_SENTENCES.extend(_claim_sentences)
     else:
         check("G4 Prolog/epilog claims trace to story elements (FACTUAL)",
               True, "(no story_elements available or no dated/causal claims — skipped)")
@@ -999,15 +1014,15 @@ def main():
     run_qa(tour_text, tour_file)
 
     print(f"\n{'=' * 60}")
-    print(f"Score: {PASS_COUNT}/{PASS_COUNT + FAIL_COUNT} (style+factual)")
-    if FACTUAL_FAIL_COUNT > 0:
-        print(f"FACTUAL INTEGRITY FAILED ({FACTUAL_FAIL_COUNT} factual check(s) failed) — RELEASE BLOCKED")
+    print(f"Score: {_J.PASS_COUNT}/{_J.PASS_COUNT + _J.FAIL_COUNT} (style+factual)")
+    if _J.FACTUAL_FAIL_COUNT > 0:
+        print(f"FACTUAL INTEGRITY FAILED ({_J.FACTUAL_FAIL_COUNT} factual check(s) failed) — RELEASE BLOCKED")
         sys.exit(1)
-    elif FAIL_COUNT <= 3:
+    elif _J.FAIL_COUNT <= 3:
         print("QA PASSED (<=3 style failures + all factual checks pass)")
         sys.exit(0)
     else:
-        print(f"QA FAILED ({FAIL_COUNT} failures)")
+        print(f"QA FAILED ({_J.FAIL_COUNT} failures)")
         sys.exit(1)
 
 

@@ -3869,16 +3869,14 @@ def _try_deliver_museum_overview(venue_name, location, tour_type, site_url,
 
     Rung 3 fires only when ``entity_resolved and site_reachable and site_url``.
     On success it SETS the module globals (_LAST_TOUR_KIND='overview',
-    _LAST_TOUR_SUGGESTION, _LAST_OVERVIEW_SOURCES, _LAST_GENERATION_COST,
-    _LAST_STOP_COUNT_NOTICE), clears _LAST_CLEAN_FAIL_EVIDENCE, writes the tour to
+    _J._LAST_TOUR_SUGGESTION, _J._LAST_OVERVIEW_SOURCES, _J._LAST_GENERATION_COST,
+    _J._LAST_STOP_COUNT_NOTICE), clears _J._LAST_CLEAN_FAIL_EVIDENCE, writes the tour to
     ``output_file``, and returns the finished tour text. Otherwise returns None and
     the caller proceeds to rung 4 (LOCAL-580 structured error + suggestion).
 
     Hours/admission inside the overview are sourced-and-dated (D538), enforced in
     museum_overview — nothing is invented here.
     """
-    global _LAST_TOUR_KIND, _LAST_TOUR_SUGGESTION, _LAST_OVERVIEW_SOURCES
-    global _LAST_CLEAN_FAIL_EVIDENCE, _LAST_GENERATION_COST
 
     if not (entity_resolved and site_reachable and site_url):
         return None
@@ -3926,14 +3924,14 @@ def _try_deliver_museum_overview(venue_name, location, tour_type, site_url,
         ov_text = _rebuild_concl(ov_text, venue_name=(venue_name or location or ""))
     except Exception as _ov_concl_err:
         print(f"  [LOCAL-619] overview conclusion skipped (non-fatal): {_ov_concl_err}")
-    _LAST_TOUR_KIND = 'overview'
-    _LAST_OVERVIEW_SOURCES = list(overview.sources)
+    _J._LAST_TOUR_KIND = 'overview'
+    _J._LAST_OVERVIEW_SOURCES = list(overview.sources)
     try:
         from actionable_failure import _walking_suggestion, derive_locality
         _ov_locality = locality or derive_locality(location)
-        _LAST_TOUR_SUGGESTION = _walking_suggestion(_ov_locality) or {}
+        _J._LAST_TOUR_SUGGESTION = _walking_suggestion(_ov_locality) or {}
     except Exception:
-        _LAST_TOUR_SUGGESTION = {}
+        _J._LAST_TOUR_SUGGESTION = {}
     _set_stop_count_notice(
         requested_stops, 1, 'overview',
         "works could not be verified; delivered a sourced museum overview from the "
@@ -3941,8 +3939,8 @@ def _try_deliver_museum_overview(venue_name, location, tour_type, site_url,
     print(f"  [LOCAL-582] OVERVIEW delivered (tour_kind='overview'): 1 stop, "
           f"{len(overview.sources)} source(s), hours={overview.has_hours} "
           f"admission={overview.has_admission}; requested {requested_stops} / delivered 1")
-    _LAST_CLEAN_FAIL_EVIDENCE = {}
-    _LAST_GENERATION_COST = {
+    _J._LAST_CLEAN_FAIL_EVIDENCE = {}
+    _J._LAST_GENERATION_COST = {
         "total_cost": 0.0, "total_tokens": 0, "cache_hit": False,
         "breakdown": {"llm": 0.0, "tts": 0.0, "search": 0.0},
     }
@@ -4211,7 +4209,38 @@ from dataclasses import dataclass, field
 from typing import Optional, List, Dict, Any
 
 # Module-level: populated on unresolvable clean-fail for structured error response
-_LAST_CLEAN_FAIL_EVIDENCE = {}
+# [LOCAL-631] The "_LAST_*" holders below (plus _DIRECT_SNIPPETS_PER_STOP and
+# _SUPPRESS_INLINE_SHORTFALL) carry PER-JOB results that the engine writes during
+# a run and generate_tour_text_service.py reads back AFTER generate_tour_text
+# returns. As plain module globals they were ONE object shared by every concurrent
+# job thread in the process, so two tours generated at the same moment overwrote
+# each other's holders — Bench R0 caught the Musee Rodin speaking the Rijksmuseum's
+# hours/admission (the preflight/holder bled across jobs). They are now backed by a
+# per-job contextvars scope (job_scoped_state): each service job-thread (and each
+# contextvars Context) sees its own values and can never observe another job's.
+# Engine code uses `_J._LAST_X` for reads/writes/in-place mutation; cross-module
+# reads (generate_tour_text._LAST_X) and external writes (test runners setting
+# _DIRECT_SNIPPETS_PER_STOP, the orchestrator setting _SUPPRESS_INLINE_SHORTFALL)
+# are routed to the same per-job scope by the module __getattr__/__setattr__.
+import job_scoped_state as _jss
+_J = _jss.attach_to_module(__name__, {
+    "_LAST_CLEAN_FAIL_EVIDENCE": dict,
+    "_LAST_TOUR_KIND": lambda: 'full',
+    "_LAST_DELIVERY_PATH": lambda: 'fresh',
+    "_LAST_TOUR_SUGGESTION": dict,
+    "_LAST_OVERVIEW_SOURCES": list,
+    "_LAST_POI_LIST": list,
+    "_LAST_VERIFICATION_TIER": lambda: "",
+    "_LAST_GENERATION_COST": lambda: {"total_cost": 0.0, "total_tokens": 0, "cache_hit": False, "breakdown": {}},
+    "_LAST_SITE_FIRST_SOURCES": list,
+    "_LAST_SITE_FIRST_COUNTS": dict,
+    "_SUPPRESS_INLINE_SHORTFALL": lambda: False,
+    "_LAST_SCORE_RECORD": lambda: None,
+    "_LAST_STOP_COUNT_NOTICE": dict,
+    "_LAST_VENUE_PREFLIGHT": dict,
+    "_LAST_PREFLIGHT_COST": dict,
+    "_DIRECT_SNIPPETS_PER_STOP": dict,
+})
 
 # [LOCAL-582] Module-level: how the LAST generation was delivered.
 #   'full'     — a normal multi-stop tour (default; LOCAL-580 and before).
@@ -4221,27 +4250,21 @@ _LAST_CLEAN_FAIL_EVIDENCE = {}
 #                clean-failing. The service/DB label the row honestly from this.
 # Declared so the service layer can read tour_kind without changing the engine's
 # return signature — the same pattern as _LAST_GENERATION_COST / _LAST_CLEAN_FAIL_EVIDENCE.
-_LAST_TOUR_KIND = 'full'
 
 # [LOCAL-605] Module-level: the delivery path that produced the LAST tour, so the
 # service's fail-closed coordinate assertion can name WHICH path delivered a tour
 # without coordinates. One of: 'fresh', 'cache', 'pool', 'by_reference',
 # 'overview'. Set at each return site; defaults to 'fresh'.
-_LAST_DELIVERY_PATH = 'fresh'
 
 # [LOCAL-582] Module-level: the LOCAL-580 actionable suggestion carried on an
 # overview job (the locality walking-tour alternative). Empty dict when none.
-_LAST_TOUR_SUGGESTION = {}
 
 # [LOCAL-582] Module-level: the venue-own-domain source URLs the overview was
 # built from (for the job result / audit). Empty on a non-overview generation.
-_LAST_OVERVIEW_SOURCES = []
 
 # [B1b] Module-level: populated after successful generation with final poi_list (including verified flags)
-_LAST_POI_LIST = []
 
 # Module-level: populated after D1v2 verification with the computed tier
-_LAST_VERIFICATION_TIER = ""
 
 # [LOCAL-593 #4] How PROMINENT is a documented work?
 # The deterministic selector used to order works by source tier only, so within
@@ -4444,13 +4467,11 @@ def _apply_artwork_guards(documented, sparql_works, venue_name, n_stops,
 # [LOCAL-60] Module-level: populated after generation with cost breakdown
 # Allows the service layer to read the cost without changing the function signature.
 # Keys: total_cost, total_tokens, cache_hit, breakdown (dict with llm/tts/search)
-_LAST_GENERATION_COST = {"total_cost": 0.0, "total_tokens": 0, "cache_hit": False, "breakdown": {}}
 
 # [LOCAL-599B] Module-level: the site-first exhibition stops delivered by the LAST
 # generation, each mapped to its own source URL + status + kind. A live runner /
 # acceptance harness reads this to report "the 7 stop titles, each with its source
 # URL" (D611) without re-fetching. {} when the last run took no site-first path.
-_LAST_SITE_FIRST_SOURCES = []  # [{'name','source_url','status','kind'}, ...]
 
 # [LOCAL-600 / D616] Module-level: the real counts behind the LAST site-first
 # delivery, so the stop-pool orchestrator can build the honest shortfall sentence
@@ -4461,7 +4482,6 @@ _LAST_SITE_FIRST_SOURCES = []  # [{'name','source_url','status','kind'}, ...]
 #   delivered_stops     — total site-first stops delivered (shows + works + spaces).
 #   requested_stops     — what the listener asked for.
 # {} when the last run took no site-first path.
-_LAST_SITE_FIRST_COUNTS = {}
 
 # [LOCAL-612] When True, the main delivery loop does NOT inject its own inline
 # D616 shortfall sentence into Stop 1. The stop-pool orchestrator sets this around
@@ -4473,14 +4493,12 @@ _LAST_SITE_FIRST_COUNTS = {}
 # straight through the main loop still carries the honest sentence exactly once.
 # This is a DEDICATED flag — DISABLE_STOP_POOL is NOT a safe discriminator because
 # live runners set it for legitimate direct runs.
-_SUPPRESS_INLINE_SHORTFALL = False
 
 # [LOCAL-540] Module-level: the before/after score record from the last generation
 # (see score_and_retry in scorer_retry.py). None on a cache hit or if scoring was
 # skipped. Exposed so a caller can read the defect the scorer saw, whether a retry
 # ran, and whether it cleared the defect — the same way _LAST_GENERATION_COST
 # exposes cost.
-_LAST_SCORE_RECORD = None
 
 # [D530] Module-level: populated whenever the delivered stop count differs from
 # what the listener asked for. Empty dict means the request was met.
@@ -4490,7 +4508,6 @@ _LAST_SCORE_RECORD = None
 # works a scrape happened to yield, and by Phase 3A the log printed "asking for
 # 2 candidates" as though 1 had always been the ask. The request left no trace.
 # Keys: requested, delivered, reason, source.
-_LAST_STOP_COUNT_NOTICE = {}
 
 # [LOCAL-603 / D618] Module-level: the venue preflight result from the LAST
 # single-venue generation (venue_preflight.preflight). {} when no preflight ran
@@ -4498,7 +4515,6 @@ _LAST_STOP_COUNT_NOTICE = {}
 # reads it to fold preflight hours/admission into the D611 opening section when
 # the site gave none, and to top up stop candidates when our own extraction fell
 # short — each with its grounding source URL (never unsourced).
-_LAST_VENUE_PREFLIGHT = {}
 
 # [LOCAL-615 item 4] Module-level: the COST of the LAST venue preflight — the
 # preflight bucket snapshot ({usd, calls, queries, input_tokens, output_tokens})
@@ -4507,7 +4523,6 @@ _LAST_VENUE_PREFLIGHT = {}
 # The delivering path (pool or normal generation) folds this into the tour's
 # _LAST_GENERATION_COST so the preflight is metered and appears in the breakdown —
 # before this it ran OUTSIDE any accumulator scope and the ledger showed calls:0.
-_LAST_PREFLIGHT_COST = {}
 
 
 def _preflight_venue_from_location(location):
@@ -4538,11 +4553,11 @@ def _set_stop_count_notice(requested, delivered, source, reason):
     """[D536] Record the listener's ask vs what shipped.
 
     A module-level setter rather than an inline `global`: generate_tour_text
-    already declares `global _LAST_STOP_COUNT_NOTICE` further down, and touching
+    already declares `global _J._LAST_STOP_COUNT_NOTICE` further down, and touching
     the name before that declaration is a SyntaxError.
     """
-    _LAST_STOP_COUNT_NOTICE.clear()
-    _LAST_STOP_COUNT_NOTICE.update({
+    _J._LAST_STOP_COUNT_NOTICE.clear()
+    _J._LAST_STOP_COUNT_NOTICE.update({
         'requested': requested, 'delivered': delivered,
         'source': source, 'reason': reason,
     })
@@ -4751,7 +4766,6 @@ without mentioning {_artist_surname}, your response will be REJECTED.
 # Keys: stop_name (str) → list of {'title': str, 'snippet': str, 'url': str}
 # When non-empty, the per-stop prompt injects these as reference material
 # with an instruction to write one grounded story about a named person.
-_DIRECT_SNIPPETS_PER_STOP: dict = {}
 
 # [LOCAL-323] REMOVED module-level globals _CURRENT_JOB_USER_ID / _CURRENT_JOB_ID.
 # They were not thread-safe: concurrent jobs sharing the same module meant one
@@ -7691,7 +7705,7 @@ def _apply_delivery_hours_guard(result):
             # Grounded values only (never invents); no-op when prose already speaks
             # hours. This runs BEFORE the unpublished-hours line so a famous museum
             # that publishes hours actually speaks them.
-            _pf_state = _LAST_VENUE_PREFLIGHT or {}
+            _pf_state = _J._LAST_VENUE_PREFLIGHT or {}
             if (_pf_state and not _pf_state.get('error') and not _pf_state.get('skipped')
                     and (_pf_state.get('hours') or _pf_state.get('admission'))):
                 try:
@@ -7883,16 +7897,15 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
     tour) routes to the by-reference path: reuse already-researched stops only
     (the stop pool + existing non-test tours of the venue), zero grounded Gemini,
     zero Serper. On success it returns the assembled text with _LAST_GENERATION_COST
-    at ~$0; when the venue has no reusable material it sets _LAST_CLEAN_FAIL_EVIDENCE
+    at ~$0; when the venue has no reusable material it sets _J._LAST_CLEAN_FAIL_EVIDENCE
     to the by_reference_no_material refusal (with nearby tours) and returns None,
     so the service surfaces the actionable refusal — never a fresh generation.
     """
-    global _LAST_GENERATION_COST, _LAST_CLEAN_FAIL_EVIDENCE, _LAST_VENUE_PREFLIGHT, _LAST_DELIVERY_PATH, _LAST_PREFLIGHT_COST
 
     # [LOCAL-605] Default: this call is a fresh generation unless a short-circuit
     # path below overwrites it. The service's fail-closed coordinate assertion
     # reads this to name the delivering path.
-    _LAST_DELIVERY_PATH = 'fresh'
+    _J._LAST_DELIVERY_PATH = 'fresh'
 
     # [LOCAL-597] L2 by-reference path. Terminal: it either delivers a tour built
     # entirely from reused material (zero grounding / zero SERP, enforced by the
@@ -7903,7 +7916,7 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
         _pool_db = os.environ.get("DATABASE_URL")
         if not _pool_db:
             print("  [LOCAL-597] by_reference requested but no DATABASE_URL — cannot reuse material")
-            _LAST_CLEAN_FAIL_EVIDENCE = {
+            _J._LAST_CLEAN_FAIL_EVIDENCE = {
                 "error_type": "by_reference_no_material",
                 "error_code": "by_reference_no_material",
                 "message": "This place hasn't been researched yet on the free level.",
@@ -7919,7 +7932,7 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
             )
         except Exception as _br_err:
             print(f"  [LOCAL-597] by-reference build error: {_br_err}")
-            _LAST_CLEAN_FAIL_EVIDENCE = {
+            _J._LAST_CLEAN_FAIL_EVIDENCE = {
                 "error_type": "by_reference_no_material",
                 "error_code": "by_reference_no_material",
                 "message": "This place hasn't been researched yet on the free level.",
@@ -7940,7 +7953,7 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                 grounding_queries=_br_grounding.get("queries", 0),
                 grounding_requests=_br_grounding.get("requests", 0),
             )
-            _LAST_GENERATION_COST = {
+            _J._LAST_GENERATION_COST = {
                 "total_cost": 0.0,
                 "total_tokens": 0,
                 "cache_hit": False,
@@ -7961,12 +7974,12 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                   f"about_stops={result.get('about_stops', 0)} "
                   f"research_reused=${result.get('research_cost_reused', 0.0):.4f} "
                   f"grounding(requests={_g.get('requests', 0)}, queries={_g.get('queries', 0)})")
-            _LAST_DELIVERY_PATH = 'by_reference'
+            _J._LAST_DELIVERY_PATH = 'by_reference'
             return _apply_delivery_hours_guard(
                 (result["text"], output_file, (None, None)))
 
         # Refusal — hand the structured no-material error to the service layer.
-        _LAST_CLEAN_FAIL_EVIDENCE = {
+        _J._LAST_CLEAN_FAIL_EVIDENCE = {
             "error_type": "by_reference_no_material",
             "error_code": result.get("error_code", "by_reference_no_material"),
             "message": result.get("message", ""),
@@ -7987,8 +8000,8 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
     # above; safe_preflight also treats the L2 guard as "skip" defensively. The
     # grounded call flows through gemini_with_sources so the LOCAL-594 meter counts
     # it, and a 7-day (venue, city) cache makes a repeat request free.
-    _LAST_VENUE_PREFLIGHT = {}
-    _LAST_PREFLIGHT_COST = {}
+    _J._LAST_VENUE_PREFLIGHT = {}
+    _J._LAST_PREFLIGHT_COST = {}
     # [LOCAL-629 item 4] The gate used to fire ONLY when tour_type == 'museum'.
     # The Van Gogh Museum request arrived as tour_type='walking' (category was
     # forced to 'museum' later, INSIDE _generate_tour_text_impl), so the wrapper
@@ -8030,7 +8043,7 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                 # the delivering path's _LAST_GENERATION_COST below (pool and normal
                 # both). nullcontext fallback keeps a keyless/accumulator-less run
                 # working exactly as before.
-                _LAST_PREFLIGHT_COST = {}
+                _J._LAST_PREFLIGHT_COST = {}
                 try:
                     import cost_accumulator as _ca_pf
                     _pf_acc = _ca_pf.CostAccumulator(job_id=job_id)
@@ -8047,11 +8060,11 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                 if _pf_acc is not None:
                     try:
                         _pf_snap = _pf_acc.snapshot()
-                        _LAST_PREFLIGHT_COST = (_pf_snap.get("provider_breakdown") or {}).get(
+                        _J._LAST_PREFLIGHT_COST = (_pf_snap.get("provider_breakdown") or {}).get(
                             "preflight", {}) or {}
                     except Exception:
-                        _LAST_PREFLIGHT_COST = {}
-                _LAST_VENUE_PREFLIGHT = _pf
+                        _J._LAST_PREFLIGHT_COST = {}
+                _J._LAST_VENUE_PREFLIGHT = _pf
                 if _pf.get('skipped'):
                     print(f"  [LOCAL-603] preflight skipped ({_pf['skipped']})")
                 elif _pf.get('error'):
@@ -8064,7 +8077,7 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                     _gate = _vpf.gate(_pf_venue, _pf_city, _pf)
                     if _gate:
                         print(f"  [LOCAL-603] VENUE CLOSED GATE: {_gate['message']}")
-                        _LAST_CLEAN_FAIL_EVIDENCE = {
+                        _J._LAST_CLEAN_FAIL_EVIDENCE = {
                             "error_type": "venue_closed",
                             "error_code": "venue_closed",
                             "message": _gate['message'],
@@ -8078,13 +8091,13 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                         return None, output_file, (None, None)
         except Exception as _pf_err:
             print(f"  [LOCAL-603] preflight error (non-fatal): {_pf_err}")
-            _LAST_VENUE_PREFLIGHT = {}
+            _J._LAST_VENUE_PREFLIGHT = {}
 
     # [LOCAL-615 item 4] Snapshot the preflight cost into a LOCAL now, before the
     # pool fast-path's recursive generate_fn call (which re-enters this wrapper and
     # overwrites the module-level _LAST_PREFLIGHT_COST with its own — a cache hit,
     # $0). The delivering path below folds THIS captured figure into the ledger.
-    _outer_preflight_cost = dict(_LAST_PREFLIGHT_COST or {})
+    _outer_preflight_cost = dict(_J._LAST_PREFLIGHT_COST or {})
 
     # [LOCAL-590] Stop-pool fast path. When a tour of this venue was already
     # delivered, reuse the pooled stops and generate only the new ones (Michael's
@@ -8125,7 +8138,7 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                         # have no richer per-provider split for the new stops.
                         if _pool_new_cost and isinstance(_pool_breakdown.get("openai"), dict):
                             _pool_breakdown["openai"]["usd"] = _pool_new_cost
-                    _LAST_GENERATION_COST = {
+                    _J._LAST_GENERATION_COST = {
                         "total_cost": _pool_new_cost,
                         "total_tokens": 0,
                         "cache_hit": False,
@@ -8145,7 +8158,7 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                     # nor _pool_breakdown includes it. Fold the captured preflight
                     # bucket into tour_total_cost and the breakdown's preflight line
                     # so the ledger shows preflight calls/queries/$ (not calls:0).
-                    _fold_preflight_cost_into_record(_LAST_GENERATION_COST,
+                    _fold_preflight_cost_into_record(_J._LAST_GENERATION_COST,
                                                      _outer_preflight_cost)
                     print(f"  [LOCAL-590] POOL DELIVERY: reused={_pool_out.get('reused_stops')} "
                           f"new={_pool_out.get('new_stops')} "
@@ -8153,7 +8166,7 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                           f"about_stops={_pool_out.get('about_stops', 0)} "
                           f"(pool held {_pool_out.get('pooled_before')}); "
                           f"research reused ${_pool_reused_research:.4f}")
-                    _LAST_DELIVERY_PATH = 'pool'
+                    _J._LAST_DELIVERY_PATH = 'pool'
                     return _apply_delivery_hours_guard(
                         (_pool_out["text"], output_file, (None, None)))
             except Exception as _pool_err:
@@ -8182,7 +8195,7 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
     # above opened, so the reconcile (which reads _acc) did not see it. Fold the
     # captured preflight bucket into the reconciled record so a direct (non-pool)
     # museum tour also meters the preflight and shows it in the breakdown.
-    _fold_preflight_cost_into_record(_LAST_GENERATION_COST, _outer_preflight_cost)
+    _fold_preflight_cost_into_record(_J._LAST_GENERATION_COST, _outer_preflight_cost)
     # [LOCAL-616 item 1] Final hours guard on the delivered text/file for the
     # fresh / cache / overview paths that funnel through _generate_tour_text_impl.
     return _apply_delivery_hours_guard(result)
@@ -8230,7 +8243,7 @@ def _fold_preflight_cost_into_record(rec, preflight_cost):
 
 
 def _reconcile_cost_record_from_accumulator(acc):
-    """[LOCAL-562] Make _LAST_GENERATION_COST authoritative from the choke point.
+    """[LOCAL-562] Make _J._LAST_GENERATION_COST authoritative from the choke point.
 
     The implementation still sums ``total_cost`` by hand for its console prints
     and the phase-boundary cost ceiling (a safety limit that must keep working),
@@ -8243,7 +8256,7 @@ def _reconcile_cost_record_from_accumulator(acc):
     zero anyway.
     """
     try:
-        rec = _LAST_GENERATION_COST
+        rec = _J._LAST_GENERATION_COST
         if not isinstance(rec, dict) or not rec:
             return
         if rec.get("cache_hit"):
@@ -8511,21 +8524,13 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
     total_cost = 0
     
     # [LOCAL-60] Declare global for cost exposure
-    global _LAST_GENERATION_COST
-    global _LAST_CLEAN_FAIL_EVIDENCE  # [LOCAL-474] clean-fail evidence set from multiple points
-    global _LAST_TOUR_KIND  # [LOCAL-582] 'full' or 'overview' — declared default below
-    global _LAST_TOUR_SUGGESTION  # [LOCAL-582] actionable suggestion carried on an overview
-    global _LAST_OVERVIEW_SOURCES  # [LOCAL-582] venue-own-domain source URLs for an overview
-    global _LAST_POI_LIST  # [LOCAL-326] needed for partial-tour early returns
-    global _DIRECT_SNIPPETS_PER_STOP  # [LOCAL-410] Allow generation path to populate search results
-    global _LAST_DELIVERY_PATH  # [LOCAL-605] delivery path for the fail-closed coord assertion
 
     # [LOCAL-582] Reset per-generation delivery kind. Defaults to 'full'; only the
     # rung-3 overview path flips it to 'overview'. Reset here so a prior overview
     # cannot leak into the next request's job result.
-    _LAST_TOUR_KIND = 'full'
-    _LAST_TOUR_SUGGESTION = {}
-    _LAST_OVERVIEW_SOURCES = []
+    _J._LAST_TOUR_KIND = 'full'
+    _J._LAST_TOUR_SUGGESTION = {}
+    _J._LAST_OVERVIEW_SOURCES = []
 
     # [LOCAL-533] Zero the grounded-request counter for this generation. Grounding
     # (Gemini + Google Search) bills per request and was absent from the printed
@@ -8583,7 +8588,7 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
                     print(f"Grounding:      ${_cache_gr_cost:.4f} "
                           f"({_cache_gq} queries, {_cache_gr} requests)")
                     print(f"Tour total:     ${_cache_gr_cost:.4f}")
-                    _LAST_GENERATION_COST = {
+                    _J._LAST_GENERATION_COST = {
                         "total_cost": 0.0,
                         "total_tokens": 0,
                         "cache_hit": True,
@@ -8628,7 +8633,7 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
                     if output_file:
                         with open(output_file, "w", encoding="utf-8") as _cf:
                             _cf.write(_cache_hit)
-                    _LAST_DELIVERY_PATH = 'cache'
+                    _J._LAST_DELIVERY_PATH = 'cache'
                     return _cache_hit, output_file, (None, None)
                 else:
                     print(f"CACHE MISS: {location} / {tour_type} / {total_stops}")
@@ -8889,8 +8894,8 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
         print(f"\n  [LOCAL-474] ⚠️  UNCLASSIFIABLE REQUEST — no tour category could be inferred")
         print(f"    location='{location}' tour_type='{tour_type}'")
         # _LAST_CLEAN_FAIL_EVIDENCE / _LAST_GENERATION_COST declared global at function top
-        _LAST_CLEAN_FAIL_EVIDENCE = _build_unclassifiable_evidence(location, tour_type)
-        _LAST_GENERATION_COST = {
+        _J._LAST_CLEAN_FAIL_EVIDENCE = _build_unclassifiable_evidence(location, tour_type)
+        _J._LAST_GENERATION_COST = {
             "total_cost": 0.0,
             "total_tokens": 0,
             "cache_hit": False,
@@ -9924,8 +9929,7 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
                 # [LOCAL-599B] Record each site-first stop's source URL + status +
                 # kind so a live runner can report "N titles, each with its source
                 # URL" (D611) without re-fetching.
-                global _LAST_SITE_FIRST_SOURCES
-                _LAST_SITE_FIRST_SOURCES = [{
+                _J._LAST_SITE_FIRST_SOURCES = [{
                     'name': _c.get('name', ''),
                     'source_url': _c.get('source_url') or _c.get('detail_url', ''),
                     'status': _c.get('status', ''),
@@ -9950,13 +9954,13 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
                 # (never unsourced, D618). Deduped against what the site already gave.
                 try:
                     if (len(poi_list) < (total_stops or 0)
-                            and _LAST_VENUE_PREFLIGHT
-                            and not _LAST_VENUE_PREFLIGHT.get('error')
-                            and not _LAST_VENUE_PREFLIGHT.get('skipped')):
+                            and _J._LAST_VENUE_PREFLIGHT
+                            and not _J._LAST_VENUE_PREFLIGHT.get('error')
+                            and not _J._LAST_VENUE_PREFLIGHT.get('skipped')):
                         import venue_preflight as _vpf
                         from story_miner import _normalize as _pf_norm
                         _planb_cands = _vpf.plan_b_stop_candidates(
-                            _LAST_VENUE_PREFLIGHT,
+                            _J._LAST_VENUE_PREFLIGHT,
                             have=len(poi_list), want=(total_stops or 0),
                             min_stops=(total_stops or 0))
                         _existing_norm = {_pf_norm(p['name']) for p in poi_list}
@@ -9973,7 +9977,7 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
                             _np['_sf_order'] = len(poi_list)
                             _np['_preflight_seed'] = True
                             poi_list.append(_np)
-                            _LAST_SITE_FIRST_SOURCES.append({
+                            _J._LAST_SITE_FIRST_SOURCES.append({
                                 'name': _cand['name'],
                                 'source_url': _cand['source_url'],
                                 'status': '',
@@ -10021,13 +10025,13 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
                         output_file=output_file,
                         entity_resolved=True, site_reachable=True)
                     if _ov_text is not None:
-                        _LAST_DELIVERY_PATH = 'overview'
+                        _J._LAST_DELIVERY_PATH = 'overview'
                         return _ov_text, output_file, (None, None)
                     # Overview could not be built either (site truly unreachable).
                     # Clean-fail with structured evidence — still no invention.
                     print(f"  [LOCAL-589] overview rung also failed — clean-fail "
                           f"(no GPT-invented stops) for '{_museum_venue_name}'")
-                    _LAST_CLEAN_FAIL_EVIDENCE = {
+                    _J._LAST_CLEAN_FAIL_EVIDENCE = {
                         "error_type": "thin_evidence",
                         "entity_resolved": True,
                         "qid": "",
@@ -10164,14 +10168,14 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
                     print(f"    Closed: {_exhibition_checklist_result.closing_date}")
                     print(f"    Reason: {_exhibition_checklist_result.reason}")
                     # [LOCAL-474] _LAST_CLEAN_FAIL_EVIDENCE declared global at function top
-                    _LAST_CLEAN_FAIL_EVIDENCE = {
+                    _J._LAST_CLEAN_FAIL_EVIDENCE = {
                         "error_type": "exhibition_closed",
                         "exhibition_title": _exhibition_checklist_result.exhibition_title,
                         "closing_date": str(_exhibition_checklist_result.closing_date),
                         "venue": _scope_venue,
                         "reason": _exhibition_checklist_result.reason,
                     }
-                    _LAST_GENERATION_COST = {
+                    _J._LAST_GENERATION_COST = {
                         "total_cost": 0.0,
                         "total_tokens": 0,
                         "cache_hit": False,
@@ -10893,11 +10897,11 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
                         output_file=output_file,
                         entity_resolved=True, site_reachable=True)
                     if _ov_text is not None:
-                        _LAST_DELIVERY_PATH = 'overview'
+                        _J._LAST_DELIVERY_PATH = 'overview'
                         return _ov_text, output_file, (None, None)
                     # No usable site -> rung 4: record structured evidence so the
                     # service layer surfaces the LOCAL-580 error + locality suggestion.
-                    _LAST_CLEAN_FAIL_EVIDENCE = {
+                    _J._LAST_CLEAN_FAIL_EVIDENCE = {
                         "error_type": "thin_evidence",
                         "entity_resolved": True,
                         "qid": "",
@@ -11017,7 +11021,6 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
         # the site_exhibition branch overwrites it with its own candidates below.
         _pre_d1v2_candidates = []
         if tour_category == 'museum' and _museum_venue_name:
-            global _LAST_VERIFICATION_TIER
             # [LOCAL-372] Skip D1v2 verification when stops come from the venue's own
             # exhibition page. These works are already grounded by their source — 
             # verifying them against SPARQL/Wikidata would reject exhibition-specific
@@ -11109,7 +11112,7 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
                 print(f"  [D532] {len(poi_list)} stop(s): {len(poi_list) - _n_unconf} confirmed by "
                       f"the venue page, {_n_unconf} unconfirmed and labelled")
                 _verification_tier = 'exhibit_museum'
-                _LAST_VERIFICATION_TIER = _verification_tier
+                _J._LAST_VERIFICATION_TIER = _verification_tier
                 # [LOCAL-599] Keep the site-sourced, grounded stops as the fill
                 # pool base so UNIFIED-FILL has a defined pool (these are already
                 # the only real candidates; nothing is invented).
@@ -11136,7 +11139,7 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
                 _d1v2_result = _verify_works_v2(poi_list, _d1v2_venue_arg, exhibition_scope=_exhibition_scope)
                 if isinstance(_d1v2_result, VerificationResult):
                     _verification_tier = _d1v2_result.tier
-                    _LAST_VERIFICATION_TIER = _verification_tier
+                    _J._LAST_VERIFICATION_TIER = _verification_tier
                     if _d1v2_result.tier == 'unresolvable':
                         # [LOCAL-582] RUNG 3 OF THE LADDER (D607). The venue resolved
                         # and its own site is reachable, but no works/exhibitions
@@ -11161,13 +11164,13 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
                             entity_resolved=_d1v2_result.entity_resolved,
                             site_reachable=_d1v2_result.site_reachable)
                         if _ov_text is not None:
-                            _LAST_DELIVERY_PATH = 'overview'
+                            _J._LAST_DELIVERY_PATH = 'overview'
                             return _ov_text, output_file, (None, None)
 
                         # RUNG 4: no usable site (or overview empty) — clean fail with
                         # the LOCAL-580 structured error + locality suggestion.
                         print(f"  [D1] Tier: unresolvable — clean fail (rung 4; no usable site)")
-                        _LAST_CLEAN_FAIL_EVIDENCE = {
+                        _J._LAST_CLEAN_FAIL_EVIDENCE = {
                             "error_type": "thin_evidence",
                             "entity_resolved": _d1v2_result.entity_resolved,
                             "qid": _d1v2_result.qid,
@@ -11285,8 +11288,8 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
                 else:
                     # _verify_works_v2 returned None or unexpected type — fail-closed (unresolvable)
                     print(f"  [D1] D1v2 returned unexpected result — demoting to unresolvable (fail-closed)")
-                    _LAST_CLEAN_FAIL_EVIDENCE.clear()
-                    _LAST_CLEAN_FAIL_EVIDENCE.update({
+                    _J._LAST_CLEAN_FAIL_EVIDENCE.clear()
+                    _J._LAST_CLEAN_FAIL_EVIDENCE.update({
                         "error_type": "thin_evidence",
                         "entity_resolved": False,
                         "qid": "",
@@ -11653,8 +11656,8 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
                         # from re-filling with unverified candidates
                         total_stops = len(poi_list)
                     if len(poi_list) == 0:
-                        _LAST_CLEAN_FAIL_EVIDENCE.clear()
-                        _LAST_CLEAN_FAIL_EVIDENCE.update({
+                        _J._LAST_CLEAN_FAIL_EVIDENCE.clear()
+                        _J._LAST_CLEAN_FAIL_EVIDENCE.update({
                             "error_type": "all_unverified",
                             "tier": _verification_tier,
                             "pre_gate_count": _pre_gate_count,
@@ -11699,8 +11702,8 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
                     print(f"  [BLOCKER1] This indicates the model misread the request as 'a tour OF the city' "
                           f"rather than 'a tour INSIDE the venue'. Rejecting — will retry or fail cleanly.")
                     # Structured clean-fail evidence (D3: was missing → mobile got Type: null)
-                    _LAST_CLEAN_FAIL_EVIDENCE.clear()
-                    _LAST_CLEAN_FAIL_EVIDENCE.update({
+                    _J._LAST_CLEAN_FAIL_EVIDENCE.clear()
+                    _J._LAST_CLEAN_FAIL_EVIDENCE.update({
                         "error_type": "venue_misread",
                         "venue_name": _museum_venue_name,
                         "suspect_venues": _suspect_venues[:5],
@@ -11721,8 +11724,8 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
                       f"for {len(poi_list)} stops — a contained museum tour should have 1-2 addresses.")
                 print(f"  [BLOCKER4b] Rejecting — this looks like a city-wide museum tour, not interior rooms.")
                 # [PALAIS-FIX B2] Structured clean-fail evidence for BLOCKER4b
-                _LAST_CLEAN_FAIL_EVIDENCE.clear()
-                _LAST_CLEAN_FAIL_EVIDENCE.update({
+                _J._LAST_CLEAN_FAIL_EVIDENCE.clear()
+                _J._LAST_CLEAN_FAIL_EVIDENCE.update({
                     "error_type": "address_scatter",
                     "venue_name": _museum_venue_name,
                     "unique_addresses": len(_unique_addresses),
@@ -12297,8 +12300,8 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
                           f"| coverage={_er_covered_count}/{_er_total_selected}")
 
                     # Surface structured evidence for the service layer
-                    _LAST_CLEAN_FAIL_EVIDENCE.clear()
-                    _LAST_CLEAN_FAIL_EVIDENCE.update({
+                    _J._LAST_CLEAN_FAIL_EVIDENCE.clear()
+                    _J._LAST_CLEAN_FAIL_EVIDENCE.update({
                         'error_type': 'exhibition_not_found',
                         'verdict': _er_result['verdict'],
                         'reason': _er_result['reason'],
@@ -12307,7 +12310,7 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
                         'request': location,
                         'resolved_venue': _er_venue.name,
                     })
-                    _LAST_GENERATION_COST = {
+                    _J._LAST_GENERATION_COST = {
                         "total_cost": 0.0,
                         "total_tokens": 0,
                         "cache_hit": False,
@@ -13230,14 +13233,14 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
         # aloud). Only runs for a single-venue museum tour where the preflight
         # succeeded and we have at least one stop to attach the venue facts to.
         if (tour_category == 'museum' and poi_list and _museum_venue_name
-                and _LAST_VENUE_PREFLIGHT and not _LAST_VENUE_PREFLIGHT.get('error')
-                and not _LAST_VENUE_PREFLIGHT.get('skipped')):
+                and _J._LAST_VENUE_PREFLIGHT and not _J._LAST_VENUE_PREFLIGHT.get('error')
+                and not _J._LAST_VENUE_PREFLIGHT.get('skipped')):
             try:
                 import venue_preflight as _vpf
                 # Did our OWN sources already supply hours/admission anywhere?
                 _have_practicals = any(p.get('operational_details') for p in poi_list)
                 if not _have_practicals:
-                    _planb = _vpf.plan_b_opening_practicals(_LAST_VENUE_PREFLIGHT)
+                    _planb = _vpf.plan_b_opening_practicals(_J._LAST_VENUE_PREFLIGHT)
                     if _planb.get('speak'):
                         # Attach the SPOKEN sentence to Stop 1 (the D611 opening
                         # section lives at the start of Stop 1). The source note is
@@ -13249,7 +13252,7 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
                         # facts gate recognises these as SOURCED claims (D538).
                         _pf_src_urls = []
                         for _f in ('hours', 'admission'):
-                            for _u in (_LAST_VENUE_PREFLIGHT.get('sources', {}) or {}).get(_f, []) or []:
+                            for _u in (_J._LAST_VENUE_PREFLIGHT.get('sources', {}) or {}).get(_f, []) or []:
                                 if _u not in _pf_src_urls:
                                     _pf_src_urls.append(_u)
                         if _pf_src_urls:
@@ -13581,7 +13584,7 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
             _partial_body += "[Description not generated — cost ceiling reached]\n\n"
         _partial_tour = _partial_header + _partial_body
         # Expose cost for metering (cost was spent even though tour is partial)
-        _LAST_GENERATION_COST = {
+        _J._LAST_GENERATION_COST = {
             "total_cost": total_cost,
             "total_tokens": total_tokens,
             "cache_hit": False,
@@ -13752,7 +13755,7 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
                     # knew what made the stop interesting and threw it away.
                     if _c.get('why'):
                         _new['_replenish_why'] = _c['why']
-                        _DIRECT_SNIPPETS_PER_STOP.setdefault(_cn, []).append({
+                        _J._DIRECT_SNIPPETS_PER_STOP.setdefault(_cn, []).append({
                             'snippet': f"{_cn}: {_c['why']}", 'title': _cn,
                             'link': '', 'source': 'replenishment_rationale'})
                     poi_list.append(_new)
@@ -13787,7 +13790,7 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
                         print(f"  [D545] no lore for '{_ln[:40]}': {_lr.get('reason','')[:60]}")
                         continue
                     _hi = sum(1 for f in _lr['facts'] if f.get('confidence') == 'high')
-                    _DIRECT_SNIPPETS_PER_STOP.setdefault(_ln, []).extend(
+                    _J._DIRECT_SNIPPETS_PER_STOP.setdefault(_ln, []).extend(
                         facts_as_snippets(_lr, _ln))
                     # [D548] Also keep them ON THE POI, so Phase 5 can require one
                     # be told. As snippets alone they compete with search results
@@ -13871,7 +13874,7 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
 
             def _gp_on_add(_poi):
                 if _poi.get('_replenish_why'):
-                    _DIRECT_SNIPPETS_PER_STOP.setdefault(_poi['name'], []).append({
+                    _J._DIRECT_SNIPPETS_PER_STOP.setdefault(_poi['name'], []).append({
                         'snippet': f"{_poi['name']}: {_poi['_replenish_why']}",
                         'title': _poi['name'], 'link': '',
                         'source': 'replenishment_rationale'})
@@ -13892,7 +13895,7 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
                     print(f"  [D556] no lore for '{_gn[:40]}': {_gr.get('reason','')[:50]}")
                     continue
                 _gp['_lore'] = _gr['facts']
-                _DIRECT_SNIPPETS_PER_STOP.setdefault(_gn, []).extend(
+                _J._DIRECT_SNIPPETS_PER_STOP.setdefault(_gn, []).extend(
                     facts_as_snippets(_gr, _gn))
                 _hi = sum(1 for f in _gr['facts'] if f.get('confidence') == 'high')
                 print(f"  [D556] +{len(_gr['facts'])} story fact(s) for '{_gn[:40]}' "
@@ -14547,9 +14550,9 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
                             # provide verified reference material. The corpus gate must NOT
                             # override them — doing so suppresses specifics the user injected.
                             _has_direct_snippets = (
-                                _DIRECT_SNIPPETS_PER_STOP
-                                and (_DIRECT_SNIPPETS_PER_STOP.get(_poi_name)
-                                     or _DIRECT_SNIPPETS_PER_STOP.get(f"__stop_{_poi_names.index(_poi_name)}__", []))
+                                _J._DIRECT_SNIPPETS_PER_STOP
+                                and (_J._DIRECT_SNIPPETS_PER_STOP.get(_poi_name)
+                                     or _J._DIRECT_SNIPPETS_PER_STOP.get(f"__stop_{_poi_names.index(_poi_name)}__", []))
                             )
                             if _has_direct_snippets:
                                 # Treat as PASSED — direct snippets ARE the verified material
@@ -14739,7 +14742,7 @@ Exempt: navigation directions ("Turn left", "Continue past").
                 _partial_body += f"Directions: {_pp['directions']}\n"
             _partial_body += "[Description not generated — cost ceiling reached]\n\n"
         _partial_tour = _partial_header + _partial_body
-        _LAST_GENERATION_COST = {
+        _J._LAST_GENERATION_COST = {
             "total_cost": total_cost,
             "total_tokens": total_tokens,
             "cache_hit": False,
@@ -14910,7 +14913,7 @@ Exempt: navigation directions ("Turn left", "Continue past").
     # facts never reached the prompt. This block fixes that gap.
     _local410_chain_log = {}  # stop_name → {queries_issued, serp_results, snippets_injected}
     if (_storied_mode and tour_category == 'museum'
-            and not _DIRECT_SNIPPETS_PER_STOP
+            and not _J._DIRECT_SNIPPETS_PER_STOP
             and os.environ.get('GENERATION_TIER', 'plus') != 'free'):
         try:
             from work_story_searcher import search_stories_for_stop, synthesize_queries
@@ -15563,7 +15566,7 @@ Exempt: navigation directions ("Turn left", "Continue past").
 
             # Populate the module-level dict so per-stop injection picks it up
             if _local410_snippets:
-                _DIRECT_SNIPPETS_PER_STOP = _local410_snippets
+                _J._DIRECT_SNIPPETS_PER_STOP = _local410_snippets
                 _total_raw = sum(len(v) for k, v in _local410_snippets.items() if not k.startswith('__'))
                 print(f"\n  [LOCAL-410] SERP search complete: {_local410_total_queries} queries, "
                       f"{_local410_total_results} results, "
@@ -15615,8 +15618,8 @@ Exempt: navigation directions ("Turn left", "Continue past").
             _kf_filled = 0
             for _kf_idx, _kf_poi in enumerate(poi_list):
                 _kf_name = _kf_poi.get('name', '')
-                _kf_have = (_DIRECT_SNIPPETS_PER_STOP.get(_kf_name, [])
-                            or _DIRECT_SNIPPETS_PER_STOP.get(f"__stop_{_kf_idx}__", []))
+                _kf_have = (_J._DIRECT_SNIPPETS_PER_STOP.get(_kf_name, [])
+                            or _J._DIRECT_SNIPPETS_PER_STOP.get(f"__stop_{_kf_idx}__", []))
                 # [D534] The trigger is ABSENCE OF OBJECT-LEVEL MATERIAL, not a low
                 # snippet count. Measured on the v3 run: all three stops had 7-8
                 # snippets, so the old `< 2` test never fired — and all three were
@@ -15651,7 +15654,7 @@ Exempt: navigation directions ("Turn left", "Continue past").
                     continue
                 _kf_snips = facts_as_snippets(_kf_res, _kf_name)
                 _kf_high = sum(1 for f in _kf_res['facts'] if f['confidence'] == 'high')
-                _DIRECT_SNIPPETS_PER_STOP.setdefault(_kf_name, []).extend(_kf_snips)
+                _J._DIRECT_SNIPPETS_PER_STOP.setdefault(_kf_name, []).extend(_kf_snips)
                 # [D534] NOT `confirmation = 'knowledge'`. That flag means "the
                 # venue's own listing does not name this WORK", and D532's option-C
                 # disclosure says so aloud. Setting it here conflated two different
@@ -15736,9 +15739,9 @@ Exempt: navigation directions ("Turn left", "Continue past").
 
                     # Gather existing snippets for this stop (from LOCAL-410)
                     _sf_snippets = []
-                    if _DIRECT_SNIPPETS_PER_STOP:
-                        _sf_snippets = (_DIRECT_SNIPPETS_PER_STOP.get(_sf_name, [])
-                                        or _DIRECT_SNIPPETS_PER_STOP.get(f"__stop_{_sf_idx}__", []))
+                    if _J._DIRECT_SNIPPETS_PER_STOP:
+                        _sf_snippets = (_J._DIRECT_SNIPPETS_PER_STOP.get(_sf_name, [])
+                                        or _J._DIRECT_SNIPPETS_PER_STOP.get(f"__stop_{_sf_idx}__", []))
 
                     _sf_stop_entries.append({
                         'name': _sf_name,
@@ -15791,12 +15794,12 @@ Exempt: navigation directions ("Turn left", "Continue past").
                                 'tier': 'tier1',
                                 '_story_first': True,
                             }
-                            if _sf_name in _DIRECT_SNIPPETS_PER_STOP:
-                                _DIRECT_SNIPPETS_PER_STOP[_sf_name].insert(0, _sf_snippet)
-                            elif f"__stop_{_sf_idx}__" in _DIRECT_SNIPPETS_PER_STOP:
-                                _DIRECT_SNIPPETS_PER_STOP[f"__stop_{_sf_idx}__"].insert(0, _sf_snippet)
+                            if _sf_name in _J._DIRECT_SNIPPETS_PER_STOP:
+                                _J._DIRECT_SNIPPETS_PER_STOP[_sf_name].insert(0, _sf_snippet)
+                            elif f"__stop_{_sf_idx}__" in _J._DIRECT_SNIPPETS_PER_STOP:
+                                _J._DIRECT_SNIPPETS_PER_STOP[f"__stop_{_sf_idx}__"].insert(0, _sf_snippet)
                             else:
-                                _DIRECT_SNIPPETS_PER_STOP[_sf_name] = [_sf_snippet]
+                                _J._DIRECT_SNIPPETS_PER_STOP[_sf_name] = [_sf_snippet]
 
                 _verified_total = sum(r.get('verified_count', 0) for r in _local440_results.values())
                 print(f"\n  [LOCAL-445] Story-first complete: "
@@ -16755,16 +16758,16 @@ MANDATORY INCLUSION — work this surprising detail into the description natural
         _all_snippet_text = ''  # [LOCAL-417] initialized here so required-names gate can check it
         _417_suppressed_beat_names = set()  # [LOCAL-417] names suppressed from required-names (no snippet evidence)
         _prompt_size_before_snippets = len(description_prompt)  # [LOCAL-411] track pre-snippet size
-        if _DIRECT_SNIPPETS_PER_STOP and poi_name:
-            _stop_snippets = _DIRECT_SNIPPETS_PER_STOP.get(poi_name, [])
+        if _J._DIRECT_SNIPPETS_PER_STOP and poi_name:
+            _stop_snippets = _J._DIRECT_SNIPPETS_PER_STOP.get(poi_name, [])
             # [LOCAL-403] Fallback: try index-based lookup (key = "__stop_N__")
             if not _stop_snippets:
-                _stop_snippets = _DIRECT_SNIPPETS_PER_STOP.get(f"__stop_{idx}__", [])
+                _stop_snippets = _J._DIRECT_SNIPPETS_PER_STOP.get(f"__stop_{idx}__", [])
             # [LOCAL-403] Fallback: normalized fuzzy match on keys
             if not _stop_snippets:
                 from story_miner import _normalize
                 _norm_poi = _normalize(poi_name)
-                for _skey, _sval in _DIRECT_SNIPPETS_PER_STOP.items():
+                for _skey, _sval in _J._DIRECT_SNIPPETS_PER_STOP.items():
                     if _skey.startswith("__stop_"):
                         continue
                     if _normalize(_skey) == _norm_poi:
@@ -17204,9 +17207,9 @@ DO NOT include directions to the next stop - these will be added separately.
         # ordinary grounding rules; this only stops a gate from silencing sources
         # that landed after it ran.
         _d533_material = []
-        if _DIRECT_SNIPPETS_PER_STOP and poi_name:
-            _d533_material = (_DIRECT_SNIPPETS_PER_STOP.get(poi_name, [])
-                              or _DIRECT_SNIPPETS_PER_STOP.get(f"__stop_{idx}__", []))
+        if _J._DIRECT_SNIPPETS_PER_STOP and poi_name:
+            _d533_material = (_J._DIRECT_SNIPPETS_PER_STOP.get(poi_name, [])
+                              or _J._DIRECT_SNIPPETS_PER_STOP.get(f"__stop_{idx}__", []))
         if _d533_material and (poi_name in _corpus_gate_empty_stops
                                or poi_name in _corpus_gate_shortened_stops):
             print(f"  [D533] Stop {stop_num} corpus-gate restriction LIFTED — "
@@ -17446,7 +17449,7 @@ NARRATIVE TONE: Write this description with a {_persona_tone} tone — emphasize
         # writing prose. The denylist cannot catch every rephrasing of "I can't do
         # what you asked"; the fix is to never ask for what we didn't provide.
         _facts_first_block = ""
-        if _DIRECT_SNIPPETS_PER_STOP and tour_category == 'museum':
+        if _J._DIRECT_SNIPPETS_PER_STOP and tour_category == 'museum':
             _ff_parts = []
             # Required names from story beats — ONLY those with snippet evidence
             if _storied_mode and _story_beats_per_stop and idx < len(_story_beats_per_stop):
@@ -17709,7 +17712,7 @@ Write the story FIRST, then add physical description if space allows.
         # [LOCAL-408] Dump the literal prompt for stop 1 to a file for diagnosis.
         # This answers: do the specifics reach the prompt at all?
         # Only dump when _DIRECT_SNIPPETS_PER_STOP is populated (MFA tour, not Palais control).
-        if stop_num == 1 and _DIRECT_SNIPPETS_PER_STOP:
+        if stop_num == 1 and _J._DIRECT_SNIPPETS_PER_STOP:
             _prompt_dump_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'prompt_dump_stop1.txt')
             try:
                 with open(_prompt_dump_path, 'w', encoding='utf-8') as _pdf:
@@ -17736,7 +17739,7 @@ Write the story FIRST, then add physical description if space allows.
                         _pdf.write("  (none extracted — snippets may be empty or regex missed)\n")
                     _pdf.write(f"\n--- SNIPPET INJECTION STATUS ---\n")
                     _pdf.write(f"_local402_snippets_injected: {_local402_snippets_injected}\n")
-                    _pdf.write(f"_DIRECT_SNIPPETS_PER_STOP keys: {list(_DIRECT_SNIPPETS_PER_STOP.keys()) if _DIRECT_SNIPPETS_PER_STOP else 'None/empty'}\n")
+                    _pdf.write(f"_DIRECT_SNIPPETS_PER_STOP keys: {list(_J._DIRECT_SNIPPETS_PER_STOP.keys()) if _J._DIRECT_SNIPPETS_PER_STOP else 'None/empty'}\n")
                 print(f"  [LOCAL-408] Prompt dump written to: {_prompt_dump_path}")
             except Exception as _dump_err:
                 print(f"  [LOCAL-408] Prompt dump FAILED: {_dump_err}")
@@ -18869,8 +18872,8 @@ Write the story FIRST, then add physical description if space allows.
                         print(f"    FAIL: {_fs['stop_name']}: story_units={_fs['story_unit_count']}")
                         for _ff in _fs['failures']:
                             print(f"      → {_ff}")
-                    _LAST_CLEAN_FAIL_EVIDENCE.clear()
-                    _LAST_CLEAN_FAIL_EVIDENCE.update({
+                    _J._LAST_CLEAN_FAIL_EVIDENCE.clear()
+                    _J._LAST_CLEAN_FAIL_EVIDENCE.update({
                         "error_type": "story_gate_failed",
                         "failed_stops": _l431_failed_stops,
                         "reason": (
@@ -18879,7 +18882,7 @@ Write the story FIRST, then add physical description if space allows.
                             "with a named person, real actions, and an arc (D394)."
                         ),
                     })
-                    _LAST_GENERATION_COST = {
+                    _J._LAST_GENERATION_COST = {
                         "total_cost": 0.0,
                         "total_tokens": 0,
                         "cache_hit": False,
@@ -18919,10 +18922,10 @@ Write the story FIRST, then add physical description if space allows.
 
                 # Get the snippets that were used to generate this stop
                 _sv_snippets = []
-                if _DIRECT_SNIPPETS_PER_STOP:
-                    _sv_snippets = _DIRECT_SNIPPETS_PER_STOP.get(_sv_name, [])
+                if _J._DIRECT_SNIPPETS_PER_STOP:
+                    _sv_snippets = _J._DIRECT_SNIPPETS_PER_STOP.get(_sv_name, [])
                     if not _sv_snippets:
-                        _sv_snippets = _DIRECT_SNIPPETS_PER_STOP.get(f"__stop_{_sv_i}__", [])
+                        _sv_snippets = _J._DIRECT_SNIPPETS_PER_STOP.get(f"__stop_{_sv_i}__", [])
 
                 # [LOCAL-427/428] Inject venue page text as a verification snippet when
                 # the source is the venue itself (not a third-party). Decision logic
@@ -19063,13 +19066,13 @@ Write the story FIRST, then add physical description if space allows.
                 _partial_body += "\n[Description not generated — cost ceiling reached]\n"
             _partial_body += "\n"
         _partial_tour = _partial_header + _partial_body
-        _LAST_GENERATION_COST = {
+        _J._LAST_GENERATION_COST = {
             "total_cost": total_cost,
             "total_tokens": total_tokens,
             "cache_hit": False,
             "breakdown": {"llm": total_cost, "tts": 0.0, "search": 0.0},
         }
-        _LAST_POI_LIST = list(poi_list)
+        _J._LAST_POI_LIST = list(poi_list)
         if output_file:
             with open(output_file, "w", encoding="utf-8") as _pf:
                 _pf.write(_partial_tour)
@@ -19964,7 +19967,7 @@ REWRITE RULES (all mandatory):
         _org_corpus = getattr(_exhibition_checklist_result, 'page_text', '') or ''
         try:
             _org_extra = []
-            for _osn in (_DIRECT_SNIPPETS_PER_STOP or {}).values():
+            for _osn in (_J._DIRECT_SNIPPETS_PER_STOP or {}).values():
                 for _os in (_osn or []):
                     if isinstance(_os, dict):
                         _org_extra.append(f"{_os.get('title','')} {_os.get('snippet','')}")
@@ -20092,7 +20095,7 @@ REWRITE RULES (all mandatory):
         print(f"\n  [LOCAL-402] PHASE 5.161: Temporal coherence gate (impossible relations)...")
         try:
             from temporal_coherence_gate import apply_temporal_coherence_gate
-            _tcg_snippets = _DIRECT_SNIPPETS_PER_STOP if _DIRECT_SNIPPETS_PER_STOP else None
+            _tcg_snippets = _J._DIRECT_SNIPPETS_PER_STOP if _J._DIRECT_SNIPPETS_PER_STOP else None
             _tcg_stats = apply_temporal_coherence_gate(
                 poi_list,
                 snippets_per_stop=_tcg_snippets,
@@ -22948,12 +22951,11 @@ RULES:
     # the stop-pool orchestrator can build the honest shortfall sentence from
     # measured facts. Computed from the FINAL (re-grouped, trimmed) poi_list.
     if _exhibition_stops_source == 'site_exhibition':
-        global _LAST_SITE_FIRST_COUNTS
         _sf_on_view_shows = sum(
             1 for _p in poi_list
             if (_p.get('_sf_kind') == 'exhibition'
                 and _p.get('_sf_status') == 'on_view'))
-        _LAST_SITE_FIRST_COUNTS = {
+        _J._LAST_SITE_FIRST_COUNTS = {
             'exhibitions_on_view': _sf_on_view_shows,
             'delivered_stops': len(poi_list),
             'requested_stops': (_requested_stop_count_original or total_stops),
@@ -22961,7 +22963,7 @@ RULES:
         print(f"  [LOCAL-600] site-first counts: "
               f"exhibitions_on_view={_sf_on_view_shows} "
               f"delivered={len(poi_list)} "
-              f"requested={_LAST_SITE_FIRST_COUNTS['requested_stops']}")
+              f"requested={_J._LAST_SITE_FIRST_COUNTS['requested_stops']}")
 
     # [LOCAL-292] Rebuild tour title with correct stop count if stops were removed
     if _l292_failed_stops and poi_list:
@@ -23018,14 +23020,13 @@ RULES:
     # anything that reduced the selection and reports OK on a tour that shrank —
     # it said "OK (1 selected == 1 delivered)" on a 3-stop request. This compares
     # against what the LISTENER asked for, which is the only number they know.
-    global _LAST_STOP_COUNT_NOTICE
-    _LAST_STOP_COUNT_NOTICE = {}
+    _J._LAST_STOP_COUNT_NOTICE = {}
     try:
         _d530_requested = int(_requested_stops)
     except (NameError, TypeError, ValueError):
         _d530_requested = None
     if _d530_requested and len(poi_list) != _d530_requested:
-        _LAST_STOP_COUNT_NOTICE = {
+        _J._LAST_STOP_COUNT_NOTICE = {
             'requested': _d530_requested,
             'delivered': len(poi_list),
             'source': _exhibition_stops_source,
@@ -24500,7 +24501,7 @@ RULES:
                 # evidence. The ORIGINAL stop body is always evidence; these only
                 # ADD support, never remove it.
                 _editor_passages = {}
-                for _k, _snips in (_DIRECT_SNIPPETS_PER_STOP or {}).items():
+                for _k, _snips in (_J._DIRECT_SNIPPETS_PER_STOP or {}).items():
                     _texts = []
                     for _s in (_snips or []):
                         if isinstance(_s, dict):
@@ -24677,7 +24678,7 @@ RULES:
         except Exception:
             pass
         _prov_pool = _SourcePool(
-            snippets_per_stop=(_DIRECT_SNIPPETS_PER_STOP or {}),
+            snippets_per_stop=(_J._DIRECT_SNIPPETS_PER_STOP or {}),
             grounded_supports=None,          # per-sentence grounded supports are not
                                              # retained to this point in the pipeline
             provenance_names=_prov_names,
@@ -24722,7 +24723,7 @@ RULES:
                 import stop_pool_store as _pool
                 _pool_sources = None
                 try:
-                    _pool_sources = (_LAST_OVERVIEW_SOURCES or None)
+                    _pool_sources = (_J._LAST_OVERVIEW_SOURCES or None)
                 except Exception:
                     _pool_sources = None
                 _pool_qid = None
@@ -24877,13 +24878,13 @@ RULES:
     print(complete_tour[:preview_length] + "...\n")
     
     # [B1b] Expose poi_list at module level for stop_metrics verified-flag mapping
-    _LAST_POI_LIST = list(poi_list)
+    _J._LAST_POI_LIST = list(poi_list)
 
     # [LOCAL-60] Expose generation cost at module level for cost metering
     # [LOCAL-533] Grounding is a SEPARATE billing channel (per-request Google
     # Search), added here so the one record a caller reads carries both channels
     # and their sum. Values computed above where the two cost lines are printed.
-    _LAST_GENERATION_COST = {
+    _J._LAST_GENERATION_COST = {
         "total_cost": total_cost,
         "total_tokens": total_tokens,
         "cache_hit": False,
@@ -24902,7 +24903,7 @@ RULES:
     # caller reads, so a run driver (e.g. run_round9) can report sourced/unsourced
     # without re-parsing the log. None when the auditor was unavailable.
     if _provenance_audit is not None:
-        _LAST_GENERATION_COST["provenance"] = _provenance_audit["counts"]
+        _J._LAST_GENERATION_COST["provenance"] = _provenance_audit["counts"]
 
     # [LOCAL-540] Record the score BEFORE and AFTER the one-shot retry directly in
     # the generation record, so the defect is visible afterwards rather than
@@ -24910,10 +24911,9 @@ RULES:
     # also break out the retry cost on its own so a caller can report the run both
     # with and without the retry. The full before/after record is also exposed at
     # module level as _LAST_SCORE_RECORD.
-    global _LAST_SCORE_RECORD
     if _score_record is not None:
         _retry_c = _score_record.get('retry_cost') or {}
-        _LAST_GENERATION_COST["score"] = {
+        _J._LAST_GENERATION_COST["score"] = {
             "defects_before": _score_record.get('defects_before', {}),
             "defects_after": _score_record.get('defects_after', {}),
             "removed": _score_record.get('removed', []),
@@ -24931,9 +24931,9 @@ RULES:
                 "total_tokens": total_tokens - int(_retry_c.get('total_tokens', 0) or 0),
             },
         }
-        _LAST_SCORE_RECORD = _score_record
+        _J._LAST_SCORE_RECORD = _score_record
     else:
-        _LAST_SCORE_RECORD = None
+        _J._LAST_SCORE_RECORD = None
 
     # -------- [LOCAL-410] Post-generation chain instrumentation --------
     # Print the full chain: serp_results → snippets_injected → beats_in_delivered_text
@@ -24945,7 +24945,7 @@ RULES:
         for _cl_name, _cl_data in _local410_chain_log.items():
             # Count how many snippet-sourced facts appear in the delivered text
             _beats_found = 0
-            _cl_snippets = _DIRECT_SNIPPETS_PER_STOP.get(_cl_name, []) if _DIRECT_SNIPPETS_PER_STOP else []
+            _cl_snippets = _J._DIRECT_SNIPPETS_PER_STOP.get(_cl_name, []) if _J._DIRECT_SNIPPETS_PER_STOP else []
             for _snip in _cl_snippets[:12]:
                 _snip_text = _snip.get('snippet', '')
                 # Check if key phrases from the snippet appear in the tour
@@ -24966,7 +24966,7 @@ RULES:
         print(f"{'=' * 72}")
 
     # Reset module-level snippets after use (don't pollute next generation)
-    _DIRECT_SNIPPETS_PER_STOP = {}
+    _J._DIRECT_SNIPPETS_PER_STOP = {}
 
     # [LOCAL-445-B] Final timing summary
     _phase_timer.start('verification')  # End packing, start verification marker

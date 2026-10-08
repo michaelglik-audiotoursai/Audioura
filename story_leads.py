@@ -106,8 +106,17 @@ YEAR | what happened, in one clause
 # when the response is parsed. Pricing lives in cost_rates; this module only
 # counts. A caller (generate_tour_text) resets the counters at the start of a
 # generation and reads them at the end.
-_GROUNDING_REQUESTS = 0
-_GROUNDING_QUERIES = 0
+# [LOCAL-631] These two grounding counters are PER-JOB: generate_tour_text
+# resets them at the start of a generation and reads them at the end (they feed
+# the cache-path _LAST_GENERATION_COST grounding line). As plain module globals
+# they were shared by every concurrent job thread, so one tour's grounded-query
+# count leaked into another's cost ledger. They are now job-scoped via contextvars
+# (fresh per service job-thread). Public API (reset/get) is unchanged.
+import job_scoped_state as _jss
+_J = _jss.attach_to_module(__name__, {
+    "_GROUNDING_REQUESTS": lambda: 0,
+    "_GROUNDING_QUERIES": lambda: 0,
+})
 
 # [LOCAL-613] Per-task hard spend cap for ISOLATED test runs.
 # ----------------------------------------------------------------------------
@@ -157,33 +166,32 @@ def _enforce_grounding_cap() -> None:
 def reset_grounding_requests() -> None:
     """Zero the grounded-request AND grounded-query counters. Call at the start
     of a generation. (Name kept for LOCAL-533 callers; now resets both.)"""
-    global _GROUNDING_REQUESTS, _GROUNDING_QUERIES
-    _GROUNDING_REQUESTS = 0
-    _GROUNDING_QUERIES = 0
+    # [LOCAL-631] job-scoped; no `global` — these isolate per service job-thread.
+    _J._GROUNDING_REQUESTS = 0
+    _J._GROUNDING_QUERIES = 0
 
 
 def get_grounding_requests() -> int:
     """Return the number of grounded requests issued since the last reset."""
-    return _GROUNDING_REQUESTS
+    return _J._GROUNDING_REQUESTS
 
 
 def get_grounding_queries() -> int:
     """[LOCAL-594] Return the number of Google search queries (webSearchQueries)
     issued across all grounded responses since the last reset. This is the unit
     Google's invoice bills ("Generate content search query gemini 3 paid")."""
-    return _GROUNDING_QUERIES
+    return _J._GROUNDING_QUERIES
 
 
 def _count_grounding_request() -> None:
     """Record one grounded request actually issued. Called only from the two
     grounded-request sites, guarded by grounded=True and a present API key."""
-    global _GROUNDING_REQUESTS
     # [LOCAL-613] Last chance to stop BEFORE this grounded request is issued: if
     # the task's combined spend cap is already reached, raise now so the query
     # that would cross the line is never sent. No-op unless a harness installed a
     # cap guard.
     _enforce_grounding_cap()
-    _GROUNDING_REQUESTS += 1
+    _J._GROUNDING_REQUESTS += 1  # [LOCAL-631] job-scoped
 
 
 def _raise_if_grounding_forbidden(what: str) -> None:
@@ -247,9 +255,9 @@ def _count_grounding_queries(web_search_queries) -> None:
     request that returned no `webSearchQueries` (e.g. the model answered without
     searching) contributes 0 queries and so costs nothing on this channel — which
     is exactly what Google bills."""
-    global _GROUNDING_QUERIES
+    # [LOCAL-631] job-scoped; no `global`.
     try:
-        _GROUNDING_QUERIES += len(web_search_queries or [])
+        _J._GROUNDING_QUERIES += len(web_search_queries or [])
     except TypeError:
         pass
     # [LOCAL-613] The queries just issued are now on the counter, so the combined
