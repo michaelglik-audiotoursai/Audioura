@@ -742,16 +742,182 @@ Be strict about KNOWN_ENOUGH — only common-knowledge items qualify.
 # STAGE 3 — SUPPLY THE GLOSS (corpus → model+citation → degrade)
 # ═══════════════════════════════════════════════════════════════════════════════
 
-def _search_corpus_for_fact(entity: str, corpus_passages: List[str]) -> Optional[str]:
+# [LOCAL-624] A gloss must describe the entity's own TYPE. The 2026-10-08 run of
+# Statens Museum for Kunst (tour 470, Stop 1) shipped
+#
+#   "...commissioned Carl Bloch, an oil-on-canvas painting by Bloch, to create
+#    a painting..."
+#   "Bloch, an intensified version of Marstrand's painting, reached a pivotal
+#    moment in his career..."
+#
+# The PERSON Carl Bloch was given an appositive that describes the WORK. The
+# mechanism is Stage 3a corpus-first (_search_corpus_for_fact): the only corpus
+# passage for the stop IS the painting's own record, the artist's name appears
+# inside it ("...painting by Carl Bloch, created in 1866"), so the sentence
+# matched for the PERSON is a sentence ABOUT THE WORK. Composed into an
+# appositive and spliced after the name, it reads as nonsense. None of the five
+# mechanical guards (_guard_spliced_sentence/doubled_name/trailing_preposition/
+# length/host_duplication) check entity-type vs gloss-type, so it passed clean.
+#
+# These phrases, in a gloss attached to a PERSON, mean the gloss is describing a
+# work of art, not the human. "version of" catches the second defect
+# ("an intensified version of Marstrand's painting"); the medium/form words
+# catch the first.
+_WORK_DESCRIPTOR_IN_PERSON_GLOSS = re.compile(
+    r'\b(?:'
+    r'painting|paintings|canvas|oil[- ]on[- ]canvas|oil\s+on\s+canvas|'
+    r'tempera|fresco|frescoes|watercolou?r|gouache|'
+    r'sculpture|sculptures|statue|bronze|marble\s+(?:statue|bust|relief)|'
+    r'engraving|etching|lithograph|woodcut|drawing|print|impression|'
+    r'altarpiece|triptych|diptych|panel\s+painting|'
+    r'portrait|landscape\s+painting|still\s+life|'
+    r'version\s+of|copy\s+of|reproduction\s+of|rendering\s+of|depiction\s+of|'
+    r'artwork|art\s+work'
+    r')\b',
+    re.IGNORECASE,
+)
+
+# "a work by X" / "a painting by X" / "an oil-on-canvas by X" — the gloss opens by
+# calling the entity a WORK made by someone else. A person is never "a work by".
+_WORK_BY_OPENER = re.compile(
+    r'^\s*(?:a|an|the)\s+[\w\s-]{0,40}?\bby\b', re.IGNORECASE)
+
+# The appositive's HEAD noun is a work form: "a/an/the [modifiers] <work-noun>"
+# where the work-noun is the head of the phrase — it is followed by a
+# preposition, comma, period, apostrophe-s, conjunction, or the end of string,
+# NOT by a further content noun. This is what distinguishes
+#   "an oil-on-canvas painting"           (work: head is "painting")  → fires
+#   "a bronze sculpture"                  (work: head is "sculpture") → fires
+# from
+#   "a master of landscape painting"      (person: "painting" is governed by
+#                                           "of", not the head)       → silent
+#   "a figure in the School of painting"  (person)                    → silent
+_WORK_HEAD = (
+    r'(?:painting|canvas|sculpture|statue|bronze|engraving|etching|'
+    r'lithograph|woodcut|fresco|watercolou?r|gouache|tempera|altarpiece|'
+    r'triptych|diptych|portrait|still\s+life|artwork)')
+_WORK_HEAD_NOUN = re.compile(
+    r'^\s*(?:a|an|the)\s+'
+    r'(?:[\w-]+(?:\s+[\w-]+){0,4}\s+)?'   # up to 5 modifier tokens
+    r'(?:oil[- ]on[- ]canvas\s+)?'
+    + _WORK_HEAD +
+    r"(?:s)?\b",
+    re.IGNORECASE)
+
+# A person-role noun — if present, the gloss describes the HUMAN, and any
+# art-form word in it is a role phrase ("a master of landscape painting"), not
+# the head. Vetoes _WORK_HEAD_NOUN so legitimate artist glosses are never
+# blocked. The whole point of LOCAL-624 is to type-match, and over-blocking a
+# real artist gloss is the same family of damage as the splice itself.
+_PERSON_ROLE_NOUN = re.compile(
+    r'\b(?:painter|sculptor|artist|engraver|draughtsman|draftsman|printmaker|'
+    r'master|pioneer|figure|exponent|practitioner|proponent|student|pupil|'
+    r'teacher|professor|founder|member|leader|champion|portraitist|'
+    r'muralist|illustrator|designer|architect|photographer|craftsman|'
+    r'merchant|collector|patron|dealer|historian|critic|poet|writer|author|'
+    r'composer|musician|king|queen|duke|count|baron|monk|priest|saint)\b',
+    re.IGNORECASE)
+
+# "a version of ...", "a copy of ...", "a reproduction/rendering/depiction of"
+_WORK_VERSION_OPENER = re.compile(
+    r'^\s*(?:a|an|the)\s+(?:[\w-]+\s+){0,3}'
+    r'(?:version|copy|reproduction|rendering|variant|replica)\s+of\b',
+    re.IGNORECASE)
+
+
+def _is_person_category(category: Optional[str]) -> bool:
+    """True when the flagged entity is a human being."""
+    return (category or '').strip().lower() == 'person'
+
+
+def _gloss_describes_a_work(gloss: str) -> bool:
+    """[LOCAL-624] Does this gloss describe a work of art rather than a person?
+
+    Used only to validate glosses attached to PERSON entities. A person's gloss
+    may legitimately NAME an art form in a role phrase — "a master of landscape
+    painting", "a prominent figure in the Hudson River School of painting" — so
+    a bare mention of "painting"/"sculpture" is NOT sufficient. The defect is
+    the appositive BEING a work: the work-noun is the HEAD of the phrase
+    ("an oil-on-canvas painting", "a bronze sculpture", "a striking marble
+    statue"), or the phrase opens as "a version/copy of ..." or "a <thing> by
+    <someone>". Those three shapes never describe a human; the role phrases do.
+    """
+    g = (gloss or '').strip()
+    if not g:
+        return False
+    # A person-role noun anywhere means the gloss describes the HUMAN, even when
+    # it also names an art form in a role phrase: "a master of landscape
+    # painting", "a pioneer of abstract sculpture", "a figure in the Hudson
+    # River School of painting". These are never a work.
+    if _PERSON_ROLE_NOUN.search(g):
+        return False
+    # 1. The appositive's HEAD noun is a work form: "a/an/the [modifiers]
+    #    <work-noun>" with the work-noun ending the head (followed by a
+    #    preposition, comma, period, or end — not by another content noun).
+    if _WORK_HEAD_NOUN.search(g):
+        return True
+    # 2. "a version of ...", "a copy of ...", "a reproduction of ..." — only a
+    #    work is a version/copy of something.
+    if _WORK_VERSION_OPENER.search(g):
+        return True
+    # 3. "a <thing> by <someone>" where <thing> is a work form — the gloss frames
+    #    the entity as an object authored by another ("an oil-on-canvas painting
+    #    by Bloch").
+    if _WORK_BY_OPENER.search(g) and _WORK_DESCRIPTOR_IN_PERSON_GLOSS.search(g):
+        return True
+    return False
+
+
+def _fact_is_about_a_work_not_the_person(entity: str, fact: str) -> bool:
+    """[LOCAL-624] A corpus sentence that is ABOUT A WORK, not the person named.
+
+    The signature is the painting's own record: the sentence predicates a
+    work-noun ("is an oil-on-canvas painting", "is a bronze sculpture") whose
+    *subject* is the work and in which the person appears only as the author
+    ("...by Carl Bloch"). We detect it by: a work-descriptor is present AND the
+    entity's name is preceded by an authorship preposition ("by"/"after") rather
+    than being the grammatical subject.
+    """
+    f = (fact or '').strip()
+    if not f or not _WORK_DESCRIPTOR_IN_PERSON_GLOSS.search(f):
+        return False
+    el = entity.lower()
+    fl = f.lower()
+    pos = fl.find(el)
+    if pos < 0:
+        return False
+    # If the entity is introduced as "by <entity>" / "after <entity>" it is the
+    # author of the work the sentence is really about — not its subject.
+    preceding = fl[:pos].rstrip()
+    if re.search(r'\b(?:by|after|from)\s*$', preceding):
+        return True
+    # Or the sentence opens with a work title and predicates a work-noun before
+    # the person is reached ("X is an oil-on-canvas painting by <entity>").
+    before_person = fl[:pos]
+    if re.search(r'\bis\s+(?:a|an|the)\b', before_person) and \
+            _WORK_DESCRIPTOR_IN_PERSON_GLOSS.search(before_person + ' '):
+        return True
+    return False
+
+
+def _search_corpus_for_fact(entity: str, corpus_passages: List[str],
+                            category: Optional[str] = None) -> Optional[str]:
     """Try to find a factual statement about entity in the corpus passages.
 
     Returns a raw fact string if found (will be composed into a clause later),
     or None if no corpus fact is available.
+
+    [LOCAL-624] When the entity is a PERSON, a matched sentence that is actually
+    about a WORK (the person appears only as its author) is rejected: it would
+    become a work-description appositive spliced onto a human name. Better to
+    fall through to the model/degrade path than to ship "Carl Bloch, an
+    oil-on-canvas painting by Bloch".
     """
     if not corpus_passages:
         return None
 
     entity_lower = entity.lower()
+    _person = _is_person_category(category)
 
     for passage in corpus_passages:
         passage_lower = passage.lower()
@@ -767,6 +933,13 @@ def _search_corpus_for_fact(entity: str, corpus_passages: List[str]) -> Optional
                                  r'occurred|took\s+place|led\s+by|'
                                  r'the\s+\d{4}|in\s+\d{4})\b',
                                  s, re.IGNORECASE):
+                        # [LOCAL-624] Reject a sentence that is about a WORK when
+                        # the entity is a PERSON — this is the painting's own
+                        # record, in which the artist appears only as "...by X".
+                        # Returning it would gloss the human with a work's
+                        # description.
+                        if _person and _fact_is_about_a_work_not_the_person(entity, s):
+                            continue
                         return s.strip()
 
     return None
@@ -810,7 +983,8 @@ def supply_glosses(references: List[Dict], corpus_passages: List[str],
     # Stage 3a: Try corpus first (free)
     model_needed = []
     for ref in needs_gloss:
-        corpus_fact = _search_corpus_for_fact(ref['entity'], corpus_passages)
+        corpus_fact = _search_corpus_for_fact(ref['entity'], corpus_passages,
+                                              category=ref.get('category'))
         if corpus_fact:
             ref['raw_fact'] = corpus_fact
             ref['gloss_source'] = 'corpus'
@@ -1000,10 +1174,19 @@ def _guard_host_duplication(gloss: str, host_sentence: str) -> bool:
     return True
 
 
-def validate_gloss(gloss: str, host_sentence: str, entity_name: str) -> Tuple[bool, str]:
-    """Run all five mechanical guards on a composed gloss.
+def validate_gloss(gloss: str, host_sentence: str, entity_name: str,
+                   category: Optional[str] = None) -> Tuple[bool, str]:
+    """Run all mechanical guards on a composed gloss.
 
     Returns (passed, failure_reason).
+
+    [LOCAL-624] `category` is the flagged entity's type (person/work/structure/
+    …). When the entity is a PERSON and the gloss describes a WORK of art
+    ("an oil-on-canvas painting by Bloch", "an intensified version of
+    Marstrand's painting"), the gloss is rejected: a human never receives a
+    work's description. This is the backstop that catches the mismatch from
+    ANY source — corpus, model, or compose — not just the corpus path filtered
+    in _search_corpus_for_fact.
     """
     if not _guard_spliced_sentence(gloss):
         return False, "spliced_sentence"
@@ -1015,6 +1198,8 @@ def validate_gloss(gloss: str, host_sentence: str, entity_name: str) -> Tuple[bo
         return False, "too_long"
     if not _guard_host_duplication(gloss, host_sentence):
         return False, "host_duplication"
+    if _is_person_category(category) and _gloss_describes_a_work(gloss):
+        return False, "type_mismatch_work_for_person"
     return True, ""
 
 
@@ -1781,6 +1966,17 @@ def _sentences_removed(original: str, gated: str) -> List[str]:
 
 # ─── Degrade output validators (LOCAL-289) ─────────────────────────────────────
 
+# [LOCAL-624] An empty / half-empty parenthetical — a field interpolation whose
+# value never arrived: "(État / )", "( / )", "()", "( )". The paren holds no
+# alphanumeric VALUE: either nothing, or only a label/word(s) terminated by a
+# dangling separator (/, -, ,, :) with whitespace to the closing paren. Repaired
+# (excised) by validate_and_repair_full_text rather than dropping the sentence.
+_EMPTY_PARENTHETICAL = re.compile(
+    r'\s*\('
+    r'(?:[^()\d]*?[/,:\-–—]\s*|\s*)'   # optional label then a dangling sep, or empty
+    r'\)',
+)
+
 # Patterns that must NEVER appear in delivered text
 _DEGRADE_GUARD_BARE_POSSESSIVE = re.compile(r"\s's\b")
 _DEGRADE_GUARD_STACKED_PREPS = re.compile(
@@ -1815,6 +2011,106 @@ _DEGRADE_GUARD_OBJECT_DROPPED = re.compile(
     r'compel|urg|request|requir|forbid|forbad|prohibit|mandat)'
     r'(?:ed|es|e)?\s+of\s+[A-Z]'
 )
+
+# [LOCAL-624] A sentence left with no object — a dangling relative clause or a
+# transitive verb with nothing after it. The 2026-10-08 SMK run (tour 470,
+# Stop 2) shipped
+#
+#   "...faithfully rendered in oil with the meticulous attention to detail
+#    that characterized."
+#
+# The gate's own degrade path produced it: the sentence read "...that
+# characterized the Danish Golden Age", "the Danish Golden Age" was flagged as
+# an unglossed reference and excised together with its article, leaving the
+# transitive verb "characterized" governing nothing. Every degrade guard above
+# passed it (none test the END of the clause), so it reached TTS. These two
+# patterns catch the whole class before it ships:
+#
+#   1. a relative pronoun followed by a single verb then the period
+#      ("that characterized.", "which revealed.", "who painted.")
+#   2. a bare transitive verb immediately before the period, with a relative
+#      pronoun earlier in the clause governing it
+#
+# Scoped to a RELATIVE-PRONOUN context AND an explicit TRANSITIVE-ONLY verb set,
+# so it never fires on a legitimate complete relative clause whose verb is
+# intransitive-capable ("the guitars that followed.", "the movement that
+# emerged.", "the crowd that gathered."). The verbs below obligatorily take a
+# direct object, so "that <verb>." at the end of a sentence means the object was
+# excised. A broad "[a-z]+ed" shape was tried and deleted the well-formed
+# "...modern guitars that followed." on the Palais Lascaris text — the exact
+# over-eager-rule damage this gate's history warns against — so the set is
+# closed and transitive-only.
+_DANGLING_TRANSITIVE_VERB = (
+    r'characterized|characterised|revealed|depict(?:s|ed)?|portray(?:s|ed)?|'
+    r'defined|shaped|embodied|captured|influenced|governed|informed|'
+    r'typified|exemplified|distinguished|dominated|unified|epitomized|'
+    r'epitomised|symbolized|symbolised|represented|reflected|expressed|'
+    r'conveyed|evoked|inspired|produced|created|painted|sculpted|rendered|'
+    r'illustrated|designed|established|influenced|championed|pioneered')
+_DEGRADE_GUARD_DANGLING_RELATIVE = re.compile(
+    r'\b(?:that|which|who|whom|whose)\s+'
+    r'(?:[a-z]+ly\s+)?'               # optional adverb: "that subtly revealed."
+    r'(?:' + _DANGLING_TRANSITIVE_VERB + r')'
+    r'\s*\.\s*$',
+    re.IGNORECASE,
+)
+
+# [LOCAL-624] "In this painting, stands ." / "the figure, stands." — a clause
+# whose verb has lost its subject AND object: a lone verb sitting between a
+# comma and the period. Catches the owner's third example form.
+_DEGRADE_GUARD_LONE_TRAILING_VERB = re.compile(
+    r',\s*(?:[a-z]+ly\s+)?'
+    r'(?:stands?|sits?|lies?|rests?|hangs?|appears?|remains?|rises?|'
+    r'characterized|revealed|depicts?|portrays?|influenced)'
+    r'\s*\.\s*$',
+    re.IGNORECASE,
+)
+
+# [LOCAL-624] A stranded object whose determiner/modifier was excised, leaving a
+# transitive verb welded onto a BARE singular countable work-noun with no
+# article: "...to obtain painting." The 2026-10-08 Wallraf-Richartz live run
+# (tour 473) shipped
+#   "...the museum deaccessioned the canvas in a trade with Theodor Fischer, an
+#    art dealer from Switzerland, to obtain painting."
+# The degrade path cut the determiner off the object ("to obtain the Fischer
+# painting" → "to obtain painting"), the same excision that produced "that
+# characterized." Restricted to acquire/create/trade verbs + a bare countable
+# work-noun (no preceding article/adjective) so it never fires on the mass-noun
+# use ("devoted to religious painting.", "a master of landscape painting.").
+_ACQUIRE_CREATE_VERB = (
+    r'obtain|acquire|purchase|buy|secure|procure|commission|create|produce|'
+    r'paint|complete|exhibit|display|sell|trade|deaccession|donate|loan|'
+    r'return|restore|unveil')
+_WORK_COUNT_NOUN = (
+    r'painting|canvas|sculpture|statue|portrait|engraving|etching|lithograph|'
+    r'woodcut|fresco|altarpiece|triptych|diptych|drawing|print')
+_DEGRADE_GUARD_STRANDED_BARE_OBJECT = re.compile(
+    r'\b(?:' + _ACQUIRE_CREATE_VERB + r')(?:ed|s|d)?\s+'
+    r'(?:' + _WORK_COUNT_NOUN + r')\s*\.\s*$',
+    re.IGNORECASE,
+)
+
+
+def _ends_in_transitive_verb_without_object(sentence: str) -> bool:
+    """[LOCAL-624] True when a sentence ends with a verb whose object is gone.
+
+    Fires only in a relative-clause / stranded-verb / stranded-bare-object
+    context so it cannot delete a well-formed intransitive sentence. Covers:
+      • "...that characterized."  (dangling relative + verb)
+      • "...which revealed."
+      • "In this painting, stands ." (lone verb between comma and period)
+      • "...to obtain painting."  (transitive verb + determiner-less work-noun)
+    """
+    s = (sentence or '').strip()
+    if not s:
+        return False
+    if _DEGRADE_GUARD_DANGLING_RELATIVE.search(s):
+        return True
+    if _DEGRADE_GUARD_LONE_TRAILING_VERB.search(s):
+        return True
+    if _DEGRADE_GUARD_STRANDED_BARE_OBJECT.search(s):
+        return True
+    return False
 
 
 _DEGRADE_OPENER = re.compile(
@@ -1955,6 +2251,8 @@ def _degrade_sentence_is_wellformed(sentence: str) -> bool:
         return False
     if _DEGRADE_GUARD_OBJECT_DROPPED.search(sentence):   # [LOCAL-530]
         return False
+    if _ends_in_transitive_verb_without_object(sentence):   # [LOCAL-624]
+        return False
     return True
 
 
@@ -2025,6 +2323,19 @@ def validate_degrade_output(full_text: str) -> List[Dict]:
                 'pattern_matched': m.group(),
             })
 
+        # Guard 8: Dangling relative / stranded transitive verb [LOCAL-624]
+        # "...that characterized.", "which revealed.", "In this painting, stands.",
+        # "...to obtain painting." (stranded bare object)
+        m = (_DEGRADE_GUARD_DANGLING_RELATIVE.search(sent_stripped)
+             or _DEGRADE_GUARD_LONE_TRAILING_VERB.search(sent_stripped)
+             or _DEGRADE_GUARD_STRANDED_BARE_OBJECT.search(sent_stripped))
+        if m:
+            violations.append({
+                'sentence': sent_stripped[:100],
+                'guard': 'truncated_clause',
+                'pattern_matched': m.group(),
+            })
+
     # Guard 5: Double space (check full text, not per-sentence)
     for m in _DEGRADE_GUARD_DOUBLE_SPACE.finditer(full_text):
         # Get surrounding context
@@ -2049,6 +2360,26 @@ def validate_and_repair_full_text(full_text: str) -> Tuple[str, List[Dict]]:
     Returns (repaired_text, dropped_sentences_log).
     """
     dropped = []
+
+    # [LOCAL-624] First, REPAIR empty/half-empty parentheticals in place rather
+    # than dropping the whole sentence. The 2026-10-08 Unterlinden run (tour 469)
+    # shipped "the Fonds Régional d'Acquisition pour les Musées (État / ), and
+    # private donors" — a field interpolation left a parenthetical whose value is
+    # empty ("(État / )", "( / )"). Dropping the sentence would lose a real,
+    # correct funding story; excising the broken parenthetical keeps it. Only
+    # parentheticals that are empty, or hold just a label followed by a dangling
+    # separator with no value, are removed.
+    before_paren = full_text
+    full_text = _EMPTY_PARENTHETICAL.sub('', full_text)
+    full_text = re.sub(r'\s{2,}', ' ', full_text)
+    full_text = re.sub(r'\s+([,.;:])', r'\1', full_text)
+    full_text = re.sub(r',\s*,', ',', full_text)
+    if full_text != before_paren:
+        dropped.append({
+            'sentence': '(empty parenthetical removed)',
+            'reason': 'empty_parenthetical_repaired',
+        })
+
     sentences = _split_sentences(full_text)
 
     for sent in sentences:
@@ -2111,7 +2442,8 @@ def apply_glosses_to_text(text: str, glossed_refs: List[Dict]) -> Tuple[str, Lis
         # Validate with mechanical guards
         # Guard 2 (doubled name) uses new_sent to check the result
         # Guard 5 (host_duplication) uses original_sent to avoid circular match
-        passed, failure_reason = validate_gloss(gloss, original_sent, entity)
+        passed, failure_reason = validate_gloss(gloss, original_sent, entity,
+                                                category=ref.get('category'))
         if passed:
             # Also check guard 2 on the composed result
             if not _guard_doubled_name(new_sent, entity):
@@ -2200,8 +2532,23 @@ def apply_unglossed_reference_gate(
         return description, stats
 
     # Stage 1: Detect
+    # [LOCAL-624] The stop's OWN artist and title are never glossed — the stop
+    # already explains them. The caller passes `exempt` built from poi fields,
+    # but the 2026-10-08 SMK run (tour 470) shipped a gloss on the stop's own
+    # artist (Carl Bloch), so the exemption clearly did not reach this stop.
+    # Make it structural here: fold the stop's own title (stop_name) and the
+    # stop_record's artist/title/creator fields into the exempt set regardless
+    # of what the caller supplied. Belt and braces with the type-mismatch guard.
+    _exempt = list(exempt or [])
+    if stop_name:
+        _exempt.append(stop_name)
+    if stop_record:
+        for _f in ('artist', 'title', 'name', 'creator', 'collaborator', 'writer'):
+            _v = stop_record.get(_f)
+            if _v and isinstance(_v, str):
+                _exempt.append(_v)
     refs = detect_unglossed_references(description, stop_names=stop_names,
-                                       exempt=exempt)
+                                       exempt=_exempt)
     stats['references_detected'] = len(refs)
 
     if not refs:
