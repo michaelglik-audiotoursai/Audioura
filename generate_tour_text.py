@@ -19998,6 +19998,46 @@ REWRITE RULES (all mandatory):
                       f"of stop {p['stop_number']}: '{p['name']}'")
     print(f"OK PHASE 5.7: Dangling-reference scrub complete ({_final_stop_count} stops)")
 
+    # -------- [LOCAL-627 defect 1] PHASE 5.7a: Truncated-snippet safety check -----
+    # A search/Serper snippet carrying a "..."/"…" cut, a mid-word clip, or a
+    # sentence ending on a dangling preposition/article/"of." must never be spoken.
+    # The About section is cleaned at source (about_museum_stop); this is the FINAL
+    # spoken-text safety net on EVERY delivered stop body/orientation, so even a
+    # fragment the model copied verbatim from a reference snippet is dropped before
+    # delivery. Deterministic (no network/LLM); reuses the one shared predicate.
+    try:
+        from about_museum_stop import scrub_truncated_sentences as _scrub_trunc
+    except Exception as _trunc_err:
+        _scrub_trunc = None
+        print(f"  [LOCAL-627] WARNING: truncation safety check skipped ({_trunc_err})")
+    if _scrub_trunc:
+        _trunc_dropped = 0
+        _trunc_stops = 0
+        for p in poi_list:
+            _stop_touched = False
+            for _field_key in ('description', 'orientation'):
+                _text = p.get(_field_key, '') or ''
+                if not _text or _text.startswith('['):
+                    continue
+                # Scrub paragraph by paragraph so blank-line structure survives.
+                _paras = _text.split('\n')
+                _new_paras = []
+                for _para in _paras:
+                    if not _para.strip():
+                        _new_paras.append(_para)
+                        continue
+                    _cleaned = _scrub_trunc(_para)
+                    if _cleaned != _para:
+                        _stop_touched = True
+                    _new_paras.append(_cleaned)
+                _new_text = '\n'.join(_new_paras)
+                if _new_text != _text:
+                    p[_field_key] = _new_text
+            if _stop_touched:
+                _trunc_stops += 1
+        print(f"  [LOCAL-627] PHASE 5.7a: Truncated-snippet safety check — "
+              f"{_trunc_stops} stop(s) cleaned")
+
     _sfp.sub_start('dangling_demo_5_7b')
     # -------- [LOCAL-318] PHASE 5.7b: Dangling-demonstrative scrub --------
     # Detect "this/these/that/those + noun" where the noun has no antecedent in
