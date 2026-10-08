@@ -22156,6 +22156,31 @@ RULES:
     elif not _saved_prolog:
         print(f"\n  [LOCAL-270] PHASE 5.96: No prolog — skipping Part 4 composition")
 
+    # -------- [LOCAL-618 #1] PHASE 5.96b: Strip later-stop facts from the orientation --------
+    # The Stop-1 orientation (the folded prolog, Part 4 included) must not pre-tell
+    # the whole tour. Deterministically drop any orientation sentence that delivers
+    # a dated event or proper noun belonging to a LATER stop (and not to Stop 1
+    # itself). The connecting thread and the "your first stop is X" pointer survive.
+    # Guarded; never fatal, never empties the orientation.
+    if _saved_prolog and poi_list and len(poi_list) > 1:
+        try:
+            from orientation_pretell import strip_later_stop_facts as _strip_pretell
+            _later_names = [p.get("name", "") for p in poi_list[1:]]
+            _later_texts = [p.get("description", "") for p in poi_list[1:]]
+            _stop1_name = poi_list[0].get("name", "")
+            _stop1_text = poi_list[0].get("description", "")
+            _pretell_cleaned, _pretell_dropped = _strip_pretell(
+                _saved_prolog, _later_names, _later_texts, _stop1_name, _stop1_text
+            )
+            if _pretell_dropped > 0:
+                print(f"  [LOCAL-618 #1] Orientation pre-tell guard: dropped {_pretell_dropped} "
+                      f"sentence(s) carrying later-stop facts")
+                _saved_prolog = _pretell_cleaned
+            else:
+                print(f"  [LOCAL-618 #1] Orientation pre-tell guard: no later-stop facts in orientation")
+        except Exception as _pretell_err:
+            print(f"  [LOCAL-618 #1] Orientation pre-tell guard skipped (non-fatal): {_pretell_err}")
+
     # -------- [LOCAL-286] PHASE 5.97: Prolog-body deduplication --------
     # If the prolog (including Part 4) repeats a clause ≥8 consecutive words
     # in any stop body, the listener hears the same thing twice within 90 seconds.
