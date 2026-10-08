@@ -70,7 +70,8 @@ def _record(url, status, body, req_body=None):
             q = 0
             for c in d.get("candidates") or []:
                 q += len(((c.get("groundingMetadata") or {}).get("webSearchQueries")) or [])
-            pin = um.get("promptTokenCount") or 0
+            # toolUsePromptTokenCount = grounding search results injected into the prompt; billed as input (LEAD 2026-10-08)
+            pin = (um.get("promptTokenCount") or 0) + (um.get("toolUsePromptTokenCount") or 0)
             pout = (um.get("candidatesTokenCount") or 0) + (um.get("thoughtsTokenCount") or 0)
             usd = (pin * GEMINI_IN + pout * GEMINI_OUT) / 1e6 + q * GROUNDING_PER_QUERY
             rec.update(model=url.split("/models/")[-1].split(":")[0] if "/models/" in url else "",
