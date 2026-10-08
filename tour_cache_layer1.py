@@ -275,7 +275,23 @@ def trim_tour_to_stops(tour_content: str, target_stops: int) -> str:
 
     head = head.rstrip()
 
-    # --- Repair the closing recap so it names only delivered stops. ---
+    # --- Rebuild the closing conclusion from the TRIMMED text (LOCAL-619). ---
+    # The trimmed tour is a NEW delivered stop list; its conclusion must be built
+    # from the stops that remain, not regex-patched from the full tour's recap.
+    # Route through the ONE unified builder so a trimmed cache delivery closes
+    # exactly like a fresh or pool-assembled tour: thread + "That's N stops"
+    # (counted from the trimmed text) + up to 3 recap lines + restaurant offer
+    # last. Falls back to the legacy regex repair if the builder is unavailable.
+    try:
+        from tour_conclusion import rebuild_conclusion as _rebuild_concl
+        head_with_sources = head
+        if sources_block:
+            head_with_sources = head + "\n\n" + sources_block
+        return _rebuild_concl(head_with_sources, venue_name=venue or "")
+    except Exception:
+        pass
+
+    # --- Legacy fallback: repair the recap so it names only delivered stops. ---
     if recap_block:
         recap_block = _repair_recap(recap_block, first_name, last_name,
                                     target_stops)

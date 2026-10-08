@@ -127,7 +127,7 @@ def _normalise_offer(offer: Optional[str]) -> str:
 _DEGENERATE_CLAUSE = re.compile(
     r'(?i)\b(there was an issue|issue with your request|generation_failed|'
     r'assistance needed|please inform|an error occurred|look for this work|'
-    r'position yourself to best view)\b')
+    r'position yourself to best view|sources?\s*\(|https?://)\b')
 
 
 def _clean_recap_clause(clause: str, title: str) -> str:
@@ -206,18 +206,21 @@ def build_conclusion(
         lines.append(f"That's {n} stops in all.")
 
     # 3. One-line recap of up to 3 stops, naming the work + one delivered fact.
-    recap_stops = _recap_pick_three(stops)
-    recap_lines = []
-    for s in recap_stops:
-        clause = _first_recap_sentence(s)
-        clause = _clean_recap_clause(clause, (s.get("title") or "").strip())
-        if clause:
-            recap_lines.append(clause)
-    if recap_lines:
-        lines.append("")
-        lines.append("Along the way:")
-        for rl in recap_lines:
-            lines.append(f"- {rl}")
+    # Skipped for a 1-stop tour: recapping the only stop is redundant with the
+    # thread sentence, and (overview path) the single stop is the venue itself.
+    if n >= 2:
+        recap_stops = _recap_pick_three(stops)
+        recap_lines = []
+        for s in recap_stops:
+            clause = _first_recap_sentence(s)
+            clause = _clean_recap_clause(clause, (s.get("title") or "").strip())
+            if clause:
+                recap_lines.append(clause)
+        if recap_lines:
+            lines.append("")
+            lines.append("Along the way:")
+            for rl in recap_lines:
+                lines.append(f"- {rl}")
 
     # 4. The restaurant offer as the VERY LAST sentence.
     if restaurant_offer:
