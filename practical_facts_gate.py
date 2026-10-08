@@ -1082,7 +1082,10 @@ def ensure_spoken_hours_line(text: str, hours: str = "", admission: str = "") ->
 
     bits = []
     if hours:
-        bits.append(f"The museum is open {hours}")
+        # [LOCAL-630 item 3] Avoid the "The museum is open Open daily…" double when
+        # the grounded hours already lead with "open".
+        _h = re.sub(r"^(?i:open)\s+", "", hours).strip() or hours
+        bits.append(f"The museum is open {_h}")
     if admission:
         bits.append(f"admission is {admission}")
     sentence = ". ".join(bits).strip()
@@ -1108,6 +1111,214 @@ def ensure_spoken_hours_line(text: str, hours: str = "", admission: str = "") ->
     sep = "" if paras[_target].rstrip().endswith((".", "!", "?")) else "."
     paras[_target] = paras[_target].rstrip() + sep + " " + sentence
     return "\n\n".join(paras), True
+
+
+# ---------------------------------------------------------------------------
+# [LOCAL-630 item 3] Hours spoken EXACTLY once
+# ---------------------------------------------------------------------------
+#
+# The NG 495 defect: the delivered text spoke hours TWICE — once in the
+# "Museum Information:" sentence (whose LABEL is stripped at TTS so its VALUE is
+# read aloud) and again in a raw injected "The museum is open Open daily…" line.
+# LOCAL-627's rule is ONE spoken practical-facts sentence. The two helpers below
+# count hours statements as the LISTENER hears them (label stripped, value kept)
+# and collapse a duplicate injected sentence down to one.
+#
+# A "spoken hours statement" is a sentence that, once the field LABEL (but NOT its
+# value) is removed, states concrete hours — matched by _SPOKEN_HOURS_PROSE_RE.
+# The "Museum Information:" value counts (TTS strips the label and speaks the
+# value); a bare "Address:"/"Coordinates:" line does not.
+
+# Label prefixes the TTS strips while KEEPING the value (so the value is spoken).
+_HOURS_VALUE_LABEL_RE = re.compile(
+    r"(?im)^\s*(museum information|operational details|hours|visiting hours|"
+    r"opening hours)\s*:\s*")
+# Field lines whose WHOLE content is non-spoken navigation metadata.
+_NONSPOKEN_FIELD_RE = re.compile(
+    r"(?im)^\s*(address|coordinates|directions|type/specialty|tour-category|"
+    r"sources?|hours?/admission source)\s*:")
+
+
+def _hours_bearing_sentences(text: str) -> "List[str]":
+    """Return the SPOKEN sentences in ``text`` that state concrete HOURS, as the
+    listener hears them: field LABELS that TTS strips are removed but their VALUE
+    kept; whole non-spoken field lines are dropped. Admission-only sentences do
+    NOT count here (hours and admission are counted separately). Pure."""
+    if not text:
+        return []
+    # Hours cue: an opening phrase or a clock/day time — NOT the admission cue.
+    _hours_cue = re.compile(
+        r"(?i)(\bis\s+open\b|\bopen\s+daily\b|\d\s*(?:am|pm)\b|\d{1,2}:\d{2}|"
+        r"\bopen\s+(?:mon|tue|wed|thu|fri|sat|sun))")
+    spoken_lines = []
+    for line in text.split("\n"):
+        if _NONSPOKEN_FIELD_RE.match(line):
+            continue
+        spoken_lines.append(_HOURS_VALUE_LABEL_RE.sub("", line))
+    body = "\n".join(spoken_lines)
+    out = []
+    for sent in re.split(r"(?<=[.!?])\s+|\n+", body):
+        s = sent.strip()
+        if s and _hours_cue.search(s):
+            out.append(s)
+    return out
+
+
+def count_spoken_hours_statements(text: str) -> int:
+    """Number of distinct SPOKEN sentences in the delivered text that state HOURS
+    (as the listener hears them). LOCAL-627/LOCAL-630 require this to be ≤ 1."""
+    return len(_hours_bearing_sentences(text))
+
+
+def collapse_spoken_hours_statements(text: str) -> "Tuple[str, int]":
+    """Ensure hours are SPOKEN at most once (LOCAL-627 / LOCAL-630 item 3).
+
+    Keeps the FIRST spoken hours statement in reading order and removes any later
+    duplicate injected sentence of the form "The museum is open …" (optionally
+    with "Admission is …"). Returns ``(text, removed_count)``. Deterministic, pure,
+    idempotent; a no-op when zero or one hours statement is present.
+
+    Only the deterministic INJECTED sentence shape is removed — never a scraped
+    "Museum Information:" line and never arbitrary narration — so the single
+    surviving statement is the one already in the prose, and we only drop the
+    redundant add-on.
+    """
+    if not text or not text.strip():
+        return text or "", 0
+    if count_spoken_hours_statements(text) <= 1:
+        return text, 0
+
+    # The injected sentence (ensure_spoken_hours_line / plan_b) always starts with
+    # "The museum is open" and may carry a trailing "Admission is …". Remove its
+    # SECOND and later occurrences, keeping whatever hours statement came first.
+    _injected = re.compile(
+        r"(?i)\s*The museum is open\b[^.!?]*(?:[.!?]\s*(?:admission is\b[^.!?]*[.!?])?)?")
+    removed = 0
+
+    # Find the position of the first hours statement; only strip injected sentences
+    # that appear AFTER it, so the earliest statement always survives.
+    first = _hours_bearing_sentences(text)
+    first_sent = first[0] if first else ""
+    first_pos = text.find(first_sent) if first_sent else -1
+
+    def _sub(m):
+        nonlocal removed
+        if first_pos >= 0 and m.start() <= first_pos:
+            return m.group(0)  # keep the first statement itself
+        removed += 1
+        return " "
+
+    out = _injected.sub(_sub, text)
+    # Tidy whitespace / orphaned punctuation left by the removal.
+    out = re.sub(r"[ \t]{2,}", " ", out)
+    out = re.sub(r"\s+([.!?,;])", r"\1", out)
+    out = re.sub(r"\n{3,}", "\n\n", out)
+    return out, removed
+
+
+# ---------------------------------------------------------------------------
+# [LOCAL-630 item 2] Admission spoken ONCE; general-free beats any price
+# ---------------------------------------------------------------------------
+#
+# NG 495 spoke admission TWICE and wrongly: "Admission is £3." then later "Free
+# for general admission." The National Gallery is free; the £3 was a donation or
+# an exhibition price mis-read as general admission. The rule: speak admission at
+# most once, and a GENERAL-FREE statement beats any price found for a donation, an
+# exhibition or the cloakroom. This delivered-text guard keeps a single admission
+# statement — preferring a general-free one when present — and removes the rest.
+
+# A spoken admission sentence: "admission is …", "Admission:", "free admission",
+# "free to enter", "entry is free", "a ticket is £N", "£/€/$ N".
+_ADMISSION_SENTENCE_RE = re.compile(
+    r"(?i)(\badmission\s+is\b|\badmission:\b|\bfree\s+admission\b|"
+    r"\bfree\s+(?:to\s+(?:enter|all)|for\s+general)\b|\bentry\s+is\b|"
+    r"\ba\s+ticket\s+is\b|\btickets?\s+(?:are|cost|start)\b|"
+    r"\bgeneral\s+admission\b|[£€$¥]\s?\d)")
+
+# A GENERAL-FREE admission statement (not "free for residents/under-18s only",
+# which is conditional). "the gallery is free", "admission is free", "free to
+# enter", "free for general admission", "entry is free".
+_GENERAL_FREE_RE = re.compile(
+    r"(?i)(\bfree\s+admission\b|\badmission\s+is\s+free\b|\bentry\s+is\b[^.!?]*\bfree\b|"
+    r"\bfree\s+to\s+(?:enter|all|visit)\b|\bfree\s+for\s+general\s+admission\b|"
+    r"\b(?:is|are)\s+free\s+to\s+enter\b|\bgeneral\s+admission\s+is\s+free\b|"
+    r"\bno\s+(?:charge|admission\s+fee)\b|\bcharges\s+no\s+admission\b)")
+
+# A PRICE admission statement (carries a currency amount).
+_PRICE_IN_ADMISSION_RE = re.compile(r"[£€$¥]\s?\d|\bUSD\b|\bEUR\b|\bGBP\b")
+
+
+def _admission_sentences_with_pos(text: str) -> "List[Tuple[int, str]]":
+    """Return [(char_pos, sentence)] for SPOKEN admission statements (label
+    stripped, value kept), in reading order."""
+    if not text:
+        return []
+    out = []
+    # Scan over the whole label-stripped text so sentence positions are stable.
+    stripped = "\n".join(
+        ("" if _NONSPOKEN_FIELD_RE.match(ln) else _HOURS_VALUE_LABEL_RE.sub("", ln))
+        for ln in text.split("\n"))
+    for m in re.finditer(r"[^.!?\n]*[.!?]", stripped):
+        s = m.group(0).strip()
+        if s and _ADMISSION_SENTENCE_RE.search(s):
+            out.append((m.start(), s))
+    return out
+
+
+def count_spoken_admission_statements(text: str) -> int:
+    """Number of SPOKEN admission statements in the delivered text (≤ 1 required)."""
+    return len(_admission_sentences_with_pos(text))
+
+
+def collapse_admission_statements(text: str) -> "Tuple[str, int]":
+    """Ensure admission is SPOKEN at most once, with general-free winning over any
+    price (LOCAL-630 item 2). Returns ``(text, removed_count)``.
+
+    Policy:
+      * If any GENERAL-FREE admission statement is present, that one is the single
+        survivor — every other admission statement (a £3 donation, an exhibition
+        price, a cloakroom fee) is removed.
+      * Otherwise the FIRST admission statement survives and later ones are removed.
+
+    Deterministic, pure, idempotent; a no-op at ≤ 1 admission statement. Only whole
+    admission sentences are removed — never other narration.
+    """
+    if not text or not text.strip():
+        return text or "", 0
+    sents = _admission_sentences_with_pos(text)
+    if len(sents) <= 1:
+        return text, 0
+
+    # Pick the survivor sentence text.
+    survivor = ""
+    for _pos, s in sents:
+        if _GENERAL_FREE_RE.search(s):
+            survivor = s
+            break
+    if not survivor:
+        survivor = sents[0][1]
+
+    removed = 0
+    kept_once = False
+    out = text
+    # Remove each admission sentence occurrence except the first match of the
+    # survivor text.
+    for _pos, s in sents:
+        if s == survivor and not kept_once:
+            kept_once = True
+            continue
+        # Remove this sentence (first occurrence) from the text.
+        idx = out.find(s)
+        if idx >= 0:
+            out = out[:idx] + out[idx + len(s):]
+            removed += 1
+    if not kept_once and survivor:
+        # ensure the survivor remains (it always does; defensive)
+        pass
+    out = re.sub(r"[ \t]{2,}", " ", out)
+    out = re.sub(r"\s+([.!?,;])", r"\1", out)
+    out = re.sub(r"\n{3,}", "\n\n", out)
+    return out, removed
 
 
 # ---------------------------------------------------------------------------

@@ -123,6 +123,28 @@ def already_edited(tour_text: str) -> bool:
     return EDITED_MARKER in (tour_text or "")
 
 
+# [LOCAL-630 item 7] A compiled matcher for the marker ON ITS OWN LINE, so it can
+# be stripped from the DELIVERED tour_content (Michael's text view) at the final
+# delivery boundary while the cache/pool copies keep it for idempotence.
+_EDITED_MARKER_LINE_RE = re.compile(
+    r"[ \t]*" + re.escape(EDITED_MARKER) + r"[ \t]*\n?")
+
+
+def strip_marker(tour_text: str) -> str:
+    """Remove the hidden idempotence marker from DELIVERED text.
+
+    [LOCAL-630 item 7] The marker is an internal idempotence flag; it must never
+    appear in the stored/delivered ``tour_content`` the user (and Michael's text
+    view) reads. The cache/pool copies KEEP the marker so a reuse/re-run is still
+    recognised as already-edited and never re-spends — only the copy handed to the
+    delivery boundary is stripped. Idempotent; a no-op when the marker is absent.
+    """
+    if not tour_text or EDITED_MARKER not in tour_text:
+        return tour_text or ""
+    out = _EDITED_MARKER_LINE_RE.sub("", tour_text)
+    return out.rstrip("\n") + ("\n" if tour_text.endswith("\n") else "")
+
+
 def _mark_edited(tour_text: str) -> str:
     """Append the hidden idempotence marker if not already present."""
     if not tour_text or EDITED_MARKER in tour_text:
