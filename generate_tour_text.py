@@ -6827,6 +6827,43 @@ def missing_stop_headers(complete_tour, rendered_headers):
     return [h for h in rendered_headers if h not in complete_tour]
 
 
+def restore_lost_stop_headers(complete_tour, rendered_headers):
+    """[LOCAL-632] Restore any "Stop N:" header that was rendered (so the stop was
+    selected, verified and narrated) but deleted from the delivered text by a late
+    narration transform, leaving its body spliced onto the previous stop.
+
+    The Rijksmuseum (tour 499/504) narrated three works but a post-assembly
+    dedup/fact-strip step (which runs after the LOCAL-361 invariant) removed the
+    third stop's "Stop 3:" header block, so the tour read as two stops against
+    three requested. For each header in ``rendered_headers`` absent from
+    ``complete_tour``, this re-inserts it on its own line immediately after the
+    preceding stop's Directions line that announces the stop by name ("… next is
+    <Name>" / "… final stop … <Name>"). Pure, deterministic; never invents a stop
+    (the header must have been rendered and the announcing directions line must be
+    present). Returns ``(repaired_text, restored_headers)``.
+    """
+    import re as _re
+    restored = []
+    if not complete_tour or not rendered_headers:
+        return complete_tour, restored
+    for _lh in rendered_headers:
+        if _lh in complete_tour:
+            continue
+        _m = _re.match(r'^Stop\s+\d+:\s*(.+?)(?:\s+by\s+.+)?$', _lh)
+        _nm = (_m.group(1).strip() if _m else '')
+        if not _nm:
+            continue
+        _anchor = _re.compile(
+            r'(?mi)^(Directions:[^\n]*?' + _re.escape(_nm) + r'[^\n]*)$')
+        _am = _anchor.search(complete_tour)
+        if _am:
+            _ins = _am.end()
+            complete_tour = (complete_tour[:_ins] + "\n\n" + _lh
+                             + complete_tour[_ins:])
+            restored.append(_lh)
+    return complete_tour, restored
+
+
 # [LOCAL-369] Credit-line provenance. At module scope so it can be tested directly —
 # the original submission verified the prohibition with an inspect.getsource string
 # assertion, which passes against any tree where the words happen to appear (D277).
@@ -24912,6 +24949,36 @@ RULES:
 
     # Reset module-level snippets after use (don't pollute next generation)
     _DIRECT_SNIPPETS_PER_STOP = {}
+
+    # [LOCAL-632] Final stop-header integrity guard. A famous museum selects N
+    # verified works and narrates all N, but a LATE narration-dedup / fact-strip
+    # transform (which runs AFTER the LOCAL-361 invariant) can delete a stop's
+    # "Stop N:" header block while leaving its body spliced onto the previous
+    # stop — the Rijksmuseum tour 499/504 symptom (Milkmaid narrated, "Stop 3:"
+    # header gone, so the tour reads as 2 stops against 3 requested). Here, as the
+    # very last step, any header that WAS rendered (_rendered_headers, i.e. the
+    # stop existed and was narrated) but is now absent from the delivered text is
+    # restored on its own line, anchored to the preceding stop's Directions line
+    # that announces it. Deterministic, museum path only; never invents a stop —
+    # the stop was selected, verified and narrated, only its header was lost.
+    if (tour_category == 'museum' and _museum_venue_name and complete_tour
+            and _rendered_headers):
+        try:
+            complete_tour, _restored = restore_lost_stop_headers(
+                complete_tour, _rendered_headers)
+            for _rlh in _restored:
+                print(f"  [LOCAL-632] restored lost stop header '{_rlh}' "
+                      f"(narrated stop whose header a late transform deleted)")
+            # If we repaired and an output_file was requested, rewrite it so the
+            # delivered file carries the restored headers too.
+            if _restored and output_file:
+                try:
+                    with open(output_file, "w", encoding="utf-8") as _hf:
+                        _hf.write(complete_tour)
+                except Exception as _hw_err:
+                    print(f"  [LOCAL-632] header-repair rewrite skipped: {_hw_err}")
+        except Exception as _hg_err:
+            print(f"  [LOCAL-632] stop-header integrity guard skipped (non-fatal): {_hg_err}")
 
     # [LOCAL-445-B] Final timing summary
     _phase_timer.start('verification')  # End packing, start verification marker

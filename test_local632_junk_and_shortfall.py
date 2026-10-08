@@ -148,5 +148,50 @@ class TestShortfallReconcile(unittest.TestCase):
             line, "[LOCAL-632] shortfall: requested=3 delivered=2 reasons=[r1; r2]")
 
 
+class TestRestoreLostStopHeaders(unittest.TestCase):
+    """The Rijksmuseum tour-504 symptom: a narrated stop whose 'Stop 3:' header a
+    late narration transform deleted, leaving the body spliced onto Stop 2."""
+
+    def test_restores_milkmaid_header(self):
+        from generate_tour_text import restore_lost_stop_headers
+        tour = (
+            "Stop 1: The Merry Drinker\n\nBody one.\n\n"
+            "Directions: Continue through Rijksmuseum — next is De grote golf bij Kanagawa.\n\n"
+            "Stop 2: De grote golf bij Kanagawa\n\nBody two.\n\n"
+            "Directions: Your final stop in Rijksmuseum: The Milkmaid.\n\n"
+            "This positioning reveals the delicate interplay of light.\n\n"
+            "Body three about Vermeer and the milkmaid.\n\n"
+            "That's 2 stops in all.\n")
+        rendered = ["Stop 1: The Merry Drinker",
+                    "Stop 2: De grote golf bij Kanagawa",
+                    "Stop 3: The Milkmaid"]
+        repaired, restored = restore_lost_stop_headers(tour, rendered)
+        self.assertEqual(restored, ["Stop 3: The Milkmaid"])
+        self.assertIn("\n\nStop 3: The Milkmaid\n\n", repaired)
+        # Header lands between the directions announcement and the orphaned body.
+        self.assertLess(
+            repaired.index("final stop in Rijksmuseum: The Milkmaid"),
+            repaired.index("Stop 3: The Milkmaid"))
+        self.assertLess(
+            repaired.index("Stop 3: The Milkmaid"),
+            repaired.index("This positioning reveals"))
+
+    def test_present_headers_untouched(self):
+        from generate_tour_text import restore_lost_stop_headers
+        tour = ("Stop 1: A\n\nx\n\nDirections: next is B.\n\nStop 2: B\n\ny\n")
+        repaired, restored = restore_lost_stop_headers(tour, ["Stop 1: A", "Stop 2: B"])
+        self.assertEqual(restored, [])
+        self.assertEqual(repaired, tour)
+
+    def test_no_anchor_no_insertion(self):
+        # A lost header with no announcing directions line is left alone (never
+        # invent a header with no body to attach to).
+        from generate_tour_text import restore_lost_stop_headers
+        tour = "Stop 1: A\n\nx\n"
+        repaired, restored = restore_lost_stop_headers(tour, ["Stop 1: A", "Stop 2: Ghost"])
+        self.assertEqual(restored, [])
+        self.assertEqual(repaired, tour)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
