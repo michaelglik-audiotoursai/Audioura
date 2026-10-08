@@ -113,6 +113,26 @@ def _authenticated_request(method, url, **kwargs):
     return requests.request(method, url, **kwargs)
 
 
+def _cancel_generation_job(text_job_id, reason=""):
+    """[LOCAL-622] Ask the generator to stop a job the orchestrator is giving up on.
+
+    Best-effort and non-raising: the orchestrator is already about to fail the
+    request, so a failed cancel must not mask the original give-up. Flipping the
+    generator's cooperative cancel flag (POST /cancel/<job_id>) stops it before
+    the next spend-incurring step, so no further money is spent on a tour nobody
+    will receive (D635).
+    """
+    if not text_job_id:
+        return
+    try:
+        print(f"[LOCAL-622] Asking generator to stop job {text_job_id} ({reason})")
+        resp = _authenticated_request(
+            "POST", f"{TOUR_GENERATOR_URL}/cancel/{text_job_id}", timeout=15)
+        print(f"[LOCAL-622] Cancel request returned {resp.status_code}: {resp.text[:200]}")
+    except Exception as _cancel_err:
+        print(f"[LOCAL-622] Cancel request failed (non-fatal): {_cancel_err}")
+
+
 # Configure unbuffered logging
 import sys
 sys.stdout.reconfigure(line_buffering=True)
@@ -1099,16 +1119,41 @@ def orchestrate_tour_async(job_id, location, tour_type, total_stops, user_id=Non
         # absolute ceiling below stops it hanging forever if the generator really is
         # dead, which is what the original guard was for.
         _MAX_CONSECUTIVE_POLL_FAILURES = 30
-        _POLL_LOOP_DEADLINE = datetime.now() + timedelta(minutes=20)
+        # [LOCAL-622] Progress-based polling. D635: a fixed 20-minute wall killed a
+        # tour the generator FINISHED — it had merely spent 663.4s stuck in
+        # external_lookups (now budget-capped), and the orchestrator counted that
+        # against an absolute clock. The orchestrator must never abandon a LIVE
+        # generation. We now give up ONLY when the generator has reported no new
+        # progress for 5 minutes (a true stall), and keep a 40-minute absolute cap
+        # as the last-resort backstop against a wedged process. Any observed
+        # progress — a changed progress string or a newer updated_at — resets the
+        # stall clock, so a slow-but-advancing tour runs to completion.
+        _POLL_STALL_LIMIT = timedelta(minutes=5)      # no-progress give-up
+        _POLL_ABSOLUTE_CAP = timedelta(minutes=40)    # hard backstop
+        _poll_started_at = datetime.now()
+        _last_progress_marker = None                  # (progress_str, updated_at)
+        _last_progress_at = datetime.now()
         _POLL_TIMEOUT = 30  # seconds; status endpoint is trivial, this measures event-loop busy-ness
         _poll_failure_start_1 = None
         while True:
             poll_count += 1
-            if datetime.now() > _POLL_LOOP_DEADLINE:
+            _now = datetime.now()
+            _stalled_for = _now - _last_progress_at
+            _ran_for = _now - _poll_started_at
+            # Give up only on a real stall, or at the absolute backstop. On
+            # either, tell the generator job to STOP so no further spend happens
+            # on a tour nobody will receive (D635).
+            if _stalled_for > _POLL_STALL_LIMIT or _ran_for > _POLL_ABSOLUTE_CAP:
+                _reason = ("no progress for "
+                           f"{_stalled_for.total_seconds() / 60:.1f} min"
+                           if _stalled_for > _POLL_STALL_LIMIT
+                           else f"absolute {_POLL_ABSOLUTE_CAP.total_seconds() / 60:.0f}-minute cap")
+                _cancel_generation_job(job_id_1, reason=_reason)
                 raise Exception(
-                    f"Text-generation exceeded the {20}-minute ceiling after "
-                    f"{poll_count} polls — giving up. The generator may still be "
-                    f"running; check its logs before assuming the tour was lost."
+                    f"Text-generation abandoned after {poll_count} polls — {_reason}. "
+                    f"The generator job was asked to stop. (ran "
+                    f"{_ran_for.total_seconds() / 60:.1f} min, last progress "
+                    f"{_stalled_for.total_seconds() / 60:.1f} min ago.)"
                 )
             print(f"Checking tour text generator status: {datetime.now().isoformat()} (Poll #{poll_count})")
             try:
@@ -1161,6 +1206,15 @@ def orchestrate_tour_async(job_id, location, tour_type, total_stops, user_id=Non
                     progress = status_data.get('progress', 'Processing...')
                     print(f"Tour text generation in progress: {progress}")
                     ACTIVE_JOBS[job_id]["progress"] = f"Text generation: {progress}"
+                    # [LOCAL-622] Advancing progress resets the stall clock. We
+                    # treat EITHER a changed progress string OR a newer updated_at
+                    # as "the generator is alive and working". updated_at is the
+                    # stronger signal (DB-backed store) but may be absent, so the
+                    # progress-string change is the always-available fallback.
+                    _marker = (progress, status_data.get('updated_at'))
+                    if _marker != _last_progress_marker:
+                        _last_progress_marker = _marker
+                        _last_progress_at = datetime.now()
                     time.sleep(10)
             else:
                 error_msg = f"Error checking text generation status: {status_response.text}"
