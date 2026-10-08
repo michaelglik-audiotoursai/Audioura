@@ -39,6 +39,8 @@ __all__ = [
     "filter_stop_body_date_consistency",
     "filter_tour_text_date_consistency",
     "parse_date_range",
+    "recompute_year_spans",
+    "recompute_year_spans_in_tour",
 ]
 
 # A single year (1000–2099 — guards against page numbers / catalogue ids).
@@ -253,4 +255,134 @@ def filter_tour_text_date_consistency(tour_text: str,
         i += 2
     report["dropped"] = total_dropped
     report["changed"] = total_dropped > 0
+    return "".join(out), report
+
+
+# ---------------------------------------------------------------------------
+# [LOCAL-630 item 8] Computed year-spans recomputed from the two dates, or dropped
+# ---------------------------------------------------------------------------
+#
+# NG 495 Stop 2 (Rokeby Venus): "Nearly 247 years after it was painted" — the work
+# was painted 1647–51 and attacked in 1914, so the real span is about 263–267
+# years, not 247. A phrase of the form "N years after/later/before" is ARITHMETIC:
+# it must equal the difference between two dates the text itself states. This gate,
+# run per stop on the delivered text, finds each such phrase, recomputes N from the
+# two nearest years in the sentence (preferring the sentence; falling back to the
+# stop body), and either CORRECTS N or DROPS the whole span clause when the two
+# anchor dates cannot be identified. It never invents a date; it only checks the
+# text's own arithmetic. Pure, deterministic, idempotent.
+
+# "Nearly 247 years after", "about 12 years later", "some 30 years before",
+# "a hundred years later" is NOT matched (we only recompute numeric spans).
+_YEAR_SPAN_RE = re.compile(
+    r"(?i)\b((?:nearly|almost|about|around|roughly|some|just|over|more\s+than|"
+    r"less\s+than|approximately)\s+)?(\d{1,4})\s+years?\s+(after|later|before|"
+    r"earlier|prior)\b")
+
+# Tolerance: a stated span within this many years of the recomputed value is left
+# alone (rounding/"nearly" slack). Beyond it, the number is corrected.
+_YEAR_SPAN_TOLERANCE = 2
+
+
+def _years_in(text: str) -> "List[int]":
+    """All distinct 4-digit years (1000–2099) in ``text``, in order of appearance."""
+    out = []
+    for m in re.finditer(r"\b(1[0-9]{3}|20[0-9]{2})\b", text or ""):
+        y = int(m.group(1))
+        if y not in out:
+            out.append(y)
+    return out
+
+
+def recompute_year_spans(text: str, context: str = "") -> "Tuple[str, Dict]":
+    """Recompute every "N years after/later/before/earlier" span in ``text`` from
+    the dates the text states; correct a wrong N, or drop the span clause when the
+    two anchor dates cannot be found.
+
+    ``context`` is additional text (the whole stop body) scanned for anchor years
+    when the sentence carrying the phrase names fewer than two. Returns
+    ``(new_text, report)`` with report = {corrected, dropped, changed, details}.
+
+    Rule per phrase:
+      * Gather the distinct years in the sentence; if < 2, add the years from
+        ``context``. The span's true value is the max span between the available
+        anchor years (the gap the phrase is describing — the earliest creation
+        year to the latest event year).
+      * If at least two anchor years exist: if the stated N differs from the
+        recomputed span by more than the tolerance, REPLACE N with the recomputed
+        value (keeping the leading qualifier like "about"); within tolerance → keep.
+      * If fewer than two anchor years exist anywhere: DROP the span clause
+        ("N years after/later" and any leading qualifier), since the arithmetic
+        cannot be verified and an unverifiable computed number is worse than none.
+    """
+    report = {"corrected": 0, "dropped": 0, "changed": False, "details": []}
+    if not text or not _YEAR_SPAN_RE.search(text):
+        return text or "", report
+
+    ctx_years = _years_in(context) if context else []
+
+    def _repl(m: "re.Match") -> str:
+        qualifier = (m.group(1) or "")
+        stated = int(m.group(2))
+        direction = m.group(3)
+        # Anchor years: the sentence this phrase sits in, else the context body.
+        sent_years = _years_in(text)
+        anchors = sent_years if len(sent_years) >= 2 else list(
+            dict.fromkeys(sent_years + ctx_years))
+        if len(anchors) < 2:
+            # cannot verify → drop the whole span clause
+            report["dropped"] += 1
+            report["changed"] = True
+            report["details"].append({"phrase": m.group(0), "action": "dropped",
+                                       "reason": "fewer than two anchor years"})
+            return ""  # remove the clause; surrounding cleanup tidies spacing
+        true_span = max(anchors) - min(anchors)
+        if abs(true_span - stated) <= _YEAR_SPAN_TOLERANCE:
+            return m.group(0)  # within slack, keep as written
+        report["corrected"] += 1
+        report["changed"] = True
+        report["details"].append({"phrase": m.group(0), "action": "corrected",
+                                   "from": stated, "to": true_span})
+        # Preserve the qualifier (e.g. "about ") and the direction word.
+        return f"{qualifier}{true_span} years {direction}"
+
+    out = _YEAR_SPAN_RE.sub(_repl, text)
+    # Tidy spacing / doubled punctuation left by a dropped clause.
+    out = re.sub(r"\s{2,}", " ", out)
+    out = re.sub(r"\s+([.,;!?])", r"\1", out)
+    out = re.sub(r",\s*,", ",", out)
+    # Repair a sentence left dangling by a dropped mid-sentence clause
+    # ("The work, , was attacked" → "The work was attacked").
+    out = re.sub(r",\s*,", ",", out)
+    return out, report
+
+
+def recompute_year_spans_in_tour(tour_text: str) -> "Tuple[str, Dict]":
+    """Apply ``recompute_year_spans`` across a delivered tour, per stop body, with
+    the whole stop body as the anchor-year context for each sentence. Pure
+    string→string. Returns (new_text, report)."""
+    report = {"stops": 0, "corrected": 0, "dropped": 0, "changed": False}
+    if not tour_text or not tour_text.strip():
+        return tour_text, report
+    parts = _STOP_HEADER_RE.split(tour_text)
+    if len(parts) < 3:
+        # No stop structure — treat the whole text as one body.
+        out, prep = recompute_year_spans(tour_text, context=tour_text)
+        report["corrected"] = prep["corrected"]
+        report["dropped"] = prep["dropped"]
+        report["changed"] = prep["changed"]
+        return out, report
+    out = [parts[0]]
+    i = 1
+    while i < len(parts):
+        header = parts[i]
+        body = parts[i + 1] if i + 1 < len(parts) else ""
+        report["stops"] += 1
+        new_body, prep = recompute_year_spans(body, context=body)
+        report["corrected"] += prep["corrected"]
+        report["dropped"] += prep["dropped"]
+        out.append(header)
+        out.append(new_body)
+        i += 2
+    report["changed"] = report["corrected"] > 0 or report["dropped"] > 0
     return "".join(out), report

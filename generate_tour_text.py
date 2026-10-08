@@ -7723,6 +7723,21 @@ def _apply_delivery_hours_guard(result):
                       f"spoken hours statement(s) — hours now spoken once", flush=True)
         except Exception as _ho:  # pragma: no cover
             _import_logger.error(f"[LOCAL-630] hours-collapse skipped: {_ho}")
+        # 2d. [LOCAL-630 item 8] Computed year-spans ("N years after/later") must
+        #     equal the difference between two dates the text states, or be
+        #     dropped. NG 495 said "Nearly 247 years after it was painted" for a
+        #     work painted 1647–51 and attacked 1914 (~267). Recompute from the
+        #     stop's own dates; correct a wrong number or drop an unverifiable one.
+        try:
+            import date_consistency_guard as _dcg_span
+            final, _span_rep = _dcg_span.recompute_year_spans_in_tour(final)
+            if _span_rep.get("changed"):
+                print(f"  [LOCAL-630 item 8] year-spans: corrected "
+                      f"{_span_rep.get('corrected', 0)}, dropped "
+                      f"{_span_rep.get('dropped', 0)} (recomputed from stop dates)",
+                      flush=True)
+        except Exception as _sp:  # pragma: no cover
+            _import_logger.error(f"[LOCAL-630] year-span recompute skipped: {_sp}")
         # 3. Drop (or translate) any genuinely-foreign spoken sentence wherever it
         #    entered the pipeline — the fresh-path closing recap leaked untranslated
         #    French ("La galerie a été construite entre 1929 et 1930…"). English is
