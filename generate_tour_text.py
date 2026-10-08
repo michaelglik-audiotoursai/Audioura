@@ -23784,11 +23784,31 @@ RULES:
             _h += f", {poi['year']}"
         _real_header_set.add(_h)
     
+    # [LEAD 2026-10-08] Match headers NORMALISED (whitespace, curly/straight quotes, case,
+    # trailing " by Artist, Year"). An exact-string match stripped the REAL Stop 3 header
+    # "Manet’s  A Bar at the Folies-Bergère" (double space) as "fake", merging Manet into
+    # Stop 2: Courtauld 2-of-3 in Bench R0/R1 and LOCAL-634 tour 508.
+    def _hdr_norm(_x):
+        _x = re.sub(r'^Stop\s+\d+:\s*', '', _x or '')
+        _x = _x.replace('\u2019', "'").replace('\u2018', "'").replace('\u201c', '"').replace('\u201d', '"')
+        _x = re.sub(r'\s+by\s+.+$', '', _x)
+        _x = re.sub(r',\s*\d{3,4}.*$', '', _x)
+        return re.sub(r'\s+', ' ', _x).strip().lower()
+    _real_by_num = {i + 1: _hdr_norm(poi.get('name') or '') for i, poi in enumerate(poi_list)}
+    def _is_real_header(_line):
+        if _line.strip() in _real_header_set:
+            return True
+        _m = re.match(r'^Stop\s+(\d+):', _line)
+        if not _m:
+            return False
+        _want = _real_by_num.get(int(_m.group(1)))
+        _got = _hdr_norm(_line)
+        return bool(_want) and (_got == _want or _got.startswith(_want) or _want.startswith(_got))
     _final_lines = complete_tour.split('\n')
     _sanitized_lines = []
     _corruption_fixed = 0
     for _line in _final_lines:
-        if re.match(r'^Stop\s+\d+:', _line) and _line.strip() not in _real_header_set:
+        if re.match(r'^Stop\s+\d+:', _line) and not _is_real_header(_line):
             # This line looks like a header but isn't a real one — strip the prefix
             _fixed = re.sub(r'^Stop\s+\d+:\s*', '', _line)
             _sanitized_lines.append(_fixed)
