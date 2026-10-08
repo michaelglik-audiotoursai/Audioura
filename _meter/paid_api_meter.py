@@ -20,6 +20,7 @@ OPENAI = {  # longest key wins
     "text-embedding-ada-002": (0.10, 0.0, 0.10),
 }
 GEMINI_IN, GEMINI_OUT, GROUNDING_PER_QUERY, SERPER_PER_QUERY = 0.75, 3.75, 0.014, 0.001
+GROUNDED_REQUEST_USD = 0.028  # per grounded Gemini response, calibrated 2026-10-08 (see below)
 
 def _host_kind(url):
     u = url or ""
@@ -68,12 +69,20 @@ def _record(url, status, body, req_body=None):
         elif kind == "gemini":
             um = d.get("usageMetadata") or {}
             q = 0
+            grounded = False
             for c in d.get("candidates") or []:
+                if c.get("groundingMetadata") is not None:
+                    grounded = True
                 q += len(((c.get("groundingMetadata") or {}).get("webSearchQueries")) or [])
             # toolUsePromptTokenCount = grounding search results injected into the prompt; billed as input (LEAD 2026-10-08)
             pin = (um.get("promptTokenCount") or 0) + (um.get("toolUsePromptTokenCount") or 0)
             pout = (um.get("candidatesTokenCount") or 0) + (um.get("thoughtsTokenCount") or 0)
-            usd = (pin * GEMINI_IN + pout * GEMINI_OUT) / 1e6 + q * GROUNDING_PER_QUERY
+            # [LEAD 2026-10-08] Calibrated to the real bill: Oct 8 00:30-05:57 EDT Google
+            # took $10.25 while per-QUERY pricing metered $2.12 over 349 grounded calls
+            # (only 109 reported queries). Google bills per grounded REQUEST: ~$0.028 each
+            # implied. Charge whichever is larger until the SKU report pins it exactly.
+            g = max(q * GROUNDING_PER_QUERY, GROUNDED_REQUEST_USD if grounded else 0.0)
+            usd = (pin * GEMINI_IN + pout * GEMINI_OUT) / 1e6 + g
             rec.update(model=url.split("/models/")[-1].split(":")[0] if "/models/" in url else "",
                        tokens_in=pin, tokens_out=pout, search_queries=q, usd=usd if status == 200 else 0.0)
         elif kind == "serper":
