@@ -366,6 +366,7 @@ def _gemini(prompt: str, model: str = None, grounded: bool = False) -> str:
 
 def _gemini_post(model, key, prompt, grounded, timeout):
     """One Gemini generateContent POST (LEAD 2026-10-08: split out so it can be retried)."""
+    import requests  # this module imports requests lazily, per function
     return requests.post(
         f'https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent',
         headers={'Content-Type': 'application/json', 'x-goog-api-key': key},
@@ -430,7 +431,7 @@ def gemini_with_sources(prompt: str, model: str = None,
         import random as _rnd, time as _tm
         for _attempt in range(4):
             r = _gemini_post(model, key, prompt, grounded, timeout)
-            if r.status_code not in (429, 500, 502, 503, 504) or _attempt == 3:
+            if getattr(r, "status_code", 200) not in (429, 500, 502, 503, 504) or _attempt == 3:
                 break
             _tm.sleep((2, 5, 10)[_attempt] + _rnd.uniform(0, 1.5))
         r.raise_for_status()
