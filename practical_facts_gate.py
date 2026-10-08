@@ -1082,7 +1082,10 @@ def ensure_spoken_hours_line(text: str, hours: str = "", admission: str = "") ->
 
     bits = []
     if hours:
-        bits.append(f"The museum is open {hours}")
+        # [LOCAL-630 item 3] Avoid the "The museum is open Open daily…" double when
+        # the grounded hours already lead with "open".
+        _h = re.sub(r"^(?i:open)\s+", "", hours).strip() or hours
+        bits.append(f"The museum is open {_h}")
     if admission:
         bits.append(f"admission is {admission}")
     sentence = ". ".join(bits).strip()
@@ -1108,6 +1111,109 @@ def ensure_spoken_hours_line(text: str, hours: str = "", admission: str = "") ->
     sep = "" if paras[_target].rstrip().endswith((".", "!", "?")) else "."
     paras[_target] = paras[_target].rstrip() + sep + " " + sentence
     return "\n\n".join(paras), True
+
+
+# ---------------------------------------------------------------------------
+# [LOCAL-630 item 3] Hours spoken EXACTLY once
+# ---------------------------------------------------------------------------
+#
+# The NG 495 defect: the delivered text spoke hours TWICE — once in the
+# "Museum Information:" sentence (whose LABEL is stripped at TTS so its VALUE is
+# read aloud) and again in a raw injected "The museum is open Open daily…" line.
+# LOCAL-627's rule is ONE spoken practical-facts sentence. The two helpers below
+# count hours statements as the LISTENER hears them (label stripped, value kept)
+# and collapse a duplicate injected sentence down to one.
+#
+# A "spoken hours statement" is a sentence that, once the field LABEL (but NOT its
+# value) is removed, states concrete hours — matched by _SPOKEN_HOURS_PROSE_RE.
+# The "Museum Information:" value counts (TTS strips the label and speaks the
+# value); a bare "Address:"/"Coordinates:" line does not.
+
+# Label prefixes the TTS strips while KEEPING the value (so the value is spoken).
+_HOURS_VALUE_LABEL_RE = re.compile(
+    r"(?im)^\s*(museum information|operational details|hours|visiting hours|"
+    r"opening hours)\s*:\s*")
+# Field lines whose WHOLE content is non-spoken navigation metadata.
+_NONSPOKEN_FIELD_RE = re.compile(
+    r"(?im)^\s*(address|coordinates|directions|type/specialty|tour-category|"
+    r"sources?|hours?/admission source)\s*:")
+
+
+def _hours_bearing_sentences(text: str) -> "List[str]":
+    """Return the SPOKEN sentences in ``text`` that state concrete HOURS, as the
+    listener hears them: field LABELS that TTS strips are removed but their VALUE
+    kept; whole non-spoken field lines are dropped. Admission-only sentences do
+    NOT count here (hours and admission are counted separately). Pure."""
+    if not text:
+        return []
+    # Hours cue: an opening phrase or a clock/day time — NOT the admission cue.
+    _hours_cue = re.compile(
+        r"(?i)(\bis\s+open\b|\bopen\s+daily\b|\d\s*(?:am|pm)\b|\d{1,2}:\d{2}|"
+        r"\bopen\s+(?:mon|tue|wed|thu|fri|sat|sun))")
+    spoken_lines = []
+    for line in text.split("\n"):
+        if _NONSPOKEN_FIELD_RE.match(line):
+            continue
+        spoken_lines.append(_HOURS_VALUE_LABEL_RE.sub("", line))
+    body = "\n".join(spoken_lines)
+    out = []
+    for sent in re.split(r"(?<=[.!?])\s+|\n+", body):
+        s = sent.strip()
+        if s and _hours_cue.search(s):
+            out.append(s)
+    return out
+
+
+def count_spoken_hours_statements(text: str) -> int:
+    """Number of distinct SPOKEN sentences in the delivered text that state HOURS
+    (as the listener hears them). LOCAL-627/LOCAL-630 require this to be ≤ 1."""
+    return len(_hours_bearing_sentences(text))
+
+
+def collapse_spoken_hours_statements(text: str) -> "Tuple[str, int]":
+    """Ensure hours are SPOKEN at most once (LOCAL-627 / LOCAL-630 item 3).
+
+    Keeps the FIRST spoken hours statement in reading order and removes any later
+    duplicate injected sentence of the form "The museum is open …" (optionally
+    with "Admission is …"). Returns ``(text, removed_count)``. Deterministic, pure,
+    idempotent; a no-op when zero or one hours statement is present.
+
+    Only the deterministic INJECTED sentence shape is removed — never a scraped
+    "Museum Information:" line and never arbitrary narration — so the single
+    surviving statement is the one already in the prose, and we only drop the
+    redundant add-on.
+    """
+    if not text or not text.strip():
+        return text or "", 0
+    if count_spoken_hours_statements(text) <= 1:
+        return text, 0
+
+    # The injected sentence (ensure_spoken_hours_line / plan_b) always starts with
+    # "The museum is open" and may carry a trailing "Admission is …". Remove its
+    # SECOND and later occurrences, keeping whatever hours statement came first.
+    _injected = re.compile(
+        r"(?i)\s*The museum is open\b[^.!?]*(?:[.!?]\s*(?:admission is\b[^.!?]*[.!?])?)?")
+    removed = 0
+
+    # Find the position of the first hours statement; only strip injected sentences
+    # that appear AFTER it, so the earliest statement always survives.
+    first = _hours_bearing_sentences(text)
+    first_sent = first[0] if first else ""
+    first_pos = text.find(first_sent) if first_sent else -1
+
+    def _sub(m):
+        nonlocal removed
+        if first_pos >= 0 and m.start() <= first_pos:
+            return m.group(0)  # keep the first statement itself
+        removed += 1
+        return " "
+
+    out = _injected.sub(_sub, text)
+    # Tidy whitespace / orphaned punctuation left by the removal.
+    out = re.sub(r"[ \t]{2,}", " ", out)
+    out = re.sub(r"\s+([.!?,;])", r"\1", out)
+    out = re.sub(r"\n{3,}", "\n\n", out)
+    return out, removed
 
 
 # ---------------------------------------------------------------------------

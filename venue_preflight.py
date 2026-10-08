@@ -759,7 +759,13 @@ def plan_b_opening_practicals(result: Dict) -> Dict:
     admission = (result.get('admission') or '').strip()
     spoken_bits = []
     if hours:
-        spoken_bits.append(f"The museum is open {hours}")
+        # [LOCAL-630 item 3] Never emit "The museum is open Open daily…": when the
+        # grounded hours value ALREADY begins with "open" (common from site/OSM
+        # extraction — "Open daily from 10:00 am"), lower-case that leading word so
+        # the sentence reads "The museum is open daily from 10:00 am", not the raw
+        # "open Open" double the NG 495 critique flagged.
+        _h = re.sub(r"^(?i:open)\s+", "", hours).strip() or hours
+        spoken_bits.append(f"The museum is open {_h}")
     if admission:
         spoken_bits.append(f"admission is {admission}")
     speak = ('. '.join(spoken_bits) + '.') if spoken_bits else ''
