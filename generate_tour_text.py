@@ -4274,6 +4274,42 @@ def _work_prominence_score(entry, corpus_text_lower=""):
         score += 50
     return score
 
+
+# [LOCAL-626 item 4] Wikidata sitelink count at/above which a work is a venue's
+# SIGNATURE highlight — a work carried by many Wikipedia language editions. A
+# 3-stop tour of a famous museum must OPEN with such works (Manet's "A Bar at the
+# Folies-Bergère" = 39 sitelinks at the Courtauld). Measured against the real
+# Courtauld catalogue (Q12110695): the signature works sit at 14–39 sitelinks
+# while the long tail (the maiolica "Footed Bowl with the Crucifixion" that
+# displaced them in tour 485) sits at 0–1. A threshold of 8 cleanly separates the
+# household-name works from the catalogue tail without inventing a cutoff per
+# venue. Env override FAMOUS_WORK_SITELINKS for tuning; never below 1.
+try:
+    _FAMOUS_WORK_SITELINKS = max(1, int(os.environ.get("FAMOUS_WORK_SITELINKS", "8")))
+except (TypeError, ValueError):
+    _FAMOUS_WORK_SITELINKS = 8
+
+
+def _prominence_tier(entry):
+    """[LOCAL-626 item 4] 0 for a signature/highlight work, 1 otherwise.
+
+    Used as the LEADING key of the museum deterministic sort so a famous work can
+    never lose its opening slot to an obscure work that merely has more harvested
+    corpus (the tour-485 defect: a well-mined maiolica bowl beat Manet/Van Gogh/
+    Cézanne because corpus-depth quality was ranked ABOVE Wikidata prominence).
+    A work is tier 0 when its Wikidata sitelink count meets the signature
+    threshold OR the museum's own site flags it as a highlight/notable work.
+    """
+    try:
+        _sl = int(entry.get('sitelinks', 0) or 0)
+    except (TypeError, ValueError):
+        _sl = 0
+    if _sl >= _FAMOUS_WORK_SITELINKS:
+        return 0
+    if entry.get('highlight') or entry.get('notable'):
+        return 0
+    return 1
+
 # [LOCAL-60] Module-level: populated after generation with cost breakdown
 # Allows the service layer to read the cost without changing the function signature.
 # Keys: total_cost, total_tokens, cache_hit, breakdown (dict with llm/tts/search)
@@ -9072,6 +9108,10 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
                     # order ONLY to break ties. This replaces the old source-only
                     # sort whose within-tier order was alphabetical — the cause of
                     # the Harvard tour opening on its 7 most obscure works.
+                    # [LOCAL-626 item 4] Lead with the signature tier so a famous
+                    # work (high sitelinks) opens the tour even if an obscure work
+                    # sits in a richer source tier — the Courtauld household names
+                    # must never fall behind a long-tail object.
                     _det_corpus_text_lower = ""
                     try:
                         _dc_pages = (_det_cache or {}).get('pages') or []
@@ -9082,6 +9122,7 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
                     except Exception:
                         _det_corpus_text_lower = ""
                     _det_documented.sort(key=lambda d: (
+                        _prominence_tier(d),
                         _priority.get(d['source'], 9),
                         -_work_prominence_score(d, _det_corpus_text_lower),
                         d['title'].lower(),
@@ -10231,6 +10272,19 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
                     # highlight flag) as a tie-break ahead of alphabetical, so that
                     # when two works have equal corpus-quality the more prominent
                     # one is chosen — never the alphabetically-first obscure work.
+                    # [LOCAL-626 item 4] But corpus-depth quality must NOT outrank
+                    # Wikidata prominence for a famous museum's signature works. In
+                    # tour 485 the Courtauld's maiolica "Footed Bowl with the
+                    # Crucifixion" (0–1 sitelinks) had more harvested corpus than
+                    # Manet's "A Bar at the Folies-Bergère" (39), Van Gogh's
+                    # "Self-Portrait with Bandaged Ear" (14) and the top Cézanne, so
+                    # the bowl led and the household-name works were skipped —
+                    # highlight-first (LOCAL-593) silently lost to corpus depth. The
+                    # sort now LEADS with a signature tier (_prominence_tier: 0 for a
+                    # famous/highlight work, 1 otherwise); corpus-depth quality then
+                    # orders works WITHIN a tier. Famous works always open; among the
+                    # long tail the describable-work preference (LOCAL-328) stands.
+                    _priority = {'catalogue': 0, 'sparql': 1, 'canonical': 2}
                     _det_corpus_text_lower = ""
                     try:
                         _dc_pages = (_det_cache or {}).get('pages') or []
@@ -10241,6 +10295,7 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
                     except Exception:
                         _det_corpus_text_lower = ""
                     _det_documented.sort(key=lambda d: (
+                        _prominence_tier(d),
                         -_depth_map.get(_det_norm(d['title']), 0),
                         _priority.get(d['source'], 9),
                         -_work_prominence_score(d, _det_corpus_text_lower),
