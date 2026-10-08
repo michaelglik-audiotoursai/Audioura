@@ -1247,7 +1247,20 @@ def venue_bound_address(stop_address: str, venue_address: str,
 
 
 def _address_supported_by_page(address: str, page_text: str) -> bool:
-    """True when the address's key tokens (number + first street word) are on the page."""
+    """True when the page states this address AS A LOCATION of the stop — not as a
+    stray street name buried in narrative prose.
+
+    [LOCAL-625] The old test accepted any address whose number + first street word
+    appeared anywhere on the page. On SMK (tour 470) Stop 1's body about the painting
+    "In a Roman Osteria" mentioned the donor-merchant's Copenhagen address
+    ("Bredgade 14"), so that per-work address was kept and shipped as the stop's
+    Address — while every other stop correctly carried the museum's own address
+    (Sølvgade 48-50). A genuine satellite-gallery address is introduced by a LOCATION
+    cue ("located at", "address", "gallery", "entrance", "visit us at"); a donor's
+    or merchant's address in a provenance sentence is not. We require BOTH the
+    address tokens AND a nearby location cue, so only an address the page presents
+    as a place-to-stand survives.
+    """
     if not address or not page_text:
         return False
     low = page_text.lower()
@@ -1255,7 +1268,20 @@ def _address_supported_by_page(address: str, page_text: str) -> bool:
     if not m:
         return False
     number, first_word = m.group(1), m.group(2).lower()
-    return number in low and first_word in low
+    idx = low.find(f"{number} {first_word}")
+    if idx < 0:
+        return False
+    # A location cue must sit within ~60 chars BEFORE the address — the way a page
+    # introduces where a gallery/annex is ("located at 10 Shore Road", "Address:
+    # 67 Shore Road", "the East Gallery at 5 King St"). A provenance sentence
+    # ("commissioned by a merchant at Bredgade 14") has no such cue.
+    window = low[max(0, idx - 60):idx]
+    _LOCATION_CUE_RE = re.compile(
+        r"(?:located\s+(?:at|in|on)|address\s*[:\-]?|situated\s+at|find\s+us|"
+        r"visit\s+us|entrance|gallery|annex|annexe|wing|pavilion|building|"
+        r"our\s+(?:home|location)|housed\s+at|based\s+at)\b"
+    )
+    return bool(_LOCATION_CUE_RE.search(window))
 
 
 # ── [LOCAL-592] opening-section composer (the Stop-1 prolog, not a stop) ──────
