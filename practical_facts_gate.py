@@ -1017,6 +1017,100 @@ def ensure_unpublished_hours_line(text: str,
 
 
 # ---------------------------------------------------------------------------
+# [LOCAL-629 item 4] Speak the KNOWN hours, once, on EVERY path
+# ---------------------------------------------------------------------------
+#
+# The Van Gogh / Belvedere live defect: the venue preflight (or the site
+# extractor) KNEW the hours, but they ended up only in a "Museum Information:"
+# FIELD LINE — which the listener-critique (and the audio) does not read as prose
+# — so no hours were ever SPOKEN. The ticket (and criterion 3) require hours to be
+# SPOKEN. This guard, run on the delivered text, injects a real spoken sentence
+# into the Stop-1 opening when (a) we HAVE hours (from the preflight/site) and
+# (b) the delivered PROSE speaks none. It never invents hours (the caller passes
+# only grounded values) and is a no-op when prose already states hours.
+
+# Concrete hours/admission IN PROSE — deliberately does NOT match the bare
+# "Museum Information" field label (that label is a non-spoken field line that the
+# audio/critique strip, so its presence must NOT be read as "hours spoken").
+_SPOKEN_HOURS_PROSE_RE = re.compile(
+    r"(?i)(\bis\s+open\b|\bopen\s+daily\b|\d\s*(?:am|pm)\b|\d{1,2}:\d{2}|"
+    r"\bopen\s+(?:mon|tue|wed|thu|fri|sat|sun)|admission\s+is\b|\bfree\s+admission\b|"
+    r"\ba\s+ticket\s+is\b)")
+
+
+def tour_speaks_hours_in_prose(text: str) -> bool:
+    """True when the delivered PROSE states concrete hours/admission.
+
+    Field lines that the audio/critique strip — "Museum Information:",
+    "Address:", "Coordinates:", "Directions:", "Orientation:" labels, and
+    "Sources:"/"Hours ... source:" notes — are removed first, so a time that
+    appears ONLY inside a non-spoken field label does not count as spoken."""
+    if not text:
+        return False
+    _spoken = []
+    for line in text.split("\n"):
+        if re.match(r"(?i)^\s*(museum information|address|coordinates|directions|"
+                    r"type/specialty|tour-category|sources?|hours?/admission source)"
+                    r"\s*:", line):
+            continue
+        _spoken.append(line)
+    return bool(_SPOKEN_HOURS_PROSE_RE.search("\n".join(_spoken)))
+
+
+def ensure_spoken_hours_line(text: str, hours: str = "", admission: str = "") -> "Tuple[str, bool]":
+    """Insert a SPOKEN hours/admission sentence once when the hours are KNOWN but
+    the delivered prose speaks none.
+
+    ``hours`` / ``admission`` are grounded values (from the venue preflight or the
+    site extractor); at least one must be non-empty for anything to happen. The
+    sentence is placed at the end of the Stop-1 orientation paragraph so the
+    listener hears it up front. Deterministic, pure, idempotent. A no-op when the
+    prose already speaks hours/admission, when there is no museum context, or when
+    both inputs are empty. Returns ``(text, inserted)``.
+    """
+    if not text or not text.strip():
+        return text or "", False
+    hours = (hours or "").strip()
+    admission = (admission or "").strip()
+    if not hours and not admission:
+        return text, False
+    # Already spoken in prose → nothing to add.
+    if tour_speaks_hours_in_prose(text):
+        return text, False
+    if not re.search(r"(?i)\b(museum|gallery|galleries|mus[ée]e|museo|kunst|collection)\b", text):
+        return text, False
+
+    bits = []
+    if hours:
+        bits.append(f"The museum is open {hours}")
+    if admission:
+        bits.append(f"admission is {admission}")
+    sentence = ". ".join(bits).strip()
+    if sentence and not sentence.endswith((".", "!", "?")):
+        sentence += "."
+    # Capitalise the lead and tidy a stray double period.
+    sentence = re.sub(r"\.\s*\.", ".", sentence)
+
+    paras = text.split("\n\n")
+    _target = None
+    for i, p in enumerate(paras):
+        if re.search(r"(?i)^\s*(?:stop\s*1\b.*)?orientation:", p) or "Orientation:" in p:
+            _target = i
+            break
+    if _target is None:
+        for i, p in enumerate(paras):
+            if p.strip():
+                _target = i
+                break
+    if _target is None:
+        return text, False
+
+    sep = "" if paras[_target].rstrip().endswith((".", "!", "?")) else "."
+    paras[_target] = paras[_target].rstrip() + sep + " " + sentence
+    return "\n\n".join(paras), True
+
+
+# ---------------------------------------------------------------------------
 # CLI: run gate on a tour file
 # ---------------------------------------------------------------------------
 

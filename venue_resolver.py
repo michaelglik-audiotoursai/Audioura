@@ -848,15 +848,31 @@ def build_canonical_titles_from_works(works: List[Dict]) -> Set[str]:
         from room_candidate_guard import is_room_or_space_title as _is_room
     except Exception:  # pragma: no cover
         _is_room = None
+    # [LOCAL-629 item 1] Nor an EVENT (the Belvedere "Austrian State Treaty"
+    # signing) nor the building/architecture. Reject by Wikidata P31 class when
+    # known, and by the title otherwise, so these never enter the canonical set
+    # that the R4 replenishment and fill paths draw from.
+    try:
+        from artwork_selection_guard import (is_nonartwork_instance as _is_nonart,
+                                              looks_like_event_title as _is_event)
+    except Exception:  # pragma: no cover
+        _is_nonart = _is_event = None
 
     def _ok(t: str) -> bool:
         if not t or t.startswith("Q") or len(t) < 3:
             return False
         if _is_room is not None and _is_room(t):
             return False
+        if _is_event is not None and _is_event(t):
+            return False
         return True
 
     for work in works:
+        # [LOCAL-629 item 1] Drop the whole work when its P31 class is a known
+        # non-artwork (event / treaty / building / architecture / room), whatever
+        # its labels say.
+        if _is_nonart is not None and _is_nonart(work.get("instance_of")):
+            continue
         label_en = work.get("label_en", "")
         if _ok(label_en):
             titles.add(label_en)

@@ -4310,6 +4310,115 @@ def _prominence_tier(entry):
         return 0
     return 1
 
+
+def _is_art_museum(venue_name: str, sparql_works=None) -> bool:
+    """[LOCAL-629 item 1] Best-effort: is this an ART museum (paintings/sculpture/
+    etc.), where every stop must be an artwork? Deterministic, conservative.
+
+    An art museum is signalled by (a) the venue name carrying an art-museum word
+    (art/gallery/pinakothek/kunst/beaux-arts/belvedere/uffizi/museo d'arte …) OR
+    (b) the SPARQL catalogue being dominated by artwork-class works (so a venue
+    named only "Belvedere" or "Uffizi" is still recognised). When neither signal
+    is present we return True by default ONLY for the museum tour category caller,
+    which already knows it is in a museum path — the caller passes the decision
+    down; this helper just sharpens it.
+    """
+    name = (venue_name or "").lower()
+    _ART_NAME_RE = re.compile(
+        r"(?i)\b(art\s+museum|art\s+gallery|museum\s+of\s+art|fine\s+arts?|"
+        r"beaux-?arts|pinakothek|kunstmuseum|kunsthalle|gem[äa]ldegalerie|"
+        r"mus[ée]e\s+d['e\s]|museo\s+d['e\s]|galleria|belvedere|uffizi|"
+        r"national\s+gallery|picture\s+gallery|gal[ée]rie|orangerie|"
+        r"reina\s+sof[íi]a|van\s+gogh|rijksmuseum|louvre|prado|mauritshuis)\b")
+    if _ART_NAME_RE.search(name):
+        return True
+    # Catalogue-dominant signal.
+    try:
+        from artwork_selection_guard import is_artwork_instance
+        works = list(sparql_works or [])
+        if works:
+            n_art = sum(1 for w in works
+                        if isinstance(w, dict) and is_artwork_instance(w.get('instance_of')))
+            if n_art >= max(3, len(works) // 2):
+                return True
+    except Exception:
+        pass
+    return False
+
+
+def _apply_artwork_guards(documented, sparql_works, venue_name, n_stops,
+                          is_art_museum=None, label=""):
+    """[LOCAL-629 items 1&2] Enforce artworks-only, then artist-variety, on a
+    deterministic ``_det_documented`` list, and PRINT the before/after lists.
+
+    ``documented`` is the ranked list of {title, source, …} selection dicts.
+    ``sparql_works`` is the full SPARQL work-dict list (carrying instance_of /
+    creator / creator_qid), used to ENRICH each documented entry by matched title
+    so the P31-class and artist decisions can be made even when the selection dict
+    was built without those fields. Returns the filtered ``documented`` list;
+    non-fatal — on any error the input list is returned unchanged (never strand a
+    tour on a guard bug).
+    """
+    try:
+        from artwork_selection_guard import (enforce_artworks_only,
+                                              cap_artist_variety)
+        from story_miner import _normalize as _n
+    except Exception as _ag_imp:
+        print(f"  [LOCAL-629] artwork guards skipped ({_ag_imp})")
+        return documented
+
+    if not documented:
+        return documented
+
+    # Build a title→SPARQL-work lookup to enrich class/creator onto each entry.
+    _sq_by_title = {}
+    for w in (sparql_works or []):
+        if not isinstance(w, dict):
+            continue
+        for _k in (w.get('label_local'), w.get('label_en')):
+            if _k:
+                _sq_by_title.setdefault(_n(_k), w)
+        for _a in (w.get('aliases') or []):
+            if _a:
+                _sq_by_title.setdefault(_n(_a), w)
+
+    enriched = []
+    for d in documented:
+        e = dict(d)
+        if not (e.get('instance_of') or e.get('creator') or e.get('creator_qid')):
+            _w = _sq_by_title.get(_n(e.get('title', '')))
+            if _w:
+                e.setdefault('instance_of', list(_w.get('instance_of', []) or []))
+                e.setdefault('creator', _w.get('creator', ''))
+                e.setdefault('creator_qid', _w.get('creator_qid', ''))
+                e.setdefault('creators', list(_w.get('creators', []) or []))
+                e.setdefault('aliases', list(_w.get('aliases', []) or []))
+        enriched.append(e)
+
+    if is_art_museum is None:
+        is_art_museum = _is_art_museum(venue_name, sparql_works)
+
+    _tag = f"[LOCAL-629{(' ' + label) if label else ''}]"
+    print(f"  {_tag} candidate works BEFORE artworks-only ({len(enriched)}): "
+          f"{[e.get('title') for e in enriched]}")
+
+    kept, dropped = enforce_artworks_only(
+        enriched, venue_name=venue_name, is_art_museum=is_art_museum)
+    if dropped:
+        print(f"  {_tag} artworks-only dropped {len(dropped)}: "
+              f"{[(e.get('title'), e.get('_reject_reason')) for e in dropped]}")
+
+    # Variety cap on the (already prominence-ranked) survivors.
+    kept2, capped = cap_artist_variety(kept, n_stops)
+    if capped:
+        print(f"  {_tag} artist-variety capped {len(capped)}: "
+              f"{[(e.get('title'), e.get('_reject_reason')) for e in capped]}")
+
+    print(f"  {_tag} candidate works AFTER guards ({len(kept2)}): "
+          f"{[e.get('title') for e in kept2]}")
+    return kept2
+
+
 # [LOCAL-60] Module-level: populated after generation with cost breakdown
 # Allows the service layer to read the cost without changing the function signature.
 # Keys: total_cost, total_tokens, cache_hit, breakdown (dict with llm/tts/search)
@@ -7553,12 +7662,37 @@ def _apply_delivery_hours_guard(result):
         #     Runs AFTER the dedupe so it cannot defeat duplicate-orientation removal.
         try:
             import practical_facts_gate as _pfg
+            # [LOCAL-629 item 4] If the venue preflight KNOWS the hours/admission
+            # (Van Gogh / Belvedere both publish them) but the delivered PROSE
+            # speaks none — they only landed in a non-spoken "Museum Information:"
+            # field line — inject a real SPOKEN sentence into the Stop-1 opening.
+            # Grounded values only (never invents); no-op when prose already speaks
+            # hours. This runs BEFORE the unpublished-hours line so a famous museum
+            # that publishes hours actually speaks them.
+            _pf_state = _LAST_VENUE_PREFLIGHT or {}
+            if (_pf_state and not _pf_state.get('error') and not _pf_state.get('skipped')
+                    and (_pf_state.get('hours') or _pf_state.get('admission'))):
+                try:
+                    _pf_hours = _pf_state.get('hours', '')
+                    # Never speak "open daily" when a closed weekday is named.
+                    try:
+                        import venue_preflight as _vpf_h
+                        _pf_hours = _vpf_h.reconcile_daily_with_closed_days(_pf_hours)
+                    except Exception:
+                        pass
+                    final, _spoke_hours = _pfg.ensure_spoken_hours_line(
+                        final, hours=_pf_hours, admission=_pf_state.get('admission', ''))
+                    if _spoke_hours:
+                        print("  [LOCAL-629 item 4] spoke the preflight's known "
+                              "hours/admission in Stop 1 (were only in a field line)",
+                              flush=True)
+                except Exception as _sh:  # pragma: no cover
+                    _import_logger.error(f"[LOCAL-629] spoken-hours inject skipped: {_sh}")
             # [LOCAL-627 defect 2] Only assert "hours weren't published" when the
             # hours preflight RAN successfully and genuinely returned no hours. If
             # the preflight errored or was skipped (a transient failure — the Prado
             # publishes hours but tour 487's preflight failed), say NOTHING instead
             # of a false claim.
-            _pf_state = _LAST_VENUE_PREFLIGHT or {}
             _hours_genuinely_absent = bool(
                 _pf_state
                 and not _pf_state.get('error')
@@ -7788,7 +7922,18 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
     # it, and a 7-day (venue, city) cache makes a repeat request free.
     _LAST_VENUE_PREFLIGHT = {}
     _LAST_PREFLIGHT_COST = {}
-    if (tour_type == 'museum' and not exclude_titles and not harness
+    # [LOCAL-629 item 4] The gate used to fire ONLY when tour_type == 'museum'.
+    # The Van Gogh Museum request arrived as tour_type='walking' (category was
+    # forced to 'museum' later, INSIDE _generate_tour_text_impl), so the wrapper
+    # skipped the preflight entirely (calls:0) and the famous museum's hours were
+    # never fetched — then the "hours not spoken" guard said nothing because the
+    # preflight had not confirmed them unpublished. Fire the preflight whenever the
+    # request NAMES A SINGLE VENUE (museum tour_type OR a location whose first
+    # segment carries a venue word), so a walking/standard request for a named
+    # museum still gets its closure check and its spoken hours.
+    _pf_named_venue = _preflight_venue_from_location(location)
+    _pf_single_venue = (tour_type == 'museum') or bool(_pf_named_venue)
+    if (_pf_single_venue and not exclude_titles and not harness
             and os.environ.get('LOCAL603_PREFLIGHT', '1') != '0'):
         try:
             import venue_preflight as _vpf
@@ -7796,7 +7941,7 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
             # venue even when its name has no English venue word: "Museo Correr",
             # "Kunsthaus Zürich", "Rijksmuseum Twenthe", "Ateneum" were all skipped,
             # so no closure check and no spoken hours. Fall back to the first segment.
-            _pf_venue = (_preflight_venue_from_location(location)
+            _pf_venue = (_pf_named_venue
                          or (location.split(',')[0].strip() if location else ''))
             if _pf_venue:
                 _pf_city = ''
@@ -9222,7 +9367,19 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
                                   f"documented works for '{_museum_venue_name}'")
                     except Exception as _ve:
                         print(f"  [LOCAL-626] venue-itself filter skipped ({_ve})")
-                    
+
+                    # [LOCAL-629 items 1&2] An ART museum's stops are its ARTWORKS,
+                    # by varied artists. Reject events (the Belvedere "Austrian
+                    # State Treaty" signing), rooms/halls, the building and its
+                    # architecture — by Wikidata P31 class and by title — and cap
+                    # any one artist at ceil(N/3) so the Uffizi gives Botticelli /
+                    # Leonardo / Titian, not three Leonardos. Runs AFTER the
+                    # prominence sort (signature-first still decides which work of
+                    # an artist leads) and BEFORE truncation.
+                    _det_documented = _apply_artwork_guards(
+                        _det_documented, _det_sparql, _museum_venue_name,
+                        total_stops)
+
                     # Take total_stops * 2 (D1v2 will filter, so give it room)
                     _det_take = min(len(_det_documented), total_stops * 2)
                     poi_list = [_new_poi(d['title']) for d in _det_documented[:_det_take]]
@@ -10411,7 +10568,19 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
                                   f"documented works for '{_museum_venue_name}'")
                     except Exception as _ve:
                         print(f"  [LOCAL-626] venue-itself filter skipped ({_ve})")
-                    
+
+                    # [LOCAL-629 items 1&2] An ART museum's stops are its ARTWORKS,
+                    # by varied artists. Reject events (the Belvedere "Austrian
+                    # State Treaty" signing), rooms/halls, the building and its
+                    # architecture — by Wikidata P31 class and by title — and cap
+                    # any one artist at ceil(N/3) so the Uffizi gives Botticelli /
+                    # Leonardo / Titian, not three Leonardos. Runs AFTER the
+                    # prominence sort (signature-first still decides which work of
+                    # an artist leads) and BEFORE truncation.
+                    _det_documented = _apply_artwork_guards(
+                        _det_documented, _det_sparql, _museum_venue_name,
+                        total_stops)
+
                     # Take total_stops * 2 (D1v2 will filter, so give it room)
                     _det_take = min(len(_det_documented), total_stops * 2)
                     poi_list = [_new_poi(d['title']) for d in _det_documented[:_det_take]]
