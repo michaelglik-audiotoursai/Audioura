@@ -689,3 +689,84 @@ def strip_dangling_openers(ordered_units):
             nu["narration"] = "\n\n".join(p for p in paras if p.strip()).strip()
         new_units.append(nu)
     return new_units, dropped
+
+
+# [LOCAL-634] Text-level FINAL dangling-opener guard (normal delivery path)
+# ---------------------------------------------------------------------------
+#
+# strip_dangling_openers runs on stop-unit dicts in the POOL assembly. The normal
+# generate_tour_text delivery path emits assembled TEXT, where the stop editor and
+# the late splice/removal passes can strip a demonstrative's antecedent and leave
+# a stop body opening on an unresolved "This/That/These + noun". Borghese (tour
+# 506) shipped exactly this dangling opener on the text path. This guard walks the
+# delivered tour stop by stop and drops the FIRST body sentence of a stop when it
+# opens with an unresolved demonstrative — the same policy as the unit guard,
+# applied to text. Field/header lines are preserved verbatim.
+
+_TEXT_STOP_HEADER_RE_DDG = re.compile(r'(?mi)^Stop\s+\d+:\s*(.+?)\s*$')
+_TEXT_FIELD_LINE_RE_DDG = re.compile(
+    r'(?mi)^(?:Address|Coordinates|Directions|Sources|Museum Information|'
+    r'Type/Specialty|Specific Examples|Operational Details|Orientation):')
+
+
+def strip_dangling_openers_in_text(tour_text):
+    """Drop the FIRST narration sentence of any stop whose body opens on an
+    unresolved demonstrative (This/That/These/Those + noun) with no antecedent in
+    the rest of that stop. Returns (cleaned_text, n_dropped). Deterministic;
+    header/field lines (including Orientation) are preserved verbatim."""
+    if not tour_text:
+        return tour_text or "", 0
+
+    lines = tour_text.split("\n")
+    # Partition the text into stop spans by header line index.
+    header_idxs = [i for i, ln in enumerate(lines)
+                   if _TEXT_STOP_HEADER_RE_DDG.match(ln.strip())]
+    if not header_idxs:
+        return tour_text, 0
+
+    dropped = 0
+    for h, start in enumerate(header_idxs):
+        end = header_idxs[h + 1] if h + 1 < len(header_idxs) else len(lines)
+        title = _TEXT_STOP_HEADER_RE_DDG.match(lines[start].strip()).group(1).strip()
+        # Find the first prose (non-field, non-blank) line in this stop span; it
+        # carries the opening narration sentence.
+        for li in range(start + 1, end):
+            raw = lines[li]
+            s = raw.strip()
+            if not s or _TEXT_FIELD_LINE_RE_DDG.match(s):
+                continue
+            # Rest of the stop (for antecedent search): title + all other prose
+            # in this span after this line, plus the remainder of this line.
+            sentences = _ss_split(s)
+            if not sentences:
+                break
+            first = sentences[0].strip()
+            m = _DEMONSTRATIVE_START_RE.match(first)
+            if not m:
+                break
+            np_result = _extract_np(first, m.end())
+            if not np_result:
+                break
+            full_np, head_noun = np_result
+            if _normalize(head_noun) in _SETTING_NOUNS:
+                break
+            np_words = full_np.split()
+            if _normalize(head_noun) in _GENERIC_SUBJECT_NOUNS and len(np_words) <= 2:
+                break
+            rest_parts = [" ".join(sentences[1:])]
+            for lj in range(li + 1, end):
+                sj = lines[lj].strip()
+                if sj and not _TEXT_FIELD_LINE_RE_DDG.match(sj):
+                    rest_parts.append(sj)
+            rest = " ".join(rest_parts)
+            if _noun_has_antecedent(head_noun, full_np, rest, title):
+                break
+            # Unresolved opener → drop the first sentence from this line.
+            remaining = " ".join(sentences[1:]).strip()
+            lines[li] = remaining
+            dropped += 1
+            break
+
+    out = "\n".join(lines)
+    out = re.sub(r"\n{3,}", "\n\n", out)
+    return out, dropped

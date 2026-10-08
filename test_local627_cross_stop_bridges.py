@@ -116,5 +116,75 @@ class TestLimitThematicBridgesInText(unittest.TestCase):
         self.assertEqual(dropped, 0)
 
 
+class TestUnseenCallback(unittest.TestCase):
+    """[LOCAL-634] A callback may name ONLY delivered artists/works. Reina Sofía
+    (505) shipped "Picasso and Braque, whose works you have already seen" with no
+    Braque stop."""
+
+    def test_unit_level_drops_undelivered_artist_callback(self):
+        units = [
+            {"title": "Pablo Picasso: Guernica",
+             "narration": "Picasso condemned the bombing of Guernica."},
+            {"title": "Juan Gris: Still Life",
+             "narration": ("This work recalls Cubism. Picasso and Braque, whose "
+                           "works you have already seen, invented it together.")},
+        ]
+        new, dropped = g.strip_unseen_callbacks(units)
+        self.assertEqual(len(dropped), 1)
+        self.assertEqual(dropped[0]["unseen"], "Braque")
+        self.assertIn("This work recalls Cubism.", new[1]["narration"])
+        self.assertNotIn("already seen", new[1]["narration"])
+
+    def test_unit_level_keeps_delivered_artist_callback(self):
+        units = [
+            {"title": "Pablo Picasso: Guernica",
+             "narration": "Picasso condemned the bombing."},
+            {"title": "Juan Gris: Still Life",
+             "narration": "Like the Picasso you saw earlier, this fractures form."},
+        ]
+        new, dropped = g.strip_unseen_callbacks(units)
+        self.assertEqual(dropped, [])
+        self.assertIn("you saw earlier", new[1]["narration"])
+
+    def test_text_level_drops_braque_callback_505(self):
+        text = (
+            "Stop 1: Pablo Picasso: Guernica\n\n"
+            "Picasso condemned the bombing of Guernica.\n\n"
+            "Stop 2: Juan Gris: Still Life with Guitar\n\n"
+            "This work recalls Cubism. Picasso and Braque, whose works you have "
+            "already seen, invented it.\n\n"
+            "Stop 3: Salvador Dali: Great Masturbator\n\n"
+            "Dali explored the subconscious."
+        )
+        cleaned, dropped = g.strip_unseen_callbacks_in_text(text)
+        self.assertEqual(dropped, 1)
+        self.assertNotIn("already seen", cleaned)
+        self.assertIn("This work recalls Cubism.", cleaned)
+        # Headers and real narration preserved.
+        self.assertIn("Stop 2: Juan Gris: Still Life with Guitar", cleaned)
+        self.assertIn("Dali explored the subconscious.", cleaned)
+
+    def test_text_level_keeps_delivered_callback(self):
+        text = (
+            "Stop 1: Pablo Picasso: Guernica\n\n"
+            "Picasso condemned the bombing.\n\n"
+            "Stop 2: Juan Gris: Still Life\n\n"
+            "Like the Picasso you saw earlier, this uses fractured planes."
+        )
+        cleaned, dropped = g.strip_unseen_callbacks_in_text(text)
+        self.assertEqual(dropped, 0)
+        self.assertIn("you saw earlier", cleaned)
+
+    def test_no_callback_cue_untouched(self):
+        # Names Braque but makes NO "you already saw" claim — not a callback, kept.
+        units = [
+            {"title": "Juan Gris: Still Life",
+             "narration": "Picasso and Braque invented Cubism around 1908."},
+        ]
+        new, dropped = g.strip_unseen_callbacks(units)
+        self.assertEqual(dropped, [])
+        self.assertIn("Braque invented Cubism", new[0]["narration"])
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

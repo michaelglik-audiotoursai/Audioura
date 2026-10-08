@@ -7694,6 +7694,19 @@ def _apply_delivery_hours_guard(result):
         if not text or not isinstance(text, str):
             return result
         final = text
+        # 0. [LOCAL-634] Restore the title/header LINE if a pass rewrote it into
+        #    the spoken "Step-by-step audio guided tour of the X in Y, is a Z
+        #    tour." shape (488/505/506). The header and field lines are structure,
+        #    never narration; this runs FIRST so every later guard sees the
+        #    canonical header. Idempotent, deterministic, no-op when canonical.
+        try:
+            import title_line_guard as _tlg
+            final, _title_restored = _tlg.restore_title_line(final)
+            if _title_restored:
+                print("  [LOCAL-634] restored the canonical title/header line "
+                      "(a pass had rewritten it into a spoken sentence)", flush=True)
+        except Exception as _tle:  # pragma: no cover
+            _import_logger.error(f"[LOCAL-634] title-line guard skipped: {_tle}")
         # 1. Fold preflight hours into any surviving "check … on <domain>" fallback.
         try:
             import stop_pool_orchestrator as _orch
@@ -7725,6 +7738,32 @@ def _apply_delivery_hours_guard(result):
                       f"extra-bridge sentence(s) from delivered text", flush=True)
         except Exception as _rce:  # pragma: no cover
             _import_logger.error(f"[LOCAL-627] text recap guard skipped: {_rce}")
+        # 1d. [LOCAL-634] Drop any callback that tells the listener they already
+        #     saw an artist/work NOT delivered in this tour. Reina Sofía (tour 505)
+        #     shipped "Picasso and Braque, whose works you have already seen" with
+        #     no Braque stop. D636 still allows real callbacks; this only removes
+        #     the ones naming an UNDELIVERED artist/title. Deterministic.
+        try:
+            import cross_stop_reference_guard as _csrg2
+            final, _n_unseen = _csrg2.strip_unseen_callbacks_in_text(final)
+            if _n_unseen:
+                print(f"  [LOCAL-634] dropped {_n_unseen} callback(s) to an "
+                      f"artist/work not delivered in this tour", flush=True)
+        except Exception as _uce:  # pragma: no cover
+            _import_logger.error(f"[LOCAL-634] unseen-callback guard skipped: {_uce}")
+        # 1e. [LOCAL-634] FINAL text-level dangling-opener guard. The stop editor
+        #     and the late recap/callback removals above can strip a
+        #     demonstrative's antecedent, leaving a stop body opening on an
+        #     unresolved "This/That/These + noun" (Borghese tour 506). Runs AFTER
+        #     those removals so no stop ships a dangling opener on the text path.
+        try:
+            import dangling_demonstrative_gate as _ddg_txt
+            final, _n_open = _ddg_txt.strip_dangling_openers_in_text(final)
+            if _n_open:
+                print(f"  [LOCAL-634] dropped {_n_open} dangling opener(s) from "
+                      f"delivered text", flush=True)
+        except Exception as _doe:  # pragma: no cover
+            _import_logger.error(f"[LOCAL-634] text dangling-opener guard skipped: {_doe}")
         # 2. Drop duplicated paragraphs (e.g. the twice-printed orientation block).
         try:
             import paragraph_dedupe as _pd
@@ -9521,6 +9560,17 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
                 else:
                     print(f"  [LOCAL-30] Documented works ({_det_documented_count}) < total_stops ({total_stops}) "
                           f"— will use documented as base, GPT fills remainder")
+                    # [LOCAL-634] Capture the verified reserve on the GPT-fill
+                    # branch too. Previously _museum_verified_reserve was set ONLY
+                    # inside the deterministic bypass (count >= N); when documented
+                    # < N, the reserve stayed empty, so the LOCAL-632 replacement-
+                    # until-N below had nothing to backfill from if a gate later
+                    # dropped a stop. Capture every documented title here so
+                    # reconcile_to_n can still refill toward N from verified works.
+                    try:
+                        _museum_verified_reserve = [d['title'] for d in _det_documented]
+                    except Exception:
+                        pass
             else:
                 # [LOCAL-599] NO Wikidata venue entity (MassArt Art Museum has
                 # none — only its parent, Q4381563, does). Discover the official
@@ -10725,6 +10775,14 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
                 else:
                     print(f"  [LOCAL-30] Documented works ({_det_documented_count}) < total_stops ({total_stops}) "
                           f"— will use documented as base, GPT fills remainder")
+                    # [LOCAL-634] Capture the verified reserve on the GPT-fill
+                    # branch too (see the quality-ranked branch above) so the
+                    # LOCAL-632 replacement-until-N has verified works to refill
+                    # from when a later gate drops a stop.
+                    try:
+                        _museum_verified_reserve = [d['title'] for d in _det_documented]
+                    except Exception:
+                        pass
         except Exception as _det_err:
             print(f"  [LOCAL-30] Deterministic selection check failed (falling through to Phase 3A): {_det_err}")
             import traceback

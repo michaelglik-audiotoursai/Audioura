@@ -945,6 +945,33 @@ def _search_corpus_for_fact(entity: str, corpus_passages: List[str],
     return None
 
 
+# [LOCAL-634] A provenance sentence names an ownership/transfer ACTION on the
+# work — a gift, bequest, purchase, acquisition or sale — whose human agent is a
+# collector/dealer/donor/buyer, NOT the stop's own artist. A person who appears
+# only in such a sentence must be glossed from the stop's OWN record (stage 2b),
+# never from an open-web/corpus lookup that can bind to a NAMESAKE (National
+# Gallery 495: "John Arrowsmith, a notable 19th-century cartographer" — the buyer
+# was the art dealer of the same name).
+_PROVENANCE_SENTENCE_RE = re.compile(
+    r"(?i)\b("
+    r"gift\s+of|bequest\s+of|bequeathed(?:\s+(?:by|to))?|donated\s+by|"
+    r"gifted\s+by|"
+    r"purchased(?:\s+(?:by|from|it|the))?|bought(?:\s+(?:by|from|it|the))?|"
+    r"acquired(?:\s+(?:by|from|it|the))?|sold(?:\s+(?:by|to|it|the))?|"
+    r"commissioned\s+by|collected\s+by|"
+    r"(?:entered|came\s+into|passed\s+(?:into|to))\s+(?:the\s+)?"
+    r"(?:collection|museum|gallery)|"
+    r"from\s+the\s+collection\s+of|in\s+the\s+collection\s+of"
+    r")\b")
+
+
+def _is_provenance_sentence(sentence: str) -> bool:
+    """True when the sentence states an ownership/transfer action (gift, bequest,
+    purchase, acquisition, sale, commission, entry into the collection) — the
+    context in which a named person is a provenance agent, not the artist."""
+    return bool(_PROVENANCE_SENTENCE_RE.search(sentence or ""))
+
+
 def supply_glosses(references: List[Dict], corpus_passages: List[str],
                    api_key: str, model: str = None) -> Tuple[List[Dict], int, float, float]:
     """Stage 3: Supply a fact for each reference that needs glossing.
@@ -973,6 +1000,40 @@ def supply_glosses(references: List[Dict], corpus_passages: List[str],
     needs_gloss = [r for r in references
                    if r.get('triage') in ('gloss_needed', 'load_bearing')
                    and not r.get('provenance')]
+
+    # [LOCAL-634] PROVENANCE-SENTENCE NAMESAKE GUARD. National Gallery (tour 495)
+    # shipped "John Arrowsmith, a notable 19th-century cartographer, purchased
+    # it" — the buyer was John Arrowsmith the ART DEALER, not the cartographer.
+    # The gloss came from the corpus/model path here, which linked the name to a
+    # NAMESAKE because the person sits in a PROVENANCE sentence (a buyer/donor),
+    # not among the stop's own documented sources. The LOCAL-627 namesake guard
+    # binds snippets to the delivered WORK's artist; it does not cover a person
+    # who appears only as a provenance agent. Rule (D-LOCAL-634): a gloss for a
+    # person in a provenance sentence must come from that stop's OWN record. If
+    # stage 2b (provenance_gloss_for) found no documented role for them, we must
+    # NOT invent a biographical gloss from the open web/corpus — DEGRADE instead
+    # (drop the bare name, keep the provenance action), which is exactly the
+    # safe outcome for a private buyer with no third-party page.
+    _prov_degraded = []
+    _kept = []
+    for r in needs_gloss:
+        if _is_provenance_sentence(r.get('sentence', '')) and not r.get('provenance'):
+            r['raw_fact'] = None
+            r['gloss_source'] = 'degrade'
+            r['stage'] = 'degrade'
+            r['degrade_reason'] = 'provenance-sentence namesake guard (LOCAL-634)'
+            _prov_degraded.append(r)
+        else:
+            _kept.append(r)
+    if _prov_degraded:
+        try:
+            print(f"    [LOCAL-634] {len(_prov_degraded)} provenance-sentence "
+                  f"reference(s) degraded rather than namesake-glossed: "
+                  f"{[r['entity'] for r in _prov_degraded]}")
+        except Exception:
+            pass
+    needs_gloss = _kept
+
     if not needs_gloss:
         return references, 0, 0.0, 0.0
 

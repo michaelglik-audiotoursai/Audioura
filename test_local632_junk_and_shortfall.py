@@ -147,6 +147,23 @@ class TestShortfallReconcile(unittest.TestCase):
         self.assertEqual(
             line, "[LOCAL-632] shortfall: requested=3 delivered=2 reasons=[r1; r2]")
 
+    def test_courtauld_2of3_refilled_when_reserve_captured(self):
+        # [LOCAL-634] The Courtauld (485) shipped 2 of 3. Root cause in the code:
+        # _museum_verified_reserve was captured ONLY on the deterministic-bypass
+        # branch; a short selection (GPT-fill path, or a post-selection gate drop)
+        # left the reserve empty so reconcile had nothing to refill from. With the
+        # reserve captured, a 2-stop selection refills to 3 from verified works.
+        selected = [{"name": "A Bar at the Folies-Bergere"},
+                    {"name": "Self-Portrait with Bandaged Ear"}]
+        reserve = [{"name": "A Bar at the Folies-Bergere"},
+                   {"name": "Self-Portrait with Bandaged Ear"},
+                   {"name": "Nevermore"},
+                   {"name": "The Card Players"}]
+        final, shortfall = reconcile_to_n(selected, reserve, 3)
+        self.assertEqual(len(final), 3)
+        self.assertEqual(final[2]["name"], "Nevermore")
+        self.assertEqual(shortfall, {})
+
 
 class TestRestoreLostStopHeaders(unittest.TestCase):
     """The Rijksmuseum tour-504 symptom: a narrated stop whose 'Stop 3:' header a

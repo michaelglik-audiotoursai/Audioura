@@ -349,3 +349,188 @@ def limit_thematic_bridges_in_text(tour_text: str,
     out = "\n".join(out_lines)
     out = re.sub(r"\n{3,}", "\n\n", out)
     return out, dropped
+
+
+# ─── [LOCAL-634] Callback to an UNSEEN work/artist ────────────────────────────
+#
+# D636 keeps real callbacks ("a couple per tour, for continuity"). But a callback
+# may name ONLY artists and works the listener actually SAW — i.e. ones delivered
+# as stops in THIS tour. Reina Sofía (tour 505) shipped:
+#
+#     "Picasso and Braque, whose works you have already seen"
+#
+# No Braque was delivered. The listener is told they saw a work that was never in
+# the tour — the same phantom as a cross-reference to an absent stop title, but
+# the entity named is an ARTIST, caught by neither strip_phantom_references
+# (title phrases only) nor limit_thematic_bridges (frequency only). This guard
+# drops a callback CLAUSE/sentence that asserts the listener already saw an
+# artist or title that is NOT among the delivered stops.
+
+# A "you already saw it" callback predicate: the sentence CLAIMS prior viewing.
+_SEEN_CALLBACK_RE = re.compile(
+    r"(?i)\b("
+    r"(?:whose\s+works?\s+)?you\s+(?:have\s+)?already\s+seen|"
+    r"you\s+(?:have\s+)?(?:already\s+)?(?:seen|viewed|encountered|met|observed|"
+    r"passed|glimpsed|visited|saw)\b[^.?!]*?\b(?:earlier|already|"
+    r"(?:previously|before)(?:\s+on\s+(?:this|your)\s+tour)?)|"
+    r"(?:as|like)\s+you\s+(?:have\s+)?(?:already\s+)?(?:seen|saw|viewed|"
+    r"encountered)\b|"
+    r"(?:which|whom|whose\s+works?)\s+you\s+(?:have\s+)?already\s+(?:seen|met)|"
+    r"you\s+(?:have\s+)?(?:just\s+)?(?:seen|viewed)\s+(?:works?\s+)?by"
+    r")\b")
+
+# A proper-noun run in a sentence (artist or title): a capitalised word, possibly
+# multi-word with connectors, excluding a lone sentence-initial capital handled
+# by the caller's position check.
+_PROPER_RUN_RE = re.compile(
+    r"\b([A-Z\u00C0-\u017F][\w'\u00C0-\u017F.\-]*"
+    r"(?:\s+(?:de|du|des|la|le|les|van|von|di|della|del|y)?\s*"
+    r"[A-Z\u00C0-\u017F][\w'\u00C0-\u017F.\-]*)*)\b")
+
+# Capitalised function words that start a sentence but are not names.
+_NAME_STOPWORDS = frozenset(w.lower() for w in (
+    "The", "A", "An", "This", "That", "These", "Those", "It", "He", "She",
+    "They", "Their", "His", "Her", "You", "Your", "We", "Our", "In", "On",
+    "At", "By", "For", "From", "To", "With", "As", "And", "But", "Or", "Of",
+    "Here", "There", "Now", "Then",
+    "Stand", "Notice", "Look", "Step", "Move", "Turn", "Consider", "Imagine",
+    "Like", "Recall", "Both", "Each", "Earlier", "Previously", "Unlike",
+))
+
+
+def _delivered_name_tokens(titles: List[str]) -> set:
+    """Build the set of delivered artist/title tokens (normalised words) from the
+    stop titles. A title is often "Artist: Work" or "Work by Artist"; we fold in
+    every word of both the artist and the work so a callback naming either the
+    artist or the title is recognised as delivered."""
+    toks: set = set()
+    for t in titles or []:
+        if not t:
+            continue
+        core = _title_core(t)
+        for piece in (t, core):
+            for w in re.findall(r"[A-Za-z\u00C0-\u017F]{3,}", _norm(piece)):
+                toks.add(w)
+        # Artist side of "Artist: Work".
+        if ":" in t:
+            for w in re.findall(r"[A-Za-z\u00C0-\u017F]{3,}", _norm(t.split(":", 1)[0])):
+                toks.add(w)
+        # "... by Artist".
+        bm = re.search(r"(?i)\bby\s+(.+)$", t)
+        if bm:
+            for w in re.findall(r"[A-Za-z\u00C0-\u017F]{3,}", _norm(bm.group(1))):
+                toks.add(w)
+    return toks
+
+
+def _named_entities_in_sentence(sentence: str) -> List[str]:
+    """Proper-noun names in a sentence, excluding sentence-initial function words
+    and quoted strings handled elsewhere. Returns display forms."""
+    out: List[str] = []
+    for m in _PROPER_RUN_RE.finditer(sentence or ""):
+        run = m.group(1).strip()
+        # Skip a run that is only a stopword (e.g. sentence-initial "The").
+        words = run.split()
+        if len(words) == 1 and words[0].lower() in _NAME_STOPWORDS:
+            continue
+        out.append(run)
+    return out
+
+
+def _callback_names_unseen(sentence: str, delivered_tokens: set) -> Optional[str]:
+    """When ``sentence`` is a "you already saw X" callback AND names an entity
+    whose words are NOT in the delivered token set, return that entity (the first
+    unseen one). Otherwise None.
+
+    A name is "seen" when ALL of its significant word tokens appear among the
+    delivered tokens (so "Pablo Picasso" matches a delivered "Picasso" title and
+    "Braque" does not match anything delivered)."""
+    if not _SEEN_CALLBACK_RE.search(sentence or ""):
+        return None
+    for ent in _named_entities_in_sentence(sentence):
+        words = [w for w in re.findall(r"[A-Za-z\u00C0-\u017F]{3,}", _norm(ent))]
+        if not words:
+            continue
+        if all(w in delivered_tokens for w in words):
+            continue  # every token of this name was delivered → a real callback
+        # At least one word of this named entity was never delivered.
+        return ent
+    return None
+
+
+def strip_unseen_callbacks(
+        ordered_units: List[Dict]) -> Tuple[List[Dict], List[Dict]]:
+    """Drop any sentence that tells the listener they already saw an artist/title
+    NOT delivered in this tour. Returns (new_units, dropped). Mirrors
+    strip_phantom_references' shape; pure and deterministic."""
+    delivered_tokens = _delivered_name_tokens(
+        [(u.get("title") or "") for u in ordered_units])
+    dropped: List[Dict] = []
+    new_units: List[Dict] = []
+    for i, unit in enumerate(ordered_units):
+        stop_num = i + 1
+        narration = unit.get("narration") or ""
+        nu = dict(unit)
+        if not narration.strip():
+            new_units.append(nu)
+            continue
+        out_paras: List[str] = []
+        for para in re.split(r"\n{2,}", narration):
+            sentences = _split_sentences(para)
+            if not sentences:
+                out_paras.append(para)
+                continue
+            kept: List[str] = []
+            for sent in sentences:
+                unseen = _callback_names_unseen(sent, delivered_tokens)
+                if unseen is not None:
+                    dropped.append({
+                        "stop": stop_num, "sentence": sent.strip(),
+                        "reason": "callback to an artist/work not delivered",
+                        "unseen": unseen})
+                    continue
+                kept.append(sent)
+            out_paras.append(" ".join(kept).strip())
+        nu["narration"] = "\n\n".join(p for p in out_paras if p.strip()).strip()
+        new_units.append(nu)
+    return new_units, dropped
+
+
+def strip_unseen_callbacks_in_text(tour_text: str) -> Tuple[str, int]:
+    """Text-level sibling of strip_unseen_callbacks for the normal delivery path
+    (tour 505 shipped the Braque callback on this path). Walks each stop, derives
+    the delivered artist/title tokens from the Stop headers, and drops any
+    sentence that claims the listener already saw an undelivered artist/title.
+    Field/header lines are preserved verbatim. Returns (cleaned_text, n_dropped).
+    """
+    if not tour_text:
+        return tour_text or "", 0
+    titles = [m.group(1) for m in re.finditer(
+        r'(?mi)^Stop\s+\d+:\s*(.+?)\s*$', tour_text)]
+    delivered_tokens = _delivered_name_tokens(titles)
+    dropped = 0
+    out_lines: List[str] = []
+    for raw in tour_text.split("\n"):
+        stripped = raw.strip()
+        if (not stripped or _TEXT_STOP_HEADER_RE.match(stripped)
+                or _TEXT_FIELD_LINE_RE.match(stripped)):
+            out_lines.append(raw)
+            continue
+        lead = ""
+        body = raw
+        om = re.match(r'(?i)^(\s*orientation:\s*)', raw)
+        if om:
+            lead = raw[:om.end()]
+            body = raw[om.end():]
+        kept_sents: List[str] = []
+        for sent in _split_sentences(body):
+            if _callback_names_unseen(sent, delivered_tokens) is not None:
+                dropped += 1
+                continue
+            kept_sents.append(sent)
+        new_body = " ".join(kept_sents).strip()
+        if lead or new_body:
+            out_lines.append((lead + new_body).rstrip())
+    out = "\n".join(out_lines)
+    out = re.sub(r"\n{3,}", "\n\n", out)
+    return out, dropped

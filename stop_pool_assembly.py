@@ -501,6 +501,17 @@ def assemble_building_tour(
     except Exception as _spr_e:  # pragma: no cover
         logger.info(f"[LOCAL-616] phantom-reference guard skipped ({_spr_e})")
         _phantom_dropped = []
+    # [LOCAL-634] Drop any callback that claims the listener already saw an
+    # artist/work NOT delivered in this tour (505: "Picasso and Braque, whose
+    # works you have already seen" with no Braque stop).
+    try:
+        from cross_stop_reference_guard import strip_unseen_callbacks as _suc
+        ordered, _unseen_dropped = _suc(ordered)
+        if _unseen_dropped:
+            logger.info(f"[LOCAL-634] dropped {len(_unseen_dropped)} unseen-work callback(s)")
+    except Exception as _suc_e:  # pragma: no cover
+        logger.info(f"[LOCAL-634] unseen-callback guard skipped ({_suc_e})")
+        _unseen_dropped = []
     # [LOCAL-627 defect 9] At most ONE light thematic bridge per tour; never a
     # previous-stop recap ("…you stopped at a moment ago"). Tour 487 recapped the
     # prior stop in every stop. Drop all previous-stop recaps and every thematic
@@ -707,6 +718,17 @@ def assemble_outdoor_tour(
     except Exception as _spr_e:  # pragma: no cover
         logger.info(f"[LOCAL-616] phantom-reference guard skipped ({_spr_e})")
         _phantom_dropped = []
+    # [LOCAL-634] Drop any callback that claims the listener already saw an
+    # artist/work NOT delivered in this tour (505: "Picasso and Braque, whose
+    # works you have already seen" with no Braque stop).
+    try:
+        from cross_stop_reference_guard import strip_unseen_callbacks as _suc
+        ordered, _unseen_dropped = _suc(ordered)
+        if _unseen_dropped:
+            logger.info(f"[LOCAL-634] dropped {len(_unseen_dropped)} unseen-work callback(s)")
+    except Exception as _suc_e:  # pragma: no cover
+        logger.info(f"[LOCAL-634] unseen-callback guard skipped ({_suc_e})")
+        _unseen_dropped = []
     # [LOCAL-627 defect 9] One thematic bridge per tour; no previous-stop recap
     # (outdoor route too).
     try:
