@@ -69,6 +69,19 @@ _MUSEUM_TYPES = {
     "Q1970365",  # natural history museum
 }
 
+# [LOCAL-618 #3] P31 (instance-of) values that indicate a building / wing / depot
+# rather than a collecting institution. A candidate typed ONLY as one of these is
+# a sub-entity (e.g. "Robbrecht & Daem wing", Q134498261 — the Boijmans depot) and
+# must never be chosen over the museum it belongs to.
+_BUILDING_WING_TYPES = {
+    "Q41176",     # building
+    "Q811979",    # architectural structure
+    "Q1021645",   # wing (part of a building)
+    "Q35112127",  # art depot / collection depot
+    "Q24354",     # theatre building (edge)
+    "Q1247867",   # extension (building)
+}
+
 
 @dataclass
 class VenueEntity:
@@ -132,6 +145,141 @@ def _normalise_venue_name(venue_string: str) -> List[str]:
             seen.add(v)
             deduped.append(v)
     return deduped
+
+
+def prefer_parent_institution(
+    candidates: List[Tuple[str, str]],
+    props_fn,
+    works_count_fn,
+) -> List[Tuple[str, str]]:
+    """[LOCAL-618 #3] Collapse sub-entities onto the collecting institution.
+
+    When the candidate set includes a *part* of another candidate (P361 → a QID
+    that is also in the set) or a candidate typed only as a building/wing/depot,
+    that sub-entity is a worse venue than the institution that owns the collection.
+    Boijmans resolved to the "Robbrecht & Daem wing" (Q134498261, 1 work) instead
+    of the museum (Q679527), so the whole tour clean-failed.
+
+    Pure and deterministic — all I/O is injected so this is unit-testable:
+      props_fn(qid)       -> {"part_of": [qid, ...], "instance_of": [qid, ...]}
+      works_count_fn(qid) -> (work_count:int, sitelinks:int)
+
+    Rules, applied in order (never returns an empty list if given one):
+      1. Drop any candidate that is P361-part-of another candidate in the set.
+      2. If both institutions and building/wing-only candidates remain, drop the
+         building/wing-only ones (keep institutions).
+      3. Order the survivors by collection size (work count), tie-broken by
+         sitelinks, so resolve_venue's "best candidate" is the richest institution.
+    """
+    if not candidates or len(candidates) < 1:
+        return candidates
+
+    qids_in_set = {q for q, _ in candidates}
+
+    # Cache property lookups so we hit the network at most once per candidate.
+    _props: Dict[str, Dict] = {}
+
+    def _p(qid: str) -> Dict:
+        if qid not in _props:
+            try:
+                _props[qid] = props_fn(qid) or {}
+            except Exception:
+                _props[qid] = {}
+        return _props[qid]
+
+    # Rule 1: drop parts whose P361 points at another candidate in the set.
+    survivors = []
+    for qid, label in candidates:
+        part_of = set(_p(qid).get("part_of", []) or [])
+        if part_of & (qids_in_set - {qid}):
+            print(f"  [venue_resolver] #3 dropping sub-entity {qid} ({label}) — part of a sibling candidate")
+            continue
+        survivors.append((qid, label))
+    if not survivors:
+        survivors = list(candidates)
+
+    # Rule 2: if any survivor is a collecting institution (museum-typed), drop
+    # survivors that are ONLY building/wing/depot typed.
+    def _is_institution(qid: str) -> bool:
+        inst = set(_p(qid).get("instance_of", []) or [])
+        return bool(inst & _MUSEUM_TYPES)
+
+    def _is_building_only(qid: str) -> bool:
+        inst = set(_p(qid).get("instance_of", []) or [])
+        if not inst:
+            return False
+        return bool(inst & _BUILDING_WING_TYPES) and not (inst & _MUSEUM_TYPES)
+
+    if any(_is_institution(q) for q, _ in survivors):
+        filtered = [(q, l) for q, l in survivors if not _is_building_only(q)]
+        if filtered:
+            for q, l in survivors:
+                if (q, l) not in filtered:
+                    print(f"  [venue_resolver] #3 dropping building/wing-only candidate {q} ({l})")
+            survivors = filtered
+
+    if len(survivors) <= 1:
+        return survivors
+
+    # Rule 3: order by collection size (then sitelinks), largest first.
+    def _size(qid: str):
+        try:
+            wc, sl = works_count_fn(qid)
+        except Exception:
+            wc, sl = 0, 0
+        return (int(wc or 0), int(sl or 0))
+
+    ranked = sorted(survivors, key=lambda c: _size(c[0]), reverse=True)
+    if ranked != survivors:
+        print(f"  [venue_resolver] #3 preferring larger collection: {ranked[0][0]} ({ranked[0][1]})")
+    return ranked
+
+
+def _fetch_part_of_and_types(qid: str) -> Dict:
+    """[LOCAL-618 #3] Network-backed props_fn: P361 (part of) + P31 (instance of)."""
+    global _network_failure_count
+    out = {"part_of": [], "instance_of": []}
+    try:
+        resp = requests.get(
+            _WIKIDATA_API,
+            params={"action": "wbgetentities", "ids": qid,
+                    "props": "claims", "format": "json"},
+            headers={"User-Agent": _USER_AGENT},
+            timeout=10,
+        )
+        if resp.status_code != 200:
+            _network_failure_count += 1
+            return out
+        claims = resp.json().get("entities", {}).get(qid, {}).get("claims", {})
+        for claim in claims.get("P361", []):
+            v = claim.get("mainsnak", {}).get("datavalue", {}).get("value", {})
+            if v.get("id"):
+                out["part_of"].append(v["id"])
+        for claim in claims.get("P31", []):
+            v = claim.get("mainsnak", {}).get("datavalue", {}).get("value", {})
+            if v.get("id"):
+                out["instance_of"].append(v["id"])
+        return out
+    except Exception as e:
+        logger.warning(f"[LOCAL-618] _fetch_part_of_and_types failed for {qid}: {e}")
+        _network_failure_count += 1
+        return out
+
+
+def _fetch_works_count(qid: str) -> Tuple[int, int]:
+    """[LOCAL-618 #3] Network-backed works_count_fn: (collection size, max sitelinks).
+
+    Uses the same P195/P276 catalogue the generator later mines, so "larger
+    collection" means exactly the corpus the tour would be built from.
+    """
+    try:
+        works = fetch_venue_works(qid)
+        wc = len(works)
+        sl = max((int(w.get("sitelinks", 0) or 0) for w in works), default=0)
+        return wc, sl
+    except Exception as e:
+        logger.warning(f"[LOCAL-618] _fetch_works_count failed for {qid}: {e}")
+        return 0, 0
 
 
 def resolve_venue(venue_string: str, city: str = "") -> Optional[VenueEntity]:
@@ -237,7 +385,23 @@ def resolve_venue(venue_string: str, city: str = "") -> Optional[VenueEntity]:
         # Fallback: try all candidates with geo-disambiguation
         print(f"  [venue_resolver] No museum-typed candidates, trying geo-disambiguation on all")
         museum_candidates = candidates[:5]
-    
+
+    # Step 2b [LOCAL-618 #3]: Collapse sub-entities (a wing/building/depot that is
+    # P361-part-of another candidate, or a building-only candidate alongside the
+    # institution) onto the collecting institution, preferring the larger
+    # collection. Runs BEFORE geo-disambiguation, because the wing and the museum
+    # share coordinates and geo alone would pick the sub-entity (the Boijmans
+    # "Robbrecht & Daem wing" clean-fail). Guarded; never fatal, never empties.
+    try:
+        if len(museum_candidates) > 1:
+            _collapsed = prefer_parent_institution(
+                museum_candidates, _fetch_part_of_and_types, _fetch_works_count
+            )
+            if _collapsed:
+                museum_candidates = _collapsed
+    except Exception as _subent_err:
+        logger.warning(f"[LOCAL-618] sub-entity collapse skipped: {_subent_err}")
+
     # Step 3: Geo-disambiguate if city provided — ALWAYS validate city match
     if city:
         if len(museum_candidates) > 1:
