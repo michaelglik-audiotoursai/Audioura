@@ -1058,15 +1058,19 @@ def tour_speaks_hours_in_prose(text: str) -> bool:
 
 
 def ensure_spoken_hours_line(text: str, hours: str = "", admission: str = "") -> "Tuple[str, bool]":
-    """Insert a SPOKEN hours/admission sentence once when the hours are KNOWN but
-    the delivered prose speaks none.
+    """Insert the SINGLE composed practical-facts sentence once when the hours are
+    KNOWN but the delivered prose speaks none.
 
     ``hours`` / ``admission`` are grounded values (from the venue preflight or the
-    site extractor); at least one must be non-empty for anything to happen. The
-    sentence is placed at the end of the Stop-1 orientation paragraph so the
-    listener hears it up front. Deterministic, pure, idempotent. A no-op when the
-    prose already speaks hours/admission, when there is no museum context, or when
-    both inputs are empty. Returns ``(text, inserted)``.
+    site extractor); at least one must be non-empty for anything to happen.
+
+    [LOCAL-633] The sentence is COMPOSED (``compose_practical_facts``) — one short
+    spoken pair, never the raw preflight paste — and it is placed in the Stop-1
+    OPENING SECTION (right after the About narration), NEVER inside an Orientation
+    paragraph. Practical facts do not belong in an Orientation (D633); the opening
+    section is their one spoken home. Deterministic, pure, idempotent. A no-op when
+    the prose already speaks hours/admission, when there is no museum context, or
+    when both inputs are empty. Returns ``(text, inserted)``.
     """
     if not text or not text.strip():
         return text or "", False
@@ -1074,37 +1078,38 @@ def ensure_spoken_hours_line(text: str, hours: str = "", admission: str = "") ->
     admission = (admission or "").strip()
     if not hours and not admission:
         return text, False
-    # Already spoken in prose → nothing to add.
+    # Already spoken in prose → nothing to add (the once-guard).
     if tour_speaks_hours_in_prose(text):
         return text, False
     if not re.search(r"(?i)\b(museum|gallery|galleries|mus[ée]e|museo|kunst|collection)\b", text):
         return text, False
 
-    bits = []
-    if hours:
-        # [LOCAL-630 item 3] Avoid the "The museum is open Open daily…" double when
-        # the grounded hours already lead with "open".
-        _h = re.sub(r"^(?i:open)\s+", "", hours).strip() or hours
-        bits.append(f"The museum is open {_h}")
-    if admission:
-        bits.append(f"admission is {admission}")
-    sentence = ". ".join(bits).strip()
-    if sentence and not sentence.endswith((".", "!", "?")):
+    # [LOCAL-633] Compose the single short sentence pair from the structured facts.
+    sentence = compose_practical_facts({"hours": hours, "admission": admission})
+    if not sentence:
+        return text, False
+    if not sentence.endswith((".", "!", "?")):
         sentence += "."
-    # Capitalise the lead and tidy a stray double period.
-    sentence = re.sub(r"\.\s*\.", ".", sentence)
 
+    # Place it in the Stop-1 opening section, after the About narration. NEVER an
+    # Orientation paragraph, and never a non-spoken field block (Museum Information,
+    # Address, Coordinates, Directions, Sources…). Target the FIRST substantive
+    # prose paragraph that is not an Orientation / field / header line.
     paras = text.split("\n\n")
     _target = None
     for i, p in enumerate(paras):
-        if re.search(r"(?i)^\s*(?:stop\s*1\b.*)?orientation:", p) or "Orientation:" in p:
-            _target = i
-            break
-    if _target is None:
-        for i, p in enumerate(paras):
-            if p.strip():
-                _target = i
-                break
+        s = p.strip()
+        if not s:
+            continue
+        if re.search(r"(?i)^\s*(?:stop\s*\d+\b.*)?orientation:", s) or "Orientation:" in s:
+            continue
+        if _NONSPOKEN_FIELD_RE.match(s) or _HOURS_VALUE_LABEL_RE.match(s):
+            continue
+        if re.match(r"(?i)^\s*(stop\s*\d+:|directions:|address:|coordinates:|"
+                    r"type/specialty:|tour-category:|sources?:)", s):
+            continue
+        _target = i
+        break
     if _target is None:
         return text, False
 

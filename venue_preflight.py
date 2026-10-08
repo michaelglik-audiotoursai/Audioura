@@ -757,18 +757,22 @@ def plan_b_opening_practicals(result: Dict) -> Dict:
     # specific closed-day fact. A genuine 7-day "daily" with no closed day is kept.
     hours = reconcile_daily_with_closed_days(hours)
     admission = (result.get('admission') or '').strip()
-    spoken_bits = []
-    if hours:
-        # [LOCAL-630 item 3] Never emit "The museum is open Open daily…": when the
-        # grounded hours value ALREADY begins with "open" (common from site/OSM
-        # extraction — "Open daily from 10:00 am"), lower-case that leading word so
-        # the sentence reads "The museum is open daily from 10:00 am", not the raw
-        # "open Open" double the NG 495 critique flagged.
-        _h = re.sub(r"^(?i:open)\s+", "", hours).strip() or hours
-        spoken_bits.append(f"The museum is open {_h}")
-    if admission:
-        spoken_bits.append(f"admission is {admission}")
-    speak = ('. '.join(spoken_bits) + '.') if spoken_bits else ''
+    # [LOCAL-633] The spoken sentence is composed ONCE, short and natural, from the
+    # structured hours/admission — never the raw preflight paste that Bench R1
+    # flagged ("The museum is open Tuesday to Sunday, 8:15 AM … (ticket office …);
+    # … admission is General Admission: €12; Combined Ticket …"). The composer
+    # applies D633's rules (day ranges, one adult price + at most one free group,
+    # no parens/discounts, currency as a word). The caller still places it ONCE.
+    speak = ''
+    try:
+        from practical_facts_gate import compose_practical_facts
+        speak = compose_practical_facts({
+            'name': result.get('name') or result.get('venue') or '',
+            'hours': hours,
+            'admission': admission,
+        })
+    except Exception:
+        speak = ''
     # D617: the source goes in the text view only — it is NOT part of `speak`.
     srcs = result.get('sources', {}) or {}
     src_urls = []
