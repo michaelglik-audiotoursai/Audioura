@@ -85,6 +85,8 @@ __all__ = [
     "clean_venue_request_name",
     "default_wiki_provider",
     "has_dangling_object_sentence",
+    "is_truncated_fragment",
+    "scrub_truncated_sentences",
     "dedupe_sentences",
     "normalise_locality",
     "extract_venue_address",
@@ -312,9 +314,32 @@ _DANGLING_FINAL_RE = re.compile(
     r"known\s+as|referred\s+to\s+as|such\s+as|"             # "known as X"
     r"including|featuring|comprising|consisting\s+of|containing|"  # "including X"
     r"designed\s+by|built\s+by|founded\s+by|created\s+by|"  # "designed by X"
-    r"and|or|but|with|the|an"                               # bare trailing connector/article
+    # [LOCAL-627 defect 1] A sentence ending in a bare connector, article OR a
+    # dangling PREPOSITION ("…enriched by the collection of.", "…on the ord…")
+    # was cut mid-thought by the extractor. "of"/"in"/"on"/"at"/"to"/"for"/"from"/
+    # "by"/"as" still expect an object; "a" is the missing article case.
+    r"and|or|but|with|the|an|a|of|in|on|at|to|for|from|by|as"
     r")\s*[.!?]?\s*$"
 )
+
+# [LOCAL-627 defect 1] A snippet FRAGMENT that must never be spoken, independent of
+# its final word:
+#   * a literal ellipsis anywhere — "..." (two or more dots) or the single char "…"
+#     ("built by Giorgio Vasari in 1565 on the ord... In 1675 …", Prado's "… and w.");
+#   * a sentence that ENDS on a mid-word cut: the final token is a lowercase word
+#     fragment with no vowel-complete look, i.e. the sentence's last "word" before
+#     the period is clipped (e.g. "…on the ord.", "… and w."). We detect the common
+#     search-snippet shape: the sentence ends with a short (1–3 char) lowercase
+#     token that is not a known whole word ("a", "an", "of" are handled above).
+# These are deterministic text shapes, not a blocklist of any museum's words.
+_ELLIPSIS_RE = re.compile(r"\.\.\.|\u2026")
+# A terminal clipped token: ends with a 1–2 letter lowercase remnant that is not a
+# real standalone word. "…the ord." leaves "ord" (3 letters) — caught by a separate
+# rule below; here we catch the 1–2 letter remnants ("… and w.", "… th.").
+_MIDWORD_CUT_RE = re.compile(r"(?i)\b([b-df-hj-np-tv-z]{1,2}|[a-z]{1,2})\s*[.!?]\s*$")
+# Known 1–2 letter words that are legitimate sentence enders are rare; guard a few.
+_SHORT_REAL_WORDS = {"go", "do", "us", "me", "it", "he", "ok", "no", "so", "up",
+                     "pm", "am", "tv", "id"}
 
 # US state-abbreviation → full name, so a request tail like "boston, ma" is spoken
 # as "Boston, Massachusetts" (mirrors geocode_stops._STATE_ABBR, extended).
@@ -430,6 +455,80 @@ def has_dangling_object_sentence(text: str) -> bool:
     return False
 
 
+def _ends_midword(sent: str) -> bool:
+    """[LOCAL-627 defect 1] True when a sentence ends on a mid-word CUT.
+
+    A search/Serper snippet clipped mid-word leaves a short lowercase remnant
+    before the period: "…built by Giorgio Vasari in 1565 on the ord." (remnant
+    "ord"), "… and w." (remnant "w"). We flag a terminal lowercase token of 1–3
+    letters that is not a known whole word AND is not an initial/acronym. A real
+    sentence rarely ends on a bare 1–3 letter lowercase fragment.
+    """
+    s = (sent or "").strip()
+    if not s:
+        return False
+    # The remnant must be a STANDALONE short token: preceded by whitespace or the
+    # start of the sentence, not the tail of a long word ("education" → "ion").
+    m = re.search(r"(?:^|\s)([A-Za-z]{1,3})\s*[.!?]?\s*$", s)
+    if not m:
+        return False
+    tok = m.group(1)
+    # An ACRONYM / initial (all caps, or single capital) is a legitimate ender.
+    if tok.isupper():
+        return False
+    low = tok.lower()
+    if low in _SHORT_REAL_WORDS:
+        return False
+    # 3-letter lowercase remnant: only a cut when it is a consonant-heavy clip
+    # (no standard short word). Common 3-letter whole words are allowed.
+    _REAL_3 = {"the", "and", "but", "for", "her", "his", "its", "our", "out",
+               "two", "ten", "art", "was", "has", "had", "one", "new", "old",
+               "era", "oil", "key", "day", "way", "saw", "see", "now", "who",
+               "all", "ago", "yet", "far", "few", "man", "men", "set", "run"}
+    if len(low) == 3 and low in _REAL_3:
+        return False
+    return True
+
+
+def is_truncated_fragment(sent: str) -> bool:
+    """[LOCAL-627 defect 1] True when a sentence is a TRUNCATED snippet fragment
+    that must never be spoken, independent of why it was clipped:
+
+      * it contains a literal ellipsis — "..." or "…"
+        (e.g. "built by Giorgio Vasari in 1565 on the ord... In 1675 …");
+      * it ends on a dangling connector / preposition / article (``_DANGLING_FINAL_RE``,
+        e.g. "…enriched by the collection of.");
+      * it ends on a mid-word cut (``_ends_midword``, e.g. "… and w.").
+
+    Pure and deterministic; the single predicate every intake/safety path uses.
+    """
+    s = (sent or "").strip()
+    if not s:
+        return False
+    if _ELLIPSIS_RE.search(s):
+        return True
+    if _DANGLING_FINAL_RE.search(s):
+        return True
+    if _ends_midword(s):
+        return True
+    return False
+
+
+def scrub_truncated_sentences(text: str) -> str:
+    """[LOCAL-627 defect 1] FINAL spoken-text safety check: drop every sentence in
+    ``text`` that ``is_truncated_fragment`` flags, re-joining the survivors.
+
+    This runs on the composed spoken text as a last line of defence, so even a
+    fragment that slipped past intake filtering is never read aloud. Preserves the
+    order of surviving sentences and collapses the whitespace a drop leaves behind.
+    """
+    if not text or not text.strip():
+        return text
+    kept = [s for s in _hygiene_split(text) if not is_truncated_fragment(s)]
+    out = " ".join(s.strip() for s in kept).strip()
+    return re.sub(r"\s{2,}", " ", out)
+
+
 def _hygiene_split(text: str) -> List[str]:
     """Abbreviation-safe sentence split, reusing the shared helper when available."""
     try:
@@ -459,8 +558,8 @@ def dedupe_sentences(sentences: List[str]) -> List[str]:
         s = (sent or "").strip()
         if not s:
             continue
-        if _DANGLING_FINAL_RE.search(s):
-            continue  # truncated object — never ship a half sentence
+        if is_truncated_fragment(s):
+            continue  # [LOCAL-627 d1] truncated fragment — never ship a half sentence
         key = _dedup_key(s)
         if not key or key in seen:
             continue
@@ -710,8 +809,8 @@ def _is_story_sentence(sent: str, venue_core: str, venue_first: str) -> bool:
         return False
     if _CRUFT_RE.search(s):
         return False
-    if _DANGLING_FINAL_RE.search(s):
-        return False  # [r2] truncated object — never lift a half sentence
+    if is_truncated_fragment(s):
+        return False  # [LOCAL-627 d1] truncated fragment — never lift a half sentence
     # [LOCAL-599C] Reject institutional boilerplate that is NOT the museum's story:
     # a land acknowledgment, a DEI/accessibility statement, a cookie/privacy or
     # newsletter banner. These often carry a story-signal word ("history",
@@ -872,15 +971,28 @@ def _compose_about_narration(
     _filtered_story = filter_museum_boilerplate(body_story)
     if _filtered_story:
         body_story = _filtered_story
+    # [LOCAL-627 defect 1] FINAL fragment safety: never let a truncated snippet
+    # ("…on the ord…", "…collection of.", "… and w.") into the body.
+    body_story = [s for s in body_story if not is_truncated_fragment(s)]
     seen_body = {_dedup_key(s) for s in body_story}
     body_arch = [s for s in dedupe_sentences(list(arch_sentences))
-                 if _dedup_key(s) not in seen_body]
+                 if _dedup_key(s) not in seen_body and not is_truncated_fragment(s)]
 
-    parts.extend(body_story)
+    # [LOCAL-627 defect 3] The About section is at most 3 sentences, about what the
+    # museum is and why it matters — no corridor/accession trivia padding. Cap the
+    # spoken BODY (story + building) at 3 sentences total, story first; the fixed
+    # opening framing line is the stop's own opener and is not one of the three.
+    _ABOUT_MAX_BODY_SENTENCES = 3
+    body_combined = list(body_story)
+    if body_arch and len(body_combined) < _ABOUT_MAX_BODY_SENTENCES:
+        # Keep the "A word about the building…" lead-in only when a building
+        # sentence actually survives the cap.
+        room = _ABOUT_MAX_BODY_SENTENCES - len(body_combined)
+        body_combined += body_arch[:room]
+        body_arch = []  # folded into the capped body below
+    body_combined = body_combined[:_ABOUT_MAX_BODY_SENTENCES]
 
-    if body_arch:
-        parts.append("A word about the building you are standing in.")
-        parts.extend(body_arch)
+    parts.extend(body_combined)
 
     # [LOCAL-616 item 2 / D617] NO spoken sourcing sentence. The old close —
     # "This account is drawn from the museum's own pages on <domain> and public
@@ -889,6 +1001,8 @@ def _compose_about_narration(
     # only in the TEXT-view Sources line, composed from AboutStop.sources.
 
     text = " ".join(p.strip() for p in parts if p and p.strip())
+    # [LOCAL-627 defect 1] Final spoken-text safety check — belt and braces.
+    text = scrub_truncated_sentences(text)
     return _trim_to_word_band(text)
 
 

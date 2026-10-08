@@ -501,6 +501,18 @@ def assemble_building_tour(
     except Exception as _spr_e:  # pragma: no cover
         logger.info(f"[LOCAL-616] phantom-reference guard skipped ({_spr_e})")
         _phantom_dropped = []
+    # [LOCAL-627 defect 9] At most ONE light thematic bridge per tour; never a
+    # previous-stop recap ("…you stopped at a moment ago"). Tour 487 recapped the
+    # prior stop in every stop. Drop all previous-stop recaps and every thematic
+    # bridge beyond the first.
+    try:
+        from cross_stop_reference_guard import limit_thematic_bridges as _ltb
+        ordered, _bridge_dropped = _ltb(ordered, max_bridges=1)
+        if _bridge_dropped:
+            logger.info(f"[LOCAL-627] dropped {len(_bridge_dropped)} recap/extra-bridge sentence(s)")
+    except Exception as _ltb_e:  # pragma: no cover
+        logger.info(f"[LOCAL-627] thematic-bridge guard skipped ({_ltb_e})")
+        _bridge_dropped = []
     # [LOCAL-616 item 5] Drop era-contradicting sentences: a stop whose work date
     # is known must not carry a century/year claim >150y away unless framed as an
     # earlier tradition (414 Stop 3: "In the 13th century…" about a 1782 object).
@@ -510,6 +522,19 @@ def assemble_building_tour(
     except Exception as _wes_e:  # pragma: no cover
         logger.info(f"[LOCAL-616] wrong-era guard skipped ({_wes_e})")
         _era_dropped = []
+    # [LOCAL-627 defect 6] FINAL first-sentence dangling-OPENER guard: a prior pass
+    # (fact dedupe / phantom guard) can remove the sentence that was a stop's
+    # opening demonstrative's antecedent, leaving "This move ensured…" dangling as
+    # the first sentence (tour 488 Stop 3). Drop such an opener now, after those
+    # removals, so no stop body opens on an unresolved This/That/These + noun.
+    try:
+        from dangling_demonstrative_gate import strip_dangling_openers as _sdo
+        ordered, _opener_dropped = _sdo(ordered)
+        if _opener_dropped:
+            logger.info(f"[LOCAL-627] dropped {len(_opener_dropped)} dangling opener(s)")
+    except Exception as _sdo_e:  # pragma: no cover
+        logger.info(f"[LOCAL-627] dangling-opener guard skipped ({_sdo_e})")
+        _opener_dropped = []
     # [LOCAL-592] Resolve the opening-section text. Prefer the explicit
     # ``opening_section``; fall back to folding a legacy ``about_stop`` unit's
     # narration (+ practical facts) so no caller path can resurrect an extra stop.
@@ -682,6 +707,16 @@ def assemble_outdoor_tour(
     except Exception as _spr_e:  # pragma: no cover
         logger.info(f"[LOCAL-616] phantom-reference guard skipped ({_spr_e})")
         _phantom_dropped = []
+    # [LOCAL-627 defect 9] One thematic bridge per tour; no previous-stop recap
+    # (outdoor route too).
+    try:
+        from cross_stop_reference_guard import limit_thematic_bridges as _ltb
+        ordered, _bridge_dropped = _ltb(ordered, max_bridges=1)
+        if _bridge_dropped:
+            logger.info(f"[LOCAL-627] dropped {len(_bridge_dropped)} recap/extra-bridge sentence(s)")
+    except Exception as _ltb_e:  # pragma: no cover
+        logger.info(f"[LOCAL-627] thematic-bridge guard skipped ({_ltb_e})")
+        _bridge_dropped = []
 
     # [LOCAL-616 item 5] Drop era-contradicting sentences for the outdoor route too.
     try:
@@ -690,6 +725,15 @@ def assemble_outdoor_tour(
     except Exception as _wes_e:  # pragma: no cover
         logger.info(f"[LOCAL-616] wrong-era guard skipped ({_wes_e})")
         _era_dropped = []
+    # [LOCAL-627 defect 6] First-sentence dangling-opener guard (outdoor route too).
+    try:
+        from dangling_demonstrative_gate import strip_dangling_openers as _sdo
+        ordered, _opener_dropped = _sdo(ordered)
+        if _opener_dropped:
+            logger.info(f"[LOCAL-627] dropped {len(_opener_dropped)} dangling opener(s)")
+    except Exception as _sdo_e:  # pragma: no cover
+        logger.info(f"[LOCAL-627] dangling-opener guard skipped ({_sdo_e})")
+        _opener_dropped = []
 
     # [LOCAL-612 / D616] Lead Stop 1 with the honest shortfall sentence when the
     # route delivered fewer stops than asked. It is placed on the first walked

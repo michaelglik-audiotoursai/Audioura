@@ -5250,7 +5250,7 @@ def _verify_works_v2(poi_list, venue_name, exhibition_scope=None):
     sparql_works = [] if not _cache_hit else sparql_works
     if _venue_entity and _venue_entity.qid and not _cache_hit:
         try:
-            sparql_works = fetch_venue_works(_venue_entity.qid, _language)
+            sparql_works = fetch_venue_works(_venue_entity.qid, _language, venue_name=_venue_entity.name)
             sparql_titles = build_canonical_titles_from_works(sparql_works)
             print(f"  [D1v2] SPARQL source: {len(sparql_titles)} canonical titles")
         except Exception as e:
@@ -7321,7 +7321,7 @@ def resolve_final_description(attempts, material_context):
 
 
 def verify_stop_claims(story_text: str, snippets: list, credit_line: str = '',
-                       stop_name: str = '') -> dict:
+                       stop_name: str = '', artist: str = '') -> dict:
     """Verify a single stop's claims against its source snippets.
 
     This is the production decision function — the same logic that runs inside
@@ -7339,6 +7339,7 @@ def verify_stop_claims(story_text: str, snippets: list, credit_line: str = '',
         snippets=snippets,
         credit_line=credit_line,
         stop_name=stop_name,
+        artist_name=artist,  # [LOCAL-627 d8] namesake disambiguation
     )
 
     # [LEAD, D369] A verifier that extracted ZERO claims has verified NOTHING.
@@ -7509,6 +7510,31 @@ def _apply_delivery_hours_guard(result):
             final = _orch._fold_preflight_hours_into_text(final)
         except Exception as _he:  # pragma: no cover
             _import_logger.error(f"[LOCAL-616] hours fold skipped: {_he}")
+        # 1b. [LOCAL-627 defect 2] Collapse any RAW spoken fare table (a verbatim
+        #     multi-ticket price list that leaked into a stop body/orientation) to
+        #     one clean 'A ticket is <price>.' sentence — practical facts are spoken
+        #     once, as at most two short sentences, never a pasted price table.
+        try:
+            import practical_facts_gate as _pfg_ft
+            final, _n_fare = _pfg_ft.collapse_fare_table(final)
+            if _n_fare:
+                print(f"  [LOCAL-627 #2] collapsed {_n_fare} raw fare table(s) to a "
+                      f"single admission sentence", flush=True)
+        except Exception as _fte:  # pragma: no cover
+            _import_logger.error(f"[LOCAL-627] fare-table collapse skipped: {_fte}")
+        # 1c. [LOCAL-627 defect 9] Drop previous-stop recaps and extra thematic
+        #     bridges on the DELIVERED TEXT — the pool assembly guard
+        #     (limit_thematic_bridges) runs on units, but the normal delivery path
+        #     emits text; tour 488 shipped "…his 'Leda col cigno' that you
+        #     previously encountered" / "…you observed earlier" on this path.
+        try:
+            import cross_stop_reference_guard as _csrg
+            final, _n_recap = _csrg.limit_thematic_bridges_in_text(final, max_bridges=1)
+            if _n_recap:
+                print(f"  [LOCAL-627 #9] dropped {_n_recap} previous-stop recap / "
+                      f"extra-bridge sentence(s) from delivered text", flush=True)
+        except Exception as _rce:  # pragma: no cover
+            _import_logger.error(f"[LOCAL-627] text recap guard skipped: {_rce}")
         # 2. Drop duplicated paragraphs (e.g. the twice-printed orientation block).
         try:
             import paragraph_dedupe as _pd
@@ -7527,10 +7553,26 @@ def _apply_delivery_hours_guard(result):
         #     Runs AFTER the dedupe so it cannot defeat duplicate-orientation removal.
         try:
             import practical_facts_gate as _pfg
-            final, _added_hours_line = _pfg.ensure_unpublished_hours_line(final)
+            # [LOCAL-627 defect 2] Only assert "hours weren't published" when the
+            # hours preflight RAN successfully and genuinely returned no hours. If
+            # the preflight errored or was skipped (a transient failure — the Prado
+            # publishes hours but tour 487's preflight failed), say NOTHING instead
+            # of a false claim.
+            _pf_state = _LAST_VENUE_PREFLIGHT or {}
+            _hours_genuinely_absent = bool(
+                _pf_state
+                and not _pf_state.get('error')
+                and not _pf_state.get('skipped')
+                and not _pf_state.get('hours'))
+            final, _added_hours_line = _pfg.ensure_unpublished_hours_line(
+                final, hours_genuinely_absent=_hours_genuinely_absent)
             if _added_hours_line:
                 print("  [LOCAL-618 #4] no hours were published — said so once "
                       "('Opening hours weren't published where we could read them')",
+                      flush=True)
+            elif not _hours_genuinely_absent and not _pfg.tour_speaks_hours(final):
+                print("  [LOCAL-627 #2] hours not spoken, but preflight did not "
+                      "confirm they are unpublished — saying nothing (not a false claim)",
                       flush=True)
         except Exception as _uh:  # pragma: no cover
             _import_logger.error(f"[LOCAL-618] unpublished-hours line skipped: {_uh}")
@@ -8899,7 +8941,7 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
                     _city_hint = parts[1] if len(parts) >= 2 else ""
                 _pre_entity = resolve_venue(_museum_venue_name, _city_hint)
                 if _pre_entity and _pre_entity.qid:
-                    _pre_works = fetch_venue_works(_pre_entity.qid, _pre_entity.language)
+                    _pre_works = fetch_venue_works(_pre_entity.qid, _pre_entity.language, venue_name=_pre_entity.name)
                     _pre_titles = build_canonical_titles_from_works(_pre_works)
                     if _pre_titles:
                         # Deduplicate by QID: one title per work (prefer local language label)
@@ -9054,7 +9096,7 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
                         _det_seen_titles_norm.add(_tn)
                 
                 # Source 2: SPARQL works (Wikidata-verified, second highest)
-                _det_sparql = fetch_venue_works(_det_entity.qid, _det_entity.language)
+                _det_sparql = fetch_venue_works(_det_entity.qid, _det_entity.language, venue_name=_det_entity.name)
                 _det_sparql_seen_qids = set()
                 for w in _det_sparql:
                     _wqid = w.get('qid', '')
@@ -10028,7 +10070,7 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
                             _det_seen_titles_norm.add(_tn)
 
                     # Source 2: SPARQL works (includes creator via LOCAL-362)
-                    _det_sparql = fetch_venue_works(_det_entity.qid, _det_entity.language)
+                    _det_sparql = fetch_venue_works(_det_entity.qid, _det_entity.language, venue_name=_det_entity.name)
                     _det_sparql_seen_qids = set()
                     for w in _det_sparql:
                         _wqid = w.get('qid', '')
@@ -10135,7 +10177,7 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
 
                 _det_entity = resolve_venue(_scope_venue, _det_city_hint)
                 if _det_entity and _det_entity.qid:
-                    _det_sparql = fetch_venue_works(_det_entity.qid, _det_entity.language)
+                    _det_sparql = fetch_venue_works(_det_entity.qid, _det_entity.language, venue_name=_det_entity.name)
                     if _det_sparql and _exhibition_scope_artists:
                         # Same creator-filter as LOCAL-362
                         _scope_artists_norm = []
@@ -10209,7 +10251,7 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
                         _det_seen_titles_norm.add(_tn)
                 
                 # Source 2: SPARQL works (Wikidata-verified, second highest)
-                _det_sparql = fetch_venue_works(_det_entity.qid, _det_entity.language)
+                _det_sparql = fetch_venue_works(_det_entity.qid, _det_entity.language, venue_name=_det_entity.name)
                 _det_sparql_seen_qids = set()
                 for w in _det_sparql:
                     _wqid = w.get('qid', '')
@@ -18639,6 +18681,7 @@ Write the story FIRST, then add physical description if space allows.
                     snippets=_sv_snippets,
                     credit_line=_sv_credit,
                     stop_name=_sv_name,
+                    artist=(_sv_poi.get('artist', '') or ''),  # [LOCAL-627 d8] namesake guard
                 )
 
                 _l423_verification_results[_sv_name] = _sv_result
@@ -19997,6 +20040,46 @@ REWRITE RULES (all mandatory):
                 print(f"  [PHASE 5.7] Scrubbed dangling Stop reference(s) from {_field_key} "
                       f"of stop {p['stop_number']}: '{p['name']}'")
     print(f"OK PHASE 5.7: Dangling-reference scrub complete ({_final_stop_count} stops)")
+
+    # -------- [LOCAL-627 defect 1] PHASE 5.7a: Truncated-snippet safety check -----
+    # A search/Serper snippet carrying a "..."/"…" cut, a mid-word clip, or a
+    # sentence ending on a dangling preposition/article/"of." must never be spoken.
+    # The About section is cleaned at source (about_museum_stop); this is the FINAL
+    # spoken-text safety net on EVERY delivered stop body/orientation, so even a
+    # fragment the model copied verbatim from a reference snippet is dropped before
+    # delivery. Deterministic (no network/LLM); reuses the one shared predicate.
+    try:
+        from about_museum_stop import scrub_truncated_sentences as _scrub_trunc
+    except Exception as _trunc_err:
+        _scrub_trunc = None
+        print(f"  [LOCAL-627] WARNING: truncation safety check skipped ({_trunc_err})")
+    if _scrub_trunc:
+        _trunc_dropped = 0
+        _trunc_stops = 0
+        for p in poi_list:
+            _stop_touched = False
+            for _field_key in ('description', 'orientation'):
+                _text = p.get(_field_key, '') or ''
+                if not _text or _text.startswith('['):
+                    continue
+                # Scrub paragraph by paragraph so blank-line structure survives.
+                _paras = _text.split('\n')
+                _new_paras = []
+                for _para in _paras:
+                    if not _para.strip():
+                        _new_paras.append(_para)
+                        continue
+                    _cleaned = _scrub_trunc(_para)
+                    if _cleaned != _para:
+                        _stop_touched = True
+                    _new_paras.append(_cleaned)
+                _new_text = '\n'.join(_new_paras)
+                if _new_text != _text:
+                    p[_field_key] = _new_text
+            if _stop_touched:
+                _trunc_stops += 1
+        print(f"  [LOCAL-627] PHASE 5.7a: Truncated-snippet safety check — "
+              f"{_trunc_stops} stop(s) cleaned")
 
     _sfp.sub_start('dangling_demo_5_7b')
     # -------- [LOCAL-318] PHASE 5.7b: Dangling-demonstrative scrub --------
@@ -22453,6 +22536,29 @@ RULES:
                 print(f"  [LOCAL-618 #1] Orientation pre-tell guard: no later-stop facts in orientation")
         except Exception as _pretell_err:
             print(f"  [LOCAL-618 #1] Orientation pre-tell guard skipped (non-fatal): {_pretell_err}")
+
+    # -------- [LOCAL-627 defect 7] PHASE 5.96c: Strip phantom artist/work names --------
+    # The orientation preview may name only artists/works that are in a DELIVERED
+    # stop. Tour 488's orientation said "Gentileschi and Ejlerskov" — Ejlerskov is
+    # in no delivered stop (a phantom carried over or invented). Drop any
+    # orientation sentence naming a proper noun absent from every delivered stop's
+    # title + narration. Guarded; never fatal, never empties the orientation.
+    if _saved_prolog and poi_list:
+        try:
+            from orientation_pretell import strip_phantom_preview_names as _strip_phantom_names
+            _all_names = [p.get("name", "") for p in poi_list]
+            _all_texts = [p.get("description", "") for p in poi_list]
+            _phantom_cleaned, _phantom_name_dropped = _strip_phantom_names(
+                _saved_prolog, _all_names, _all_texts)
+            if _phantom_name_dropped > 0:
+                print(f"  [LOCAL-627 #7] Orientation phantom-name guard: dropped "
+                      f"{_phantom_name_dropped} sentence(s) naming an artist/work "
+                      f"in no delivered stop")
+                _saved_prolog = _phantom_cleaned
+            else:
+                print(f"  [LOCAL-627 #7] Orientation phantom-name guard: no phantom names")
+        except Exception as _phantom_name_err:
+            print(f"  [LOCAL-627 #7] Orientation phantom-name guard skipped (non-fatal): {_phantom_name_err}")
 
     # -------- [LOCAL-286] PHASE 5.97: Prolog-body deduplication --------
     # If the prolog (including Part 4) repeats a clause ≥8 consecutive words

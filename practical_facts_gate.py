@@ -872,6 +872,63 @@ def collapse_website_pointers(text: str) -> Tuple[str, int]:
 
 
 # ---------------------------------------------------------------------------
+# [LOCAL-627 defect 2] Collapse a RAW spoken fare table to one clean sentence
+# ---------------------------------------------------------------------------
+#
+# Tour 488 spoke, inside Stop 1's Orientation, a verbatim fare table:
+#   "admission is Single ticket purchased on the day of entry: €25. Single ticket
+#    reserved online: €29. Reduced ticket: €2. (Discounts exist for various groups)."
+# Practical facts must be spoken ONCE, as at most two short sentences. This guard
+# detects a spoken admission RUN that lists multiple ticket lines and collapses it
+# to one standard-admission sentence ("A ticket is €25."), keeping the first
+# (adult/standard) price it finds. Deterministic; never invents a price.
+
+# A fare-table run: an "admission is …" (or "Admission:") lead followed by two or
+# more ticket/price segments. Matches the spoken prose shape, within one paragraph.
+_FARE_TABLE_RE = re.compile(
+    r"(?i)(?:admission\s+is\s+|admission:\s*)?"
+    r"(?:single|standard|full|adult|reduced|concession|day|online)?\s*ticket[^.]*?"
+    r"[€£$¥]\s?\d{1,4}"                                   # first priced ticket line
+    r"(?:[^.]*?\.\s*(?:single|standard|full|adult|reduced|concession|day|online|"
+    r"\(?discount|tickets?)[^.]*?(?:[€£$¥]\s?\d{1,4})?)+"  # >=1 more ticket line
+    r"\s*\.?",
+)
+_FIRST_PRICE_RE = re.compile(r"[€£$¥]\s?\d{1,4}")
+
+
+def collapse_fare_table(text: str) -> Tuple[str, int]:
+    """Collapse any spoken RAW fare table to one 'A ticket is <price>.' sentence.
+
+    Returns ``(cleaned, n_collapsed)``. Deterministic and pure. Only a multi-line
+    ticket run (two or more priced ticket segments) is collapsed; a single clean
+    admission sentence ("A ticket is 25 euros.") is left untouched. The first
+    (standard/adult) price in the run is kept.
+    """
+    if not text:
+        return text or "", 0
+    out = text
+    collapsed = 0
+    while True:
+        m = _FARE_TABLE_RE.search(out)
+        if not m:
+            break
+        run = m.group(0)
+        price_m = _FIRST_PRICE_RE.search(run)
+        if not price_m:
+            break
+        price = re.sub(r"\s+", "", price_m.group(0))
+        replacement = f"A ticket is {price}."
+        out = out[:m.start()] + replacement + out[m.end():]
+        collapsed += 1
+        if collapsed > 10:  # safety against pathological loops
+            break
+    if collapsed:
+        out = re.sub(r'[ \t]{2,}', ' ', out)
+        out = re.sub(r'[ \t]+\n', '\n', out)
+    return out, collapsed
+
+
+# ---------------------------------------------------------------------------
 # [LOCAL-618 #4] Say the honest unpublished-hours line, once, on EVERY path
 # ---------------------------------------------------------------------------
 #
@@ -905,7 +962,8 @@ def tour_speaks_hours(text: str) -> bool:
     return False
 
 
-def ensure_unpublished_hours_line(text: str) -> Tuple[str, bool]:
+def ensure_unpublished_hours_line(text: str,
+                                  hours_genuinely_absent: bool = True) -> Tuple[str, bool]:
     """Insert the honest unpublished-hours line once when no hours are spoken.
 
     Returns ``(text, inserted)``. Deterministic, pure. Does nothing when the tour
@@ -913,9 +971,21 @@ def ensure_unpublished_hours_line(text: str) -> Tuple[str, bool]:
     fires for a MUSEUM-context tour (a walking/neighbourhood tour has no single
     building whose hours a visitor would check). The line is placed at the end of
     the Stop-1 orientation paragraph, so the listener hears it up front.
+
+    [LOCAL-627 defect 2] ``hours_genuinely_absent`` guards the honest line: it is
+    True only when the hours preflight RAN successfully and found no hours. When
+    the preflight ERRORED or was skipped (a transient failure, not real evidence
+    that the venue publishes no hours — the Prado publishes hours but tour 487's
+    preflight failed), the caller passes False and we say NOTHING rather than
+    assert "weren't published". Default True keeps the LOCAL-618 contract for
+    callers that do not distinguish.
     """
     if not text or not text.strip():
         return text or "", False
+    if not hours_genuinely_absent:
+        # [LOCAL-627 d2] Preflight did not reliably establish that hours are
+        # unpublished — say nothing rather than a false "weren't published".
+        return text, False
     if _UNPUBLISHED_HOURS_LINE in text:
         return text, False
     if tour_speaks_hours(text):

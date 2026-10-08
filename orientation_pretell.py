@@ -20,16 +20,19 @@ __all__ = [
     "extract_later_stop_terms",
     "sentence_delivers_later_stop_fact",
     "strip_later_stop_facts",
+    "strip_phantom_preview_names",
     "build_forward_connection_prompt",
 ]
 
 # Words that look like proper nouns but are too generic to count as a "later-stop
 # fact" (they appear everywhere and would over-trigger the strip).
 _GENERIC_PROPER = {
-    "the", "a", "an", "this", "that", "stop", "stops", "tour", "museum", "gallery",
-    "collection", "work", "works", "artist", "painting", "paintings", "room",
+    "the", "a", "an", "this", "that", "these", "those", "stop", "stops", "tour",
+    "museum", "gallery",
+    "collection", "work", "works", "artist", "artists", "painting", "paintings", "room",
     "first", "second", "third", "next", "final", "last", "you", "your",
     "orientation", "it", "its", "here", "there", "where", "what", "who",
+    "on", "in", "at", "before", "after", "during", "prepare", "step", "walk",
     "january", "february", "march", "april", "may", "june", "july", "august",
     "september", "october", "november", "december",
 }
@@ -134,6 +137,74 @@ def strip_later_stop_facts(orientation: str,
         # Never empty the orientation — keep the first sentence.
         kept = [sentences[0]] if sentences else []
         dropped = max(0, len(sentences) - 1)
+
+    cleaned = label + " ".join(s.strip() for s in kept).strip()
+    return cleaned, dropped
+
+
+def _is_year_token(w: str) -> bool:
+    return bool(re.fullmatch(r"(1\d{3}|20\d{2})", w or ""))
+
+
+def strip_phantom_preview_names(orientation: str,
+                                delivered_names: List[str],
+                                delivered_texts: List[str]) -> Tuple[str, int]:
+    """[LOCAL-627 defect 7] Drop orientation sentences that NAME an artist or work
+    that appears in NO delivered stop.
+
+    Tour 488's orientation said "Gentileschi and Ejlerskov" — Ejlerskov is in no
+    delivered stop. The orientation preview may name only delivered stops' artists
+    and works. A sentence is dropped when it carries a proper-noun name (a
+    capitalised multi/single-word token that is not a generic word) that does NOT
+    appear anywhere in the delivered stops' titles or narration. Conservative: a
+    sentence with no concrete out-of-tour name is kept, and the leading
+    "Orientation:" label plus a "your first stop is X" pointer always survive.
+
+    Returns (cleaned_orientation, dropped_count). Never empties the orientation.
+    """
+    if not orientation or not orientation.strip():
+        return orientation, 0
+
+    # Build the delivered name vocabulary (lowercased significant words) from the
+    # titles AND narration of every delivered stop.
+    delivered_words: set = set()
+    for name in delivered_names:
+        for w in _significant_words(name):
+            delivered_words.add(w.lower())
+    for text in delivered_texts:
+        for ph in _proper_nouns(text):
+            for w in _significant_words(ph):
+                delivered_words.add(w.lower())
+
+    label = ""
+    body = orientation
+    m = re.match(r"^(orientation:\s*)", orientation, flags=re.IGNORECASE)
+    if m:
+        label = orientation[: m.end()]
+        body = orientation[m.end():]
+
+    sentences = re.split(r"(?<=[.!?])\s+", body.strip())
+    kept: List[str] = []
+    dropped = 0
+    for sent in sentences:
+        if not sent.strip():
+            continue
+        if "first stop is" in sent.lower():
+            kept.append(sent)
+            continue
+        # Significant proper-noun words named in THIS sentence.
+        s_words = {w.lower() for ph in _proper_nouns(sent)
+                   for w in _significant_words(ph) if not _is_year_token(w)}
+        # A phantom word: a named proper noun not present in any delivered stop.
+        phantom = s_words - delivered_words
+        if phantom:
+            dropped += 1
+            continue
+        kept.append(sent)
+
+    if not kept:
+        kept = [sentences[0]] if sentences else []
+        dropped = max(0, len([s for s in sentences if s.strip()]) - 1)
 
     cleaned = label + " ".join(s.strip() for s in kept).strip()
     return cleaned, dropped

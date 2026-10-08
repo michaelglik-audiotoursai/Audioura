@@ -502,24 +502,127 @@ def resolve_venue(venue_string: str, city: str = "") -> Optional[VenueEntity]:
     return entity
 
 
-def fetch_venue_works(venue_qid: str, language: str = "en") -> List[Dict]:
+# ─── [LOCAL-627 defect 4] Reject reproductions / casts / copies / replicas ────
+# A museum catalogue (P195/P276) sometimes lists a REPRODUCTION of a work — a
+# plaster cast, a copy, a replica, a facsimile — alongside originals. Tour 487
+# opened on "Wrestlers (sculpture, 2021)", a 2021 plaster cast, as if it were an
+# original Prado masterwork. These Wikidata item-type (P31) QIDs are reproductions
+# and are never a signature original; a work whose instance-of is any of them is
+# dropped from the candidate set (unless the venue is itself a cast/reproduction
+# collection, which the caller signals).
+_REPRODUCTION_INSTANCE_QIDS = frozenset({
+    "Q11060274",   # print (reproduction) — context dependent; included defensively
+    "Q1278452",    # replica
+    "Q16919298",   # plaster cast
+    "Q2342621",    # facsimile
+    "Q13464614",   # copy (of a work)
+    "Q53092",      # reproduction
+    "Q27043472",   # reproduction (artwork)
+    "Q1543677",    # cast (metallurgy/sculpture reproduction)
+})
+# Text markers (label / alias) for a reproduction when P31 is missing or coarse.
+_REPRODUCTION_TEXT_RE = re.compile(
+    r"(?i)\b(reproduction|replica|facsimile|plaster\s+cast|"
+    r"after\s+(?:the\s+)?original|copy\s+(?:of|after)|cast\s+of)\b")
+# A work created after this year is "modern" for a classical museum — rejected
+# unless the venue is a modern/contemporary-art museum (D-LOCAL-627 defect 4).
+_WORK_INCEPTION_CUTOFF = 1990
+
+
+def strip_parenthetical_disambiguator(title: str) -> str:
+    """[LOCAL-627 defect 4] Strip a trailing parenthetical disambiguator from a
+    SPOKEN work title.
+
+    Wikidata labels carry disambiguators a listener should never hear:
+    "Wrestlers (sculpture, 2021)" → "Wrestlers", "The Three Graces (painting)" →
+    "The Three Graces", "David (Michelangelo)" → "David". Only a PARENTHETICAL at
+    the end is removed; a title that is itself parenthetical in meaning is left if
+    stripping would empty it. Deterministic and pure.
+    """
+    t = (title or "").strip()
+    if not t:
+        return t
+    # Remove one or more trailing "( … )" groups and surrounding space.
+    stripped = re.sub(r"\s*\([^()]*\)\s*$", "", t).strip()
+    # Collapse a second trailing paren group ("Name (a) (b)").
+    while True:
+        again = re.sub(r"\s*\([^()]*\)\s*$", "", stripped).strip()
+        if again == stripped:
+            break
+        stripped = again
+    return stripped or t
+
+
+def _work_is_reproduction(entry: Dict) -> bool:
+    """True when a work entry is a reproduction/cast/copy/replica (by P31 QID or a
+    label/alias text marker)."""
+    for qid in entry.get("instance_of", []) or []:
+        if qid in _REPRODUCTION_INSTANCE_QIDS:
+            return True
+    label_blob = " ".join([
+        entry.get("label_en", "") or "", entry.get("label_local", "") or "",
+        " ".join(entry.get("aliases", []) or []),
+    ])
+    return bool(_REPRODUCTION_TEXT_RE.search(label_blob))
+
+
+def _work_is_too_modern(entry: Dict, cutoff: int = _WORK_INCEPTION_CUTOFF) -> bool:
+    """True when a work's inception year is AFTER the cutoff (so it is a modern
+    piece a classical museum should not open on). Unknown inception → not modern
+    (never reject a work for a date we could not read — D584 honesty)."""
+    yr = entry.get("inception_year")
+    try:
+        return yr is not None and int(yr) > int(cutoff)
+    except (TypeError, ValueError):
+        return False
+
+
+_MODERN_ART_MUSEUM_RE = re.compile(
+    r"(?i)\b(modern\s+art|contemporary\s+art|museum\s+of\s+modern|"
+    r"\bmoma\b|modern\s+and\s+contemporary|arte\s+contempor|art\s+contemporain|"
+    r"moderne?\s+kunst|kunsthalle|new\s+media|digital\s+art|"
+    r"guggenheim|tate\s+modern|pompidou|whitney|ica\b|institute\s+of\s+contemporary)\b")
+
+
+def venue_is_modern_art(venue_name: str) -> bool:
+    """[LOCAL-627 defect 4] Best-effort: is the venue a modern/contemporary-art
+    museum, where a post-1990 original work is legitimate? Deterministic name
+    heuristic — conservative, used only to EXEMPT a venue from the post-1990
+    rejection, never to add anything."""
+    return bool(_MODERN_ART_MUSEUM_RE.search(venue_name or ""))
+
+
+def fetch_venue_works(venue_qid: str, language: str = "en",
+                      is_modern_art_museum=None, venue_name: str = "") -> List[Dict]:
     """Fetch canonical works for a venue via SPARQL (P195/P276).
-    
-    Returns list of {qid, label_en, label_local, aliases, creator, creator_qid} for each work.
+
+    Returns list of {qid, label_en, label_local, aliases, creator, creator_qid,
+    sitelinks, inception_year, instance_of} for each work.
     Gets labels in BOTH English and the local language for cross-language matching.
     Includes P170 (creator) for exhibition-scoped filtering (LOCAL-362).
+
+    [LOCAL-627 defect 4] Rejects reproductions/casts/copies/replicas (P31) and
+    works whose inception (P571) is after 1990, UNLESS the venue is a modern/
+    contemporary-art museum. ``is_modern_art_museum`` may be passed explicitly;
+    when left None it is auto-detected from ``venue_name`` so contemporary venues
+    (MoMA, Tate Modern, Pompidou…) are not stripped of their modern originals.
     """
+    if is_modern_art_museum is None:
+        is_modern_art_museum = venue_is_modern_art(venue_name)
     query = f"""
-    SELECT ?work ?workLabel ?workAltLabel ?workLabel_en ?creatorLabel ?creator ?sitelinks WHERE {{
+    SELECT ?work ?workLabel ?workAltLabel ?workLabel_en ?creatorLabel ?creator ?sitelinks ?inception ?instanceOf WHERE {{
       {{ ?work wdt:P195 wd:{venue_qid}. }}
       UNION
       {{ ?work wdt:P276 wd:{venue_qid}. }}
       OPTIONAL {{ ?work wdt:P170 ?creator. }}
       OPTIONAL {{ ?work wikibase:sitelinks ?sitelinks. }}
+      OPTIONAL {{ ?work wdt:P571 ?inception. }}
+      OPTIONAL {{ ?work wdt:P31 ?instanceOf. }}
       OPTIONAL {{ ?work rdfs:label ?workLabel_en. FILTER(LANG(?workLabel_en) = "en") }}
       SERVICE wikibase:label {{ bd:serviceParam wikibase:language "{language},en". }}
     }}
-    LIMIT 200
+    ORDER BY DESC(?sitelinks)
+    LIMIT 400
     """
     
     try:
@@ -571,6 +674,21 @@ def fetch_venue_works(venue_qid: str, language: str = "en") -> List[Dict]:
                 _sitelinks = int(r.get("sitelinks", {}).get("value", "0") or "0")
             except (TypeError, ValueError):
                 _sitelinks = 0
+
+            # [LOCAL-627 defect 4] Inception year (P571) and instance-of (P31). A
+            # work may yield several rows (multiple creators / instance_of values);
+            # we capture both and merge across the rows for the same QID below.
+            _inception_year = None
+            _inc_raw = r.get("inception", {}).get("value", "") or ""
+            if _inc_raw:
+                _m = re.search(r"(-?\d{3,4})", _inc_raw)  # ISO date or year
+                if _m:
+                    try:
+                        _inception_year = int(_m.group(1))
+                    except (TypeError, ValueError):
+                        _inception_year = None
+            _inst_uri = r.get("instanceOf", {}).get("value", "") or ""
+            _inst_qid = _inst_uri.split("/")[-1] if _inst_uri else ""
             
             # Deduplicate: same work may appear multiple times with different creators
             # (works with multiple creators) — keep first occurrence but merge creator info
@@ -584,6 +702,13 @@ def fetch_venue_works(venue_qid: str, language: str = "en") -> List[Dict]:
                             # [LOCAL-593 #4] Keep the strongest prominence seen.
                             if _sitelinks > existing.get('sitelinks', 0):
                                 existing['sitelinks'] = _sitelinks
+                            # [LOCAL-627 d4] Merge instance_of and keep earliest inception.
+                            if _inst_qid and _inst_qid not in existing.setdefault('instance_of', []):
+                                existing['instance_of'].append(_inst_qid)
+                            if _inception_year is not None:
+                                _cur = existing.get('inception_year')
+                                if _cur is None or _inception_year < _cur:
+                                    existing['inception_year'] = _inception_year
                             break
                     continue
                 _seen_qids.add(work_qid)
@@ -591,14 +716,45 @@ def fetch_venue_works(venue_qid: str, language: str = "en") -> List[Dict]:
                     "qid": work_qid,
                     "label_en": label_en,
                     "label_local": label,
+                    # [LOCAL-627 defect 4] The SPOKEN title has its trailing
+                    # parenthetical disambiguator removed ("Wrestlers (sculpture,
+                    # 2021)" → "Wrestlers", "The Three Graces (painting)" → "The
+                    # Three Graces"); the full label is kept above and in aliases
+                    # so title MATCHING is unaffected.
+                    "display_title": strip_parenthetical_disambiguator(label_en),
                     "aliases": [a.strip() for a in alt_label.split(",") if a.strip()] if alt_label else [],
                     "creator": creator_label if creator_label and not creator_label.startswith("Q") else "",
                     "creator_qid": creator_qid if creator_label and not creator_label.startswith("Q") else "",
                     "creators": [creator_label] if creator_label and not creator_label.startswith("Q") else [],
                     "sitelinks": _sitelinks,  # [LOCAL-593 #4] prominence signal
+                    "inception_year": _inception_year,   # [LOCAL-627 d4]
+                    "instance_of": [_inst_qid] if _inst_qid else [],  # [LOCAL-627 d4]
                 }
                 works.append(entry)
-        
+
+        # [LOCAL-627 defect 4] Reject reproductions / casts / copies / replicas and
+        # works whose inception is after the modern cutoff — UNLESS the venue is a
+        # modern/contemporary-art museum (then a post-1990 original is legitimate,
+        # and only reproductions are dropped). Tour 487 opened on "Wrestlers
+        # (sculpture, 2021)", a 2021 plaster cast, at the (classical) Prado.
+        _kept = []
+        _rej_repro = 0
+        _rej_modern = 0
+        for w in works:
+            if _work_is_reproduction(w):
+                _rej_repro += 1
+                continue
+            if not is_modern_art_museum and _work_is_too_modern(w):
+                _rej_modern += 1
+                continue
+            _kept.append(w)
+        if _rej_repro or _rej_modern:
+            print(f"  [venue_resolver] [LOCAL-627 d4] rejected "
+                  f"{_rej_repro} reproduction/cast + {_rej_modern} post-"
+                  f"{_WORK_INCEPTION_CUTOFF} work(s) "
+                  f"(modern_art_museum={is_modern_art_museum})")
+        works = _kept
+
         print(f"  [venue_resolver] SPARQL: {len(works)} works found for {venue_qid}")
         return works
         

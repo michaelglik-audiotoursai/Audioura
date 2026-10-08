@@ -615,3 +615,77 @@ def apply_dangling_demonstrative_gate(
             poi['description'] = modified_desc
 
     return stats
+
+
+# ---------------------------------------------------------------------------
+# [LOCAL-627 defect 6] Final first-sentence dangling-OPENER guard (unit-level)
+# ---------------------------------------------------------------------------
+#
+# apply_dangling_demonstrative_gate (PHASE 5.7b) scrubs every stop's description.
+# But a LATER assembly pass (cross_stop_fact_dedupe, phantom-reference guard) can
+# REMOVE the sentence that was the antecedent of a demonstrative, leaving the
+# stop's FIRST body sentence opening on an unresolved "This/That/These + noun"
+# that now refers to removed text — tour 488 Stop 3 shipped "This move ensured
+# the sculpture's preservation…" after its setup sentence was dropped. This guard
+# runs on the ordered stop-unit dicts AFTER those passes: it drops a unit's FIRST
+# narration sentence when it opens with a dangling demonstrative whose head noun
+# has no antecedent in the rest of that unit (title + remaining body). Pure,
+# deterministic; mirrors cross_stop_fact_dedupe's (new_units, dropped) shape.
+
+def strip_dangling_openers(ordered_units):
+    """Drop a unit's FIRST narration sentence when it opens with an unresolved
+    demonstrative (This/That/These/Those + noun) with no antecedent in the rest of
+    the unit. Returns (new_units, dropped). ``dropped`` entries are
+    {stop, sentence, head_noun}.
+    """
+    dropped = []
+    new_units = []
+    for i, unit in enumerate(ordered_units):
+        narration = unit.get("narration") or ""
+        nu = dict(unit)
+        if not narration.strip():
+            new_units.append(nu)
+            continue
+        title = (unit.get("title") or "").strip()
+        paras = re.split(r"\n{2,}", narration)
+        changed = False
+        # Only the FIRST non-empty paragraph can carry the opening sentence.
+        for pi, para in enumerate(paras):
+            if not para.strip():
+                continue
+            sentences = _ss_split(para)
+            if not sentences:
+                break
+            first = sentences[0].strip()
+            m = _DEMONSTRATIVE_START_RE.match(first)
+            if not m:
+                break  # first sentence does not open with a demonstrative
+            np_result = _extract_np(first, m.end())
+            if not np_result:
+                break
+            full_np, head_noun = np_result
+            if _normalize(head_noun) in _SETTING_NOUNS:
+                break  # deictic to the setting — legitimate
+            # Antecedent search space = title + the REST of this unit's body.
+            rest = " ".join(sentences[1:]) + " " + " ".join(
+                paras[pi + 1:])
+            if _noun_has_antecedent(head_noun, full_np, rest, title):
+                break  # resolved elsewhere in the stop — keep
+            # Generic subject noun (short NP) refers to the stop's own subject.
+            np_words = full_np.split()
+            if _normalize(head_noun) in _GENERIC_SUBJECT_NOUNS and len(np_words) <= 2:
+                break
+            # Unresolved opener → drop the first sentence.
+            remaining = " ".join(sentences[1:]).strip()
+            paras[pi] = remaining
+            dropped.append({
+                "stop": i + 1,
+                "sentence": first,
+                "head_noun": head_noun,
+            })
+            changed = True
+            break
+        if changed:
+            nu["narration"] = "\n\n".join(p for p in paras if p.strip()).strip()
+        new_units.append(nu)
+    return new_units, dropped
