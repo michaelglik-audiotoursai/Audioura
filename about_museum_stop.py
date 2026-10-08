@@ -292,6 +292,59 @@ def _is_recruitment_sentence(s: str) -> bool:
     return bool(_RECRUITMENT_RE.search(s or ""))
 
 
+# [LOCAL-630 item 5] STAFF NAMES and AMENITIES / MARKETING copy. The About section
+# says what the museum IS and why it matters — not who currently runs it, and not
+# the café/shop marketing. NG 495's About lifted "The current director is Gabriele
+# Finaldi." (a staff name, dated and churns) and "The National Gallery's
+# restaurants, bars and cafés offer something for everyone." (amenities marketing).
+#
+# STAFF: a sentence whose subject is a current post-holder — director, chief
+# curator, CEO, chair/president of the board, head of … — named or not. A FOUNDER
+# in a historical founding sentence is handled by _subject_is_person above and by
+# the founding-signal path; this rule targets the CURRENT-leadership statement
+# ("the current/present director is X", "X is the museum's director", "appointed
+# director in 2015"), which is churn, not the institution's story.
+_STAFF_ROLE = (
+    r"director|chief\s+curator|curator|chief\s+executive|c\.?e\.?o\.?|"
+    r"chair(?:man|woman|person)?|president|trustee|board\s+of\s+(?:directors|trustees)|"
+    r"head\s+of|keeper|deputy\s+director|artistic\s+director|managing\s+director")
+_STAFF_SENTENCE_RE = re.compile(
+    r"(?i)("
+    # "the current/present director is …", "the director of the gallery is …"
+    r"\b(?:current|present|the)\s+(?:" + _STAFF_ROLE + r")\b|"
+    # "<Name> is the/its director", "serves as director", "was appointed director"
+    r"\bis\s+(?:the|its|their|our)\s+(?:" + _STAFF_ROLE + r")\b|"
+    r"\b(?:serves?|served|appointed|named|became|is)\s+(?:as\s+)?(?:the\s+|a\s+)?"
+    r"(?:" + _STAFF_ROLE + r")\b|"
+    r"\b(?:" + _STAFF_ROLE + r")\s+(?:is|was)\s+appointed\b"
+    r")")
+
+# AMENITIES / MARKETING: café/restaurant/bar/shop/gift-shop/car-park copy and the
+# "something for everyone" register. The museum's dining and retail are not the
+# story of what the museum is.
+_AMENITIES_RE = re.compile(
+    r"(?i)("
+    r"\brestaurants?\b|\bcaf[eé]s?\b|\bbars?\b|\bbrasseries?\b|\beateries\b|"
+    r"\bgift\s*shops?\b|\bmuseum\s+shops?\b|\bbookshops?\b|\bretail\b|"
+    r"\bcar\s*park(?:ing)?\b|\bcloak\s*rooms?\b|\blockers?\b|"
+    r"something\s+for\s+everyone|a\s+bite\s+to\s+eat|grab\s+a\s+(?:coffee|drink)|"
+    r"relax\s+and\s+(?:enjoy|unwind)|offers?\s+(?:a\s+)?(?:range|variety|selection)\s+of\s+"
+    r"(?:dining|food|refreshments?|drinks?)"
+    r")")
+
+
+def _is_staff_or_amenities_sentence(s: str) -> bool:
+    """[LOCAL-630 item 5] True when a sentence is a CURRENT-STAFF statement
+    (director/curator/CEO/board) or AMENITIES / marketing copy (café, restaurant,
+    shop, "something for everyone"). Pure, deterministic."""
+    t = s or ""
+    if _AMENITIES_RE.search(t):
+        return True
+    if _STAFF_SENTENCE_RE.search(t):
+        return True
+    return False
+
+
 # Architecture signal words for building sentences.
 _ARCH_SIGNAL_RE = re.compile(
     r"(?i)\b(architect|designed\s+by|building\s+was|edifice|fa\u00e7ade|facade|"
@@ -833,6 +886,14 @@ def _is_story_sentence(sent: str, venue_core: str, venue_first: str) -> bool:
     # — a recruitment pitch never states the museum's identity, so there is no
     # identity exemption as there is for the academic-program rule.
     if _is_recruitment_sentence(s):
+        return False
+    # [LOCAL-630 item 5] Reject CURRENT-STAFF statements (the director/curator/CEO/
+    # board) and AMENITIES / marketing copy (café, restaurant, shop, "something for
+    # everyone"). NG 495's About lifted "The current director is Gabriele Finaldi."
+    # and "The National Gallery's restaurants, bars and cafés offer something for
+    # everyone." Neither says what the museum IS or why it matters. Dropped
+    # unconditionally — a staff/amenities line never states institutional identity.
+    if _is_staff_or_amenities_sentence(s):
         return False
     # [LOCAL-602 r2 / D617 item 11] Reject a FOUNDER BIOGRAPHY sentence: one whose
     # subject is a PERSON (the founder) and that describes the person, not the

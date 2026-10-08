@@ -4402,6 +4402,28 @@ def _apply_artwork_guards(documented, sparql_works, venue_name, n_stops,
     print(f"  {_tag} candidate works BEFORE artworks-only ({len(enriched)}): "
           f"{[e.get('title') for e in enriched]}")
 
+    # [LOCAL-630 item 1] Collection-membership FIRST: a stop's work must HANG IN
+    # THIS museum — its Wikidata current collection (P195) or location (P276) must
+    # be the venue (the SPARQL set fetched for this venue QID), or the venue's own
+    # site must list it. A title that leaked in only via Wikipedia/corpus
+    # extraction — Millais's "Ophelia" (Tate) scraped from the NG article, or
+    # Raphael's "Madonna del Prato" (KHM) — is NOT in this venue's collection and
+    # is rejected here, before the artworks-only / variety passes. No-op when there
+    # is no SPARQL/site collection to check against (never strands a sparse venue).
+    try:
+        from artwork_selection_guard import enforce_collection_membership
+        _mem_kept, _mem_dropped = enforce_collection_membership(
+            enriched, sparql_works=(sparql_works or []), site_titles=(),
+            venue_name=venue_name, is_art_museum=bool(is_art_museum))
+        if _mem_dropped:
+            print(f"  {_tag} [LOCAL-630 item 1] collection-membership dropped "
+                  f"{len(_mem_dropped)}: "
+                  f"{[(e.get('title'), e.get('_reject_reason')) for e in _mem_dropped]}")
+        enriched = _mem_kept
+    except Exception as _mem_err:  # pragma: no cover
+        print(f"  {_tag} [LOCAL-630 item 1] collection-membership skipped "
+              f"({_mem_err})")
+
     kept, dropped = enforce_artworks_only(
         enriched, venue_name=venue_name, is_art_museum=is_art_museum)
     if dropped:
@@ -7710,6 +7732,47 @@ def _apply_delivery_hours_guard(result):
                       flush=True)
         except Exception as _uh:  # pragma: no cover
             _import_logger.error(f"[LOCAL-618] unpublished-hours line skipped: {_uh}")
+        # 2c. [LOCAL-630 item 3] Hours spoken EXACTLY once. The "Museum Information:"
+        #     sentence (whose label TTS strips, so its value is read aloud) and an
+        #     injected "The museum is open …" line could BOTH speak hours — the NG
+        #     495 "open Open daily" double. Keep the first spoken hours statement
+        #     and drop any later injected duplicate. Deterministic; no-op at ≤1.
+        try:
+            import practical_facts_gate as _pfg_once
+            final, _hrs_removed = _pfg_once.collapse_spoken_hours_statements(final)
+            if _hrs_removed:
+                print(f"  [LOCAL-630 item 3] collapsed {_hrs_removed} duplicate "
+                      f"spoken hours statement(s) — hours now spoken once", flush=True)
+        except Exception as _ho:  # pragma: no cover
+            _import_logger.error(f"[LOCAL-630] hours-collapse skipped: {_ho}")
+        # 2c-bis. [LOCAL-630 item 2] Admission spoken ONCE; general-free beats any
+        #     price. NG 495 said "Admission is £3." (a donation/exhibition price)
+        #     AND "Free for general admission." Keep a single admission statement,
+        #     preferring the general-free one; drop the rest. Deterministic.
+        try:
+            import practical_facts_gate as _pfg_adm
+            final, _adm_removed = _pfg_adm.collapse_admission_statements(final)
+            if _adm_removed:
+                print(f"  [LOCAL-630 item 2] collapsed {_adm_removed} extra admission "
+                      f"statement(s) — admission spoken once (free beats price)",
+                      flush=True)
+        except Exception as _ao:  # pragma: no cover
+            _import_logger.error(f"[LOCAL-630] admission-collapse skipped: {_ao}")
+        # 2d. [LOCAL-630 item 8] Computed year-spans ("N years after/later") must
+        #     equal the difference between two dates the text states, or be
+        #     dropped. NG 495 said "Nearly 247 years after it was painted" for a
+        #     work painted 1647–51 and attacked 1914 (~267). Recompute from the
+        #     stop's own dates; correct a wrong number or drop an unverifiable one.
+        try:
+            import date_consistency_guard as _dcg_span
+            final, _span_rep = _dcg_span.recompute_year_spans_in_tour(final)
+            if _span_rep.get("changed"):
+                print(f"  [LOCAL-630 item 8] year-spans: corrected "
+                      f"{_span_rep.get('corrected', 0)}, dropped "
+                      f"{_span_rep.get('dropped', 0)} (recomputed from stop dates)",
+                      flush=True)
+        except Exception as _sp:  # pragma: no cover
+            _import_logger.error(f"[LOCAL-630] year-span recompute skipped: {_sp}")
         # 3. Drop (or translate) any genuinely-foreign spoken sentence wherever it
         #    entered the pipeline — the fresh-path closing recap leaked untranslated
         #    French ("La galerie a été construite entre 1929 et 1930…"). English is
@@ -7738,12 +7801,16 @@ def _apply_delivery_hours_guard(result):
             from tour_conclusion import (
                 rebuild_conclusion as _rebuild_concl,
                 fix_orientation_first_stop as _fix_first_stop,
+                fix_orientation_work_mismatch as _fix_orient_work,
                 count_delivered_stops as _count_delivered,
                 has_thematic_conclusion as _has_thematic,
             )
             if _count_delivered(final) > 0:
                 _concl_venue = _recover_tour_venue(final)
                 final = _fix_first_stop(final)
+                # [LOCAL-630 item 4] Each Orientation must describe its OWN stop's
+                # work — repair any that names another delivered stop's title.
+                final = _fix_orient_work(final)
                 # [LOCAL-619B] If a correct THEMATIC conclusion is already present
                 # (the fresh path built one, possibly LLM-written and theme-aware),
                 # PRESERVE it — rebuilding here would overwrite the discovered
@@ -8551,6 +8618,13 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
                                 api_key=os.environ.get("OPENAI_API_KEY", ""))
                     except Exception as _che:
                         print(f"  [LOCAL-628] cache-hit editor pass skipped (non-fatal): {_che}")
+                    # [LOCAL-630 item 7] Strip the internal idempotence marker from
+                    # the DELIVERED cache-hit text (the cache row keeps its own copy
+                    # unchanged for reuse). No-op when absent.
+                    try:
+                        _cache_hit = _stop_editor_cache.strip_marker(_cache_hit)
+                    except Exception:
+                        pass
                     if output_file:
                         with open(output_file, "w", encoding="utf-8") as _cf:
                             _cf.write(_cache_hit)
@@ -24468,6 +24542,7 @@ RULES:
         from tour_conclusion import (
             rebuild_conclusion as _rebuild_concl,
             fix_orientation_first_stop as _fix_first_stop,
+            fix_orientation_work_mismatch as _fix_orient_work,
             count_delivered_stops as _count_delivered,
         )
         # Venue name for the thread sentence: the resolved museum venue when we
@@ -24511,6 +24586,8 @@ RULES:
         # Late-gate consistency: the orientation's "first stop" name must match
         # the real first delivered stop (a late gate may have dropped it).
         complete_tour = _fix_first_stop(complete_tour)
+        # [LOCAL-630 item 4] Each Orientation must describe its OWN stop's work.
+        complete_tour = _fix_orient_work(complete_tour)
         # [LOCAL-619B] FIRST thematic build on the fresh path, with the discovered
         # theme (SQ-S6b) preferred as the thread and the cheap LLM writing the
         # body (a)+(b) from the delivered stops' text only. The LLM draft is
@@ -24688,6 +24765,21 @@ RULES:
                 _import_logger.error("[LOCAL-590] MISSING: stop_pool_store — stop pooling DISABLED")
             except Exception as _pool_store_err:
                 print(f"  [LOCAL-590] Pool store error (non-fatal): {_pool_store_err}")
+
+    # [LOCAL-630 item 7] The stop-editor idempotence marker
+    # (<!-- LOCAL-628:stop-editor:v1 -->) is an INTERNAL flag. The cache/pool
+    # copies above KEEP it so a reuse/re-run is recognised as already-edited and
+    # never re-spends; but it must NEVER appear in the delivered tour_content
+    # (Michael's text view). Strip it from the copy written to file and returned,
+    # AFTER the cache/pool stores have run. Idempotent; no-op when absent.
+    try:
+        import stop_editor as _se_strip
+        if complete_tour and _se_strip.already_edited(complete_tour):
+            complete_tour = _se_strip.strip_marker(complete_tour)
+            print("  [LOCAL-630 item 7] stripped editor marker from delivered "
+                  "tour_content (kept in cache/pool for idempotence)", flush=True)
+    except Exception as _sm:  # pragma: no cover
+        _import_logger.error(f"[LOCAL-630] marker strip skipped: {_sm}")
 
     # Save to file if output_file is provided
     if not output_file:

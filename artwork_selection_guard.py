@@ -65,6 +65,7 @@ __all__ = [
     "work_has_creator",
     "work_artist_key",
     "enforce_artworks_only",
+    "enforce_collection_membership",
     "cap_artist_variety",
 ]
 
@@ -291,6 +292,171 @@ def work_artist_key(entry: Dict) -> str:
             if t and t not in {"van", "von", "de", "del", "della", "di", "la",
                                "le", "du", "des", "der", "den", "el"}]
     return toks[-1] if toks else name.lower()
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# ITEM 1 (LOCAL-630) — collection membership. A stop's work must HANG IN THIS
+# museum. A work is in the collection only when Wikidata says its current
+# collection (P195) or location (P276) is the venue (the SPARQL set the generator
+# fetched for this venue QID), OR the venue's own website lists it. A title that
+# entered the candidate set ONLY via Wikipedia / corpus extraction — e.g. Millais's
+# "Ophelia" (Tate Britain) scraped from the National Gallery's Wikipedia article,
+# or Raphael's "Madonna del Prato" (Kunsthistorisches Museum) — is NOT in this
+# venue's collection and must be rejected, however artwork-like it is.
+# ─────────────────────────────────────────────────────────────────────────────
+
+def _norm_title(s: str) -> str:
+    """Normalise a title for membership matching: lowercase, strip accents to the
+    base letter, drop a leading article and all non-alphanumerics. Pure."""
+    import unicodedata
+    t = unicodedata.normalize("NFKD", str(s or ""))
+    t = "".join(c for c in t if not unicodedata.combining(c)).lower()
+    t = re.sub(r"^(the|a|an|le|la|les|il|lo|der|die|das|el)\s+", "", t.strip())
+    t = re.sub(r"[^a-z0-9]+", "", t)
+    return t
+
+
+def _collection_title_set(sparql_works, site_titles) -> set:
+    """Build the set of normalised titles that ARE in the venue collection:
+    every SPARQL work's label/aliases (P195/P276 confirmed) plus the venue's own
+    site-listed titles."""
+    allowed = set()
+    for w in sparql_works or []:
+        if isinstance(w, dict):
+            for k in ("label_local", "label_en", "title", "name"):
+                v = w.get(k)
+                if v:
+                    allowed.add(_norm_title(v))
+            for a in (w.get("aliases") or []):
+                if a:
+                    allowed.add(_norm_title(a))
+        elif w:
+            allowed.add(_norm_title(w))
+    for t in site_titles or []:
+        if t:
+            allowed.add(_norm_title(t))
+    allowed.discard("")
+    return allowed
+
+
+def _entry_is_collection_confirmed(entry: Dict, allowed: set) -> bool:
+    """True when a candidate is confirmed in the venue collection:
+      * it carries an explicit confirmation flag (sparql_confirmed / site_listed /
+        in_collection / collection_confirmed), OR
+      * its title or any alias matches a SPARQL/site title in ``allowed``.
+    """
+    if not isinstance(entry, dict):
+        return _norm_title(entry) in allowed
+    for flag in ("sparql_confirmed", "site_listed", "in_collection",
+                 "collection_confirmed"):
+        if entry.get(flag):
+            return True
+    for k in ("title", "label_en", "label_local", "name"):
+        v = entry.get(k)
+        if v and _norm_title(v) in allowed:
+            return True
+    for a in (entry.get("aliases") or []):
+        if a and _norm_title(a) in allowed:
+            return True
+    return False
+
+
+# [LOCAL-630 item 1] KNOWN-MISATTRIBUTION guard. A small, curated map of famous
+# works to the venue that ACTUALLY holds them, used to reject a work from a venue
+# that is not its home EVEN WHEN a Wikidata P276 "location" row (which can be a
+# loan, a data error, or a stale value) leaked it into the venue's SPARQL set.
+# This is the ticket's named failure: Millais's *Ophelia* (Tate Britain) and
+# Raphael's *Madonna del Prato* (Kunsthistorisches Museum) appearing in National
+# Gallery / Belvedere tours. Keyed on the normalised work title → set of
+# normalised home-venue name fragments. Deliberately NARROW: only unambiguous,
+# single-home masterpieces, so a legitimately shared/loaned title is never caught.
+_KNOWN_WORK_HOME = {
+    "ophelia": {"tate", "tatebritain"},                 # Millais — Tate Britain
+    "madonnadelprato": {"kunsthistorisches", "khm"},    # Raphael — KHM Vienna
+    "madonnaofthemeadow": {"kunsthistorisches", "khm"}, # EN alias of the above
+    "thehaywain": {"nationalgallery"},                  # Constable — NG (sanity)
+}
+
+
+def _violates_known_home(title: str, venue_name: str) -> bool:
+    """True when ``title`` is a famous work whose KNOWN home venue is not
+    ``venue_name`` — a wrong-museum stop to reject. A no-op for any title not in
+    the curated map (returns False), so unknown works are governed only by the
+    SPARQL/site collection check."""
+    key = _norm_title(title)
+    homes = _KNOWN_WORK_HOME.get(key)
+    if not homes:
+        return False
+    vn = _norm_title(venue_name)
+    # The venue is the work's home when any home fragment is contained in the
+    # (normalised) venue name.
+    for h in homes:
+        if h and h in vn:
+            return False
+    return True
+
+
+def enforce_collection_membership(
+    works: Sequence[Dict],
+    sparql_works: Sequence[Dict] = (),
+    site_titles: Sequence[str] = (),
+    *,
+    venue_name: str = "",
+    is_art_museum: bool = True,
+    title_key: str = "title",
+) -> Tuple[List[Dict], List[Dict]]:
+    """[LOCAL-630 item 1] Keep only candidates CONFIRMED to be in the venue's
+    collection. Returns (kept, dropped); each dropped entry is a shallow copy with
+    a ``_reject_reason`` key so the caller can show the before/after membership
+    check.
+
+    Two rejection paths:
+      * KNOWN MISATTRIBUTION — a famous work whose curated home venue is not this
+        venue (Ophelia→Tate, Madonna del Prato→KHM) is dropped FIRST, even if a
+        Wikidata P276 "location" row leaked it into the SPARQL set; and
+      * NOT-IN-COLLECTION — a candidate that is neither a SPARQL work (P195/P276 =
+        venue) nor venue-site-listed, matched by title/alias/QID or a flag.
+
+    SAFETY: the not-in-collection gate only bites when there IS a collection to
+    check against (``sparql_works`` or ``site_titles`` non-empty); with neither it
+    keeps every candidate so a sparse venue is never stranded (D577). The known-
+    misattribution guard fires regardless, since it needs no reference collection.
+    When ``is_art_museum`` is False the whole gate is a no-op.
+    """
+    kept: List[Dict] = []
+    dropped: List[Dict] = []
+    if not works:
+        return kept, dropped
+    if not is_art_museum:
+        return list(works), dropped
+
+    allowed = _collection_title_set(sparql_works, site_titles)
+
+    for entry in works:
+        e = entry if isinstance(entry, dict) else {title_key: str(entry or "")}
+        title = (e.get(title_key) or e.get("label_en")
+                 or e.get("name") or e.get("label_local") or "").strip()
+        # 1. Known-misattribution: a famous work whose home is a DIFFERENT venue.
+        if _violates_known_home(title, venue_name):
+            d = dict(e)
+            d["_reject_reason"] = (
+                f"wrong_museum (known home of '{title}' is not "
+                f"{venue_name or 'this venue'})")
+            dropped.append(d)
+            continue
+        # 2. Collection membership (only when a reference collection exists).
+        if not allowed:
+            kept.append(entry)
+            continue
+        if _entry_is_collection_confirmed(e, allowed):
+            kept.append(entry)
+        else:
+            d = dict(e)
+            d["_reject_reason"] = (
+                f"not_in_collection (no P195/P276={venue_name or 'venue'} match "
+                f"and not site-listed)")
+            dropped.append(d)
+    return kept, dropped
 
 
 # ─────────────────────────────────────────────────────────────────────────────

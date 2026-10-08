@@ -1174,3 +1174,81 @@ def fix_orientation_first_stop(tour_text: str) -> str:
         return f"{m.group(1)}{fs}{m.group(3)}"
 
     return _FIRST_STOP_PTR.sub(_sub, text, count=1)
+
+
+# ── [LOCAL-630 item 4] Each Orientation must describe its OWN stop's work ─────
+#
+# NG 495 Stop 1's Orientation said "Stand several paces back from The Toilet of
+# Venus…" — but The Toilet of Venus is STOP 2's work, not Stop 1's. The per-stop
+# orientation map desynced from the stop order (an orientation written against one
+# ordering, kept when the stops were reordered). This guard, run on the delivered
+# text, repairs it index-independently: for every stop, if its Orientation names a
+# DIFFERENT delivered stop's work-title (and not its own), the foreign title is
+# rewritten to the stop's own title, so each Orientation points at the work in
+# front of the listener. Deterministic, idempotent; a no-op when every Orientation
+# already names its own work (or names no work at all).
+
+def _bare_title(raw: str) -> str:
+    """Strip a stop header's trailing ', <year>' / ' by <artist>' decoration."""
+    t = re.sub(r',\s*\d{3,4}\s*$', '', (raw or "").strip())
+    t = re.sub(r'\s+by\s+.+$', '', t, flags=re.IGNORECASE)
+    return t.strip()
+
+
+def fix_orientation_work_mismatch(tour_text: str) -> str:
+    """[LOCAL-630 item 4] Ensure each stop's Orientation describes its OWN work.
+
+    For every ``Stop N:`` block, if its ``Orientation:`` line references ANOTHER
+    delivered stop's work-title and does NOT reference its own, replace the foreign
+    title with this stop's own title. Only a foreign STOP title is rewritten — a
+    generic orientation that names no work is left untouched. Pure, idempotent.
+    """
+    text = tour_text or ""
+    headers = list(_STOP_HEADER.finditer(text))
+    if len(headers) < 2:
+        return text
+
+    titles = []
+    for h in headers:
+        titles.append(_bare_title(h.group(2)))
+
+    # Build the stop spans.
+    spans = []
+    for k, h in enumerate(headers):
+        start = h.start()
+        end = headers[k + 1].start() if k + 1 < len(headers) else len(text)
+        spans.append((start, end))
+
+    out = text
+    # Work from the LAST span to the first so earlier char offsets stay valid.
+    for k in range(len(spans) - 1, -1, -1):
+        own = titles[k]
+        if not own:
+            continue
+        start, end = spans[k]
+        block = out[start:end]
+        # Isolate the Orientation line within the block.
+        om = re.search(r'(?im)^(\s*Orientation:\s*)(.+)$', block)
+        if not om:
+            continue
+        orient_line = om.group(0)
+        orient_val = om.group(2)
+        if own.lower() in orient_val.lower():
+            continue  # already references its own work
+        # Does it reference ANOTHER stop's title?
+        foreign = None
+        for j, t in enumerate(titles):
+            if j == k or not t:
+                continue
+            if len(t) >= 4 and re.search(r'\b' + re.escape(t) + r'\b', orient_val,
+                                         flags=re.IGNORECASE):
+                foreign = t
+                break
+        if not foreign:
+            continue
+        new_val = re.sub(r'\b' + re.escape(foreign) + r'\b', own, orient_val,
+                         flags=re.IGNORECASE)
+        new_line = om.group(1) + new_val
+        new_block = block[:om.start()] + new_line + block[om.end():]
+        out = out[:start] + new_block + out[end:]
+    return out
