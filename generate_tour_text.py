@@ -7745,6 +7745,19 @@ def _apply_delivery_hours_guard(result):
                       f"spoken hours statement(s) — hours now spoken once", flush=True)
         except Exception as _ho:  # pragma: no cover
             _import_logger.error(f"[LOCAL-630] hours-collapse skipped: {_ho}")
+        # 2c-bis. [LOCAL-630 item 2] Admission spoken ONCE; general-free beats any
+        #     price. NG 495 said "Admission is £3." (a donation/exhibition price)
+        #     AND "Free for general admission." Keep a single admission statement,
+        #     preferring the general-free one; drop the rest. Deterministic.
+        try:
+            import practical_facts_gate as _pfg_adm
+            final, _adm_removed = _pfg_adm.collapse_admission_statements(final)
+            if _adm_removed:
+                print(f"  [LOCAL-630 item 2] collapsed {_adm_removed} extra admission "
+                      f"statement(s) — admission spoken once (free beats price)",
+                      flush=True)
+        except Exception as _ao:  # pragma: no cover
+            _import_logger.error(f"[LOCAL-630] admission-collapse skipped: {_ao}")
         # 2d. [LOCAL-630 item 8] Computed year-spans ("N years after/later") must
         #     equal the difference between two dates the text states, or be
         #     dropped. NG 495 said "Nearly 247 years after it was painted" for a

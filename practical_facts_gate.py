@@ -1217,6 +1217,111 @@ def collapse_spoken_hours_statements(text: str) -> "Tuple[str, int]":
 
 
 # ---------------------------------------------------------------------------
+# [LOCAL-630 item 2] Admission spoken ONCE; general-free beats any price
+# ---------------------------------------------------------------------------
+#
+# NG 495 spoke admission TWICE and wrongly: "Admission is £3." then later "Free
+# for general admission." The National Gallery is free; the £3 was a donation or
+# an exhibition price mis-read as general admission. The rule: speak admission at
+# most once, and a GENERAL-FREE statement beats any price found for a donation, an
+# exhibition or the cloakroom. This delivered-text guard keeps a single admission
+# statement — preferring a general-free one when present — and removes the rest.
+
+# A spoken admission sentence: "admission is …", "Admission:", "free admission",
+# "free to enter", "entry is free", "a ticket is £N", "£/€/$ N".
+_ADMISSION_SENTENCE_RE = re.compile(
+    r"(?i)(\badmission\s+is\b|\badmission:\b|\bfree\s+admission\b|"
+    r"\bfree\s+(?:to\s+(?:enter|all)|for\s+general)\b|\bentry\s+is\b|"
+    r"\ba\s+ticket\s+is\b|\btickets?\s+(?:are|cost|start)\b|"
+    r"\bgeneral\s+admission\b|[£€$¥]\s?\d)")
+
+# A GENERAL-FREE admission statement (not "free for residents/under-18s only",
+# which is conditional). "the gallery is free", "admission is free", "free to
+# enter", "free for general admission", "entry is free".
+_GENERAL_FREE_RE = re.compile(
+    r"(?i)(\bfree\s+admission\b|\badmission\s+is\s+free\b|\bentry\s+is\b[^.!?]*\bfree\b|"
+    r"\bfree\s+to\s+(?:enter|all|visit)\b|\bfree\s+for\s+general\s+admission\b|"
+    r"\b(?:is|are)\s+free\s+to\s+enter\b|\bgeneral\s+admission\s+is\s+free\b|"
+    r"\bno\s+(?:charge|admission\s+fee)\b|\bcharges\s+no\s+admission\b)")
+
+# A PRICE admission statement (carries a currency amount).
+_PRICE_IN_ADMISSION_RE = re.compile(r"[£€$¥]\s?\d|\bUSD\b|\bEUR\b|\bGBP\b")
+
+
+def _admission_sentences_with_pos(text: str) -> "List[Tuple[int, str]]":
+    """Return [(char_pos, sentence)] for SPOKEN admission statements (label
+    stripped, value kept), in reading order."""
+    if not text:
+        return []
+    out = []
+    # Scan over the whole label-stripped text so sentence positions are stable.
+    stripped = "\n".join(
+        ("" if _NONSPOKEN_FIELD_RE.match(ln) else _HOURS_VALUE_LABEL_RE.sub("", ln))
+        for ln in text.split("\n"))
+    for m in re.finditer(r"[^.!?\n]*[.!?]", stripped):
+        s = m.group(0).strip()
+        if s and _ADMISSION_SENTENCE_RE.search(s):
+            out.append((m.start(), s))
+    return out
+
+
+def count_spoken_admission_statements(text: str) -> int:
+    """Number of SPOKEN admission statements in the delivered text (≤ 1 required)."""
+    return len(_admission_sentences_with_pos(text))
+
+
+def collapse_admission_statements(text: str) -> "Tuple[str, int]":
+    """Ensure admission is SPOKEN at most once, with general-free winning over any
+    price (LOCAL-630 item 2). Returns ``(text, removed_count)``.
+
+    Policy:
+      * If any GENERAL-FREE admission statement is present, that one is the single
+        survivor — every other admission statement (a £3 donation, an exhibition
+        price, a cloakroom fee) is removed.
+      * Otherwise the FIRST admission statement survives and later ones are removed.
+
+    Deterministic, pure, idempotent; a no-op at ≤ 1 admission statement. Only whole
+    admission sentences are removed — never other narration.
+    """
+    if not text or not text.strip():
+        return text or "", 0
+    sents = _admission_sentences_with_pos(text)
+    if len(sents) <= 1:
+        return text, 0
+
+    # Pick the survivor sentence text.
+    survivor = ""
+    for _pos, s in sents:
+        if _GENERAL_FREE_RE.search(s):
+            survivor = s
+            break
+    if not survivor:
+        survivor = sents[0][1]
+
+    removed = 0
+    kept_once = False
+    out = text
+    # Remove each admission sentence occurrence except the first match of the
+    # survivor text.
+    for _pos, s in sents:
+        if s == survivor and not kept_once:
+            kept_once = True
+            continue
+        # Remove this sentence (first occurrence) from the text.
+        idx = out.find(s)
+        if idx >= 0:
+            out = out[:idx] + out[idx + len(s):]
+            removed += 1
+    if not kept_once and survivor:
+        # ensure the survivor remains (it always does; defensive)
+        pass
+    out = re.sub(r"[ \t]{2,}", " ", out)
+    out = re.sub(r"\s+([.!?,;])", r"\1", out)
+    out = re.sub(r"\n{3,}", "\n\n", out)
+    return out, removed
+
+
+# ---------------------------------------------------------------------------
 # CLI: run gate on a tour file
 # ---------------------------------------------------------------------------
 
