@@ -7488,14 +7488,43 @@ def _apply_delivery_hours_guard(result):
                 rebuild_conclusion as _rebuild_concl,
                 fix_orientation_first_stop as _fix_first_stop,
                 count_delivered_stops as _count_delivered,
+                has_thematic_conclusion as _has_thematic,
             )
             if _count_delivered(final) > 0:
                 _concl_venue = _recover_tour_venue(final)
                 final = _fix_first_stop(final)
-                final = _rebuild_concl(final, venue_name=_concl_venue)
-                print(f"  [LOCAL-619] conclusion rebuilt from final text "
-                      f"(every-path guard): {_count_delivered(final)} delivered "
-                      f"stop(s), venue={_concl_venue!r}", flush=True)
+                # [LOCAL-619B] If a correct THEMATIC conclusion is already present
+                # (the fresh path built one, possibly LLM-written and theme-aware),
+                # PRESERVE it — rebuilding here would overwrite the discovered
+                # theme / LLM body with the generic template. Only (re)build when
+                # none is present (cache/pool/by-reference/overview, or a legacy
+                # From→to closing) or when the stated count is stale after a late
+                # gate. The first build lets the cheap LLM write the body (metered
+                # via cost_accumulator; validated by claim/G4; template fallback);
+                # a re-build is deterministic and never re-spends.
+                import re as _re619
+                _m_cnt = _re619.search(r"That['\u2019]s\s+(\d+)\s+stops?", final)
+                _stated = int(_m_cnt.group(1)) if _m_cnt else None
+                _delivered = _count_delivered(final)
+                _count_ok = (_stated is None) or (_stated == _delivered)
+                if _has_thematic(final) and _count_ok:
+                    # Preserve the existing thematic conclusion, but match the
+                    # trailing-newline normalisation rebuild_conclusion applies
+                    # (``.strip() + "\n"``) so a second guard pass is byte-for-byte
+                    # idempotent (LOCAL-616 test_idempotent).
+                    final = final.strip() + "\n"
+                    print(f"  [LOCAL-619B] thematic conclusion already present and "
+                          f"count OK ({_delivered} stop(s)); preserved "
+                          f"(every-path guard)", flush=True)
+                else:
+                    _concl_use_llm = not _has_thematic(final)
+                    final = _rebuild_concl(final, venue_name=_concl_venue,
+                                           use_llm=_concl_use_llm)
+                    print(f"  [LOCAL-619B] thematic conclusion built from final "
+                          f"text (every-path guard): {_count_delivered(final)} "
+                          f"delivered stop(s), venue={_concl_venue!r}, "
+                          f"llm={'on' if _concl_use_llm else 'off (re-build)'}",
+                          flush=True)
         except ImportError:
             _import_logger.error("[LOCAL-619] MISSING: tour_conclusion — the "
                                  "trailing recap stub is NOT replaced")
@@ -23866,10 +23895,19 @@ RULES:
         # Late-gate consistency: the orientation's "first stop" name must match
         # the real first delivered stop (a late gate may have dropped it).
         complete_tour = _fix_first_stop(complete_tour)
+        # [LOCAL-619B] FIRST thematic build on the fresh path, with the discovered
+        # theme (SQ-S6b) preferred as the thread and the cheap LLM writing the
+        # body (a)+(b) from the delivered stops' text only. The LLM draft is
+        # metered via cost_accumulator and validated by the claim/G4 check inside
+        # build_conclusion; on any failure the deterministic common-element
+        # template ships. The every-path delivery guard downstream PRESERVES this
+        # conclusion (it is thematic + count-correct), so the discovered theme and
+        # the LLM body survive to delivery.
         complete_tour = _rebuild_concl(
-            complete_tour, venue_name=_concl_venue, theme=_concl_theme)
+            complete_tour, venue_name=_concl_venue, theme=_concl_theme,
+            use_llm=True)
         _n_after = _count_delivered(complete_tour)
-        print(f"  [LOCAL-619] conclusion rebuilt from final text: "
+        print(f"  [LOCAL-619B] thematic conclusion built from final text: "
               f"{_n_after} delivered stop(s)"
               + (f" (was counted {_n_before} before rebuild)"
                  if _n_before != _n_after else "")

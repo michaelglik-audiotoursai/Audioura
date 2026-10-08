@@ -1,43 +1,50 @@
 """[LOCAL-619] One real conclusion for EVERY tour path, built from the FINAL text.
 
-The critic's #1 blocker on tours 440/441/442 was the trailing recap STUB
-("That's N stops — …"): it stated the wrong count (3 when a late gate delivered
-2), named only some stops, spliced per-stop metadata into a broken sentence, and
-stood in for a conclusion.
+[LOCAL-619B / Michael D634, 2026-10-07] The conclusion is about the TOUR, not a
+list of stops. Michael: "Naming all stops, especially if there are more than 3,
+will be very annoying to the listeners: the conclusion should be about our tour:
+what are the common elements in the stops and the theme of the tour."
 
-LOCAL-607 built a deterministic conclusion for POOL-assembled tours
-(``stop_pool_assembly._closing_recap``). It is the right shape, but the FRESH
-generator path, the cache-trim path, the by-reference path and the overview path
-each emitted (or trimmed) a different trailing recap. This module unifies them:
-ONE builder, run ONCE on the FINAL delivered stop list, after every gate.
+LOCAL-619 (merged) replaced the broken "That's N stops — …" splice, but its
+conclusion still ENUMERATED: "From X to Y, you have followed the thread … That's
+N stops in all. Along the way, a few moments stand out. <stop>: … <stop>: …". For
+a 4-stop tour that reads as a roll-call. This module replaces it with a THEMATIC
+conclusion — 2 to 4 sentences, about the tour as a whole:
 
-The conclusion, in order, is:
+  (a) the THREAD or THEME the stops shared — the tour theme if one was chosen
+      (SQ-S6b / theme_thread_discoverer), otherwise derived from the stops'
+      common elements (period, movement, subject, place, the people connecting
+      them);
+  (b) ONE line of MEANING — why it matters, or what to take away;
+  (c) OPTIONALLY one named example as an illustration, NEVER a list — at most a
+      single delivered title appears in the whole conclusion;
+  (d) the stop COUNT may be stated ONLY if it is correct (it is counted from the
+      delivered text, so when present it is always correct);
+  (e) the RESTAURANT OFFER is the last sentence — the exact house wording.
 
-  1. ONE short paragraph naming the THREAD that connected the stops — the tour
-     THEME when one is supplied, otherwise the venue's own collection
-     ("the collection of {venue}"). Same wording the pool path uses.
-  2. "That's N stops", with N COUNTED FROM THE DELIVERED TEXT (the ``Stop N:``
-     headers actually present), never a stale generation-time count.
-  3. A one-line recap of up to 3 stops, each naming the work plus one concrete,
-     already-delivered fact — reusing ``stop_pool_assembly._first_recap_sentence``
-     so every recapped fact is lifted verbatim from a delivered stop's narration
-     (the D177 rule: the conclusion can never reference a stop that is not present
-     or state a fact the tour did not deliver).
-  4. The RESTAURANT OFFER as the very last sentence — the exact house wording.
+There is no "From X to Y". A cheap LLM (gpt-4o-mini) may write (a)+(b) FROM THE
+DELIVERED STOPS' TEXT ONLY, metered via ``cost_accumulator`` (the network meter).
+It must contain NO fact that is not in the delivered text; that is enforced with
+the existing claim/G4 machinery (``claim_check.check_paragraph`` against the
+delivered stops as the corpus), and on ANY failure — no key, network error, an
+unsupported claim, a smuggled stop list, a "From…to…" — the builder FALLS BACK to
+a deterministic thematic template built from the stops' common elements. The
+template is also what ships when no API key is available, so the conclusion is
+always present and always true.
 
-No LLM is needed: everything is derived from the final text. The optional
-``thread`` argument lets a caller pass a tour THEME phrase (if the pipeline
-discovered one); when absent the venue collection is named, so the thread
-sentence is always present and always true.
-
-``rebuild_conclusion`` is the single finalization pass: it STRIPS whatever
-trailing conclusion/recap/stub a path produced and APPENDS the one built here,
-preserving the trailing ``Sources:`` block. It is deterministic and idempotent —
-running it twice yields the same text.
+``build_conclusion`` builds the block; ``rebuild_conclusion`` is the single
+finalization pass: it STRIPS whatever trailing conclusion/recap/stub a path
+produced (the LOCAL-619 From→to form, a pool/overview closing, a "That's N
+stops" splice) and APPENDS the one built here, preserving the trailing
+``Sources:`` block. Deterministic template path is idempotent; the LLM path is
+only taken on the first build (``rebuild`` strips an existing thematic opener and
+would re-call the LLM, so the every-path caller passes ``use_llm`` only once —
+see the wiring note on ``rebuild_conclusion``).
 """
 
 from __future__ import annotations
 
+import os
 import re
 from typing import Dict, List, Optional
 
@@ -59,15 +66,48 @@ RESTAURANT_OFFER = (
     "If you would like to eat nearby we can build you a restaurant tour."
 )
 
-# A conclusion opener used to detect an already-built (idempotent) conclusion.
-# It must match ONLY the conclusion's own single-line thread sentence, so the
-# "from … to …" clause is constrained to a single line (no DOTALL): a narration
-# sentence like "…the baroque spirit of music from the late 17th century. … you
-# have followed…" must NOT be read as the opener. Both the From→to form and the
-# single-stop "On this tour you have followed the thread" form are matched.
-_THREAD_OPENER = re.compile(
+# Conclusion openers used to detect an already-built conclusion so a rebuild
+# STRIPS it before appending the freshly-built one. Three families are matched,
+# all anchored to the start of a line (no DOTALL) so a narration sentence can
+# never be mistaken for the conclusion:
+#   * the NEW thematic openers this module now writes (``_THEMATIC_OPENER``);
+#   * the LEGACY LOCAL-619 "From X to Y / On this tour you have followed the
+#     thread" openers (so a cached/pooled tour's old enumerating conclusion is
+#     replaced, not duplicated);
+#   * a bare "That's N stops" count opener (``_COUNT_OPENER``).
+# ``_THREAD_OPENER`` is the union used by ``_split_tail`` to find where any old
+# conclusion begins.
+
+# The deterministic thematic template's first sentence always begins with one of
+# these stems; the LLM-written opener is constrained (by prompt + validation) to
+# begin with one too, so a rebuilt tour's conclusion is detectable and strippable.
+_THEMATIC_LEAD_STEMS = (
+    "This tour",
+    "Across these stops",
+    "Across the stops",
+    "Taken together",
+    "Together, these",
+    "Together these",
+    "What connects",
+    "The works on this tour",
+    "The stops on this tour",
+    "On this tour",          # also the legacy single-stop lead
+)
+_THEMATIC_OPENER = re.compile(
+    r'(?im)^(?:' + '|'.join(re.escape(s) for s in _THEMATIC_LEAD_STEMS) + r')\b')
+
+# Legacy LOCAL-619 thread openers (From→to and the single-stop form). Kept so a
+# rebuild of a tour that still carries the OLD enumerating conclusion strips it.
+_LEGACY_THREAD_OPENER = re.compile(
     r'(?im)^(?:From\s+[^\n]+?\s+to\s+[^\n]+?,\s+you have followed the thread'
     r'|On this tour you have followed the thread)\b',
+)
+# Union opener: the earliest of a thematic or a legacy thread opener marks where
+# any trailing conclusion begins.
+_THREAD_OPENER = re.compile(
+    r'(?im)^(?:' + '|'.join(re.escape(s) for s in _THEMATIC_LEAD_STEMS) + r'\b'
+    r'|From\s+[^\n]+?\s+to\s+[^\n]+?,\s+you have followed the thread\b'
+    r'|On this tour you have followed the thread\b)',
 )
 # A bare single-/zero-stop count opener (no From→to), also treated as a recap.
 _COUNT_OPENER = re.compile(r"\bThat['\u2019]s\s+\d+\s+stops?\b",
@@ -125,6 +165,22 @@ def count_delivered_stops(tour_text: str) -> int:
     (see ``normalise_stop_headers``).
     """
     return len(_STOP_HEADER.findall(normalise_stop_headers(tour_text or "")))
+
+
+def has_thematic_conclusion(tour_text: str) -> bool:
+    """True when the text already carries a THEMATIC conclusion this module wrote.
+
+    The every-path finalization guard uses this so the cheap LLM is invoked ONLY
+    on the first build (no thematic opener yet). On a re-run or a cache hit the
+    opener is already present, so the guard rebuilds deterministically — the
+    opener is stripped and re-appended from the same stops — and never re-spends.
+    A LEGACY (From→to) conclusion returns False, so a cached tour that still
+    carries the old enumerating closing is upgraded to the thematic form once.
+    """
+    text = normalise_stop_headers(tour_text or "")
+    headers = list(_STOP_HEADER.finditer(text))
+    search_from = headers[-1].end() if headers else 0
+    return _THEMATIC_OPENER.search(text, search_from) is not None
 
 
 def _normalise_offer(offer: Optional[str]) -> str:
@@ -295,21 +351,45 @@ def build_conclusion(
     theme: Optional[str] = None,
     restaurant_offer: bool = True,
     offer_text: Optional[str] = None,
+    use_llm: bool = False,
+    llm_fn=None,
+    api_key: Optional[str] = None,
 ) -> str:
-    """Build the ONE conclusion block from the FINAL delivered stop list.
+    """Build the ONE **thematic** conclusion block from the FINAL delivered stops.
 
-    Deterministic, no LLM. The count is read from ``tour_text`` (``count_delivered_stops``),
-    so it is always consistent with what the listener receives — even after a late
-    gate dropped a stop.
+    [LOCAL-619B / D634] The conclusion is about the TOUR, not a list of stops. It
+    is 2 to 4 sentences:
+
+      (a) the THREAD or THEME the stops shared — the discovered tour ``theme`` when
+          one is supplied, else a phrase derived from the stops' COMMON ELEMENTS
+          (shared period/century, movement, subject, place, or connecting people),
+          else the venue's own collection;
+      (b) one line of MEANING — why the thread matters / what to take away;
+      (c) OPTIONALLY one named example (a single delivered title), never a list;
+      (d) the stop COUNT, stated only when correct (it is counted from the
+          delivered text, so it is always correct when present);
+      (e) the RESTAURANT OFFER as the last sentence.
+
+    There is NO "From X to Y" and NO per-stop roll-call.
+
+    By default the body (a)+(b) is produced by a DETERMINISTIC template built from
+    the common elements. When ``use_llm`` is True and an API key / ``llm_fn`` is
+    available, a cheap LLM (gpt-4o-mini) writes (a)+(b) FROM THE DELIVERED STOPS'
+    TEXT ONLY, metered via ``cost_accumulator``; the draft is accepted only if it
+    passes the claim/G4 check (no fact absent from the delivered text), contains
+    no "From…to…", and names at most one delivered title. On ANY failure the
+    deterministic template is used instead.
 
     Args:
         tour_text:   the FINAL tour text (post every gate).
-        venue_name:  the venue, used for the default thread ("the collection of {venue}").
-        theme:       an optional discovered THEME phrase; when given it is named
-                     as the thread instead of the venue collection.
+        venue_name:  the venue, used as a last-resort thread ("the collection of {venue}").
+        theme:       an optional discovered THEME phrase; preferred as the thread.
         restaurant_offer: when True (default) the restaurant offer is the last line.
-        offer_text:  an optional richer offer; the restaurant sentence is still
-                     forced last (see ``_normalise_offer``).
+        offer_text:  an optional richer offer; the restaurant sentence is still last.
+        use_llm:     when True, try the cheap-LLM writer first (validated; falls back).
+        llm_fn:      optional callable(prompt, api_key) -> str for the LLM pass
+                     (defaults to the house gpt-4o-mini client). Injected in tests.
+        api_key:     OpenAI key; defaults to ``OPENAI_API_KEY`` from the environment.
 
     Returns the conclusion block (no trailing Sources), or "" when there are no
     delivered stops.
@@ -320,63 +400,392 @@ def build_conclusion(
     if n <= 0 or not stops:
         return ""
 
-    titles = [(s.get("title") or "").strip() for s in stops]
-    first = titles[0]
-    last = titles[-1]
+    titles = [(s.get("title") or "").strip() for s in stops if (s.get("title") or "").strip()]
 
-    thread_phrase = (theme or "").strip()
+    # The thread phrase: discovered theme > derived common element > venue collection.
+    common = _derive_common_elements(stops, venue_name=venue_name)
+    thread_phrase = (theme or "").strip() or common.get("thread_phrase") or ""
     if not thread_phrase:
         v = (venue_name or "").strip()
-        thread_phrase = f"the collection of {v}" if v else "a single collection"
+        thread_phrase = f"the collection of {v}" if v else "this collection"
+
+    # Build the thematic body (a)+(b)[+c]. Try the LLM first when asked; validate
+    # against the delivered stops; fall back to the deterministic template.
+    body = ""
+    if use_llm:
+        body = _llm_thematic_body(
+            stops, thread_phrase=thread_phrase, theme=(theme or "").strip(),
+            venue_name=venue_name, titles=titles,
+            llm_fn=llm_fn, api_key=api_key)
+    if not body:
+        body = _template_thematic_body(
+            stops, thread_phrase=thread_phrase, theme=(theme or "").strip(),
+            common=common, titles=titles, n=n)
+
+    # (d) The count, only when correct — appended as its own short sentence so it
+    #     is optional and never an enumeration. Omit for a 1-stop overview (a
+    #     count sentence on a single stop reads oddly and adds nothing thematic).
+    count_sentence = ""
+    if n >= 2:
+        count_sentence = f"That's {n} stops in all."
 
     lines: List[str] = []
+    para = _ensure_period(body)
+    if count_sentence:
+        para = (para + " " + count_sentence).strip()
+    lines.append(para)
 
-    # 1. The thread sentence + 2. the count, counted from the delivered text.
-    #    These open the single closing paragraph.
-    if n < 2:
-        para = [f"On this tour you have followed the thread of {thread_phrase}.",
-                f"That's {n} stop in all."]
-    else:
-        para = [f"From {first} to {last}, you have followed the thread of "
-                f"{thread_phrase}.",
-                f"That's {n} stops in all."]
-
-    # 3. A one-line recap of up to 3 stops, woven into PROSE (not a bulleted list,
-    #    which read as leftover scaffolding). Each clause names the work plus one
-    #    concrete, already-delivered fact (reusing _first_recap_sentence); the
-    #    clauses are joined into flowing sentences so the close reads as a
-    #    conclusion. Skipped for a 1-stop tour (recapping the only stop is
-    #    redundant with the thread sentence; the overview's single stop is the
-    #    venue itself).
-    if n >= 2:
-        recap_stops = _recap_pick_three(stops)
-        recap_clauses = []
-        _seen = set()
-        for s in recap_stops:
-            clause = _pick_recap_clause(s)
-            clause = _clean_recap_clause(clause, (s.get("title") or "").strip())
-            if not clause:
-                continue
-            # Guard against two stops yielding the same clause text (e.g. both
-            # fell back to a near-identical title line) so the recap never
-            # repeats a sentence (criterion 2).
-            key = re.sub(r'\s+', ' ', clause).strip().lower().rstrip('.')
-            if key in _seen:
-                continue
-            _seen.add(key)
-            recap_clauses.append(clause.rstrip())
-        if recap_clauses:
-            para.append("Along the way, a few moments stand out. "
-                        + " ".join(_ensure_period(c) for c in recap_clauses))
-
-    lines.append(" ".join(para))
-
-    # 4. The restaurant offer as the VERY LAST sentence.
+    # (e) The restaurant offer as the VERY LAST sentence.
     if restaurant_offer:
         lines.append("")
         lines.append(_normalise_offer(offer_text))
 
     return "\n".join(lines).strip()
+
+
+# ── Common-element derivation (deterministic, no network) ────────────────────
+#
+# When no theme was discovered the thread must still be TRUE and about the tour.
+# We derive it from what the delivered stops SHARE: a common century/period, a
+# recurring subject word, or a connecting person. Everything is lifted from the
+# delivered narration so the thread never states a fact the tour did not deliver.
+
+_CENTURY_WORD = {
+    15: "fifteenth", 16: "sixteenth", 17: "seventeenth", 18: "eighteenth",
+    19: "nineteenth", 20: "twentieth", 21: "twenty-first",
+}
+
+# Subject / genre words that, when shared across stops, make a true thematic
+# thread. Each maps to the noun phrase used in the thread sentence.
+_SUBJECT_WORDS = {
+    "portrait": "portraiture", "portraits": "portraiture",
+    "landscape": "landscape", "landscapes": "landscape",
+    "still life": "still life", "still-life": "still life",
+    "seascape": "the sea", "marine": "the sea",
+    "mytholog": "myth and allegory", "allegor": "myth and allegory",
+    "religious": "religious devotion", "biblical": "religious devotion",
+    "sacred": "religious devotion", "altarpiece": "religious devotion",
+    "history painting": "history painting",
+    "nude": "the human figure", "figure": "the human figure",
+    "sculpture": "sculpture", "sculptures": "sculpture",
+    "impressionis": "Impressionism", "cubis": "Cubism",
+    "baroque": "the Baroque", "renaissance": "the Renaissance",
+    "romantic": "Romanticism", "realis": "realism",
+    "abstract": "abstraction", "modern": "modern art",
+}
+
+
+def _derive_common_elements(stops: List[Dict], *, venue_name: str = "") -> Dict:
+    """Derive the stops' COMMON ELEMENTS from the delivered narration.
+
+    Returns a dict with:
+      thread_phrase : a short noun phrase for the thread sentence, or "";
+      meaning       : a one-line "why it matters" clause keyed to the thread;
+      shared_terms  : the concrete shared terms found (for the template body);
+      period_label  : a human century/period label when stops share one, or "".
+    All values are grounded in the delivered text (no invention).
+    """
+    narrations = [(s.get("narration") or "") for s in stops]
+    joined = " \n ".join(narrations)
+    low = joined.lower()
+    n_stops = len([s for s in stops if (s.get("title") or "").strip()])
+
+    # Shared century: a century that appears in the narration of >= 2 stops (or
+    # the only century present on a 1-stop overview).
+    def _centuries(text: str) -> set:
+        cents = set()
+        for y in re.findall(r'\b(1[0-9]{3}|20[0-2][0-9])\b', text):
+            cents.add((int(y) - 1) // 100 + 1)
+        for m in re.finditer(r'\b(\d{1,2})(?:st|nd|rd|th)\s+century\b', text,
+                             re.IGNORECASE):
+            cents.add(int(m.group(1)))
+        return cents
+
+    per_stop_cents = [_centuries(t) for t in narrations]
+    cent_counts: Dict[int, int] = {}
+    for cset in per_stop_cents:
+        for c in cset:
+            cent_counts[c] = cent_counts.get(c, 0) + 1
+    shared_cents = sorted(c for c, k in cent_counts.items()
+                          if k >= max(2, 1 if n_stops == 1 else 2))
+    period_label = ""
+    if shared_cents:
+        if len(shared_cents) == 1:
+            w = _CENTURY_WORD.get(shared_cents[0])
+            if w:
+                period_label = f"the {w} century"
+        else:
+            lo = _CENTURY_WORD.get(min(shared_cents))
+            hi = _CENTURY_WORD.get(max(shared_cents))
+            if lo and hi:
+                period_label = f"the {lo} to {hi} centuries"
+
+    # Shared subject/genre: a subject word present in >= 2 stops' narration.
+    subject_phrase = ""
+    subj_hits: Dict[str, int] = {}
+    for text in narrations:
+        tl = text.lower()
+        seen = set()
+        for key, phrase in _SUBJECT_WORDS.items():
+            if key in tl and phrase not in seen:
+                subj_hits[phrase] = subj_hits.get(phrase, 0) + 1
+                seen.add(phrase)
+    shared_subjects = sorted((p for p, k in subj_hits.items() if k >= 2),
+                             key=lambda p: -subj_hits[p])
+    if shared_subjects:
+        subject_phrase = shared_subjects[0]
+
+    # Assemble the thread phrase from the strongest shared element.
+    thread_phrase = ""
+    if subject_phrase and period_label:
+        thread_phrase = f"{subject_phrase} in {period_label}"
+    elif subject_phrase:
+        thread_phrase = subject_phrase
+    elif period_label:
+        v = (venue_name or "").strip()
+        thread_phrase = (f"the art of {period_label} at {v}" if v
+                         else f"the art of {period_label}")
+
+    # A one-line meaning keyed to the thread (generic but TRUE; it asserts no
+    # fact about any specific work, only the value of having followed the thread).
+    if subject_phrase:
+        meaning = (f"Seen together, the works show how differently that subject "
+                   f"could be imagined.")
+    elif period_label:
+        meaning = (f"Set side by side, they trace how taste and technique shifted "
+                   f"across {period_label}.")
+    else:
+        meaning = ("Taken together, the stops add up to more than any one of them "
+                   "seen alone.")
+
+    return {
+        "thread_phrase": thread_phrase,
+        "meaning": meaning,
+        "shared_terms": shared_subjects + ([period_label] if period_label else []),
+        "period_label": period_label,
+        "subject_phrase": subject_phrase,
+    }
+
+
+def _template_thematic_body(
+    stops: List[Dict], *, thread_phrase: str, theme: str, common: Dict,
+    titles: List[str], n: int,
+) -> str:
+    """Deterministic thematic body (a)+(b)[+c] — the fallback and the no-key path.
+
+    Produces 2 sentences: the THREAD sentence and the MEANING sentence. When the
+    thread is a derived/venue phrase (not a strong subject/period), ONE delivered
+    title may be named as a single illustrative example — never a list, never
+    "From X to Y".
+    """
+    thread_phrase = (thread_phrase or "this collection").strip()
+    meaning = common.get("meaning") or (
+        "Taken together, the stops add up to more than any one of them seen alone.")
+
+    # (a) THREAD — "This tour drew together …". No From→to, no roll-call.
+    if theme:
+        thread_sentence = f"This tour followed one thread: {thread_phrase}."
+    else:
+        thread_sentence = f"Across these stops, one thread runs through: {thread_phrase}."
+
+    # (c) OPTIONAL single example — only when the thread is generic (no strong
+    # subject/period element), to keep the close concrete. At most ONE title.
+    example_sentence = ""
+    strong = bool(common.get("subject_phrase") or common.get("period_label"))
+    if not strong and titles:
+        example = _best_example_title(stops) or titles[0]
+        if example:
+            example_sentence = f"{example} is one you might carry with you."
+
+    parts = [thread_sentence, meaning]
+    if example_sentence:
+        parts.append(example_sentence)
+    return " ".join(_ensure_period(p) for p in parts if p).strip()
+
+
+def _best_example_title(stops: List[Dict]) -> str:
+    """Pick ONE delivered title to name as the single illustrative example.
+
+    Prefers a stop whose narration carries a concrete, non-provenance story (so
+    the one named work is a memorable one), else the first delivered title.
+    """
+    for s in stops:
+        title = (s.get("title") or "").strip()
+        narration = (s.get("narration") or "").strip()
+        if not title or not narration:
+            continue
+        sentences = [x.strip() for x in re.split(r'(?<=[.!?])\s+', narration)
+                     if x.strip()]
+        for sent in sentences[1:]:
+            if not (30 <= len(sent) <= 220):
+                continue
+            if _PROVENANCE_LEAD.search(sent) or _DIMENSIONS_ONLY.search(sent):
+                continue
+            if _VIEWING_INSTRUCTION.search(sent) or _DANGLING_LEAD.match(sent):
+                continue
+            return title
+    for s in stops:
+        title = (s.get("title") or "").strip()
+        if title:
+            return title
+    return ""
+
+
+# ── Cheap-LLM thematic writer (metered) + claim/G4 validation ────────────────
+
+_LLM_THEMATIC_PROMPT = """You are writing the CLOSING of an audio museum tour. The listener has just
+heard {n} short stops. Below is the FULL delivered narration of every stop.
+
+DELIVERED STOPS:
+{stops_block}
+
+Write a 2-sentence conclusion ABOUT THE TOUR AS A WHOLE — not a list of the
+stops. Sentence 1 names the common THREAD or THEME connecting the stops ({thread_hint}).
+Sentence 2 says in one line why that thread matters or what to take away.
+
+HARD RULES:
+- Use ONLY facts that appear in the delivered narration above. State NO date,
+  name, place, number or claim that is not already in that text.
+- Do NOT list the stops. Name AT MOST ONE work, and only as a single example.
+- Do NOT write "From X to Y". Do NOT count the stops.
+- Begin sentence 1 with "This tour", "Across these stops", or "Together, these".
+- Keep it under 60 words total. Return ONLY the two sentences, nothing else."""
+
+
+def _default_thematic_llm(prompt: str, api_key: str) -> Optional[str]:
+    """One gpt-4o-mini chat-completion, metered via cost_accumulator. Returns the
+    assistant text or None on any failure. Mirrors the house gate client."""
+    if not api_key:
+        return None
+    import json as _json
+    try:
+        import requests as _req
+    except Exception:
+        return None
+    model = os.environ.get("CONCLUSION_LLM_MODEL", "gpt-4o-mini")
+    headers = {"Content-Type": "application/json",
+               "Authorization": f"Bearer {api_key}"}
+    data = {
+        "model": model,
+        "messages": [
+            {"role": "system",
+             "content": "You write audio-tour closings. Use only the facts given."},
+            {"role": "user", "content": prompt},
+        ],
+        "temperature": 0.4,
+        "max_tokens": 160,
+    }
+    try:
+        resp = _req.post("https://api.openai.com/v1/chat/completions",
+                         headers=headers, data=_json.dumps(data), timeout=30)
+        if resp.status_code != 200:
+            return None
+        j = resp.json()
+        text = j["choices"][0]["message"]["content"].strip()
+        # Meter the call via the tour's cost accumulator (the network meter).
+        try:
+            import cost_accumulator
+            usage = j.get("usage", {}) or {}
+            cost_accumulator.add_llm_usage(
+                int(usage.get("prompt_tokens", 0) or 0),
+                int(usage.get("completion_tokens", 0) or 0),
+                model)
+        except Exception:
+            pass
+        return text
+    except Exception:
+        return None
+
+
+def _llm_thematic_body(
+    stops: List[Dict], *, thread_phrase: str, theme: str, venue_name: str,
+    titles: List[str], llm_fn=None, api_key: Optional[str] = None,
+) -> str:
+    """Ask a cheap LLM to write (a)+(b) from the delivered stops' text ONLY, then
+    VALIDATE the draft with the existing claim/G4 machinery. Returns the accepted
+    body, or "" to signal the caller should fall back to the template.
+
+    A draft is REJECTED (→ "") when it:
+      * is empty / unparseable;
+      * contains a "From … to …" construction;
+      * names more than one delivered title (an enumeration);
+      * states the stop count;
+      * carries a factual claim NOT supported by the delivered narration
+        (``claim_check.check_paragraph`` with the delivered stops as the corpus).
+    """
+    api_key = api_key if api_key is not None else os.environ.get("OPENAI_API_KEY", "")
+    fn = llm_fn or _default_thematic_llm
+    if not api_key and llm_fn is None:
+        return ""
+
+    stops_block = "\n\n".join(
+        f"Stop {i+1}: {(s.get('title') or '').strip()}\n{(s.get('narration') or '').strip()}"
+        for i, s in enumerate(stops)
+    )
+    thread_hint = (f"the chosen theme is \"{theme}\"" if theme
+                   else f"for example {thread_phrase}" if thread_phrase
+                   else "derive it from what the works share")
+    prompt = _LLM_THEMATIC_PROMPT.format(
+        n=len([s for s in stops if (s.get("title") or "").strip()]),
+        stops_block=stops_block[:12000],
+        thread_hint=thread_hint,
+    )
+
+    try:
+        draft = fn(prompt, api_key)
+    except Exception:
+        return ""
+    if not draft or not draft.strip():
+        return ""
+    draft = draft.strip().strip('"').strip()
+
+    if not _thematic_draft_ok(draft, stops=stops, titles=titles,
+                              venue_name=venue_name):
+        return ""
+    return draft
+
+
+def _thematic_draft_ok(draft: str, *, stops: List[Dict], titles: List[str],
+                       venue_name: str) -> bool:
+    """Validate an LLM-written thematic body. True iff it is safe to ship."""
+    low = draft.lower()
+
+    # No "From … to …" construction (the enumerating opener the ticket bans).
+    if re.search(r'\bfrom\s+.+?\s+to\s+.+?,', draft, re.IGNORECASE):
+        return False
+    # Must not state the stop count.
+    if re.search(r"that['\u2019]?s\s+\d+\s+stops?|\b\d+\s+stops?\b", low):
+        return False
+    # Name AT MOST ONE delivered title (no enumeration / roll-call).
+    named = 0
+    for t in titles:
+        tnorm = re.sub(r'\s+', ' ', t).strip()
+        if len(tnorm) < 4:
+            continue
+        if re.search(r'\b' + re.escape(tnorm) + r'\b', draft, re.IGNORECASE):
+            named += 1
+    if named > 1:
+        return False
+
+    # The claim/G4 check: NO factual claim absent from the delivered narration.
+    # The delivered stops' narration IS the corpus; a draft that smuggles any new
+    # date/number/attribution/proper-noun predicate is rejected.
+    try:
+        import claim_check
+        passages = [(s.get("narration") or "").strip() for s in stops
+                    if (s.get("narration") or "").strip()]
+        result = claim_check.check_paragraph(
+            draft, stop_title="", venue_name=(venue_name or ""),
+            passages=passages, other_stop_passages=None)
+        vc = result.get("verdict_counts", {}) or {}
+        bad = int(vc.get("unsupported", 0)) + int(vc.get("contradicted", 0))
+        if bad > 0:
+            return False
+    except Exception:
+        # If the checker cannot run, be conservative and reject the LLM draft so
+        # the deterministic (always-true) template ships instead.
+        return False
+    return True
 
 
 def _split_tail(tour_text: str):
@@ -395,9 +804,9 @@ def _split_tail(tour_text: str):
         sources_block = m_src.group(0).strip()
         text = text[: m_src.start()]
 
-    # Find where the trailing conclusion begins: the earliest of a From→to recap
-    # opener or a bare "That's N stops" count opener that sits AFTER the last
-    # stop header. Everything from there to the end is the old conclusion.
+    # Find where the trailing conclusion begins: the earliest of a thematic/legacy
+    # thread opener or a bare "That's N stops" count opener that sits AFTER the
+    # last stop header. Everything from there to the end is the old conclusion.
     headers = list(_STOP_HEADER.finditer(text))
     search_from = headers[-1].end() if headers else 0
 
@@ -432,17 +841,26 @@ def rebuild_conclusion(
     theme: Optional[str] = None,
     restaurant_offer: bool = True,
     offer_text: Optional[str] = None,
+    use_llm: bool = False,
+    llm_fn=None,
+    api_key: Optional[str] = None,
 ) -> str:
     """The single finalization pass: replace any trailing conclusion with the one
     built from the FINAL text.
 
     Strips whatever trailing conclusion/recap/stub the path produced (fresh,
-    pool, cache, by-reference, overview), builds the unified conclusion, and
-    re-appends it followed by the preserved Sources block.
+    pool, cache, by-reference, overview) — the LOCAL-619 From→to form, a pool /
+    overview closing, or a "That's N stops" splice — builds the unified THEMATIC
+    conclusion, and re-appends it followed by the preserved Sources block.
 
-    Deterministic and IDEMPOTENT: running it on already-rebuilt text yields the
-    same text (the old conclusion is stripped first, then rebuilt from the same
-    stop list). Safe on text with no stops (returned unchanged).
+    ``use_llm`` (with ``llm_fn`` / ``api_key``) asks ``build_conclusion`` to let a
+    cheap LLM write the thematic body (validated by the claim/G4 check, falling
+    back to the deterministic template). The DETERMINISTIC path is idempotent;
+    the LLM path is non-deterministic, so an every-path caller should pass
+    ``use_llm=True`` ONCE on the first build and leave it False on any re-run (the
+    thematic opener is still stripped and rebuilt deterministically on re-runs).
+
+    Safe on text with no stops (returned unchanged).
     """
     if not tour_text or not tour_text.strip():
         return tour_text
@@ -459,6 +877,9 @@ def rebuild_conclusion(
         theme=theme,
         restaurant_offer=restaurant_offer,
         offer_text=offer_text,
+        use_llm=use_llm,
+        llm_fn=llm_fn,
+        api_key=api_key,
     )
 
     parts = [body]
