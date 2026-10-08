@@ -1,0 +1,22 @@
+[CLASS MIX PER STOP] — McMullen Museum of Art, Boston, USA
+  Stop 1: Paris Along the Seine                                        details 0.33 / historic 0.33 / social 0.33  (dominant: None)
+  Stop 2: Saints and Sinners: Caravaggio and the Baroque Image         details 0.60 / historic 0.00 / social 0.40  (dominant: details)
+  Stop 3: Dura-Europos: Crossroads of Antiquity                        details 0.75 / historic 0.00 / social 0.25  (dominant: details)
+  Stop 4: A retrospective of the work of Surrealist Roberto Matta      details 0.50 / historic 0.00 / social 0.50  (dominant: details)
+  Stop 5: Pollock Matters                                              details 0.50 / historic 0.00 / social 0.50  (dominant: details)
+  tour coverage: classes_present=['details', 'social'] missing=['historic'] covered=False
+
+[CLASS MIX PER STOP] — McMullen Museum of Art, Boston, USA
+  Stop 1: Paris Along the Seine                                        details 1.00 / historic 0.00 / social 0.00  (dominant: details)
+  Stop 2: Saints and Sinners: Caravaggio and the Baroque Image         details 0.50 / historic 0.25 / social 0.25  (dominant: details)
+  Stop 3: A retrospective of the work of Surrealist Roberto Matta      details 1.00 / historic 0.00 / social 0.00  (dominant: details)
+  Stop 4: Dura-Europos: Crossroads of Antiquity                        details 1.00 / historic 0.00 / social 0.00  (dominant: details)
+  Stop 5: Meal at the House of Simon the Pharisee                      details 1.00 / historic 0.00 / social 0.00  (dominant: details)
+  tour coverage: classes_present=['details', 'historic', 'social'] missing=[] covered=True
+
+[CLASS MIX PER STOP] — Musée des Beaux-Arts de Lille, Lille, France
+  Stop 1: La plage de Berck                                            details 0.00 / historic 1.00 / social 0.00  (dominant: historic)
+  Stop 2: L'Empereur Auguste ordonne de fermer les portes du temple de details 0.62 / historic 0.38 / social 0.00  (dominant: details)
+  Stop 3: Jésus au jardin des Oliviers                                 details 0.80 / historic 0.00 / social 0.20  (dominant: details)
+  tour coverage: classes_present=['details', 'historic', 'social'] missing=[] covered=True
+
