@@ -22494,6 +22494,29 @@ RULES:
         except Exception as _pretell_err:
             print(f"  [LOCAL-618 #1] Orientation pre-tell guard skipped (non-fatal): {_pretell_err}")
 
+    # -------- [LOCAL-627 defect 7] PHASE 5.96c: Strip phantom artist/work names --------
+    # The orientation preview may name only artists/works that are in a DELIVERED
+    # stop. Tour 488's orientation said "Gentileschi and Ejlerskov" — Ejlerskov is
+    # in no delivered stop (a phantom carried over or invented). Drop any
+    # orientation sentence naming a proper noun absent from every delivered stop's
+    # title + narration. Guarded; never fatal, never empties the orientation.
+    if _saved_prolog and poi_list:
+        try:
+            from orientation_pretell import strip_phantom_preview_names as _strip_phantom_names
+            _all_names = [p.get("name", "") for p in poi_list]
+            _all_texts = [p.get("description", "") for p in poi_list]
+            _phantom_cleaned, _phantom_name_dropped = _strip_phantom_names(
+                _saved_prolog, _all_names, _all_texts)
+            if _phantom_name_dropped > 0:
+                print(f"  [LOCAL-627 #7] Orientation phantom-name guard: dropped "
+                      f"{_phantom_name_dropped} sentence(s) naming an artist/work "
+                      f"in no delivered stop")
+                _saved_prolog = _phantom_cleaned
+            else:
+                print(f"  [LOCAL-627 #7] Orientation phantom-name guard: no phantom names")
+        except Exception as _phantom_name_err:
+            print(f"  [LOCAL-627 #7] Orientation phantom-name guard skipped (non-fatal): {_phantom_name_err}")
+
     # -------- [LOCAL-286] PHASE 5.97: Prolog-body deduplication --------
     # If the prolog (including Part 4) repeats a clause ≥8 consecutive words
     # in any stop body, the listener hears the same thing twice within 90 seconds.
