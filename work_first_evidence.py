@@ -1063,7 +1063,9 @@ _TRUNCATED_TAIL_RE = re.compile(
     r"(?i)\b("
     r"talent\s+for|ability\s+to|known\s+for|famous\s+for|devoted\s+to|"
     r"dedicated\s+to|thanks\s+to|because\s+of|such\s+as|including|featuring|"
-    r"as\s+well\s+as|in\s+order\s+to|the|a|an|his|her|their|its|of|to|for|and|"
+    r"as\s+well\s+as|in\s+order\s+to|skill\s+in|mastery\s+of|gift\s+for|"
+    r"capturing|showcasing|depicting|portraying|rendering|conveying|evoking|"
+    r"exploring|revealing|the|a|an|his|her|their|its|of|to|for|and|"
     r"with|that|which|was|were|is|are"
     r")\s*[.!?]?\s*$")
 
