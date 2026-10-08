@@ -363,6 +363,20 @@ def _gemini(prompt: str, model: str = None, grounded: bool = False) -> str:
         return ''
 
 
+
+def _gemini_post(model, key, prompt, grounded, timeout):
+    """One Gemini generateContent POST (LEAD 2026-10-08: split out so it can be retried)."""
+    return requests.post(
+        f'https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent',
+        headers={'Content-Type': 'application/json', 'x-goog-api-key': key},
+        json={'contents': [{'parts': [{'text': prompt}]}],
+              'generationConfig': {
+                  'temperature': 0.2,
+                  'maxOutputTokens': int(os.environ.get('GEMINI_MAX_TOKENS', '4000')),
+                  'thinkingConfig': {'thinkingBudget': 0}},
+              **({'tools': [{'google_search': {}}]} if grounded else {})},
+        timeout=timeout)
+
 def gemini_with_sources(prompt: str, model: str = None,
                         resolve: bool = True, timeout: int = 90,
                         grounded: bool = True) -> Dict:
@@ -409,23 +423,16 @@ def gemini_with_sources(prompt: str, model: str = None,
         # an explicitly ungrounded call is not charged the per-request rate.
         if grounded:
             _count_grounding_request()
-        r = requests.post(
-            f'https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent',
-            headers={'Content-Type': 'application/json', 'x-goog-api-key': key},
-            json={'contents': [{'parts': [{'text': prompt}]}],
-                  'generationConfig': {
-                      'temperature': 0.2,
-                      'maxOutputTokens': int(os.environ.get('GEMINI_MAX_TOKENS', '4000')),
-                      'thinkingConfig': {'thinkingBudget': 0}},
-                  # [2026-09-23] Grounding with Google Search is billed PER
-                  # REQUEST (~$35/1000, ~3.5c a call) and is independent of tokens.
-                  # It was unconditional here, so questions that cannot benefit from
-                  # a web search were paying for one: "what kind of place is this?"
-                  # and "what does a church consist of?" are CLASS knowledge — the
-                  # model either knows or it does not, and no search helps. Roughly
-                  # four of the ~15 Gemini calls per tour were paying for nothing.
-                  **({'tools': [{'google_search': {}}]} if grounded else {})},
-            timeout=timeout)
+        # [LEAD 2026-10-08] Retry transient overload. Bench R2 (6 concurrent tours) lost
+        # 33 of 108 Gemini calls to HTTP 503 "model overloaded", and those stops got no
+        # research. Up to 3 retries on 429/500/502/503/504 with 2/5/10 s (+jitter) backoff.
+        # A failed attempt is not billed by Google, so the meter is unaffected.
+        import random as _rnd, time as _tm
+        for _attempt in range(4):
+            r = _gemini_post(model, key, prompt, grounded, timeout)
+            if r.status_code not in (429, 500, 502, 503, 504) or _attempt == 3:
+                break
+            _tm.sleep((2, 5, 10)[_attempt] + _rnd.uniform(0, 1.5))
         r.raise_for_status()
         d = r.json()
     except Exception as e:
