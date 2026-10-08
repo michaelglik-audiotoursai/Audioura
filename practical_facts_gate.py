@@ -1093,29 +1093,67 @@ def ensure_spoken_hours_line(text: str, hours: str = "", admission: str = "") ->
 
     # Place it in the Stop-1 opening section, after the About narration. NEVER an
     # Orientation paragraph, and never a non-spoken field block (Museum Information,
-    # Address, Coordinates, Directions, Sources…). Target the FIRST substantive
-    # prose paragraph that is not an Orientation / field / header line.
+    # Address, Coordinates, Directions, Sources…). Target the Stop-1 OPENING
+    # SECTION: a narration prose paragraph that appears BEFORE the first
+    # Orientation. Never the title/header block, a field block, a stop header, or
+    # an Orientation. If no such prose paragraph exists yet, the sentence is
+    # inserted as its OWN new paragraph immediately after the first stop header
+    # (the opening-section position), still never inside an Orientation.
+    _TITLE_OR_HEADER = re.compile(
+        r"(?i)^\s*(step-by-step\b|tour-category:|type/specialty:|address:|"
+        r"coordinates:|directions:|sources?:|stop\s*\d+:|orientation:|"
+        r"museum information:|operational details:|visiting hours:|opening hours:|"
+        r"hours:|specific examples:)")
+
+    def _prose_lines(paragraph):
+        out = []
+        for ln in paragraph.split("\n"):
+            s = ln.strip()
+            if not s or _TITLE_OR_HEADER.match(s):
+                continue
+            out.append(ln)
+        return out
+
     paras = text.split("\n\n")
+
+    # First Orientation / first stop-header positions bound the opening section.
+    _first_orientation = next(
+        (i for i, p in enumerate(paras) if "Orientation:" in p), len(paras))
+    _first_stop = next(
+        (i for i, p in enumerate(paras)
+         if re.match(r"(?i)^\s*stop\s*\d+:", p.strip())), None)
+
+    # (a) Prefer a narration prose paragraph in the opening section (before the
+    #     first Orientation), that is not a header/field/stop block.
     _target = None
     for i, p in enumerate(paras):
-        s = p.strip()
-        if not s:
+        if i >= _first_orientation:
+            break
+        if "Orientation:" in p:
             continue
-        if re.search(r"(?i)^\s*(?:stop\s*\d+\b.*)?orientation:", s) or "Orientation:" in s:
-            continue
-        if _NONSPOKEN_FIELD_RE.match(s) or _HOURS_VALUE_LABEL_RE.match(s):
-            continue
-        if re.match(r"(?i)^\s*(stop\s*\d+:|directions:|address:|coordinates:|"
-                    r"type/specialty:|tour-category:|sources?:)", s):
-            continue
-        _target = i
-        break
-    if _target is None:
-        return text, False
+        if _prose_lines(p):
+            _target = i
+            break
 
-    sep = "" if paras[_target].rstrip().endswith((".", "!", "?")) else "."
-    paras[_target] = paras[_target].rstrip() + sep + " " + sentence
-    return "\n\n".join(paras), True
+    if _target is not None:
+        lines = paras[_target].split("\n")
+        _li = next((j for j in range(len(lines) - 1, -1, -1)
+                    if lines[j].strip() and not _TITLE_OR_HEADER.match(lines[j].strip())),
+                   None)
+        if _li is None:
+            return text, False
+        sep = "" if lines[_li].rstrip().endswith((".", "!", "?")) else "."
+        lines[_li] = lines[_li].rstrip() + sep + " " + sentence
+        paras[_target] = "\n".join(lines)
+        return "\n\n".join(paras), True
+
+    # (b) No opening-section prose yet → insert the sentence as its OWN paragraph
+    #     right after the first stop header (opening-section position).
+    if _first_stop is not None:
+        paras.insert(_first_stop + 1, sentence)
+        return "\n\n".join(paras), True
+
+    return text, False
 
 
 # ---------------------------------------------------------------------------

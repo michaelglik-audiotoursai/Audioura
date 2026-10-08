@@ -264,7 +264,12 @@ class TestItem4HoursSpoken(unittest.TestCase):
         self.assertTrue(inserted)
         self.assertTrue(pfg.tour_speaks_hours_in_prose(out))
         self.assertIn("open", out.lower())
-        self.assertIn("€65", out)
+        # [LOCAL-633] the COMPOSED spoken sentence uses the currency as a WORD.
+        self.assertIn("65 euros", out)
+        # Practical facts are placed in the opening section, never the Orientation.
+        orientation = [p for p in out.split("\n\n")
+                       if p.strip().lower().startswith("orientation:")][0]
+        self.assertNotIn("is open", orientation)
 
     def test_spoken_hours_noop_when_prose_already_speaks(self):
         # No double-up: when prose already states hours, inject nothing.
