@@ -23908,10 +23908,26 @@ RULES:
                     and getattr(_thread_result, 'mode', '') == 'threaded'
                     and getattr(_thread_result, 'threads', None)):
                 _tn = (getattr(_thread_result.threads[0], 'name', '') or '').strip()
+                _td = (getattr(_thread_result.threads[0], 'description', '') or '').strip()
                 # Use the discovered theme only when it reads as a short noun
                 # phrase (it is slotted into "you have followed the thread of {X}").
                 if _tn and 2 <= len(_tn.split()) <= 8:
                     _concl_theme = _tn
+                # [LOCAL-620 item 6a / D634] INSTITUTIONAL-THEME GUARD. Lille (tour
+                # 463) got the SQ-S6b thread "evolution of museum techniques and
+                # renovations", which framed the stops and the conclusion around the
+                # institution instead of the art. When the discovered theme reads as
+                # institutional, DISCARD it so the deterministic common-element
+                # thread (period/subject the works share) is used instead.
+                if _concl_theme:
+                    try:
+                        from work_first_evidence import is_institutional_theme as _is_inst_theme
+                        if _is_inst_theme(_concl_theme, _td):
+                            print(f"  [LOCAL-620] discarded institutional discovered "
+                                  f"theme '{_concl_theme}' — using common-element thread")
+                            _concl_theme = None
+                    except Exception:
+                        pass
         except Exception:
             _concl_theme = None
 

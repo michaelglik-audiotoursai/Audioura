@@ -211,6 +211,79 @@ def _ensure_period(s: str) -> str:
     return s if s.endswith((".", "!", "?")) else s + "."
 
 
+# [LOCAL-620 item 6b / D634] Close an unclosed example quote and put the
+# sentence's terminator AFTER the closing quote. The LOCAL-619B single-example
+# sentence (and, more often, the cheap-LLM thematic body) could drop the closing
+# quote on a titled work — the live Dürer conclusion read:
+#   … as seen in Dürer's "Ritter, Tod und Teufel. That's 4 stops …
+# which leaves the quotation open for the rest of the tour. This balancer scans
+# the conclusion block for an opening double-quote with no matching close and
+# inserts the closing quote at the end of that quoted span, moving a trailing
+# period to sit AFTER the quote (English convention, and what the ticket asks).
+_OPEN_DQUOTE = '"'
+# curly quotes the LLM sometimes emits
+_CURLY_OPEN = "\u201c"
+_CURLY_CLOSE = "\u201d"
+
+
+def balance_quotes(text: str) -> str:
+    """Close an unbalanced double-quote in ``text`` and place the period after it.
+
+    Deterministic and idempotent. Handles straight (") and curly (" ") quotes.
+    When the number of opening quotes exceeds closings, the final quoted span is
+    closed at the end of its sentence (before the sentence terminator), and the
+    terminator is re-emitted AFTER the closing quote. Balanced text is returned
+    unchanged.
+    """
+    if not text:
+        return text
+
+    # Normalise count across straight + curly. We only repair the common case:
+    # exactly one more opener than closer (a single dropped closing quote).
+    straight = text.count(_OPEN_DQUOTE)
+    curly_open = text.count(_CURLY_OPEN)
+    curly_close = text.count(_CURLY_CLOSE)
+
+    # Case A: straight quotes — odd count means one is unclosed.
+    if straight % 2 == 1:
+        # find the last opening straight quote
+        last_open = text.rfind(_OPEN_DQUOTE)
+        if last_open == -1:
+            return text
+        after = text[last_open + 1:]
+        # the quoted span runs to the next sentence terminator; close before it
+        m = re.search(r'[.!?]', after)
+        if m:
+            cut = last_open + 1 + m.start()
+            terminator = text[cut]
+            repaired = (text[:cut].rstrip()
+                        + _OPEN_DQUOTE + terminator
+                        + text[cut + 1:])
+        else:
+            # no terminator — append a closing quote at the very end
+            repaired = text.rstrip() + _OPEN_DQUOTE
+        return repaired
+
+    # Case B: curly quotes — more opens than closes.
+    if curly_open > curly_close:
+        last_open = text.rfind(_CURLY_OPEN)
+        if last_open == -1:
+            return text
+        after = text[last_open + 1:]
+        m = re.search(r'[.!?]', after)
+        if m:
+            cut = last_open + 1 + m.start()
+            terminator = text[cut]
+            repaired = (text[:cut].rstrip()
+                        + _CURLY_CLOSE + terminator
+                        + text[cut + 1:])
+        else:
+            repaired = text.rstrip() + _CURLY_CLOSE
+        return repaired
+
+    return text
+
+
 # Degenerate / placeholder narration that must never become a recap "fact".
 # A stop whose narration failed generation can carry an apology or placeholder;
 # the recap must name the work, not echo an error, so such a clause is reduced
@@ -431,6 +504,9 @@ def build_conclusion(
 
     lines: List[str] = []
     para = _ensure_period(body)
+    # [LOCAL-620 item 6b] Close any unclosed example quote and move the period
+    # after it (the live Dürer "Ritter, Tod und Teufel. defect).
+    para = balance_quotes(para)
     if count_sentence:
         para = (para + " " + count_sentence).strip()
     lines.append(para)
@@ -788,6 +864,102 @@ def _thematic_draft_ok(draft: str, *, stops: List[Dict], titles: List[str],
     return True
 
 
+# [LOCAL-620 item 6c / D634] Drop an ORPHAN one-sentence paragraph that names a
+# work which is NOT one of the delivered stops. Städel (tour 462) carried, between
+# the last stop body and the conclusion, a stray one-line paragraph:
+#   "Hieronymus Bosch's 'Ecce Homo' was created around 1476."
+# — a leftover after G4 removed sentences, naming a work the tour never delivered.
+# This is a different KIND of defect from the conclusion recap: it sits in the
+# body tail. We remove any one-sentence paragraph AFTER the last Stop header whose
+# only named work is not among the delivered stop titles.
+
+# A quoted or titled work reference inside a paragraph: 'X', "X", or a
+# "<Artist>'s <Title>" possessive construction.
+_QUOTED_WORK_RE = re.compile(r"['\u2018\u201c\"]([^'\u2019\u201d\"]{3,80})['\u2019\u201d\"]")
+
+
+def _paragraph_names_only_undelivered_work(paragraph: str,
+                                           delivered_titles: List[str]) -> bool:
+    """True when a one-sentence paragraph's named work is NOT a delivered stop.
+
+    Conservative: only fires when the paragraph is a SINGLE sentence, names a
+    quoted/titled work, and NONE of the delivered titles appears in it. A
+    paragraph that mentions a delivered title (even in passing) is kept.
+    """
+    p = (paragraph or "").strip()
+    if not p:
+        return False
+    # single sentence only
+    sents = [s for s in re.split(r'(?<=[.!?])\s+', p) if s.strip()]
+    if len(sents) != 1:
+        return False
+    quoted = _QUOTED_WORK_RE.findall(p)
+    if not quoted:
+        return False
+    low = p.lower()
+    for t in delivered_titles:
+        tn = re.sub(r'\s+', ' ', (t or '')).strip().lower()
+        if len(tn) >= 4 and tn in low:
+            return False  # names a delivered work — keep
+        # also match the quoted span against the delivered title
+        for q in quoted:
+            qn = re.sub(r'\s+', ' ', q).strip().lower()
+            if len(qn) >= 4 and (qn in tn or tn in qn):
+                return False
+    return True
+
+
+def drop_orphan_work_paragraphs(tour_text: str) -> "tuple[str, Dict]":
+    """Remove orphan one-sentence paragraphs (naming an undelivered work) that sit
+    AFTER the last delivered stop body.
+
+    Deterministic, idempotent. Returns (new_text, report). The region scanned is
+    only the tail after the last ``Stop N:`` header, so stop bodies and the
+    conclusion/Sources are never touched by this pass (the caller runs it on the
+    body before the conclusion is built).
+    """
+    report = {"dropped": 0}
+    text = tour_text or ""
+    if not text.strip():
+        return text, report
+
+    delivered_titles = []
+    for m in _STOP_HEADER.finditer(text):
+        raw = (m.group(2) if m.lastindex and m.lastindex >= 2 else m.group(0)).strip()
+        raw = re.sub(r',\s*\d{3,4}\s*$', '', raw)
+        raw = re.sub(r'\s+by\s+.+$', '', raw, flags=re.IGNORECASE)
+        if raw:
+            delivered_titles.append(raw.strip())
+
+    headers = list(_STOP_HEADER.finditer(text))
+    if not headers:
+        return text, report
+    last_end = headers[-1].end()
+
+    head = text[:last_end]
+    tail = text[last_end:]
+
+    # Split the tail into paragraphs, drop orphan ones.
+    paras = re.split(r'(\n\s*\n)', tail)
+    out_paras = []
+    dropped = 0
+    for seg in paras:
+        if seg.strip() == "" or re.fullmatch(r'\n\s*\n', seg):
+            out_paras.append(seg)
+            continue
+        if _paragraph_names_only_undelivered_work(seg, delivered_titles):
+            dropped += 1
+            continue
+        out_paras.append(seg)
+    report["dropped"] = dropped
+    if dropped == 0:
+        return text, report
+    new_tail = "".join(out_paras)
+    new_text = head + new_tail
+    new_text = re.sub(r'\n{3,}', '\n\n', new_text)
+    return new_text, report
+
+
 def _split_tail(tour_text: str):
     """Split the tour into (body_before_conclusion, sources_block).
 
@@ -827,6 +999,9 @@ def _split_tail(tour_text: str):
     body = strip_epilog(body)
     for pat in _TRAILING_OFFER_PATTERNS:
         body = pat.sub("", body)
+    # [LOCAL-620 item 6c] Drop an orphan one-sentence paragraph (naming an
+    # undelivered work) that sits after the last stop body (the Städel 462 defect).
+    body, _orphan_rep = drop_orphan_work_paragraphs(body)
     body = re.sub(r'[ \t]+\n', '\n', body)
     body = re.sub(r'\n{3,}', '\n\n', body)
     body = body.rstrip()

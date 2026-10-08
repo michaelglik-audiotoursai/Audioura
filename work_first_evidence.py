@@ -899,7 +899,15 @@ _INSTITUTIONAL_THEME_RE = re.compile(
     r"formation|origins?)|museum'?s?\s+(?:growth|history|mission|founding)|"
     r"expropriation|confiscation|desamortiz|nationaliz|redistribut|"
     r"patronage|philanthrop|endowment|the\s+making\s+of\s+(?:a|the)\s+(?:museum|"
-    r"collection)"
+    r"collection)|"
+    # [LOCAL-620 item 6a] building/renovation/display-technique framings — the
+    # Lille (tour 463) SQ-S6b thread "evolution of museum techniques and
+    # renovations" dragged the institution into every stop and the conclusion.
+    r"renovat(?:ed|ion|ions)|refurbish(?:ed|ment)?|restoration\s+of\s+the\s+"
+    r"(?:museum|building|gallery)|museum\s+(?:techniques?|architecture|building|"
+    r"display|galler(?:y|ies))|evolution\s+of\s+(?:the\s+)?museum|"
+    r"(?:display|curatorial|conservation|exhibition)\s+(?:techniques?|practices?|"
+    r"methods?)|museography|the\s+building\s+itself|wing[s]?\s+and\s+galler"
     r")\b"
 )
 
