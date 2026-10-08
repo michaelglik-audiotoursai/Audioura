@@ -229,9 +229,23 @@ def prefer_parent_institution(
             wc, sl = 0, 0
         return (int(wc or 0), int(sl or 0))
 
-    ranked = sorted(survivors, key=lambda c: _size(c[0]), reverse=True)
+    sized = [(c, _size(c[0])) for c in survivors]
+    ranked = [c for c, _ in sorted(sized, key=lambda cs: cs[1], reverse=True)]
     if ranked != survivors:
         print(f"  [venue_resolver] #3 preferring larger collection: {ranked[0][0]} ({ranked[0][1]})")
+
+    # When the largest collection DOMINATES, collapse to that single candidate so a
+    # downstream geo-disambiguation (which picks by distance, and a wing shares the
+    # museum's coordinates) cannot re-select the tiny sub-entity. This is the
+    # Boijmans case: Q679527 has 100 works, the Robbrecht & Daem wing 1 — the
+    # museum must win outright, not merely rank first.
+    _top = max(wc for _, (wc, _s) in sized)
+    _rest = sorted((wc for _, (wc, _s) in sized), reverse=True)
+    _second = _rest[1] if len(_rest) > 1 else 0
+    if _top >= 10 and _top >= 3 * max(_second, 1):
+        print(f"  [venue_resolver] #3 collection dominates ({_top} vs {_second}) — "
+              f"collapsing to {ranked[0][0]} ({ranked[0][1]})")
+        return [ranked[0]]
     return ranked
 
 

@@ -77,6 +77,31 @@ def test_larger_collection_wins_between_two_institutions():
     assert out[0][0] == big, f"larger collection must rank first, got {out}"
 
 
+def test_dominant_collection_collapses_to_single_winner():
+    """Boijmans: the museum (100 works) must WIN OUTRIGHT over the wing (1 work),
+    collapsing to a single candidate so geo-disambiguation cannot re-pick the wing
+    (they share coordinates). No P361 edge and no museum typing available (the live
+    search returned none)."""
+    museum, wing = "Q679527", "Q134498261"
+    def props(qid):
+        return {"part_of": [], "instance_of": []}   # as in the live Boijmans case
+    def counts(qid):
+        return {museum: (100, 40), wing: (1, 2)}.get(qid, (0, 0))
+    out = prefer_parent_institution([(wing, "wing"), (museum, "museum")], props, counts)
+    assert out == [(museum, "museum")], f"museum must win outright, got {out}"
+
+
+def test_close_collections_not_collapsed():
+    """Two comparable collections must both survive (collapse only on domination)."""
+    def props(qid):
+        return {"part_of": [], "instance_of": ["Q207694"]}
+    def counts(qid):
+        return {"Q1": (40, 5), "Q2": (50, 6)}.get(qid, (0, 0))
+    out = prefer_parent_institution([("Q1", "a"), ("Q2", "b")], props, counts)
+    assert len(out) == 2, f"comparable collections must not collapse, got {out}"
+    assert out[0][0] == "Q2", "but the larger still ranks first"
+
+
 def test_never_empties():
     """If every candidate is a part of every other (pathological), keep them."""
     def props(qid):
