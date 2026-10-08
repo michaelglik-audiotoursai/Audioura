@@ -1543,19 +1543,19 @@ def _compose_visiting_sentences(facts: str, venue_name: str, domain: str,
     venue_full = _full_venue_for_hours(venue_name)
     hours_sentence = _compose_hours_sentence(venue_full, hours_segs, closed_segs)
     adm_sentence = _compose_admission_sentence(admission_segs)
-    signal = _source_month_signal(domain, as_of)
 
+    # [LOCAL-623 defect 4] NO spoken provenance / citation tail. The month stamp
+    # ("as published by the museum in October 2026") was attached to the spoken
+    # admission/hours sentence as an honesty signal, but the critique flagged it as
+    # a citation leftover a listener hears aloud (tour 468). Provenance belongs in
+    # the TEXT-view Sources, exactly as D617 moved the source domain out of speech;
+    # the spoken sentence states only the fact. The AboutStop still carries
+    # ``as_of`` for the text view — this only stops it being spoken.
     out_sentences: List[str] = []
     if hours_sentence:
         out_sentences.append(hours_sentence)
     if adm_sentence:
-        # Attach the honesty signal to the admission sentence (it carries the price,
-        # the most volatile fact). "… teachers, as listed on <domain> in <month>."
-        adm_sentence = adm_sentence.rstrip(".") + f", {signal}."
         out_sentences.append(adm_sentence)
-    elif hours_sentence:
-        # No admission to carry the signal → attach it to the hours sentence.
-        out_sentences[-1] = out_sentences[-1].rstrip(".") + f", {signal}."
     composed = " ".join(out_sentences).strip()
     # The visiting block opens its own paragraph — capitalise its first letter
     # ("the Griffin is open" → "The Griffin is open") without touching a leading
