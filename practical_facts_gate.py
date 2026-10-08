@@ -150,10 +150,16 @@ def _parse_info_text_into_claims(info_text: str) -> List[PracticalClaim]:
     """Parse a Museum Information or Operational Details line into individual claims."""
     claims = []
 
-    # Split by sentence-like boundaries
-    sentences = re.split(r'[.;]\s*', info_text)
+    # Split by sentence-like boundaries. [LOCAL-625] A dot BETWEEN two digits is a
+    # European clock separator ("10.00"), NOT a sentence end — splitting there turned
+    # "10.00-18.00" into "10", "00-18", "00" and leaked a bare "00-18" as hours.
+    # Require the '.' separator to be followed by whitespace (a real sentence break);
+    # ';' always separates. This keeps dotted clock tokens intact.
+    sentences = re.split(r'(?<!\d)\.\s+|\.\s*(?!\d)|;\s*', info_text)
 
     for sentence in sentences:
+        if sentence is None:
+            continue
         sentence = sentence.strip()
         if not sentence:
             continue

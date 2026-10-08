@@ -328,24 +328,39 @@ def resolve_venue(venue_string: str, city: str = "") -> Optional[VenueEntity]:
     # Wikipedia naming conventions: "X in City", "X (City)", "X, City"
     candidates = []
 
-    # Try each normalised variant with the full search cascade
+    # Try each normalised variant with the full search cascade.
+    # [LOCAL-625] UNION the city-qualified hits with the bare-variant hits instead
+    # of breaking on the first city-qualified hit. For "Mauritshuis, The Hague" the
+    # city-qualified query "Mauritshuis in The Hague" matched ONLY a PAINTING titled
+    # exactly that (Q17324051, 0 works), short-circuiting the bare "Mauritshuis"
+    # query that returns the real museum Q221092 (111 works, 5 sitelinks) first.
+    # Collecting both keeps the museum in the candidate set so the type/collection
+    # ranking below can prefer it. Order: city-qualified first (disambiguation
+    # convention), then the bare variant's hits, de-duplicated by QID.
+    def _merge_candidates(dst, src):
+        _seen = {q for q, _ in dst}
+        for q, lbl in (src or []):
+            if q not in _seen:
+                _seen.add(q)
+                dst.append((q, lbl))
+        return dst
+
     for _variant in _name_variants:
+        _variant_hits = []
         if city:
-            # Try city-qualified queries first (Wikipedia disambiguation conventions)
             for _qual_query in [
                 f"{_variant} in {city}",
                 f"{_variant} ({city})",
                 f"{_variant} {city}",
             ]:
-                candidates = _search_entities(_qual_query)
-                if candidates:
-                    print(f"  [venue_resolver] City-qualified search hit: '{_qual_query}' → {len(candidates)} candidates")
-                    break
-
-        if not candidates:
-            candidates = _search_entities(_variant)
-
-        if candidates:
+                _merge_candidates(_variant_hits, _search_entities(_qual_query))
+        # Always also take the bare-variant hits so a museum entity that the
+        # city-qualified phrasing missed is still a candidate.
+        _merge_candidates(_variant_hits, _search_entities(_variant))
+        if _variant_hits:
+            candidates = _variant_hits
+            print(f"  [venue_resolver] Candidates for variant '{_variant}': "
+                  f"{[q for q, _ in candidates][:8]}")
             break  # Found candidates with this variant
 
     if not candidates:
@@ -396,9 +411,38 @@ def resolve_venue(venue_string: str, city: str = "") -> Optional[VenueEntity]:
             museum_candidates.append((qid, label))
     
     if not museum_candidates:
-        # Fallback: try all candidates with geo-disambiguation
-        print(f"  [venue_resolver] No museum-typed candidates, trying geo-disambiguation on all")
-        museum_candidates = candidates[:5]
+        # [LOCAL-625] No candidate is museum-typed. The old fallback blindly took
+        # candidates[:5] in search order, which selected the PAINTING entity
+        # "Mauritshuis in The Hague" (Q17324051, 0 works, 0 sitelinks) over the real
+        # museum. Before falling back, rank the candidates by whether they hold a
+        # collection: prefer any candidate with works (and sitelinks) over a 0-work
+        # entity, so a bare object/painting entity never wins when a collecting
+        # entity is present. Deterministic; network lookups are the same P195/P276
+        # catalogue + sitelinks the generator uses. Guarded and non-fatal.
+        print(f"  [venue_resolver] No museum-typed candidates; ranking by collection size")
+        _pool = candidates[:8]
+        try:
+            _scored = []
+            for _q, _l in _pool:
+                try:
+                    _wc, _sl = _fetch_works_count(_q)
+                except Exception:
+                    _wc, _sl = 0, 0
+                _scored.append(((_q, _l), (int(_wc or 0), int(_sl or 0))))
+            # Keep only candidates with a collection when ANY has one; otherwise
+            # keep the search order (nothing to prefer on).
+            _with_works = [c for c, (wc, _s) in _scored if wc > 0]
+            if _with_works:
+                _ranked = [c for c, _s in sorted(
+                    _scored, key=lambda cs: cs[1], reverse=True)]
+                museum_candidates = _ranked
+                print(f"  [venue_resolver] collection-ranked fallback: "
+                      f"{museum_candidates[0][0]} has works")
+            else:
+                museum_candidates = _pool[:5]
+        except Exception as _rank_err:
+            logger.warning(f"[LOCAL-625] collection-rank fallback skipped: {_rank_err}")
+            museum_candidates = candidates[:5]
 
     # Step 2b [LOCAL-618 #3]: Collapse sub-entities (a wing/building/depot that is
     # P361-part-of another candidate, or a building-only candidate alongside the
@@ -640,16 +684,32 @@ def build_canonical_titles_from_works(works: List[Dict]) -> Set[str]:
     Returns a set of canonical title strings.
     """
     titles = set()
+    # [LOCAL-625] A museum stop must be an ARTWORK — never a room/gallery/wing. The
+    # Alte Pinakothek's Wikidata catalogue stores its "Kabinett 1-2 … 23" cabinets
+    # as entities, which the deterministic documented-works fill shipped as stops
+    # (tour 471/474 Stop 2). Drop any label/alias that is just a space designation.
+    try:
+        from room_candidate_guard import is_room_or_space_title as _is_room
+    except Exception:  # pragma: no cover
+        _is_room = None
+
+    def _ok(t: str) -> bool:
+        if not t or t.startswith("Q") or len(t) < 3:
+            return False
+        if _is_room is not None and _is_room(t):
+            return False
+        return True
+
     for work in works:
         label_en = work.get("label_en", "")
-        if label_en and not label_en.startswith("Q") and len(label_en) >= 3:
+        if _ok(label_en):
             titles.add(label_en)
         local_label = work.get("label_local", "")
-        if local_label and local_label != label_en and not local_label.startswith("Q") and len(local_label) >= 3:
+        if local_label != label_en and _ok(local_label):
             titles.add(local_label)
         # Also add aliases as canonical titles (they're valid names)
         for alias in work.get("aliases", []):
-            if alias and len(alias) >= 3 and not alias.startswith("Q"):
+            if _ok(alias):
                 titles.add(alias)
     return titles
 

@@ -23,6 +23,7 @@ discovery/extraction logic is unit-testable by injecting a fake fetcher.
 """
 from __future__ import annotations
 
+import os
 import re
 import time
 from typing import Callable, Dict, List, Optional, Tuple
@@ -653,8 +654,22 @@ def build_site_first_candidates(
     candidates: List[Dict] = []
     _names = set()
 
+    _allow_spaces = os.environ.get("ALLOW_MUSEUM_SPACE_STOPS", "").strip() == "1"
+    try:
+        from room_candidate_guard import is_room_or_space_title as _is_room
+    except Exception:  # pragma: no cover
+        _is_room = None
+
     def _append(c: Optional[Dict]) -> bool:
         if not c or len(candidates) >= cap:
+            return False
+        # [LOCAL-625 item 3] Never accept a room/gallery/wing/floor/building as an
+        # artwork stop (the "Kabinett 1-2" defect). A scraped exhibition/work title
+        # that is really a space is dropped so the corpus fill replaces it.
+        if (not _allow_spaces and _is_room is not None
+                and c.get('kind') != 'museum_space'
+                and _is_room(c.get('name', '') or c.get('title', ''))):
+            diagnostics['rooms_rejected'] = diagnostics.get('rooms_rejected', 0) + 1
             return False
         key = c['name'].lower()
         if key in _names:
@@ -685,15 +700,24 @@ def build_site_first_candidates(
 
     # (b) museum's own named spaces / building features (/visit, /about), only to
     # fill toward N and only when the venue's own pages name them.
-    if len(candidates) < total_stops:
-        space_candidates = _discover_museum_spaces(
-            base_site_url, fetch, diagnostics,
-            want=total_stops - len(candidates),
-            exclude_titles=set(_names))
-        for sc in space_candidates:
-            if len(candidates) >= cap:
-                break
-            _append(sc)
+    #
+    # [LOCAL-625 item 3] A museum stop must be an ARTWORK ({title, artist}) — never
+    # a room/gallery/wing/floor/building. The LOCAL-599B "named spaces" fill shipped
+    # "Obergeschoss, Kabinett 1-2" as the Alte Pinakothek's Stop 2, narrated with
+    # the von Klenze building history (tour 471). Space candidates are therefore no
+    # longer used as artwork stops; the shortfall is filled from the corpus by the
+    # caller instead (honest short count rather than a room). Opt back in only via
+    # the explicit env flag for a space/architecture tour kind.
+    if os.environ.get("ALLOW_MUSEUM_SPACE_STOPS", "").strip() == "1":
+        if len(candidates) < total_stops:
+            space_candidates = _discover_museum_spaces(
+                base_site_url, fetch, diagnostics,
+                want=total_stops - len(candidates),
+                exclude_titles=set(_names))
+            for sc in space_candidates:
+                if len(candidates) >= cap:
+                    break
+                _append(sc)
 
     # (c) at most ONE upcoming exhibition, labelled "opening <date>". NEVER past.
     if len(candidates) < total_stops and upcoming:

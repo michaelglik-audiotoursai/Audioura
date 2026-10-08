@@ -108,15 +108,26 @@ def _normalize_time(time_str: str) -> str:
     """
     time_str = time_str.strip()
     # "10h30" or "10h"
-    m = re.match(r'(\d{1,2})h(\d{2})?', time_str)
+    m = re.match(r'(\d{1,2})h(\d{2})?$', time_str)
     if m:
         h = m.group(1).zfill(2)
         mi = m.group(2) or '00'
         return f"{h}:{mi}"
     # "10:30" or "10:00"
-    m = re.match(r'(\d{1,2}):(\d{2})', time_str)
+    m = re.match(r'(\d{1,2}):(\d{2})$', time_str)
     if m:
         return f"{m.group(1).zfill(2)}:{m.group(2)}"
+    # [LOCAL-625] European dot-separated clock: "10.00" → "10:00", "9.30" → "09:30".
+    # German/Austrian venue pages (Alte Pinakothek, Munich) render times this way.
+    # Without this clause the dotted minute half ("00") leaked out as a bare hour
+    # and the broken time regex produced "00–18" (midnight-start garbage).
+    m = re.match(r'(\d{1,2})\.(\d{2})$', time_str)
+    if m:
+        return f"{m.group(1).zfill(2)}:{m.group(2)}"
+    # Bare clock hour: "10" → "10:00" (only a 1-2 digit integer, nothing else).
+    m = re.match(r'(\d{1,2})$', time_str)
+    if m:
+        return f"{m.group(1).zfill(2)}:00"
     # "10 am" / "5 pm"
     m = re.match(r'(\d{1,2})(?::(\d{2}))?\s*(am|pm)', time_str, re.IGNORECASE)
     if m:
@@ -128,6 +139,15 @@ def _normalize_time(time_str: str) -> str:
             h = 0
         return f"{h:02d}:{mi}"
     return time_str
+
+
+# [LOCAL-625] A WHOLE clock token: an hour (1–2 digits) optionally followed by a
+# ':', 'h' or '.' minute group, optionally an am/pm. The leading negative
+# lookbehind and trailing negative lookahead forbid the match from STARTING or
+# ENDING inside another clock — the old `\d{1,2}h?\d{0,2}` could match the bare
+# minute half "00" out of "10:00"/"10.00", so "10.00-18.00" produced "00–18"
+# (the Alte Pinakothek "Museum Information: 00–18; 00–20" defect, LOCAL-625).
+_CLOCK_TOKEN = r'(?<![\d:h.])\d{1,2}(?:[:.]\d{2}|h\d{2}|h)?(?:\s?(?:am|pm))?(?![\d:.]|h\d)'
 
 
 def _page_literal_time(raw: str) -> str:
@@ -599,7 +619,7 @@ def extract_visitor_facts_from_text(page_text: str, page_lang: str = "fr",
         # Pattern: "de 10h à 17h du 1er septembre au 30 juin"
         # Can appear multiple times for different seasons
         hour_matches = re.finditer(
-            r'(?:de\s+)?(\d{1,2}h?\d{0,2})\s*(?:[àa]|[-–])\s*(\d{1,2}h?\d{0,2})'
+            r'(?:de\s+)?(' + _CLOCK_TOKEN + r')\s*(?:[àa]|[-–])\s*(' + _CLOCK_TOKEN + r')'
             r'(?:\s+(?:du|de|le)\s+(.{10,60}?))?'
             r'(?=\s*[.•\n]|\s*(?:du|de|ferm|Du|De|Ferm|\Z))',
             page_text
@@ -620,7 +640,7 @@ def extract_visitor_facts_from_text(page_text: str, page_lang: str = "fr",
         # If no structured matches, try broader pattern for single time range
         if not facts.hours:
             simple_m = re.search(
-                r'(\d{1,2}h?\d{0,2})\s*(?:[àa]|[-–])\s*(\d{1,2}h?\d{0,2})',
+                r'(' + _CLOCK_TOKEN + r')\s*(?:[àa]|[-–])\s*(' + _CLOCK_TOKEN + r')',
                 page_text
             )
             if simple_m:

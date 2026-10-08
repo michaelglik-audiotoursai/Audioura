@@ -39,6 +39,7 @@ Each returns an `AssemblyResult` (the final tour text + the reuse counts the cos
 ledger needs).
 """
 import logging
+import os
 import re
 from dataclasses import dataclass, field
 from typing import List, Dict, Optional, Callable
@@ -426,6 +427,27 @@ def assemble_building_tour(
       otherwise each stop keeps its own orientation.
     """
     ordered = list(new_stops) + list(pooled_stops)
+
+    # [LOCAL-625 item 3] Last-line guard: a museum stop must be an ARTWORK, never a
+    # room/gallery/wing/floor/building. A pooled stop reused from an earlier tour,
+    # or a space that slipped past the site-first builder, is dropped here so no
+    # room ("Obergeschoss, Kabinett 1-2") ever ships narrated as building history.
+    # Replacement happens upstream (corpus fill); shipping one fewer real stop is
+    # correct over shipping a room. Opt out only for a space/architecture tour kind.
+    if os.environ.get("ALLOW_MUSEUM_SPACE_STOPS", "").strip() != "1":
+        try:
+            from room_candidate_guard import is_room_or_space_title as _is_room
+            _kept = [s for s in ordered
+                     if not _is_room((s.get("title") or s.get("name") or ""), venue_name)]
+            if len(_kept) != len(ordered):
+                _dropped_rooms = [s.get("title") or s.get("name") for s in ordered
+                                  if s not in _kept]
+                logger.info(f"[LOCAL-625] dropped room/space stops (not artworks): "
+                            f"{_dropped_rooms}")
+                ordered = _kept
+        except Exception as _rg_e:  # pragma: no cover
+            logger.info(f"[LOCAL-625] room-stop guard skipped ({_rg_e})")
+
     n = len(ordered)
 
     # [LOCAL-592 r2] Address provenance (D611): in a contained venue every
