@@ -7751,6 +7751,44 @@ def _apply_delivery_hours_guard(result):
                       f"artist/work not delivered in this tour", flush=True)
         except Exception as _uce:  # pragma: no cover
             _import_logger.error(f"[LOCAL-634] unseen-callback guard skipped: {_uce}")
+        # 1d-ii. [LOCAL-635] Repair any broken sentence-join on the DELIVERED TEXT
+        #     — a removal/splice pass can run a lowercase word straight into a
+        #     capitalised sentence-starter ("…the tragedies surrounding During
+        #     this time, he created…", Tate 515). Deterministic; invents no word
+        #     (trims the orphaned clause lead-in and starts a clean sentence).
+        try:
+            import stop_editor as _se_bj
+            final, _n_bj = _se_bj.repair_broken_joins_in_text(final)
+            if _n_bj:
+                print(f"  [LOCAL-635] repaired {_n_bj} broken sentence-join(s) "
+                      f"in delivered text", flush=True)
+        except Exception as _bje:  # pragma: no cover
+            _import_logger.error(f"[LOCAL-635] broken-join guard skipped: {_bje}")
+        # 1d-iii. [LOCAL-635] Fill any empty title-quote on the DELIVERED TEXT —
+        #     a title-substitution step can blank a work-title slot and leave a
+        #     bare quote pair ("Yet in “ ” the domestic replaces…", Courtauld
+        #     485). Fill it with the stop's own title; never speak blank quotes.
+        try:
+            import stop_editor as _se_eq
+            final, _n_eq = _se_eq.fill_empty_title_quotes_in_text(final)
+            if _n_eq:
+                print(f"  [LOCAL-635] filled {_n_eq} empty title-quote(s) with "
+                      f"the stop title in delivered text", flush=True)
+        except Exception as _eqe:  # pragma: no cover
+            _import_logger.error(f"[LOCAL-635] empty-title-quote guard skipped: {_eqe}")
+        # 1d-iv. [LOCAL-635] Repair any garbled/truncated person-name on the
+        #     DELIVERED TEXT — a strip+recapitalise pass can eat the start of a
+        #     name ("Andrea Mantegna" → "Rea Mantegna", Brera 513). Canonical
+        #     forms come from the whole tour; the corrupted mention is restored
+        #     to the full form seen elsewhere. Deterministic; invents no name.
+        try:
+            import stop_editor as _se_gn
+            final, _n_gn = _se_gn.repair_garbled_names_in_text(final)
+            if _n_gn:
+                print(f"  [LOCAL-635] repaired {_n_gn} garbled person-name(s) "
+                      f"in delivered text", flush=True)
+        except Exception as _gne:  # pragma: no cover
+            _import_logger.error(f"[LOCAL-635] garbled-name guard skipped: {_gne}")
         # 1e. [LOCAL-634] FINAL text-level dangling-opener guard. The stop editor
         #     and the late recap/callback removals above can strip a
         #     demonstrative's antecedent, leaving a stop body opening on an
