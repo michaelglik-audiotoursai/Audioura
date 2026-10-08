@@ -167,6 +167,22 @@ def count_delivered_stops(tour_text: str) -> int:
     return len(_STOP_HEADER.findall(normalise_stop_headers(tour_text or "")))
 
 
+def has_thematic_conclusion(tour_text: str) -> bool:
+    """True when the text already carries a THEMATIC conclusion this module wrote.
+
+    The every-path finalization guard uses this so the cheap LLM is invoked ONLY
+    on the first build (no thematic opener yet). On a re-run or a cache hit the
+    opener is already present, so the guard rebuilds deterministically — the
+    opener is stripped and re-appended from the same stops — and never re-spends.
+    A LEGACY (From→to) conclusion returns False, so a cached tour that still
+    carries the old enumerating closing is upgraded to the thematic form once.
+    """
+    text = normalise_stop_headers(tour_text or "")
+    headers = list(_STOP_HEADER.finditer(text))
+    search_from = headers[-1].end() if headers else 0
+    return _THEMATIC_OPENER.search(text, search_from) is not None
+
+
 def _normalise_offer(offer: Optional[str]) -> str:
     """Return a terminal offer sentence. Defaults to the house restaurant line.
 
