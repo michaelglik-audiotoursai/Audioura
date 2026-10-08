@@ -26,22 +26,31 @@ import threading
 
 # Labels stripped from TTS audio (kept in .txt files for mobile app parsing)
 # Matches all 5 structured metadata fields — same set as translation_service._NAV_FIELD_PREFIXES
-_SPOKEN_LABEL_RE = re.compile(r'^\s*(Museum Information|Orientation|Directions)\s*:\s*', re.IGNORECASE)
+# [LOCAL-633] "Museum Information:" is DROPPED WHOLE from TTS (label + value). The
+# practical facts are spoken ONCE as the composed sentence in the Stop-1 opening
+# section (about_museum_stop + practical_facts_gate.compose_practical_facts); the
+# "Museum Information:" field keeps the full detail for the TEXT VIEW only and must
+# NOT be read aloud — otherwise the long hours/admission dump is spoken a second
+# time (Bench R1: Uffizi/Reina Sofía/Met).
+_SPOKEN_LABEL_RE = re.compile(r'^\s*(Orientation|Directions)\s*:\s*', re.IGNORECASE)
 _NAV_LABEL_RE = re.compile(
-    r'^\s*(Address|Coordinates|Type/Specialty|Specific Examples|Operational Details)\s*:',
+    r'^\s*(Museum Information|Address|Coordinates|Type/Specialty|Specific Examples|Operational Details)\s*:',
     re.IGNORECASE | re.MULTILINE
 )
 
 def _strip_nav_fields_for_tts(text):
     """Remove structured metadata lines before sending to Polly.
     Keeps: stop name, Orientation, and all narrative paragraphs.
-    Strips: Address, Coordinates, Type/Specialty, Specific Examples, Operational Details.
+    Strips: Museum Information, Address, Coordinates, Type/Specialty, Specific
+    Examples, Operational Details.
     The .txt files are written from the original text and remain unchanged."""
     lines = text.split('\n')
     kept = [l for l in lines if not _NAV_LABEL_RE.match(l)]
-    # [LEAD 2026-10-08] Speak the content, not the field label: "Museum Information:
-    # The museum is open…" was read aloud label-first (critic criterion 3 on every
-    # canary). The .txt keeps the label for the app's text view.
+    # [LEAD 2026-10-08 / LOCAL-633] "Museum Information:" is now dropped WHOLE above
+    # (its practical facts are spoken once in the opening-section prose). Only the
+    # remaining spoken labels (Orientation/Directions) are label-stripped so their
+    # value — not the field word — is read aloud. The .txt keeps every label for the
+    # app's text view.
     return '\n'.join(_SPOKEN_LABEL_RE.sub('', l) for l in kept)
 
 from job_store import get_job_store

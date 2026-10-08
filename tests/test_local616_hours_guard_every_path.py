@@ -71,8 +71,11 @@ class TestHoursGuardEveryPath(unittest.TestCase):
             (_FABRE_414_STOP1, None, (None, None)))
         self.assertNotIn("Check opening hours and admission on museefabre.fr", folded)
         self.assertNotIn("before you go", folded)
-        # The real hours from the preflight are spoken instead.
-        self.assertIn("Monday, Thursday, Friday: 12:00 PM", folded)
+        # The real hours from the preflight are spoken instead — now as the
+        # LOCAL-633 COMPOSED sentence (the day LIST becomes an honest "daily except
+        # Tuesday and Wednesday", not the raw row paste).
+        self.assertIn("open daily except Tuesday and Wednesday", folded)
+        self.assertIn("8 euros", folded)
 
     def test_output_file_is_rewritten(self):
         # The service reads the delivered tour from the FILE — it must be rewritten.
@@ -87,7 +90,7 @@ class TestHoursGuardEveryPath(unittest.TestCase):
             on_disk = open(path, encoding="utf-8").read()
             self.assertEqual(on_disk, folded)
             self.assertNotIn("Check opening hours and admission on museefabre.fr", on_disk)
-            self.assertIn("Monday, Thursday, Friday: 12:00 PM", on_disk)
+            self.assertIn("open daily except Tuesday and Wednesday", on_disk)
         finally:
             os.unlink(path)
 

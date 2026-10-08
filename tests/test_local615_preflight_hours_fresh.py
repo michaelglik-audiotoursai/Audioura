@@ -61,9 +61,11 @@ class TestFoldPreflightHoursIntoText(unittest.TestCase):
         # The fallback is gone...
         self.assertNotIn("Check opening hours and admission on museobilbao.com", out)
         self.assertNotIn("before you go", out)
-        # ...and the real hours (and admission) are spoken instead.
-        self.assertIn("The museum is open Tuesday to Sunday, 10:00 to 20:00", out)
-        self.assertIn("admission is 10 euros", out)
+        # ...and the real hours (and admission) are spoken instead, now as the
+        # LOCAL-633 COMPOSED sentence (short, one price, currency as a word) rather
+        # than the raw preflight paste.
+        self.assertIn("open Tuesday to Sunday", out)
+        self.assertIn("10 euros", out)
 
     def test_unchanged_when_preflight_has_no_hours(self):
         # No hours/admission → never invent; the honest pointer stays.

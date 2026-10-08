@@ -2404,8 +2404,8 @@ Say 'What are my options' to hear this help again"""
         return html
     # Fields that should not be spoken aloud — same set as Fix A in tour_generation_modernized.py
     _NAV_FIELD_PREFIXES = [
-        'Address:', 'Coordinates:', 'Type/Specialty:', 'Specific Examples:',
-        'Operational Details:'
+        'Museum Information:', 'Address:', 'Coordinates:', 'Type/Specialty:',
+        'Specific Examples:', 'Operational Details:'
     ]
 
     def _strip_nav_fields_for_tts(self, stop_text):

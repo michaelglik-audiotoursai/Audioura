@@ -168,14 +168,21 @@ class TestItem2AdmissionOnce(unittest.TestCase):
 class TestItem3HoursOnce(unittest.TestCase):
     def test_open_open_double_is_fixed(self):
         # The grounded hours value already begins with "Open daily …" — the
-        # sentence must NOT read "The museum is open Open daily …".
+        # composed sentence must NOT read "The museum is open Open daily …".
+        # [LOCAL-633] Practical facts are placed in the Stop-1 OPENING SECTION, never
+        # inside an Orientation, so the fixture carries an opening prose paragraph.
         out, inserted = pfg.ensure_spoken_hours_line(
-            "Stop 1: X\n\nOrientation: You are at the gallery. Stand here.",
+            "You are about to explore the gallery.\n\nStop 1: X\n\n"
+            "Orientation: You are at the gallery. Stand here.",
             hours="Open daily from 10:00 am to 6:00 pm", admission="Free")
         self.assertTrue(inserted)
         self.assertNotIn("open Open", out)
         self.assertNotIn("is open Open", out)
-        self.assertIn("The museum is open daily from 10:00 am", out)
+        self.assertIn("is open daily", out)
+        # The composed sentence is NOT in the Orientation paragraph.
+        orientation = [p for p in out.split("\n\n")
+                       if p.strip().lower().startswith("orientation:")][0]
+        self.assertNotIn("is open daily", orientation)
 
     def test_hours_spoken_statements_equals_one(self):
         # A Museum-Information value (spoken at TTS, label stripped) PLUS an

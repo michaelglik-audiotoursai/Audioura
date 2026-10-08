@@ -1058,15 +1058,19 @@ def tour_speaks_hours_in_prose(text: str) -> bool:
 
 
 def ensure_spoken_hours_line(text: str, hours: str = "", admission: str = "") -> "Tuple[str, bool]":
-    """Insert a SPOKEN hours/admission sentence once when the hours are KNOWN but
-    the delivered prose speaks none.
+    """Insert the SINGLE composed practical-facts sentence once when the hours are
+    KNOWN but the delivered prose speaks none.
 
     ``hours`` / ``admission`` are grounded values (from the venue preflight or the
-    site extractor); at least one must be non-empty for anything to happen. The
-    sentence is placed at the end of the Stop-1 orientation paragraph so the
-    listener hears it up front. Deterministic, pure, idempotent. A no-op when the
-    prose already speaks hours/admission, when there is no museum context, or when
-    both inputs are empty. Returns ``(text, inserted)``.
+    site extractor); at least one must be non-empty for anything to happen.
+
+    [LOCAL-633] The sentence is COMPOSED (``compose_practical_facts``) — one short
+    spoken pair, never the raw preflight paste — and it is placed in the Stop-1
+    OPENING SECTION (right after the About narration), NEVER inside an Orientation
+    paragraph. Practical facts do not belong in an Orientation (D633); the opening
+    section is their one spoken home. Deterministic, pure, idempotent. A no-op when
+    the prose already speaks hours/admission, when there is no museum context, or
+    when both inputs are empty. Returns ``(text, inserted)``.
     """
     if not text or not text.strip():
         return text or "", False
@@ -1074,43 +1078,82 @@ def ensure_spoken_hours_line(text: str, hours: str = "", admission: str = "") ->
     admission = (admission or "").strip()
     if not hours and not admission:
         return text, False
-    # Already spoken in prose → nothing to add.
+    # Already spoken in prose → nothing to add (the once-guard).
     if tour_speaks_hours_in_prose(text):
         return text, False
     if not re.search(r"(?i)\b(museum|gallery|galleries|mus[ée]e|museo|kunst|collection)\b", text):
         return text, False
 
-    bits = []
-    if hours:
-        # [LOCAL-630 item 3] Avoid the "The museum is open Open daily…" double when
-        # the grounded hours already lead with "open".
-        _h = re.sub(r"^(?i:open)\s+", "", hours).strip() or hours
-        bits.append(f"The museum is open {_h}")
-    if admission:
-        bits.append(f"admission is {admission}")
-    sentence = ". ".join(bits).strip()
-    if sentence and not sentence.endswith((".", "!", "?")):
+    # [LOCAL-633] Compose the single short sentence pair from the structured facts.
+    sentence = compose_practical_facts({"hours": hours, "admission": admission})
+    if not sentence:
+        return text, False
+    if not sentence.endswith((".", "!", "?")):
         sentence += "."
-    # Capitalise the lead and tidy a stray double period.
-    sentence = re.sub(r"\.\s*\.", ".", sentence)
+
+    # Place it in the Stop-1 opening section, after the About narration. NEVER an
+    # Orientation paragraph, and never a non-spoken field block (Museum Information,
+    # Address, Coordinates, Directions, Sources…). Target the Stop-1 OPENING
+    # SECTION: a narration prose paragraph that appears BEFORE the first
+    # Orientation. Never the title/header block, a field block, a stop header, or
+    # an Orientation. If no such prose paragraph exists yet, the sentence is
+    # inserted as its OWN new paragraph immediately after the first stop header
+    # (the opening-section position), still never inside an Orientation.
+    _TITLE_OR_HEADER = re.compile(
+        r"(?i)^\s*(step-by-step\b|tour-category:|type/specialty:|address:|"
+        r"coordinates:|directions:|sources?:|stop\s*\d+:|orientation:|"
+        r"museum information:|operational details:|visiting hours:|opening hours:|"
+        r"hours:|specific examples:)")
+
+    def _prose_lines(paragraph):
+        out = []
+        for ln in paragraph.split("\n"):
+            s = ln.strip()
+            if not s or _TITLE_OR_HEADER.match(s):
+                continue
+            out.append(ln)
+        return out
 
     paras = text.split("\n\n")
+
+    # First Orientation / first stop-header positions bound the opening section.
+    _first_orientation = next(
+        (i for i, p in enumerate(paras) if "Orientation:" in p), len(paras))
+    _first_stop = next(
+        (i for i, p in enumerate(paras)
+         if re.match(r"(?i)^\s*stop\s*\d+:", p.strip())), None)
+
+    # (a) Prefer a narration prose paragraph in the opening section (before the
+    #     first Orientation), that is not a header/field/stop block.
     _target = None
     for i, p in enumerate(paras):
-        if re.search(r"(?i)^\s*(?:stop\s*1\b.*)?orientation:", p) or "Orientation:" in p:
+        if i >= _first_orientation:
+            break
+        if "Orientation:" in p:
+            continue
+        if _prose_lines(p):
             _target = i
             break
-    if _target is None:
-        for i, p in enumerate(paras):
-            if p.strip():
-                _target = i
-                break
-    if _target is None:
-        return text, False
 
-    sep = "" if paras[_target].rstrip().endswith((".", "!", "?")) else "."
-    paras[_target] = paras[_target].rstrip() + sep + " " + sentence
-    return "\n\n".join(paras), True
+    if _target is not None:
+        lines = paras[_target].split("\n")
+        _li = next((j for j in range(len(lines) - 1, -1, -1)
+                    if lines[j].strip() and not _TITLE_OR_HEADER.match(lines[j].strip())),
+                   None)
+        if _li is None:
+            return text, False
+        sep = "" if lines[_li].rstrip().endswith((".", "!", "?")) else "."
+        lines[_li] = lines[_li].rstrip() + sep + " " + sentence
+        paras[_target] = "\n".join(lines)
+        return "\n\n".join(paras), True
+
+    # (b) No opening-section prose yet → insert the sentence as its OWN paragraph
+    #     right after the first stop header (opening-section position).
+    if _first_stop is not None:
+        paras.insert(_first_stop + 1, sentence)
+        return "\n\n".join(paras), True
+
+    return text, False
 
 
 # ---------------------------------------------------------------------------
@@ -1319,6 +1362,357 @@ def collapse_admission_statements(text: str) -> "Tuple[str, int]":
     out = re.sub(r"\s+([.!?,;])", r"\1", out)
     out = re.sub(r"\n{3,}", "\n\n", out)
     return out, removed
+
+
+# ---------------------------------------------------------------------------
+# [LOCAL-633] compose_practical_facts — ONE short spoken sentence pair
+# ---------------------------------------------------------------------------
+#
+# Bench R1 flagged three tours (Uffizi 488, Reina Sofía 505, Met 507) that spoke
+# the RAW preflight dump — the full ticket-office/discount/price-table paragraph —
+# inside the first stop. LOCAL-627's rule is ONE short spoken practical-facts
+# sentence. This composer turns the STRUCTURED preflight (hours + admission
+# strings) into at most two short sentences, spoken naturally:
+#
+#   "The Uffizi is open Tuesday to Sunday, and closed on Mondays. Adult tickets
+#    are 25 euros; under-18s go free."
+#
+# Rules (binding, D633):
+#   * day RANGES, not day lists;
+#   * one adult price plus at most one free group;
+#   * no parentheses, no discount schemes, no ticket-office details;
+#   * the currency as a WORD ("euros"), never a symbol;
+#   * only facts present in the structured preflight (never invented).
+#
+# Pure and deterministic: no network, no LLM. The caller places the returned
+# string ONCE, right after the About sentences, with a once-guard.
+
+_WEEKDAYS = ["monday", "tuesday", "wednesday", "thursday", "friday",
+             "saturday", "sunday"]
+_WEEKDAY_TITLE = {d: d.capitalize() for d in _WEEKDAYS}
+
+# Common weekday ABBREVIATIONS → full lower-case name. Expanded once up front so
+# the composer's weekday logic ("Tue-Sun", "closed Mon") sees full names.
+_WEEKDAY_ABBR = {
+    "mon": "monday", "tue": "tuesday", "tues": "tuesday", "wed": "wednesday",
+    "weds": "wednesday", "thu": "thursday", "thur": "thursday", "thurs": "thursday",
+    "fri": "friday", "sat": "saturday", "sun": "sunday",
+}
+
+
+def _expand_weekday_abbr(text: str) -> str:
+    """Expand bare weekday abbreviations to full names ('Tue-Sun' → 'tuesday-sunday',
+    'closed Mon' → 'closed monday'). Only whole-word abbreviations are expanded, so
+    'Monday' / 'Sunday' are untouched. Case-insensitive; returns lower-cased text
+    (the composer's weekday logic is case-insensitive)."""
+    if not text:
+        return ""
+
+    def _sub(m):
+        return _WEEKDAY_ABBR.get(m.group(0).lower(), m.group(0))
+
+    return re.sub(r"\b(" + "|".join(sorted(_WEEKDAY_ABBR, key=len, reverse=True))
+                  + r")\b\.?", _sub, text, flags=re.I)
+
+
+# Currency symbol → spoken word (always the plural noun; "25 euros").
+_CURRENCY_WORD = {"€": "euros", "$": "dollars", "£": "pounds", "¥": "yen"}
+
+
+def _spoken_price(symbol: str, amount: str) -> str:
+    """'€' + '25' → '25 euros'; '$' + '30' → '30 dollars'. The currency is spoken
+    as a WORD (D633), never a symbol, and never read back as a numeral+symbol."""
+    word = _CURRENCY_WORD.get(symbol, "")
+    amt = amount.strip()
+    if not amt:
+        return ""
+    return f"{amt} {word}".strip()
+
+
+def _extract_closed_days(hours_text: str) -> "List[str]":
+    """The weekday names the venue is CLOSED, lower-cased, de-duplicated, in week
+    order. Handles 'closed on Mondays', 'Tuesday: Closed', 'closed Wednesdays'.
+    Calendar-date closures (January 1, December 25) are ignored — a spoken facts
+    line names a weekly closed DAY, not a holiday list."""
+    if not hours_text:
+        return []
+    low = hours_text.lower()
+    closed = set()
+    # "closed on Monday(s)" / "closed Monday(s)" / "closed: Monday"
+    for m in re.finditer(r"closed\b[^.;]*", low):
+        seg = m.group(0)
+        for d in _WEEKDAYS:
+            if re.search(rf"\b{d}s?\b", seg):
+                closed.add(d)
+    # "Tuesday: Closed" (day precedes the word closed)
+    for m in re.finditer(r"\b(" + "|".join(_WEEKDAYS) + r")s?\b\s*:?\s*closed", low):
+        closed.add(m.group(1))
+    return [d for d in _WEEKDAYS if d in closed]
+
+
+def _extract_open_range(hours_text: str) -> str:
+    """An explicit open day-RANGE phrase if the source states one — 'Tuesday to
+    Sunday', 'Monday–Friday'. Returns a natural 'X to Y' string or ''. Never a
+    day LIST (D633)."""
+    if not hours_text:
+        return ""
+    low = hours_text.lower()
+    m = re.search(
+        r"\b(" + "|".join(_WEEKDAYS) + r")\b\s*(?:to|–|-|through|thru)\s*\b("
+        + "|".join(_WEEKDAYS) + r")\b", low)
+    if m:
+        a, b = m.group(1), m.group(2)
+        # Guard against a range that is really the open window of a single line
+        # ("Monday, Wednesday to Saturday") — only trust it when the two ends are
+        # not the same day.
+        if a != b:
+            return f"{_WEEKDAY_TITLE[a]} to {_WEEKDAY_TITLE[b]}"
+    return ""
+
+
+def _open_phrase_from_closed(closed: "List[str]") -> str:
+    """Turn the CLOSED day set into an open phrase as a RANGE, never a list.
+      * no closed day               → 'daily'
+      * one closed day              → 'daily except <Day>'
+      * two closed days             → 'daily except <Day> and <Day>'
+      * three or more closed days   → '' (too many to phrase as 'daily except …';
+                                      the caller lets an explicit open range speak)
+    """
+    if not closed:
+        return "daily"
+    names = [_WEEKDAY_TITLE[d] for d in closed]
+    if len(names) == 1:
+        return f"daily except {names[0]}"
+    if len(names) == 2:
+        return f"daily except {names[0]} and {names[1]}"
+    return ""
+
+
+def _mentioned_open_days(hours_text: str) -> "List[str]":
+    """Weekdays the source NAMES with an opening time (an open-day list such as
+    'Monday, Thursday, Friday: 12:00 – 6:00; Saturday, Sunday: 10:00 – 6:00').
+    Days that appear only inside a 'closed …' clause are excluded. Week-ordered."""
+    if not hours_text:
+        return []
+    low = hours_text.lower()
+    # Remove closed clauses so a closed day is not counted as open.
+    low_open = re.sub(r"closed[^.;]*", " ", low)
+    mentioned = {d for d in _WEEKDAYS if re.search(rf"\b{d}s?\b", low_open)}
+    return [d for d in _WEEKDAYS if d in mentioned]
+
+
+def _closed_from_open_complement(hours_text: str) -> "List[str]":
+    """When the source lists OPEN days (no 'to' range, no explicit 'closed' day),
+    the closed days are the complement of the named open days. Only trusted when
+    the source names a plausible open-day LIST (3–6 distinct weekdays) so a single
+    stray weekday does not imply six closed days. Week-ordered."""
+    open_days = _mentioned_open_days(hours_text)
+    if not (3 <= len(open_days) <= 6):
+        return []
+    return [d for d in _WEEKDAYS if d not in open_days]
+
+
+def _extract_open_time_span(hours_text: str) -> str:
+    """A SINGLE simplified open→close span, e.g. '8:15 to 6:30', '10 to 5' — the
+    FIRST clock span in the source, with am/pm/'h' suffixes and the ticket-office
+    parenthetical dropped so the sentence stays short (the task example keeps the
+    span: 'open Tuesday to Sunday from 8:15 to 6:30'). Returns '' when the source
+    carries no clock time. Only one span is ever kept — a venue's many day-group
+    time rows are not read aloud (that is the long dump D633 removes)."""
+    if not hours_text:
+        return ""
+    # Drop parentheticals (ticket-office / hall-closing detail) before scanning.
+    txt = re.sub(r"\([^)]*\)", " ", hours_text)
+    # Normalise the word times to a spoken form the span regex can carry.
+    txt = re.sub(r"(?i)\bnoon\b", "12", txt)
+    txt = re.sub(r"(?i)\bmidnight\b", "12", txt)
+    m = re.search(
+        r"(\d{1,2})(?::(\d{2}))?\s*(?:am|pm)?\s*(?:to|–|-|until|till)\s*"
+        r"(\d{1,2})(?::(\d{2}))?\s*(?:am|pm)?", txt, re.I)
+    if not m:
+        return ""
+
+    def _fmt(h, mm):
+        return f"{h}:{mm}" if mm else f"{h}"
+
+    start = _fmt(m.group(1), m.group(2))
+    end = _fmt(m.group(3), m.group(4))
+    return f"{start} to {end}"
+
+
+def _compose_hours_phrase(hours_text: str, venue_short: str) -> str:
+    """One short spoken hours sentence from the structured hours string.
+
+    Prefers an explicit open day-RANGE ('Tuesday to Sunday'); otherwise derives
+    'daily except <Day>' from a single closed day. A single simplified time span
+    ('from 8:15 to 6:30') rides along when the source gives one — the task example
+    keeps it, and one short span cannot trip long_practical_sentence (which needs a
+    clock time AND >30 words). Parentheticals, ticket-office / hall-closing detail,
+    and multi-row time tables are never read aloud. Returns '' when no weekday
+    structure can be found."""
+    hours_text = (hours_text or "").strip()
+    if not hours_text:
+        return ""
+    hours_text = _expand_weekday_abbr(hours_text)
+    closed = _extract_closed_days(hours_text)
+    open_range = _extract_open_range(hours_text)
+    time_span = _extract_open_time_span(hours_text)
+    # When the source lists OPEN days with no explicit closed day and no 'to'
+    # range, the closed days are the complement of the named open days — so a
+    # 5-day list ("Monday, Thursday, Friday … Saturday, Sunday") becomes an honest
+    # "daily except Tuesday and Wednesday", never a false "daily".
+    if not closed:
+        closed = _closed_from_open_complement(hours_text)
+
+    if open_range:
+        body = f"open {open_range}"
+        if time_span:
+            body += f" from {time_span}"
+        if len(closed) == 1:
+            body += f", and closed on {_WEEKDAY_TITLE[closed[0]]}s"
+    else:
+        phrase = _open_phrase_from_closed(closed)
+        if not phrase:
+            return ""
+        body = f"open {phrase}"
+        if time_span:
+            # "open daily from 10 to 5" / "open daily except Monday, 10 to 5"
+            sep = ", " if "except" in phrase else " from "
+            body += f"{sep}{time_span}"
+    return f"{venue_short} is {body}."
+
+
+def _compose_admission_phrase(admission_text: str) -> str:
+    """One short spoken admission sentence: ONE adult price plus AT MOST one free
+    group. The currency is a WORD. No parentheses, no discount schemes, no price
+    tables (D633). Returns '' when neither a price nor a general/concession-free
+    fact is present."""
+    admission_text = (admission_text or "").strip()
+    if not admission_text:
+        return ""
+    # Strip any parenthetical aside outright — those are the discount/ticket-office
+    # details the composer must never speak.
+    cleaned = re.sub(r"\([^)]*\)", " ", admission_text)
+
+    # The FIRST currency amount is taken as the adult/general price (sources lead
+    # with the general ticket). Symbol-led ("€12", "$30") or amount-led ("12 EUR").
+    price = ""
+    m = re.search(r"([$€£¥])\s?(\d{1,4}(?:\.\d{2})?)", cleaned)
+    if m:
+        price = _spoken_price(m.group(1), m.group(2))
+    else:
+        m2 = re.search(r"\b(\d{1,4})\s?(?:eur|euros?|usd|dollars?|gbp|pounds?)\b",
+                       cleaned, re.I)
+        if m2:
+            # Normalise the trailing currency word.
+            word = re.search(r"(eur|euros?|usd|dollars?|gbp|pounds?)",
+                             cleaned[m2.start():], re.I)
+            w = (word.group(1).lower() if word else "")
+            spoken_w = ("euros" if w.startswith("eur") else
+                        "dollars" if w.startswith(("usd", "dollar")) else
+                        "pounds" if w.startswith(("gbp", "pound")) else w)
+            price = f"{m2.group(1)} {spoken_w}".strip()
+
+    # Is there a FREE group we may name (at most one)? Only a group the source
+    # explicitly ties to FREE entry — never a PRICED concession ("$8 for seniors,
+    # students" means they PAY $8, not that they go free). Isolate the clause(s)
+    # that actually carry a "free" marker and look for a group ONLY there.
+    low = cleaned.lower()
+    general_free = bool(re.search(
+        r"\b(?:admission|entry)\s+is\s+free\b|\bfree\s+admission\b|"
+        r"\balways\s+free\b|\bfree\s+to\s+(?:the\s+public|all|enter|visit)\b", low))
+
+    # The spans of text that are about FREE entry: a "free … <groups>" lead
+    # ("free for children 12 and under", "Free Admission: … under 18, over 65"),
+    # or a "<group> … free" trailer.
+    free_context = " ".join(re.findall(r"free[^.;]*", low))
+    free_context += " " + " ".join(re.findall(r"[^.;]*?\bfree\b", low))
+
+    free_group = ""
+    if re.search(r"\bunder[-\s]?18s?\b|\bunder\s+18\b|\baged?\s+18\s+and\s+under\b"
+                 r"|\bchildren\b|\bchild(?:ren)?\b|\b1[0-9]\s+and\s+under\b",
+                 free_context):
+        free_group = "under-18s"
+    elif re.search(r"\bstudents?\b", free_context):
+        free_group = "students"
+    elif re.search(r"\bover[-\s]?65s?\b|\bseniors?\b|\b65\+\b", free_context):
+        free_group = "seniors"
+
+    if price and free_group:
+        return f"Admission is {price} for adults; {free_group} go free."
+    if price:
+        return f"Admission is {price} for adults."
+    if general_free:
+        return "Admission is free."
+    return ""
+
+
+def compose_practical_facts(preflight: "Optional[Dict]") -> str:
+    """[LOCAL-633] Compose ONE short spoken practical-facts sentence pair from the
+    STRUCTURED preflight.
+
+    ``preflight`` is the venue preflight dict (keys ``hours``, ``admission`` are
+    free-text strings grounded by the preflight; ``name``/``venue``/``museum_name``
+    optionally carry the venue's name for the spoken subject). Returns at most two
+    short sentences (hours, then admission), about 30 words total, spoken naturally
+    and faithful to D633's rules. Returns '' when the preflight carries neither a
+    usable hours structure nor an admission fact.
+
+    Pure and deterministic. Only facts present in the preflight are spoken — the
+    composer never invents a day, a price or a free group.
+    """
+    if not preflight or not isinstance(preflight, dict):
+        return ""
+    if preflight.get("error") or preflight.get("skipped"):
+        return ""
+    hours_text = (preflight.get("hours") or "").strip()
+    admission_text = (preflight.get("admission") or "").strip()
+    if not hours_text and not admission_text:
+        return ""
+
+    # Spoken subject: a natural short venue name, else "The museum".
+    venue_name = (preflight.get("name") or preflight.get("venue")
+                  or preflight.get("museum_name") or "").strip()
+    venue_short = _compose_subject(venue_name)
+
+    # Never speak "open daily" when a closed weekday is named (reuse the preflight's
+    # own reconciliation when available).
+    if hours_text:
+        try:
+            import venue_preflight as _vpf
+            hours_text = _vpf.reconcile_daily_with_closed_days(hours_text)
+        except Exception:
+            pass
+
+    parts: List[str] = []
+    hours_sentence = _compose_hours_phrase(hours_text, venue_short)
+    if hours_sentence:
+        parts.append(hours_sentence)
+    adm_sentence = _compose_admission_phrase(admission_text)
+    if adm_sentence:
+        parts.append(adm_sentence)
+    return " ".join(parts).strip()
+
+
+def _compose_subject(venue_name: str) -> str:
+    """A natural spoken subject for the hours sentence: 'The Uffizi', 'The Met',
+    else 'The museum'. Strips a trailing ', City, ST' tail and a generic descriptor
+    so the sentence reads aloud, and ensures a leading 'The'."""
+    vn = (venue_name or "").split(",")[0].strip()
+    if not vn:
+        return "The museum"
+    # Known natural short names people say aloud.
+    low = vn.lower()
+    if "uffizi" in low:
+        return "The Uffizi"
+    if "metropolitan museum" in low or low == "the met":
+        return "The Met"
+    if "reina sof" in low:
+        return "The Reina Sofía"
+    # Prefix "The" when the name is not already article-led.
+    if low.startswith(("the ", "a ", "an ")):
+        return vn[:1].upper() + vn[1:]
+    return f"The {vn}"
 
 
 # ---------------------------------------------------------------------------

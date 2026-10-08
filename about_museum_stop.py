@@ -1806,71 +1806,59 @@ def _source_month_signal(domain: str, as_of: str) -> str:
 
 def _compose_visiting_sentences(facts: str, venue_name: str, domain: str,
                                 as_of: str) -> str:
-    """[LOCAL-592 r4] Turn the gated practical-facts string into SPOKEN sentences.
+    """[LOCAL-592 r4 → LOCAL-633] Turn the gated practical-facts string into ONE
+    short spoken sentence pair.
 
-    r3 emitted a note: "Before you go in, a few practical notes. Closed on Monday.
-    Noon–4 PM. $12." r4 composes it as speech, keeps the day range WITH the hours
-    (bound by the extractor), keeps the admission categories the page gives, and
-    closes with the source + month honesty signal:
+    LOCAL-592 r4 kept the page segments VERBATIM, which Bench R1 showed produced a
+    pasted dump inside Stop 1 (the Uffizi ticket-office / discount paragraph, the
+    Reina Sofía price table). LOCAL-633 makes this the SINGLE place practical facts
+    are spoken, and it speaks them through ``practical_facts_gate.compose_practical_facts``:
+    at most two short sentences (~30 words), day ranges not lists, one adult price
+    plus at most one free group, no parentheses / discounts / ticket-office detail,
+    the currency as a word.
 
-        "The Griffin is open Tuesday through Sunday, Noon–4 PM, and closed on
-         Monday. Admission is $12 for adults and $8 for seniors, students and
-         teachers, as listed on griffinmuseum.org in October 2026."
+        "The Uffizi is open Tuesday to Sunday, and closed on Mondays. Adult tickets
+         are 25 euros; under-18s go free."
 
-    Nothing is invented: every weekday, time, price and category is carried
-    verbatim from the gated ``facts`` (built upstream under the D584 contract).
-    """
+    Nothing is invented: the composer draws only on the hours/admission text the
+    gated ``facts`` carried (built upstream under the D584 contract). ``domain`` and
+    ``as_of`` are accepted for signature-compatibility but are NOT spoken (D617 /
+    LOCAL-623 defect 4 — provenance lives in the text-view Sources only)."""
     facts = (facts or "").strip()
     if not facts:
         return ""
-    # Split into top-level segments on sentence boundaries. Keep ';' inside a
-    # segment so an hours line with several day groups stays one segment.
+    # Split the gated facts string into hours-bearing vs admission-bearing text so
+    # the composer receives a preflight-shaped {hours, admission} structure. Keep
+    # ';' inside a segment so an hours line with several day groups stays one segment.
     segs = [s.strip() for s in re.split(r"(?<=[.!?])\s+|\.\s+", facts) if s.strip()]
     if not segs:
         segs = [facts]
 
     hours_segs: List[str] = []
-    closed_segs: List[str] = []
     admission_segs: List[str] = []
     for seg in segs:
         if _CLOSED_SEG_RE.search(seg):
-            closed_segs.append(seg)
+            hours_segs.append(seg)  # closed-day text is part of the hours structure
         elif _ADMISSION_SEG_RE.search(seg) and not _HOURS_SEG_RE.search(
                 re.sub(r"(?i)admission|entry|ticket|free", "", seg)):
             admission_segs.append(seg)
         elif _HOURS_SEG_RE.search(seg):
             hours_segs.append(seg)
         else:
-            # Unclassifiable — keep it as an admission-ish trailing note only if it
-            # carries a price; otherwise drop (never invent).
             if _ADMISSION_SEG_RE.search(seg):
                 admission_segs.append(seg)
 
-    # [LOCAL-599C] The HOURS sentence names the museum in FULL ("The MassArt Art
-    # Museum is open …"), per LEAD r3 — never the stripped short name.
-    venue_full = _full_venue_for_hours(venue_name)
-    hours_sentence = _compose_hours_sentence(venue_full, hours_segs, closed_segs)
-    adm_sentence = _compose_admission_sentence(admission_segs)
-
-    # [LOCAL-623 defect 4] NO spoken provenance / citation tail. The month stamp
-    # ("as published by the museum in October 2026") was attached to the spoken
-    # admission/hours sentence as an honesty signal, but the critique flagged it as
-    # a citation leftover a listener hears aloud (tour 468). Provenance belongs in
-    # the TEXT-view Sources, exactly as D617 moved the source domain out of speech;
-    # the spoken sentence states only the fact. The AboutStop still carries
-    # ``as_of`` for the text view — this only stops it being spoken.
-    out_sentences: List[str] = []
-    if hours_sentence:
-        out_sentences.append(hours_sentence)
-    if adm_sentence:
-        out_sentences.append(adm_sentence)
-    composed = " ".join(out_sentences).strip()
-    # The visiting block opens its own paragraph — capitalise its first letter
-    # ("the Griffin is open" → "The Griffin is open") without touching a leading
-    # price/number or an already-capital proper noun.
-    if composed and composed[0].islower():
-        composed = composed[0].upper() + composed[1:]
-    return composed
+    preflight = {
+        "name": venue_name or "",
+        "hours": "; ".join(s.rstrip(". ") for s in hours_segs),
+        "admission": "; ".join(s.rstrip(". ") for s in admission_segs),
+    }
+    try:
+        from practical_facts_gate import compose_practical_facts
+        composed = compose_practical_facts(preflight)
+    except Exception:
+        composed = ""
+    return composed.strip()
 
 
 def build_shortfall_sentence(venue_name: str, exhibitions_on_view: int,
