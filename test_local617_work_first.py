@@ -492,5 +492,59 @@ class TestTruncatedTail(unittest.TestCase):
         self.assertIn("restaurant tour", new)
 
 
+class TestBrokenSentences(unittest.TestCase):
+    """[LOCAL-617 item 3/8] repair_broken_sentences — missing-subject + dup clause.
+
+    Real corruptions the independent critic flagged on the three live tours:
+      tour 429  "During this period, was refining his techniques"  (missing subj)
+      tour 427  "…a profound act of devotion, of Assisi in a profound act of
+                 devotion"                                          (dup clause)
+    """
+
+    def test_drops_missing_subject_clause(self):
+        text = ("Stop 2: Murillo\n"
+                "During this period, was refining his techniques. "
+                "The canvas glows with a warm, enveloping light.")
+        new, rep = wf.repair_broken_sentences(text)
+        self.assertTrue(rep["changed"])
+        self.assertEqual(rep["missing_subject_dropped"], 1)
+        self.assertNotIn("was refining his techniques", new)
+        self.assertIn("warm, enveloping light", new)
+
+    def test_collapses_duplicated_clause(self):
+        text = ("Stop 2: Zurbaran\n"
+                "It depicts Saint Francis, a profound act of devotion, "
+                "of Assisi in a profound act of devotion.")
+        new, rep = wf.repair_broken_sentences(text)
+        self.assertTrue(rep["changed"])
+        self.assertEqual(rep["dup_clauses_collapsed"], 1)
+        # the verbatim repeat is gone — only one "profound act of devotion"
+        self.assertEqual(new.count("a profound act of devotion"), 1)
+
+    def test_never_empties_a_stop(self):
+        # the ONLY sentence of the stop is broken — keep it rather than vanish it
+        text = "Stop 5: X\nDuring this period, was refining his techniques."
+        new, rep = wf.repair_broken_sentences(text)
+        self.assertIn("was refining his techniques", new)
+
+    def test_imperatives_untouched(self):
+        text = "Walk to the next gallery. Look closely at the brushwork."
+        new, rep = wf.repair_broken_sentences(text)
+        self.assertFalse(rep["changed"])
+        self.assertEqual(new, text)
+
+    def test_legit_sentence_with_subject_preserved(self):
+        text = "During this period, Murillo was refining his techniques."
+        new, rep = wf.repair_broken_sentences(text)
+        self.assertFalse(rep["changed"])
+        self.assertEqual(new, text)
+
+    def test_stop_header_not_altered(self):
+        text = "Stop 3: The Immaculate Conception\nThe figure rises on a crescent moon."
+        new, rep = wf.repair_broken_sentences(text)
+        self.assertFalse(rep["changed"])
+        self.assertIn("Stop 3: The Immaculate Conception", new)
+
+
 if __name__ == "__main__":
     unittest.main()

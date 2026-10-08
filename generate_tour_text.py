@@ -23095,6 +23095,30 @@ RULES:
     except Exception as _tail_err:
         print(f"  [LOCAL-617] Truncated-tail repair error (non-fatal): {_tail_err}")
 
+    # -------- [LOCAL-617 item 3/8] Repair broken sentences --------
+    # The critic flagged, on every live tour, sentences shipped corrupted: a
+    # missing subject after an intro adverbial ("During this period, was refining
+    # his techniques" — the artist slot rendered empty) and a duplicated adjacent
+    # clause ("…a profound act of devotion, of Assisi in a profound act of
+    # devotion"). Both read as a factual red flag (criterion 8). Drop/collapse
+    # them deterministically; never empty a stop (D577).
+    try:
+        import work_first_evidence as _wfe_bs
+        _wf_bs_subjects = {}
+        try:
+            for _bi, _bp in enumerate(poi_list, 1):
+                _wf_bs_subjects[_bi] = _bp.get('name', '') or ''
+        except Exception:
+            pass
+        complete_tour, _bs_rep = _wfe_bs.repair_broken_sentences(
+            complete_tour, stop_subjects=_wf_bs_subjects)
+        if _bs_rep.get('changed'):
+            print(f"  [LOCAL-617] Broken-sentence repair: dropped "
+                  f"{_bs_rep['missing_subject_dropped']} missing-subject, collapsed "
+                  f"{_bs_rep['dup_clauses_collapsed']} duplicated clause(s)")
+    except Exception as _bs_err:
+        print(f"  [LOCAL-617] Broken-sentence repair error (non-fatal): {_bs_err}")
+
     # -------- [LOCAL-36] Practical facts QA gate --------
     # Verify provenance of every practical claim before delivery.
     # Claims without traceable source are DROPPED — silence is correct.
@@ -23626,6 +23650,71 @@ RULES:
         # Adopt the (possibly) repaired text so the cache store, file write and
         # everything downstream see the retried tour.
         complete_tour = _score_record['text']
+        # -------- [LOCAL-617] RE-APPLY work-first repairs after the retry --------
+        # The scorer-retry at LOCAL-540 can splice an LLM-REGENERATED stop body or
+        # conclusion into the tour AFTER the deterministic LOCAL-617 guards already
+        # ran (institutional filter, shortfall reconcile, conclusion de-dup,
+        # truncated-tail repair, all ~700 lines up). The regenerated text is the
+        # LAST thing to touch the tour before cache store + DB write, so without a
+        # re-pass it ships UNGUARDED — which is exactly how tours 427/429 shipped a
+        # conclusion cut mid-clause ("…Murillo's talent for.", "…Zurbarán's skill
+        # in capturing.") and residual museum/collection drift the critic flagged
+        # at criterion 1. Re-run the same pure, unit-tested repairs on the retried
+        # text so the delivered (and critiqued) tour carries the work-first
+        # guarantees end-to-end. Only runs when a rewrite actually happened; a
+        # non-retried tour already passed these and is untouched. Each guard is
+        # exception-isolated and never empties a stop (D577).
+        if _score_record.get('retried'):
+            print("  [LOCAL-617] scorer-retry rewrote the tour — re-applying "
+                  "work-first + conclusion/tail repairs to the final text")
+            if tour_category == 'museum':
+                try:
+                    import work_first_evidence as _wfe_r1
+                    _r_tokens = [w for w in re.split(r'[\s,\-]+', (location or ''))
+                                 if len(w) >= 3]
+                    _r_subjects = {}
+                    try:
+                        for _ri, _rp in enumerate(poi_list, 1):
+                            _r_subjects[_ri] = _rp.get('name', '') or ''
+                    except Exception:
+                        pass
+                    complete_tour, _r_body = _wfe_r1.filter_tour_text_work_first(
+                        complete_tour, venue_tokens=_r_tokens, stop_subjects=_r_subjects)
+                    if _r_body.get('changed'):
+                        print(f"  [LOCAL-617] post-retry stop-body filter: dropped "
+                              f"{_r_body['institutional_dropped']} institutional "
+                              f"sentence(s) across {_r_body['stops']} stops")
+                except Exception as _r_body_err:
+                    print(f"  [LOCAL-617] post-retry stop-body filter error "
+                          f"(non-fatal): {_r_body_err}")
+            try:
+                import work_first_evidence as _wfe_r2
+                complete_tour, _r_sf = _wfe_r2.reconcile_shortfall_in_text(complete_tour)
+                if _r_sf.get('removed') or _r_sf.get('rewritten'):
+                    print(f"  [LOCAL-617] post-retry shortfall reconciled "
+                          f"(delivered={_r_sf.get('delivered')})")
+                complete_tour, _r_cc = _wfe_r2.dedupe_conclusion(complete_tour)
+                if _r_cc.get('removed_redundant_covered'):
+                    print("  [LOCAL-617] post-retry conclusion de-dup: removed "
+                          "redundant 'This tour covered …' line")
+                complete_tour, _r_tl = _wfe_r2.repair_truncated_tail(complete_tour)
+                if _r_tl.get('repaired'):
+                    print("  [LOCAL-617] post-retry repaired truncated final sentence")
+                _r_bs_subjects = {}
+                try:
+                    for _rbi, _rbp in enumerate(poi_list, 1):
+                        _r_bs_subjects[_rbi] = _rbp.get('name', '') or ''
+                except Exception:
+                    pass
+                complete_tour, _r_bs = _wfe_r2.repair_broken_sentences(
+                    complete_tour, stop_subjects=_r_bs_subjects)
+                if _r_bs.get('changed'):
+                    print(f"  [LOCAL-617] post-retry broken-sentence repair: dropped "
+                          f"{_r_bs['missing_subject_dropped']} missing-subject, collapsed "
+                          f"{_r_bs['dup_clauses_collapsed']} duplicated clause(s)")
+            except Exception as _r_tail_err:
+                print(f"  [LOCAL-617] post-retry conclusion/tail repair error "
+                      f"(non-fatal): {_r_tail_err}")
         # Fold the retry's OpenAI cost into the run totals BEFORE they are printed
         # and recorded, so the cost a caller reads includes the retry (LOCAL-533's
         # instrument, extended). A cache hit never reaches here, so its $0.00 is

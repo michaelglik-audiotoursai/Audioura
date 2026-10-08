@@ -77,6 +77,7 @@ __all__ = [
     "looks_like_non_artwork_listing",
     "dedupe_conclusion",
     "repair_truncated_tail",
+    "repair_broken_sentences",
 ]
 
 
@@ -1096,3 +1097,95 @@ def repair_truncated_tail(tour_text: str) -> Tuple[str, Dict]:
             # preserve a trailing newline convention
             return new_text + "\n", report
     return tour_text, report
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# [LOCAL-617 item 3/8] Broken-sentence repair. The critic flagged, on EVERY one
+# of the three live tours, sentences the generator shipped corrupted:
+#   • a MISSING SUBJECT after an intro adverbial — "During this period, was
+#     refining his techniques" (tour 429), where the {artist} slot rendered empty;
+#   • a DUPLICATED adjacent clause — "a profound act of devotion, of Assisi in a
+#     profound act of devotion" (tour 427), a template splice gone wrong.
+# Both read as a data gap / factual red flag (criterion 8) to a listener. These
+# are deterministic, local text corruptions — repair them without the LLM.
+# ─────────────────────────────────────────────────────────────────────────────
+
+# An intro adverbial phrase, a comma, then a CONJUGATED verb with no subject
+# between the comma and the verb. "During this period, was refining…",
+# "In 1890, painted the canvas…", "At this moment, had become…". The verb set is
+# the auxiliaries/common past verbs that cannot legally open a main clause with no
+# subject. We require a leading intro phrase so we never touch an imperative.
+_MISSING_SUBJECT_RE = re.compile(
+    r"(?i)^\s*"
+    r"(?:(?:during|in|at|after|before|by|throughout|around|amid|following|"
+    r"while|when|as|though|although|despite)\b[^,.;]{0,60}),\s+"
+    r"(was|were|had|has|would|could|began|started|continued|returned|became|"
+    r"painted|created|made|refining|developing|working|producing)\b"
+)
+
+# A clause of >= 3 words that repeats verbatim later in the SAME sentence,
+# separated by a comma or connective — the splice artifact the critic saw.
+_DUP_CLAUSE_RE = re.compile(
+    r"(?i)\b((?:\w+\s+){2,6}\w+)\b(.{0,40}?)\b\1\b")
+
+
+def repair_broken_sentences(tour_text: str, stop_subjects: Optional[Dict[int, str]] = None
+                            ) -> Tuple[str, Dict]:
+    """[LOCAL-617 item 3/8] Drop/clean sentences the generator shipped corrupted.
+
+    Two deterministic corruptions the critic flagged on tours 427/428/429:
+
+    1. **Missing-subject clause** ("During this period, was refining his
+       techniques") — an intro adverbial, a comma, then a conjugated verb with no
+       subject. The subject slot rendered empty. These are dropped (the stop keeps
+       its other, complete sentences); never the only sentence of a stop (D577).
+    2. **Duplicated adjacent clause** ("…a profound act of devotion, of Assisi in
+       a profound act of devotion") — collapse the verbatim repeat to one copy.
+
+    Pure string→string. Operates per paragraph so a drop never crosses a stop
+    boundary and a stop is never emptied.
+    """
+    report = {"missing_subject_dropped": 0, "dup_clauses_collapsed": 0}
+    if not tour_text or not tour_text.strip():
+        return tour_text, report
+
+    out_paras: List[str] = []
+    for para in tour_text.split("\n"):
+        if not para.strip():
+            out_paras.append(para)
+            continue
+        # Header lines (Stop N:, Tour-Category:, titles) are left untouched.
+        if re.match(r"(?i)^\s*(stop\s+\d+\s*:|tour-category:|##|\*\*)", para):
+            out_paras.append(para)
+            continue
+        sents = split_sentences(para)
+        if not sents:
+            out_paras.append(para)
+            continue
+        kept: List[str] = []
+        for s in sents:
+            # (2) collapse a verbatim duplicated clause inside the sentence first
+            m = _DUP_CLAUSE_RE.search(s)
+            if m and len(m.group(1).split()) >= 3:
+                s2 = _DUP_CLAUSE_RE.sub(lambda mm: mm.group(1), s, count=1)
+                s2 = re.sub(r"\s{2,}", " ", s2).replace(" ,", ",").strip()
+                if s2 and s2 != s:
+                    report["dup_clauses_collapsed"] += 1
+                    s = s2
+            # (1) drop a missing-subject clause — but never the last substance in
+            # the paragraph.
+            if _MISSING_SUBJECT_RE.search(s):
+                report["missing_subject_dropped"] += 1
+                continue
+            kept.append(s)
+        if not kept:
+            # every sentence was broken — keep the ORIGINAL rather than empty the
+            # stop (D577); a broken stop still beats a vanished one.
+            out_paras.append(para)
+            continue
+        out_paras.append(" ".join(kept))
+
+    new_text = "\n".join(out_paras)
+    report["changed"] = (report["missing_subject_dropped"] > 0
+                         or report["dup_clauses_collapsed"] > 0)
+    return new_text, report
