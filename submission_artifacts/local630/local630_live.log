@@ -1,0 +1,1229 @@
+=== LOCAL-630 isolated live run (National Gallery + Art Institute of Chicago, 3 stops each) ===
+host  : cf7a22ec4b65
+model : gpt-4o   HARD CAP: $1.5  reserve: $0.9  STOP_EDITOR=1  cache=1 pool=1
+[db] audio_tours row count BEFORE: 301
+[db] paid_api_calls spend for host cf7a22ec4b65 BEFORE: $0.0
+
+[reserve-gate] spend_so_far=$0.0 + reserve $0.9 vs cap $1.5
+=== generating: The National Gallery, London, UK (3 stops) ===
+  [LOCAL-603] preflight venue='The National Gallery' status=open hours=y admission=y highlights=6
+
+======================================================================
+CALL #001 | 20:13:00.146 | GENERATE_TOUR_TEXT_FUNCTION_ENTRY
+======================================================================
+  location: The National Gallery, London, UK
+  tour_type: museum
+  total_stops_parameter: 3
+  output_file: /app/tours/LOCAL630_NATIONAL_GALLERY.txt
+
+  [LOCAL-245] Stop-existence gate mode: LOG_ONLY
+
+======================================================================
+CALL #002 | 20:13:00.154 | TOTAL_STOPS_FINALIZED
+======================================================================
+  location: The National Gallery, London, UK
+  total_stops_final: 3
+  source: parameter
+
+
+PHASE 1: Analyzing tour intent with AI...
+Intent analysis response: ```json
+{
+    "poi_type": "museums",
+    "location": "London, UK",
+    "theme_type": "STANDARD",
+    "theme_name": null,
+    "requirements": null,
+    "business_hours_relevant": true,
+    "accessibility_mentioned": false,
+    "needs_research": false,
+    "venue_name": "The National Gallery",
+    "geographic_scope": "London, UK",
+    "named_places": [],
+    "scope_precision": "CITY",
+    "transport_mode": "on_foot",
+    "country_scope": "UK"
+}
+```
+  [INTENT] Stripped LLM fences from response
+  [TRANSPORT] mode=on_foot, country_scope=UK (keyword=on_foot, intent=on_foot)
+✅ Intent Analysis Results:
+   POI Type: museums
+   Location: London, UK
+   Requirements: None
+   Business Hours Relevant: True
+   Accessibility Mentioned: False
+   Venue Name: The National Gallery
+  [venue_name sanity] 'The National Gallery' OK
+  [S15] Forced tour_category=museum from venue_name='The National Gallery'
+[TIMING] phase=intent elapsed=1.3s cumulative=1.3s
+[LOCAL-474] tour_type='museum' → category='museum' (source=explicit)
+
+Detected tour category: MUSEUM
+Using museum template for The National Gallery, London, UK - museum
+
+======================================================================
+CALL #003 | 20:13:01.461 | GENERATING_PROMPT
+======================================================================
+  location: The National Gallery, London, UK
+  user_request: museum The National Gallery, London, UK
+  total_stops: 3
+
+
+PHASE 3A: Fetching 3 candidate POI(s) for The National Gallery, London, UK...
+  [Museum constraint] Venue from intent='The National Gallery'
+  [venue_resolver] Name variants: ['The National Gallery']
+  [venue_resolver] Candidates for variant 'The National Gallery': ['Q180788', 'Q46810531', 'Q104471917', 'Q18686576', 'Q26506403', 'Q99925496', 'Q110157648', 'Q64583955']
+  [venue_resolver] SPARQL: 119 works found for Q180788
+  [venue_resolver] SPARQL: 8 works found for Q46810531
+  [venue_resolver] #3 collection dominates (119 vs 8) — collapsing to Q180788 (National Gallery)
+  [venue_resolver] Resolved: 'The National Gallery' → Q180788 (National Gallery)
+    URL: https://www.nationalgallery.org.uk
+    Coords: 51.50888888888889, -0.12833333333333333
+    Language: en
+  [venue_resolver] SPARQL: 119 works found for Q180788
+  [Phase3A] Injected 12 canonical title hints from Wikidata (QID-deduped)
+  [S17] no scope_constraint (precision='CITY', scope='London, UK')
+  [venue_resolver] Name variants: ['The National Gallery']
+  [venue_resolver] Candidates for variant 'The National Gallery': ['Q180788', 'Q46810531', 'Q104471917', 'Q18686576', 'Q26506403', 'Q99925496', 'Q110157648', 'Q64583955']
+  [venue_resolver] SPARQL: 119 works found for Q180788
+  [venue_resolver] SPARQL: 8 works found for Q46810531
+  [venue_resolver] #3 collection dominates (119 vs 8) — collapsing to Q180788 (National Gallery)
+  [venue_resolver] Resolved: 'The National Gallery' → Q180788 (National Gallery)
+    URL: https://www.nationalgallery.org.uk
+    Coords: 51.50888888888889, -0.12833333333333333
+    Language: en
+  [venue_cache] HIT for Q180788 (tier=rich, expires=2026-11-07 19:37:58.809194)
+  [venue_resolver] SPARQL: 119 works found for Q180788
+  [LOCAL-30] Deterministic selection: 119 documented works (0 catalogue, 119 SPARQL; 104 site/cache canonical title(s) are NOT documented)
+  [LOCAL-629] candidate works BEFORE artworks-only (223): ['Arnolfini Portrait', 'The Ambassadors', 'Ophelia', 'Rokeby Venus', 'The Hay Wain', 'Supper at Emmaus', 'Venus and Mars', 'An Experiment on a Bird in the Air Pump', "Belshazzar's Feast", 'Rain, Steam and Speed – The Great Western Railway', 'Music in the Tuileries', 'Venus, Cupid, Folly and Time', 'The Dream of a Knight', 'The Fighting Temeraire', 'Boy Bitten by a Lizard', 'The Umbrellas', 'Bathers at Asnières', 'Mr and Mrs Andrews', 'Diana and Actaeon', 'Allegory of Prudence', 'Carnation, Lily, Lily and Rose', 'The Entombment', 'The Lady of Shalott', 'Bacchus and Ariadne', 'Madonna of the Pinks', 'A Young Woman Standing at a Virginal', 'Christ in the House of His Parents', "Van Gogh's Chair", 'Madame Moitessier', 'Samson and Delilah', 'Mond Crucifixion', 'A Young Woman seated at a Virginal', 'The Baptism of Christ', 'The Execution of Lady Jane Grey', 'Tiger in a Tropical Storm', 'Ansidei Madonna', 'The Adoration of the Kings', 'Beata Beatrix', 'Portrait of a Man (Self      Portrait?)', 'The Virgin and Child with Saint Anne and Saint John the Baptist', 'Léal Souvenir', 'Saint Jerome in His Study', 'The Annunciation, with Saint Emidius', 'The Magdalen Reading', 'The Mystical Nativity', 'Hope', 'Saint Catherine of Alexandria', 'Dido building Carthage', 'Garvagh Madonna', 'La Schiavona', 'Madonna del Prato', 'Portrait of a young man with a skull', 'Portrait of Doña Isabel de Porcel', 'Saint Eulalia', 'Self-Portrait at the Age of 34', 'The Judgement of Paris', 'The Origin of the Milky Way', 'The Ugly Duchess', 'Wilton Diptych', 'Diana and Callisto', 'Christ in the House of Martha and Mary', 'Manchester Madonna', 'Marriage à-la-mode', 'Noli me tangere', 'Portrait of Doge Leonardo Loredan', 'The Adoration of the Golden Calf', 'Tobias and the Angel', 'Agony in the Garden', 'April Love', 'Christ Crowned with Thorns', 'Ecce Ancilla Domini', 'Miss La La at the Cirque Fernando', 'Our English Coasts', 'Salome with the Head of John the Baptist', 'The Age of Innocence', 'The Agony in the Garden', 'The Cornfield', 'The Death of Procris', 'The Lament for Icarus', 'The Order of Release', "The Stonemason's Yard", 'The Vale of Rest', 'The Woman Taken in Adultery', 'Two Crabs', 'Portrait of Susanna Lunden', 'Cupid Complaining to Venus', 'Farms near Auvers', 'King Cophetua and the Beggar Maid', 'Portrait of a Woman', 'Portrait of Gerolamo (?) Barbarigo', 'Salisbury Cathedral from the Meadows', 'St. Jerome in the Wilderness', 'The Nativity', 'The Vision of Saint Eustace', 'Whistlejacket', 'A View of Het Steen in the Early Morning', 'A Woman Bathing in a Stream (Hendrickje Stoffels?)', 'Christ before the High Priest', 'Christina of Denmark, Duchess of Milan', 'Martyrdom of Saint Sebastian', 'Philip IV in Brown and Silver', 'Saint George and the Dragon', 'Saint Margaret of Antioch', 'Self-Portrait at the Age of 63', 'Symphony in White, No. 2: The Little White Girl', 'The Bath of Psyche', 'The Beloved', 'The Courtyard of a House in Delft', 'The Death of Actaeon', 'The Girlhood of Mary Virgin', 'The Graham Children', 'The Magic Circle', 'The Vision of Saint Jerome', 'Apollo and Daphne', 'Nativity at Night', 'Nocturne: Blue and Gold – Old Battersea Bridge', 'The Bewitched Man', 'The Conversion of Mary Magdalene', "Venus with Mercury and Cupid ('The School of Love')", '1838', 'Alteration and expansion (Pennethorne, Barry and Taylor)', 'An Allegory with Venus and Cupid', 'Artists in residence', 'Early 20th century', 'Explanatory notes', 'Foundation and early history', 'General sources', 'Growth under Eastlake and his successors', "Hampton's site", 'Laure Gargallo', 'My National Gallery', 'Open Mind', 'Portrait of Christina of Denmark', 'Post-war developments', 'Renovation of the Sainsbury Wing', 'Sainsbury Wing and later additions', 'St Vincent House extension', 'The call for a National Gallery', 'Transport connections', 'West Wing Project', "William Wilkins's building", "'Mystic Nativity'", '1852', 'A Grotesque Old Woman', 'A Man with a Quilted Sleeve', 'A Satyr mourning over a Nymph', "A Scene from El Hechizado por Fuerza ('The Forcibly Bewitched')", 'Adoration of the magi', 'Aldobrandini-Garvagh Madonna', 'An Allegory - Vision of a Knight', 'An Allegory of Prudence', 'An Allegory of Venus and Cupid and A Triumph of Venus', 'An Autumn Landscape with a View of Het Steen in the Early Morning', "An Old Woman ('The Ugly Duchess')", 'Ariosto', 'Bacchus and Ariadne (Titian)', 'Bathers at Asni?res', 'Bañistas en Asnieres', 'Christ Mocked (The Crowning with Thorns)', 'Crocifissione Gavari', 'Diana and Actaeon (Titian)', "Jean de Dinteville and Georges de Selve ('The Ambassadors')", 'Judgment of Paris', 'Kitchen Scene with Christ in the House of Martha and Mary', 'Lady Seated at a Virginal', 'Landscape: Noon', 'Madonna of the Meadow', 'Marriage à-la-mode\xa0(series of six)', 'Miss LaLa en el Cirque Fernando', 'Music in the Tuileries Gardens', 'Noli me tangere (Titian)', 'or The Rise of the Carthaginian Empire', 'Penitent Jerome', 'Philip IV of Spain in Brown and Silver', "Portrait of a Lady ('La Schiavona')", "Portrait of a Man ('Léal Souvenir')", 'Portrait of a Man in a Red Turban', 'Portrait of a Man in a Turban', 'Portrait of a Woman inspired by Lucretia', 'Portrait of Girolamo (?) Barbarigo', "Portrait of Susanna Lunden(?) ('Le Chapeau de Paille')", 'Portrait of the Doge Leonardo Loredan', "Richard II presented to the Virgin and Child by his Patron Saint John the Baptist and Saints Edward and Edmund ('The Wilton Diptych')", 'Saint George Killing the Dragon', 'Saint Jerome in the Wilderness', 'Saints and Angels (The Mond Crucifixion)', 'Salome receives the Head of John the Baptist', "Samson Asleep in Delilah's Lap", 'St. Jerome in His Study', 'Strayed Sheep', 'Surprised!', 'The Aldobrandini Madonna', 'The Arnolfini Double Portrait', 'The Arnolfini Marriage', 'The Arnolfini Portrait (Portrait of Giovanni Arnolfini (?) and his Wife)', 'The Arnolfini Wedding', 'The Carpenter Shop', 'The Crucified Christ with the Virgin Mary', 'The Entombment (or Christ being carried to his Tomb)', 'The Family of Darius before Alexander', 'The Fighting Temeraire tugged to her last berth to be broken up', 'The Golden Stairs', 'The Haywain', 'the Honey Thief', "The Madonna and Child with Saint John the Baptist and Saint Nicholas of Bari ('The Ansidei Madonna')", 'The Madonna and Child with Saints John the Baptist and Jerome', 'The Madonna and Child with St John and Angels', 'The Madonna and Child with the Infant Baptist (The Garvagh Madonna)', "The Madonna of the Pinks ('La Madonna dei Garofani')", 'The Martyrdom of Saint Sebastian', 'The Martyrdom of St. Sebastian', 'The Nativity at Night', 'The Portrait of Caterina Cornaro', 'The Stonemason’s Yard (Venice: Campo Santa Vidal and Santa Maria Della Carita)', 'The Supper at Emmaus', "The Toilet of Venus ('The Rokeby Venus')", "The Virgin and Child with Saint Anne and the Infant Saint John the Baptist ('The Burlington House Cartoon')", "The Virgin and Child with Saint John and Angels ('The Manchester Madonna')", 'The Virgin and Child with St. Anne and St. John the Baptist', 'Timotheus', "Venice: Campo S. Vidal and Santa Maria della Carit? ('The Stonemason's Yard')", "Vincent's Chair with His Pipe", 'Young Man holding a Skull (Vanitas)']
+  [LOCAL-629] [LOCAL-630 item 1] collection-membership dropped 21: [('Alteration and expansion (Pennethorne, Barry and Taylor)', 'not_in_collection (no P195/P276=The National Gallery match and not site-listed)'), ('Artists in residence', 'not_in_collection (no P195/P276=The National Gallery match and not site-listed)'), ('Early 20th century', 'not_in_collection (no P195/P276=The National Gallery match and not site-listed)'), ('Explanatory notes', 'not_in_collection (no P195/P276=The National Gallery match and not site-listed)'), ('Foundation and early history', 'not_in_collection (no P195/P276=The National Gallery match and not site-listed)'), ('General sources', 'not_in_collection (no P195/P276=The National Gallery match and not site-listed)'), ('Growth under Eastlake and his successors', 'not_in_collection (no P195/P276=The National Gallery match and not site-listed)'), ("Hampton's site", 'not_in_collection (no P195/P276=The National Gallery match and not site-listed)'), ('Laure Gargallo', 'not_in_collection (no P195/P276=The National Gallery match and not site-listed)'), ('My National Gallery', 'not_in_collection (no P195/P276=The National Gallery match and not site-listed)'), ('Open Mind', 'not_in_collection (no P195/P276=The National Gallery match and not site-listed)'), ('Post-war developments', 'not_in_collection (no P195/P276=The National Gallery match and not site-listed)'), ('Renovation of the Sainsbury Wing', 'not_in_collection (no P195/P276=The National Gallery match and not site-listed)'), ('Sainsbury Wing and later additions', 'not_in_collection (no P195/P276=The National Gallery match and not site-listed)'), ('St Vincent House extension', 'not_in_collection (no P195/P276=The National Gallery match and not site-listed)'), ('The call for a National Gallery', 'not_in_collection (no P195/P276=The National Gallery match and not site-listed)'), ('Transport connections', 'not_in_collection (no P195/P276=The National Gallery match and not site-listed)'), ('West Wing Project', 'not_in_collection (no P195/P276=The National Gallery match and not site-listed)'), ("William Wilkins's building", 'not_in_collection (no P195/P276=The National Gallery match and not site-listed)'), ('The Family of Darius before Alexander', 'not_in_collection (no P195/P276=The National Gallery match and not site-listed)'), ('The Golden Stairs', 'not_in_collection (no P195/P276=The National Gallery match and not site-listed)')]
+  [LOCAL-629] artist-variety capped 133: [('The Fighting Temeraire', 'artist_variety_cap (>1 by q159758)'), ('Boy Bitten by a Lizard', 'artist_variety_cap (>1 by q42207)'), ('Allegory of Prudence', 'artist_variety_cap (>1 by q47551)'), ('Bacchus and Ariadne', 'artist_variety_cap (>1 by q47551)'), ('Madonna of the Pinks', 'artist_variety_cap (>1 by q5597)'), ('Christ in the House of His Parents', 'artist_variety_cap (>1 by q159606)'), ('Mond Crucifixion', 'artist_variety_cap (>1 by q5597)'), ('A Young Woman seated at a Virginal', 'artist_variety_cap (>1 by q41264)'), ('Ansidei Madonna', 'artist_variety_cap (>1 by q5597)'), ('Portrait of a Man (Self      Portrait?)', 'artist_variety_cap (>1 by q102272)'), ('Léal Souvenir', 'artist_variety_cap (>1 by q102272)'), ('The Mystical Nativity', 'artist_variety_cap (>1 by q5669)'), ('Saint Catherine of Alexandria', 'artist_variety_cap (>1 by q5597)'), ('Dido building Carthage', 'artist_variety_cap (>1 by q159758)'), ('Garvagh Madonna', 'artist_variety_cap (>1 by q5597)'), ('La Schiavona', 'artist_variety_cap (>1 by q47551)'), ('Saint Eulalia', 'artist_variety_cap (>1 by q212754)'), ('Self-Portrait at the Age of 34', 'artist_variety_cap (>1 by q5598)'), ('Diana and Callisto', 'artist_variety_cap (>1 by q47551)'), ('Christ in the House of Martha and Mary', 'artist_variety_cap (>1 by q297)'), ('Manchester Madonna', 'artist_variety_cap (>1 by q5592)'), ('Noli me tangere', 'artist_variety_cap (>1 by q47551)'), ('Portrait of Doge Leonardo Loredan', 'artist_variety_cap (>1 by q17169)'), ('Ecce Ancilla Domini', 'artist_variety_cap (>1 by q186748)'), ('Salome with the Head of John the Baptist', 'artist_variety_cap (>1 by q42207)'), ('The Agony in the Garden', 'artist_variety_cap (>1 by q5681)'), ('The Cornfield', 'artist_variety_cap (>1 by q159297)'), ('The Order of Release', 'artist_variety_cap (>1 by q159606)'), ('The Vale of Rest', 'artist_variety_cap (>1 by q159606)'), ('The Woman Taken in Adultery', 'artist_variety_cap (>1 by q5598)'), ('Two Crabs', 'artist_variety_cap (>1 by q5582)'), ('Portrait of Susanna Lunden', 'artist_variety_cap (>1 by q5599)'), ('Farms near Auvers', 'artist_variety_cap (>1 by q5582)'), ('Portrait of Gerolamo (?) Barbarigo', 'artist_variety_cap (>1 by q47551)'), ('Salisbury Cathedral from the Meadows', 'artist_variety_cap (>1 by q159297)'), ('The Nativity', 'artist_variety_cap (>1 by q5822)'), ('A View of Het Steen in the Early Morning', 'artist_variety_cap (>1 by q5599)'), ('A Woman Bathing in a Stream (Hendrickje Stoffels?)', 'artist_variety_cap (>1 by q5598)'), ('Christina of Denmark, Duchess of Milan', 'artist_variety_cap (>1 by q48319)'), ('Philip IV in Brown and Silver', 'artist_variety_cap (>1 by q297)'), ('Saint George and the Dragon', 'artist_variety_cap (>1 by q9319)'), ('Self-Portrait at the Age of 63', 'artist_variety_cap (>1 by q5598)'), ('The Beloved', 'artist_variety_cap (>1 by q186748)'), ('The Death of Actaeon', 'artist_variety_cap (>1 by q47551)'), ('The Girlhood of Mary Virgin', 'artist_variety_cap (>1 by q186748)'), ('The Graham Children', 'artist_variety_cap (>1 by q171344)'), ('The Magic Circle', 'artist_variety_cap (>1 by q212754)'), ('Apollo and Daphne', 'artist_variety_cap (>1 by q707046)'), ('Nocturne: Blue and Gold – Old Battersea Bridge', 'artist_variety_cap (>1 by q203643)'), ('The Bewitched Man', 'artist_variety_cap (>1 by q5432)'), ('1838', 'artist_variety_cap (>1 by q159758)'), ('An Allegory with Venus and Cupid', 'artist_variety_cap (>1 by q7803)'), ('Portrait of Christina of Denmark', 'artist_variety_cap (>1 by q48319)'), ("'Mystic Nativity'", 'artist_variety_cap (>1 by q5669)'), ('1852', 'artist_variety_cap (>1 by q211763)'), ('A Grotesque Old Woman', 'artist_variety_cap (>1 by metsys)'), ('A Man with a Quilted Sleeve', 'artist_variety_cap (>1 by q47551)'), ('A Satyr mourning over a Nymph', 'artist_variety_cap (>1 by q280851)'), ("A Scene from El Hechizado por Fuerza ('The Forcibly Bewitched')", 'artist_variety_cap (>1 by q5432)'), ('Adoration of the magi', 'artist_variety_cap (>1 by q43270)'), ('Aldobrandini-Garvagh Madonna', 'artist_variety_cap (>1 by q5597)'), ('An Allegory - Vision of a Knight', 'artist_variety_cap (>1 by q5597)'), ('An Allegory of Prudence', 'artist_variety_cap (>1 by q47551)'), ('An Allegory of Venus and Cupid and A Triumph of Venus', 'artist_variety_cap (>1 by q7803)'), ('An Autumn Landscape with a View of Het Steen in the Early Morning', 'artist_variety_cap (>1 by q5599)'), ("An Old Woman ('The Ugly Duchess')", 'artist_variety_cap (>1 by metsys)'), ('Ariosto', 'artist_variety_cap (>1 by q47551)'), ('Bacchus and Ariadne (Titian)', 'artist_variety_cap (>1 by q47551)'), ('Bathers at Asni?res', 'artist_variety_cap (>1 by q34013)'), ('Bañistas en Asnieres', 'artist_variety_cap (>1 by q34013)'), ('Christ Mocked (The Crowning with Thorns)', 'artist_variety_cap (>1 by q130531)'), ('Crocifissione Gavari', 'artist_variety_cap (>1 by q5597)'), ('Diana and Actaeon (Titian)', 'artist_variety_cap (>1 by q47551)'), ("Jean de Dinteville and Georges de Selve ('The Ambassadors')", 'artist_variety_cap (>1 by q48319)'), ('Judgment of Paris', 'artist_variety_cap (>1 by q5599)'), ('Kitchen Scene with Christ in the House of Martha and Mary', 'artist_variety_cap (>1 by q297)'), ('Lady Seated at a Virginal', 'artist_variety_cap (>1 by q41264)'), ('Landscape: Noon', 'artist_variety_cap (>1 by q159297)'), ('Madonna of the Meadow', 'artist_variety_cap (>1 by q17169)'), ('Marriage à-la-mode\xa0(series of six)', 'artist_variety_cap (>1 by q171344)'), ('Miss LaLa en el Cirque Fernando', 'artist_variety_cap (>1 by q46373)'), ('Music in the Tuileries Gardens', 'artist_variety_cap (>1 by q40599)'), ('Noli me tangere (Titian)', 'artist_variety_cap (>1 by q47551)'), ('or The Rise of the Carthaginian Empire', 'artist_variety_cap (>1 by q159758)'), ('Penitent Jerome', 'artist_variety_cap (>1 by q5580)'), ('Philip IV of Spain in Brown and Silver', 'artist_variety_cap (>1 by q297)'), ("Portrait of a Lady ('La Schiavona')", 'artist_variety_cap (>1 by q47551)'), ("Portrait of a Man ('Léal Souvenir')", 'artist_variety_cap (>1 by q102272)'), ('Portrait of a Man in a Red Turban', 'artist_variety_cap (>1 by q102272)'), ('Portrait of a Man in a Turban', 'artist_variety_cap (>1 by q102272)'), ('Portrait of a Woman inspired by Lucretia', 'artist_variety_cap (>1 by q310973)'), ('Portrait of Girolamo (?) Barbarigo', 'artist_variety_cap (>1 by q47551)'), ("Portrait of Susanna Lunden(?) ('Le Chapeau de Paille')", 'artist_variety_cap (>1 by q5599)'), ('Portrait of the Doge Leonardo Loredan', 'artist_variety_cap (>1 by q17169)'), ("Richard II presented to the Virgin and Child by his Patron Saint John the Baptist and Saints Edward and Edmund ('The Wilton Diptych')", 'artist_variety_cap (>1 by ffbef093f41550ffa45b30c5b91a3156)'), ('Saint George Killing the Dragon', 'artist_variety_cap (>1 by q9319)'), ('Saint Jerome in the Wilderness', 'artist_variety_cap (>1 by q5580)'), ('Saints and Angels (The Mond Crucifixion)', 'artist_variety_cap (>1 by q5597)'), ('Salome receives the Head of John the Baptist', 'artist_variety_cap (>1 by q42207)'), ("Samson Asleep in Delilah's Lap", 'artist_variety_cap (>1 by d4b4117da05a2b47b8d8581dd75900f1)'), ('St. Jerome in His Study', 'artist_variety_cap (>1 by q5594)'), ('Strayed Sheep', 'artist_variety_cap (>1 by q211763)'), ('Surprised!', 'artist_variety_cap (>1 by q156386)'), ('The Aldobrandini Madonna', 'artist_variety_cap (>1 by q5597)'), ('The Arnolfini Double Portrait', 'artist_variety_cap (>1 by q102272)'), ('The Arnolfini Marriage', 'artist_variety_cap (>1 by q102272)'), ('The Arnolfini Portrait (Portrait of Giovanni Arnolfini (?) and his Wife)', 'artist_variety_cap (>1 by q102272)'), ('The Arnolfini Wedding', 'artist_variety_cap (>1 by q102272)'), ('The Carpenter Shop', 'artist_variety_cap (>1 by q159606)'), ('The Crucified Christ with the Virgin Mary', 'artist_variety_cap (>1 by q5597)'), ('The Entombment (or Christ being carried to his Tomb)', 'artist_variety_cap (>1 by q5592)'), ('The Fighting Temeraire tugged to her last berth to be broken up', 'artist_variety_cap (>1 by q159758)'), ('The Haywain', 'artist_variety_cap (>1 by q159297)'), ('the Honey Thief', 'artist_variety_cap (>1 by q191748)'), ("The Madonna and Child with Saint John the Baptist and Saint Nicholas of Bari ('The Ansidei Madonna')", 'artist_variety_cap (>1 by q5597)'), ('The Madonna and Child with Saints John the Baptist and Jerome', 'artist_variety_cap (>1 by q9348)'), ('The Madonna and Child with St John and Angels', 'artist_variety_cap (>1 by q5592)'), ('The Madonna and Child with the Infant Baptist (The Garvagh Madonna)', 'artist_variety_cap (>1 by q5597)'), ("The Madonna of the Pinks ('La Madonna dei Garofani')", 'artist_variety_cap (>1 by q5597)'), ('The Martyrdom of Saint Sebastian', 'artist_variety_cap (>1 by q707046)'), ('The Martyrdom of St. Sebastian', 'artist_variety_cap (>1 by q707046)'), ('The Nativity at Night', 'artist_variety_cap (>1 by q360888)'), ('The Portrait of Caterina Cornaro', 'artist_variety_cap (>1 by q47551)'), ('The Stonemason’s Yard (Venice: Campo Santa Vidal and Santa Maria Della Carita)', 'artist_variety_cap (>1 by q182664)'), ('The Supper at Emmaus', 'artist_variety_cap (>1 by q42207)'), ("The Toilet of Venus ('The Rokeby Venus')", 'artist_variety_cap (>1 by q297)'), ("The Virgin and Child with Saint Anne and the Infant Saint John the Baptist ('The Burlington House Cartoon')", 'artist_variety_cap (>1 by q762)'), ("The Virgin and Child with Saint John and Angels ('The Manchester Madonna')", 'artist_variety_cap (>1 by q5592)'), ('The Virgin and Child with St. Anne and St. John the Baptist', 'artist_variety_cap (>1 by q762)'), ('Timotheus', 'artist_variety_cap (>1 by q102272)'), ("Venice: Campo S. Vidal and Santa Maria della Carit? ('The Stonemason's Yard')", 'artist_variety_cap (>1 by q182664)'), ("Vincent's Chair with His Pipe", 'artist_variety_cap (>1 by q5582)'), ('Young Man holding a Skull (Vanitas)', 'artist_variety_cap (>1 by q167654)')][LOCAL-230] _search_entities failed: HTTP 429 for query 'The National Gallery (London)'
+[LOCAL-197] llm_cost() called with total_tokens (deprecated) by /app/generate_tour_text.py:10791. Caller should supply input_tokens and output_tokens separately.
+[LOCAL-197] llm_cost() called with total_tokens (deprecated) by /app/generate_tour_text.py:10792. Caller should supply input_tokens and output_tokens separately.
+
+  [LOCAL-629] candidate works AFTER guards (69): ['Arnolfini Portrait', 'The Ambassadors', 'Ophelia', 'Rokeby Venus', 'The Hay Wain', 'Supper at Emmaus', 'Venus and Mars', 'An Experiment on a Bird in the Air Pump', "Belshazzar's Feast", 'Rain, Steam and Speed – The Great Western Railway', 'Music in the Tuileries', 'Venus, Cupid, Folly and Time', 'The Dream of a Knight', 'The Umbrellas', 'Bathers at Asnières', 'Mr and Mrs Andrews', 'Diana and Actaeon', 'Carnation, Lily, Lily and Rose', 'The Entombment', 'The Lady of Shalott', 'A Young Woman Standing at a Virginal', "Van Gogh's Chair", 'Madame Moitessier', 'Samson and Delilah', 'The Baptism of Christ', 'The Execution of Lady Jane Grey', 'Tiger in a Tropical Storm', 'The Adoration of the Kings', 'Beata Beatrix', 'The Virgin and Child with Saint Anne and Saint John the Baptist', 'Saint Jerome in His Study', 'The Annunciation, with Saint Emidius', 'The Magdalen Reading', 'Hope', 'Madonna del Prato', 'Portrait of a young man with a skull', 'Portrait of Doña Isabel de Porcel', 'The Judgement of Paris', 'The Origin of the Milky Way', 'The Ugly Duchess', 'Wilton Diptych', 'Marriage à-la-mode', 'The Adoration of the Golden Calf', 'Tobias and the Angel', 'Agony in the Garden', 'April Love', 'Christ Crowned with Thorns', 'Miss La La at the Cirque Fernando', 'Our English Coasts', 'The Age of Innocence', 'The Death of Procris', 'The Lament for Icarus', "The Stonemason's Yard", 'Cupid Complaining to Venus', 'King Cophetua and the Beggar Maid', 'Portrait of a Woman', 'St. Jerome in the Wilderness', 'The Vision of Saint Eustace', 'Whistlejacket', 'Christ before the High Priest', 'Martyrdom of Saint Sebastian', 'Saint Margaret of Antioch', 'Symphony in White, No. 2: The Little White Girl', 'The Bath of Psyche', 'The Courtyard of a House in Delft', 'The Vision of Saint Jerome', 'Nativity at Night', 'The Conversion of Mary Magdalene', "Venus with Mercury and Cupid ('The School of Love')"]
+  [LOCAL-30] DETERMINISTIC BYPASS: 6 documented works → Phase 3A SKIPPED
+   Stops proposed (deterministic, no GPT):
+     - Arnolfini Portrait [sparql]
+     - The Ambassadors [sparql]
+     - Ophelia [sparql]
+  [venue_resolver] Name variants: ['The National Gallery']
+  [DEAD-HOST] Marked cold: wikimedia (HTTP 429 on _search_entities)
+  [venue_resolver] No Wikidata candidates for 'The National Gallery'
+  [R4] Museum tour: asking for 6 candidates (2x for D1v2 filtering)
+
+======================================================================
+CALL #004 | 20:13:20.109 | PHASE_3A_REQUEST
+======================================================================
+  location: The National Gallery, London, UK
+  total_stops: 3
+  poi_type_hint: museums
+
+PHASE 3A API call cost: $0.0030 (633 tokens)
+
+======================================================================
+CALL #005 | 20:13:21.327 | OPENAI_API_CALL
+======================================================================
+  total_stops_requested: 3
+  stop_count_in_prompt: True
+  http_status: 200
+  prompt_first_500_chars: You are a knowledgeable local guide for The National Gallery, London, UK.
+List exactly 6 specific, real, well-known museums relevant to: museum The National Gallery, London, UK.
+
+Requirements:
+- Use REAL, SPECIFIC names of actual establishments or landmarks.
+- NEVER use generic placeholders like 'Restaurant 1', 'Stop 1', 'Location A'.
+- Include a complete street address with ZIP code where applicable.
+
+CRITICAL CONSTRAINT — THIS IS A SINGLE-VENUE MUSEUM TOUR (WORKS-FIRST):
+- List the 3 most famo
+  prompt_last_300_chars: e Air Pump; Ansidei Madonna; Apollo and Daphne; April Love; Arnolfini Portrait; Bacchus and Ariadne
+Each work should appear ONLY ONCE in your list — do NOT list the same work under multiple names.
+
+
+Return ONLY a JSON array, no other text, no markdown fences:
+[{"name": "...", "address": "..."}, ...]
+  stops_found_in_response: 0
+  stop_markers_in_response:
+    []
+  response_first_500_chars: [{"name": "Arnolfini Portrait", "address": "The National Gallery, Trafalgar Square, London WC2N 5DN"}, {"name": "A Young Woman Standing at a Virginal", "address": "The National Gallery, Trafalgar Square, London WC2N 5DN"}, {"name": "An Experiment on a Bird in the Air Pump", "address": "The National Gallery, Trafalgar Square, London WC2N 5DN"}]
+
+   ! [D530] Duplicate of an existing stop, skipped: 'Arnolfini Portrait'
+OK PHASE 3A parsed 8 candidate POI(s):
+   - Arnolfini Portrait
+   - The Ambassadors
+   - Ophelia
+   - Rokeby Venus
+   - The Hay Wain
+   - Supper at Emmaus
+   - A Young Woman Standing at a Virginal @ The National Gallery, Trafalgar Square, London WC2N 5DN
+   - An Experiment on a Bird in the Air Pump @ The National Gallery, Trafalgar Square, London WC2N 5DN
+  [venue_resolver] Name variants: ['The National Gallery']
+  [venue_resolver] No Wikidata candidates for 'The National Gallery'
+  [D1v2] Venue resolver returned None — falling back to heuristic
+  [LOCAL-599] Official-site search: "The National Gallery" London official site
+  [LOCAL-599]   candidate: nationalgallery.org.uk score=7 ["title_match(['national'])", "host_name(['national'])", 'city(London)'] title='The National Gallery, London'
+  [LOCAL-599]   candidate: nga.gov score=-5 ['http_0'] title=''
+  [LOCAL-599]   reject (aggregator): en.wikipedia.org
+  [LOCAL-599]   reject (aggregator): artsandculture.google.com
+  [LOCAL-599]   reject (aggregator): youtube.com
+  [LOCAL-599]   reject (aggregator): facebook.com
+  [LOCAL-599]   candidate: seventh-art.com score=2 ['street_address'] title='Seventh Art Productions - Exhibition On Screen'
+  [LOCAL-599] PICK (web_search): https://nationalgallery.org.uk/ score=7 ["title_match(['national'])", "host_name(['national'])", 'city(London)']
+  [LOCAL-599] Official site discovered without Wikidata: https://nationalgallery.org.uk/ (route=web_search)
+  [story_miner] Site page: https://nationalgallery.org.uk/visiting/eat-and-drink (26448 chars)
+  [story_miner] Sub-page: https://nationalgallery.org.uk/visiting (30000 chars)
+  [story_miner] Sub-page: https://nationalgallery.org.uk/visiting/floorplans/level-0 (21731 chars)
+  [story_miner] Sub-page: https://nationalgallery.org.uk/visiting/floorplans/level-2 (30000 chars)
+  [story_miner] Sub-page: https://nationalgallery.org.uk/visiting/floorplans/sainsbury-wing (25000 chars)
+  [story_miner] Sub-page: https://nationalgallery.org.uk/membership/supporters-house (30000 chars)
+  [story_miner] Site page: https://nationalgallery.org.uk/shop (30000 chars)
+  [story_miner] Sub-page: https://nationalgallery.org.uk/subscribe (19810 chars)
+  [story_miner] Sub-page: https://nationalgallery.org.uk/about-us (30000 chars)
+  [story_miner] Sub-page: https://nationalgallery.org.uk/privacy-policy (30000 chars)
+  [story_miner] Site page: https://nationalgallery.org.uk/exhibitions/catharina-van-hemessen (20695 chars)
+  [story_miner] Site page: https://nationalgallery.org.uk/events/tour-where-did-she-buy-that-dress-a-tour-on-fashion-through-the-collection-09-10-2026 (24953 chars)
+  [story_miner] Sub-page: https://nationalgallery.org.uk/paintings/francois-hubert-drouais-madame-de-pompadour-at-her-tambour-frame (30000 chars)
+  [story_miner] Sub-page: https://nationalgallery.org.uk/visiting/floorplans/sainsbury-wing?fromLocation=442 (25000 chars)
+  [story_miner] Site page: https://nationalgallery.org.uk/events/ccl-welcome-space-weekends-and-holidays (21523 chars)
+  [story_miner] Site page: https://nationalgallery.org.uk/events/highlights-tour (30000 chars)
+  [story_miner] Site page: https://nationalgallery.org.uk/podcast (30000 chars)
+  [story_miner] Site page: https://nationalgallery.org.uk/visiting/virtual-gallery/national-gallery-imaginarium (22855 chars)
+  [story_miner] Site page: https://nationalgallery.org.uk/whats-on/keeper-of-paintings (21053 chars)
+  [story_miner] Site page: https://nationalgallery.org.uk/exhibitions/renoir-and-love (30000 chars)
+  [story_miner] Site page: https://nationalgallery.org.uk/exhibitions/yinka-shonibare-and-thomas-gainsborough-a-conversation (27929 chars)
+  [story_miner] Site page: https://nationalgallery.org.uk/exhibitions/van-eyck-the-portraits (30000 chars)
+  [story_miner] Site page: https://nationalgallery.org.uk/exhibitions/german-expressionism-modern-painting-1900-1918 (22928 chars)
+  [story_miner] Site page: https://nationalgallery.org.uk/exhibitions (24109 chars)
+  [story_miner] Site page: https://nationalgallery.org.uk/events/rooms-with-a-view-lily-le-brun-and-sophie-ashby-09-10-2026 (24108 chars)
+  [story_miner] Site crawl: 26 pages fetched (budget: 15)
+  [T0a] Extracted 1 canonical titles, 0 cycle names
+  [LOCAL-28] Catalogue page detected: https://nationalgallery.org.uk/events/highlights-tour
+  [LOCAL-28] Extracted 1 documented works from https://nationalgallery.org.uk/events/highlights-tour
+  [LOCAL-28] Catalogue extraction: 1 documented works with metadata
+  [story_miner] Corpus: 26 pages, 2 titles, 0 from Joconde
+  [D1v2] Canonical titles union: 2 site/wiki + 0 SPARQL = 2 total
+  [LOCAL-24] Classification: 1 works, 0 galleries, 1 excluded
+    EXCLUDED: 'Footer' — rule: url_path_nonwork (events)
+  [D1v2-LOCAL24] After filter: 1 works, 0 galleries, 1 excluded
+  [D1v2] artist-check skipped (no valid creator) — venue not resolved
+  [D1v2] DROPPED 'Arnolfini Portrait' — no canonical title match
+  [D1v2] DROPPED 'The Ambassadors' — no canonical title match
+  [D1v2] DROPPED 'Ophelia' — no canonical title match
+  [D1v2] DROPPED 'Rokeby Venus' — no canonical title match
+  [D1v2] DROPPED 'The Hay Wain' — no canonical title match
+  [D1v2] DROPPED 'Supper at Emmaus' — no canonical title match
+  [D1v2] DROPPED 'A Young Woman Standing at a Virginal' — no canonical title match
+  [D1v2] DROPPED 'An Experiment on a Bird in the Air Pump' — no canonical title match
+  [D1v2] ⚠️  ALL 8 candidate(s) were DROPPED — every work was filtered out, producing unresolvable from non-empty input
+    DROPPED: 'Arnolfini Portrait' — no canonical match
+    DROPPED: 'The Ambassadors' — no canonical match
+    DROPPED: 'Ophelia' — no canonical match
+    DROPPED: 'Rokeby Venus' — no canonical match
+    DROPPED: 'The Hay Wain' — no canonical match
+    DROPPED: 'Supper at Emmaus' — no canonical match
+    DROPPED: 'A Young Woman Standing at a Virginal' — no canonical match
+    DROPPED: 'An Experiment on a Bird in the Air Pump' — no canonical match
+  [D1v2] 0 works verified — tier: unresolvable
+  [D1] Tier: unresolvable (entity=False, site_reachable=True, sparql=0)
+  [D1] Tier: unresolvable — clean fail (rung 4; no usable site)
+OUTCOME: NO TOUR TEXT after 55.1s
+
+[reserve-gate] spend_so_far=$0.016235 + reserve $0.9 vs cap $1.5
+=== generating: Art Institute of Chicago, Chicago, USA (3 stops) ===
+[LOCAL-230] _search_entities failed: HTTP 429 for query 'Art Institute of Chicago in Chicago'
+  [LOCAL-603] preflight venue='Art Institute of Chicago' status=open hours=y admission=y highlights=6
+
+======================================================================
+CALL #006 | 20:13:54.725 | GENERATE_TOUR_TEXT_FUNCTION_ENTRY
+======================================================================
+  location: Art Institute of Chicago, Chicago, USA
+  tour_type: museum
+  total_stops_parameter: 3
+  output_file: /app/tours/LOCAL630_ART_INSTITUTE_CHICAGO.txt
+
+  [LOCAL-245] Stop-existence gate mode: LOG_ONLY
+
+======================================================================
+CALL #007 | 20:13:54.725 | TOTAL_STOPS_FINALIZED
+======================================================================
+  location: Art Institute of Chicago, Chicago, USA
+  total_stops_final: 3
+  source: parameter
+
+
+PHASE 1: Analyzing tour intent with AI...
+  [Bug2Fix/D536] tour_type='museum' not prepended (pre_category='walking'); intent sees the ORIGINAL request, not the stripped one
+Intent analysis response: ```json
+{
+    "poi_type": "museums",
+    "location": "Chicago, USA",
+    "theme_type": "STANDARD",
+    "theme_name": null,
+    "requirements": null,
+    "business_hours_relevant": true,
+    "accessibility_mentioned": false,
+    "needs_research": false,
+    "venue_name": "Art Institute of Chicago",
+    "geographic_scope": "Chicago, USA",
+    "named_places": [],
+    "scope_precision": "CITY",
+    "transport_mode": "on_foot",
+    "country_scope": "USA"
+}
+```
+  [INTENT] Stripped LLM fences from response
+  [TRANSPORT] mode=on_foot, country_scope=USA (keyword=on_foot, intent=on_foot)
+✅ Intent Analysis Results:
+   POI Type: museums
+   Location: Chicago, USA
+   Requirements: None
+   Business Hours Relevant: True
+   Accessibility Mentioned: False
+   Venue Name: Art Institute of Chicago
+  [venue_name sanity] 'Art Institute of Chicago' OK
+  [S15] Forced tour_category=museum from venue_name='Art Institute of Chicago'
+[TIMING] phase=intent elapsed=1.6s cumulative=1.6s
+[LOCAL-474] tour_type='museum' → category='museum' (source=explicit)
+
+Detected tour category: MUSEUM
+Using museum template for Art Institute of Chicago, Chicago, USA - museum
+
+======================================================================
+CALL #008 | 20:13:56.346 | GENERATING_PROMPT
+======================================================================
+  location: Art Institute of Chicago, Chicago, USA
+  user_request: Art Institute of Chicago, Chicago, USA
+  total_stops: 3
+
+
+PHASE 3A: Fetching 3 candidate POI(s) for Art Institute of Chicago, Chicago, USA...
+  [Museum constraint] Venue from intent='Art Institute of Chicago'
+  [venue_resolver] Name variants: ['Art Institute of Chicago']
+  [DEAD-HOST] Marked cold: wikimedia (HTTP 429 on _search_entities)
+  [venue_resolver] No Wikidata candidates for 'Art Institute of Chicago'
+  [S17] no scope_constraint (precision='CITY', scope='Chicago, USA')
+  [venue_resolver] Name variants: ['Art Institute of Chicago']
+  [venue_resolver] No Wikidata candidates for 'Art Institute of Chicago'
+  [LOCAL-599] Official-site search: "Art Institute of Chicago" Chicago official site
+  [LOCAL-599]   candidate: artic.edu score=-5 ['http_403'] title=''
+  [LOCAL-599]   reject (aggregator): en.wikipedia.org
+  [LOCAL-599]   reject (aggregator): facebook.com
+  [LOCAL-599]   candidate: choosechicago.com score=9 ["title_match(['chicago'])", "host_name(['chicago'])", 'city(Chicago)', 'street_address'] title='Chicago: Best Big City | Things to Do, Restaurants, &amp; Vacations'
+  [LOCAL-599]   reject (aggregator): youtube.com
+  [LOCAL-599]   candidate: saic.edu score=7 ["title_match(['chicago'])", 'city(Chicago)', 'street_address'] title='School of the Art Institute of Chicago | Top Fine Arts College in The U.S.'
+  [LOCAL-599]   reject (aggregator): instagram.com
+  [LOCAL-599] PICK (web_search): https://choosechicago.com/ score=9 ["title_match(['chicago'])", "host_name(['chicago'])", 'city(Chicago)', 'street_address']
+  [LOCAL-599] No Wikidata entity for 'Art Institute of Chicago' — site discovered (route=web_search); exhibition-museum site-first path ELIGIBLE (site='https://choosechicago.com/')
+[TIMING] phase=poi_selection elapsed=2.4s cumulative=4.1s
+  [LOCAL-589][fetch] https://choosechicago.com/current-exhibitions -> status=404 bytes=0 0.98s
+  [LOCAL-589][fetch] https://choosechicago.com/current-exhibitions/ -> status=404 bytes=0 0.92s
+  [LOCAL-589][fetch] https://choosechicago.com/exhibitions -> status=404 bytes=0 1.15s
+  [LOCAL-589][fetch] https://choosechicago.com/exhibitions/current -> status=200 bytes=123531 1.34s
+  [LOCAL-589][fetch] https://choosechicago.com/exhibition -> status=404 bytes=0 0.99s
+  [LOCAL-589][fetch] https://choosechicago.com/whats-on -> status=404 bytes=0 0.95s
+  [LOCAL-589][fetch] https://choosechicago.com/on-view -> status=404 bytes=0 1.13s
+  [LOCAL-589][fetch] https://choosechicago.com/on-display -> status=404 bytes=0 0.90s
+  [LOCAL-589][fetch] https://choosechicago.com/robots.txt -> status=200 bytes=953 0.26s
+  [LOCAL-589][fetch] https://choosechicago.com/sitemap.xml -> status=200 bytes=3440 2.18s
+  [LOCAL-589][fetch] https://www.choosechicago.com/sitemap_index.xml -> status=200 bytes=3440 1.53s
+  [LOCAL-589][fetch] https://www.choosechicago.com/post-sitemap.xml -> status=200 bytes=644619 0.23s
+  [LOCAL-589][fetch] https://www.choosechicago.com/page-sitemap.xml -> status=200 bytes=156937 0.16s
+  [LOCAL-589][fetch] https://www.choosechicago.com/tribe_events-sitemap.xml -> status=200 bytes=287987 0.18s
+  [LOCAL-589][fetch] https://www.choosechicago.com/tribe_events-sitemap2.xml -> status=200 bytes=114131 0.16s
+  [LOCAL-589][fetch] https://www.choosechicago.com/listing-sitemap.xml -> status=200 bytes=139181 0.16s
+  [LOCAL-589][fetch] https://www.choosechicago.com/listing-sitemap2.xml -> status=200 bytes=135941 1.00s
+  [LOCAL-589][fetch] https://www.choosechicago.com/listing-sitemap3.xml -> status=200 bytes=26078 0.12s
+  [LOCAL-589][fetch] https://www.choosechicago.com/meeting_article-sitemap.xml -> status=200 bytes=68234 0.17s
+  [LOCAL-589][fetch] https://www.choosechicago.com/neighborhood-sitemap.xml -> status=200 bytes=36730 0.13s
+  [LOCAL-589][fetch] https://www.choosechicago.com/news_destination-sitemap.xml -> status=200 bytes=14339 0.84s
+  [LOCAL-589][fetch] https://www.choosechicago.com/news_media-sitemap.xml -> status=200 bytes=16967 0.14s
+  [LOCAL-589][fetch] https://www.choosechicago.com/news_travel-sitemap.xml -> status=200 bytes=32917 0.14s
+  [LOCAL-589][fetch] https://www.choosechicago.com/news_updates-sitemap.xml -> status=200 bytes=5191 0.15s
+  [LOCAL-589][fetch] https://www.choosechicago.com/news_whats_new-sitemap.xml -> status=200 bytes=8602 0.11s
+  [LOCAL-589][fetch] https://www.choosechicago.com/tribe_event_series-sitemap.xml -> status=200 bytes=78643 0.15s
+  [LOCAL-589][fetch] https://www.choosechicago.com/category-sitemap.xml -> status=200 bytes=5658 0.13s
+  [LOCAL-589][fetch] https://www.choosechicago.com/post_tag-sitemap.xml -> status=200 bytes=33664 0.12s
+  [LOCAL-589][fetch] https://www.choosechicago.com/deal_category-sitemap.xml -> status=200 bytes=1206 0.13s
+  [LOCAL-589][fetch] https://www.choosechicago.com/listing_category-sitemap.xml -> status=200 bytes=19639 0.13s
+  [LOCAL-589][fetch] https://www.choosechicago.com/meeting_article_category-sitemap.xml -> status=200 bytes=1958 0.12s
+  [LOCAL-589][fetch] https://choosechicago.com/chicago -> status=200 bytes=84291 1.00s
+  [LOCAL-589][fetch] https://choosechicago.com/locations/chicago -> status=200 bytes=107689 1.30s
+  [LOCAL-589][fetch] https://choosechicago.com/location/chicago -> status=200 bytes=107689 0.67s
+  [LOCAL-602] junk-stop filter dropped 2 non-stop page(s) (tickets/gift-cards/shop/branch-index/…)
+
+PHASE 3A: SKIPPED (LOCAL-580 site-first — 1 current exhibition(s) from the venue site)
+   - Chicago: a challenge for your taste buds | Choose Chicago [SITE EXHIBITION https://www.choosechicago.com/press-media/in-the-news/chicago-a-challenge-for-your-taste-buds/]
+  [LOCAL-603] Plan B seeded 2 stop candidate(s) from preflight (site gave 1 < 3 requested)
+   - Mary Cassatt: After Impressionism [PREFLIGHT SEED https://sales.artic.edu/Admissions]
+[LOCAL-197] llm_cost() called with total_tokens (deprecated) by /app/generate_tour_text.py:12783. Caller should supply input_tokens and output_tokens separately.
+[LOCAL-197] llm_cost() called with total_tokens (deprecated) by /app/generate_tour_text.py:12784. Caller should supply input_tokens and output_tokens separately.
+[OSM-VENUE] Overpass ConnectionError for 'Art Institute of Chicago' (attempt 1/2)
+[OSM-VENUE] Overpass ConnectionError for 'Art Institute of Chicago' (attempt 2/2)
+[LOCAL-197] llm_cost() called with total_tokens (deprecated) by /app/generate_tour_text.py:13334. Caller should supply input_tokens and output_tokens separately.
+No RAG context for Lee Miller: Fearless — cannot generate fact sheet
+No RAG context for Mary Cassatt: After Impressionism — cannot generate fact sheet
+No RAG context for Chicago: a challenge for your taste buds | Choose Chicago — cannot generate fact sheet
+   - Lee Miller: Fearless [PREFLIGHT SEED https://sales.artic.edu/Admissions]
+[TIMING] phase=site_first_exhibitions elapsed=20.0s cumulative=24.0s
+  [R4] Museum tour: asking for 6 candidates (2x for D1v2 filtering)
+
+PHASE 3A: SKIPPED (deterministic fill from 3 documented works)
+OK PHASE 3A parsed 3 candidate POI(s):
+   - Chicago: a challenge for your taste buds | Choose Chicago
+   - Mary Cassatt: After Impressionism
+   - Lee Miller: Fearless
+  [D1/LOCAL-372] Exhibition path (site_exhibition) — D1v2 checks the PERMANENT collection; a temporary show is not in it
+  [D532] Provenance: 3 page-sourced, 0 knowledge-proposed
+  [D1/LOCAL-372] WARNING: no page_text captured — exhibition stops are ungrounded this run
+  [D532] 3 stop(s): 3 confirmed by the venue page, 0 unconfirmed and labelled
+  [R4] Target reached: 3/3 stops
+  [LOCAL-16 GATE] All 3 stops cleared the gate ✓
+
+PHASE 4.5: Validating AI knowledge for Art Institute of Chicago, Chicago, USA...
+OK Knowledge validation passed: Knowledge validation passed
+
+PHASE 4: skipped (tour_category='museum', no type-verification required)
+  [LOCAL-437] EXISTENCE-GATE: EXEMPT — stops sourced from exhibition site_exhibition (already grounded against venue page by LOCAL-372)
+
+PHASE 3B: Requesting structured details and walking directions for 3 stop(s)...
+
+======================================================================
+CALL #009 | 20:14:18.754 | PHASE_3B_REQUEST
+======================================================================
+  location: Art Institute of Chicago, Chicago, USA
+  stop_count: 3
+
+PHASE 3B API call cost: $0.0029 (613 tokens)
+OK PHASE 3B: ordered 3 stop(s) with structured details and directions
+  [LOCAL-39] No visitor info sourced — Museum Information field OMITTED
+  [LOCAL-355] [LOCAL-583] Exhibit-museum: querying OSM ONCE for the museum building 'Art Institute of Chicago' (not per-exhibition — a show has no OSM node)
+  [LOCAL-355] museum building: no practical facts in OSM
+  [LOCAL-622] OSM lookup budget: spent=2.5s / limit=120s, skipped=0
+  [LOCAL-603] Plan B practicals folded into Stop 1 (site/OSM gave none): The museum is open Monday, Wednesday, Friday, Saturday, and Sunday: 11:00 a.m. – 5:00 p.m.; Open Thursday: 11:00 a.m. – 8:00 p.m.; Closed Tuesdays. (Note: Daily from 10:00 a.m. – 11:00 a.m. is reserved for member-only viewing). admission is General adult admission ranges from $32 to $40 depending on residency (discounts apply for Illinois and Chicago residents), while seniors are approximately $26. Free for children under 14, Chicago teens under 18, Illinois educators, active military, and LINK/WIC cardholders. Select special exhibitions may carry an additional fee (e.g., $7)..
+   Coords cluster detected: 2 stops share '41.8796, -87.6233', refetching...
+   Cluster refetch OK 'Mary Cassatt: After Impressionism': 41.8781, -87.6298
+   Cluster refetch OK 'Lee Miller: Fearless': 41.8781, -87.6298
+Extracted first POI coordinates: (41.8839, -87.6278)
+  [D4] Museum single-coordinate: all stops set to (41.8839, -87.6278) (source: model (fallback))
+
+=== Extracted POI Information ===
+1. Chicago: a challenge for your taste buds | Choose Chicago
+   Address: 72 E Randolph St, Chicago, IL 60601
+   Coordinates: 41.8839, -87.6278
+   Directions: From the Clark/Lake station, exit onto W Lake St, walk east for one block, then ...
+2. Mary Cassatt: After Impressionism
+   Address: 111 S Michigan Ave, Chicago, IL 60603
+   Coordinates: 41.8839, -87.6278
+   Directions: Head south on N State St towards E Monroe St for about two blocks, then turn rig...
+3. Lee Miller: Fearless
+   Address: 111 S Michigan Ave, Chicago, IL 60603
+   Coordinates: 41.8839, -87.6278
+   Directions: Enter the Art Institute and head to the gallery featuring Lee Miller, which is l...
+================================
+
+
+[Storied] STORIED_MODE=true — generating spine + fact sheets...
+  [LOCAL-37] Three-class retrieval: 3 stops processed, 0 with category
+  [SQ-S6b] Insufficient data for thread discovery (elements=0, stops=3)
+  [SQ-S6b] Thread discovery: mode=mosaic, threads=0
+  [§3] No story elements available — spine will use invented arc (mode=invented)
+SPINE_COST: category=museum venue=Art Institute of Chicago model=gpt-4o tokens=1180 (in=660 out=520) cost=$0.0069 latency=4.0s
+[COST_METER] FRESH | spine_generate | $0.006850 | user=None | job=None
+  [LOCAL-278] Spine cost folded into total: $0.0069
+  [LOCAL-111] Spine quality: 3/4 | {'climax_position': False, 'unique_emotional_beats': True, 'valid_callbacks': True, 'closing_revelation_length': True}
+  [Storied] Spine generated: 3 arc entries (mode=invented)
+  [LOCAL-183] stop_corpus: 0/3 stops have per-stop passages (0 total passages)
+  [LOCAL-198] Corpus gate: ENABLED — checking stop coverage...
+  [CORPUS-GATE] stop='Chicago: a challenge for your taste buds | Choose Chicago' verdict=EMPTY action=EMPTY_RESTRICTED
+  [CORPUS-GATE] stop='Mary Cassatt: After Impressionism' verdict=EMPTY action=EMPTY_RESTRICTED
+  [CORPUS-GATE] stop='Lee Miller: Fearless' verdict=EMPTY action=EMPTY_RESTRICTED
+  [LOCAL-198] Corpus gate: 0 PASSED, 0 CREATOR_ONLY, 3 EMPTY, 0 SHORTENED
+  [Storied] Fact sheets: 0/3 generated
+  [S25] Story types assigned: ['art', 'history', 'anecdote']
+  [work_stories] MISS for chicago a challenge for your taste buds 
+  [work_stories] MISS for mary cassatt after impressionism
+  [work_stories] MISS for lee miller fearless
+  [LOCAL-37] Tour diversity: no swaps needed (naturally balanced)
+  [LOCAL-188] Style constraints ACTIVE (declarative prose rules injected)
+[TIMING] phase=fact_sheets elapsed=4.4s cumulative=35.0s
+
+PHASE 5: Generating detailed descriptions for each POI (parallel)...
+
+  [LOCAL-382] framing=none source='-'
+[TIMING] phase=narration elapsed=0.0s cumulative=35.0s
+  [D495] no venue URL resolved — venue-domain seeding inactive for this run (falls back to Wikidata + disk cache)
+
+  [LOCAL-410] SERP search wiring — searching for stories on 3 stops...
+  [work_stories] MISS for chicago a challenge for your taste buds 
+  [work_stories] MISS for mary cassatt after impressionism
+  [work_stories] MISS for lee miller fearless
+  [LOCAL-441] Batch P856 check: 1 domains, budget=20.0s, pool=10
+  [LOCAL-441] Batch complete: 0.0s, 0 tier1, 1 unverified, 0 budget-expired
+  [LOCAL-441] Batch P856 check: 6 domains, budget=20.0s, pool=10
+  [LOCAL-441] Batch complete: 0.0s, 0 tier1, 6 unverified, 0 budget-expired
+    [D500] Stop 1: placeholder cleared from ['publisher', 'credit_line', 'medium', 'artist'] — unknown, not 'Not specified'
+    [LOCAL-486] Stop 1 worthiness: score=1/4 mine=True — has specific_title
+    [D489] material kind: stop='Chicago: a challenge for your taste bu' kind=inert volume=COVERED sentences=10 active=0 staked=0 eventful=0 passive=0  <-- DISAGREE: enough material, wrong kind
+    [LOCAL-489] Stop 1 needs more material (thin+eventless): 7 passages, 1014 chars, verdict=COVERED
+      [LOCAL-489] +8 from: "Chicago: a challenge for your taste buds | Choose Chicago" "Art Institute of 
+      [LOCAL-498] after replenishment: kind inert -> active, 1014 -> 2190 chars, eventful=0 (CHANGED)
+         best now: "This post provides a historical overview of the Art Institute of Chicago, describing it as both a museum and a"
+    [LOCAL-488] step 4: 2 providers, 8 leads, 2 with cross-model agreement, 1 SERP-confirmed
+      → injected 1 confirmed lead(s) ahead of the SERP snippets
+    Stop 1 'Chicago: a challenge for your taste buds | Choose ': queries=3 serp_results=7 snippets=16
+      → 2020 The Art Institute of Chicago temporarily closed due to the COVID-19 pandemic.
+      → Meet some of the donors who have decided to support the Art Institute of Chicago through planned giving.
+    [D500] Stop 2: placeholder cleared from ['publisher', 'credit_line', 'medium', 'artist'] — unknown, not 'Not specified'
+    [LOCAL-486] Stop 2 worthiness: score=1/4 mine=True — has specific_title
+    [D489] material kind: stop='Mary Cassatt: After Impressionism' kind=inert volume=COVERED sentences=41 active=0 staked=4 eventful=0 passive=0  <-- DISAGREE: enough material, wrong kind
+    [LOCAL-489] Stop 2 needs more material (eventless): 20 passages, 3049 chars, verdict=COVERED
+      [LOCAL-489] +8 from: "Mary Cassatt: After Impressionism" "Art Institute of Chicago" provenance
+      [LOCAL-498] after replenishment: kind inert -> inert, 3049 -> 4251 chars, eventful=0 (NO CHANGE — the round bought more of the same)
+    [LOCAL-488] step 4: 2 providers, 10 leads, 2 with cross-model agreement, 2 SERP-confirmed
+      → injected 2 confirmed lead(s) ahead of the SERP snippets
+    Stop 2 'Mary Cassatt: After Impressionism': queries=3 serp_results=20 snippets=30
+      → 1926 Mary Cassatt died in Château de Beaufresne, France.
+      → 1893 Mary Cassatt was commissioned to create a mural for the Women's Building at the World's Columbian Exposition in Chi
+    [D500] Stop 3: placeholder cleared from ['publisher', 'credit_line', 'medium', 'artist'] — unknown, not 'Not specified'
+    [LOCAL-486] Stop 3 worthiness: score=1/4 mine=True — has specific_title
+    [D489] material kind: stop='Lee Miller: Fearless' kind=inert volume=COVERED sentences=32 active=0 staked=3 eventful=0 passive=0  <-- DISAGREE: enough material, wrong kind
+    [LOCAL-489] Stop 3 needs more material (eventless): 20 passages, 3325 chars, verdict=COVERED
+      [LOCAL-489] +8 from: "Lee Miller: Fearless" "Art Institute of Chicago" provenance
+      [LOCAL-498] after replenishment: kind inert -> inert, 3325 -> 4516 chars, eventful=0 (NO CHANGE — the round bought more of the same)
+    [LOCAL-488] step 4: 2 providers, 9 leads, 1 with cross-model agreement, 0 SERP-confirmed
+    Stop 3 'Lee Miller: Fearless': queries=3 serp_results=20 snippets=28
+      → Lee Miller: Fearless is the first comprehensive survey of Miller's photographs in more than 25 years and gathers togethe
+      → Lee Miller: Fearless is organized by the Art Institute of Chicago in collaboration with Tate Britain and Musée d’Art Mod
+
+  [LOCAL-410] SERP search complete: 12 queries, 71 results, 74 total snippets
+  [LOCAL-411] Snippet ranking+capping enabled: cap=5/stop, 74 raw → max 15 injected
+
+  [LOCAL-410] CHAIN INSTRUMENTATION:
+    Chicago: a challenge for your taste buds | Choose : serp_results=7 elements_extracted=- beats_injected=- (measured post-generation)
+    Mary Cassatt: After Impressionism: serp_results=20 elements_extracted=- beats_injected=- (measured post-generation)
+    Lee Miller: Fearless: serp_results=20 elements_extracted=- beats_injected=- (measured post-generation)
+  [D534] Stop 1 has 16 snippet(s) but they are VENUE-level only — fetching object-level facts
+  [D533] Stop 1 'Chicago: a challenge for your taste buds | Choose ' has 16 snippet(s) — asking the knowledge fallback
+  [D533] fallback returned nothing: model returned no facts
+  [D534] Stop 2 has 30 snippet(s) but they are VENUE-level only — fetching object-level facts
+  [D533] Stop 2 'Mary Cassatt: After Impressionism' has 30 snippet(s) — asking the knowledge fallback
+  [D533] +5 fact(s) via gemini (5 high-confidence) — stop will be labelled aloud
+      [high] 'Mary Cassatt: After Impressionism' is a temporary loan exhibition and scholarly publication organized by the 
+      [high] The exhibition was curated by Annelise K. Madsen, the Gilda and Henry Buchbinder Curator of Arts of the Americ
+      [high] Scheduled to run from September 6, 2026, through January 3, 2027, the exhibition marks the centennial of Mary 
+      [high] The exhibition gathers over 70 works produced by Cassatt from the late 1880s through the early 1900s, includin
+      [high] The exhibition includes archival materials and a reconstruction focused on Cassatt's lost 1893 World's Columbi
+  [D534] Stop 3 has 28 snippet(s) but they are VENUE-level only — fetching object-level facts
+  [D533] Stop 3 'Lee Miller: Fearless' has 28 snippet(s) — asking the knowledge fallback
+  [D533] +4 fact(s) via gemini (4 high-confidence) — stop will be labelled aloud
+      [high] 'Lee Miller: Fearless' is not a single museum object, but a temporary major retrospective exhibition organized
+      [high] The exhibition was curated by Matthew S. Witkovsky, Richard and Ellen Sandor Chair and Curator of Photography 
+      [high] The Art Institute of Chicago scheduled the exhibition to run from August 29 through December 7, 2026.
+      [high] The presentation brings together approximately 150 photographic works by American photographer Lee Miller span
+  [D533] Knowledge fallback filled 2 starved stop(s)
+[TIMING] phase=external_lookups elapsed=69.4s cumulative=104.3s
+
+Generating description for Stop 1: Chicago: a challenge for your taste buds | Choose Chicago by , ...
+
+Generating description for Stop 2: Mary Cassatt: After Impressionism by , ...
+
+Generating description for Stop 3: Lee Miller: Fearless by , ...
+  [LOCAL-381] stop='Chicago: a challenge for your taste buds | Choose Chicago' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-411] Stop 1 snippet ranking: input=16 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=5 output=5 usable=5 (t1t2=3, t3=0, market=0)
+    Top scores: [('Meet Our Donors', 11, 'tier1'), ('Cross-model lead (gemini+openai)', 7, ''), ('Ways to Give | School of the Art Institute of Chic', 6, 'tier1')]
+  [LOCAL-381] stop='Lee Miller: Fearless' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-411] Stop 3 snippet ranking: input=32 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=5 output=5 usable=5 (t1t2=4, t3=0, market=0)
+    Top scores: [('Lee Miller: Fearless - The Art Institute of Chicag', 12, 'tier1'), ('Lee Miller: Fearless - The Art Institute of Chicag', 11, 'tier1'), ('Lee Miller: Fearless', 11, 'tier1')]
+  [LOCAL-381] stop='Mary Cassatt: After Impressionism' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-411] Stop 2 snippet ranking: input=35 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=5 output=5 usable=5 (t1t2=3, t3=0, market=0)
+    Top scores: [('Mary Cassatt: After Impressionism', 20, 'tier1'), ('Mary Cassatt: After Impressionism', 17, 'tier1'), ('Tips for Visiting Mary Cassatt: After Impressionis', 16, 'tier1')]
+  [LOCAL-620] Stop 1 evidence balance: input=5 kept_rich=0 kept_story=3 dropped_boilerplate=0 output=3
+  [LOCAL-402] Stop 1: injected 3 snippets as reference material
+  [LOCAL-620] Stop 3 evidence balance: input=5 kept_rich=0 kept_story=3 dropped_boilerplate=0 output=3
+  [LOCAL-402] Stop 3: injected 3 snippets as reference material
+  [LOCAL-620] Stop 2 evidence balance: input=5 kept_rich=1 kept_story=3 dropped_boilerplate=0 output=4
+  [LOCAL-402] Stop 2: injected 4 snippets as reference material
+  [LOCAL-620] prefs: default/balanced (no user_id)
+  [LOCAL-617] Stop 1: narration contract injected (reception_evidence=False)
+  [D533] Stop 1 corpus-gate restriction LIFTED — 16 source item(s) arrived after the gate ran
+  [LOCAL-411] Stop 1 prompt size: before_snippets=9800 after=21810 (+12010 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (21810)
+  [LOCAL-620] prefs: default/balanced (no user_id)
+  [LOCAL-617] Stop 3: narration contract injected (reception_evidence=False)
+  [D533] Stop 3 corpus-gate restriction LIFTED — 32 source item(s) arrived after the gate ran
+  [LOCAL-411] Stop 3 prompt size: before_snippets=10357 after=22562 (+12205 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (22562)
+  [LOCAL-620] prefs: default/balanced (no user_id)
+  [LOCAL-617] Stop 2: narration contract injected (reception_evidence=False)
+  [D533] Stop 2 corpus-gate restriction LIFTED — 35 source item(s) arrived after the gate ran
+  [LOCAL-411] Stop 2 prompt size: before_snippets=10471 after=22802 (+12331 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (22802)
+  [D498] Stop 1 matrix: 3/9 slots filled — empty: ['artist', 'publisher', 'printed_by', 'medium', 'credit_line', 'focus_fact']
+  [D498] Stop 3 matrix: 3/9 slots filled — empty: ['artist', 'publisher', 'printed_by', 'medium', 'credit_line', 'focus_fact']
+  [D498] Stop 2 matrix: 3/9 slots filled — empty: ['artist', 'publisher', 'printed_by', 'medium', 'credit_line', 'focus_fact']
+[LOCAL-197] llm_cost() called with total_tokens (deprecated) by /app/generate_tour_text.py:17802. Caller should supply input_tokens and output_tokens separately.
+  [D500] agents 0/3: hero=—, sponsor=—, builder=—
+  [D500] agents 0/3: hero=—, sponsor=—, builder=—
+  [D500] agents 0/3: hero=—, sponsor=—, builder=—
+  [LOCAL-490] Stop 3 story pass: ok=True (3 sentences), $0.0043
+    story: "For over 25 years, the photographs of Lee Miller were not comprehensively surveyed in one exhibition. This changed when the Art Institute of Chicago, "
+  [LOCAL-490] Stop 1 story pass: ok=True (4 sentences), $0.0043
+    story: "In 2020, the Art Institute of Chicago faced a significant disruption when it temporarily closed due to the COVID-19 pandemic. This closure halted the "
+  [LOCAL-408] Prompt dump written to: /app/prompt_dump_stop1.txt
+  [LOCAL-490] Stop 2 story pass: ok=True (3 sentences), $0.0048
+    story: "In the late 1880s, Mary Cassatt was an established artist known for her Impressionist works. Seeking to challenge herself, she decided to explore new "
+Stop 3 API call cost: $0.0273 (5739 tokens, model=gpt-4o)
+  [LOCAL-569] Stop 3 attempt 1/5 story_count=1 words=123
+  [LOCAL-417] Stop 3: POSITIVE GATE FAILED — ['no concrete fact (date, measurement, material, or provenance)']
+  [LOCAL-417]   verbatim: 'For over 25 years, the photographs of Lee Miller were not comprehensively surveyed in one exhibition. This changed when the Art Institute of Chicago, in collaboration with Tate Britain and Musée d’Art Moderne de Paris, organized "Lee Miller: Fearless," bringing together the major episodes of her sin'
+  [LOCAL-417] Stop 3: retrying (attempt 1, temp=0.90)...
+Stop 1 API call cost: $0.0263 (5542 tokens, model=gpt-4o)
+  [LOCAL-569] Stop 1 attempt 1/5 story_count=1 words=111
+  [LOCAL-393] Stop 1: WORD FLOOR — 111 words < 120, retrying (attempt 2/5)
+Stop 2 API call cost: $0.0277 (5821 tokens, model=gpt-4o)
+  [LOCAL-569] Stop 2 attempt 1/5 story_count=0 words=84
+  [LOCAL-417] Stop 2: POSITIVE GATE FAILED — ['no concrete fact (date, measurement, material, or provenance)']
+  [LOCAL-417]   verbatim: 'In the late 1880s, Mary Cassatt, known for her Impressionist works, sought new artistic challenges. This pursuit led her to declare, "I began to think it would be great fun to do something I had never done." This marked a significant shift in her style, seen in the diverse collection of paintings, p'
+  [LOCAL-417] Stop 2: retrying (attempt 1, temp=0.90)...
+Stop 1 API call cost: $0.0269 (5652 tokens, model=gpt-4o)
+  [LOCAL-569] Stop 1 attempt 2/5 story_count=1 words=143
+  [LOCAL-432] Stop 1: STORY RETRY — story_count=1 < 3, need 2 more, retrying (attempt 3/5)
+Stop 2 API call cost: $0.0281 (5904 tokens, model=gpt-4o)
+  [LOCAL-569] Stop 2 attempt 2/5 story_count=2 words=160
+  [LOCAL-417] Stop 2: POSITIVE GATE FAILED — ['no concrete fact (date, measurement, material, or provenance)']
+  [LOCAL-417]   verbatim: 'In the late 1880s, Mary Cassatt was an established artist known for her Impressionist works. Seeking to challenge herself, she decided to explore new techniques and subjects, stating, "I began to think it would be great fun to do something I had never done." This decision led to a significant evolut'
+  [LOCAL-417] Stop 2: retrying (attempt 2, temp=1.00)...
+Stop 1 API call cost: $0.0284 (5968 tokens, model=gpt-4o)
+  [LOCAL-569] Stop 1 attempt 3/5 story_count=1 words=100
+  [LOCAL-393] Stop 1: WORD FLOOR — 100 words < 120, retrying (attempt 4/5)
+Stop 2 API call cost: $0.0277 (5830 tokens, model=gpt-4o)
+  [LOCAL-569] Stop 2 attempt 3/5 story_count=0 words=96
+  [LOCAL-417] Stop 2: POSITIVE GATE FAILED — ['no concrete fact (date, measurement, material, or provenance)']
+  [LOCAL-417]   verbatim: 'In the late 1880s, Mary Cassatt, already a celebrated figure within the Impressionist movement, sought to push her artistic boundaries, declaring, "I began to think it would be great fun to do something I had never done." This marked a crucial period in her career when she embraced new techniques an'
+  [LOCAL-417] Stop 2: retrying (attempt 3, temp=1.00)...
+Stop 1 API call cost: $0.0286 (6024 tokens, model=gpt-4o)
+  [LOCAL-569] Stop 1 attempt 4/5 story_count=2 words=103
+  [LOCAL-393] Stop 1: WORD FLOOR — 103 words < 120, retrying (attempt 5/5)
+Stop 2 API call cost: $0.0278 (5860 tokens, model=gpt-4o)
+  [LOCAL-569] Stop 2 attempt 4/5 story_count=2 words=122
+  [LOCAL-417] Stop 2: POSITIVE GATE FAILED — ['no concrete fact (date, measurement, material, or provenance)']
+  [LOCAL-417]   verbatim: 'In the late 1880s, Mary Cassatt was an established artist known for her Impressionist works. Seeking to challenge herself, she decided to explore new techniques and subjects, stating, "I began to think it would be great fun to do something I had never done." This decision led to a significant evolut'
+  [LOCAL-417] Stop 2: retrying (attempt 4, temp=1.00)...
+Stop 1 API call cost: $0.0290 (6113 tokens, model=gpt-4o)
+  [LOCAL-569] Stop 1 attempt 5/5 story_count=2 words=117
+  [LOCAL-394] stop='Chicago: a challenge for your taste buds | Choose Chicago' below_floor words=117 — kept (never dropped)
+Stop 1 description word count: 117 words
+  [LOCAL-407] Stop 1: snippets injected but no candidate specifics extracted
+Stop 2 API call cost: $0.0278 (5843 tokens, model=gpt-4o)
+  [LOCAL-569] Stop 2 attempt 5/5 story_count=1 words=113
+  [LOCAL-417] Stop 2: POSITIVE GATE FAILED — ['no concrete fact (date, measurement, material, or provenance)']
+  [LOCAL-417]   verbatim: 'In the late 1880s, Mary Cassatt, already celebrated for her Impressionist masterpieces, sought a challenge beyond her established style. As she reflected, "I began to think it would be great fun to do something I had never done." This pursuit led Cassatt into a new realm of artistic exploration, pro'
+  [LOCAL-417] Stop 2: GATE FAILED after 5 attempts — using fallback (never shipping operator-directed text)
+  [LOCAL-422] Stop 2: resolved final description (160 words)
+Stop 2 description word count: 160 words
+  [LOCAL-407] Stop 2: snippets injected but no candidate specifics extracted
+Stop 3 API call cost: $0.0274 (5759 tokens, model=gpt-4o)
+  [LOCAL-569] Stop 3 attempt 2/5 story_count=1 words=129
+  [LOCAL-417] Stop 3: POSITIVE GATE FAILED — ['no concrete fact (date, measurement, material, or provenance)']
+  [LOCAL-417]   verbatim: 'For over 25 years, the photographs of Lee Miller were not comprehensively surveyed in one exhibition. This changed when the Art Institute of Chicago, in collaboration with Tate Britain and Musée d’Art Moderne de Paris, organized "Lee Miller: Fearless," bringing together the major episodes of her sin'
+  [LOCAL-417] Stop 3: retrying (attempt 2, temp=1.00)...
+Stop 3 API call cost: $0.0273 (5748 tokens, model=gpt-4o)
+  [LOCAL-569] Stop 3 attempt 3/5 story_count=1 words=118
+  [LOCAL-417] Stop 3: POSITIVE GATE FAILED — ['no concrete fact (date, measurement, material, or provenance)']
+  [LOCAL-417]   verbatim: 'For over 25 years, the photographs of Lee Miller were not comprehensively surveyed in one exhibition. This changed when the Art Institute of Chicago, in collaboration with Tate Britain and Musée d’Art Moderne de Paris, organized "Lee Miller: Fearless," bringing together the major episodes of her sin'
+  [LOCAL-417] Stop 3: retrying (attempt 3, temp=1.00)...
+Stop 3 API call cost: $0.0274 (5758 tokens, model=gpt-4o)
+  [LOCAL-569] Stop 3 attempt 4/5 story_count=1 words=124
+  [LOCAL-417] Stop 3: POSITIVE GATE FAILED — ['no concrete fact (date, measurement, material, or provenance)']
+  [LOCAL-417]   verbatim: 'For over 25 years, the photographs of Lee Miller were not comprehensively surveyed in one exhibition. This changed when the Art Institute of Chicago, in collaboration with Tate Britain and Musée d’Art Moderne de Paris, organized "Lee Miller: Fearless," bringing together the major episodes of her sin'
+  [LOCAL-417] Stop 3: retrying (attempt 4, temp=1.00)...
+Stop 3 API call cost: $0.0273 (5745 tokens, model=gpt-4o)
+  [LOCAL-569] Stop 3 attempt 5/5 story_count=1 words=103
+  [LOCAL-417] Stop 3: POSITIVE GATE FAILED — ['no concrete fact (date, measurement, material, or provenance)']
+[LOCAL-197] llm_cost() called with total_tokens (deprecated) by /app/generate_tour_text.py:19201. Caller should supply input_tokens and output_tokens separately.
+  [LOCAL-417]   verbatim: 'For over 25 years, Lee Miller\'s photographs lacked a comprehensive exhibition. The Art Institute of Chicago, alongside Tate Britain and Musée d’Art Moderne de Paris, changed this by organizing "Lee Miller: Fearless." This exhibition showcases the key moments of her extraordinary career, made possibl'
+  [LOCAL-417] Stop 3: GATE FAILED after 5 attempts — using fallback (never shipping operator-directed text)
+  [LOCAL-422] Stop 3: resolved final description (129 words)
+Stop 3 description word count: 129 words
+  [LOCAL-407] Stop 3: snippets injected but no candidate specifics extracted
+
+  [LOCAL-439] STORY GATE: checking story-units per stop (D394)...
+    ✓ PASS stop='Chicago: a challenge for your taste buds | Choose Chicago': story_units=1, entities_ok=True, thesis_ok=True
+      interest: emotional=3, new_info=2, deduction=1, total=4
+    ✓ PASS stop='Mary Cassatt: After Impressionism': story_units=1, entities_ok=True, thesis_ok=True
+      interest: emotional=3, new_info=2, deduction=1, total=4
+    ✗ FAIL stop='Lee Miller: Fearless': story_units=0, entities_ok=True, thesis_ok=True
+      → story_units=0: no candidate story-unit of ≥3 sentences passes classification (need at least 1 with named person, real actions, arc)
+  [LOCAL-439] Classification cost: $0.000680 (input=2757, output=444)
+  [LOCAL-439] STORY GATE: SOME STOPS FAILED (informational — does not block delivery)
+
+  [LOCAL-423] STORY VERIFICATION: checking claims against sources...
+    ✗ FAIL stop='Chicago: a challenge for your taste buds | Choose Chicago': claims=2, sourced=1, unsourced=1, contradicted=0
+      → UNSOURCED: 'Boris Fridman, a collector who specialized in innovative contemporary' (person_descriptor) — no snippet contains this assertion
+      evidence (1 sourced claims):
+        claim='2020' ← 
+    ✓ PASS stop='Mary Cassatt: After Impressionism': claims=1, sourced=1, unsourced=0, contradicted=0
+      evidence (1 sourced claims):
+        claim='Mary Cassatt was an established artist known for her Impressionist works' ← https://www.artic.edu/events/6539/conversation-mary-cassatts
+    ✗ FAIL stop='Lee Miller: Fearless': claims=0, sourced=0, unsourced=0, contradicted=0
+      → VACUOUS: 0 claims extracted — nothing was verified
+  [LOCAL-423] STORY VERIFICATION: SOME STOPS HAVE UNSOURCED CLAIMS
+  [LOCAL-423] Unsourced claims will be stripped from delivered text
+    [LOCAL-423] Stripped 1 sentence(s) from 'Chicago: a challenge for your taste buds | Choose Chicago':
+      ✗ "The institute turned to supporters like Boris Fridman, a collector who specialized in innovative con"
+  [LOCAL-394] stop='Chicago: a challenge for your taste buds | Choose Chicago' below_floor words=95 — kept (never dropped)
+
+  [LOCAL-192] PHASE 5.1: Style validation + per-paragraph retry...
+  [LOCAL-192] Stop 1 para 1: retry FIXED (R4_PRESCRIBED_FEELING)
+  [LOCAL-192] Stop 2 para 1: retry FIXED (R2_QUESTION)
+  [LOCAL-192] Style retry summary: 2 paragraphs retried, 2 fixed/improved, 0 kept original
+  [LOCAL-192] Retry cost: $0.0050 (1055 tokens)
+
+  [LOCAL-255] PHASE 5.13: R1 imperative rewrite...
+  [LOCAL-255] R1 summary: 0 rewritten, 0 deleted, 0 stops affected, LLM tokens: 0 ($0.0000)
+
+  [LOCAL-251] PHASE 5.14: R7 hallucinated-sensory deletion...
+  [LOCAL-251] R7 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-261] PHASE 5.141: R2 question deletion...
+  [LOCAL-261] R2 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-261] PHASE 5.142: R3 suggestive-exploration deletion...
+  [LOCAL-261] R3 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-261] PHASE 5.143: R4 prescribed-feeling deletion...
+  [LOCAL-261] R4 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-261] PHASE 5.144: R8 prompt-leakage deletion...
+  [LOCAL-261] R8 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-216] PHASE 5.15: R9 generic-sentence deletion...
+  [LOCAL-216] R9 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-235] PHASE 5.155: R10 unfulfilled-promise deletion...
+  [LOCAL-235] R10 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-472] PHASE 5.152: Stop-specificity gate...
+  [LOCAL-472] Stop-specificity gate summary:
+    Stops checked: 3
+    Paragraphs checked: 3
+    Transferable (high, removed): 0
+    Transferable (low conf, kept): 0
+    Last-paragraph protected: 0
+    Ungrounded named entities: 3
+    Stops affected: 0
+    [LOCAL-472] UNGROUNDED entity stop='Chicago: a challenge for your taste buds | Choose Chicago' entity='Art Institute' reason='No concrete link to the stop is provided.' in: "In 2020, the Art Institute of Chicago faced a significant disruption when it temporarily closed due "
+    [LOCAL-472] UNGROUNDED entity stop='Lee Miller: Fearless' entity='Tate Britain' reason='No concrete link between Tate Britain and Lee Miller is provided.' in: "For over 25 years, the photographs of Lee Miller were not comprehensively surveyed in one exhibition"
+    [LOCAL-472] UNGROUNDED entity stop='Lee Miller: Fearless' entity='Art Moderne de Paris' reason='No concrete link to the stop is provided.' in: "For over 25 years, the photographs of Lee Miller were not comprehensively surveyed in one exhibition"
+
+  [LOCAL-263] PHASE 5.156: Unsupported-claim gate...
+  [LOCAL-263] Unsupported-claim gate summary:
+    Sentences removed: 0
+    Sentences kept (substantiated): 0
+    By type: PROMISE=0, SENSORY=0, FEELING=0, QUALITY=0
+    Escalation calls: 0
+    Stops affected: 0
+    Deletion rate: 0.0% (0/14)
+
+  [LOCAL-269] PHASE 5.157: Unglossed-reference gate...
+  [LOCAL-269] Unglossed-reference gate summary (LOCAL-287: compose, not splice):
+    References detected: 5
+    Glossed (composed): 1
+    Suppressed (already explained): 0
+    Degraded (name dropped): 4
+    Guard failures: 0
+    Known (skipped): 0
+    Triage: 601 tokens, $0.0002, 1.6s
+    Gloss: 393 tokens, $0.0001, 1.0s
+    Compose: 499 tokens, $0.0001, 0.6s
+    Total added cost: $0.0003
+    Stops affected: 1
+    Glosses applied:
+      • Tate Britain → DEGRADED (name dropped)
+      • Art Moderne de Paris → DEGRADED (name dropped)
+      • Lee Miller Archives → "dedicated to preserving Miller's work" [source: model]
+      • Farleys House → DEGRADED (name dropped)
+      • Gallery Trust → DEGRADED (name dropped)
+
+  [LOCAL-458] entity gate SKIPPED: corpus=0 chars (retrieval returned no page text)
+
+  [LOCAL-458] entity gate SKIPPED: corpus=0 chars (retrieval returned no page text)
+
+  [LOCAL-385] Form-claim gate SKIPPED (no exhibition scope — unscoped museum tours are not gated)
+
+  [LOCAL-389] Numeric-claim gate SKIPPED (no exhibition scope — unscoped museum tours are not gated)
+
+  [LOCAL-402] PHASE 5.161: Temporal coherence gate (impossible relations)...
+  [LOCAL-402] Temporal coherence gate summary:
+    Relations checked: 18
+    Relations rejected: 0
+    Sentences removed: 0
+    Stops affected: 0
+
+  [LOCAL-229] PHASE 5.16: CONTRADICTED claim block (D100 enforcement)...
+  [LOCAL-229] CONTRADICTED block summary: 0 group(s) blocked, 0 stop(s) affected
+
+PHASE 5.5a: Post-description knowledge validation (all tour types)...
+OK Post-description validation passed: Knowledge validation passed
+
+PHASE 5.5b: Validating descriptions are inside 'Art Institute of Chicago'...
+   Authority: 2 D1v2-verified (kept unconditionally), 0 unverified (will check)
+   Pre-filter: 0 clean, 0 suspect (will call OpenAI for suspect only)
+OK PHASE 5.5b: 3 stop(s) passed venue description validation
+OK PHASE 5.7: Dangling-reference scrub complete (3 stops)
+  [LOCAL-627] PHASE 5.7a: Truncated-snippet safety check — 1 stop(s) cleaned
+
+  [LOCAL-318] PHASE 5.7b: Dangling-demonstrative scrub...
+  [LOCAL-318] Dangling-demonstrative scrub summary:
+    Detected: 3
+    Repaired (name substituted): 0
+    Deleted (unrepairable): 3
+    Stops affected: 3
+    [1] DELETED: 'These contributions' in: These contributions were crucial for financial stability and the museum's reopen
+    [2] DELETED: 'This led' in: This led to a significant evolution in her style, resulting in a diverse collect
+    [3] DELETED: 'This changed' in: This changed when the Art Institute of Chicago, in collaboration and Musée d’Art
+OK PHASE 5.7b: Dangling-demonstrative scrub complete
+
+PHASE 5.8: Type/prose contradiction check (LOCAL-27)...
+  [LOCAL-27] No type/prose contradictions detected
+
+PHASE 5.9: Audio-native cleanup (LOCAL-41)...
+  [LOCAL-41] Stripped 0 trailing question(s), removed 0 'broader context' instance(s)
+
+  [D498] step 7c: most valuable stop is 2 'Mary Cassatt: After Impressionism' (index 23) — allowance 5 -> 7 sentences on regeneration, story currently 3 sentence(s)
+
+  [LOCAL-487] step 7a: 3 stop(s) have NO VALID STORY by Michael's bar (3+ consecutive sentences, one person, an action and something at stake)
+    stop 1 'Chicago: a challenge for your taste bu': longest qualifying run is 2 sentence(s); the bar is 3 consecutive sentences about one subject, carrying an act
+    stop 2 'Mary Cassatt: After Impressionism': the longest run (4 sentences, Mary Cassatt) has agency=0 stakes=0 — someone is described, but nothing is riske
+    stop 3 'Lee Miller: Fearless': the longest run (5 sentences, Lee Miller) has agency=0 stakes=0 — someone is described, but nothing is risked,
+    [LOCAL-487] cap=1: retrying only the weakest — stop 1 'Chicago: a challenge for your tast' (index 20)
+  [D534] No cross-stop repetition in the drafts
+
+  [LOCAL-474] PHASE 5.17: retry 'Chicago: a challenge for your taste buds | C' — 95w → 51w after gates, 5 sentence(s) removed
+    removed: "In 2020, the Art Institute of Chicago faced a significant disruption when it temporarily closed due "
+    removed: "This closure halted the flow of visitors and the revenue essential for the museum's operations."
+    removed: "These contributions were crucial for maintaining financial stability and ensuring the museum's reope"
+    removed: "This exhibit showcases how Chicago's culinary landscape mirrors its diverse cultural influences, inv"
+    removed: "Standing here, you sense a curiosity for what happens when artists push the boundaries of their own "
+    [LOCAL-491] step 7b: rotating to the venue fact — institutional context; weakest, but it scopes the search
+      focus: "Chicago: a challenge for your taste buds | Choose Chicago is held at Art Institute of Chicago."
+
+  [LOCAL-474] PHASE 5.17: retry 'Mary Cassatt: After Impressionism' — 160w → 95w after gates, 4 sentence(s) removed
+    removed: "In the late 1880s, Mary Cassatt was an established artist known for her Impressionist works."
+    removed: "Seeking to challenge herself, she decided to explore new techniques and subjects, stating, "I began "
+    removed: "These works, now gathered at the Art Institute of Chicago's exhibition "Mary Cassatt: After Impressi"
+    removed: "What kind of courage does it take to document the unthinkable in the midst of chaos?"
+    [LOCAL-491] step 7b: rotating to the venue fact — institutional context; weakest, but it scopes the search
+      focus: "Mary Cassatt: After Impressionism is held at Art Institute of Chicago."
+
+  [LOCAL-474] PHASE 5.17: retry 'Lee Miller: Fearless' — 129w → 95w after gates, 2 sentence(s) removed
+    removed: "This changed when the Art Institute of Chicago, in collaboration with Tate Britain and Musée d’Art M"
+    removed: "As a result, visitors now have the opportunity to experience the breadth of Miller's work, thanks in"
+    [LOCAL-491] step 7b: rotating to the venue fact — institutional context; weakest, but it scopes the search
+      focus: "Lee Miller: Fearless is held at Art Institute of Chicago."
+
+  [LOCAL-526] PHASE 5.17: regenerating 3 eligible stop(s) concurrently (max_workers=3)
+
+Generating description for Stop 1: Chicago: a challenge for your taste buds | Choose Chicago by , ...
+  [LOCAL-381] stop='Chicago: a challenge for your taste buds | Choose Chicago' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-411] Stop 1 snippet ranking: input=16 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=5 output=5 usable=5 (t1t2=3, t3=0, market=0)
+    Top scores: [('Meet Our Donors', 11, 'tier1'), ('Cross-model lead (gemini+openai)', 7, ''), ('Ways to Give | School of the Art Institute of Chic', 6, 'tier1')]
+
+Generating description for Stop 2: Mary Cassatt: After Impressionism by , ...
+  [LOCAL-620] Stop 1 evidence balance: input=5 kept_rich=0 kept_story=3 dropped_boilerplate=0 output=3
+  [LOCAL-402] Stop 1: injected 3 snippets as reference material
+  [LOCAL-620] prefs: default/balanced (no user_id)
+  [LOCAL-617] Stop 1: narration contract injected (reception_evidence=False)
+  [D533] Stop 1 corpus-gate restriction LIFTED — 16 source item(s) arrived after the gate ran
+  [LOCAL-411] Stop 1 prompt size: before_snippets=9800 after=21810 (+12010 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (21810)
+  [D498] Stop 1 matrix: 4/9 slots filled — empty: ['artist', 'publisher', 'printed_by', 'medium', 'credit_line']
+  [D500] agents 0/3: hero=—, sponsor=—, builder=—
+  [LOCAL-381] stop='Mary Cassatt: After Impressionism' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-411] Stop 2 snippet ranking: input=35 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=5 output=5 usable=5 (t1t2=3, t3=0, market=0)
+    Top scores: [('Mary Cassatt: After Impressionism', 20, 'tier1'), ('Mary Cassatt: After Impressionism', 17, 'tier1'), ('Tips for Visiting Mary Cassatt: After Impressionis', 16, 'tier1')]
+  [LOCAL-620] Stop 2 evidence balance: input=5 kept_rich=1 kept_story=3 dropped_boilerplate=0 output=4
+  [LOCAL-402] Stop 2: injected 4 snippets as reference material
+  [LOCAL-620] prefs: default/balanced (no user_id)
+  [LOCAL-617] Stop 2: narration contract injected (reception_evidence=False)
+  [D533] Stop 2 corpus-gate restriction LIFTED — 35 source item(s) arrived after the gate ran
+  [LOCAL-411] Stop 2 prompt size: before_snippets=10471 after=22802 (+12331 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (22802)
+  [D498] Stop 2 matrix: 4/9 slots filled — empty: ['artist', 'publisher', 'printed_by', 'medium', 'credit_line']
+  [D500] agents 0/3: hero=—, sponsor=—, builder=—
+
+Generating description for Stop 3: Lee Miller: Fearless by , ...
+  [LOCAL-381] stop='Lee Miller: Fearless' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-411] Stop 3 snippet ranking: input=32 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=5 output=5 usable=5 (t1t2=4, t3=0, market=0)
+    Top scores: [('Lee Miller: Fearless - The Art Institute of Chicag', 12, 'tier1'), ('Lee Miller: Fearless - The Art Institute of Chicag', 11, 'tier1'), ('Lee Miller: Fearless', 11, 'tier1')]
+  [LOCAL-620] Stop 3 evidence balance: input=5 kept_rich=0 kept_story=3 dropped_boilerplate=0 output=3
+  [LOCAL-402] Stop 3: injected 3 snippets as reference material
+  [LOCAL-620] prefs: default/balanced (no user_id)
+  [LOCAL-617] Stop 3: narration contract injected (reception_evidence=False)
+  [D533] Stop 3 corpus-gate restriction LIFTED — 32 source item(s) arrived after the gate ran
+  [LOCAL-411] Stop 3 prompt size: before_snippets=10357 after=22562 (+12205 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (22562)
+  [D498] Stop 3 matrix: 4/9 slots filled — empty: ['artist', 'publisher', 'printed_by', 'medium', 'credit_line']
+  [D500] agents 0/3: hero=—, sponsor=—, builder=—
+  [LOCAL-490] Stop 1 story pass: ok=False (model returned NO_STORY — material did not support one), $0.0046
+  [LOCAL-408] Prompt dump written to: /app/prompt_dump_stop1.txt
+  [LOCAL-490] Stop 3 story pass: ok=True (3 sentences), $0.0049
+    story: "Lee Miller: Fearless is held at the Art Institute of Chicago. This significant exhibition was made possible because the Art Institute collaborated wit"
+  [LOCAL-490] Stop 2 story pass: ok=True (4 sentences), $0.0060
+    story: "For over 25 years, the Art Institute of Chicago had not dedicated an exhibition to a single female artist. This changed when they decided to host "Mar"
+Stop 1 API call cost: $0.0287 (6046 tokens, model=gpt-4o)
+  [LOCAL-569] Stop 1 attempt 1/5 story_count=0 words=88
+  [LOCAL-415] Stop 1: LLM REFUSAL DETECTED — matched: 'I'm sorry, but I'
+  [LOCAL-415]   verbatim (88 words): 'I\'m sorry, but I don\'t have enough information to provide a detailed description of "Chicago: a challenge for your taste buds | Choose Chicago" at the Art Institute of Chicago. The reference material does not supply specific details about this exhibit or its content, making it impossible to describe'
+  [LOCAL-415] Stop 1: refusal detected (attempt 1), retrying with anti-refusal reinforcement (temp=0.90)...
+Stop 3 API call cost: $0.0286 (6019 tokens, model=gpt-4o)
+  [LOCAL-569] Stop 3 attempt 1/5 story_count=1 words=118
+  [LOCAL-417] Stop 3: POSITIVE GATE FAILED — ['no concrete fact (date, measurement, material, or provenance)']
+  [LOCAL-417]   verbatim: '"Lee Miller: Fearless" is held at the Art Institute of Chicago. This significant exhibition was made possible because the Art Institute collaborated with Tate Britain and Musée d’Art Moderne de Paris. As a result, visitors now have access to a comprehensive survey of Miller\'s photographs, the first '
+  [LOCAL-417] Stop 3: retrying (attempt 1, temp=0.90)...
+Stop 1 API call cost: $0.0287 (6044 tokens, model=gpt-4o)
+  [LOCAL-569] Stop 1 attempt 2/5 story_count=0 words=38
+  [LOCAL-415] Stop 1: LLM REFUSAL DETECTED — matched: 'I'm sorry, but I'
+  [LOCAL-415]   verbatim (38 words): 'I\'m sorry, but I cannot provide a description of "Chicago: a challenge for your taste buds | Choose Chicago" at the Art Institute of Chicago as I do not have specific reference materials or information about this exhibit.'
+  [LOCAL-415] Stop 1: refusal detected (attempt 2), retrying with anti-refusal reinforcement (temp=1.00)...
+Stop 2 API call cost: $0.0298 (6276 tokens, model=gpt-4o)
+  [LOCAL-569] Stop 2 attempt 1/5 story_count=3 words=124
+Stop 2 description word count: 124 words
+  [LOCAL-407] Stop 2: snippets injected but no candidate specifics extracted
+Stop 3 API call cost: $0.0286 (6029 tokens, model=gpt-4o)
+  [LOCAL-569] Stop 3 attempt 2/5 story_count=1 words=119
+  [LOCAL-417] Stop 3: POSITIVE GATE FAILED — ['no concrete fact (date, measurement, material, or provenance)']
+  [LOCAL-417]   verbatim: "Lee Miller: Fearless is held at the Art Institute of Chicago. This significant exhibition was made possible because the Art Institute collaborated with Tate Britain and Musée d’Art Moderne de Paris. As a result, visitors now have access to a comprehensive survey of Miller's photographs, the first of"
+  [LOCAL-417] Stop 3: retrying (attempt 2, temp=1.00)...
+Stop 1 API call cost: $0.0298 (6267 tokens, model=gpt-4o)
+  [LOCAL-569] Stop 1 attempt 3/5 story_count=1 words=119
+  [LOCAL-393] Stop 1: WORD FLOOR — 119 words < 120, retrying (attempt 4/5)
+Stop 3 API call cost: $0.0286 (6024 tokens, model=gpt-4o)
+  [LOCAL-569] Stop 3 attempt 3/5 story_count=0 words=114
+  [LOCAL-393] Stop 3: WORD FLOOR — 114 words < 120, retrying (attempt 4/5)
+Stop 1 API call cost: $0.0300 (6321 tokens, model=gpt-4o)
+  [LOCAL-569] Stop 1 attempt 4/5 story_count=0 words=128
+  [LOCAL-417] Stop 1: POSITIVE GATE FAILED — ['no concrete fact (date, measurement, material, or provenance)']
+  [LOCAL-417]   verbatim: "The exhibit highlights the city's rich tapestry of culinary traditions, reflecting its unique blend of cultural influences over the decades. It serves to remind visitors of the dynamic and evolving relationship between food and art, showcasing how dishes can express identity and heritage. While spec"
+  [LOCAL-417] Stop 1: retrying (attempt 4, temp=1.00)...
+Stop 3 API call cost: $0.0288 (6053 tokens, model=gpt-4o)
+  [LOCAL-569] Stop 3 attempt 4/5 story_count=1 words=113
+  [LOCAL-417] Stop 3: POSITIVE GATE FAILED — ['no concrete fact (date, measurement, material, or provenance)']
+  [LOCAL-417]   verbatim: "Lee Miller: Fearless at the Art Institute of Chicago is a landmark exhibition made possible through collaboration with Tate Britain and Musée d’Art Moderne de Paris. This presentation marks the first comprehensive survey of Miller's photographs in over 25 years. Known for her war photography, Miller"
+  [LOCAL-417] Stop 3: retrying (attempt 4, temp=1.00)...
+Stop 1 API call cost: $0.0298 (6269 tokens, model=gpt-4o)
+  [LOCAL-569] Stop 1 attempt 5/5 story_count=0 words=92
+  [LOCAL-417] Stop 1: POSITIVE GATE FAILED — ['no concrete fact (date, measurement, material, or provenance)']
+  [LOCAL-417]   verbatim: "At the heart of this exhibition lies a tale of unfolding cultural exploration. This exhibit is not just a display but a vibrant canvas where Chicago's diverse culinary scene comes to life. It transforms vibrant food culture into an art form, evoking the dynamism of the city. The integration of vibra"
+  [LOCAL-417] Stop 1: GATE FAILED after 5 attempts — using fallback (never shipping operator-directed text)
+  [LOCAL-422] Stop 1: resolved final description (128 words)
+Stop 1 description word count: 128 words
+  [LOCAL-407] Stop 1: snippets injected but no candidate specifics extracted
+Stop 3 API call cost: $0.0289 (6077 tokens, model=gpt-4o)
+  [LOCAL-569] Stop 3 attempt 5/5 story_count=1 words=108
+  [LOCAL-417] Stop 3: POSITIVE GATE FAILED — ['no concrete fact (date, measurement, material, or provenance)']
+  [LOCAL-417]   verbatim: "Lee Miller: Fearless is held at the Art Institute of Chicago. This significant exhibition was made possible because the Art Institute collaborated with Tate Britain and Musée d’Art Moderne de Paris. As a result, visitors now have access to a comprehensive survey of Miller's photographs, the first of"
+  [LOCAL-417] Stop 3: GATE FAILED after 5 attempts — using fallback (never shipping operator-directed text)
+  [LOCAL-422] Stop 3: resolved final description (119 words)
+  [LOCAL-394] stop='Lee Miller: Fearless' below_floor words=119 — kept (never dropped)
+Stop 3 description word count: 119 words
+  [LOCAL-407] Stop 3: snippets injected but no candidate specifics extracted
+  [LOCAL-526] PHASE 5.17 regeneration wall: 11.4s for 3 stop(s) at max_workers=3
+    [LOCAL-474] regenerated and re-gated: 128w (was 51w)
+    [LOCAL-474] regenerated and re-gated: 124w (was 95w)
+    [LOCAL-474] regenerated and re-gated: 119w (was 95w)
+  [D534] no repeated sentences left after the retries
+
+  [LOCAL-474] retry summary: 3 eligible, 3 retried, 3 improved, 0 kept original
+  [LOCAL-487] triggers: 3 hollowed by gates, 1 storyless (step 7a — Michael's bar, independent of length), 0 top-value (step 7c — larger allowance), 0 repeating an earlier stop (D534), 3 thin enough for another story (D534, floor=300w). Triggers overlap and are counted separately; they do not sum to 'eligible'.
+  [LOCAL-474] each regenerated stop was re-gated before being accepted; a retry can only replace text it beats after gating.
+
+PHASE 5.10: Anti-preaching cleanup (LOCAL-44)...
+  [LOCAL-44] Stripped 0 preaching closer(s)
+
+  [LOCAL-444] Obligation audit DISABLED by L444_OBLIGATION_AUDIT=false
+  [LOCAL-427] HTTP 200 from https://www.saic.edu/printmedia (attempt 1)
+  [LOCAL-459] R5: Fetched 2165 chars from https://www.saic.edu/printmedia
+  [LOCAL-427] HTTP 200 from https://chicagoprintmakers.com/print-making-classes-chicago/ (attempt 1)
+  [LOCAL-459] R5: Fetched 1740 chars from https://chicagoprintmakers.com/print-making-classe
+  [LOCAL-427] HTTP 200 from https://www.youtube.com/watch?v=lNoRrp17SJ4 (attempt 1)
+  [LOCAL-427] HTTP 200 from https://researchguides.ccc.edu/c.php?g=880024&p=6537961 (attempt 1)
+  [LOCAL-459] R5: Fetched 2223 chars from https://researchguides.ccc.edu/c.php?g=880024&p=65
+  [LOCAL-427] HTTP 200 from https://www.clarkart.edu/microsites/impressionist-line/about/printmaking-techniques (attempt 1)
+  [LOCAL-459] R5: Fetched 1756 chars from https://www.clarkart.edu/microsites/impressionist-
+  [D512] verb discovery: query='Art Institute of Chicago printmaking process how it is made tech' -> 3 new verb(s): introduced, required, inked
+  [D512] _AGENCY_VERB widened by 3 discovered verb(s)
+
+  [D511] PHASE 5.20: credit_line loop — object record, seeds, challenge, adjudicate, gate
+    [D511] 4 credit_line(s) to try (0 from the matrix, 4 from the text)
+    [D511] 4 credit_line(s) to try (0 from the matrix, 4 from the text)
+    [D511] 2 credit_line(s) to try (0 from the matrix, 2 from the text)
+    [D511] 1.1                    kind=none     idx=10  C0 X1 fail:index_d515  [old gate: eventful,index,confirmed]
+  [LOCAL-427] HTTP 200 from https://villa-albertine.org/va/events/mary-cassat-after-impressionism/ (attempt 1)
+  [LOCAL-459] R5: Fetched 2398 chars from https://villa-albertine.org/va/events/mary-cassat-
+  [LOCAL-427] HTTP 200 from https://www.instagram.com/p/Dd1fn4eoAO7/ (attempt 1)
+  [LOCAL-427] HTTP 200 from https://www.instagram.com/p/B4idKqrpq-U/ (attempt 1)
+  [LOCAL-427] HTTP 200 from https://apollo-magazine.com/lee-miller-fearless-art-institute-chicago-preview/ (attempt 1)
+  [LOCAL-459] R5: Fetched 1253 chars from https://apollo-magazine.com/lee-miller-fearless-ar
+    [D511] 2.1                    kind=none     idx=5   C0 X1 fail:index_d515  [old gate: eventful,index,confirmed]
+  [LOCAL-427] HTTP 200 from https://www.facebook.com/artic/posts/opening-next-weeklee-miller-fearlessfrom-the-1920s-through-the-1950s-miller-wore/1487901410048682/ (attempt 1)
+  [LOCAL-427] HTTP 200 from https://galeriemagazine.com/art-institute-of-chicago-delves-into-lee-millers-iconoclastic-legacy/ (attempt 1)
+  [LOCAL-459] R5: Fetched 2378 chars from https://galeriemagazine.com/art-institute-of-chica
+  [LOCAL-427] HTTP 200 from https://heni.com/news/article/art-institute-of-chicago-to-present-lee-miller-survey-amidst-global-exhibitions (attempt 1)
+  [LOCAL-459] R5: Fetched 2229 chars from https://heni.com/news/article/art-institute-of-chi
+    [D511] 5.1                    kind=none     idx=10  C0 X1 fail:index_d515  [old gate: eventful,index,confirmed]
+  [LOCAL-427] HTTP 200 from https://www.phaidon.com/en-us/blogs/artspace/tagged/category_interview?srsltid=AU7gw4U1coMtLWT7viDARrYXQiJDo9QGirlaGMpmIGVacBJGNBtViFkC (attempt 1)
+  [LOCAL-459] R5: Fetched 3003 chars from https://www.phaidon.com/en-us/blogs/artspace/tagge
+  [LOCAL-427] HTTP 200 from https://news.artprice.com/en/13178/mary-cassatt-after-impressionism-at-the-art-institute-of-chicago-the-modernity-of-a-modern-woman-revealed (attempt 1)
+  [LOCAL-459] R5: Fetched 3003 chars from https://news.artprice.com/en/13178/mary-cassatt-af
+  [LOCAL-427] HTTP 200 from https://svmoa.org/events/lectures-talks/2026-10-15/museum-passport-mary-cassatt-after-impressionism-at-the-art (attempt 1)
+  [LOCAL-459] R5: Fetched 1778 chars from https://svmoa.org/events/lectures-talks/2026-10-15
+  [LOCAL-427] HTTP 200 from https://www.facebook.com/artnouveauclub/posts/the-art-institute-of-chicago-is-presenting-the-exhibition-mary-cassatt-after-imp/1504040728428954/ (attempt 1)
+  [LOCAL-427] HTTP 200 from https://www.instagram.com/p/Dc83J53j_MJ/ (attempt 1)
+    [D511] 5.2                    kind=none     idx=10  C0 X1 fail:index_d515  [old gate: eventful,index,confirmed]
+    [LOCAL-468] pairwise overlap: mean=0.232, max=0.331 (DIVERSE)
+      reflecting its uniqu × showcasing how dishe = 0.161
+      reflecting its uniqu × Chicago's culinary s = 0.241
+      reflecting its uniqu × posing the question  = 0.287
+      showcasing how dishe × Chicago's culinary s = 0.255
+      showcasing how dishe × posing the question  = 0.114
+      Chicago's culinary s × posing the question  = 0.331
+    [D511] examined 4 credit_line(s) (indices 10, 5, 10, 10), no story passed, ~$0.048, 18s
+  [LOCAL-427] HTTP 200 from https://www.facebook.com/lynn.becker.37/posts/the-most-moving-lecture-ive-ever-attended-although-i-admit-i-had-already-been-ca/10241011657047220/ (attempt 1)
+  [LOCAL-427] HTTP 200 from https://www.facebook.com/douglas.wood.1000/posts/9102026-a-trip-to-the-art-institute-of-chicagowe-saw-the-incredible-exhibit-call/4622783981287117/ (attempt 1)
+  [LOCAL-427] HTTP 200 from https://patch.com/illinois/oakpark/calendar/event/20261005/d63a3e3b-4b74-48ba-ae33-3d8ad8099f13/mary-cassatt-after-impressionism (attempt 1)
+  [LOCAL-459] R5: Fetched 1497 chars from https://patch.com/illinois/oakpark/calendar/event/
+  [LOCAL-427] HTTP 200 from https://art.newcity.com/2026/09/23/lee-miller-on-both-sides-of-the-camera/ (attempt 1)
+  [LOCAL-459] R5: Fetched 3003 chars from https://art.newcity.com/2026/09/23/lee-miller-on-b
+  [LOCAL-427] HTTP 200 from https://thirdcoastreview.com/art/2026/09/10/lee-miller-fearless (attempt 1)
+  [LOCAL-459] R5: Fetched 1542 chars from https://thirdcoastreview.com/art/2026/09/10/lee-mi
+  [LOCAL-427] HTTP 200 from https://www.meer.com/en/112160-lee-miller-fearless (attempt 1)
+  [LOCAL-459] R5: Fetched 1354 chars from https://www.meer.com/en/112160-lee-miller-fearless
+  [LOCAL-427] HTTP 200 from https://www.facebook.com/artic/posts/now-openmary-cassatt-after-impressionismdiscover-the-bold-new-directions-cassatt/1503773881794768/ (attempt 1)
+    [D511] 3.1                    kind=inert    idx=40  C3 X4 fail:no_invented_person,index_d515  [old gate: eventful,index]  UNGROUNDED:Europe,Matthew
+  [LOCAL-427] HTTP 200 from https://artsandculture.google.com/entity/mary-cassatt-after-impressionism/t2czmhk6m_gsn3 (attempt 1)
+  [LOCAL-459] R5: Fetched 1260 chars from https://artsandculture.google.com/entity/mary-cass
+  [LOCAL-427] HTTP 200 from https://store.philamuseum.org/mary-cassatt-after-impressionism/ (attempt 1)
+  [LOCAL-459] R5: Fetched 3003 chars from https://store.philamuseum.org/mary-cassatt-after-i
+  [LOCAL-427] Cache HIT: https://news.artprice.com/en/13178/mary-cassatt-after-impressionism-at-the-art-institute-of-chicago-the-modernity-of-a-modern-woman-revealed (9187 chars)
+  [LOCAL-459] R5: Fetched 3003 chars from https://news.artprice.com/en/13178/mary-cassatt-af
+    [D511] 4.1                    kind=none     idx=5   C0 X1 fail:index_d515  [old gate: eventful,index,confirmed]
+    [D511] 4.1                    kind=eventful idx=55  C3 X2 PASS  [old gate: index]
+    [D511] 6.1                    kind=none     idx=5   C0 X1 fail:index_d515  [old gate: eventful,index,confirmed]
+    [D511] 5.1                    kind=none     idx=5   C0 X1 fail:index_d515  [old gate: eventful,index,confirmed]
+    [LOCAL-468] pairwise overlap: mean=0.016, max=0.016 (DIVERSE)
+      Cassatt's paintings  × Institute's ongoing  = 0.016
+    [D511] examined 2 credit_line(s) (indices 55, 5), STORY ACCEPTED at 55, ~$0.027, 32s
+    [D511] 6.2                    kind=none     idx=5   C0 X1 fail:index_d515  [old gate: eventful,index,confirmed]
+    [LOCAL-468] pairwise overlap: mean=0.432, max=1.000 (CONVERGED — seeds not working)
+      Miller's photographs × capture the chaos of = 0.022
+      Miller's photographs × Miller's images expo = 0.007
+      Miller's photographs × you explored earlier = 0.007
+      capture the chaos of × Miller's images expo = 0.778
+      capture the chaos of × you explored earlier = 0.778
+      Miller's images expo × you explored earlier = 1.000
+    [D511] examined 4 credit_line(s) (indices 40, 5, 5, 5), no story passed, ~$0.051, 32s
+
+  [D511] stop 1: Chicago: a challenge for your taste buds | C
+    [D511] no story passed the gate — stop keeps its descriptive text and publishes no story
+
+  [D511] stop 2: Mary Cassatt: After Impressionism
+    [D518] 0 of 5 prose sentence(s) replaced by story 1
+    [D511] stop 2: 1 story published (55) from credit_lines "Cassatt's paintings"
+
+  [D511] stop 3: Lee Miller: Fearless
+    [D511] no story passed the gate — stop keeps its descriptive text and publishes no story
+
+  [D511] PHASE 5.20 summary: 1/3 stops got a gated story (0 with multiple stories), ~$0.126, [D518] 0 duplicated prose sentence(s) replaced
+
+  [LOCAL-485] PHASE 5.21: Story valuation index (report only, never gates)...
+     #  stop                                      idx  hist  detl   soc
+     1  Chicago: a challenge for your taste buds   20     0     0     0
+     2  Mary Cassatt: After Impressionism          51    58    20    72
+     3  Lee Miller: Fearless                       35     0     0    57
+    [LOCAL-485] index mean 35.3 over 3 stop(s), range 20-51
+    [LOCAL-485] weakest: 'Chicago: a challenge for your taste buds' at 20
+[TIMING] phase=story_first elapsed=103.4s cumulative=207.7s
+
+PHASE 6: Assembling the complete tour...
+  [R2] Prolog saved for Stop 1 (88 words)
+
+  [LOCAL-244] PHASE 5.9: Prolog gating (R9, R10, subject routine)...
+  [LOCAL-244] Prolog before gates: 88 words
+  [LOCAL-244] Prolog R9: 0 deletions
+  [LOCAL-286] Prolog R7: 0 deletions
+  [LOCAL-244] Prolog R10: 0 deletions
+  [LOCAL-244] Prolog subject: 0 expanded, 0 deleted, cost=$0.0000
+  [LOCAL-244] Prolog after gates: 88 words (delta: 0)
+
+  [LOCAL-246] PHASE 5.95: Orientation gating (R9, R10)...
+  [LOCAL-246] Orientation gating summary:
+    Words before: 132
+    Words after:  132
+    Delta: 0
+    Stops affected: 0/3
+
+  [LOCAL-270] PHASE 5.96: Composing Part 4 (forward connection) from delivered narrations...
+    Stops with delivered content: 3/3
+    [LOCAL-276] Intrigue ranking completed: 2.0s, $0.0075, 1125 tokens
+    [LOCAL-276] Ranked 3 stops:
+      [Chicago: a challenge for your taste buds | Choose Chicago] (reversal): Beyond the plates, Chicago's culinary scene becomes a metaphor for resilience an...
+      [Mary Cassatt: After Impressionism] (dated_event): This changed when they decided to host "Mary Cassatt: After Impressionism" from ...
+      [Lee Miller: Fearless] (reversal): The stark contrasts in her work not only chronicle historical events but also re...
+    [LOCAL-276] 3 intriguing / 0 excluded (celebrity_trivia)
+    [LOCAL-276] Using ranked facts for composition (3 stops)
+    Part 4 LLM cost: $0.0031 (524 tokens) [attempt 1]
+    ✓ Part 4 composed and verified (35 words):
+      "As you journey through the upcoming stops, you'll experience the culinary innovation of Chicago, pondering the boundaries food can transcend, and explore Lee Miller's transformation from fashion model to war correspondent at Lee Miller: Fearless."
+      Stops referenced: 2
+    Part 4 total cost: $0.0031
+  [LOCAL-618 #1] Orientation pre-tell guard: dropped 3 sentence(s) carrying later-stop facts
+  [LOCAL-627 #7] Orientation phantom-name guard: no phantom names
+
+  [LOCAL-286] PHASE 5.97: Prolog-body deduplication (≥8 word overlap)...
+  [LOCAL-286] Deduplication: 0 sentence(s) removed from stop bodies
+
+  [LOCAL-292] Empty stop removal gate: PASSED (all 3 stops have narration)
+  [LOCAL-600] site-first counts: exhibitions_on_view=0 delivered=3 requested=3
+  [LOCAL-394] Stop count invariant: OK (3 selected == 3 delivered)
+  [D536] Listener asked for 3 stop(s), delivering 3 — request met
+  DEBUG - POI 1 content includes:
+    Specific Examples: False
+    Operational Details: True
+    Walking Directions: True
+  [T4] Transition to Stop 2: Continue through Art Institute of Chicago — next is Mary Cas...
+  DEBUG - POI 2 content includes:
+    Specific Examples: False
+    Operational Details: False
+    Walking Directions: True
+  [T4] Transition to Stop 3: Your final stop in Art Institute of Chicago: Lee Miller: Fea...
+  DEBUG - POI 3 content includes:
+    Specific Examples: False
+    Operational Details: False
+    Walking Directions: True
+  [LOCAL-280] Recap composition: 1.0s, $0.0024, 427 tokens
+  [LOCAL-280] Recap built: 27 words, 2 composed clauses (0 D177 rejected, 0 navigation rejected)
+    [Chicago: a challenge for your taste buds | Choose Chicago] (reversal): "Beyond the plates, Chicago's culinary scene becomes a metaphor for resilience an..."
+      → composed: "Chicago: culinary scene symbolizes resilience and innovation, pushing food boundaries"
+    [Lee Miller: Fearless] (reversal): "The stark contrasts in her work not only chronicle historical events but also re..."
+      → composed: "Lee Miller: work chronicles history, shows her evolution from model to correspondent"
+    D177 verified: all 2 source facts present in delivered text
+  [LOCAL-280] Recap added: "That's 3 stops — Chicago: culinary scene symbolizes resilience and innovation, pushing food boundaries and Lee Miller: work chronicles history, shows her evolution from model to correspondent."
+  [LOCAL-275] Part 2: museum tour category, no restaurant found nearby
+  [D519] Treat Page: no treat within 1.0 km of any of 3 stop(s) (0 treat(s) with coordinates) — mention OMITTED
+  [LOCAL-275/D519] Part 2: nothing verified — no tour offer, no Treat Page
+  [LOCAL-275] Part 2 error: name '_venue_parts_used' is not defined
+  [LOCAL-275] Closing offer fallback (no verification passed)
+  [EPILOG] Journey epilog added to last stop
+  [S27] No cross-stop repetition detected
+  [D533] No cross-stop fact repetition detected
+  [D533] Person-year role guard: no corpus available — check SKIPPED
+  [LOCAL-615] No duplicated paragraphs
+  [LOCAL-620] Story-balance stop-body policy: no change (3 stops scanned)
+  [LOCAL-623] Same-title bleed filter: no change (3 stops scanned)
+  [LOCAL-626] Date-consistency filter: dropped 1 conflicting-date sentence(s) across 3 stops
+  [LOCAL-623] Museum-motif filter: no change (3 stops scanned)
+  [LOCAL-617] Conclusion de-dup: removed redundant 'This tour covered …' line (recap kept)
+
+  [LOCAL-36] Practical Facts Gate:
+    Claims found: 4
+    Verified: 4
+    Dropped: 0
+    AUDIT: closed_day | Closed Tuesdays | https://sales.artic.edu/Admissions, https://www.artic.edu/exhibitions, https://www.expedia.com/things-to-do/art-institute-of-chicago.a170360.activity-details | VERIFIED
+    AUDIT: admission | admission is General adult admission ranges from $32 to $40 depending on residency (discounts apply for Illinois and Chicago residents), while seniors are approximately $26 | https://sales.artic.edu/Admissions, https://www.artic.edu/exhibitions, https://www.expedia.com/things-to-do/art-institute-of-chicago.a170360.activity-details | VERIFIED
+    AUDIT: admission | Free for children under 14, Chicago teens under 18, Illinois educators, active military, and LINK/WIC cardholders | https://sales.artic.edu/Admissions, https://www.artic.edu/exhibitions, https://www.expedia.com/things-to-do/art-institute-of-chicago.a170360.activity-details | VERIFIED
+    AUDIT: admission | , $7) | https://sales.artic.edu/Admissions, https://www.artic.edu/exhibitions, https://www.expedia.com/things-to-do/art-institute-of-chicago.a170360.activity-details | VERIFIED
+  [LOCAL-36] PRACTICAL FACTS GATE: PASSED (4 verified)
+  [LOCAL-618 #2] grammar/splice lint: 7 flagged, 5 dropped, 0 rewritten ({'repeated_pair': 1, 'verbless': 4, 'unbalanced': 2})
+  [LOCAL-618 #2] grammar/splice lint: 7 flagged, 5 dropped, 0 rewritten by_code={'repeated_pair': 1, 'verbless': 4, 'unbalanced': 2}
+
+  [LOCAL-260] PROLOG STRUCTURE VALIDATION: 4 error(s), 0 warning(s)
+    [ERROR] Part 1: PART1_MISSING — Part 1 (Tour name and transportation mode) is not present.
+    [ERROR] Part 2: PART2_MISSING — Part 2 (Directions and physicality expectation (route substance)) is not present.
+    [ERROR] Part 3: PART3_MISSING — Part 3 (Purpose / intrigue with sourced facts) is not present.
+    [ERROR] Part 4: PART4_MISSING — Part 4 (Forward connection to stops) is not present.
+
+=== Word Count Statistics ===
+Stop 1: Chicago: a challenge for your taste buds | Choose Chicago - 117 words
+Stop 2: Mary Cassatt: After Impressionism - 160 words
+Stop 3: Lee Miller: Fearless - 129 words
+===========================
+
+  [LOCAL-540] scorer ran on assembled tour (5243 chars, 3/3 stops)
+  [LOCAL-540] no defects — tour is clean
+[LOCAL-628] stop 1: rejected(length -61%)
+[LOCAL-628] stop 2: rejected(claim_check unsupported=1 contradicted=0)
+[LOCAL-628] stop 3: edited
+[LOCAL-628] editor pass complete: 1 edited, 2 kept original
+  [LOCAL-619B] thematic conclusion built from final text: 3 delivered stop(s), venue='Art Institute of Chicago'
+
+Total API cost: $0.3258 (22803 tokens)
+Grounding:      $0.0420 (3 queries, 6 requests)
+Tour total:     $0.3678
+Provenance:     6/23 factual sentences sourced, 17 unsourced (6 corpus, 0 grounded, 17 parametric)
+  [LOCAL-630 item 7] stripped editor marker from delivered tour_content (kept in cache/pool for idempotence)
+
+Tour text generated successfully!
+  [LOCAL-230] ⚠ NETWORK FAILURES: 1 API call(s) failed during this generation — tour may be degraded
+Saved to: /app/tours/LOCAL630_ART_INSTITUTE_CHICAGO.txt
+  [C5-5] Evidence (provenance-only) persisted: /app/tours/LOCAL630_ART_INSTITUTE_CHICAGO_evidence.json
+
+Preview of the generated tour:
+
+Step-by-Step Audio Guided Tour: Art Institute of Chicago, Chicago, USA - Museum Tour
+Tour-Category: museum
+
+Stop 1: Chicago: a challenge for your taste buds | Choose Chicago
+
+Address:
+
+Coordinates: 41.8839, -87.6278
+
+Museum Information: The museum is open Monday, Wednesday, Friday, Saturday, and Sunday: 11:00 a.m. – 5:00 p.m.; Open Thursday: 11:00 a.m. – 8:00 p.m.; Closed Tuesdays. – 11:00 a.m. admission is General adult admission ranges from $32 to $40 depending on residency (discounts apply fo...
+
+
+========================================================================
+  [LOCAL-410] CHAIN INSTRUMENTATION (post-generation)
+========================================================================
+    Chicago: a challenge for your taste buds | Choose : serp_results=7 snippets_injected=16 beats_in_delivered_text=0
+    Mary Cassatt: After Impressionism: serp_results=20 snippets_injected=30 beats_in_delivered_text=9
+    Lee Miller: Fearless: serp_results=20 snippets_injected=28 beats_in_delivered_text=0
+========================================================================
+[TIMING] phase=packing elapsed=12.6s cumulative=220.4s
+[TIMING] phase=verification elapsed=0.0s cumulative=220.4s
+[TIMING] TOTAL wall=220.4s phases: story_first=103.4s, external_lookups=69.4s, site_first_exhibitions=20.0s, packing=12.6s, fact_sheets=4.4s, poi_selection=2.4s, intent=1.6s, narration=0.0s, verification=0.0s
+  [LOCAL-629 item 4] spoke the preflight's known hours/admission in Stop 1 (were only in a field line)
+  [LOCAL-630 item 3] collapsed 1 duplicate spoken hours statement(s) — hours now spoken once
+  [LOCAL-630 item 2] collapsed 3 extra admission statement(s) — admission spoken once (free beats price)
+  [LOCAL-619B] thematic conclusion already present and count OK (3 stop(s)); preserved (every-path guard)
+OUTCOME: DELIVERED — 5753 chars, 3 stops, wall 234.6s
+  STOP TITLE: Chicago: a challenge for your taste buds | Choose Chicago
+  STOP TITLE: Mary Cassatt: After Impressionism
+  STOP TITLE: Lee Miller: Fearless
+  HOURS(spoken): Museum Information: The museum is open Monday, Wednesday, Friday, Saturday, and Sunday: 11:00 a.
+  ADMISSION(spoken): admission is General adult admission ranges from $32 to $40 depending on residency (discounts apply for Illinois and Chicago residents), while seniors are approximately $26.
+  ABOUT/OPENING: The exploration of these limits unites the collection, guiding you through a journey of challenging norms and pushing the boundaries of creativity. As you delve into each artwork, consider the themes of exploration and daring that define this museum's collection. Your first stop is Chicago: a challenge for your taste buds | Choose Chicago. Stand before the exhibit titled "Chicago: a challenge for your taste buds | Choose Chicago" at the Art Institute of Chicago, where the vibrant fusion of gastronomy and art mirrors the city's rich cultural influences. m. – 5:00 p.m.; Open Thursday: 11:00 a.m.
+  --- CONCLUSION ---
+    Together, these stops reveal the dynamic interplay between art and personal narratives, showcasing how artists like Mary Cassatt and Lee Miller express identity through their distinctive lenses. This exploration invites us to reflect on the resilience and innovation that emerge from both cultural and historical contexts. That's 3 stops in all.
+    If you would like to eat nearby we can build you a restaurant tour.
+  --- end conclusion ---
+  [item 7] editor marker absent from delivered text — OK
+[cost] tour_total=$0.6041
+STORED audio_tours id = 496  (is_test=true)
+LOCAL630_TOUR_ID=496
+
+[db] audio_tours row count AFTER: 302
+[db] paid_api_calls spend for host cf7a22ec4b65 AFTER: $0.47107
+=== LOCAL-630 run complete ===
+LOCAL630_TOUR_IDS=496
+[COST_METER] FRESH | tour_generate | $0.572986 | user=TEST-LOCAL-630 | job=None
+[LIVE_RUN_METER] TEST-LOCAL-630  (cap $1.50, all providers combined)
+  openai            $0.4847
+  gemini_grounding  $0.0420  (requests=6, queries=3)
+  gemini_tokens     $0.0113
+  serper            $0.0350
+  preflight         $0.0311
+  TOTAL             $0.5730   description='test run'
+[LIVE_RUN_METER] cost_ledger row f7cc3713-02d8-41f4-a4b6-34ec3ede578b (user_id=TEST-LOCAL-630, description='test run')

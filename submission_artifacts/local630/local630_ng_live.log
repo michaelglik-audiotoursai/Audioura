@@ -1,0 +1,1084 @@
+=== LOCAL-630 isolated live run (National Gallery + Art Institute of Chicago, 3 stops each) ===
+host  : 11682218bda5
+model : gpt-4o   HARD CAP: $0.9  reserve: $0.6  STOP_EDITOR=1  cache=1 pool=1
+[db] audio_tours row count BEFORE: 303
+[db] paid_api_calls spend for host 11682218bda5 BEFORE: $0.0
+
+[reserve-gate] spend_so_far=$0.0 + reserve $0.6 vs cap $0.9
+=== generating: The National Gallery, London, UK (3 stops) ===
+  [LOCAL-603] preflight venue='The National Gallery' status=open hours=y admission=y highlights=5
+
+======================================================================
+CALL #001 | 20:19:38.116 | GENERATE_TOUR_TEXT_FUNCTION_ENTRY
+======================================================================
+  location: The National Gallery, London, UK
+  tour_type: museum
+  total_stops_parameter: 3
+  output_file: /app/tours/LOCAL630_NATIONAL_GALLERY.txt
+
+  [LOCAL-245] Stop-existence gate mode: LOG_ONLY
+
+======================================================================
+CALL #002 | 20:19:38.123 | TOTAL_STOPS_FINALIZED
+======================================================================
+  location: The National Gallery, London, UK
+  total_stops_final: 3
+  source: parameter
+
+
+PHASE 1: Analyzing tour intent with AI...
+Intent analysis response: ```json
+{
+    "poi_type": "museums",
+    "location": "London, UK",
+    "theme_type": "STANDARD",
+    "theme_name": null,
+    "requirements": null,
+    "business_hours_relevant": true,
+    "accessibility_mentioned": false,
+    "needs_research": false,
+    "venue_name": "The National Gallery",
+    "geographic_scope": "London, UK",
+    "named_places": [],
+    "scope_precision": "CITY",
+    "transport_mode": "on_foot",
+    "country_scope": "UK"
+}
+```
+  [INTENT] Stripped LLM fences from response
+  [TRANSPORT] mode=on_foot, country_scope=UK (keyword=on_foot, intent=on_foot)
+✅ Intent Analysis Results:
+   POI Type: museums
+   Location: London, UK
+   Requirements: None
+   Business Hours Relevant: True
+   Accessibility Mentioned: False
+   Venue Name: The National Gallery
+  [venue_name sanity] 'The National Gallery' OK
+  [S15] Forced tour_category=museum from venue_name='The National Gallery'
+[TIMING] phase=intent elapsed=1.4s cumulative=1.4s
+[LOCAL-474] tour_type='museum' → category='museum' (source=explicit)
+
+Detected tour category: MUSEUM
+Using museum template for The National Gallery, London, UK - museum
+
+======================================================================
+CALL #003 | 20:19:39.511 | GENERATING_PROMPT
+======================================================================
+  location: The National Gallery, London, UK
+  user_request: museum The National Gallery, London, UK
+  total_stops: 3
+
+
+PHASE 3A: Fetching 3 candidate POI(s) for The National Gallery, London, UK...
+  [Museum constraint] Venue from intent='The National Gallery'
+  [venue_resolver] Name variants: ['The National Gallery']
+  [venue_resolver] Candidates for variant 'The National Gallery': ['Q180788', 'Q46810531', 'Q104471917', 'Q18686576', 'Q26506403', 'Q99925496', 'Q110157648', 'Q64583955']
+  [venue_resolver] SPARQL: 120 works found for Q180788
+  [venue_resolver] SPARQL: 8 works found for Q46810531
+  [venue_resolver] #3 collection dominates (120 vs 8) — collapsing to Q180788 (National Gallery)
+  [venue_resolver] Resolved: 'The National Gallery' → Q180788 (National Gallery)
+    URL: https://www.nationalgallery.org.uk
+    Coords: 51.50888888888889, -0.12833333333333333
+    Language: en
+  [venue_resolver] SPARQL: 120 works found for Q180788
+  [Phase3A] Injected 12 canonical title hints from Wikidata (QID-deduped)
+  [S17] no scope_constraint (precision='CITY', scope='London, UK')
+  [venue_resolver] Name variants: ['The National Gallery']
+  [venue_resolver] Candidates for variant 'The National Gallery': ['Q180788', 'Q46810531', 'Q104471917', 'Q18686576', 'Q26506403', 'Q99925496', 'Q110157648', 'Q64583955']
+  [venue_resolver] SPARQL: 120 works found for Q180788
+  [venue_resolver] SPARQL: 8 works found for Q46810531
+  [venue_resolver] #3 collection dominates (120 vs 8) — collapsing to Q180788 (National Gallery)
+  [venue_resolver] Resolved: 'The National Gallery' → Q180788 (National Gallery)
+    URL: https://www.nationalgallery.org.uk
+    Coords: 51.50888888888889, -0.12833333333333333
+    Language: en
+  [venue_cache] HIT for Q180788 (tier=rich, expires=2026-11-07 19:37:58.809194)
+  [venue_resolver] SPARQL: 120 works found for Q180788
+  [LOCAL-30] Deterministic selection: 120 documented works (0 catalogue, 120 SPARQL; 103 site/cache canonical title(s) are NOT documented)
+  [LOCAL-629] candidate works BEFORE artworks-only (223): ['Arnolfini Portrait', 'The Ambassadors', 'Ophelia', 'Rokeby Venus', 'The Hay Wain', 'Supper at Emmaus', 'Venus and Mars', 'An Experiment on a Bird in the Air Pump', "Belshazzar's Feast", 'Rain, Steam and Speed – The Great Western Railway', 'Music in the Tuileries', 'Venus, Cupid, Folly and Time', 'The Dream of a Knight', 'The Fighting Temeraire', 'Boy Bitten by a Lizard', 'The Umbrellas', 'Bathers at Asnières', 'Mr and Mrs Andrews', 'Diana and Actaeon', 'Allegory of Prudence', 'Carnation, Lily, Lily and Rose', 'The Entombment', 'The Lady of Shalott', 'Bacchus and Ariadne', 'Madonna of the Pinks', 'A Young Woman Standing at a Virginal', 'Christ in the House of His Parents', "Van Gogh's Chair", 'Madame Moitessier', 'Samson and Delilah', 'Mond Crucifixion', 'A Young Woman seated at a Virginal', 'The Baptism of Christ', 'The Execution of Lady Jane Grey', 'Tiger in a Tropical Storm', 'Ansidei Madonna', 'The Adoration of the Kings', 'Beata Beatrix', 'Portrait of a Man (Self      Portrait?)', 'The Virgin and Child with Saint Anne and Saint John the Baptist', 'Léal Souvenir', 'Saint Jerome in His Study', 'The Annunciation, with Saint Emidius', 'The Magdalen Reading', 'The Mystical Nativity', 'Hope', 'Saint Catherine of Alexandria', 'Dido building Carthage', 'Garvagh Madonna', 'La Schiavona', 'Madonna del Prato', 'Portrait of a young man with a skull', 'Portrait of Doña Isabel de Porcel', 'Saint Eulalia', 'Self-Portrait at the Age of 34', 'The Judgement of Paris', 'The Origin of the Milky Way', 'The Ugly Duchess', 'Wilton Diptych', 'Diana and Callisto', 'Christ in the House of Martha and Mary', 'Manchester Madonna', 'Marriage à-la-mode', 'Noli me tangere', 'Portrait of Doge Leonardo Loredan', 'The Adoration of the Golden Calf', 'Tobias and the Angel', 'Agony in the Garden', 'April Love', 'Christ Crowned with Thorns', 'Ecce Ancilla Domini', 'Miss La La at the Cirque Fernando', 'Our English Coasts', 'Salome with the Head of John the Baptist', 'The Age of Innocence', 'The Agony in the Garden', 'The Cornfield', 'The Death of Procris', 'The Lament for Icarus', 'The Order of Release', "The Stonemason's Yard", 'The Vale of Rest', 'The Woman Taken in Adultery', 'Two Crabs', 'Portrait of Susanna Lunden', 'Cupid Complaining to Venus', 'Farms near Auvers', 'King Cophetua and the Beggar Maid', 'Portrait of a Woman', 'Portrait of Gerolamo (?) Barbarigo', 'Salisbury Cathedral from the Meadows', 'St. Jerome in the Wilderness', 'The Nativity', 'The Vision of Saint Eustace', 'Whistlejacket', 'A View of Het Steen in the Early Morning', 'A Woman Bathing in a Stream (Hendrickje Stoffels?)', 'Christ before the High Priest', 'Christina of Denmark, Duchess of Milan', 'Martyrdom of Saint Sebastian', 'Philip IV in Brown and Silver', 'Saint George and the Dragon', 'Saint Margaret of Antioch', 'Self-Portrait at the Age of 63', 'Symphony in White, No. 2: The Little White Girl', 'The Bath of Psyche', 'The Beloved', 'The Courtyard of a House in Delft', 'The Death of Actaeon', 'The Girlhood of Mary Virgin', 'The Graham Children', 'The Magic Circle', 'The Vision of Saint Jerome', 'Apollo and Daphne', 'Nativity at Night', 'The Bewitched Man', 'The Conversion of Mary Magdalene', 'The Family of Darius Before Alexander', 'The Golden Stairs', "Venus with Mercury and Cupid ('The School of Love')", '1838', 'Alteration and expansion (Pennethorne, Barry and Taylor)', 'An Allegory with Venus and Cupid', 'Artists in residence', 'Early 20th century', 'Explanatory notes', 'Foundation and early history', 'General sources', 'Growth under Eastlake and his successors', "Hampton's site", 'Laure Gargallo', 'My National Gallery', 'Open Mind', 'Portrait of Christina of Denmark', 'Post-war developments', 'Renovation of the Sainsbury Wing', 'Sainsbury Wing and later additions', 'St Vincent House extension', 'The call for a National Gallery', 'Transport connections', 'West Wing Project', "William Wilkins's building", "'Mystic Nativity'", '1852', 'A Grotesque Old Woman', 'A Man with a Quilted Sleeve', 'A Satyr mourning over a Nymph', "A Scene from El Hechizado por Fuerza ('The Forcibly Bewitched')", 'Adoration of the magi', 'Aldobrandini-Garvagh Madonna', 'An Allegory - Vision of a Knight', 'An Allegory of Prudence', 'An Allegory of Venus and Cupid and A Triumph of Venus', 'An Autumn Landscape with a View of Het Steen in the Early Morning', "An Old Woman ('The Ugly Duchess')", 'Ariosto', 'Bacchus and Ariadne (Titian)', 'Bathers at Asni?res', 'Bañistas en Asnieres', 'Christ Mocked (The Crowning with Thorns)', 'Crocifissione Gavari', 'Diana and Actaeon (Titian)', "Jean de Dinteville and Georges de Selve ('The Ambassadors')", 'Judgment of Paris', 'Kitchen Scene with Christ in the House of Martha and Mary', 'Lady Seated at a Virginal', 'Landscape: Noon', 'Madonna of the Meadow', 'Marriage à-la-mode\xa0(series of six)', 'Miss LaLa en el Cirque Fernando', 'Music in the Tuileries Gardens', 'Nocturne: Blue and Gold - Old Battersea Bridge', 'Noli me tangere (Titian)', 'or The Rise of the Carthaginian Empire', 'Penitent Jerome', 'Philip IV of Spain in Brown and Silver', "Portrait of a Lady ('La Schiavona')", "Portrait of a Man ('Léal Souvenir')", 'Portrait of a Man in a Red Turban', 'Portrait of a Man in a Turban', 'Portrait of a Woman inspired by Lucretia', 'Portrait of Girolamo (?) Barbarigo', "Portrait of Susanna Lunden(?) ('Le Chapeau de Paille')", 'Portrait of the Doge Leonardo Loredan', "Richard II presented to the Virgin and Child by his Patron Saint John the Baptist and Saints Edward and Edmund ('The Wilton Diptych')", 'Saint George Killing the Dragon', 'Saint Jerome in the Wilderness', 'Saints and Angels (The Mond Crucifixion)', 'Salome receives the Head of John the Baptist', "Samson Asleep in Delilah's Lap", 'St. Jerome in His Study', 'Strayed Sheep', 'Surprised!', 'The Aldobrandini Madonna', 'The Arnolfini Double Portrait', 'The Arnolfini Marriage', 'The Arnolfini Portrait (Portrait of Giovanni Arnolfini (?) and his Wife)', 'The Arnolfini Wedding', 'The Carpenter Shop', 'The Crucified Christ with the Virgin Mary', 'The Entombment (or Christ being carried to his Tomb)', 'The Fighting Temeraire tugged to her last berth to be broken up', 'The Haywain', 'the Honey Thief', "The Madonna and Child with Saint John the Baptist and Saint Nicholas of Bari ('The Ansidei Madonna')", 'The Madonna and Child with Saints John the Baptist and Jerome', 'The Madonna and Child with St John and Angels', 'The Madonna and Child with the Infant Baptist (The Garvagh Madonna)', "The Madonna of the Pinks ('La Madonna dei Garofani')", 'The Martyrdom of Saint Sebastian', 'The Martyrdom of St. Sebastian', 'The Nativity at Night', 'The Portrait of Caterina Cornaro', 'The Stonemason’s Yard (Venice: Campo Santa Vidal and Santa Maria Della Carita)', 'The Supper at Emmaus', "The Toilet of Venus ('The Rokeby Venus')", "The Virgin and Child with Saint Anne and the Infant Saint John the Baptist ('The Burlington House Cartoon')", "The Virgin and Child with Saint John and Angels ('The Manchester Madonna')", 'The Virgin and Child with St. Anne and St. John the Baptist', 'Timotheus', "Venice: Campo S. Vidal and Santa Maria della Carit? ('The Stonemason's Yard')", "Vincent's Chair with His Pipe", 'Young Man holding a Skull (Vanitas)']
+  [LOCAL-629] [LOCAL-630 item 1] collection-membership dropped 20: [('Alteration and expansion (Pennethorne, Barry and Taylor)', 'not_in_collection (no P195/P276=The National Gallery match and not site-listed)'), ('Artists in residence', 'not_in_collection (no P195/P276=The National Gallery match and not site-listed)'), ('Early 20th century', 'not_in_collection (no P195/P276=The National Gallery match and not site-listed)'), ('Explanatory notes', 'not_in_collection (no P195/P276=The National Gallery match and not site-listed)'), ('Foundation and early history', 'not_in_collection (no P195/P276=The National Gallery match and not site-listed)'), ('General sources', 'not_in_collection (no P195/P276=The National Gallery match and not site-listed)'), ('Growth under Eastlake and his successors', 'not_in_collection (no P195/P276=The National Gallery match and not site-listed)'), ("Hampton's site", 'not_in_collection (no P195/P276=The National Gallery match and not site-listed)'), ('Laure Gargallo', 'not_in_collection (no P195/P276=The National Gallery match and not site-listed)'), ('My National Gallery', 'not_in_collection (no P195/P276=The National Gallery match and not site-listed)'), ('Open Mind', 'not_in_collection (no P195/P276=The National Gallery match and not site-listed)'), ('Post-war developments', 'not_in_collection (no P195/P276=The National Gallery match and not site-listed)'), ('Renovation of the Sainsbury Wing', 'not_in_collection (no P195/P276=The National Gallery match and not site-listed)'), ('Sainsbury Wing and later additions', 'not_in_collection (no P195/P276=The National Gallery match and not site-listed)'), ('St Vincent House extension', 'not_in_collection (no P195/P276=The National Gallery match and not site-listed)'), ('The call for a National Gallery', 'not_in_collection (no P195/P276=The National Gallery match and not site-listed)'), ('Transport connections', 'not_in_collection (no P195/P276=The National Gallery match and not site-listed)'), ('West Wing Project', 'not_in_collection (no P195/P276=The National Gallery match and not site-listed)'), ("William Wilkins's building", 'not_in_collection (no P195/P276=The National Gallery match and not site-listed)'), ('Nocturne: Blue and Gold - Old Battersea Bridge', 'not_in_collection (no P195/P276=The National Gallery match and not site-listed)')]
+  [LOCAL-629] artist-variety capped 134: [('The Fighting Temeraire', 'artist_variety_cap (>1 by q159758)'), ('Boy Bitten by a Lizard', 'artist_variety_cap (>1 by q42207)'), ('Allegory of Prudence', 'artist_variety_cap (>1 by q47551)'), ('Bacchus and Ariadne', 'artist_variety_cap (>1 by q47551)'), ('Madonna of the Pinks', 'artist_variety_cap (>1 by q5597)'), ('Christ in the House of His Parents', 'artist_variety_cap (>1 by q159606)'), ('Mond Crucifixion', 'artist_variety_cap (>1 by q5597)'), ('A Young Woman seated at a Virginal', 'artist_variety_cap (>1 by q41264)'), ('Ansidei Madonna', 'artist_variety_cap (>1 by q5597)'), ('Portrait of a Man (Self      Portrait?)', 'artist_variety_cap (>1 by q102272)'), ('Léal Souvenir', 'artist_variety_cap (>1 by q102272)'), ('The Mystical Nativity', 'artist_variety_cap (>1 by q5669)'), ('Saint Catherine of Alexandria', 'artist_variety_cap (>1 by q5597)'), ('Dido building Carthage', 'artist_variety_cap (>1 by q159758)'), ('Garvagh Madonna', 'artist_variety_cap (>1 by q5597)'), ('La Schiavona', 'artist_variety_cap (>1 by q47551)'), ('Saint Eulalia', 'artist_variety_cap (>1 by q212754)'), ('Self-Portrait at the Age of 34', 'artist_variety_cap (>1 by q5598)'), ('Diana and Callisto', 'artist_variety_cap (>1 by q47551)'), ('Christ in the House of Martha and Mary', 'artist_variety_cap (>1 by q297)'), ('Manchester Madonna', 'artist_variety_cap (>1 by q5592)'), ('Noli me tangere', 'artist_variety_cap (>1 by q47551)'), ('Portrait of Doge Leonardo Loredan', 'artist_variety_cap (>1 by q17169)'), ('Ecce Ancilla Domini', 'artist_variety_cap (>1 by q186748)'), ('Salome with the Head of John the Baptist', 'artist_variety_cap (>1 by q42207)'), ('The Agony in the Garden', 'artist_variety_cap (>1 by q5681)'), ('The Cornfield', 'artist_variety_cap (>1 by q159297)'), ('The Order of Release', 'artist_variety_cap (>1 by q159606)'), ('The Vale of Rest', 'artist_variety_cap (>1 by q159606)'), ('The Woman Taken in Adultery', 'artist_variety_cap (>1 by q5598)'), ('Two Crabs', 'artist_variety_cap (>1 by q5582)'), ('Portrait of Susanna Lunden', 'artist_variety_cap (>1 by q5599)'), ('Farms near Auvers', 'artist_variety_cap (>1 by q5582)'), ('Portrait of Gerolamo (?) Barbarigo', 'artist_variety_cap (>1 by q47551)'), ('Salisbury Cathedral from the Meadows', 'artist_variety_cap (>1 by q159297)'), ('The Nativity', 'artist_variety_cap (>1 by q5822)'), ('A View of Het Steen in the Early Morning', 'artist_variety_cap (>1 by q5599)'), ('A Woman Bathing in a Stream (Hendrickje Stoffels?)', 'artist_variety_cap (>1 by q5598)'), ('Christina of Denmark, Duchess of Milan', 'artist_variety_cap (>1 by q48319)'), ('Philip IV in Brown and Silver', 'artist_variety_cap (>1 by q297)'), ('Saint George and the Dragon', 'artist_variety_cap (>1 by q9319)'), ('Self-Portrait at the Age of 63', 'artist_variety_cap (>1 by q5598)'), ('The Beloved', 'artist_variety_cap (>1 by q186748)'), ('The Death of Actaeon', 'artist_variety_cap (>1 by q47551)'), ('The Girlhood of Mary Virgin', 'artist_variety_cap (>1 by q186748)'), ('The Graham Children', 'artist_variety_cap (>1 by q171344)'), ('The Magic Circle', 'artist_variety_cap (>1 by q212754)'), ('Apollo and Daphne', 'artist_variety_cap (>1 by q707046)'), ('The Bewitched Man', 'artist_variety_cap (>1 by q5432)'), ('The Family of Darius Before Alexander', 'artist_variety_cap (>1 by q9440)'), ('The Golden Stairs', 'artist_variety_cap (>1 by q216406)'), ('1838', 'artist_variety_cap (>1 by q159758)'), ('An Allegory with Venus and Cupid', 'artist_variety_cap (>1 by q7803)'), ('Portrait of Christina of Denmark', 'artist_variety_cap (>1 by q48319)'), ("'Mystic Nativity'", 'artist_variety_cap (>1 by q5669)'), ('1852', 'artist_variety_cap (>1 by q211763)'), ('A Grotesque Old Woman', 'artist_variety_cap (>1 by metsys)'), ('A Man with a Quilted Sleeve', 'artist_variety_cap (>1 by q47551)'), ('A Satyr mourning over a Nymph', 'artist_variety_cap (>1 by q280851)'), ("A Scene from El Hechizado por Fuerza ('The Forcibly Bewitched')", 'artist_variety_cap (>1 by q5432)'), ('Adoration of the magi', 'artist_variety_cap (>1 by q43270)'), ('Aldobrandini-Garvagh Madonna', 'artist_variety_cap (>1 by q5597)'), ('An Allegory - Vision of a Knight', 'artist_variety_cap (>1 by q5597)'), ('An Allegory of Prudence', 'artist_variety_cap (>1 by q47551)'), ('An Allegory of Venus and Cupid and A Triumph of Venus', 'artist_variety_cap (>1 by q7803)'), ('An Autumn Landscape with a View of Het Steen in the Early Morning', 'artist_variety_cap (>1 by q5599)'), ("An Old Woman ('The Ugly Duchess')", 'artist_variety_cap (>1 by metsys)'), ('Ariosto', 'artist_variety_cap (>1 by q47551)'), ('Bacchus and Ariadne (Titian)', 'artist_variety_cap (>1 by q47551)'), ('Bathers at Asni?res', 'artist_variety_cap (>1 by q34013)'), ('Bañistas en Asnieres', 'artist_variety_cap (>1 by q34013)'), ('Christ Mocked (The Crowning with Thorns)', 'artist_variety_cap (>1 by q130531)'), ('Crocifissione Gavari', 'artist_variety_cap (>1 by q5597)'), ('Diana and Actaeon (Titian)', 'artist_variety_cap (>1 by q47551)'), ("Jean de Dinteville and Georges de Selve ('The Ambassadors')", 'artist_variety_cap (>1 by q48319)'), ('Judgment of Paris', 'artist_variety_cap (>1 by q5599)'), ('Kitchen Scene with Christ in the House of Martha and Mary', 'artist_variety_cap (>1 by q297)'), ('Lady Seated at a Virginal', 'artist_variety_cap (>1 by q41264)'), ('Landscape: Noon', 'artist_variety_cap (>1 by q159297)'), ('Madonna of the Meadow', 'artist_variety_cap (>1 by q17169)'), ('Marriage à-la-mode\xa0(series of six)', 'artist_variety_cap (>1 by q171344)'), ('Miss LaLa en el Cirque Fernando', 'artist_variety_cap (>1 by q46373)'), ('Music in the Tuileries Gardens', 'artist_variety_cap (>1 by q40599)'), ('Noli me tangere (Titian)', 'artist_variety_cap (>1 by q47551)'), ('or The Rise of the Carthaginian Empire', 'artist_variety_cap (>1 by q159758)'), ('Penitent Jerome', 'artist_variety_cap (>1 by q5580)'), ('Philip IV of Spain in Brown and Silver', 'artist_variety_cap (>1 by q297)'), ("Portrait of a Lady ('La Schiavona')", 'artist_variety_cap (>1 by q47551)'), ("Portrait of a Man ('Léal Souvenir')", 'artist_variety_cap (>1 by q102272)'), ('Portrait of a Man in a Red Turban', 'artist_variety_cap (>1 by q102272)'), ('Portrait of a Man in a Turban', 'artist_variety_cap (>1 by q102272)'), ('Portrait of a Woman inspired by Lucretia', 'artist_variety_cap (>1 by q310973)'), ('Portrait of Girolamo (?) Barbarigo', 'artist_variety_cap (>1 by q47551)'), ("Portrait of Susanna Lunden(?) ('Le Chapeau de Paille')", 'artist_variety_cap (>1 by q5599)'), ('Portrait of the Doge Leonardo Loredan', 'artist_variety_cap (>1 by q17169)'), ("Richard II presented to the Virgin and Child by his Patron Saint John the Baptist and Saints Edward and Edmund ('The Wilton Diptych')", 'artist_variety_cap (>1 by ffbef093f41550ffa45b30c5b91a3156)'), ('Saint George Killing the Dragon', 'artist_variety_cap (>1 by q9319)'), ('Saint Jerome in the Wilderness', 'artist_variety_cap (>1 by q5580)'), ('Saints and Angels (The Mond Crucifixion)', 'artist_variety_cap (>1 by q5597)'), ('Salome receives the Head of John the Baptist', 'artist_variety_cap (>1 by q42207)'), ("Samson Asleep in Delilah's Lap", 'artist_variety_cap (>1 by d4b4117da05a2b47b8d8581dd75900f1)'), ('St. Jerome in His Study', 'artist_variety_cap (>1 by q5594)'), ('Strayed Sheep', 'artist_variety_cap (>1 by q211763)'), ('Surprised!', 'artist_variety_cap (>1 by q156386)'), ('The Aldobrandini Madonna', 'artist_variety_cap (>1 by q5597)'), ('The Arnolfini Double Portrait', 'artist_variety_cap (>1 by q102272)'), ('The Arnolfini Marriage', 'artist_variety_cap (>1 by q102272)'), ('The Arnolfini Portrait (Portrait of Giovanni Arnolfini (?) and his Wife)', 'artist_variety_cap (>1 by q102272)'), ('The Arnolfini Wedding', 'artist_variety_cap (>1 by q102272)'), ('The Carpenter Shop', 'artist_variety_cap (>1 by q159606)'), ('The Crucified Christ with the Virgin Mary', 'artist_variety_cap (>1 by q5597)'), ('The Entombment (or Christ being carried to his Tomb)', 'artist_variety_cap (>1 by q5592)'), ('The Fighting Temeraire tugged to her last berth to be broken up', 'artist_variety_cap (>1 by q159758)'), ('The Haywain', 'artist_variety_cap (>1 by q159297)'), ('the Honey Thief', 'artist_variety_cap (>1 by q191748)'), ("The Madonna and Child with Saint John the Baptist and Saint Nicholas of Bari ('The Ansidei Madonna')", 'artist_variety_cap (>1 by q5597)'), ('The Madonna and Child with Saints John the Baptist and Jerome', 'artist_variety_cap (>1 by q9348)'), ('The Madonna and Child with St John and Angels', 'artist_variety_cap (>1 by q5592)'), ('The Madonna and Child with the Infant Baptist (The Garvagh Madonna)', 'artist_variety_cap (>1 by q5597)'), ("The Madonna of the Pinks ('La Madonna dei Garofani')", 'artist_variety_cap (>1 by q5597)'), ('The Martyrdom of Saint Sebastian', 'artist_variety_cap (>1 by q707046)'), ('The Martyrdom of St. Sebastian', 'artist_variety_cap (>1 by q707046)'), ('The Nativity at Night', 'artist_variety_cap (>1 by q360888)'), ('The Portrait of Caterina Cornaro', 'artist_variety_cap (>1 by q47551)'), ('The Stonemason’s Yard (Venice: Campo Santa Vidal and Santa Maria Della Carita)', 'artist_variety_cap (>1 by q182664)'), ('The Supper at Emmaus', 'artist_variety_cap (>1 by q42207)'), ("The Toilet of Venus ('The Rokeby Venus')", 'artist_variety_cap (>1 by q297)'), ("The Virgin and Child with Saint Anne and the Infant Saint John the Baptist ('The Burlington House Cartoon')", 'artist_variety_cap (>1 by q762)'), ("The Virgin and Child with Saint John and Angels ('The Manchester Madonna')", 'artist_variety_cap (>1 by q5592)'), ('The Virgin and Child with St. Anne and St. John the Baptist', 'artist_variety_cap (>1 by q762)'), ('Timotheus', 'artist_variety_cap (>1 by q102272)'), ("Venice: Campo S. Vidal and Santa Maria della Carit? ('The Stonemason's Yard')", 'artist_variety_cap (>1 by q182664)'), ("Vincent's Chair with His Pipe", 'artist_variety_cap (>1 by q5582)'), ('Young Man holding a Skull (Vanitas)', 'artist_variety_cap (>1 by q167654)')]
+  [LOCAL-629] candidate works AFTER guards (69): ['Arnolfini Portrait', 'The Ambassadors', 'Ophelia', 'Rokeby Venus', 'The Hay Wain', 'Supper at Emmaus', 'Venus and Mars', 'An Experiment on a Bird in the Air Pump', "Belshazzar's Feast", 'Rain, Steam and Speed – The Great Western Railway', 'Music in the Tuileries', 'Venus, Cupid, Folly and Time', 'The Dream of a Knight', 'The Umbrellas', 'Bathers at Asnières', 'Mr and Mrs Andrews', 'Diana and Actaeon', 'Carnation, Lily, Lily and Rose', 'The Entombment', 'The Lady of Shalott', 'A Young Woman Standing at a Virginal', "Van Gogh's Chair", 'Madame Moitessier', 'Samson and Delilah', 'The Baptism of Christ', 'The Execution of Lady Jane Grey', 'Tiger in a Tropical Storm', 'The Adoration of the Kings', 'Beata Beatrix', 'The Virgin and Child with Saint Anne and Saint John the Baptist', 'Saint Jerome in His Study', 'The Annunciation, with Saint Emidius', 'The Magdalen Reading', 'Hope', 'Madonna del Prato', 'Portrait of a young man with a skull', 'Portrait of Doña Isabel de Porcel', 'The Judgement of Paris', 'The Origin of the Milky Way', 'The Ugly Duchess', 'Wilton Diptych', 'Marriage à-la-mode', 'The Adoration of the Golden Calf', 'Tobias and the Angel', 'Agony in the Garden', 'April Love', 'Christ Crowned with Thorns', 'Miss La La at the Cirque Fernando', 'Our English Coasts', 'The Age of Innocence', 'The Death of Procris', 'The Lament for Icarus', "The Stonemason's Yard", 'Cupid Complaining to Venus', 'King Cophetua and the Beggar Maid', 'Portrait of a Woman', 'St. Jerome in the Wilderness', 'The Vision of Saint Eustace', 'Whistlejacket', 'Christ before the High Priest', 'Martyrdom of Saint Sebastian', 'Saint Margaret of Antioch', 'Symphony in White, No. 2: The Little White Girl', 'The Bath of Psyche', 'The Courtyard of a House in Delft', 'The Vision of Saint Jerome', 'Nativity at Night', 'The Conversion of Mary Magdalene', "Venus with Mercury and Cupid ('The School of Love')"]
+  [LOCAL-30] DETERMINISTIC BYPASS: 6 documented works → Phase 3A SKIPPED
+   Stops proposed (deterministic, no GPT):
+     - Arnolfini Portrait [sparql]
+     - The Ambassadors [sparql]
+     - Ophelia [sparql]
+  [venue_resolver] Name variants: ['The National Gallery']
+  [venue_resolver] Candidates for variant 'The National Gallery': ['Q180788', 'Q46810531', 'Q104471917', 'Q18686576', 'Q26506403', 'Q99925496', 'Q110157648', 'Q64583955']
+  [venue_resolver] SPARQL: 120 works found for Q180788
+  [venue_resolver] SPARQL: 8 works found for Q46810531
+  [venue_resolver] #3 collection dominates (120 vs 8) — collapsing to Q180788 (National Gallery)
+  [venue_resolver] Resolved: 'The National Gallery' → Q180788 (National Gallery)
+    URL: https://www.nationalgallery.org.uk
+    Coords: 51.50888888888889, -0.12833333333333333
+    Language: en
+  [venue_cache] HIT for Q180788 (tier=rich, expires=2026-11-07 19:37:58.809194)
+  [venue_resolver] SPARQL: 120 works found for Q180788
+  [LOCAL-30] Deterministic selection: 120 documented works (0 catalogue, 120 SPARQL; 103 site/cache canonical title(s) are NOT documented)
+  [LOCAL-328] Quality score map: 14 objects scored (source-weighted, sludge excluded)
+  [LOCAL-629] candidate works BEFORE artworks-only (223): ['Ophelia', 'The Hay Wain', 'Arnolfini Portrait', 'The Ambassadors', 'Rokeby Venus', 'Supper at Emmaus', 'Venus and Mars', 'An Experiment on a Bird in the Air Pump', "Belshazzar's Feast", 'Rain, Steam and Speed – The Great Western Railway', 'Music in the Tuileries', 'Venus, Cupid, Folly and Time', 'The Dream of a Knight', 'The Fighting Temeraire', 'Boy Bitten by a Lizard', 'The Umbrellas', 'Bathers at Asnières', 'Mr and Mrs Andrews', 'Diana and Actaeon', 'Allegory of Prudence', 'Carnation, Lily, Lily and Rose', 'The Entombment', 'The Lady of Shalott', 'Bacchus and Ariadne', 'Madonna of the Pinks', 'A Young Woman Standing at a Virginal', 'Christ in the House of His Parents', "Van Gogh's Chair", 'Madame Moitessier', 'Samson and Delilah', 'Mond Crucifixion', 'A Young Woman seated at a Virginal', 'The Baptism of Christ', 'The Execution of Lady Jane Grey', 'Tiger in a Tropical Storm', 'Ansidei Madonna', 'The Adoration of the Kings', 'Beata Beatrix', 'Portrait of a Man (Self      Portrait?)', 'The Virgin and Child with Saint Anne and Saint John the Baptist', 'Léal Souvenir', 'Saint Jerome in His Study', 'The Annunciation, with Saint Emidius', 'The Magdalen Reading', 'The Mystical Nativity', 'Hope', 'Saint Catherine of Alexandria', 'Dido building Carthage', 'Garvagh Madonna', 'La Schiavona', 'Madonna del Prato', 'Portrait of a young man with a skull', 'Portrait of Doña Isabel de Porcel', 'Saint Eulalia', 'Self-Portrait at the Age of 34', 'The Judgement of Paris', 'The Origin of the Milky Way', 'The Ugly Duchess', 'Wilton Diptych', 'Diana and Callisto', 'Christ in the House of Martha and Mary', 'Manchester Madonna', 'Marriage à-la-mode', 'Noli me tangere', 'Portrait of Doge Leonardo Loredan', 'The Adoration of the Golden Calf', 'Tobias and the Angel', 'Agony in the Garden', 'April Love', 'Christ Crowned with Thorns', 'Ecce Ancilla Domini', 'Miss La La at the Cirque Fernando', 'Our English Coasts', 'Salome with the Head of John the Baptist', 'The Age of Innocence', 'The Agony in the Garden', 'The Cornfield', 'The Death of Procris', 'The Lament for Icarus', 'The Order of Release', "The Stonemason's Yard", 'The Vale of Rest', 'The Woman Taken in Adultery', 'Two Crabs', 'Portrait of Susanna Lunden', 'Cupid Complaining to Venus', 'Farms near Auvers', 'King Cophetua and the Beggar Maid', 'Portrait of a Woman', 'Portrait of Gerolamo (?) Barbarigo', 'Salisbury Cathedral from the Meadows', 'St. Jerome in the Wilderness', 'The Nativity', 'The Vision of Saint Eustace', 'Whistlejacket', 'A View of Het Steen in the Early Morning', 'A Woman Bathing in a Stream (Hendrickje Stoffels?)', 'Christ before the High Priest', 'Christina of Denmark, Duchess of Milan', 'Martyrdom of Saint Sebastian', 'Philip IV in Brown and Silver', 'Saint George and the Dragon', 'Saint Margaret of Antioch', 'Self-Portrait at the Age of 63', 'Symphony in White, No. 2: The Little White Girl', 'The Bath of Psyche', 'The Beloved', 'The Courtyard of a House in Delft', 'The Death of Actaeon', 'The Girlhood of Mary Virgin', 'The Graham Children', 'The Magic Circle', 'The Vision of Saint Jerome', 'Apollo and Daphne', 'Nativity at Night', 'The Bewitched Man', 'The Conversion of Mary Magdalene', 'The Family of Darius Before Alexander', 'The Golden Stairs', "Venus with Mercury and Cupid ('The School of Love')", "The Toilet of Venus ('The Rokeby Venus')", 'The Supper at Emmaus', '1838', 'Alteration and expansion (Pennethorne, Barry and Taylor)', 'An Allegory with Venus and Cupid', 'Artists in residence', 'Early 20th century', 'Explanatory notes', 'Foundation and early history', 'General sources', 'Growth under Eastlake and his successors', "Hampton's site", 'Laure Gargallo', 'My National Gallery', 'Open Mind', 'Portrait of Christina of Denmark', 'Post-war developments', 'Renovation of the Sainsbury Wing', 'Sainsbury Wing and later additions', 'St Vincent House extension', 'The call for a National Gallery', 'Transport connections', 'West Wing Project', "William Wilkins's building", "'Mystic Nativity'", '1852', 'A Grotesque Old Woman', 'A Man with a Quilted Sleeve', 'A Satyr mourning over a Nymph', "A Scene from El Hechizado por Fuerza ('The Forcibly Bewitched')", 'Adoration of the magi', 'Aldobrandini-Garvagh Madonna', 'An Allegory - Vision of a Knight', 'An Allegory of Prudence', 'An Allegory of Venus and Cupid and A Triumph of Venus', 'An Autumn Landscape with a View of Het Steen in the Early Morning', "An Old Woman ('The Ugly Duchess')", 'Ariosto', 'Bacchus and Ariadne (Titian)', 'Bathers at Asni?res', 'Bañistas en Asnieres', 'Christ Mocked (The Crowning with Thorns)', 'Crocifissione Gavari', 'Diana and Actaeon (Titian)', "Jean de Dinteville and Georges de Selve ('The Ambassadors')", 'Judgment of Paris', 'Kitchen Scene with Christ in the House of Martha and Mary', 'Lady Seated at a Virginal', 'Landscape: Noon', 'Madonna of the Meadow', 'Marriage à-la-mode\xa0(series of six)', 'Miss LaLa en el Cirque Fernando', 'Music in the Tuileries Gardens', 'Nocturne: Blue and Gold - Old Battersea Bridge', 'Noli me tangere (Titian)', 'or The Rise of the Carthaginian Empire', 'Penitent Jerome', 'Philip IV of Spain in Brown and Silver', "Portrait of a Lady ('La Schiavona')", "Portrait of a Man ('Léal Souvenir')", 'Portrait of a Man in a Red Turban', 'Portrait of a Man in a Turban', 'Portrait of a Woman inspired by Lucretia', 'Portrait of Girolamo (?) Barbarigo', "Portrait of Susanna Lunden(?) ('Le Chapeau de Paille')", 'Portrait of the Doge Leonardo Loredan', "Richard II presented to the Virgin and Child by his Patron Saint John the Baptist and Saints Edward and Edmund ('The Wilton Diptych')", 'Saint George Killing the Dragon', 'Saint Jerome in the Wilderness', 'Saints and Angels (The Mond Crucifixion)', 'Salome receives the Head of John the Baptist', "Samson Asleep in Delilah's Lap", 'St. Jerome in His Study', 'Strayed Sheep', 'Surprised!', 'The Aldobrandini Madonna', 'The Arnolfini Double Portrait', 'The Arnolfini Marriage', 'The Arnolfini Portrait (Portrait of Giovanni Arnolfini (?) and his Wife)', 'The Arnolfini Wedding', 'The Carpenter Shop', 'The Crucified Christ with the Virgin Mary', 'The Entombment (or Christ being carried to his Tomb)', 'The Fighting Temeraire tugged to her last berth to be broken up', 'The Haywain', 'the Honey Thief', "The Madonna and Child with Saint John the Baptist and Saint Nicholas of Bari ('The Ansidei Madonna')", 'The Madonna and Child with Saints John the Baptist and Jerome', 'The Madonna and Child with St John and Angels', 'The Madonna and Child with the Infant Baptist (The Garvagh Madonna)', "The Madonna of the Pinks ('La Madonna dei Garofani')", 'The Martyrdom of Saint Sebastian', 'The Martyrdom of St. Sebastian', 'The Nativity at Night', 'The Portrait of Caterina Cornaro', 'The Stonemason’s Yard (Venice: Campo Santa Vidal and Santa Maria Della Carita)', "The Virgin and Child with Saint Anne and the Infant Saint John the Baptist ('The Burlington House Cartoon')", "The Virgin and Child with Saint John and Angels ('The Manchester Madonna')", 'The Virgin and Child with St. Anne and St. John the Baptist', 'Timotheus', "Venice: Campo S. Vidal and Santa Maria della Carit? ('The Stonemason's Yard')", "Vincent's Chair with His Pipe", 'Young Man holding a Skull (Vanitas)']
+  [LOCAL-629] [LOCAL-630 item 1] collection-membership dropped 20: [('Alteration and expansion (Pennethorne, Barry and Taylor)', 'not_in_collection (no P195/P276=The National Gallery match and not site-listed)'), ('Artists in residence', 'not_in_collection (no P195/P276=The National Gallery match and not site-listed)'), ('Early 20th century', 'not_in_collection (no P195/P276=The National Gallery match and not site-listed)'), ('Explanatory notes', 'not_in_collection (no P195/P276=The National Gallery match and not site-listed)'), ('Foundation and early history', 'not_in_collection (no P195/P276=The National Gallery match and not site-listed)'), ('General sources', 'not_in_collection (no P195/P276=The National Gallery match and not site-listed)'), ('Growth under Eastlake and his successors', 'not_in_collection (no P195/P276=The National Gallery match and not site-listed)'), ("Hampton's site", 'not_in_collection (no P195/P276=The National Gallery match and not site-listed)'), ('Laure Gargallo', 'not_in_collection (no P195/P276=The National Gallery match and not site-listed)'), ('My National Gallery', 'not_in_collection (no P195/P276=The National Gallery match and not site-listed)'), ('Open Mind', 'not_in_collection (no P195/P276=The National Gallery match and not site-listed)'), ('Post-war developments', 'not_in_collection (no P195/P276=The National Gallery match and not site-listed)'), ('Renovation of the Sainsbury Wing', 'not_in_collection (no P195/P276=The National Gallery match and not site-listed)'), ('Sainsbury Wing and later additions', 'not_in_collection (no P195/P276=The National Gallery match and not site-listed)'), ('St Vincent House extension', 'not_in_collection (no P195/P276=The National Gallery match and not site-listed)'), ('The call for a National Gallery', 'not_in_collection (no P195/P276=The National Gallery match and not site-listed)'), ('Transport connections', 'not_in_collection (no P195/P276=The National Gallery match and not site-listed)'), ('West Wing Project', 'not_in_collection (no P195/P276=The National Gallery match and not site-listed)'), ("William Wilkins's building", 'not_in_collection (no P195/P276=The National Gallery match and not site-listed)'), ('Nocturne: Blue and Gold - Old Battersea Bridge', 'not_in_collection (no P195/P276=The National Gallery match and not site-listed)')]
+  [LOCAL-629] artist-variety capped 134: [('The Fighting Temeraire', 'artist_variety_cap (>1 by q159758)'), ('Boy Bitten by a Lizard', 'artist_variety_cap (>1 by q42207)'), ('Allegory of Prudence', 'artist_variety_cap (>1 by q47551)'), ('Bacchus and Ariadne', 'artist_variety_cap (>1 by q47551)'), ('Madonna of the Pinks', 'artist_variety_cap (>1 by q5597)'), ('Christ in the House of His Parents', 'artist_variety_cap (>1 by q159606)'), ('Mond Crucifixion', 'artist_variety_cap (>1 by q5597)'), ('A Young Woman seated at a Virginal', 'artist_variety_cap (>1 by q41264)'), ('Ansidei Madonna', 'artist_variety_cap (>1 by q5597)'), ('Portrait of a Man (Self      Portrait?)', 'artist_variety_cap (>1 by q102272)'), ('Léal Souvenir', 'artist_variety_cap (>1 by q102272)'), ('The Mystical Nativity', 'artist_variety_cap (>1 by q5669)'), ('Saint Catherine of Alexandria', 'artist_variety_cap (>1 by q5597)'), ('Dido building Carthage', 'artist_variety_cap (>1 by q159758)'), ('Garvagh Madonna', 'artist_variety_cap (>1 by q5597)'), ('La Schiavona', 'artist_variety_cap (>1 by q47551)'), ('Saint Eulalia', 'artist_variety_cap (>1 by q212754)'), ('Self-Portrait at the Age of 34', 'artist_variety_cap (>1 by q5598)'), ('Diana and Callisto', 'artist_variety_cap (>1 by q47551)'), ('Christ in the House of Martha and Mary', 'artist_variety_cap (>1 by q297)'), ('Manchester Madonna', 'artist_variety_cap (>1 by q5592)'), ('Noli me tangere', 'artist_variety_cap (>1 by q47551)'), ('Portrait of Doge Leonardo Loredan', 'artist_variety_cap (>1 by q17169)'), ('Ecce Ancilla Domini', 'artist_variety_cap (>1 by q186748)'), ('Salome with the Head of John the Baptist', 'artist_variety_cap (>1 by q42207)'), ('The Agony in the Garden', 'artist_variety_cap (>1 by q5681)'), ('The Cornfield', 'artist_variety_cap (>1 by q159297)'), ('The Order of Release', 'artist_variety_cap (>1 by q159606)'), ('The Vale of Rest', 'artist_variety_cap (>1 by q159606)'), ('The Woman Taken in Adultery', 'artist_variety_cap (>1 by q5598)'), ('Two Crabs', 'artist_variety_cap (>1 by q5582)'), ('Portrait of Susanna Lunden', 'artist_variety_cap (>1 by q5599)'), ('Farms near Auvers', 'artist_variety_cap (>1 by q5582)'), ('Portrait of Gerolamo (?) Barbarigo', 'artist_variety_cap (>1 by q47551)'), ('Salisbury Cathedral from the Meadows', 'artist_variety_cap (>1 by q159297)'), ('The Nativity', 'artist_variety_cap (>1 by q5822)'), ('A View of Het Steen in the Early Morning', 'artist_variety_cap (>1 by q5599)'), ('A Woman Bathing in a Stream (Hendrickje Stoffels?)', 'artist_variety_cap (>1 by q5598)'), ('Christina of Denmark, Duchess of Milan', 'artist_variety_cap (>1 by q48319)'), ('Philip IV in Brown and Silver', 'artist_variety_cap (>1 by q297)'), ('Saint George and the Dragon', 'artist_variety_cap (>1 by q9319)'), ('Self-Portrait at the Age of 63', 'artist_variety_cap (>1 by q5598)'), ('The Beloved', 'artist_variety_cap (>1 by q186748)'), ('The Death of Actaeon', 'artist_variety_cap (>1 by q47551)'), ('The Girlhood of Mary Virgin', 'artist_variety_cap (>1 by q186748)'), ('The Graham Children', 'artist_variety_cap (>1 by q171344)'), ('The Magic Circle', 'artist_variety_cap (>1 by q212754)'), ('Apollo and Daphne', 'artist_variety_cap (>1 by q707046)'), ('The Bewitched Man', 'artist_variety_cap (>1 by q5432)'), ('The Family of Darius Before Alexander', 'artist_variety_cap (>1 by q9440)'), ('The Golden Stairs', 'artist_variety_cap (>1 by q216406)'), ("The Toilet of Venus ('The Rokeby Venus')", 'artist_variety_cap (>1 by q297)'), ('The Supper at Emmaus', 'artist_variety_cap (>1 by q42207)'), ('1838', 'artist_variety_cap (>1 by q159758)'), ('An Allegory with Venus and Cupid', 'artist_variety_cap (>1 by q7803)'), ('Portrait of Christina of Denmark', 'artist_variety_cap (>1 by q48319)'), ("'Mystic Nativity'", 'artist_variety_cap (>1 by q5669)'), ('1852', 'artist_variety_cap (>1 by q211763)'), ('A Grotesque Old Woman', 'artist_variety_cap (>1 by metsys)'), ('A Man with a Quilted Sleeve', 'artist_variety_cap (>1 by q47551)'), ('A Satyr mourning over a Nymph', 'artist_variety_cap (>1 by q280851)'), ("A Scene from El Hechizado por Fuerza ('The Forcibly Bewitched')", 'artist_variety_cap (>1 by q5432)'), ('Adoration of the magi', 'artist_variety_cap (>1 by q43270)'), ('Aldobrandini-Garvagh Madonna', 'artist_variety_cap (>1 by q5597)'), ('An Allegory - Vision of a Knight', 'artist_variety_cap (>1 by q5597)'), ('An Allegory of Prudence', 'artist_variety_cap (>1 by q47551)'), ('An Allegory of Venus and Cupid and A Triumph of Venus', 'artist_variety_cap (>1 by q7803)'), ('An Autumn Landscape with a View of Het Steen in the Early Morning', 'artist_variety_cap (>1 by q5599)'), ("An Old Woman ('The Ugly Duchess')", 'artist_variety_cap (>1 by metsys)'), ('Ariosto', 'artist_variety_cap (>1 by q47551)'), ('Bacchus and Ariadne (Titian)', 'artist_variety_cap (>1 by q47551)'), ('Bathers at Asni?res', 'artist_variety_cap (>1 by q34013)'), ('Bañistas en Asnieres', 'artist_variety_cap (>1 by q34013)'), ('Christ Mocked (The Crowning with Thorns)', 'artist_variety_cap (>1 by q130531)'), ('Crocifissione Gavari', 'artist_variety_cap (>1 by q5597)'), ('Diana and Actaeon (Titian)', 'artist_variety_cap (>1 by q47551)'), ("Jean de Dinteville and Georges de Selve ('The Ambassadors')", 'artist_variety_cap (>1 by q48319)'), ('Judgment of Paris', 'artist_variety_cap (>1 by q5599)'), ('Kitchen Scene with Christ in the House of Martha and Mary', 'artist_variety_cap (>1 by q297)'), ('Lady Seated at a Virginal', 'artist_variety_cap (>1 by q41264)'), ('Landscape: Noon', 'artist_variety_cap (>1 by q159297)'), ('Madonna of the Meadow', 'artist_variety_cap (>1 by q17169)'), ('Marriage à-la-mode\xa0(series of six)', 'artist_variety_cap (>1 by q171344)'), ('Miss LaLa en el Cirque Fernando', 'artist_variety_cap (>1 by q46373)'), ('Music in the Tuileries Gardens', 'artist_variety_cap (>1 by q40599)'), ('Noli me tangere (Titian)', 'artist_variety_cap (>1 by q47551)'), ('or The Rise of the Carthaginian Empire', 'artist_variety_cap (>1 by q159758)'), ('Penitent Jerome', 'artist_variety_cap (>1 by q5580)'), ('Philip IV of Spain in Brown and Silver', 'artist_variety_cap (>1 by q297)'), ("Portrait of a Lady ('La Schiavona')", 'artist_variety_cap (>1 by q47551)'), ("Portrait of a Man ('Léal Souvenir')", 'artist_variety_cap (>1 by q102272)'), ('Portrait of a Man in a Red Turban', 'artist_variety_cap (>1 by q102272)'), ('Portrait of a Man in a Turban', 'artist_variety_cap (>1 by q102272)'), ('Portrait of a Woman inspired by Lucretia', 'artist_variety_cap (>1 by q310973)'), ('Portrait of Girolamo (?) Barbarigo', 'artist_variety_cap (>1 by q47551)'), ("Portrait of Susanna Lunden(?) ('Le Chapeau de Paille')", 'artist_variety_cap (>1 by q5599)'), ('Portrait of the Doge Leonardo Loredan', 'artist_variety_cap (>1 by q17169)'), ("Richard II presented to the Virgin and Child by his Patron Saint John the Baptist and Saints Edward and Edmund ('The Wilton Diptych')", 'artist_variety_cap (>1 by ffbef093f41550ffa45b30c5b91a3156)'), ('Saint George Killing the Dragon', 'artist_variety_cap (>1 by q9319)'), ('Saint Jerome in the Wilderness', 'artist_variety_cap (>1 by q5580)'), ('Saints and Angels (The Mond Crucifixion)', 'artist_variety_cap (>1 by q5597)'), ('Salome receives the Head of John the Baptist', 'artist_variety_cap (>1 by q42207)'), ("Samson Asleep in Delilah's Lap", 'artist_variety_cap (>1 by d4b4117da05a2b47b8d8581dd75900f1)'), ('St. Jerome in His Study', 'artist_variety_cap (>1 by q5594)'), ('Strayed Sheep', 'artist_variety_cap (>1 by q211763)'), ('Surprised!', 'artist_variety_cap (>1 by q156386)'), ('The Aldobrandini Madonna', 'artist_variety_cap (>1 by q5597)'), ('The Arnolfini Double Portrait', 'artist_variety_cap (>1 by q102272)'), ('The Arnolfini Marriage', 'artist_variety_cap (>1 by q102272)'), ('The Arnolfini Portrait (Portrait of Giovanni Arnolfini (?) and his Wife)', 'artist_variety_cap (>1 by q102272)'), ('The Arnolfini Wedding', 'artist_variety_cap (>1 by q102272)'), ('The Carpenter Shop', 'artist_variety_cap (>1 by q159606)'), ('The Crucified Christ with the Virgin Mary', 'artist_variety_cap (>1 by q5597)'), ('The Entombment (or Christ being carried to his Tomb)', 'artist_variety_cap (>1 by q5592)'), ('The Fighting Temeraire tugged to her last berth to be broken up', 'artist_variety_cap (>1 by q159758)'), ('The Haywain', 'artist_variety_cap (>1 by q159297)'), ('the Honey Thief', 'artist_variety_cap (>1 by q191748)'), ("The Madonna and Child with Saint John the Baptist and Saint Nicholas of Bari ('The Ansidei Madonna')", 'artist_variety_cap (>1 by q5597)'), ('The Madonna and Child with Saints John the Baptist and Jerome', 'artist_variety_cap (>1 by q9348)'), ('The Madonna and Child with St John and Angels', 'artist_variety_cap (>1 by q5592)'), ('The Madonna and Child with the Infant Baptist (The Garvagh Madonna)', 'artist_variety_cap (>1 by q5597)'), ("The Madonna of the Pinks ('La Madonna dei Garofani')", 'artist_variety_cap (>1 by q5597)'), ('The Martyrdom of Saint Sebastian', 'artist_variety_cap (>1 by q707046)'), ('The Martyrdom of St. Sebastian', 'artist_variety_cap (>1 by q707046)'), ('The Nativity at Night', 'artist_variety_cap (>1 by q360888)'), ('The Portrait of Caterina Cornaro', 'artist_variety_cap (>1 by q47551)'), ('The Stonemason’s Yard (Venice: Campo Santa Vidal and Santa Maria Della Carita)', 'artist_variety_cap (>1 by q182664)'), ("The Virgin and Child with Saint Anne and the Infant Saint John the Baptist ('The Burlington House Cartoon')", 'artist_variety_cap (>1 by q762)'), ("The Virgin and Child with Saint John and Angels ('The Manchester Madonna')", 'artist_variety_cap (>1 by q5592)'), ('The Virgin and Child with St. Anne and St. John the Baptist', 'artist_variety_cap (>1 by q762)'), ('Timotheus', 'artist_variety_cap (>1 by q102272)'), ("Venice: Campo S. Vidal and Santa Maria della Carit? ('The Stonemason's Yard')", 'artist_variety_cap (>1 by q182664)'), ("Vincent's Chair with His Pipe", 'artist_variety_cap (>1 by q5582)'), ('Young Man holding a Skull (Vanitas)', 'artist_variety_cap (>1 by q167654)')][LOCAL-197] llm_cost() called with total_tokens (deprecated) by /app/generate_tour_text.py:12783. Caller should supply input_tokens and output_tokens separately.
+[LOCAL-197] llm_cost() called with total_tokens (deprecated) by /app/generate_tour_text.py:12784. Caller should supply input_tokens and output_tokens separately.
+[OSM-VENUE] Overpass ConnectionError for "The Toilet of Venus ('The Rokeby Venus')" (attempt 1/2)
+[OSM-VENUE] Overpass ConnectionError for "The Toilet of Venus ('The Rokeby Venus')" (attempt 2/2)
+[OSM-VENUE] Overpass ConnectionError for 'Ophelia' (attempt 1/2)
+[OSM-VENUE] Overpass ConnectionError for 'Ophelia' (attempt 2/2)
+[OSM-VENUE] Overpass ConnectionError for 'The Supper at Emmaus' (attempt 1/2)
+[OSM-VENUE] Overpass ConnectionError for 'The Supper at Emmaus' (attempt 2/2)
+
+  [LOCAL-629] candidate works AFTER guards (69): ['Ophelia', 'The Hay Wain', 'Arnolfini Portrait', 'The Ambassadors', 'Rokeby Venus', 'Supper at Emmaus', 'Venus and Mars', 'An Experiment on a Bird in the Air Pump', "Belshazzar's Feast", 'Rain, Steam and Speed – The Great Western Railway', 'Music in the Tuileries', 'Venus, Cupid, Folly and Time', 'The Dream of a Knight', 'The Umbrellas', 'Bathers at Asnières', 'Mr and Mrs Andrews', 'Diana and Actaeon', 'Carnation, Lily, Lily and Rose', 'The Entombment', 'The Lady of Shalott', 'A Young Woman Standing at a Virginal', "Van Gogh's Chair", 'Madame Moitessier', 'Samson and Delilah', 'The Baptism of Christ', 'The Execution of Lady Jane Grey', 'Tiger in a Tropical Storm', 'The Adoration of the Kings', 'Beata Beatrix', 'The Virgin and Child with Saint Anne and Saint John the Baptist', 'Saint Jerome in His Study', 'The Annunciation, with Saint Emidius', 'The Magdalen Reading', 'Hope', 'Madonna del Prato', 'Portrait of a young man with a skull', 'Portrait of Doña Isabel de Porcel', 'The Judgement of Paris', 'The Origin of the Milky Way', 'The Ugly Duchess', 'Wilton Diptych', 'Marriage à-la-mode', 'The Adoration of the Golden Calf', 'Tobias and the Angel', 'Agony in the Garden', 'April Love', 'Christ Crowned with Thorns', 'Miss La La at the Cirque Fernando', 'Our English Coasts', 'The Age of Innocence', 'The Death of Procris', 'The Lament for Icarus', "The Stonemason's Yard", 'Cupid Complaining to Venus', 'King Cophetua and the Beggar Maid', 'Portrait of a Woman', 'St. Jerome in the Wilderness', 'The Vision of Saint Eustace', 'Whistlejacket', 'Christ before the High Priest', 'Martyrdom of Saint Sebastian', 'Saint Margaret of Antioch', 'Symphony in White, No. 2: The Little White Girl', 'The Bath of Psyche', 'The Courtyard of a House in Delft', 'The Vision of Saint Jerome', 'Nativity at Night', 'The Conversion of Mary Magdalene', "Venus with Mercury and Cupid ('The School of Love')"]
+  [LOCAL-30] DETERMINISTIC BYPASS: 6 documented works → Phase 3A SKIPPED
+   Stops proposed (deterministic, quality-score ranked):
+     - Ophelia [sparql] (quality=5.0)
+     - The Hay Wain [sparql] (quality=4.0)
+     - Arnolfini Portrait [sparql] (quality=0.0)
+  [R4] Museum tour: asking for 6 candidates (2x for D1v2 filtering)
+
+PHASE 3A: SKIPPED (deterministic fill from 6 documented works)
+OK PHASE 3A parsed 6 candidate POI(s):
+   - Ophelia
+   - The Hay Wain
+   - Arnolfini Portrait
+   - The Ambassadors
+   - Rokeby Venus
+   - Supper at Emmaus
+  [venue_resolver] Name variants: ['The National Gallery']
+  [venue_resolver] Candidates for variant 'The National Gallery': ['Q180788', 'Q46810531', 'Q104471917', 'Q18686576', 'Q26506403', 'Q99925496', 'Q110157648', 'Q64583955']
+  [venue_resolver] SPARQL: 120 works found for Q180788
+  [venue_resolver] SPARQL: 8 works found for Q46810531
+  [venue_resolver] #3 collection dominates (120 vs 8) — collapsing to Q180788 (National Gallery)
+  [venue_resolver] Resolved: 'The National Gallery' → Q180788 (National Gallery)
+    URL: https://www.nationalgallery.org.uk
+    Coords: 51.50888888888889, -0.12833333333333333
+    Language: en
+  [D1v2] Venue resolved: Q180788 → URL=https://www.nationalgallery.org.uk, lang=en
+  [venue_cache] HIT for Q180788 (tier=rich, expires=2026-11-07 19:37:58.809194)
+  [D1v2] Cache HIT: 190 canonical titles (tier=rich), 0 catalogue works, combined_text=787069 chars
+  [LOCAL-34] Will enrich bare title at stop-naming: '1838' → '1838 (1832)'
+  [LOCAL-24] Classification: 190 works, 0 galleries, 0 excluded
+  [D1v2-LOCAL24] After filter: 190 works, 0 galleries, 0 excluded
+  [venue_resolver] Built 238 dynamic aliases from 119 works
+  [D1v2] Injected 238 dynamic aliases
+  [D1v2] Built bilingual map: 84 word pairs
+  [D1v2] artist-check skipped (no valid creator) — no artist_qid on entity
+  [D1v2] VERIFIED 'Ophelia' → canonical: 'Ophelia'
+  [D1v2] VERIFIED 'The Hay Wain' → canonical: 'The Hay Wain'
+  [D1v2] VERIFIED 'Arnolfini Portrait' → canonical: 'The Arnolfini Double Portrait'
+  [D1v2] DROPPED 'The Ambassadors' — no canonical title match
+  [D1v2] VERIFIED 'Rokeby Venus' → canonical: 'The Toilet of Venus ('The Rokeby Venus')'
+  [D1v2] VERIFIED 'Supper at Emmaus' → canonical: 'The Supper at Emmaus'
+  [D1v2] 5/6 works verified — tier: rich
+  [D1] Tier: rich (5 verified works)
+  [R4] Target reached: 5/3 stops
+  [LOCAL-16 GATE] All 5 stops cleared the gate ✓
+
+PHASE 4.5: Validating AI knowledge for The National Gallery, London, UK...
+OK Knowledge validation passed: Knowledge validation passed
+
+PHASE 4: skipped (tour_category='museum', no type-verification required)
+  [LOCAL-212] Coverage selection: 0 COVERED, fallback needed: 3×VENUE_ONLY (not enough covered candidates to fill 3 stops)
+  [LOCAL-212] Selected: ["The Toilet of Venus ('The Rokeby Venus')=VENUE_ONLY", 'Ophelia=VENUE_ONLY', 'The Supper at Emmaus=VENUE_ONLY']
+  [LOCAL-212] Dropped:  ['The Hay Wain=VENUE_ONLY', 'The Arnolfini Double Portrait=VENUE_ONLY']
+  [LOCAL-349] Yield scores (selected): ["The Toilet of Venus ('The Rokeby Venus')=7.0", 'Ophelia=5.0', 'The Supper at Emmaus=5.0']
+  [LOCAL-349] Yield scores (dropped):  ['The Hay Wain=4.0', 'The Arnolfini Double Portrait=0.0']
+  [EXISTENCE-GATE] LOG_ONLY — 5/5 stops verified (100%), 0 would be dropped
+    [VERIFIED] "The Toilet of Venus ('The Rokeby Venus')" — venue_corpus canonical_title: "The Toilet of Venus ('The Rokeby Venus')" at 'The
+    [VERIFIED] 'Ophelia' — venue_corpus canonical_title: 'Ophelia' at 'The National Gallery, London, United
+    [VERIFIED] 'The Supper at Emmaus' — venue_corpus canonical_title: 'The Supper at Emmaus' at 'The National Gallery, L
+    [VERIFIED] 'The Hay Wain' — venue_corpus canonical_title: 'The Hay Wain' at 'The National Gallery, London, U
+    [VERIFIED] 'The Arnolfini Double Portrait' — venue_corpus canonical_title: 'The Arnolfini Double Portrait' at 'The National G
+    [HARVEST] 'The Arnolfini Double Portrait': verified_no_detail (name match only, no facts in source)
+    [HARVEST] Summary: 0 harvested, 4 already had corpus, 1 verified_no_detail
+    [INTERPRETIVE] DROPPED attributed quote for "The Toilet of Venus ('The Rokeby Venus')": 'was removed from display at the National Gallery in London this ' — no_primary_source_found_for:was removed from display at the National Gallery in London this 
+    [INTERPRETIVE] 'Ophelia': +1 passages (2 queries)
+    [INTERPRETIVE] 'The Supper at Emmaus': +3 passages (2 queries)
+    [INTERPRETIVE] 'The Hay Wain': +1 passages (2 queries)
+    [INTERPRETIVE] 'The Arnolfini Double Portrait': +2 passages (2 queries)
+    [INTERPRETIVE] Summary: 4 stops enriched, +7 passages, 11 queries issued, 1 attributions dropped
+
+PHASE 3B: Requesting structured details and walking directions for 3 stop(s)...
+
+======================================================================
+CALL #004 | 20:20:35.119 | PHASE_3B_REQUEST
+======================================================================
+  location: The National Gallery, London, UK
+  stop_count: 3
+
+PHASE 3B API call cost: $0.0030 (632 tokens)
+OK PHASE 3B: ordered 3 stop(s) with structured details and directions
+  [LOCAL-27] Corpus-sourced metadata applied to 3 stops
+  [LOCAL-35] Visitor info page found (en): https://www.nationalgallery.org.uk/opening-hours
+  [LOCAL-35] Extracted from https://www.nationalgallery.org.uk/opening-hours: closed=[], hours=0, admission='FREE'
+  [LOCAL-35] Formatted result too short — omitting
+  [LOCAL-584] dropped unsupported practical fact: '£2027' — not supported by source (gate) [https://www.nationalgallery.org.uk]
+  [LOCAL-91] Corpus fallback: visitor info extracted from https://www.nationalgallery.org.uk
+  [LOCAL-91] Corpus fallback Museum Information: Daily, 10 AM–6 PM
+  [LOCAL-39] Museum Information sourced from official site for stop 1
+  [LOCAL-355] Querying OSM for venue facts (city: London, hint: museum)
+  [LOCAL-355] The Toilet of Venus ('The Rokeby Venus'): no practical facts in OSM
+  [LOCAL-355] Ophelia: no practical facts in OSM
+  [LOCAL-355] The Supper at Emmaus: no practical facts in OSM
+  [LOCAL-622] OSM lookup budget: spent=12.5s / limit=120s, skipped=0
+[LOCAL-197] llm_cost() called with total_tokens (deprecated) by /app/generate_tour_text.py:13334. Caller should supply input_tokens and output_tokens separately.
+[LOCAL-197] llm_cost() called with total_tokens (deprecated) by /app/fact_extractor.py:220. Caller should supply input_tokens and output_tokens separately.
+   Coords cluster detected: 3 stops share '51.5089, -0.1283', refetching...
+   Cluster refetch OK 'The Toilet of Venus ('The Rokeby Venus')': 51.5081, -0.1280
+   Cluster refetch OK 'Ophelia': 51.5089, -0.1283
+   Cluster refetch OK 'The Supper at Emmaus': 51.5089, -0.1283
+Extracted first POI coordinates: (51.5081, -0.128)
+  [D4] Museum single-coordinate: all stops set to (51.5081, -0.128) (source: model (fallback))
+
+=== Extracted POI Information ===
+1. The Toilet of Venus ('The Rokeby Venus')
+   Address: The National Gallery, Trafalgar Square, London WC2N 5DN, UK
+   Coordinates: 51.5081, -0.128
+   Directions: From Charing Cross Station, exit onto Strand and head west towards Trafalgar Squ...
+2. Ophelia
+   Address: The National Gallery, Trafalgar Square, London WC2N 5DN, UK
+   Coordinates: 51.5081, -0.128
+   Directions: From The Toilet of Venus, head east through the gallery, passing the information...
+3. The Supper at Emmaus
+   Address: The National Gallery, Trafalgar Square, London WC2N 5DN, UK
+   Coordinates: 51.5081, -0.128
+   Directions: From Ophelia, exit the room and turn left, then walk straight ahead until you re...
+================================
+
+[TIMING] phase=poi_selection elapsed=77.2s cumulative=78.6s
+
+[Storied] STORIED_MODE=true — generating spine + fact sheets...
+  [§3-adapter] Extracting story elements from 5/28 corpus pages for 'The National Gallery'
+    page[0] score=12690 url=https://en.wikipedia.org/wiki/National_Gallery
+    page[1] score=1015 url=https://www.nationalgallery.org.uk/paintings/elisabeth-louise-vigee-le-brun-self
+    page[2] score=830 url=https://www.nationalgallery.org.uk/paintings/picture-of-the-month
+  [§3-adapter] Raw elements: 7 from 1 pages
+  [§3-adapter] After corroboration scoring: 7 elements
+  [§3-adapter] Final: 7 ranked elements (top type: origin)
+  [§3-adapter] Persisted 7 elements → /app/tours/LOCAL630_NATIONAL_GALLERY_story_elements.json
+  [§3] Updated venue_corpus.story_elements_json for Q180788 (7 elements)
+  [LOCAL-37] Three-class retrieval: 3 stops processed, 0 with category
+  [SQ-S6b] Elements per stop: s0=5, s1=5, s2=4
+  [SQ-S6b] Entity clusters found: 10 (≥2 stops)
+    → vigée le brun (people): 3 stops, 6 elements
+    → le brun (people): 3 stops, 3 elements
+    → 18th century (eras): 2 stops, 2 elements
+    → self portrait (people): 2 stops, 1 elements
+    → straw hat (people): 2 stops, 1 elements
+  [SQ-S6b] Theme naming: $0.0138, 1770 tokens
+  [SQ-S6b] LLM named 3 candidate themes
+  [SQ-S6b] Scored themes: 3
+    → 'Vigée Le Brun's Influence and Technique': coverage=1.00, evidence=0.60, distinct=1.00, arc=1.00, TOTAL=0.900
+    → '18th Century Artistic Connections': coverage=1.00, evidence=0.60, distinct=0.80, arc=1.00, TOTAL=0.860
+    → 'Artistic Reception and Reputation': coverage=1.00, evidence=0.60, distinct=0.80, arc=1.00, TOTAL=0.860
+  [SQ-S6b] Blended 3 threads: 'Vigée Le Brun's Influence and Technique'=0.33, '18th Century Artistic Connections'=0.33, 'Artistic Reception and Reputation'=0.33
+  [SQ-S6b] Thread discovery: mode=threaded, threads=3
+    → 'Vigée Le Brun's Influence and Technique': coverage=100%, weight=0.33, elements=['se_001', 'se_002', 'se_003', 'se_006']
+    → '18th Century Artistic Connections': coverage=100%, weight=0.33, elements=['se_001', 'se_003', 'se_007']
+    → 'Artistic Reception and Reputation': coverage=100%, weight=0.33, elements=['se_006', 'se_007']
+  [§3] Story elements injected into spine prompt (7 elements, mode=found)
+  [SQ-S6b] Thread context injected into spine prompt (3 threads)
+SPINE_COST: category=museum venue=The National Gallery model=gpt-4o tokens=2065 (in=1537 out=528) cost=$0.0091 latency=3.9s
+[COST_METER] FRESH | spine_generate | $0.009123 | user=None | job=None
+  [LOCAL-278] Spine cost folded into total: $0.0091
+  [LOCAL-111] Spine quality: 3/4 | {'climax_position': False, 'unique_emotional_beats': True, 'valid_callbacks': True, 'closing_revelation_length': True}
+  [Storied] Spine generated: 3 arc entries (mode=found)
+  [LOCAL-183] stop_corpus: 3/3 stops have per-stop passages (21 total passages)
+  [LOCAL-198] Corpus gate: ENABLED — checking stop coverage...
+  [CORPUS-GATE] stop='The Toilet of Venus ('The Rokeby Venus')' verdict=VENUE_ONLY action=SHORTENED
+  [CORPUS-GATE] stop='Ophelia' verdict=VENUE_ONLY action=SHORTENED
+  [CORPUS-GATE] stop='The Supper at Emmaus' verdict=VENUE_ONLY action=SHORTENED
+  [LOCAL-198] Corpus gate: 0 PASSED, 0 CREATOR_ONLY, 0 EMPTY, 3 SHORTENED
+  [Storied] Fact sheets: 3/3 generated
+  [S25] Story types assigned: ['art', 'history', 'anecdote']
+  [work_stories] MISS for the toilet of venus the rokeby venus
+  [work_stories] MISS for ophelia
+  [work_stories] MISS for the supper at emmaus
+  [LOCAL-37] Tour diversity: no swaps needed (naturally balanced)
+  [LOCAL-188] Style constraints ACTIVE (declarative prose rules injected)
+[TIMING] phase=fact_sheets elapsed=23.4s cumulative=102.0s
+
+PHASE 5: Generating detailed descriptions for each POI (parallel)...
+
+  [LOCAL-382] framing=venue_purpose source='dedicated to bringing renewed attention to composers whose careers were disrupte'
+[TIMING] phase=narration elapsed=0.0s cumulative=102.0s
+  [D495] venue domain seeded tier1: nationalgallery.org.uk
+
+  [LOCAL-410] SERP search wiring — searching for stories on 3 stops...
+  [work_stories] MISS for ophelia
+  [work_stories] MISS for the supper at emmaus
+  [work_stories] MISS for the toilet of venus the rokeby venus
+  [LOCAL-441] Batch P856 check: 6 domains, budget=20.0s, pool=10
+  [LOCAL-441] Batch P856 check: 8 domains, budget=20.0s, pool=10
+  [LOCAL-441] Batch P856 check: 4 domains, budget=20.0s, pool=10
+  [DEAD-HOST] Marked cold: wikimedia (timeout/network error for italianreflections.wordpress.com: The read operation timed out)
+  [SQ-S2] Wikidata P856 check failed for italianreflections.wordpress.com: The read operation timed out
+  [SQ-S2] Wikidata P856 check failed for godwhospeaks.uk: The read operation timed out
+  [SQ-S2] Wikidata P856 check failed for commons.wikimedia.org: The read operation timed out
+  [SQ-S2] Wikidata P856 check failed for ulstermuseum.org: The read operation timed out
+  [SQ-S2] Wikidata P856 check failed for doaks.org: The read operation timed out
+  [SQ-S2] Wikidata P856 check failed for nationalgallery.ie: The read operation timed out
+  [LOCAL-441] Batch complete: 3.1s, 0 tier1, 6 unverified, 0 budget-expired
+  [SQ-S2] Wikidata P856 check failed for westernarthistorybysuzy.wordpress.com: The read operation timed out
+  [SQ-S2] Wikidata P856 check failed for artfund.org: The read operation timed out
+  [SQ-S2] Wikidata P856 check failed for butlerandhill.com: The read operation timed out
+  [SQ-S2] Wikidata P856 check failed for artuk.org: The read operation timed out
+  [SQ-S2] Wikidata P856 check failed for commons.wikimedia.org: The read operation timed out
+  [SQ-S2] Wikidata P856 check failed for alljigsawpuzzles.com: The read operation timed out
+  [SQ-S2] Wikidata P856 check failed for barnebys.com: The read operation timed out
+  [SQ-S2] Wikidata P856 check failed for doaks.org: The read operation timed out
+  [LOCAL-441] Batch complete: 3.1s, 0 tier1, 8 unverified, 0 budget-expired
+  [SQ-S2] Wikidata P856 check failed for doaks.org: The read operation timed out
+  [SQ-S2] Wikidata P856 check failed for artuk.org: The read operation timed out
+  [SQ-S2] Wikidata P856 check failed for digital.nga.gov.au: The read operation timed out
+  [SQ-S2] Wikidata P856 check failed for galeriemagazine.com: The read operation timed out
+  [LOCAL-441] Batch complete: 3.1s, 0 tier1, 4 unverified, 0 budget-expired
+    [D500] Stop 1: placeholder cleared from ['publisher', 'credit_line', 'medium', 'artist'] — unknown, not 'Not specified'
+    [LOCAL-486] Stop 1 worthiness: score=1/4 mine=True — has specific_title
+    [D489] material kind: stop='The Toilet of Venus ('The Rokeby Venus' kind=active volume=COVERED sentences=41 active=1 staked=3 eventful=0 passive=0  <-- DISAGREE: enough material, wrong kind
+         best: "Mellon donated a substantial art collection and funds for construction. the donation of other substantial art collections by a number of pri"
+    [LOCAL-489] Stop 1 needs more material (eventless): 21 passages, 3178 chars, verdict=COVERED
+      [LOCAL-489] +4 from: "The Toilet of Venus ('The Rokeby Venus')" "The National Gallery" provenance
+      [LOCAL-498] after replenishment: kind active -> active, 3178 -> 3813 chars, eventful=0 (NO CHANGE — the round bought more of the same)
+         best now: "Mellon donated a substantial art collection and funds for construction. the donation of other substantial art "
+    [LOCAL-488] step 4: 2 providers, 10 leads, 2 with cross-model agreement, 2 SERP-confirmed
+      → injected 2 confirmed lead(s) ahead of the SERP snippets
+    Stop 1 'The Toilet of Venus ('The Rokeby Venus')': queries=3 serp_results=21 snippets=27
+      → 1906 The painting was transferred to the National Gallery from the collection of the Duke of Westminster.
+      → 1914 The painting was attacked by suffragette Mary Richardson with a meat cleaver at the National Gallery.
+    [D500] Stop 2: placeholder cleared from ['publisher', 'credit_line', 'medium', 'artist'] — unknown, not 'Not specified'
+    [LOCAL-486] Stop 2 worthiness: score=1/4 mine=True — has specific_title
+    [D489] material kind: stop='Ophelia' kind=active volume=COVERED sentences=28 active=1 staked=0 eventful=0 passive=1  <-- DISAGREE: enough material, wrong kind
+         best: "Mellon donated a substantial art collection and funds for construction. the creation of the National Gallery encouraged the donation of othe"
+    [LOCAL-489] Stop 2 needs more material (eventless): 16 passages, 2414 chars, verdict=COVERED
+      [LOCAL-489] +8 from: "Ophelia" "The National Gallery" provenance
+      [LOCAL-498] after replenishment: kind active -> active, 2414 -> 3552 chars, eventful=0 (NO CHANGE — the round bought more of the same)
+         best now: "Mellon donated a substantial art collection and funds for construction. the creation of the National Gallery e"
+    [LOCAL-488] step 4: 2 providers, 11 leads, 1 with cross-model agreement, 2 SERP-confirmed
+      → injected 2 confirmed lead(s) ahead of the SERP snippets
+    Stop 2 'Ophelia': queries=3 serp_results=16 snippets=26
+      → 1852 "Ophelia" was first exhibited at the Royal Academy of Arts in London
+      → 1852 John Everett Millais completed the painting "Ophelia"
+    [D500] Stop 3: placeholder cleared from ['publisher', 'credit_line', 'medium', 'artist'] — unknown, not 'Not specified'
+    [LOCAL-486] Stop 3 worthiness: score=1/4 mine=True — has specific_title
+    [D489] material kind: stop='The Supper at Emmaus' kind=active volume=COVERED sentences=41 active=2 staked=0 eventful=0 passive=0  <-- DISAGREE: enough material, wrong kind
+         best: "The Supper at Emmaus is a painting by the Italian Baroque master Caravaggio, completed in 1601, and now in London."
+    [LOCAL-489] Stop 3 needs more material (eventless): 19 passages, 2938 chars, verdict=COVERED
+      [LOCAL-489] +8 from: "The Supper at Emmaus" "The National Gallery" provenance
+      [LOCAL-498] after replenishment: kind active -> active, 2938 -> 4100 chars, eventful=0 (NO CHANGE — the round bought more of the same)
+         best now: "The Supper at Emmaus is a painting by the Italian Baroque master Caravaggio, completed in 1601, and now in Lon"
+    [LOCAL-488] step 4: 2 providers, 6 leads, 0 with cross-model agreement, 0 SERP-confirmed
+    Stop 3 'The Supper at Emmaus': queries=3 serp_results=19 snippets=27
+      → The Supper at Emmaus. Artist: Michelangelo Merisi da Caravaggio. Artist dates: 1571 - 1610. Date made: 1601. Medium and 
+      → The Supper at Emmaus is a painting by the Italian Baroque master Caravaggio, completed in 1601, and now in London. It de
+
+  [LOCAL-410] SERP search complete: 12 queries, 76 results, 80 total snippets
+  [LOCAL-411] Snippet ranking+capping enabled: cap=5/stop, 80 raw → max 15 injected
+
+  [LOCAL-410] CHAIN INSTRUMENTATION:
+    The Toilet of Venus ('The Rokeby Venus'): serp_results=21 elements_extracted=- beats_injected=- (measured post-generation)
+    Ophelia: serp_results=16 elements_extracted=- beats_injected=- (measured post-generation)
+    The Supper at Emmaus: serp_results=19 elements_extracted=- beats_injected=- (measured post-generation)
+  [D534] Stop 1 has 27 snippet(s) but they are VENUE-level only — fetching object-level facts
+  [D533] Stop 1 'The Toilet of Venus ('The Rokeby Venus')' has 27 snippet(s) — asking the knowledge fallback
+  [D533] +7 fact(s) via gemini (7 high-confidence) — stop will be labelled aloud
+      [high] The painting was created by the Spanish court painter Diego Velázquez (1599–1660), likely between 1647 and 165
+      [high] It is an oil painting on canvas measuring 122.5 cm by 177 cm and is registered under inventory number NG2057 a
+      [high] It is the only surviving female nude painted by Diego Velázquez.
+      [high] Its earliest confirmed record is in a June 1651 Madrid inventory belonging to Gaspar Méndez de Haro, Marqués d
+      [high] The picture acquired the name 'The Rokeby Venus' after hanging at Rokeby Park in County Durham throughout the 
+      [high] The painting was acquired by the National Gallery in 1906 through purchase and presentation by the National Ar
+  [D534] Stop 2 has 26 snippet(s) but they are VENUE-level only — fetching object-level facts
+  [D533] Stop 2 'Ophelia' has 26 snippet(s) — asking the knowledge fallback
+  [D533] +6 fact(s) via gemini (6 high-confidence) — stop will be labelled aloud
+      [high] The artwork titled 'Ophelia among the Flowers' in The National Gallery, London, was created by the French Symb
+      [high] The work was created circa 1905–1908 in France.
+      [high] The medium of the work is pastel on paper, measuring 64 by 91 cm.
+      [high] The National Gallery acquired the drawing in 1977 with a financial contribution from the Art Fund.
+      [high] The object is catalogued in The National Gallery under the accession number NG6438.
+      [high] Unlike John Everett Millais's 1851–1852 oil painting of Ophelia (which is in the collection of Tate Britain), 
+  [D534] Stop 3 has 27 snippet(s) but they are VENUE-level only — fetching object-level facts
+  [D533] Stop 3 'The Supper at Emmaus' has 27 snippet(s) — asking the knowledge fallback
+  [D533] +8 fact(s) via gemini (8 high-confidence) — stop will be labelled aloud
+      [high] The painting was created in 1601 by the Italian painter Michelangelo Merisi da Caravaggio, who was active prim
+      [high] It was executed in oil and egg tempera on canvas and measures 141 centimetres high by 196.2 centimetres wide.
+      [high] The work was commissioned by the Roman nobleman and collector Ciriaco Mattei, who paid the artist 150 scudi in
+      [high] By the mid-seventeenth century, the painting had passed into the Borghese collection in Rome, where it remaine
+      [high] The painting entered the National Gallery's collection in 1839 as a gift from George Venables-Vernon, 5th Baro
+      [high] Unlike Caravaggio's later 1606 depiction of the same subject now held at the Pinacoteca di Brera in Milan, thi
+  [D533] Knowledge fallback filled 3 starved stop(s)
+[TIMING] phase=external_lookups elapsed=76.0s cumulative=178.0s
+
+Generating description for Stop 1: The Toilet of Venus ('The Rokeby Venus') by , ...
+
+Generating description for Stop 2: Ophelia by , ...
+
+Generating description for Stop 3: The Supper at Emmaus by , ...
+  [LOCAL-381] stop='Ophelia' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-411] Stop 2 snippet ranking: input=32 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=5 output=5 usable=5 (t1t2=3, t3=0, market=0)
+    Top scores: [('The Story of Ophelia - Tate', 8, 'tier1'), ('Exhibition poster - John Everett Millais, Ophelia,', 8, 'tier1'), ('The Story of Ophelia - Tate', 8, 'tier1')]
+  [LOCAL-381] stop='The Toilet of Venus ('The Rokeby Venus')' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-381] stop='The Supper at Emmaus' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-411] Stop 3 snippet ranking: input=35 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=5 output=5 usable=5 (t1t2=1, t3=0, market=0)
+[LOCAL-197] llm_cost() called with total_tokens (deprecated) by /app/generate_tour_text.py:17802. Caller should supply input_tokens and output_tokens separately.
+    Top scores: [('The Supper at Emmaus', 16, ''), ('The Supper at Emmaus', 16, ''), ("Caravaggio's The Supper at Emmaus, 1610 #art", 13, '')]
+    [LOCAL-469] CONSEQUENCE RESCUE: 'The Toilet of Venus, one of the gallery's greatest treasures' let through (score 12) — no surviving snippet carried a stakes marker
+  [LOCAL-411] Stop 1 snippet ranking: input=34 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=5 output=5 usable=5 (t1t2=2, t3=0, market=0)
+    Top scores: [("Diego Velázquez | The Toilet of Venus ('The Rokeby", 18, 'tier1'), ("Diego Velázquez | The Toilet of Venus ('The Rokeby", 17, ''), ("The Toilet of Venus ('The Rokeby Venus')", 17, '')]
+  [LOCAL-620] Stop 2 evidence balance: input=5 kept_rich=0 kept_story=3 dropped_boilerplate=0 output=3
+  [LOCAL-402] Stop 2: injected 3 snippets as reference material
+  [LOCAL-620] Stop 3 evidence balance: input=5 kept_rich=2 kept_story=0 dropped_boilerplate=0 output=2
+  [LOCAL-402] Stop 3: injected 2 snippets as reference material
+  [LOCAL-620] Stop 1 evidence balance: input=5 kept_rich=0 kept_story=3 dropped_boilerplate=0 output=3
+  [LOCAL-402] Stop 1: injected 3 snippets as reference material
+  [LOCAL-620] prefs: default/balanced (no user_id)
+  [LOCAL-617] Stop 2: narration contract injected (reception_evidence=False)
+  [D533] Stop 2 corpus-gate restriction LIFTED — 32 source item(s) arrived after the gate ran
+  [LOCAL-411] Stop 2 prompt size: before_snippets=12027 after=28366 (+16339 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (28366)
+  [LOCAL-620] prefs: default/balanced (no user_id)
+  [LOCAL-617] Stop 3: narration contract injected (reception_evidence=False)
+  [D533] Stop 3 corpus-gate restriction LIFTED — 35 source item(s) arrived after the gate ran
+  [LOCAL-411] Stop 3 prompt size: before_snippets=11976 after=28473 (+16497 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (28473)
+  [LOCAL-620] prefs: default/balanced (no user_id)
+  [LOCAL-617] Stop 1: narration contract injected (reception_evidence=False)
+  [D533] Stop 1 corpus-gate restriction LIFTED — 34 source item(s) arrived after the gate ran
+  [LOCAL-411] Stop 1 prompt size: before_snippets=11223 after=27996 (+16773 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (27996)
+  [D498] Stop 2 matrix: 3/9 slots filled — empty: ['artist', 'publisher', 'printed_by', 'medium', 'credit_line', 'focus_fact']
+  [D498] Stop 3 matrix: 3/9 slots filled — empty: ['artist', 'publisher', 'printed_by', 'medium', 'credit_line', 'focus_fact']
+  [D498] Stop 1 matrix: 3/9 slots filled — empty: ['artist', 'publisher', 'printed_by', 'medium', 'credit_line', 'focus_fact']
+  [D500] agents 0/3: hero=—, sponsor=—, builder=—
+  [D500] agents 0/3: hero=—, sponsor=—, builder=—
+  [D500] agents 0/3: hero=—, sponsor=—, builder=—
+  [LOCAL-490] Stop 2 story pass: ok=True (3 sentences), $0.0042
+    story: "Ophelia, painted by John Everett Millais between 1851 and 1852, found a new home in 1894 when it became part of the original Henry Tate Gift. This tra"
+  [LOCAL-490] Stop 1 story pass: ok=True (3 sentences), $0.0043
+    story: "In 1906, the National Gallery acquired Diego Velázquez's 'Rokeby Venus' through a purchase made possible by the National Art Collections Fund. This ac"
+  [LOCAL-408] Prompt dump written to: /app/prompt_dump_stop1.txt
+  [LOCAL-490] Stop 3 story pass: ok=True (3 sentences), $0.0043
+    story: "In 1601, the Roman nobleman and collector Ciriaco Mattei commissioned Caravaggio to create a painting, offering the artist 150 scudi for his work. Car"
+Stop 2 API call cost: $0.0347 (7307 tokens, model=gpt-4o)
+  [LOCAL-569] Stop 2 attempt 1/5 story_count=1 words=234
+  [LOCAL-432] Stop 2: STORY RETRY — story_count=1 < 3, need 2 more, retrying (attempt 2/5)
+Stop 1 API call cost: $0.0344 (7244 tokens, model=gpt-4o)
+  [LOCAL-569] Stop 1 attempt 1/5 story_count=0 words=304
+  [LOCAL-432] Stop 1: STORY RETRY — story_count=0 < 3, need 3 more, retrying (attempt 2/5)
+Stop 3 API call cost: $0.0355 (7470 tokens, model=gpt-4o)
+  [LOCAL-569] Stop 3 attempt 1/5 story_count=1 words=288
+  [LOCAL-432] Stop 3: STORY RETRY — story_count=1 < 3, need 2 more, retrying (attempt 2/5)
+Stop 2 API call cost: $0.0366 (7706 tokens, model=gpt-4o)
+  [LOCAL-569] Stop 2 attempt 2/5 story_count=0 words=225
+  [LOCAL-432] Stop 2: STORY RETRY — story_count=0 < 3, need 3 more, retrying (attempt 3/5)
+Stop 1 API call cost: $0.0365 (7679 tokens, model=gpt-4o)
+  [LOCAL-569] Stop 1 attempt 2/5 story_count=4 words=311
+Stop 1 description word count: 311 words
+  [LOCAL-407] Stop 1: snippets injected but no candidate specifics extracted
+Stop 2 API call cost: $0.0387 (8138 tokens, model=gpt-4o)
+  [LOCAL-569] Stop 2 attempt 3/5 story_count=1 words=249
+  [LOCAL-432] Stop 2: STORY RETRY — story_count=1 < 3, need 2 more, retrying (attempt 4/5)
+Stop 3 API call cost: $0.0372 (7831 tokens, model=gpt-4o)
+  [LOCAL-569] Stop 3 attempt 2/5 story_count=2 words=279
+  [LOCAL-432] Stop 3: STORY RETRY — story_count=2 < 3, need 1 more, retrying (attempt 3/5)
+Stop 2 API call cost: $0.0407 (8558 tokens, model=gpt-4o)
+  [LOCAL-569] Stop 2 attempt 4/5 story_count=0 words=283
+  [LOCAL-432] Stop 2: STORY RETRY — story_count=0 < 3, need 3 more, retrying (attempt 5/5)
+Stop 3 API call cost: $0.0389 (8194 tokens, model=gpt-4o)
+  [LOCAL-569] Stop 3 attempt 3/5 story_count=3 words=253
+Stop 3 description word count: 253 words
+  [LOCAL-407] Stop 3: snippets injected but no candidate specifics extracted
+Stop 2 API call cost: $0.0425 (8956 tokens, model=gpt-4o)
+  [LOCAL-569] Stop 2 attempt 5/5 story_count=2 words=267
+Stop 2 description word count: 267 words
+  [LOCAL-407] Stop 2: snippets injected but no candidate specifics extracted
+
+  [LOCAL-439] STORY GATE: checking story-units per stop (D394)...
+    ✗ FAIL stop='The Toilet of Venus ('The Rokeby Venus')': story_units=0, entities_ok=True, thesis_ok=False
+      → story_units=0: no candidate story-unit of ≥3 sentences passes classification (need at least 1 with named person, real actions, arc)
+      → thesis_missing: description does not connect to venue's stated purpose
+    ✓ PASS stop='Ophelia': story_units=1, entities_ok=True, thesis_ok=True
+      interest: emotional=3, new_info=2, deduction=0, total=5
+    ✗ FAIL stop='The Supper at Emmaus': story_units=1, entities_ok=True, thesis_ok=False
+      → thesis_missing: description does not connect to venue's stated purpose
+      interest: emotional=3, new_info=2, deduction=0, total=5
+  [LOCAL-439] Classification cost: $0.002049 (input=8412, output=1312)
+  [LOCAL-439] STORY GATE: SOME STOPS FAILED (informational — does not block delivery)
+
+  [LOCAL-423] STORY VERIFICATION: checking claims against sources...
+    ✗ FAIL stop='The Toilet of Venus ('The Rokeby Venus')': claims=3, sourced=1, unsourced=2, contradicted=0
+      → UNSOURCED: 'National Gallery acquired Diego' (attribution) — no snippet contains this assertion
+      → UNSOURCED: 'in 1814' (year) — no snippet contains this assertion
+      evidence (1 sourced claims):
+        claim='1906' ← 
+    ✓ PASS stop='Ophelia': claims=1, sourced=1, unsourced=0, contradicted=0
+      evidence (1 sourced claims):
+        claim='in 1894' ← https://www.tate.org.uk/art/artworks/millais-ophelia-n01506/
+    ✓ PASS stop='The Supper at Emmaus': claims=4, sourced=4, unsourced=0, contradicted=0
+      evidence (4 sourced claims):
+        claim='1601' ← https://www.nationalgallery.org.uk/paintings/michelangelo-me
+        claim='Ciriaco Mattei commissioned Caravaggio,' ← 
+        claim='in 1839' ← 
+  [LOCAL-423] STORY VERIFICATION: SOME STOPS HAVE UNSOURCED CLAIMS
+  [LOCAL-423] Unsourced claims will be stripped from delivered text
+    [LOCAL-423] Stripped 2 sentence(s) from 'The Toilet of Venus ('The Rokeby Venus')':
+      ✗ "In 1906, the National Gallery acquired Diego Velázquez's "Rokeby Venus" through a purchase made poss"
+      ✗ "The painting's moniker, "Rokeby Venus," originates from British politician John Morritt, who purchas"
+[LOCAL-197] llm_cost() called with total_tokens (deprecated) by /app/generate_tour_text.py:19201. Caller should supply input_tokens and output_tokens separately.
+
+  [LOCAL-192] PHASE 5.1: Style validation + per-paragraph retry...
+  [LOCAL-192] Stop 1 para 1: retry IMPROVED (3→1 errors)
+  [LOCAL-192] Stop 2 para 3: retry FIXED (R1_IMPERATIVE, R2_QUESTION)
+  [LOCAL-192] Stop 3 para 1: retry FIXED (R1_IMPERATIVE)
+  [LOCAL-192] Style retry summary: 3 paragraphs retried, 3 fixed/improved, 0 kept original
+  [LOCAL-192] Retry cost: $0.0098 (2058 tokens)
+
+  [LOCAL-255] PHASE 5.13: R1 imperative rewrite...
+  [LOCAL-255] R1 summary: 0 rewritten, 0 deleted, 0 stops affected, LLM tokens: 0 ($0.0000)
+
+  [LOCAL-251] PHASE 5.14: R7 hallucinated-sensory deletion...
+  [LOCAL-251] R7 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-261] PHASE 5.141: R2 question deletion...
+  [LOCAL-261] R2 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-261] PHASE 5.142: R3 suggestive-exploration deletion...
+  [LOCAL-261] R3 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-261] PHASE 5.143: R4 prescribed-feeling deletion...
+  [LOCAL-261] R4 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-261] PHASE 5.144: R8 prompt-leakage deletion...
+  [LOCAL-261] R8 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-216] PHASE 5.15: R9 generic-sentence deletion...
+  [LOCAL-216] R9 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-235] PHASE 5.155: R10 unfulfilled-promise deletion...
+  [LOCAL-235] R10 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-472] PHASE 5.152: Stop-specificity gate...
+  [LOCAL-472] Stop-specificity gate summary:
+    Stops checked: 3
+    Paragraphs checked: 8
+    Transferable (high, removed): 0
+    Transferable (low conf, kept): 0
+    Last-paragraph protected: 0
+    Ungrounded named entities: 4
+    Stops affected: 0
+    [LOCAL-472] UNGROUNDED entity stop='Ophelia' entity='Vigée Le Brun' reason='No concrete link to the stop is provided.' in: "The narrative embodied in Millais’ "Ophelia" is one of melancholy, reminiscent of the emotional comp"
+    [LOCAL-472] UNGROUNDED entity stop='Ophelia' entity='Self Portrait' reason='No concrete link to the stop is provided.' in: "The narrative embodied in Millais’ "Ophelia" is one of melancholy, reminiscent of the emotional comp"
+    [LOCAL-472] UNGROUNDED entity stop='Ophelia' entity='Straw Hat' reason='No concrete link to the stop is provided.' in: "The narrative embodied in Millais’ "Ophelia" is one of melancholy, reminiscent of the emotional comp"
+    [LOCAL-472] UNGROUNDED entity stop='The Supper at Emmaus' entity='Vigée Le Brun' reason='It does not specify a concrete link between Vigée Le Brun and the stop.' in: "Standing before this canvas, one can't help but feel the electric moment of discovery reflected in t"
+
+  [LOCAL-263] PHASE 5.156: Unsupported-claim gate...
+  [LOCAL-263] Unsupported-claim gate summary:
+    Sentences removed: 0
+    Sentences kept (substantiated): 0
+    By type: PROMISE=0, SENSORY=0, FEELING=0, QUALITY=0
+    Escalation calls: 0
+    Stops affected: 0
+    Deletion rate: 0.0% (0/32)
+
+  [LOCAL-269] PHASE 5.157: Unglossed-reference gate...
+  [LOCAL-269] Unglossed-reference gate summary (LOCAL-287: compose, not splice):
+    References detected: 9
+    Glossed (composed): 5
+    Suppressed (already explained): 1
+    Degraded (name dropped): 2
+    Guard failures: 0
+    Known (skipped): 1
+    Triage: 1345 tokens, $0.0003, 3.4s
+    Gloss: 567 tokens, $0.0001, 1.9s
+    Compose: 1728 tokens, $0.0003, 2.0s
+    Total added cost: $0.0007
+    Stops affected: 3
+    Glosses applied:
+      • Velázquez → "the only surviving nude by this artist" [source: corpus]
+      • John Everett Millais → "the Pre-Raphaelite masterpiece from 1852" [source: corpus]
+      • Henry Tate Gift → SUPPRESSED (already explained)
+      • Raphaelite Brotherhood → DEGRADED (name dropped)
+      • Hogsmill River → "a tributary of the River Thames" [source: model]
+      • Mattei → DEGRADED (name dropped)
+      • Honorable George Vernon → "a notable 19th-century art collector" [source: model]
+      • Vigée Le Brun → "a prominent French portrait painter" [source: model]
+
+  [LOCAL-458] entity gate SKIPPED: no exhibition scope (unscoped museum tour)
+
+  [LOCAL-458] entity gate SKIPPED: no exhibition scope (unscoped museum tour)
+
+  [LOCAL-385] Form-claim gate SKIPPED (no exhibition scope — unscoped museum tours are not gated)
+
+  [LOCAL-389] Numeric-claim gate SKIPPED (no exhibition scope — unscoped museum tours are not gated)
+
+  [LOCAL-402] PHASE 5.161: Temporal coherence gate (impossible relations)...
+  [LOCAL-402] Temporal coherence gate summary:
+    Relations checked: 36
+    Relations rejected: 0
+    Sentences removed: 0
+    Stops affected: 0
+
+  [LOCAL-229] PHASE 5.16: CONTRADICTED claim block (D100 enforcement)...
+  [LOCAL-229] CONTRADICTED block summary: 0 group(s) blocked, 0 stop(s) affected
+
+PHASE 5.5a: Post-description knowledge validation (all tour types)...
+OK Post-description validation passed: Knowledge validation passed
+
+PHASE 5.5b: Validating descriptions are inside 'The National Gallery'...
+   Authority: 2 D1v2-verified (kept unconditionally), 0 unverified (will check)
+   Pre-filter: 0 clean, 0 suspect (will call OpenAI for suspect only)
+OK PHASE 5.5b: 3 stop(s) passed venue description validation
+OK PHASE 5.7: Dangling-reference scrub complete (3 stops)
+  [LOCAL-627] PHASE 5.7a: Truncated-snippet safety check — 2 stop(s) cleaned
+
+  [LOCAL-318] PHASE 5.7b: Dangling-demonstrative scrub...
+  [LOCAL-318] Dangling-demonstrative scrub summary:
+    Detected: 3
+    Repaired (name substituted): 0
+    Deleted (unrepairable): 3
+    Stops affected: 3
+    [1] DELETED: 'This acquisition' in: This acquisition marked a significant change, as the painting became a part of t
+    [2] DELETED: 'This move' in: This move transformed it from a private masterpiece into a public treasure, maki
+    [3] DELETED: 'This masterful' in: This masterful composition vividly captures the biblical scene of Christ reveali
+OK PHASE 5.7b: Dangling-demonstrative scrub complete
+
+PHASE 5.8: Type/prose contradiction check (LOCAL-27)...
+  [LOCAL-27] No type/prose contradictions detected
+
+PHASE 5.9: Audio-native cleanup (LOCAL-41)...
+  [LOCAL-41] Stripped 0 trailing question(s), removed 0 'broader context' instance(s)
+
+  [D498] step 7c: most valuable stop is 2 'Ophelia' (index 54) — allowance 5 -> 7 sentences on regeneration, story currently 3 sentence(s)
+
+  [LOCAL-487] step 7a: 2 stop(s) have NO VALID STORY by Michael's bar (3+ consecutive sentences, one person, an action and something at stake)
+    stop 1 'The Toilet of Venus ('The Rokeby Venus': the longest run (3 sentences, Rokeby Venus) has agency=0 stakes=0 — someone is described, but nothing is riske
+    stop 3 'The Supper at Emmaus': the longest run (3 sentences, Caravaggio) has agency=1 stakes=0 — someone is described, but nothing is risked,
+    [LOCAL-487] cap=1: retrying only the weakest — stop 1 'The Toilet of Venus ('The Rokeby V' (index 38)
+  [D534] No cross-stop repetition in the drafts
+
+  [LOCAL-474] PHASE 5.17: retry 'The Toilet of Venus ('The Rokeby Venus')' — 265w → 189w after gates, 6 sentence(s) removed
+    removed: "This acquisition marked a significant change, as the painting became a part of the gallery's collect"
+    removed: "Painted between 1647 and 1651, "The Rokeby Venus" is an oil depiction of Venus, the goddess of love,"
+    removed: "This work stands out as the only surviving nude by Velázquez, making it a unique specimen in his oeu"
+    removed: "Velázquez skillfully captured the sensuous curves of Venus's body with a gentle, almost tangible qua"
+    removed: "Velázquez painted "The Rokeby Venus" likely during or just before his second visit to Italy from 164"
+    removed: "As you stand before this masterpiece, consider the rich narrative woven through its history, from Ve"
+    [LOCAL-491] step 7b: rotating to the venue fact — institutional context; weakest, but it scopes the search
+      focus: "The Toilet of Venus ('The Rokeby Venus') is held at The National Gallery."
+
+  [LOCAL-474] PHASE 5.17: retry 'Ophelia' — 267w → 218w after gates, 5 sentence(s) removed
+    removed: "Ophelia, painted by John Everett Millais between 1851 and 1852, became part of the original Henry Ta"
+    removed: "This move transformed it from a private masterpiece into a public treasure, making it a cornerstone "
+    removed: "Millais, a pivotal figure in the Pre-Raphaelite Brotherhood, chose to delve into the tragic beauty o"
+    removed: "As you stand before this masterpiece, consider how "Ophelia" remains a dialogue between past artistr"
+    removed: "Can the power of emotion rendered in art alter our perceptions of reality?"
+    [LOCAL-491] step 7b: rotating to the venue fact — institutional context; weakest, but it scopes the search
+      focus: "Ophelia is held at The National Gallery."
+
+  [LOCAL-474] PHASE 5.17: retry 'The Supper at Emmaus' — 253w → 186w after gates, 7 sentence(s) removed
+    removed: "In 1601, the Roman nobleman and collector Ciriaco Mattei commissioned Caravaggio, offering him 150 s"
+    removed: "Caravaggio accepted and produced "The Supper at Emmaus," an oil on canvas that measures 141 by 196.2"
+    removed: "This masterful composition vividly captures the biblical scene of Christ revealing his identity to t"
+    removed: "Mattei's collection, known for its prestige, gained significant value with Caravaggio's inclusion, e"
+    removed: "This painting marks a pivotal moment in his career and showcases his efforts to humanize divine narr"
+    removed: "The National Gallery acquired this work in 1839, presented by the Honorable George Vernon, and it st"
+    removed: "Caravaggio's ability to transform a simple meal into an extraordinary revelation continues to influe"
+    [LOCAL-491] step 7b: rotating to the venue fact — institutional context; weakest, but it scopes the search
+      focus: "The Supper at Emmaus is held at The National Gallery."
+
+  [LOCAL-526] PHASE 5.17: regenerating 3 eligible stop(s) concurrently (max_workers=3)
+
+Generating description for Stop 1: The Toilet of Venus ('The Rokeby Venus') by , ...
+
+Generating description for Stop 2: Ophelia by , ...
+  [LOCAL-381] stop='Ophelia' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-411] Stop 2 snippet ranking: input=32 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=5 output=5 usable=5 (t1t2=3, t3=0, market=0)
+    Top scores: [('The Story of Ophelia - Tate', 8, 'tier1'), ('Exhibition poster - John Everett Millais, Ophelia,', 8, 'tier1'), ('The Story of Ophelia - Tate', 8, 'tier1')]
+  [LOCAL-620] Stop 2 evidence balance: input=5 kept_rich=0 kept_story=3 dropped_boilerplate=0 output=3
+  [LOCAL-402] Stop 2: injected 3 snippets as reference material
+  [LOCAL-620] prefs: default/balanced (no user_id)
+  [LOCAL-617] Stop 2: narration contract injected (reception_evidence=False)
+  [D533] Stop 2 corpus-gate restriction LIFTED — 32 source item(s) arrived after the gate ran
+  [LOCAL-411] Stop 2 prompt size: before_snippets=12027 after=28366 (+16339 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (28366)
+  [D498] Stop 2 matrix: 4/9 slots filled — empty: ['artist', 'publisher', 'printed_by', 'medium', 'credit_line']
+  [D500] agents 0/3: hero=—, sponsor=—, builder=—
+  [LOCAL-381] stop='The Toilet of Venus ('The Rokeby Venus')' matched_work=False medium='' work_identity_chars=0
+
+Generating description for Stop 3: The Supper at Emmaus by , ...
+  [LOCAL-381] stop='The Supper at Emmaus' matched_work=False medium='' work_identity_chars=0
+    [LOCAL-469] CONSEQUENCE RESCUE: 'The Toilet of Venus, one of the gallery's greatest treasures' let through (score 12) — no surviving snippet carried a stakes marker
+  [LOCAL-411] Stop 1 snippet ranking: input=34 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=5 output=5 usable=5 (t1t2=2, t3=0, market=0)
+    Top scores: [("Diego Velázquez | The Toilet of Venus ('The Rokeby", 18, 'tier1'), ("Diego Velázquez | The Toilet of Venus ('The Rokeby", 17, ''), ("The Toilet of Venus ('The Rokeby Venus')", 17, '')]
+  [LOCAL-620] Stop 1 evidence balance: input=5 kept_rich=0 kept_story=3 dropped_boilerplate=0 output=3
+  [LOCAL-402] Stop 1: injected 3 snippets as reference material
+  [LOCAL-620] prefs: default/balanced (no user_id)
+  [LOCAL-617] Stop 1: narration contract injected (reception_evidence=False)
+  [D533] Stop 1 corpus-gate restriction LIFTED — 34 source item(s) arrived after the gate ran
+  [LOCAL-411] Stop 1 prompt size: before_snippets=11223 after=27996 (+16773 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (27996)
+  [D498] Stop 1 matrix: 4/9 slots filled — empty: ['artist', 'publisher', 'printed_by', 'medium', 'credit_line']
+  [D500] agents 0/3: hero=—, sponsor=—, builder=—
+  [LOCAL-411] Stop 3 snippet ranking: input=35 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=5 output=5 usable=5 (t1t2=1, t3=0, market=0)
+    Top scores: [('The Supper at Emmaus', 16, ''), ('The Supper at Emmaus', 16, ''), ("Caravaggio's The Supper at Emmaus, 1610 #art", 13, '')]
+  [LOCAL-620] Stop 3 evidence balance: input=5 kept_rich=2 kept_story=0 dropped_boilerplate=0 output=2
+  [LOCAL-402] Stop 3: injected 2 snippets as reference material
+  [LOCAL-620] prefs: default/balanced (no user_id)
+  [LOCAL-617] Stop 3: narration contract injected (reception_evidence=False)
+  [D533] Stop 3 corpus-gate restriction LIFTED — 35 source item(s) arrived after the gate ran
+  [LOCAL-411] Stop 3 prompt size: before_snippets=11976 after=28473 (+16497 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (28473)
+  [D498] Stop 3 matrix: 4/9 slots filled — empty: ['artist', 'publisher', 'printed_by', 'medium', 'credit_line']
+  [D500] agents 0/3: hero=—, sponsor=—, builder=—
+  [LOCAL-490] Stop 2 story pass: ok=True (3 sentences), $0.0051
+    story: "Ophelia is held at The National Gallery. This change occurred because the painting was featured in an exhibition at the National Gallery of Art in 194"
+  [LOCAL-490] Stop 1 story pass: ok=False (only 2 sentence(s); the bar is 3), $0.0057
+  [LOCAL-408] Prompt dump written to: /app/prompt_dump_stop1.txt
+  [LOCAL-490] Stop 3 story pass: ok=True (3 sentences), $0.0057
+    story: "In 1601, the Roman nobleman and collector Ciriaco Mattei paid 150 scudi for "The Supper at Emmaus," an oil on canvas by Michelangelo Merisi da Caravag"
+Stop 2 API call cost: $0.0367 (7725 tokens, model=gpt-4o)
+  [LOCAL-569] Stop 2 attempt 1/5 story_count=1 words=271
+  [LOCAL-432] Stop 2: STORY RETRY — story_count=1 < 3, need 2 more, retrying (attempt 2/5)
+Stop 3 API call cost: $0.0376 (7912 tokens, model=gpt-4o)
+  [LOCAL-569] Stop 3 attempt 1/5 story_count=0 words=287
+  [LOCAL-432] Stop 3: STORY RETRY — story_count=0 < 3, need 3 more, retrying (attempt 2/5)
+Stop 1 API call cost: $0.0378 (7948 tokens, model=gpt-4o)
+  [LOCAL-569] Stop 1 attempt 1/5 story_count=1 words=329
+  [LOCAL-432] Stop 1: STORY RETRY — story_count=1 < 3, need 2 more, retrying (attempt 2/5)
+Stop 2 API call cost: $0.0383 (8053 tokens, model=gpt-4o)
+  [LOCAL-569] Stop 2 attempt 2/5 story_count=1 words=253
+  [LOCAL-432] Stop 2: STORY RETRY — story_count=1 < 3, need 2 more, retrying (attempt 3/5)
+Stop 1 API call cost: $0.0393 (8269 tokens, model=gpt-4o)
+  [LOCAL-569] Stop 1 attempt 2/5 story_count=2 words=263
+  [LOCAL-432] Stop 1: STORY RETRY — story_count=2 < 3, need 1 more, retrying (attempt 3/5)
+Stop 3 API call cost: $0.0395 (8325 tokens, model=gpt-4o)
+  [LOCAL-569] Stop 3 attempt 2/5 story_count=1 words=310
+  [LOCAL-432] Stop 3: STORY RETRY — story_count=1 < 3, need 2 more, retrying (attempt 3/5)
+Stop 2 API call cost: $0.0404 (8505 tokens, model=gpt-4o)
+  [LOCAL-569] Stop 2 attempt 3/5 story_count=4 words=285
+Stop 2 description word count: 285 words
+  [LOCAL-407] Stop 2: snippets injected but no candidate specifics extracted
+  [LOCAL-414] Stop 2: SCRUBBED banned phrases from output: ['a testament to']
+Stop 1 API call cost: $0.0411 (8653 tokens, model=gpt-4o)
+  [LOCAL-569] Stop 1 attempt 3/5 story_count=2 words=275
+  [LOCAL-432] Stop 1: STORY RETRY — story_count=2 < 3, need 1 more, retrying (attempt 4/5)
+Stop 3 API call cost: $0.0415 (8730 tokens, model=gpt-4o)
+  [LOCAL-569] Stop 3 attempt 3/5 story_count=1 words=304
+  [LOCAL-432] Stop 3: STORY RETRY — story_count=1 < 3, need 2 more, retrying (attempt 4/5)
+Stop 1 API call cost: $0.0430 (9052 tokens, model=gpt-4o)
+  [LOCAL-569] Stop 1 attempt 4/5 story_count=2 words=283
+  [LOCAL-432] Stop 1: STORY RETRY — story_count=2 < 3, need 1 more, retrying (attempt 5/5)
+Stop 3 API call cost: $0.0429 (9036 tokens, model=gpt-4o)
+  [LOCAL-569] Stop 3 attempt 4/5 story_count=2 words=234
+  [LOCAL-432] Stop 3: STORY RETRY — story_count=2 < 3, need 1 more, retrying (attempt 5/5)
+Stop 1 API call cost: $0.0449 (9444 tokens, model=gpt-4o)
+  [LOCAL-569] Stop 1 attempt 5/5 story_count=4 words=282
+Stop 1 description word count: 282 words
+  [LOCAL-407] Stop 1: snippets injected but no candidate specifics extracted
+Stop 3 API call cost: $0.0450 (9464 tokens, model=gpt-4o)
+  [LOCAL-569] Stop 3 attempt 5/5 story_count=1 words=247
+Stop 3 description word count: 247 words
+  [LOCAL-407] Stop 3: snippets injected but no candidate specifics extracted
+  [LOCAL-414] Stop 3: SCRUBBED banned phrases from output: ['a testament to', 'stands as a testament']
+  [LOCAL-526] PHASE 5.17 regeneration wall: 24.5s for 3 stop(s) at max_workers=3
+    [LOCAL-487] retry judged on the story bar, not on length: cleared=False
+    [LOCAL-474] retry not better after re-gating — keeping the original gated text
+    [D498] step 7c judged on the index, not on length: 54 -> 45, accepted=False
+    [LOCAL-474] retry not better after re-gating — keeping the original gated text
+    [LOCAL-474] regenerated and re-gated: 223w (was 186w)
+  [D534] no repeated sentences left after the retries
+
+  [LOCAL-474] retry summary: 3 eligible, 3 retried, 1 improved, 2 kept original
+  [LOCAL-487] triggers: 0 hollowed by gates, 1 storyless (step 7a — Michael's bar, independent of length), 1 top-value (step 7c — larger allowance), 0 repeating an earlier stop (D534), 3 thin enough for another story (D534, floor=300w). Triggers overlap and are counted separately; they do not sum to 'eligible'.
+  [LOCAL-474] each regenerated stop was re-gated before being accepted; a retry can only replace text it beats after gating.
+
+PHASE 5.10: Anti-preaching cleanup (LOCAL-44)...
+  [LOCAL-44] Stripped 0 preaching closer(s)
+
+  [LOCAL-444] Obligation audit DISABLED by L444_OBLIGATION_AUDIT=false
+  [LOCAL-427] HTTP 200 from https://www.youtube.com/watch?v=RvjQYRxMMzI&xstg=CAMSBhUDzO3xHw%3D%3D (attempt 1)
+  [LOCAL-427] HTTP 429 from https://www.metmuseum.org/perspectives/series/materials-and-techniques — retrying in 2.5s (attempt 1, 30s budget remaining)
+  [LOCAL-427] HTTP 429 from https://www.metmuseum.org/perspectives/series/materials-and-techniques — retrying in 4.5s (attempt 2, 27s budget remaining)
+  [LOCAL-427] HTTP 429 from https://www.metmuseum.org/perspectives/series/materials-and-techniques — retrying in 7.3s (attempt 3, 23s budget remaining)
+  [LOCAL-427] HTTP 429 from https://www.metmuseum.org/perspectives/series/materials-and-techniques — retrying in 11.1s (attempt 4, 15s budget remaining)
+  [LOCAL-427] HTTP 429 from https://www.metmuseum.org/perspectives/series/materials-and-techniques — budget exhausted after 5 attempt(s), 30s elapsed
+  [LOCAL-427] HTTP 200 from https://www.facebook.com/nationalgalleryofart/videos/a-w-mellon-lectures/466688837749035/ (attempt 1)
+  [LOCAL-427] HTTP 200 from https://paceprints.com/techniques (attempt 1)
+  [LOCAL-459] R5: Fetched 2341 chars from https://paceprints.com/techniques
+  [LOCAL-427] HTTP 200 from https://rivergalleryschool.org/classes/printmaking/ (attempt 1)
+  [LOCAL-459] R5: Fetched 2338 chars from https://rivergalleryschool.org/classes/printmaking
+  [D512] verb discovery: query='The National Gallery printmaking process how it is made techniqu' -> 6 new verb(s): inked, produced, raised, incised, handmade, placed
+  [D512] _AGENCY_VERB widened by 6 discovered verb(s)
+
+  [D511] PHASE 5.20: credit_line loop — object record, seeds, challenge, adjudicate, gate
+    [D501] no object record for 'Ophelia' — matrix unchanged
+    [D511] 4 credit_line(s) to try (0 from the matrix, 4 from the text)
+    [D501] no object record for 'The Supper at Emmaus' — matrix unchanged
+    [D511] 4 credit_line(s) to try (0 from the matrix, 4 from the text)
+    [D501] no object record for 'The Toilet of Venus ('The Rokeby Venus')' — matrix unchanged
+    [D511] 4 credit_line(s) to try (0 from the matrix, 4 from the text)
+    [D511] 1.1                    kind=none     idx=5   C0 X5 fail:index_d515  [old gate: eventful,index,confirmed]
+    [D511] 1.1                    kind=none     idx=5   C0 X6 fail:index_d515  [old gate: eventful,index,confirmed]
+    [D511] 1.1                    kind=none     idx=5   C0 X5 fail:index_d515  [old gate: eventful,index,confirmed]
+    [D511] 3.1                    kind=none     idx=5   C0 X8 fail:index_d515  [old gate: eventful,index,confirmed]
+  [LOCAL-427] HTTP 200 from https://www.nationalgallery.org.uk/paintings/diego-velazquez-the-toilet-of-venus-the-rokeby-venus (attempt 1)
+  [LOCAL-459] R5: Fetched 3003 chars from https://www.nationalgallery.org.uk/paintings/diego
+  [LOCAL-427] HTTP 200 from https://en.wikipedia.org/wiki/Rokeby_Venus (attempt 1)
+  [LOCAL-459] R5: Fetched 2499 chars from https://en.wikipedia.org/wiki/Rokeby_Venus
+  [LOCAL-427] HTTP 200 from https://www.artble.com/artists/diego_velazquez/paintings/the_toilet_of_venus (attempt 1)
+  [LOCAL-459] R5: Fetched 3003 chars from https://www.artble.com/artists/diego_velazquez/pai
+    [D511] 3.2                    kind=none     idx=5   C0 X5 fail:index_d515  [old gate: eventful,index,confirmed]
+    [D511] 1.2                    kind=none     idx=5   C0 X5 fail:index_d515  [old gate: eventful,index,confirmed]
+    [D511] 2.1                    kind=none     idx=15  C0 X6 fail:index_d515  [old gate: eventful,index,confirmed]
+    [D511] 2.1                    kind=none     idx=5   C0 X1 fail:index_d515  [old gate: eventful,index,confirmed]
+    [D511] 6.1                    kind=none     idx=5   C0 X9 fail:index_d515  [old gate: eventful,index,confirmed]
+    [LOCAL-468] pairwise overlap: mean=0.598, max=0.732 (CONVERGED — seeds not working)
+      marking a significan × Mattei's collection  = 0.570
+      marking a significan × reflecting his statu = 0.581
+      marking a significan × Caravaggio's use of  = 0.618
+      Mattei's collection  × reflecting his statu = 0.732
+      Mattei's collection  × Caravaggio's use of  = 0.537
+      reflecting his statu × Caravaggio's use of  = 0.550
+    [D511] examined 4 credit_line(s) (indices 5, 5, 5, 5), no story passed, ~$0.048, 30s
+    [D511] 2.2                    kind=none     idx=5   C0 X6 fail:index_d515  [old gate: eventful,index,confirmed]
+  [LOCAL-427] HTTP 200 from https://www.tate.org.uk/art/artworks/millais-ophelia-n01506/story-ophelia (attempt 1)
+  [LOCAL-459] R5: Fetched 2014 chars from https://www.tate.org.uk/art/artworks/millais-ophel
+  [LOCAL-427] HTTP 200 from https://eclecticlight.co/2019/08/01/work-in-progress-john-everett-millais-ophelia/ (attempt 1)
+  [LOCAL-459] R5: Fetched 2086 chars from https://eclecticlight.co/2019/08/01/work-in-progre
+  [LOCAL-427] HTTP 200 from https://www.facebook.com/bcknowledgenetwork/posts/andrew-follows-john-everett-millaiss-ophelia-from-its-unlikely-origins-as-part-o/10159766252573563/ (attempt 1)
+  [LOCAL-427] HTTP 200 from https://www.facebook.com/100093129769667/posts/famous-paintings-of-ophelia-by-millais-waterhouse-and-other-artists/429917120122610/ (attempt 1)
+  [LOCAL-427] HTTP 200 from https://www.classpop.com/magazine/ophelia-painting (attempt 1)
+  [LOCAL-459] R5: Fetched 2003 chars from https://www.classpop.com/magazine/ophelia-painting
+  [LOCAL-427] Cache HIT: https://www.tate.org.uk/art/artworks/millais-ophelia-n01506/story-ophelia (43927 chars)
+  [LOCAL-459] R5: Fetched 1018 chars from https://www.tate.org.uk/art/artworks/millais-ophel
+  [LOCAL-427] HTTP 200 from https://painting-meanings.com/artworks/john-everett-millais/ophelia/value (attempt 1)
+  [LOCAL-459] R5: Fetched 2663 chars from https://painting-meanings.com/artworks/john-everet
+  [LOCAL-427] HTTP 200 from https://blog.artsper.com/en/a-closer-look/john-everett-millais-ophelia/ (attempt 1)
+  [LOCAL-459] R5: Fetched 2204 chars from https://blog.artsper.com/en/a-closer-look/john-eve
+    [D511] 3.1                    kind=none     idx=5   C0 X6 fail:index_d515  [old gate: eventful,index,confirmed]
+    [LOCAL-468] pairwise overlap: mean=0.224, max=0.426 (DIVERSE)
+      establishing it as a × Velázquez, the only  = 0.132
+      establishing it as a × making it a unique s = 0.292
+      establishing it as a × Venus's body were ca = 0.324
+      Velázquez, the only  × making it a unique s = 0.041
+      Velázquez, the only  × Venus's body were ca = 0.128
+      making it a unique s × Venus's body were ca = 0.426
+    [D511] examined 4 credit_line(s) (indices 5, 15, 5, 5), no story passed, ~$0.049, 38s
+    [D511] 3.1                    kind=inert    idx=60  C2 X3 PASS  [old gate: eventful]
+    [LOCAL-468] pairwise overlap: mean=0.270, max=0.777 (CONVERGED — seeds not working)
+      Millais, a pivotal f × capturing the moment = 0.777
+      Millais, a pivotal f × ensuring that every  = 0.406
+      Millais, a pivotal f × allowed him to achie = 0.024
+      capturing the moment × ensuring that every  = 0.364
+      capturing the moment × allowed him to achie = 0.029
+      ensuring that every  × allowed him to achie = 0.021
+    [D511] examined 4 credit_line(s) (indices 5, 5, 5, 60), STORY ACCEPTED at 60, ~$0.050, 42s
+
+  [D511] stop 1: The Toilet of Venus ('The Rokeby Venus')
+    [D511] no story passed the gate — stop keeps its descriptive text and publishes no story
+
+  [D511] stop 2: Ophelia
+      [D518] dropped (anchors 0.80 hogsmill,millais,river,surrey | content 0.27): "Famous for his dedication to realism, Millais painstakingly crafted this scene on the ba"
+    [D518] 1 of 9 prose sentence(s) replaced by story 1
+    [D511] stop 2: 1 story published (60) from credit_lines 'allowed him to achieve the luminous qual'
+
+  [D511] stop 3: The Supper at Emmaus
+    [D511] no story passed the gate — stop keeps its descriptive text and publishes no story
+
+  [D511] PHASE 5.20 summary: 1/3 stops got a gated story (0 with multiple stories), ~$0.147, [D518] 1 duplicated prose sentence(s) replaced
+
+  [LOCAL-485] PHASE 5.21: Story valuation index (report only, never gates)...
+     #  stop                                      idx  hist  detl   soc
+     1  The Toilet of Venus ('The Rokeby Venus')   38    24    12    35
+     2  Ophelia                                    68     0    14    69
+     3  The Supper at Emmaus                       41    23    21    60
+    [LOCAL-485] index mean 49.0 over 3 stop(s), range 38-68
+    [LOCAL-485] weakest: 'The Toilet of Venus ('The Rokeby Venus')' at 38
+[TIMING] phase=story_first elapsed=165.7s cumulative=343.7s
+
+PHASE 6: Assembling the complete tour...
+  [LOCAL-11] Venue-identity mining: 7 facts found {'architecture': 1, 'programs': 1, 'founding': 2, 'design': 3}
+  [LOCAL-382] Thesis block injected into prolog (373 chars)
+  [R2] Prolog saved for Stop 1 (111 words)
+
+  [LOCAL-244] PHASE 5.9: Prolog gating (R9, R10, subject routine)...
+  [LOCAL-244] Prolog before gates: 111 words
+  [LOCAL-244] Prolog R9: 0 deletions
+  [LOCAL-286] Prolog R7: 0 deletions
+  [LOCAL-244] Prolog R10: 1 sentence(s) deleted
+  [LOCAL-244] Prolog subject: 0 expanded, 0 deleted, cost=$0.0000
+  [LOCAL-244] Prolog after gates: 92 words (delta: -19)
+  [LOCAL-244] Prolog deletions (1):
+    [R10_UNFULFILLED_PROMISE] "This tour traces the story of Vigée Le Brun's Influence and Technique, exploring the shared elements..."
+
+  [LOCAL-246] PHASE 5.95: Orientation gating (R9, R10)...
+  [LOCAL-246] Orientation gating summary:
+    Words before: 176
+    Words after:  176
+    Delta: 0
+    Stops affected: 0/3
+
+  [LOCAL-270] PHASE 5.96: Composing Part 4 (forward connection) from delivered narrations...
+    Stops with delivered content: 3/3
+    [LOCAL-276] Intrigue ranking completed: 2.1s, $0.0079, 1215 tokens
+    [LOCAL-276] Ranked 3 stops:
+      [The Toilet of Venus ('The Rokeby Venus')] (mystery): This work stands out as the only surviving nude by Velázquez, the only surviving...
+      [Ophelia] (mystery): Millais, a pivotal figure in chose to delve into the tragic beauty of Shakespear...
+      [The Supper at Emmaus] (dated_event): The artwork captures the biblical scene where the resurrected Christ reveals His...
+    [LOCAL-276] 3 intriguing / 0 excluded (celebrity_trivia)
+    [LOCAL-276] Using ranked facts for composition (3 stops)
+    Part 4 LLM cost: $0.0033 (532 tokens) [attempt 1]
+    ✓ Part 4 composed and verified (46 words):
+      "On this tour, you'll explore Millais' depiction of Ophelia just before her untimely demise and Velázquez's unique nude, The Toilet of Venus ('The Rokeby Venus'). Next, witness the biblical scene in The Supper at Emmaus where Christ reveals His identity to two disciples during a meal."
+      Stops referenced: 3
+    Part 4 total cost: $0.0033
+  [LOCAL-618 #1] Orientation pre-tell guard: dropped 5 sentence(s) carrying later-stop facts
+  [LOCAL-627 #7] Orientation phantom-name guard: no phantom names
+
+  [LOCAL-286] PHASE 5.97: Prolog-body deduplication (≥8 word overlap)...
+  [LOCAL-286] Deduplication: 0 sentence(s) removed from stop bodies
+
+  [LOCAL-292] Empty stop removal gate: PASSED (all 3 stops have narration)
+  [LOCAL-394] Stop count invariant: OK (3 selected == 3 delivered)
+  [D536] Listener asked for 3 stop(s), delivering 3 — request met
+  DEBUG - POI 1 content includes:
+    Specific Examples: False
+    Operational Details: True
+    Walking Directions: True
+  [T4] Transition to Stop 2: Continue through The National Gallery — next is Ophelia....
+  DEBUG - POI 2 content includes:
+    Specific Examples: False
+    Operational Details: False
+    Walking Directions: True
+  [T4] Transition to Stop 3: Your final stop in The National Gallery: The Supper at Emmau...
+  DEBUG - POI 3 content includes:
+    Specific Examples: False
+    Operational Details: False
+    Walking Directions: True
+  [LOCAL-280] Recap composition: 0.7s, $0.0024, 431 tokens
+  [LOCAL-280] Recap built: 22 words, 2 composed clauses (0 D177 rejected, 0 navigation rejected)
+    [The Toilet of Venus ('The Rokeby Venus')] (mystery): "This work stands out as the only surviving nude by Velázquez, the only surviving..."
+      → composed: "The Toilet of Venus, the sole surviving nude by Velázquez"
+    [Ophelia] (mystery): "Millais, a pivotal figure in chose to delve into the tragic beauty of Shakespear..."
+      → composed: "Ophelia, Millais' portrayal of Shakespeare's tragic character"
+    D177 verified: all 2 source facts present in delivered text
+  [LOCAL-280] Recap added: "That's 3 stops — The Toilet of Venus, the sole surviving nude by Velázquez and Ophelia, Millais' portrayal of Shakespeare's tragic character."
+  [LOCAL-275] Part 2: museum tour category, no restaurant found nearby
+  [D519] Treat Page: no treat within 1.0 km of any of 3 stop(s) (0 treat(s) with coordinates) — mention OMITTED
+  [LOCAL-275/D519] Part 2: nothing verified — no tour offer, no Treat Page
+  [LOCAL-275] Part 2 error: name '_venue_parts_used' is not defined
+  [LOCAL-275] Closing offer fallback (no verification passed)
+  [EPILOG] Journey epilog added to last stop
+  [S27] No cross-stop repetition detected
+  [D533] No cross-stop fact repetition detected
+  [D533] Person-year role guard: no mismatches (790227 chars of corpus checked)
+  [LOCAL-615] No duplicated paragraphs
+  [LOCAL-620] Story-balance stop-body policy: no change (3 stops scanned)
+  [LOCAL-623] Same-title bleed filter: no change (3 stops scanned)
+  [LOCAL-623] Museum-motif filter: no change (3 stops scanned)
+  [LOCAL-617] Conclusion de-dup: removed redundant 'This tour covered …' line (recap kept)
+
+  [LOCAL-36] Practical Facts Gate:
+    Claims found: 0
+    Verified: 0
+    Dropped: 0
+    AUDIT: NO_CLAIMS | (none) | (none) | PASS — no practical claims to verify
+[LOCAL-197] llm_cost() called with total_tokens (deprecated) by /app/generate_tour_text.py:24441. Caller should supply input_tokens and output_tokens separately.
+  [LOCAL-36] No practical claims found to verify (informational for tour_category='museum')
+  [D523] spoken-text hygiene: 0 template seam(s), 1 missing space(s), 0 spoken label(s), 0 dangling phrase(s) removed
+  [LOCAL-618 #2] grammar/splice lint: 4 flagged, 3 dropped, 1 rewritten ({'repeated_pair': 1, 'verbless': 3})
+  [LOCAL-618 #2] grammar/splice lint: 4 flagged, 3 dropped, 1 rewritten by_code={'repeated_pair': 1, 'verbless': 3}
+
+  [LOCAL-260] PROLOG STRUCTURE VALIDATION: 4 error(s), 0 warning(s)
+    [ERROR] Part 1: PART1_MISSING — Part 1 (Tour name and transportation mode) is not present.
+    [ERROR] Part 2: PART2_MISSING — Part 2 (Directions and physicality expectation (route substance)) is not present.
+    [ERROR] Part 3: PART3_MISSING — Part 3 (Purpose / intrigue with sourced facts) is not present.
+    [ERROR] Part 4: PART4_MISSING — Part 4 (Forward connection to stops) is not present.
+
+=== Word Count Statistics ===
+Stop 1: The Toilet of Venus ('The Rokeby Venus') - 311 words
+Stop 2: Ophelia - 267 words
+Stop 3: The Supper at Emmaus - 253 words
+===========================
+
+  [LOCAL-540] scorer ran on assembled tour (6585 chars, 3/3 stops)
+  [LOCAL-540] defects seen: ['dangling_reference', 'no_story']
+  [LOCAL-540]   dangling_reference [REQUIRED_CLEAN]: 1 dangling pronoun reference(s), e.g. 'His bold choice to depict a nude Venus was daring for a Span'
+  [LOCAL-540]   no_story [advisory]: no named people anywhere in the tour
+  [LOCAL-540] REQUIRED_CLEAN defect present (['dangling_reference']) — issuing ONE retry over 1 section(s)
+  [LOCAL-540] retry: regenerating stop (stop 1) for ['dangling_reference']
+  [LOCAL-540] retry rewrite: 1135 tokens, $0.005395 (gpt-4o)
+  [LOCAL-540] rescored after retry: defects ['dangling_reference', 'no_story'] -> ['no_story', 'thin']
+  [LOCAL-540] retry removed: ['dangling_reference']
+  [LOCAL-540] retry cleared all REQUIRED_CLEAN defects
+[LOCAL-628] stop 1: edited
+[LOCAL-628] stop 3: rejected(length -31%)
+[LOCAL-628] editor pass complete: 1 edited, 1 kept original
+  [LOCAL-619B] thematic conclusion built from final text: 3 delivered stop(s), thread='Vigée Le Brun's Influence and Technique'
+
+Total API cost: $0.3512 (34433 tokens)
+Grounding:      $0.0560 (4 queries, 6 requests)
+Tour total:     $0.4072
+Provenance:     0/31 factual sentences sourced, 31 unsourced (0 corpus, 0 grounded, 31 parametric)
+  [LOCAL-630 item 7] stripped editor marker from delivered tour_content (kept in cache/pool for idempotence)
+
+Tour text generated successfully!
+  [LOCAL-230] Network failures: 0 (all API calls succeeded)
+Saved to: /app/tours/LOCAL630_NATIONAL_GALLERY.txt
+  [C5-5] Evidence persisted: /app/tours/LOCAL630_NATIONAL_GALLERY_evidence.json
+
+Preview of the generated tour:
+
+Step-by-step audio guided tour of the National Gallery in London, UK, museum tour.
+
+Stop 1: The Toilet of Venus ('The Rokeby Venus')
+
+Address:
+
+Coordinates: 51.5081, -0.128
+
+To truly appreciate the sensual allure of Diego Velázquez's "The Toilet of Venus ('The Rokeby Venus')," stand directly in front of the painting and let the soft interplay of light and shadow draw you into the intimate world Velázquez created. This vantage point reveals the delicate contrast between the pale skin of Venus and...
+
+
+========================================================================
+  [LOCAL-410] CHAIN INSTRUMENTATION (post-generation)
+========================================================================
+    The Toilet of Venus ('The Rokeby Venus'): serp_results=21 snippets_injected=27 beats_in_delivered_text=0
+    Ophelia: serp_results=16 snippets_injected=26 beats_in_delivered_text=0
+    The Supper at Emmaus: serp_results=19 snippets_injected=27 beats_in_delivered_text=0
+========================================================================
+[TIMING] phase=packing elapsed=25.0s cumulative=368.6s
+[TIMING] phase=verification elapsed=0.0s cumulative=368.6s
+[TIMING] TOTAL wall=368.6s phases: story_first=165.7s, poi_selection=77.2s, external_lookups=76.0s, packing=25.0s, fact_sheets=23.4s, intent=1.4s, narration=0.0s, verification=0.0s
+  [LOCAL-629 item 4] spoke the preflight's known hours/admission in Stop 1 (were only in a field line)
+  [LOCAL-619B] thematic conclusion already present and count OK (3 stop(s)); preserved (every-path guard)
+OUTCOME: DELIVERED — 6524 chars, 3 stops, wall 383.9s
+  STOP TITLE: The Toilet of Venus ('The Rokeby Venus')
+  STOP TITLE: Ophelia
+  STOP TITLE: The Supper at Emmaus
+  HOURS(spoken): The museum is open daily from 10:00 am to 6:00 pm, and Fridays until 9:00 pm (closed December 24–26 and January 1).
+  ADMISSION(spoken): the left of "Ophelia" to take in the cascade of flowers that float along the stream, guiding your eye from her delicate hands to the vivid blooms that ripple through the painting. From this vantage, the emotional depth of Millais’ work comes alive, drawing you into the poignant tale embedded within its brushstrokes. The museum is open daily from 10:00 am to 6:00 pm, and Fridays until 9:00 pm (closed December 24–26 and January 1). admission is General admission is free (donations welcome; advance booking recommended, though walk-up entry is available).
+  --- CONCLUSION ---
+    This tour highlights the influence and technique of Vigée Le Brun, showcasing how emotional depth and naturalistic settings resonate across various masterpieces. Understanding this connection enriches our appreciation of how art captures and shapes our perceptions of reality. That's 3 stops in all.
+    If you would like to eat nearby we can build you a restaurant tour.
+    Sources: This tour draws on information from www.nationalgallery.org.uk and the Wikipedia article on the museum.
+  --- end conclusion ---
+  [item 7] editor marker absent from delivered text — OK
+[cost] tour_total=$0.7715
+STORED audio_tours id = 500  (is_test=true)
+LOCAL630_TOUR_ID=500
+
+[db] audio_tours row count AFTER: 306
+[db] paid_api_calls spend for host 11682218bda5 AFTER: $0.603969
+=== LOCAL-630 run complete ===
+LOCAL630_TOUR_IDS=500
+[COST_METER] FRESH | tour_generate | $0.741235 | user=TEST-LOCAL-630 | job=None
+[LIVE_RUN_METER] TEST-LOCAL-630  (cap $0.90, all providers combined)
+  openai            $0.6294
+  gemini_grounding  $0.0560  (requests=6, queries=4)
+  gemini_tokens     $0.0239
+  serper            $0.0320
+  preflight         $0.0302
+  TOTAL             $0.7412   description='test run'
+[LIVE_RUN_METER] cost_ledger row 1bf57581-cab4-426a-bd55-0d0fe2261ff8 (user_id=TEST-LOCAL-630, description='test run')
