@@ -122,6 +122,39 @@ def test_full_splice_is_not_shipped_end_to_end():
     assert not passed and reason == "type_mismatch_work_for_person"
 
 
+def test_earlier_tour_454_van_ruisdael_same_class():
+    """The same person-glossed-as-work class appeared earlier in tour 454:
+        "...a time when van Ruisdael, the 1665 Baroque landscape painting, was
+         working..."
+    The person van Ruisdael must not receive the work's description.
+    """
+    host = ("The painting before you is oil on canvas, created around "
+            "1670-1675, a time when van Ruisdael was working at the height of "
+            "his powers.")
+    passed, reason = urg.validate_gloss(
+        "the 1665 Baroque landscape painting", host, "van Ruisdael",
+        category="person")
+    assert not passed and reason == "type_mismatch_work_for_person"
+
+
+def test_role_phrase_glosses_are_not_blocked():
+    """Precision: a person gloss that merely NAMES an art form in a role phrase
+    must NOT be rejected — over-blocking a real artist gloss is the same family
+    of damage as the splice.
+    """
+    host = "This work was created by the master himself."
+    for gloss in [
+        "a prominent figure in the Hudson River School of painting",
+        "a master of landscape painting",
+        "a pioneer of abstract sculpture",
+        "an engraver and painter of religious scenes",
+        "a Danish merchant known for his interest in art",
+    ]:
+        passed, reason = urg.validate_gloss(gloss, host, "Someone",
+                                            category="person")
+        assert passed, f"role-phrase person gloss wrongly rejected ({reason}): {gloss!r}"
+
+
 # ── Deliverable 2: no truncated clauses ────────────────────────────────────────
 
 # The exact 470 Stop 2 truncation.
@@ -182,6 +215,29 @@ def test_validate_degrade_output_reports_truncated_clause():
     issues = urg.validate_degrade_output(TRUNCATED_470)
     guards = {i["guard"] for i in issues}
     assert "truncated_clause" in guards, issues
+
+
+# ── Deliverable 3: a further class found by the scan — empty interpolated field ─
+
+def test_empty_parenthetical_field_repaired_exact_469():
+    """Tour 469 (Unterlinden) shipped '...pour les Musées (État / ), and private
+    donors.' — a field interpolation left an empty parenthetical. Repair excises
+    the broken parenthetical and keeps the real funding story."""
+    text = ("This addition was made possible through the Fonds Régional "
+            "d'Acquisition pour les Musées (État / ), and private donors.")
+    repaired, _ = urg.validate_and_repair_full_text(text)
+    assert "(État / )" not in repaired and "( /" not in repaired
+    assert "private donors" in repaired  # the real content survives
+
+
+def test_legitimate_parentheticals_preserved():
+    for s in [
+        "Schongauer, a master engraver born in Colmar (around 1445), crafted this.",
+        "the Isenheim Altarpiece (1512-1516) remains a symbol.",
+        "the museum (open daily except Tuesday) welcomes visitors.",
+    ]:
+        repaired, _ = urg.validate_and_repair_full_text(s)
+        assert repaired.strip() == s.strip(), f"legit parenthetical changed: {repaired!r}"
 
 
 if __name__ == "__main__":

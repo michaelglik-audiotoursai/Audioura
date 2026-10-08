@@ -782,6 +782,48 @@ _WORK_DESCRIPTOR_IN_PERSON_GLOSS = re.compile(
 _WORK_BY_OPENER = re.compile(
     r'^\s*(?:a|an|the)\s+[\w\s-]{0,40}?\bby\b', re.IGNORECASE)
 
+# The appositive's HEAD noun is a work form: "a/an/the [modifiers] <work-noun>"
+# where the work-noun is the head of the phrase — it is followed by a
+# preposition, comma, period, apostrophe-s, conjunction, or the end of string,
+# NOT by a further content noun. This is what distinguishes
+#   "an oil-on-canvas painting"           (work: head is "painting")  → fires
+#   "a bronze sculpture"                  (work: head is "sculpture") → fires
+# from
+#   "a master of landscape painting"      (person: "painting" is governed by
+#                                           "of", not the head)       → silent
+#   "a figure in the School of painting"  (person)                    → silent
+_WORK_HEAD = (
+    r'(?:painting|canvas|sculpture|statue|bronze|engraving|etching|'
+    r'lithograph|woodcut|fresco|watercolou?r|gouache|tempera|altarpiece|'
+    r'triptych|diptych|portrait|still\s+life|artwork)')
+_WORK_HEAD_NOUN = re.compile(
+    r'^\s*(?:a|an|the)\s+'
+    r'(?:[\w-]+(?:\s+[\w-]+){0,4}\s+)?'   # up to 5 modifier tokens
+    r'(?:oil[- ]on[- ]canvas\s+)?'
+    + _WORK_HEAD +
+    r"(?:s)?\b",
+    re.IGNORECASE)
+
+# A person-role noun — if present, the gloss describes the HUMAN, and any
+# art-form word in it is a role phrase ("a master of landscape painting"), not
+# the head. Vetoes _WORK_HEAD_NOUN so legitimate artist glosses are never
+# blocked. The whole point of LOCAL-624 is to type-match, and over-blocking a
+# real artist gloss is the same family of damage as the splice itself.
+_PERSON_ROLE_NOUN = re.compile(
+    r'\b(?:painter|sculptor|artist|engraver|draughtsman|draftsman|printmaker|'
+    r'master|pioneer|figure|exponent|practitioner|proponent|student|pupil|'
+    r'teacher|professor|founder|member|leader|champion|portraitist|'
+    r'muralist|illustrator|designer|architect|photographer|craftsman|'
+    r'merchant|collector|patron|dealer|historian|critic|poet|writer|author|'
+    r'composer|musician|king|queen|duke|count|baron|monk|priest|saint)\b',
+    re.IGNORECASE)
+
+# "a version of ...", "a copy of ...", "a reproduction/rendering/depiction of"
+_WORK_VERSION_OPENER = re.compile(
+    r'^\s*(?:a|an|the)\s+(?:[\w-]+\s+){0,3}'
+    r'(?:version|copy|reproduction|rendering|variant|replica)\s+of\b',
+    re.IGNORECASE)
+
 
 def _is_person_category(category: Optional[str]) -> bool:
     """True when the flagged entity is a human being."""
@@ -792,20 +834,36 @@ def _gloss_describes_a_work(gloss: str) -> bool:
     """[LOCAL-624] Does this gloss describe a work of art rather than a person?
 
     Used only to validate glosses attached to PERSON entities. A person's gloss
-    may legitimately say the person is a *painter* or that they *painted* works,
-    so we match the nouns/forms that only a WORK can be ("an oil-on-canvas
-    painting", "a bronze sculpture", "a version of ..."), not the verbs of
-    making ("painted", "sculpted") which describe the person correctly.
+    may legitimately NAME an art form in a role phrase — "a master of landscape
+    painting", "a prominent figure in the Hudson River School of painting" — so
+    a bare mention of "painting"/"sculpture" is NOT sufficient. The defect is
+    the appositive BEING a work: the work-noun is the HEAD of the phrase
+    ("an oil-on-canvas painting", "a bronze sculpture", "a striking marble
+    statue"), or the phrase opens as "a version/copy of ..." or "a <thing> by
+    <someone>". Those three shapes never describe a human; the role phrases do.
     """
     g = (gloss or '').strip()
     if not g:
         return False
-    if _WORK_DESCRIPTOR_IN_PERSON_GLOSS.search(g):
+    # A person-role noun anywhere means the gloss describes the HUMAN, even when
+    # it also names an art form in a role phrase: "a master of landscape
+    # painting", "a pioneer of abstract sculpture", "a figure in the Hudson
+    # River School of painting". These are never a work.
+    if _PERSON_ROLE_NOUN.search(g):
+        return False
+    # 1. The appositive's HEAD noun is a work form: "a/an/the [modifiers]
+    #    <work-noun>" with the work-noun ending the head (followed by a
+    #    preposition, comma, period, or end — not by another content noun).
+    if _WORK_HEAD_NOUN.search(g):
         return True
-    # "a <stuff> by <someone>" with no personhood word — the gloss frames the
-    # entity as an object authored by another, e.g. "an oil-on-canvas painting
-    # by Bloch". Guard against false positives like "a sculptor known for ...".
-    if _WORK_BY_OPENER.search(g):
+    # 2. "a version of ...", "a copy of ...", "a reproduction of ..." — only a
+    #    work is a version/copy of something.
+    if _WORK_VERSION_OPENER.search(g):
+        return True
+    # 3. "a <thing> by <someone>" where <thing> is a work form — the gloss frames
+    #    the entity as an object authored by another ("an oil-on-canvas painting
+    #    by Bloch").
+    if _WORK_BY_OPENER.search(g) and _WORK_DESCRIPTOR_IN_PERSON_GLOSS.search(g):
         return True
     return False
 
@@ -1908,6 +1966,17 @@ def _sentences_removed(original: str, gated: str) -> List[str]:
 
 # ─── Degrade output validators (LOCAL-289) ─────────────────────────────────────
 
+# [LOCAL-624] An empty / half-empty parenthetical — a field interpolation whose
+# value never arrived: "(État / )", "( / )", "()", "( )". The paren holds no
+# alphanumeric VALUE: either nothing, or only a label/word(s) terminated by a
+# dangling separator (/, -, ,, :) with whitespace to the closing paren. Repaired
+# (excised) by validate_and_repair_full_text rather than dropping the sentence.
+_EMPTY_PARENTHETICAL = re.compile(
+    r'\s*\('
+    r'(?:[^()\d]*?[/,:\-–—]\s*|\s*)'   # optional label then a dangling sep, or empty
+    r'\)',
+)
+
 # Patterns that must NEVER appear in delivered text
 _DEGRADE_GUARD_BARE_POSSESSIVE = re.compile(r"\s's\b")
 _DEGRADE_GUARD_STACKED_PREPS = re.compile(
@@ -1962,15 +2031,26 @@ _DEGRADE_GUARD_OBJECT_DROPPED = re.compile(
 #   2. a bare transitive verb immediately before the period, with a relative
 #      pronoun earlier in the clause governing it
 #
-# Scoped to a RELATIVE-PRONOUN context so it never fires on a legitimate
-# intransitive ending ("the crowd gathered.", "the sun had risen.").
+# Scoped to a RELATIVE-PRONOUN context AND an explicit TRANSITIVE-ONLY verb set,
+# so it never fires on a legitimate complete relative clause whose verb is
+# intransitive-capable ("the guitars that followed.", "the movement that
+# emerged.", "the crowd that gathered."). The verbs below obligatorily take a
+# direct object, so "that <verb>." at the end of a sentence means the object was
+# excised. A broad "[a-z]+ed" shape was tried and deleted the well-formed
+# "...modern guitars that followed." on the Palais Lascaris text — the exact
+# over-eager-rule damage this gate's history warns against — so the set is
+# closed and transitive-only.
+_DANGLING_TRANSITIVE_VERB = (
+    r'characterized|characterised|revealed|depict(?:s|ed)?|portray(?:s|ed)?|'
+    r'defined|shaped|embodied|captured|influenced|governed|informed|'
+    r'typified|exemplified|distinguished|dominated|unified|epitomized|'
+    r'epitomised|symbolized|symbolised|represented|reflected|expressed|'
+    r'conveyed|evoked|inspired|produced|created|painted|sculpted|rendered|'
+    r'illustrated|designed|established|influenced|championed|pioneered')
 _DEGRADE_GUARD_DANGLING_RELATIVE = re.compile(
-    r'\b(?:that|which|who|whom|whose|where)\s+'
+    r'\b(?:that|which|who|whom|whose)\s+'
     r'(?:[a-z]+ly\s+)?'               # optional adverb: "that subtly revealed."
-    r'(?:[a-z]+ed|[a-z]+s|'           # -ed / -s verb forms
-    r'characterized|revealed|depicts?|portrays?|defined|shaped|'
-    r'embodied|captured|influenced|governed|marked|informed|'
-    r'typified|exemplified|distinguished|dominated|unified)'
+    r'(?:' + _DANGLING_TRANSITIVE_VERB + r')'
     r'\s*\.\s*$',
     re.IGNORECASE,
 )
@@ -2251,6 +2331,26 @@ def validate_and_repair_full_text(full_text: str) -> Tuple[str, List[Dict]]:
     Returns (repaired_text, dropped_sentences_log).
     """
     dropped = []
+
+    # [LOCAL-624] First, REPAIR empty/half-empty parentheticals in place rather
+    # than dropping the whole sentence. The 2026-10-08 Unterlinden run (tour 469)
+    # shipped "the Fonds Régional d'Acquisition pour les Musées (État / ), and
+    # private donors" — a field interpolation left a parenthetical whose value is
+    # empty ("(État / )", "( / )"). Dropping the sentence would lose a real,
+    # correct funding story; excising the broken parenthetical keeps it. Only
+    # parentheticals that are empty, or hold just a label followed by a dangling
+    # separator with no value, are removed.
+    before_paren = full_text
+    full_text = _EMPTY_PARENTHETICAL.sub('', full_text)
+    full_text = re.sub(r'\s{2,}', ' ', full_text)
+    full_text = re.sub(r'\s+([,.;:])', r'\1', full_text)
+    full_text = re.sub(r',\s*,', ',', full_text)
+    if full_text != before_paren:
+        dropped.append({
+            'sentence': '(empty parenthetical removed)',
+            'reason': 'empty_parenthetical_repaired',
+        })
+
     sentences = _split_sentences(full_text)
 
     for sent in sentences:
