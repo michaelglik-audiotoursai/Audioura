@@ -23383,6 +23383,60 @@ RULES:
         except Exception as _stbg_err:
             print(f"  [LOCAL-623] Same-title bleed filter error (non-fatal): {_stbg_err}")
 
+    # -------- [LOCAL-626 item 5] Object-TYPE bleed filter --------------------
+    # Tour 485 Stop 3 ("Footed Bowl with the Crucifixion" — a maiolica BOWL) said
+    # "this Crucifixion PANEL was specifically created for a hospital chapel". A
+    # panel is a different KIND of object from a bowl: a same-title bleed that the
+    # LOCAL-623 artist binding does not catch (no wrong artist). Bind each stop to
+    # its OBJECT KIND (from title + material) and drop a sentence that re-labels
+    # the object an incompatible kind. Museum tours only; never empties a stop.
+    if tour_category == 'museum':
+        try:
+            import same_title_bleed_guard as _otg
+            _ot_titles, _ot_materials = {}, {}
+            try:
+                for _si, _sp in enumerate(poi_list, 1):
+                    _ot_titles[_si] = _sp.get('name', '') or ''
+                    _ot_materials[_si] = (_sp.get('material', '')
+                                          or _sp.get('medium', '') or '')
+            except Exception:
+                pass
+            complete_tour, _otg_rep = _otg.filter_tour_text_object_type(
+                complete_tour, stop_titles=_ot_titles, stop_materials=_ot_materials)
+            if _otg_rep.get('changed'):
+                print(f"  [LOCAL-626] Object-type bleed filter: dropped "
+                      f"{_otg_rep['dropped']} wrong-object-kind sentence(s) across "
+                      f"{_otg_rep['stops']} stops")
+        except Exception as _otg_err:
+            print(f"  [LOCAL-626] Object-type bleed filter error (non-fatal): {_otg_err}")
+
+    # -------- [LOCAL-626 item 5] Same-stop date-consistency filter -----------
+    # Tour 485 Stop 3 dated the SAME bowl "between 1550 and 1570" (the corpus
+    # date) AND "during the period 1510-1571" (invented) in one stop. One date per
+    # work, the corpus date wins: keep the sentence whose creation date matches the
+    # corpus period (from the stop's SPARQL/catalogue date, else the stop title's
+    # date, else the first date stated) and drop sentences asserting a conflicting
+    # work date. A PERSON's dates ("Patanazzi, active 1515-1587") are left alone.
+    # Museum tours only; never empties a stop.
+    if tour_category == 'museum':
+        try:
+            import date_consistency_guard as _dcg
+            _dc_dates = {}
+            try:
+                for _si, _sp in enumerate(poi_list, 1):
+                    _dc_dates[_si] = (_sp.get('period', '') or _sp.get('date', '')
+                                      or _sp.get('name', '') or '')
+            except Exception:
+                pass
+            complete_tour, _dcg_rep = _dcg.filter_tour_text_date_consistency(
+                complete_tour, stop_corpus_dates=_dc_dates)
+            if _dcg_rep.get('changed'):
+                print(f"  [LOCAL-626] Date-consistency filter: dropped "
+                      f"{_dcg_rep['dropped']} conflicting-date sentence(s) across "
+                      f"{_dcg_rep['stops']} stops")
+        except Exception as _dcg_err:
+            print(f"  [LOCAL-626] Date-consistency filter error (non-fatal): {_dcg_err}")
+
     # -------- [LOCAL-623 defect 2 / D634] Recurring museum-motif filter -------
     # Tour 468 wove an abstract "museum story of preservation and renewal /
     # concealment and revelation" refrain through BOTH stop bodies. Per D634 the
