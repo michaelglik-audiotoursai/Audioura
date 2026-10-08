@@ -7404,6 +7404,22 @@ def _apply_delivery_hours_guard(result):
                       f"from delivered text (every-path guard)", flush=True)
         except Exception as _de:  # pragma: no cover
             _import_logger.error(f"[LOCAL-616] paragraph dedupe skipped: {_de}")
+        # 2b. [LOCAL-618 #4] If — after the fold — the tour still speaks NO hours
+        #     (the venue published none, so there was nothing to fold), say the
+        #     honest line once. The fresh museum path does not always build the
+        #     About opening section that carries this sentence, so three live
+        #     critiques flagged "hours never spoken"; this guarantees it on every
+        #     museum path. Never invents hours; a no-op when hours are addressed.
+        #     Runs AFTER the dedupe so it cannot defeat duplicate-orientation removal.
+        try:
+            import practical_facts_gate as _pfg
+            final, _added_hours_line = _pfg.ensure_unpublished_hours_line(final)
+            if _added_hours_line:
+                print("  [LOCAL-618 #4] no hours were published — said so once "
+                      "('Opening hours weren't published where we could read them')",
+                      flush=True)
+        except Exception as _uh:  # pragma: no cover
+            _import_logger.error(f"[LOCAL-618] unpublished-hours line skipped: {_uh}")
         # 3. Drop (or translate) any genuinely-foreign spoken sentence wherever it
         #    entered the pipeline — the fresh-path closing recap leaked untranslated
         #    French ("La galerie a été construite entre 1929 et 1930…"). English is

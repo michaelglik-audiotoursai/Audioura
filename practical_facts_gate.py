@@ -866,6 +866,81 @@ def collapse_website_pointers(text: str) -> Tuple[str, int]:
 
 
 # ---------------------------------------------------------------------------
+# [LOCAL-618 #4] Say the honest unpublished-hours line, once, on EVERY path
+# ---------------------------------------------------------------------------
+#
+# The fresh museum path does not always build the About opening section that
+# carries _visiting_fallback_sentence, so a tour whose venue published no hours
+# shipped with NOTHING said about hours — three live critiques flagged
+# "hours & admission never spoken" as a High defect. This tour-wide guard, run on
+# the delivered text, inserts the honest line ONCE after the Stop-1 orientation
+# when (a) no concrete hours are spoken anywhere and (b) the line is not already
+# present. It never invents hours and never fires when real hours are present.
+
+_UNPUBLISHED_HOURS_LINE = "Opening hours weren't published where we could read them."
+
+# A sentence that STATES concrete opening hours (a time, a weekday range, "open
+# daily"), or admission — anything that means the tour already speaks visiting info.
+_SPOKEN_HOURS_RE = re.compile(
+    r"(?i)(\bis\s+open\b|\bopen\s+daily\b|\d\s*(?:am|pm)\b|\d{1,2}:\d{2}|"
+    r"\bopen\s+(?:mon|tue|wed|thu|fri|sat|sun)|admission\s+is\b|\bfree\s+admission\b|"
+    r"Museum Information)")
+
+
+def tour_speaks_hours(text: str) -> bool:
+    """True when the delivered text already addresses hours/admission — either by
+    stating concrete hours/admission, or by carrying a website-pointer / honest
+    'weren't published' sentence. In all these cases there is nothing to add."""
+    if _SPOKEN_HOURS_RE.search(text or ""):
+        return True
+    # An existing pointer / honest line already addresses hours — don't double up.
+    if _WEBSITE_POINTER_SENT_RE.search(text or ""):
+        return True
+    return False
+
+
+def ensure_unpublished_hours_line(text: str) -> Tuple[str, bool]:
+    """Insert the honest unpublished-hours line once when no hours are spoken.
+
+    Returns ``(text, inserted)``. Deterministic, pure. Does nothing when the tour
+    already speaks hours/admission or already carries the honest line, and only
+    fires for a MUSEUM-context tour (a walking/neighbourhood tour has no single
+    building whose hours a visitor would check). The line is placed at the end of
+    the Stop-1 orientation paragraph, so the listener hears it up front.
+    """
+    if not text or not text.strip():
+        return text or "", False
+    if _UNPUBLISHED_HOURS_LINE in text:
+        return text, False
+    if tour_speaks_hours(text):
+        return text, False
+    # Museum-context gate: the honest hours line is only meaningful for a venue the
+    # visitor enters. Require a museum/gallery signal in the delivered text.
+    if not re.search(r"(?i)\b(museum|gallery|galleries|mus[ée]e|museo|kunst|collection)\b", text):
+        return text, False
+
+    paras = text.split("\n\n")
+    # Prefer the Stop-1 orientation paragraph.
+    _target = None
+    for i, p in enumerate(paras):
+        if re.search(r"(?i)^\s*(?:stop\s*1\b.*)?orientation:", p) or "Orientation:" in p:
+            _target = i
+            break
+    if _target is None:
+        # Fall back to the first non-empty paragraph.
+        for i, p in enumerate(paras):
+            if p.strip():
+                _target = i
+                break
+    if _target is None:
+        return text, False
+
+    sep = "" if paras[_target].rstrip().endswith((".", "!", "?")) else "."
+    paras[_target] = paras[_target].rstrip() + sep + " " + _UNPUBLISHED_HOURS_LINE
+    return "\n\n".join(paras), True
+
+
+# ---------------------------------------------------------------------------
 # CLI: run gate on a tour file
 # ---------------------------------------------------------------------------
 

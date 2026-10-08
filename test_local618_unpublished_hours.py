@@ -58,6 +58,42 @@ def test_honest_line_recognised_as_pointer():
     assert is_website_pointer_sentence(HONEST)
 
 
+def test_every_path_inserts_honest_line_when_no_hours():
+    """A delivered tour that speaks no hours gets the honest line once, after the
+    Stop-1 orientation."""
+    from practical_facts_gate import ensure_unpublished_hours_line, tour_speaks_hours
+    text = (
+        "Stop 1: The Virgin of the Napkin\n\n"
+        "Orientation: You are at the Museo de Bellas Artes de Sevilla.\n\n"
+        "Murillo painted this Virgin in 1678.\n\n"
+        "Stop 2: Another work\n\nIt hangs nearby."
+    )
+    assert not tour_speaks_hours(text)
+    out, inserted = ensure_unpublished_hours_line(text)
+    assert inserted is True
+    assert out.count(HONEST) == 1
+    # Placed in the orientation paragraph, up front.
+    _orient_para = [p for p in out.split("\n\n") if "Orientation:" in p][0]
+    assert HONEST in _orient_para
+
+
+def test_every_path_noop_when_hours_spoken():
+    from practical_facts_gate import ensure_unpublished_hours_line
+    text = ("Orientation: You are at the museum.\n\n"
+            "The museum is open Tuesday to Sunday, 10:00 AM to 6:00 PM.")
+    out, inserted = ensure_unpublished_hours_line(text)
+    assert inserted is False
+    assert HONEST not in out
+
+
+def test_every_path_noop_when_line_already_present():
+    from practical_facts_gate import ensure_unpublished_hours_line
+    text = "Orientation: You are at the museum. " + HONEST
+    out, inserted = ensure_unpublished_hours_line(text)
+    assert inserted is False
+    assert out.count(HONEST) == 1
+
+
 if __name__ == "__main__":
     import traceback
     fns = [v for k, v in sorted(globals().items()) if k.startswith("test_") and callable(v)]
