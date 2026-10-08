@@ -55,17 +55,25 @@ class TestComposedVisitingSentenceNoDomain(unittest.TestCase):
             "$12 for adults, $8 for seniors, students and teachers")
         self.assertNotIn("griffinmuseum.org", section)
         self.assertNotRegex(section, r"(?i)as listed on")
-        # The honesty stamp (month) and the no-domain phrasing both present.
-        self.assertRegex(section, r"(?i)as published by the museum in October 2026")
+        # [LOCAL-623 defect 4 supersedes LOCAL-614 item 4] The spoken sentence no
+        # longer carries the month stamp either — the critique flagged "as
+        # published by the museum in October 2026" as a citation leftover a
+        # listener hears aloud. Provenance (domain AND date) is text-view only.
+        self.assertNotRegex(section, r"(?i)as published by the museum")
+        # The facts themselves are still spoken.
+        self.assertIn("is open", section)
+        self.assertIn("Admission is", section)
 
     def test_free_admission_line_no_domain(self):
         # The exact McMullen shape the critique flagged ("free, as listed on
-        # bc.edu in October 2026") must now read without the domain.
+        # bc.edu in October 2026") must now read without the domain — and
+        # [LOCAL-623] without the spoken month stamp.
         section = am._compose_visiting_sentences(
             "Open Monday–Friday 10 AM–5 PM. Free admission",
             "McMullen Museum of Art", "bc.edu", "October 2026")
         self.assertNotIn("bc.edu", section)
-        self.assertIn("as published by the museum in October 2026", section)
+        self.assertNotIn("as published by the museum", section)
+        self.assertIn("Admission is free", section)
 
 
 if __name__ == "__main__":
