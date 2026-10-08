@@ -7662,12 +7662,37 @@ def _apply_delivery_hours_guard(result):
         #     Runs AFTER the dedupe so it cannot defeat duplicate-orientation removal.
         try:
             import practical_facts_gate as _pfg
+            # [LOCAL-629 item 4] If the venue preflight KNOWS the hours/admission
+            # (Van Gogh / Belvedere both publish them) but the delivered PROSE
+            # speaks none — they only landed in a non-spoken "Museum Information:"
+            # field line — inject a real SPOKEN sentence into the Stop-1 opening.
+            # Grounded values only (never invents); no-op when prose already speaks
+            # hours. This runs BEFORE the unpublished-hours line so a famous museum
+            # that publishes hours actually speaks them.
+            _pf_state = _LAST_VENUE_PREFLIGHT or {}
+            if (_pf_state and not _pf_state.get('error') and not _pf_state.get('skipped')
+                    and (_pf_state.get('hours') or _pf_state.get('admission'))):
+                try:
+                    _pf_hours = _pf_state.get('hours', '')
+                    # Never speak "open daily" when a closed weekday is named.
+                    try:
+                        import venue_preflight as _vpf_h
+                        _pf_hours = _vpf_h.reconcile_daily_with_closed_days(_pf_hours)
+                    except Exception:
+                        pass
+                    final, _spoke_hours = _pfg.ensure_spoken_hours_line(
+                        final, hours=_pf_hours, admission=_pf_state.get('admission', ''))
+                    if _spoke_hours:
+                        print("  [LOCAL-629 item 4] spoke the preflight's known "
+                              "hours/admission in Stop 1 (were only in a field line)",
+                              flush=True)
+                except Exception as _sh:  # pragma: no cover
+                    _import_logger.error(f"[LOCAL-629] spoken-hours inject skipped: {_sh}")
             # [LOCAL-627 defect 2] Only assert "hours weren't published" when the
             # hours preflight RAN successfully and genuinely returned no hours. If
             # the preflight errored or was skipped (a transient failure — the Prado
             # publishes hours but tour 487's preflight failed), say NOTHING instead
             # of a false claim.
-            _pf_state = _LAST_VENUE_PREFLIGHT or {}
             _hours_genuinely_absent = bool(
                 _pf_state
                 and not _pf_state.get('error')

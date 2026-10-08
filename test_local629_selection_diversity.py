@@ -247,6 +247,35 @@ class TestItem4HoursSpoken(unittest.TestCase):
             museum_text, hours_genuinely_absent=False)
         self.assertFalse(inserted)
 
+    def test_known_hours_spoken_when_only_in_field_line(self):
+        # The Belvedere/Van Gogh live defect: hours were KNOWN but only landed in
+        # a non-spoken "Museum Information:" field line, so no hours were SPOKEN.
+        # ensure_spoken_hours_line injects a real spoken sentence into Stop 1.
+        museum_text = (
+            "Step-by-step tour of the museum.\n\n"
+            "Stop 1: Madonna del Prato\n\n"
+            "Museum Information: Tuesday to Sunday, 11 AM-6 PM. €65\n\n"
+            "Orientation: You are at the Belvedere. Stand before the painting.\n")
+        # A bare "Museum Information:" field line is NOT spoken hours.
+        self.assertFalse(pfg.tour_speaks_hours_in_prose(museum_text))
+        out, inserted = pfg.ensure_spoken_hours_line(
+            museum_text, hours="Tuesday to Sunday, 11 AM-6 PM",
+            admission="€65")
+        self.assertTrue(inserted)
+        self.assertTrue(pfg.tour_speaks_hours_in_prose(out))
+        self.assertIn("open", out.lower())
+        self.assertIn("€65", out)
+
+    def test_spoken_hours_noop_when_prose_already_speaks(self):
+        # No double-up: when prose already states hours, inject nothing.
+        text = ("Tour of the museum.\n\n"
+                "Stop 1: A Work\n\nOrientation: The museum is open daily 9 AM-6 PM. "
+                "Stand before the work.\n")
+        out, inserted = pfg.ensure_spoken_hours_line(
+            text, hours="daily 9 AM-6 PM", admission="€10")
+        self.assertFalse(inserted)
+        self.assertEqual(out, text)
+
 
 if __name__ == "__main__":
     unittest.main()
