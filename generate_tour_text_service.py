@@ -367,7 +367,33 @@ def generate_tour_async(job_id, location, tour_type, total_stops=10, user_id=Non
             if os.path.exists(temp_path):
                 os.unlink(temp_path)
             return
-        
+
+        # [LOCAL-622] Cancellation checkpoint — BEFORE any spend. If the
+        # orchestrator gave up on this job (POST /cancel/<job_id>), stop here so
+        # we do NOT meter cost or charge the wallet for a tour nobody will
+        # receive (D635: a finished-then-discarded tour still cost $0.60). The
+        # generation work above already happened, but every spend-incurring step
+        # (cost metering, cost-ceiling, wallet charge, TTS) is still ahead of us.
+        try:
+            from job_cancellation import is_cancelled as _is_cancelled, clear as _clear_cancel
+            if _is_cancelled(job_id):
+                _svc_logger.warning(
+                    f"[LOCAL-622] Job {job_id} cancelled by orchestrator — "
+                    f"aborting before spend (no metering, no charge).")
+                ACTIVE_JOBS.update(
+                    job_id, status="error",
+                    error="Generation cancelled: the request was abandoned before billing.",
+                    error_code="cancelled")
+                _clear_cancel(job_id)
+                if os.path.exists(temp_path):
+                    try:
+                        os.unlink(temp_path)
+                    except Exception:
+                        pass
+                return
+        except ImportError:
+            pass  # cancellation module absent — behave as before
+
         # [LOCAL-60] Record operation cost immediately after generation (before QA gate)
         # This ensures cache hits are always metered even if QA subsequently rejects.
         _our_cost = 0.0
@@ -951,9 +977,20 @@ def generate_tour_async(job_id, location, tour_type, total_stops=10, user_id=Non
                           **_l582_extra,
                           **({"tour_content": tour_content_str} if tour_content_str else {}),
                           **({"i_con_avg": _icon_result["tour_avg"]} if _icon_result else {}))
-        
+        # [LOCAL-622] Job finished — forget any cancel flag so the set stays bounded.
+        try:
+            from job_cancellation import clear as _clear_cancel_done
+            _clear_cancel_done(job_id)
+        except ImportError:
+            pass
+
     except Exception as e:
         ACTIVE_JOBS.update(job_id, status="error", error=str(e))
+        try:
+            from job_cancellation import clear as _clear_cancel_err
+            _clear_cancel_err(job_id)
+        except ImportError:
+            pass
 
 @app.route('/health', methods=['GET'])
 def health_check():
@@ -1076,6 +1113,39 @@ def generate_tour():
     
     return jsonify({"job_id": job_id, "status": "queued"})
 
+@app.route('/cancel/<job_id>', methods=['POST'])
+def cancel_job(job_id):
+    """[LOCAL-622] Ask a running generation job to stop.
+
+    The orchestrator calls this when it gives up on a job (only after a real
+    5-minute no-progress stall, with a 40-minute absolute cap). Flipping the
+    cooperative cancel flag makes the generator's async worker abort before the
+    next spend-incurring step (external lookups and, critically, billing), so no
+    further money is spent on a tour nobody will receive (D635).
+
+    Idempotent and safe to call for an unknown or already-finished job.
+    """
+    try:
+        from job_cancellation import request_cancel
+        request_cancel(job_id)
+    except Exception as _c_err:
+        _svc_logger.error(f"[LOCAL-622] cancel request failed for {job_id}: {_c_err}")
+        return jsonify({"job_id": job_id, "cancelled": False, "error": str(_c_err)}), 500
+
+    # Best-effort: reflect the request in the job's status for observability.
+    try:
+        if job_id in ACTIVE_JOBS:
+            _j = ACTIVE_JOBS[job_id]
+            if _j.get("status") not in ("completed", "error"):
+                ACTIVE_JOBS.update(job_id, cancel_requested=True,
+                                   progress="Cancellation requested by orchestrator")
+    except Exception as _cu_err:
+        _svc_logger.error(f"[LOCAL-622] cancel status update failed for {job_id}: {_cu_err}")
+
+    _svc_logger.info(f"[LOCAL-622] cancel requested for job {job_id}")
+    return jsonify({"job_id": job_id, "cancelled": True})
+
+
 @app.route('/status/<job_id>', methods=['GET'])
 def get_job_status(job_id):
     """Get job status."""
@@ -1092,6 +1162,15 @@ def get_job_status(job_id):
         "total_stops": job["total_stops"],
         "created_at": job["created_at"]
     }
+
+    # [LOCAL-622] Expose a last-update timestamp and the cancel flag so the
+    # orchestrator can tell live progress from a true stall. updated_at is only
+    # present in the database-backed store; progress-string change is the
+    # fallback signal the orchestrator always has.
+    if job.get("updated_at"):
+        response["updated_at"] = job["updated_at"]
+    if job.get("cancel_requested"):
+        response["cancel_requested"] = True
     
     if job["status"] == "completed":
         response["output_file"] = job["output_file"]

@@ -48,6 +48,12 @@ _overpass_lock = threading.Lock()
 _overpass_last_request_time = 0.0
 _OVERPASS_MIN_INTERVAL = 5.0  # Conservative: 1 request per 5 seconds
 
+# [LOCAL-622] Per-call hard timeout for a single Overpass request. Was 20s, which
+# — multiplied by one retry across five stops — let a single tour spend 663.4s in
+# external_lookups (D635). A short per-call cap plus the per-tour LookupBudget
+# (see external_lookup_budget.py) keeps the phase at or under ~150s.
+_OVERPASS_CALL_TIMEOUT = 10.0
+
 
 # ---------------------------------------------------------------------------
 # Venue kind classification
@@ -241,52 +247,73 @@ class OsmVenueFacts:
 # Overpass query
 # ---------------------------------------------------------------------------
 
-def _overpass_request(query: str, context: str = "") -> Optional[dict]:
+def _overpass_request(query: str, context: str = "", budget=None) -> Optional[dict]:
     """Make a rate-limited Overpass API request.
 
     Returns parsed JSON or None on failure.
+
+    [LOCAL-622] Each HTTP attempt uses a short hard timeout (``_OVERPASS_CALL_TIMEOUT``,
+    clamped by the remaining tour ``budget`` when one is supplied). At most one
+    retry is made, and the retry is skipped if the per-tour budget has run out —
+    an optional enrichment must never stall the tour. The wall time of the whole
+    request (including the rate-limit sleep and any retry) is charged to the
+    budget so the phase total stays bounded.
     """
     import requests as _http
 
     global _overpass_last_request_time
 
-    with _overpass_lock:
-        now = time.time()
-        elapsed = now - _overpass_last_request_time
-        if elapsed < _OVERPASS_MIN_INTERVAL:
-            time.sleep(_OVERPASS_MIN_INTERVAL - elapsed)
-        _overpass_last_request_time = time.time()
+    # Per-call timeout: never longer than the configured cap, and never longer
+    # than what the tour's lookup budget has left.
+    _call_timeout = _OVERPASS_CALL_TIMEOUT
+    if budget is not None:
+        _call_timeout = min(_call_timeout, max(1.0, budget.effective_timeout()))
 
-    for attempt in range(2):
-        try:
-            resp = _http.post(
-                _OVERPASS_URL,
-                data={"data": query},
-                headers=_OVERPASS_HEADERS,
-                timeout=20,
-            )
-            if resp.status_code == 200:
-                return resp.json()
-            elif resp.status_code == 429:
-                logger.warning(f"[OSM-VENUE] Overpass 429 for {context!r} "
-                               f"(attempt {attempt + 1}/2)")
-                if attempt == 0:
-                    time.sleep(10)
+    _req_start = time.monotonic()
+    try:
+        with _overpass_lock:
+            now = time.time()
+            elapsed = now - _overpass_last_request_time
+            if elapsed < _OVERPASS_MIN_INTERVAL:
+                time.sleep(_OVERPASS_MIN_INTERVAL - elapsed)
+            _overpass_last_request_time = time.time()
+
+        for attempt in range(2):
+            try:
+                resp = _http.post(
+                    _OVERPASS_URL,
+                    data={"data": query},
+                    headers=_OVERPASS_HEADERS,
+                    timeout=_call_timeout,
+                )
+                if resp.status_code == 200:
+                    return resp.json()
+                elif resp.status_code == 429:
+                    logger.warning(f"[OSM-VENUE] Overpass 429 for {context!r} "
+                                   f"(attempt {attempt + 1}/2)")
+                    # [LOCAL-622] Only back off and retry if the tour still has
+                    # budget AND this is the first attempt. Otherwise give up now.
+                    if attempt == 0 and (budget is None or not budget.is_exhausted()):
+                        time.sleep(min(5, _call_timeout))
+                        continue
+                    return None
+                else:
+                    logger.warning(f"[OSM-VENUE] Overpass HTTP {resp.status_code} "
+                                   f"for {context!r}")
+                    return None
+            except (_http.exceptions.Timeout, _http.exceptions.ConnectionError) as e:
+                logger.warning(f"[OSM-VENUE] Overpass {type(e).__name__} for "
+                               f"{context!r} (attempt {attempt + 1}/2)")
+                # [LOCAL-622] At most one retry, and only while budget remains.
+                if attempt == 0 and (budget is None or not budget.is_exhausted()):
+                    time.sleep(min(2, _call_timeout))
                     continue
                 return None
-            else:
-                logger.warning(f"[OSM-VENUE] Overpass HTTP {resp.status_code} "
-                               f"for {context!r}")
-                return None
-        except (_http.exceptions.Timeout, _http.exceptions.ConnectionError) as e:
-            logger.warning(f"[OSM-VENUE] Overpass {type(e).__name__} for "
-                           f"{context!r} (attempt {attempt + 1}/2)")
-            if attempt == 0:
-                time.sleep(5)
-                continue
-            return None
 
-    return None
+        return None
+    finally:
+        if budget is not None:
+            budget.record(time.monotonic() - _req_start)
 
 
 def _build_overpass_query(stop_title: str, city: str, venue_hint: str = "") -> str:
@@ -466,6 +493,7 @@ def fetch_osm_venue_facts(
     stop_title: str,
     city: str,
     venue_hint: str = "",
+    budget=None,
 ) -> OsmVenueFacts:
     """Fetch sourceable practical facts from OpenStreetMap for any venue.
 
@@ -477,15 +505,23 @@ def fetch_osm_venue_facts(
         city: City name (e.g. "Nice")
         venue_hint: Optional kind hint ('dining', 'museum', 'park')
                    to narrow the Overpass query.
+        budget: Optional :class:`external_lookup_budget.LookupBudget`. When the
+                per-tour budget is exhausted this returns an EMPTY result without
+                issuing any network request (LOCAL-622 — never stall the tour on
+                an optional OSM enrichment).
 
     Returns:
         OsmVenueFacts with extracted facts and source provenance.
-        If nothing found, returns empty OsmVenueFacts.
+        If nothing found (or the budget is spent), returns empty OsmVenueFacts.
     """
     result = OsmVenueFacts(stop_title=stop_title)
 
+    # [LOCAL-622] Past the per-tour budget, skip this optional lookup entirely.
+    if budget is not None and budget.should_skip("osm", context=stop_title):
+        return result
+
     query = _build_overpass_query(stop_title, city, venue_hint)
-    data = _overpass_request(query, context=stop_title)
+    data = _overpass_request(query, context=stop_title, budget=budget)
 
     if not data or not data.get("elements"):
         logger.debug(f"[OSM-VENUE] No OSM result for {stop_title!r} in {city}")
@@ -554,6 +590,7 @@ def fetch_osm_facts_for_stops(
     stops: List[Dict],
     city: str,
     venue_hint: str = "",
+    budget=None,
 ) -> Dict[str, OsmVenueFacts]:
     """Fetch OSM facts for multiple stops.
 
@@ -561,6 +598,8 @@ def fetch_osm_facts_for_stops(
         stops: List of stop dicts with at least 'name' key
         city: City name for the search area
         venue_hint: Optional category hint to narrow queries
+        budget: Optional per-tour :class:`external_lookup_budget.LookupBudget`.
+                Once exhausted, remaining stops are skipped (LOCAL-622).
 
     Returns:
         Dict mapping stop name → OsmVenueFacts
@@ -570,7 +609,7 @@ def fetch_osm_facts_for_stops(
         name = stop.get("name", "")
         if not name:
             continue
-        facts = fetch_osm_venue_facts(name, city, venue_hint)
+        facts = fetch_osm_venue_facts(name, city, venue_hint, budget=budget)
         results[name] = facts
     return results
 

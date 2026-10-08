@@ -12623,6 +12623,16 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
                 and not _venue_parts_used):
             try:
                 from osm_venue_facts import fetch_osm_venue_facts, extract_city_from_venue_name as _extract_city
+                # [LOCAL-622] One per-tour budget for ALL optional external lookups
+                # (OSM venue facts here, and any Wikidata/site enrichment that
+                # accepts it). D635: the per-stop Overpass loop stalled 663.4s and
+                # the tour was discarded. Past the budget, each remaining optional
+                # lookup is skipped and logged — the tour never stalls on OSM.
+                try:
+                    from external_lookup_budget import LookupBudget as _LookupBudget
+                    _osm_budget = _LookupBudget()
+                except ImportError:
+                    _osm_budget = None
                 _osm_city = _extract_city(location)
                 if _osm_city:
                     _venue_hint = 'museum' if tour_category == 'museum' else ''
@@ -12645,7 +12655,7 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
                         _venue_query_name = _museum_venue_name or venue_name
                         print(f"  [LOCAL-355] [LOCAL-583] Exhibit-museum: querying OSM ONCE for the "
                               f"museum building '{_venue_query_name}' (not per-exhibition — a show has no OSM node)")
-                        _venue_osm = fetch_osm_venue_facts(_venue_query_name, _osm_city, venue_hint='museum')
+                        _venue_osm = fetch_osm_venue_facts(_venue_query_name, _osm_city, venue_hint='museum', budget=_osm_budget)
                         if not _venue_osm.is_empty():
                             _venue_sentence = _venue_osm.format_practical_sentence()
                             for poi in poi_list:
@@ -12659,7 +12669,7 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
                     else:
                         print(f"  [LOCAL-355] Querying OSM for venue facts (city: {_osm_city}, hint: {_venue_hint or 'auto'})")
                         for poi in poi_list:
-                            _osm_facts = fetch_osm_venue_facts(poi['name'], _osm_city, venue_hint=_venue_hint)
+                            _osm_facts = fetch_osm_venue_facts(poi['name'], _osm_city, venue_hint=_venue_hint, budget=_osm_budget)
                             if not _osm_facts.is_empty():
                                 # Only replace if no visitor info was already sourced (LOCAL-34/39)
                                 if not poi.get('operational_details'):
@@ -12679,6 +12689,8 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
                             _visitor_info_source_url = ", ".join(_osm_source_urls_355[:3])
                 else:
                     print(f"  [LOCAL-355] Could not extract city from location — OSM lookup skipped")
+                if _osm_budget is not None:
+                    print(f"  [LOCAL-622] OSM lookup budget: {_osm_budget.summary()}")
             except ImportError:
                 print(f"  [LOCAL-355] osm_venue_facts not available — operational details unchanged")
             except Exception as _osm_err:
