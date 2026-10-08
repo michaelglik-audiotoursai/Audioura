@@ -851,6 +851,15 @@ def _thematic_draft_ok(draft: str, *, stops: List[Dict], titles: List[str],
     if named > 1:
         return False
 
+    # [LOCAL-629 item 3 / D634] The single example may be NAMED but NOT
+    # RE-NARRATED. The conclusion is about the THEME and the common elements, so
+    # it must carry NO fact lifted from a stop body (a date/year, a measurement,
+    # an inventory/catalogue number, a specific event) and NO new factoid
+    # ("discovered in 2013"). The claim/G4 check below CANNOT catch this, because
+    # a re-told stop fact IS present in the delivered text and so is "supported".
+    if _conclusion_renarrates_stop(draft):
+        return False
+
     # The claim/G4 check: NO factual claim absent from the delivered narration.
     # The delivered stops' narration IS the corpus; a draft that smuggles any new
     # date/number/attribution/proper-noun predicate is rejected.
@@ -870,6 +879,56 @@ def _thematic_draft_ok(draft: str, *, stops: List[Dict], titles: List[str],
         # the deterministic (always-true) template ships instead.
         return False
     return True
+
+
+# [LOCAL-629 item 3 / Michael D634] A conclusion RE-TELLS a stop when it carries a
+# concrete stop-body fact rather than staying on the theme. These are the signals
+# of a re-narrated stop (any one of them fails a draft):
+#   * a 4-digit year or an explicit date ("in 1890", "July 1890", "in 2013");
+#   * a measurement / dimension ("55.5 cm", "73 by 91", "oil on canvas");
+#   * an inventory / catalogue number ("F 370", "s0017V1962", "inv.");
+#   * an event factoid verb tied to a date ("discovered/unveiled/rediscovered/
+#     acquired/painted/signed … in <year>").
+# A thematic sentence ("one thread runs through these works: the human figure")
+# carries none of these.
+_CONCL_YEAR_RE = re.compile(r"\b(1[0-9]{3}|20[0-2][0-9])\b")
+_CONCL_DATE_RE = re.compile(
+    r"(?i)\b(january|february|march|april|may|june|july|august|september|"
+    r"october|november|december)\b")
+_CONCL_MEASURE_RE = re.compile(
+    r"(?i)\b(\d+(?:\.\d+)?\s*(?:cm|mm|m|centimet\w*|metre?s?|meters?|inch\w*)\b"
+    r"|\d+\s*(?:by|x|×)\s*\d+"
+    r"|oil\s+on\s+(?:canvas|panel|board|jute|burlap)|tempera\s+on|fresco\b)")
+_CONCL_INVENTORY_RE = re.compile(
+    r"(?i)\b([Ff]\s?\d{2,}|JH\s?\d{2,}|s\d{3,}V\d{3,}|inv(?:entory|\.)?\s*(?:no\.?|number)?\s*\w*\d)")
+_CONCL_EVENT_FACTOID_RE = re.compile(
+    r"(?i)\b(discover\w*|unveil\w*|rediscover\w*|acquir\w*|bequeath\w*|donat\w*|"
+    r"paint\w*|paint|signed|completed|created|exhibited|sold|stolen|restored)\b"
+    r"[^.]*\b(1[0-9]{3}|20[0-2][0-9])\b")
+
+
+def _conclusion_renarrates_stop(draft: str) -> bool:
+    """True when a conclusion draft re-tells a stop instead of staying thematic.
+
+    Deterministic, pure. Fires on a stop-body fact — a year/date, a measurement,
+    an inventory/catalogue number, or an event factoid bound to a year. A purely
+    thematic body (thread + meaning + at most one NAMED example) carries none of
+    these and returns False.
+    """
+    t = (draft or "").strip()
+    if not t:
+        return False
+    if _CONCL_EVENT_FACTOID_RE.search(t):
+        return True
+    if _CONCL_YEAR_RE.search(t):
+        return True
+    if _CONCL_DATE_RE.search(t):
+        return True
+    if _CONCL_MEASURE_RE.search(t):
+        return True
+    if _CONCL_INVENTORY_RE.search(t):
+        return True
+    return False
 
 
 # [LOCAL-620 item 6c / D634] Drop an ORPHAN one-sentence paragraph that names a
