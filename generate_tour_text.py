@@ -4402,6 +4402,28 @@ def _apply_artwork_guards(documented, sparql_works, venue_name, n_stops,
     print(f"  {_tag} candidate works BEFORE artworks-only ({len(enriched)}): "
           f"{[e.get('title') for e in enriched]}")
 
+    # [LOCAL-630 item 1] Collection-membership FIRST: a stop's work must HANG IN
+    # THIS museum — its Wikidata current collection (P195) or location (P276) must
+    # be the venue (the SPARQL set fetched for this venue QID), or the venue's own
+    # site must list it. A title that leaked in only via Wikipedia/corpus
+    # extraction — Millais's "Ophelia" (Tate) scraped from the NG article, or
+    # Raphael's "Madonna del Prato" (KHM) — is NOT in this venue's collection and
+    # is rejected here, before the artworks-only / variety passes. No-op when there
+    # is no SPARQL/site collection to check against (never strands a sparse venue).
+    try:
+        from artwork_selection_guard import enforce_collection_membership
+        _mem_kept, _mem_dropped = enforce_collection_membership(
+            enriched, sparql_works=(sparql_works or []), site_titles=(),
+            venue_name=venue_name, is_art_museum=bool(is_art_museum))
+        if _mem_dropped:
+            print(f"  {_tag} [LOCAL-630 item 1] collection-membership dropped "
+                  f"{len(_mem_dropped)}: "
+                  f"{[(e.get('title'), e.get('_reject_reason')) for e in _mem_dropped]}")
+        enriched = _mem_kept
+    except Exception as _mem_err:  # pragma: no cover
+        print(f"  {_tag} [LOCAL-630 item 1] collection-membership skipped "
+              f"({_mem_err})")
+
     kept, dropped = enforce_artworks_only(
         enriched, venue_name=venue_name, is_art_museum=is_art_museum)
     if dropped:
