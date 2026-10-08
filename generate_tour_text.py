@@ -7738,6 +7738,19 @@ def _apply_delivery_hours_guard(result):
                       f"artist/work not delivered in this tour", flush=True)
         except Exception as _uce:  # pragma: no cover
             _import_logger.error(f"[LOCAL-634] unseen-callback guard skipped: {_uce}")
+        # 1e. [LOCAL-634] FINAL text-level dangling-opener guard. The stop editor
+        #     and the late recap/callback removals above can strip a
+        #     demonstrative's antecedent, leaving a stop body opening on an
+        #     unresolved "This/That/These + noun" (Borghese tour 506). Runs AFTER
+        #     those removals so no stop ships a dangling opener on the text path.
+        try:
+            import dangling_demonstrative_gate as _ddg_txt
+            final, _n_open = _ddg_txt.strip_dangling_openers_in_text(final)
+            if _n_open:
+                print(f"  [LOCAL-634] dropped {_n_open} dangling opener(s) from "
+                      f"delivered text", flush=True)
+        except Exception as _doe:  # pragma: no cover
+            _import_logger.error(f"[LOCAL-634] text dangling-opener guard skipped: {_doe}")
         # 2. Drop duplicated paragraphs (e.g. the twice-printed orientation block).
         try:
             import paragraph_dedupe as _pd

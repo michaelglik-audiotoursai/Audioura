@@ -73,5 +73,49 @@ class TestStripDanglingOpeners(unittest.TestCase):
         self.assertEqual(dropped, [])
 
 
+class TestStripDanglingOpenersInText(unittest.TestCase):
+    """[LOCAL-634] Text-level sibling for the normal delivery path. Borghese
+    (tour 506) shipped a dangling opener on the TEXT path, where the stop editor
+    and late recap/callback removals can strip the antecedent."""
+
+    def test_text_level_unresolved_opener_dropped(self):
+        text = (
+            "Stop 1: Apollo and Daphne\n\n"
+            "Orientation: Stand before the marble group.\n\n"
+            "This move ensured the sculpture reached the villa intact. "
+            "Bernini carved the figures from a single block.\n\n"
+            "Stop 2: The Rape of Proserpina\n\n"
+            "Bernini modelled the flesh in marble."
+        )
+        cleaned, n = g.strip_dangling_openers_in_text(text)
+        self.assertEqual(n, 1)
+        self.assertNotIn("This move ensured", cleaned)
+        self.assertIn("Bernini carved the figures", cleaned)
+        # Header, Orientation and other stops preserved.
+        self.assertIn("Stop 1: Apollo and Daphne", cleaned)
+        self.assertIn("Orientation: Stand before the marble group.", cleaned)
+        self.assertIn("Stop 2: The Rape of Proserpina", cleaned)
+
+    def test_text_level_resolved_opener_kept(self):
+        text = (
+            "Stop 1: Laocoon\n\n"
+            "Pope Julius II ordered the move of the statue to the Vatican. "
+            "This move ensured its preservation."
+        )
+        cleaned, n = g.strip_dangling_openers_in_text(text)
+        self.assertEqual(n, 0)
+        self.assertIn("This move ensured", cleaned)
+
+    def test_text_level_generic_subject_kept(self):
+        text = ("Stop 1: Laocoon\n\n"
+                "This sculpture depicts a priest and his sons. It is marble.")
+        cleaned, n = g.strip_dangling_openers_in_text(text)
+        self.assertEqual(n, 0)
+
+    def test_text_level_no_headers_safe(self):
+        cleaned, n = g.strip_dangling_openers_in_text("Just some prose, no stops.")
+        self.assertEqual(n, 0)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
