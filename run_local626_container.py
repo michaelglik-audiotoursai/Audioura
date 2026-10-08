@@ -27,6 +27,16 @@ _sys.path.insert(0, _os.path.join(
     _os.path.dirname(_os.path.abspath(__file__)), 'tests'))
 
 CAP_USD = 1.20
+# [LOCAL-626] A 3-stop fresh museum tour empirically costs ~$0.70–$0.90 combined
+# (openai dominates; measured 486=$0.80, 487=$0.72). The in-process LiveRunMeter
+# cap guard only trips at the GROUNDING counter, so a tour's OpenAI spend is not
+# visible mid-tour — a tour started under the cap can still carry the running
+# total past it. To make the cap a HARD stop (not merely reported), the harness
+# refuses to START a tour unless the budget still has at least this reserve left,
+# i.e. it starts a tour only while  combined_spend + RESERVE <= CAP. With CAP=1.20
+# and RESERVE=0.90 the first tour (spend 0) starts; the second starts only if the
+# first cost <= 0.30 — so two ~$0.8 tours can never bill ~$1.6 again.
+PER_TOUR_RESERVE_USD = 0.90
 
 import live_run_meter as _lrm  # noqa: E402
 # Build the meter ourselves (not auto_meter) so we can read combined_spend_usd()
@@ -202,11 +212,15 @@ print(f"[db] audio_tours row count BEFORE: total={_before} is_test={_before_test
 ids = []
 for location, stops, slug in VENUES:
     spend = _METER.combined_spend_usd()
-    print(f"\n[CAP] combined spend so far ${spend:.4f} / cap ${CAP_USD:.2f}",
-          flush=True)
-    if spend >= CAP_USD:
-        print(f"[CAP] HARD CAP REACHED (${spend:.4f} >= ${CAP_USD:.2f}) — NOT "
-              f"starting '{location}'. Stopping.", flush=True)
+    print(f"\n[CAP] combined spend so far ${spend:.4f} / cap ${CAP_USD:.2f} "
+          f"(reserve ${PER_TOUR_RESERVE_USD:.2f} per tour)", flush=True)
+    # Hard stop: do not START a tour unless the remaining budget covers a tour's
+    # worst-case cost. A cap that only reports does not count — this refuses to
+    # start the next tour before it can push the total past $1.20.
+    if spend + PER_TOUR_RESERVE_USD > CAP_USD:
+        print(f"[CAP] HARD CAP: ${spend:.4f} + reserve ${PER_TOUR_RESERVE_USD:.2f} "
+              f"> cap ${CAP_USD:.2f} — NOT starting '{location}'. Stopping.",
+              flush=True)
         break
     tid = _run_one(location, stops, f"/app/tours/LOCAL626_{slug}.txt", slug)
     # fold this tour's measured spend into the meter before deciding on the next
