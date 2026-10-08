@@ -1564,6 +1564,15 @@ def _compose_hours_phrase(hours_text: str, venue_short: str) -> str:
     if not closed:
         closed = _closed_from_open_complement(hours_text)
 
+    # [LEAD 2026-10-08] Trust a stated range only when it covers EXACTLY the non-closed days.
+    # The Met source "Sun–Tue, Thu…Sat; closed Wednesday" yielded "open Sunday to Tuesday",
+    # a false statement that drops Thursday to Saturday. Otherwise phrase from the closed days.
+    if open_range and closed:
+        _a, _b = [d.lower() for d in open_range.split(" to ")]
+        _i, _j = _WEEKDAYS.index(_a), _WEEKDAYS.index(_b)
+        _span = {_WEEKDAYS[(_i + k) % 7] for k in range(((_j - _i) % 7) + 1)}
+        if _span != set(_WEEKDAYS) - set(closed):
+            open_range = ""
     if open_range:
         body = f"open {open_range}"
         if time_span:
@@ -1629,10 +1638,15 @@ def _compose_admission_phrase(admission_text: str) -> str:
     free_context += " " + " ".join(re.findall(r"[^.;]*?\bfree\b", low))
 
     free_group = ""
-    if re.search(r"\bunder[-\s]?18s?\b|\bunder\s+18\b|\baged?\s+18\s+and\s+under\b"
-                 r"|\bchildren\b|\bchild(?:ren)?\b|\b1[0-9]\s+and\s+under\b",
-                 free_context):
-        free_group = "under-18s"
+    # [LEAD 2026-10-08] Speak the source's OWN age: "children 12 and under" stays 12. The
+    # previous code mapped any child mention to "under-18s" (Met tour 512 was false).
+    _age = re.search(r"\b(?:children|kids|visitors|youth)?\s*(?:aged\s+)?(\d{1,2})\s+(?:and|&)\s+(?:under|younger)\b"
+                     r"|\bunder[-\s]?(\d{1,2})s?\b", free_context)
+    if _age:
+        _n = _age.group(1) or _age.group(2)
+        free_group = (f"children {_n} and under" if _age.group(1) else f"under-{_n}s")
+    elif re.search(r"\bchildren\b|\bchild\b", free_context):
+        free_group = "children"
     elif re.search(r"\bstudents?\b", free_context):
         free_group = "students"
     elif re.search(r"\bover[-\s]?65s?\b|\bseniors?\b|\b65\+\b", free_context):
