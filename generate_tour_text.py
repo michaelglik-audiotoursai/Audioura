@@ -7321,7 +7321,7 @@ def resolve_final_description(attempts, material_context):
 
 
 def verify_stop_claims(story_text: str, snippets: list, credit_line: str = '',
-                       stop_name: str = '') -> dict:
+                       stop_name: str = '', artist: str = '') -> dict:
     """Verify a single stop's claims against its source snippets.
 
     This is the production decision function — the same logic that runs inside
@@ -7339,6 +7339,7 @@ def verify_stop_claims(story_text: str, snippets: list, credit_line: str = '',
         snippets=snippets,
         credit_line=credit_line,
         stop_name=stop_name,
+        artist_name=artist,  # [LOCAL-627 d8] namesake disambiguation
     )
 
     # [LEAD, D369] A verifier that extracted ZERO claims has verified NOTHING.
@@ -18639,6 +18640,7 @@ Write the story FIRST, then add physical description if space allows.
                     snippets=_sv_snippets,
                     credit_line=_sv_credit,
                     stop_name=_sv_name,
+                    artist=(_sv_poi.get('artist', '') or ''),  # [LOCAL-627 d8] namesake guard
                 )
 
                 _l423_verification_results[_sv_name] = _sv_result

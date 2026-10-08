@@ -352,16 +352,73 @@ _DISAMBIGUATION_RULES = [
 ]
 
 
+def is_namesake_collision(text: str, artist_name: str) -> Tuple[bool, str]:
+    """[LOCAL-627 defect 8] True when ``text`` mentions the artist's NAME as part
+    of a DIFFERENT, longer person-name — a namesake, not the artist.
+
+    Tour 487 attributed "Titian Ramsey Peale II" — a 19th-century American
+    naturalist — to Titian the painter, because the snippet's first token matched
+    "Titian". When the artist is known by a single distinctive name (Titian,
+    Rembrandt, Caravaggio, Michelangelo, Raphael, Donatello), any occurrence of
+    that name immediately followed by one or more extra Capitalised surname tokens
+    (and optionally a generational suffix) is a namesake person — the painter is
+    never referred to with trailing surnames. Deterministic and conservative: a
+    bare "Titian" or "Titian's" is NOT a collision; only "Titian <Surname>…" is.
+
+    Returns (is_namesake, reason). ``is_namesake`` True means the text is about the
+    wrong (namesake) entity and must not be bound to the artist's record.
+    """
+    name = (artist_name or "").strip()
+    if not name or " " in name:
+        # Multi-token artist names ("Pablo Picasso") are matched in full elsewhere;
+        # the namesake trap is specific to mononym artists.
+        return False, ""
+    # artist mononym directly followed by >=1 extra Capitalised surname token.
+    # "Titian Ramsey Peale", "Titian Peale II" → namesake; "Titian painted" → no.
+    pat = re.compile(
+        r"\b" + re.escape(name) +
+        r"\s+([A-Z][a-zA-Z.'-]+(?:\s+[A-Z][a-zA-Z.'-]+)*"
+        r"(?:\s+(?:I|II|III|IV|Jr\.?|Sr\.?))?)",
+    )
+    m = pat.search(text or "")
+    if m:
+        trailing = m.group(1)
+        # Guard against the artist name simply REPEATED (e.g. a title "Titian"
+        # concatenated with body "Titian painted…" → "Titian Titian"): the first
+        # trailing token being the artist name itself is not a namesake surname.
+        first_trailing = trailing.split()[0] if trailing.split() else ""
+        if first_trailing.lower() == name.lower():
+            return False, ""
+        # A generational suffix alone ("Titian II") or a trailing Capitalised
+        # SURNAME is the namesake signature. The painter is never "<name> <Surname>".
+        return True, (f"Namesake: '{name} {trailing}' is a different person, "
+                      f"not {name} the artist")
+    return False, ""
+
+
 def disambiguate_snippet(snippet_text: str, snippet_title: str = '',
-                         target_surname: str = '') -> Tuple[bool, str]:
+                         target_surname: str = '',
+                         artist_name: str = '') -> Tuple[bool, str]:
     """Check if a snippet is about the RIGHT entity (not a namesake).
 
     Returns (is_valid, reason). If is_valid=False, the snippet must be excluded.
+
+    [LOCAL-627 defect 8] ``artist_name`` enables the general namesake guard: a
+    mononym artist (Titian) whose name appears as the first token of a longer
+    person-name ("Titian Ramsey Peale II") is a namesake and the snippet is
+    excluded, independent of the hardcoded rule list.
     """
+    combined = f"{snippet_title} {snippet_text}"
+    # [LOCAL-627 d8] General namesake collision on the artist's mononym.
+    if artist_name:
+        is_ns, ns_reason = is_namesake_collision(combined, artist_name)
+        if is_ns:
+            return False, ns_reason
+
     if not target_surname:
         return True, ''
 
-    combined = f"{snippet_title} {snippet_text}".lower()
+    combined = combined.lower()
     target_lower = target_surname.lower()
 
     # Only check disambiguation if the surname appears in the snippet
@@ -378,10 +435,14 @@ def disambiguate_snippet(snippet_text: str, snippet_title: str = '',
     return True, ''
 
 
-def disambiguate_snippets(snippets: List[Dict], target_surname: str) -> Tuple[List[Dict], List[Dict]]:
+def disambiguate_snippets(snippets: List[Dict], target_surname: str,
+                          artist_name: str = '') -> Tuple[List[Dict], List[Dict]]:
     """Filter snippets, removing those about wrong entities.
 
     Returns (valid_snippets, excluded_snippets).
+
+    [LOCAL-627 defect 8] ``artist_name`` (a mononym like "Titian") activates the
+    general namesake guard so a snippet about "Titian Ramsey Peale II" is excluded.
     """
     valid = []
     excluded = []
@@ -389,7 +450,7 @@ def disambiguate_snippets(snippets: List[Dict], target_surname: str) -> Tuple[Li
     for snip in snippets:
         text = snip.get('snippet', '')
         title = snip.get('title', '')
-        is_valid, reason = disambiguate_snippet(text, title, target_surname)
+        is_valid, reason = disambiguate_snippet(text, title, target_surname, artist_name)
         if is_valid:
             valid.append(snip)
         else:
@@ -659,6 +720,7 @@ def verify_story_candidate(
     snippets: List[Dict],
     credit_line: str = '',
     stop_name: str = '',
+    artist_name: str = '',
 ) -> Dict:
     """Verify a candidate story against its retrieved sources.
 
@@ -711,11 +773,17 @@ def verify_story_candidate(
 
     valid_snippets = snippets
     excluded_snippets = []
-    if donor_surname:
-        valid_snippets, excluded_snippets = disambiguate_snippets(snippets, donor_surname)
+    # [LOCAL-627 defect 8] Run disambiguation whenever a donor surname OR a mononym
+    # artist name is available, so a namesake ("Titian Ramsey Peale II" vs Titian
+    # the painter) is excluded even when there is no donor credit line.
+    _artist_mononym = (artist_name or "").strip()
+    if donor_surname or _artist_mononym:
+        valid_snippets, excluded_snippets = disambiguate_snippets(
+            snippets, donor_surname, artist_name=_artist_mononym)
         if excluded_snippets:
+            _why = donor_surname or _artist_mononym
             print(f"    [LOCAL-423] Entity disambiguation: excluded {len(excluded_snippets)} "
-                  f"snippets for '{donor_surname}' (wrong entity)")
+                  f"snippets for '{_why}' (wrong entity)")
             for ex in excluded_snippets:
                 print(f"      • {ex.get('title', '')[:60]}: {ex.get('exclusion_reason', '')}")
 

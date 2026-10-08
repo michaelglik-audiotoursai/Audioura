@@ -837,7 +837,8 @@ def _classify_single_candidate(candidate_text: str, idx: int) -> Optional[Dict]:
 
 
 def evaluate_candidates(candidates: List[str], snippets: List[Dict],
-                        credit_line: str = '', stop_name: str = '') -> List[Dict]:
+                        credit_line: str = '', stop_name: str = '',
+                        artist: str = '') -> List[Dict]:
     """Classify and verify story candidates. Only verified pass.
 
     Uses the SHIPPED LOCAL-439 machinery (classify_story_unit, score_story_interest)
@@ -893,6 +894,7 @@ def evaluate_candidates(candidates: List[str], snippets: List[Dict],
             snippets=snippets,
             credit_line=credit_line,
             stop_name=stop_name,
+            artist_name=artist,
         )
 
         if not verification.get('passed', False):
@@ -923,7 +925,8 @@ def evaluate_candidates(candidates: List[str], snippets: List[Dict],
 
 def evaluate_candidates_concurrent(candidates: List[str], snippets: List[Dict],
                                    credit_line: str = '', stop_name: str = '',
-                                   budget_seconds: float = None) -> List[Dict]:
+                                   budget_seconds: float = None,
+                                   artist: str = '') -> List[Dict]:
     """[LOCAL-443-C] Classify + verify candidates concurrently within a budget.
 
     Same semantics as evaluate_candidates but uses a thread pool for classification
@@ -1015,6 +1018,7 @@ def evaluate_candidates_concurrent(candidates: List[str], snippets: List[Dict],
             snippets=snippets,
             credit_line=credit_line,
             stop_name=stop_name,
+            artist_name=artist,
         )
 
         if not verification.get('passed', False):
@@ -1390,6 +1394,7 @@ def story_first_pipeline(stop_data: Dict, fact_sheet: str = '',
         credit_line=credit_line or anchor_facts.get('credit_line', ''),
         stop_name=stop_name,
         budget_seconds=classify_budget,
+        artist=(anchor_facts.get('artist', '') or ''),
     )
     _mark('4_classify_verify', _t)
 
