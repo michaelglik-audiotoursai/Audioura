@@ -175,3 +175,92 @@ def strip_phantom_references(
         nu["narration"] = new_narr
         new_units.append(nu)
     return new_units, dropped
+
+
+# ─── [LOCAL-627 defect 9] Cross-stop callback / recap-phrase guard ────────────
+#
+# cross_stop_fact_dedupe collapses a repeated dated FACT; this guard governs the
+# SOFT callback — the recap sentence that tells the listener to recall a previous
+# stop. Tour 487 opened "…you stopped at a moment ago" / "think of the Portrait…
+# you stopped at earlier" in EVERY stop. Michael's rule: at most ONE light
+# thematic bridge per tour, and NEVER a recap of the PREVIOUS stop (the listener
+# was just there). Deterministic: no network/LLM.
+
+# A PREVIOUS-STOP recap: "you stopped at … a moment ago / just now / earlier",
+# "the <X> you (just) saw", "a moment ago", "which we just left". These are the
+# "you were just there" callbacks that must never appear.
+_PREV_STOP_RECAP_RE = re.compile(
+    r"(?i)("
+    r"you\s+(?:stopped\s+at|saw|viewed|visited|passed|left|were\s+at)\b[^.?!]*"
+    r"\b(?:a\s+moment\s+ago|just\s+now|moments?\s+ago|earlier|previously|"
+    r"a\s+(?:few\s+)?(?:moments?|minutes?)\s+ago)\b|"
+    r"\b(?:a\s+moment\s+ago|just\s+a\s+moment\s+ago|moments?\s+ago)\b|"
+    r"(?:which|that)\s+(?:we|you)\s+just\s+(?:saw|left|visited|passed)|"
+    r"\bjust\s+(?:saw|left|visited|passed)\s+(?:a\s+moment\s+ago)?"
+    r")")
+
+# A THEMATIC BRIDGE: a soft callback that connects stops by theme, without naming
+# a "you were just there" recency. "Like the earlier stop", "as you saw earlier
+# on this tour", "echoing a theme from a previous stop", "recall the …".
+_THEMATIC_BRIDGE_RE = re.compile(
+    r"(?i)("
+    r"earlier\s+(?:on\s+)?(?:this|your)\s+tour|previously\s+on\s+this\s+tour|"
+    r"as\s+you\s+saw\s+earlier|like\s+the\s+earlier\s+stop|"
+    r"echo(?:es|ing)?\s+(?:a\s+)?(?:theme|motif|idea)\s+from|"
+    r"recall(?:ing)?\s+the\b|"
+    r"a\s+(?:previous|prior|earlier)\s+stop|other\s+stops?\s+(?:of|on)\s+this\s+tour"
+    r")")
+
+
+def limit_thematic_bridges(
+        ordered_units: List[Dict],
+        max_bridges: int = 1) -> Tuple[List[Dict], List[Dict]]:
+    """[LOCAL-627 defect 9] Allow at most ``max_bridges`` light thematic bridges
+    across the whole tour and drop EVERY previous-stop recap sentence.
+
+    Walks stops in order. A sentence is DROPPED when:
+      * it is a previous-stop recap ("…you stopped at a moment ago", "the X you
+        just saw") — always, regardless of the bridge budget; or
+      * it is a thematic bridge AND the per-tour bridge budget is already spent.
+
+    The FIRST ``max_bridges`` thematic bridges (that are not also previous-stop
+    recaps) are kept. Returns (new_units, dropped). Pure and deterministic; mirrors
+    strip_phantom_references' shape.
+    """
+    bridges_kept = 0
+    dropped: List[Dict] = []
+    new_units: List[Dict] = []
+    for i, unit in enumerate(ordered_units):
+        stop_num = i + 1
+        narration = unit.get("narration") or ""
+        nu = dict(unit)
+        if not narration.strip():
+            new_units.append(nu)
+            continue
+        out_paras: List[str] = []
+        for para in re.split(r"\n{2,}", narration):
+            sentences = _split_sentences(para)
+            if not sentences:
+                out_paras.append(para)
+                continue
+            kept: List[str] = []
+            for sent in sentences:
+                is_recap = bool(_PREV_STOP_RECAP_RE.search(sent))
+                is_bridge = bool(_THEMATIC_BRIDGE_RE.search(sent))
+                if is_recap:
+                    dropped.append({
+                        "stop": stop_num, "sentence": sent.strip(),
+                        "reason": "previous-stop recap"})
+                    continue
+                if is_bridge:
+                    if bridges_kept >= max_bridges:
+                        dropped.append({
+                            "stop": stop_num, "sentence": sent.strip(),
+                            "reason": "more than one thematic bridge"})
+                        continue
+                    bridges_kept += 1
+                kept.append(sent)
+            out_paras.append(" ".join(kept).strip())
+        nu["narration"] = "\n\n".join(p for p in out_paras if p.strip()).strip()
+        new_units.append(nu)
+    return new_units, dropped

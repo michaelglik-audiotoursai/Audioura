@@ -501,6 +501,18 @@ def assemble_building_tour(
     except Exception as _spr_e:  # pragma: no cover
         logger.info(f"[LOCAL-616] phantom-reference guard skipped ({_spr_e})")
         _phantom_dropped = []
+    # [LOCAL-627 defect 9] At most ONE light thematic bridge per tour; never a
+    # previous-stop recap ("…you stopped at a moment ago"). Tour 487 recapped the
+    # prior stop in every stop. Drop all previous-stop recaps and every thematic
+    # bridge beyond the first.
+    try:
+        from cross_stop_reference_guard import limit_thematic_bridges as _ltb
+        ordered, _bridge_dropped = _ltb(ordered, max_bridges=1)
+        if _bridge_dropped:
+            logger.info(f"[LOCAL-627] dropped {len(_bridge_dropped)} recap/extra-bridge sentence(s)")
+    except Exception as _ltb_e:  # pragma: no cover
+        logger.info(f"[LOCAL-627] thematic-bridge guard skipped ({_ltb_e})")
+        _bridge_dropped = []
     # [LOCAL-616 item 5] Drop era-contradicting sentences: a stop whose work date
     # is known must not carry a century/year claim >150y away unless framed as an
     # earlier tradition (414 Stop 3: "In the 13th century…" about a 1782 object).
@@ -695,6 +707,16 @@ def assemble_outdoor_tour(
     except Exception as _spr_e:  # pragma: no cover
         logger.info(f"[LOCAL-616] phantom-reference guard skipped ({_spr_e})")
         _phantom_dropped = []
+    # [LOCAL-627 defect 9] One thematic bridge per tour; no previous-stop recap
+    # (outdoor route too).
+    try:
+        from cross_stop_reference_guard import limit_thematic_bridges as _ltb
+        ordered, _bridge_dropped = _ltb(ordered, max_bridges=1)
+        if _bridge_dropped:
+            logger.info(f"[LOCAL-627] dropped {len(_bridge_dropped)} recap/extra-bridge sentence(s)")
+    except Exception as _ltb_e:  # pragma: no cover
+        logger.info(f"[LOCAL-627] thematic-bridge guard skipped ({_ltb_e})")
+        _bridge_dropped = []
 
     # [LOCAL-616 item 5] Drop era-contradicting sentences for the outdoor route too.
     try:
