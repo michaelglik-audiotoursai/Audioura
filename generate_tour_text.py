@@ -7578,7 +7578,12 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
             and os.environ.get('LOCAL603_PREFLIGHT', '1') != '0'):
         try:
             import venue_preflight as _vpf
-            _pf_venue = _preflight_venue_from_location(location)
+            # [LEAD 2026-10-08] tour_type is already 'museum' here, so the request names a
+            # venue even when its name has no English venue word: "Museo Correr",
+            # "Kunsthaus Zürich", "Rijksmuseum Twenthe", "Ateneum" were all skipped,
+            # so no closure check and no spoken hours. Fall back to the first segment.
+            _pf_venue = (_preflight_venue_from_location(location)
+                         or (location.split(',')[0].strip() if location else ''))
             if _pf_venue:
                 _pf_city = ''
                 if ',' in location:
