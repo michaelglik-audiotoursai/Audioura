@@ -18,7 +18,15 @@ set -uo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
 IMAGE="local617-gen-img"
 ENV_FILE="${HERE}/.env"
-OUT_DIR="${HERE}/tours/local617_live"
+OUT_DIR="${LOCAL617_OUT_DIR:-$HOME/.local617_live}"   # [safety] NEVER inside the
+                                                      # external-SSD worktree: a
+                                                      # writable bind-mount of a
+                                                      # worktree subdir on Docker
+                                                      # Desktop's external-SSD
+                                                      # virtiofs wiped the whole
+                                                      # worktree mid-run once. Keep
+                                                      # the mutable mount on the
+                                                      # internal disk.
 NET="development_default"
 GEN="local617-gen"
 mkdir -p "${OUT_DIR}"

@@ -142,7 +142,48 @@ _INSTITUTIONAL_RE = re.compile(
     r"(?:artistic\s+)?heritage|"
     r"became\s+(?:a\s+)?(?:pivotal\s+)?part\s+of\s+(?:the\s+)?(?:museum|collection)|"
     r"enter(?:ed|ing)\s+the\s+collection|removed\s+from\s+its\s+(?:religious\s+)?setting|"
-    r"removed\s+from\s+(?:its|the)\s+(?:original\s+)?(?:church|convent|chapel|altar)"
+    r"removed\s+from\s+(?:its|the)\s+(?:original\s+)?(?:church|convent|chapel|altar)|"
+    # [LOCAL-617 live 431/432] collection SIZE / holdings as the subject — the
+    # critic flagged "The Würth Collection … comprises over 20,000 works" and
+    # "a collection crafted to showcase pieces from … heritage".
+    r"comprise[sd]?\s+(?:over\s+)?\d|"
+    r"(?:over|more\s+than|some|nearly)\s+[\d,]+\s+(?:works?|pieces?|objects?|"
+    r"artworks?|paintings?)\b|"
+    r"collection\s+(?:crafted|designed|assembled|built|created)\s+to\s+(?:showcase|"
+    r"display|house|present)|"
+    r"spanning\s+(?:more\s+than\s+)?\d+\s+(?:years?|centuries)|"
+    # donor as the collection's "driving force"; the acquiring-collector biography
+    r"driving\s+force\s+behind\s+the\s+collection|"
+    r"dedicated\s+(?:himself|herself|themselves)\s+to\s+acquiring|"
+    r"(?:his|her|their)\s+successor,?\s+(?:continued|carried\s+on)|"
+    r"dual-?purpose\s+building|corporate\s+(?:office|collection|gallery)|"
+    # provenance by public ownership / state redistribution / expropriation (the
+    # Sevilla "entered public ownership through church property redistribution",
+    # "governmental decision altered its setting", "Mendizábal expropriation")
+    r"enter(?:ed|ing)\s+public\s+ownership|public\s+ownership\s+(?:through|via|by)|"
+    r"redistribution\s+of\s+(?:church|ecclesiastical)\s+property|"
+    r"government(?:al)?\s+(?:decision|decree)\s+(?:altered|changed|made|transferred)|"
+    r"expropriation|desamortizaci|mendiz[aá]bal|"
+    r"altered\s+its\s+(?:setting|purpose)\s+and|"
+    r"made\s+(?:it\s+)?accessible\s+to\s+the\s+(?:wider\s+)?public|"
+    r"cultural\s+shifts\s+of\s+the\b"
+    r")\b"
+)
+
+# A provenance/institutional PREDICATE strong enough to win even when the subject
+# is a work deictic ("This canvas", "The painting"): "This canvas entered public
+# ownership…", "The painting now resided in a collection…". Here the sentence is
+# ABOUT how the object changed hands, not about what it shows — so it must count
+# as institutional despite the work-word, which otherwise steals it into 'work'.
+_PROVENANCE_PREDICATE_RE = re.compile(
+    r"(?i)\b("
+    r"enter(?:ed|ing)\s+public\s+ownership|"
+    r"redistribution\s+of\s+(?:church|ecclesiastical)\s+property|"
+    r"now\s+resid(?:ed|es)\s+in\s+(?:a|the)\s+(?:collection|museum)|"
+    r"government(?:al)?\s+(?:decision|decree)|expropriation|"
+    r"altered\s+its\s+(?:setting|purpose)|"
+    r"comprise[sd]?\s+(?:over\s+)?\d|"
+    r"driving\s+force\s+behind\s+the\s+collection"
     r")\b"
 )
 
@@ -325,6 +366,12 @@ def _is_institutional_dominant(s: str, inst: bool, recep: bool, work: bool,
     """
     if not inst:
         return False
+    # [LOCAL-617 live 431/432] A strong provenance/institutional PREDICATE wins
+    # even when the sentence opens with a work deictic ("This canvas entered
+    # public ownership…", "The painting now resided in a collection…"). The
+    # sentence is about how the object changed hands, not what it depicts.
+    if _PROVENANCE_PREDICATE_RE.search(s):
+        return True
     # If the sentence substantively describes the work or the artist, it is not
     # institutional-dominant — the museum word is incidental.
     if work or artist:

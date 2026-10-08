@@ -96,6 +96,37 @@ class TestClassifier(unittest.TestCase):
              "the museum's best-loved paintings.")
         self.assertIn(wf.classify_sentence(s), ("work", "artist", "reception", "emotion"))
 
+    def test_live_431_432_institutional_patterns(self):
+        # [LOCAL-617 live] exact sentences the independent critic flagged as
+        # criterion-1 institutional on tours 431 (Basel) and 432 (Sevilla) that
+        # the first lexicon missed. All must now classify institutional.
+        vb = ["Kunstmuseum", "Basel"]
+        vs = ["Museo", "Bellas", "Artes", "Sevilla", "Seville"]
+        for s, v in [
+            ("The Würth Collection, which started in 1970, comprises over 20,000 "
+             "works spanning more than 500 years.", vb),
+            ("Hans Würth, the driving force behind the collection, dedicated "
+             "himself to acquiring artwork.", vb),
+            ("This governmental decision altered its setting and purpose, making "
+             "it accessible to the wider public.", vs),
+            ("This canvas entered public ownership through the redistribution of "
+             "church property.", vs),
+            ("The painting now resided in a collection crafted to showcase pieces "
+             "from Seville's heritage.", vs),
+        ]:
+            self.assertEqual(wf.classify_sentence(s, venue_tokens=v),
+                             "institutional", msg=f"not institutional: {s!r}")
+
+    def test_provenance_predicate_does_not_steal_real_ekphrasis(self):
+        # a true work description with a work deictic must NOT be dragged into
+        # institutional by the provenance-predicate override.
+        for s in [
+            "This canvas depicts Saint Francis embracing the crucified Christ.",
+            "The painting glows with a warm, enveloping light across the robes.",
+            "Murillo painted this canvas in his final years, after a great loss.",
+        ]:
+            self.assertNotEqual(wf.classify_sentence(s), "institutional", msg=s)
+
 
 class TestOwnAcquisition(unittest.TestCase):
     def test_own_acquisition_true(self):
