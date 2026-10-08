@@ -895,8 +895,12 @@ def _site_first_shortfall_sentence(location, delivered_count, requested_n):
 
 
 # [LOCAL-615 item 2] "Never say 'check… on <domain>' when the preflight has hours."
+# [LOCAL-618 #4] Also recognise the honest "weren't published" line, so that if
+# the preflight DID return hours they still override the fallback on the delivered
+# text (when the About-stop facts were empty but the preflight was not).
 _CHECK_HOURS_FALLBACK_RE = re.compile(
-    r'(?i)Check opening hours and admission on\b[^\n]*?before you go\.?')
+    r'(?i)(?:Check opening hours and admission on\b[^\n]*?before you go\.?'
+    r'|Opening hours\s+(?:weren.?t|were not)\s+published[^\n.]*\.?)')
 
 
 def _fold_preflight_hours_into_text(tour_text: str) -> str:

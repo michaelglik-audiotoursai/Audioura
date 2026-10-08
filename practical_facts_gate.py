@@ -825,6 +825,10 @@ _WEBSITE_POINTER_SENT_RE = re.compile(
     r'|(?:opening\s+hours?|admission(?:\s+prices?)?)\s+(?:are|were)\s+(?:listed|not\s+listed)[^.?!]*?[.?!]'
     r'|please\s+check\s+[^.?!]*?before\s+you\s+(?:go|visit)[^.?!]*?[.?!]'
     r'|admission\s+prices?\s+were\s+not\s+listed[^.?!]*?[.?!]'
+    # [LOCAL-618 #4] The honest "we couldn't read them" line replaces the
+    # dead-end "check the website" pointer when the preflight returns none; it
+    # too must appear at most once tour-wide.
+    r'|opening\s+hours?\s+(?:weren.?t|were\s+not)\s+published[^.?!]*?[.?!]'
     r')'
 )
 
