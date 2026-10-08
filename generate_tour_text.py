@@ -23083,6 +23083,18 @@ RULES:
     except Exception as _concl_err:
         print(f"  [LOCAL-617] Conclusion de-dup error (non-fatal): {_concl_err}")
 
+    # -------- [LOCAL-617 item 6] Repair a conclusion cut mid-clause --------
+    # The critic flagged a closing cut mid-token ("…showcases Murillo's talent
+    # for."). Never ship a tour whose final sentence ends on a word still
+    # expecting an object — drop the broken sentence so the tour ends complete.
+    try:
+        import work_first_evidence as _wfe_tail
+        complete_tour, _tail_rep = _wfe_tail.repair_truncated_tail(complete_tour)
+        if _tail_rep.get('repaired'):
+            print(f"  [LOCAL-617] Repaired truncated final sentence (dropped mid-clause fragment)")
+    except Exception as _tail_err:
+        print(f"  [LOCAL-617] Truncated-tail repair error (non-fatal): {_tail_err}")
+
     # -------- [LOCAL-36] Practical facts QA gate --------
     # Verify provenance of every practical claim before delivery.
     # Claims without traceable source are DROPPED — silence is correct.

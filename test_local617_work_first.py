@@ -468,5 +468,29 @@ class TestDedupeConclusion(unittest.TestCase):
         self.assertEqual(new, text)
 
 
+class TestTruncatedTail(unittest.TestCase):
+    def test_drops_mid_clause_final_sentence(self):
+        text = ("The composition is luminous and tender. "
+                "San Francisco abrazando a Cristo en la Cruz showcases Murillo's talent for.")
+        new, rep = wf.repair_truncated_tail(text)
+        self.assertTrue(rep["repaired"])
+        self.assertNotIn("talent for.", new)
+        self.assertIn("luminous and tender", new)
+
+    def test_complete_conclusion_untouched(self):
+        text = ("You have stood before three works of quiet devotion. "
+                "Each one rewards a slow, attentive gaze.")
+        new, rep = wf.repair_truncated_tail(text)
+        self.assertFalse(rep["repaired"])
+        self.assertEqual(new.strip(), text.strip())
+
+    def test_restaurant_offer_last_sentence_safe(self):
+        text = ("A fitting close to the visit. "
+                "If you would like to eat nearby we can build you a restaurant tour.")
+        new, rep = wf.repair_truncated_tail(text)
+        self.assertFalse(rep["repaired"])
+        self.assertIn("restaurant tour", new)
+
+
 if __name__ == "__main__":
     unittest.main()

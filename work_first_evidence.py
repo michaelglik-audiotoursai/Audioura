@@ -76,6 +76,7 @@ __all__ = [
     "is_institutional_theme",
     "looks_like_non_artwork_listing",
     "dedupe_conclusion",
+    "repair_truncated_tail",
 ]
 
 
@@ -1052,4 +1053,44 @@ def dedupe_conclusion(tour_text: str) -> Tuple[str, Dict]:
         new_text = re.sub(r"\n[ \t]+", "\n", new_text)
         report["removed_redundant_covered"] = True
         return new_text, report
+    return tour_text, report
+
+
+# A sentence that ends on a word still expecting an object — the generator cut it
+# mid-clause ("…showcases Murillo's talent for."). These final tokens mean the
+# object is missing.
+_TRUNCATED_TAIL_RE = re.compile(
+    r"(?i)\b("
+    r"talent\s+for|ability\s+to|known\s+for|famous\s+for|devoted\s+to|"
+    r"dedicated\s+to|thanks\s+to|because\s+of|such\s+as|including|featuring|"
+    r"as\s+well\s+as|in\s+order\s+to|the|a|an|his|her|their|its|of|to|for|and|"
+    r"with|that|which|was|were|is|are"
+    r")\s*[.!?]?\s*$")
+
+
+def repair_truncated_tail(tour_text: str) -> Tuple[str, Dict]:
+    """[LOCAL-617 item 6] Never ship a conclusion that ends mid-clause.
+
+    The critic flagged a closing like "San Francisco … showcases Murillo's talent
+    for." — a template cut mid-token. When the FINAL sentence of the tour ends on
+    a word that still expects an object, drop that broken sentence so the tour
+    ends on its previous complete sentence. Pure string→string.
+    """
+    report = {"repaired": False}
+    if not tour_text or not tour_text.strip():
+        return tour_text, report
+    stripped = tour_text.rstrip()
+    # consider the last sentence
+    sents = re.split(r"(?<=[.!?])\s+", stripped)
+    if not sents:
+        return tour_text, report
+    last = sents[-1].strip()
+    if last and _TRUNCATED_TAIL_RE.search(last) and len(sents) >= 2:
+        # remove the final broken sentence
+        idx = stripped.rfind(last)
+        if idx > 0:
+            new_text = stripped[:idx].rstrip()
+            report["repaired"] = True
+            # preserve a trailing newline convention
+            return new_text + "\n", report
     return tour_text, report
