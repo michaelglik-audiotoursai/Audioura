@@ -7508,6 +7508,11 @@ def _apply_delivery_hours_guard(result):
                 _delivered = _count_delivered(final)
                 _count_ok = (_stated is None) or (_stated == _delivered)
                 if _has_thematic(final) and _count_ok:
+                    # Preserve the existing thematic conclusion, but match the
+                    # trailing-newline normalisation rebuild_conclusion applies
+                    # (``.strip() + "\n"``) so a second guard pass is byte-for-byte
+                    # idempotent (LOCAL-616 test_idempotent).
+                    final = final.strip() + "\n"
                     print(f"  [LOCAL-619B] thematic conclusion already present and "
                           f"count OK ({_delivered} stop(s)); preserved "
                           f"(every-path guard)", flush=True)
