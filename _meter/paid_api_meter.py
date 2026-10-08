@@ -85,7 +85,9 @@ def _record(url, status, body, req_body=None):
             f.write(json.dumps(rec, default=str) + "\n")
     except Exception:
         pass
-    threading.Thread(target=_db_write, args=(rec,), daemon=True).start()
+    # Synchronous (3 s connect timeout): a daemon thread is killed when a short-lived
+    # script exits, which lost the DB copy for isolated test runs.
+    _db_write(rec)
 
 
 def _db_write(rec):
