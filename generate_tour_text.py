@@ -16501,6 +16501,24 @@ MANDATORY INCLUSION — work this surprising detail into the description natural
                         description_prompt += _wfe_c.narration_contract_instruction(
                             work_title=poi_name or '', artist=artist or '',
                             has_reception_evidence=_has_reception)
+                        # [LOCAL-620 item 4 / D634] Personalise the contract toward
+                        # the listener's learned class prefs (a LEAN, not a filter):
+                        # load once per tour, append an addendum that nudges toward
+                        # preferred classes while keeping every class >= 10%. Behind
+                        # env STORY_PREFS (default on). Cold start / no prefs / off →
+                        # no addendum, balanced default.
+                        try:
+                            import story_prefs as _sprefs
+                            if '_pref_weights_cache' not in dir():
+                                _pref_weights_cache, _pref_meta_cache = \
+                                    _sprefs.load_user_class_weights(user_id)
+                                print("  " + _sprefs.pref_summary_line(
+                                    _pref_weights_cache, _pref_meta_cache))
+                            _pref_add = _sprefs.narration_pref_addendum(_pref_weights_cache)
+                            if _pref_add:
+                                description_prompt += _pref_add
+                        except Exception as _sp_err:
+                            print(f"  [LOCAL-620] prefs addendum skipped: {_sp_err}")
                         print(f"  [LOCAL-617] Stop {stop_num}: narration contract injected "
                               f"(reception_evidence={_has_reception})")
                     except Exception as _wfc_err:
