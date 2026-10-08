@@ -280,6 +280,87 @@ _US_STATE_ABBR = {
 }
 
 
+# [LOCAL-623 defect 2 / D634] FORBIDDEN museum boilerplate in the stop-1 opening
+# section: a founding-DATE-only line (no named founder), a merger of predecessor
+# institutions, and the building / renovation / architecture of the museum. Tour
+# 468's About narration landed all three in Stop 1 ("established in 1922 by
+# merging … founded in 1906", "the new building designed by David Chipperfield
+# Architects"). Per D634 these are boilerplate and must NOT appear in a stop body.
+# The ONE thing D634 keeps is a REAL founder/collector STORY — a sentence that
+# NAMES the founder/collector (a person) — so the Griffin's "founded in 1992 by
+# the photographer Arthur Griffin, dedicated to promoting photography" is kept
+# while Folkwang's institution-merger and Chipperfield building are dropped.
+
+# A merger of predecessor institutions — always boilerplate (names no human story).
+_D634_MERGER_RE = re.compile(
+    r"(?i)\b(by\s+merging|merger\s+of|merging\s+(?:the\s+|of\s+)|"
+    r"formed\s+(?:the\s+basis|by\s+(?:merging|the\s+union))|"
+    r"predecessor\s+(?:museum|institution|collection))\b")
+
+# The building / architecture / renovation of the museum — always boilerplate
+# (unless the listener asked for architecture, handled by the caller).
+_D634_BUILDING_RE = re.compile(
+    r"(?i)\b("
+    r"new\s+building|the\s+building\s+(?:was|designed|opened)|"
+    r"designed\s+by\s+[A-Z]|architect(?:s|ure|ural)?\b|"
+    r"renovat(?:ed|ion)|refurbish|expansion|extension\s+(?:was|opened)|"
+    r"additional\s+exhibition\s+spaces?|striking\s+appearance|wing\s+(?:was|opened)"
+    r")\b")
+
+# A bare founding / establishment statement with a year.
+_D634_FOUNDING_RE = re.compile(
+    r"(?i)\b(founded|established|incorporated|inaugurated|chartered)\b"
+    r"[^.]*\b\d{3,4}\b|\b(?:was|were)\s+(?:founded|established|incorporated)\b")
+
+# A named person (First Last) — a founder/collector the founding sentence may name.
+_D634_NAMED_PERSON_RE = re.compile(
+    r"\b[A-ZÀ-Þ][a-zà-ÿ]+(?:\s+(?:van|von|de|della|del|di|du|des|der|la|le)\b)?"
+    r"\s+[A-ZÀ-Þ][a-zà-ÿ]+")
+
+
+def is_forbidden_museum_boilerplate(sentence: str) -> bool:
+    """True when a sentence is founding/merger/building/renovation boilerplate
+    that D634 forbids in a stop body.
+
+    Forbidden:
+      • a MERGER of predecessor institutions (names no human story);
+      • the museum's BUILDING / architecture / renovation / exhibition-space
+        expansion;
+      • a bare FOUNDING-date line that does NOT name a founder (a person).
+
+    Kept (returns False):
+      • a REAL founder/collector story — the founding sentence NAMES the
+        founder/collector (a person) — e.g. "founded in 1992 by the photographer
+        Arthur Griffin, dedicated to promoting photography";
+      • a plain identity statement ("<Venue> is a museum of 20th-century art");
+      • anything ``story_type_classes.is_real_collector_story`` already rescues.
+    """
+    s = (sentence or "").strip()
+    if not s:
+        return False
+    try:
+        import story_type_classes as _stc
+        if _stc.is_real_collector_story(s):
+            return False
+    except Exception:
+        pass
+    # Merger and building are boilerplate regardless of a named person.
+    if _D634_MERGER_RE.search(s) or _D634_BUILDING_RE.search(s):
+        return True
+    # A founding statement is boilerplate ONLY when no founder (person) is named.
+    if _D634_FOUNDING_RE.search(s) and not _D634_NAMED_PERSON_RE.search(s):
+        return True
+    return False
+
+
+def filter_museum_boilerplate(sentences: List[str]) -> List[str]:
+    """Drop founding/merger/building/renovation boilerplate (D634) from a list of
+    About-narration sentences, keeping real founder/collector stories and
+    everything that is not boilerplate. Order is preserved.
+    """
+    return [s for s in sentences if not is_forbidden_museum_boilerplate(s)]
+
+
 def has_dangling_object_sentence(text: str) -> bool:
     """True when ANY sentence in `text` ends mid-thought (object was cut).
 
@@ -712,6 +793,15 @@ def _compose_about_narration(
     # the history (story) and the building (architecture) section is spoken once.
     wiki_sents = _hygiene_split(wiki_summary.strip()) if wiki_summary else []
     body_story = dedupe_sentences(wiki_sents + list(story_sentences))
+    # [LOCAL-623 defect 2 / D634] Drop founding-date-only, merger-of-predecessor,
+    # and building/renovation boilerplate from the About body. Only a REAL
+    # collector story (named person + motive/consequence) survives this filter;
+    # the opening section is still a stop body and D634 forbids that boilerplate.
+    # If the filter would empty the body (nothing but boilerplate was sourced),
+    # keep the pre-filter body rather than ship an empty About (D577).
+    _filtered_story = filter_museum_boilerplate(body_story)
+    if _filtered_story:
+        body_story = _filtered_story
     seen_body = {_dedup_key(s) for s in body_story}
     body_arch = [s for s in dedupe_sentences(list(arch_sentences))
                  if _dedup_key(s) not in seen_body]

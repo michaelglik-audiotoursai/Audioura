@@ -23259,6 +23259,27 @@ RULES:
         except Exception as _stbg_err:
             print(f"  [LOCAL-623] Same-title bleed filter error (non-fatal): {_stbg_err}")
 
+    # -------- [LOCAL-623 defect 2 / D634] Recurring museum-motif filter -------
+    # Tour 468 wove an abstract "museum story of preservation and renewal /
+    # concealment and revelation" refrain through BOTH stop bodies. Per D634 the
+    # museum motif must NOT recur across stops, and this vague institutional
+    # framing does not belong in a stop body at all. Drop the museum-endurance
+    # motif sentences from every stop body (the Stop-1 About opening section — the
+    # museum's real story — is exempt). Museum tours only; never empties a stop.
+    if tour_category == 'museum':
+        try:
+            import museum_motif_guard as _mmg
+            complete_tour, _mmg_rep = _mmg.filter_tour_text_museum_motif(complete_tour)
+            if _mmg_rep.get('changed'):
+                print(f"  [LOCAL-623] Museum-motif filter: dropped "
+                      f"{_mmg_rep['dropped']} endurance-motif sentence(s) across "
+                      f"{_mmg_rep['stops']} stops")
+            else:
+                print(f"  [LOCAL-623] Museum-motif filter: no change "
+                      f"({_mmg_rep['stops']} stops scanned)")
+        except Exception as _mmg_err:
+            print(f"  [LOCAL-623] Museum-motif filter error (non-fatal): {_mmg_err}")
+
     # -------- [LOCAL-617 item 5/6] Fresh-path shortfall reconciliation --------
     # When a LATE gate drops a stop AFTER the D616/D612 shortfall sentence was
     # composed (Granet delivered 2/3 while the sentence already said 3), the
