@@ -1353,6 +1353,30 @@ _WEEKDAYS = ["monday", "tuesday", "wednesday", "thursday", "friday",
              "saturday", "sunday"]
 _WEEKDAY_TITLE = {d: d.capitalize() for d in _WEEKDAYS}
 
+# Common weekday ABBREVIATIONS → full lower-case name. Expanded once up front so
+# the composer's weekday logic ("Tue-Sun", "closed Mon") sees full names.
+_WEEKDAY_ABBR = {
+    "mon": "monday", "tue": "tuesday", "tues": "tuesday", "wed": "wednesday",
+    "weds": "wednesday", "thu": "thursday", "thur": "thursday", "thurs": "thursday",
+    "fri": "friday", "sat": "saturday", "sun": "sunday",
+}
+
+
+def _expand_weekday_abbr(text: str) -> str:
+    """Expand bare weekday abbreviations to full names ('Tue-Sun' → 'tuesday-sunday',
+    'closed Mon' → 'closed monday'). Only whole-word abbreviations are expanded, so
+    'Monday' / 'Sunday' are untouched. Case-insensitive; returns lower-cased text
+    (the composer's weekday logic is case-insensitive)."""
+    if not text:
+        return ""
+
+    def _sub(m):
+        return _WEEKDAY_ABBR.get(m.group(0).lower(), m.group(0))
+
+    return re.sub(r"\b(" + "|".join(sorted(_WEEKDAY_ABBR, key=len, reverse=True))
+                  + r")\b\.?", _sub, text, flags=re.I)
+
+
 # Currency symbol → spoken word (always the plural noun; "25 euros").
 _CURRENCY_WORD = {"€": "euros", "$": "dollars", "£": "pounds", "¥": "yen"}
 
@@ -1410,31 +1434,102 @@ def _extract_open_range(hours_text: str) -> str:
 
 def _open_phrase_from_closed(closed: "List[str]") -> str:
     """Turn the CLOSED day set into an open phrase as a RANGE, never a list.
-      * exactly one closed day      → 'daily except <Day>'
       * no closed day               → 'daily'
-      * two or more closed days     → '' (let an explicit open range speak instead)
+      * one closed day              → 'daily except <Day>'
+      * two closed days             → 'daily except <Day> and <Day>'
+      * three or more closed days   → '' (too many to phrase as 'daily except …';
+                                      the caller lets an explicit open range speak)
     """
     if not closed:
         return "daily"
-    if len(closed) == 1:
-        return f"daily except {_WEEKDAY_TITLE[closed[0]]}"
+    names = [_WEEKDAY_TITLE[d] for d in closed]
+    if len(names) == 1:
+        return f"daily except {names[0]}"
+    if len(names) == 2:
+        return f"daily except {names[0]} and {names[1]}"
     return ""
 
 
+def _mentioned_open_days(hours_text: str) -> "List[str]":
+    """Weekdays the source NAMES with an opening time (an open-day list such as
+    'Monday, Thursday, Friday: 12:00 – 6:00; Saturday, Sunday: 10:00 – 6:00').
+    Days that appear only inside a 'closed …' clause are excluded. Week-ordered."""
+    if not hours_text:
+        return []
+    low = hours_text.lower()
+    # Remove closed clauses so a closed day is not counted as open.
+    low_open = re.sub(r"closed[^.;]*", " ", low)
+    mentioned = {d for d in _WEEKDAYS if re.search(rf"\b{d}s?\b", low_open)}
+    return [d for d in _WEEKDAYS if d in mentioned]
+
+
+def _closed_from_open_complement(hours_text: str) -> "List[str]":
+    """When the source lists OPEN days (no 'to' range, no explicit 'closed' day),
+    the closed days are the complement of the named open days. Only trusted when
+    the source names a plausible open-day LIST (3–6 distinct weekdays) so a single
+    stray weekday does not imply six closed days. Week-ordered."""
+    open_days = _mentioned_open_days(hours_text)
+    if not (3 <= len(open_days) <= 6):
+        return []
+    return [d for d in _WEEKDAYS if d not in open_days]
+
+
+def _extract_open_time_span(hours_text: str) -> str:
+    """A SINGLE simplified open→close span, e.g. '8:15 to 6:30', '10 to 5' — the
+    FIRST clock span in the source, with am/pm/'h' suffixes and the ticket-office
+    parenthetical dropped so the sentence stays short (the task example keeps the
+    span: 'open Tuesday to Sunday from 8:15 to 6:30'). Returns '' when the source
+    carries no clock time. Only one span is ever kept — a venue's many day-group
+    time rows are not read aloud (that is the long dump D633 removes)."""
+    if not hours_text:
+        return ""
+    # Drop parentheticals (ticket-office / hall-closing detail) before scanning.
+    txt = re.sub(r"\([^)]*\)", " ", hours_text)
+    # Normalise the word times to a spoken form the span regex can carry.
+    txt = re.sub(r"(?i)\bnoon\b", "12", txt)
+    txt = re.sub(r"(?i)\bmidnight\b", "12", txt)
+    m = re.search(
+        r"(\d{1,2})(?::(\d{2}))?\s*(?:am|pm)?\s*(?:to|–|-|until|till)\s*"
+        r"(\d{1,2})(?::(\d{2}))?\s*(?:am|pm)?", txt, re.I)
+    if not m:
+        return ""
+
+    def _fmt(h, mm):
+        return f"{h}:{mm}" if mm else f"{h}"
+
+    start = _fmt(m.group(1), m.group(2))
+    end = _fmt(m.group(3), m.group(4))
+    return f"{start} to {end}"
+
+
 def _compose_hours_phrase(hours_text: str, venue_short: str) -> str:
-    """One short spoken hours sentence from the structured hours string. Prefers an
-    explicit open RANGE; otherwise derives 'daily except <Day>' from a single
-    closed day. Keeps NO clock times (they are the ticket-office / long-sentence
-    detail D633 strips) so the sentence stays short and passes long_practical_sentence.
-    Returns '' when no weekday structure can be found."""
+    """One short spoken hours sentence from the structured hours string.
+
+    Prefers an explicit open day-RANGE ('Tuesday to Sunday'); otherwise derives
+    'daily except <Day>' from a single closed day. A single simplified time span
+    ('from 8:15 to 6:30') rides along when the source gives one — the task example
+    keeps it, and one short span cannot trip long_practical_sentence (which needs a
+    clock time AND >30 words). Parentheticals, ticket-office / hall-closing detail,
+    and multi-row time tables are never read aloud. Returns '' when no weekday
+    structure can be found."""
     hours_text = (hours_text or "").strip()
     if not hours_text:
         return ""
+    hours_text = _expand_weekday_abbr(hours_text)
     closed = _extract_closed_days(hours_text)
     open_range = _extract_open_range(hours_text)
+    time_span = _extract_open_time_span(hours_text)
+    # When the source lists OPEN days with no explicit closed day and no 'to'
+    # range, the closed days are the complement of the named open days — so a
+    # 5-day list ("Monday, Thursday, Friday … Saturday, Sunday") becomes an honest
+    # "daily except Tuesday and Wednesday", never a false "daily".
+    if not closed:
+        closed = _closed_from_open_complement(hours_text)
 
     if open_range:
         body = f"open {open_range}"
+        if time_span:
+            body += f" from {time_span}"
         if len(closed) == 1:
             body += f", and closed on {_WEEKDAY_TITLE[closed[0]]}s"
     else:
@@ -1442,6 +1537,10 @@ def _compose_hours_phrase(hours_text: str, venue_short: str) -> str:
         if not phrase:
             return ""
         body = f"open {phrase}"
+        if time_span:
+            # "open daily from 10 to 5" / "open daily except Monday, 10 to 5"
+            sep = ", " if "except" in phrase else " from "
+            body += f"{sep}{time_span}"
     return f"{venue_short} is {body}."
 
 
@@ -1476,25 +1575,35 @@ def _compose_admission_phrase(admission_text: str) -> str:
                         "pounds" if w.startswith(("gbp", "pound")) else w)
             price = f"{m2.group(1)} {spoken_w}".strip()
 
-    # Is there a FREE group we may name (at most one)? Prefer the common concession
-    # groups; a general-free venue says "admission is free".
+    # Is there a FREE group we may name (at most one)? Only a group the source
+    # explicitly ties to FREE entry — never a PRICED concession ("$8 for seniors,
+    # students" means they PAY $8, not that they go free). Isolate the clause(s)
+    # that actually carry a "free" marker and look for a group ONLY there.
     low = cleaned.lower()
     general_free = bool(re.search(
         r"\b(?:admission|entry)\s+is\s+free\b|\bfree\s+admission\b|"
         r"\balways\s+free\b|\bfree\s+to\s+(?:the\s+public|all|enter|visit)\b", low))
+
+    # The spans of text that are about FREE entry: a "free … <groups>" lead
+    # ("free for children 12 and under", "Free Admission: … under 18, over 65"),
+    # or a "<group> … free" trailer.
+    free_context = " ".join(re.findall(r"free[^.;]*", low))
+    free_context += " " + " ".join(re.findall(r"[^.;]*?\bfree\b", low))
+
     free_group = ""
     if re.search(r"\bunder[-\s]?18s?\b|\bunder\s+18\b|\baged?\s+18\s+and\s+under\b"
-                 r"|\bchildren\b|\bchild(?:ren)?\s+\d+\s+and\s+under\b", low):
+                 r"|\bchildren\b|\bchild(?:ren)?\b|\b1[0-9]\s+and\s+under\b",
+                 free_context):
         free_group = "under-18s"
-    elif re.search(r"\bstudents?\b", low):
+    elif re.search(r"\bstudents?\b", free_context):
         free_group = "students"
-    elif re.search(r"\bover[-\s]?65s?\b|\bseniors?\b|\b65\+\b", low):
+    elif re.search(r"\bover[-\s]?65s?\b|\bseniors?\b|\b65\+\b", free_context):
         free_group = "seniors"
 
     if price and free_group:
-        return f"Adult tickets are {price}; {free_group} go free."
+        return f"Admission is {price} for adults; {free_group} go free."
     if price:
-        return f"Adult tickets are {price}."
+        return f"Admission is {price} for adults."
     if general_free:
         return "Admission is free."
     return ""

@@ -288,9 +288,10 @@ class TestOpenMuseumHours(unittest.TestCase):
         self.assertIn("https://mfa.org/visit", res["sources"]["hours"])
 
         planb = vp.plan_b_opening_practicals(res)
-        # Hours + admission are SPOKEN.
-        self.assertIn("Tue-Sun 10am-5pm", planb["speak"])
-        self.assertIn("Adults $27", planb["speak"])
+        # Hours + admission are SPOKEN, now as the LOCAL-633 COMPOSED sentence
+        # (short day range + one price, currency as a word) — not the raw paste.
+        self.assertIn("open Tuesday to Sunday", planb["speak"])
+        self.assertIn("27 dollars", planb["speak"])
         # D617: the source is NOT in the spoken text; it is in the text-view note.
         self.assertNotIn("mfa.org", planb["speak"])
         self.assertIn("mfa.org", planb["source_note"])

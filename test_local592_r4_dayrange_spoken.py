@@ -143,58 +143,60 @@ class TestSpokenVisitingComposition(unittest.TestCase):
         low = section.lower()
         self.assertIn("tuesday", low)
         self.assertIn("sunday", low)
-        self.assertIn("4 pm", low)
+        self.assertIn("4", low)   # [LOCAL-633] simplified time span ("noon to 4")
         # The day range precedes the time in the spoken sentence.
-        self.assertLess(low.index("tuesday"), low.index("4 pm"),
+        self.assertLess(low.index("tuesday"), low.index(" 4"),
                         f"days must be spoken with (before) the hours: {section!r}")
 
     def test_source_and_month_present(self):
+        # [LOCAL-633 / LOCAL-623 defect 4] The spoken visiting sentence carries NO
+        # citation tail — not a source domain, and not the month stamp. Provenance
+        # is text-view only. The facts themselves are still spoken.
         section = self._section(
             "Open Tuesday through Sunday, Noon–4 PM. $12 for adults, $8 for seniors")
-        self.assertIn("October 2026", section)
-        # [LOCAL-614 item 4 / D617] No source DOMAIN is spoken in the visiting
-        # signal. The honesty stamp keeps the month, without the domain.
-        self.assertRegex(section, r"(?i)as published by the museum in October 2026")
+        self.assertNotRegex(section, r"(?i)as published by the museum")
         self.assertNotRegex(section, r"(?i)as listed on griffinmuseum\.org")
+        self.assertRegex(section, r"(?i)\bis open\b")
+        self.assertRegex(section, r"(?i)admission is")
 
     def test_admission_categories_kept_never_invented(self):
+        # [LOCAL-633] ONE adult price plus AT MOST one free group — not the full
+        # price table. The currency is a WORD, never a symbol. Priced concessions
+        # ("$8 for seniors, students") are NOT read, and no category is invented.
         section = self._section(
             "Open Tuesday through Sunday, Noon–4 PM. "
             "$12 for adults, $8 for seniors, students and teachers")
-        self.assertIn("$12", section)
-        self.assertIn("$8", section)
+        self.assertIn("12 dollars", section)      # the one adult price, as a word
+        self.assertNotIn("$12", section)          # never a currency symbol
+        self.assertNotIn("$8", section)           # no price list / second price
+        self.assertNotIn("8 dollars", section)
         low = section.lower()
-        for cat in ("adults", "seniors", "students", "teachers"):
-            self.assertIn(cat, low, f"page-given category '{cat}' must be kept: {section!r}")
-        # A category the page did NOT give must never be invented.
+        self.assertIn("adults", low)
+        # Priced concessions are not spoken as free, and no category is invented.
+        self.assertNotIn("students go free", low)
         self.assertNotIn("children", low)
         self.assertNotIn("military", low)
 
     def test_griffin_sentence_shape_end_to_end(self):
-        # The LEAD's target shape (content, not exact wording): open <days>, <time>,
-        # closed <day>; admission <price> for <cats>, as published by the museum in
-        # <month>  (D617 / LOCAL-614 item 4: no source domain is spoken).
+        # [LOCAL-633] The composed shape: "The Griffin is open <days> from <time>,
+        # and closed on <day>. Admission is <price> for adults." One price, currency
+        # as a word, no spoken citation tail.
         section = self._section(
             "Open Tuesday through Sunday, Noon–4 PM. Closed on Monday. "
             "$12 for adults, $8 for seniors, students and teachers")
         low = section.lower()
         i_open = re.search(r"(?i)is open|opens", section).start()
         i_days = low.index("tuesday")
-        i_time = low.index("4 pm")
         i_closed = low.index("closed")
-        i_adm = section.index("$12")
-        # The visiting source signal is now domain-free ("as published by the
-        # museum in <month>"). Anchor the ordering check on the dated signal.
-        m_src = re.search(r"(?i)as published by the museum in October 2026", section)
-        self.assertIsNotNone(m_src, f"visiting source signal missing: {section!r}")
-        i_src = m_src.start()
-        # open → days → time all in the hours sentence; closed stated; then
-        # admission; then the dated source signal last.
+        i_adm = low.index("admission is")
+        # open → days in the hours sentence; closed stated; then admission.
         self.assertLess(i_open, i_days)
-        self.assertLess(i_days, i_time)
-        self.assertLess(i_time, i_adm)
+        self.assertLess(i_days, i_adm)
         self.assertLess(i_closed, i_adm)
-        self.assertLess(i_adm, i_src)
+        # One price, as a word; no price table and no spoken provenance.
+        self.assertIn("12 dollars", section)
+        self.assertNotIn("$", section)
+        self.assertNotRegex(section, r"(?i)as published by the museum")
 
     def test_no_pointer_when_both_known(self):
         # Full facts → no "check the website" pointer (r3 contract preserved).
@@ -223,22 +225,19 @@ class TestAthenaeumSpokenDayGroups(unittest.TestCase):
         return am.build_opening_section(about)
 
     def test_each_day_group_spoken(self):
+        # [LOCAL-633] The composer states ONE day range and ONE simplified time
+        # span (not every day-group row — that was the long dump). The source
+        # DOMAIN is never spoken, and the month stamp is no longer spoken either.
         section = self._section(
             "Open Monday to Thursday, 9 AM–8 PM; Friday and Saturday, 9 AM–5 PM. "
             "Closed on Sunday. Admission is free")
         low = section.lower()
         self.assertIn("monday", low)
-        self.assertIn("thursday", low)
-        self.assertIn("friday", low)
-        self.assertIn("8 pm", low)
-        self.assertIn("5 pm", low)
-        # [LOCAL-616 item 2 / D617] The month honesty stamp is spoken, but the
-        # source DOMAIN is not — it lives in the text-view Sources line only. (This
-        # assertion previously required "bostonathenaeum.org" in the spoken section,
-        # which the now-removed "This account is drawn from … on <domain>" sentence
-        # supplied; that violated D617 and was the tour-414 defect.)
+        self.assertRegex(low, r"\bis open\b")
+        self.assertIn("9 to 8", low)              # one simplified span
+        self.assertIn("admission is free", low)
         self.assertNotIn("bostonathenaeum.org", section)
-        self.assertIn("October 2026", section)
+        self.assertNotRegex(section, r"(?i)as published by the museum")
 
     def test_free_admission_spoken_without_invented_price(self):
         section = self._section(

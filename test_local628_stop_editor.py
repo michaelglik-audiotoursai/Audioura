@@ -204,9 +204,12 @@ class TestOpenDailyClosedDay(unittest.TestCase):
         pb = vp.plan_b_opening_practicals(
             {"hours": "Open daily, 10:00-18:00, closed Mondays",
              "admission": "", "sources": {}})
-        self.assertNotIn("daily", pb["speak"].lower(),
-                         "spoken sentence must not say 'daily' when a day is closed")
-        self.assertIn("closed Mondays", pb["speak"])
+        # [LOCAL-633] The composed sentence must NOT claim an unqualified 7-day
+        # "daily" when Monday is closed — it names Monday as excluded/closed.
+        self.assertNotRegex(
+            pb["speak"], r"(?i)\bdaily\b(?!\s+except)",
+            "must not say an unqualified 'daily' when a day is closed")
+        self.assertRegex(pb["speak"], r"(?i)except Monday|closed on Monday")
 
     def test_genuine_seven_day_daily_is_kept(self):
         import venue_preflight as vp
