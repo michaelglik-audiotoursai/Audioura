@@ -1,0 +1,1304 @@
+
+======================================================================
+CALL #001 | 18:43:21.476 | GENERATE_TOUR_TEXT_FUNCTION_ENTRY
+======================================================================
+  location: Belvedere, Vienna
+  tour_type: walking
+  total_stops_parameter: 3
+  output_file: /app/tours/local628_belvedere.txt
+
+  [LOCAL-245] Stop-existence gate mode: LOG_ONLY
+
+======================================================================
+CALL #002 | 18:43:21.481 | TOTAL_STOPS_FINALIZED
+======================================================================
+  location: Belvedere, Vienna
+  total_stops_final: 3
+  source: parameter
+
+
+PHASE 1: Analyzing tour intent with AI...
+  [Bug2Fix/D536] tour_type='walking' not prepended (pre_category='walking'); intent sees the ORIGINAL request, not the stripped one
+Intent analysis response: ```json
+{
+    "poi_type": "museums",
+    "location": "Vienna",
+    "theme_type": "STANDARD",
+    "theme_name": null,
+    "requirements": null,
+    "business_hours_relevant": false,
+    "accessibility_mentioned": false,
+    "needs_research": false,
+    "venue_name": "Belvedere",
+    "geographic_scope": "Belvedere, Vienna",
+    "named_places": [],
+    "scope_precision": "BUILDING",
+    "transport_mode": "on_foot",
+    "country_scope": null
+}
+```
+  [INTENT] Stripped LLM fences from response
+  [TRANSPORT] mode=on_foot, country_scope=None (keyword=on_foot, intent=on_foot)
+✅ Intent Analysis Results:
+   POI Type: museums
+   Location: Vienna
+   Requirements: None
+   Business Hours Relevant: False
+   Accessibility Mentioned: False
+   Venue Name: Belvedere
+  [venue_name sanity] 'Belvedere' OK
+  [S15] Forced tour_category=museum from venue_name='Belvedere'
+[TIMING] phase=intent elapsed=1.6s cumulative=1.6s
+[LOCAL-474] tour_type='walking' → category='museum' (source=explicit)
+
+Detected tour category: MUSEUM
+Using museum template for Belvedere, Vienna - walking
+
+======================================================================
+CALL #003 | 18:43:23.061 | GENERATING_PROMPT
+======================================================================
+  location: Belvedere, Vienna
+  user_request: Belvedere, Vienna
+  total_stops: 3
+
+
+PHASE 3A: Fetching 3 candidate POI(s) for Belvedere, Vienna...
+  [Museum constraint] Venue from intent='Belvedere'
+  [venue_resolver] Name variants: ['Belvedere']
+  [venue_resolver] Candidates for variant 'Belvedere': ['Q303139', 'Q147108', 'Q37503368', 'Q742848', 'Q1005240', 'Q816265', 'Q211818', 'Q2054234']
+  [venue_resolver] No museum-typed candidates; ranking by collection size
+SPARQL attempt 1 failed: HTTPSConnectionPool(host='query.wikidata.org', port=443): Read timed out. (read timeout=20)
+  [venue_resolver] SPARQL: 84 works found for Q303139
+  [venue_resolver] [LOCAL-627 d4] rejected 0 reproduction/cast + 2 post-1990 work(s) (modern_art_museum=False)
+  [venue_resolver] SPARQL: 11 works found for Q147108
+  [venue_resolver] SPARQL: 0 works found for Q37503368
+  [venue_resolver] SPARQL: 0 works found for Q742848
+  [venue_resolver] SPARQL: 3 works found for Q1005240
+  [venue_resolver] SPARQL: 0 works found for Q816265
+  [venue_resolver] SPARQL: 10 works found for Q211818
+  [venue_resolver] SPARQL: 1 works found for Q2054234
+  [venue_resolver] collection-ranked fallback: Q303139 has works
+  [venue_resolver] #3 dropping sub-entity Q303139 (Belvedere) — part of a sibling candidate
+  [venue_resolver] [LOCAL-627 d4] rejected 0 reproduction/cast + 2 post-1990 work(s) (modern_art_museum=False)
+  [venue_resolver] SPARQL: 11 works found for Q147108
+  [venue_resolver] SPARQL: 10 works found for Q211818
+  [venue_resolver] SPARQL: 3 works found for Q1005240
+  [venue_resolver] SPARQL: 1 works found for Q2054234
+  [venue_resolver] SPARQL: 0 works found for Q37503368
+  [venue_resolver] SPARQL: 0 works found for Q742848
+  [venue_resolver] SPARQL: 0 works found for Q816265
+  [venue_resolver] Geo-disambiguated by distance: Q211818 (Belvedere) — 1.8km from Vienna
+    [venue_resolver] Artist inferred from name: 'Belvedere'
+  [venue_resolver] Resolved: 'Belvedere' → Q211818 (Belvedere)
+    URL: https://www.belvedere.at/
+    Coords: 48.1934, 16.380519444444445
+    Language: en
+    Artist: Belvedere ()
+  [venue_resolver] SPARQL: 10 works found for Q211818
+  [Phase3A] Injected 10 canonical title hints from Wikidata (QID-deduped)
+  [S17] no scope_constraint (precision='BUILDING', scope='Belvedere, Vienna')
+  [venue_resolver] Name variants: ['Belvedere']
+  [venue_resolver] Candidates for variant 'Belvedere': ['Q303139', 'Q147108', 'Q37503368', 'Q742848', 'Q1005240', 'Q816265', 'Q211818', 'Q2054234']
+  [venue_resolver] No museum-typed candidates; ranking by collection size
+  [venue_resolver] SPARQL: 84 works found for Q303139
+  [venue_resolver] [LOCAL-627 d4] rejected 0 reproduction/cast + 2 post-1990 work(s) (modern_art_museum=False)
+  [venue_resolver] SPARQL: 11 works found for Q147108
+  [venue_resolver] SPARQL: 0 works found for Q37503368
+  [venue_resolver] SPARQL: 0 works found for Q742848
+  [venue_resolver] SPARQL: 3 works found for Q1005240
+  [venue_resolver] SPARQL: 0 works found for Q816265
+  [venue_resolver] SPARQL: 10 works found for Q211818
+  [venue_resolver] SPARQL: 1 works found for Q2054234
+  [venue_resolver] collection-ranked fallback: Q303139 has works
+  [venue_resolver] #3 dropping sub-entity Q303139 (Belvedere) — part of a sibling candidate
+  [venue_resolver] [LOCAL-627 d4] rejected 0 reproduction/cast + 2 post-1990 work(s) (modern_art_museum=False)
+  [venue_resolver] SPARQL: 11 works found for Q147108
+  [venue_resolver] SPARQL: 10 works found for Q211818
+  [venue_resolver] SPARQL: 3 works found for Q1005240
+  [venue_resolver] SPARQL: 1 works found for Q2054234
+  [venue_resolver] SPARQL: 0 works found for Q37503368
+  [venue_resolver] SPARQL: 0 works found for Q742848
+  [venue_resolver] SPARQL: 0 works found for Q816265
+  [venue_resolver] Geo-disambiguated by distance: Q211818 (Belvedere) — 1.8km from Vienna
+    [venue_resolver] Artist inferred from name: 'Belvedere'
+  [venue_resolver] Resolved: 'Belvedere' → Q211818 (Belvedere)
+    URL: https://www.belvedere.at/
+    Coords: 48.1934, 16.380519444444445
+    Language: en
+    Artist: Belvedere ()
+  [venue_cache] MISS for Q211818
+  [venue_resolver] SPARQL: 10 works found for Q211818
+  [LOCAL-30] Deterministic selection: 10 documented works (0 catalogue, 10 SPARQL; 0 site/cache canonical title(s) are NOT documented)
+  [LOCAL-30] DETERMINISTIC BYPASS: 6 documented works → Phase 3A SKIPPED
+   Stops proposed (deterministic, no GPT):
+     - Austrian State Treaty [sparql]
+     - First Vienna Award [sparql]
+     - Second Vienna Award [sparql]
+  [venue_resolver] Name variants: ['Belvedere']
+  [venue_resolver] Candidates for variant 'Belvedere': ['Q303139', 'Q147108', 'Q37503368', 'Q742848', 'Q1005240', 'Q816265', 'Q211818', 'Q2054234']
+  [venue_resolver] No museum-typed candidates; ranking by collection size
+  [venue_resolver] SPARQL: 84 works found for Q303139
+  [venue_resolver] [LOCAL-627 d4] rejected 0 reproduction/cast + 2 post-1990 work(s) (modern_art_museum=False)
+  [venue_resolver] SPARQL: 11 works found for Q147108
+  [venue_resolver] SPARQL: 0 works found for Q37503368
+  [venue_resolver] SPARQL: 0 works found for Q742848
+  [venue_resolver] SPARQL: 3 works found for Q1005240
+  [venue_resolver] SPARQL: 0 works found for Q816265
+  [venue_resolver] SPARQL: 10 works found for Q211818
+  [venue_resolver] SPARQL: 1 works found for Q2054234
+  [venue_resolver] collection-ranked fallback: Q303139 has works
+  [venue_resolver] #3 dropping sub-entity Q303139 (Belvedere) — part of a sibling candidate
+  [venue_resolver] [LOCAL-627 d4] rejected 0 reproduction/cast + 2 post-1990 work(s) (modern_art_museum=False)
+  [venue_resolver] SPARQL: 11 works found for Q147108
+  [venue_resolver] SPARQL: 10 works found for Q211818
+  [venue_resolver] SPARQL: 3 works found for Q1005240
+  [venue_resolver] SPARQL: 1 works found for Q2054234
+  [venue_resolver] SPARQL: 0 works found for Q37503368
+  [venue_resolver] SPARQL: 0 works found for Q742848
+  [venue_resolver] SPARQL: 0 works found for Q816265
+  [venue_resolver] Geo-disambiguated by distance: Q211818 (Belvedere) — 1.8km from Vienna
+    [venue_resolver] Artist inferred from name: 'Belvedere'
+  [venue_resolver] Resolved: 'Belvedere' → Q211818 (Belvedere)
+    URL: https://www.belvedere.at/
+    Coords: 48.1934, 16.380519444444445
+    Language: en
+    Artist: Belvedere ()
+  [venue_cache] MISS for Q211818
+  [venue_resolver] SPARQL: 10 works found for Q211818
+  [LOCAL-30] Deterministic selection: 10 documented works (0 catalogue, 10 SPARQL; 0 site/cache canonical title(s) are NOT documented)
+  [LOCAL-30] DETERMINISTIC BYPASS: 6 documented works → Phase 3A SKIPPED
+   Stops proposed (deterministic, quality-score ranked):
+     - Austrian State Treaty [sparql] (quality=0.0)
+     - First Vienna Award [sparql] (quality=0.0)
+     - Second Vienna Award [sparql] (quality=0.0)
+  [R4] Museum tour: asking for 6 candidates (2x for D1v2 filtering)
+
+PHASE 3A: SKIPPED (deterministic fill from 6 documented works)
+OK PHASE 3A parsed 6 candidate POI(s):
+   - Austrian State Treaty
+   - First Vienna Award
+   - Second Vienna Award
+   - Yugoslav accession to the Tripartite Pact
+   - Belvedere Palace Chapel
+   - Monatsputti
+  [venue_resolver] Name variants: ['Belvedere']
+  [venue_resolver] Candidates for variant 'Belvedere': ['Q303139', 'Q147108', 'Q37503368', 'Q742848', 'Q1005240', 'Q816265', 'Q211818', 'Q2054234']
+  [venue_resolver] No museum-typed candidates; ranking by collection size
+  [venue_resolver] SPARQL: 84 works found for Q303139
+  [venue_resolver] [LOCAL-627 d4] rejected 0 reproduction/cast + 2 post-1990 work(s) (modern_art_museum=False)
+  [venue_resolver] SPARQL: 11 works found for Q147108
+  [venue_resolver] SPARQL: 0 works found for Q37503368
+  [venue_resolver] SPARQL: 0 works found for Q742848
+  [venue_resolver] SPARQL: 3 works found for Q1005240
+  [venue_resolver] SPARQL: 0 works found for Q816265
+  [venue_resolver] SPARQL: 10 works found for Q211818
+  [venue_resolver] SPARQL: 1 works found for Q2054234
+  [venue_resolver] collection-ranked fallback: Q303139 has works
+  [venue_resolver] #3 dropping sub-entity Q303139 (Belvedere) — part of a sibling candidate
+  [venue_resolver] [LOCAL-627 d4] rejected 0 reproduction/cast + 2 post-1990 work(s) (modern_art_museum=False)
+  [venue_resolver] SPARQL: 11 works found for Q147108
+  [venue_resolver] SPARQL: 10 works found for Q211818
+  [venue_resolver] SPARQL: 3 works found for Q1005240
+  [venue_resolver] SPARQL: 1 works found for Q2054234
+  [venue_resolver] SPARQL: 0 works found for Q37503368
+  [venue_resolver] SPARQL: 0 works found for Q742848
+  [venue_resolver] SPARQL: 0 works found for Q816265
+  [venue_resolver] Geo-disambiguated by distance: Q211818 (Belvedere) — 1.8km from Vienna
+    [venue_resolver] Artist inferred from name: 'Belvedere'
+  [venue_resolver] Resolved: 'Belvedere' → Q211818 (Belvedere)
+    URL: https://www.belvedere.at/
+    Coords: 48.1934, 16.380519444444445
+    Language: en
+    Artist: Belvedere ()
+  [D1v2] Venue resolved: Q211818 → URL=https://www.belvedere.at/, lang=en
+  [venue_cache] MISS for Q211818
+  [venue_resolver] SPARQL: 10 works found for Q211818
+  [D1v2] SPARQL source: 16 canonical titles
+  [story_miner] Site page: https://www.belvedere.at/galerie-mittelalter (30000 chars)
+  [story_miner] Sub-page: https://www.belvedere.at/en/study-collection-middle-ages-and-renaissance (30000 chars)
+  [story_miner] Site page: https://www.belvedere.at/das-belvedere/geschichte-und-architektur (30000 chars)
+  [story_miner] Site page: https://www.belvedere.at/presse (30000 chars)
+  [story_miner] Site crawl: 5 pages fetched (budget: 15)
+  [story_miner] Sitelink EN: 'Belvedere, Vienna'
+  [story_miner] Wikipedia EN: 516 chars (title: 'Belvedere, Vienna')
+  [T0a] Exhibit-name extraction: 0 from sections, 5 from quoted/bold/list
+  [T0a] Extracted 5 canonical titles, 0 cycle names
+  [story_miner] Corpus: 6 pages, 5 titles, 0 from Joconde
+  [D1v2] Canonical titles union: 5 site/wiki + 16 SPARQL = 21 total
+  [D1v2] Removed 1 substring titles (prefer longer forms)
+  [LOCAL-24] Classification: 20 works, 0 galleries, 0 excluded
+  [D1v2-LOCAL24] After filter: 20 works, 0 galleries, 0 excluded
+  [venue_resolver] Built 16 dynamic aliases from 10 works
+  [D1v2] Injected 16 dynamic aliases
+  [D1v2] Built bilingual map: 84 word pairs
+  [D1v2] artist-check skipped (no valid creator) — no artist_qid on entity
+  [D1v2] VERIFIED 'Austrian State Treaty' → canonical: 'Austrian State Treaty'
+  [D1v2] VERIFIED 'First Vienna Award' → canonical: 'First Vienna Award'
+  [D1v2] VERIFIED 'Second Vienna Award' → canonical: 'Second Vienna Award'
+  [D1v2] VERIFIED 'Yugoslav accession to the Tripartite Pact' → canonical: 'Yugoslav accession to the Tripartite Pact'
+  [D1v2] VERIFIED 'Belvedere Palace Chapel' → canonical: 'Belvedere Palace Chapel'
+  [D1v2] VERIFIED 'Monatsputti' → canonical: 'Monatsputti'
+  [D1v2] 6/6 works verified — tier: rich
+  [venue_cache] STORED Q211818 (tier=rich, ttl=30d, expires=2026-11-07)
+  [D1] Tier: rich (6 verified works)
+  [R4] Target reached: 6/3 stops
+  [LOCAL-16 GATE] All 6 stops cleared the gate ✓
+
+PHASE 4.5: Validating AI knowledge for Belvedere, Vienna...
+OK Knowledge validation passed: Knowledge validation passed
+
+PHASE 4: skipped (tour_category='museum', no type-verification required)
+  [LOCAL-212] Coverage selection: 0 COVERED, fallback needed: 2×VENUE_ONLY, 1×EMPTY (not enough covered candidates to fill 3 stops)
+  [LOCAL-212] Selected: ['Austrian State Treaty=VENUE_ONLY', 'Belvedere Palace Chapel=VENUE_ONLY', 'First Vienna Award=EMPTY']
+  [LOCAL-212] Dropped:  ['Second Vienna Award=EMPTY', 'Yugoslav accession to the Tripartite Pact=EMPTY', 'Monatsputti=EMPTY']
+  [EXISTENCE-GATE] LOG_ONLY — 6/6 stops verified (100%), 0 would be dropped
+    [VERIFIED] 'Austrian State Treaty' — venue_corpus canonical_title: 'Austrian State Treaty' at 'Belvedere, Vienna'
+    [VERIFIED] 'Belvedere Palace Chapel' — venue_corpus canonical_title: 'Belvedere Palace Chapel' at 'Belvedere, Vienna'
+    [VERIFIED] 'First Vienna Award' — venue_corpus canonical_title: 'First Vienna Arbitration' at 'Belvedere, Vienna'
+    [VERIFIED] 'Second Vienna Award' — venue_corpus canonical_title: 'Second Vienna Award' at 'Belvedere, Vienna'
+    [VERIFIED] 'Yugoslav accession to the Tripartite Pact' — venue_corpus canonical_title: 'Yugoslav accession to the Tripartite Pact' at 'Be
+    [VERIFIED] 'Monatsputti' — venue_corpus canonical_title: 'Monatsputti' at 'Belvedere, Vienna'
+    [HARVEST] 'Austrian State Treaty': verified_no_detail (name match only, no facts in source)
+    [HARVEST] 'Belvedere Palace Chapel': verified_no_detail (name match only, no facts in source)
+    [HARVEST] 'First Vienna Award': verified_no_detail (name match only, no facts in source)
+    [HARVEST] 'Second Vienna Award': verified_no_detail (name match only, no facts in source)
+    [HARVEST] 'Yugoslav accession to the Tripartite Pact': verified_no_detail (name match only, no facts in source)
+    [HARVEST] 'Monatsputti': verified_no_detail (name match only, no facts in source)
+    [HARVEST] Summary: 0 harvested, 0 already had corpus, 6 verified_no_detail
+    [INTERPRETIVE] 'Austrian State Treaty': +7 passages (2 queries)
+    [INTERPRETIVE] 'Belvedere Palace Chapel': +4 passages (2 queries)
+    [INTERPRETIVE] 'First Vienna Award': +14 passages (2 queries)
+    [INTERPRETIVE] 'Second Vienna Award': +11 passages (2 queries)
+    [INTERPRETIVE] 'Yugoslav accession to the Tripartite Pact': +6 passages (2 queries)
+    [INTERPRETIVE] Summary: 5 stops enriched, +42 passages, 12 queries issued, 0 attributions dropped
+
+PHASE 3B: Requesting structured details and walking directions for 3 stop(s)...
+
+======================================================================
+CALL #004 | 18:45:53.730 | PHASE_3B_REQUEST
+======================================================================
+  location: Belvedere, Vienna
+  stop_count: 3
+
+[LOCAL-197] llm_cost() called with total_tokens (deprecated) by /app/generate_tour_text.py:12540. Caller should supply input_tokens and output_tokens separately.
+[LOCAL-197] llm_cost() called with total_tokens (deprecated) by /app/generate_tour_text.py:12541. Caller should supply input_tokens and output_tokens separately.
+PHASE 3B API call cost: $0.0005 (599 tokens)
+OK PHASE 3B: ordered 3 stop(s) with structured details and directions
+  [LOCAL-27] Corpus-sourced metadata applied to 3 stops
+  [LOCAL-35] Visitor info page found (en): https://www.belvedere.at/en/visit
+  [LOCAL-35] Extracted from https://www.belvedere.at/en/visit: closed=[], hours=2, admission='€65; free for Métropole residents'
+  [LOCAL-35] Final Museum Information: Tuesday to Sunday, 11 AM–6 PM; Thursday, 11 AM–9 PM. €65; free for Métropole residents
+  [LOCAL-39] Museum Information sourced from official site for stop 1
+  [LOCAL-355] Querying OSM for venue facts (city: Vienna, hint: museum)
+[OSM-VENUE] Overpass ConnectionError for 'Austrian State Treaty' (attempt 1/2)
+[OSM-VENUE] Overpass ConnectionError for 'Austrian State Treaty' (attempt 2/2)
+  [LOCAL-355] Austrian State Treaty: no practical facts in OSM
+[OSM-VENUE] Overpass ConnectionError for 'Belvedere Palace Chapel' (attempt 1/2)
+  [LOCAL-355] Belvedere Palace Chapel: no practical facts in OSM
+[OSM-VENUE] Overpass ConnectionError for 'Belvedere Palace Chapel' (attempt 2/2)
+[OSM-VENUE] Overpass ConnectionError for 'First Vienna Award' (attempt 1/2)
+[OSM-VENUE] Overpass ConnectionError for 'First Vienna Award' (attempt 2/2)
+  [LOCAL-355] First Vienna Award: no practical facts in OSM
+  [LOCAL-622] OSM lookup budget: spent=12.5s / limit=120s, skipped=0
+Extracted first POI coordinates: (48.2051, 16.3728)
+  [D4] Museum single-coordinate: all stops set to (48.2051, 16.3728) (source: model (fallback))
+
+=== Extracted POI Information ===
+1. Austrian State Treaty
+   Address: Austrian State Treaty, 1010 Vienna, Austria
+   Coordinates: 48.2051, 16.3728
+   Directions: From the nearest U-Bahn station, take the U1 line to Stephansplatz and exit towa...
+2. Belvedere Palace Chapel
+   Address: Belvedere Palace, 1030 Vienna, Austria
+   Coordinates: 48.2051, 16.3728
+   Directions: From the Austrian State Treaty, head southeast on Herrengasse, then turn left on...
+3. First Vienna Award
+   Address: First Vienna Award, 1030 Vienna, Austria
+   Coordinates: 48.2051, 16.3728
+   Directions: From the Belvedere Palace Chapel, exit and proceed east along the main pathway, ...
+================================
+
+[TIMING] phase=poi_selection elapsed=186.5s cumulative=188.1s
+
+[Storied] STORIED_MODE=true — generating spine + fact sheets...
+  [§3-adapter] Extracting story elements from 5/6 corpus pages for 'Belvedere'
+    page[0] score=10045 url=https://en.wikipedia.org/wiki/Belvedere,_Vienna
+    page[1] score=530 url=https://www.belvedere.at/das-belvedere/geschichte-und-architektur
+    page[2] score=435 url=https://www.belvedere.at/en/study-collection-middle-ages-and-renaissance
+  [§3-adapter] No elements extracted from 5 pages
+  [LOCAL-37] Three-class retrieval: 3 stops processed, 0 with category
+  [SQ-S6b] Insufficient data for thread discovery (elements=0, stops=3)
+  [SQ-S6b] Thread discovery: mode=mosaic, threads=0
+  [§3] No story elements available — spine will use invented arc (mode=invented)
+SPINE_COST: category=museum venue=Belvedere model=gpt-4o tokens=1124 (in=634 out=490) cost=$0.0065 latency=5.3s
+[COST_METER] FRESH | spine_generate | $0.006485 | user=None | job=None
+  [LOCAL-278] Spine cost folded into total: $0.0065
+  [LOCAL-111] Spine quality: 3/4 | {'climax_position': False, 'unique_emotional_beats': True, 'valid_callbacks': True, 'closing_revelation_length': True}
+  [Storied] Spine generated: 3 arc entries (mode=invented)
+  [LOCAL-183] stop_corpus: 3/3 stops have per-stop passages (21 total passages)
+  [LOCAL-198] Corpus gate: ENABLED — checking stop coverage...
+  [CORPUS-GATE] stop='Austrian State Treaty' verdict=VENUE_ONLY action=SHORTENED
+  [CORPUS-GATE] stop='Belvedere Palace Chapel' verdict=VENUE_ONLY action=SHORTENED
+  [CORPUS-GATE] stop='First Vienna Award' verdict=VENUE_ONLY action=SHORTENED
+  [LOCAL-198] Corpus gate: 0 PASSED, 0 CREATOR_ONLY, 0 EMPTY, 3 SHORTENED
+[LOCAL-197] llm_cost() called with total_tokens (deprecated) by /app/fact_extractor.py:220. Caller should supply input_tokens and output_tokens separately.
+  [Storied] Fact sheets: 3/3 generated
+  [S25] Story types assigned: ['art', 'history', 'anecdote']
+  [work_stories] MISS for austrian state treaty
+  [work_stories] MISS for belvedere palace chapel
+  [work_stories] MISS for first vienna award
+  [LOCAL-37] Tour diversity: no swaps needed (naturally balanced)
+  [LOCAL-188] Style constraints ACTIVE (declarative prose rules injected)
+[TIMING] phase=fact_sheets elapsed=14.3s cumulative=202.3s
+
+PHASE 5: Generating detailed descriptions for each POI (parallel)...
+
+  [LOCAL-382] framing=none source='-'
+[TIMING] phase=narration elapsed=0.0s cumulative=202.4s
+  [D495] venue domain seeded tier1: belvedere.at
+
+  [LOCAL-410] SERP search wiring — searching for stories on 3 stops...
+  [work_stories] MISS for austrian state treaty
+  [work_stories] MISS for belvedere palace chapel
+  [work_stories] MISS for first vienna award
+  [LOCAL-441] Batch P856 check: 12 domains, budget=20.0s, pool=10
+  [LOCAL-441] Batch P856 check: 14 domains, budget=20.0s, pool=10
+  [LOCAL-441] Batch P856 check: 13 domains, budget=20.0s, pool=10
+  [DEAD-HOST] Marked cold: wikimedia (timeout/network error for researchgate.net: The read operation timed out)
+  [SQ-S2] Wikidata P856 check failed for researchgate.net: The read operation timed out
+  [SQ-S2] Wikidata P856 check failed for akg-images.fr: The read operation timed out
+  [SQ-S2] Wikidata P856 check failed for belvederesquare.com: The read operation timed out
+  [SQ-S2] Wikidata P856 check failed for belvederecollege.ie: The read operation timed out
+  [SQ-S2] Wikidata P856 check failed for casa-belvedere.org: The read operation timed out
+  [SQ-S2] Wikidata P856 check failed for kafkadeskdotorg.wordpress.com: The read operation timed out
+  [SQ-S2] Wikidata P856 check failed for belvedereseries.org: The read operation timed out
+  [SQ-S2] Wikidata P856 check failed for philanthropy.org: The read operation timed out
+  [SQ-S2] Wikidata P856 check failed for helpbaltimoreshomeless.org: The read operation timed out
+  [SQ-S2] Wikidata P856 check failed for maps.apple.com: The read operation timed out
+  [SQ-S2] Wikidata P856 check failed for eventseeker.com: The read operation timed out
+  [SQ-S2] Wikidata P856 check failed for commons.wikimedia.org: The read operation timed out
+  [SQ-S2] Wikidata P856 check failed for casa-belvedere.org: The read operation timed out
+  [SQ-S2] Wikidata P856 check failed for helpbaltimoreshomeless.org: The read operation timed out
+  [SQ-S2] Wikidata P856 check failed for belvederecollege.ie: The read operation timed out
+  [SQ-S2] Wikidata P856 check failed for suemtravels.com: The read operation timed out
+  [SQ-S2] Wikidata P856 check failed for aroundus.com: The read operation timed out
+  [SQ-S2] Wikidata P856 check failed for belvederesquare.com: The read operation timed out
+  [SQ-S2] Wikidata P856 check failed for ww2db.com: The read operation timed out
+  [LOCAL-441] Batch complete: 4.1s, 0 tier1, 12 unverified, 0 budget-expired
+  [SQ-S2] Wikidata P856 check failed for hamaward.cloud: The read operation timed out
+  [SQ-S2] Wikidata P856 check failed for helpbaltimoreshomeless.org: The read operation timed out
+  [SQ-S2] Wikidata P856 check failed for casa-belvedere.org: The read operation timed out
+  [SQ-S2] Wikidata P856 check failed for austriainusa.org: The read operation timed out
+  [SQ-S2] Wikidata P856 check failed for belvederesquare.com: The read operation timed out
+  [SQ-S2] Wikidata P856 check failed for lazarus-union.international: The read operation timed out
+  [SQ-S2] Wikidata P856 check failed for belvederecollege.ie: The read operation timed out
+  [SQ-S2] Wikidata P856 check failed for philanthropy.org: The read operation timed out
+  [SQ-S2] Wikidata P856 check failed for alamy.com: The read operation timed out
+  [SQ-S2] Wikidata P856 check failed for opil.ouplaw.com: The read operation timed out
+  [LOCAL-441] Batch complete: 3.4s, 0 tier1, 13 unverified, 0 budget-expired
+  [SQ-S2] Wikidata P856 check failed for rome2rio.com: The read operation timed out
+  [LOCAL-441] Batch complete: 4.2s, 0 tier1, 14 unverified, 0 budget-expired
+    [D500] Stop 1: placeholder cleared from ['publisher', 'credit_line', 'medium', 'artist'] — unknown, not 'Not specified'
+    [LOCAL-486] Stop 1 worthiness: score=1/4 mine=True — has specific_title
+    [D489] material kind: stop='Austrian State Treaty' kind=active volume=COVERED sentences=38 active=1 staked=0 eventful=0 passive=3  <-- DISAGREE: enough material, wrong kind
+         best: "Austria, France, the Soviet Union, and the United Kingdom completed their ratifications by early July and the Austrian State Treaty entered "
+    [LOCAL-489] Stop 1 needs more material (eventless): 21 passages, 3162 chars, verdict=COVERED
+      [LOCAL-489] +8 from: "Austrian State Treaty" "Belvedere" provenance
+      [LOCAL-498] after replenishment: kind active -> active, 3162 -> 4398 chars, eventful=0 (NO CHANGE — the round bought more of the same)
+         best now: "Austria, France, the Soviet Union, and the United Kingdom completed their ratifications by early July and the "
+    [LOCAL-488] step 4: 2 providers, 6 leads, 1 with cross-model agreement, 0 SERP-confirmed
+    Stop 1 'Austrian State Treaty': queries=3 serp_results=21 snippets=29
+      → The Austrian State Treaty (German: Österreichischer Staatsvertrag ... It was signed on 15 May 1955 in Vienna, at the Sch
+      → The Austrian State Treaty, signed at the Belvedere Palace, formally ended the occupation and reestablished Austria as an
+    [D500] Stop 2: placeholder cleared from ['publisher', 'credit_line', 'medium', 'artist'] — unknown, not 'Not specified'
+    [LOCAL-486] Stop 2 worthiness: score=1/4 mine=True — has specific_title
+    [D489] material kind: stop='Belvedere Palace Chapel' kind=eventful volume=COVERED sentences=45 active=4 staked=3 eventful=0 passive=2
+         best: "It was designed by the Austrian ... It was only in 1753 when the Belvedere Palace Chapel was open for public visits."
+    [LOCAL-488] step 4: 2 providers, 10 leads, 1 with cross-model agreement, 1 SERP-confirmed
+      → injected 1 confirmed lead(s) ahead of the SERP snippets
+    Stop 2 'Belvedere Palace Chapel': queries=3 serp_results=22 snippets=23
+      → 1745 Empress Maria Theresa attended a service at the chapel.
+      → Belvedere Palace Chapel is a chapel located in the south eastern corner tower of the Upper Belvedere in Vienna, Austria.
+    [D500] Stop 3: placeholder cleared from ['publisher', 'credit_line', 'medium', 'artist'] — unknown, not 'Not specified'
+    [LOCAL-486] Stop 3 worthiness: score=1/4 mine=True — has specific_title
+    [D489] material kind: stop='First Vienna Award' kind=eventful volume=COVERED sentences=29 active=2 staked=9 eventful=2 passive=2
+         best: "10 Nov 1938, Hungary completed the occupation of territory ceded by Czechoslovakia per the First Vienna Award. ; 12 Nov 1938, The Hungarian "
+    [LOCAL-488] step 4: 2 providers, 7 leads, 1 with cross-model agreement, 3 SERP-confirmed
+      → injected 3 confirmed lead(s) ahead of the SERP snippets
+    Stop 3 'First Vienna Award': queries=3 serp_results=21 snippets=24
+      → 1938 Representatives from Germany and Italy mediated the First Vienna Award.
+      → 1938 Hungary was awarded parts of southern Czechoslovakia as a result of the First Vienna Award.
+
+  [LOCAL-410] SERP search complete: 10 queries, 72 results, 76 total snippets
+  [LOCAL-411] Snippet ranking+capping enabled: cap=5/stop, 76 raw → max 15 injected
+
+  [LOCAL-410] CHAIN INSTRUMENTATION:
+    Austrian State Treaty: serp_results=21 elements_extracted=- beats_injected=- (measured post-generation)
+    Belvedere Palace Chapel: serp_results=22 elements_extracted=- beats_injected=- (measured post-generation)
+    First Vienna Award: serp_results=21 elements_extracted=- beats_injected=- (measured post-generation)
+  [D534] Stop 1 has 29 snippet(s) but they are VENUE-level only — fetching object-level facts
+  [D533] Stop 1 'Austrian State Treaty' has 29 snippet(s) — asking the knowledge fallback
+  [D533] +7 fact(s) via gemini (7 high-confidence) — stop will be labelled aloud
+      [high] The Austrian State Treaty was signed on 15 May 1955 in the Marble Hall of the Upper Belvedere in Vienna.
+      [high] The treaty was signed by the foreign ministers and high commissioners of the four Allied occupying powers—the 
+      [high] The original treaty document is not permanently held by the Belvedere; as the Soviet Union was designated the 
+      [high] The physical treaty consists of bound text in Russian, English, French, and German, totaling nearly 300 pages.
+      [high] Each signatory added an impression in red sealing wax alongside their signature on the final execution page.
+      [high] Austrian Foreign Minister Leopold Figl uniquely signed the instrument in green ink, distinguishing his signatu
+  [D534] Stop 2 has 23 snippet(s) but they are VENUE-level only — fetching object-level facts
+  [D533] Stop 2 'Belvedere Palace Chapel' has 23 snippet(s) — asking the knowledge fallback
+  [D533] +7 fact(s) via gemini (7 high-confidence) — stop will be labelled aloud
+      [high] The Belvedere Palace Chapel was designed by architect Johann Lukas von Hildebrandt and completed in 1723 in th
+      [high] The chapel spans two stories and features an upper gallery that directly connects to the former residential ap
+      [high] The altarpiece depicting the Resurrection of Christ was commissioned in 1719 and painted by the Neapolitan art
+      [high] The ceiling fresco of the chapel was executed by Italian painter Carlo Innocenzo Carlone.
+      [high] The stucco decorations throughout the interior of the chapel were executed by Santino Bussi.
+      [high] While large sections of the Upper Belvedere sustained severe bomb damage during World War II, the chapel survi
+  [D534] Stop 3 has 24 snippet(s) but they are VENUE-level only — fetching object-level facts
+  [D533] Stop 3 'First Vienna Award' has 24 snippet(s) — asking the knowledge fallback
+  [D533] +3 fact(s) via gemini (3 high-confidence) — stop will be labelled aloud
+      [high] The First Vienna Award is not a physical museum artifact or display object, but a diplomatic treaty and arbitr
+      [high] The agreement was arbitrated and signed by the foreign ministers of Nazi Germany and Fascist Italy, Joachim vo
+      [high] The Belvedere does not curate or exhibit the First Vienna Award as a collection piece; the site functioned as 
+  [D533] Knowledge fallback filled 3 starved stop(s)
+[TIMING] phase=external_lookups elapsed=73.0s cumulative=275.4s
+
+Generating description for Stop 1: Austrian State Treaty by , ...
+
+Generating description for Stop 2: Belvedere Palace Chapel by , ...
+
+Generating description for Stop 3: First Vienna Award by , ...
+  [LOCAL-381] stop='Belvedere Palace Chapel' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-411] Stop 2 snippet ranking: input=30 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=5 output=5 usable=5 (t1t2=1, t3=0, market=0)
+    Top scores: [('Belvedere Palace Chapel', 16, ''), ('Belvedere Palace Chapel', 16, ''), ('Belvedere Palace Chapel, Vienna, eventseeker', 12, 'unverified')]
+  [LOCAL-381] stop='First Vienna Award' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-411] Stop 3 snippet ranking: input=27 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=5 output=5 usable=5 (t1t2=2, t3=0, market=0)
+    Top scores: [('First Vienna Award', 21, 'tier1'), ('First Vienna Award', 21, 'tier1'), ('First Vienna Award', 16, '')]
+  [LOCAL-381] stop='Austrian State Treaty' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-411] Stop 1 snippet ranking: input=36 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=5 output=5 usable=5 (t1t2=1, t3=0, market=0)
+    Top scores: [('Austrian State Treaty', 17, 'tier1'), ('Belvedere, Vienna', 16, ''), ('Austrian State Treaty Overview | PDF', 16, '')]
+  [LOCAL-620] Stop 2 evidence balance: input=5 kept_rich=0 kept_story=3 dropped_boilerplate=0 output=3
+  [LOCAL-402] Stop 2: injected 3 snippets as reference material
+  [LOCAL-620] Stop 3 evidence balance: input=5 kept_rich=0 kept_story=3 dropped_boilerplate=0 output=3
+  [LOCAL-402] Stop 3: injected 3 snippets as reference material
+  [LOCAL-620] Stop 1 evidence balance: input=5 kept_rich=0 kept_story=3 dropped_boilerplate=0 output=3
+  [LOCAL-402] Stop 1: injected 3 snippets as reference material
+  [LOCAL-620] prefs: default/balanced (no user_id)
+  [LOCAL-617] Stop 2: narration contract injected (reception_evidence=False)
+  [D533] Stop 2 corpus-gate restriction LIFTED — 30 source item(s) arrived after the gate ran
+  [LOCAL-411] Stop 2 prompt size: before_snippets=11292 after=27066 (+15774 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (27066)
+  [LOCAL-620] prefs: default/balanced (no user_id)
+  [LOCAL-617] Stop 3: narration contract injected (reception_evidence=False)
+  [D533] Stop 3 corpus-gate restriction LIFTED — 27 source item(s) arrived after the gate ran
+  [LOCAL-411] Stop 3 prompt size: before_snippets=11283 after=28999 (+17716 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (28999)
+  [LOCAL-620] prefs: default/balanced (no user_id)
+  [LOCAL-617] Stop 1: narration contract injected (reception_evidence=False)
+  [D533] Stop 1 corpus-gate restriction LIFTED — 36 source item(s) arrived after the gate ran
+  [LOCAL-411] Stop 1 prompt size: before_snippets=10363 after=26810 (+16447 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (26810)
+  [D498] Stop 2 matrix: 3/9 slots filled — empty: ['artist', 'publisher', 'printed_by', 'medium', 'credit_line', 'focus_fact']  [D498] Stop 3 matrix: 3/9 slots filled — empty: ['artist', 'publisher', 'printed_by', 'medium', 'credit_line', 'focus_fact']  [D498] Stop 1 matrix: 3/9 slots filled — empty: ['artist', 'publisher', 'printed_by', 'medium', 'credit_line', 'focus_fact']
+
+
+  [D500] agents 0/3: hero=—, sponsor=—, builder=—
+  [D500] agents 0/3: hero=—, sponsor=—, builder=—
+  [D500] agents 0/3: hero=—, sponsor=—, builder=—
+  [LOCAL-490] Stop 3 story pass: ok=False (model returned NO_STORY — material did not support one), $0.0034
+  [LOCAL-490] Stop 2 story pass: ok=True (3 sentences), $0.0043
+    story: "The Belvedere Palace Chapel, designed by Johann Lukas von Hildebrandt, was completed in 1723 as a private worship center within the Upper Belvedere in"
+  [LOCAL-490] Stop 1 story pass: ok=True (3 sentences), $0.0041
+    story: "On 15 May 1955, the Austrian State Treaty was signed at the Upper Belvedere in Vienna. This action formally re-established Austria's sovereignty and i"
+  [LOCAL-408] Prompt dump written to: /app/prompt_dump_stop1.txt
+Stop 2 API call cost: $0.0331 (6960 tokens, model=gpt-4o)
+[LOCAL-197] llm_cost() called with total_tokens (deprecated) by /app/generate_tour_text.py:17559. Caller should supply input_tokens and output_tokens separately.
+  [LOCAL-569] Stop 2 attempt 1/5 story_count=1 words=286
+  [LOCAL-432] Stop 2: STORY RETRY — story_count=1 < 3, need 2 more, retrying (attempt 2/5)
+Stop 1 API call cost: $0.0331 (6968 tokens, model=gpt-4o)
+  [LOCAL-569] Stop 1 attempt 1/5 story_count=2 words=318
+  [LOCAL-432] Stop 1: STORY RETRY — story_count=2 < 3, need 1 more, retrying (attempt 2/5)
+Stop 3 API call cost: $0.0358 (7531 tokens, model=gpt-4o)
+  [LOCAL-569] Stop 3 attempt 1/5 story_count=1 words=254
+  [LOCAL-432] Stop 3: STORY RETRY — story_count=1 < 3, need 2 more, retrying (attempt 2/5)
+Stop 2 API call cost: $0.0345 (7268 tokens, model=gpt-4o)
+  [LOCAL-569] Stop 2 attempt 2/5 story_count=1 words=242
+  [LOCAL-432] Stop 2: STORY RETRY — story_count=1 < 3, need 2 more, retrying (attempt 3/5)
+Stop 1 API call cost: $0.0346 (7288 tokens, model=gpt-4o)
+  [LOCAL-569] Stop 1 attempt 2/5 story_count=1 words=268
+  [LOCAL-432] Stop 1: STORY RETRY — story_count=1 < 3, need 2 more, retrying (attempt 3/5)
+Stop 3 API call cost: $0.0376 (7913 tokens, model=gpt-4o)
+  [LOCAL-569] Stop 3 attempt 2/5 story_count=1 words=243
+  [LOCAL-432] Stop 3: STORY RETRY — story_count=1 < 3, need 2 more, retrying (attempt 3/5)
+Stop 2 API call cost: $0.0366 (7701 tokens, model=gpt-4o)
+  [LOCAL-569] Stop 2 attempt 3/5 story_count=1 words=270
+  [LOCAL-432] Stop 2: STORY RETRY — story_count=1 < 3, need 2 more, retrying (attempt 4/5)
+Stop 1 API call cost: $0.0365 (7691 tokens, model=gpt-4o)
+  [LOCAL-569] Stop 1 attempt 3/5 story_count=0 words=267
+  [LOCAL-432] Stop 1: STORY RETRY — story_count=0 < 3, need 3 more, retrying (attempt 4/5)
+Stop 2 API call cost: $0.0382 (8049 tokens, model=gpt-4o)
+  [LOCAL-569] Stop 2 attempt 4/5 story_count=2 words=234
+  [LOCAL-432] Stop 2: STORY RETRY — story_count=2 < 3, need 1 more, retrying (attempt 5/5)
+Stop 3 API call cost: $0.0394 (8299 tokens, model=gpt-4o)
+  [LOCAL-569] Stop 3 attempt 3/5 story_count=0 words=223
+  [LOCAL-417] Stop 3: POSITIVE GATE FAILED — ['no concrete fact (date, measurement, material, or provenance)']
+  [LOCAL-417]   verbatim: "The First Vienna Award was a calculated move, orchestrated by two towering figures: Germany's Foreign Minister Joachim von Ribbentrop and Italy’s Count Galeazzo Ciano. Ribbentrop orchestrated the treaty proceedings as part of a broader strategy to strengthen Germany's influence in Central Europe. Ci"
+  [LOCAL-417] Stop 3: retrying (attempt 3, temp=1.00)...
+Stop 1 API call cost: $0.0382 (8041 tokens, model=gpt-4o)
+  [LOCAL-569] Stop 1 attempt 4/5 story_count=1 words=237
+  [LOCAL-432] Stop 1: STORY RETRY — story_count=1 < 3, need 2 more, retrying (attempt 5/5)
+Stop 2 API call cost: $0.0402 (8467 tokens, model=gpt-4o)
+  [LOCAL-569] Stop 2 attempt 5/5 story_count=0 words=243
+Stop 2 description word count: 243 words
+  [LOCAL-407] Stop 2: snippets injected but no candidate specifics extracted
+Stop 3 API call cost: $0.0395 (8315 tokens, model=gpt-4o)
+  [LOCAL-569] Stop 3 attempt 4/5 story_count=4 words=251
+Stop 3 description word count: 251 words
+  [LOCAL-407] Stop 3: snippets injected but no candidate specifics extracted
+Stop 1 API call cost: $0.0403 (8484 tokens, model=gpt-4o)
+  [LOCAL-569] Stop 1 attempt 5/5 story_count=1 words=278
+Stop 1 description word count: 278 words
+  [LOCAL-407] Stop 1: snippets injected but no candidate specifics extracted
+
+  [LOCAL-439] STORY GATE: checking story-units per stop (D394)...
+    ✗ FAIL stop='Austrian State Treaty': story_units=0, entities_ok=True, thesis_ok=True
+      → story_units=0: no candidate story-unit of ≥3 sentences passes classification (need at least 1 with named person, real actions, arc)
+    ✗ FAIL stop='Belvedere Palace Chapel': story_units=0, entities_ok=True, thesis_ok=True
+      → story_units=0: no candidate story-unit of ≥3 sentences passes classification (need at least 1 with named person, real actions, arc)
+    ✗ FAIL stop='First Vienna Award': story_units=0, entities_ok=True, thesis_ok=True
+      → story_units=0: no candidate story-unit of ≥3 sentences passes classification (need at least 1 with named person, real actions, arc)
+  [LOCAL-439] Classification cost: $0.002677 (input=10973, output=1718)
+  [LOCAL-439] STORY GATE: SOME STOPS FAILED (informational — does not block delivery)
+
+  [LOCAL-423] STORY VERIFICATION: checking claims against sources...
+    ✗ FAIL stop='Austrian State Treaty': claims=0, sourced=0, unsourced=0, contradicted=0
+      → VACUOUS: 0 claims extracted — nothing was verified
+    ✓ PASS stop='Belvedere Palace Chapel': claims=2, sourced=2, unsourced=0, contradicted=0
+      evidence (2 sourced claims):
+        claim='in 1723' ← 
+        claim='1753' ← https://eventseeker.com/venue/897034-belvedere-palace-chapel
+    ✗ FAIL stop='First Vienna Award': claims=1, sourced=0, unsourced=1, contradicted=0
+      → UNSOURCED: 'Ribbentrop commissioned the' (attribution) — no snippet contains this assertion
+  [LOCAL-423] STORY VERIFICATION: SOME STOPS HAVE UNSOURCED CLAIMS
+  [LOCAL-423] Unsourced claims will be stripped from delivered text
+    [LOCAL-423] Stripped 1 sentence(s) from 'First Vienna Award':
+      ✗ "Ribbentrop commissioned the agreement as part of Hitler’s larger strategy to solidify Germany’s domi"
+
+  [LOCAL-192] PHASE 5.1: Style validation + per-paragraph retry...
+[LOCAL-197] llm_cost() called with total_tokens (deprecated) by /app/generate_tour_text.py:18958. Caller should supply input_tokens and output_tokens separately.
+  [LOCAL-192] Stop 1 para 3: retry FAILED — keeping original (R4_PRESCRIBED_FEELING)
+  [LOCAL-192] Stop 2 para 3: retry FIXED (R10_UNFULFILLED_PROMISE, R1_IMPERATIVE, R2_QUESTION)
+  [LOCAL-192] Stop 3 para 1: retry FIXED (R1_IMPERATIVE)
+  [LOCAL-192] Style retry summary: 3 paragraphs retried, 2 fixed/improved, 1 kept original
+  [LOCAL-192] Retry cost: $0.0015 (1838 tokens)
+
+  [LOCAL-255] PHASE 5.13: R1 imperative rewrite...
+LOCAL-371: _take_in_handler Case 3 declining unrepairable tail: 'how the careful arrangement of diplomatic settings seems suited for negotiation and discussion.'
+  [LOCAL-255] Stop 3 'First Vienna Award': 0 rewritten, 1 deleted
+  [LOCAL-255] R1 summary: 0 rewritten, 1 deleted, 1 stops affected, LLM tokens: 0 ($0.0000)
+  [LOCAL-255] WARNING: deletion rate 1/1 = 100.0% exceeds 10% — rewriter may be failing and quietly shortening tours
+
+  [LOCAL-251] PHASE 5.14: R7 hallucinated-sensory deletion...
+  [LOCAL-251] R7 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-261] PHASE 5.141: R2 question deletion...
+  [LOCAL-261] R2 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-261] PHASE 5.142: R3 suggestive-exploration deletion...
+  [LOCAL-261] R3 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-261] PHASE 5.143: R4 prescribed-feeling deletion...
+  [LOCAL-261] Stop 1 'Austrian State Treaty': 1 sentence(s) deleted, 0 paragraph(s) emptied
+  [LOCAL-261] R4 summary: 1 sentences deleted, 0 paragraphs emptied, 1 stops affected
+
+  [LOCAL-261] PHASE 5.144: R8 prompt-leakage deletion...
+  [LOCAL-261] R8 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-216] PHASE 5.15: R9 generic-sentence deletion...
+  [LOCAL-216] R9 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-235] PHASE 5.155: R10 unfulfilled-promise deletion...
+  [LOCAL-235] R10 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-472] PHASE 5.152: Stop-specificity gate...
+  [LOCAL-472] Stop-specificity gate summary:
+    Stops checked: 3
+    Paragraphs checked: 7
+    Transferable (high, removed): 0
+    Transferable (low conf, kept): 0
+    Last-paragraph protected: 0
+    Ungrounded named entities: 7
+    Stops affected: 0
+    [LOCAL-472] UNGROUNDED entity stop='Austrian State Treaty' entity='John Foster Dulles' reason='No concrete link to the stop is provided.' in: "On that significant day, key figures, including Soviet Foreign Minister Vyacheslav Molotov, gathered"
+    [LOCAL-472] UNGROUNDED entity stop='Austrian State Treaty' entity='Paris Peace Treaties' reason='It does not specify a direct link between the treaties and the stop.' in: "This was not merely a formality; the treaty's signing at the Belvedere marked the first time since t"
+    [LOCAL-472] UNGROUNDED entity stop='Austrian State Treaty' entity='Soviet Union' reason='It does not specify a concrete link between the Soviet Union and the Austrian State Treaty stop.' in: "This was not merely a formality; the treaty's signing at the Belvedere marked the first time since t"
+    [LOCAL-472] UNGROUNDED entity stop='Austrian State Treaty' entity='United States' reason='It does not specify a concrete link between the United States and the stop.' in: "This was not merely a formality; the treaty's signing at the Belvedere marked the first time since t"
+    [LOCAL-472] UNGROUNDED entity stop='Austrian State Treaty' entity='Federal People' reason='No specific link to "Federal People" is provided.' in: "This was not merely a formality; the treaty's signing at the Belvedere marked the first time since t"
+    [LOCAL-472] UNGROUNDED entity stop='Belvedere Palace Chapel' entity='Neapolitan Baroque' reason='It does not specify that Solimena painted the altarpiece at this stop.' in: "A commanding feature within this sacred space is Solimena's altarpiece, portraying the dramatic mome"
+    [LOCAL-472] UNGROUNDED entity stop='First Vienna Award' entity='Central European' reason='No concrete link between "Central European" and the First Vienna Award is provided.' in: "The First Vienna Award, signed on November 2, 1938, at the Belvedere Palace, was a treaty that redre"
+
+  [LOCAL-263] PHASE 5.156: Unsupported-claim gate...
+  [LOCAL-263] Unsupported-claim gate summary:
+    Sentences removed: 0
+    Sentences kept (substantiated): 1
+    By type: PROMISE=0, SENSORY=0, FEELING=0, QUALITY=0
+    Escalation calls: 0
+    Stops affected: 0
+    Deletion rate: 0.0% (0/26)
+
+  [LOCAL-269] PHASE 5.157: Unglossed-reference gate...
+  [LOCAL-269] Unglossed-reference gate summary (LOCAL-287: compose, not splice):
+    References detected: 16
+    Glossed (composed): 5
+    Suppressed (already explained): 3
+    Degraded (name dropped): 4
+    Guard failures: 1
+    Known (skipped): 4
+    Triage: 1816 tokens, $0.0004, 5.4s
+    Gloss: 874 tokens, $0.0002, 3.3s
+    Compose: 2119 tokens, $0.0004, 3.7s
+    Total added cost: $0.0010
+    Stops affected: 3
+    Glosses applied:
+      • Soviet Foreign Minister Vyacheslav Molotov → SUPPRESSED (already explained)
+      • Paris Peace Treaties → "the only treaty co-signed by both superpowers" [source: corpus]
+      • Federal People → DEGRADED (name dropped)
+      • Johann Lukas von Hildebrandt → "the designer of this grand chapel" [source: corpus]
+      • Prince Eugene → "a prominent figure of the Holy Roman Empire" [source: corpus]
+      • Prince Eugene of → "a prominent figure of the Holy Roman Empire" [source: corpus]
+      • Neapolitan Baroque → GUARD FAILED (type_mismatch_work_for_person), name dropped
+      • Hildebrandt → SUPPRESSED (already explained)
+      • Felvidék → DEGRADED (name dropped)
+      • German Foreign Minister Joachim von Ribbentrop → SUPPRESSED (already explained)
+      • Italian Foreign Minister Galeazzo Ciano → "the Italian Foreign Minister from 1936 to 1943" [source: model]
+      • Central European → DEGRADED (name dropped)
+    Guard failures detail:
+      ✗ Neapolitan Baroque: "an influential style of Italian painting" — type_mismatch_work_for_person
+
+  [LOCAL-458] entity gate SKIPPED: no exhibition scope (unscoped museum tour)
+
+  [LOCAL-458] entity gate SKIPPED: no exhibition scope (unscoped museum tour)
+
+  [LOCAL-385] Form-claim gate SKIPPED (no exhibition scope — unscoped museum tours are not gated)
+
+  [LOCAL-389] Numeric-claim gate SKIPPED (no exhibition scope — unscoped museum tours are not gated)
+
+  [LOCAL-402] PHASE 5.161: Temporal coherence gate (impossible relations)...
+  [LOCAL-402] Temporal coherence gate summary:
+    Relations checked: 30
+    Relations rejected: 0
+    Sentences removed: 0
+    Stops affected: 0
+
+  [LOCAL-229] PHASE 5.16: CONTRADICTED claim block (D100 enforcement)...
+  [LOCAL-229] BLOCKED Stop 3 'First Vienna Award': claim='1936 (in context: "iano, the Italian Foreign Minister from 1' contradicted_by='On November 2, 1938, orchestrated by the foreign ministers of Germany, Joachim v' → DROPPED
+  [LOCAL-229] CONTRADICTED block summary: 1 group(s) blocked, 1 stop(s) affected
+  [LOCAL-229] Block log (1 entries):
+    stop=3 claim='1936 (in context: "iano, the Italian Foreign Minis' evidence='On November 2, 1938, orchestrated by the foreign m' action=DROPPED
+
+PHASE 5.5a: Post-description knowledge validation (all tour types)...
+OK Post-description validation passed: Knowledge validation passed
+
+PHASE 5.5b: Validating descriptions are inside 'Belvedere'...
+   Authority: 2 D1v2-verified (kept unconditionally), 0 unverified (will check)
+   Pre-filter: 0 clean, 0 suspect (will call OpenAI for suspect only)
+OK PHASE 5.5b: 3 stop(s) passed venue description validation
+OK PHASE 5.7: Dangling-reference scrub complete (3 stops)
+  [LOCAL-627] PHASE 5.7a: Truncated-snippet safety check — 1 stop(s) cleaned
+
+  [LOCAL-318] PHASE 5.7b: Dangling-demonstrative scrub...
+  [LOCAL-318] Dangling-demonstrative scrub summary:
+    Detected: 3
+    Repaired (name substituted): 0
+    Deleted (unrepairable): 3
+    Stops affected: 2
+    [2] DELETED: 'This architectural' in: This architectural gem was initially a private devotion space for Prince Eugene,
+    [2] DELETED: 'This artistic endeavor' in: This artistic endeavor marked a pivotal moment in Solimena's career, underscorin
+    [3] DELETED: 'This event' in: This event had profound implications for the people and nations involved.
+OK PHASE 5.7b: Dangling-demonstrative scrub complete
+
+PHASE 5.8: Type/prose contradiction check (LOCAL-27)...
+  [LOCAL-27] No type/prose contradictions detected
+
+PHASE 5.9: Audio-native cleanup (LOCAL-41)...
+  [LOCAL-41] Stripped 0 trailing question(s), removed 0 'broader context' instance(s)
+
+  [D498] step 7c: most valuable stop is 2 'Belvedere Palace Chapel' (index 46) — allowance 5 -> 7 sentences on regeneration, story currently 3 sentence(s)
+
+  [LOCAL-487] step 7a: 3 stop(s) have NO VALID STORY by Michael's bar (3+ consecutive sentences, one person, an action and something at stake)
+    stop 1 'Austrian State Treaty': longest qualifying run is 1 sentence(s); the bar is 3 consecutive sentences about one subject, carrying an act
+    stop 2 'Belvedere Palace Chapel': longest qualifying run is 2 sentence(s); the bar is 3 consecutive sentences about one subject, carrying an act
+    stop 3 'First Vienna Award': the longest run (3 sentences, war) has agency=0 stakes=2 — someone is described, but nothing is risked, refuse
+    [LOCAL-487] cap=1: retrying only the weakest — stop 3 'First Vienna Award' (index 44)
+  [D534] No cross-stop repetition in the drafts
+
+  [LOCAL-474] PHASE 5.17: retry 'Austrian State Treaty' — 278w → 248w after gates, 3 sentence(s) removed
+    removed: "This was not merely a formality; the treaty's signing at the Belvedere marked the first time since t"
+    removed: "The subsequent accession of the Federal People's Republic of Yugoslavia to the agreement further und"
+    removed: "Standing here, one can feel the weight of that momentous occasion, the hopes and dreams encapsulated"
+    [LOCAL-491] step 7b: rotating to the venue fact — institutional context; weakest, but it scopes the search
+      focus: "Austrian State Treaty is held at Belvedere."
+
+  [LOCAL-474] PHASE 5.17: retry 'Belvedere Palace Chapel' — 243w → 113w after gates, 7 sentence(s) removed
+    removed: "The Belvedere Palace Chapel represents a unique intersection of art and faith, completed in 1723 und"
+    removed: "This architectural gem was initially a private devotion space for Prince Eugene of Savoy and his sel"
+    removed: "Solimena, renowned for his mastery in the Neapolitan Baroque style, breathed life into this work thr"
+    removed: "This artistic endeavor marked a pivotal moment in Solimena's career, underscoring his ambition to co"
+    removed: "The chapel’s interior walls echo with the past, much like the Austrian State Treaty you have already"
+    removed: "As you absorb the artistry, consider the vibrancy of life it imparts, a visual symphony that celebra"
+    removed: "What other stories linger here, quietly shaping the history of Belvedere beyond the spiritual and ar"
+    [LOCAL-491] step 7b: rotating to the venue fact — institutional context; weakest, but it scopes the search
+      focus: "Belvedere Palace Chapel is held at Belvedere."
+
+  [LOCAL-474] PHASE 5.17: retry 'First Vienna Award' — 234w → 155w after gates, 6 sentence(s) removed
+    removed: "The First Vienna Award, signed on November 2, 1938, at the Belvedere Palace, was a treaty that redre"
+    removed: "This event was not merely a geographical adjustment; it had profound implications for the people and"
+    removed: "On that November day, German Foreign Minister Joachim von Ribbentrop and Italian Foreign Minister Ga"
+    removed: "Meanwhile, Ciano, keen on expanding Italy’s regional influence under Mussolini, collaborated closely"
+    removed: "As you absorb these details, consider how the Belvedere has been both a witness and a participant in"
+    removed: "The First Vienna Award was more than just a diplomatic act; it was a pivot that influenced Central E"
+    [LOCAL-491] step 7b: rotating to the venue fact — institutional context; weakest, but it scopes the search
+      focus: "First Vienna Award is held at Belvedere."
+
+  [LOCAL-526] PHASE 5.17: regenerating 3 eligible stop(s) concurrently (max_workers=3)
+
+Generating description for Stop 1: Austrian State Treaty by , ...
+  [LOCAL-381] stop='Austrian State Treaty' matched_work=False medium='' work_identity_chars=0
+
+Generating description for Stop 2: Belvedere Palace Chapel by , ...
+  [LOCAL-381] stop='Belvedere Palace Chapel' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-411] Stop 2 snippet ranking: input=30 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=5 output=5 usable=5 (t1t2=1, t3=0, market=0)
+    Top scores: [('Belvedere Palace Chapel', 16, ''), ('Belvedere Palace Chapel', 16, ''), ('Belvedere Palace Chapel, Vienna, eventseeker', 12, 'unverified')]
+  [LOCAL-620] Stop 2 evidence balance: input=5 kept_rich=0 kept_story=3 dropped_boilerplate=0 output=3
+  [LOCAL-402] Stop 2: injected 3 snippets as reference material
+  [LOCAL-620] prefs: default/balanced (no user_id)
+  [LOCAL-617] Stop 2: narration contract injected (reception_evidence=False)  [LOCAL-411] Stop 1 snippet ranking: input=36 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=5 output=5 usable=5 (t1t2=1, t3=0, market=0)
+    Top scores: [('Austrian State Treaty', 17, 'tier1'), ('Belvedere, Vienna', 16, ''), ('Austrian State Treaty Overview | PDF', 16, '')]
+  [D533] Stop 2 corpus-gate restriction LIFTED — 30 source item(s) arrived after the gate ran
+  [LOCAL-411] Stop 2 prompt size: before_snippets=11292 after=27066 (+15774 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (27066)
+  [D498] Stop 2 matrix: 4/9 slots filled — empty: ['artist', 'publisher', 'printed_by', 'medium', 'credit_line']
+  [D500] agents 0/3: hero=—, sponsor=—, builder=—
+
+
+Generating description for Stop 3: First Vienna Award by , ...
+  [LOCAL-381] stop='First Vienna Award' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-411] Stop 3 snippet ranking: input=27 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=5 output=5 usable=5 (t1t2=2, t3=0, market=0)
+    Top scores: [('First Vienna Award', 21, 'tier1'), ('First Vienna Award', 21, 'tier1'), ('First Vienna Award', 16, '')]
+  [LOCAL-620] Stop 3 evidence balance: input=5 kept_rich=0 kept_story=3 dropped_boilerplate=0 output=3
+  [LOCAL-402] Stop 3: injected 3 snippets as reference material
+  [LOCAL-620] prefs: default/balanced (no user_id)
+  [LOCAL-617] Stop 3: narration contract injected (reception_evidence=False)
+  [D533] Stop 3 corpus-gate restriction LIFTED — 27 source item(s) arrived after the gate ran
+  [LOCAL-411] Stop 3 prompt size: before_snippets=11283 after=28999 (+17716 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (28999)
+  [D498] Stop 3 matrix: 4/9 slots filled — empty: ['artist', 'publisher', 'printed_by', 'medium', 'credit_line']
+  [D500] agents 0/3: hero=—, sponsor=—, builder=—
+  [LOCAL-620] Stop 1 evidence balance: input=5 kept_rich=0 kept_story=3 dropped_boilerplate=0 output=3
+  [LOCAL-402] Stop 1: injected 3 snippets as reference material
+  [LOCAL-620] prefs: default/balanced (no user_id)
+  [LOCAL-617] Stop 1: narration contract injected (reception_evidence=False)
+  [D533] Stop 1 corpus-gate restriction LIFTED — 36 source item(s) arrived after the gate ran
+  [LOCAL-411] Stop 1 prompt size: before_snippets=10363 after=26810 (+16447 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (26810)
+  [D498] Stop 1 matrix: 4/9 slots filled — empty: ['artist', 'publisher', 'printed_by', 'medium', 'credit_line']
+  [D500] agents 0/3: hero=—, sponsor=—, builder=—
+  [LOCAL-490] Stop 3 story pass: ok=False (model returned NO_STORY — material did not support one), $0.0048
+  [LOCAL-490] Stop 1 story pass: ok=True (4 sentences), $0.0054
+    story: "On 15 May 1955, an important event unfolded at the Upper Belvedere in Vienna. The Austrian State Treaty was signed here, marking a pivotal moment that"
+  [LOCAL-408] Prompt dump written to: /app/prompt_dump_stop1.txt
+  [LOCAL-490] Stop 2 story pass: ok=True (6 sentences), $0.0064
+    story: "For nearly three decades after its completion in 1723, the Belvedere Palace Chapel remained a private worship space, inaccessible to the public. In 17"
+Stop 3 API call cost: $0.0383 (8061 tokens, model=gpt-4o)
+  [LOCAL-569] Stop 3 attempt 1/5 story_count=1 words=245
+  [LOCAL-417] Stop 3: POSITIVE GATE FAILED — ['no concrete fact (date, measurement, material, or provenance)']
+  [LOCAL-417]   verbatim: 'The First Vienna Award, a direct consequence of the Munich Agreement, was orchestrated by the foreign ministers of Germany and Italy, Joachim von Ribbentrop and Galeazzo Ciano. This arbitration was not merely a diplomatic formality; it was a strategic maneuver that reflected the volatile geopolitics'
+  [LOCAL-417] Stop 3: retrying (attempt 1, temp=0.90)...
+Stop 1 API call cost: $0.0349 (7350 tokens, model=gpt-4o)
+  [LOCAL-569] Stop 1 attempt 1/5 story_count=2 words=305
+  [LOCAL-432] Stop 1: STORY RETRY — story_count=2 < 3, need 1 more, retrying (attempt 2/5)
+Stop 2 API call cost: $0.0355 (7473 tokens, model=gpt-4o)
+  [LOCAL-569] Stop 2 attempt 1/5 story_count=1 words=252
+  [LOCAL-432] Stop 2: STORY RETRY — story_count=1 < 3, need 2 more, retrying (attempt 2/5)
+Stop 3 API call cost: $0.0385 (8112 tokens, model=gpt-4o)
+  [LOCAL-569] Stop 3 attempt 2/5 story_count=2 words=285
+  [LOCAL-432] Stop 3: STORY RETRY — story_count=2 < 3, need 1 more, retrying (attempt 3/5)
+Stop 1 API call cost: $0.0365 (7689 tokens, model=gpt-4o)
+  [LOCAL-569] Stop 1 attempt 2/5 story_count=1 words=265
+  [LOCAL-432] Stop 1: STORY RETRY — story_count=1 < 3, need 2 more, retrying (attempt 3/5)
+Stop 2 API call cost: $0.0373 (7858 tokens, model=gpt-4o)
+  [LOCAL-569] Stop 2 attempt 2/5 story_count=2 words=264
+  [LOCAL-432] Stop 2: STORY RETRY — story_count=2 < 3, need 1 more, retrying (attempt 3/5)
+Stop 3 API call cost: $0.0398 (8371 tokens, model=gpt-4o)
+  [LOCAL-569] Stop 3 attempt 3/5 story_count=1 words=187
+  [LOCAL-432] Stop 3: STORY RETRY — story_count=1 < 3, need 2 more, retrying (attempt 4/5)
+Stop 2 API call cost: $0.0391 (8239 tokens, model=gpt-4o)
+  [LOCAL-569] Stop 2 attempt 3/5 story_count=1 words=247Stop 1 API call cost: $0.0382 (8037 tokens, model=gpt-4o)
+  [LOCAL-569] Stop 1 attempt 3/5 story_count=1 words=217
+  [LOCAL-417] Stop 1: POSITIVE GATE FAILED — ['no concrete fact (date, measurement, material, or provenance)']
+  [LOCAL-417]   verbatim: 'On that pivotal day, representatives from the Allied occupying powers — France, the United Kingdom, the United States, and the Soviet Union — gathered under the resplendent Baroque ceiling. Chancellor Julius Raab of Austria, a key figure in the negotiations, played a crucial role in re-establishing '
+  [LOCAL-417] Stop 1: retrying (attempt 3, temp=1.00)...
+
+  [LOCAL-432] Stop 2: STORY RETRY — story_count=1 < 3, need 2 more, retrying (attempt 4/5)
+Stop 3 API call cost: $0.0421 (8856 tokens, model=gpt-4o)
+  [LOCAL-569] Stop 3 attempt 4/5 story_count=2 words=238
+  [LOCAL-432] Stop 3: STORY RETRY — story_count=2 < 3, need 1 more, retrying (attempt 5/5)
+Stop 2 API call cost: $0.0408 (8580 tokens, model=gpt-4o)
+  [LOCAL-569] Stop 2 attempt 4/5 story_count=1 words=222
+  [LOCAL-432] Stop 2: STORY RETRY — story_count=1 < 3, need 2 more, retrying (attempt 5/5)
+Stop 1 API call cost: $0.0384 (8083 tokens, model=gpt-4o)
+  [LOCAL-569] Stop 1 attempt 4/5 story_count=0 words=250
+  [LOCAL-432] Stop 1: STORY RETRY — story_count=0 < 3, need 3 more, retrying (attempt 5/5)
+Stop 2 API call cost: $0.0427 (8988 tokens, model=gpt-4o)
+  [LOCAL-569] Stop 2 attempt 5/5 story_count=0 words=226
+Stop 2 description word count: 226 words
+  [LOCAL-407] Stop 2: snippets injected but no candidate specifics extracted
+  [LOCAL-414] Stop 2: SCRUBBED banned phrases from output: ['a testament to']
+Stop 3 API call cost: $0.0439 (9248 tokens, model=gpt-4o)
+  [LOCAL-569] Stop 3 attempt 5/5 story_count=0 words=263
+Stop 3 description word count: 263 words
+  [LOCAL-407] Stop 3: snippets injected but no candidate specifics extracted
+  [LOCAL-414] Stop 3: SCRUBBED banned phrases from output: ['a testament to', 'stands as a testament']
+Stop 1 API call cost: $0.0403 (8491 tokens, model=gpt-4o)
+  [LOCAL-569] Stop 1 attempt 5/5 story_count=0 words=276
+Stop 1 description word count: 276 words
+  [LOCAL-407] Stop 1: snippets injected but no candidate specifics extracted
+  [LOCAL-414] Stop 1: SCRUBBED banned phrases from output: ['a testament to']
+  [LOCAL-526] PHASE 5.17 regeneration wall: 21.5s for 3 stop(s) at max_workers=3
+    [LOCAL-474] regenerated and re-gated: 256w (was 248w)
+    [LOCAL-474] regenerated and re-gated: 187w (was 113w)
+    [LOCAL-487] retry judged on the story bar, not on length: cleared=False
+    [LOCAL-474] retry not better after re-gating — keeping the original gated text
+  [D534] no repeated sentences left after the retries
+
+  [LOCAL-474] retry summary: 3 eligible, 3 retried, 2 improved, 1 kept original
+  [LOCAL-487] triggers: 1 hollowed by gates, 1 storyless (step 7a — Michael's bar, independent of length), 0 top-value (step 7c — larger allowance), 0 repeating an earlier stop (D534), 3 thin enough for another story (D534, floor=300w). Triggers overlap and are counted separately; they do not sum to 'eligible'.
+  [LOCAL-474] each regenerated stop was re-gated before being accepted; a retry can only replace text it beats after gating.
+
+PHASE 5.10: Anti-preaching cleanup (LOCAL-44)...
+  [LOCAL-44] Stripped 0 preaching closer(s)
+
+  [LOCAL-444] Obligation audit DISABLED by L444_OBLIGATION_AUDIT=false
+  [LOCAL-427] HTTP 200 from https://www.youtube.com/watch?v=lNoRrp17SJ4 (attempt 1)
+  [LOCAL-427] HTTP 200 from https://paceprints.com/techniques (attempt 1)
+  [LOCAL-459] R5: Fetched 2341 chars from https://paceprints.com/techniques
+  [LOCAL-427] HTTP 429 from https://www.metmuseum.org/perspectives/series/materials-and-techniques — retrying in 2.1s (attempt 1, 30s budget remaining)
+  [LOCAL-427] HTTP 429 from https://www.metmuseum.org/perspectives/series/materials-and-techniques — retrying in 4.3s (attempt 2, 28s budget remaining)
+  [LOCAL-427] HTTP 429 from https://www.metmuseum.org/perspectives/series/materials-and-techniques — retrying in 10.3s (attempt 3, 23s budget remaining)
+  [LOCAL-427] HTTP 429 from https://www.metmuseum.org/perspectives/series/materials-and-techniques — retrying in 11.0s (attempt 4, 13s budget remaining)
+  [LOCAL-427] HTTP 429 from https://www.metmuseum.org/perspectives/series/materials-and-techniques — budget exhausted after 5 attempt(s), 30s elapsed
+  [LOCAL-427] HTTP 200 from https://artshow.com/resources/printmaking.html (attempt 1)
+  [LOCAL-459] R5: Fetched 1266 chars from https://artshow.com/resources/printmaking.html
+  [LOCAL-427] HTTP 200 from https://www.highpointprintmaking.org/about-printmaking (attempt 1)
+  [LOCAL-459] R5: Fetched 1621 chars from https://www.highpointprintmaking.org/about-printma
+  [LOCAL-427] HTTP 200 from https://www.khanacademy.org/humanities/special-topics-art-history/creating-conserving/printmaking/v/moma-intaglio-process (attempt 1)
+  [LOCAL-459] R5: Fetched 323 chars from https://www.khanacademy.org/humanities/special-top
+  [LOCAL-427] HTTP 200 from https://www.clarkart.edu/microsites/impressionist-line/about/printmaking-techniques (attempt 1)
+  [LOCAL-459] R5: Fetched 1756 chars from https://www.clarkart.edu/microsites/impressionist-
+  [D512] verb discovery: query='Belvedere printmaking process how it is made technique step by s' -> 6 new verb(s): inked, raised, produced, handmade, removed, proceed
+  [D512] _AGENCY_VERB widened by 6 discovered verb(s)
+
+  [D511] PHASE 5.20: credit_line loop — object record, seeds, challenge, adjudicate, gate
+    [D501] no object record for 'First Vienna Award' — matrix unchanged
+    [D511] 4 credit_line(s) to try (0 from the matrix, 4 from the text)
+    [D501] no object record for 'Austrian State Treaty' — matrix unchanged
+    [D511] 4 credit_line(s) to try (0 from the matrix, 4 from the text)
+    [D501] no object record for 'Belvedere Palace Chapel' — matrix unchanged
+    [D511] 4 credit_line(s) to try (0 from the matrix, 4 from the text)
+  [LOCAL-427] HTTP 200 from https://en.wikipedia.org/wiki/First_Vienna_Award (attempt 1)
+  [LOCAL-459] R5: Fetched 3003 chars from https://en.wikipedia.org/wiki/First_Vienna_Award
+  [LOCAL-427] HTTP 200 from https://kafkadeskdotorg.wordpress.com/2021/11/02/on-this-day-in-1938-the-first-vienna-award-forced-czechoslovakia-to-surrender-territory-to-hungary/ (attempt 1)
+  [LOCAL-459] R5: Fetched 3003 chars from https://kafkadeskdotorg.wordpress.com/2021/11/02/o
+  [LOCAL-427] HTTP 200 from https://www.akg-images.fr/asset/608205/First-Vienna-Award--Conference-Room--Photo,-1938 (attempt 1)
+  [LOCAL-427] HTTP 200 from https://2001-2009.state.gov/r/pa/ho/time/lw/107185.htm (attempt 1)
+  [LOCAL-459] R5: Fetched 261 chars from https://2001-2009.state.gov/r/pa/ho/time/lw/107185
+  [LOCAL-427] HTTP 200 from https://en.wikipedia.org/wiki/Belvedere_Palace_Chapel (attempt 1)
+  [LOCAL-459] R5: Fetched 1710 chars from https://en.wikipedia.org/wiki/Belvedere_Palace_Cha
+  [LOCAL-427] HTTP 200 from https://rubicon.hu/en/cikkek/ethnic-revision-great-power-games-and-national-expansion-the-first-vienna-award-and-the-return-of-upper-hungary (attempt 1)
+  [LOCAL-459] R5: Fetched 3003 chars from https://rubicon.hu/en/cikkek/ethnic-revision-great
+  [LOCAL-427] HTTP 200 from https://commons.wikimedia.org/wiki/Category:Upper_Belvedere,_Interior_-_Chapel (attempt 1)
+  [LOCAL-459] R5: Fetched 2539 chars from https://commons.wikimedia.org/wiki/Category:Upper_
+  [LOCAL-427] HTTP 200 from https://www.facebook.com/enrs.eu/posts/-on-15-may-1955-austria-france-the-soviet-union-the-united-kingdom-and-the-unite/1545135660950164/ (attempt 1)
+  [LOCAL-427] HTTP 200 from https://aroundus.com/p/10738041-belvedere-palace-chapel (attempt 1)  [LOCAL-427] HTTP 200 from https://www.presidency.ucsb.edu/documents/message-the-senate-transmitting-the-austrian-state-treaty (attempt 1)
+
+  [LOCAL-459] R5: Fetched 2208 chars from https://www.presidency.ucsb.edu/documents/message-
+  [LOCAL-459] R5: Fetched 1597 chars from https://aroundus.com/p/10738041-belvedere-palace-c
+  [LOCAL-427] HTTP 200 from https://en.wikipedia.org/wiki/Austrian_State_Treaty (attempt 1)
+  [LOCAL-459] R5: Fetched 3003 chars from https://en.wikipedia.org/wiki/Austrian_State_Treat
+  [LOCAL-427] Cache HIT: https://en.wikipedia.org/wiki/Belvedere_Palace_Chapel (8298 chars)
+  [LOCAL-459] R5: Fetched 1710 chars from https://en.wikipedia.org/wiki/Belvedere_Palace_Cha
+  [LOCAL-427] HTTP 200 from https://gomuseum.at/01690284/Belvedere_Palace_Chapel (attempt 1)
+  [LOCAL-427] HTTP 200 from https://www.facebook.com/groups/487740025630735/posts/1464310537973674/ (attempt 1)
+  [LOCAL-427] HTTP 200 from https://en.wikipedia.org/wiki/Munich_Agreement (attempt 1)
+  [LOCAL-459] R5: Fetched 2334 chars from https://en.wikipedia.org/wiki/Munich_Agreement
+  [LOCAL-427] HTTP 200 from https://www.history.com/articles/hungary-axis-powers-hitler (attempt 1)
+  [LOCAL-459] R5: Fetched 1477 chars from https://www.history.com/articles/hungary-axis-powe
+  [LOCAL-427] Cache HIT: https://en.wikipedia.org/wiki/Austrian_State_Treaty (15773 chars)
+  [LOCAL-459] R5: Fetched 3003 chars from https://en.wikipedia.org/wiki/Austrian_State_Treat
+  [LOCAL-427] Cache HIT: https://2001-2009.state.gov/r/pa/ho/time/lw/107185.htm (267 chars)
+  [LOCAL-459] R5: Fetched 261 chars from https://2001-2009.state.gov/r/pa/ho/time/lw/107185
+  [LOCAL-427] HTTP 200 from https://it.scribd.com/document/333596542/Prince-Eugene-and-his-library-A-prelimi-pdf (attempt 1)
+  [LOCAL-459] R5: Fetched 4539 chars from https://it.scribd.com/document/333596542/Prince-Eu
+  [LOCAL-427] HTTP 200 from https://www.facebook.com/100095502465673/videos/the-treaty-of-trianon-when-hungary-said-no-no-never/2962503760600289/ (attempt 1)
+  [LOCAL-427] HTTP 200 from https://www.cia.gov/readingroom/docs/CIA-RDP79R01012A013700040017-0.pdf (attempt 1)
+    [D511] 2.1                    kind=active   idx=63  C1 X1 fail:no_invented_person  [old gate: eventful]  UNGROUNDED:Savoy
+    [D511] 1.1                    kind=eventful idx=55  C4 X4 PASS  [old gate: index]
+  [LOCAL-427] HTTP 200 from https://www.lazarus-union.international/cms/austria-is-free-the-austrian-state-treaty-and-the-rebirth-of-a-nation-on-15-may-1955/ (attempt 1)
+  [LOCAL-459] R5: Fetched 2084 chars from https://www.lazarus-union.international/cms/austri
+  [LOCAL-427] Cache HIT: https://en.wikipedia.org/wiki/First_Vienna_Award (72777 chars)
+  [LOCAL-459] R5: Fetched 3003 chars from https://en.wikipedia.org/wiki/First_Vienna_Award
+  [LOCAL-427] HTTP 200 from https://suemtravels.com/2022/09/23/the-osterreichische-gallery-belvedere-palace-vienna/ (attempt 1)
+  [LOCAL-459] R5: Fetched 1556 chars from https://suemtravels.com/2022/09/23/the-osterreichi
+  [LOCAL-427] HTTP 200 from https://aroundus.com/p/5921553-belvedere (attempt 1)
+  [LOCAL-459] R5: Fetched 3003 chars from https://aroundus.com/p/5921553-belvedere
+  [LOCAL-427] HTTP 200 from https://www.cambridge.org/core/journals/austrian-history-yearbook/article/first-vienna-award-november-2-1938/4DE2E04B88887469EC2B42345A7B5599 (attempt 1)
+  [LOCAL-459] R5: Fetched 3003 chars from https://www.cambridge.org/core/journals/austrian-h
+    [D511] 1.1                    kind=active   idx=51  C6 X6 PASS  [old gate: eventful,index]
+  [LOCAL-427] HTTP 200 from https://www.memoryofnations.eu/en/2111938-first-vienna-award-hungarian-annexation-carpathian-ruthenia-and-south-slovakia (attempt 1)
+  [LOCAL-459] R5: Fetched 1141 chars from https://www.memoryofnations.eu/en/2111938-first-vi
+  [LOCAL-427] HTTP 200 from https://www.instagram.com/reel/DYCs87-hgo3/ (attempt 1)
+  [LOCAL-427] Cache HIT: https://en.wikipedia.org/wiki/First_Vienna_Award (72777 chars)
+  [LOCAL-459] R5: Fetched 3003 chars from https://en.wikipedia.org/wiki/First_Vienna_Award
+  [LOCAL-427] HTTP 200 from https://en.wikipedia.org/wiki/Vienna_Award (attempt 1)
+  [LOCAL-459] R5: Fetched 2046 chars from https://en.wikipedia.org/wiki/Vienna_Award
+  [LOCAL-427] Cache HIT: https://www.cambridge.org/core/journals/austrian-history-yearbook/article/first-vienna-award-november-2-1938/4DE2E04B88887469EC2B42345A7B5599 (49494 chars)
+  [LOCAL-459] R5: Fetched 3003 chars from https://www.cambridge.org/core/journals/austrian-h
+  [LOCAL-427] HTTP 200 from https://viennaepass.com/vienna-attractions/upper-belvedere (attempt 1)
+  [LOCAL-459] R5: Fetched 1794 chars from https://viennaepass.com/vienna-attractions/upper-b
+  [LOCAL-427] Cache HIT: https://it.scribd.com/document/333596542/Prince-Eugene-and-his-library-A-prelimi-pdf (4539 chars)
+  [LOCAL-459] R5: Fetched 4539 chars from https://it.scribd.com/document/333596542/Prince-Eu
+  [LOCAL-427] HTTP 200 from https://en.wikipedia.org/wiki/Outline_of_Vienna (attempt 1)
+  [LOCAL-459] R5: Fetched 3003 chars from https://en.wikipedia.org/wiki/Outline_of_Vienna
+  [LOCAL-427] HTTP 200 from https://history.state.gov/historicaldocuments/frus1955-57v05/ch1 (attempt 1)
+  [LOCAL-459] R5: Fetched 3003 chars from https://history.state.gov/historicaldocuments/frus
+  [LOCAL-427] HTTP 200 from https://en.wikipedia.org/wiki/Allied-occupied_Austria (attempt 1)
+  [LOCAL-459] R5: Fetched 3003 chars from https://en.wikipedia.org/wiki/Allied-occupied_Aust
+    [D511] 1.2                    kind=inert    idx=45  C3 X10 fail:index_d515  [old gate: eventful,index]
+  [LOCAL-427] HTTP 200 from https://1440review.com/2022/10/12/austrian-partition/ (attempt 1)
+  [LOCAL-459] R5: Fetched 983 chars from https://1440review.com/2022/10/12/austrian-partiti
+  [LOCAL-427] HTTP 200 from https://api.parliament.uk/historic-hansard/commons/1955/jun/29/austrian-state-treaty-bill (attempt 1)
+  [LOCAL-459] R5: Fetched 2507 chars from https://api.parliament.uk/historic-hansard/commons
+  [LOCAL-427] HTTP 200 from https://history.state.gov/historicaldocuments/frus1947v02/d207 (attempt 1)
+  [LOCAL-459] R5: Fetched 3003 chars from https://history.state.gov/historicaldocuments/frus
+  [LOCAL-427] HTTP 200 from https://praguepapers.ff.cuni.cz/wp-content/uploads/sites/16/2015/11/Iren_Simandi_133-138.pdf (attempt 1)
+  [LOCAL-427] HTTP 200 from https://arslonga.dk/WIEN_VIENNA.htm (attempt 1)
+  [LOCAL-459] R5: Fetched 920 chars from https://arslonga.dk/WIEN_VIENNA.htm
+  [LOCAL-427] Cache HIT: https://it.scribd.com/document/333596542/Prince-Eugene-and-his-library-A-prelimi-pdf (4539 chars)
+  [LOCAL-459] R5: Fetched 4539 chars from https://it.scribd.com/document/333596542/Prince-Eu
+  [LOCAL-427] HTTP 200 from https://www.scribd.com/document/63172236/State-Treaty-for-Austria-signed-Vienna-15-May-1955 (attempt 1)
+  [LOCAL-459] R5: Fetched 3003 chars from https://www.scribd.com/document/63172236/State-Tre
+  [LOCAL-427] Cache HIT: https://en.wikipedia.org/wiki/Austrian_State_Treaty (15773 chars)
+  [LOCAL-459] R5: Fetched 3003 chars from https://en.wikipedia.org/wiki/Austrian_State_Treat
+  [LOCAL-427] Cache HIT: https://en.wikipedia.org/wiki/First_Vienna_Award (72777 chars)
+  [LOCAL-459] R5: Fetched 3003 chars from https://en.wikipedia.org/wiki/First_Vienna_Award
+  [LOCAL-427] Cache HIT: https://kafkadeskdotorg.wordpress.com/2021/11/02/on-this-day-in-1938-the-first-vienna-award-forced-czechoslovakia-to-surrender-territory-to-hungary/ (8289 chars)
+  [LOCAL-459] R5: Fetched 3003 chars from https://kafkadeskdotorg.wordpress.com/2021/11/02/o
+  [LOCAL-427] Cache HIT: https://www.cambridge.org/core/journals/austrian-history-yearbook/article/first-vienna-award-november-2-1938/4DE2E04B88887469EC2B42345A7B5599 (49494 chars)
+  [LOCAL-459] R5: Fetched 604 chars from https://www.cambridge.org/core/journals/austrian-h
+  [LOCAL-427] HTTP 200 from https://www.ebsco.com/research-starters/history/austria-regains-its-independence/ (attempt 1)
+  [LOCAL-459] R5: Fetched 1414 chars from https://www.ebsco.com/research-starters/history/au
+  [LOCAL-427] HTTP 200 from https://history.state.gov/historicaldocuments/frus1947v02/d236 (attempt 1)
+  [LOCAL-459] R5: Fetched 3003 chars from https://history.state.gov/historicaldocuments/frus
+  [LOCAL-427] HTTP 200 from https://www.jstor.org/stable/755849 (attempt 1)
+  [LOCAL-459] R5: Fetched 323 chars from https://www.jstor.org/stable/755849
+    [D511] 4.1                    kind=active   idx=45  C2 X12 fail:index_d515  [old gate: eventful,index]
+    [D511] 2.1                    kind=active   idx=50  C2 X4 PASS  [old gate: eventful,index,confirmed]
+  [LOCAL-427] Cache HIT: https://it.scribd.com/document/333596542/Prince-Eugene-and-his-library-A-prelimi-pdf (4539 chars)
+  [LOCAL-459] R5: Fetched 4539 chars from https://it.scribd.com/document/333596542/Prince-Eu
+  [LOCAL-427] Cache HIT: https://arslonga.dk/WIEN_VIENNA.htm (30343 chars)
+  [LOCAL-459] R5: Fetched 893 chars from https://arslonga.dk/WIEN_VIENNA.htm
+  [LOCAL-427] Cache HIT: https://it.scribd.com/document/333596542/Prince-Eugene-and-his-library-A-prelimi-pdf (4539 chars)
+  [LOCAL-459] R5: Fetched 4539 chars from https://it.scribd.com/document/333596542/Prince-Eu
+  [LOCAL-427] Cache HIT: https://en.wikipedia.org/wiki/First_Vienna_Award (72777 chars)
+  [LOCAL-459] R5: Fetched 3003 chars from https://en.wikipedia.org/wiki/First_Vienna_Award
+  [LOCAL-427] HTTP 200 from https://en.wikipedia.org/wiki/Second_Vienna_Award (attempt 1)
+  [LOCAL-459] R5: Fetched 2337 chars from https://en.wikipedia.org/wiki/Second_Vienna_Award
+  [LOCAL-427] HTTP 200 from https://alchetron.com/First-Vienna-Award (attempt 1)
+  [LOCAL-459] R5: Fetched 3003 chars from https://alchetron.com/First-Vienna-Award
+  [LOCAL-427] Cache HIT: https://en.wikipedia.org/wiki/First_Vienna_Award (72777 chars)
+  [LOCAL-459] R5: Fetched 3003 chars from https://en.wikipedia.org/wiki/First_Vienna_Award
+  [LOCAL-427] Cache HIT: https://kafkadeskdotorg.wordpress.com/2021/11/02/on-this-day-in-1938-the-first-vienna-award-forced-czechoslovakia-to-surrender-territory-to-hungary/ (8289 chars)
+  [LOCAL-459] R5: Fetched 3003 chars from https://kafkadeskdotorg.wordpress.com/2021/11/02/o
+  [LOCAL-427] Cache HIT: https://www.cambridge.org/core/journals/austrian-history-yearbook/article/first-vienna-award-november-2-1938/4DE2E04B88887469EC2B42345A7B5599 (49494 chars)
+  [LOCAL-459] R5: Fetched 604 chars from https://www.cambridge.org/core/journals/austrian-h
+  [LOCAL-427] HTTP 200 from https://www.cambridge.org/core/journals/austrian-history-yearbook/article/austrian-neutrality-the-early-years-19551958/0A0B43BA02022C1D5E9EE8E1BBA5CA1D (attempt 1)
+  [LOCAL-459] R5: Fetched 2186 chars from https://www.cambridge.org/core/journals/austrian-h
+    [D511] 5.1                    kind=active   idx=50  C2 X4 PASS  [old gate: eventful,index,confirmed]
+  [LOCAL-427] HTTP 200 from https://www.facebook.com/fb-answers/austria-after-world-war-ii/?locale=pt_PT (attempt 1)
+  [LOCAL-427] Cache HIT: https://en.wikipedia.org/wiki/First_Vienna_Award (72777 chars)
+  [LOCAL-459] R5: Fetched 3003 chars from https://en.wikipedia.org/wiki/First_Vienna_Award
+  [LOCAL-427] Cache HIT: https://kafkadeskdotorg.wordpress.com/2021/11/02/on-this-day-in-1938-the-first-vienna-award-forced-czechoslovakia-to-surrender-territory-to-hungary/ (8289 chars)
+  [LOCAL-459] R5: Fetched 3003 chars from https://kafkadeskdotorg.wordpress.com/2021/11/02/o
+  [LOCAL-427] Cache HIT: https://rubicon.hu/en/cikkek/ethnic-revision-great-power-games-and-national-expansion-the-first-vienna-award-and-the-return-of-upper-hungary (60783 chars)
+  [LOCAL-459] R5: Fetched 3003 chars from https://rubicon.hu/en/cikkek/ethnic-revision-great
+  [LOCAL-427] HTTP 200 from https://en.wikipedia.org/wiki/History_of_Austria (attempt 1)
+  [LOCAL-459] R5: Fetched 2318 chars from https://en.wikipedia.org/wiki/History_of_Austria
+  [LOCAL-427] Cache HIT: https://it.scribd.com/document/333596542/Prince-Eugene-and-his-library-A-prelimi-pdf (4539 chars)
+  [LOCAL-459] R5: Fetched 4539 chars from https://it.scribd.com/document/333596542/Prince-Eu
+    [D511] 3.1                    kind=eventful idx=55  C4 X4 PASS  [old gate: index]
+    [LOCAL-468] pairwise overlap: mean=0.324, max=0.402 (DIVERSE)
+      redrew the borders b × returning the region = 0.234
+      redrew the borders b × embodying the tumult = 0.401
+      redrew the borders b × echoing both unity a = 0.402
+      returning the region × embodying the tumult = 0.290
+      returning the region × echoing both unity a = 0.255
+      embodying the tumult × echoing both unity a = 0.362
+    [D511] examined 4 credit_line(s) (indices 55, 45, 50, 55), STORY ACCEPTED at 55, ~$0.056, 65s
+    [D511] 4.1                    kind=active   idx=40  C4 X9 fail:index_d515  [old gate: eventful,index]
+  [LOCAL-427] HTTP 200 from https://aroundus.com/p/5923577-belvedere (attempt 1)
+  [LOCAL-459] R5: Fetched 1861 chars from https://aroundus.com/p/5923577-belvedere
+  [LOCAL-427] Cache HIT: https://it.scribd.com/document/333596542/Prince-Eugene-and-his-library-A-prelimi-pdf (4539 chars)
+  [LOCAL-459] R5: Fetched 4539 chars from https://it.scribd.com/document/333596542/Prince-Eu
+  [LOCAL-427] HTTP 200 from https://fr.aroundus.com/p/5923577-osterreichische-galerie-belvedere (attempt 1)
+  [LOCAL-459] R5: Fetched 3003 chars from https://fr.aroundus.com/p/5923577-osterreichische-
+    [D511] 6.1                    kind=active   idx=35  C0 X6 fail:index_d515  [old gate: eventful,index,confirmed]
+    [LOCAL-468] pairwise overlap: mean=0.127, max=0.196 (DIVERSE)
+      reserving it for the × marking its transfor = 0.164
+      reserving it for the × Francesco Solimena,  = 0.079
+      reserving it for the × Solimena's commissio = 0.058
+      marking its transfor × Francesco Solimena,  = 0.172
+      marking its transfor × Solimena's commissio = 0.093
+      Francesco Solimena,  × Solimena's commissio = 0.196
+    [D511] examined 4 credit_line(s) (indices 63, 45, 50, 35), STORY ACCEPTED at 50, ~$0.057, 70s
+  [LOCAL-427] Cache HIT: https://2001-2009.state.gov/r/pa/ho/time/lw/107185.htm (267 chars)
+  [LOCAL-459] R5: Fetched 261 chars from https://2001-2009.state.gov/r/pa/ho/time/lw/107185
+  [LOCAL-427] HTTP 200 from https://archivum.org/entries/blog/austrian-state-treaty-at-70-an-eastern-european-perspective (attempt 1)
+  [LOCAL-459] R5: Fetched 3003 chars from https://archivum.org/entries/blog/austrian-state-t
+  [LOCAL-427] Cache HIT: https://www.presidency.ucsb.edu/documents/message-the-senate-transmitting-the-austrian-state-treaty (6390 chars)
+  [LOCAL-459] R5: Fetched 2208 chars from https://www.presidency.ucsb.edu/documents/message-
+  [LOCAL-427] HTTP 200 from https://digitalcommons.uri.edu/theses/1786/ (attempt 1)
+  [LOCAL-459] R5: Fetched 2390 chars from https://digitalcommons.uri.edu/theses/1786/
+  [LOCAL-427] HTTP 200 from https://www.jstor.org/stable/260702 (attempt 1)
+  [LOCAL-459] R5: Fetched 323 chars from https://www.jstor.org/stable/260702
+  [LOCAL-427] Cache HIT: https://en.wikipedia.org/wiki/Allied-occupied_Austria (54021 chars)
+  [LOCAL-459] R5: Fetched 3003 chars from https://en.wikipedia.org/wiki/Allied-occupied_Aust
+  [LOCAL-427] HTTP 200 from https://www.facebook.com/enrs.eu/posts/otd-austrian-state-treatyon-15-may-1955-austria-france-the-soviet-union-the-unit/5146350828779588/ (attempt 1)
+  [LOCAL-427] HTTP 200 from https://history.state.gov/historicaldocuments/frus1952-54v07p1/d521 (attempt 1)
+  [LOCAL-459] R5: Fetched 1944 chars from https://history.state.gov/historicaldocuments/frus
+  [LOCAL-427] HTTP 200 from https://responsiblestatecraft.org/2023/05/15/what-the-68-year-old-austria-treaty-could-tell-us-about-ukraine-today/ (attempt 1)
+  [LOCAL-459] R5: Fetched 3003 chars from https://responsiblestatecraft.org/2023/05/15/what-
+  [LOCAL-427] HTTP 200 from https://www.jstor.org/stable/2706669 (attempt 1)
+  [LOCAL-459] R5: Fetched 323 chars from https://www.jstor.org/stable/2706669
+    [D511] 5.1                    kind=inert    idx=40  C5 X8 fail:index_d515  [old gate: eventful,index]
+  [LOCAL-427] Cache HIT: https://www.lazarus-union.international/cms/austria-is-free-the-austrian-state-treaty-and-the-rebirth-of-a-nation-on-15-may-1955/ (9538 chars)
+  [LOCAL-459] R5: Fetched 2084 chars from https://www.lazarus-union.international/cms/austri
+  [LOCAL-427] Cache HIT: https://digitalcommons.uri.edu/theses/1786/ (8866 chars)
+  [LOCAL-459] R5: Fetched 2026 chars from https://digitalcommons.uri.edu/theses/1786/
+  [LOCAL-427] HTTP 200 from https://www.cia.gov/readingroom/document/cia-rdp79r01012a005300010025-7 (attempt 1)
+  [LOCAL-459] R5: Fetched 2115 chars from https://www.cia.gov/readingroom/document/cia-rdp79
+  [LOCAL-427] Cache HIT: https://en.wikipedia.org/wiki/Austrian_State_Treaty (15773 chars)
+  [LOCAL-459] R5: Fetched 3003 chars from https://en.wikipedia.org/wiki/Austrian_State_Treat
+  [LOCAL-427] Cache HIT: https://2001-2009.state.gov/r/pa/ho/time/lw/107185.htm (267 chars)
+  [LOCAL-459] R5: Fetched 261 chars from https://2001-2009.state.gov/r/pa/ho/time/lw/107185
+  [LOCAL-427] HTTP 200 from https://history.state.gov/historicaldocuments/frus1955-57v26/d13 (attempt 1)
+  [LOCAL-459] R5: Fetched 3003 chars from https://history.state.gov/historicaldocuments/frus
+  [LOCAL-427] Cache HIT: https://en.wikipedia.org/wiki/Austrian_State_Treaty (15773 chars)
+  [LOCAL-459] R5: Fetched 3003 chars from https://en.wikipedia.org/wiki/Austrian_State_Treat
+  [LOCAL-427] Cache HIT: https://archivum.org/entries/blog/austrian-state-treaty-at-70-an-eastern-european-perspective (12331 chars)
+  [LOCAL-459] R5: Fetched 3003 chars from https://archivum.org/entries/blog/austrian-state-t
+  [LOCAL-427] HTTP 200 from https://history.state.gov/historicaldocuments/frus1955-57v26/d19 (attempt 1)
+  [LOCAL-459] R5: Fetched 2460 chars from https://history.state.gov/historicaldocuments/frus
+    [D511] 7.1                    kind=inert    idx=41  C8 X10 fail:index_d515  [old gate: eventful,index]
+    [LOCAL-468] pairwise overlap: mean=0.260, max=0.333 (DIVERSE)
+      France, the United K × Austria's borders as = 0.245
+      France, the United K × spring day           = 0.260
+      France, the United K × restored freedom     = 0.237
+      Austria's borders as × spring day           = 0.333
+      Austria's borders as × restored freedom     = 0.241
+      spring day           × restored freedom     = 0.247
+    [D511] examined 4 credit_line(s) (indices 51, 40, 40, 41), STORY ACCEPTED at 51, ~$0.060, 103s
+
+  [D511] stop 1: Austrian State Treaty
+      [D518] dropped (anchors 1.00 4,allied,france,kingdom,soviet | content 0.77): "The Austrian State Treaty was signed in this grand hall by representatives from the four"
+      [D518] dropped (anchors 0.75 cold,soviet,states,union,united | content 0.64): "The treaty was unique as it was one of the rare agreements during that era co-signed by "
+      [D518] dropped (anchors 0.50 soviet,union | content 0.15): "Each of these nations sent their high-ranking diplomats—figures like Vyacheslav Molotov "
+    [D518] 3 of 12 prose sentence(s) replaced by story 1
+    [D511] stop 1: 1 story published (51) from credit_lines 'France, the United Kingdom'
+
+  [D511] stop 2: Belvedere Palace Chapel
+    [D518] 0 of 8 prose sentence(s) replaced by story 1
+    [D511] stop 2: 1 story published (50) from credit_lines 'Francesco Solimena, a revered Neapolitan'
+
+  [D511] stop 3: First Vienna Award
+      [D518] dropped (anchors 1.00 1938,2,belvedere,czechoslovakia,hungary | content 0.73): "The First Vienna Award, signed on November 2, 1938, at the Belvedere Palace, was a treat"
+      [D518] dropped (anchors 1.00 belvedere,palace | content 0.14): "The Belvedere Palace, as the backdrop to this historical event, carries with it an emoti"
+      [D518] dropped (anchors 0.67 europe,munich | content 0.31): "The Munich Agreement, signed earlier, paved the way for this arbitration, embodying the "
+    [D518] 3 of 6 prose sentence(s) replaced by story 1
+      [D518] dropped (anchors 1.00 1938,2,belvedere,ciano,foreign | content 0.93): "On November 2, 1938, German Foreign Minister Joachim von Ribbentrop and Italian Foreign "
+      [D518] dropped (anchors 0.71 900,carpathian,czechoslovakia,hungary,slovakia | content 0.91): "The decision forced Czechoslovakia to surrender more than 11,900 square kilometers of so"
+      [D518] dropped (anchors 0.50 czechoslovakia,following,munich | content 0.54): "Following directly upon the Munich Agreement's partition of Czechoslovakia, this arbitra"
+    [LOCAL-466] story 2 dropped: merge absorbed it (+0 sentences) — duplicate of already-published content
+    [LOCAL-466] story 3 skipped: index 50 < SECOND_MIN 55
+    [D511] stop 3: 1 story published (55) from credit_lines 'redrew the borders between Czechoslovaki'
+
+  [D511] PHASE 5.20 summary: 3/3 stops got a gated story (0 with multiple stories), ~$0.173, [D518] 6 duplicated prose sentence(s) replaced
+
+  [LOCAL-485] PHASE 5.21: Story valuation index (report only, never gates)...
+     #  stop                                      idx  hist  detl   soc
+     1  Austrian State Treaty                      59    52    14    60
+     2  Belvedere Palace Chapel                    55    51     0    69
+     3  First Vienna Award                         52    25     0    84
+    [LOCAL-485] index mean 55.3 over 3 stop(s), range 52-59
+    [LOCAL-485] weakest: 'First Vienna Award' at 52
+[TIMING] phase=story_first elapsed=255.3s cumulative=530.7s
+
+PHASE 6: Assembling the complete tour...
+  [LOCAL-11] Venue-identity mining: no specific facts found in corpus
+  [R2] Prolog saved for Stop 1 (99 words)
+
+  [LOCAL-244] PHASE 5.9: Prolog gating (R9, R10, subject routine)...
+  [LOCAL-244] Prolog before gates: 99 words
+  [LOCAL-244] Prolog R9: 0 deletions
+  [LOCAL-286] Prolog R7: 0 deletions
+  [LOCAL-244] Prolog R10: 0 deletions
+  [LOCAL-244] Prolog subject: 0 expanded, 0 deleted, cost=$0.0000
+  [LOCAL-244] Prolog after gates: 99 words (delta: 0)
+
+  [LOCAL-246] PHASE 5.95: Orientation gating (R9, R10)...
+  [LOCAL-246] Orientation gating summary:
+    Words before: 117
+    Words after:  117
+    Delta: 0
+    Stops affected: 0/3
+
+  [LOCAL-270] PHASE 5.96: Composing Part 4 (forward connection) from delivered narrations...
+    Stops with delivered content: 3/3
+    [LOCAL-276] Intrigue ranking completed: 2.3s, $0.0071, 1115 tokens
+    [LOCAL-276] Ranked 3 stops:
+      [Austrian State Treaty] (dated_event): Their actions ended a decade-long occupation, officially recognizing Austria as ...
+      [Belvedere Palace Chapel] (reversal): In 1753, this changed when the chapel was opened for public visits, marking its ...
+      [First Vienna Award] (reversal): The award’s decree was a poignant reminder of sovereignty and identity lost and ...
+    [LOCAL-276] 3 intriguing / 0 excluded (celebrity_trivia)
+    [LOCAL-276] Using ranked facts for composition (3 stops)
+    Part 4 LLM cost: $0.0030 (485 tokens) [attempt 1]
+    ✓ Part 4 composed and verified (45 words):
+      "On this tour, you'll learn about the Austrian State Treaty's role in recognizing Austria's independence and the poignant reminder of lost sovereignty and identity at the First Vienna Award. Additionally, discover how the Belvedere Palace Chapel became a cultural icon accessible to all in 1753."
+      Stops referenced: 3
+    Part 4 total cost: $0.0030
+  [LOCAL-618 #1] Orientation pre-tell guard: dropped 5 sentence(s) carrying later-stop facts
+  [LOCAL-627 #7] Orientation phantom-name guard: no phantom names
+
+  [LOCAL-286] PHASE 5.97: Prolog-body deduplication (≥8 word overlap)...
+  [LOCAL-286] Deduplication: 0 sentence(s) removed from stop bodies
+
+  [LOCAL-292] Empty stop removal gate: PASSED (all 3 stops have narration)
+  [LOCAL-394] Stop count invariant: OK (3 selected == 3 delivered)
+  [D536] Listener asked for 3 stop(s), delivering 3 — request met
+  DEBUG - POI 1 content includes:
+    Specific Examples: False
+    Operational Details: True
+    Walking Directions: True
+  [T4] Transition to Stop 2: Continue through Belvedere — next is Belvedere Palace Chapel...
+  DEBUG - POI 2 content includes:
+    Specific Examples: False
+    Operational Details: False
+    Walking Directions: True
+  [T4] Transition to Stop 3: Your final stop in Belvedere: First Vienna Award....
+  DEBUG - POI 3 content includes:
+    Specific Examples: False
+    Operational Details: False
+    Walking Directions: True
+  [LOCAL-280] Recap composition: 1.2s, $0.0024, 410 tokens
+  [LOCAL-280] Recap built: 28 words, 2 composed clauses (0 D177 rejected, 0 navigation rejected)
+    [Belvedere Palace Chapel] (reversal): "In 1753, this changed when the chapel was opened for public visits, marking its ..."
+      → composed: "Belvedere Palace Chapel, opened to public in 1753, became a cultural icon"
+    [First Vienna Award] (reversal): "The award’s decree was a poignant reminder of sovereignty and identity lost and ..."
+      → composed: "First Vienna Award's decree symbolized lost and regained sovereignty and identity"
+    D177 verified: all 2 source facts present in delivered text
+  [LOCAL-280] Recap added: "That's 3 stops — Belvedere Palace Chapel, opened to public in 1753, became a cultural icon and First Vienna Award's decree symbolized lost and regained sovereignty and identity."
+  [LOCAL-275] Part 2: museum tour category, no restaurant found nearby
+  [D519] Treat Page: no treat within 1.0 km of any of 3 stop(s) (0 treat(s) with coordinates) — mention OMITTED
+  [LOCAL-275/D519] Part 2: nothing verified — no tour offer, no Treat Page
+  [LOCAL-275] Part 2 error: name '_venue_parts_used' is not defined
+  [LOCAL-275] Closing offer fallback (no verification passed)
+  [EPILOG] Journey epilog added to last stop
+  [S27] No cross-stop repetition detected
+  [D533] REPEATED FACT kept in stop 3 (1030/austria) — sentence not in stop block
+  [D533] 0 repeated fact(s) removed, 1 kept
+  [D533] Person-year role guard: no mismatches (153639 chars of corpus checked)
+  [LOCAL-615] No duplicated paragraphs
+  [LOCAL-620] Story-balance stop-body policy: no change (3 stops scanned)
+  [LOCAL-623] Same-title bleed filter: no change (3 stops scanned)
+  [LOCAL-626] Date-consistency filter: dropped 3 conflicting-date sentence(s) across 3 stops
+  [LOCAL-623] Museum-motif filter: no change (3 stops scanned)
+  [LOCAL-617] Conclusion de-dup: removed redundant 'This tour covered …' line (recap kept)
+
+  [LOCAL-36] Practical Facts Gate:
+    Claims found: 2
+    Verified: 2
+    Dropped: 0
+    AUDIT: admission | €65 | https://www.belvedere.at/en/visit | VERIFIED
+    AUDIT: admission | free for Métropole residents | https://www.belvedere.at/en/visit | VERIFIED
+  [LOCAL-36] PRACTICAL FACTS GATE: PASSED (2 verified)
+  [D523] spoken-text hygiene: 0 template seam(s), 1 missing space(s), 0 spoken label(s), 0 dangling phrase(s) removed
+  [LOCAL-618 #2] grammar/splice lint: 3 flagged, 2 dropped, 1 rewritten ({'repeated_pair': 1, 'verbless': 2})
+  [LOCAL-618 #2] grammar/splice lint: 3 flagged, 2 dropped, 1 rewritten by_code={'repeated_pair': 1, 'verbless': 2}
+
+  [LOCAL-260] PROLOG STRUCTURE VALIDATION: 4 error(s), 0 warning(s)
+    [ERROR] Part 1: PART1_MISSING — Part 1 (Tour name and transportation mode) is not present.
+    [ERROR] Part 3: PART3_MISSING — Part 3 (Purpose / intrigue with sourced facts) is not present.
+    [ERROR] Part 4: PART4_MISSING — Part 4 (Forward connection to stops) is not present.
+    [ERROR] Part 2: PART2_INSUFFICIENT_SUBSTANCE — Part 2 has only 1 route indicator(s) (endpoints); need at least 2 of: endpoints, distance, terrain, duration.
+
+=== Word Count Statistics ===
+Stop 1: Austrian State Treaty - 278 words
+Stop 2: Belvedere Palace Chapel - 243 words
+Stop 3: First Vienna Award - 251 words
+===========================
+
+  [LOCAL-540] scorer ran on assembled tour (5455 chars, 3/3 stops)
+  [LOCAL-540] defects seen: ['unsourced_person_event']
+  [LOCAL-540]   unsourced_person_event [advisory]: 1 unsourced person-event(s); "First Vienna Award" placed here in 1753 with no source: "That's 3 stops — Belvedere Palace Chapel, opened to public in 1753, becam
+[LOCAL-628] stop 1: edited
+[LOCAL-628] stop 2: edited
+[LOCAL-628] stop 3: edited
+[LOCAL-628] editor pass complete: 3 edited, 0 kept original
+  [LOCAL-619B] thematic conclusion built from final text: 3 delivered stop(s), venue='Belvedere'
+
+Total API cost: $0.3963 (34231 tokens)
+Grounding:      $0.0700 (5 queries, 6 requests)
+Tour total:     $0.4663
+Provenance:     3/26 factual sentences sourced, 23 unsourced (3 corpus, 0 grounded, 23 parametric)
+CACHE STORE: Belvedere, Vienna / walking / 3
+  [venue_resolver] Name variants: ['Belvedere']
+  [venue_resolver] No Wikidata candidates for 'Belvedere, Vienna'
+  [LOCAL-590] POOL STORE: 3 stop(s) pooled for Belvedere, Vienna / walking (research $0.2984/stop)
+
+Tour text generated successfully!
+  [LOCAL-230] Network failures: 0 (all API calls succeeded)
+Saved to: /app/tours/local628_belvedere.txt
+  [C5-5] Evidence persisted: /app/tours/local628_belvedere_evidence.json
+
+Preview of the generated tour:
+
+Step-by-step audio guided tour of the Belvedere in Vienna, a museum tour.
+
+Stop 1: Austrian State Treaty
+
+Address:
+
+Coordinates: 48.2051, 16.3728
+
+Stand in the Marble Hall of the Upper Belvedere, where voices once echoed with the weight of a nation's future. Here, you are at the heart of a momentous event: the signing of the Austrian State Treaty on May 15, 1955. The Belvedere, traditionally a center for art and culture, became a symbol of newfound sovereignty on that spring day. The grandeur of...
+
+
+========================================================================
+  [LOCAL-410] CHAIN INSTRUMENTATION (post-generation)
+========================================================================
+    Austrian State Treaty: serp_results=21 snippets_injected=29 beats_in_delivered_text=3
+    Belvedere Palace Chapel: serp_results=22 snippets_injected=23 beats_in_delivered_text=6
+    First Vienna Award: serp_results=21 snippets_injected=24 beats_in_delivered_text=7
+========================================================================
+[TIMING] phase=packing elapsed=13.8s cumulative=544.5s
+[TIMING] phase=verification elapsed=0.0s cumulative=544.5s
+[TIMING] TOTAL wall=544.5s phases: story_first=255.3s, poi_selection=186.5s, external_lookups=73.0s, fact_sheets=14.3s, packing=13.8s, intent=1.6s, narration=0.0s, verification=0.0s
+  [LOCAL-627 #2] hours not spoken, but preflight did not confirm they are unpublished — saying nothing (not a false claim)
+  [LOCAL-619B] thematic conclusion already present and count OK (3 stop(s)); preserved (every-path guard)
+
+==== LOCAL-628 ONE-SHOT RESULT ====
+location: Belvedere, Vienna
+stops_requested: 3
+elapsed_s: 544.5
+delivery_path: fresh
+cost_record: {"total_cost": 0.7341323999999996, "total_tokens": 289098, "cache_hit": false, "grounding_cost": 0.07, "grounding_requests": 6, "grounding_queries": 5, "tour_total_cost": 0.8952425999999996, "breakdown": {"openai": {"usd": 0.7341323999999996, "calls": 117, "input_tokens": 270474, "output_tokens": 18624, "by_model": {"gpt-4o-mini-2024-07-18": {"usd": 0.0069154499999999975, "calls": 65, "input_tokens": 29427, "output_tokens": 4169}, "gpt-4o-2024-08-06": {"usd": 0.703695, "calls": 39, "input_tokens": 232174, "output_tokens": 12326}, "gpt-3.5-turbo-0125": {"usd": 0.0026260000000000003, "calls": 6, "input_tokens": 3440, "output_tokens": 604}, "gpt-4.1-2025-04-14": {"usd": 0.01036, "calls": 3, "input_tokens": 2212, "output_tokens": 742}, "gpt-4.1": {"usd": 0.01036, "calls": 3, "input_tokens": 2212, "output_tokens": 742}, "gpt-4o-mini": {"usd": 0.00017595, "calls": 1, "input_tokens": 1009, "output_tokens": 41}}}, "gemini_grounding": {"usd": 0.07, "requests": 6, "queries": 5}, "gemini_tokens": {"usd": 0.0381102, "calls": 30, "input_tokens": 34959, "output_tokens": 11049}, "serper": {"usd": 0.05300000000000004, "queries": 53}, "preflight": {"usd": 0.0, "calls": 0, "queries": 0, "input_tokens": 0, "output_tokens": 0}, "tts": {"usd": 0.0, "engine": "", "characters": 0, "calls": 0}}, "provenance": {"sourced": 3, "unsourced": 23, "total": 26, "corpus": 3, "grounded": 0, "parametric": 23}, "score": {"defects_before": {"unsourced_person_event": "1 unsourced person-event(s); \"First Vienna Award\" placed here in 1753 with no source: \"That's 3 stops \u2014 Belvedere Palace Chapel, opened to public in 1753, became a cultural icon and First Vienna Award's decr\""}, "defects_after": {"unsourced_person_event": "1 unsourced person-event(s); \"First Vienna Award\" placed here in 1753 with no source: \"That's 3 stops \u2014 Belvedere Palace Chapel, opened to public in 1753, became a cultural icon and First Vienna Award's decr\""}, "removed": [], "remaining": [], "retried": false, "clean_after": true, "retry_cost": {"total_cost": 0.0, "total_tokens": 0}, "cost_without_retry": {"total_cost": 0.396335, "total_tokens": 34231}}, "gemini_tokens_cost": 0.0381102, "preflight_cost": 0.0, "cost_accumulator": {"job_id": null, "total_usd": 0.8952425999999997, "breakdown": {"llm": 0.7341323999999996, "grounding": 0.07, "search": 0.05300000000000004, "tts": 0.0}, "provider_breakdown": {"openai": {"usd": 0.7341323999999996, "calls": 117, "input_tokens": 270474, "output_tokens": 18624, "by_model": {"gpt-4o-mini-2024-07-18": {"usd": 0.0069154499999999975, "calls": 65, "input_tokens": 29427, "output_tokens": 4169}, "gpt-4o-2024-08-06": {"usd": 0.703695, "calls": 39, "input_tokens": 232174, "output_tokens": 12326}, "gpt-3.5-turbo-0125": {"usd": 0.0026260000000000003, "calls": 6, "input_tokens": 3440, "output_tokens": 604}, "gpt-4.1-2025-04-14": {"usd": 0.01036, "calls": 3, "input_tokens": 2212, "output_tokens": 742}, "gpt-4.1": {"usd": 0.01036, "calls": 3, "input_tokens": 2212, "output_tokens": 742}, "gpt-4o-mini": {"usd": 0.00017595, "calls": 1, "input_tokens": 1009, "output_tokens": 41}}}, "gemini_grounding": {"usd": 0.07, "requests": 6, "queries": 5}, "gemini_tokens": {"usd": 0.0381102, "calls": 30, "input_tokens": 34959, "output_tokens": 11049}, "serper": {"usd": 0.05300000000000004, "queries": 53}, "preflight": {"usd": 0.0, "calls": 0, "queries": 0, "input_tokens": 0, "output_tokens": 0}, "tts": {"usd": 0.0, "engine": "", "characters": 0, "calls": 0}}, "llm": {"usd": 0.7341323999999996, "calls": 117, "input_tokens": 270474, "output_tokens": 18624}, "llm_by_model": {"gpt-4o-mini-2024-07-18": {"usd": 0.0069154499999999975, "calls": 65, "input_tokens": 29427, "output_tokens": 4169}, "gpt-4o-2024-08-06": {"usd": 0.703695, "calls": 39, "input_tokens": 232174, "output_tokens": 12326}, "gpt-3.5-turbo-0125": {"usd": 0.0026260000000000003, "calls": 6, "input_tokens": 3440, "output_tokens": 604}, "gpt-4.1-2025-04-14": {"usd": 0.01036, "calls": 3, "input_tokens": 2212, "output_tokens": 742}, "gpt-4.1": {"usd": 0.01036, "calls": 3, "input_tokens": 2212, "output_tokens": 742}, "gpt-4o-mini": {"usd": 0.00017595, "calls": 1, "input_tokens": 1009, "output_tokens": 41}}, "grounding": {"usd": 0.07, "requests": 6, "queries": 5}, "gemini_tokens": {"usd": 0.0381102, "calls": 30, "input_tokens": 34959, "output_tokens": 11049}, "preflight": {"usd": 0.0, "calls": 0, "queries": 0, "input_tokens": 0, "output_tokens": 0}, "search": {"usd": 0.05300000000000004, "queries": 53}, "tts": {"usd": 0.0, "characters": 0, "calls": 0}}}
+edited_marker_present: True
+audio_tours_id: 492

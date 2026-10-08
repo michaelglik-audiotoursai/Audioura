@@ -8391,6 +8391,21 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
                         ),
                     }
                     # Return cached tour immediately
+                    # [LOCAL-628] A cache HIT returns here directly, bypassing the
+                    # every-path delivery guard. A tour cached by post-628 code was
+                    # already edited and carries the hidden marker → this is a
+                    # no-op with NO re-spend. A tour cached by PRE-628 code (no
+                    # marker) is edited once here so the cache path is covered too.
+                    try:
+                        import stop_editor as _stop_editor_cache
+                        if (_stop_editor_cache.is_enabled()
+                                and not _stop_editor_cache.already_edited(_cache_hit)):
+                            _cache_hit = _stop_editor_cache.edit_tour_text(
+                                _cache_hit,
+                                venue_name=str(location).split(',')[0].strip() if location else "",
+                                api_key=os.environ.get("OPENAI_API_KEY", ""))
+                    except Exception as _che:
+                        print(f"  [LOCAL-628] cache-hit editor pass skipped (non-fatal): {_che}")
                     if output_file:
                         with open(output_file, "w", encoding="utf-8") as _cf:
                             _cf.write(_cache_hit)
@@ -24209,6 +24224,63 @@ RULES:
     except Exception as _sc_err:
         print(f"  [LOCAL-540] scoring/retry error (non-fatal, shipping tour): "
               f"{type(_sc_err).__name__}: {_sc_err}")
+
+    # ── [LOCAL-628 / LEAD D637] THE FINAL PER-STOP EDITOR PASS ─────────────────
+    # Runs LAST — after every deterministic splice/removal pass above (story
+    # beats, G4 corrective, gloss gate, degrade, guards) and BEFORE the conclusion
+    # and the TTS below — so it repairs exactly the prose those passes damage:
+    # sentences out of order, dangling openers ("As a result"), dropped words,
+    # orphan fragments, evasive filler, glosses jammed into names, unintroduced
+    # references. One gpt-4.1 copy-edit per stop, metered through the normal
+    # OpenAI path (cost_accumulator). It adds NO fact: each edit is VALIDATED by
+    # the same claim/G4 machinery LOCAL-619B uses for the conclusion
+    # (claim_check.check_paragraph) with the ORIGINAL stop body + its passages as
+    # evidence; a new unsupported/contradicted claim, a length move past ±25 %, or
+    # any new proper noun → the edit is rejected and the ORIGINAL stop kept. The
+    # fallback is always the original. The pass marks the text with a hidden
+    # idempotence marker, so a cache/pool hit or a re-run never re-edits or
+    # re-spends. It runs here, before the cache/pool store below, so what is
+    # cached, pooled and shipped is the edited text. Gated behind STOP_EDITOR
+    # (default ON). Guarded; never fatal.
+    try:
+        import stop_editor as _stop_editor
+        if _stop_editor.is_enabled() and not _stop_editor.already_edited(complete_tour):
+            _editor_venue = ""
+            if '_museum_venue_name' in dir() and _museum_venue_name:
+                _editor_venue = _museum_venue_name
+            elif location:
+                _editor_venue = str(location).split(',')[0].strip()
+            _editor_passages = None
+            try:
+                # _DIRECT_SNIPPETS_PER_STOP maps poi-name / "__stop_N__" → list of
+                # snippet dicts; flatten each to its text for extra validation
+                # evidence. The ORIGINAL stop body is always evidence; these only
+                # ADD support, never remove it.
+                _editor_passages = {}
+                for _k, _snips in (_DIRECT_SNIPPETS_PER_STOP or {}).items():
+                    _texts = []
+                    for _s in (_snips or []):
+                        if isinstance(_s, dict):
+                            _t = (_s.get('text') or _s.get('snippet')
+                                  or _s.get('content') or '')
+                        else:
+                            _t = str(_s)
+                        if _t and _t.strip():
+                            _texts.append(_t.strip())
+                    if _texts:
+                        _editor_passages[_k] = _texts
+            except Exception:
+                _editor_passages = None
+            _api_key = os.environ.get("OPENAI_API_KEY", "")
+            complete_tour = _stop_editor.edit_tour_text(
+                complete_tour, venue_name=_editor_venue,
+                passages_by_stop=_editor_passages, api_key=_api_key)
+    except ImportError:
+        _import_logger.error("[LOCAL-628] MISSING: stop_editor — final per-stop "
+                             "editor pass SKIPPED; tour shipped unedited")
+    except Exception as _editor_err:
+        print(f"  [LOCAL-628] editor pass skipped (non-fatal): "
+              f"{type(_editor_err).__name__}: {_editor_err}")
 
     # ── [LOCAL-619] THE ONE CONCLUSION, built from the FINAL delivered text ────
     # The critic's #1 blocker on 440/441/442 was the trailing recap STUB
