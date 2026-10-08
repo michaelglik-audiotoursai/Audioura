@@ -1,20 +1,34 @@
-"""test_local619_real_conclusion.py — LOCAL-619 acceptance tests.
+"""test_local619_real_conclusion.py — LOCAL-619 / LOCAL-619B acceptance tests.
 
-Fixtures are the ACTUAL delivered `tour_content` of audio_tours 440 (Boijmans),
-441 (Sevilla) and 442 (Rouen) — the LOCAL-618 live tours the critic blocked on.
-Each delivered EXACTLY 2 stops (stops_count=2 in the DB) but its trailing recap
-STUB said "That's 3 stops — …": a late gate dropped a stop and the count was
-never recomputed. The exports live in tests/fixtures/local619/tour_44*.txt.
+[LOCAL-619B / Michael D634, 2026-10-07] The conclusion is about the TOUR, not a
+list of stops: "Naming all stops, especially if there are more than 3, will be
+very annoying to the listeners: the conclusion should be about our tour: what are
+the common elements in the stops and the theme of the tour."
 
-The ticket's acceptance criteria, as tests:
-  1. the conclusion count equals the delivered stops;
-  2. no "That's N stops —" splice survives;
-  3. one conclusion per tour;
-  4. the restaurant line is the last sentence of the conclusion;
-  5. a late-gate drop updates ALL the counts (conclusion count, stops_count,
-     orientation "first stop").
+LOCAL-619 built one conclusion on every path with the count read from the final
+text — but it still ENUMERATED ("From X to Y … That's N stops … Along the way …
+<stop>: … <stop>: …"). LOCAL-619B replaces that with a THEMATIC conclusion: a
+thread/theme sentence, a one-line meaning, an optional SINGLE example, the count
+only when correct, and the restaurant offer last. No "From X to Y", no roll-call.
 
-Pure/offline: no DB, no network, no LLM — the builder operates on the final text.
+Fixtures are the ACTUAL delivered ``tour_content`` of audio_tours 440 (Boijmans),
+441 (Sevilla) and 442 (Rouen) — the LOCAL-618 live tours. Each delivers THREE
+stops (one header is glued onto the prior sentence, so the raw line-start count
+is 2 until the builder recovers it). The exports live in
+tests/fixtures/local619/tour_44*.txt.
+
+The ticket's thematic acceptance criteria, as tests:
+  1. NO STOP LIST: at most ONE delivered title appears in the conclusion;
+  2. NO "From … to …";
+  3. every FACTUAL noun in the conclusion appears in the stops (claim/G4);
+  4. the RESTAURANT offer is the last sentence;
+  5. the stop COUNT is correct when present.
+Plus the still-valid structural contracts: three stops recovered from a glued
+header, one conclusion per tour, Sources preserved, idempotency, and a late-gate
+drop recomputing the count.
+
+Pure/offline: no DB, no network, no LLM — the builder's deterministic template is
+exercised (the LLM path is a separate, injected-``llm_fn`` test below).
 
 Run: python3 -m pytest tests/test_local619_real_conclusion.py -q
 """
@@ -28,6 +42,11 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import tour_conclusion as tc
 
+try:
+    import claim_check
+except Exception:  # pragma: no cover
+    claim_check = None
+
 _FIX_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)),
                         "fixtures", "local619")
 
@@ -37,9 +56,15 @@ _FIXTURES = {
     442: "Musee des Beaux-Arts de Rouen",
 }
 
-_SPLICE_RE = re.compile(r"That['\u2019]s\s+\d+\s+stops?\s+[—-]")
+# A legacy enumerating splice ("That's N stops — …") must never survive.
+_SPLICE_RE = re.compile(r"That['\u2019]s\s+\d+\s+stops?\s+[\u2014-]")
 _COUNT_RE = re.compile(r"That['\u2019]s\s+(\d+)\s+stops?")
-_THREAD_RE = re.compile(r"you have followed the thread", re.IGNORECASE)
+# The thematic opener (the one conclusion sentence). No "From … to …".
+_THEMATIC_RE = re.compile(
+    r"(?im)^(?:This tour|Across these stops|Across the stops|Taken together|"
+    r"Together,? these|What connects|The works on this tour|"
+    r"The stops on this tour|On this tour)\b")
+_FROM_TO_RE = re.compile(r"\bFrom\s+.+?\s+to\s+.+?,", re.IGNORECASE)
 _RESTAURANT_RE = re.compile(r"we can build you a restaurant tour", re.IGNORECASE)
 
 
@@ -48,19 +73,45 @@ def _load(tid):
         return f.read()
 
 
-class TestFixturesPresentAndBroken(unittest.TestCase):
-    """The fixtures must be the real, originally-broken tours."""
+def _conclusion_only(rebuilt):
+    """Return just the conclusion block (thematic opener → end, minus Sources)."""
+    body = re.split(r'(?mi)^\s*Sources:', rebuilt)[0]
+    m = _THEMATIC_RE.search(body)
+    return body[m.start():].strip() if m else ""
+
+
+def _delivered_titles(rebuilt):
+    """Titles of every delivered ``Stop N:`` header in the rebuilt tour."""
+    out = []
+    for m in re.finditer(r'(?m)^Stop\s+\d+:\s*(.+?)\s*$', rebuilt):
+        t = m.group(1).strip()
+        t = re.sub(r',\s*\d{3,4}\s*$', '', t)
+        t = re.sub(r'\s+by\s+.+$', '', t, flags=re.IGNORECASE)
+        if t:
+            out.append(t.strip())
+    return out
+
+
+def _delivered_narration_passages(rebuilt):
+    """The delivered stops' narration — the corpus the conclusion is checked
+    against (every factual claim in the conclusion must be supported here)."""
+    import stop_pool_store as sps
+    stops = sps.parse_delivered_stops(tc.normalise_stop_headers(rebuilt))
+    return [(s.get("narration") or "").strip() for s in stops
+            if (s.get("narration") or "").strip()]
+
+
+class TestFixturesPresentAndDeliverThree(unittest.TestCase):
+    """The fixtures must be the real tours, each delivering three stops once the
+    glued header is recovered."""
 
     def test_fixtures_exist(self):
         for tid in _FIXTURES:
-            self.assertTrue(os.path.exists(os.path.join(_FIX_DIR, f"tour_{tid}.txt")),
-                            f"missing fixture tour_{tid}.txt")
+            self.assertTrue(
+                os.path.exists(os.path.join(_FIX_DIR, f"tour_{tid}.txt")),
+                f"missing fixture tour_{tid}.txt")
 
     def test_fixtures_each_deliver_three_stops(self):
-        # Each tour delivers THREE stops. In the raw stored text one header is
-        # GLUED onto the prior sentence (a lost newline), so a naive line-start
-        # count sees only 2 — the exact miscount this ticket fixes. The builder's
-        # header normalisation recovers the true count of 3.
         for tid in _FIXTURES:
             raw = len(re.findall(r'(?m)^Stop \d+:', _load(tid)))
             self.assertEqual(raw, 2,
@@ -70,62 +121,97 @@ class TestFixturesPresentAndBroken(unittest.TestCase):
                              f"tour {tid} should deliver exactly 3 stops once the "
                              f"glued header is recovered")
 
-    def test_fixtures_originally_had_a_broken_count(self):
-        # The stored tours shipped a count that disagreed with the true delivered
-        # stop list: a bare line-start count saw 2 while 3 were delivered. (Guards
-        # against a fixture that is already clean, which would make the fix tests
-        # vacuous.)
-        for tid in _FIXTURES:
-            raw = len(re.findall(r'(?m)^Stop \d+:', _load(tid)))
-            true_n = tc.count_delivered_stops(_load(tid))
-            self.assertNotEqual(raw, true_n,
-                                f"tour {tid}: fixture is not broken (raw {raw} == "
-                                f"true {true_n}) — fix tests would be vacuous")
 
-
-class TestConclusionCriteria(unittest.TestCase):
-    """The five acceptance criteria, on the rebuilt conclusion."""
+class TestThematicConclusionCriteria(unittest.TestCase):
+    """The five thematic acceptance criteria (D634), on the rebuilt conclusion."""
 
     def _rebuilt(self, tid):
         return tc.rebuild_conclusion(_load(tid), venue_name=_FIXTURES[tid])
 
-    def test_1_count_equals_delivered_stops(self):
+    # Criterion 1 — NO STOP LIST: at most one delivered title appears.
+    def test_1_no_stop_list_at_most_one_title(self):
+        for tid in _FIXTURES:
+            out = self._rebuilt(tid)
+            concl = _conclusion_only(out)
+            self.assertTrue(concl, f"tour {tid}: no thematic conclusion found")
+            named = 0
+            for t in _delivered_titles(out):
+                if len(t) < 4:
+                    continue
+                if re.search(r'\b' + re.escape(t) + r'\b', concl, re.IGNORECASE):
+                    named += 1
+            self.assertLessEqual(
+                named, 1,
+                f"tour {tid}: conclusion names {named} delivered titles "
+                f"(a stop list); at most 1 allowed:\n{concl}")
+
+    # Criterion 2 — NO "From … to …".
+    def test_2_no_from_to(self):
+        for tid in _FIXTURES:
+            concl = _conclusion_only(self._rebuilt(tid))
+            self.assertIsNone(
+                _FROM_TO_RE.search(concl),
+                f"tour {tid}: conclusion contains a 'From … to …' enumeration:\n{concl}")
+
+    # Criterion 3 — every FACTUAL noun in the conclusion appears in the stops.
+    @unittest.skipIf(claim_check is None, "claim_check unavailable")
+    def test_3_every_factual_noun_appears_in_stops(self):
+        for tid in _FIXTURES:
+            out = self._rebuilt(tid)
+            concl = _conclusion_only(out)
+            # Strip the fixed house restaurant sentence (not a tour fact) and the
+            # count sentence (verified separately in criterion 5).
+            checkable = _RESTAURANT_RE.sub("", concl)
+            checkable = _COUNT_RE.sub("", checkable)
+            passages = _delivered_narration_passages(out)
+            result = claim_check.check_paragraph(
+                checkable, stop_title="", venue_name=_FIXTURES[tid],
+                passages=passages, other_stop_passages=None)
+            vc = result.get("verdict_counts", {}) or {}
+            bad = int(vc.get("unsupported", 0)) + int(vc.get("contradicted", 0))
+            self.assertEqual(
+                bad, 0,
+                f"tour {tid}: conclusion carries {bad} factual claim(s) not "
+                f"supported by the delivered stops: "
+                f"{[c for c in result.get('claims', []) if c.get('verdict') in ('UNSUPPORTED','CONTRADICTED')]}\n{concl}")
+
+    # Criterion 4 — the RESTAURANT offer is the last sentence.
+    def test_4_restaurant_offer_is_last_sentence(self):
+        for tid in _FIXTURES:
+            out = self._rebuilt(tid)
+            body = re.split(r'(?mi)^\s*Sources:', out)[0].strip()
+            last_line = [ln for ln in body.splitlines() if ln.strip()][-1]
+            self.assertTrue(
+                _RESTAURANT_RE.search(last_line),
+                f"tour {tid}: last conclusion sentence is not the restaurant "
+                f"offer: {last_line!r}")
+
+    # Criterion 5 — the stop COUNT is correct when present.
+    def test_5_count_correct_when_present(self):
         for tid in _FIXTURES:
             out = self._rebuilt(tid)
             delivered = tc.count_delivered_stops(out)
             m = _COUNT_RE.search(out)
-            self.assertIsNotNone(m, f"tour {tid}: conclusion has no count")
-            self.assertEqual(int(m.group(1)), delivered,
-                             f"tour {tid}: conclusion count {m.group(1)} != "
-                             f"delivered {delivered}")
+            if m is not None:  # the count is OPTIONAL; when present it must match
+                self.assertEqual(
+                    int(m.group(1)), delivered,
+                    f"tour {tid}: stated count {m.group(1)} != delivered {delivered}")
             self.assertEqual(delivered, 3, f"tour {tid}: should be 3 stops")
 
-    def test_2_no_splice_survives(self):
+    # Structural contracts carried over from LOCAL-619.
+    def test_one_conclusion_per_tour(self):
         for tid in _FIXTURES:
             out = self._rebuilt(tid)
-            self.assertIsNone(_SPLICE_RE.search(out),
+            self.assertEqual(
+                len(_THEMATIC_RE.findall(out)), 1,
+                f"tour {tid}: expected exactly one thematic conclusion")
+
+    def test_no_legacy_splice_survives(self):
+        for tid in _FIXTURES:
+            self.assertIsNone(_SPLICE_RE.search(self._rebuilt(tid)),
                               f"tour {tid}: a 'That's N stops —' splice survived")
 
-    def test_3_one_conclusion_per_tour(self):
-        for tid in _FIXTURES:
-            out = self._rebuilt(tid)
-            self.assertEqual(len(_THREAD_RE.findall(out)), 1,
-                             f"tour {tid}: expected exactly one conclusion")
-            self.assertEqual(len(_COUNT_RE.findall(out)), 1,
-                             f"tour {tid}: expected exactly one count sentence")
-
-    def test_4_restaurant_offer_is_last_sentence(self):
-        for tid in _FIXTURES:
-            out = self._rebuilt(tid)
-            # The conclusion's last sentence (before any trailing Sources block)
-            # must be the restaurant offer.
-            body = re.split(r'(?mi)^\s*Sources:', out)[0].strip()
-            last_line = [ln for ln in body.splitlines() if ln.strip()][-1]
-            self.assertTrue(_RESTAURANT_RE.search(last_line),
-                            f"tour {tid}: last conclusion sentence is not the "
-                            f"restaurant offer: {last_line!r}")
-
-    def test_5_sources_block_preserved(self):
+    def test_sources_block_preserved(self):
         for tid in _FIXTURES:
             self.assertIn("Sources:", self._rebuilt(tid),
                           f"tour {tid}: Sources block was lost")
@@ -137,70 +223,55 @@ class TestConclusionCriteria(unittest.TestCase):
             self.assertEqual(once, twice, f"tour {tid}: rebuild is not idempotent")
 
 
-class TestLateGateDropUpdatesAllCounts(unittest.TestCase):
-    """A late-gate drop updates the conclusion count, stops_count, and the
-    orientation's 'first stop' name — all recomputed from the final text."""
+class TestLateGateDropUpdatesCount(unittest.TestCase):
+    """A late-gate drop recomputes the conclusion count and the orientation's
+    'first stop' name — all from the final text — without re-introducing a list."""
 
     def _drop_first_stop(self, tour_text):
-        """Simulate a late gate dropping the FIRST delivered stop block."""
         body, sources = tc._split_tail(tour_text)
         blocks = re.split(r'(?m)(?=^Stop \d+:)', body)
-        # blocks[0] is the title/preamble; blocks[1:] are the stop blocks.
         head = blocks[0]
         stop_blocks = blocks[1:]
         self.assertGreaterEqual(len(stop_blocks), 2)
-        kept = head + "".join(stop_blocks[1:])  # drop the first stop
+        kept = head + "".join(stop_blocks[1:])
         if sources:
             kept = kept.rstrip() + "\n\n" + sources
         return kept
 
-    def test_drop_updates_conclusion_count(self):
-        tid = 442  # Rouen
+    def test_drop_updates_count_and_stays_thematic(self):
+        tid = 442
         text = tc.rebuild_conclusion(_load(tid), venue_name=_FIXTURES[tid])
         self.assertEqual(tc.count_delivered_stops(text), 3)
 
         dropped = self._drop_first_stop(text)
         rebuilt = tc.rebuild_conclusion(dropped, venue_name=_FIXTURES[tid])
 
-        # (a) conclusion count now 2 (one stop dropped from 3)
-        delivered = tc.count_delivered_stops(rebuilt)
-        self.assertEqual(delivered, 2)
+        self.assertEqual(tc.count_delivered_stops(rebuilt), 2)
         m = _COUNT_RE.search(rebuilt)
         self.assertIsNotNone(m)
         self.assertEqual(int(m.group(1)), 2)
-        # (b) the From→to endpoints now span the remaining first/last stops
-        self.assertEqual(len(_THREAD_RE.findall(rebuilt)), 1)
-        # (c) restaurant offer still last
+        # Still thematic, still no From→to, restaurant still last.
+        self.assertEqual(len(_THEMATIC_RE.findall(rebuilt)), 1)
+        self.assertIsNone(_FROM_TO_RE.search(_conclusion_only(rebuilt)))
         body = re.split(r'(?mi)^\s*Sources:', rebuilt)[0].strip()
         last_line = [ln for ln in body.splitlines() if ln.strip()][-1]
         self.assertTrue(_RESTAURANT_RE.search(last_line))
 
-    def test_drop_to_single_stop_has_no_from_to(self):
-        # Dropping two stops from a 3-stop tour leaves ONE: no "From X to Y".
+    def test_drop_to_single_stop_omits_count(self):
+        # One stop left: the count sentence is omitted (a count on a single stop
+        # reads oddly), and there is still no From→to.
         tid = 442
         text = tc.rebuild_conclusion(_load(tid), venue_name=_FIXTURES[tid])
         once = self._drop_first_stop(text)
-        twice = self._drop_first_stop(tc.rebuild_conclusion(once, venue_name=_FIXTURES[tid]))
+        twice = self._drop_first_stop(
+            tc.rebuild_conclusion(once, venue_name=_FIXTURES[tid]))
         rebuilt = tc.rebuild_conclusion(twice, venue_name=_FIXTURES[tid])
         self.assertEqual(tc.count_delivered_stops(rebuilt), 1)
-        m = _COUNT_RE.search(rebuilt)
-        self.assertEqual(int(m.group(1)), 1)
-        self.assertNotRegex(rebuilt, r"\bFrom\s+.+?\s+to\s+.+?,\s+you have followed")
-
-    def test_stops_count_recomputed_from_final_text(self):
-        # stops_count (what the orchestrator persists) is count_delivered_stops of
-        # the FINAL text — never a stale generation-time value.
-        for tid in _FIXTURES:
-            out = tc.rebuild_conclusion(_load(tid), venue_name=_FIXTURES[tid])
-            self.assertEqual(tc.count_delivered_stops(out), 3)
-            dropped = self._drop_first_stop(out)
-            self.assertEqual(tc.count_delivered_stops(dropped), 2)
+        self.assertIsNone(_COUNT_RE.search(rebuilt),
+                          "a 1-stop tour should not state a stop count")
+        self.assertIsNone(_FROM_TO_RE.search(rebuilt))
 
     def test_orientation_first_stop_follows_delivered_text(self):
-        # fix_orientation_first_stop rewrites a "Your first stop is X" pointer to
-        # the real first delivered stop after a drop. The pointer lives in the
-        # tour-level preamble (before Stop 1), so dropping Stop 1 leaves a STALE
-        # pointer that still names the dropped stop — exactly the late-gate case.
         synthetic = (
             "Step-by-Step Audio Guided Tour: Demo Museum\n\n"
             "Prepare to encounter two works. Your first stop is Alpha.\n\n"
@@ -208,21 +279,18 @@ class TestLateGateDropUpdatesAllCounts(unittest.TestCase):
             "Alpha depicts a quiet harbour at dawn, painted in oil on canvas in 1700.\n\n"
             "Stop 2: Beta\n\n"
             "Beta shows a bustling market, rendered in tempera around 1710.\n\n"
-            "From Alpha to Beta, you have followed the thread of the collection of Demo Museum.\n\n"
+            "Across these stops, one thread runs through: harbour life. "
+            "Seen together, the works show how differently that subject could be imagined. "
             "That's 2 stops in all.\n\n"
             "If you would like to eat nearby we can build you a restaurant tour.\n"
         )
         self.assertEqual(tc.first_stop_name(synthetic), "Alpha")
-
-        # Drop Stop 1 (Alpha); Beta becomes the first delivered stop. The
-        # preamble pointer still says "Alpha" — the dropped stop.
         body, sources = tc._split_tail(synthetic)
         blocks = re.split(r'(?m)(?=^Stop \d+:)', body)
-        dropped = blocks[0] + "".join(blocks[2:])  # keep preamble + Stop 2 only
+        dropped = blocks[0] + "".join(blocks[2:])
         if sources:
             dropped = dropped.rstrip() + "\n\n" + sources
         self.assertIn("Your first stop is Alpha", dropped)
-
         fixed = tc.fix_orientation_first_stop(dropped)
         self.assertIn("Your first stop is Beta", fixed)
         self.assertNotIn("Your first stop is Alpha", fixed)
@@ -231,12 +299,7 @@ class TestLateGateDropUpdatesAllCounts(unittest.TestCase):
 
 class TestGluedStopHeaderRecovered(unittest.TestCase):
     """A ``Stop N:`` header glued onto a prior sentence (a lost newline) must
-    still be counted, so the conclusion reflects every stop the listener hears.
-
-    This reproduces the live tour 448 defect: a final-stop transition ran into
-    the next header ("…: Atelierwand.Stop 3: Atelierwand"), so the raw line-start
-    count saw 2 while the listener heard 3, and the conclusion said "2 stops".
-    """
+    still be counted (the live tour 448 defect)."""
 
     GLUED = (
         "Step-by-step audio guided tour of the Demo Museum in Town, Country, is a museum tour.\n\n"
@@ -246,86 +309,81 @@ class TestGluedStopHeaderRecovered(unittest.TestCase):
         "Das Eismeer shows an ice-locked sea, painted between 1823 and 1824. "
         "Your final stop in Demo Museum: Atelierwand.Stop 3: Atelierwand\n\n"
         "Atelierwand studies the wall of the artist's studio in close detail.\n\n"
-        "From Nana to Das Eismeer, you have followed the thread of the collection of Demo Museum.\n\n"
+        "Across these stops, one thread runs through: the sea. "
+        "Seen together, the works show how differently that subject could be imagined. "
         "That's 2 stops in all.\n\n"
         "If you would like to eat nearby we can build you a restaurant tour.\n"
     )
 
     def test_glued_header_counted(self):
-        # Raw line-start count misses the glued header; normalised count sees it.
         self.assertEqual(len(re.findall(r'(?m)^Stop \d+:', self.GLUED)), 2)
         self.assertEqual(tc.count_delivered_stops(self.GLUED), 3)
 
     def test_rebuild_recovers_three_stops(self):
         out = tc.rebuild_conclusion(self.GLUED, venue_name="Demo Museum")
-        # All three headers are now at line-start.
         self.assertEqual(len(re.findall(r'(?m)^Stop \d+:', out)), 3)
-        # The conclusion count is 3, not the stale 2.
         m = _COUNT_RE.search(out)
+        self.assertIsNotNone(m)
         self.assertEqual(int(m.group(1)), 3)
-        # Idempotent.
         self.assertEqual(out, tc.rebuild_conclusion(out, venue_name="Demo Museum"))
 
 
-class TestRecapAvoidsAccessionAndVerbatimOpener(unittest.TestCase):
-    """[LOCAL-619 #critic] After the count was fixed, the live critique's residual
-    in-scope complaint was that the recap (a) led with a dry accession/provenance
-    line and (b) echoed the stop's opening sentence verbatim, so the close read as
-    "re-read the dullest line of each stop" rather than a conclusion.
-
-    This reproduces the live Kunsthalle Stop-1 shape — a stop whose delivered
-    narration OPENS with an accession sentence and later tells the work's story —
-    and asserts the recap clause skips the accession opener and lifts the story.
-    """
+class TestLLMThematicBodyValidation(unittest.TestCase):
+    """The cheap-LLM path writes (a)+(b) from the delivered stops only, VALIDATED
+    by the claim/G4 machinery, and FALLS BACK to the deterministic template on any
+    failure. Exercised with an injected ``llm_fn`` so the test is offline."""
 
     TOUR = (
-        "Step-by-step audio guided tour of the Demo Kunsthalle in City, Country, is a museum tour.\n\n"
-        "Stop 1: Das Eismeer\n\n"
-        'In 1905, "Das Eismeer" was acquired by the Demo Kunsthalle from a private collector '
-        "and entered the permanent collection. "
-        "Because buyers rejected the composition, it stayed completely unsold throughout the "
-        "artist's entire lifetime until his death in 1840.\n\n"
-        "Stop 2: Nana\n\n"
-        "In 1877, Manet submitted this painting of a courtesan to the Salon. "
-        "The jury refused to exhibit the piece, so Manet placed it in a gallery window instead.\n\n"
+        "Tour.\n\n"
+        "Stop 1: Nana\n\n"
+        "Nana depicts an actress at her mirror, painted in oil in 1877.\n\n"
+        "Stop 2: Olympia\n\n"
+        "Olympia is a portrait of a reclining woman, painted in 1863.\n\n"
         "If you would like to eat nearby we can build you a restaurant tour.\n"
     )
 
-    def setUp(self):
-        self.out = tc.rebuild_conclusion(self.TOUR, venue_name="Demo Kunsthalle")
-        m = re.search(r'Along the way.*?(?=\n\nIf you would like|\Z)',
-                      self.out, re.DOTALL)
-        self.recap = (m.group(0) if m else "")
+    def _concl(self, out):
+        return _conclusion_only(out)
 
-    def test_recap_present(self):
-        self.assertIn("Along the way", self.recap)
+    def test_grounded_draft_accepted(self):
+        draft = ("Across these stops, the painted woman returns again and again. "
+                 "Together they ask who gets to look and who is looked at.")
+        out = tc.build_conclusion(self.TOUR, venue_name="V", use_llm=True,
+                                  llm_fn=lambda p, k: draft, api_key="x")
+        self.assertIn("painted woman returns again and again", out)
 
-    def test_recap_skips_accession_opener(self):
-        # The accession opener ("…was acquired by… entered the permanent
-        # collection") must NOT be the recapped fact for Das Eismeer.
-        self.assertNotIn("was acquired by the Demo Kunsthalle", self.recap)
-        self.assertNotIn("entered the permanent collection", self.recap)
+    def test_smuggled_fact_rejected_falls_back(self):
+        # 1912 and "the king" are NOT in the delivered text → claim/G4 rejects.
+        draft = ("Across these stops, the figures were all painted in 1912 for "
+                 "the king. Together they changed art forever.")
+        out = tc.build_conclusion(self.TOUR, venue_name="V", use_llm=True,
+                                  llm_fn=lambda p, k: draft, api_key="x")
+        self.assertNotIn("1912", out)
+        self.assertNotIn("the king", out)
+        # Fell back to the deterministic template (a true thread sentence).
+        self.assertTrue(_THEMATIC_RE.search(out))
 
-    def test_recap_lifts_the_story(self):
-        # It should instead carry the work's STORY sentence.
-        self.assertIn("stayed completely unsold", self.recap)
+    def test_from_to_draft_rejected(self):
+        draft = "From Nana to Olympia you followed the thread. Together they matter."
+        out = tc.build_conclusion(self.TOUR, venue_name="V", use_llm=True,
+                                  llm_fn=lambda p, k: draft, api_key="x")
+        self.assertNotIn("From Nana to Olympia", out)
 
-    def test_recap_does_not_echo_stop_opening_sentence_verbatim(self):
-        # The first delivered sentence of each stop must not be copied verbatim.
-        for opener in ('In 1905, "Das Eismeer" was acquired',
-                       "In 1877, Manet submitted this painting of a courtesan to the Salon."):
-            self.assertNotIn(opener, self.recap)
+    def test_two_titles_draft_rejected(self):
+        draft = ("Across these stops, Nana and Olympia both show women. "
+                 "Together they matter.")
+        out = tc.build_conclusion(self.TOUR, venue_name="V", use_llm=True,
+                                  llm_fn=lambda p, k: draft, api_key="x")
+        self.assertFalse("Nana" in out and "Olympia" in out,
+                         "an LLM draft naming two titles must be rejected")
 
-    def test_still_one_conclusion_count_matches_restaurant_last(self):
-        # The structural contracts still hold after the recap change.
-        self.assertEqual(len(_THREAD_RE.findall(self.out)), 1)
-        m = _COUNT_RE.search(self.out)
-        self.assertEqual(int(m.group(1)), tc.count_delivered_stops(self.out))
-        self.assertTrue(self.out.rstrip().endswith(
+    def test_no_key_no_llm_fn_uses_template(self):
+        # No api_key and no injected llm_fn → the deterministic template ships.
+        out = tc.build_conclusion(self.TOUR, venue_name="V", use_llm=True,
+                                  api_key="")
+        self.assertTrue(_THEMATIC_RE.search(out))
+        self.assertTrue(out.rstrip().endswith(
             "we can build you a restaurant tour."))
-        # Idempotent.
-        self.assertEqual(self.out,
-                         tc.rebuild_conclusion(self.out, venue_name="Demo Kunsthalle"))
 
 
 if __name__ == "__main__":
