@@ -7694,6 +7694,19 @@ def _apply_delivery_hours_guard(result):
         if not text or not isinstance(text, str):
             return result
         final = text
+        # 0. [LOCAL-634] Restore the title/header LINE if a pass rewrote it into
+        #    the spoken "Step-by-step audio guided tour of the X in Y, is a Z
+        #    tour." shape (488/505/506). The header and field lines are structure,
+        #    never narration; this runs FIRST so every later guard sees the
+        #    canonical header. Idempotent, deterministic, no-op when canonical.
+        try:
+            import title_line_guard as _tlg
+            final, _title_restored = _tlg.restore_title_line(final)
+            if _title_restored:
+                print("  [LOCAL-634] restored the canonical title/header line "
+                      "(a pass had rewritten it into a spoken sentence)", flush=True)
+        except Exception as _tle:  # pragma: no cover
+            _import_logger.error(f"[LOCAL-634] title-line guard skipped: {_tle}")
         # 1. Fold preflight hours into any surviving "check … on <domain>" fallback.
         try:
             import stop_pool_orchestrator as _orch
