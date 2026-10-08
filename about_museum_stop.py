@@ -1476,10 +1476,47 @@ def _compose_admission_sentence(admission_segs: List[str]) -> str:
     if not body:
         return ""
     low = body.lower()
-    # If the segment already begins with "Admission"/"Entry", keep its own lead.
+    # [LOCAL-626 item 2] Speak admission ONLY when the source states a general/adult
+    # PRICE or says the venue is free for GENERAL admission. A line that only lists
+    # concession-group free entry ("Free for visitors aged 18 and under, Members …",
+    # "Free Entry: under-18s free") is NOT a general-free statement and must not be
+    # spoken as "Admission is free" (D626). Decide what the body actually supports:
+    _has_price = bool(re.search(r"[$€£¥]\s?\d|\b\d+\s?(?:USD|EUR|GBP)\b", body))
+    _general_free = bool(re.search(
+        r"(?i)\b(?:admission|entry)\s+is\s+free\b|\bfree\s+admission\b|"
+        r"\balways\s+free\b|\bfree\s+to\s+(?:the\s+public|all|visit|enter)\b|"
+        r"\bno\s+(?:admission|entry)\s+(?:fee|charge)\b", body))
+    _conditional_free = bool(re.search(
+        r"(?i)free\s+(?:entry|admission)?\s*[:.]?\s*for\s+"
+        r"(?:visitors?\s+aged|under|members|children|students|concessions)|"
+        r"(?:under[-\s]?\d+s?|members|students|children|concessions)\s+"
+        r"(?:go\s+|get\s+in\s+)?free", body))
+    if not _has_price and not _general_free:
+        # Only concession-free (or nothing concrete): say nothing about price.
+        return ""
+    # [LOCAL-626 item 2] When the body is a long structured admission blob
+    # ("Permanent Collection: Tickets start from £11 standard admission (online
+    # rates …). Concessions & Free Entry: Free for …"), speak the ADULT/standard
+    # price as one clean sentence rather than reading the whole page section aloud.
+    # Pull the first "<lead> £N" (optionally "from £N") and keep the currency+amount.
+    if _has_price and (len(body) > 90 or re.match(r"(?i)^\s*permanent\b", body)):
+        m = re.search(
+            r"(?i)(?:tickets?|admission|entry|standard)[^.£€$¥]{0,40}?"
+            r"(from\s+)?([$€£¥]\s?\d{1,4})",
+            body)
+        if not m:
+            m = re.search(r"(from\s+)?([$€£¥]\s?\d{1,4})", body)
+        if m:
+            frm = "from " if m.group(1) else ""
+            price = m.group(2).replace(" ", "")
+            return f"Standard admission is {frm}{price}.".replace("from from", "from")
+    # If a general price is present alongside a concessions-free line, keep the
+    # price-bearing statement (the concessions clause rides along verbatim when the
+    # segment carried it) and never collapse to "free".
+    # If the segment already begins with "Admission"/"Entry"/"Tickets", keep its lead.
     if re.match(r"(?i)^\s*(?:admission|entry|tickets?)\b", body):
         sent = body
-    elif low.startswith("free"):
+    elif _general_free and not _has_price and not low.startswith("permanent"):
         # "Free admission (the museum charges no admission fee)" → "Admission is free."
         # (LEAD 2026-10-06: the preflight phrased it as a noun phrase and the tour
         # said "Admission is Free admission (…)".)

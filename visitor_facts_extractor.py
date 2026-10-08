@@ -828,6 +828,34 @@ def extract_visitor_facts_from_text(page_text: str, page_lang: str = "fr",
                 r'(?:(€|£|\$|¥|CHF)\s*)?(\d+)\s*(€|£|\$|¥|EUR|USD|GBP|CHF)\s*(?:per\s+person)?',
                 page_text, re.IGNORECASE
             )
+        if not _price_match:
+            # [LOCAL-626 item 2] A LEADING currency symbol glued to the amount with no
+            # trailing code — "£11", "from £11", "Tickets start from £11", "$25" — is
+            # the common adult-price shape and the two patterns above missed it
+            # (they both require either an "admission/ticket -/: £N" lead or a
+            # TRAILING currency code). The Courtauld's real admission string
+            # ("Tickets start from £11 standard admission") carries exactly this
+            # shape, so the extractor saw no price, fell through to the free line,
+            # and spoke "Admission is free" — the D626 false-free defect. Capture a
+            # leading-symbol amount so the adult price is found and wins.
+            _price_match = re.search(
+                r'(€|£|\$|¥)\s*(\d{1,4})(?:\.\d{2})?',
+                page_text
+            )
+            if _price_match:
+                # Normalise to the (lead_sym, amount, trail_sym) group shape the
+                # downstream code reads: symbol in group 1, amount in group 2.
+                _lead = _price_match.group(1)
+                _amt = _price_match.group(2)
+
+                class _PM:  # tiny shim with .group(n) to match the API below
+                    def __init__(self, s, a):
+                        self._g = {1: s, 2: a, 3: ''}
+
+                    def group(self, n):
+                        return self._g.get(n, '')
+
+                _price_match = _PM(_lead, _amt)
 
         # Check for free admission
         # [LOCAL-599B] MAAM states "Always free" (its admission banner). Accept the
@@ -835,10 +863,35 @@ def extract_visitor_facts_from_text(page_text: str, page_lang: str = "fr",
         # is (always) free" forms in addition to the existing "free admission" /
         # "admission free" / "no admission fee". A page-literal free statement, not
         # an invented price.
+        #
+        # [LOCAL-626 item 2] GENERAL free only. A concessions sub-heading ("Free
+        # Entry:" above "Free for visitors aged 18 and under, Members …") or a
+        # "free for <group>" / "under-18s free" line is a CONDITION, not a general
+        # free-admission statement, and must NOT make the whole venue read as free.
+        # The Courtauld's admission opens with "Tickets start from £11 …" and only
+        # later lists "Concessions & Free Entry: Free for visitors aged 18 and
+        # under, Courtauld Members …"; the old regex matched that "Free Entry"
+        # heading and spoke "Admission is free" (D626). Require that the free phrase
+        # is NOT immediately scoped to a sub-group, and treat a bare heading
+        # "Free Entry:" (followed by a conditional list) as a condition, not general
+        # free.
         _free_match = re.search(
-            r'(?:free\s+(?:admission|entry)|admission\s+(?:is\s+)?(?:always\s+)?free|'
+            r'(?:free\s+admission|admission\s+(?:is\s+)?(?:always\s+)?free|'
             r'always\s+free|free\s+to\s+(?:the\s+public|visit|enter|all)|'
-            r'no\s+(?:admission|entry)\s+(?:fee|charge))',
+            r'no\s+(?:admission|entry)\s+(?:fee|charge)|'
+            r'entry\s+is\s+free)'
+            r'(?!\s*[:.]?\s*(?:for|to\s+(?:under|visitors?\s+aged|members|children|students|concessions)))',
+            page_text, re.IGNORECASE
+        )
+        # A "free for <group>" / "<group> free" / "under-18s free" line is a
+        # CONCESSION, never general free. Detect it so it can veto a stray general
+        # match that happens to overlap the same clause.
+        _conditional_free = re.search(
+            r'free\s+(?:entry|admission)?\s*[:.]?\s*for\s+'
+            r'(?:visitors?\s+aged|under|members|children|students|concessions|'
+            r'the\s+(?:unemployed|disabled))'
+            r'|(?:under[-\s]?\d+s?|members|students|children|concessions)\s+'
+            r'(?:go\s+|get\s+in\s+)?free',
             page_text, re.IGNORECASE
         )
 
@@ -866,14 +919,21 @@ def extract_visitor_facts_from_text(page_text: str, page_lang: str = "fr",
             page_text, re.IGNORECASE
         )
 
-        if _free_match and not _price_match:
-            _is_unconditionally_free = True
-        elif _price_match:
+        if _price_match:
             # [LOCAL-584] Symbol from the page (leading group 1 or trailing group 3);
             # amount is group 2. No marker ⇒ bare number, never a € default.
+            # [LOCAL-626 item 2] An adult/general PRICE always wins over any free
+            # phrase: a venue that charges £11 but offers free entry to under-18s is
+            # NOT a free museum. This is evaluated before the free branch so the
+            # concessions "Free Entry" heading can never override a real price.
             _sym = _price_match.group(1) or _price_match.group(3) or ''
             _general_price = _format_price(_sym, _price_match.group(2))
             _has_general_price = True
+        elif _free_match and not _conditional_free:
+            # Only a GENERAL free statement (no price anywhere, and the free phrase
+            # is not scoped to a concession group) yields an unconditional-free
+            # verdict. Otherwise we say nothing about price (never default to free).
+            _is_unconditionally_free = True
         if _metropole_free:
             _has_free_condition = True
             _free_condition = "free for Métropole residents"

@@ -1007,37 +1007,60 @@ def _build_opening_section(location: str, tour_type: str, request_text: str,
     # correct — never invent hours/prices).
     practical_facts = _source_practical_facts(venue, site_url, address)
 
-    # [LOCAL-607 defect 5] When live site extraction gives NO hours/admission, fold
-    # in the LOCAL-603 venue-preflight Plan B practicals (Michael: "LOCAL-603's
-    # preflight now supplies hours"). The preflight ran once in the wrapper BEFORE
-    # the pool path and stored its result on generate_tour_text._LAST_VENUE_PREFLIGHT;
-    # its spoken sentence is the SAME real hours the non-pool path folds into Stop 1.
-    # This replaces the generic "Check opening hours … on <site> before you go."
-    # fallback with the actual hours whenever the preflight has them.
-    if not (practical_facts or "").strip():
-        try:
-            import generate_tour_text as _gtt
-            import venue_preflight as _vpf
-            _pf = getattr(_gtt, "_LAST_VENUE_PREFLIGHT", None) or {}
-            if _pf and not _pf.get("skipped") and not _pf.get("error"):
-                _planb = _vpf.plan_b_opening_practicals(_pf)
-                # Pass the RAW hours/admission segments (not the pre-composed
-                # "The museum is open …" sentence) in the same ". "-joined shape
-                # _source_practical_facts returns, so about_museum_stop composes a
-                # single clean spoken sentence (no "is open … is open …" seam).
+    # [LOCAL-626 item 2] The live-site extraction can return a DEGENERATE practical
+    # string — a single weekday with no range ("Monday, 10:00–18:00", the tour-485
+    # defect, where the venue is actually open Monday–Sunday), or a bare "free"
+    # that contradicts a real adult price. The LOCAL-603 preflight is the
+    # authoritative, grounded source for hours/admission. Prefer it whenever (a) we
+    # have NO live practicals, or (b) the live hours name only ONE weekday while the
+    # preflight states a full day RANGE, or (c) the live admission reads "free"
+    # while the preflight carries a concrete price. This fixes "why only one day was
+    # kept" without inventing anything — the preflight text is used verbatim.
+    def _hours_is_single_day(txt: str) -> bool:
+        days = re.findall(
+            r"(?i)\b(monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b",
+            txt or "")
+        has_range = bool(re.search(
+            r"(?i)\b(?:to|through|–|-|daily|every day)\b.*?"
+            r"(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday|daily)",
+            txt or "")) or "daily" in (txt or "").lower()
+        return len(set(d.lower() for d in days)) == 1 and not has_range
+
+    def _looks_bare_free(txt: str) -> bool:
+        t = (txt or "").lower()
+        return "free" in t and not re.search(r"[$€£¥]\s?\d", t)
+
+    _pf_authoritative = False
+    _live = (practical_facts or "").strip()
+    try:
+        import generate_tour_text as _gtt
+        import venue_preflight as _vpf
+        _pf = getattr(_gtt, "_LAST_VENUE_PREFLIGHT", None) or {}
+        if _pf and not _pf.get("skipped") and not _pf.get("error"):
+            _planb = _vpf.plan_b_opening_practicals(_pf)
+            _h = (_planb or {}).get("hours", "").strip()
+            _a = (_planb or {}).get("admission", "").strip()
+            _pf_has_range = bool(_h) and (
+                bool(re.search(r"(?i)\b(?:to|through|daily|every day)\b", _h))
+                or "daily" in _h.lower())
+            _pf_has_price = bool(re.search(r"[$€£¥]\s?\d", _a))
+            # (a) nothing live, or (b) degenerate single-day live hours vs a ranged
+            # preflight, or (c) bare-free live admission vs a priced preflight.
+            if (not _live
+                    or (_h and _pf_has_range and _hours_is_single_day(_live))
+                    or (_a and _pf_has_price and _looks_bare_free(_live))):
                 _bits = []
-                _h = (_planb or {}).get("hours", "").strip()
-                _a = (_planb or {}).get("admission", "").strip()
                 if _h:
                     _bits.append(_h)
                 if _a:
                     _bits.append(_a)
                 if _bits:
                     practical_facts = ". ".join(_bits)
-                    print(f"  [LOCAL-607] Stop-1 hours from LOCAL-603 preflight: "
-                          f"{practical_facts!r}")
-        except Exception as _pf_e:
-            logger.info(f"[LOCAL-607] preflight practicals fold skipped ({_pf_e})")
+                    _pf_authoritative = True
+                    print(f"  [LOCAL-626] Stop-1 hours/admission from LOCAL-603 "
+                          f"preflight (authoritative): {practical_facts!r}")
+    except Exception as _pf_e:
+        logger.info(f"[LOCAL-626] preflight practicals fold skipped ({_pf_e})")
 
     try:
         about = build_about_stop(
