@@ -1510,9 +1510,16 @@ def _clean_degrade_artifacts(sentence: str) -> str:
         lambda m: m.group(2),  # keep the second prep (it likely belongs to what follows)
         sentence, flags=re.IGNORECASE
     )
-    # Remove orphan possessive: " 's " with no word before it (or space before it)
-    sentence = re.sub(r"(\s)'s\b", r'\1', sentence)
-    sentence = re.sub(r"\u2019s\b", '', sentence)
+    # Remove orphan possessive: a "'s" with no word before it (start of string or
+    # a space in front) — the entity it was bound to was just excised. BOTH the
+    # straight and the curly apostrophe must match the SAME orphan-only shape.
+    # [LOCAL-623 defect 5] The curly branch used to be `re.sub(r"\u2019s\b", '')`,
+    # with no "no word before it" guard, so it stripped EVERY curly possessive in
+    # the whole sentence — "Corot's scene" → "Corot scene", "the painting's
+    # celebration" → "the painting celebration" (tour 468 Stop 2). A possessive
+    # bound to a real word must survive; only a dangling "'s" is removed.
+    sentence = re.sub(r"(^|\s)'s\b", r'\1', sentence)
+    sentence = re.sub(r"(^|\s)\u2019s\b", r'\1', sentence)
     # Capitalize first letter if sentence starts lowercase after cleanup
     sentence = sentence.strip()
     if sentence and sentence[0].islower() and not sentence.startswith('...'):
