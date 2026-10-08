@@ -64,7 +64,7 @@ logger = logging.getLogger(__name__)
 # what a listener would actually HEAR — i.e. whenever a cached tour made by the
 # old code would now be considered wrong or stale. (A pure refactor that cannot
 # change the delivered tour text does not require a bump.)
-TOUR_CACHE_VERSION = 6  # v6 (LOCAL-630 merge, D639). v5 (LEAD 2026-10-08, D639): retire stops and tours made before LOCAL-623..629 + D637 editor (bench R0 replayed the fixed Wrestlers cast and doubled admission from the pool). RULE: bump on every merge that changes delivered stop text. v4 (LEAD 2026-10-07): retire stops pooled before D628/D629 (invented authors/patrons) and LOCAL-614/615. v3 (LEAD 2026-10-06): retires tours/stops made before LOCAL-593 #4
+TOUR_CACHE_VERSION = 7  # v7 (LOCAL-631/632 merge, D639). v6 (LOCAL-630 merge, D639). v5 (LEAD 2026-10-08, D639): retire stops and tours made before LOCAL-623..629 + D637 editor (bench R0 replayed the fixed Wrestlers cast and doubled admission from the pool). RULE: bump on every merge that changes delivered stop text. v4 (LEAD 2026-10-07): retire stops pooled before D628/D629 (invented authors/patrons) and LOCAL-614/615. v3 (LEAD 2026-10-06): retires tours/stops made before LOCAL-593 #4
                         # highlight-first selection, D611 opening, D615/D616 — Harvard's
                         # alphabetical stops were being re-served from cache and pool.
                         # LOCAL-588: version added to the key. v2 retires every
