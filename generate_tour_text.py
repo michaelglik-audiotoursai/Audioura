@@ -4347,7 +4347,8 @@ def _is_art_museum(venue_name: str, sparql_works=None) -> bool:
 
 
 def _apply_artwork_guards(documented, sparql_works, venue_name, n_stops,
-                          is_art_museum=None, label=""):
+                          is_art_museum=None, label="",
+                          venue_qid="", parent_qids=()):
     """[LOCAL-629 items 1&2] Enforce artworks-only, then artist-variety, on a
     deterministic ``_det_documented`` list, and PRINT the before/after lists.
 
@@ -4393,6 +4394,12 @@ def _apply_artwork_guards(documented, sparql_works, venue_name, n_stops,
                 e.setdefault('creator_qid', _w.get('creator_qid', ''))
                 e.setdefault('creators', list(_w.get('creators', []) or []))
                 e.setdefault('aliases', list(_w.get('aliases', []) or []))
+        # [LOCAL-632] Always enrich P195 collection QIDs from the matched SPARQL
+        # work so the collection-membership gate can reject a P276-only leak.
+        if not e.get('collection_qids'):
+            _wc = _sq_by_title.get(_n(e.get('title', '')))
+            if _wc and _wc.get('collection_qids'):
+                e['collection_qids'] = list(_wc.get('collection_qids') or [])
         enriched.append(e)
 
     if is_art_museum is None:
@@ -4414,7 +4421,8 @@ def _apply_artwork_guards(documented, sparql_works, venue_name, n_stops,
         from artwork_selection_guard import enforce_collection_membership
         _mem_kept, _mem_dropped = enforce_collection_membership(
             enriched, sparql_works=(sparql_works or []), site_titles=(),
-            venue_name=venue_name, is_art_museum=bool(is_art_museum))
+            venue_name=venue_name, venue_qid=venue_qid, parent_qids=parent_qids,
+            is_art_museum=bool(is_art_museum))
         if _mem_dropped:
             print(f"  {_tag} [LOCAL-630 item 1] collection-membership dropped "
                   f"{len(_mem_dropped)}: "
@@ -9491,7 +9499,8 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
                     # an artist leads) and BEFORE truncation.
                     _det_documented = _apply_artwork_guards(
                         _det_documented, _det_sparql, _museum_venue_name,
-                        total_stops)
+                        total_stops,
+                        venue_qid=(getattr(_det_entity, 'qid', '') or ''))
 
                     # Take total_stops * 2 (D1v2 will filter, so give it room)
                     _museum_verified_reserve = [d['title'] for d in _det_documented]  # [LOCAL-632]
@@ -10694,7 +10703,8 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
                     # an artist leads) and BEFORE truncation.
                     _det_documented = _apply_artwork_guards(
                         _det_documented, _det_sparql, _museum_venue_name,
-                        total_stops)
+                        total_stops,
+                        venue_qid=(getattr(_det_entity, 'qid', '') or ''))
 
                     # Take total_stops * 2 (D1v2 will filter, so give it room)
                     _museum_verified_reserve = [d['title'] for d in _det_documented]  # [LOCAL-632]

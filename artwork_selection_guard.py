@@ -380,6 +380,51 @@ def _entry_is_collection_confirmed(entry: Dict, allowed: set) -> bool:
     return False
 
 
+# [LOCAL-632 / LEAD item 6] COLLECTION (P195) membership — the scalable rule that
+# REPLACES the hard-coded _KNOWN_WORK_HOME map as production logic. A work belongs
+# to a venue by its COLLECTION, not a hand-written list (which cannot scale to
+# 34,000 museums). The real leak is that the venue SPARQL set admits works through
+# P276 ("location") rows — a loan, a stale value, or a data error. The rule:
+#
+#   * if the work has a P195 (collection) and NONE of its P195 values is the venue
+#     (or its parent organisation), REJECT it, whatever P276 says;
+#   * if it has no P195, accept it only when P276 is the venue (it is in the
+#     venue's SPARQL set, i.e. collection-confirmed by title) AND the venue's site
+#     lists it — handled by the existing title-set / site-listed check below.
+#
+# ``_KNOWN_WORK_HOME`` is kept ONLY as a test fixture (see test_local632) and as a
+# last-ditch catch for a work whose Wikidata P195 is missing/wrong; it is no longer
+# the primary mechanism.
+
+
+def _qid_norm(v) -> str:
+    s = str(v or "").strip()
+    if "/" in s:
+        s = s.rsplit("/", 1)[-1]
+    return s if re.fullmatch(r"Q\d+", s) else ""
+
+
+def _work_collection_excludes_venue(entry: Dict, venue_qid: str,
+                                    parent_qids=None) -> bool:
+    """[LOCAL-632] True when the work carries P195 collection QIDs and NONE of them
+    is the venue (or a parent organisation) — a P276-only leak to reject, whatever
+    its location says. False when the work has no P195 (then the title/site check
+    governs) or when a P195 value matches the venue/parent. Pure."""
+    vq = _qid_norm(venue_qid)
+    if not vq:
+        return False
+    colls = [_qid_norm(c) for c in (entry.get("collection_qids") or [])]
+    colls = [c for c in colls if c]
+    if not colls:
+        return False  # no P195 → not decided here
+    allowed = {vq}
+    for p in (parent_qids or []):
+        pq = _qid_norm(p)
+        if pq:
+            allowed.add(pq)
+    return not any(c in allowed for c in colls)
+
+
 # [LOCAL-630 item 1] KNOWN-MISATTRIBUTION guard. A small, curated map of famous
 # works to the venue that ACTUALLY holds them, used to reject a work from a venue
 # that is not its home EVEN WHEN a Wikidata P276 "location" row (which can be a
@@ -421,26 +466,31 @@ def enforce_collection_membership(
     site_titles: Sequence[str] = (),
     *,
     venue_name: str = "",
+    venue_qid: str = "",
+    parent_qids: Sequence[str] = (),
     is_art_museum: bool = True,
     title_key: str = "title",
 ) -> Tuple[List[Dict], List[Dict]]:
-    """[LOCAL-630 item 1] Keep only candidates CONFIRMED to be in the venue's
-    collection. Returns (kept, dropped); each dropped entry is a shallow copy with
-    a ``_reject_reason`` key so the caller can show the before/after membership
-    check.
+    """[LOCAL-630 item 1 + LOCAL-632 LEAD item 6] Keep only candidates CONFIRMED to
+    be in the venue's collection. Returns (kept, dropped); each dropped entry is a
+    shallow copy with a ``_reject_reason`` key.
 
-    Two rejection paths:
-      * KNOWN MISATTRIBUTION — a famous work whose curated home venue is not this
-        venue (Ophelia→Tate, Madonna del Prato→KHM) is dropped FIRST, even if a
-        Wikidata P276 "location" row leaked it into the SPARQL set; and
+    Rejection paths, in order:
+      * COLLECTION (P195) MISMATCH [LOCAL-632] — the scalable rule: a work that
+        carries a Wikidata collection (P195) NONE of whose values is the venue (or
+        a ``parent_qids`` organisation) is rejected, whatever its P276 "location"
+        says. This replaces the hard-coded map as the primary mechanism and needs
+        no per-work curation (requires ``venue_qid`` and ``collection_qids`` on the
+        candidate; a no-op without them).
+      * KNOWN MISATTRIBUTION [LOCAL-630] — the curated ``_KNOWN_WORK_HOME`` fixture,
+        kept as a last-ditch catch for a famous work whose P195 is missing/wrong.
       * NOT-IN-COLLECTION — a candidate that is neither a SPARQL work (P195/P276 =
-        venue) nor venue-site-listed, matched by title/alias/QID or a flag.
+        venue) nor venue-site-listed.
 
-    SAFETY: the not-in-collection gate only bites when there IS a collection to
-    check against (``sparql_works`` or ``site_titles`` non-empty); with neither it
-    keeps every candidate so a sparse venue is never stranded (D577). The known-
-    misattribution guard fires regardless, since it needs no reference collection.
-    When ``is_art_museum`` is False the whole gate is a no-op.
+    SAFETY: the P195 rule only bites a work that HAS a P195 (so a sparse work with
+    no collection claim is never stranded); the not-in-collection gate only bites
+    when there IS a reference collection; the whole gate is a no-op when
+    ``is_art_museum`` is False.
     """
     kept: List[Dict] = []
     dropped: List[Dict] = []
@@ -455,7 +505,17 @@ def enforce_collection_membership(
         e = entry if isinstance(entry, dict) else {title_key: str(entry or "")}
         title = (e.get(title_key) or e.get("label_en")
                  or e.get("name") or e.get("label_local") or "").strip()
-        # 1. Known-misattribution: a famous work whose home is a DIFFERENT venue.
+        # 1. [LOCAL-632] Collection (P195) mismatch — the scalable rule.
+        if isinstance(e, dict) and _work_collection_excludes_venue(
+                e, venue_qid, parent_qids):
+            d = dict(e)
+            d["_reject_reason"] = (
+                f"wrong_collection (P195={','.join(e.get('collection_qids') or [])} "
+                f"excludes {venue_qid or venue_name or 'this venue'}; P276 location "
+                f"ignored)")
+            dropped.append(d)
+            continue
+        # 2. Known-misattribution fixture: a famous work whose home is elsewhere.
         if _violates_known_home(title, venue_name):
             d = dict(e)
             d["_reject_reason"] = (
@@ -463,7 +523,7 @@ def enforce_collection_membership(
                 f"{venue_name or 'this venue'})")
             dropped.append(d)
             continue
-        # 2. Collection membership (only when a reference collection exists).
+        # 3. Collection membership (only when a reference collection exists).
         if not allowed:
             kept.append(entry)
             continue

@@ -193,5 +193,95 @@ class TestRestoreLostStopHeaders(unittest.TestCase):
         self.assertEqual(repaired, tour)
 
 
+class TestCollectionMembershipP195(unittest.TestCase):
+    """[LEAD item 6] A work belongs to a venue by its COLLECTION (P195), not a
+    hard-coded list. Uses the real Wikidata QIDs: Tate = Q430682, KHM = Q95569,
+    National Gallery London = Q180788, Belvedere = Q303139."""
+
+    def test_ophelia_rejected_from_national_gallery_by_p195(self):
+        from artwork_selection_guard import enforce_collection_membership
+        # Ophelia (Millais) P195 = Tate (Q430682); a P276 location row leaked it
+        # into the National Gallery (Q180788) SPARQL set.
+        works = [
+            {"title": "Ophelia", "collection_qids": ["Q430682"],
+             "instance_of": ["Q3305213"]},
+            {"title": "Sunflowers", "collection_qids": ["Q180788"],
+             "instance_of": ["Q3305213"]},
+        ]
+        kept, dropped = enforce_collection_membership(
+            works, sparql_works=works, venue_name="National Gallery",
+            venue_qid="Q180788")
+        self.assertEqual([k["title"] for k in kept], ["Sunflowers"])
+        self.assertEqual(len(dropped), 1)
+        self.assertIn("wrong_collection", dropped[0]["_reject_reason"])
+
+    def test_madonna_del_prato_rejected_from_belvedere_by_p195(self):
+        from artwork_selection_guard import enforce_collection_membership
+        # Madonna del Prato (Raphael) P195 = Kunsthistorisches Museum (Q95569).
+        works = [{"title": "Madonna del Prato", "collection_qids": ["Q95569"]}]
+        kept, dropped = enforce_collection_membership(
+            works, sparql_works=works, venue_name="Belvedere",
+            venue_qid="Q303139")
+        self.assertEqual(kept, [])
+        self.assertIn("wrong_collection", dropped[0]["_reject_reason"])
+
+    def test_p195_matches_venue_kept(self):
+        from artwork_selection_guard import enforce_collection_membership
+        works = [{"title": "The Night Watch", "collection_qids": ["Q190804"]}]
+        kept, dropped = enforce_collection_membership(
+            works, sparql_works=works, venue_name="Rijksmuseum",
+            venue_qid="Q190804")
+        self.assertEqual([k["title"] for k in kept], ["The Night Watch"])
+        self.assertEqual(dropped, [])
+
+    def test_parent_org_collection_accepted(self):
+        from artwork_selection_guard import enforce_collection_membership
+        # A work whose P195 is the parent organisation of the venue is kept.
+        works = [{"title": "W", "collection_qids": ["Q999"]}]
+        kept, _ = enforce_collection_membership(
+            works, sparql_works=works, venue_name="Branch",
+            venue_qid="Q1000", parent_qids=["Q999"])
+        self.assertEqual([k["title"] for k in kept], ["W"])
+
+    def test_no_p195_not_decided_by_collection_rule(self):
+        from artwork_selection_guard import enforce_collection_membership
+        # No P195 → the P195 rule is a no-op; title-set membership governs (it's in
+        # the sparql set here, so kept).
+        works = [{"title": "Untitled Drawing"}]
+        kept, dropped = enforce_collection_membership(
+            works, sparql_works=works, venue_name="Albertina",
+            venue_qid="Q371908")
+        self.assertEqual([k["title"] for k in kept], ["Untitled Drawing"])
+
+    def test_known_work_home_is_only_a_fixture(self):
+        # The hard-coded map remains importable as a fixture but is no longer the
+        # primary mechanism (the P195 rule above is).
+        import artwork_selection_guard as g
+        self.assertIn("ophelia", g._KNOWN_WORK_HOME)
+
+
+class TestTourismBoardChrome(unittest.TestCase):
+    """[LEAD item 7] Art Institute of Chicago tour 496 Stop 1 was 'Chicago: a
+    challenge for your taste buds | Choose Chicago' — tourism-board chrome from the
+    site-first/exhibition path. The junk-title guard must catch it, and it must run
+    on EVERY candidate path (site-first _append + JS fallback)."""
+
+    def test_choose_chicago_breadcrumb_rejected(self):
+        self.assertTrue(is_junk_page_title(
+            "Chicago: a challenge for your taste buds | Choose Chicago",
+            "Art Institute of Chicago"))
+        self.assertTrue(is_junk_page_title(
+            "Things to Do in Chicago | Choose Chicago", "Art Institute of Chicago"))
+
+    def test_guard_wired_into_site_first_paths(self):
+        # The site-first builder's _append and the JS fallback both import and call
+        # is_junk_page_title — assert the wiring is present in source.
+        import inspect
+        import exhibition_site_first as esf
+        src = inspect.getsource(esf)
+        self.assertIn("from junk_title_guard import is_junk_page_title", src)
+        self.assertIn("_is_junk", src)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

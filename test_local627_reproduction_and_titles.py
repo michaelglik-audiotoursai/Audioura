@@ -24,6 +24,10 @@ import venue_resolver as vr
 
 def _binding(qid, label, sitelinks="0", inception=None, instance_of=None,
              creator=None, creator_label=None):
+    # [LOCAL-632] fetch_venue_works now runs a GROUPed SPARQL query (one row per
+    # work) with GROUP_CONCAT fields: instanceOfs / collections / creators /
+    # creatorQids (separator '||'), and SAMPLEd sitelinks / inception. The mock
+    # emits that shape so it matches what the parser reads.
     b = {
         "work": {"value": f"http://www.wikidata.org/entity/{qid}"},
         "workLabel": {"value": label},
@@ -33,11 +37,11 @@ def _binding(qid, label, sitelinks="0", inception=None, instance_of=None,
     if inception is not None:
         b["inception"] = {"value": inception}
     if instance_of is not None:
-        b["instanceOf"] = {"value": f"http://www.wikidata.org/entity/{instance_of}"}
+        b["instanceOfs"] = {"value": f"http://www.wikidata.org/entity/{instance_of}"}
     if creator is not None:
-        b["creator"] = {"value": f"http://www.wikidata.org/entity/{creator}"}
+        b["creatorQids"] = {"value": f"http://www.wikidata.org/entity/{creator}"}
     if creator_label is not None:
-        b["creatorLabel"] = {"value": creator_label}
+        b["creators"] = {"value": creator_label}
     return b
 
 
