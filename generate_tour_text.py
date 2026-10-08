@@ -9560,6 +9560,17 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
                 else:
                     print(f"  [LOCAL-30] Documented works ({_det_documented_count}) < total_stops ({total_stops}) "
                           f"— will use documented as base, GPT fills remainder")
+                    # [LOCAL-634] Capture the verified reserve on the GPT-fill
+                    # branch too. Previously _museum_verified_reserve was set ONLY
+                    # inside the deterministic bypass (count >= N); when documented
+                    # < N, the reserve stayed empty, so the LOCAL-632 replacement-
+                    # until-N below had nothing to backfill from if a gate later
+                    # dropped a stop. Capture every documented title here so
+                    # reconcile_to_n can still refill toward N from verified works.
+                    try:
+                        _museum_verified_reserve = [d['title'] for d in _det_documented]
+                    except Exception:
+                        pass
             else:
                 # [LOCAL-599] NO Wikidata venue entity (MassArt Art Museum has
                 # none — only its parent, Q4381563, does). Discover the official
@@ -10764,6 +10775,14 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
                 else:
                     print(f"  [LOCAL-30] Documented works ({_det_documented_count}) < total_stops ({total_stops}) "
                           f"— will use documented as base, GPT fills remainder")
+                    # [LOCAL-634] Capture the verified reserve on the GPT-fill
+                    # branch too (see the quality-ranked branch above) so the
+                    # LOCAL-632 replacement-until-N has verified works to refill
+                    # from when a later gate drops a stop.
+                    try:
+                        _museum_verified_reserve = [d['title'] for d in _det_documented]
+                    except Exception:
+                        pass
         except Exception as _det_err:
             print(f"  [LOCAL-30] Deterministic selection check failed (falling through to Phase 3A): {_det_err}")
             import traceback
