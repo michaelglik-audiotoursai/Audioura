@@ -110,11 +110,29 @@ _SCRIPT_STYLE_RE = re.compile(r"<(script|style)\b.*?</\1>", re.DOTALL | re.IGNOR
 # it exists, mission, history, the building). Ordered so the highest-value "story"
 # pages are reached first. These mirror the real Griffin IA: /about-us, /mission,
 # /history, the founder archive, "your-support-matters" (Griffin's Mission page).
+# [LOCAL-626 item 3] GALLERY-first: for a venue that shares its domain with an
+# academic institution (the Courtauld GALLERY lives under courtauld.ac.uk next to
+# the Courtauld INSTITUTE's admissions pages, the source of tour 485's "You'll
+# learn from leaders … forge a career" copy), reach the gallery's OWN about/
+# history pages before the bare-root /about, so the museum story — not the
+# prospectus — is sourced first.
 _STORY_SEEDS = [
+    "/gallery/about", "/gallery/about-us", "/gallery/our-history",
+    "/gallery/history", "/gallery", "/the-gallery", "/about-the-gallery",
     "/about", "/about-us", "/about-the-museum", "/our-story", "/history",
     "/our-history", "/mission", "/your-support-matters", "/who-we-are",
     "/the-building", "/architecture", "/visit", "/plan-your-visit",
 ]
+
+# [LOCAL-626 item 3] Path fragments that mark an ACADEMIC / ADMISSIONS / COURSE
+# section of a shared institution domain. A candidate story URL on one of these
+# paths is DE-PRIORITISED (moved after the gallery/museum story pages) so a
+# gallery's own about page is always consulted before the institute's prospectus.
+_ACADEMIC_PATH_RE = re.compile(
+    r"(?i)/(?:study|studies|courses?|programmes?|programs?|admissions?|apply|"
+    r"ug|pg|undergraduate|postgraduate|degrees?|teaching|learning|students?|"
+    r"academic|research-degrees?|short-courses?|summer-school)(?:/|$)"
+)
 
 # Request phrases that make the building/architecture a first-class subject.
 # Includes the misspelling "architectual" seen in the real Athenaeum field request
@@ -233,6 +251,43 @@ _ACADEMIC_PROGRAM_RE = re.compile(
     r"liberal\s+arts\s+tradition|academic\s+(?:program|offerings?)\b|"
     r"prepare\s+you\s+to\s+address\s+the\s+challenges"
     r")")
+
+
+# [LOCAL-626 item 3] SECOND-PERSON MARKETING / RECRUITMENT register. Tour 485's
+# Stop 1 spoke the Courtauld INSTITUTE's admissions-page copy: "You'll learn from
+# leaders across the history, conservation, curation and business of art, and
+# forge a career in the wider professional art world"; "Study in the heart of
+# London with world-renowned specialists". These are a prospectus addressing a
+# prospective STUDENT, not tour narration about the museum — and the academic
+# regex above misses them because they carry no "major/minor/admissions/degree"
+# token, only recruitment verbs in the second person. A sentence is dropped when
+# it addresses the listener as a would-be student/applicant: "you'll learn/study/
+# gain", "study with/at us", "join/enrol/apply", "forge/build/launch a career",
+# "world-renowned/leading programmes". Kept deliberately NARROW (second-person +
+# a recruitment object) so ordinary tour second-person framing ("as you look
+# closer", "you can see the brushwork") is never caught.
+_RECRUITMENT_RE = re.compile(
+    r"(?i)("
+    # second-person recruitment promise: "you will/you'll learn/study/gain/
+    # develop/join/forge/build/launch/pursue ..."
+    r"\byou(?:'ll|\s+will|\s+can)?\s+(?:learn|study|gain|develop|acquire|"
+    r"join|forge|build|launch|pursue|master|train|graduate|enrol|enroll|apply)\b|"
+    r"\bstudy\s+(?:with|at|under|alongside|in\s+the\s+heart\s+of)\b|"
+    r"\bforge\s+a\s+career\b|\blaunch\s+your\s+career\b|\bbuild\s+a\s+career\b|"
+    r"\bcareer\s+in\s+the\b|"
+    r"\b(?:enrol|enroll|apply)\s+(?:now|today|on(?:line)?)\b|"
+    r"\bapply\s+for\s+(?:a|our|the)\b|"
+    r"\bour\s+(?:world-?renowned|leading|flagship|degree)?\s*programmes?\b|"
+    r"\bworld-?renowned\s+programmes?\b|"
+    r"\bjoin\s+(?:us|our\s+community|a\s+community\s+of)\b"
+    r")")
+
+
+def _is_recruitment_sentence(s: str) -> bool:
+    """[LOCAL-626 item 3] True when a sentence is second-person marketing /
+    recruitment copy (a prospectus addressing a prospective student), not tour
+    narration. Pure and deterministic."""
+    return bool(_RECRUITMENT_RE.search(s or ""))
 
 
 # Architecture signal words for building sentences.
@@ -520,7 +575,14 @@ def _candidate_story_urls(base_site_url: str) -> List[str]:
         if u not in seen:
             seen.add(u)
             urls.append(u)
-    return urls
+    # [LOCAL-626 item 3] Rank the venue's own gallery/museum story pages ABOVE the
+    # institution's academic/admissions pages: stably move any academic-path URL to
+    # the end while preserving relative order within each group. The gallery about
+    # page is thus always fetched before the institute prospectus the Courtauld
+    # tour (485) leaked ("Study in the heart of London …").
+    _non_academic = [u for u in urls if not _ACADEMIC_PATH_RE.search(urlparse(u).path)]
+    _academic = [u for u in urls if _ACADEMIC_PATH_RE.search(urlparse(u).path)]
+    return _non_academic + _academic
 
 
 def _venue_core(venue_name: str) -> str:
@@ -664,6 +726,14 @@ def _is_story_sentence(sent: str, venue_core: str, venue_first: str) -> bool:
     # contemporary practice of history" — a BC degree-program page — because it
     # carries a story verb and a signal word. A sentence must be about the museum.
     if _ACADEMIC_PROGRAM_RE.search(s) and not _states_museum_identity(s, venue_first):
+        return False
+    # [LOCAL-626 item 3] Reject SECOND-PERSON MARKETING / RECRUITMENT copy: the
+    # Courtauld Institute's admissions prose ("You'll learn from leaders … forge a
+    # career …", "Study in the heart of London with world-renowned specialists")
+    # is a student prospectus, not the museum's story. It is dropped unconditionally
+    # — a recruitment pitch never states the museum's identity, so there is no
+    # identity exemption as there is for the academic-program rule.
+    if _is_recruitment_sentence(s):
         return False
     # [LOCAL-602 r2 / D617 item 11] Reject a FOUNDER BIOGRAPHY sentence: one whose
     # subject is a PERSON (the founder) and that describes the person, not the
@@ -1476,10 +1546,47 @@ def _compose_admission_sentence(admission_segs: List[str]) -> str:
     if not body:
         return ""
     low = body.lower()
-    # If the segment already begins with "Admission"/"Entry", keep its own lead.
+    # [LOCAL-626 item 2] Speak admission ONLY when the source states a general/adult
+    # PRICE or says the venue is free for GENERAL admission. A line that only lists
+    # concession-group free entry ("Free for visitors aged 18 and under, Members …",
+    # "Free Entry: under-18s free") is NOT a general-free statement and must not be
+    # spoken as "Admission is free" (D626). Decide what the body actually supports:
+    _has_price = bool(re.search(r"[$€£¥]\s?\d|\b\d+\s?(?:USD|EUR|GBP)\b", body))
+    _general_free = bool(re.search(
+        r"(?i)\b(?:admission|entry)\s+is\s+free\b|\bfree\s+admission\b|"
+        r"\balways\s+free\b|\bfree\s+to\s+(?:the\s+public|all|visit|enter)\b|"
+        r"\bno\s+(?:admission|entry)\s+(?:fee|charge)\b", body))
+    _conditional_free = bool(re.search(
+        r"(?i)free\s+(?:entry|admission)?\s*[:.]?\s*for\s+"
+        r"(?:visitors?\s+aged|under|members|children|students|concessions)|"
+        r"(?:under[-\s]?\d+s?|members|students|children|concessions)\s+"
+        r"(?:go\s+|get\s+in\s+)?free", body))
+    if not _has_price and not _general_free:
+        # Only concession-free (or nothing concrete): say nothing about price.
+        return ""
+    # [LOCAL-626 item 2] When the body is a long structured admission blob
+    # ("Permanent Collection: Tickets start from £11 standard admission (online
+    # rates …). Concessions & Free Entry: Free for …"), speak the ADULT/standard
+    # price as one clean sentence rather than reading the whole page section aloud.
+    # Pull the first "<lead> £N" (optionally "from £N") and keep the currency+amount.
+    if _has_price and (len(body) > 90 or re.match(r"(?i)^\s*permanent\b", body)):
+        m = re.search(
+            r"(?i)(?:tickets?|admission|entry|standard)[^.£€$¥]{0,40}?"
+            r"(from\s+)?([$€£¥]\s?\d{1,4})",
+            body)
+        if not m:
+            m = re.search(r"(from\s+)?([$€£¥]\s?\d{1,4})", body)
+        if m:
+            frm = "from " if m.group(1) else ""
+            price = m.group(2).replace(" ", "")
+            return f"Standard admission is {frm}{price}.".replace("from from", "from")
+    # If a general price is present alongside a concessions-free line, keep the
+    # price-bearing statement (the concessions clause rides along verbatim when the
+    # segment carried it) and never collapse to "free".
+    # If the segment already begins with "Admission"/"Entry"/"Tickets", keep its lead.
     if re.match(r"(?i)^\s*(?:admission|entry|tickets?)\b", body):
         sent = body
-    elif low.startswith("free"):
+    elif _general_free and not _has_price and not low.startswith("permanent"):
         # "Free admission (the museum charges no admission fee)" → "Admission is free."
         # (LEAD 2026-10-06: the preflight phrased it as a noun phrase and the tour
         # said "Admission is Free admission (…)".)

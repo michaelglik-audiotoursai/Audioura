@@ -36,6 +36,10 @@ __all__ = [
     "sentence_is_bleed",
     "filter_stop_body_same_title",
     "filter_tour_text_same_title",
+    "object_kind_of",
+    "sentence_is_object_type_bleed",
+    "filter_stop_body_object_type",
+    "filter_tour_text_object_type",
 ]
 
 # A capitalised personal-name span (optionally with a particle: "van", "de").
@@ -330,3 +334,205 @@ def _title_from_header(header: str) -> str:
     """Pull the work title out of a 'Stop N: <title>' header."""
     m = re.match(r"(?i)^\s*Stop\s+\d+\s*[:\-]\s*(.+?)\s*$", header or "")
     return m.group(1).strip() if m else ""
+
+
+# ── [LOCAL-626 item 5] OBJECT-TYPE bleed ──────────────────────────────────────
+#
+# Tour 485 Stop 3 is "Footed Bowl with the Crucifixion" — a maiolica BOWL. Its
+# narration then said: "this Crucifixion PANEL was specifically created for a
+# hospital chapel." A panel is a flat wooden painting support — a different KIND
+# of object from a bowl. The same-title bleed above binds TITLE→ARTIST; this binds
+# TITLE→OBJECT KIND, so a sentence that re-labels the stop's object as an
+# incompatible physical kind (bowl called a panel/canvas/sculpture/…) is dropped.
+#
+# Object-kind families. Each maps a surface noun to a canonical family; two works
+# in DIFFERENT families are physically incompatible. Within one family (bowl/dish/
+# plate = vessel; painting/canvas/panel = picture) nouns are compatible synonyms,
+# so "the painting" never conflicts with "the canvas".
+_OBJECT_KIND_FAMILIES = {
+    # ceramic / vessel
+    "bowl": "vessel", "footed bowl": "vessel", "dish": "vessel", "plate": "vessel",
+    "platter": "vessel", "cup": "vessel", "vase": "vessel", "ewer": "vessel",
+    "jar": "vessel", "jug": "vessel", "pitcher": "vessel", "tazza": "vessel",
+    "charger": "vessel", "maiolica": "vessel", "majolica": "vessel",
+    "porcelain": "vessel", "pottery": "vessel", "ceramic": "vessel",
+    "urn": "vessel", "amphora": "vessel", "chalice": "vessel",
+    # flat picture
+    "painting": "picture", "canvas": "picture", "panel": "picture",
+    "altarpiece": "picture", "fresco": "picture", "watercolour": "picture",
+    "watercolor": "picture", "oil": "picture", "diptych": "picture",
+    "triptych": "picture", "miniature": "picture",
+    # works on paper
+    "drawing": "paper", "print": "paper", "etching": "paper", "engraving": "paper",
+    "lithograph": "paper", "woodcut": "paper", "sketch": "paper",
+    "watercolour on paper": "paper",
+    # three-dimensional
+    "sculpture": "sculpture", "statue": "sculpture", "bust": "sculpture",
+    "relief": "sculpture", "bronze": "sculpture", "marble": "sculpture",
+    "figurine": "sculpture", "carving": "sculpture",
+    # textile / furniture / other
+    "tapestry": "textile", "textile": "textile", "rug": "textile",
+    "furniture": "furniture", "cabinet": "furniture", "chair": "furniture",
+    "table": "furniture", "clock": "clock", "medal": "medal", "coin": "coin",
+    "manuscript": "manuscript", "book": "manuscript",
+}
+
+# Longest keys first so "footed bowl" / "watercolour on paper" win over "bowl".
+_OBJECT_KIND_KEYS = sorted(_OBJECT_KIND_FAMILIES, key=len, reverse=True)
+
+# [LOCAL-626 item 5] Nouns that are too ambiguous to be a KIND assertion on their
+# own: "painting"/"drawing"/"print" also name the decoration/activity ("the
+# painting on the bowl", "the drawing of the figure"), and material words
+# ("ceramic", "oil", "marble", "bronze") describe the stop object itself. These
+# resolve a stop's OWN kind (via object_kind_of on the title/material) but must
+# NOT, by themselves, be read as re-labelling the object a different kind — only
+# an unambiguous physical-object noun (panel, canvas, bowl, statue, tapestry, …)
+# triggers an object-type bleed. This keeps "The painting was not chosen at
+# random" (about the bowl's painted scene) from being mistaken for a panel claim.
+_AMBIGUOUS_KIND_NOUNS = {
+    "painting", "drawing", "print", "oil", "ceramic", "pottery", "porcelain",
+    "maiolica", "majolica", "marble", "bronze", "watercolour", "watercolor",
+    "miniature", "book", "sketch",
+}
+
+# Demonstrative reference to the stop's own object: "this bowl", "this panel",
+# "this Crucifixion panel", "the painted ceramic", "the altarpiece". After a
+# this/the/that, up to three intervening words (adjectives, the title noun) may
+# precede the object noun, so "this Crucifixion panel" is read as a PANEL claim.
+# Demonstrative reference to the stop's own object: "this bowl", "this panel",
+# "this Crucifixion panel", "the painted ceramic", "the altarpiece". After a
+# this/that/the, we scan the next few words for ANY object-kind noun, so
+# "this Crucifixion panel" is read as a PANEL (picture) claim even though an
+# adjective/title-noun sits between the demonstrative and the object noun.
+_DEMONSTRATIVE_RE = re.compile(r"(?i)\b(?:this|that|the)\b")
+_WORD_RE = re.compile(r"[A-Za-zà-ÿ']+")
+# How many words after a demonstrative to scan for an object noun.
+_OBJ_WINDOW = 4
+
+
+def object_kind_of(*texts: str) -> Optional[str]:
+    """Canonical object FAMILY implied by any of the given texts (title first,
+    then material/period hints). Returns the family string ("vessel", "picture",
+    …) or None when no object noun is present. The FIRST text that resolves a
+    family wins, so pass the title before looser corpus text.
+    """
+    for text in texts:
+        low = (text or "").lower()
+        if not low:
+            continue
+        for key in _OBJECT_KIND_KEYS:
+            if re.search(r"\b" + re.escape(key) + r"\b", low):
+                return _OBJECT_KIND_FAMILIES[key]
+    return None
+
+
+def _asserted_kinds(sentence: str) -> List[str]:
+    """Object FAMILIES a sentence asserts via a 'this/that/the <…> <noun>'
+    reference. For each demonstrative, scan the next few words and collect every
+    object-kind noun found (so "this Crucifixion panel" yields the panel family).
+    """
+    low = (sentence or "").lower()
+    words = _WORD_RE.findall(low)
+    # index each word's position so we can window after a demonstrative
+    out: List[str] = []
+    for i, w in enumerate(words):
+        if w in ("this", "that", "the"):
+            window = words[i + 1:i + 1 + _OBJ_WINDOW]
+            for j, wj in enumerate(window):
+                # support the two-word key "footed bowl"
+                if wj == "footed" and j + 1 < len(window):
+                    fam = _OBJECT_KIND_FAMILIES.get("footed " + window[j + 1])
+                    if fam:
+                        out.append(fam)
+                        continue
+                if wj in _AMBIGUOUS_KIND_NOUNS:
+                    continue  # too ambiguous to be a KIND re-label on its own
+                fam = _OBJECT_KIND_FAMILIES.get(wj)
+                if fam:
+                    out.append(fam)
+    return out
+
+
+def sentence_is_object_type_bleed(sentence: str, stop_kind: Optional[str]) -> bool:
+    """True when a sentence re-labels the stop's object as an INCOMPATIBLE kind.
+
+    Fires only when (a) the stop's own object family is known, and (b) the
+    sentence makes a demonstrative reference ("this <noun>"/"the <noun>") whose
+    noun belongs to a DIFFERENT family — the "this Crucifixion panel" (picture)
+    on a stop whose object is a bowl (vessel). A sentence that uses a compatible
+    synonym within the same family ("the vessel", "the dish") never fires, and a
+    sentence with no demonstrative object reference never fires.
+    """
+    if not stop_kind:
+        return False
+    kinds = _asserted_kinds(sentence)
+    return any(k != stop_kind for k in kinds)
+
+
+def filter_stop_body_object_type(body: str, stop_title: str,
+                                  stop_material: str = "") -> Tuple[str, Dict]:
+    """Drop object-type bleed sentences from one stop body. Never empties a body
+    (D577). Returns (new_body, report) with report = {dropped, stop_kind, changed}.
+    """
+    report = {"dropped": 0, "stop_kind": None, "changed": False}
+    if not body or not body.strip():
+        return body, report
+    stop_kind = object_kind_of(stop_title, stop_material)
+    report["stop_kind"] = stop_kind
+    if not stop_kind:
+        return body, report
+    sents = _split_sentences(body)
+    if len(sents) <= 1:
+        return body, report
+    kept, dropped = [], 0
+    for s in sents:
+        if sentence_is_object_type_bleed(s, stop_kind):
+            dropped += 1
+            continue
+        kept.append(s)
+    if dropped == 0:
+        return body, report
+    new_body = " ".join(k.strip() for k in kept if k.strip()).strip()
+    if not new_body:
+        return body, report
+    report["dropped"] = dropped
+    report["changed"] = True
+    return new_body, report
+
+
+def filter_tour_text_object_type(tour_text: str,
+                                 stop_titles: Optional[Dict[int, str]] = None,
+                                 stop_materials: Optional[Dict[int, str]] = None
+                                 ) -> Tuple[str, Dict]:
+    """Apply the object-type bleed filter across a delivered tour, per stop.
+    Mirrors filter_tour_text_same_title's structure. Pure string→string."""
+    report = {"stops": 0, "dropped": 0, "changed": False}
+    if not tour_text or not tour_text.strip():
+        return tour_text, report
+    parts = _STOP_HEADER_RE.split(tour_text)
+    if len(parts) < 3:
+        return tour_text, report
+    out = [parts[0]]
+    i, stop_index, total_dropped = 1, 0, 0
+    while i < len(parts):
+        header = parts[i]
+        body = parts[i + 1] if i + 1 < len(parts) else ""
+        stop_index += 1
+        report["stops"] += 1
+        title = (stop_titles or {}).get(stop_index, "") or _title_from_header(header)
+        material = (stop_materials or {}).get(stop_index, "")
+        paras = re.split(r"(\n\s*\n)", body)
+        new_paras: List[str] = []
+        for seg in paras:
+            if seg.strip() == "" or re.fullmatch(r"\n\s*\n", seg):
+                new_paras.append(seg)
+                continue
+            filtered, prep = filter_stop_body_object_type(seg, title, material)
+            total_dropped += prep.get("dropped", 0)
+            new_paras.append(filtered)
+        out.append(header)
+        out.append("".join(new_paras))
+        i += 2
+    report["dropped"] = total_dropped
+    report["changed"] = total_dropped > 0
+    return "".join(out), report

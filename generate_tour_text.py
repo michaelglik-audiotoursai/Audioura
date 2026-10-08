@@ -4274,6 +4274,42 @@ def _work_prominence_score(entry, corpus_text_lower=""):
         score += 50
     return score
 
+
+# [LOCAL-626 item 4] Wikidata sitelink count at/above which a work is a venue's
+# SIGNATURE highlight — a work carried by many Wikipedia language editions. A
+# 3-stop tour of a famous museum must OPEN with such works (Manet's "A Bar at the
+# Folies-Bergère" = 39 sitelinks at the Courtauld). Measured against the real
+# Courtauld catalogue (Q12110695): the signature works sit at 14–39 sitelinks
+# while the long tail (the maiolica "Footed Bowl with the Crucifixion" that
+# displaced them in tour 485) sits at 0–1. A threshold of 8 cleanly separates the
+# household-name works from the catalogue tail without inventing a cutoff per
+# venue. Env override FAMOUS_WORK_SITELINKS for tuning; never below 1.
+try:
+    _FAMOUS_WORK_SITELINKS = max(1, int(os.environ.get("FAMOUS_WORK_SITELINKS", "8")))
+except (TypeError, ValueError):
+    _FAMOUS_WORK_SITELINKS = 8
+
+
+def _prominence_tier(entry):
+    """[LOCAL-626 item 4] 0 for a signature/highlight work, 1 otherwise.
+
+    Used as the LEADING key of the museum deterministic sort so a famous work can
+    never lose its opening slot to an obscure work that merely has more harvested
+    corpus (the tour-485 defect: a well-mined maiolica bowl beat Manet/Van Gogh/
+    Cézanne because corpus-depth quality was ranked ABOVE Wikidata prominence).
+    A work is tier 0 when its Wikidata sitelink count meets the signature
+    threshold OR the museum's own site flags it as a highlight/notable work.
+    """
+    try:
+        _sl = int(entry.get('sitelinks', 0) or 0)
+    except (TypeError, ValueError):
+        _sl = 0
+    if _sl >= _FAMOUS_WORK_SITELINKS:
+        return 0
+    if entry.get('highlight') or entry.get('notable'):
+        return 0
+    return 1
+
 # [LOCAL-60] Module-level: populated after generation with cost breakdown
 # Allows the service layer to read the cost without changing the function signature.
 # Keys: total_cost, total_tokens, cache_hit, breakdown (dict with llm/tts/search)
@@ -5370,6 +5406,25 @@ def _verify_works_v2(poi_list, venue_name, exhibition_scope=None):
                       f"{_room_before} → {len(canonical_titles)} — dropped {_rooms_dropped}")
         except Exception as _rg_err:
             print(f"  [LOCAL-625] room-title canonical filter skipped ({_rg_err})")
+
+    # [LOCAL-626 item 1] Reject the VENUE ITSELF from the canonical SET at the same
+    # chokepoint. Tour 485 shipped "Courtauld Gallery" as Stop 1 — the museum as
+    # its own artwork stop, carrying building history. The about-museum opening is
+    # already folded into Stop 1 (LOCAL-592); the venue must never also hold a work
+    # slot or N stops deliver N-1 works. Always on (no ALLOW_* opt-out: a space
+    # tour still is not a tour OF the institution-as-an-object).
+    if canonical_titles:
+        try:
+            from room_candidate_guard import is_venue_itself_title as _is_venue_canon
+            _venue_dropped = sorted(t for t in canonical_titles
+                                    if _is_venue_canon(t, venue_name))
+            if _venue_dropped:
+                canonical_titles = set(t for t in canonical_titles
+                                       if t not in _venue_dropped)
+                print(f"  [LOCAL-626] rejected venue-itself title(s) from canonical "
+                      f"SET for '{venue_name}': dropped {_venue_dropped}")
+        except Exception as _ve_err:
+            print(f"  [LOCAL-626] venue-itself canonical filter skipped ({_ve_err})")
 
     # Store classification in corpus_result for downstream audit
     # CRITICAL: Also update corpus_result['canonical_titles'] so R4 replenishment
@@ -9072,6 +9127,10 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
                     # order ONLY to break ties. This replaces the old source-only
                     # sort whose within-tier order was alphabetical — the cause of
                     # the Harvard tour opening on its 7 most obscure works.
+                    # [LOCAL-626 item 4] Lead with the signature tier so a famous
+                    # work (high sitelinks) opens the tour even if an obscure work
+                    # sits in a richer source tier — the Courtauld household names
+                    # must never fall behind a long-tail object.
                     _det_corpus_text_lower = ""
                     try:
                         _dc_pages = (_det_cache or {}).get('pages') or []
@@ -9082,6 +9141,7 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
                     except Exception:
                         _det_corpus_text_lower = ""
                     _det_documented.sort(key=lambda d: (
+                        _prominence_tier(d),
                         _priority.get(d['source'], 9),
                         -_work_prominence_score(d, _det_corpus_text_lower),
                         d['title'].lower(),
@@ -9090,6 +9150,21 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
                     # Apply bare-noun filter (shouldn't be needed but defence-in-depth)
                     from story_miner import is_bare_generic_noun
                     _det_documented = [d for d in _det_documented if not is_bare_generic_noun(d['title'])]
+                    # [LOCAL-626 item 1] Drop any candidate that names the VENUE
+                    # ITSELF ("The Courtauld Gallery") BEFORE truncation, so a real
+                    # artwork fills its slot and N stops stay N works. The about-
+                    # museum section already carries the venue's story (LOCAL-592);
+                    # the venue must never also be an artwork stop.
+                    try:
+                        from room_candidate_guard import is_venue_itself_title as _is_venue
+                        _before_v = len(_det_documented)
+                        _det_documented = [d for d in _det_documented
+                                           if not _is_venue(d['title'], _museum_venue_name)]
+                        if len(_det_documented) != _before_v:
+                            print(f"  [LOCAL-626] dropped venue-itself candidate(s) from "
+                                  f"documented works for '{_museum_venue_name}'")
+                    except Exception as _ve:
+                        print(f"  [LOCAL-626] venue-itself filter skipped ({_ve})")
                     
                     # Take total_stops * 2 (D1v2 will filter, so give it room)
                     _det_take = min(len(_det_documented), total_stops * 2)
@@ -10231,6 +10306,19 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
                     # highlight flag) as a tie-break ahead of alphabetical, so that
                     # when two works have equal corpus-quality the more prominent
                     # one is chosen — never the alphabetically-first obscure work.
+                    # [LOCAL-626 item 4] But corpus-depth quality must NOT outrank
+                    # Wikidata prominence for a famous museum's signature works. In
+                    # tour 485 the Courtauld's maiolica "Footed Bowl with the
+                    # Crucifixion" (0–1 sitelinks) had more harvested corpus than
+                    # Manet's "A Bar at the Folies-Bergère" (39), Van Gogh's
+                    # "Self-Portrait with Bandaged Ear" (14) and the top Cézanne, so
+                    # the bowl led and the household-name works were skipped —
+                    # highlight-first (LOCAL-593) silently lost to corpus depth. The
+                    # sort now LEADS with a signature tier (_prominence_tier: 0 for a
+                    # famous/highlight work, 1 otherwise); corpus-depth quality then
+                    # orders works WITHIN a tier. Famous works always open; among the
+                    # long tail the describable-work preference (LOCAL-328) stands.
+                    _priority = {'catalogue': 0, 'sparql': 1, 'canonical': 2}
                     _det_corpus_text_lower = ""
                     try:
                         _dc_pages = (_det_cache or {}).get('pages') or []
@@ -10241,6 +10329,7 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
                     except Exception:
                         _det_corpus_text_lower = ""
                     _det_documented.sort(key=lambda d: (
+                        _prominence_tier(d),
                         -_depth_map.get(_det_norm(d['title']), 0),
                         _priority.get(d['source'], 9),
                         -_work_prominence_score(d, _det_corpus_text_lower),
@@ -10250,6 +10339,21 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
                     # Apply bare-noun filter (shouldn't be needed but defence-in-depth)
                     from story_miner import is_bare_generic_noun
                     _det_documented = [d for d in _det_documented if not is_bare_generic_noun(d['title'])]
+                    # [LOCAL-626 item 1] Drop any candidate that names the VENUE
+                    # ITSELF ("The Courtauld Gallery") BEFORE truncation, so a real
+                    # artwork fills its slot and N stops stay N works. The about-
+                    # museum section already carries the venue's story (LOCAL-592);
+                    # the venue must never also be an artwork stop.
+                    try:
+                        from room_candidate_guard import is_venue_itself_title as _is_venue
+                        _before_v = len(_det_documented)
+                        _det_documented = [d for d in _det_documented
+                                           if not _is_venue(d['title'], _museum_venue_name)]
+                        if len(_det_documented) != _before_v:
+                            print(f"  [LOCAL-626] dropped venue-itself candidate(s) from "
+                                  f"documented works for '{_museum_venue_name}'")
+                    except Exception as _ve:
+                        print(f"  [LOCAL-626] venue-itself filter skipped ({_ve})")
                     
                     # Take total_stops * 2 (D1v2 will filter, so give it room)
                     _det_take = min(len(_det_documented), total_stops * 2)
@@ -23278,6 +23382,60 @@ RULES:
                       f"({_stbg_rep['stops']} stops scanned)")
         except Exception as _stbg_err:
             print(f"  [LOCAL-623] Same-title bleed filter error (non-fatal): {_stbg_err}")
+
+    # -------- [LOCAL-626 item 5] Object-TYPE bleed filter --------------------
+    # Tour 485 Stop 3 ("Footed Bowl with the Crucifixion" — a maiolica BOWL) said
+    # "this Crucifixion PANEL was specifically created for a hospital chapel". A
+    # panel is a different KIND of object from a bowl: a same-title bleed that the
+    # LOCAL-623 artist binding does not catch (no wrong artist). Bind each stop to
+    # its OBJECT KIND (from title + material) and drop a sentence that re-labels
+    # the object an incompatible kind. Museum tours only; never empties a stop.
+    if tour_category == 'museum':
+        try:
+            import same_title_bleed_guard as _otg
+            _ot_titles, _ot_materials = {}, {}
+            try:
+                for _si, _sp in enumerate(poi_list, 1):
+                    _ot_titles[_si] = _sp.get('name', '') or ''
+                    _ot_materials[_si] = (_sp.get('material', '')
+                                          or _sp.get('medium', '') or '')
+            except Exception:
+                pass
+            complete_tour, _otg_rep = _otg.filter_tour_text_object_type(
+                complete_tour, stop_titles=_ot_titles, stop_materials=_ot_materials)
+            if _otg_rep.get('changed'):
+                print(f"  [LOCAL-626] Object-type bleed filter: dropped "
+                      f"{_otg_rep['dropped']} wrong-object-kind sentence(s) across "
+                      f"{_otg_rep['stops']} stops")
+        except Exception as _otg_err:
+            print(f"  [LOCAL-626] Object-type bleed filter error (non-fatal): {_otg_err}")
+
+    # -------- [LOCAL-626 item 5] Same-stop date-consistency filter -----------
+    # Tour 485 Stop 3 dated the SAME bowl "between 1550 and 1570" (the corpus
+    # date) AND "during the period 1510-1571" (invented) in one stop. One date per
+    # work, the corpus date wins: keep the sentence whose creation date matches the
+    # corpus period (from the stop's SPARQL/catalogue date, else the stop title's
+    # date, else the first date stated) and drop sentences asserting a conflicting
+    # work date. A PERSON's dates ("Patanazzi, active 1515-1587") are left alone.
+    # Museum tours only; never empties a stop.
+    if tour_category == 'museum':
+        try:
+            import date_consistency_guard as _dcg
+            _dc_dates = {}
+            try:
+                for _si, _sp in enumerate(poi_list, 1):
+                    _dc_dates[_si] = (_sp.get('period', '') or _sp.get('date', '')
+                                      or _sp.get('name', '') or '')
+            except Exception:
+                pass
+            complete_tour, _dcg_rep = _dcg.filter_tour_text_date_consistency(
+                complete_tour, stop_corpus_dates=_dc_dates)
+            if _dcg_rep.get('changed'):
+                print(f"  [LOCAL-626] Date-consistency filter: dropped "
+                      f"{_dcg_rep['dropped']} conflicting-date sentence(s) across "
+                      f"{_dcg_rep['stops']} stops")
+        except Exception as _dcg_err:
+            print(f"  [LOCAL-626] Date-consistency filter error (non-fatal): {_dcg_err}")
 
     # -------- [LOCAL-623 defect 2 / D634] Recurring museum-motif filter -------
     # Tour 468 wove an abstract "museum story of preservation and renewal /

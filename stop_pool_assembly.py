@@ -434,16 +434,24 @@ def assemble_building_tour(
     # room ("Obergeschoss, Kabinett 1-2") ever ships narrated as building history.
     # Replacement happens upstream (corpus fill); shipping one fewer real stop is
     # correct over shipping a room. Opt out only for a space/architecture tour kind.
+    # [LOCAL-626 item 1] The same guard drops a stop that names the VENUE ITSELF
+    # ("Courtauld Gallery" — tour 485 Stop 1, which carried the museum's founding/
+    # relocation history as its body). The about-museum section is already folded
+    # into Stop 1 (LOCAL-592) and must never ALSO take an artwork slot, or N stops
+    # become N-1 works. The venue-as-stop slips the room guard because it has no
+    # room number, so is_venue_itself_title catches it explicitly.
     if os.environ.get("ALLOW_MUSEUM_SPACE_STOPS", "").strip() != "1":
         try:
-            from room_candidate_guard import is_room_or_space_title as _is_room
+            from room_candidate_guard import (is_room_or_space_title as _is_room,
+                                              is_venue_itself_title as _is_venue)
             _kept = [s for s in ordered
-                     if not _is_room((s.get("title") or s.get("name") or ""), venue_name)]
+                     if not _is_room((s.get("title") or s.get("name") or ""), venue_name)
+                     and not _is_venue((s.get("title") or s.get("name") or ""), venue_name)]
             if len(_kept) != len(ordered):
                 _dropped_rooms = [s.get("title") or s.get("name") for s in ordered
                                   if s not in _kept]
-                logger.info(f"[LOCAL-625] dropped room/space stops (not artworks): "
-                            f"{_dropped_rooms}")
+                logger.info(f"[LOCAL-625/626] dropped room/space/venue-itself stops "
+                            f"(not artworks): {_dropped_rooms}")
                 ordered = _kept
         except Exception as _rg_e:  # pragma: no cover
             logger.info(f"[LOCAL-625] room-stop guard skipped ({_rg_e})")
