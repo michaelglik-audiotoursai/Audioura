@@ -198,6 +198,32 @@ def test_other_dangling_forms_are_illformed():
         assert not urg._degrade_sentence_is_wellformed(s), f"should be ill-formed: {s!r}"
 
 
+def test_stranded_bare_object_live_473_is_illformed():
+    """The 2026-10-08 Wallraf-Richartz live run (tour 473) shipped a stranded
+    bare object — the degrade cut the determiner off the object:
+        "...in a trade with Theodor Fischer, an art dealer from Switzerland, to
+         obtain painting."
+    A transitive acquire/create verb welded onto a determiner-less work-noun is
+    ill-formed and must be dropped."""
+    s = ("In 1938, the museum deaccessioned the canvas in a trade with Theodor "
+         "Fischer, an art dealer from Switzerland, to obtain painting.")
+    assert not urg._degrade_sentence_is_wellformed(s)
+    repaired, dropped = urg.validate_and_repair_full_text(s)
+    assert dropped and "to obtain painting." not in repaired
+
+
+def test_mass_noun_and_determined_object_survive():
+    """Precision: a work-noun as a mass noun or with a determiner is well-formed."""
+    for s in [
+        "He devoted his life to religious painting.",
+        "She was a master of landscape painting.",
+        "The museum acquired the painting in 1938.",
+        "The trade allowed the museum to obtain a van Gogh painting.",
+        "He created a monumental sculpture.",
+    ]:
+        assert urg._degrade_sentence_is_wellformed(s), f"wrongly flagged: {s!r}"
+
+
 def test_legitimate_sentences_survive():
     """False-positive guard — well-formed sentences must stay well-formed."""
     for s in [

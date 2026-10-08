@@ -2066,15 +2066,40 @@ _DEGRADE_GUARD_LONE_TRAILING_VERB = re.compile(
     re.IGNORECASE,
 )
 
+# [LOCAL-624] A stranded object whose determiner/modifier was excised, leaving a
+# transitive verb welded onto a BARE singular countable work-noun with no
+# article: "...to obtain painting." The 2026-10-08 Wallraf-Richartz live run
+# (tour 473) shipped
+#   "...the museum deaccessioned the canvas in a trade with Theodor Fischer, an
+#    art dealer from Switzerland, to obtain painting."
+# The degrade path cut the determiner off the object ("to obtain the Fischer
+# painting" → "to obtain painting"), the same excision that produced "that
+# characterized." Restricted to acquire/create/trade verbs + a bare countable
+# work-noun (no preceding article/adjective) so it never fires on the mass-noun
+# use ("devoted to religious painting.", "a master of landscape painting.").
+_ACQUIRE_CREATE_VERB = (
+    r'obtain|acquire|purchase|buy|secure|procure|commission|create|produce|'
+    r'paint|complete|exhibit|display|sell|trade|deaccession|donate|loan|'
+    r'return|restore|unveil')
+_WORK_COUNT_NOUN = (
+    r'painting|canvas|sculpture|statue|portrait|engraving|etching|lithograph|'
+    r'woodcut|fresco|altarpiece|triptych|diptych|drawing|print')
+_DEGRADE_GUARD_STRANDED_BARE_OBJECT = re.compile(
+    r'\b(?:' + _ACQUIRE_CREATE_VERB + r')(?:ed|s|d)?\s+'
+    r'(?:' + _WORK_COUNT_NOUN + r')\s*\.\s*$',
+    re.IGNORECASE,
+)
+
 
 def _ends_in_transitive_verb_without_object(sentence: str) -> bool:
     """[LOCAL-624] True when a sentence ends with a verb whose object is gone.
 
-    Fires only in a relative-clause / stranded-verb context so it cannot delete
-    a well-formed intransitive sentence. Covers:
+    Fires only in a relative-clause / stranded-verb / stranded-bare-object
+    context so it cannot delete a well-formed intransitive sentence. Covers:
       • "...that characterized."  (dangling relative + verb)
       • "...which revealed."
       • "In this painting, stands ." (lone verb between comma and period)
+      • "...to obtain painting."  (transitive verb + determiner-less work-noun)
     """
     s = (sentence or '').strip()
     if not s:
@@ -2082,6 +2107,8 @@ def _ends_in_transitive_verb_without_object(sentence: str) -> bool:
     if _DEGRADE_GUARD_DANGLING_RELATIVE.search(s):
         return True
     if _DEGRADE_GUARD_LONE_TRAILING_VERB.search(s):
+        return True
+    if _DEGRADE_GUARD_STRANDED_BARE_OBJECT.search(s):
         return True
     return False
 
@@ -2297,9 +2324,11 @@ def validate_degrade_output(full_text: str) -> List[Dict]:
             })
 
         # Guard 8: Dangling relative / stranded transitive verb [LOCAL-624]
-        # "...that characterized.", "which revealed.", "In this painting, stands."
+        # "...that characterized.", "which revealed.", "In this painting, stands.",
+        # "...to obtain painting." (stranded bare object)
         m = (_DEGRADE_GUARD_DANGLING_RELATIVE.search(sent_stripped)
-             or _DEGRADE_GUARD_LONE_TRAILING_VERB.search(sent_stripped))
+             or _DEGRADE_GUARD_LONE_TRAILING_VERB.search(sent_stripped)
+             or _DEGRADE_GUARD_STRANDED_BARE_OBJECT.search(sent_stripped))
         if m:
             violations.append({
                 'sentence': sent_stripped[:100],
