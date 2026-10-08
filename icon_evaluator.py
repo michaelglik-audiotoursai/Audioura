@@ -388,11 +388,38 @@ def evaluate_tour_icon(tour_text: str, story_elements: List[Dict] = None) -> Dic
                     det_signals["flags"].append("demotion_5to3_no_specifics")
             
             # Single filler match: informs only, never caps (LEAD fix 4a)
-            
+
+            # [LOCAL-620 / D634 item 3] DETERMINISTIC per-paragraph class tag.
+            # The swipe engine maps a listener's like/dislike on a stop to the
+            # three classes via stop_metrics.class_*. Those tags must be grounded
+            # in the DELIVERED text, not an LLM guess that can drift, so we tag
+            # each paragraph deterministically from its sentences (story types →
+            # preference classes) and use THAT distribution as the stored class
+            # vector. The LLM class_dist is retained only as a fallback for a
+            # paragraph that carries no deterministic class signal at all.
+            try:
+                import story_type_classes as _stc
+                _det_dist = _stc.paragraph_class_distribution(para)
+                _det_counts = _det_dist.get("_counts", {})
+                if sum(_det_counts.values()) > 0:
+                    _para_class_dist = {
+                        "details": _det_dist["details"],
+                        "historic": _det_dist["historic"],
+                        "social": _det_dist["social"],
+                    }
+                    _para_story_class = _stc.classify_segment_class(para)
+                else:
+                    _para_class_dist = llm_result["class_dist"]
+                    _para_story_class = None
+            except Exception:
+                _para_class_dist = llm_result["class_dist"]
+                _para_story_class = None
+
             stop_paragraphs.append({
                 "text": para[:200],  # Truncate for storage
                 "i_con": final_icon,
-                "class_dist": llm_result["class_dist"],
+                "class_dist": _para_class_dist,
+                "story_class": _para_story_class,
                 "evidence_sentence": llm_result["evidence_sentence"],
                 "flags": det_signals["flags"],
             })
