@@ -236,6 +236,17 @@ def is_chrome_title(title: str, venue_name: str = "") -> bool:
         return True
     if norm in _GENERIC_HEADING_LABELS or norm in _CHROME_EXACT_LABELS:
         return True
+    # [LOCAL-617] A price / opening-hours / event / guided-tour listing scraped
+    # from a calendar or pricing feed is not an artwork. Kunstmuseum Basel (tour
+    # 418) shipped "Kosten: Eintritt Sammlung" and "Mit der wissenschaftlichen
+    # Assistentin Amélie Joller" as artwork stops — the critic's two Critical
+    # defects. Caught structurally and multilingually here, before selection.
+    try:
+        import work_first_evidence as _wfe_listing
+        if _wfe_listing.looks_like_non_artwork_listing(title):
+            return True
+    except Exception:
+        pass
     words = norm.split()
     # FAQ / help-text residue: a title that READS AS A QUESTION — it begins with
     # an interrogative word ("When Are The Member Portfolio Reviews Scheduled",

@@ -232,10 +232,10 @@ SHARED ENTITIES ACROSS STOPS (deterministic overlap analysis):
 
 TASK: Name 2-5 candidate narrative themes that could connect these stops into a coherent story.
 A theme is NOT a mood ("all works explore identity") — it is a SPECIFIC shared thread:
-- A person who connects multiple stops (e.g., a patron, architect, donor)
-- A historical event that affected multiple stops (e.g., a war, a political change, a fire)
-- A cultural force with documented presence at multiple stops (e.g., a trade route, a religious movement)
-- A chronological narrative (e.g., "from village to metropolis")
+- An artist or circle who connects multiple works (e.g., a teacher and pupils, a movement)
+- A historical event that shaped the WORKS themselves (e.g., a war the artists lived through)
+- A shared subject, technique, or human experience the WORKS explore (devotion, exile, light)
+- A chronological narrative of the ART (e.g., "from early realism to late abstraction")
 
 RULES:
 1. Every theme MUST cite the specific element IDs that support it in "grounded_on"
@@ -243,6 +243,11 @@ RULES:
 3. Never invent connections not present in the elements above
 4. Name the theme as a short, specific phrase (5-12 words)
 5. Describe what arc it could form: what's the beginning, the turn, the payoff?
+6. [LOCAL-617] The theme MUST be about the WORKS and ARTISTS — what they show, what
+   they meant, what people said about them. Do NOT name a theme about the MUSEUM or
+   COLLECTION as an institution: its founding, its donors/benefactors, how it
+   acquired or was given the works, confiscations/expropriations, renovations, or
+   "institutional foundations". Such a theme will be REJECTED.
 
 Return ONLY valid JSON array:
 [
@@ -324,6 +329,22 @@ def _score_themes(
         description = cand.get("description", "")
         grounded_on = cand.get("grounded_on", [])
         stops_covered = cand.get("stops_covered", [])
+
+        # [LOCAL-617] Reject INSTITUTIONAL themes. The critic flagged tours whose
+        # organizing thread was the museum/collection itself ("19th-Century
+        # Institutional Foundations", donor legacy, confiscation/expropriation of
+        # the collection) — a theme that drags donor/acquisition history into the
+        # orientation and every stop body, which is exactly criterion 1. A theme
+        # must be about the WORKS and ARTISTS, not the institution. Dropping it
+        # lets the discoverer fall back to a work-first thread or mosaic mode.
+        try:
+            import work_first_evidence as _wfe_theme
+            if _wfe_theme.is_institutional_theme(name, description):
+                print(f"  [LOCAL-617] Theme '{name}' rejected: institutional framing "
+                      f"(donor/collection/founding), not about the works/artists")
+                continue
+        except Exception:
+            pass
 
         # Convert 1-based stop indices from LLM to 0-based
         stops_0based = [s - 1 for s in stops_covered if isinstance(s, int) and s >= 1]

@@ -3486,8 +3486,21 @@ def _build_closing_offer(poi_list, tour_category, transport_mode, location, sent
 
     # ─── Fallback: one-sentence factual summary ─────────────────────────
     # Tour should not end mid-thought. Summarize what was covered.
-    _stop_names_str = " and ".join(p['name'] for p in poi_list[-2:]) if len(poi_list) >= 2 else poi_list[0]['name']
-    fallback = f"This tour covered {_stop_names_str}."
+    # [LOCAL-617] Name ALL delivered stops, not just the last two. The old
+    # poi_list[-2:] produced a self-contradiction the critic flagged on tours
+    # 419/421: the recap says "That's 3 stops" and this line then said "This tour
+    # covered <stop2> and <stop3>", omitting stop 1 — reading as "covered only 2
+    # of 3". The conclusion must name only, and all, the delivered stops.
+    _names = [p['name'] for p in poi_list if p.get('name')]
+    if len(_names) >= 3:
+        _stop_names_str = ", ".join(_names[:-1]) + f", and {_names[-1]}"
+    elif len(_names) == 2:
+        _stop_names_str = f"{_names[0]} and {_names[1]}"
+    elif _names:
+        _stop_names_str = _names[0]
+    else:
+        _stop_names_str = ""
+    fallback = f"This tour covered {_stop_names_str}." if _stop_names_str else ""
     print(f"  [LOCAL-275] Closing offer fallback (no verification passed)")
     return fallback
 
@@ -16012,6 +16025,26 @@ MANDATORY INCLUSION — work this surprising detail into the description natural
                 poi_name, _exhibition_checklist_result.works)
             if _matched_work:
                 _credit_line_for_stop = (_matched_work.get('credit_line') or '').strip()
+                # [LOCAL-617 item 4] ATTRIBUTION CHECK. The stop's spoken artist
+                # must match the work's catalogue/SPARQL creator. LOCAL-616's
+                # Groeningemuseum run said "Johannes van Eyck" for a Memling. On a
+                # real surname mismatch, the catalogue creator wins and the
+                # conflicting attribution is corrected before any prose is written.
+                try:
+                    import work_first_evidence as _wfe_attr
+                    _cat_creator = (_matched_work.get('artist') or '').strip()
+                    if _cat_creator and (artist or '').strip():
+                        _attr = _wfe_attr.check_attribution(artist, _cat_creator)
+                        if _attr['mismatch']:
+                            print(f"  [LOCAL-617] ATTRIBUTION MISMATCH on '{poi_name}': "
+                                  f"stop artist '{artist}' != catalogue creator "
+                                  f"'{_cat_creator}' — using catalogue creator")
+                            artist = _attr['use']
+                        elif _attr['use'] and _attr['use'] != artist:
+                            # a fuller/variant form — adopt the catalogue spelling
+                            artist = _attr['use']
+                except Exception as _attr_err:
+                    print(f"  [LOCAL-617] attribution check skipped: {_attr_err}")
         description_prompt += build_provenance_block(_credit_line_for_stop)
 
         # [LOCAL-379/381] WORK IDENTITY BLOCK: Inject artist, date, medium, publisher
@@ -16210,7 +16243,39 @@ MANDATORY INCLUSION — work this surprising detail into the description natural
                 # Replace unranked list with ranked+capped list for injection
                 _stop_snippets = _ranked_snippets
 
-                # [LOCAL-407] Extract candidate specifics from snippet text.
+                # [LOCAL-617 item 2] WORK-FIRST EVIDENCE FILTER. The critic's top
+                # defect on every museum tour is institutional material (donors,
+                # acquisitions, renovations, provenance) crowding out the work and
+                # artist. Classify each ranked snippet and drop the purely
+                # institutional ones, passing at most ONE and only when it is this
+                # work's own acquisition story. Museum stops only; other tour types
+                # are untouched. Belt-and-suspenders: never let it empty the stop.
+                if tour_category == 'museum':
+                    try:
+                        import work_first_evidence as _wfe
+                        try:
+                            _wf_venue = _museum_venue_name or location or ''
+                        except NameError:
+                            _wf_venue = location or ''
+                        _venue_tokens_wf = [w for w in re.split(r'[\s,\-]+', _wf_venue)
+                                            if len(w) >= 3]
+                        _wf_kept, _wf_report = _wfe.filter_snippets_work_first(
+                            _stop_snippets, work_subject=poi_name or '',
+                            venue_tokens=_venue_tokens_wf)
+                        if _wf_kept:  # never strip a stop's evidence to nothing
+                            _stop_snippets = _wf_kept
+                            print(f"  [LOCAL-617] Stop {stop_num} evidence filter: "
+                                  f"input={_wf_report['input']} "
+                                  f"dropped_institutional={_wf_report['dropped_institutional']} "
+                                  f"kept_own_acquisition={_wf_report['kept_own_acquisition']} "
+                                  f"output={_wf_report['output']}")
+                        elif _wf_report['dropped_institutional']:
+                            print(f"  [LOCAL-617] Stop {stop_num} evidence filter: all "
+                                  f"{_wf_report['input']} snippets institutional — kept as-is "
+                                  f"(never empty a stop)")
+                    except Exception as _wf_err:
+                        print(f"  [LOCAL-617] evidence filter skipped: {_wf_err}")
+
                 # These are concrete, checkable facts — numbers, named materials,
                 # named techniques, named literary forms — that the prose MUST prefer
                 # over general claims like "revolutionized" or "had no precedent".
@@ -16286,6 +16351,29 @@ MANDATORY INCLUSION — work this surprising detail into the description natural
                 description_prompt += _snippet_block
                 _local402_snippets_injected = True
                 print(f"  [LOCAL-402] Stop {stop_num}: injected {len(_stop_snippets)} snippets as reference material")
+
+                # [LOCAL-617 item 3] NARRATION CONTRACT. Order the museum stop:
+                # (a) what the work shows, (b) the artist at that moment, (c) ONE
+                # attributed reception item ONLY if the evidence has it, (d) the
+                # emotional/human reading. No invented quotes; write less when thin.
+                # Reception is offered only when a surviving snippet actually
+                # carries an attributed opinion, so the model is never nudged to
+                # fabricate a critic.
+                if tour_category == 'museum':
+                    try:
+                        import work_first_evidence as _wfe_c
+                        _has_reception = any(
+                            _wfe_c.classify_sentence(_s) == 'reception'
+                            for _snip in _stop_snippets
+                            for _s in _wfe_c.split_sentences(
+                                f"{_snip.get('title','')}. {_snip.get('snippet','')}"))
+                        description_prompt += _wfe_c.narration_contract_instruction(
+                            work_title=poi_name or '', artist=artist or '',
+                            has_reception_evidence=_has_reception)
+                        print(f"  [LOCAL-617] Stop {stop_num}: narration contract injected "
+                              f"(reception_evidence={_has_reception})")
+                    except Exception as _wfc_err:
+                        print(f"  [LOCAL-617] narration contract skipped: {_wfc_err}")
 
         # [B6] Scored story elements → generation wiring (per-status phrasing)
         # Reads ranked elements from work_stories cache and injects them with
@@ -22929,6 +23017,83 @@ RULES:
                              "paragraph removal DISABLED")
     except Exception as _dup_err:
         print(f"  [LOCAL-615] Duplicated-paragraph dedupe error (non-fatal): {_dup_err}")
+
+    # -------- [LOCAL-617 item 2/3] Work-first stop-body filter --------
+    # The critic's dominant defect on every museum tour is institutional material
+    # (donors, bequests, acquisitions, renovations, provenance, loans, the museum's
+    # mission) crowding out the WORK and ARTIST. On the DELIVERED spoken text,
+    # keep at most ONE institutional sentence per stop — the work's own acquisition
+    # story if present — and only when the stop still has work/artist/reception/
+    # emotion substance to stand on. The Stop-1 opening section (D611 About story +
+    # practical notes + honest shortfall) is exempt. Museum tours only; the filter
+    # never empties a stop (D577).
+    if tour_category == 'museum':
+        try:
+            import work_first_evidence as _wfe_body
+            _wf_body_tokens = [w for w in re.split(r'[\s,\-]+', (location or ''))
+                               if len(w) >= 3]
+            _wf_subjects = {}
+            try:
+                for _si, _sp in enumerate(poi_list, 1):
+                    _wf_subjects[_si] = _sp.get('name', '') or ''
+            except Exception:
+                pass
+            complete_tour, _wf_body_report = _wfe_body.filter_tour_text_work_first(
+                complete_tour, venue_tokens=_wf_body_tokens, stop_subjects=_wf_subjects)
+            if _wf_body_report.get('changed'):
+                print(f"  [LOCAL-617] Work-first stop-body filter: dropped "
+                      f"{_wf_body_report['institutional_dropped']} institutional "
+                      f"sentence(s) across {_wf_body_report['stops']} stops")
+            else:
+                print(f"  [LOCAL-617] Work-first stop-body filter: no change "
+                      f"({_wf_body_report['stops']} stops scanned)")
+        except Exception as _wf_body_err:
+            print(f"  [LOCAL-617] Work-first stop-body filter error (non-fatal): {_wf_body_err}")
+
+    # -------- [LOCAL-617 item 5/6] Fresh-path shortfall reconciliation --------
+    # When a LATE gate drops a stop AFTER the D616/D612 shortfall sentence was
+    # composed (Granet delivered 2/3 while the sentence already said 3), the
+    # delivered-count clause contradicts the stops actually in the tour, and the
+    # conclusion then claims a stop the tour did not make. Recompute the clause on
+    # the FINAL delivered count (the real Stop-header count), or remove the
+    # sentence entirely if the ask turned out to be met. Runs on ALL tour types.
+    try:
+        import work_first_evidence as _wfe_sf
+        complete_tour, _sf_rec = _wfe_sf.reconcile_shortfall_in_text(complete_tour)
+        if _sf_rec.get('removed'):
+            print(f"  [LOCAL-617] Shortfall sentence REMOVED — ask met on final count "
+                  f"({_sf_rec['delivered']} delivered)")
+        elif _sf_rec.get('rewritten'):
+            print(f"  [LOCAL-617] Shortfall sentence recomputed to final delivered "
+                  f"count ({_sf_rec['delivered']})")
+    except Exception as _sf_rec_err:
+        print(f"  [LOCAL-617] Shortfall reconciliation error (non-fatal): {_sf_rec_err}")
+
+    # -------- [LOCAL-617 item 6] Conclusion de-duplication --------
+    # Never ship two recaps that can disagree. The critic flagged tours whose
+    # ending had both "That's N stops — …" and a "This tour covered X and Y."
+    # line naming a different set — a self-contradiction. Keep the richer recap,
+    # drop the redundant "This tour covered …" sentence.
+    try:
+        import work_first_evidence as _wfe_concl
+        complete_tour, _concl_rep = _wfe_concl.dedupe_conclusion(complete_tour)
+        if _concl_rep.get('removed_redundant_covered'):
+            print(f"  [LOCAL-617] Conclusion de-dup: removed redundant "
+                  f"'This tour covered …' line (recap kept)")
+    except Exception as _concl_err:
+        print(f"  [LOCAL-617] Conclusion de-dup error (non-fatal): {_concl_err}")
+
+    # -------- [LOCAL-617 item 6] Repair a conclusion cut mid-clause --------
+    # The critic flagged a closing cut mid-token ("…showcases Murillo's talent
+    # for."). Never ship a tour whose final sentence ends on a word still
+    # expecting an object — drop the broken sentence so the tour ends complete.
+    try:
+        import work_first_evidence as _wfe_tail
+        complete_tour, _tail_rep = _wfe_tail.repair_truncated_tail(complete_tour)
+        if _tail_rep.get('repaired'):
+            print(f"  [LOCAL-617] Repaired truncated final sentence (dropped mid-clause fragment)")
+    except Exception as _tail_err:
+        print(f"  [LOCAL-617] Truncated-tail repair error (non-fatal): {_tail_err}")
 
     # -------- [LOCAL-36] Practical facts QA gate --------
     # Verify provenance of every practical claim before delivery.
