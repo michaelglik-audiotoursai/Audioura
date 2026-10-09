@@ -5771,6 +5771,46 @@ def _verify_works_v2(poi_list, venue_name, exhibition_scope=None):
         except Exception as _ve_err:
             print(f"  [LOCAL-626] venue-itself canonical filter skipped ({_ve_err})")
 
+    # [LOCAL-653] Site-listed candidates get the SAME guards as Wikidata candidates.
+    # The Courtauld (586/592) shipped a SIBLING institution ("Courtauld Institute"
+    # for "The Courtauld Gallery"), ARTIST NAMES ALONE ("Paul Cézanne", "Georges
+    # Seurat", "Edgar Degas") and MARKETING-prefixed titles as stops: the Wikidata
+    # path dropped them as not_in_collection, but the venue_corpus canonical SET —
+    # which THIS verification matches against — only filtered chrome/rooms/the
+    # venue itself, so they slipped back in. And LOCAL-626's venue check failed on
+    # "Courtauld Institute"/"Courtauld Gallery" because ``venue_name`` here carries
+    # a ", London, United Kingdom" tail that defeats the token comparison. This
+    # guard is location-suffix robust and drops a venue/sibling/site-brand title or
+    # a bare artist name (matched against the venue's OWN SPARQL creators). SPARQL
+    # labels are protected so a Wikidata-confirmed work is never dropped.
+    if canonical_titles:
+        try:
+            from site_candidate_guard import filter_site_candidates as _filter_site
+            # Artist names = the venue's own creator labels from SPARQL (precise;
+            # a bare "Paul Cézanne" title is an artist, not a work).
+            _lc653_artists = set()
+            for _w in (sparql_works or []):
+                if not isinstance(_w, dict):
+                    continue
+                _c = (_w.get('creator') or '').strip()
+                if _c:
+                    _lc653_artists.add(_c)
+                for _cc in (_w.get('creators') or []):
+                    if _cc and str(_cc).strip():
+                        _lc653_artists.add(str(_cc).strip())
+            _lc653_kept, _lc653_dropped = _filter_site(
+                sorted(canonical_titles), venue_name,
+                artist_names=_lc653_artists,
+                protected_titles=sparql_titles,
+                allow_shape_fallback=True)
+            if _lc653_dropped:
+                canonical_titles = set(_lc653_kept)
+                print(f"  [LOCAL-653] rejected site-listed junk/sibling/artist "
+                      f"title(s) from canonical SET for '{venue_name}': "
+                      f"{[(d, '') if isinstance(d, str) else (d.get('title'), d.get('_reject_reason')) for d in _lc653_dropped]}")
+        except Exception as _lc653_err:
+            print(f"  [LOCAL-653] site-candidate canonical filter skipped ({_lc653_err})")
+
     # Store classification in corpus_result for downstream audit
     # CRITICAL: Also update corpus_result['canonical_titles'] so R4 replenishment
     # uses the FILTERED set (prevents excluded titles from being re-verified via R4)
@@ -5971,6 +6011,34 @@ def _verify_works_v2(poi_list, venue_name, exhibition_scope=None):
             if _best_title in _bare_sparql_enrichments:
                 _best_title = _bare_sparql_enrichments[_best_title]
                 print(f"  [LOCAL-34] Stop title enriched: '{canonical_title}' → '{_best_title}'")
+            # [LOCAL-653] Strip a leading possessive-artist + adjective MARKETING
+            # prefix from the stop name when the remainder is still a known title:
+            # the Courtauld's venue_corpus canonical form was
+            # "Van Gogh's iconic Self-Portrait with Bandaged Ear" /
+            # "Manet's A Bar at the Folies-Bergère" — a title is the work, not the
+            # ad copy around it. The remainder must match a canonical/SPARQL title
+            # (so a real possessive title is never mangled); the artist is kept on
+            # the evidence record for the narration.
+            try:
+                from site_candidate_guard import strip_marketing_prefix as _strip_mkt
+                # Known titles for the strip: the canonical + SPARQL sets AND the
+                # candidate that D1v2 just matched (``work_name``). The candidate is
+                # often the CLEAN title ("Self-Portrait with Bandaged Ear") that the
+                # marketing-prefixed canonical form was matched against, so it is the
+                # strongest evidence the stripped remainder is a real work.
+                _mkt_known = set(canonical_titles) | set(sparql_titles or ())
+                if work_name:
+                    _mkt_known.add(work_name)
+                _clean_title, _mkt_artist = _strip_mkt(_best_title, known_titles=_mkt_known)
+                if _clean_title and _clean_title != _best_title:
+                    print(f"  [LOCAL-653] stripped marketing prefix: "
+                          f"'{_best_title}' → '{_clean_title}'"
+                          f"{(' (artist: ' + _mkt_artist + ')') if _mkt_artist else ''}")
+                    _best_title = _clean_title
+                    if _mkt_artist and isinstance(evidence_log.get(work_name), dict):
+                        evidence_log[work_name].setdefault('marketing_artist', _mkt_artist)
+            except Exception as _mkt_err:
+                print(f"  [LOCAL-653] marketing-prefix strip skipped ({_mkt_err})")
             poi['name'] = _best_title
             verified_pois.append(poi)
             continue
