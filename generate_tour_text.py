@@ -7916,6 +7916,24 @@ def _apply_delivery_hours_guard(result):
                       flush=True)
         except Exception as _ao:  # pragma: no cover
             _import_logger.error(f"[LOCAL-630] admission-collapse skipped: {_ao}")
+        # 2c-ter. [LOCAL-638 Note 1] Practical facts (hours/price/admission) belong
+        #     in the OPENING general description at the top of Stop 1, never inside
+        #     a stop's Orientation or narration. Michael, Frick 523 (D640): the
+        #     composed facts sentence had landed INSIDE Stop 1's Orientation. Move
+        #     any hours/admission sentence that sits at or after the first
+        #     Orientation back into the opening section, before the first
+        #     Orientation. Deterministic; never invents or drops a fact; no-op when
+        #     the facts are already in the opening section.
+        try:
+            import practical_facts_gate as _pfg_reloc
+            final, _reloc = _pfg_reloc.relocate_practical_facts_to_opening(final)
+            if _reloc:
+                print(f"  [LOCAL-638 Note 1] moved {_reloc} practical-facts "
+                      f"sentence(s) out of a stop Orientation/body into the Stop-1 "
+                      f"opening section (hours/price belong in the general "
+                      f"description)", flush=True)
+        except Exception as _rl:  # pragma: no cover
+            _import_logger.error(f"[LOCAL-638] practical-facts relocation skipped: {_rl}")
         # 2d. [LOCAL-630 item 8] Computed year-spans ("N years after/later") must
         #     equal the difference between two dates the text states, or be
         #     dropped. NG 495 said "Nearly 247 years after it was painted" for a
