@@ -1,6 +1,6 @@
 ================================================================================
 LITERAL PROMPT SENT TO LLM — STOP 1
-Generated: 2026-09-23T22:10:22.178403
+Generated: 2026-10-09T14:33:44.823730
 Model: gpt-4o
 Temperature: 0.7
 Max tokens: 1000
@@ -10,9 +10,9 @@ Max tokens: 1000
 You are a knowledgeable museum guide with expertise in art, architecture, and history.
 
 --- USER MESSAGE ---
-STYLE: Evoke the living pulse of a community — traditions, rituals, and the everyday rhythms that define a place.
+STYLE: Channel the passion of a curator who fell in love with this piece — make the listener see what the artist felt.
 
-Create a detailed description for the stop "Paul Revere House" on a walking tour of Faneuil Hall Marketplace, Boston MA.
+Create a detailed audio description for Water Lilies at Impressionism Now at Museum of Fine Arts, Boston, MA, focusing on museum.
 
 NAME THE STORY OR DROP THE GESTURE. Never write that a place has a 'storied past', hosted 'luminaries', 'notable figures' or 'countless chapters of history', witnessed 'clandestine meetings', 'intrigue', 'secrets' or 'countless tales' — unless the SAME PARAGRAPH then gives ONE of them concretely: who, when, what they did, what came of it.
 - BAD:  'a storied past of hosting luminaries'
@@ -23,59 +23,68 @@ These GOOD examples are illustrations of the SHAPE required, not facts to reuse.
 
 NO UNEXPLAINED CLAIMS OF IMPORTANCE. If you call something innovative, pioneering, revolutionary, groundbreaking, influential or a turning point, the SAME SENTENCE or the next must say what specifically changed — what could be done afterwards that could not be done before, and for whom. 'A centerpiece of musical innovation' states nothing. 'The first with a pedal mechanism that let a player change key mid-piece' states something. If the source material does not tell you what changed, do not make the claim at all.
 
-VERIFIED EPISODES ABOUT THIS PLACE — RETRIEVED AND SOURCE-CHECKED.
-  - In 1676, the Great Fire of Boston consumed the parsonage of the Second Church of Boston, home to Increase Mather.
-  - Around 1680, Robert Howard built the current wooden house over the footprint of Increase Mather's parsonage.
-  - On April 18, 1775, Paul Revere realized he left his spurs behind during his Midnight Ride and sent his dog back to retrieve them.
-  - On April 18, 1775, Paul Revere and his men used a flannel petticoat to muffle the sound of their oars while rowing past the HMS Somerset.
-  - In 1779, Paul Revere was accused of cowardice and insubordination during the Penobscot Expedition.
-  - Upon returning to Boston in 1779, Paul Revere was confined to house arrest in his North Square home.
-  - In February 1782, Paul Revere was acquitted by a court-martial on a technicality.
-  - Paul Revere had 16 children between two wives, Sarah Orne and Rachel Walker.
-TELL AT LEAST TWO OF THESE AS STORIES, and tell them PROPERLY.
+Start with a brief orientation that names "Water Lilies" specifically (not "the exhibit" or "this piece") and tells the listener WHERE to stand or look AND WHY — what becomes visible, legible, or striking from that position that they would miss otherwise.
 
-[D551] A story told as a headline is not a story. Michael, 2026-08-29, on a stop that said only 'a dessert accident involving the Prince of Wales led to the creation of the famous Crepe Suzette': "we started but then abruptly stopped without explaining who Suzette was." The retrieved fact named Henri Charpentier and Suzanne Reichenberg and the narration dropped both.
+Then provide a detailed description of the exhibit, in THIS ORDER OF PRIORITY
+(LOCAL-607 — spend your words on the WORK and the ARTIST, not on how the museum
+acquired it):
 
-For each episode you tell:
-  - name EVERY person the fact names — a dropped name is the story's point removed
-  - say what actually happened, including what went wrong
-  - say what came of it: the name that stuck, the record, the consequence
-  - if the fact explains WHY something is called what it is, deliver that explanation
+(a) THE WORK ITSELF — lead with it and give it the most words: what it shows or
+    consists of, how it was made (one specific technique, material, or
+    compositional choice and WHY it matters), why it was made, what it means, and
+    what critics or scholars have said about it. This is what the listener is
+    standing in front of.
+(b) THE ARTIST — the maker's life and the turning point this work marks for them:
+    where they were, what had just happened to them, what they were trying to do
+    at this moment in their career. Name the artist and anchor the work in their life.
+(c) THE EMOTIONAL READING — one or two sentences on what the work makes a viewer
+    feel or notice, grounded in (a) and (b), never free-floating.
 
-This is the reason the listener is standing HERE rather than at any other place on this tour. If what you write would still make sense with a different stop's name substituted in, it is not about this stop and it has failed.
+ACQUISITION / DONATION IS CAPPED AT ONE SENTENCE (hard limit): how the museum came
+to own the work (donor, gift, bequest, purchase, the collection it belongs to) may
+occupy AT MOST ONE sentence, and only if it is genuinely about THIS work. Do NOT
+retell the museum's founding, renaming, relocation, or the donors behind the
+building — that belongs to the tour's opening, not to a work's stop. If you have
+nothing to say about the work or the artist, write less; do not pad with provenance.
+Also include, when relevant: how this piece connects to the broader collection or museum.
 
-Use ONLY what is listed above. Do not add a guest, a date or an incident that is not here, and do not embellish one that is. If a listed fact is thin, tell a different one rather than inventing detail to fill it out.
-
-
-LENGTH: write 280-380 words for this stop. Two episodes told properly needs that room; 150 words means an episode has been compressed into a headline, which is the failure this stop exists to avoid. Do NOT pad with atmosphere to reach it — if the material genuinely supports only one episode, write that one fully and stop.
-
-Start with an orientation section that explains how the visitor arrives at this stop and what they should look for.
-
-Then provide a detailed description. Include:
-- The specific evidence for why this place matters — a fact, a number, a named person, not adjectives
-- Historical or cultural context: name a date, a person, an event, a cause-and-effect
-- Ground the listener in the physical present — weave in a real sound, texture, or smell they can perceive right now at this spot
-- How this stop connects to the tour's theme — show the connection, don't just assert it
+NAME THE OBJECT, AND SAY WHAT IT COST (D468-D471 — the two rules that moved the score):
+- AT LEAST ONE SENTENCE MUST NAME A PHYSICAL PROPERTY OF THE THING IN FRONT OF THE
+  LISTENER — its medium, material, technique, edition size, count, binding, colour or
+  condition — and tie that property to the story. "A set of ten drypoints and
+  lithographs on sheepskin" is the standard; "an important work" is not. The listener
+  is standing in front of the object; a story that never mentions it is a caption about
+  something else. Take the property from the source material. If the material names
+  none, write nothing about the physical object rather than inventing a property.
+- SAY WHAT IT COST OR WHAT WAS AT STAKE. What was lost, refused, destroyed, left
+  unfinished, done only once, done for the last time, or done despite something. That
+  is the difference between a story and a caption. It must come from the source
+  material — if there is no such consequence there, write without one rather than
+  inventing drama.
 
 EXPLAIN-WHAT-YOU-NAME RULE (critical):
-Every concept, motif, symbol, person, or cultural reference you mention MUST get at least
-one clause of explanation. If you cannot explain it in a clause, cut the reference.
-- BAD: "the vibrant world of this ancient masterpiece" (vibrant how? which world?)
-- GOOD: "the gilt lacquer catches overhead light differently depending on your angle —
-  the craftsman applied seven layers, sanding each to translucence before the next"
-- BAD: "a person of great historical significance" (say WHO and WHY)
-- GOOD: "Commodore Perry, whose 1853 arrival with four warships forced Japan to open
-  its ports after two centuries of isolation"
-The stop's own subject needs no gloss. But anything mentioned in passing that most
-visitors won't know MUST get one explanatory clause or be cut entirely.
+Every concept, motif, symbol, technique, cultural reference, or person you mention
+MUST get at least one clause of explanation. If you cannot explain it in a clause, cut it.
+- BAD: "the rich cultural heritage of Bengal" (names but explains nothing)
+- GOOD: "the Pala dynasty tradition of Bengal, where Buddhist monasteries commissioned
+  bronze casting between the 8th and 12th centuries"
+- BAD: "delicate floral motifs adorning the crown" (what do they mean?)
+- GOOD: "lotus petals on the crown — a symbol of spiritual purity in Hindu iconography,
+  also found on temple lintels across Southeast Asia"
+- BAD: "Each intricate detail tells a story of creation and rebirth"
+  (asserts meaning without delivering it)
+- GOOD: "The four arms each hold a specific object: the axe that severs attachment,
+  the rope that pulls devotees from illusion, the tusk broken as a writing implement,
+  and the sweetmeat representing the reward of a disciplined life"
+The stop's own subject (the exhibit itself) needs no gloss — the whole stop explains it.
+But a person referenced in passing (e.g. Ulysses Grant) needs one clause: "the American
+Civil War general who became president." If most visitors won't know it, explain it or cut it.
 
-NO UNSUPPORTED PRAISE: Do not end paragraphs with evaluative claims unless the preceding
-sentences contain the specific evidence that earns them. Delete praise that isn't earned
-by evidence immediately before it.
-
-Do NOT use museum/gallery framing (no "exhibit", no "viewing platform", no "artwork" unless it genuinely is one).
-Do NOT use academic narration words: never write "thesis", "framing", or "premise" in your output.
-Do NOT invent specific named people or attribute quotes unless they are well-documented public figures associated with this location.
+NO UNSUPPORTED PRAISE: Do not end paragraphs with evaluative claims ("a truly remarkable
+achievement", "a testament to the artist's genius") unless you have just provided the
+specific evidence that earns the evaluation. If the preceding sentences do not contain
+that evidence, delete the praise — it is filler. A shorter stop that explains three things
+beats a longer one that names eight and explains none.
 
 AUDIO RULES (this will be heard, not read):
 - NEVER end with a rhetorical question. End on a statement — an image, a fact, or a thought the listener can carry forward.
@@ -83,13 +92,8 @@ AUDIO RULES (this will be heard, not read):
 - Write for the EAR: short-to-medium sentences, concrete language, no parenthetical asides.
 
 NO PREACHING — NEVER INSTRUCT THE LISTENER (critical):
-- NEVER end a stop by telling the listener what to feel, notice, consider, reflect on,
-  or carry away. End on a FACT or an OBSERVATION, not an instruction.
-- BANNED CLOSINGS: "Consider what other..." / "Let the whispers guide..."
-  "Take a moment to..." / "Allow yourself to..." / "Reflect on..." / "Ponder..."
-  "Imagine..." / "Let this be a reminder..." / "Carry this with you as..."
-- The listener is an adult. Do NOT tell them what they "should" feel or do.
-- A stop ends when you run out of things to SAY, not when you have issued a command.
+- NEVER end by telling the listener to consider, reflect, imagine, or feel something.
+  End on a FACT or OBSERVATION. The listener is an adult — no commands, no "Take a moment to..."
 
 DECLARATIVE PROSE (LOCAL-188 — enforced by validation):
 - NO IMPERATIVES aimed at listener: "Feel the weight", "Notice", "Imagine", "Discover" → BANNED. Write "The weight is visible in..." instead.
@@ -99,37 +103,9 @@ DECLARATIVE PROSE (LOCAL-188 — enforced by validation):
 - NO HALLUCINATED SENSES: "You can almost hear..." → BANNED. Only current sensory facts.
 Exempt: navigation directions ("Turn left", "Continue past").
 
-NO CONDESCENSION:
-- NEVER write "To truly appreciate/understand [X], one must..." — just state the context.
-- NEVER write "It is worth noting that..." or "It is important to understand that..."
-
-VENUE DISAMBIGUATION (D62 — critical, prevents entity conflation):
-This stop is "Paul Revere House" located in/near Boston on this tour of Faneuil Hall Marketplace, Boston MA.
-If multiple places share this name (e.g., museums in different cities), you are describing
-ONLY the one in Boston. Do NOT use facts about a same-named institution in another
-city. If you are uncertain which facts apply to THIS specific location, omit them rather
-than risk conflation.
-
-RETRIEVED FACTS (incorporate these checkable facts into your description — they are confirmed from sources):
-  - Quincy Market (originally Faneuil Hall Market) is a historic marketplace complex in Downtown Boston, Massachusetts, United States.
-  - Located at Merchants Row next to Faneuil Hall, it consists of three buildings constructed in 1826 and designed by Alexander Parris.
-  - The central two-story building (sometimes known as Quincy Market) is flanked by the 4+1⁄2-story North and South Markets, each containing multiple storefront units.
-  - Since 1976, Quincy Market has been the Faneuil Hall Marketplace, a festival marketplace.
-  - The buildings are designated as a National Historic Landmark and as Boston Landmarks.
-
-SUBSTANCE RULE: Your description MUST include at least 2 of the facts above. Each fact you use
-must appear as a specific, checkable claim (with a date, a name, or a number). Do NOT
-paraphrase them into vague atmosphere. If you cannot find a way to include them naturally,
-state them directly.
-
-GROUNDING RULE (D50/D62 — critical): For specific historical claims (founding year, collection
-size, building name, architect, named events), use ONLY the retrieved facts above. Do NOT
-supplement with facts from your training data that are not in these passages — such facts may
-apply to a same-named entity in a different city. If the passages do not mention a founding
-year, collection size, or building name, do NOT supply one from memory.
-
-HISTORICAL CONTEXT (from verified sources about this area — use specific facts from this, not vague atmosphere):
-Quincy Market (originally Faneuil Hall Market) is a historic marketplace complex in Downtown Boston, Massachusetts, United States. Located at Merchants Row next to Faneuil Hall, it consists of three buildings constructed in 1826 and designed by Alexander Parris. The central two-story building (sometimes known as Quincy Market) is flanked by the 4+1⁄2-story North and South Markets, each containing multiple storefront units. Since 1976, Quincy Market has been the Faneuil Hall Marketplace, a festiv
+NO CONDESCENSION / NO DESCRIBING THE OBVIOUS:
+- Never "To truly appreciate..." or "It is worth noting..." — just state the thing.
+- The listener is in front of the object. Describe what they'd MISS, not what's obvious.
 
 OPENING STYLE (mandatory for this stop): Open with a vivid sensory detail — a sound, smell, texture, or visual that immediately places the listener at this location.
 This instruction overrides any default opening pattern — do NOT open with a generic introduction or the same structure as other stops.
@@ -140,208 +116,135 @@ BANNED OPENERS (never use these, regardless of which style is assigned above):
 - Any variation that opens with a generic locative clause placing the stop geographically before saying anything interesting about it.
 If your first instinct is a locative-clause opener, delete it and lead with the specific detail, question, or sensory element the style above requires instead.
 
-CATEGORY VOICE: Historical-narrative and grounded — anchor each place in its real history and layers of time. Speak as a knowledgeable neighbor walking alongside the listener through familiar streets.
+CATEGORY VOICE: Contemplative and precise — linger on details, share what you've noticed after hours in this room. Speak as someone who knows the collection intimately and wants to show what most visitors miss.
 This tone should permeate the entire description — not as a single inserted sentence, but as the underlying sensibility.
 
-NARRATIVE HONESTY — UNVERIFIED WORK: This artwork's presence at this venue has NOT been
-independently confirmed. Frame this uncertainty as part of the story — not as a bureaucratic
-disclaimer, but as an intriguing layer of the narrative. Use phrasing like:
-"The story goes that this piece...", "If the records are right, what you're looking at is...",
-"There's a fascinating claim that this work..., though its exact provenance here remains a
-matter of debate among scholars."
-The uncertainty itself is interesting — present it that way. NEVER state the work's presence
-as certain fact, but also avoid robotically repeating "believed to be" or "reportedly" — vary
-your uncertainty markers and weave them into the storytelling naturally.
+DO NOT USE these phrases: the building was erected, historically important, the population of, vibrant\s+colou?rs?\s*(and|of|that), dreamlike\s+(imagery|quality|world|scene|composition), deep\s+connection\s+to, (his|her|their)\s+Jewish\s+heritage, intricate\s+details?, timeless\s+themes?, position\s+yourself\s+in\s+the\s+center, the\s+artist['']?s?\s+(unique|remarkable|extraordinary), masterpiece\s+that, a\s+testament\s+to, creative\s+genius, stir(s|ring)?\s+the\s+soul
 
-NARRATIVE HONESTY — UNVERIFIED CLAIMS: No independent fact-checking has been performed on
-specific claims about people, events, or history for this stop. When you include a specific
-claim (a named person, a particular event, a date), frame uncertainty as part of the narrative
-rather than as a flat disclaimer:
-Instead of "reportedly" or "believed to be" (which sound clinical), use storytelling framing:
-"The story passed down through the neighborhood is that...",
-"Local tradition holds that..., though the details have shifted in each retelling",
-"One account — perhaps embellished over the years — describes...",
-"If you ask a local, they'll tell you that...".
-The uncertainty itself adds texture — present it as an intriguing element, not a legal caveat.
-General, well-known facts (a neighborhood's founding era, a cuisine's regional origin) can be
-stated plainly. The narrative-honesty requirement applies specifically to particular people or
-events tied to this specific stop. Do NOT invent specific names, dates, or incidents.
+CRITICAL CONSTRAINT: This artwork/exhibit MUST be something that is physically on display at 'Museum of Fine Arts'. Describe the ARTWORK itself — its visual qualities, technique, symbolism, and story. If you know which room or hall it's in, mention that briefly. If you don't know the exact room, do NOT fabricate one — just describe the work directly.
 
-DO NOT USE these phrases: built in the year, the facade features, architecturally speaking, vibrant\s+colou?rs?\s*(and|of|that), dreamlike\s+(imagery|quality|world|scene|composition), deep\s+connection\s+to, (his|her|their)\s+Jewish\s+heritage, intricate\s+details?, timeless\s+themes?, position\s+yourself\s+in\s+the\s+center, the\s+artist['']?s?\s+(unique|remarkable|extraordinary), masterpiece\s+that, a\s+testament\s+to, creative\s+genius, stir(s|ring)?\s+the\s+soul
+EXHIBITION VS OBJECT RULE (critical — prevents fabrication):
+A catalogue entry may be an EXHIBITION, a GALLERY, or a PROGRAMME rather than a physical object.
+Before describing brushwork, material, colour palette, or composition, CONFIRM that the subject
+is an actual physical artwork (a painting, sculpture, ceramic, textile, etc.).
+If the title names a person, an event, or uses language like "hommage à", "exposition",
+"les années...", it is likely an EXHIBITION or PROGRAMME, not a canvas or object.
+- If it IS an exhibition: describe what it covers, its scope, what visitors encounter (the
+  types of works shown, the period or theme), NOT imagined visual details of a single piece.
+- If it IS an object: describe it normally — technique, material, visual content, history.
+Example: "Pierre Matisse, un marchand d'art à New York" is a biographical EXHIBITION about
+Henri Matisse's son — describe the exhibition's subject and scope, NOT brushstrokes.
 
-NARRATIVE SPINE CONTEXT (use to shape your description):
-- Emotional beat for this stop: curiosity
-- Unique angle to emphasize: Here, you can touch the same wooden walls that sheltered a silversmith who became a midnight rider, a tangible connection to the whispers of revolution.
-- End with a forward-looking hook: As you step outside, imagine the cobblestones that once echoed with hooves leading you to a place where voices raised for change...
+THIN-CORPUS HONESTY RULE (critical — prevents fabrication):
+If you do not have verified, specific information about this particular work's visual content,
+material, or history, DO NOT INVENT details. Instead:
+- State what IS known (title, artist, period, medium if available)
+- Describe the TYPE of work and its general context
+- Acknowledge the gap honestly rather than filling it with plausible-sounding fiction
+A 120-word honest description beats a 300-word fabricated one. When your knowledge is thin,
+be SHORT and FACTUAL. The number of confirmed facts in the fact sheet below tells you how
+much material you actually have to work with.
 
-CONTEXTUAL INFORMATION (use as background only — do NOT assert these as facts about this specific exhibit):
-The Paul Revere House was built around 1680 and is the oldest surviving structure in Downtown Boston.; Paul Revere owned the house from 1770 to 1800.; The house was previously the parsonage of the Second Church of Boston.
+Do NOT repeat the artist's biographical background (birth year, nationality, school associations like 'École de Paris', artistic formats like 'stained glass and stage sets'). That information belongs in the tour introduction only. Here, focus EXCLUSIVELY on THIS SPECIFIC ARTWORK — what it depicts, its technique, its story, what to look for with your eyes.
 
-REFERENCE MATERIAL (retrieved from published sources — cite nothing these do not support):
-  [1] Paul Revere House
-      On April 18, 1775, Paul Revere realized he left his spurs behind during his Midnight Ride and sent his dog back to retrieve them.
-  [2] Paul Revere House
-      In 1676, the Great Fire of Boston consumed the parsonage of the Second Church of Boston, home to Increase Mather.
-  [3] Paul Revere House
-      Around 1680, Robert Howard built the current wooden house over the footprint of Increase Mather's parsonage.
-  [4] Paul Revere House
-      On April 18, 1775, Paul Revere and his men used a flannel petticoat to muffle the sound of their oars while rowing past the HMS Somerset.
-  [5] Paul Revere House
-      In 1779, Paul Revere was accused of cowardice and insubordination during the Penobscot Expedition.
-  [6] Paul Revere House
-      Upon returning to Boston in 1779, Paul Revere was confined to house arrest in his North Square home.
-  [7] Paul Revere House
-      In February 1782, Paul Revere was acquitted by a court-martial on a technicality.
-  [8] Paul Revere House
-      Paul Revere had 16 children between two wives, Sarah Orne and Rachel Walker.
-  [9] Paul Revere House
-      By 1902, John Phillips Reynolds Jr., Revere’s great-grandson, bought the property to prevent its demolition and restore it.
+BANNED PHRASES — do NOT use any of these in your description:
+- "vibrant colors" / "dreamlike imagery" / "dreamlike quality"
+- "creative genius" / "artistic prowess" / "masterpiece that"
+- "stir the soul" / "touch the heart" / "pulsate with life"
+- "symphony of emotions" / "tapestry of dreams" / "weaves a narrative"
+- "truly remarkable" / "a testament to" / "stands as a testament"
+- "captivating artistry" / "mesmerizing world" / "intricate details"
+- "invites you to explore/discover/reflect" / "immerse yourself in"
+- "invites contemplation" / "invites the viewer" / "invites us to"
+- "can't help but" / "feast for the eyes" / "step into a world"
+- "created by God" / "fall into sin" / "disobedience" / "the fall of humanity"
+Instead, use SPECIFIC, CONCRETE language: name colors precisely (cerulean, ochre, vermilion), describe actual compositional choices, mention documented historical context.
 
-STORY INSTRUCTION (LOCAL-407/412/419):
-Use the reference material above. Your text MUST include at least TWO of the following NAMED FIELDS if the snippets provide them:
+UNEARNED ADJECTIVES — these words are BANNED unless the same sentence or the one before it
+contains the specific evidence that earns them:
+- "vibrant" — ONLY permitted if you name the specific colors/contrasts that make it vibrant
+- "stunning" — ONLY if you describe what causes the visual impact (scale? technique? contrast?)
+- "remarkable" — ONLY if you state what distinguishes it from comparable works
+- "mesmerizing" — ONLY if you explain the optical or compositional mechanism
+- "exquisite" — ONLY if you describe the craftsmanship detail (grain, jointwork, brushstroke)
+- "breathtaking" — ONLY if you name the physical feature that produces the effect
+- "captivating" — ONLY if you explain what holds attention and why
+If you cannot provide that evidence in the same breath, delete the adjective. A bare noun
+is better than a noun preceded by an unearned superlative.
 
-  1. DATE — the year the work was created or published (e.g. "1955", "1974")
-  2. PUBLISHER — the publisher's name (e.g. "Tériade", "Louis Broder")
-  3. PRINTER — the printer's name (e.g. "Mourlot Frères", "Crommelynck")
-  4. EDITION — the edition size or number (e.g. "edition of 220", "set of 10")
-  5. MEDIUM/TECHNIQUE — what it is made of (e.g. "lithographs on Arches wove paper", "drypoints on sheepskin")
-  6. COLLABORATOR — who wrote the text or poems (e.g. "Pierre Reverdy", "Sigmund Freud")
-
-PRIORITY RULE: a concrete detail ALWAYS beats a general claim. "published by Tériade in 1955, printed by Mourlot Frères in an edition of 220" beats "an intriguing fusion of visual and textual elements."
-
-FAILURE MODE TO AVOID: Do NOT write sentences like "reveals a deep connection" or "beckons us to question" or "stands out for its intriguing fusion" — these are EMPTY. Instead write: WHO made it, WHEN, HOW (technique), WHERE (printer/workshop), and HOW MANY (edition).
-
-Rules:
-  - Name people explicitly (never "the publisher" — use their actual name)
-  - State specific actions (not "influenced" or "collaborated" — what did they DO?)
-  - Do NOT assert interactions unless the material confirms both people were alive and working together
-  - Dates must be accurate. If unsupported, omit rather than invent.
-  - "X and Y worked together" / "X's collaboration with Y" is NOT a story — it is the
-    identity form. A story requires: who did what, with what material consequence.
-  - NO HALLUCINATED SENSORY CLAIMS: never assert a sensation the listener cannot verify
-    (smell, sound, temperature, texture) unless the material states it.
-
-STORY REQUIREMENT (LOCAL-421/423 — NON-NEGOTIABLE):
-Your description MUST contain at least ONE STORY of no fewer than THREE SENTENCES.
-A story = a claim about PEOPLE AND CONSEQUENCES: a relationship, a decision, a dispute,
-a gift, a reason something was made the way it was.
-
-VERIFICATION CONSTRAINT (LOCAL-423 — HARD GATE):
-Every factual claim in your story (dates, numbers, locations, attributions) will be
-verified against the reference material above. If a claim cannot be found in the
-snippets, it will be STRIPPED from the delivered text. DO NOT invent details that
-the snippets do not support — even if you believe them to be true. If the snippets
-say "a Russian collector", do NOT say "a Boston-based collector". If the snippets
-do not state a donation year, do NOT assert one. Write ONLY what the sources confirm.
-Self-contradictions (e.g. "15 lithographs" in one sentence and "40 lithographs" in
-another) cause AUTOMATIC REJECTION — pick one number and cite which snippet supports it.
-
-WHAT COUNTS AS A STORY:
-  - "Boris Fridman donated this work to the MFA in 2003. Fridman, a Boston-based collector
-    who specialized in livres d'artiste, assembled one of the largest private collections
-    of artist's books in New England. His gift brought the museum's holdings of
-    Surrealist-era printed works to a critical mass."
-  - "Dalí chose Freud's Moses and Monotheism because he considered Freud's work
-    foundational to Surrealism. Dalí had attempted to visit Freud in London in 1938
-    and sketched the dying psychoanalyst during that meeting."
-  - "Louis Broder commissioned this work from Miró as part of a deliberate campaign to
-    revive the livre d'artiste tradition after the war. Broder's editions were tiny —
-    rarely more than 150 copies — and he insisted on direct collaboration between
-    artist, poet, and printer at the same workshop."
-
-WHAT DOES NOT COUNT:
-  - A list of facts with no narrative thread (just naming publisher + printer + date)
-  - "Invites you to ponder" / "transcends boundaries" / "a testament to" (evaluation)
-  - An interpretation the writer supplies without sourcing it to a person or event
-  - Describing the image/object itself (that is ekphrasis, not story)
-
-If the reference material supports NO story, you must still try to build one from the
-entities you do have (donor, publisher, printer) — state who they were and what their
-involvement meant. If truly nothing supports even that, write only what you can verify.
-
-ENTITY NAMING RULE (LOCAL-421 — NON-NEGOTIABLE):
-Every named person in the credit line (donor, publisher, printer, collaborator) MUST
-appear BY NAME in your text. Never write "the generous donation" when the data says
-"Gift of Boris Fridman". Never write "the publisher" when you know the name. The name
-IS the story's starting point.
+FACTUAL INTEGRITY RULE: Do NOT invent visual specifics or biographical claims not in the fact sheet above. You may describe the general biblical SUBJECT (e.g. "depicts the parting of the Red Sea") but do NOT assert specific visual details as facts (colors, composition) unless grounded in the facts above. Never call a work "the artist's final masterpiece" or similar unverifiable superlatives.
 
 Format your response as follows:
 Orientation: (write a brief orientation text explaining the best viewing position here)
 
-Then write the description directly — a flowing, 350-word narrative about the exhibit. Do NOT wrap it in brackets, placeholders, or formatting markers. Just write the prose.
+Then write the description directly — a flowing, 120-word narrative about the exhibit. Do NOT wrap it in brackets, placeholders, or formatting markers. Just write the prose.
 
 MINIMUM LENGTH: Your description (after the Orientation section) MUST be at least 120 words. If you do not have 120 words of verified content, discuss the artistic form, the collaboration, or the exhibition context to reach the floor. Never deliver fewer than 120 words.
 
 DO NOT include any section headers other than "Orientation:" - the description should flow naturally after the orientation section.
 DO NOT include directions to the next stop - these will be added separately.
 
-LENGTH CONSTRAINT: You have rich verified material for this stop. Write up to 350 words, using the extra space ONLY for additional sourced facts or explained connections — NOT for padding, praise, or instructing the listener.
+LENGTH CONSTRAINT: Write EXACTLY 120 words (NOT 300). You have very limited verified information about this specific exhibit. Be honest and concise: describe only what you can confirm, note what is unknown, and do NOT pad with generic appreciation language like 'a testament to the artist's genius' or 'invites contemplation'. Brevity with real content is better than length with filler.
 
-PER-STOP SOURCE MATERIAL for "Paul Revere House" (from verified sources — use this as your primary factual basis):
-  Passage 1: The Paul Revere House, built c.1680, was the colonial home of American patriot and Founding Father Paul Revere during the time of the American Revolution.
-  Passage 2: Paul Revere House, owned by the legendary patriot from 1770-1800, is the oldest remaining structure in downtown Boston and also the only official Freedom Trail ...
-  Passage 3: Built around 1680, the Paul Revere House stands as the oldest surviving structure in Downtown Boston, a remarkable achievement given the city's extensive ...
-  Passage 4: The house occupies the former site of the Second Church of Boston's parsonage, destroyed by fire in 1676. The Revere House was built no later than 1680; its ...
-  Passage 5: The 3-story building was the home of silversmith and Boston Patriot Paul Revere from 1770-1800, previously housing the parsonage of the Second Church of Boston.
-  Passage 6: Most people think of Paul Revere solely as a silversmith, but his work as a printer and an artist was key to his role as a patriot seeking to ...
-  Passage 7: Located in Boston's oldest residential neighborhood, the North End, is the home to the Revolutionary War figure Paul Revere, who lived here from 1770 to 1800.
-  Passage 8: Paul Revere House was the home of goldsmith/silversmith and founding father Paul Revere and his family from 1770 to 1800. Paul Revere House...
-  Passage 9: Paul Revere owned the home from 1770 to 1800, although he and his family may not have lived here in some periods in the 1780s and 90s. After Revere sold the ...
-  Passage 10: Paul Revere House (1680): The oldest remaining structure in downtown Boston — the home Paul Revere lived in when he rode to Lexington on April ...
-  Passage 11: British soldiers in 1771. Lucretia Reynolds in 1947. She. John Phillips Reynolds Jr, a direct descendant of Revere, who is known for his ...
-  Passage 12: Built in 1680, the Paul Revere House has witnessed over 300 years of North End history, and been home to hundreds of people, including Puritan shipping merchant ...
-  Passage 13: Built in 1680, home of Paul Revere during his midnight ride
-  Passage 14: Houses the famous Liberty Bowl made by Paul Revere
-  Sources:
-  [Paul Revere House — interpretive search] https://faneuilhallmarketplace.com/go/paul-revere-house (tier 3)
-  [Paul Revere House — interpretive search] https://www.thefreedomtrail.org/trail-sites/paul-revere-house (tier 3)
-  [Paul Revere House — interpretive search] https://www.trolleytours.com/boston/paul-revere-house (tier 3)
-  [Paul Revere House — interpretive search] https://en.wikipedia.org/wiki/Paul_Revere_House (tier 1)
-  [Paul Revere House — interpretive search] https://goingplacesfarandnear.com/tag/faneuil-hall/ (tier 3)
-  [Paul Revere House — interpretive search] https://thelibertytrail.org/ma/trail-sites/historic-sites/paul-revere-house (tier 3)
-  [Paul Revere House — interpretive search] https://www.historyhit.com/locations/paul-revere-house/ (tier 3)
-  [Paul Revere House — interpretive search] https://events.thehistorylist.com/venues/the-paul-revere-house-boston-massachusetts (tier 3)
-  [Paul Revere House — interpretive search] https://www.traveltourister.com/articles/places-to-visit-in-boston/ (tier 3)
-  [Paul Revere House — interpretive search] https://www.paulreverehouse.org/curiosities-from-the-paul-revere-memorial-associations-archives/ (tier 3)
-  [Paul Revere House — interpretive search] https://www.placebasedboston.org/paul-revere-house (tier 3)
-  [Paul Revere House — selection-stage notability reason] llm:phase3a-selection (tier 3)
+CORPUS GATE: EMPTY (D50 enforcement — LOCAL-209):
+There is NO verified source material for "Water Lilies" — no stop-level corpus,
+no venue-level corpus, nothing. Every specific claim you might generate about
+this place comes from your training data and CANNOT be verified.
 
-GROUNDING RULE (D50 — critical): Substantiate claims ONLY from the passages above. Do NOT supplement with facts from your own training data that are not in these passages. If the passages do not mention something, do not assert it as fact. You may describe what is physically visible at the stop and provide general orientation, but specific historical claims, dates, people, and events MUST come from the passages above. If a passage names a person or event, you may include it; if it does not, leave it out.
+YOU MUST NOT:
+- Assert any specific date, year, century, or historical period
+- State any measurement (depth, height, distance, area)
+- Attribute a nickname, title, or epithet to this place
+- Name specific people, architects, artists, or historical figures
+- Claim specific events happened here
+- Describe specific architectural features as fact
 
-BODY USAGE RULE (LOCAL-345 — critical): Your DESCRIPTION BODY (the main narrative paragraphs after the orientation) MUST incorporate specific facts, dates, or claims from the passages above. The orientation alone is not sufficient — the body text is where the listener spends most of their time. If a passage mentions a UNESCO designation, a founding date, a named historical event, or a specific fact, that material MUST appear in the body narrative, not just be referenced in the orientation line. A body that contains zero material from the provided passages is a failure.
+YOU MAY ONLY:
+- Name the stop and its general geographic context (e.g. "a coastal town east of Nice")
+- Describe what is physically visible to a cyclist arriving now (sea, buildings, streets)
+- Provide wayfinding and orientation ("look to your left", "the harbor is ahead")
+- Use hedging language ("this area is known for…", "visitors often notice…")
+- Note the atmosphere and sensory experience (sounds, smells, light)
 
-NARRATIVE ARC RULE (LOCAL-352 — critical): When a passage describes a person DOING something — leaving a position, founding a place, refusing an offer, recommending a dish, returning after years away — your description MUST tell the sequence of events, not merely state the person's credential or association. A credential is an adjective ("Michelin-starred chef"); a narrative is a sequence ("he left his two-star kitchen at the Negresco to cook for twenty people in a back-street bistro"). The listener wants to experience what happened, not read a résumé. Specifically:
-  - If a passage names WHERE someone came from and WHERE they went, state both.
-  - If a passage names WHAT someone gave up and WHAT they chose instead, state the contrast.
-  - If a passage names a specific person recommending, reviewing, or recounting an experience at this place, tell it as an event: who did what, where, and what they said or found. This applies to visitors, critics, chefs from elsewhere, and documented incidents — not only owners.
-  - Do NOT flatten a narrative into a single adjective or title. "Former head chef of the Negresco" is a title; "walked away from the Negresco's two Michelin stars to serve twenty people at a place whose name means workman's snack" is a story. Tell the story.
-  - Every element of the story MUST come from the passages above. You may not infer motivation, emotion, or dates not stated in the source material.
+Write 60-80 words maximum. This is an orientation-only placeholder. No factual claims.
 
 
-THIS STOP IS TOO SHORT AT 107 WORDS. Every other stop on this tour carries more. Add ANOTHER story about this object — a second, DIFFERENT episode with a named person, real actions and a consequence, drawn from the source material below. Do not pad the existing story with adjectives or restate it at greater length; find a second thing that actually happened. If the source material genuinely supports only one story, write that one well and stop — a short honest stop beats a padded one.
+━━━ FINAL STORY SHAPE (read this LAST — it overrides everything above) ━━━
+Your description MUST contain a NARRATIVE of at least THREE consecutive sentences
+that follows this shape:
 
+  SENTENCE 1: Name a person (donor/publisher/printer/collaborator) and state
+    ONE SPECIFIC THING they did — a decision, a commission, a gift.
+    Example: "Louis Broder commissioned Miró for this portfolio because Broder
+    specialized in limited editions requiring direct artist-printer collaboration."
 
-CLAIMS ALREADY REJECTED FOR THIS STOP. A fact-check removed each of the following from a previous draft because it is FALSE:
-- "The Paul Revere House, constructed around 1680, occupies the site of the Second Church of Boston's parsonage, which was destroyed in the Great Fire of 1676."
-- "This wooden dwelling was built by Robert Howard and later became the home of Paul Revere, an American silversmith and patriot, from 1770 to 1800."
-- "As you stand in the shadow of its weathered facade, envision the flurry of activity that once filled these halls."
-- "In the backdrop of Revere's everyday life, extraordinary episodes unfolded that would etch his name into the annals of history."
-- "On the night of April 18, 1775, Revere embarked on his legendary Midnight Ride to alert colonial militia of approaching British forces."
-- "In an amusing twist, Revere realized he had forgotten his spurs, crucial for his horseback journey.As Revere and his men rowed past the HMS Somerset, they muffled the sound of their oars with a flannel petticoat, a silent rebellion against the looming threat."
-- "Yet, life for Revere was not solely defined by his midnight dash."
-- "In 1779, he faced accusations of cowardice and insubordination during the ill-fated Penobscot Expedition."
-- "Standing here, the Paul Revere House is more than a monument; it's a tangible connection to the whispers of revolution that once swept through Boston."
+  SENTENCE 2: State the CONSEQUENCE or REASON — why it mattered, what it caused,
+    what it meant for the work.
+    Example: "Broder's editions were produced with artist, poet, and printer working
+    in the same workshop — Mourlot's atelier on Rue de Chabrol in Paris."
 
-Do not restate these claims in ANY form. This is a ban on the underlying assertion, not on the wording — rephrasing it, nominalising the verb, softening it with 'reportedly' or 'is said to have', or implying it indirectly all count as restating it. In particular, do not assert that two people worked together, met, or corresponded at any date if a claim above says they did. Write about something else that the source material supports.
+  SENTENCE 3: Connect to a SECOND named person or to the wider story.
+    Example: "Boris Fridman, a Russian collector who assembled livres d'artiste,
+    donated this work to the MFA, adding to the museum's holdings of
+    collaborative printed works."
+
+WHAT TO AVOID:
+  - "X's collaboration... showcasing a unique fusion" (evaluation, not story)
+  - "stands as a testament to" (evaluation)
+  - "the transformative power of" (empty abstraction)
+  - "goes beyond mere artistic interpretation" (empty)
+
+Write the story FIRST, then add physical description if space allows.
+━━━ END FINAL STORY SHAPE ━━━
 
 
 ================================================================================
-Total user message length: 30289 chars
+Total user message length: 17516 chars
 
 --- CANDIDATE SPECIFICS STATUS ---
 candidate_specifics found: 0
   (none extracted — snippets may be empty or regex missed)
 
 --- SNIPPET INJECTION STATUS ---
-_local402_snippets_injected: True
-_DIRECT_SNIPPETS_PER_STOP keys: ['Paul Revere House', 'Quincy Market', 'Faneuil Hall', 'Old State House']
+_local402_snippets_injected: False
+_DIRECT_SNIPPETS_PER_STOP keys: ['Water Lilies', '__stop_0__', 'Impression, Sunrise', '__stop_1__', 'Dance at Le Moulin de la Galette', '__stop_2__', 'A Sunday Afternoon on the Island of La Grande Jatte', '__stop_3__', 'Starry Night Over the Rhône', '__stop_4__']
