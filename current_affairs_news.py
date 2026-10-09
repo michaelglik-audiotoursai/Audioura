@@ -871,6 +871,11 @@ Begin the sentence with that approximate phrase EXACTLY as given, e.g. "Last \
 month, ..." or "About three weeks ago, ...". You MUST NOT state or guess a \
 specific day, date number or month name for these — doing so is a factual error.
   * Never write a specific date that is not printed in the header.
+  * The header date is when the article was PUBLISHED, not necessarily when \
+the event happens. Use it as "On <date>, <outlet> reported that ..." or for an \
+event that already happened that day. A FUTURE event (an election, a vote, a \
+hearing) keeps the date the ARTICLE gives for it, or no date at all; never move \
+it onto the publication date.
 - POLITICAL BALANCE IS MANDATORY. If the item concerns a dispute or an election, \
 report what EACH side said or did, attributed by name/party, with no editorialising \
 and no adjective that favours a side.
@@ -1340,6 +1345,14 @@ def _attribution_suffix(news_text: str, src_names: List[str]) -> str:
     return f" (Reported by {', '.join(missing)}.)"
 
 
+# A paragraph that belongs to the whole tour, not to the last stop: the closing
+# thread (LOCAL-619B), the stop-count line, the restaurant offer, the honest note.
+_TOUR_END_PARA_RE = re.compile(
+    r"\bstops? in all\b|\beat nearby we can build\b|\brestaurant tour\b|"
+    r"^(?:Together|Across|Taken together),? these stops\b|^This tour\b|"
+    r"^A note on current affairs\b", re.I | re.M)
+
+
 def _insert_news_paragraph(block: str, para: str) -> str:
     """Insert `para` as a new paragraph before a trailing Directions:/Sources:
     line in a stop block, else at the end of the block."""
@@ -1349,6 +1362,19 @@ def _insert_news_paragraph(block: str, para: str) -> str:
         head = block[:m.start()].rstrip()
         tail = block[m.start():]
         return f"{head}\n\n{para}\n\n{tail}"
+    # [LEAD 2026-10-09] The LAST stop's block runs to the end of the tour, so it
+    # also holds the conclusion, the restaurant offer and the honest note. The news
+    # belongs to the stop: insert it before the first of those paragraphs, never
+    # after the tour has ended (tour 557 v6 put the governor debate after
+    # "That's 5 stops in all" and the restaurant line).
+    paras = list(re.finditer(r"(?:^|\n\n)([^\n][\s\S]*?)(?=\n\n|\Z)", block))
+    for pm in paras:
+        ptxt = pm.group(1)
+        if _TOUR_END_PARA_RE.search(ptxt):
+            cut = pm.start(1)
+            head = block[:cut].rstrip()
+            tail = block[cut:]
+            return f"{head}\n\n{para}\n\n{tail}"
     return f"{block.rstrip()}\n\n{para}\n"
 
 
