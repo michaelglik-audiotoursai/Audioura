@@ -1004,18 +1004,47 @@ def _search_entities(query: str) -> Optional[List[Tuple[str, str]]]:
         pass
 
     try:
-        resp = requests.get(
-            _WIKIDATA_API,
-            params={
-                "action": "wbsearchentities",
-                "search": query,
-                "language": "en",
-                "format": "json",
-                "limit": 10,
-            },
-            headers={"User-Agent": _USER_AGENT},
-            timeout=10,
-        )
+        # [LOCAL-636 issue 3] Retry a TRANSIENT Wikidata stall before giving up.
+        # The National Gallery (Q180788, 390 catalogued works) was refused in Bench
+        # R2 during a provider-overload window: a single search stall here returned
+        # None, resolve_venue returned None, and a famous, well-catalogued museum
+        # was told "we could not find enough verified material". fetch_venue_works
+        # already retries (LEAD); the first step, entity search, did not — one
+        # 5xx/timeout sank the whole build. Retry on 500/502/503/504 and on
+        # timeout/connection errors (NOT 429 — that correctly trips the dead-host
+        # breaker); keep the single 10s per-attempt timeout and the None-on-failure
+        # contract. A transient endpoint stall is not "venue unknown".
+        import time as _t
+        resp = None
+        _last_exc = None
+        for _attempt in range(3):
+            try:
+                resp = requests.get(
+                    _WIKIDATA_API,
+                    params={
+                        "action": "wbsearchentities",
+                        "search": query,
+                        "language": "en",
+                        "format": "json",
+                        "limit": 10,
+                    },
+                    headers={"User-Agent": _USER_AGENT},
+                    timeout=10,
+                )
+                if resp.status_code == 200:
+                    break
+                # 429 is handled below (cold-host); other 5xx are transient.
+                if resp.status_code == 429 or resp.status_code not in (500, 502, 503, 504):
+                    break
+            except (requests.exceptions.Timeout,
+                    requests.exceptions.ConnectionError) as _e:
+                _last_exc = _e
+                resp = None
+            if _attempt < 2:
+                _t.sleep(1.5 * (_attempt + 1))
+        if resp is None:
+            raise (_last_exc or requests.exceptions.ConnectionError(
+                "Wikidata search unavailable after retries"))
         if resp.status_code == 429:
             try:
                 from dead_host_breaker import mark_host_cold

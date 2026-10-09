@@ -539,6 +539,157 @@ def fact_signatures(sentence: str):
     return sigs
 
 
+# ---------------------------------------------------------------------------
+# [LOCAL-636 issue 2] KEYPHRASE repetition — the same STORY told twice with no
+# year to anchor it. fact_signatures needs a YEAR, so it is blind to:
+#
+#   Brera 513 Stop 1 "the Germanic word 'braida,' meaning a grassy opening in the
+#             city structure"
+#   Brera 513 Stop 2 "its name drawn from an ancient word for a grassy opening"
+#
+# Both tell the Brera-name etymology; neither carries a year. The shared signal is
+# a DISTINCTIVE noun phrase — the rare bigram "grassy opening" (and the loanword
+# "braida"). A keyphrase signature keys a sentence on its rare, distinctive
+# content n-grams, so the same institution-origin anecdote collapses to one
+# fingerprint across stops however it is reworded.
+#
+# And the Courtauld 485 "Courtauld acquired the largest group of [artist] in
+# Britain" story, retold at Stop 1 (Cézanne) and Stop 2 (Seurat): different
+# artists, so no shared rare phrase — but an identical CLAIM SHAPE, "the
+# {largest/greatest/finest/most important} {collection/group/holding} … in
+# {Britain/the UK}". A superlative-collection signature collapses that shape
+# regardless of which artist's name fills it.
+# ---------------------------------------------------------------------------
+
+# Common tour / art vocabulary AND common English — a bigram made of these is
+# never distinctive. Distinctive words (braida, grassy, etymology, pointillist,
+# …) are deliberately absent, so a phrase built from them keys. Both tokens of a
+# keyphrase bigram must be absent from this set, so an ordinary English
+# collocation ("turning point", "faith and loss", "evolution of modern art")
+# never keys — only a genuinely rare noun phrase does.
+_KEYPHRASE_COMMON = _FACT_GENERIC_WORDS | {
+    # art / tour vocabulary
+    'paint', 'painted', 'painting', 'canvas', 'panel', 'oil', 'colour', 'color',
+    'colours', 'colors', 'brushwork', 'brush', 'surface', 'figure', 'figures',
+    'light', 'shadow', 'shadows', 'composition', 'scene', 'image', 'viewer',
+    'gallery', 'work', 'works', 'piece', 'pieces', 'artist', 'artists', 'style',
+    'subject', 'form', 'forms', 'space', 'line', 'lines', 'detail', 'details',
+    'canvas', 'portrait', 'landscape', 'fresco', 'altarpiece', 'sculpture',
+    'drawing', 'technique', 'techniques', 'palette', 'perspective', 'depth',
+    # common English content words that form ordinary collocations
+    'present', 'moment', 'moments', 'sense', 'world', 'life', 'lives', 'time',
+    'times', 'years', 'year', 'early', 'late', 'first', 'last', 'other', 'these',
+    'those', 'their', 'about', 'which', 'where', 'while', 'between', 'through',
+    'across', 'before', 'behind', 'above', 'below', 'name', 'named', 'drawn',
+    'word', 'words', 'ancient', 'meaning', 'comes', 'home', 'living', 'fabric',
+    'within', 'reminder', 'turning', 'point', 'points', 'faith', 'loss', 'hope',
+    'power', 'reveal', 'reveals', 'revealing', 'themselves', 'itself', 'become',
+    'became', 'becomes', 'evolution', 'modern', 'directly', 'onto', 'into', 'upon',
+    'left', 'right', 'treatment', 'incident', 'hospital', 'result', 'results',
+    'together', 'brought', 'holds', 'held', 'establish', 'studying', 'painter',
+    'acquisitions', 'locus', 'stands', 'standing', 'reflect', 'experience',
+    'experiences', 'shared', 'enduring', 'persistence', 'likeness', 'records',
+    'record', 'aftermath', 'crisis', 'themselves', 'something', 'everything',
+    'nothing', 'someone', 'always', 'never', 'often', 'nearly', 'almost',
+    'rather', 'instead', 'simply', 'merely', 'highlights', 'innovative',
+    'profound', 'intimate', 'remote', 'distant', 'quiet', 'silent', 'gentle',
+    'strong', 'broad', 'narrow', 'deep', 'close', 'range', 'vantage', 'position',
+    'stage', 'period', 'career', 'commission', 'audience', 'placed', 'opened',
+    'founded', 'built', 'created', 'depicts', 'shows', 'depicted', 'rendered',
+    'placed', 'suspended', 'enthroned', 'surrounded', 'beneath', 'above',
+}
+
+# A superlative + a holding noun + a place = the "biggest collection of X here"
+# boast. Keyed on the PLACE so the artist's name does not matter.
+_SUPERLATIVE_RE = re.compile(
+    r"(?i)\b(largest|greatest|finest|biggest|most\s+important|most\s+significant|"
+    r"most\s+complete|foremost|pre-?eminent)\b[^.?!]{0,60}?"
+    r"\b(collection|group|holding|holdings|array|assembly|ensemble)\b")
+_PLACE_RE = re.compile(
+    r"(?i)\bin\s+(britain|great\s+britain|the\s+uk|the\s+united\s+kingdom|"
+    r"england|the\s+country|the\s+world|europe|america|the\s+united\s+states)\b")
+# Collapse place synonyms so "in Britain" and "in the United Kingdom" are one.
+_PLACE_CANON = {
+    'britain': 'uk', 'great britain': 'uk', 'the uk': 'uk',
+    'the united kingdom': 'uk', 'england': 'uk',
+    'the united states': 'us', 'america': 'us',
+}
+
+# A quoted span is almost always a work TITLE; its words recur legitimately (the
+# preview line names the next stop's title) and must not key a keyphrase repeat.
+_QUOTED_SPAN_RE = re.compile(r"[\"“”']{1}[^\"“”']{0,120}[\"“”']{1}")
+
+
+def _keyphrase_tokens(sentence: str):
+    """Lower-cased, accent-folded content tokens (length >= 4) of a sentence,
+    in order, EXCLUDING proper nouns and quoted work titles.
+
+    A keyphrase repeat must be a rare COMMON-noun phrase ("grassy opening"), not a
+    name or a title. Work titles and artist names legitimately recur — a stop
+    names the next stop's work in its preview, and an artist is mentioned in the
+    preview and again in their own stop — so a token that is capitalised
+    (a proper noun), sentence-initial, or inside quotation marks (a title) must
+    NOT participate in a keyphrase bigram.
+    """
+    import unicodedata
+    s = _QUOTED_SPAN_RE.sub(' " " ', sentence or '')  # blank out quoted titles
+    out = []
+    raw = re.findall(r"[A-Za-zà-þÀ-Þ'\-]{4,}", s)
+    for i, w in enumerate(raw):
+        if i == 0:
+            out.append(None)  # sentence-initial capitalisation is positional
+            continue
+        if w[:1].isupper():
+            out.append(None)  # proper noun / capitalised — breaks the bigram
+            continue
+        f = unicodedata.normalize('NFKD', w.lower())
+        f = ''.join(c for c in f if not unicodedata.combining(c))
+        if not f or f in _FACT_NAME_STOPWORDS:
+            out.append(None)
+            continue
+        out.append(f)
+    return out
+
+
+def keyphrase_signatures(sentence: str):
+    """Distinctive, YEAR-FREE repeat signatures for a sentence.
+
+    Two kinds, both deterministic and wording-tolerant:
+      * ("kp", (w1, w2)) — a rare bigram of ADJACENT distinctive LOWER-CASE common
+        nouns where BOTH tokens are outside the common tour/art/English set, e.g.
+        ("grassy","opening"). An ordinary collocation ("turning point") never
+        keys. Proper nouns, sentence-initial words and quoted titles never
+        participate.
+      * ("coll", place) — a superlative-collection boast ("the largest group …
+        in Britain"), keyed on the canonicalised place so it collapses across
+        different artists AND across Britain / the United Kingdom.
+
+    Returns a set; empty when the sentence carries nothing distinctive.
+    """
+    s = sentence or ''
+    if _FACT_RECAP.search(s):
+        return set()
+    sigs = set()
+
+    # Superlative-collection claim shape.
+    if _SUPERLATIVE_RE.search(s):
+        mp = _PLACE_RE.search(s)
+        place = re.sub(r'\s+', ' ', mp.group(1).lower()).strip() if mp else 'here'
+        place = _PLACE_CANON.get(place, place)
+        sigs.add(("coll", place))
+
+    # Rare distinctive bigrams of adjacent lower-case common nouns. BOTH tokens
+    # must be distinctive (outside _KEYPHRASE_COMMON) so only a genuinely rare
+    # noun phrase keys.
+    toks = _keyphrase_tokens(s)
+    for a, b in zip(toks, toks[1:]):
+        if a is None or b is None:
+            continue
+        if a not in _KEYPHRASE_COMMON and b not in _KEYPHRASE_COMMON:
+            sigs.add(("kp", (a, b)))
+    return sigs
+
+
 def _stop_blocks(tour_text: str):
     """Split a tour into (stop_number, block_text). Stop 1 is the first block."""
     parts = re.split(r'\n(Stop\s+\d+:)', tour_text or '')
@@ -580,7 +731,7 @@ def check_cross_stop_fact_repetition(tour_text: str, min_stops: int = 2):
                       if not ln.strip().lower().startswith('orientation:')]
         narration = '\n'.join(ln for ln in _lines if not _FACT_SKIP_LINE.match(ln))
         for sent in _split_into_sentences(narration):
-            for sig in fact_signatures(sent):
+            for sig in fact_signatures(sent) | keyphrase_signatures(sent):
                 if sig in local:
                     continue
                 local.add(sig)

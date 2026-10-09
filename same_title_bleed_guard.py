@@ -37,6 +37,7 @@ __all__ = [
     "filter_stop_body_same_title",
     "filter_tour_text_same_title",
     "object_kind_of",
+    "infer_stop_kind_from_body",
     "sentence_is_object_type_bleed",
     "filter_stop_body_object_type",
     "filter_tour_text_object_type",
@@ -144,6 +145,43 @@ def _names_the_title(sentence: str, title: str) -> bool:
     return all(re.search(r"\b" + re.escape(t) + r"\b", low) for t in toks)
 
 
+# [LOCAL-636 issue 1] Style / technique / signature nouns that an artist "owns".
+# A sentence saying "<Name>'s pointillist METHOD" / "<Name>'s STYLE" attributes a
+# way of working to a named artist WITHOUT a creation verb, so artists_in_sentence
+# (which keys on "X painted" / "by X") does not see it. On the Courtauld tour the
+# Cézanne stop opened with "a hallmark of Seurat's pointillist method" — the
+# Seurat stop's viewing text bled in. When the foreign artist is named this way
+# and the stop's OWN artist is not named in the sentence, it is foreign content.
+_TECHNIQUE_NOUN = (
+    r"(?:method|technique|style|manner|approach|hallmark|signature|"
+    r"brushwork|handling|palette|pointillis\w*|chromoluminaris\w*|"
+    r"divisionis\w*|impasto|sfumato|chiaroscuro|facture)")
+# "<Name>'s [adj] <technique-noun>". The NAME is matched case-sensitively (a
+# capitalised span) — IGNORECASE here would let the uppercase class match a
+# lowercase lead word ("hallmark of Seurat"), swallowing the preposition. Both a
+# straight (') and a curly (’) apostrophe are accepted; the technique noun stays
+# case-insensitive via an inline (?i:…) group.
+_POSSESSIVE_TECHNIQUE_RE = re.compile(
+    r"\b(" + _NAME_SPAN + r")['\u2019]s\s+(?:[a-zà-ÿ]+\s+){0,2}"
+    r"(?i:" + _TECHNIQUE_NOUN + r")\b")
+
+
+def _possessive_technique_artists(sentence: str) -> List[str]:
+    """Names credited with a STYLE/TECHNIQUE via a possessive ("Seurat's
+    pointillist method"), as written. Not a creation attribution, so these are
+    found separately from artists_in_sentence."""
+    out, seen = [], set()
+    for m in _POSSESSIVE_TECHNIQUE_RE.finditer(sentence or ""):
+        name = m.group(1).strip()
+        lead = name.split()[0].lower() if name.split() else ""
+        if lead in _NON_NAME_LEAD:
+            continue
+        if name.lower() not in seen:
+            seen.add(name.lower())
+            out.append(name)
+    return out
+
+
 def sentence_is_bleed(sentence: str, stop_title: str, stop_artist: str,
                       _wrong_artist_surnames: Optional[set] = None) -> bool:
     """True when a sentence is a same-title / wrong-artist bleed for this stop.
@@ -156,7 +194,11 @@ def sentence_is_bleed(sentence: str, stop_title: str, stop_artist: str,
       • it is a follow-on sentence anchored on a wrong artist already seen in this
         stop (``_wrong_artist_surnames`` carries their surnames) and names no
         other maker — "The work emerged from an expressionistic style that
-        Corinth developed …".
+        Corinth developed …"; OR
+      • [LOCAL-636] it credits a STYLE/TECHNIQUE to a foreign artist via a
+        possessive ("a hallmark of Seurat's pointillist method") while the stop's
+        OWN artist is not named — the Seurat viewing text that bled into the
+        Cézanne stop.
 
     Never fires when the stop artist is unknown (nothing to bind to), and never
     drops a sentence whose only named maker IS the stop's artist.
@@ -174,6 +216,19 @@ def sentence_is_bleed(sentence: str, stop_title: str, stop_artist: str,
     # a creation attributed to a non-stop artist → wrong-artist bleed
     if foreign:
         return True
+
+    # [LOCAL-636] a style/technique credited to a FOREIGN artist possessively
+    # ("Seurat's pointillist method") while the stop's own artist is NOT named in
+    # the sentence → foreign-content bleed. The stop-artist guard keeps a genuine
+    # comparison that names the stop's own artist ("unlike Monet's method,
+    # Cézanne …") from being dropped.
+    tech = _possessive_technique_artists(s)
+    tech_foreign = [n for n in tech if not _name_matches_stop_artist(n, stop_artist)]
+    if tech_foreign:
+        names_stop = bool(
+            re.search(r"\b" + re.escape(surname_of(stop_artist)) + r"\b", s.lower()))
+        if not names_stop:
+            return True
 
     # follow-on sentence anchored on a wrong artist seen earlier in this stop,
     # naming no competing stop-artist attribution.
@@ -469,15 +524,91 @@ def sentence_is_object_type_bleed(sentence: str, stop_kind: Optional[str]) -> bo
     return any(k != stop_kind for k in kinds)
 
 
+# [LOCAL-636 issue 1] An unambiguous object noun DECLARED about the stop's own
+# object, e.g. "is an oil and resin painting on panel", "these monumental oils on
+# wood", "the canvas before you". When the title carries no object noun (a work
+# titled only by its subject — "Leda col cigno") and the POI material field is
+# empty, the stop's own kind is still stated plainly in its narration. We read the
+# DOMINANT declared family from the body so a lone cross-genre sentence (a
+# sculpture condition blurb lifted into a painting stop) can still be caught.
+#
+# Only unambiguous physical-object nouns vote (the _AMBIGUOUS_KIND_NOUNS set is
+# excluded) so "the painting on the bowl" never mislabels a vessel as a picture.
+# A medium phrase such as "oil ON panel" / "oils on wood" is a reliable picture
+# declaration, so "panel"/"wood"/"canvas"/"paper" following "oil(s)/tempera/
+# acrylic/watercolour on" is counted even though those nouns alone are generic.
+_MEDIUM_ON_SUPPORT_RE = re.compile(
+    r"(?i)\b(?:oil|oils|tempera|acrylic|watercolou?r|gouache|fresco)\b"
+    r"[^.?!]{0,40}?\bon\b\s+(?:a\s+)?(panel|canvas|wood|paper|copper|board)\b")
+_SUPPORT_FAMILY = {
+    "panel": "picture", "canvas": "picture", "wood": "picture",
+    "board": "picture", "copper": "picture", "paper": "paper",
+}
+
+
+def _declared_kinds_in_body(body: str) -> List[str]:
+    """Every object FAMILY the body declares about its OWN object, via an
+    unambiguous object noun or a 'medium ON support' phrase. Ambiguous nouns
+    (painting/drawing/oil/marble …) do NOT vote on their own, mirroring
+    _asserted_kinds, so a decoration or technique mention is never a kind claim.
+    """
+    low = (body or "").lower()
+    out: List[str] = []
+    for m in _MEDIUM_ON_SUPPORT_RE.finditer(low):
+        fam = _SUPPORT_FAMILY.get(m.group(1))
+        if fam:
+            out.append(fam)
+    for key in _OBJECT_KIND_KEYS:
+        if key in _AMBIGUOUS_KIND_NOUNS:
+            continue
+        if re.search(r"\b" + re.escape(key) + r"\b", low):
+            out.append(_OBJECT_KIND_FAMILIES[key])
+    return out
+
+
+def infer_stop_kind_from_body(body: str) -> Optional[str]:
+    """Best-guess the stop's OWN object family from its narration, or None.
+
+    Returns the DOMINANT declared family (the most frequently declared one) when
+    the body plainly states its medium/support, so a stop whose title and material
+    field carry no object noun can still be bound to a kind. Ties and a body with
+    no clear declaration return None (we never guess from a single ambiguous
+    mention — that would risk dropping the stop's real content).
+    """
+    kinds = _declared_kinds_in_body(body)
+    if not kinds:
+        return None
+    counts: Dict[str, int] = {}
+    for k in kinds:
+        counts[k] = counts.get(k, 0) + 1
+    ranked = sorted(counts.items(), key=lambda kv: (-kv[1], kv[0]))
+    if len(ranked) > 1 and ranked[0][1] == ranked[1][1]:
+        return None  # no clear majority → do not guess
+    return ranked[0][0]
+
+
 def filter_stop_body_object_type(body: str, stop_title: str,
-                                  stop_material: str = "") -> Tuple[str, Dict]:
+                                  stop_material: str = "",
+                                  stop_kind_override: Optional[str] = None
+                                  ) -> Tuple[str, Dict]:
     """Drop object-type bleed sentences from one stop body. Never empties a body
     (D577). Returns (new_body, report) with report = {dropped, stop_kind, changed}.
+
+    [LOCAL-636 issue 1] The stop's own kind is resolved from the title and the POI
+    material field first; when neither carries an object noun (a subject-only title
+    like "Leda col cigno" with an empty material field) the kind is inferred from
+    the body's OWN declared medium ("oil and resin painting on panel" → picture),
+    so a lone sculpture-condition sentence bled in from a statue record is still
+    dropped. ``stop_kind_override`` lets the tour-level caller resolve the kind
+    once from the WHOLE stop body and apply it to each paragraph (the medium is
+    often declared in a different paragraph from the bleed).
     """
     report = {"dropped": 0, "stop_kind": None, "changed": False}
     if not body or not body.strip():
         return body, report
-    stop_kind = object_kind_of(stop_title, stop_material)
+    stop_kind = stop_kind_override or object_kind_of(stop_title, stop_material)
+    if not stop_kind:
+        stop_kind = infer_stop_kind_from_body(body)
     report["stop_kind"] = stop_kind
     if not stop_kind:
         return body, report
@@ -521,13 +652,20 @@ def filter_tour_text_object_type(tour_text: str,
         report["stops"] += 1
         title = (stop_titles or {}).get(stop_index, "") or _title_from_header(header)
         material = (stop_materials or {}).get(stop_index, "")
+        # [LOCAL-636 issue 1] Resolve the stop's own kind ONCE from the whole stop
+        # body: title/material first, else inferred from the body's declared
+        # medium. The medium ("oil … on panel") and the bled sentence ("the
+        # sculpture …") usually sit in different paragraphs, so a per-paragraph
+        # inference would miss it; a single whole-body kind is applied to each.
+        stop_kind = object_kind_of(title, material) or infer_stop_kind_from_body(body)
         paras = re.split(r"(\n\s*\n)", body)
         new_paras: List[str] = []
         for seg in paras:
             if seg.strip() == "" or re.fullmatch(r"\n\s*\n", seg):
                 new_paras.append(seg)
                 continue
-            filtered, prep = filter_stop_body_object_type(seg, title, material)
+            filtered, prep = filter_stop_body_object_type(
+                seg, title, material, stop_kind_override=stop_kind)
             total_dropped += prep.get("dropped", 0)
             new_paras.append(filtered)
         out.append(header)
