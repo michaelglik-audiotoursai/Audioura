@@ -187,13 +187,27 @@ class TestFilterSiteCandidates(unittest.TestCase):
         for w in REAL_WORKS_KEPT:
             self.assertIn(w, kept, f"should keep {w!r}")
 
-    def test_protected_sparql_title_never_dropped(self):
-        # Even if a SPARQL-confirmed label happened to look like an artist name,
-        # protecting it keeps it. (Defensive: a work titled after a person.)
+    def test_precise_artist_match_beats_protection(self):
+        # [LOCAL-653 live fix] "Georges Seurat"/"Edgar Degas" leaked because they
+        # were ALSO SPARQL labels (protected) — a data quirk where an artist page
+        # is catalogued as a "work". A bare title that EXACTLY matches one of the
+        # venue's own creator names is an artist, never a work, so the precise
+        # artist match must beat protection.
         kept, dropped = filter_site_candidates(
             ["Paul Cézanne"], VENUE, artist_names=ARTISTS,
             protected_titles=["Paul Cézanne"])
-        self.assertEqual(kept, ["Paul Cézanne"])
+        self.assertEqual(kept, [])
+        self.assertEqual(len(dropped), 1)
+        self.assertEqual(dropped[0], "Paul Cézanne")
+
+    def test_non_artist_protected_title_kept(self):
+        # A SPARQL-confirmed label that is NOT a bare creator name is still
+        # protected from the junk/sibling heuristics (defensive: a work titled
+        # after a person, carrying dates, is a real work).
+        kept, dropped = filter_site_candidates(
+            ["Samuel Courtauld (1876–1947)"], VENUE, artist_names=ARTISTS,
+            protected_titles=["Samuel Courtauld (1876–1947)"])
+        self.assertEqual(kept, ["Samuel Courtauld (1876–1947)"])
         self.assertEqual(dropped, [])
 
     def test_dict_candidates_carry_reason(self):

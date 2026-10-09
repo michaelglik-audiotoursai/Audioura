@@ -129,16 +129,24 @@ def venue_core_name(venue_name: str) -> str:
     which previously defeated every token-equality venue check downstream.
     """
     raw = str(venue_name or "")
-    # 1. Peel comma-separated LOCATION segments from the RIGHT. A segment is a
-    #    location segment when every token in it is location filler.
+    # 1. The venue's proper name is the FIRST comma-segment; a comma almost always
+    #    introduces a location ("…, London, United Kingdom") or an institutional
+    #    qualifier, never part of the distinctive name. Keep the first segment,
+    #    but if trailing segments are plainly location filler peel them explicitly
+    #    too (handles a name that itself contains a comma — rare).
     segs = [s.strip() for s in raw.split(",") if s.strip()]
-    while len(segs) > 1:
-        tail_tokens = _norm(segs[-1]).split()
-        if tail_tokens and all(tok in _LOCATION_FILLER for tok in tail_tokens):
-            segs = segs[:-1]
-            continue
-        break
-    core = ", ".join(segs) if segs else raw
+    if len(segs) > 1:
+        # Peel trailing pure-location segments; whatever remains, keep only the
+        # first segment as the distinctive name (locations never lead).
+        while len(segs) > 1:
+            tail_tokens = _norm(segs[-1]).split()
+            if tail_tokens and all(tok in _LOCATION_FILLER for tok in tail_tokens):
+                segs = segs[:-1]
+                continue
+            break
+        core = segs[0]
+    else:
+        core = segs[0] if segs else raw
     # 2. Normalise and strip the trailing institution noun(s).
     toks = _norm(core).split()
     while len(toks) > 1 and toks[-1] in _INSTITUTION_NOUNS:
@@ -150,6 +158,16 @@ def venue_core_name(venue_name: str) -> str:
 # scraper lifted from the chrome). Matched as the WHOLE normalised title.
 _SITE_BRAND_PHRASES = frozenset({
     "official site", "official website", "homepage", "home page", "website",
+})
+
+# Institution-GLUE words that connect an institution name to its type
+# ("Institute OF ART", "Museum OF FINE ARTS", "Centre FOR THE Arts"). Allowed in a
+# sibling remainder — alongside the institution nouns — so "Courtauld Institute of
+# Art" is recognised as the sibling. Deliberately tiny: these never carry a work's
+# distinctive content on their own.
+_INSTITUTION_GLUE = frozenset({
+    "of", "the", "for", "and", "art", "arts", "fine", "modern", "contemporary",
+    "decorative", "applied", "visual",
 })
 
 
@@ -179,11 +197,17 @@ def is_venue_or_sibling_title(title: str, venue_name: str = "") -> bool:
     if toks[: len(core_toks)] != core_toks:
         return False
     rest = toks[len(core_toks):]
-    # ...and every REMAINING token must be an institution noun (sibling/own
-    # institution) — nothing that could be a work word. No remainder → the venue
-    # itself. ("courtauld" + "institute"/"gallery" → sibling; "courtauld" alone →
-    # the venue.)
-    return all(tok in _INSTITUTION_NOUNS for tok in rest)
+    # No remainder → the venue itself. Otherwise it is a sibling only when the
+    # remainder is institution noun(s) + optional institution-glue words and
+    # contains AT LEAST ONE institution noun — nothing that could be a work word.
+    # ("courtauld" + "institute"/"gallery" → sibling; "courtauld" + "institute of
+    # art" → sibling; "courtauld" + "family portrait" → a work, kept.)
+    if not rest:
+        return True
+    if any(tok not in _INSTITUTION_NOUNS and tok not in _INSTITUTION_GLUE
+           for tok in rest):
+        return False
+    return any(tok in _INSTITUTION_NOUNS for tok in rest)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -391,10 +415,13 @@ def filter_site_candidates(
       3. is_artist_name_alone (a bare artist/person name — "Paul Cézanne").
 
     A title in ``protected_titles`` (e.g. a SPARQL/Wikidata-confirmed work label)
-    is kept whatever the heuristics say, so a legitimate work is never dropped by
-    the bare-name fallback. The marketing-prefix strip is NOT applied here (it is a
-    renaming, not a drop); callers apply ``strip_marketing_prefix`` when assigning
-    the stop name.
+    is kept against the junk/sibling heuristics so a legitimate work is never
+    dropped. EXCEPTION: a bare title that exactly matches one of ``artist_names``
+    (a precise creator match) is dropped even when protected — an artist name is
+    never a work, even when it leaked into the SPARQL label set (the "Georges
+    Seurat"/"Edgar Degas" live leak). The marketing-prefix strip is NOT applied
+    here (it is a renaming, not a drop); callers apply ``strip_marketing_prefix``
+    when assigning the stop name.
     """
     try:
         from junk_title_guard import is_junk_page_title as _is_junk
@@ -409,18 +436,27 @@ def filter_site_candidates(
 
     kept: List = []
     dropped: List = []
+    _known_artists = {_norm(a) for a in (artist_names or []) if a}
+    _known_artists.discard("")
     for c in titles or []:
         if isinstance(c, dict):
             title = (c.get(title_key) or c.get("name") or "").strip()
         else:
             title = str(c or "").strip()
 
-        if _norm(title) in protected:
+        reason = ""
+        # A bare title that EXACTLY matches one of the venue's own creator names is
+        # an artist, never a work — even if it also leaked into the SPARQL label
+        # set (a data quirk where an artist page is catalogued as a "work"). This
+        # precise match beats protection; the heuristic/junk checks below do not.
+        if title and _norm(title) in _known_artists:
+            reason = "artist_name_alone"
+        elif _norm(title) in protected:
+            # SPARQL/Wikidata-confirmed label (and not a bare artist name): keep it,
+            # so a legitimate work is never dropped by the junk/sibling heuristics.
             kept.append(c)
             continue
-
-        reason = ""
-        if _is_junk is not None and title and _is_junk(title, _core):
+        elif _is_junk is not None and title and _is_junk(title, _core):
             reason = "junk_page_title"
         elif title and is_venue_or_sibling_title(title, venue_name):
             reason = "venue_or_sibling_institution"

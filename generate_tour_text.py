@@ -6000,7 +6000,14 @@ def _verify_works_v2(poi_list, venue_name, exhibition_scope=None):
             # the evidence record for the narration.
             try:
                 from site_candidate_guard import strip_marketing_prefix as _strip_mkt
+                # Known titles for the strip: the canonical + SPARQL sets AND the
+                # candidate that D1v2 just matched (``work_name``). The candidate is
+                # often the CLEAN title ("Self-Portrait with Bandaged Ear") that the
+                # marketing-prefixed canonical form was matched against, so it is the
+                # strongest evidence the stripped remainder is a real work.
                 _mkt_known = set(canonical_titles) | set(sparql_titles or ())
+                if work_name:
+                    _mkt_known.add(work_name)
                 _clean_title, _mkt_artist = _strip_mkt(_best_title, known_titles=_mkt_known)
                 if _clean_title and _clean_title != _best_title:
                     print(f"  [LOCAL-653] stripped marketing prefix: "
