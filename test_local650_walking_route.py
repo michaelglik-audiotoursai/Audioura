@@ -386,6 +386,7 @@ class TestPipelineComposition650B(unittest.TestCase):
 # DB-backed check on the live 557 row (skips when the DB is unreachable).
 # ─────────────────────────────────────────────────────────────────────────────
 
+@unittest.skip("LEAD 2026-10-09: reads the LIVE row 557, which was regenerated with the 650B fix (no theme stop now); a fixture-based test covers the logic")
 class TestLive557Row(unittest.TestCase):
     def _fetch_557(self):
         try:
