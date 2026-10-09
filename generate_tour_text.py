@@ -7962,6 +7962,24 @@ def _apply_delivery_hours_guard(result):
                       f"sentence(s) from delivered text (every-path guard)", flush=True)
         except Exception as _fe:  # pragma: no cover
             _import_logger.error(f"[LOCAL-616] foreign-sentence sweep skipped: {_fe}")
+        # 3a. [LOCAL-638 Note 2] A stop must not END on an unpaid teaser — a closing
+        #     gesture at a story the stop never tells ("deeper stories", "hint at",
+        #     "more to discover", "secrets", "beneath the calm"). Michael, Frick 523
+        #     (D640): the tour ended "unexpected details hint at the deeper stories
+        #     beneath the calm". The editor (LOCAL-628) is asked to deliver-or-drop,
+        #     but it is disabled on cache/pool/by-reference paths — this text-level
+        #     guard is the universal fallback: drop a trailing unpaid-teaser sentence
+        #     from each stop body. Runs BEFORE the directions guarantee so a stop
+        #     whose last sentence was a teaser still gets its hand-off appended.
+        try:
+            import stop_editor as _se_tz
+            final, _tz_dropped = _se_tz.strip_unpaid_teaser_in_text(final)
+            if _tz_dropped:
+                print(f"  [LOCAL-638 Note 2] dropped {_tz_dropped} unpaid-teaser "
+                      f"ending(s) (a stop must deliver the story it teases, or not "
+                      f"tease)", flush=True)
+        except Exception as _tze:  # pragma: no cover
+            _import_logger.error(f"[LOCAL-638] unpaid-teaser guard skipped: {_tze}")
         # 3b. [LOCAL-638 Note 4] Every stop except the last must end with directions
         #     to the next stop, on EVERY path. Michael, Frick 523 (D640): "The story
         #     stops abruptly and has no directions to the next exhibit" — Stop 2 had
