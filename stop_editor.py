@@ -1190,6 +1190,46 @@ def edit_stop(
     if not (body or "").strip():
         return (stop_block, False, "no body")
 
+    # [LOCAL-640] Fabricated single-name creator guard. Before the LLM edit, drop
+    # any sentence in the BODY that introduces a single-surname creator ("composer
+    # Losonczy created a musical piece …") whose surname is in NONE of the stop's
+    # external sources (the ``passages`` corpus). Pinakothek der Moderne (tour 533)
+    # shipped exactly that: a composer who does not exist, named only by a bare
+    # surname, so the multi-word prose-entity gate never saw it and the stop was
+    # not exhibition-scoped. This runs on EVERY stop body, is deterministic, adds
+    # no text, and only ever DROPS when a non-empty corpus proves the name absent
+    # (empty corpus → no drop, matching the grounding chain's false-rejection
+    # posture). The cleaned body becomes the baseline the LLM edits AND the
+    # fallback that ships on every rejection path below (via _fab_fallback_block),
+    # so the fabricated name never reaches the listener even when the edit is
+    # rejected.
+    _fab_removed = False
+    _fab_fallback_block = stop_block
+    if passages:
+        try:
+            from prose_entity_grounding_gate import strip_fabricated_single_names
+            _cleaned_body, _fab_dropped = strip_fabricated_single_names(
+                body, list(passages))
+            if _fab_dropped and _cleaned_body.strip():
+                if log:
+                    for _d in _fab_dropped:
+                        log(f"[LOCAL-640] stop {stop_number}: dropped fabricated "
+                            f"name '{_d['surname']}' ({_d['trigger']}): "
+                            f"\"{_d['sentence'][:80]}\"")
+                body = _cleaned_body
+                _fab_removed = True
+                _fab_fallback_block = _reassemble_block(
+                    stop_block, header_line, preserved_meta, body, tail_meta)
+        except Exception as _fab_err:  # pragma: no cover
+            if log:
+                log(f"[LOCAL-640] stop {stop_number}: fabricated-name guard "
+                    f"skipped ({type(_fab_err).__name__})")
+
+    if not (body or "").strip():
+        # The fabrication removal emptied the body — ship the original block
+        # rather than an empty stop (another gate owns a now-empty stop).
+        return (stop_block, False, "body empty after fabricated-name strip")
+
     prompt = build_editor_prompt(title, body)
     try:
         edited_body = fn(prompt, api_key)
@@ -1198,7 +1238,8 @@ def edit_stop(
         reason = f"llm error: {type(exc).__name__}"
         if log:
             log(f"[LOCAL-628] stop {stop_number}: rejected({reason})")
-        return (stop_block, False, reason)
+        return (_fab_fallback_block, _fab_removed,
+                "fabricated-name-stripped" if _fab_removed else reason)
 
     edited_body = (edited_body or "").strip().strip('"').strip()
     if not edited_body:
@@ -1235,7 +1276,8 @@ def edit_stop(
                 return (new_block, True, "teaser-dropped")
         if log:
             log(f"[LOCAL-628] stop {stop_number}: rejected({reason})")
-        return (stop_block, False, reason)
+        return (_fab_fallback_block, _fab_removed,
+                "fabricated-name-stripped" if _fab_removed else reason)
 
     ok, reason = validate_edit(
         edited_body, body, stop_title=title, venue_name=venue_name,
@@ -1298,7 +1340,8 @@ def edit_stop(
                 return (new_block, True, "teaser-dropped")
         if log:
             log(f"[LOCAL-628] stop {stop_number}: rejected({reason})")
-        return (stop_block, False, reason)
+        return (_fab_fallback_block, _fab_removed,
+                "fabricated-name-stripped" if _fab_removed else reason)
 
     # [LOCAL-638 Note 2] The stop must not end on an unpaid teaser. The prompt asks
     # the LLM to DELIVER or DROP it; as a deterministic guarantee, if the accepted

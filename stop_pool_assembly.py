@@ -512,6 +512,17 @@ def assemble_building_tour(
     except Exception as _suc_e:  # pragma: no cover
         logger.info(f"[LOCAL-634] unseen-callback guard skipped ({_suc_e})")
         _unseen_dropped = []
+    # [LOCAL-640] Drop any COMPARISON to a NAMED undelivered work ("echoes the
+    # way Gauguin, in the 'Græshopperne og myrerne'", Ny Carlsberg 532). D636
+    # keeps comparisons to a DELIVERED stop; only a named undelivered work goes.
+    try:
+        from cross_stop_reference_guard import strip_unseen_comparisons as _suk
+        ordered, _cmp_dropped = _suk(ordered)
+        if _cmp_dropped:
+            logger.info(f"[LOCAL-640] dropped {len(_cmp_dropped)} unseen-comparison(s)")
+    except Exception as _suk_e:  # pragma: no cover
+        logger.info(f"[LOCAL-640] unseen-comparison guard skipped ({_suk_e})")
+        _cmp_dropped = []
     # [LOCAL-627 defect 9] At most ONE light thematic bridge per tour; never a
     # previous-stop recap ("…you stopped at a moment ago"). Tour 487 recapped the
     # prior stop in every stop. Drop all previous-stop recaps and every thematic
@@ -729,6 +740,15 @@ def assemble_outdoor_tour(
     except Exception as _suc_e:  # pragma: no cover
         logger.info(f"[LOCAL-634] unseen-callback guard skipped ({_suc_e})")
         _unseen_dropped = []
+    # [LOCAL-640] Comparison to a NAMED undelivered work (outdoor route too).
+    try:
+        from cross_stop_reference_guard import strip_unseen_comparisons as _suk
+        ordered, _cmp_dropped = _suk(ordered)
+        if _cmp_dropped:
+            logger.info(f"[LOCAL-640] dropped {len(_cmp_dropped)} unseen-comparison(s)")
+    except Exception as _suk_e:  # pragma: no cover
+        logger.info(f"[LOCAL-640] unseen-comparison guard skipped ({_suk_e})")
+        _cmp_dropped = []
     # [LOCAL-627 defect 9] One thematic bridge per tour; no previous-stop recap
     # (outdoor route too).
     try:

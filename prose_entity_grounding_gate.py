@@ -1818,3 +1818,206 @@ def apply_org_grounding_gate(poi_list: List[Dict], page_text: str,
         if affected:
             stats['stops_affected'] += 1
     return stats
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# [LOCAL-640] FABRICATED SINGLE-NAME PERSON (role/attribution) BODY GUARD
+# ═══════════════════════════════════════════════════════════════════════════════
+#
+# `apply_prose_entity_grounding_gate` only ever inspects MULTI-WORD names — a
+# deliberate contract (test_local378 `test_single_word_not_detected`), because a
+# bare capitalised word in prose is usually a title word, a place, or the first
+# word of a sentence, not a person. The cost of that contract showed up at
+# Pinakothek der Moderne (tour 533), a general museum stop, which shipped inside
+# a stop BODY:
+#
+#   "composer Losonczy created a musical piece of the same name … inspired
+#    directly by Klee's painting."
+#
+# There is no verifiable composer named Losonczy, and the name is in NONE of the
+# stop's sources. It is a single surname, so the multi-word extractor never saw
+# it; and the stop is not exhibition-scoped, so the exhibition page gate never
+# ran. The listener is told a fabricated person composed a work.
+#
+# This guard asks the same question the org gate asks, for a narrower shape that
+# the person gate structurally cannot see:
+#
+#   A person named ONLY by a ROLE word ("composer/painter/sculptor/architect/
+#   poet/writer/…") immediately before a capitalised surname, OR a bare
+#   capitalised surname that is the SUBJECT of an authorship verb
+#   ("composed/created/painted/designed/sculpted/wrote/…"), who appears NOWHERE
+#   in the evidence corpus — is a fabrication. Its sentence is dropped (with
+#   fragment cleanup), exactly like an ungrounded org/person.
+#
+# Conservative by construction — it only ever DROPS when ALL hold:
+#   * the name is introduced by a role word or is the subject of an authorship
+#     verb (so an incidental capitalised word is never touched);
+#   * a non-empty evidence corpus is provided (an empty corpus means "we cannot
+#     check", and the gate's whole-session posture is to never drop on no
+#     evidence — D482/D483);
+#   * the surname is absent from that corpus (accent-folded, whole-word);
+#   * the surname is not a known non-person / common word, and is 3+ letters.
+# Multi-word names remain the multi-word gate's job; this guard skips any
+# surname that is part of a multi-word name already present in the same text.
+
+# Role words that commonly introduce a creator by a single surname.
+_ROLE_WORDS = (
+    "composer", "painter", "sculptor", "architect", "poet", "writer",
+    "novelist", "playwright", "dramatist", "author", "artist", "designer",
+    "photographer", "printmaker", "engraver", "illustrator", "muralist",
+    "ceramicist", "potter", "weaver", "draughtsman", "draftsman", "etcher",
+    "musician", "pianist", "violinist", "conductor", "singer", "songwriter",
+    "director", "filmmaker", "choreographer", "dancer",
+    "philosopher", "scientist", "inventor", "engineer", "mathematician",
+    "critic", "historian", "collector", "patron", "curator", "dealer",
+)
+
+# Authorship / making verbs that take a creator as their subject.
+_AUTHORSHIP_VERBS = (
+    "composed", "created", "painted", "designed", "sculpted", "wrote",
+    "drew", "etched", "engraved", "carved", "cast", "built", "crafted",
+    "produced", "authored", "penned", "directed", "choreographed",
+    "photographed", "printed", "illustrated", "founded", "invented",
+    "discovered", "devised", "conceived",
+)
+
+# "<role> <Surname>" — role word (optionally preceded by "the"/"a"/"an"), then a
+# single capitalised surname NOT followed by another capitalised name word (that
+# would be a multi-word name, which the other gate owns). The role word is
+# matched case-insensitively via an inline group; the surname and the lookahead
+# are case-SENSITIVE on purpose — a global (?i) makes the "another capital"
+# lookahead match the lowercase verb and truncates the surname ("Losoncz").
+_ROLE_NAME_RE = re.compile(
+    r'\b(?:[Tt]he\s+|[Aa]\s+|[Aa]n\s+)?'
+    r'(?i:(' + "|".join(_ROLE_WORDS) + r'))\s+'
+    r'([A-ZÀ-ÖØ-Þ][a-zà-ÿ\'\u2019\-]{2,})'
+    r'(?!\s+[A-ZÀ-ÖØ-Þ][a-zà-ÿ])')
+
+# "<Surname> <authorship verb>" — a bare capitalised surname as the subject of a
+# making verb, NOT preceded by another capitalised word (multi-word name) and
+# NOT a sentence that merely continues ("…, Surname created").
+_NAME_VERB_RE = re.compile(
+    r'(?<![A-Za-zÀ-ÿ])([A-ZÀ-ÖØ-Þ][a-zà-ÿ\'\u2019\-]{2,})\s+'
+    r'(?:' + "|".join(_AUTHORSHIP_VERBS) + r')\b')
+
+# Common/structural capitalised words that are never a person surname even in a
+# role/verb slot (reuse the gate's non-name vocabulary + a few prose openers).
+_SINGLE_NAME_STOPWORDS = frozenset(
+    {w for w in _NON_NAME_WORDS}
+    | {w for w in _NON_NAME_OPENERS}
+    | {
+        "it", "he", "she", "they", "we", "you", "this", "that", "these",
+        "those", "here", "there", "today", "later", "earlier", "then",
+        "its", "his", "her", "their", "our", "your",
+        "one", "work", "works", "piece", "pieces", "painting", "paintings",
+        "sculpture", "drawing", "print", "series", "both", "each", "many",
+        "some", "most", "another", "other", "such", "same",
+    }
+)
+
+
+def _corpus_haystack(corpus_texts: List[str]) -> str:
+    """Accent-folded concatenation of every evidence passage, for whole-word
+    surname lookup."""
+    return " ".join(fold(t) for t in (corpus_texts or []) if t and t.strip())
+
+
+def _candidate_fabricated_surnames(text: str) -> List[Tuple[str, str]]:
+    """Return (surname, trigger) pairs for single-name creators introduced by a
+    role word or standing as the subject of an authorship verb. ``trigger`` is a
+    short label for the drop log ("role:composer" / "verb:composed")."""
+    out: List[Tuple[str, str]] = []
+    seen: set = set()
+
+    def _consider(surname: str, trigger: str) -> None:
+        if not surname:
+            return
+        key = surname.lower()
+        if key in seen:
+            return
+        if len(surname) < 3:
+            return
+        if key in _SINGLE_NAME_STOPWORDS:
+            return
+        if surname.lower() in _KNOWN_NON_PERSON_STRINGS:
+            return
+        seen.add(key)
+        out.append((surname, trigger))
+
+    for m in _ROLE_NAME_RE.finditer(text or ""):
+        _consider(m.group(2), f"role:{m.group(1).lower()}")
+    for m in _NAME_VERB_RE.finditer(text or ""):
+        surname = m.group(1)
+        # Skip a sentence-initial capital that is just the first word of a
+        # sentence AND a stopword — handled by _SINGLE_NAME_STOPWORDS already.
+        _consider(surname, "verb")
+    return out
+
+
+def _surname_is_part_of_multiword(surname: str, text: str) -> bool:
+    """True when ``surname`` only ever appears as part of a MULTI-WORD name in
+    ``text`` (e.g. 'Klee' inside 'Paul Klee'). Those are the multi-word gate's
+    responsibility; this guard must not act on them."""
+    sl = fold(surname)
+    for name in extract_person_names(text or ""):
+        parts = [fold(p) for p in name.split()]
+        if sl in parts and len(parts) >= 2:
+            # It is a component of a detected multi-word name. If it also appears
+            # standalone, we still defer: the multi-word gate grounds the whole.
+            return True
+    return False
+
+
+def detect_fabricated_single_name(text: str,
+                                  corpus_texts: List[str]) -> List[Tuple[str, str]]:
+    """[LOCAL-640] Return the (surname, trigger) pairs in ``text`` that name a
+    single-surname creator (role word or authorship-verb subject) whose surname
+    is ABSENT from the evidence ``corpus_texts``. Returns [] when the corpus is
+    empty (cannot check → never drop) or nothing is fabricated.
+
+    Deterministic; no network. The surname lookup is accent-folded and
+    whole-word, so 'Losonczy' absent from the corpus is fabricated, while a
+    'Klee' present in the Klee snippet is grounded and kept."""
+    corpus_texts = [t for t in (corpus_texts or []) if t and t.strip()]
+    if not corpus_texts:
+        return []
+    haystack = _corpus_haystack(corpus_texts)
+    if not haystack:
+        return []
+    out: List[Tuple[str, str]] = []
+    for surname, trigger in _candidate_fabricated_surnames(text):
+        if _surname_is_part_of_multiword(surname, text):
+            continue
+        # Grounded if the surname appears whole-word in the folded corpus.
+        if contains_entity(haystack, surname):
+            continue
+        out.append((surname, trigger))
+    return out
+
+
+def strip_fabricated_single_names(text: str,
+                                  corpus_texts: List[str]) -> Tuple[str, List[Dict]]:
+    """[LOCAL-640] Drop every sentence in ``text`` that introduces a fabricated
+    single-surname creator (per ``detect_fabricated_single_name``). Returns
+    (cleaned_text, dropped) where ``dropped`` is a list of
+    {surname, trigger, sentence}. Fragment cleanup mirrors
+    ``remove_person_from_text`` so a deletion never leaves a dangling opener.
+    """
+    fabricated = detect_fabricated_single_name(text, corpus_texts)
+    if not fabricated:
+        return text, []
+    dropped: List[Dict] = []
+    cleaned = text
+    for surname, trigger in fabricated:
+        # Remove by bare surname (whole-word / possessive), reusing the person
+        # remover so possessives and fragments are handled identically.
+        before = cleaned
+        new_text, removed = remove_person_from_text(cleaned, surname)
+        if removed:
+            cleaned = new_text
+            for sent in removed:
+                dropped.append({"surname": surname, "trigger": trigger,
+                                "sentence": sent})
+        else:
+            cleaned = before
+    return cleaned, dropped

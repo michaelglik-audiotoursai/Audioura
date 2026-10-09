@@ -637,3 +637,157 @@ def strip_unseen_callbacks_in_text(tour_text: str) -> Tuple[str, int]:
     out = "\n".join(out_lines)
     out = re.sub(r"\n{3,}", "\n\n", out)
     return out, dropped
+
+
+# ─── [LOCAL-640] Comparison to an UNSEEN work ─────────────────────────────────
+#
+# The recall guards above catch "you may recall / you saw / already encountered".
+# Bench R8 showed a THIRD cross-reference shape that names a work the listener was
+# never given — a COMPARISON, not a recall:
+#
+#   Ny Carlsberg Glyptotek 532:
+#     "…echoes the way Gauguin, in the 'Græshopperne og myrerne', …"
+#   Courtauld 485:
+#     "It echoes the social facades …"
+#
+# "echoes the way <Artist>, in '<Title>'" compares the current stop to a work
+# ('Græshopperne og myrerne') that is NOT a delivered stop. The listener is told
+# "this echoes that other work" when they have no "that other work" — the same
+# phantom as a recall of an absent stop, through a comparison verb the recall
+# regexes do not cover.
+#
+# D636 is explicit that a comparison to a DELIVERED stop is welcome continuity.
+# So the rule is identical to strip_phantom_references: a comparison that NAMES a
+# title (quoted, or introduced by "such as"/"like"/"as in") which is NOT among
+# the delivered titles is dropped; a comparison to a delivered title stays; a
+# comparison that names no concrete work is left to other guards (we never drop
+# on a bare "echoes the social facades" — nothing concrete to falsify). This
+# reuses _candidate_titles / _is_delivered so "delivered-ness" is decided exactly
+# as the phantom-reference guard decides it.
+
+# Comparison verbs that assert the current stop is LIKE some other work. The verb
+# itself is the cue; a named undelivered title in the SAME sentence is the drop
+# condition.
+_COMPARISON_CUE_RE = re.compile(
+    r"(?i)\b("
+    r"echoes?|echoing|mirrors?|mirroring|evokes?|evoking|recalls?|"
+    r"parallels?|paralleling|resembles?|resembling|reminiscent\s+of|"
+    r"harks?\s+back\s+to|harkens?\s+back\s+to|in\s+the\s+manner\s+of|"
+    r"much\s+like|just\s+as|akin\s+to|as\s+in"
+    r")\b")
+
+
+def _comparison_names_unseen(sentence: str,
+                             delivered_norms: List[str]) -> Optional[str]:
+    """When ``sentence`` is a comparison ("echoes/mirrors/… the way X, in
+    '<Title>'") that NAMES a title NOT among the delivered titles, return that
+    phantom title; otherwise None. A comparison naming no concrete title, or one
+    naming a DELIVERED title, returns None (kept)."""
+    if not _COMPARISON_CUE_RE.search(sentence or ""):
+        return None
+    for cand in _candidate_titles(sentence):
+        if not _is_delivered(cand, delivered_norms):
+            return cand
+    return None
+
+
+def _delivered_norms_from_units(ordered_units: List[Dict]) -> List[str]:
+    """Normalised delivered titles + work cores from stop-unit dicts (mirrors the
+    set strip_phantom_references builds)."""
+    out: List[str] = []
+    for u in ordered_units:
+        t = (u.get("title") or "").strip()
+        if not t:
+            continue
+        out.append(_norm(t))
+        core = _title_core(t)
+        if core:
+            out.append(_norm(core))
+    return [d for d in out if d]
+
+
+def strip_unseen_comparisons(
+        ordered_units: List[Dict]) -> Tuple[List[Dict], List[Dict]]:
+    """[LOCAL-640] Drop every sentence that compares the current stop to a NAMED
+    work not delivered in this tour ("echoes the way Gauguin, in the
+    'Græshopperne og myrerne'"). Returns (new_units, dropped). Comparisons to a
+    delivered title are kept (D636). Pure and deterministic; mirrors
+    strip_phantom_references' shape."""
+    delivered_norms = _delivered_norms_from_units(ordered_units)
+    dropped: List[Dict] = []
+    new_units: List[Dict] = []
+    for i, unit in enumerate(ordered_units):
+        stop_num = i + 1
+        narration = unit.get("narration") or ""
+        nu = dict(unit)
+        if not narration.strip():
+            new_units.append(nu)
+            continue
+        out_paras: List[str] = []
+        for para in re.split(r"\n{2,}", narration):
+            sentences = _split_sentences(para)
+            if not sentences:
+                out_paras.append(para)
+                continue
+            kept: List[str] = []
+            for sent in sentences:
+                phantom = _comparison_names_unseen(sent, delivered_norms)
+                if phantom is not None:
+                    dropped.append({
+                        "stop": stop_num, "sentence": sent.strip(),
+                        "reason": "comparison to a work not in this tour",
+                        "phantom": phantom})
+                    continue
+                kept.append(sent)
+            out_paras.append(" ".join(kept).strip())
+        nu["narration"] = "\n\n".join(p for p in out_paras if p.strip()).strip()
+        new_units.append(nu)
+    return new_units, dropped
+
+
+def strip_unseen_comparisons_in_text(tour_text: str) -> Tuple[str, int]:
+    """Text-level sibling of strip_unseen_comparisons for the normal delivery
+    path (Ny Carlsberg 532 shipped the Gauguin comparison on this path). Walks
+    each stop, derives delivered titles from the Stop headers, and drops any
+    sentence that compares the stop to a NAMED undelivered work. Field/header
+    lines are preserved verbatim. Returns (cleaned_text, n_dropped)."""
+    if not tour_text:
+        return tour_text or "", 0
+    titles = [m.group(1) for m in re.finditer(
+        r'(?mi)^Stop\s+\d+:\s*(.+?)\s*$', tour_text)]
+    delivered_norms: List[str] = []
+    for t in titles:
+        t = (t or "").strip()
+        if not t:
+            continue
+        delivered_norms.append(_norm(t))
+        core = _title_core(t)
+        if core:
+            delivered_norms.append(_norm(core))
+    delivered_norms = [d for d in delivered_norms if d]
+    dropped = 0
+    out_lines: List[str] = []
+    for raw in tour_text.split("\n"):
+        stripped = raw.strip()
+        if (not stripped or _TEXT_STOP_HEADER_RE.match(stripped)
+                or _TEXT_FIELD_LINE_RE.match(stripped)):
+            out_lines.append(raw)
+            continue
+        lead = ""
+        body = raw
+        om = re.match(r'(?i)^(\s*orientation:\s*)', raw)
+        if om:
+            lead = raw[:om.end()]
+            body = raw[om.end():]
+        kept_sents: List[str] = []
+        for sent in _split_sentences(body):
+            if _comparison_names_unseen(sent, delivered_norms) is not None:
+                dropped += 1
+                continue
+            kept_sents.append(sent)
+        new_body = " ".join(kept_sents).strip()
+        if lead or new_body:
+            out_lines.append((lead + new_body).rstrip())
+    out = "\n".join(out_lines)
+    out = re.sub(r"\n{3,}", "\n\n", out)
+    return out, dropped
