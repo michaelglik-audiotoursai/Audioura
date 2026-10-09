@@ -263,6 +263,17 @@ def _normalise_venue_name(venue_string: str) -> List[str]:
     else:
         variants.append(_stripped)
 
+    # [LOCAL-637] Add a leading-article-stripped variant. "The Wallace Collection"
+    # must also be searched as "Wallace Collection": the museum's Wikidata label is
+    # "Wallace Collection" (no "The"), so wbsearchentities for "The Wallace
+    # Collection" returns ONLY the Belgian pop-rock BAND (Q1516598) and a caricature
+    # (Q106500505) — the museum Q1327919 is absent. Searching the bare name surfaces
+    # the museum first. Appended AFTER the full form so an exact match still wins.
+    _article_stripped = re.sub(r'(?i)^(the|le|la|les|l[\'’]|il|lo|el|das|der|die)\s+',
+                               '', _stripped).strip()
+    if _article_stripped and _article_stripped != _stripped:
+        variants.append(_article_stripped)
+
     # Deduplicate while preserving order
     seen = set()
     deduped = []
@@ -545,6 +556,19 @@ def resolve_venue(venue_string: str, city: str = "") -> Optional[VenueEntity]:
             candidates = _variant_hits
             print(f"  [venue_resolver] Candidates for variant '{_variant}': "
                   f"{[q for q, _ in candidates][:8]}")
+            # [LOCAL-637] Do NOT break before trying a leading-article-stripped
+            # variant. "The Wallace Collection" matches ONLY the band (Q1516598);
+            # the museum Q1327919 is labelled "Wallace Collection" and only
+            # surfaces for the article-stripped query. Union those hits in so the
+            # Step-2 museum-type filter can pick the museum. The matched variant's
+            # hits stay FIRST so an exact match still ranks ahead.
+            _variant_stripped = re.sub(
+                r'(?i)^(the|le|la|les|l[\'’]|il|lo|el|das|der|die)\s+',
+                '', _variant).strip()
+            if _variant_stripped and _variant_stripped != _variant:
+                _merge_candidates(candidates, _search_entities(_variant_stripped))
+                print(f"  [venue_resolver] Augmented with article-stripped "
+                      f"variant '{_variant_stripped}': {[q for q, _ in candidates][:8]}")
             break  # Found candidates with this variant
 
     if not candidates:

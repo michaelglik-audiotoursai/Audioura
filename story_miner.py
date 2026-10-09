@@ -20,6 +20,69 @@ import requests
 
 logger = logging.getLogger(__name__)
 
+
+# ─── [LOCAL-637] Disambiguation-qualifier guard ──────────────────────────────
+# Bench R6 built the Wallace Collection museum's corpus from a MUSIC BAND's
+# Wikipedia article. The venue resolved (under a 429 that defeated the P31 museum
+# filter) to Q1516598 — "Wallace Collection", the Belgian pop-rock BAND — whose
+# enwiki sitelink is literally "Wallace Collection (band)". The real museum is
+# Q1327919 (enwiki "Wallace Collection", 674 works). The band title was then
+# accepted "on venue-name match" because the band article's lead naturally
+# contains the words "Wallace" and "Collection".
+#
+# Rule: a Wikipedia title (sitelink or fuzzy fallback) whose PARENTHETICAL
+# qualifier names something that is not a museum/gallery/collection/institution/
+# building — "(band)", "(album)", "(film)", "(song)", "(TV series)", … — must
+# never be accepted as the corpus for a museum venue. A museum's own article is
+# either unqualified ("Wallace Collection") or carries a place/institution
+# qualifier ("... (museum)", "... (London)"), never a creative-work qualifier.
+_NON_MUSEUM_PAREN_QUALIFIERS = frozenset({
+    'band', 'album', 'film', 'song', 'tv series', 'television series', 'tv show',
+    'single', 'ep', 'musician', 'singer', 'musical group', 'rock band',
+    'pop group', 'duo', 'play', 'opera', 'novel', 'book', 'video game',
+    'comics', 'comic', 'manga', 'anime', 'character', 'fictional character',
+    'episode', 'soundtrack', 'mixtape', 'rapper', 'dj', 'actor', 'actress',
+    'footballer', 'politician', 'horse', 'ship', 'aircraft', 'company',
+})
+
+# Parenthetical qualifiers that ARE compatible with a museum venue, so a title
+# like "Wallace Collection (museum)" or "... (London)" is still accepted.
+_MUSEUM_OK_PAREN_QUALIFIERS = frozenset({
+    'museum', 'gallery', 'art museum', 'art gallery', 'collection', 'institution',
+    'building', 'house', 'palace', 'library', 'archive', 'foundation', 'manor',
+})
+
+
+def _parenthetical_qualifier(title: str) -> str:
+    """Return the lowercased parenthetical qualifier of a Wikipedia title, or ''.
+
+    "Wallace Collection (band)" -> "band"; "Wallace Collection" -> "".
+    """
+    if not title:
+        return ''
+    m = re.search(r'\(([^()]+)\)\s*$', title.strip())
+    return m.group(1).strip().lower() if m else ''
+
+
+def _title_qualifier_rejects_museum(title: str) -> bool:
+    """True when `title`'s parenthetical qualifier is a non-museum disambiguator.
+
+    Used to reject a band/album/film/… Wikipedia title as the corpus for a museum
+    venue. A museum-compatible qualifier (or no qualifier at all) returns False.
+    """
+    q = _parenthetical_qualifier(title)
+    if not q:
+        return False
+    if q in _MUSEUM_OK_PAREN_QUALIFIERS:
+        return False
+    if q in _NON_MUSEUM_PAREN_QUALIFIERS:
+        return True
+    # Unknown qualifier that mentions a museum-ish word is allowed; otherwise, be
+    # conservative and allow it (only KNOWN creative-work qualifiers are rejected)
+    # so we never strip a legitimate "(Nice)"/"(Paris)" place disambiguator.
+    return False
+
+
 # --- HTML text extraction ---
 
 class _TextExtractor(HTMLParser):
@@ -1495,10 +1558,20 @@ def fetch_venue_narrative_corpus(
                 for _sl_r in _sl_data.get('results', {}).get('bindings', []):
                     _sl_url = _sl_r.get('sitelink', {}).get('value', '')
                     if 'en.wikipedia.org' in _sl_url:
-                        _en_wiki_title_exact = _sl_url.split('/wiki/')[-1].replace('_', ' ')
+                        _candidate_title = _sl_url.split('/wiki/')[-1].replace('_', ' ')
                         from urllib.parse import unquote
-                        _en_wiki_title_exact = unquote(_en_wiki_title_exact)
-                        print(f"  [story_miner] Sitelink EN: '{_en_wiki_title_exact}'")
+                        _candidate_title = unquote(_candidate_title)
+                        # [LOCAL-637] Reject a non-museum parenthetical qualifier.
+                        # The venue QID can be a NAMESAKE (band/album/film) whose
+                        # OWN enwiki sitelink is e.g. "Wallace Collection (band)".
+                        # A museum venue must never adopt a creative-work article
+                        # as its corpus.
+                        if _title_qualifier_rejects_museum(_candidate_title):
+                            print(f"  [story_miner] Sitelink EN rejected (non-museum "
+                                  f"qualifier): '{_candidate_title}' for {venue_qid}")
+                        else:
+                            _en_wiki_title_exact = _candidate_title
+                            print(f"  [story_miner] Sitelink EN: '{_en_wiki_title_exact}'")
                     elif f'{language}.wikipedia.org' in _sl_url and language != 'en':
                         _local_wiki_title_exact = _sl_url.split('/wiki/')[-1].replace('_', ' ')
                         from urllib.parse import unquote
@@ -1539,6 +1612,13 @@ def fetch_venue_narrative_corpus(
         
         en_article = ""
         for _en_title in _en_titles:
+            # [LOCAL-637] Never adopt a band/album/film/… article as a museum's
+            # corpus, no matter how it entered the title list (exact sitelink of a
+            # namesake QID, or a fuzzy fallback that redirected to the namesake).
+            if _title_qualifier_rejects_museum(_en_title):
+                print(f"  [story_miner] Wikipedia EN: '{_en_title}' rejected "
+                      f"(non-museum parenthetical qualifier)")
+                continue
             _candidate = fetch_wikipedia_summary(_en_title)
             if _candidate and len(_candidate) > 500:
                 # Validate: article should mention the venue's city (avoid wrong-city museum)
