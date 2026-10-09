@@ -71,18 +71,33 @@ def get_tour_by_code(code):
             return jsonify({'error': 'tour not found'}), 404
 
         cur.execute("""
-            SELECT id, tour_name, request_string, lat, lng, number_requested,
-                   language, original_tour_id
-            FROM audio_tours
-            WHERE id = %s
-        """, (row[0],))
+            SELECT t.id, t.tour_name, t.request_string, t.lat, t.lng,
+                   t.number_requested, t.language, t.original_tour_id,
+                   v.max_version_no, v.last_replaced_at, t.created_at
+            FROM audio_tours t
+            LEFT JOIN (
+                SELECT tour_id,
+                       MAX(version_no)  AS max_version_no,
+                       MAX(replaced_at) AS last_replaced_at
+                FROM audio_tour_versions
+                WHERE tour_id = %s
+                GROUP BY tour_id
+            ) v ON v.tour_id = t.id
+            WHERE t.id = %s
+        """, (row[0], row[0]))
         t = cur.fetchone()
         cur.close()
         conn.close()
         if not t:
             return jsonify({'error': 'tour not found'}), 404
 
-        tour_id, tour_name, request_string, tour_lat, tour_lng, requests, language, original_id = t
+        (tour_id, tour_name, request_string, tour_lat, tour_lng, requests,
+         language, original_id, max_vn, last_replaced, created_at) = t
+        # [LOCAL-657] A share code can point at a translation row as well as an
+        # original; either way we join on that row's own id, so the version is the
+        # version of the exact tour the listener will download. Translations carry
+        # their own version per the task.
+        version, updated_at = _version_fields(max_vn, last_replaced, created_at)
         # Same keys as a /tours-near element. distance_km is None, not 0: the listener
         # is not near it, and 0 would sort it to the top under false pretences.
         return jsonify({
@@ -98,6 +113,8 @@ def get_tour_by_code(code):
                 'language': language or 'en',
                 'original_tour_id': original_id,
                 'via_share_code': code,
+                'version': version,
+                'updated_at': updated_at,
             }],
             'count': 1,
         })
@@ -136,6 +153,30 @@ def get_db_connection():
         user="admin",
         password="password123"
     )
+
+def _version_fields(max_version_no, last_replaced_at, created_at):
+    """[LOCAL-657] Derive the (version, updated_at) pair the app shows next to Downloads.
+
+    version = COALESCE(MAX(version_no), 0) + 1 for the tour's own id. A tour that
+    has never been replaced has no audio_tour_versions rows (max is NULL) and is
+    therefore version 1. Each replacement archives the OLD version_no (1,2,3,…),
+    so N archived rows mean the live row is version N+1.
+
+    updated_at = the newest replaced_at if the tour has ever been replaced, else
+    the row's created_at. Returned as an ISO date string (YYYY-MM-DD), or None if
+    no timestamp is available at all. The app only renders this when version >= 2.
+    """
+    version = (max_version_no or 0) + 1
+    stamp = last_replaced_at or created_at
+    updated_at = None
+    if stamp is not None:
+        try:
+            updated_at = stamp.date().isoformat()
+        except AttributeError:
+            # Already a date, or a string — fall back to str() of its date part.
+            updated_at = str(stamp)[:10]
+    return version, updated_at
+
 
 def calculate_distance(lat1, lng1, lat2, lng2):
     """Calculate distance between two points in kilometers"""
@@ -178,25 +219,38 @@ def get_tours_near_location(lat, lng):
         
         # Get only English/original tours for map display (no translations)
         # Exclude test-generated tours (is_test flag set by test-mode generation)
+        # [LOCAL-657] LEFT JOIN one grouped pass over audio_tour_versions (not a
+        # query per tour) to carry each tour's version + last-replaced timestamp.
         cur.execute("""
-            SELECT id, tour_name, request_string, lat, lng, number_requested, content_language, original_tour_id
-            FROM audio_tours 
-            WHERE lat IS NOT NULL AND lng IS NOT NULL
-            AND (content_language = 'en' OR content_language IS NULL)
-            AND original_tour_id IS NULL
-            AND (is_test IS NOT TRUE)
+            SELECT t.id, t.tour_name, t.request_string, t.lat, t.lng,
+                   t.number_requested, t.content_language, t.original_tour_id,
+                   v.max_version_no, v.last_replaced_at, t.created_at
+            FROM audio_tours t
+            LEFT JOIN (
+                SELECT tour_id,
+                       MAX(version_no)  AS max_version_no,
+                       MAX(replaced_at) AS last_replaced_at
+                FROM audio_tour_versions
+                GROUP BY tour_id
+            ) v ON v.tour_id = t.id
+            WHERE t.lat IS NOT NULL AND t.lng IS NOT NULL
+            AND (t.content_language = 'en' OR t.content_language IS NULL)
+            AND t.original_tour_id IS NULL
+            AND (t.is_test IS NOT TRUE)
         """)
         
         tours = cur.fetchall()
         tours_list = []
         
         for tour in tours:
-            tour_id, tour_name, request_string, tour_lat, tour_lng, requests, language, original_id = tour
+            (tour_id, tour_name, request_string, tour_lat, tour_lng, requests,
+             language, original_id, max_vn, last_replaced, created_at) = tour
             
             if tour_lat and tour_lng:
                 distance = calculate_distance(lat, lng, tour_lat, tour_lng)
                 
                 if distance <= radius_km:
+                    version, updated_at = _version_fields(max_vn, last_replaced, created_at)
                     tour_data = {
                         'id': tour_id,
                         'name': tour_name,
@@ -207,7 +261,9 @@ def get_tours_near_location(lat, lng):
                         'popularity': requests,
                         'type': 'walking_tour',
                         'language': language or 'en',
-                        'original_tour_id': original_id
+                        'original_tour_id': original_id,
+                        'version': version,
+                        'updated_at': updated_at
                     }
                     tours_list.append(tour_data)
         
