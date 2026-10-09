@@ -42,6 +42,132 @@ _USER_AGENT = "Audioura/2.2 (tour-generation; contact: support@audioura.com)"
 _WIKIDATA_API = "https://www.wikidata.org/w/api.php"
 _SPARQL_ENDPOINT = "https://query.wikidata.org/sparql"
 
+
+# ─── [LOCAL-637] Rate-limit resilience: 429/5xx retry with backoff ───────────
+# Bench R6 refused the National Gallery because a single Wikidata 429 (six tours
+# ran at once) tripped the dead-host breaker, which then short-circuited every
+# later Wikidata call in that tour to None — the already-resolved museum (Q180788,
+# 389 works) was discarded on a RATE LIMIT. A 429 or a transient 5xx is a "try
+# again shortly" signal, NOT "venue unknown".
+#
+# _request_with_backoff() is the single retry path for every Wikidata/Wikipedia
+# GET in this module. It:
+#   - retries 429 and 500/502/503/504 (and timeout/connection errors) up to
+#     3 attempts with 2 s / 5 s / 10 s backoff plus jitter;
+#   - honours a Retry-After header (seconds or HTTP-date) when the server sends
+#     one, capped so a hostile header cannot stall a build;
+#   - marks the host cold in the dead-host breaker ONLY after the retries are
+#     exhausted (so one transient 429 no longer disables the host), and the
+#     breaker's mark is now a short cool-down (see dead_host_breaker.py), not a
+#     tour-long death sentence.
+# It returns the final Response (any status) or None when every attempt raised a
+# network exception. Callers keep their existing status-code handling.
+
+_BACKOFF_SCHEDULE = (2.0, 5.0, 10.0)   # seconds before attempts 2, 3, 4
+_RETRY_AFTER_CAP = 15.0                # never wait longer than this on Retry-After
+_RETRYABLE_STATUS = frozenset({429, 500, 502, 503, 504})
+
+
+def _parse_retry_after(value: str) -> Optional[float]:
+    """Parse a Retry-After header value (delta-seconds or HTTP-date).
+
+    Returns a non-negative float number of seconds to wait, or None when the
+    header is absent/unparseable. The result is clamped to _RETRY_AFTER_CAP by
+    the caller.
+    """
+    if not value:
+        return None
+    value = value.strip()
+    # delta-seconds form
+    try:
+        secs = float(value)
+        return max(0.0, secs)
+    except (TypeError, ValueError):
+        pass
+    # HTTP-date form
+    try:
+        from email.utils import parsedate_to_datetime
+        import datetime as _dt
+        dt = parsedate_to_datetime(value)
+        if dt is None:
+            return None
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=_dt.timezone.utc)
+        delta = (dt - _dt.datetime.now(_dt.timezone.utc)).total_seconds()
+        return max(0.0, delta)
+    except Exception:
+        return None
+
+
+def _request_with_backoff(url, *, params=None, headers=None, timeout=10,
+                          host_for_cold=None, label=""):
+    """GET with 429/5xx retry, backoff + jitter, and Retry-After support.
+
+    Args:
+        url: request URL.
+        params/headers/timeout: forwarded to requests.get.
+        host_for_cold: host/URL to mark cold in the dead-host breaker once the
+            retries are exhausted on a 429 or a network error. When None, no
+            cold-marking is done (caller handles it).
+        label: short string for diagnostics in logs.
+
+    Returns:
+        The final requests.Response (any status code) on the last attempt, or
+        None when every attempt raised a network exception.
+    """
+    import time as _t
+    import random as _r
+
+    attempts = len(_BACKOFF_SCHEDULE) + 1  # schedule entries + the first try
+    resp = None
+    last_exc = None
+
+    for _attempt in range(attempts):
+        resp = None
+        try:
+            resp = requests.get(url, params=params, headers=headers, timeout=timeout)
+        except (requests.exceptions.Timeout,
+                requests.exceptions.ConnectionError) as _e:
+            last_exc = _e
+            resp = None
+
+        # Success or a non-retryable status → return immediately.
+        if resp is not None and resp.status_code not in _RETRYABLE_STATUS:
+            return resp
+
+        # Out of attempts → stop (caller inspects resp / None).
+        if _attempt >= attempts - 1:
+            break
+
+        # Decide the wait: Retry-After (if present) else the backoff schedule,
+        # always with a little jitter so concurrent tours do not resynchronise.
+        base = _BACKOFF_SCHEDULE[_attempt]
+        wait = base
+        if resp is not None:
+            ra = _parse_retry_after(resp.headers.get("Retry-After", "")) \
+                if hasattr(resp, "headers") else None
+            if ra is not None:
+                wait = min(ra, _RETRY_AFTER_CAP)
+        wait = wait + _r.uniform(0.0, 0.5 * base)
+        _code = resp.status_code if resp is not None else f"{type(last_exc).__name__}"
+        logger.warning(f"[LOCAL-637] {label or url}: {_code} — retry "
+                       f"{_attempt + 1}/{attempts - 1} in {wait:.1f}s")
+        _t.sleep(wait)
+
+    # Retries exhausted. Mark the host cold (short cool-down) so sibling calls in
+    # this tour back off briefly, then let the caller handle resp/None.
+    if host_for_cold is not None:
+        try:
+            from dead_host_breaker import mark_host_cold
+            _why = (f"HTTP {resp.status_code}" if resp is not None
+                    else f"{type(last_exc).__name__}")
+            mark_host_cold(host_for_cold,
+                           reason=f"{_why} after {attempts} attempts on {label or 'request'}")
+        except ImportError:
+            pass
+    return resp
+
+
 # Country code → primary Wikipedia language
 _COUNTRY_LANG = {
     "Q142": "fr",   # France
@@ -296,6 +422,64 @@ def _fetch_works_count(qid: str) -> Tuple[int, int]:
         return 0, 0
 
 
+# [LOCAL-637] A "high-confidence" candidate is one we are willing to keep even
+# when city validation could not complete (a 429/5xx made the location check
+# UNKNOWN). It must clear BOTH bars so a stall never promotes a weak guess:
+#   1. Label match — the candidate's Wikidata label carries the venue's
+#      distinctive name tokens (so "National Gallery" matches Q180788's label
+#      "National Gallery", but a random namesake would not).
+#   2. Large catalogue — the entity holds a sizeable P195/P276 collection, which
+#      is exactly the corpus the tour would mine. A band/painting/namesake has 0.
+_HIGH_CONFIDENCE_MIN_WORKS = 25
+
+
+def _is_high_confidence_candidate(qid: str, label: str, venue_string: str) -> bool:
+    """True when `qid`/`label` is a strong match for `venue_string`.
+
+    Used by resolve_venue to KEEP an already-resolved candidate when city
+    validation is UNKNOWN (network/429), instead of discarding it on a rate limit.
+    Both the label-match and the large-catalogue bars must be cleared.
+    """
+    try:
+        _stop = {'the', 'of', 'de', 'du', 'des', 'le', 'la', 'les', 'and', '&',
+                 'museum', 'museums', 'gallery', 'galleria', 'musee', 'musée',
+                 'national', 'nationale', 'collection', 'art', 'arts', 'institute'}
+
+        def _tokens(s: str):
+            return {w for w in re.split(r'[\s\-,()]+', (s or '').lower())
+                    if len(w) >= 3 and w not in _stop}
+
+        # Distinctive tokens from the venue name (drop the generic museum words).
+        _venue_head = venue_string.split(',')[0]
+        _venue_tokens = _tokens(_venue_head)
+        _label_tokens = _tokens(label)
+
+        if _venue_tokens:
+            # All distinctive venue tokens must appear in the label (e.g.
+            # "national"+"gallery" are generic/stop-listed, but a distinctive name
+            # like "Wallace" or "Chagall" must be present).
+            _label_ok = _venue_tokens.issubset(_label_tokens)
+        else:
+            # Venue name was entirely generic ("The National Gallery") — fall back
+            # to a direct normalised string match against the label.
+            _norm_v = re.sub(r'[^a-z0-9]+', ' ', _venue_head.lower()).strip()
+            _norm_l = re.sub(r'[^a-z0-9]+', ' ', (label or '').lower()).strip()
+            _label_ok = bool(_norm_v) and (_norm_v in _norm_l or _norm_l in _norm_v)
+
+        if not _label_ok:
+            return False
+
+        # Large-catalogue bar: the entity must hold a real collection.
+        try:
+            _wc, _sl = _fetch_works_count(qid)
+        except Exception:
+            _wc, _sl = 0, 0
+        return int(_wc or 0) >= _HIGH_CONFIDENCE_MIN_WORKS
+    except Exception as _e:
+        logger.warning(f"[LOCAL-637] _is_high_confidence_candidate error for {qid}: {_e}")
+        return False
+
+
 def resolve_venue(venue_string: str, city: str = "") -> Optional[VenueEntity]:
     """Resolve a venue string to a Wikidata entity.
     
@@ -467,10 +651,27 @@ def resolve_venue(venue_string: str, city: str = "") -> Optional[VenueEntity]:
             if best:
                 museum_candidates = [best]
         elif len(museum_candidates) == 1:
-            # Even with 1 candidate, validate it's actually in the requested city
+            # Even with 1 candidate, validate it's actually in the requested city.
+            # [LOCAL-637] _validate_city_match is TRI-STATE:
+            #   True  → confirmed in city → keep.
+            #   None  → could NOT verify (429/5xx/timeout). A rate limit is not a
+            #           wrong-city verdict. Keep the candidate when it is
+            #           high-confidence (its label matches the venue name AND it
+            #           holds a large catalogue) — this is exactly the Bench R6
+            #           National Gallery case (Q180788, 389 works) that a single
+            #           429 wrongly discarded.
+            #   False → VERIFIED not in city → discard and try a city-qualified
+            #           replacement search.
             _qid, _label = museum_candidates[0]
-            if not _validate_city_match(_qid, city):
-                print(f"  [venue_resolver] Single candidate {_qid} ({_label}) failed city validation for '{city}'")
+            _city_ok = _validate_city_match(_qid, city)
+            if _city_ok is None and _is_high_confidence_candidate(_qid, _label, venue_string):
+                print(f"  [venue_resolver] Single candidate {_qid} ({_label}) city "
+                      f"validation UNKNOWN (network/429); keeping high-confidence "
+                      f"candidate for '{city}'")
+            elif _city_ok is not True:
+                _why = "failed" if _city_ok is False else "could not complete"
+                print(f"  [venue_resolver] Single candidate {_qid} ({_label}) {_why} "
+                      f"city validation for '{city}'")
                 # Try city-qualified search as last resort
                 _city_candidates = _search_entities(f"{venue_string} in {city}")
                 _city_candidates = _filter_disambiguation_pages(_city_candidates)
@@ -479,11 +680,23 @@ def resolve_venue(venue_string: str, city: str = "") -> Optional[VenueEntity]:
                     for _cqid, _clabel in _city_candidates[:5]:
                         _ctype = _get_instance_of(_cqid)
                         if _ctype and _ctype in _MUSEUM_TYPES:
-                            if _validate_city_match(_cqid, city):
+                            if _validate_city_match(_cqid, city) is True:
                                 museum_candidates = [(_cqid, _clabel)]
                                 print(f"  [venue_resolver] City-validated replacement: {_cqid} ({_clabel})")
                                 break
-    
+                    else:
+                        # No city-validated replacement found. If the original
+                        # verdict was UNKNOWN (not a hard False), keep the original
+                        # candidate rather than failing the whole venue on a stall.
+                        if _city_ok is None:
+                            print(f"  [venue_resolver] No replacement; validation was "
+                                  f"UNKNOWN — keeping original {_qid} ({_label})")
+                elif _city_ok is None:
+                    # The replacement search itself could not run (empty/None under
+                    # a stall) and the verdict was UNKNOWN — keep the original.
+                    print(f"  [venue_resolver] Replacement search unavailable; "
+                          f"validation UNKNOWN — keeping original {_qid} ({_label})")
+
     if not museum_candidates:
         return None
     
@@ -650,26 +863,20 @@ def fetch_venue_works(venue_qid: str, language: str = "en",
         # [LEAD 2026-10-07] One Wikidata timeout turned Musée Fabre (125 works) into a
         # 1-stop tour ("0 documented works"). Retry with a longer timeout before
         # concluding the venue has no catalogue; a transient endpoint stall is not data.
-        import time as _t
-        resp = None
-        for _attempt, _to in enumerate((20, 40, 60)):
-            try:
-                resp = requests.get(
-                    _SPARQL_ENDPOINT,
-                    params={"query": query, "format": "json"},
-                    headers={"User-Agent": _USER_AGENT, "Accept": "application/sparql-results+json"},
-                    timeout=_to,
-                )
-                if resp.status_code == 200:
-                    break
-                if resp.status_code not in (429, 500, 502, 503, 504):
-                    break
-            except requests.exceptions.RequestException as _sq_err:
-                logger.warning(f"SPARQL attempt {_attempt + 1} failed: {_sq_err}")
-                resp = None
-            _t.sleep(2 * (_attempt + 1))
+        # [LOCAL-637] Route through the shared backoff helper so a 429 honours
+        # Retry-After and the host is only marked cold (short cool-down) after the
+        # SPARQL retries are exhausted — never on the first rate limit. SPARQL keeps
+        # its longer per-attempt timeout (60 s), which the helper applies to every try.
+        resp = _request_with_backoff(
+            _SPARQL_ENDPOINT,
+            params={"query": query, "format": "json"},
+            headers={"User-Agent": _USER_AGENT, "Accept": "application/sparql-results+json"},
+            timeout=60,
+            host_for_cold='https://www.wikidata.org',
+            label=f"fetch_venue_works({venue_qid})",
+        )
         if resp is None:
-            raise RuntimeError("SPARQL unavailable after 3 attempts")
+            raise RuntimeError("SPARQL unavailable after retries")
         if resp.status_code != 200:
             logger.warning(f"SPARQL error: {resp.status_code}")
             return []
@@ -960,28 +1167,52 @@ def _filter_disambiguation_pages(candidates: List[Tuple[str, str]]) -> List[Tupl
     return filtered
 
 
-def _validate_city_match(qid: str, city: str) -> bool:
+def _validate_city_match(qid: str, city: str) -> Optional[bool]:
     """Validate that a Wikidata entity is located in the specified city.
-    
+
     Checks P131 (located in administrative territory) and P625 coordinates
-    against the city. Returns True if the entity is confirmed in the city.
+    against the city.
+
+    [LOCAL-637] Tri-state return so a rate limit / network stall is not read as
+    "wrong city". Bench R6 discarded the National Gallery (Q180788, 389 works)
+    because a 429 made city validation return False and the single high-confidence
+    candidate was dropped. The three states are:
+        True  — confirmed in the city (P131 match, or coordinates within 30 km);
+        False — verified NOT in the city (both P131 and coordinates completed and
+                neither places it in the city);
+        None  — could NOT complete the check (429/5xx/timeout somewhere in the
+                chain). Callers must treat None as UNKNOWN, never as a rejection.
     """
     if not city:
         return True  # No city constraint — always valid
-    
-    # Check P131 chain first (most reliable)
-    if _is_located_in(qid, city):
+
+    # Check P131 chain first (most reliable). Tri-state: True / False / None.
+    _p131 = _is_located_in(qid, city)
+    if _p131 is True:
         return True
-    
-    # Fallback: check coordinates proximity
+
+    # Fallback: check coordinates proximity.
     city_lat, city_lng = _geocode_city(city)
-    if city_lat is None or (city_lat == 0.0 and city_lng == 0.0):
-        return False  # Can't verify (network failure or no coords)
-    
+    if city_lat is None:
+        # Network failure geocoding the city — cannot verify by coordinates.
+        # If P131 completed and said "not in city" (False) we still cannot be
+        # sure (the city might lack a P131 territory match yet be within range),
+        # so the overall result is UNKNOWN.
+        return None
+    if city_lat == 0.0 and city_lng == 0.0:
+        # City resolved but has no coordinates — coordinate check impossible.
+        # Fall back to the P131 verdict: a completed False is a real not-in-city;
+        # a None (couldn't complete P131) stays UNKNOWN.
+        return False if _p131 is False else None
+
     entity_lat, entity_lng = _get_coordinates(qid)
-    if entity_lat is None or (entity_lat == 0.0 and entity_lng == 0.0):
-        return False  # Entity has no coordinates (or network failed)
-    
+    if entity_lat is None:
+        # Network failure fetching the entity's coordinates — cannot verify.
+        return None
+    if entity_lat == 0.0 and entity_lng == 0.0:
+        # Entity genuinely has no P625. Defer to the P131 verdict.
+        return False if _p131 is False else None
+
     dist = _haversine(city_lat, city_lng, entity_lat, entity_lng)
     return dist < 30  # Within 30km of city center
 
@@ -994,83 +1225,55 @@ def _search_entities(query: str) -> Optional[List[Tuple[str, str]]]:
         None on network/API failure (LOCAL-230: distinguishable from empty).
 
     [LOCAL-445-C] Dead-host rule: short-circuits if Wikidata is already cold.
+    [LOCAL-637] A 429/5xx now retries with backoff + Retry-After before the host
+    is marked cold; one transient rate limit no longer sinks the resolve.
     """
     global _network_failure_count
     try:
-        from dead_host_breaker import is_host_cold, mark_host_cold
+        from dead_host_breaker import is_host_cold
         if is_host_cold('https://www.wikidata.org'):
             return None
     except ImportError:
         pass
 
     try:
-        # [LOCAL-636 issue 3] Retry a TRANSIENT Wikidata stall before giving up.
-        # The National Gallery (Q180788, 390 catalogued works) was refused in Bench
-        # R2 during a provider-overload window: a single search stall here returned
-        # None, resolve_venue returned None, and a famous, well-catalogued museum
-        # was told "we could not find enough verified material". fetch_venue_works
-        # already retries (LEAD); the first step, entity search, did not — one
-        # 5xx/timeout sank the whole build. Retry on 500/502/503/504 and on
-        # timeout/connection errors (NOT 429 — that correctly trips the dead-host
-        # breaker); keep the single 10s per-attempt timeout and the None-on-failure
-        # contract. A transient endpoint stall is not "venue unknown".
-        import time as _t
-        resp = None
-        _last_exc = None
-        for _attempt in range(3):
-            try:
-                resp = requests.get(
-                    _WIKIDATA_API,
-                    params={
-                        "action": "wbsearchentities",
-                        "search": query,
-                        "language": "en",
-                        "format": "json",
-                        "limit": 10,
-                    },
-                    headers={"User-Agent": _USER_AGENT},
-                    timeout=10,
-                )
-                if resp.status_code == 200:
-                    break
-                # 429 is handled below (cold-host); other 5xx are transient.
-                if resp.status_code == 429 or resp.status_code not in (500, 502, 503, 504):
-                    break
-            except (requests.exceptions.Timeout,
-                    requests.exceptions.ConnectionError) as _e:
-                _last_exc = _e
-                resp = None
-            if _attempt < 2:
-                _t.sleep(1.5 * (_attempt + 1))
+        # [LOCAL-637] One retry path for 429 and transient 5xx/timeout. The
+        # National Gallery (Q180788) was refused in Bench R6 when a single 429 on
+        # the city-validation search tripped the dead-host breaker and short-
+        # circuited every later Wikidata call to None. The breaker is now marked
+        # cold ONLY after retries are exhausted (and as a short cool-down).
+        resp = _request_with_backoff(
+            _WIKIDATA_API,
+            params={
+                "action": "wbsearchentities",
+                "search": query,
+                "language": "en",
+                "format": "json",
+                "limit": 10,
+            },
+            headers={"User-Agent": _USER_AGENT},
+            timeout=10,
+            host_for_cold='https://www.wikidata.org',
+            label=f"_search_entities('{query}')",
+        )
         if resp is None:
-            raise (_last_exc or requests.exceptions.ConnectionError(
-                "Wikidata search unavailable after retries"))
+            logger.error(f"[LOCAL-230] _search_entities failed: network error "
+                         f"after retries (query='{query}')")
+            _network_failure_count += 1
+            return None
         if resp.status_code == 429:
-            try:
-                from dead_host_breaker import mark_host_cold
-                mark_host_cold('https://www.wikidata.org', reason=f'HTTP 429 on _search_entities')
-            except ImportError:
-                pass
-            logger.error(f"[LOCAL-230] _search_entities failed: HTTP 429 for query '{query}'")
+            logger.error(f"[LOCAL-230] _search_entities failed: HTTP 429 after "
+                         f"retries for query '{query}'")
             _network_failure_count += 1
             return None
         if resp.status_code != 200:
             logger.error(f"[LOCAL-230] _search_entities failed: HTTP {resp.status_code} for query '{query}'")
             _network_failure_count += 1
             return None
-        
+
         data = resp.json()
         results = [(r["id"], r.get("label", "")) for r in data.get("search", [])]
         return results
-    except (requests.exceptions.Timeout, requests.exceptions.ConnectionError) as e:
-        try:
-            from dead_host_breaker import mark_host_cold
-            mark_host_cold('https://www.wikidata.org', reason=f'timeout/connection error: {e}')
-        except ImportError:
-            pass
-        logger.error(f"[LOCAL-230] _search_entities failed: {type(e).__name__}: {e} (query='{query}')")
-        _network_failure_count += 1
-        return None
     except Exception as e:
         logger.error(f"[LOCAL-230] _search_entities failed: {type(e).__name__}: {e} (query='{query}')")
         _network_failure_count += 1
@@ -1252,10 +1455,18 @@ def _get_coordinates(qid: str) -> Tuple[Optional[float], Optional[float]]:
         return None, None
 
 
-def _is_located_in(qid: str, city: str) -> bool:
-    """Check if entity's P131 (located-in) chain contains the named city."""
+def _is_located_in(qid: str, city: str) -> Optional[bool]:
+    """Check if entity's P131 (located-in) chain contains the named city.
+
+    [LOCAL-637] Tri-state so a rate limit is not read as "not in this city":
+        True  — a P131 territory label contains the city name (confirmed in city);
+        False — the entity has P131 claims and NONE matches the city (verified
+                not-in-city);
+        None  — the lookup could not complete (429/5xx/timeout, or a territory
+                label lookup failed) so the result is UNKNOWN, not a rejection.
+    """
     try:
-        resp = requests.get(
+        resp = _request_with_backoff(
             _WIKIDATA_API,
             params={
                 "action": "wbgetentities",
@@ -1265,18 +1476,22 @@ def _is_located_in(qid: str, city: str) -> bool:
             },
             headers={"User-Agent": _USER_AGENT},
             timeout=10,
+            host_for_cold='https://www.wikidata.org',
+            label=f"_is_located_in({qid})",
         )
-        if resp.status_code != 200:
-            return False
-        
+        if resp is None or resp.status_code != 200:
+            return None  # could not verify
+
         data = resp.json()
         entity = data.get("entities", {}).get(qid, {})
         claims = entity.get("claims", {})
-        
+
         city_lower = city.lower()
-        
+
+        p131_claims = claims.get("P131", [])
+        _label_lookup_failed = False
         # Check P131 values — get label for each and compare to city
-        for claim in claims.get("P131", []):
+        for claim in p131_claims:
             value = claim.get("mainsnak", {}).get("datavalue", {}).get("value", {})
             territory_qid = value.get("id", "")
             if territory_qid:
@@ -1284,10 +1499,17 @@ def _is_located_in(qid: str, city: str) -> bool:
                 label = _get_entity_label(territory_qid)
                 if label and city_lower in label.lower():
                     return True
-        
+                if not label:
+                    # A label lookup that returned "" may be a network failure
+                    # rather than a genuinely unlabelled territory; remember it so
+                    # we return UNKNOWN instead of a false "not-in-city".
+                    _label_lookup_failed = True
+
+        if _label_lookup_failed:
+            return None
         return False
     except Exception:
-        return False
+        return None
 
 
 def _get_entity_label(qid: str, lang: str = "en") -> str:
