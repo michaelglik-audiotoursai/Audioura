@@ -2022,9 +2022,9 @@ def place_practical_facts_in_opening(text: str) -> "Tuple[str, int]":
     j = s1_out + 1
     while j < len(out) and (not out[j].strip() or _FIELD_PARA_RE.match(out[j].strip())):
         j += 1
-    k = j
-    while k < len(out) and _ABOUT_PARA_RE.search(out[k]) and not re.match(r"(?i)^\s*stop\s*\d+\s*:", out[k].strip()):
-        k += 1
+    # Only the FIRST paragraph can be the museum introduction. Walking on while paragraphs
+    # "looked like" an introduction carried the Courtauld facts past the Van Gogh story (R7 tour 485).
+    k = j + 1 if (j < len(out) and _ABOUT_PARA_RE.search(out[j])) else j
     out.insert(k, " ".join(facts))
     new = "\n\n".join(out)
     return new, (0 if new == text else moved)
