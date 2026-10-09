@@ -548,6 +548,333 @@ def repair_dropped_words(text: str) -> Tuple[str, int]:
     return repaired, n
 
 
+# ─────────────────────────────────────────────────────────────────────────────
+# [LOCAL-635] Broken sentence-join detection & repair
+# ─────────────────────────────────────────────────────────────────────────────
+#
+# A removal/splice pass can delete the OBJECT of a clause and then stitch the
+# surviving lead-in straight onto the NEXT sentence without a terminator, so a
+# lowercase word runs directly into a capitalised sentence-starter. Bench R2,
+# Tate Modern 515, Stop 2:
+#
+#   "…affected by the Spanish Civil War and the tragedies surrounding During
+#    this time, he created a series…"
+#
+# "the tragedies surrounding" lost its object and "During this time, he created"
+# — a new sentence — was concatenated with only a space. A listener hears a hard
+# glitch. This is the D638 ``lowercase_sentence_join`` detector's shape:
+#   lowercase word (3+ letters) + SPACE + {During|After|Before|In|The|This|When}
+#   + space + lowercase.
+#
+# The repair invents no text: the capitalised word begins a real sentence, so we
+# cut the orphaned lead-in back to the previous sentence boundary (or clause
+# comma/'and'), terminate it with a period, and let the capitalised word start
+# its own sentence. "…the Spanish Civil War and the tragedies surrounding During
+# this time, he created…" → "…the Spanish Civil War. During this time, he
+# created…". Deterministic; adds no new word, number or name.
+
+# Capitalised words that legitimately begin a new sentence (the detector's set).
+_JOIN_SENTENCE_STARTERS = ("During", "After", "Before", "In", "The", "This", "When")
+_BROKEN_JOIN_RE = re.compile(
+    r"\b([a-z]{3,})\s+(" + "|".join(_JOIN_SENTENCE_STARTERS) + r")\s+([a-z])")
+
+# Dangling clause lead-ins: a trailing conjunction/participle fragment left when
+# the clause object was removed. We cut the SHORTEST such trailing fragment (from
+# the LAST boundary before the break) so the surviving sentence keeps as much
+# real content as possible. The participle group ("surrounding", "including", …)
+# is what typically lost its object; a trailing bare "and/with/of …" clause is
+# cut only when it is short (no finite verb), never a whole fact-bearing clause.
+_DANGLING_LEADIN_RE = re.compile(
+    r"(?i)\s+(?:surrounding|including|featuring|involving|regarding|concerning|"
+    r"amid|amidst|during|through|via)\s+[a-z][\w'’-]*(?:\s+[a-z][\w'’-]*){0,3}$"
+    r"|\s+(?:and|but|or|with)\s+the\s+[a-z][\w'’-]*(?:\s+[a-z][\w'’-]*){0,3}$")
+
+
+def detect_broken_join(text: str) -> Optional[str]:
+    """Return a short description of the FIRST broken sentence-join in ``text``
+    (a lowercase word running straight into a capitalised sentence-starter), or
+    None when clean. Deterministic; mirrors the D638 lowercase_sentence_join
+    detector."""
+    if not text:
+        return None
+    m = _BROKEN_JOIN_RE.search(text)
+    if m:
+        return f"broken sentence join: '{m.group(1)} {m.group(2)} {m.group(3)}…'"
+    return None
+
+
+def repair_broken_joins(text: str) -> Tuple[str, int]:
+    """Repair every broken sentence-join in ``text`` WITHOUT inventing a word.
+
+    For each "<lowercase> <Starter> <lowercase>" break: the <Starter> begins a
+    genuine new sentence, so we (a) trim the dangling clause lead-in that lost
+    its object back to its boundary (comma / conjunction / participle), (b) add a
+    sentence-terminating period, and (c) let the <Starter> word open its own
+    sentence. If no clear lead-in boundary is found, we simply insert a period
+    before the <Starter> (split the run in two) rather than drop content.
+    Returns ``(repaired, n_repaired)``. Deterministic; adds no new token.
+    """
+    if not text:
+        return text or "", 0
+    n = 0
+    out = text
+    # Iterate until no broken join remains (guard against pathological loops).
+    for _ in range(20):
+        m = _BROKEN_JOIN_RE.search(out)
+        if not m:
+            break
+        n += 1
+        # Position of the capitalised starter word.
+        starter_start = m.start(2)
+        before = out[:starter_start]
+        after = out[starter_start:]
+        # Trim a dangling clause lead-in from the END of `before` ("… and the
+        # tragedies surrounding " → "…"). Keep the preceding complete clause.
+        trimmed = _DANGLING_LEADIN_RE.sub("", before.rstrip())
+        trimmed = trimmed.rstrip()
+        if not trimmed or not re.search(r"[A-Za-z0-9]", trimmed):
+            # Nothing solid before the break — fall back to a bare split so we
+            # never drop the whole lead; terminate the lowercase run.
+            trimmed = before.rstrip().rstrip(",;:")
+        # Ensure a terminator between the two sentences.
+        if not trimmed.endswith((".", "!", "?")):
+            trimmed = trimmed + "."
+        out = trimmed + " " + after
+    out = re.sub(r"\s{2,}", " ", out).strip()
+    return out, n
+
+
+def repair_dropped_words_and_joins(text: str) -> Tuple[str, int]:
+    """Convenience: run both the dropped-word and the broken-join repairs. Used
+    by the text-level delivery guard. Returns ``(repaired, total_fixed)``."""
+    r1, n1 = repair_dropped_words(text)
+    r2, n2 = repair_broken_joins(r1)
+    return r2, (n1 + n2)
+
+
+def repair_broken_joins_in_text(tour_text: str) -> Tuple[str, int]:
+    """[LOCAL-635] Text-level broken-join guard for the normal delivery path.
+    Repairs each stop body's prose (header/field lines preserved verbatim) so no
+    tour ships a lowercase→Capital sentence collision. Returns
+    ``(cleaned_text, n_repaired)``."""
+    if not tour_text:
+        return tour_text or "", 0
+    total = 0
+    out_lines: List[str] = []
+    for raw in tour_text.split("\n"):
+        stripped = raw.strip()
+        if (not stripped
+                or re.match(r'(?i)^Stop\s+\d+:\s', stripped)
+                or re.match(r'(?i)^(?:Address|Coordinates|Directions|Sources|'
+                            r'Museum Information|Type/Specialty|Specific Examples|'
+                            r'Operational Details):', stripped)):
+            out_lines.append(raw)
+            continue
+        if detect_broken_join(raw):
+            repaired, k = repair_broken_joins(raw)
+            total += k
+            out_lines.append(repaired)
+        else:
+            out_lines.append(raw)
+    return "\n".join(out_lines), total
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# [LOCAL-635] Empty title-quote detection & fill
+# ─────────────────────────────────────────────────────────────────────────────
+#
+# A title-substitution step can replace a work-title placeholder with an EMPTY
+# string, leaving a bare quotation pair in the prose. Bench R2, Courtauld 485,
+# Stop 2:
+#
+#   "Yet in “ ” the domestic replaces the maritime…"
+#
+# The work is *Young Woman Powdering Herself*; the title slot blanked out. A
+# listener hears "Yet in … the domestic replaces" — a dropped title. The fix:
+# never emit an empty quote. Fill the empty pair with the STOP's own title (the
+# only grounded value available on the delivery path); if no title is known,
+# collapse the empty quotes and surrounding spaces so no blank pair is spoken.
+# Deterministic; the only text added is the stop's own title.
+
+# An empty (or whitespace-only) quotation pair: straight, curly, or single.
+_EMPTY_QUOTES_RE = re.compile(r'("\s*"|“\s*”|‘\s*’|\'\s*\')')
+
+
+def detect_empty_title_quotes(text: str) -> bool:
+    """True when ``text`` contains an empty/whitespace-only quotation pair (the
+    D638 ``empty_title_quotes`` shape). Deterministic."""
+    return bool(_EMPTY_QUOTES_RE.search(text or ""))
+
+
+def fill_empty_title_quotes(text: str, title: str) -> Tuple[str, int]:
+    """Replace every empty quotation pair in ``text`` with ``title`` (quoted), or
+    — when ``title`` is empty — remove the blank pair and tidy spacing. Returns
+    ``(filled, n_filled)``. Deterministic; adds only the supplied stop title."""
+    if not text:
+        return text or "", 0
+    t = (title or "").strip().strip('"“”‘’\'').strip()
+    n = 0
+
+    def _sub(m: "re.Match") -> str:
+        nonlocal n
+        n += 1
+        quote = m.group(1)
+        if not t:
+            return ""  # no title available — drop the blank pair entirely
+        # Preserve the quote style that was used (curly vs straight).
+        if quote.startswith("“"):
+            return f"“{t}”"
+        if quote.startswith("‘"):
+            return f"‘{t}’"
+        return f'"{t}"'
+
+    out = _EMPTY_QUOTES_RE.sub(_sub, text)
+    # Tidy doubled spaces / space-before-punct left by an empty removal.
+    out = re.sub(r"\s{2,}", " ", out)
+    out = re.sub(r"\s+([,.;:!?])", r"\1", out)
+    return out, n
+
+
+def fill_empty_title_quotes_in_text(tour_text: str) -> Tuple[str, int]:
+    """[LOCAL-635] Text-level guard: fill any empty title quote in a stop body
+    with that stop's title (from its Stop header). Header/field lines preserved.
+    Returns ``(cleaned_text, n_filled)``. No empty quotes ever reach narration."""
+    if not tour_text:
+        return tour_text or "", 0
+    total = 0
+    current_title = ""
+    out_lines: List[str] = []
+    for raw in tour_text.split("\n"):
+        stripped = raw.strip()
+        hm = re.match(r'(?i)^Stop\s+\d+:\s*(.+?)\s*$', stripped)
+        if hm:
+            current_title = hm.group(1).strip()
+            out_lines.append(raw)
+            continue
+        if (not stripped
+                or re.match(r'(?i)^(?:Address|Coordinates|Directions|Sources|'
+                            r'Museum Information|Type/Specialty|Specific Examples|'
+                            r'Operational Details):', stripped)):
+            out_lines.append(raw)
+            continue
+        if detect_empty_title_quotes(raw):
+            filled, k = fill_empty_title_quotes(raw, current_title)
+            total += k
+            out_lines.append(filled)
+        else:
+            out_lines.append(raw)
+    return "\n".join(out_lines), total
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# [LOCAL-635] Garbled / truncated person-name detection & repair
+# ─────────────────────────────────────────────────────────────────────────────
+#
+# A pass that strips a leading clause word and recapitalises the next token can
+# EAT the start of a name: "Andrea Mantegna" → "Rea Mantegna" (the leading "And"
+# of "Andrea" removed, "rea" recapitalised to "Rea"). Bench R2, Brera 513, Stop
+# 1 opens "Rea Mantegna painted…" while the header and the rest of the stop say
+# "Andrea Mantegna". A listener hears a famous name mangled on the opening line.
+#
+# The editor's contract (Michael): "reject an output in which a person's name
+# differs from EVERY name in its input sources." We implement that as:
+#   * a given-name form "<Y> <Surname>" is GARBLED when the same stop/sources
+#     also contain a longer canonical "<X> <Surname>" whose given name X ENDS
+#     with Y (a truncation: "Rea" is a tail of "Andrea") and X != Y;
+#   * the garbled form is repaired to the canonical "<X> <Surname>" (invents no
+#     text — the canonical form is already present), and
+#   * validate_edit REJECTS an edit that introduces a name whose words match no
+#     source name (the existing _new_proper_nouns gate), extended here to also
+#     reject a truncated given-name variant of a source name.
+
+# "<Given> <Surname>" where both are capitalised words (allow accented letters).
+_NAME_PAIR_RE = re.compile(
+    r"\b([A-Z\u00C0-\u017F][a-z\u00C0-\u017F]+)\s+"
+    r"([A-Z\u00C0-\u017F][a-z\u00C0-\u017F]+)\b")
+
+
+def _canonical_given_names(text: str) -> Dict[str, str]:
+    """Map surname → the LONGEST given-name form seen with it in ``text``. Used to
+    recognise a truncated given name ("Rea" vs canonical "Andrea") for the same
+    surname."""
+    by_surname: Dict[str, str] = {}
+    for m in _NAME_PAIR_RE.finditer(text or ""):
+        given, surname = m.group(1), m.group(2)
+        if given.lower() in _STOPWORDS or surname.lower() in _STOPWORDS:
+            continue
+        cur = by_surname.get(surname)
+        if cur is None or len(given) > len(cur):
+            by_surname[surname] = given
+    return by_surname
+
+
+def _garbled_name_pairs(text: str, canonical: Optional[Dict[str, str]] = None
+                        ) -> List[Tuple[str, str]]:
+    """Return [(garbled "Y Surname", canonical "X Surname")] where Y is a strict
+    truncated tail of a longer canonical given name X for the same surname.
+    ``canonical`` defaults to the longest forms found in ``text`` itself."""
+    canon = canonical if canonical is not None else _canonical_given_names(text)
+    out: List[Tuple[str, str]] = []
+    seen: set = set()
+    for m in _NAME_PAIR_RE.finditer(text or ""):
+        given, surname = m.group(1), m.group(2)
+        if given.lower() in _STOPWORDS or surname.lower() in _STOPWORDS:
+            continue
+        full = canon.get(surname)
+        if not full or full == given:
+            continue
+        # Y is a truncation of X when X ends with Y (case-insensitive) and is
+        # strictly longer: "Andrea".endswith("rea") → "Rea" is garbled.
+        if (len(given) < len(full)
+                and full.lower().endswith(given.lower())):
+            key = (given, surname)
+            if key not in seen:
+                seen.add(key)
+                out.append((f"{given} {surname}", f"{full} {surname}"))
+    return out
+
+
+def detect_garbled_name(text: str, canonical: Optional[Dict[str, str]] = None
+                        ) -> Optional[str]:
+    """Return the first garbled name ("Y Surname") in ``text`` (a truncated
+    given-name variant of a canonical source name), or None when clean."""
+    pairs = _garbled_name_pairs(text, canonical)
+    return pairs[0][0] if pairs else None
+
+
+def repair_garbled_names(text: str, canonical: Optional[Dict[str, str]] = None
+                         ) -> Tuple[str, int]:
+    """Replace every truncated given-name variant with its canonical full form.
+    Returns ``(repaired, n_repaired)``. Deterministic; the replacement form is
+    already present in the text (invents nothing)."""
+    if not text:
+        return text or "", 0
+    pairs = _garbled_name_pairs(text, canonical)
+    out = text
+    n = 0
+    for garbled, full in pairs:
+        new = re.sub(r"\b" + re.escape(garbled) + r"\b", full, out)
+        if new != out:
+            n += 1
+            out = new
+    return out, n
+
+
+def repair_garbled_names_in_text(tour_text: str) -> Tuple[str, int]:
+    """[LOCAL-635] Text-level garbled-name guard for the delivery path. Canonical
+    given-name forms are derived from the WHOLE tour (header titles + bodies), so
+    a corrupted first mention is repaired to the full form seen elsewhere. Header
+    and field lines are left untouched EXCEPT a garbled name in a header is also
+    repaired. Returns ``(cleaned_text, n_repaired)``."""
+    if not tour_text:
+        return tour_text or "", 0
+    canonical = _canonical_given_names(tour_text)
+    if not canonical:
+        return tour_text, 0
+    repaired, n = repair_garbled_names(tour_text, canonical)
+    return repaired, n
+
+
 def validate_edit(
     edited_body: str,
     original_body: str,
@@ -587,6 +914,19 @@ def validate_edit(
     if new_names:
         return (False, f"new proper noun: {new_names[0]}")
 
+    # [LOCAL-635] Garbled-name guard. Reject an edit in which a person's name is
+    # a truncated variant that differs from every name in the INPUT SOURCES (the
+    # original body + any research passages). Canonical given-name forms come
+    # from the sources; a stop body that opens "Rea Mantegna" while the sources
+    # say "Andrea Mantegna" is rejected so the original/repaired name ships.
+    _src = o
+    if passages:
+        _src = o + "\n" + "\n".join(p for p in passages if p and p.strip())
+    _canon = _canonical_given_names(_src)
+    garbled = detect_garbled_name(e, _canon)
+    if garbled:
+        return (False, f"garbled name: {garbled}")
+
     # [LOCAL-634] Dropped-word guard. An edit that STILL contains a dropped-word
     # pattern (the editor was asked to repair these; an output that keeps one is
     # a failed edit) is REJECTED so the original — or the deterministic repair in
@@ -594,6 +934,20 @@ def validate_edit(
     dropped = detect_dropped_word(e)
     if dropped:
         return (False, f"dropped word: {dropped}")
+
+    # [LOCAL-635] Broken sentence-join guard. An edit that still runs a lowercase
+    # word straight into a capitalised sentence-starter ("…surrounding During
+    # this time…") is a hard glitch; REJECT so the original/deterministic repair
+    # ships instead.
+    bj = detect_broken_join(e)
+    if bj:
+        return (False, f"broken join: {bj}")
+
+    # [LOCAL-635] Empty title-quote guard. An edit that speaks a blank quotation
+    # pair ("Yet in “ ” the domestic…") dropped a work title; REJECT so the
+    # original/deterministic fill ships the stop title instead of blank quotes.
+    if detect_empty_title_quotes(e):
+        return (False, "empty title quotes")
 
     # Claim/G4 guard — ORIGINAL body (+ passages) is the evidence corpus.
     try:

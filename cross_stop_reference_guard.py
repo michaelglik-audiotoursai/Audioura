@@ -379,6 +379,40 @@ _SEEN_CALLBACK_RE = re.compile(
     r"you\s+(?:have\s+)?(?:just\s+)?(?:seen|viewed)\s+(?:works?\s+)?by"
     r")\b")
 
+# ─── [LOCAL-635] Generalised recall phrase ───────────────────────────────────
+#
+# LOCAL-634 (_SEEN_CALLBACK_RE above) only caught "whose works you have already
+# seen". Bench R2 showed two more recall shapes that reference a work NEVER
+# delivered — not an artist-missing case, but a recall that resolves to NOTHING
+# the listener was given:
+#
+#   Uffizi 488:  "…so distinct from the completed works you have already
+#                 encountered"   — generic "completed works", no delivered title.
+#   Marmottan 514: "the 1985 daylight theft you encountered at …"
+#                 — recall of an EVENT that no earlier stop ever narrated.
+#
+# Michael's rule: ANY recall phrase (you may recall / you encountered / you saw /
+# seen earlier / met earlier) must refer to a DELIVERED stop's TITLE or ARTIST,
+# naming it in the SAME clause, BEFORE the recall verb (so "Botticelli's
+# Adorazione dei Magi, which you may recall" is anchored, but a bare "the works
+# you have already encountered" is not). Otherwise the clause is dropped. This
+# mirrors the D638 ``recall_unseen_work`` detector, which fails a recall verb
+# with no delivered title in the ≤80 chars that precede it. D636 callbacks that
+# DO name a delivered stop stay.
+#
+# A recall VERB phrase, matched with its start position so we can inspect the
+# text that PRECEDES it in the sentence (the detector's ≤80-char window). Kept
+# in lock-step with the detector's own verb list.
+_RECALL_PHRASE_RE = re.compile(
+    r"(?i)\b(you\s+may\s+recall|"
+    r"you\s+(?:have\s+)?(?:already\s+)?"
+    r"(?:encountered|saw|seen|observed|met)"
+    r"(?:\s+earlier|\s+before|\s+previously)?)\b")
+
+# Window (characters) of text before the recall verb in which a delivered title
+# or artist must appear for the recall to be anchored. Matches the detector's 80.
+_RECALL_ANCHOR_WINDOW = 80
+
 # A proper-noun run in a sentence (artist or title): a capitalised word, possibly
 # multi-word with connectors, excluding a lone sentence-initial capital handled
 # by the caller's position check.
@@ -423,6 +457,22 @@ def _delivered_name_tokens(titles: List[str]) -> set:
     return toks
 
 
+def _delivered_title_norms(titles: List[str]) -> List[str]:
+    """[LOCAL-635] Normalised delivered titles (full title + work core) for the
+    recall-anchor window check. Mirrors the delivered_norms built in
+    strip_phantom_references."""
+    norms: List[str] = []
+    for t in titles or []:
+        t = (t or "").strip()
+        if not t:
+            continue
+        norms.append(_norm(t))
+        core = _title_core(t)
+        if core:
+            norms.append(_norm(core))
+    return [d for d in norms if d]
+
+
 def _named_entities_in_sentence(sentence: str) -> List[str]:
     """Proper-noun names in a sentence, excluding sentence-initial function words
     and quoted strings handled elsewhere. Returns display forms."""
@@ -437,24 +487,73 @@ def _named_entities_in_sentence(sentence: str) -> List[str]:
     return out
 
 
-def _callback_names_unseen(sentence: str, delivered_tokens: set) -> Optional[str]:
-    """When ``sentence`` is a "you already saw X" callback AND names an entity
-    whose words are NOT in the delivered token set, return that entity (the first
-    unseen one). Otherwise None.
+def _recall_is_anchored(sentence: str, delivered_tokens: set,
+                        delivered_norms: List[str]) -> bool:
+    """[LOCAL-635] True when every recall verb phrase in ``sentence`` is anchored
+    to a delivered stop — i.e. a delivered TITLE or ARTIST token appears in the
+    text BEFORE the recall verb (within ``_RECALL_ANCHOR_WINDOW`` chars, matching
+    the D638 ``recall_unseen_work`` detector). A sentence with no recall verb is
+    trivially anchored (returns True). A recall whose preceding window names no
+    delivered entity is UNanchored → returns False, so the caller drops it.
+
+    "Anchored" means the ≤80-char window before the verb contains either a
+    normalised delivered title (any direction of containment) or at least one
+    multi-letter delivered artist/title token. "the completed works you have
+    already encountered" (488) and "the 1985 daylight theft you encountered at…"
+    (514) both have windows naming no delivered work → unanchored."""
+    s = sentence or ""
+    found_recall = False
+    for m in _RECALL_PHRASE_RE.finditer(s):
+        found_recall = True
+        start = m.start()
+        window = s[max(0, start - _RECALL_ANCHOR_WINDOW):start]
+        wn = _norm(window)
+        if not wn:
+            return False
+        # (a) a delivered title appears (either direction of containment).
+        anchored = any(dn and (dn in wn or wn in dn) for dn in delivered_norms)
+        # (b) or a delivered artist/title token (3+ letters) appears in the window.
+        if not anchored:
+            win_words = set(re.findall(r"[A-Za-z\u00C0-\u017F]{3,}", wn))
+            anchored = bool(win_words & delivered_tokens)
+        if not anchored:
+            return False
+    return True if found_recall else True
+
+
+def _callback_names_unseen(sentence: str, delivered_tokens: set,
+                           delivered_norms: Optional[List[str]] = None) -> Optional[str]:
+    """When ``sentence`` is a recall/"you already saw X" callback that resolves to
+    something NOT delivered, return the offending phrase (the first unseen entity,
+    or a short marker for an unanchored recall). Otherwise None.
+
+    Two cases, both deterministic:
+      * [LOCAL-634] a "you already saw" callback that NAMES an artist/title whose
+        words are not all in the delivered token set ("Picasso and Braque, whose
+        works you have already seen" with no Braque);
+      * [LOCAL-635] ANY recall phrase (you may recall / you encountered / you
+        saw / seen earlier / met earlier) that is NOT anchored to a delivered
+        title or artist BEFORE the verb ("the completed works you have already
+        encountered"; "the 1985 daylight theft you encountered at…").
 
     A name is "seen" when ALL of its significant word tokens appear among the
     delivered tokens (so "Pablo Picasso" matches a delivered "Picasso" title and
     "Braque" does not match anything delivered)."""
-    if not _SEEN_CALLBACK_RE.search(sentence or ""):
-        return None
-    for ent in _named_entities_in_sentence(sentence):
-        words = [w for w in re.findall(r"[A-Za-z\u00C0-\u017F]{3,}", _norm(ent))]
-        if not words:
-            continue
-        if all(w in delivered_tokens for w in words):
-            continue  # every token of this name was delivered → a real callback
-        # At least one word of this named entity was never delivered.
-        return ent
+    # [LOCAL-634] named-but-undelivered artist/title in a seen-callback.
+    if _SEEN_CALLBACK_RE.search(sentence or ""):
+        for ent in _named_entities_in_sentence(sentence):
+            words = [w for w in re.findall(r"[A-Za-z\u00C0-\u017F]{3,}", _norm(ent))]
+            if not words:
+                continue
+            if all(w in delivered_tokens for w in words):
+                continue  # every token of this name was delivered → a real callback
+            # At least one word of this named entity was never delivered.
+            return ent
+    # [LOCAL-635] generalised unanchored recall phrase.
+    if delivered_norms is not None and _RECALL_PHRASE_RE.search(sentence or ""):
+        if not _recall_is_anchored(sentence, delivered_tokens, delivered_norms):
+            m = _RECALL_PHRASE_RE.search(sentence or "")
+            return f"unanchored recall: '{m.group(1).strip()}'" if m else "unanchored recall"
     return None
 
 
@@ -463,8 +562,9 @@ def strip_unseen_callbacks(
     """Drop any sentence that tells the listener they already saw an artist/title
     NOT delivered in this tour. Returns (new_units, dropped). Mirrors
     strip_phantom_references' shape; pure and deterministic."""
-    delivered_tokens = _delivered_name_tokens(
-        [(u.get("title") or "") for u in ordered_units])
+    _titles = [(u.get("title") or "") for u in ordered_units]
+    delivered_tokens = _delivered_name_tokens(_titles)
+    delivered_norms = _delivered_title_norms(_titles)
     dropped: List[Dict] = []
     new_units: List[Dict] = []
     for i, unit in enumerate(ordered_units):
@@ -482,7 +582,8 @@ def strip_unseen_callbacks(
                 continue
             kept: List[str] = []
             for sent in sentences:
-                unseen = _callback_names_unseen(sent, delivered_tokens)
+                unseen = _callback_names_unseen(sent, delivered_tokens,
+                                                delivered_norms)
                 if unseen is not None:
                     dropped.append({
                         "stop": stop_num, "sentence": sent.strip(),
@@ -508,6 +609,7 @@ def strip_unseen_callbacks_in_text(tour_text: str) -> Tuple[str, int]:
     titles = [m.group(1) for m in re.finditer(
         r'(?mi)^Stop\s+\d+:\s*(.+?)\s*$', tour_text)]
     delivered_tokens = _delivered_name_tokens(titles)
+    delivered_norms = _delivered_title_norms(titles)
     dropped = 0
     out_lines: List[str] = []
     for raw in tour_text.split("\n"):
@@ -524,7 +626,8 @@ def strip_unseen_callbacks_in_text(tour_text: str) -> Tuple[str, int]:
             body = raw[om.end():]
         kept_sents: List[str] = []
         for sent in _split_sentences(body):
-            if _callback_names_unseen(sent, delivered_tokens) is not None:
+            if _callback_names_unseen(sent, delivered_tokens,
+                                      delivered_norms) is not None:
                 dropped += 1
                 continue
             kept_sents.append(sent)
