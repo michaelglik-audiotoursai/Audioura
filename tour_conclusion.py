@@ -712,12 +712,25 @@ def build_conclusion(
                 theme)
             theme = ""
 
+    # [LOCAL-658] Category awareness: the deterministic fallback must not apply
+    # ART vocabulary (subjects, "the works show", "the art of …") to a non-art
+    # tour. Determine whether this is an art tour and parse the request theme so
+    # a themed walking/history tour closes on its own theme, not on art.
+    _is_art = _tour_is_art(tour_text, stops)
+    _request_theme = "" if _is_art else _request_theme_from_title(tour_text)
+
     # The thread phrase: discovered theme > derived common element > venue collection.
-    common = _derive_common_elements(stops, venue_name=venue_name)
+    common = _derive_common_elements(
+        stops, venue_name=venue_name,
+        is_art_tour=_is_art, request_theme=_request_theme)
     thread_phrase = theme or common.get("thread_phrase") or ""
     if not thread_phrase:
         v = (venue_name or "").strip()
-        thread_phrase = f"the collection of {v}" if v else "this collection"
+        if _is_art:
+            thread_phrase = f"the collection of {v}" if v else "this collection"
+        else:
+            thread_phrase = (f"the places that shape {v}" if v
+                             else "the places on this route")
 
     # Build the thematic body (a)+(b)[+c]. Try the LLM first when asked; validate
     # against the delivered stops; fall back to the deterministic template.
@@ -821,8 +834,80 @@ _SUBJECT_WORDS = {
     "abstract": "abstraction", "modern": "modern art",
 }
 
+# [LOCAL-658] The subject vocabulary above is ART vocabulary. Applying it to a
+# non-art tour produced the live defect on Boston walking tour 557: incidental
+# words ("modern" in "modern Boston", "figure") made the deterministic fallback
+# announce "modern art in the eighteenth to twentieth centuries" and "the works
+# show how differently that subject could be imagined" — an art close on a
+# politics walking tour. The art subject/period interpretation and the "works"
+# meaning are used ONLY when the tour is actually about artworks (a museum/art/
+# gallery tour, or stops that carry artist/work grounding). Every other tour
+# gets a category-appropriate thread (the request's theme, else the places) and
+# a meaning that never says "works" or "art".
+_ART_CATEGORIES = {"museum", "art", "gallery", "exhibition", "exhibit"}
 
-def _derive_common_elements(stops: List[Dict], *, venue_name: str = "") -> Dict:
+_TOUR_CATEGORY_RE = re.compile(r'(?im)^Tour-Category:\s*(.+?)\s*$')
+_TOUR_TITLE_RE = re.compile(
+    r'(?im)^Step-by-Step Audio Guided Tour:\s*(.+?)\s*$')
+# Theme phrases a request title carries: "… dedicated to X", "… about X",
+# "… focused on X", "tour of X". X is the thread for a themed non-art tour.
+_THEME_PHRASE_RE = re.compile(
+    r'(?i)\b(?:dedicated to|devoted to|focused on|focusing on|about|'
+    r'exploring|celebrating|on the (?:theme|subject) of|themed around)\s+(.+)$')
+
+
+def _parse_tour_category(tour_text: str) -> str:
+    m = _TOUR_CATEGORY_RE.search(tour_text or "")
+    return (m.group(1).strip().lower() if m else "")
+
+
+def _tour_is_art(tour_text: str, stops: List[Dict]) -> bool:
+    """True when the art subject/period vocabulary is appropriate.
+
+    An art tour is a museum/art/gallery category, OR a tour whose delivered stops
+    carry artist/work grounding (every museum stop records an ``artist`` or a
+    work title). A walking/restaurant/specialized tour with no artist metadata is
+    NOT an art tour, so the art vocabulary must not drive its conclusion.
+    """
+    cat = _parse_tour_category(tour_text)
+    if cat in _ART_CATEGORIES:
+        return True
+    if cat in ("walking", "restaurant", "specialized", "food", "driving",
+               "biking", "cycling"):
+        return False
+    # Unknown/blank category: fall back to evidence — an artist on any stop.
+    for s in stops or []:
+        if str(s.get("artist") or "").strip():
+            return True
+    return False
+
+
+def _request_theme_from_title(tour_text: str) -> str:
+    """Extract the request's theme phrase from the tour title, or "".
+
+    "Walking tour in Boston dedicated to Massachusetts politics and current
+    affairs, Boston, MA" → "Massachusetts politics and current affairs". The
+    phrase is cleaned of a trailing ", City, ST" location tail so the thread
+    reads as a subject, not an address.
+    """
+    tm = _TOUR_TITLE_RE.search(tour_text or "")
+    if not tm:
+        return ""
+    title = tm.group(1).strip()
+    pm = _THEME_PHRASE_RE.search(title)
+    if not pm:
+        return ""
+    theme = pm.group(1).strip()
+    # Drop a trailing location tail: ", Boston, MA" / ", MA" / ", Boston".
+    theme = re.sub(r'\s*,\s*[A-Z][a-zA-Z.\- ]+(?:,\s*[A-Z]{2})?\s*$', '', theme)
+    theme = re.sub(r'\s*,\s*[A-Z]{2}\s*$', '', theme).strip(' .,')
+    # Guard against a theme that is only a place (no subject left).
+    return theme if len(theme.split()) >= 2 else ""
+
+
+def _derive_common_elements(stops: List[Dict], *, venue_name: str = "",
+                            is_art_tour: bool = True,
+                            request_theme: str = "") -> Dict:
     """Derive the stops' COMMON ELEMENTS from the delivered narration.
 
     Returns a dict with:
@@ -868,21 +953,52 @@ def _derive_common_elements(stops: List[Dict], *, venue_name: str = "") -> Dict:
                 period_label = f"the {lo} to {hi} centuries"
 
     # Shared subject/genre: a subject word present in >= 2 stops' narration.
+    # [LOCAL-658] This vocabulary is ART vocabulary — only mine it on an art tour.
     subject_phrase = ""
-    subj_hits: Dict[str, int] = {}
-    for text in narrations:
-        tl = text.lower()
-        seen = set()
-        for key, phrase in _SUBJECT_WORDS.items():
-            if key in tl and phrase not in seen:
-                subj_hits[phrase] = subj_hits.get(phrase, 0) + 1
-                seen.add(phrase)
-    shared_subjects = sorted((p for p, k in subj_hits.items() if k >= 2),
-                             key=lambda p: -subj_hits[p])
-    if shared_subjects:
-        subject_phrase = shared_subjects[0]
+    shared_subjects: List[str] = []
+    if is_art_tour:
+        subj_hits: Dict[str, int] = {}
+        for text in narrations:
+            tl = text.lower()
+            seen = set()
+            for key, phrase in _SUBJECT_WORDS.items():
+                if key in tl and phrase not in seen:
+                    subj_hits[phrase] = subj_hits.get(phrase, 0) + 1
+                    seen.add(phrase)
+        shared_subjects = sorted((p for p, k in subj_hits.items() if k >= 2),
+                                 key=lambda p: -subj_hits[p])
+        if shared_subjects:
+            subject_phrase = shared_subjects[0]
 
-    # Assemble the thread phrase from the strongest shared element.
+    # [LOCAL-658] Non-art tours: the thread is the request's THEME (parsed from
+    # the title) when present, else the shared period as a plain era (never "the
+    # art of …"), else a places thread. The meaning never says "works" or "art".
+    if not is_art_tour:
+        if request_theme:
+            thread_phrase = request_theme
+            meaning = ("Seen together, these stops show how that story is written "
+                       "into the places themselves.")
+        elif period_label:
+            thread_phrase = f"the history of {period_label}"
+            meaning = (f"Set side by side, they trace how this place changed "
+                       f"across {period_label}.")
+        else:
+            v = (venue_name or "").strip()
+            thread_phrase = (f"the places that shape {v}" if v
+                             else "the places on this route")
+            meaning = ("Taken together, the stops add up to more than any one of "
+                       "them seen alone.")
+        return {
+            "thread_phrase": thread_phrase,
+            "meaning": meaning,
+            # No art subject; expose period only as a weak signal so the body
+            # does not try to name an "illustrative work".
+            "shared_terms": ([period_label] if period_label else []),
+            "period_label": period_label,
+            "subject_phrase": "",
+        }
+
+    # Assemble the thread phrase from the strongest shared element (art tour).
     thread_phrase = ""
     if subject_phrase and period_label:
         thread_phrase = f"{subject_phrase} in {period_label}"
