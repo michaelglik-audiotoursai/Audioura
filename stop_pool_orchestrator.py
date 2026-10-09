@@ -732,9 +732,39 @@ def _merge_sources(new_text: str, pooled_rows: List[Dict]) -> str:
 
 def _overall_from_new(new_text: str) -> Optional[str]:
     """Recover the overall/orientation description from the freshly generated
-    sub-tour's first stop so the merged building tour's opening reflects the new
-    (leading) stops. Returns the Stop-1 Orientation body, or None."""
-    m = re.search(r'^Orientation:\s*(.+?)(?:\n\n|\Z)', new_text or "", re.M | re.S)
+    sub-tour's FIRST stop so the merged building tour's opening reflects the new
+    (leading) stops. Returns the Stop-1 Orientation body, or None.
+
+    [LOCAL-641] Scoped to the Stop-1 block ONLY. The previous implementation did a
+    global ``re.search`` for the first ``Orientation:`` label anywhere in the text.
+    When Stop 1's own orientation was folded into opening prose and carried no
+    ``Orientation:`` label of its own, that search returned the FIRST LATER stop's
+    orientation (Stop 2's) and injected it as Stop 1's overall seed — so a fresh
+    tour opened Stop 1 with Stop 2's orientation (Courtauld R10: Stop 1 Van Gogh
+    carried Seurat's "tapestry of discrete points / pointillist" orientation; the
+    LOCAL-630 rename then masked it; Stop 2 lost its orientation to cross-stop
+    dedupe). The reuse path passes ``overall_orientation=None`` and never did this,
+    which is why the SAME stops reused scored 8–8.5 and fresh scored 4.
+
+    Now the search is confined to the text BEFORE the second ``Stop N:`` header, so
+    only Stop 1's own ``Orientation:`` can ever be returned. If Stop 1 has no such
+    label, this returns None — nothing is pulled forward from a later stop — and
+    the fresh delivery matches the reuse delivery (each stop keeps its own
+    orientation; no later orientation is ever hoisted onto Stop 1).
+    """
+    text = new_text or ""
+    headers = list(re.finditer(r'^Stop (\d+):\s*.+?\s*$', text, re.M))
+    # Confine the search to the Stop-1 block: from the Stop-1 header to the Stop-2
+    # header (or to end-of-text when there is only one stop). Falling back to the
+    # whole text only when NO stop header exists at all keeps older callers working
+    # while guaranteeing a later stop's Orientation is never returned.
+    if headers:
+        stop1_start = headers[0].end()
+        stop1_end = headers[1].start() if len(headers) > 1 else len(text)
+        search_region = text[stop1_start:stop1_end]
+    else:
+        search_region = text
+    m = re.search(r'^Orientation:\s*(.+?)(?:\n\n|\Z)', search_region, re.M | re.S)
     if m:
         return m.group(1).strip()
     return None

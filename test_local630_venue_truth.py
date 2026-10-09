@@ -219,14 +219,32 @@ class TestItem4OrientationOwnWork(unittest.TestCase):
         "Velázquez painted this reclining nude.\n")
 
     def test_stop1_orientation_names_its_own_work(self):
-        out = tc.fix_orientation_work_mismatch(self.TOUR)
-        # Isolate Stop 1's orientation line.
-        s1 = out.split("Stop 2:")[0]
-        orient = [ln for ln in s1.splitlines() if ln.startswith("Orientation:")][0]
-        self.assertIn("The Arnolfini Portrait", orient)
-        self.assertNotIn("The Toilet of Venus", orient)
-        # Stop 2 is untouched (it already names its own work).
+        # [LOCAL-641] fix_orientation_work_mismatch is now a LOGGING-ONLY detector:
+        # it no longer RENAMES a foreign work-title (the rename hid the real defect
+        # — a fresh tour opening Stop 1 with a LATER stop's orientation; root cause
+        # fixed in stop_pool_orchestrator._overall_from_new). It must detect the
+        # mismatch, log [LOCAL-641], and return the text UNCHANGED.
+        with self.assertLogs("tour_conclusion", level="WARNING") as cm:
+            out = tc.fix_orientation_work_mismatch(self.TOUR)
+        self.assertEqual(out, self.TOUR, "detector must leave the text unchanged")
+        self.assertTrue(
+            any("[LOCAL-641] orientation mismatch" in m for m in cm.output),
+            f"expected a [LOCAL-641] orientation mismatch log, got: {cm.output}")
+        # Stop 2 (which already names its own work) is untouched too.
         self.assertIn("Orientation: Stand before The Toilet of Venus.", out)
+
+    def test_no_mismatch_is_silent_noop(self):
+        # When every Orientation already names its own work, the detector returns
+        # the text unchanged (and does not raise).
+        clean = (
+            "Step-by-step tour: The National Gallery.\n\n"
+            "Stop 1: The Arnolfini Portrait\n\n"
+            "Orientation: Stand several paces back from The Arnolfini Portrait.\n\n"
+            "Jan van Eyck signed this panel in 1434.\n\n"
+            "Stop 2: The Toilet of Venus\n\n"
+            "Orientation: Stand before The Toilet of Venus.\n\n"
+            "Velázquez painted this reclining nude.\n")
+        self.assertEqual(tc.fix_orientation_work_mismatch(clean), clean)
 
     def test_idempotent(self):
         once = tc.fix_orientation_work_mismatch(self.TOUR)
