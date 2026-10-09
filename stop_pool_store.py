@@ -86,6 +86,25 @@ except Exception:  # pragma: no cover - import shim for isolated tests
 POOL_VERSION = _POOL_VERSION
 
 
+# ── [LOCAL-655] news freshness ────────────────────────────────────────────────
+# A pooled stop that carries a dated news item (the delivery-time current-affairs
+# pass stamped "In recent news:" into its narration) must not be reused once it is
+# older than this. The default matches current_affairs_news.CA_NEWS_FRESH_DAYS and
+# the venue_preflight 7-day TTL. History-only stops carry no marker and are never
+# aged out — their behaviour is unchanged.
+import os as _os
+NEWS_FRESH_DAYS = int(_os.environ.get('CA_NEWS_FRESH_DAYS', '7'))
+_NEWS_MARKER = 'In recent news:'
+
+
+def _unit_has_news(unit: Dict) -> bool:
+    """True when a parsed stop unit's narration/body carries the news marker."""
+    for k in ('narration', 'raw_block'):
+        if _NEWS_MARKER in (unit.get(k) or ''):
+            return True
+    return False
+
+
 # ── Venue identity ───────────────────────────────────────────────────────────
 
 def venue_identity(location: str, qid: Optional[str] = None) -> str:
@@ -557,6 +576,16 @@ def _ensure_table(conn) -> None:
         cur.execute("""
             ALTER TABLE stop_pool ADD COLUMN IF NOT EXISTS stop_record_json TEXT
         """)
+        # [LOCAL-655] Additive migration: when a pooled stop carries a dated NEWS
+        # item (the delivery-time current-affairs pass injected "In recent news:"
+        # into its narration), stamp the time it was generated. A stop with a news
+        # item is reused only while it is FRESH (< CA_NEWS_FRESH_DAYS, default 7);
+        # the reader excludes a stale news-bearing row. A history-only stop has
+        # news_generated_at = NULL and is never excluded — today's behaviour is
+        # unchanged for it. Never DELETE/DROP (ticket LOCAL-655).
+        cur.execute("""
+            ALTER TABLE stop_pool ADD COLUMN IF NOT EXISTS news_generated_at TIMESTAMPTZ
+        """)
         cur.execute("""
             CREATE INDEX IF NOT EXISTS idx_stop_pool_key
             ON stop_pool (pool_key)
@@ -641,6 +670,10 @@ def store_delivered_tour(
                 if not _rec:
                     _rec = _record_from_unit(u, seq_i + 1)
                 rec_json = json.dumps(_rec) if _rec else None
+                # [LOCAL-655] Stamp the freshness clock only for a stop that
+                # actually carries a dated news item; a history-only stop stays
+                # NULL (never aged out).
+                _news_has = _unit_has_news(u)
                 cur.execute(
                     """
                     INSERT INTO stop_pool (
@@ -648,8 +681,10 @@ def store_delivered_tour(
                         title, artist, year, narration, raw_block,
                         address, coordinates, type_specialty, specific_examples,
                         operational_details, sources_json, story_elements_json,
-                        order_seq, research_cost_usd, stop_record_json, generated_at
-                    ) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,NOW())
+                        order_seq, research_cost_usd, stop_record_json,
+                        news_generated_at, generated_at
+                    ) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,
+                              CASE WHEN %s THEN NOW() ELSE NULL END, NOW())
                     ON CONFLICT (pool_key, title_norm) DO UPDATE SET
                         title = EXCLUDED.title,
                         artist = EXCLUDED.artist,
@@ -667,6 +702,11 @@ def store_delivered_tour(
                         -- [LOCAL-644] Refresh the structured record with the newest
                         -- delivery's record (the narration/fields just stored).
                         stop_record_json = COALESCE(EXCLUDED.stop_record_json, stop_pool.stop_record_json),
+                        -- [LOCAL-655] The newest delivery is authoritative for the
+                        -- news freshness clock: a re-pool carrying news refreshes
+                        -- it; a re-pool WITHOUT news clears it (the stop no longer
+                        -- carries a dated item, so it is not aged out as news).
+                        news_generated_at = EXCLUDED.news_generated_at,
                         -- [LOCAL-609] Keep the ORIGINAL research cost on re-pool
                         -- (first-pooled semantics): only adopt the new value when
                         -- the stored one is 0/NULL (never seen a real cost yet).
@@ -684,6 +724,7 @@ def store_delivered_tour(
                         u["specific_examples"], u["operational_details"],
                         sources_json_default, se_json, base_seq + seq_i,
                         float(research_cost_usd_per_stop or 0.0), rec_json,
+                        _news_has,
                     ),
                 )
                 written += 1
@@ -741,9 +782,16 @@ def get_pool_stops(
                        stop_record_json
                 FROM stop_pool
                 WHERE pool_key = ANY(%s)
+                  -- [LOCAL-655] A stop carrying a dated news item is reusable only
+                  -- while fresh; a stale news-bearing row is IGNORED (not deleted),
+                  -- mirroring the venue_preflight 7-day stale-row pattern. A
+                  -- history-only stop has news_generated_at IS NULL and is always
+                  -- kept — its behaviour is unchanged.
+                  AND (news_generated_at IS NULL
+                       OR news_generated_at >= NOW() - (%s || ' days')::interval)
                 ORDER BY order_seq ASC, generated_at ASC, title_norm ASC
                 """,
-                (keys,),
+                (keys, str(NEWS_FRESH_DAYS)),
             )
             rows = cur.fetchall()
         conn.close()
