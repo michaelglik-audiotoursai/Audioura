@@ -486,6 +486,45 @@ def build_only(out_dir, diet=False, fixed_first=False):
     print(f"[build-only] {len(stops)} stops -> {out_dir}", flush=True)
 
 
+def measure_prompts(out_dir):
+    """Measure full vs diet prompt sizes per stop (chars + approx tokens).
+
+    tiktoken isn't in the image, so this prints a char count and a ~chars/4 token
+    estimate; the AUTHORITATIVE prompt_tokens come from the API usage recorded in
+    each run's results.json (full vs diet runs), which the report compares.
+    """
+    os.makedirs(out_dir, exist_ok=True)
+    stops = load_stops()
+    rows = []
+    for stop in stops:
+        si = build_stop_input(stop)
+        full = build_prompt(stop, si, diet=False, fixed_first=False)
+        diet = build_prompt(stop, si, diet=True, fixed_first=False)
+        rows.append({
+            "stop_id": stop["stop_id"],
+            "full_chars": len(full), "diet_chars": len(diet),
+            "full_tok_est": len(full) // 4, "diet_tok_est": len(diet) // 4,
+            "saved_chars": len(full) - len(diet),
+        })
+        print(f"[measure] {stop['stop_id']:16s} full={len(full)}c (~{len(full)//4}tok) "
+              f"diet={len(diet)}c (~{len(diet)//4}tok) saved={len(full)-len(diet)}c",
+              flush=True)
+    import statistics as _st
+    summary = {
+        "mean_full_chars": round(_st.mean(r["full_chars"] for r in rows)),
+        "mean_diet_chars": round(_st.mean(r["diet_chars"] for r in rows)),
+        "mean_full_tok_est": round(_st.mean(r["full_tok_est"] for r in rows)),
+        "mean_diet_tok_est": round(_st.mean(r["diet_tok_est"] for r in rows)),
+        "rows": rows,
+    }
+    with open(os.path.join(out_dir, "measure.json"), "w", encoding="utf-8") as f:
+        json.dump(summary, f, ensure_ascii=False, indent=2)
+    print(f"[measure] mean full ~{summary['mean_full_tok_est']} tok, "
+          f"diet ~{summary['mean_diet_tok_est']} tok "
+          f"({summary['mean_full_chars']} vs {summary['mean_diet_chars']} chars)",
+          flush=True)
+
+
 def _main():
     if len(sys.argv) < 2:
         print(__doc__)
@@ -521,6 +560,9 @@ def _main():
     elif cmd == "build-only":
         out = opt("--out", "/app/bench_out/_prompts")
         build_only(out, diet=diet, fixed_first=fixed_first)
+    elif cmd == "measure":
+        out = opt("--out", "/app/bench_out/_measure")
+        measure_prompts(out)
     else:
         print(f"unknown command: {cmd}")
         print(__doc__)

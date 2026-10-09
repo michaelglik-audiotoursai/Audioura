@@ -133,9 +133,12 @@ def _load_arm(d, arm):
     return json.load(open(p, encoding="utf-8"))
 
 
-def run_detectors(base_dir):
+def run_detectors(base_dir, arms=None):
+    arms = arms or ARMS
     out = {}
-    for arm in ARMS:
+    for arm in arms:
+        if not os.path.exists(os.path.join(base_dir, arm, f"arm_{arm}_results.json")):
+            continue
         recs = _load_arm(base_dir, arm)
         arm_out = []
         for r in recs:
@@ -210,11 +213,11 @@ def _main():
     base = opt("--dir", "bench_out")
     arms = list(opt("--arms", "ABCDE"))
     if cmd == "detectors":
-        run_detectors(base)
+        run_detectors(base, arms)
     elif cmd == "kiro":
         run_kiro(base, arms)
     elif cmd == "all":
-        run_detectors(base)
+        run_detectors(base, arms)
         run_kiro(base, arms)
     else:
         print(f"unknown command: {cmd}")
