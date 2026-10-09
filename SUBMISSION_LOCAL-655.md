@@ -133,3 +133,151 @@ Boston Globe / WCVB (the Boston one) — no out-of-state match.
 Committed after each step. `git rev-list --count origin/subscribed..HEAD` ≥ 1 at
 every step. Did NOT touch DECISIONS.md / CLAUDE.md / BACKLOG.md / WORK_QUEUE.md /
 `.continuous_dev/STATUS.md`.
+
+
+---
+
+# 655B — Bounce: the research ran, but it found the wrong news
+
+**Agent:** Mac Mini Kiro **Branch:** `LOCAL-655-current-affairs-news`
+**Base:** rebased onto `origin/subscribed` @ `c0976635` (so LOCAL-650B is present;
+`git merge-base --is-ancestor c0976635 HEAD` exits 0). The rebase re-applied the 6
+LOCAL-655 commits; the one conflict (`generate_tour_text.py`) was resolved by
+keeping BOTH guards — the LOCAL-655 news pass runs first, then the LOCAL-650
+honesty fallback.
+
+## What the LEAD found on live tour 618
+1. The **THEME queries never ran** — `research_news_for_stops` looped over stops
+   only, so "Massachusetts politics" / the governor's Oct 8 debate never entered.
+2. **Wrong-place** news: the *Arkansas* Old State House Museum (Arkansas Times,
+   KARK) shipped on Boston stops 2 **and** 4.
+3. **Off-theme** news: a burger opening ("Smashed by BRED") on Faneuil Hall.
+4. **Undated** item sold as recent: "Recently, … as outlined in the 2022 strategy".
+5. **The same item on two stops**.
+
+## The fix (all in `current_affairs_news.py`)
+- **A deterministic relevance gate on every item, before composing** —
+  `gate_item()` checks, in order: **(c) date** — `parse_news_date()` resolves the
+  Serper date (relative "Six days ago"/"4 days ago"/"yesterday" and absolute
+  "Oct 8, 2026"/"2026-10-08"); **undated → dropped**, stale (> window) → dropped;
+  **(a) place** — the article (title+snippet+fetched text) must name the request's
+  city or state; if it names a *different* US state and not the request's place it
+  is rejected (the Arkansas case); **(b) theme** — it must name a civic/politics
+  word, so a restaurant opening is rejected (the burger case). I chose a
+  **deterministic** gate, not a model call, because on 618 the cheap composer was
+  the *only* filter and it happily wrote dated, attributed prose about Arkansas and
+  burgers — a generative filter is exactly what failed. Each rejection carries a
+  logged reason.
+- **The theme queries now run.** `research_news_for_stops` issues
+  `derive_theme_queries(request)` **and** the per-stop queries, gates everything,
+  fetches the survivors, re-gates on the fuller text, then **assigns each item to
+  exactly one stop**: state-government → the live **capitol** stop
+  (`_find_capitol_stop` prefers `capitol` > a `state house` that is **not** "Old
+  State House" > `legislature`; "Old State House" alone is a historical landmark,
+  never the state stop — this is precisely why 618 duplicated it), city-government
+  → the **City Hall** stop, else most stop-name/text overlap. Dedup is by article
+  link, so **one item lands on one stop only**.
+- **Fluent delivery.** The "In recent news:" lead-in stays; `_attribution_suffix`
+  **drops the "(Reported by X, Y.)" parenthetical for any source the sentences
+  already name in-text**, and omits it entirely when all sources are named there.
+- **Dated, never "Recently".** The gate stashes the resolved date; the composer
+  prompt now carries `DATE: YYYY-MM-DD` per article and is forbidden to write
+  "Recently".
+
+## Tests — `test_local655_current_affairs_news.py` (37, all green)
+New fixtures reproduce the exact 618 failures: `TestRelevanceGate` (Arkansas →
+rejected *wrong place*; burger → rejected *off-theme*; undated → *dropped*; stale →
+*dropped*; the Oct 8 debate → *accepted*; `parse_news_date` relative+absolute),
+`TestStopAssignment` (state → State House, city → City Hall), `TestNoDuplicate­
+AcrossStops` (the full 618 candidate mix: only the debate survives, on the State
+House, **once**), `TestAttributionParenthetical` (dropped when the source is named
+in-text), `TestDatedComposition` (prompt carries the date, forbids "Recently"),
+`TestNoHonestNoteContradiction`. The 20 original 655 tests still pass.
+
+```
+python3 -m pytest test_local655_current_affairs_news.py -q      # 37 passed
+python3 -m pytest test_local655_current_affairs_news.py \
+    test_local650_walking_route.py tests/test_local611_canary.py -q
+                                                                 # 76 passed, 3 skipped
+```
+(The 3 skips are the DB-backed TTL cases when Postgres is unreachable.)
+
+## Live (own container `local655b-gen`, image `local655b-gen-img`, `--rm`, port 5118, net `development_default`)
+Two FRESH tours (`DISABLE_TOUR_CACHE=1`, `DISABLE_STOP_POOL=1`).
+
+**Boston walking, 5 stops (id 623, `is_test`) — the success.**
+- **Theme queries RAN:** `'Massachusetts politics and current affairs Boston, MA'`
+  (10 items), `'Boston, MA latest news'` (10). 12 queries total, 80 items,
+  **6 accepted / 37 rejected** (rest de-duped/empty).
+- **Accepted → assigned (one stop each, no duplicate):** *Massachusetts State
+  House* ← Healey signs abortion-protection law (Mass.gov, 2026-10-08), Mike
+  Minogue GOP governor bid (WGBH), SNAP changes (WBUR); *Boston City Hall* ←
+  citywide data-center ban (WBUR), Mayor Wu vs USPS (Harvard Crimson), Micah Jones
+  for Moulton's seat (NBC Boston).
+- **Rejected, with reasons (sample):** `'Restaurant roundup: Smashed by BRED comes
+  to Faneuil Hall'` → *off-theme*; `'Revitalizing Our Downtown Core' (Boston.gov)`
+  → *off-theme* (the 2022-strategy class); `'Trump's Texas two-step'` → *wrong
+  place (names texas)*; `'Paul Martino, NH House candidate'` → *wrong place (new
+  hampshire)*; a dozen weather/crash/sport items → *off-theme*; several
+  politics-ish items that never name Boston → *place not confirmed*. **No Arkansas
+  item appeared at all.**
+- **Stop list (no theme stop — LOCAL-650B holds):** Massachusetts State House /
+  Boston City Hall / Faneuil Hall / Old State House / The State House Steps.
+
+**Courtauld museum, 3 stops (id 625, `is_test`) — canary.** The news pass is a
+strict NO-OP: 0 "In recent news:", no honest note.
+
+### Two defects found on the delivered 623, fixed after the run (unit-verified; NOT re-run live, to respect the cap)
+1. The composer wrote **"Recently, …"** on dated items. Fixed: the gate stashes
+   `_parsed_date`; the prompt now states `DATE: YYYY-MM-DD` and forbids "Recently".
+2. 623 **also** carried the LOCAL-650 "no verified developments from the past five
+   years" note *even though news was injected* — because "Recently" has no 4-digit
+   year, LOCAL-650's `has_recent_item` missed the fresh items. Fixed two ways:
+   (a) the dated composer now puts a 2026 year in the text; (b) the delivery guard
+   **suppresses the LOCAL-650 note whenever "In recent news:" is present** (it
+   would contradict the delivered news). Both paths verified offline.
+
+### Detectors (`.continuous_dev/bench/detectors.py 623 5 "<request>"`) — 2 failures
+- `restaurant_not_last` — caused *only* by defect #2 above (the contradiction note
+  landed after the "restaurant tour." line). Fixed by the suppression guard.
+- `one_word_sentence` — a **false positive** on "James T. Austin. The" in the Stop
+  3 Faneuil Hall **history** narration (base generator), unrelated to 655B.
+
+### Kiro (`.continuous_dev/calib/critique.sh 623 5`) — 4.5/10
+The high-severity defects are **pre-existing base-generator** issues outside 655B
+scope: Stop 1 carries *City Hall* facts under the *State House* header; Stop 5 has
+orphaned/subjectless sentences; Stop 5 duplicates Stop 1 (POI selection chose both
+"Massachusetts State House" and "The State House Steps"). The one news-specific
+note — the "(Reported by …)"/"according to …" source tags read as in-narration
+citations — is in tension with the ticket, which **requires** each item to stay
+dated **and attributed** (both sides); my change only drops the *redundant*
+parenthetical, so some attribution must remain by design.
+
+## Rows / cost / safety — honest
+- `audio_tours`: **422 before → 424 after** (two additive `is_test=true` rows:
+  623, 625). `is_test`: 357 → 359. **No DELETE.** No GCloud.
+- **Spend: the whole-task network total was `$1.38` (`paid_api_calls`, host
+  `617ee598bb9f`, 367 calls) — OVER the `$1.20` cap.** The `LiveRunMeter`
+  grounding-counter cap reported `$1.004`; it stops a *single process* at the
+  grounding step and did not stop the *cross-tour* network total. The overrun is
+  the **Courtauld museum canary (~$1.08 on its own)** run as a second full paid
+  generation after Boston (~$0.80). That was a mistake: the museum no-op is already
+  proven offline by `TestMuseumNoOp` / `TestDeliveryPassByteIdentical`, so the paid
+  canary was unnecessary. I am reporting it rather than hiding it. No further paid
+  runs were made; the two post-run defects were fixed and verified offline only.
+
+## Files (655B)
+- `current_affairs_news.py` — relevance gate (`parse_news_date`, `gate_item`,
+  `gate_items`), theme-query pass + one-stop assignment (`assign_item_to_stop`,
+  `_find_capitol_stop`) in a rewritten `research_news_for_stops`, dated-composer
+  prompt, `_attribution_suffix`.
+- `generate_tour_text.py` — accepted/rejected logging; LOCAL-650 honesty note
+  suppressed when news was injected.
+- `test_local655_current_affairs_news.py` — the new 655B test classes.
+- `run_local655b_container.py`, `run_local655b_live.sh` — the isolated 655B live
+  harness (own container, spare port 5118).
+
+## Process (655B)
+Committed after each step. Base kept an ancestor of HEAD at every commit. Did NOT
+touch DECISIONS.md / CLAUDE.md / BACKLOG.md / WORK_QUEUE.md /
+`.continuous_dev/STATUS.md`.
