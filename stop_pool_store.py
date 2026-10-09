@@ -384,6 +384,23 @@ def parse_delivered_stops(tour_content: str) -> List[Dict]:
     whole, not to a stop, so they are excluded from every unit.
     """
     text = tour_content or ""
+    # [LOCAL-644] Un-glue any field labels flattened onto a single line BEFORE
+    # parsing, exactly as stop_records.parse_tour_to_records does. A tour stored
+    # before the structured path (NG 495 R9/R12) had a whole stop block collapsed
+    # onto one line ("Stop 2: … Address: … Coordinates: … Orientation: …"); the
+    # line-based header/field regexes below would otherwise swallow the entire
+    # block as the stop TITLE. Recovering the inline labels first means a legacy
+    # pooled stop is parsed into a CLEAN unit (and thus a clean record), so reuse
+    # renders it the same way a well-formed stop renders — the ticket's "parse the
+    # old units once into records and render the same way" back-compat rule.
+    try:
+        from stop_records import _recover_inline_labels as _ril
+        _recovered = []
+        for _ln in text.split("\n"):
+            _recovered.extend(_ril(_ln))
+        text = "\n".join(_recovered)
+    except Exception:
+        pass
     headers = list(_STOP_HEADER.finditer(text))
     if not headers:
         return []
