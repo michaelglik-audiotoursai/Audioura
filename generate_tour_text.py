@@ -7962,6 +7962,24 @@ def _apply_delivery_hours_guard(result):
                       f"sentence(s) from delivered text (every-path guard)", flush=True)
         except Exception as _fe:  # pragma: no cover
             _import_logger.error(f"[LOCAL-616] foreign-sentence sweep skipped: {_fe}")
+        # 3b. [LOCAL-638 Note 4] Every stop except the last must end with directions
+        #     to the next stop, on EVERY path. Michael, Frick 523 (D640): "The story
+        #     stops abruptly and has no directions to the next exhibit" — Stop 2 had
+        #     no "Your final stop…" transition before Stop 3. Both base paths attach
+        #     a transition per non-last stop, but a later pass (editor / dedupe /
+        #     conclusion) can drop it. This final guarantee appends a deterministic
+        #     museum hand-off to any non-last stop that lacks one, naming the next
+        #     stop. Runs BEFORE the conclusion rebuild so the conclusion sees the
+        #     finalized bodies. Deterministic; never removes content.
+        try:
+            import directions_guarantee as _dg
+            _dg_venue = _recover_tour_venue(final) or ""
+            final, _dir_added = _dg.ensure_directions_between_stops(final, _dg_venue)
+            if _dir_added:
+                print(f"  [LOCAL-638 Note 4] added directions to {_dir_added} stop(s) "
+                      f"that ended with no hand-off to the next stop", flush=True)
+        except Exception as _dge:  # pragma: no cover
+            _import_logger.error(f"[LOCAL-638] directions guarantee skipped: {_dge}")
         # 4. [LOCAL-619] THE ONE CONCLUSION — built from the FINAL delivered text,
         #    as the LAST step on EVERY path (fresh, pool, cache, by_reference,
         #    overview), after every other gate above. This is the single choke
