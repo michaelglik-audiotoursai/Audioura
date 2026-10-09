@@ -91,13 +91,18 @@ def share_tour():
             _conn = _pg.connect(DATABASE_URL)
             with _conn.cursor() as _cur:
                 _cur.execute(
-                    "SELECT tour_name, request_string, stops_count, tour_content "
+                    "SELECT tour_name, request_string, stops_count, tour_content, "
+                    "(zip_filename IS NOT NULL OR audio_tour IS NOT NULL) "
                     "FROM audio_tours WHERE id = %s", (int(audio_tour_id),))
                 _row = _cur.fetchone()
             _conn.close()
             if not _row:
                 return jsonify({"error": "tour not found"}), 404
-            _name, _req, _stops, _content = _row
+            _name, _req, _stops, _content, _has_package = _row
+            # [LEAD 2026-10-09] Never issue a code for a tour that cannot be downloaded: tour 558
+            # (text-only test copy, no audio package) got a code, and the phone's download 404'd.
+            if not _has_package:
+                return jsonify({"error": "tour has no audio package yet; it cannot be shared"}), 409
             location = location or _req or _name
             tour_type = tour_type or 'walking'
             total_stops = total_stops or _stops or 1
