@@ -556,6 +556,86 @@ def _pick_recap_clause(stop: Dict) -> str:
     return _clean_recap_clause(f"{title}: {clause}.", title)
 
 
+# [LOCAL-652] CONCLUSION INVARIANT — only name works/artists that are on the tour
+# -----------------------------------------------------------------------------
+# The phantom-thread defect (SQ-S6b naming a tour after Vigée Le Brun) produced a
+# conclusion that named a work/artist on no delivered stop:
+#   "This tour highlights Vigée Le Brun's artistic influence and legacy …"
+# Fix 1 stops the phantom thread from being chosen, so `theme` is no longer the
+# foreign name; but the invariant is ENFORCED on the built conclusion regardless
+# of how the body was produced (discovered theme, cheap LLM, or template). The
+# conclusion may name only a work or artist that is on the tour.
+
+import unicodedata as _concl_unicodedata
+
+_CONCL_GROUNDING_STOPWORDS = {
+    'the', 'a', 'an', 'of', 'and', 'in', 'on', 'at', 'to', 'for', 'with', 'by',
+    'from', 'this', 'that', 'these', 'those', 'its', 'their', 'his', 'her',
+    'self', 'portrait', 'portraits', 'study', 'studies', 'view', 'scene',
+    'tour', 'tours', 'stop', 'stops', 'work', 'works', 'art', 'arts', 'artist',
+    'artists', 'artistic', 'painting', 'paintings', 'sculpture', 'legacy',
+    'influence', 'technique', 'techniques', 'century', 'centuries', 'collection',
+    'museum', 'gallery', 'together', 'across', 'thread', 'theme', 'period',
+    'saint', 'sainte', 'san', 'santa',
+}
+
+
+def _concl_fold(s: str) -> str:
+    return ''.join(c for c in _concl_unicodedata.normalize('NFD', s or '')
+                   if _concl_unicodedata.category(c) != 'Mn')
+
+
+def _concl_grounding_tokens(text: str) -> set:
+    out = set()
+    for w in re.findall(r"[A-Za-zÀ-ÿ']+", text or ""):
+        wl = _concl_fold(w.lower()).strip("'")
+        if len(wl) >= 4 and wl not in _CONCL_GROUNDING_STOPWORDS:
+            out.add(wl)
+    return out
+
+
+def _delivered_conclusion_grounding(stops: List[Dict]) -> set:
+    """Content tokens of every delivered stop's title + artist (folded)."""
+    grounding: set = set()
+    for s in stops or []:
+        grounding |= _concl_grounding_tokens(s.get("title", "") or "")
+        grounding |= _concl_grounding_tokens(str(s.get("artist", "") or ""))
+    return grounding
+
+
+def _conclusion_names_foreign_entity(text: str, delivered_grounding: set) -> List[str]:
+    """Return the foreign work/artist entities a conclusion names (empty = clean).
+
+    A conclusion may name a work or artist ONLY if it is on the tour. We detect
+    named entities with the same person/work patterns the stop gate uses, then
+    flag any whose distinctive tokens appear in NONE of the delivered stops'
+    titles/artists. Geography and generic nouns never carry grounding tokens, so
+    they are not flagged. When grounding is empty (no art metadata) we flag
+    nothing (fail-open — never corrupt a non-art conclusion)."""
+    if not delivered_grounding or not text:
+        return []
+    foreign: List[str] = []
+    seen = set()
+    try:
+        from stop_specificity_gate import _detect_named_entities as _dne
+        entities = _dne(text, "", None)
+    except Exception:
+        entities = re.findall(r"\b([A-Z][a-zà-ÿ]+(?:\s+[A-Z][a-zà-ÿ]+)+)", text)
+        entities += re.findall(r"['\u2018\u201c\"]([^'\u2019\u201d\"]{3,60})", text)
+    for ent in entities:
+        toks = _concl_grounding_tokens(ent)
+        if not toks:
+            continue
+        if toks & delivered_grounding:
+            continue
+        low = ent.lower()
+        if low in seen:
+            continue
+        seen.add(low)
+        foreign.append(ent)
+    return foreign
+
+
 def build_conclusion(
     tour_text: str,
     *,
@@ -614,9 +694,27 @@ def build_conclusion(
 
     titles = [(s.get("title") or "").strip() for s in stops if (s.get("title") or "").strip()]
 
+    # [LOCAL-652] Conclusion invariant: the conclusion may name only a work or
+    # artist that is on the tour. Build the delivered grounding from the parsed
+    # stops' titles + artists and use it to (a) discard a foreign discovered
+    # theme, (b) reject a foreign LLM body, and (c) strip a foreign example from
+    # the final body. Empty grounding (non-art tour) disables the check.
+    _delivered_grounding = _delivered_conclusion_grounding(stops)
+    # The venue name is a legitimate thread subject ("the collection of {venue}"),
+    # so its tokens are part of the allowed grounding — never flagged as foreign.
+    _delivered_grounding |= _concl_grounding_tokens(venue_name or "")
+    theme = (theme or "").strip()
+    if theme and _delivered_grounding:
+        if _conclusion_names_foreign_entity(theme, _delivered_grounding):
+            logger.warning(
+                "[LOCAL-652] discarded foreign discovered theme %r — it names a "
+                "work/artist on no delivered stop; using common-element thread",
+                theme)
+            theme = ""
+
     # The thread phrase: discovered theme > derived common element > venue collection.
     common = _derive_common_elements(stops, venue_name=venue_name)
-    thread_phrase = (theme or "").strip() or common.get("thread_phrase") or ""
+    thread_phrase = theme or common.get("thread_phrase") or ""
     if not thread_phrase:
         v = (venue_name or "").strip()
         thread_phrase = f"the collection of {v}" if v else "this collection"
@@ -626,13 +724,47 @@ def build_conclusion(
     body = ""
     if use_llm:
         body = _llm_thematic_body(
-            stops, thread_phrase=thread_phrase, theme=(theme or "").strip(),
+            stops, thread_phrase=thread_phrase, theme=theme,
             venue_name=venue_name, titles=titles,
             llm_fn=llm_fn, api_key=api_key)
+        # [LOCAL-652] Reject an LLM body that names a foreign work/artist.
+        if body and _delivered_grounding:
+            _foreign = _conclusion_names_foreign_entity(body, _delivered_grounding)
+            if _foreign:
+                logger.warning(
+                    "[LOCAL-652] rejected LLM conclusion body naming foreign "
+                    "work/artist %s — falling back to template", _foreign)
+                body = ""
     if not body:
         body = _template_thematic_body(
-            stops, thread_phrase=thread_phrase, theme=(theme or "").strip(),
+            stops, thread_phrase=thread_phrase, theme=theme,
             common=common, titles=titles, n=n)
+
+    # [LOCAL-652] Final enforcement: if the body still names a foreign work/artist
+    # (e.g. a template example lifted from a stray title), strip the offending
+    # sentence(s). Never empty the body — if every sentence is foreign, keep the
+    # deterministic thread+meaning template (which names no specific work).
+    if body and _delivered_grounding:
+        _foreign = _conclusion_names_foreign_entity(body, _delivered_grounding)
+        if _foreign:
+            _folded = [_concl_fold(e.lower()) for e in _foreign]
+            _sents = [s for s in re.split(r'(?<=[.!?])\s+', body.strip()) if s.strip()]
+            _kept = [s for s in _sents
+                     if not any(fe and fe in _concl_fold(s.lower()) for fe in _folded)]
+            if _kept and len(_kept) < len(_sents):
+                body = " ".join(_kept)
+                logger.warning(
+                    "[LOCAL-652] stripped %d conclusion sentence(s) naming foreign "
+                    "work/artist %s", len(_sents) - len(_kept), _foreign)
+            elif not _kept:
+                # Everything named a foreign entity — rebuild from the thread +
+                # meaning template with NO example (names no specific work).
+                body = _template_thematic_body(
+                    stops, thread_phrase=(common.get("thread_phrase") or thread_phrase),
+                    theme="", common=common, titles=[], n=n)
+                logger.warning(
+                    "[LOCAL-652] rebuilt conclusion with no named example — every "
+                    "candidate sentence named a foreign work/artist %s", _foreign)
 
     # (d) The count, only when correct — appended as its own short sentence so it
     #     is optional and never an enumeration. Omit for a 1-stop overview (a
