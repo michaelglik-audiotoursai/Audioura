@@ -7998,6 +7998,16 @@ def _apply_delivery_hours_guard(result):
         try:
             import directions_guarantee as _dg
             _dg_venue = _recover_tour_venue(final) or ""
+            # [LOCAL-639 defect 1] Restore any header glued onto an empty field
+            # label / prior sentence BEFORE the directions guarantee, so a stop
+            # whose hand-off went missing (the Uffizi 488 empty "Directions:"
+            # before Stop 3) is seen as a non-last stop and gets its transition
+            # back, rather than staying invisible behind the glued label.
+            try:
+                from tour_conclusion import normalise_stop_headers as _norm_hdr_dg
+                final = _norm_hdr_dg(final)
+            except Exception:
+                pass
             final, _dir_added = _dg.ensure_directions_between_stops(final, _dg_venue)
             if _dir_added:
                 print(f"  [LOCAL-638 Note 4] added directions to {_dir_added} stop(s) "
@@ -8022,7 +8032,16 @@ def _apply_delivery_hours_guard(result):
                 fix_orientation_work_mismatch as _fix_orient_work,
                 count_delivered_stops as _count_delivered,
                 has_thematic_conclusion as _has_thematic,
+                normalise_stop_headers as _normalise_headers,
             )
+            # [LOCAL-639 defect 1] FINAL header guarantee: restore any ``Stop N:``
+            # header the render glued onto a prior sentence or an empty field
+            # label ("Directions:Stop 3:" — the live Uffizi 488 "2 of 3" defect)
+            # so the number of narrated stop bodies equals the number of headers
+            # in the SHIPPED text. Applied before the count is read and on every
+            # branch below, so stops_count and the "That's N stops" close both
+            # agree with what the listener hears.
+            final = _normalise_headers(final)
             if _count_delivered(final) > 0:
                 _concl_venue = _recover_tour_venue(final)
                 final = _fix_first_stop(final)

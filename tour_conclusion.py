@@ -139,19 +139,40 @@ _TRAILING_OFFER_PATTERNS = (
 # "Stop N:" header and re-break the line.
 _GLUED_STOP_HEADER = re.compile(r'(?<=[.!?])\s*(Stop\s+\d+:\s)')
 
+# [LOCAL-639 defect 1] A ``Stop N:`` header glued directly onto an EMPTY field
+# label — the live Uffizi 488 defect: "…unfolds once more.\n\nDirections:Stop 3:
+# Adamo ed Eva". The stop 2→3 directions value was empty, so a label-only
+# "Directions:" was emitted with NO trailing newline and the next header was
+# written straight after it. The LEAD empty-field sweep
+# (``^(?:Address|Directions):[ \t]*\n``) only drops a label followed by a
+# newline, so this label-glued header survived AND vanished from the count
+# (stops_count=2 of 3, "That's 2 stops"). Match an Address/Directions/Coordinates
+# label (empty of value) immediately followed by a "Stop N:" header, drop the
+# orphan label and re-break the header onto its own line. The label must carry no
+# value (only optional spaces/tabs) so a real "Directions: Continue…\n\nStop N:"
+# is never touched.
+_LABEL_GLUED_STOP_HEADER = re.compile(
+    r'(?im)^[ \t]*(?:Address|Directions|Coordinates|Orientation):[ \t]*(Stop\s+\d+:\s)')
+
 
 def normalise_stop_headers(tour_text: str) -> str:
     """Restore a line break before any ``Stop N:`` header glued to prior text.
 
     Deterministic and idempotent. A header already at line-start is untouched.
     This makes the stop COUNT reflect every stop the listener actually hears,
-    even when an upstream render lost the newline before a header (the live
-    '…Atelierwand.Stop 3: Atelierwand' defect).
+    even when an upstream render lost the newline before a header — both the live
+    '…Atelierwand.Stop 3: Atelierwand' defect (a header glued to a sentence) and
+    the Uffizi 488 'Directions:Stop 3: Adamo ed Eva' defect (a header glued to an
+    empty field label; the orphan label is dropped as it has no value to speak).
     """
     if not tour_text:
         return tour_text
-    out = _GLUED_STOP_HEADER.sub(r'\n\n\1', tour_text)
-    # Collapse any 3+ newline run the re-break may create.
+    # (1) A header glued onto an EMPTY field label ("Directions:Stop 3:"): drop
+    #     the valueless label and put the header on its own line.
+    out = _LABEL_GLUED_STOP_HEADER.sub(r'\n\n\1', tour_text)
+    # (2) A header glued onto the end of a sentence ("…once more.Stop 3:").
+    out = _GLUED_STOP_HEADER.sub(r'\n\n\1', out)
+    # Collapse any 3+ newline run the re-breaks may create.
     out = re.sub(r'\n{3,}', '\n\n', out)
     return out
 
