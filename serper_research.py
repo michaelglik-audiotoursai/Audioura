@@ -59,80 +59,119 @@ def _blank() -> Dict:
 # ── 1. prompt -> Serper queries ───────────────────────────────────────────────
 
 _QUOTED = re.compile(r'[“"\u201c\u201d]([^"\u201c\u201d]{3,80})[”"\u201c\u201d]')
-_YEAR = re.compile(r'\b(1[5-9]\d{2}|20[0-3]\d)\b')
+_YEAR = re.compile(r'\b(1[4-9]\d{2}|20[0-3]\d)\b')
+# The pipeline's per-stop prompt (story_query.compile_for_seed) always carries a
+# structured "Context — the work this concerns:" block with these labelled
+# fields. They are the strongest retrieval signal — far better than scraping the
+# free text — so we parse them first.
+_CTX_FIELD = re.compile(r'(?mi)^\s*(canonical_title|artist|venue_name|'
+                        r'credit_line|publication_year|medium)\s*:\s*(.+?)\s*$')
+# Instruction boilerplate that must never become a query term.
+_BOILER_PHRASES = ('no reliable information', 'no material found',
+                   'using google search', 'google search')
+
+
+def _parse_context(text: str) -> dict:
+    """Pull the labelled context fields out of a compile_for_seed prompt."""
+    ctx = {}
+    for m in _CTX_FIELD.finditer(text or ''):
+        k = m.group(1).lower()
+        v = m.group(2).strip()
+        if v and v.lower() not in ('', 'not specified', 'n/a'):
+            ctx.setdefault(k, v)
+    return ctx
+
+
+def _strip_gloss(title: str) -> str:
+    """Drop a parenthetical English gloss, mirroring story_query._bare_title."""
+    return re.sub(r'\s*\([^)]*\)\s*', ' ', title or '').strip() or (title or '')
+
+
+def _clean_name(v: str) -> str:
+    """Surname-or-short-name for an agent, dropping donor verbs."""
+    v = re.sub(r'^(gift|bequest|loan|promised gift)\s+of\s+', '', v or '',
+               flags=re.IGNORECASE)
+    v = v.split('.')[0].split(',')[0].strip()
+    toks = [t for t in v.split() if len(t) > 1]
+    if not toks:
+        return ''
+    return toks[-1] if len(toks) > 1 and len(toks[-1]) > 3 else ' '.join(toks)
 
 
 def derive_queries(prompt: str, max_queries: int = MAX_QUERIES) -> List[str]:
     """Turn a story-lead prompt into a few focused web queries.
 
-    The grounded prompts the pipeline sends name a VENUE, a WORK (often quoted),
-    and sometimes a SUBJECT/artist. The most reliable retrieval query is the
-    quoted title (+ any year); we add a venue-scoped query and a plain
-    content-word query so a page about the work OR about the venue's holding of it
-    is reachable. Deterministic and free — no network, no model.
+    PREFERRED path: the pipeline's prompt carries a labelled context block
+    (canonical_title / artist / venue_name / credit_line / year). We build the
+    queries from those strong signals — the quoted title + artist, the title +
+    venue, the title + year — the same encoding story_query.compile_for_serper
+    proved. FALLBACK (an ad-hoc prompt with no context block): quoted title, then
+    a proper-noun phrase, then content words. Deterministic and free.
     """
     text = (prompt or '').strip()
+    ctx = _parse_context(text)
     queries: List[str] = []
 
-    quoted = [m.group(1).strip() for m in _QUOTED.finditer(text)]
-    years = _YEAR.findall(text)
+    if ctx.get('canonical_title'):
+        title = _strip_gloss(ctx['canonical_title'])
+        artist = _clean_name(ctx.get('artist', ''))
+        venue = (ctx.get('venue_name') or '').strip()
+        donor = _clean_name(ctx.get('credit_line', ''))
+        year = ''
+        ym = _YEAR.search(ctx.get('publication_year', '') or
+                          ctx.get('credit_line', '') or '')
+        if ym:
+            year = ym.group(1)
 
-    # Query 1: the strongest signal — a quoted title, with a year if present.
-    if quoted:
-        q = quoted[0]
-        if years:
-            q = f'{q} {years[0]}'
-        queries.append(q)
+        # Q1: title (quoted) + artist + year — the object itself.
+        q1 = f'"{title}"'
+        if artist:
+            q1 += f' {artist}'
+        if year:
+            q1 += f' {year}'
+        queries.append(q1)
+        # Q2: title + venue — the venue's holding / acquisition of it.
+        if venue:
+            queries.append(f'"{title}" {venue}')
+        # Q3: title + donor/collection + "history" — provenance angle.
+        if donor and donor.lower() not in (artist.lower(), venue.lower()):
+            queries.append(f'"{title}" {donor} history')
+        elif artist:
+            queries.append(f'"{title}" {artist} history')
 
-    # Query 2: title + the next-most-named entity (second quote, or capitalised
-    # multiword phrase that is not the title) — surfaces the maker / collection.
-    if len(quoted) >= 2:
-        queries.append(f'{quoted[0]} {quoted[1]}')
-    else:
-        # Pull a plausible proper-noun phrase (e.g. an artist or a venue) that is
-        # not already the title, to broaden coverage.
-        caps = re.findall(r'\b([A-Z][a-zà-ÿ’\'-]+(?:\s+[A-Z][a-zà-ÿ’\'-]+){1,3})\b',
-                          text)
-        extra = ''
-        title_fold = (quoted[0].lower() if quoted else '')
-        # Boilerplate capitalised phrases that appear in the instruction wrapper
-        # of every grounded prompt, never a real entity.
-        _boiler = {'using google search', 'google search', 'research'}
-        for c in caps:
-            cl = c.lower()
-            if cl in title_fold or title_fold in cl:
-                continue
-            if cl in _boiler or 'google' in cl:
-                continue
-            if len(c) >= 6:
-                extra = c
-                break
-        if quoted and extra:
-            queries.append(f'{quoted[0]} {extra}')
-        elif extra:
-            queries.append(extra)
-
-    # Query 3: a content-word fallback built from the longest words in the prompt,
-    # so a prompt with no quotes still produces a usable query.
-    if not queries or len(queries) < max_queries:
+    # Fallback / top-up when there is no context block or too few queries.
+    if len(queries) < max_queries:
+        quoted = [m.group(1).strip() for m in _QUOTED.finditer(text)]
+        years = _YEAR.findall(text)
+        if quoted:
+            q = quoted[0] + (f' {years[0]}' if years else '')
+            queries.append(q)
         words = re.findall(r"[A-Za-zÀ-ÿ'’\-]{5,}", text)
-        # drop instruction/boilerplate words that appear in every prompt
         stop = {'using', 'google', 'search', 'research', 'museum', 'venue',
                 'works', 'facts', 'sources', 'checkable', 'events', 'visitor',
                 'tour', 'about', 'their', 'which', 'there', 'these', 'those',
-                'please', 'provide', 'specific', 'history', 'notable'}
+                'please', 'provide', 'specific', 'history', 'notable', 'story',
+                'visitors', 'reliable', 'information', 'context', 'concerns',
+                'exhibition', 'answer', 'bracket', 'brackets', 'sentence',
+                'maximum', 'prefer', 'standing', 'front', 'cannot', 'praise',
+                'describe', 'looks', 'nothing'}
         content = [w for w in words if w.lower() not in stop]
         if content:
             queries.append(' '.join(content[:6]))
 
-    # De-dupe, preserve order, cap.
+    # Drop any query that is pure boilerplate, then de-dupe / cap.
     seen, out = set(), []
     for q in queries:
         q = re.sub(r'\s+', ' ', q).strip()
         k = q.lower()
-        if q and k not in seen:
-            seen.add(k)
-            out.append(q)
+        if not q or k in seen:
+            continue
+        # A query that is nothing but an instruction phrase retrieves garbage.
+        bare = k.replace('"', '').strip()
+        if any(bare.startswith(b) or b == bare for b in _BOILER_PHRASES):
+            continue
+        seen.add(k)
+        out.append(q)
         if len(out) >= max_queries:
             break
     return out
