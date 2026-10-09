@@ -563,6 +563,19 @@ NARRATION CONTRACT (LOCAL-617 — museum stop, in THIS order):
       — the circumstance, not a résumé. One or two sentences.
 {reception_clause}  (d) The emotional or human reading — what it is like to stand before it,
       what it is about as human experience.
+  (e) IF {_title} depicts, commemorates, or is bound up with a PIVOTAL DECISION
+      or EVENT — a refusal, a stand on principle, a betrayal, a theft, a battle
+      or war, an exile, a trial, an execution or death sentence, a martyrdom, a
+      flight, a conversion, a coronation or abdication — then STATE ITS
+      CONSEQUENCE and link it back to the work. What followed from the act (the
+      sitter's fate, the outcome for the subject), and how the work reflects or
+      foreshadows it. ONLY from the reference material: give the real consequence
+      (e.g. a named outcome, a year, a fate) the sources record — never invent
+      one. If the sources record the event but not its consequence, say what the
+      sources do give and stop; do not guess. Example of the shape: a portrait of
+      a statesman who refused to recognise his king as head of the Church is
+      incomplete if it does not say that he was executed for that refusal, and how
+      the painting's steady composure reads against that fate.
 
 DO NOT narrate the MUSEUM instead of the work: no donor, bequest, acquisition,
 accession, provenance, founding, renovation, budget, loan, or mission sentences.

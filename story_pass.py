@@ -179,6 +179,18 @@ The test to apply when you finish: a listener who has just heard this should wan
 to say "IT DID?" or "HE DID?" — not "how interesting", and above all not
 "so what?". If the only honest response is "so what?", you have written a label.
 
+IF THE ACTION IS A PIVOTAL DECISION OR EVENT, GIVE ITS CONSEQUENCE. When part 2
+is a refusal, a stand on principle, a betrayal, a theft, a battle or war, an
+exile, a trial, an execution or death sentence, a martyrdom, a flight, a
+conversion, a coronation or abdication, part 3 is not optional and is not vague:
+state WHAT FOLLOWED from the act — the named outcome, the fate, the year — and
+link it back to the object in front of the listener (how the work reflects,
+commemorates or foreshadows that consequence). "He refused" is half a story; "he
+refused, and was executed in 1535 for it, which is why this calm portrait reads
+the way it does" is the whole one. Take the consequence ONLY from the source
+material; if the material records the event but not its consequence, tell what it
+does record and stop — never invent the outcome.
+
 Where the material is plainer than the examples, write the plainer version — a
 real, small, sourced action beats an invented dramatic one. Numbers earn this:
 how many were destroyed, how long it lasted, how much was paid, what remains.
