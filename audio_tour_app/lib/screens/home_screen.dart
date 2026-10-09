@@ -578,6 +578,16 @@ class _HomeScreenState extends State<HomeScreen> {
     });
   }
 
+  /// [LEAD 2026-10-09] Found-by-name tours use exactly the map's dialogs (shared code, same look):
+  /// one tour → the single-tour dialog, several → the multi-tour dialog.
+  void _presentFoundTours(List<Map<String, dynamic>> tours) {
+    if (tours.length == 1) {
+      _onTourMarkerTapped(tours.first);
+    } else {
+      _showMultipleTourDialog(tours);
+    }
+  }
+
   void _onTourMarkerTapped(Map<String, dynamic> item) {
     if (item['type'] == 'treat') {
       // Navigate directly to treat detail view
@@ -878,15 +888,6 @@ class _HomeScreenState extends State<HomeScreen> {
                           ],
                         ),
                         dense: true,
-                        // [LEAD 2026-10-09] same per-tour language/translate dialog as a single-tour map tap
-                        secondary: IconButton(
-                          icon: Icon(Icons.translate, color: Color(0xFF8e44ad)),
-                          tooltip: 'Languages & translate',
-                          onPressed: () {
-                            Navigator.pop(context);
-                            _onTourMarkerTapped(tour);
-                          },
-                        ),
                       );
                     },
                   ),
@@ -1327,6 +1328,10 @@ class _HomeScreenState extends State<HomeScreen> {
                         });
                         
                         final results = await _searchTours(controller.text.trim());
+                        // [LEAD 2026-10-09] Michael: dialogs with the same purpose must look the same and share
+                        // code. Found tours go to the SAME dialogs as the map: one → single-tour dialog,
+                        // several → multi-tour dialog (both with the shared LanguageSelector).
+                        if (results.isNotEmpty) { Navigator.pop(context); _presentFoundTours(results); return; }
                         
                         setDialogState(() {
                           isSearching = false;
@@ -1346,6 +1351,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     });
                     
                     final results = await _searchTours(value.trim());
+                    if (results.isNotEmpty) { Navigator.pop(context); _presentFoundTours(results); return; }  // [LEAD 2026-10-09] same dialogs as the map
                     
                     setDialogState(() {
                       isSearching = false;
@@ -1412,17 +1418,6 @@ class _HomeScreenState extends State<HomeScreen> {
                             ],
                           ),
                           dense: true,
-                          // [LEAD 2026-10-09] Name-search results had only "Download Selected" (English).
-                          // The language/translate options lived only on the map dialog. This opens
-                          // the same dialog for this one tour (Michael: "no options for translation").
-                          secondary: IconButton(
-                            icon: Icon(Icons.translate, color: Color(0xFF8e44ad)),
-                            tooltip: 'Languages & translate',
-                            onPressed: () {
-                              Navigator.pop(context);
-                              _onTourMarkerTapped(tour);
-                            },
-                          ),
                         );
                       },
                     ),
