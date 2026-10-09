@@ -696,6 +696,31 @@ def _find_stop(stop_names: List[str], *keywords: str) -> Optional[str]:
     return None
 
 
+def _find_capitol_stop(stop_names: List[str]) -> Optional[str]:
+    """The working STATE capitol stop, preferring it over the historical
+    'Old State House'.
+
+    Tour 618's duplicate came from treating both 'Old State House' (a Revolutionary
+    museum/landmark) and 'State House' (the live Beacon Hill capitol) as the state
+    stop. State-government news belongs ONLY at the live capitol. Preference:
+      1. a stop named 'capitol',
+      2. a 'state house'/'statehouse' stop that is NOT 'old state house',
+      3. 'legislature'.
+    'Old State House' alone is NOT returned here — it is a historical landmark, not
+    the seat of state government."""
+    for name in stop_names:
+        if 'capitol' in name.lower():
+            return name
+    for name in stop_names:
+        nl = name.lower()
+        if ('state house' in nl or 'statehouse' in nl) and 'old state house' not in nl:
+            return name
+    for name in stop_names:
+        if 'legislature' in name.lower():
+            return name
+    return None
+
+
 def assign_item_to_stop(item: Dict, stop_names: List[str]) -> Optional[str]:
     """Pick the ONE stop a theme/news item belongs to.
 
@@ -713,8 +738,7 @@ def assign_item_to_stop(item: Dict, stop_names: List[str]) -> Optional[str]:
     # When both fire, prefer the more specific "city hall"/"city council" only if
     # the state capitol words are absent as the dominant signal.
     if is_state and not is_city:
-        s = _find_stop(stop_names, 'state house', 'statehouse', 'capitol',
-                       'legislature')
+        s = _find_capitol_stop(stop_names)
         if s:
             return s
     if is_city and not is_state:
@@ -733,10 +757,13 @@ def assign_item_to_stop(item: Dict, stop_names: List[str]) -> Optional[str]:
     if best_overlap > 0:
         return best
     # Still nothing: if exactly one of state/city fired but its canonical stop was
-    # missing, hand it to the other government stop if present.
-    if is_state or is_city:
-        return _find_stop(stop_names, 'state house', 'statehouse', 'capitol',
-                          'city hall', 'town hall', 'legislature', 'council')
+    # missing, hand it to the other government stop if present (capitol preferred).
+    if is_state:
+        return (_find_capitol_stop(stop_names)
+                or _find_stop(stop_names, 'city hall', 'town hall', 'council'))
+    if is_city:
+        return (_find_stop(stop_names, 'city hall', 'town hall', 'city council')
+                or _find_capitol_stop(stop_names))
     return None
 
 

@@ -177,6 +177,233 @@ class TestComposeAndResearch(unittest.TestCase):
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# 2b. [LOCAL-655B] RELEVANCE GATE + STOP ASSIGNMENT + ATTRIBUTION
+#     Fixtures reproduce the exact live-tour-618 failures the LEAD flagged.
+# ─────────────────────────────────────────────────────────────────────────────
+import datetime as _dt
+
+NOW = _dt.date(2026, 10, 9)  # the live context date, so relative dates resolve.
+
+# The real wrong-place item that shipped on Boston stops 2 AND 4 of tour 618.
+ARKANSAS_ITEM = {
+    "title": "Longtime Old State House Museum employee resigns",
+    "source": "Arkansas Times", "date": "Six days ago",
+    "link": "https://arktimes.example/resign",
+    "snippet": ("Marie Brown-Bealer, a 15-year employee at the Old State House "
+                "Museum in Little Rock, Arkansas, resigned citing insensitive "
+                "remarks about slavery under new leadership."),
+}
+ARKANSAS_ITEM2 = {
+    "title": "Old State House Museum announces gambling exhibit",
+    "source": "KARK", "date": "4 days ago",
+    "link": "https://kark.example/gambling",
+    "snippet": ("The Old State House Museum announced a new exhibit on the rise "
+                "and fall of gambling in Hot Springs, Arkansas."),
+}
+# The off-theme restaurant item that shipped on Faneuil Hall.
+BURGER_ITEM = {
+    "title": "Smashed by BRED to open in Faneuil Hall Marketplace",
+    "source": "Axios", "date": "2 days ago",
+    "link": "https://axios.example/bred",
+    "snippet": ("BRED, a Boston restaurant group, will open Smashed by BRED in "
+                "Faneuil Hall Marketplace next month, serving burgers and chicken."),
+}
+# The undated 'Recently … 2022 strategy' item.
+UNDATED_ITEM = {
+    "title": "Downtown revitalization includes Faneuil Hall",
+    "source": "Boston.gov", "date": "",
+    "link": "https://boston.gov.example/downtown",
+    "snippet": ("The City of Boston has included Faneuil Hall in its Downtown "
+                "revitalization under the 2022 strategy."),
+}
+# The item Michael actually asked about: the Oct 8 governor's debate.
+DEBATE_ITEM = {
+    "title": "Healey debates Republican challenger in Massachusetts governor race",
+    "source": "State House News Service", "date": "Oct 8, 2026",
+    "link": "https://statehousenews.example/debate",
+    "snippet": ("Massachusetts Governor Maura Healey debated her Republican "
+                "challenger over the state budget at the State House in Boston."),
+}
+
+
+class TestRelevanceGate(unittest.TestCase):
+    def test_arkansas_item_rejected_wrong_place(self):
+        ok, reason = ca.gate_item(ARKANSAS_ITEM, BOSTON_REQ, fresh_days=365, now=NOW)
+        self.assertFalse(ok)
+        self.assertIn("arkansas", reason.lower())
+
+    def test_burger_item_rejected_off_theme(self):
+        ok, reason = ca.gate_item(BURGER_ITEM, BOSTON_REQ, fresh_days=365, now=NOW)
+        self.assertFalse(ok)
+        self.assertIn("off-theme", reason.lower())
+
+    def test_undated_item_dropped(self):
+        ok, reason = ca.gate_item(UNDATED_ITEM, BOSTON_REQ, fresh_days=365, now=NOW)
+        self.assertFalse(ok)
+        self.assertIn("undated", reason.lower())
+
+    def test_stale_dated_item_dropped(self):
+        old = dict(DEBATE_ITEM, date="Jan 2, 2020")
+        ok, reason = ca.gate_item(old, BOSTON_REQ, fresh_days=365, now=NOW)
+        self.assertFalse(ok)
+        self.assertIn("stale", reason.lower())
+
+    def test_debate_item_accepted(self):
+        ok, reason = ca.gate_item(DEBATE_ITEM, BOSTON_REQ, fresh_days=365, now=NOW)
+        self.assertTrue(ok, reason)
+        self.assertIn("ok", reason.lower())
+
+    def test_parse_news_date_relative_and_absolute(self):
+        self.assertEqual(ca.parse_news_date("Six days ago", now=NOW),
+                         _dt.date(2026, 10, 3))
+        self.assertEqual(ca.parse_news_date("4 days ago", now=NOW),
+                         _dt.date(2026, 10, 5))
+        self.assertEqual(ca.parse_news_date("yesterday", now=NOW),
+                         _dt.date(2026, 10, 8))
+        self.assertEqual(ca.parse_news_date("Oct 8, 2026"), _dt.date(2026, 10, 8))
+        self.assertEqual(ca.parse_news_date("2026-10-08"), _dt.date(2026, 10, 8))
+        self.assertIsNone(ca.parse_news_date(""))
+        self.assertIsNone(ca.parse_news_date("Recently"))
+
+    def test_gate_items_splits_accepted_rejected(self):
+        acc, rej = ca.gate_items(
+            [DEBATE_ITEM, ARKANSAS_ITEM, BURGER_ITEM, UNDATED_ITEM],
+            BOSTON_REQ, fresh_days=365, now=NOW)
+        self.assertEqual([a["link"] for a in acc], [DEBATE_ITEM["link"]])
+        self.assertEqual(len(rej), 3)
+        self.assertTrue(all("_reject_reason" in r for r in rej))
+
+
+class TestStopAssignment(unittest.TestCase):
+    STOPS = ["Faneuil Hall", "Old State House", "Boston Common",
+             "Massachusetts State House", "Boston City Hall"]
+
+    def test_state_item_assigned_to_state_house(self):
+        self.assertEqual(ca.assign_item_to_stop(DEBATE_ITEM, self.STOPS),
+                         "Massachusetts State House")
+
+    def test_city_item_assigned_to_city_hall(self):
+        city_item = {"title": "Boston City Council passes ordinance",
+                     "snippet": ("The Boston City Council and Mayor approved a "
+                                 "zoning ordinance at City Hall."), "text": ""}
+        self.assertEqual(ca.assign_item_to_stop(city_item, self.STOPS),
+                         "Boston City Hall")
+
+    def test_no_government_stop_falls_back_or_none(self):
+        # No gov stop present; a generic item with no name overlap -> None.
+        item = {"title": "x", "snippet": "a generic civic protest downtown",
+                "text": ""}
+        self.assertIsNone(ca.assign_item_to_stop(item, ["Riverside Park"]))
+
+
+class TestNoDuplicateAcrossStops(unittest.TestCase):
+    """A single item returned by MANY queries must land on exactly ONE stop."""
+    def test_duplicate_item_lands_on_one_stop_only(self):
+        # The debate item is returned for several queries (theme + two stops);
+        # it must appear on exactly one stop (the State House), never twice.
+        def serp_dupe(query, tbs='qdr:m', num=8):
+            if tbs != 'qdr:m':
+                return []
+            return [dict(DEBATE_ITEM)]
+
+        def fetch(url):
+            return ("On October 8, 2026, Massachusetts Governor Maura Healey "
+                    "debated her Republican challenger over the state budget at "
+                    "the State House in Boston. Healey, a Democrat, defended local "
+                    "aid; her Republican opponent called for spending cuts.")
+
+        def answer(prompt, model=None, max_tokens=None):
+            return {"text": ("On October 8, 2026, Massachusetts Governor Maura "
+                             "Healey debated her Republican challenger over the "
+                             "state budget, according to the State House News "
+                             "Service [1]."), "error": ""}
+
+        log = ca.research_news_for_stops(
+            BOSTON_REQ, ["Old State House", "Massachusetts State House"],
+            serp=serp_dupe, fetch=fetch, answer=answer, now=NOW)
+        # Exactly one stop received the item.
+        stops_with_news = list(log["by_stop"].keys())
+        self.assertEqual(len(stops_with_news), 1, log["by_stop"])
+        self.assertEqual(stops_with_news[0], "Massachusetts State House")
+        # And it is accepted exactly once (deduped by link).
+        self.assertEqual(len([a for a in log["accepted"]
+                              if a["link"] == DEBATE_ITEM["link"]]), 1)
+
+    def test_full_mix_only_debate_survives_on_one_stop(self):
+        """The full tour-618 candidate mix: Arkansas x2 + burger + undated +
+        debate. Only the debate survives, on the State House, once."""
+        pool = [ARKANSAS_ITEM, ARKANSAS_ITEM2, BURGER_ITEM, UNDATED_ITEM, DEBATE_ITEM]
+
+        def serp_mix(query, tbs='qdr:m', num=8):
+            return list(pool) if tbs == 'qdr:m' else []
+
+        def fetch(url):
+            if url == DEBATE_ITEM["link"]:
+                return ("On October 8, 2026, Massachusetts Governor Maura Healey "
+                        "debated her Republican challenger at the State House in "
+                        "Boston over the state budget.")
+            # the rejected items keep their off-place/off-theme/undated text
+            return {ARKANSAS_ITEM["link"]: ARKANSAS_ITEM["snippet"],
+                    ARKANSAS_ITEM2["link"]: ARKANSAS_ITEM2["snippet"],
+                    BURGER_ITEM["link"]: BURGER_ITEM["snippet"],
+                    UNDATED_ITEM["link"]: UNDATED_ITEM["snippet"]}.get(url, "")
+
+        def answer(prompt, model=None, max_tokens=None):
+            return {"text": ("On October 8, 2026, Massachusetts Governor Maura "
+                             "Healey debated her Republican challenger over the "
+                             "state budget, according to the State House News "
+                             "Service [1]."), "error": ""}
+
+        log = ca.research_news_for_stops(
+            BOSTON_REQ,
+            ["Faneuil Hall", "Old State House", "Boston Common",
+             "Massachusetts State House", "Boston City Hall"],
+            serp=serp_mix, fetch=fetch, answer=answer, now=NOW)
+        self.assertEqual(list(log["by_stop"].keys()), ["Massachusetts State House"])
+        acc_links = {a["link"] for a in log["accepted"]}
+        self.assertEqual(acc_links, {DEBATE_ITEM["link"]})
+        rej_links = {r["link"] for r in log["rejected"]}
+        for bad in (ARKANSAS_ITEM, ARKANSAS_ITEM2, BURGER_ITEM, UNDATED_ITEM):
+            self.assertIn(bad["link"], rej_links)
+
+
+class TestAttributionParenthetical(unittest.TestCase):
+    def test_parenthetical_dropped_when_source_named_in_text(self):
+        by_stop = {"Massachusetts State House": {
+            "text": ("On October 8, 2026, Governor Healey debated her Republican "
+                     "challenger, according to the State House News Service."),
+            "sources": [{"source": "State House News Service", "url": "u",
+                         "date": "Oct 8, 2026"}]}}
+        text = ("Stop 1: Massachusetts State House\n\nBuilt in 1798.\n\n"
+                "Directions: Walk on.\n")
+        out, n = ca.inject_news_into_text(text, by_stop)
+        self.assertEqual(n, 1)
+        self.assertIn(ca._NEWS_MARK, out)
+        self.assertNotIn("Reported by", out,
+                         "parenthetical must be dropped when source named in text")
+
+    def test_parenthetical_kept_for_unnamed_source(self):
+        by_stop = {"Massachusetts State House": {
+            "text": "On October 8, 2026, the governor debated her challenger.",
+            "sources": [{"source": "State House News Service", "url": "u",
+                         "date": "Oct 8, 2026"}]}}
+        text = ("Stop 1: Massachusetts State House\n\nBuilt in 1798.\n\n"
+                "Directions: Walk on.\n")
+        out, n = ca.inject_news_into_text(text, by_stop)
+        self.assertEqual(n, 1)
+        self.assertIn("Reported by State House News Service", out)
+
+    def test_attribution_suffix_helper(self):
+        self.assertEqual(ca._attribution_suffix(
+            "x according to Axios", ["Axios"]), "")
+        self.assertEqual(ca._attribution_suffix(
+            "x happened", ["Axios"]), " (Reported by Axios.)")
+        self.assertEqual(ca._attribution_suffix(
+            "named WGBH only", ["WGBH", "Boston.com"]),
+            " (Reported by Boston.com.)")
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # 3. EMPTY RESPONSE -> HONEST NOTE
 # ─────────────────────────────────────────────────────────────────────────────
 class TestHonestNote(unittest.TestCase):
