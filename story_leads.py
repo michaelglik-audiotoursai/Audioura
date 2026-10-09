@@ -497,7 +497,61 @@ def _gemini_grounded(prompt: str) -> str:
     return _gemini(prompt, grounded=True)
 
 
-# ── [LOCAL-645] GEMINI_PER_VENUE — one grounded research pass per MUSEUM ───────
+# ── [LOCAL-648] RESEARCH_BACKEND — Serper research instead of Gemini grounding ─
+# A fresh grounded Gemini answer costs ~$0.035 on Google's per-request search fee
+# (price card r4). The same question can be answered with Serper ($0.001/query) +
+# a page fetch + a cheap model constrained to the fetched text. `serper_research`
+# returns the EXACT shape `gemini_with_sources` returns, so it is a drop-in.
+#
+# This router is the ONE place that chooses. The grounded per-stop narrate (the
+# D511 r1 call in story_production_loop) calls `research_with_sources` instead of
+# `gemini_with_sources` directly; everything else (notably the venue preflight)
+# still calls `gemini_with_sources`, so the preflight always stays on Gemini.
+#
+# DEFAULT is gemini: when RESEARCH_BACKEND is unset/empty/anything-but-"serper"
+# the router calls gemini_with_sources with the identical arguments, so behaviour
+# is byte-for-byte unchanged. The serper backend is engaged ONLY when
+# RESEARCH_BACKEND=serper AND the call is grounded=True (an explicitly ungrounded
+# call is class knowledge and must not pay for retrieval — it stays on Gemini
+# ungrounded).
+RESEARCH_BACKEND_ENV = 'RESEARCH_BACKEND'
+
+
+def research_backend() -> str:
+    """The selected research backend: 'serper' or 'gemini' (default). Case- and
+    whitespace-insensitive; anything other than 'serper' means 'gemini'."""
+    v = os.environ.get(RESEARCH_BACKEND_ENV, '').strip().lower()
+    return 'serper' if v == 'serper' else 'gemini'
+
+
+def research_with_sources(prompt: str, model: str = None, resolve: bool = True,
+                          timeout: int = 90, grounded: bool = True) -> Dict:
+    """Answer a research question, returning {text, sources, supports, queries,
+    error}. Dispatches to the Serper backend when RESEARCH_BACKEND=serper AND
+    grounded=True, otherwise to gemini_with_sources with the identical arguments.
+
+    This is call-compatible with gemini_with_sources, so a call site swaps one for
+    the other with no argument changes. With the default backend (gemini) this is
+    exactly gemini_with_sources — nothing changes."""
+    if grounded and research_backend() == 'serper':
+        try:
+            import serper_research
+        except Exception as e:
+            # If the backend module cannot be imported, fail SAFE to Gemini rather
+            # than breaking generation.
+            out = gemini_with_sources(prompt, model=None, resolve=resolve,
+                                      timeout=timeout, grounded=grounded)
+            if isinstance(out, dict) and not out.get('error'):
+                return out
+            return out
+        return serper_research.serper_research(
+            prompt, model=model, resolve=resolve, timeout=timeout,
+            grounded=grounded)
+    return gemini_with_sources(prompt, model=model, resolve=resolve,
+                               timeout=timeout, grounded=grounded)
+
+
+
 # COST PROTOTYPE 1 (ticket LOCAL-645). Gemini grounding is ~55% of a fresh tour's
 # cost: a 3-stop tour issues N+1 search-enabled requests (1 venue preflight + one
 # per stop in the D511 loop), and MANY of those per-stop requests ask about the

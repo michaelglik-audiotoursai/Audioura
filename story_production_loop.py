@@ -214,6 +214,16 @@ def run_for_stop(matrix: Dict, stop_text: str, exhibition: str = '',
         from story_query import (compile_for_serper, compile_for_gemini,
                                  compile_for_seed)
         from story_leads import gemini_with_sources
+        # [LOCAL-648] RESEARCH_BACKEND router: the per-stop grounded narrate (r1)
+        # goes through this instead of gemini_with_sources directly, so
+        # RESEARCH_BACKEND=serper answers it with Serper + page fetch + a cheap
+        # model. Default (gemini) makes research_with_sources == gemini_with_sources,
+        # so r1 is unchanged. Imported defensively: a missing symbol (older
+        # story_leads) falls back to gemini_with_sources.
+        try:
+            from story_leads import research_with_sources as _research_with_sources
+        except Exception:
+            _research_with_sources = gemini_with_sources
         # [LOCAL-645] GEMINI_PER_VENUE: one grounded research pass per museum,
         # reused ungrounded by every stop. Imported here so the loop has no hard
         # dependency when the symbols are absent (older story_leads) — a missing
@@ -376,7 +386,7 @@ def run_for_stop(matrix: Dict, stop_text: str, exhibition: str = '',
                     _ground_r1 = n_gem_grounded < MAX_GROUNDED_PER_STOP
             else:
                 _ground_r1 = n_gem_grounded < MAX_GROUNDED_PER_STOP
-            r1 = gemini_with_sources(_seed_prompt, grounded=_ground_r1)
+            r1 = _research_with_sources(_seed_prompt, grounded=_ground_r1)
             n_gem += 1
             if _ground_r1:
                 n_gem_grounded += 1
