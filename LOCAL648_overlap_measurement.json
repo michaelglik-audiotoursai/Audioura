@@ -1,0 +1,719 @@
+{
+  "summary": {
+    "rate_tag": "2026-10-08-r4",
+    "n_questions": 6,
+    "gemini": {
+      "total_usd": 0.21646,
+      "usd_per_q": 0.03608,
+      "facts_total": 41,
+      "facts_per_q": 6.8,
+      "secs_per_q": 10.8
+    },
+    "serper": {
+      "total_usd": 0.03436,
+      "usd_per_q": 0.00573,
+      "facts_total": 41,
+      "facts_per_q": 6.8,
+      "secs_per_q": 11.1
+    },
+    "total_run_usd": 0.25082
+  },
+  "results": [
+    {
+      "venue": "The Courtauld Gallery, London",
+      "work": "A Bar at the Folies-Bergère",
+      "prompt": "What story can be told to visitors of The Courtauld Gallery, London about A Bar at the Folies-Bergère, Samuel Courtauld Trust?\n\nContext — the work this concerns:\n  canonical_title: A Bar at the Folies-Bergère\n  artist: Édouard Manet\n  venue_name: The Courtauld Gallery\n  credit_line: Samuel Courtauld Trust\n  publication_year: 1882\nExhibition: The Courtauld Gallery, London\n\nSearch, then answer with FACTS ONLY — each one sentence, with its source in brackets. Prefer what a visitor standing in front of it cannot see: why it was made, who decided, what went wrong, what it cost someone. If you find nothing reliable, say exactly \"NO RELIABLE INFORMATION\". Do not praise the work. Do not describe how it looks. Maximum 6 sentences.",
+      "serper_keyword_form": "\"A Bar at the Folies-Bergère\" Trust Manet why 1882",
+      "gemini": {
+        "text": "Édouard Manet painted the work in his studio while suffering from severe locomotor ataxia caused by tertiary syphilis, completing it just one year before his death.\n\nTo construct the scene, he had a real barmaid from the Folies-Bergère named Suzon come to his studio to model behind a specially erected bar counter.\n\nX-ray analyses reveal that Manet initially painted the composition closer to realistic perspective before radically shifting the barmaid's reflection to create an impossible, disorienting optical viewpoint.\n\nContemporary critics at the 1882 Paris Salon harshly attacked the painting, accusing Manet of complete incompetence and ignorance regarding the laws of perspective.\n\nThe painting originally hung above the piano of French composer Emmanuel Chabrier, who bought it at Manet's posthumous studio auction in 1884.\n\nIndustrialist Samuel Courtauld purchased the masterpiece in 1926 before formally gifting it to the trust in 1934 to establish the gallery's core collection.",
+        "error": "",
+        "sources": [
+          {
+            "domain": "getty.edu",
+            "url": "https://www.getty.edu/art/exhibitions/manet_bar/"
+          },
+          {
+            "domain": "artuk.org",
+            "url": "https://artuk.org/discover/artworks/a-bar-at-the-folies-bergere-207293"
+          },
+          {
+            "domain": "theartwolf.com",
+            "url": "https://theartwolf.com/news/manet-folies-bergeres-sothebys-2015/"
+          },
+          {
+            "domain": "wikipedia.org",
+            "url": "https://en.wikipedia.org/wiki/A_Bar_at_the_Folies-Berg%C3%A8re"
+          },
+          {
+            "domain": "painting-meanings.com",
+            "url": "https://painting-meanings.com/artworks/douard-manet/a-bar-at-the-folies-berg-re/value"
+          }
+        ],
+        "queries": [
+          "Manet A Bar at the Folies Bergere Samuel Courtauld purchased price",
+          "A Bar at the Folies Bergere Courtauld facts provenance model cost"
+        ],
+        "n_facts": 8,
+        "facts": [
+          "Édouard Manet painted the work while suffering from severe locomotor ataxia caused by tertiary syphilis.",
+          "Manet completed the painting one year before his death.",
+          "A barmaid from the Folies-Bergère named Suzon modeled for the painting.",
+          "Contemporary critics at the 1882 Paris Salon harshly attacked the painting.",
+          "The painting originally hung above the piano of French composer Emmanuel Chabrier.",
+          "Emmanuel Chabrier bought the painting at Manet's posthumous studio auction in 1884.",
+          "Industrialist Samuel Courtauld purchased the painting in 1926.",
+          "Samuel Courtauld gifted the painting to the trust in 1934."
+        ],
+        "seconds": 8.1,
+        "usd": 0.0361
+      },
+      "serper": {
+        "text": "Édouard Manet painted A Bar at the Folies-Bergère in 1882, and it was his last major work, exhibited at the Paris Salon that year. The painting depicts a scene in the Folies-Bergère nightclub, a popular Parisian music hall known for its entertainment and the presence of barmaids who were also seen as prostitutes. Manet made preparatory sketches on site but completed the final painting in his studio, where he set up a bar and employed a barmaid named Suzon to pose. The work was originally owned by the composer Emmanuel Chabrier and now belongs to The Courtauld Gallery in London, credited to the Samuel Courtauld Trust. The painting is famous for its complex and debated use of perspective, especially the mirror behind the barmaid, which creates optical puzzles about the viewer’s position and the reflections shown. The Folies-Bergère setting was a fashionable, somewhat expensive venue attracting a middle to upper-middle-class clientele, where people came to see and be seen.",
+        "error": "",
+        "sources": [
+          {
+            "domain": "en.wikipedia.org",
+            "url": "https://en.wikipedia.org/wiki/A_Bar_at_the_Folies-Berg%C3%A8re"
+          },
+          {
+            "domain": "courtauld.ac.uk",
+            "url": "http://courtauld.ac.uk/highlights/a-bar-at-the-folies-bergere/"
+          },
+          {
+            "domain": "getty.edu",
+            "url": "https://www.getty.edu/art/exhibitions/manet_bar/"
+          },
+          {
+            "domain": "artsandculture.google.com",
+            "url": "https://artsandculture.google.com/asset/a-bar-at-the-folies-berg%C3%A8re-eduard-manet/NQE8B0Mjo2nq2g?hl=en"
+          },
+          {
+            "domain": "artinsociety.com",
+            "url": "https://www.artinsociety.com/reflections-on-a-masterpiece-manets-a-bar-at-the-folies-bergere"
+          }
+        ],
+        "queries": [
+          "\"A Bar at the Folies-Bergère\" Manet 1882",
+          "\"A Bar at the Folies-Bergère\" The Courtauld Gallery",
+          "\"A Bar at the Folies-Bergère\" Trust history"
+        ],
+        "n_facts": 6,
+        "facts": [
+          "Édouard Manet painted A Bar at the Folies-Bergère in 1882.",
+          "A Bar at the Folies-Bergère was exhibited at the Paris Salon in 1882.",
+          "Manet employed a barmaid named Suzon to pose for A Bar at the Folies-Bergère.",
+          "The painting A Bar at the Folies-Bergère was originally owned by composer Emmanuel Chabrier.",
+          "A Bar at the Folies-Bergère now belongs to The Courtauld Gallery in London.",
+          "The Courtauld Gallery credits A Bar at the Folies-Bergère to the Samuel Courtauld Trust."
+        ],
+        "seconds": 9.0,
+        "usd": 0.00376
+      },
+      "overlap_judgement": {
+        "shared": [
+          "Édouard Manet painted the work while suffering from severe locomotor ataxia caused by tertiary syphilis",
+          "A barmaid named Suzon modeled/posed for the painting",
+          "The painting was exhibited at the Paris Salon in 1882 and was harshly criticized",
+          "The painting was originally owned by French composer Emmanuel Chabrier",
+          "Samuel Courtauld purchased the painting and gifted it to a trust (The Courtauld Gallery)"
+        ],
+        "only_a": [
+          "Manet completed the painting one year before his death",
+          "The painting originally hung above the piano of Emmanuel Chabrier",
+          "Emmanuel Chabrier bought the painting at Manet's posthumous studio auction in 1884",
+          "Samuel Courtauld purchased the painting in 1926",
+          "Samuel Courtauld gifted the painting to the trust in 1934"
+        ],
+        "only_b": [
+          "Édouard Manet painted A Bar at the Folies-Bergère in 1882",
+          "A Bar at the Folies-Bergère now belongs to The Courtauld Gallery in London",
+          "The Courtauld Gallery credits A Bar at the Folies-Bergère to the Samuel Courtauld Trust"
+        ],
+        "a_total": 9,
+        "b_total": 6
+      }
+    },
+    {
+      "venue": "The Walters Art Museum, Baltimore",
+      "work": "The Ideal City",
+      "prompt": "What story can be told to visitors of The Walters Art Museum, Baltimore about The Ideal City, acquired by Henry Walters?\n\nContext — the work this concerns:\n  canonical_title: The Ideal City\n  artist: Fra Carnevale\n  venue_name: The Walters Art Museum\n  credit_line: acquired by Henry Walters\n  publication_year: 1480\nExhibition: The Walters Art Museum, Baltimore\n\nSearch, then answer with FACTS ONLY — each one sentence, with its source in brackets. Prefer what a visitor standing in front of it cannot see: why it was made, who decided, what went wrong, what it cost someone. If you find nothing reliable, say exactly \"NO RELIABLE INFORMATION\". Do not praise the work. Do not describe how it looks. Maximum 6 sentences.",
+      "serper_keyword_form": "\"The Ideal City\" Walters Carnevale why 1480 acquired",
+      "gemini": {
+        "text": "The painting was likely commissioned around the early 1480s for the Ducal Palace of Federico da Montefeltro, the Duke of Urbino. \n\nScholars propose it was crafted as a decorative *spalliera* panel set into woodwork at shoulder height, or possibly as an illusionistic theatrical backdrop. \n\nIn 1902, Henry Walters acquired the panel as part of the en-bloc purchase of Don Marcello Massarenti’s massive collection from Rome for one million dollars. \n\nThe transaction was considered a major gamble because the collection had been heavily inflated with false attributions and forgeries, though this panel proved to be an authentic Renaissance masterpiece. \n\nAlthough the museum officially attributes the panel to Fra Carnevale, art historians have never reached a consensus on the maker, debating alternative authors such as Francesco di Giorgio Martini, Giuliano da Sangallo, and Piero della Francesca.",
+        "error": "",
+        "sources": [
+          {
+            "domain": "wikipedia.org",
+            "url": "https://en.wikipedia.org/wiki/The_Ideal_City_(painting)"
+          },
+          {
+            "domain": "thewalters.org",
+            "url": "https://art.thewalters.org/object/37.677/"
+          },
+          {
+            "domain": "americanaristocracy.com",
+            "url": "https://americanaristocracy.com/people/henry-walters"
+          },
+          {
+            "domain": "oxfordreference.com",
+            "url": "https://www.oxfordreference.com/viewbydoi/10.1093/acref/9780198662037.013.0169"
+          },
+          {
+            "domain": "gazette-drouot.com",
+            "url": "https://www.gazette-drouot.com/en/article/the-walters-art-museum-confronts-its-founders--confederate-legacy/23781"
+          },
+          {
+            "domain": "artvee.com",
+            "url": "https://artvee.com/artist/fra-carnevale/"
+          },
+          {
+            "domain": "finestresullarte.info",
+            "url": "https://www.finestresullarte.info/en/travelnotebooks/1902v_the-ideal-city-of-urbino-one-of-the-mysteries-of-the-early-renaissance.php"
+          }
+        ],
+        "queries": [
+          "\"Massarenti\" \"Henry Walters\" \"5,000,000\" OR \"million\" OR price OR cost OR lire",
+          "\"The Ideal City\" Walters Art Museum Fra Carnevale provenance why made"
+        ],
+        "n_facts": 4,
+        "facts": [
+          "The painting was likely commissioned around the early 1480s for the Ducal Palace of Federico da Montefeltro, the Duke of Urbino.",
+          "In 1902, Henry Walters acquired the panel as part of the en-bloc purchase of Don Marcello Massarenti’s collection from Rome for one million dollars.",
+          "The museum officially attributes the panel to Fra Carnevale.",
+          "Art historians have debated alternative authors such as Francesco di Giorgio Martini, Giuliano da Sangallo, and Piero della Francesca."
+        ],
+        "seconds": 10.8,
+        "usd": 0.0361
+      },
+      "serper": {
+        "text": "The Ideal City at The Walters Art Museum, Baltimore, is usually attributed to Fra Carnevale and was created around 1480-1484. It was most likely commissioned for the Ducal Palace of Federico da Montefeltro, Duke of Urbino, who employed Carnevale as one of the architects for palace renovations. The painting was probably part of a decorative scheme called spalliere, set into wood paneling or furnishings, common in late 15th-century Italy. The work exemplifies Renaissance ideals of urban planning, classical architecture, and the use of mathematical central perspective developed in Florence. It features symbolic statues representing cardinal virtues of a good ruler, reflecting the moral and political ideals expected of a virtuous leader. Henry Walters acquired the painting, which is now displayed at The Walters Art Museum.",
+        "error": "",
+        "sources": [
+          {
+            "domain": "art.thewalters.org",
+            "url": "https://art.thewalters.org/object/37.677/"
+          },
+          {
+            "domain": "en.wikipedia.org",
+            "url": "https://en.wikipedia.org/wiki/The_Ideal_City_(painting)"
+          },
+          {
+            "domain": "commons.wikimedia.org",
+            "url": "https://commons.wikimedia.org/wiki/File:Fra_Carnevale_-_The_Ideal_City_-_Walters_37677.jpg"
+          },
+          {
+            "domain": "artsandculture.google.com",
+            "url": "https://artsandculture.google.com/asset/the-ideal-city/8wFKYPd4faLPlw?hl=en"
+          },
+          {
+            "domain": "italianoldmasters.wordpress.com",
+            "url": "https://italianoldmasters.wordpress.com/2020/04/06/the-ideal-city-in-the-renaissance/"
+          }
+        ],
+        "queries": [
+          "\"The Ideal City\" Carnevale 1480",
+          "\"The Ideal City\" The Walters Art Museum",
+          "\"The Ideal City\" Walters history"
+        ],
+        "n_facts": 6,
+        "facts": [
+          "The Ideal City at The Walters Art Museum, Baltimore, was created around 1480-1484.",
+          "The Ideal City was most likely commissioned for the Ducal Palace of Federico da Montefeltro, Duke of Urbino.",
+          "Federico da Montefeltro employed Fra Carnevale as one of the architects for palace renovations.",
+          "The painting was probably part of a decorative scheme called spalliere, common in late 15th-century Italy.",
+          "Henry Walters acquired The Ideal City painting.",
+          "The Ideal City painting is now displayed at The Walters Art Museum."
+        ],
+        "seconds": 8.8,
+        "usd": 0.00455
+      },
+      "overlap_judgement": {
+        "shared": [
+          "The painting was likely commissioned around the early 1480s for the Ducal Palace of Federico da Montefeltro, Duke of Urbino",
+          "Henry Walters acquired the painting",
+          "The painting is attributed to Fra Carnevale"
+        ],
+        "only_a": [
+          "The museum officially attributes the panel to Fra Carnevale",
+          "Art historians have debated alternative authors such as Francesco di Giorgio Martini, Giuliano da Sangallo, and Piero della Francesca",
+          "The painting was acquired in 1902 as part of the en-bloc purchase of Don Marcello Massarenti’s collection from Rome for one million dollars"
+        ],
+        "only_b": [
+          "The painting is called The Ideal City",
+          "The painting was created around 1480-1484",
+          "Federico da Montefeltro employed Fra Carnevale as one of the architects for palace renovations",
+          "The painting was probably part of a decorative scheme called spalliere, common in late 15th-century Italy",
+          "The painting is now displayed at The Walters Art Museum"
+        ],
+        "a_total": 6,
+        "b_total": 6
+      }
+    },
+    {
+      "venue": "The Wallace Collection, London",
+      "work": "The Swing",
+      "prompt": "What story can be told to visitors of The Wallace Collection, London about The Swing, Sir Richard Wallace?\n\nContext — the work this concerns:\n  canonical_title: The Swing\n  artist: Jean-Honoré Fragonard\n  venue_name: The Wallace Collection\n  credit_line: Sir Richard Wallace\n  publication_year: 1767\nExhibition: The Wallace Collection, London\n\nSearch, then answer with FACTS ONLY — each one sentence, with its source in brackets. Prefer what a visitor standing in front of it cannot see: why it was made, who decided, what went wrong, what it cost someone. If you find nothing reliable, say exactly \"NO RELIABLE INFORMATION\". Do not praise the work. Do not describe how it looks. Maximum 6 sentences.",
+      "serper_keyword_form": "\"The Swing\" Wallace Fragonard why 1767",
+      "gemini": {
+        "text": "A French courtier conceived the painting as an erotic portrait of his mistress and initially offered the commission to the religious painter Gabriel-François Doyen. \n\nThe courtier instructed Doyen to depict the mistress being pushed on a swing by a bishop while positioning the patron below to look up her skirt. \n\nHorrified by the scandalous and anti-clerical nature of the request, Doyen refused the commission and recommended Jean-Honoré Fragonard instead. \n\nFragonard accepted the lucrative private assignment to escape the financial and bureaucratic frustrations of working for the royal arts administration. \n\nThe 4th Marquess of Hertford bought the work at the duc de Morny's 1865 Paris auction for 30,200 francs, later leaving it to Sir Richard Wallace. \n\nSir Richard's wife, Lady Wallace, kept the painting in her private bedroom before bequeathing the entire collection to the British nation.",
+        "error": "",
+        "sources": [
+          {
+            "domain": "wallacecollection.org",
+            "url": "https://www.wallacecollection.org/explore/explore-in-depth/fragonards-the-swing/origins-of-the-swing/the-commission/"
+          },
+          {
+            "domain": "artsy.net",
+            "url": "https://www.artsy.net/article/artsy-editorial-undressing-erotic-symbolism-the-swing-fragonards-decadent-masterpiece"
+          },
+          {
+            "domain": "oneonta.edu",
+            "url": "http://employees.oneonta.edu/farberas/arth/arth200/gender/fragonard_swing.html"
+          },
+          {
+            "domain": "google.com",
+            "url": "https://artsandculture.google.com/asset/conserving-fragonard-s-the-swing-wallace-collection/HgHhMSaHgUZPSQ?childAssetId=0wHFLok1QsHEpg"
+          },
+          {
+            "domain": "meron.design",
+            "url": "https://meron.design/blogs/art/fragonard-the-swing-scandal"
+          },
+          {
+            "domain": "wikipedia.org",
+            "url": "https://en.wikipedia.org/wiki/Wallace_Collection"
+          },
+          {
+            "domain": "jisc.ac.uk",
+            "url": "https://blog.archiveshub.jisc.ac.uk/category/museums/"
+          }
+        ],
+        "queries": [
+          "\"4th Marquess of Hertford\" \"The Swing\" Morny sale francs",
+          "Fragonard The Swing Wallace Collection provenance commission history",
+          "The Swing Fragonard Baron de Saint-Julien Doyen"
+        ],
+        "n_facts": 7,
+        "facts": [
+          "Gabriel-François Doyen was initially offered the commission to paint an erotic portrait by a French courtier.",
+          "Gabriel-François Doyen refused the commission and recommended Jean-Honoré Fragonard.",
+          "Jean-Honoré Fragonard accepted the private assignment.",
+          "The 4th Marquess of Hertford bought the painting at the duc de Morny's 1865 Paris auction for 30,200 francs.",
+          "The 4th Marquess of Hertford left the painting to Sir Richard Wallace.",
+          "Lady Wallace kept the painting in her private bedroom.",
+          "Lady Wallace bequeathed the entire collection to the British nation."
+        ],
+        "seconds": 20.2,
+        "usd": 0.03612
+      },
+      "serper": {
+        "text": "The Swing, painted by Jean-Honoré Fragonard in 1767, was originally commissioned by a courtier who wanted a portrait of his mistress on a swing pushed by a bishop, but Fragonard instead painted a layman pushing the swing. The painting's early ownership is unclear until it was owned by Marie-François Ménage de Pressigny, who was guillotined in 1794, after which the painting was seized by the revolutionary government. It later belonged to the Duc de Morny and was bought at auction in Paris by Lord Hertford, the main founder of the Wallace Collection, after the Duc's death in 1865. The Wallace Collection credits Sir Richard Wallace for the painting, indicating it entered the collection through him. In 2021, The Swing underwent a sensitive conservation process at the Wallace Collection to restore its original brilliance, funded by the Bank of America Art Conservation Project. The painting was shortlisted for Conservation Project of the Year at the 2021 Museum and Heritage Awards.",
+        "error": "",
+        "sources": [
+          {
+            "domain": "en.wikipedia.org",
+            "url": "https://en.wikipedia.org/wiki/The_Swing_(Fragonard)"
+          },
+          {
+            "domain": "wallacecollection.org",
+            "url": "https://www.wallacecollection.org/explore/collection/search-the-collection/les-hazards-heureux-de-lescarpolette-swing/"
+          },
+          {
+            "domain": "contemporary.burlington.org.uk",
+            "url": "https://contemporary.burlington.org.uk/journal/journal/retouching-the-swing"
+          },
+          {
+            "domain": "commons.wikimedia.org",
+            "url": "https://commons.wikimedia.org/wiki/File:Fragonard,_The_Swing.jpg"
+          },
+          {
+            "domain": "wallacecollection.org",
+            "url": "https://www.wallacecollection.org/explore/explore-in-depth/fragonards-the-swing/"
+          }
+        ],
+        "queries": [
+          "\"The Swing\" Fragonard 1767",
+          "\"The Swing\" The Wallace Collection",
+          "\"The Swing\" Wallace history"
+        ],
+        "n_facts": 10,
+        "facts": [
+          "The Swing was painted by Jean-Honoré Fragonard in 1767.",
+          "Marie-François Ménage de Pressigny owned The Swing before 1794.",
+          "Marie-François Ménage de Pressigny was guillotined in 1794.",
+          "The painting was seized by the revolutionary government after 1794.",
+          "The Swing later belonged to the Duc de Morny.",
+          "The Swing was bought at auction in Paris by Lord Hertford after the Duc de Morny's death in 1865.",
+          "The Wallace Collection credits Sir Richard Wallace for The Swing.",
+          "In 2021, The Swing underwent a conservation process at the Wallace Collection.",
+          "The conservation process in 2021 was funded by the Bank of America Art Conservation Project.",
+          "The Swing was shortlisted for Conservation Project of the Year at the 2021 Museum and Heritage Awards."
+        ],
+        "seconds": 8.7,
+        "usd": 0.00462
+      },
+      "overlap_judgement": {
+        "shared": [
+          "Jean-Honoré Fragonard painted The Swing",
+          "The painting was bought at auction in Paris by Lord Hertford after the Duc de Morny's death in 1865",
+          "The 4th Marquess of Hertford left the painting to Sir Richard Wallace"
+        ],
+        "only_a": [
+          "Gabriel-François Doyen was initially offered the commission to paint an erotic portrait by a French courtier",
+          "Gabriel-François Doyen refused the commission and recommended Jean-Honoré Fragonard",
+          "Jean-Honoré Fragonard accepted the private assignment",
+          "Lady Wallace kept the painting in her private bedroom",
+          "Lady Wallace bequeathed the entire collection to the British nation"
+        ],
+        "only_b": [
+          "The Swing was painted in 1767",
+          "Marie-François Ménage de Pressigny owned The Swing before 1794",
+          "Marie-François Ménage de Pressigny was guillotined in 1794",
+          "The painting was seized by the revolutionary government after 1794",
+          "The Swing later belonged to the Duc de Morny",
+          "The Wallace Collection credits Sir Richard Wallace for The Swing",
+          "In 2021, The Swing underwent a conservation process at the Wallace Collection",
+          "The conservation process in 2021 was funded by the Bank of America Art Conservation Project",
+          "The Swing was shortlisted for Conservation Project of the Year at the 2021 Museum and Heritage Awards"
+        ],
+        "a_total": 8,
+        "b_total": 12
+      }
+    },
+    {
+      "venue": "The Frick Collection, New York",
+      "work": "St. Francis in the Desert",
+      "prompt": "What story can be told to visitors of The Frick Collection, New York about St. Francis in the Desert, Henry Clay Frick, 1915?\n\nContext — the work this concerns:\n  canonical_title: St. Francis in the Desert\n  artist: Giovanni Bellini\n  venue_name: The Frick Collection\n  credit_line: Henry Clay Frick, 1915\n  publication_year: 1480\nExhibition: The Frick Collection, New York\n\nSearch, then answer with FACTS ONLY — each one sentence, with its source in brackets. Prefer what a visitor standing in front of it cannot see: why it was made, who decided, what went wrong, what it cost someone. If you find nothing reliable, say exactly \"NO RELIABLE INFORMATION\". Do not praise the work. Do not describe how it looks. Maximum 6 sentences.",
+      "serper_keyword_form": "\"St. Francis in the Desert\" Frick Bellini why 1480",
+      "gemini": {
+        "text": "The painting was likely commissioned by the Venetian nobleman Giovanni Michiel as a private devotional work. \n\nIn February 1851, the art dealer William Buchanan offered the panel to the National Gallery in London, but the museum rejected the purchase. \n\nWhen the painting went up for auction at Christie's later that year in July 1851, it failed to attract a single buyer. \n\nThe panel sold at Christie's the following year in 1852 for only 735 pounds. \n\nOn May 10, 1915, Henry Clay Frick acquired the work through the dealer Knoedler for $170,000. \n\nUnder the terms of Frick's bequest, the painting is permanently prohibited from being loaned to other institutions.",
+        "error": "",
+        "sources": [
+          {
+            "domain": "frick.org",
+            "url": "https://www.frick.org/exhibitions/bellini_giorgione/2"
+          },
+          {
+            "domain": "frick.org",
+            "url": "https://www.frick.org/blogs/curatorial/mapping_provenance_bellinis_st_francis_desert"
+          },
+          {
+            "domain": "google.com",
+            "url": "https://artsandculture.google.com/asset/st-francis-in-the-desert-giovanni-bellini/egGQB5gOZujX4g?hl=en"
+          },
+          {
+            "domain": "blogspot.com",
+            "url": "http://artwithhillary.blogspot.com/2011/06/radiant-masterpiece-reveals-more-part-1.html"
+          }
+        ],
+        "queries": [
+          "Giovanni Bellini St Francis in the Desert commission patron Michiel",
+          "Frick Collection St Francis in the Desert Henry Clay Frick 1915 purchase price provenance"
+        ],
+        "n_facts": 8,
+        "facts": [
+          "Giovanni Michiel likely commissioned the painting as a private devotional work.",
+          "In February 1851, art dealer William Buchanan offered the panel to the National Gallery in London.",
+          "The National Gallery in London rejected the purchase in February 1851.",
+          "The painting went up for auction at Christie's in July 1851.",
+          "The painting failed to attract a buyer at Christie's auction in July 1851.",
+          "The panel sold at Christie's in 1852 for 735 pounds.",
+          "On May 10, 1915, Henry Clay Frick acquired the work through the dealer Knoedler for $170,000.",
+          "Under the terms of Frick's bequest, the painting is permanently prohibited from being loaned to other institutions."
+        ],
+        "seconds": 7.0,
+        "usd": 0.03597
+      },
+      "serper": {
+        "text": "\"St. Francis in the Desert\" was painted by Giovanni Bellini around 1480 and depicts Saint Francis of Assisi receiving the stigmata during his retreat at La Verna in 1224. The painting was originally commissioned by the Venetian nobleman Giovanni Michiel as a devotional piece. Henry Clay Frick purchased the painting in 1915 for $170,000, and it has been part of The Frick Collection in New York since then. Bellini’s work is notable for its detailed landscape filled with symbolic elements such as a skull, sandals, and a bell, which represent meditation, mortality, and monastic life. The miracle of the stigmata is suggested through a golden, transcendental light rather than a visible seraphic crucifix, which was more common in other depictions of the subject. The painting’s signature appears on a scrap of paper blown against some branches in the lower left corner.",
+        "error": "",
+        "sources": [
+          {
+            "domain": "frick.org",
+            "url": "https://www.frick.org/exhibitions/bellini_giorgione/2"
+          },
+          {
+            "domain": "en.wikipedia.org",
+            "url": "https://en.wikipedia.org/wiki/Saint_Francis_in_Ecstasy_(Bellini)"
+          },
+          {
+            "domain": "catholiccompany.com",
+            "url": "https://www.catholiccompany.com/pages/art-commentary/st-francis-in-the-desert-by-bellini"
+          },
+          {
+            "domain": "google.com",
+            "url": "https://www.google.com/culturalinstitute/asset-viewer/st-francis-in-the-desert/egGQB5gOZujX4g?projectId=art-project&hl=fr"
+          },
+          {
+            "domain": "artsandculture.google.com",
+            "url": "https://artsandculture.google.com/asset/st-francis-in-the-desert-giovanni-bellini/egGQB5gOZujX4g?hl=en"
+          }
+        ],
+        "queries": [
+          "\"St. Francis in the Desert\" Bellini 1480",
+          "\"St. Francis in the Desert\" The Frick Collection",
+          "\"St. Francis in the Desert\" Frick history"
+        ],
+        "n_facts": 5,
+        "facts": [
+          "\"St. Francis in the Desert\" was painted by Giovanni Bellini around 1480.",
+          "Saint Francis of Assisi received the stigmata during his retreat at La Verna in 1224.",
+          "The painting was originally commissioned by the Venetian nobleman Giovanni Michiel.",
+          "Henry Clay Frick purchased the painting in 1915 for $170,000.",
+          "The painting has been part of The Frick Collection in New York since 1915."
+        ],
+        "seconds": 11.7,
+        "usd": 0.0046
+      },
+      "overlap_judgement": {
+        "shared": [
+          "The painting was originally commissioned by Giovanni Michiel",
+          "Henry Clay Frick purchased the painting in 1915 for $170,000"
+        ],
+        "only_a": [
+          "In February 1851, art dealer William Buchanan offered the panel to the National Gallery in London",
+          "The National Gallery in London rejected the purchase in February 1851",
+          "The painting went up for auction at Christie's in July 1851",
+          "The painting failed to attract a buyer at Christie's auction in July 1851",
+          "The panel sold at Christie's in 1852 for 735 pounds",
+          "Under the terms of Frick's bequest, the painting is permanently prohibited from being loaned to other institutions"
+        ],
+        "only_b": [
+          "\"St. Francis in the Desert\" was painted by Giovanni Bellini around 1480",
+          "Saint Francis of Assisi received the stigmata during his retreat at La Verna in 1224",
+          "The painting has been part of The Frick Collection in New York since 1915"
+        ],
+        "a_total": 8,
+        "b_total": 5
+      }
+    },
+    {
+      "venue": "Uffizi Gallery, Florence",
+      "work": "The Birth of Venus",
+      "prompt": "What story can be told to visitors of Uffizi Gallery, Florence about The Birth of Venus, Medici collection?\n\nContext — the work this concerns:\n  canonical_title: The Birth of Venus\n  artist: Sandro Botticelli\n  venue_name: Uffizi Gallery\n  credit_line: Medici collection\n  publication_year: 1485\nExhibition: Uffizi Gallery, Florence\n\nSearch, then answer with FACTS ONLY — each one sentence, with its source in brackets. Prefer what a visitor standing in front of it cannot see: why it was made, who decided, what went wrong, what it cost someone. If you find nothing reliable, say exactly \"NO RELIABLE INFORMATION\". Do not praise the work. Do not describe how it looks. Maximum 6 sentences.",
+      "serper_keyword_form": "\"The Birth of Venus\" Medici Botticelli why 1485",
+      "gemini": {
+        "text": "There is no surviving contemporary documentation recording who commissioned the painting, the original contract, or how much Sandro Botticelli was paid for it. \n\nThe earliest written record of the work dates to 1550, when Giorgio Vasari reported seeing it at the Medici family's country estate, the Villa di Castello. \n\nHistorians believe the classical subject was likely devised by the Medici court poet Agnolo Poliziano, possibly commissioned by Lorenzo di Pierfrancesco de' Medici. \n\nUnlike many Renaissance panel paintings that were destroyed during Girolamo Savonarola's \"Bonfire of the Vanities\" in the 1490s, the work survived largely because it was kept safely outside Florence at the villa. \n\nBotticelli chose canvas rather than expensive wood paneling because canvas was cheaper, lighter, and practical for large decorative hangings in country villas. \n\nThe painting remained largely overlooked and uncelebrated for nearly three centuries until it was relocated to the Uffizi Gallery in 1815 and revived by nineteenth-century art critics.",
+        "error": "",
+        "sources": [
+          {
+            "domain": "uffizi.it",
+            "url": "https://www.uffizi.it/en/artworks/birth-of-venus"
+          },
+          {
+            "domain": "wikipedia.org",
+            "url": "https://en.wikipedia.org/wiki/The_Birth_of_Venus"
+          },
+          {
+            "domain": "finestresullarte.info",
+            "url": "https://www.finestresullarte.info/en/works-and-artists/botticelli-s-venus-a-symbol-of-the-renaissance"
+          },
+          {
+            "domain": "historycollection.com",
+            "url": "https://historycollection.com/the-birth-of-venus/"
+          },
+          {
+            "domain": "italotreno.com",
+            "url": "https://blog.italotreno.com/en/travel-ideas/where-is-botticellis-venus-located/"
+          }
+        ],
+        "queries": [
+          "Birth of Venus commission Medici Villa di Castello Giorgio Vasari"
+        ],
+        "n_facts": 4,
+        "facts": [
+          "The earliest written record of the work dates to 1550.",
+          "Giorgio Vasari reported seeing the painting at the Medici family's country estate, the Villa di Castello.",
+          "The painting survived the \"Bonfire of the Vanities\" in the 1490s.",
+          "The painting was relocated to the Uffizi Gallery in 1815."
+        ],
+        "seconds": 9.8,
+        "usd": 0.03619
+      },
+      "serper": {
+        "text": "The Birth of Venus was probably painted around 1484-1485 for Lorenzo di Pierfrancesco de’ Medici, a cousin of Lorenzo the Magnificent, for his villa at Castello. The theme was likely suggested by the humanist poet Agnolo Poliziano, who celebrated Venus in his verses. The painting shows Venus arriving on the shore of Cyprus or Kithera, born from sea foam and blown by the wind god Zephyr, who carries the nymph Chloris. It was painted on canvas using tempera, a technique that allowed for a delicate transparency, and was unusual at the time since most paintings were on wood panels. The orange trees in the painting are considered an emblem of the Medici family, linking the work to their dynasty. Giorgio Vasari first described the painting in the mid-16th century as part of the Medici collection at the Villa of Castello.",
+        "error": "",
+        "sources": [
+          {
+            "domain": "uffizi.it",
+            "url": "https://www.uffizi.it/en/artworks/birth-of-venus"
+          },
+          {
+            "domain": "blog.artsper.com",
+            "url": "https://blog.artsper.com/en/a-closer-look/the-birth-of-venus-botticelli-painting/"
+          },
+          {
+            "domain": "en.wikipedia.org",
+            "url": "https://en.wikipedia.org/wiki/The_Birth_of_Venus"
+          },
+          {
+            "domain": "artsandculture.google.com",
+            "url": "https://artsandculture.google.com/asset/the-birth-of-venus-sandro-botticelli/MQEeq50LABEBVg?hl=en"
+          },
+          {
+            "domain": "italianrenaissance.org",
+            "url": "https://www.italianrenaissance.org/botticelli-birth-of-venus/"
+          }
+        ],
+        "queries": [
+          "\"The Birth of Venus\" Botticelli 1485",
+          "\"The Birth of Venus\" Uffizi Gallery",
+          "\"The Birth of Venus\" collection history"
+        ],
+        "n_facts": 7,
+        "facts": [
+          "The Birth of Venus was probably painted around 1484-1485.",
+          "The Birth of Venus was painted for Lorenzo di Pierfrancesco de’ Medici.",
+          "Lorenzo di Pierfrancesco de’ Medici was a cousin of Lorenzo the Magnificent.",
+          "The Birth of Venus was painted for Lorenzo di Pierfrancesco de’ Medici's villa at Castello.",
+          "The theme of The Birth of Venus was likely suggested by the humanist poet Agnolo Poliziano.",
+          "Giorgio Vasari first described The Birth of Venus in the mid-16th century.",
+          "The Birth of Venus was part of the Medici collection at the Villa of Castello in the mid-16th century."
+        ],
+        "seconds": 18.7,
+        "usd": 0.00466
+      },
+      "overlap_judgement": {
+        "shared": [
+          "Giorgio Vasari reported seeing or first described the painting at the Medici family's country estate, the Villa di Castello",
+          "The painting was part of the Medici collection at the Villa di Castello in the mid-16th century"
+        ],
+        "only_a": [
+          "The earliest written record of the work dates to 1550",
+          "The painting survived the 'Bonfire of the Vanities' in the 1490s",
+          "The painting was relocated to the Uffizi Gallery in 1815"
+        ],
+        "only_b": [
+          "The Birth of Venus was probably painted around 1484-1485",
+          "The Birth of Venus was painted for Lorenzo di Pierfrancesco de’ Medici",
+          "Lorenzo di Pierfrancesco de’ Medici was a cousin of Lorenzo the Magnificent",
+          "The Birth of Venus was painted for Lorenzo di Pierfrancesco de’ Medici's villa at Castello",
+          "The theme of The Birth of Venus was likely suggested by the humanist poet Agnolo Poliziano"
+        ],
+        "a_total": 5,
+        "b_total": 6
+      }
+    },
+    {
+      "venue": "National Gallery, London",
+      "work": "The Arnolfini Portrait",
+      "prompt": "What story can be told to visitors of National Gallery, London about The Arnolfini Portrait, purchased 1842?\n\nContext — the work this concerns:\n  canonical_title: The Arnolfini Portrait\n  artist: Jan van Eyck\n  venue_name: National Gallery\n  credit_line: purchased 1842\n  publication_year: 1434\nExhibition: National Gallery, London\n\nSearch, then answer with FACTS ONLY — each one sentence, with its source in brackets. Prefer what a visitor standing in front of it cannot see: why it was made, who decided, what went wrong, what it cost someone. If you find nothing reliable, say exactly \"NO RELIABLE INFORMATION\". Do not praise the work. Do not describe how it looks. Maximum 6 sentences.",
+      "serper_keyword_form": "\"The Arnolfini Portrait\" 1842 Eyck why 1434 purchased",
+      "gemini": {
+        "text": "The Italian merchant Giovanni di Nicolao Arnolfini commissioned the painting in Bruges, long presumed to record his wedding or commemorate his deceased wife Costanza Trenta. \n\nBy 1516, the Spanish courtier Don Diego de Guevara owned the panel and gifted it to Margaret of Austria, Regent of the Netherlands, who ordered a lock installed on its protective outer shutters. \n\nDuring the Peninsular War, the picture vanished from the Spanish royal palace in Madrid before British officer Major-General James Hay acquired it under unclear circumstances. \n\nThe National Gallery's trustees agreed to purchase the panel in 1842 for 600 guineas, making it the institution’s first early Netherlandish work. \n\nAdministrative delays left Major-General Hay unpaid until February 1843, months after the painting had already arrived at the museum.",
+        "error": "",
+        "sources": [
+          {
+            "domain": "wikipedia.org",
+            "url": "https://en.wikipedia.org/wiki/Arnolfini_Portrait"
+          },
+          {
+            "domain": "thecollector.com",
+            "url": "https://www.thecollector.com/arnolfini-portrait-theories-analysis/"
+          },
+          {
+            "domain": "gailsibley.com",
+            "url": "https://www.gailsibley.com/2013/10/13/jan-van-eycks-the-arnolfini-portrait-a-close-look/"
+          },
+          {
+            "domain": "nationalgallery.org.uk",
+            "url": "https://www.nationalgallery.org.uk/paintings/catalogues/campbell-1998/the-arnolfini-portrait"
+          },
+          {
+            "domain": "nationalgallery.org.uk",
+            "url": "https://www.nationalgallery.org.uk/paintings/jan-van-eyck-the-arnolfini-portrait"
+          }
+        ],
+        "queries": [
+          "Arnolfini Portrait provenance National Gallery purchase 1842 price",
+          "Arnolfini Portrait history commission Margaret of Austria National Gallery London"
+        ],
+        "n_facts": 10,
+        "facts": [
+          "Giovanni di Nicolao Arnolfini commissioned the painting in Bruges.",
+          "By 1516, Don Diego de Guevara owned the panel.",
+          "Don Diego de Guevara gifted the panel to Margaret of Austria.",
+          "Margaret of Austria ordered a lock installed on the painting's protective outer shutters.",
+          "During the Peninsular War, the painting vanished from the Spanish royal palace in Madrid.",
+          "Major-General James Hay acquired the painting during the Peninsular War.",
+          "The National Gallery's trustees agreed to purchase the panel in 1842 for 600 guineas.",
+          "The painting was the National Gallery’s first early Netherlandish work.",
+          "Major-General James Hay was unpaid until February 1843.",
+          "The painting arrived at the National Gallery before February 1843."
+        ],
+        "seconds": 8.7,
+        "usd": 0.03598
+      },
+      "serper": {
+        "text": "The Arnolfini Portrait was painted by Jan van Eyck in 1434 and is believed to depict the Italian merchant Giovanni di Nicolao Arnolfini and his wife in their Bruges residence. The painting is signed and dated by van Eyck with the inscription \"Johannes de eyck fuit hic 1434\" meaning \"Jan van Eyck was here\". It is considered a unique form of marriage contract recorded as a painting by art historians such as Erwin Panofsky. The work was acquired by the National Gallery, London, in 1842. Before that, it was in the collections of Margaret of Austria (1516), Mary of Hungary (1530), Philip II of Spain (1558), and James Hay (1813). The painting is notable for being one of the earliest to use oil paint on panel and for its complex iconography and use of perspective.",
+        "error": "",
+        "sources": [
+          {
+            "domain": "nationalgallery.org.uk",
+            "url": "https://www.nationalgallery.org.uk/paintings/jan-van-eyck-the-arnolfini-portrait"
+          },
+          {
+            "domain": "en.wikipedia.org",
+            "url": "https://en.wikipedia.org/wiki/Arnolfini_Portrait"
+          },
+          {
+            "domain": "about.jstor.org",
+            "url": "https://about.jstor.org/blog/the-many-questions-surrounding-jan-van-eycks-arnolfini-portrait/"
+          },
+          {
+            "domain": "gailsibley.com",
+            "url": "https://www.gailsibley.com/2013/10/13/jan-van-eycks-the-arnolfini-portrait-a-close-look/"
+          },
+          {
+            "domain": "commons.wikimedia.org",
+            "url": "https://commons.wikimedia.org/wiki/File:The_Arnolfini_portrait_(1434).jpg"
+          }
+        ],
+        "queries": [
+          "\"The Arnolfini Portrait\" Eyck 1434",
+          "\"The Arnolfini Portrait\" National Gallery",
+          "\"The Arnolfini Portrait\" 1842 history"
+        ],
+        "n_facts": 7,
+        "facts": [
+          "The Arnolfini Portrait was painted by Jan van Eyck in 1434.",
+          "The painting is signed and dated by van Eyck with the inscription \"Johannes de eyck fuit hic 1434\".",
+          "The work was acquired by the National Gallery, London, in 1842.",
+          "The painting was in the collection of Margaret of Austria in 1516.",
+          "The painting was in the collection of Mary of Hungary in 1530.",
+          "The painting was in the collection of Philip II of Spain in 1558.",
+          "The painting was in the collection of James Hay in 1813."
+        ],
+        "seconds": 9.4,
+        "usd": 0.0047
+      },
+      "overlap_judgement": {
+        "shared": [
+          "The painting was acquired by the National Gallery in 1842",
+          "The painting was in the collection of Margaret of Austria in 1516",
+          "The painting was in the collection of James Hay"
+        ],
+        "only_a": [
+          "Giovanni di Nicolao Arnolfini commissioned the painting in Bruges",
+          "Don Diego de Guevara owned the panel by 1516",
+          "Don Diego de Guevara gifted the panel to Margaret of Austria",
+          "Margaret of Austria ordered a lock installed on the painting's protective outer shutters",
+          "During the Peninsular War, the painting vanished from the Spanish royal palace in Madrid",
+          "Major-General James Hay acquired the painting during the Peninsular War",
+          "The National Gallery's trustees agreed to purchase the panel in 1842 for 600 guineas",
+          "The painting was the National Gallery’s first early Netherlandish work",
+          "Major-General James Hay was unpaid until February 1843",
+          "The painting arrived at the National Gallery before February 1843"
+        ],
+        "only_b": [
+          "The Arnolfini Portrait was painted by Jan van Eyck in 1434",
+          "The painting is signed and dated by van Eyck with the inscription \"Johannes de eyck fuit hic 1434\"",
+          "The painting was in the collection of Mary of Hungary in 1530",
+          "The painting was in the collection of Philip II of Spain in 1558",
+          "The painting was in the collection of James Hay in 1813"
+        ],
+        "a_total": 13,
+        "b_total": 8
+      }
+    }
+  ]
+}

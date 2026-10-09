@@ -257,7 +257,10 @@ def main():
     print(f"[db] paid_api_calls spend for host {HOST} BEFORE: ${_spend_so_far()}",
           flush=True)
 
-    run_offline()
+    if os.environ.get('LOCAL648_SKIP_OFFLINE', '').strip() == '1':
+        print("\n[PHASE 1] skipped (LOCAL648_SKIP_OFFLINE=1)", flush=True)
+    else:
+        run_offline()
 
     try:
         import story_leads as _sl
