@@ -878,6 +878,15 @@ class _HomeScreenState extends State<HomeScreen> {
                           ],
                         ),
                         dense: true,
+                        // [LEAD 2026-10-09] same per-tour language/translate dialog as a single-tour map tap
+                        secondary: IconButton(
+                          icon: Icon(Icons.translate, color: Color(0xFF8e44ad)),
+                          tooltip: 'Languages & translate',
+                          onPressed: () {
+                            Navigator.pop(context);
+                            _onTourMarkerTapped(tour);
+                          },
+                        ),
                       );
                     },
                   ),
@@ -1403,6 +1412,17 @@ class _HomeScreenState extends State<HomeScreen> {
                             ],
                           ),
                           dense: true,
+                          // [LEAD 2026-10-09] Name-search results had only "Download Selected" (English).
+                          // The language/translate options lived only on the map dialog. This opens
+                          // the same dialog for this one tour (Michael: "no options for translation").
+                          secondary: IconButton(
+                            icon: Icon(Icons.translate, color: Color(0xFF8e44ad)),
+                            tooltip: 'Languages & translate',
+                            onPressed: () {
+                              Navigator.pop(context);
+                              _onTourMarkerTapped(tour);
+                            },
+                          ),
                         );
                       },
                     ),
