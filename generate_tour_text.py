@@ -14802,11 +14802,16 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
             _thread_result = None
             try:
                 from theme_thread_discoverer import discover_theme_threads
+                # [LOCAL-652] Pass the delivered stops' artists so the discoverer
+                # can reject phantom threads whose named artist/work is on no
+                # delivered stop.
+                _poi_artists = [str(p.get("artist", "") or "") for p in poi_list]
                 _thread_result = discover_theme_threads(
                     story_elements=_story_elements,
                     poi_names=_poi_names,
                     venue_name=_venue_name,
                     api_key=api_key,
+                    poi_artists=_poi_artists,
                 )
                 if _thread_result:
                     print(f"  [SQ-S6b] Thread discovery: mode={_thread_result.mode}, "
