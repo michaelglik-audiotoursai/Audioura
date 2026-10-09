@@ -79,8 +79,11 @@ SECRETS="$HOME/Audioura/build_secrets.env"
 [ -f "$SECRETS" ] || { echo "✗ $SECRETS not found — see build_ios_release.sh for how to create it"; exit 1; }
 . "$SECRETS"
 ( . "$HOME/Audioura/gateway_key_check.sh" ) || exit 1
+# [LEAD 2026-10-09] NOT `flutter install`: it runs "Uninstalling old version..." first, which wipes the
+# app's Documents + preferences (Michael lost his downloaded tours on every dev install). devicectl
+# installs IN PLACE, exactly like a TestFlight/App Store update, so user content survives.
 flutter build ios --release --dart-define=GATEWAY_API_KEY="$GATEWAY_API_KEY" \
-  && flutter install --release -d "$PHONE_ID"
+  && xcrun devicectl device install app --device "$PHONE_ID" build/ios/iphoneos/Runner.app
 RC=$?
 
 echo
