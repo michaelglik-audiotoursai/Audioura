@@ -155,7 +155,7 @@ def _run_one(location, stops, slug):
     t0 = time.time()
     try:
         text, _p, _c = generate_tour_text(
-            location, 'museum', f"/app/tours/LOCAL635_{slug}.txt", stops, user_id=None)
+            location, 'museum', f"/tmp/LOCAL635_{slug}.txt", stops, user_id=None)
     except Exception as e:
         print(f"RUN ERROR for {location}: {e}", flush=True); return None
     elapsed = time.time() - t0
