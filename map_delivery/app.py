@@ -427,13 +427,21 @@ def search_tours():
         # Convert regex pattern back to SQL LIKE pattern
         sql_pattern = pattern.replace('.*', '%')
         
+        # [LOCAL-657, LEAD] Search results open the same tour dialogs, so they carry
+        # the version label fields too (one grouped LEFT JOIN, as in /tours-near).
         cur.execute("""
-            SELECT id, tour_name, request_string, lat, lng, number_requested, content_language, original_tour_id
-            FROM audio_tours 
-            WHERE (tour_name ILIKE %s OR request_string ILIKE %s)
-            AND lat IS NOT NULL AND lng IS NOT NULL
-            AND (is_test IS NOT TRUE)
-            ORDER BY number_requested DESC
+            SELECT t.id, t.tour_name, t.request_string, t.lat, t.lng, t.number_requested,
+                   t.content_language, t.original_tour_id,
+                   v.max_version_no, v.last_replaced_at, t.created_at
+            FROM audio_tours t
+            LEFT JOIN (
+                SELECT tour_id, MAX(version_no) AS max_version_no, MAX(replaced_at) AS last_replaced_at
+                FROM audio_tour_versions GROUP BY tour_id
+            ) v ON v.tour_id = t.id
+            WHERE (t.tour_name ILIKE %s OR t.request_string ILIKE %s)
+            AND t.lat IS NOT NULL AND t.lng IS NOT NULL
+            AND (t.is_test IS NOT TRUE)
+            ORDER BY t.number_requested DESC
             LIMIT 50
         """, (f'%{sql_pattern}%', f'%{sql_pattern}%'))
         
@@ -441,7 +449,9 @@ def search_tours():
         search_results = []
         
         for tour in tours:
-            tour_id, tour_name, request_string, tour_lat, tour_lng, requests, language, original_id = tour
+            (tour_id, tour_name, request_string, tour_lat, tour_lng, requests, language, original_id,
+             max_vn, last_replaced, created_at) = tour
+            version, updated_at = _version_fields(max_vn, last_replaced, created_at)
             
             if tour_lat and tour_lng:
                 distance = calculate_distance(lat, lng, tour_lat, tour_lng)
@@ -458,7 +468,9 @@ def search_tours():
                     'type': 'walking_tour',
                     'language': language or 'en',
                     'is_translation': is_translation,
-                    'parent_tour_id': original_id
+                    'parent_tour_id': original_id,
+                    'version': version,
+                    'updated_at': updated_at,
                 })
         
         # Sort by popularity first, then by distance
