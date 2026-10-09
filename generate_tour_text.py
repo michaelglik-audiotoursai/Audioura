@@ -21664,7 +21664,11 @@ REWRITE RULES (all mandatory):
                         _matrix, _desc,
                         exhibition=_exh_name_resolved or location,
                         venue_url=_d511_venue_url,
-                        extra_entities=[_poi.get('artist', '')])
+                        extra_entities=[_poi.get('artist', '')],
+                        # [LOCAL-645] venue/city for the GEMINI_PER_VENUE pass.
+                        # Harmless when the flag is off (never read).
+                        venue=_museum_venue_name or '',
+                        city=location or '')
 
                 _d511_results = {}  # stop_index -> result dict
                 if _d511_eligible:

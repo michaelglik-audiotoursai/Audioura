@@ -497,6 +497,268 @@ def _gemini_grounded(prompt: str) -> str:
     return _gemini(prompt, grounded=True)
 
 
+# ── [LOCAL-645] GEMINI_PER_VENUE — one grounded research pass per MUSEUM ───────
+# COST PROTOTYPE 1 (ticket LOCAL-645). Gemini grounding is ~55% of a fresh tour's
+# cost: a 3-stop tour issues N+1 search-enabled requests (1 venue preflight + one
+# per stop in the D511 loop), and MANY of those per-stop requests ask about the
+# SAME museum and works from slightly different angles — measured in
+# story_loop_candidates.jsonl: 414 grounded passes for only 8 works (51.8/work),
+# "Le Lézard" alone 294 passes at overlap 1.0.
+#
+# The cut: behind GEMINI_PER_VENUE=1, run ONE search-enabled Gemini request per
+# VENUE (asking about the venue and the stop works together), cache it in the DB
+# per venue for 30 days with the SAME pattern as venue_preflight_cache, and let
+# every later stop AND every later tour of the same museum reuse it ungrounded.
+# A per-WORK grounded request is issued at most once, and ONLY when the venue pass
+# returned nothing about that work. Requests that need no search (class knowledge)
+# stay ungrounded, exactly as before.
+#
+# DEFAULT OFF. When GEMINI_PER_VENUE is unset/0 the function below is simply never
+# consulted by the loop, so generation is byte-for-byte unchanged (proven by the
+# flag-OFF test). The LEAD runs the live quality A/B (flag OFF vs ON) in the
+# morning; this module makes NO quality claim.
+_VENUE_RESEARCH_TTL_DAYS = int(os.environ.get('GEMINI_VENUE_RESEARCH_TTL_DAYS', '30'))
+
+GEMINI_PER_VENUE_ENV = 'GEMINI_PER_VENUE'
+
+
+def gemini_per_venue_enabled() -> bool:
+    """True when the GEMINI_PER_VENUE cost prototype is on. OFF by default, so a
+    pipeline that never sets the flag behaves exactly as before this change."""
+    return os.environ.get(GEMINI_PER_VENUE_ENV, '').strip() == '1'
+
+
+_VENUE_RESEARCH_PROMPT = """\
+Using Google Search, research this museum/venue and the specific works a visitor \
+will see on a tour of it, and cite your sources.
+
+Venue: {venue}
+City: {city}
+Works on this tour:
+{works}
+
+For the VENUE, give 2-3 sentences on what it is and what it is known for.
+Then, for EACH work listed above, give 2-4 specific, dated, checkable facts \
+(who made it, when, how the venue acquired it, any notable event in its history) \
+— one short paragraph per work, each beginning with the work's title. Base every \
+fact on the search results; if the search returns nothing about a work, write \
+exactly "NO MATERIAL FOUND" for that work and nothing else. Do not guess.
+"""
+
+
+def _venue_research_fold(s: str) -> str:
+    """Local alias so the cache key folds identically to venue_preflight."""
+    return _fold(s)
+
+
+def _venue_research_cache_key(venue: str, city: str) -> str:
+    return f"{_venue_research_fold(venue)}|{_venue_research_fold(city)}"
+
+
+def _venue_research_db_conn(db_url: str):
+    import psycopg2
+    return psycopg2.connect(db_url)
+
+
+def _ensure_venue_research_table(conn) -> None:
+    """Create the small ADDITIVE per-venue cache table if absent. Mirrors
+    venue_preflight_cache exactly. Nothing here DROPs or DELETEs; a stale row is
+    ignored by TTL and overwritten on refresh."""
+    with conn.cursor() as cur:
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS gemini_venue_research_cache (
+                cache_key   TEXT PRIMARY KEY,
+                venue       TEXT NOT NULL,
+                city        TEXT NOT NULL,
+                result_json TEXT NOT NULL,
+                fetched_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+            )
+        """)
+    conn.commit()
+
+
+def _venue_research_cache_get(venue: str, city: str, db_url: str):
+    """Return a cached venue-research result younger than the 30-day TTL, else
+    None. Best-effort: any DB error is a miss (so the pass simply runs). Mirrors
+    venue_preflight._cache_get."""
+    if not db_url:
+        return None
+    try:
+        conn = _venue_research_db_conn(db_url)
+        _ensure_venue_research_table(conn)
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT result_json
+                FROM gemini_venue_research_cache
+                WHERE cache_key = %s
+                  AND fetched_at > NOW() - INTERVAL '%s days'
+                """,
+                (_venue_research_cache_key(venue, city), _VENUE_RESEARCH_TTL_DAYS),
+            )
+            row = cur.fetchone()
+        conn.close()
+    except Exception:
+        return None
+    if not row:
+        return None
+    try:
+        res = json.loads(row[0])
+        if isinstance(res, dict):
+            res['cached'] = True
+            return res
+    except (ValueError, TypeError):
+        return None
+    return None
+
+
+def _venue_research_cache_put(venue: str, city: str, result: Dict, db_url: str) -> None:
+    """Upsert the venue-research result for (venue, city). Additive — the same key
+    is UPDATEd in place with a fresh fetched_at. Never raises. An errored pass is
+    not persisted (we want a real answer cached for 30 days, not a transient
+    failure). Mirrors venue_preflight._cache_put."""
+    if not db_url:
+        return
+    if result.get('error'):
+        return
+    stored = dict(result)
+    stored['cached'] = False  # store canonical shape; _cache_get sets True
+    try:
+        conn = _venue_research_db_conn(db_url)
+        _ensure_venue_research_table(conn)
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                INSERT INTO gemini_venue_research_cache
+                    (cache_key, venue, city, result_json, fetched_at)
+                VALUES (%s, %s, %s, %s, NOW())
+                ON CONFLICT (cache_key) DO UPDATE SET
+                    venue = EXCLUDED.venue,
+                    city = EXCLUDED.city,
+                    result_json = EXCLUDED.result_json,
+                    fetched_at = NOW()
+                """,
+                (_venue_research_cache_key(venue, city), venue, city,
+                 json.dumps(stored, ensure_ascii=False)),
+            )
+        conn.commit()
+        conn.close()
+    except Exception:
+        return
+
+
+def venue_research_cache_row_count(db_url: str = None) -> int:
+    """Row count of the per-venue research cache (for the submission's DB report).
+    Returns -1 if the table/connection is unavailable."""
+    if db_url is None:
+        db_url = os.environ.get('DATABASE_URL')
+    if not db_url:
+        return -1
+    try:
+        conn = _venue_research_db_conn(db_url)
+        _ensure_venue_research_table(conn)
+        with conn.cursor() as cur:
+            cur.execute("SELECT COUNT(*) FROM gemini_venue_research_cache")
+            n = cur.fetchone()[0]
+        conn.close()
+        return int(n)
+    except Exception:
+        return -1
+
+
+_NO_MATERIAL = 'NO MATERIAL FOUND'
+
+
+def _blank_venue_research() -> Dict:
+    return {'text': '', 'works': {}, 'sources': [], 'queries': [],
+            'cached': False, 'error': ''}
+
+
+def _split_work_material(text: str, works: List[str]) -> Dict[str, str]:
+    """Attribute the grounded prose to each work by title prefix.
+
+    The prompt asks for one paragraph per work, each BEGINNING with the work's
+    title, and the literal string "NO MATERIAL FOUND" when a work got nothing. We
+    fold-match each work title against each paragraph's opening; a paragraph that
+    is (or contains only) NO MATERIAL FOUND maps to '' so the caller treats it as
+    "venue pass had nothing about this work" and may fall back to a per-work
+    grounded request. Pure string work; never raises."""
+    out = {}
+    paras = [p.strip() for p in re.split(r'\n\s*\n', text or '') if p.strip()]
+    folded_paras = [(_fold(p), p) for p in paras]
+    for w in works or []:
+        fw = _fold(w)
+        if not fw:
+            continue
+        material = ''
+        for fp, p in folded_paras:
+            # Match when a paragraph opens with (or clearly names near its start)
+            # the work title. Opening-prefix first, then an early mention.
+            if fp.startswith(fw[:40]) or fw[:40] in fp[:120]:
+                material = p
+                break
+        if material and _NO_MATERIAL.lower() in _fold(material):
+            material = ''
+        out[w] = material
+    return out
+
+
+def venue_research(venue: str, city: str = '', works: List[str] = None,
+                   db_url: str = None, use_cache: bool = True) -> Dict:
+    """[LOCAL-645] ONE grounded Gemini research pass for a whole VENUE.
+
+    Returns {'text', 'works': {title: material_or_empty}, 'sources', 'queries',
+    'cached', 'error'}. The single grounded call goes through
+    `gemini_with_sources(grounded=True)` so the LOCAL-594 meter counts it exactly
+    once. A 30-day per-(venue, city) cache (table gemini_venue_research_cache,
+    same shape as venue_preflight_cache) makes a repeat request — a later stop of
+    this tour, OR a later tour of the same museum — FREE: a cache hit issues NO
+    grounded request.
+
+    `works` is the list of stop work-titles to research alongside the venue, so
+    the one call covers what the per-stop grounded calls used to ask separately.
+    `works[title]` is '' when the pass found nothing about that title, which is the
+    signal the caller uses to decide a per-work grounded fallback is warranted.
+
+    This function is only reached when GEMINI_PER_VENUE=1; the flag gate lives in
+    the caller (story_production_loop), so with the flag off this never runs and
+    behaviour is unchanged. `use_cache=False` forces a fresh call (tests)."""
+    if db_url is None:
+        db_url = os.environ.get('DATABASE_URL')
+    venue = (venue or '').strip()
+    city = (city or '').strip()
+    works = [w for w in (works or []) if (w or '').strip()]
+
+    # 30-day cache: a hit makes NO grounded call. We still (re)attribute material
+    # to the CURRENT works list, so a later stop whose work was not in the cached
+    # pass gets '' and can fall back.
+    if use_cache:
+        hit = _venue_research_cache_get(venue, city, db_url)
+        if hit is not None:
+            hit['works'] = _split_work_material(hit.get('text', ''), works)
+            return hit
+
+    works_block = '\n'.join(f'- {w}' for w in works) or '- (none specified)'
+    prompt = _VENUE_RESEARCH_PROMPT.format(
+        venue=venue or '(unspecified)', city=city or '(unspecified)',
+        works=works_block)
+
+    call = gemini_with_sources(prompt, grounded=True)
+    res = _blank_venue_research()
+    if call.get('error'):
+        res['error'] = call['error']
+        res['sources'] = call.get('sources', []) or []
+        return res
+    res['text'] = call.get('text', '') or ''
+    res['sources'] = call.get('sources', []) or []
+    res['queries'] = call.get('queries', []) or []
+    res['works'] = _split_work_material(res['text'], works)
+
+    if use_cache and not res.get('error') and res['text'].strip():
+        _venue_research_cache_put(venue, city, res, db_url)
+    return res
+
+
 PROVIDERS = {'openai': _openai, 'gemini': _gemini,
              'gemini_grounded': _gemini_grounded}
 

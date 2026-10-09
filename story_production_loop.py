@@ -178,7 +178,7 @@ def _agent_seeds(matrix: Dict) -> List[Dict]:
 
 def run_for_stop(matrix: Dict, stop_text: str, exhibition: str = '',
                  venue_url: str = '', extra_entities: Optional[List[str]] = None,
-                 verbose: bool = True) -> Dict:
+                 verbose: bool = True, venue: str = '', city: str = '') -> Dict:
     """The whole loop for one stop. Returns the best story AND all accepted stories.
 
     Returns {'story', 'stories', 'credit_line', 'gate', 'counts', 'index',
@@ -194,7 +194,14 @@ def run_for_stop(matrix: Dict, stop_text: str, exhibition: str = '',
 
     `story` is '' when nothing passes — which is a publishable outcome, not an
     error (Michael: "correct gate behavior is to publish nothing").
-    """
+
+    [LOCAL-645] `venue`/`city` feed the GEMINI_PER_VENUE cost prototype: when the
+    flag is ON, this stop's grounded narrate is replaced by the venue-level
+    grounded research pass (one per museum, cached 30 days) reused UNGROUNDED for
+    this stop's work; a per-work grounded request is made only when that pass
+    returned nothing about the work. They default to '' and `matrix['venue_name']`
+    is the fallback, so callers that pass neither are unaffected — and with the
+    flag OFF the values are never read."""
     t0 = time.time()
     out = {'story': '', 'stories': [], 'credit_line': '', 'gate': None,
            'counts': {}, 'index': None, 'sources': [], 'examined': 0,
@@ -207,6 +214,18 @@ def run_for_stop(matrix: Dict, stop_text: str, exhibition: str = '',
         from story_query import (compile_for_serper, compile_for_gemini,
                                  compile_for_seed)
         from story_leads import gemini_with_sources
+        # [LOCAL-645] GEMINI_PER_VENUE: one grounded research pass per museum,
+        # reused ungrounded by every stop. Imported here so the loop has no hard
+        # dependency when the symbols are absent (older story_leads) — a missing
+        # import simply leaves the flag path unavailable and the stop grounds as
+        # before.
+        try:
+            from story_leads import (venue_research as _pv_research,
+                                     gemini_per_venue_enabled as _pv_enabled)
+        except Exception:
+            _pv_research = None
+            def _pv_enabled():
+                return False
         from story_adjudicate import (claims_of, challenge_queries_for,
                                       ADJUDICATION_PROMPT, count_statuses,
                                       ungrounded_names, surviving_errors)
@@ -277,6 +296,42 @@ def run_for_stop(matrix: Dict, stop_text: str, exhibition: str = '',
     agents = [a for a in (matrix.get('collaborator'), matrix.get('printed_by'),
                           matrix.get('publisher')) if a]
 
+    # ── [LOCAL-645] GEMINI_PER_VENUE: fetch the ONE grounded venue pass ──────
+    # When the flag is on, we do NOT ground the per-stop narrate. Instead we fetch
+    # (or reuse, from the 30-day cache) a single grounded research pass for the
+    # whole venue, keyed on (venue, city). The pass covers this stop's work, so
+    # the stop narrates UNGROUNDED with that material as context. The venue pass's
+    # grounded request is counted ONCE by the LOCAL-594 meter; a cache hit — a
+    # later stop of this tour, or a later tour of the same museum — costs nothing.
+    # `_pv_material` holds the venue pass's facts about THIS work; '' means the
+    # pass found nothing about it, which is the only case that earns a per-work
+    # grounded fallback below.
+    _pv_on = False
+    _pv_material = ''
+    _pv_venue_text = ''
+    if _pv_research is not None:
+        try:
+            _pv_on = bool(_pv_enabled())
+        except Exception:
+            _pv_on = False
+    if _pv_on:
+        _pv_venue = (venue or matrix.get('venue_name') or '').strip()
+        _pv_city = (city or '').strip()
+        try:
+            _pv = _pv_research(_pv_venue, _pv_city, works=[work] if work else [])
+            _pv_venue_text = (_pv or {}).get('text', '') or ''
+            _pv_material = ((_pv or {}).get('works', {}) or {}).get(work, '') or ''
+            if verbose:
+                print(f"    [LOCAL-645] GEMINI_PER_VENUE on: venue='{_pv_venue}' "
+                      f"cached={'y' if (_pv or {}).get('cached') else 'n'} "
+                      f"work_material={'y' if _pv_material else 'NONE (per-work fallback)'}"
+                      f"{' err=' + _pv['error'] if (_pv or {}).get('error') else ''}")
+        except Exception as _pv_err:
+            if verbose:
+                print(f"    [LOCAL-645] venue research unavailable "
+                      f"(non-fatal): {_pv_err}")
+            _pv_on = False
+
     for seed in seeds:
         out['examined'] += 1
         cl = seed['seed']
@@ -298,10 +353,30 @@ def run_for_stop(matrix: Dict, stop_text: str, exhibition: str = '',
             # the same Serper challenge + adjudication below, so later credit_lines
             # still reach the stop as verified candidates without each buying a new
             # Google search.
-            _ground_r1 = n_gem_grounded < MAX_GROUNDED_PER_STOP
-            r1 = gemini_with_sources(
-                compile_for_seed(seed, matrix, exhibition),
-                grounded=_ground_r1)
+            #
+            # [LOCAL-645] When GEMINI_PER_VENUE is on, the fresh-web facts come from
+            # the ONE venue research pass instead of a per-stop grounded search:
+            #   * venue pass HAS material about this work  -> narrate UNGROUNDED,
+            #     with that material injected as context. No grounded request.
+            #   * venue pass had NOTHING about this work    -> fall back to a
+            #     per-work grounded request, at most once, within the stop budget.
+            # With the flag off, _pv_on is False and this is the LOCAL-594 behaviour
+            # unchanged.
+            _seed_prompt = compile_for_seed(seed, matrix, exhibition)
+            if _pv_on:
+                if _pv_material:
+                    _ground_r1 = False
+                    _seed_prompt = (
+                        "Grounded research about this work (use it as the factual "
+                        "basis; do not contradict it):\n"
+                        f"{_pv_material}\n\n{_seed_prompt}")
+                else:
+                    # Per-work fallback: only when the venue pass found nothing,
+                    # and only within the per-stop grounded budget.
+                    _ground_r1 = n_gem_grounded < MAX_GROUNDED_PER_STOP
+            else:
+                _ground_r1 = n_gem_grounded < MAX_GROUNDED_PER_STOP
+            r1 = gemini_with_sources(_seed_prompt, grounded=_ground_r1)
             n_gem += 1
             if _ground_r1:
                 n_gem_grounded += 1
