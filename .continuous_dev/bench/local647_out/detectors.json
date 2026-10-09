@@ -1,0 +1,566 @@
+{
+  "A": [
+    {
+      "stop_id": "Courtauld-0",
+      "museum": "Courtauld",
+      "title": "Manet’s A Bar at the Folies-Bergère",
+      "status": 200,
+      "detector_failures": [],
+      "detector_detail": [],
+      "n_failures": 0
+    },
+    {
+      "stop_id": "Courtauld-1",
+      "museum": "Courtauld",
+      "title": "Van Gogh’s iconic Self-Portrait with Bandaged Ear",
+      "status": 200,
+      "detector_failures": [],
+      "detector_detail": [],
+      "n_failures": 0
+    },
+    {
+      "stop_id": "Courtauld-2",
+      "museum": "Courtauld",
+      "title": "Georges Seurat",
+      "status": 200,
+      "detector_failures": [],
+      "detector_detail": [],
+      "n_failures": 0
+    },
+    {
+      "stop_id": "Walters-0",
+      "museum": "Walters",
+      "title": "Springtime (1872)",
+      "status": 200,
+      "detector_failures": [],
+      "detector_detail": [],
+      "n_failures": 0
+    },
+    {
+      "stop_id": "Walters-1",
+      "museum": "Walters",
+      "title": "The Death of Caesar",
+      "status": 200,
+      "detector_failures": [],
+      "detector_detail": [],
+      "n_failures": 0
+    },
+    {
+      "stop_id": "Walters-2",
+      "museum": "Walters",
+      "title": "Sappho and Alcaeus",
+      "status": 200,
+      "detector_failures": [],
+      "detector_detail": [],
+      "n_failures": 0
+    },
+    {
+      "stop_id": "Wallace-0",
+      "museum": "Wallace",
+      "title": "The Laughing Cavalier",
+      "status": 200,
+      "detector_failures": [],
+      "detector_detail": [],
+      "n_failures": 0
+    },
+    {
+      "stop_id": "Wallace-1",
+      "museum": "Wallace",
+      "title": "A Dance to the Music of Time",
+      "status": 200,
+      "detector_failures": [],
+      "detector_detail": [],
+      "n_failures": 0
+    },
+    {
+      "stop_id": "Wallace-2",
+      "museum": "Wallace",
+      "title": "Madame de Pompadour",
+      "status": 200,
+      "detector_failures": [],
+      "detector_detail": [],
+      "n_failures": 0
+    },
+    {
+      "stop_id": "Frick-0",
+      "museum": "Frick",
+      "title": "Officer and Laughing Girl",
+      "status": 200,
+      "detector_failures": [],
+      "detector_detail": [],
+      "n_failures": 0
+    },
+    {
+      "stop_id": "Frick-1",
+      "museum": "Frick",
+      "title": "Portrait of Sir Thomas More",
+      "status": 200,
+      "detector_failures": [],
+      "detector_detail": [],
+      "n_failures": 0
+    },
+    {
+      "stop_id": "Frick-2",
+      "museum": "Frick",
+      "title": "Portrait of Comtesse d'Haussonville",
+      "status": 200,
+      "detector_failures": [],
+      "detector_detail": [],
+      "n_failures": 0
+    }
+  ],
+  "B": [
+    {
+      "stop_id": "Courtauld-0",
+      "museum": "Courtauld",
+      "title": "Manet’s A Bar at the Folies-Bergère",
+      "status": 200,
+      "detector_failures": [],
+      "detector_detail": [],
+      "n_failures": 0
+    },
+    {
+      "stop_id": "Courtauld-1",
+      "museum": "Courtauld",
+      "title": "Van Gogh’s iconic Self-Portrait with Bandaged Ear",
+      "status": 200,
+      "detector_failures": [],
+      "detector_detail": [],
+      "n_failures": 0
+    },
+    {
+      "stop_id": "Courtauld-2",
+      "museum": "Courtauld",
+      "title": "Georges Seurat",
+      "status": 200,
+      "detector_failures": [],
+      "detector_detail": [],
+      "n_failures": 0
+    },
+    {
+      "stop_id": "Walters-0",
+      "museum": "Walters",
+      "title": "Springtime (1872)",
+      "status": 200,
+      "detector_failures": [],
+      "detector_detail": [],
+      "n_failures": 0
+    },
+    {
+      "stop_id": "Walters-1",
+      "museum": "Walters",
+      "title": "The Death of Caesar",
+      "status": 200,
+      "detector_failures": [],
+      "detector_detail": [],
+      "n_failures": 0
+    },
+    {
+      "stop_id": "Walters-2",
+      "museum": "Walters",
+      "title": "Sappho and Alcaeus",
+      "status": 200,
+      "detector_failures": [],
+      "detector_detail": [],
+      "n_failures": 0
+    },
+    {
+      "stop_id": "Wallace-0",
+      "museum": "Wallace",
+      "title": "The Laughing Cavalier",
+      "status": 200,
+      "detector_failures": [],
+      "detector_detail": [],
+      "n_failures": 0
+    },
+    {
+      "stop_id": "Wallace-1",
+      "museum": "Wallace",
+      "title": "A Dance to the Music of Time",
+      "status": 200,
+      "detector_failures": [],
+      "detector_detail": [],
+      "n_failures": 0
+    },
+    {
+      "stop_id": "Wallace-2",
+      "museum": "Wallace",
+      "title": "Madame de Pompadour",
+      "status": 200,
+      "detector_failures": [],
+      "detector_detail": [],
+      "n_failures": 0
+    },
+    {
+      "stop_id": "Frick-0",
+      "museum": "Frick",
+      "title": "Officer and Laughing Girl",
+      "status": 200,
+      "detector_failures": [],
+      "detector_detail": [],
+      "n_failures": 0
+    },
+    {
+      "stop_id": "Frick-1",
+      "museum": "Frick",
+      "title": "Portrait of Sir Thomas More",
+      "status": 200,
+      "detector_failures": [],
+      "detector_detail": [],
+      "n_failures": 0
+    },
+    {
+      "stop_id": "Frick-2",
+      "museum": "Frick",
+      "title": "Portrait of Comtesse d'Haussonville",
+      "status": 200,
+      "detector_failures": [],
+      "detector_detail": [],
+      "n_failures": 0
+    }
+  ],
+  "C": [
+    {
+      "stop_id": "Courtauld-0",
+      "museum": "Courtauld",
+      "title": "Manet’s A Bar at the Folies-Bergère",
+      "status": 200,
+      "detector_failures": [],
+      "detector_detail": [],
+      "n_failures": 0
+    },
+    {
+      "stop_id": "Courtauld-1",
+      "museum": "Courtauld",
+      "title": "Van Gogh’s iconic Self-Portrait with Bandaged Ear",
+      "status": 200,
+      "detector_failures": [],
+      "detector_detail": [],
+      "n_failures": 0
+    },
+    {
+      "stop_id": "Courtauld-2",
+      "museum": "Courtauld",
+      "title": "Georges Seurat",
+      "status": 200,
+      "detector_failures": [],
+      "detector_detail": [],
+      "n_failures": 0
+    },
+    {
+      "stop_id": "Walters-0",
+      "museum": "Walters",
+      "title": "Springtime (1872)",
+      "status": 200,
+      "detector_failures": [],
+      "detector_detail": [],
+      "n_failures": 0
+    },
+    {
+      "stop_id": "Walters-1",
+      "museum": "Walters",
+      "title": "The Death of Caesar",
+      "status": 200,
+      "detector_failures": [],
+      "detector_detail": [],
+      "n_failures": 0
+    },
+    {
+      "stop_id": "Walters-2",
+      "museum": "Walters",
+      "title": "Sappho and Alcaeus",
+      "status": 200,
+      "detector_failures": [],
+      "detector_detail": [],
+      "n_failures": 0
+    },
+    {
+      "stop_id": "Wallace-0",
+      "museum": "Wallace",
+      "title": "The Laughing Cavalier",
+      "status": 200,
+      "detector_failures": [],
+      "detector_detail": [],
+      "n_failures": 0
+    },
+    {
+      "stop_id": "Wallace-1",
+      "museum": "Wallace",
+      "title": "A Dance to the Music of Time",
+      "status": 200,
+      "detector_failures": [],
+      "detector_detail": [],
+      "n_failures": 0
+    },
+    {
+      "stop_id": "Wallace-2",
+      "museum": "Wallace",
+      "title": "Madame de Pompadour",
+      "status": 200,
+      "detector_failures": [],
+      "detector_detail": [],
+      "n_failures": 0
+    },
+    {
+      "stop_id": "Frick-0",
+      "museum": "Frick",
+      "title": "Officer and Laughing Girl",
+      "status": 200,
+      "detector_failures": [
+        "truncated_snippet"
+      ],
+      "detector_detail": [
+        [
+          "truncated_snippet",
+          ""
+        ]
+      ],
+      "n_failures": 1
+    },
+    {
+      "stop_id": "Frick-1",
+      "museum": "Frick",
+      "title": "Portrait of Sir Thomas More",
+      "status": 200,
+      "detector_failures": [],
+      "detector_detail": [],
+      "n_failures": 0
+    },
+    {
+      "stop_id": "Frick-2",
+      "museum": "Frick",
+      "title": "Portrait of Comtesse d'Haussonville",
+      "status": 200,
+      "detector_failures": [],
+      "detector_detail": [],
+      "n_failures": 0
+    }
+  ],
+  "D": [
+    {
+      "stop_id": "Courtauld-0",
+      "museum": "Courtauld",
+      "title": "Manet’s A Bar at the Folies-Bergère",
+      "status": 200,
+      "detector_failures": [],
+      "detector_detail": [],
+      "n_failures": 0
+    },
+    {
+      "stop_id": "Courtauld-1",
+      "museum": "Courtauld",
+      "title": "Van Gogh’s iconic Self-Portrait with Bandaged Ear",
+      "status": 200,
+      "detector_failures": [],
+      "detector_detail": [],
+      "n_failures": 0
+    },
+    {
+      "stop_id": "Courtauld-2",
+      "museum": "Courtauld",
+      "title": "Georges Seurat",
+      "status": 200,
+      "detector_failures": [],
+      "detector_detail": [],
+      "n_failures": 0
+    },
+    {
+      "stop_id": "Walters-0",
+      "museum": "Walters",
+      "title": "Springtime (1872)",
+      "status": 200,
+      "detector_failures": [],
+      "detector_detail": [],
+      "n_failures": 0
+    },
+    {
+      "stop_id": "Walters-1",
+      "museum": "Walters",
+      "title": "The Death of Caesar",
+      "status": 200,
+      "detector_failures": [],
+      "detector_detail": [],
+      "n_failures": 0
+    },
+    {
+      "stop_id": "Walters-2",
+      "museum": "Walters",
+      "title": "Sappho and Alcaeus",
+      "status": 200,
+      "detector_failures": [],
+      "detector_detail": [],
+      "n_failures": 0
+    },
+    {
+      "stop_id": "Wallace-0",
+      "museum": "Wallace",
+      "title": "The Laughing Cavalier",
+      "status": 200,
+      "detector_failures": [
+        "truncated_snippet"
+      ],
+      "detector_detail": [
+        [
+          "truncated_snippet",
+          ""
+        ]
+      ],
+      "n_failures": 1
+    },
+    {
+      "stop_id": "Wallace-1",
+      "museum": "Wallace",
+      "title": "A Dance to the Music of Time",
+      "status": 200,
+      "detector_failures": [],
+      "detector_detail": [],
+      "n_failures": 0
+    },
+    {
+      "stop_id": "Wallace-2",
+      "museum": "Wallace",
+      "title": "Madame de Pompadour",
+      "status": 200,
+      "detector_failures": [],
+      "detector_detail": [],
+      "n_failures": 0
+    },
+    {
+      "stop_id": "Frick-0",
+      "museum": "Frick",
+      "title": "Officer and Laughing Girl",
+      "status": 200,
+      "detector_failures": [],
+      "detector_detail": [],
+      "n_failures": 0
+    },
+    {
+      "stop_id": "Frick-1",
+      "museum": "Frick",
+      "title": "Portrait of Sir Thomas More",
+      "status": 200,
+      "detector_failures": [],
+      "detector_detail": [],
+      "n_failures": 0
+    },
+    {
+      "stop_id": "Frick-2",
+      "museum": "Frick",
+      "title": "Portrait of Comtesse d'Haussonville",
+      "status": 200,
+      "detector_failures": [],
+      "detector_detail": [],
+      "n_failures": 0
+    }
+  ],
+  "E": [
+    {
+      "stop_id": "Courtauld-0",
+      "museum": "Courtauld",
+      "title": "Manet’s A Bar at the Folies-Bergère",
+      "status": 200,
+      "detector_failures": [],
+      "detector_detail": [],
+      "n_failures": 0
+    },
+    {
+      "stop_id": "Courtauld-1",
+      "museum": "Courtauld",
+      "title": "Van Gogh’s iconic Self-Portrait with Bandaged Ear",
+      "status": 200,
+      "detector_failures": [],
+      "detector_detail": [],
+      "n_failures": 0
+    },
+    {
+      "stop_id": "Courtauld-2",
+      "museum": "Courtauld",
+      "title": "Georges Seurat",
+      "status": 200,
+      "detector_failures": [],
+      "detector_detail": [],
+      "n_failures": 0
+    },
+    {
+      "stop_id": "Walters-0",
+      "museum": "Walters",
+      "title": "Springtime (1872)",
+      "status": 200,
+      "detector_failures": [],
+      "detector_detail": [],
+      "n_failures": 0
+    },
+    {
+      "stop_id": "Walters-1",
+      "museum": "Walters",
+      "title": "The Death of Caesar",
+      "status": 200,
+      "detector_failures": [],
+      "detector_detail": [],
+      "n_failures": 0
+    },
+    {
+      "stop_id": "Walters-2",
+      "museum": "Walters",
+      "title": "Sappho and Alcaeus",
+      "status": 200,
+      "detector_failures": [],
+      "detector_detail": [],
+      "n_failures": 0
+    },
+    {
+      "stop_id": "Wallace-0",
+      "museum": "Wallace",
+      "title": "The Laughing Cavalier",
+      "status": 200,
+      "detector_failures": [],
+      "detector_detail": [],
+      "n_failures": 0
+    },
+    {
+      "stop_id": "Wallace-1",
+      "museum": "Wallace",
+      "title": "A Dance to the Music of Time",
+      "status": 200,
+      "detector_failures": [],
+      "detector_detail": [],
+      "n_failures": 0
+    },
+    {
+      "stop_id": "Wallace-2",
+      "museum": "Wallace",
+      "title": "Madame de Pompadour",
+      "status": 200,
+      "detector_failures": [],
+      "detector_detail": [],
+      "n_failures": 0
+    },
+    {
+      "stop_id": "Frick-0",
+      "museum": "Frick",
+      "title": "Officer and Laughing Girl",
+      "status": 200,
+      "detector_failures": [],
+      "detector_detail": [],
+      "n_failures": 0
+    },
+    {
+      "stop_id": "Frick-1",
+      "museum": "Frick",
+      "title": "Portrait of Sir Thomas More",
+      "status": 200,
+      "detector_failures": [],
+      "detector_detail": [],
+      "n_failures": 0
+    },
+    {
+      "stop_id": "Frick-2",
+      "museum": "Frick",
+      "title": "Portrait of Comtesse d'Haussonville",
+      "status": 200,
+      "detector_failures": [],
+      "detector_detail": [],
+      "n_failures": 0
+    }
+  ]
+}
