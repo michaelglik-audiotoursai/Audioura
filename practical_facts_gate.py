@@ -1973,3 +1973,58 @@ if __name__ == "__main__":
     else:
         print(f"\n  GATE: CLAIMS DROPPED — {len(result.dropped_claims)} unverifiable claim(s)")
         sys.exit(1)
+
+
+# ─── [LEAD 2026-10-08, D640 note 1] Label-independent placement ─────────────────
+# relocate_practical_facts_to_opening keys on an "Orientation:" label. Frick 528's Stop 1
+# carried NO such label, so "The museum is open daily except Tuesday. Admission is 30 dollars"
+# stayed after the painting description, exactly what Michael objected to ("it starts telling
+# about the painting, then the museum information, then goes back to the painting").
+# Rule: ONE practical-facts paragraph, placed after the museum-introduction paragraph(s) at the
+# top of Stop 1 (or first in Stop 1 when there is no introduction). Every other hours/admission
+# sentence in the tour is removed. Never invents a fact: only sentences already present move.
+_ABOUT_PARA_RE = re.compile(
+    r"(?i)\b(is an? (?:art |national |public |private )?(?:museum|gallery|collection)|"
+    r"art museum|museum (?:in|on|at)|gallery (?:in|on|at)|houses (?:the )?collection|"
+    r"founded in|opened (?:to the public )?in)\b")
+_FIELD_PARA_RE = re.compile(r"(?i)^\s*(address|coordinates|tour-category|museum information|step-by-step)\s*:")
+
+
+def place_practical_facts_in_opening(text: str) -> "Tuple[str, int]":
+    if not text or not text.strip():
+        return text or "", 0
+    paras = text.split("\n\n")
+    stop_idx = [i for i, p in enumerate(paras) if re.match(r"(?i)^\s*stop\s*\d+\s*:", p.strip())]
+    if not stop_idx:
+        return text, 0
+    s1 = stop_idx[0]
+    facts: "List[str]" = []
+    moved = 0
+    out = []
+    for i, p in enumerate(paras):
+        if i <= s1 or _FIELD_PARA_RE.match(p.strip() or "x") or re.match(r"(?i)^\s*(stop\s*\d+\s*:|sources:)", p.strip()):
+            out.append(p)
+            continue
+        kept = []
+        for sent in _split_sentences_keep(p):
+            if _is_practical_facts_sentence(sent):
+                if sent.strip() not in facts:
+                    facts.append(sent.strip())
+                moved += 1
+            else:
+                kept.append(sent)
+        if kept:
+            out.append(" ".join(kept) if len(kept) != len(_split_sentences_keep(p)) else p)
+    if not facts:
+        return text, 0
+    # insertion point: after leading museum-introduction paragraphs in Stop 1, else first prose slot
+    s1_out = next(i for i, p in enumerate(out) if re.match(r"(?i)^\s*stop\s*\d+\s*:", p.strip()))
+    j = s1_out + 1
+    while j < len(out) and (not out[j].strip() or _FIELD_PARA_RE.match(out[j].strip())):
+        j += 1
+    k = j
+    while k < len(out) and _ABOUT_PARA_RE.search(out[k]) and not re.match(r"(?i)^\s*stop\s*\d+\s*:", out[k].strip()):
+        k += 1
+    out.insert(k, " ".join(facts))
+    new = "\n\n".join(out)
+    return new, (0 if new == text else moved)

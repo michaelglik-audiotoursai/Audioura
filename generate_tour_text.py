@@ -7927,6 +7927,12 @@ def _apply_delivery_hours_guard(result):
         try:
             import practical_facts_gate as _pfg_reloc
             final, _reloc = _pfg_reloc.relocate_practical_facts_to_opening(final)
+            # [LEAD 2026-10-08] label-independent placement (Frick 528: no Orientation label in Stop 1)
+            final, _reloc2 = _pfg_reloc.place_practical_facts_in_opening(final)
+            if _reloc2:
+                print(f"  [LEAD D640-1] practical facts placed as the opening paragraph ({_reloc2} sentence(s))", flush=True)
+            # [LEAD 2026-10-08] drop empty field lines ("Address:" / "Directions:" with no value; Frick 528)
+            final = re.sub(r"(?m)^(?:Address|Directions):[ \t]*\n(?:[ \t]*\n)?", "", final)
             if _reloc:
                 print(f"  [LOCAL-638 Note 1] moved {_reloc} practical-facts "
                       f"sentence(s) out of a stop Orientation/body into the Stop-1 "
