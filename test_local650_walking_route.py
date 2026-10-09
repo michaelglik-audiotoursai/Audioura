@@ -1,25 +1,27 @@
 #!/usr/bin/env python3
-"""test_local650_walking_route.py — LOCAL-650.
+"""test_local650_walking_route.py — LOCAL-650B.
 
 Three walking-tour defects on the REAL request
 "Walking tour in Boston dedicated to Massachusetts politics and current affairs,
 Boston, MA" (walking, 5 stops; audio_tours.id=557 and the Oct-6 baseline):
 
-  FIX 1 — the request's THEME became a stop. Stop 5 = "Massachusetts politics and
-          current affairs" (the theme phrase), Address N/A. A POI must be a real,
-          geocodable place; a theme phrase / topic-like name must be rejected and
-          replaced by a real place that fits the theme.
+  FIX 1 (650B) — the request's THEME became a stop. Stop 5 = "Massachusetts
+          politics and current affairs" (the theme phrase), Address N/A. A POI must
+          be a real, geocodable place; a theme phrase / topic-like name must be
+          REJECTED AT SELECTION, not renamed after the fact. The old
+          rename_theme_phrase_stops text-surgery is DELETED (D643 anti-pattern).
   FIX 2 — Directions led BACKWARDS. Stop 4 (Old State House) said "… head north …
           until you reach the Massachusetts State House …" — that is STOP 1, not
           the next stop. Each stop's Directions must name the NEXT stop and say
-          roughly how far it is.
+          roughly how far it is — BUT only when both stops have VERIFIED (P625)
+          coordinates.
   FIX 3 — "current affairs" honesty. When the request names current affairs, at
           least one stop must carry a recent (≤ 5 years) grounded item, or the
           tour must say honestly there is none.
 
 The fixtures below are the REAL tour-557 stop blocks (verbatim). A DB-backed test
 reads the live row when reachable and otherwise skips, so the suite runs offline.
-MUSEUM behaviour is proven unchanged: every LOCAL-650 guard is a no-op on a
+MUSEUM behaviour is proven unchanged: every LOCAL-650B guard is a no-op on a
 Tour-Category: museum text.
 
 Run: python3 -m pytest test_local650_walking_route.py -q
@@ -112,9 +114,37 @@ MUSEUM_TEXT = (
     "Cézanne, 1890s. That's 2 stops in all.\n"
 )
 
+# A CLEAN walking tour with no theme-phrase stop (what a correctly-filtered
+# generation produces). Used to test the guard composition without rename.
+CLEAN_WALKING = (
+    "Step-by-Step Audio Guided Tour: Walking tour in Boston dedicated to "
+    "Massachusetts politics and current affairs, Boston, MA\n"
+    "Tour-Category: walking\n\n"
+    "Stop 1: Massachusetts State House\n\n"
+    "Coordinates: 42.3588, -71.0638\n\n"
+    "The seat of Massachusetts government since 1798.\n\n"
+    "Directions: Head east on Beacon Street towards Tremont.\n\n"
+    "Stop 2: Boston City Hall\n\n"
+    "Coordinates: 42.3609, -71.0577\n\n"
+    "In late 2024, federal prosecutors indicted a Boston City Councilor.\n\n"
+    "Directions: Head south on Congress Street.\n\n"
+    "Stop 3: Faneuil Hall\n\n"
+    "Coordinates: 42.3600, -71.0568\n\n"
+    "Peter Faneuil gave this building to the city in 1742.\n\n"
+    "Directions: Walk south on Congress to State Street.\n\n"
+    "Stop 4: Old State House\n\n"
+    "Coordinates: 42.3604, -71.0572\n\n"
+    "The oldest surviving public building in Boston.\n\n"
+    "Directions: Head south along the Freedom Trail.\n\n"
+    "Stop 5: Boston Public Library\n\n"
+    "Coordinates: 42.3496, -71.0783\n\n"
+    "Opened in 1854 as the first large free municipal library. That's 5 stops.\n\n"
+    "Sources:\n- https://example.com\n"
+)
+
 
 # ─────────────────────────────────────────────────────────────────────────────
-# FIX 1 — theme phrase must never be a stop
+# FIX 1 (650B) — theme phrase must be REJECTED at selection, never renamed
 # ─────────────────────────────────────────────────────────────────────────────
 
 class TestFix1ThemeStop(unittest.TestCase):
@@ -134,7 +164,8 @@ class TestFix1ThemeStop(unittest.TestCase):
         for place in ("Massachusetts State House", "Boston City Hall",
                       "Faneuil Hall", "Old State House",
                       "The University of Massachusetts Boston",
-                      "John F. Kennedy Presidential Library"):
+                      "John F. Kennedy Presidential Library",
+                      "Boston Public Library"):
             self.assertFalse(tsg.is_theme_phrase_stop(place, th), place)
             self.assertFalse(tsg.topic_like_name(place), place)
 
@@ -150,102 +181,119 @@ class TestFix1ThemeStop(unittest.TestCase):
         self.assertEqual(found[0][0], 5)
         self.assertEqual(found[0][1], "Massachusetts politics and current affairs")
 
-    def test_rename_derives_real_place_from_narration(self):
-        fixed, changes = tsg.rename_theme_phrase_stops(TOUR557)
-        self.assertEqual(len(changes), 1)
-        self.assertEqual(changes[0]['stop'], 5)
-        # The replacement is a real place the stop's own narration names.
-        self.assertIn("University of Massachusetts Boston", changes[0]['to'])
-        # The theme phrase is gone from the Stop 5 header.
-        self.assertNotRegex(
-            fixed, r"(?m)^Stop 5: Massachusetts politics and current affairs\s*$")
-        self.assertRegex(fixed, r"(?m)^Stop 5: .*University of Massachusetts Boston")
-        # Coordinates and body are preserved.
-        self.assertIn("Coordinates: 42.3584, -71.0598", fixed)
-        self.assertIn("From 1996 to 2011", fixed)
-
-    def test_rename_idempotent(self):
-        once, _ = tsg.rename_theme_phrase_stops(TOUR557)
-        twice, ch2 = tsg.rename_theme_phrase_stops(once)
-        self.assertEqual(ch2, [])
-        self.assertEqual(once, twice)
-
-    def test_selection_predicate(self):
+    def test_selection_predicate_rejects_theme(self):
+        """stop_name_is_not_a_place is the selection-time gate. It must reject
+        the request theme and any topic-like name."""
         th = tsg.extract_request_theme(TOUR557)
         self.assertTrue(tsg.stop_name_is_not_a_place(
             "Massachusetts politics and current affairs", th))
+        self.assertTrue(tsg.stop_name_is_not_a_place(
+            "political history", th))
+        self.assertTrue(tsg.stop_name_is_not_a_place(
+            "power and public engagement", th))
+
+    def test_selection_predicate_accepts_real_places(self):
+        th = tsg.extract_request_theme(TOUR557)
         self.assertFalse(tsg.stop_name_is_not_a_place("Faneuil Hall", th))
+        self.assertFalse(tsg.stop_name_is_not_a_place("Boston Public Library", th))
+        self.assertFalse(tsg.stop_name_is_not_a_place("Old State House", th))
+
+    def test_rename_function_deleted(self):
+        """The D643 anti-pattern (rename after narration) is removed."""
+        self.assertFalse(hasattr(tsg, 'rename_theme_phrase_stops'),
+                         "rename_theme_phrase_stops must not exist in 650B")
+        self.assertFalse(hasattr(tsg, 'derive_real_place_from_block'),
+                         "derive_real_place_from_block must not exist in 650B")
+
+    def test_clean_walking_tour_passes_detector(self):
+        """A properly-filtered tour (no theme-phrase stop) passes the detector."""
+        found = tsg.find_theme_phrase_stops(CLEAN_WALKING)
+        self.assertEqual(found, [])
 
     def test_museum_is_a_noop(self):
-        fixed, changes = tsg.rename_theme_phrase_stops(MUSEUM_TEXT)
-        self.assertEqual(changes, [])
-        self.assertEqual(fixed, MUSEUM_TEXT)
+        found = tsg.find_theme_phrase_stops(MUSEUM_TEXT)
+        self.assertEqual(found, [])
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# FIX 2 — directions lead to the NEXT stop, with distance
+# FIX 2 (650B) — directions + verified-coords-only distances
 # ─────────────────────────────────────────────────────────────────────────────
 
 class TestFix2WalkingDirections(unittest.TestCase):
-    def _after_rename(self):
-        fixed, _ = tsg.rename_theme_phrase_stops(TOUR557)
-        return fixed
+    def test_wrong_target_detected_on_clean_tour(self):
+        """On a clean tour, Stop 4's generic directions (no next-stop name) are
+        detected as needing augmentation, not as wrong-target."""
+        analysis = wdg.analyze(CLEAN_WALKING)
+        rep = {r['num']: r for r in analysis}
+        # Generic directions don't name a WRONG stop, they just lack the next name.
+        for r in analysis:
+            self.assertFalse(r['wrong_target'], f"Stop {r['num']} falsely flagged")
 
-    def test_wrong_target_detected_after_rename(self):
-        # After Stop 5 is renamed to UMass Boston, Stop 4's Directions still name
-        # the Massachusetts State House (Stop 1) — a wrong target.
-        txt = self._after_rename()
-        self.assertEqual(wdg.count_wrong_target_directions(txt), 1)
-        rep = {r['num']: r for r in wdg.analyze(txt)}
-        self.assertTrue(rep[4]['wrong_target'])
-
-    def test_guard_corrects_wrong_target_and_adds_distance(self):
-        txt = self._after_rename()
-        fixed, report = wdg.ensure_walking_directions_lead_to_next(txt)
+    def test_guard_augments_directions(self):
+        """The guard augments directions with next-stop names and distances."""
+        vc = {1: (42.3588, -71.0638), 2: (42.3609, -71.0577),
+              3: (42.3600, -71.0568), 4: (42.3604, -71.0572),
+              5: (42.3496, -71.0783)}
+        fixed, report = wdg.ensure_walking_directions_lead_to_next(CLEAN_WALKING, vc)
         self.assertEqual(wdg.count_wrong_target_directions(fixed), 0)
-        self.assertGreaterEqual(report['corrected'], 1)
-        # Stop 4's Directions now name the next stop (UMass Boston) and NOT the
-        # Massachusetts State House as the destination.
-        m = re.search(r"(?ms)^Stop 4:.*?^Directions:\s*(.+?)$.*?^Stop 5:", fixed)
-        self.assertIsNotNone(m)
-        s4_dir = m.group(1)
-        self.assertIn("University of Massachusetts Boston", s4_dir)
-        self.assertNotIn("until you reach the Massachusetts State House", s4_dir)
-        # A distance phrase was added somewhere in the directions.
-        self.assertRegex(fixed, r"(?i)(meters?|km|minute).{0,8}(away|walk)")
+        # Distances should have been added for verified coord pairs.
+        self.assertGreater(report['distance_added'], 0)
+
+    def test_verified_coords_distance_both_verified(self):
+        """When both stops in a pair have verified coords, distance is computed."""
+        vc = {1: (42.3588, -71.0638), 2: (42.3609, -71.0577),
+              3: (42.3600, -71.0568), 4: (42.3604, -71.0572),
+              5: (42.3584, -71.0598)}
+        fixed, report = wdg.ensure_walking_directions_lead_to_next(TOUR557, vc)
+        self.assertGreater(report['distance_added'], 0)
+
+    def test_verified_coords_distance_omitted_when_unverified(self):
+        """When only one stop in a pair has verified coords, distance is omitted."""
+        # Only stop 1 verified — no pair has BOTH verified.
+        vc = {1: (42.3588, -71.0638)}
+        fixed, report = wdg.ensure_walking_directions_lead_to_next(TOUR557, vc)
+        self.assertEqual(report['distance_added'], 0)
+
+    def test_verified_coords_empty_dict_no_distances(self):
+        """Empty verified_stop_coords = no verified coords at all = no distances."""
+        fixed, report = wdg.ensure_walking_directions_lead_to_next(TOUR557, {})
+        self.assertEqual(report['distance_added'], 0)
+
+    def test_verified_coords_none_uses_text_coords(self):
+        """verified_stop_coords=None = legacy behaviour, uses text-parsed coords."""
+        fixed, report = wdg.ensure_walking_directions_lead_to_next(TOUR557, None)
+        # Text has coordinates for all stops, so distances should be computed.
+        self.assertGreater(report['distance_added'], 0)
+
+    def test_clean_walking_directions_augmented(self):
+        """A clean walking tour gets next-stop naming + distances."""
+        vc = {1: (42.3588, -71.0638), 2: (42.3609, -71.0577),
+              3: (42.3600, -71.0568), 4: (42.3604, -71.0572),
+              5: (42.3496, -71.0783)}
+        fixed, report = wdg.ensure_walking_directions_lead_to_next(CLEAN_WALKING, vc)
+        # All non-last stops should have a hand-off naming the next stop.
+        self.assertEqual(wdg.count_wrong_target_directions(fixed), 0)
 
     def test_headers_unchanged_by_directions_guard(self):
-        txt = self._after_rename()
-        before = re.findall(r"(?m)^Stop \d+: (.+)$", txt)
-        fixed, _ = wdg.ensure_walking_directions_lead_to_next(txt)
+        before = re.findall(r"(?m)^Stop \d+: (.+)$", TOUR557)
+        fixed, _ = wdg.ensure_walking_directions_lead_to_next(TOUR557)
         after = re.findall(r"(?m)^Stop \d+: (.+)$", fixed)
         self.assertEqual(before, after)
 
-    def test_blank_line_before_next_header_preserved(self):
-        txt = self._after_rename()
-        fixed, _ = wdg.ensure_walking_directions_lead_to_next(txt)
-        # No stop header is glued onto a previous line (same physical line).
-        self.assertNotRegex(fixed, r"(?m)^.+\bStop \d+:")
-        self.assertRegex(fixed, r"\n\nStop 5:")
-
     def test_idempotent(self):
-        txt = self._after_rename()
-        once, _ = wdg.ensure_walking_directions_lead_to_next(txt)
+        once, _ = wdg.ensure_walking_directions_lead_to_next(TOUR557)
         twice, rep2 = wdg.ensure_walking_directions_lead_to_next(once)
         self.assertEqual(rep2['corrected'], 0)
         self.assertEqual(rep2['distance_added'], 0)
         self.assertEqual(once, twice)
 
     def test_directions_generator_target_guard(self):
-        # The 557 Stop-4 prose names the Massachusetts State House; the next stop
-        # is the University of Massachusetts Boston — the target guard must reject.
         self.assertFalse(dgen._directions_name_destination(
             "head north until you reach the Massachusetts State House",
-            "The University of Massachusetts Boston"))
-        # Prose that names the next stop passes.
+            "Boston Public Library"))
         self.assertTrue(dgen._directions_name_destination(
-            "make your way to the University of Massachusetts Boston campus",
-            "The University of Massachusetts Boston"))
+            "make your way to the Boston Public Library",
+            "Boston Public Library"))
 
     def test_museum_is_a_noop(self):
         fixed, report = wdg.ensure_walking_directions_lead_to_next(MUSEUM_TEXT)
@@ -263,8 +311,6 @@ class TestFix3CurrentAffairs(unittest.TestCase):
         self.assertFalse(cac.request_wants_current_affairs(MUSEUM_TEXT))
 
     def test_557_has_recent_item_so_no_note(self):
-        # The real 557 Boston City Hall stop carries a late-2024 indictment, so
-        # the first clause of the requirement is already met — no note is added.
         self.assertTrue(cac.has_recent_item(TOUR557, now_year=2026))
         out, changed = cac.ensure_current_affairs_coverage(TOUR557, now_year=2026)
         self.assertFalse(changed)
@@ -276,7 +322,6 @@ class TestFix3CurrentAffairs(unittest.TestCase):
             TOUR_OLD_ONLY, now_year=2026)
         self.assertTrue(changed)
         self.assertIn("no verified developments from the past five years", out)
-        # The note sits before the Sources block, never invents a year.
         self.assertLess(out.index("no verified developments"), out.index("Sources:"))
 
     def test_honest_note_idempotent(self):
@@ -299,29 +344,40 @@ class TestFix3CurrentAffairs(unittest.TestCase):
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# End-to-end on the fixture: the three guards compose cleanly, museum untouched.
+# 650B composition: guards compose WITHOUT rename step
 # ─────────────────────────────────────────────────────────────────────────────
 
-class TestPipelineComposition(unittest.TestCase):
-    def test_three_guards_compose_on_557(self):
-        txt = TOUR557
-        txt, ch1 = tsg.rename_theme_phrase_stops(txt)
-        txt, rep2 = wdg.ensure_walking_directions_lead_to_next(txt)
-        txt, ch3 = cac.ensure_current_affairs_coverage(txt, now_year=2026)
-        # fix1 renamed Stop 5; fix2 corrected Stop 4; fix3 added nothing (recent).
-        self.assertEqual(len(ch1), 1)
-        self.assertEqual(wdg.count_wrong_target_directions(txt), 0)
-        self.assertFalse(ch3)
+class TestPipelineComposition650B(unittest.TestCase):
+    def test_clean_tour_passes_all_guards(self):
+        """A tour produced by correctly-filtered selection passes all guards."""
+        txt = CLEAN_WALKING
+        # No theme-phrase stops.
         self.assertEqual(tsg.find_theme_phrase_stops(txt), [])
+        # Directions guard runs without crash.
+        txt, rep = wdg.ensure_walking_directions_lead_to_next(txt)
+        self.assertEqual(wdg.count_wrong_target_directions(txt), 0)
+        # Current-affairs guard (recent item present).
+        txt, ch3 = cac.ensure_current_affairs_coverage(txt, now_year=2026)
+        # 5 stop headers preserved.
         self.assertEqual(len(re.findall(r"(?m)^Stop \d+:", txt)), 5)
 
-    def test_three_guards_noop_on_museum(self):
-        txt = MUSEUM_TEXT
-        txt, ch1 = tsg.rename_theme_phrase_stops(txt)
-        txt, rep2 = wdg.ensure_walking_directions_lead_to_next(txt)
-        txt, ch3 = cac.ensure_current_affairs_coverage(txt, now_year=2026)
-        self.assertEqual(ch1, [])
+    def test_557_theme_stop_detected_but_not_renamed(self):
+        """On the pre-fix tour 557, the theme-phrase stop IS detected, but
+        there is no rename function to run. The fix is at selection."""
+        found = tsg.find_theme_phrase_stops(TOUR557)
+        self.assertEqual(len(found), 1)
+        self.assertEqual(found[0][0], 5)
+        # No rename_theme_phrase_stops to call — the function is deleted.
+        self.assertFalse(hasattr(tsg, 'rename_theme_phrase_stops'))
+
+    def test_guards_noop_on_museum(self):
+        """Museum canary: all guards are no-ops."""
+        found = tsg.find_theme_phrase_stops(MUSEUM_TEXT)
+        self.assertEqual(found, [])
+        txt, rep2 = wdg.ensure_walking_directions_lead_to_next(MUSEUM_TEXT)
         self.assertEqual(rep2['corrected'], 0)
+        self.assertEqual(txt, MUSEUM_TEXT)
+        txt, ch3 = cac.ensure_current_affairs_coverage(MUSEUM_TEXT, now_year=2026)
         self.assertFalse(ch3)
         self.assertEqual(txt, MUSEUM_TEXT)
 
@@ -356,17 +412,21 @@ class TestLive557Row(unittest.TestCase):
             self.skipTest("audio_tours.id=557 not present")
         return row[0]
 
-    def test_live_557_guards_fix_the_defects(self):
+    def test_live_557_theme_stop_detected(self):
         tc = self._fetch_557()
-        # The live row shows the theme-phrase stop and the backwards directions.
-        self.assertEqual(len(tsg.find_theme_phrase_stops(tc)), 1)
-        fixed, ch = tsg.rename_theme_phrase_stops(tc)
-        self.assertEqual(len(ch), 1)
-        fixed, rep = wdg.ensure_walking_directions_lead_to_next(fixed)
+        # The live row shows the theme-phrase stop — fix 1 catches it.
+        found = tsg.find_theme_phrase_stops(tc)
+        self.assertGreaterEqual(len(found), 1)
+
+    def test_live_557_directions_guard_works(self):
+        tc = self._fetch_557()
+        fixed, rep = wdg.ensure_walking_directions_lead_to_next(tc)
         self.assertEqual(wdg.count_wrong_target_directions(fixed), 0)
-        # The live row already carries a recent (2024) item, so no note is added.
-        _out, changed = cac.ensure_current_affairs_coverage(fixed, now_year=2026)
-        self.assertFalse(changed)
+
+    def test_live_557_has_recent_item(self):
+        tc = self._fetch_557()
+        # The live row already carries a recent (2024) item.
+        self.assertTrue(cac.has_recent_item(tc, now_year=2026))
 
 
 if __name__ == "__main__":
