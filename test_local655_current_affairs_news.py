@@ -55,13 +55,21 @@ class TestIntentAndQueries(unittest.TestCase):
         self.assertTrue(any("politics" in q.lower() for q in qs))
 
     def test_stop_queries_shape(self):
-        """The ticket's example: 'Massachusetts State House' ->
-        ['Massachusetts State House news', 'Massachusetts State House <topic>']."""
+        """The ticket's example, now CITY-ANCHORED so a generic landmark name does
+        not pull a same-named place elsewhere: 'Massachusetts State House' ->
+        ['Massachusetts State House Boston news', 'Massachusetts State House <topic>']."""
         qs = ca.derive_stop_queries("Massachusetts State House", BOSTON_REQ)
-        self.assertEqual(qs[0], "Massachusetts State House news")
+        self.assertEqual(qs[0], "Massachusetts State House Boston news")
         self.assertGreaterEqual(len(qs), 2)
         self.assertTrue(any(w in qs[1].lower() for w in
                             ("legislature", "politics", "senate")))
+
+    def test_stop_queries_are_city_anchored(self):
+        """Every stop query carries the city when the stop name does not already
+        name it (the LOCAL-655 live run matched an Arkansas 'Old State House')."""
+        qs = ca.derive_stop_queries("Old State House", BOSTON_REQ)
+        self.assertTrue(all("boston" in q.lower() for q in qs),
+                        f"a stop query is not city-anchored: {qs}")
 
     def test_empty_request_is_not_current_affairs(self):
         self.assertFalse(ca.wants_current_affairs(""))
@@ -135,8 +143,8 @@ class TestComposeAndResearch(unittest.TestCase):
             BOSTON_REQ, ["Massachusetts State House", "Boston City Hall"],
             serp=_fake_serp, fetch=_fake_fetch, answer=_fake_answer_balanced)
         self.assertTrue(log["searched"])
-        self.assertTrue(any("State House news" in q for q in log["queries"]))
-        self.assertTrue(any("City Hall news" in q for q in log["queries"]))
+        self.assertTrue(any("State House" in q and "news" in q for q in log["queries"]))
+        self.assertTrue(any("City Hall" in q and "news" in q for q in log["queries"]))
         self.assertIn("Massachusetts State House", log["by_stop"])
         self.assertNotIn("Boston City Hall", log["by_stop"])
         self.assertRegex(log["by_stop"]["Massachusetts State House"]["text"],

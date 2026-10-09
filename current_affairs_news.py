@@ -167,20 +167,44 @@ def derive_theme_queries(request_text: str) -> List[str]:
     return uniq
 
 
+def _city_token(request_text: str) -> str:
+    """A short city/region token for anchoring a stop query (e.g. 'Boston').
+
+    The request tail is usually ", City, STATE/Country"; the city is the first
+    component of that tail. Falls back to the whole region phrase."""
+    region = _region_phrase(request_text)
+    if region:
+        first = region.split(',')[0].strip()
+        if first:
+            return first
+    return region
+
+
 def derive_stop_queries(stop_name: str, request_text: str,
                         max_queries: int = NEWS_MAX_STOP_QUERIES) -> List[str]:
-    """Per-stop news queries: the stop itself, and the stop + a theme/region word.
+    """Per-stop news queries: the stop + its CITY, and the stop + a theme word.
 
-    e.g. "Massachusetts State House" -> ["Massachusetts State House news",
-    "Massachusetts State House legislature"].
+    Every query is anchored to the tour's city so a generic landmark name does not
+    pull a same-named place elsewhere (the LOCAL-655 live run matched an "Old State
+    House" in Arkansas without the anchor). e.g. for a Boston tour:
+    "Massachusetts State House" ->
+        ["Massachusetts State House Boston news",
+         "Massachusetts State House legislature"].
     """
     name = (stop_name or '').strip()
     if not name:
         return []
     region = _region_phrase(request_text)
+    city = _city_token(request_text)
     theme = _theme_phrase(request_text)
-    out = [f"{name} news"]
-    # a topical second query: pick the strongest theme word present
+    # Primary query: the stop, anchored to its city, scoped to news. Only add the
+    # city when the stop name does not already contain it.
+    if city and city.lower() not in name.lower():
+        out = [f"{name} {city} news"]
+    else:
+        out = [f"{name} news"]
+    # a topical second query: pick the strongest theme word present, still city-
+    # anchored so it stays local.
     topical = ''
     for w in ('legislature', 'senate', 'governor', 'election', 'politics',
               'policy', 'council', 'mayor'):
@@ -188,7 +212,10 @@ def derive_stop_queries(stop_name: str, request_text: str,
             topical = w
             break
     if topical:
-        out.append(f"{name} {topical}")
+        _tail = f"{name} {topical}"
+        if city and city.lower() not in _tail.lower():
+            _tail = f"{_tail} {city}"
+        out.append(_tail)
     elif region:
         out.append(f"{name} {region}")
     seen, uniq = set(), []
@@ -296,10 +323,13 @@ def _rank_items(items: List[Dict]) -> List[Dict]:
 # ── 4. compose dated, attributed, balanced sentences ──────────────────────────
 
 _NEWS_PROMPT = """\
-You are a careful news writer for a walking-tour audio guide. Using ONLY the \
-numbered ARTICLES below, write {max_items} short, DATED sentence(s) about recent \
-developments connected to "{subject}". Rules you must follow exactly:
+You are a careful news writer for a walking-tour audio guide in {locale}. Using \
+ONLY the numbered ARTICLES below, write {max_items} short, DATED sentence(s) about \
+recent developments connected to "{subject}" in {locale}. Rules you must follow \
+exactly:
 
+- RELEVANCE: write only about the "{subject}" that is in {locale}. If an article \
+is about a same-named place or person somewhere ELSE, or is unrelated, IGNORE it.
 - Ground every statement in the articles. Do NOT use any outside knowledge, and \
 do NOT invent any quote, number, name or date that is not in an article.
 - Begin each sentence with the DATE of the event when the article gives one \
@@ -309,8 +339,8 @@ report what EACH side said or did, attributed by name/party, with no editorialis
 and no adjective that favours a side.
 - Attribute claims ("Governor Healey said ...", "according to the State House \
 News Service ..."). End each sentence with its source number in brackets, like [2].
-- If the articles contain nothing of substance about the subject, reply with \
-exactly: NO MATERIAL FOUND
+- If the articles contain nothing of substance about the subject in {locale}, \
+reply with exactly: NO MATERIAL FOUND
 
 ARTICLES:
 {sources}
@@ -352,10 +382,12 @@ def _strip_cites(s: str) -> str:
 
 def compose_news_sentences(subject: str, articles: List[Dict],
                            max_items: int = 2,
-                           answer: Optional[Callable] = None) -> Dict:
+                           answer: Optional[Callable] = None,
+                           locale: str = '') -> Dict:
     """Write dated, attributed, balanced sentences grounded in `articles`.
 
-    `articles` is [{title, source, date, snippet, text, link}]. Returns
+    `articles` is [{title, source, date, snippet, text, link}]. `locale` is the
+    tour's city/region, used to reject same-named places elsewhere. Returns
     {text, sources:[{source,url,date}], error}. `answer` injectable for tests.
     An empty/`NO MATERIAL FOUND` result returns text=''.
     """
@@ -371,7 +403,8 @@ def compose_news_sentences(subject: str, articles: List[Dict],
             head += f" ({a['date']})"
         blocks.append(f"{head}\n{body}")
     prompt = _NEWS_PROMPT.format(
-        subject=subject, max_items=max_items, sources="\n\n".join(blocks))
+        subject=subject, max_items=max_items,
+        locale=(locale or 'the tour city'), sources="\n\n".join(blocks))
     ans = answer(prompt, model=NEWS_MODEL)
     if ans.get('error'):
         out['error'] = ans['error']
@@ -453,7 +486,8 @@ def research_news_for_stops(request_text: str, stop_names: List[str],
                 articles.append(a)
         if articles:
             log['articles_fetched'] += len(articles)
-            composed = compose_news_sentences(name, articles, answer=answer)
+            composed = compose_news_sentences(name, articles, answer=answer,
+                                              locale=_region_phrase(request_text))
             if composed.get('text'):
                 log['by_stop'][name] = {
                     'text': composed['text'],
