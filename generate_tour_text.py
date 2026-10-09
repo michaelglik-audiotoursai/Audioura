@@ -8182,6 +8182,64 @@ def _apply_delivery_hours_guard(result):
                       f"tease)", flush=True)
         except Exception as _tze:  # pragma: no cover
             _import_logger.error(f"[LOCAL-638] unpaid-teaser guard skipped: {_tze}")
+        # 3a-ter. [LOCAL-650B] Theme-phrase / topic-like stops are now rejected at
+        #     SELECTION (Phase 3A candidate loop), never renamed after the fact.
+        #     The old rename_theme_phrase_stops text-surgery (LOCAL-650 fix 1) is
+        #     DELETED — it manufactured a false place by renaming a stop whose
+        #     coordinates pointed elsewhere (D643 anti-pattern). This diagnostic
+        #     block only DETECTS; it never mutates the text. A non-empty result
+        #     means the selection gate missed one — log it loudly.
+        try:
+            import theme_stop_guard as _tsg
+            _theme_leftovers = _tsg.find_theme_phrase_stops(final)
+            if _theme_leftovers:
+                for _tl in _theme_leftovers:
+                    print(f"  [LOCAL-650B] WARNING: theme/topic stop survived "
+                          f"selection — Stop {_tl[0]}: {_tl[1]!r} ({_tl[2]})",
+                          flush=True)
+            else:
+                print(f"  [LOCAL-650B] theme-stop detector: clean (no theme/topic "
+                      f"stops in delivered text)", flush=True)
+        except Exception as _tsge:  # pragma: no cover
+            _import_logger.error(f"[LOCAL-650B] theme-stop detector skipped: {_tsge}")
+        # 3a-quater. [LOCAL-650 fix 2] On a WALKING tour, each stop's Directions
+        #     must lead to the NEXT stop by name, and say roughly how far it is.
+        #     Michael, 2026-10-09 (tour 557): Stop 4's Directions read "… until you
+        #     reach the Massachusetts State House …" — that is STOP 1, not the next
+        #     stop. The route order is correct (_compute_route_order); the per-stop
+        #     Directions PROSE named the wrong landmark. directions_guarantee only
+        #     checks a hand-off is PRESENT, not that it points at the correct next
+        #     stop. This every-path text guard replaces a wrong-target line with a
+        #     deterministic hand-off naming the next stop, appends an approximate
+        #     straight-line distance from the two stops' coordinates, and runs
+        #     BEFORE the directions guarantee. Walking/outdoor only; museum/venue
+        #     tours (room-flow seams) are a no-op. Deterministic, idempotent.
+        try:
+            import walking_directions_guard as _wdg
+            # [LOCAL-650B] Build verified-coords dict from poi_list. Only use
+            # Wikidata P625 coordinates (set by WALK-D1 verify_landmarks / A7),
+            # which are independently verified. LLM-guessed coordinates can be
+            # wildly wrong (D643: UMass Boston "300 meters" from the Old State
+            # House when it is 5 km away). When a stop lacks verified coords,
+            # its distance is omitted rather than stated from a guess.
+            _verified_coords = {}
+            try:
+                for _si, _sp in enumerate(poi_list, 1):
+                    _wlat = _sp.get('wikidata_lat')
+                    _wlng = _sp.get('wikidata_lng')
+                    if _wlat and _wlng:
+                        _verified_coords[_si] = (float(_wlat), float(_wlng))
+            except Exception:
+                _verified_coords = None  # fall back to text-parsed coords
+            final, _wdg_rep = _wdg.ensure_walking_directions_lead_to_next(
+                final, verified_stop_coords=_verified_coords or None)
+            if _wdg_rep.get('corrected') or _wdg_rep.get('distance_added'):
+                print(f"  [LOCAL-650 fix2] walking directions: corrected "
+                      f"{_wdg_rep.get('corrected', 0)} wrong-target line(s), added "
+                      f"{_wdg_rep.get('distance_added', 0)} approximate distance(s) "
+                      f"— each hand-off now names the correct next stop", flush=True)
+        except Exception as _wdge:  # pragma: no cover
+            _import_logger.error(f"[LOCAL-650] walking-directions guard skipped: {_wdge}")
         # 3b. [LOCAL-638 Note 4] Every stop except the last must end with directions
         #     to the next stop, on EVERY path. Michael, Frick 523 (D640): "The story
         #     stops abruptly and has no directions to the next exhibit" — Stop 2 had
@@ -8281,6 +8339,25 @@ def _apply_delivery_hours_guard(result):
                                  "trailing recap stub is NOT replaced")
         except Exception as _ce:  # pragma: no cover
             _import_logger.error(f"[LOCAL-619] conclusion rebuild skipped: {_ce}")
+        # 5. [LOCAL-650 fix 3] Current-affairs honesty. Michael, 2026-10-09 (tour
+        #    557, request "… Massachusetts politics and current affairs"): a tour
+        #    that advertises CURRENT AFFAIRS should carry at least one recent
+        #    (≤ 5 years) grounded item, or say honestly that there is none — not
+        #    leave the listener assuming decades-old events are "current". This
+        #    every-path text guard runs LAST, after the conclusion is built, so
+        #    the honest note (added only when the request asked for current
+        #    affairs AND no recent year appears in any stop) lands at the true end
+        #    of the spoken text, before Sources. It NEVER invents a recent fact.
+        #    Idempotent; a no-op when a recent item is already present.
+        try:
+            import current_affairs_coverage as _cac
+            final, _cac_added = _cac.ensure_current_affairs_coverage(final)
+            if _cac_added:
+                print("  [LOCAL-650 fix3] request asked for current affairs but no "
+                      "verified item from the past five years was present — added "
+                      "one honest note (no fact invented)", flush=True)
+        except Exception as _cace:  # pragma: no cover
+            _import_logger.error(f"[LOCAL-650] current-affairs coverage skipped: {_cace}")
         if final != text and out_file:
             # Rewrite the delivered file so the service (which reads the file,
             # not the return value) ships the cleaned text on every path.
@@ -11191,6 +11268,40 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
         else:
             _phase3a_json_hint = '[{"name": "...", "address": "..."}, ...]'
 
+        # [LOCAL-650 fix 1] A WALKING/outdoor stop must be a real, geocodable PLACE,
+        # never the request's THEME. Tour 557 named a stop "Massachusetts politics
+        # and current affairs" — the theme itself. Tell the model explicitly, and
+        # reject such candidates deterministically below.
+        _theme_stop_constraint = ""
+        if tour_category not in ('museum', 'building', 'venue'):
+            try:
+                import theme_stop_guard as _tsg_c
+                _req_theme = _tsg_c.extract_request_theme(user_request) \
+                    or _tsg_c.extract_request_theme(location)
+            except Exception:
+                _req_theme = ""
+            _theme_clause = (
+                f"\n- CRITICAL: every stop MUST be a REAL, named, geocodable PLACE "
+                f"a visitor can physically stand at (a building, square, park, "
+                f"monument, library, hall, street corner). NEVER name a stop after "
+                f"the tour's THEME or a topic. "
+            )
+            if _req_theme:
+                _theme_clause += (
+                    f"In particular, do NOT create a stop called "
+                    f"\"{_req_theme}\" or any slice of it — that is the theme, not "
+                    f"a place. Choose real places that EMBODY the theme instead "
+                    f"(e.g. a library, a historic hall, a government building, a "
+                    f"museum, a memorial)."
+                )
+            else:
+                _theme_clause += (
+                    "Do NOT create a stop whose name is an abstract topic "
+                    "(\"politics and current affairs\", \"local history and "
+                    "culture\") — name the real place that embodies it."
+                )
+            _theme_stop_constraint = _theme_clause
+
         phase_3a_prompt = (
             f"You are a knowledgeable local guide for {location}.\n"
             f"List exactly {_phase3a_count} specific, real, well-known {poi_type_hint} relevant to: {user_request}.\n\n"
@@ -11203,6 +11314,7 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
             + _transport_stop_constraint
             + _scope_constraint
             + _compactness_constraint
+            + _theme_stop_constraint
             + "\n\nReturn ONLY a JSON array, no other text, no markdown fences:\n"
             + _phase3a_json_hint
         )
@@ -11286,6 +11398,23 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
                 if _is_name_corrupted(name):
                     print(f"   ! [LOCAL-22] Rejected corrupted name from PHASE 3A: '{name[:80]}'")
                     continue
+
+                # [LOCAL-650 fix 1] A walking/outdoor stop must be a real PLACE,
+                # never the request theme or a topic. Reject a candidate whose
+                # name is the theme phrase (or a subset of it) or is topic-like
+                # (no proper place noun) — tour 557's "Massachusetts politics and
+                # current affairs" stop. Museum work titles are exempt.
+                if tour_category not in ('museum', 'building', 'venue'):
+                    try:
+                        import theme_stop_guard as _tsg_sel
+                        _sel_theme = _tsg_sel.extract_request_theme(user_request) \
+                            or _tsg_sel.extract_request_theme(location)
+                        if _tsg_sel.stop_name_is_not_a_place(name, _sel_theme):
+                            print(f"   ! [LOCAL-650] Rejected theme/topic candidate "
+                                  f"(not a real place): '{name[:80]}'")
+                            continue
+                    except Exception as _tsg_sel_err:  # pragma: no cover
+                        print(f"   ! [LOCAL-650] theme candidate check skipped: {_tsg_sel_err}")
 
                 # [LOCAL-329] Capture and filter selection reasons
                 reason = (c.get("reason") or "").strip()
@@ -11444,6 +11573,29 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
             print(f"  [LOCAL-576] named anchors: {_lr576_anchors} "
                   f"start={_lr576['start']!r} end={_lr576['end']!r} "
                   f"is_loop={_lr576['is_loop']}")
+        # [LOCAL-650B] A WALKING/outdoor tour's "dedicated to <theme>" is NOT a
+        # route anchor — named_anchors misreads "dedicated TO X" as a "to Y" end
+        # anchor and would INSERT the theme phrase as a stop (tour 557: Stop 5
+        # "Massachusetts politics and current affairs"). This is the anchor path
+        # that bypasses the Phase 3A selection filter, so apply the SAME detector
+        # here: drop any anchor that is the request theme phrase or topic-like.
+        # Museum/building/venue anchors are left alone (not theme-driven).
+        if tour_category not in ('museum', 'building', 'venue') and _lr576_anchors:
+            try:
+                import theme_stop_guard as _tsg_anc
+                _anc_theme = _tsg_anc.extract_request_theme(user_request) \
+                    or _tsg_anc.extract_request_theme(location)
+                _kept_anchors = []
+                for _a in _lr576_anchors:
+                    if _tsg_anc.stop_name_is_not_a_place(_a, _anc_theme):
+                        print(f"  [LOCAL-650B] Dropped theme/topic anchor "
+                              f"(not a real place): '{_a[:80]}' — the request's "
+                              f"theme is not a stop", flush=True)
+                    else:
+                        _kept_anchors.append(_a)
+                _lr576_anchors = _kept_anchors
+            except Exception as _anc_err:  # pragma: no cover
+                print(f"  [LOCAL-650B] anchor theme filter skipped: {_anc_err}")
         # Inserted at index 0 one by one, so reverse to keep the request's order.
         poi_list, _wp_inserted = _apply_named_waypoints(
             poi_list, location, _new_poi, extra=list(reversed(_named_venues)),
@@ -13872,7 +14024,9 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
                             "Requirements:\n"
                             "- REAL, SPECIFIC names; never generic placeholders.\n"
                             "- Complete street address with ZIP where applicable.\n"
-                            "- Must be within comfortable walking distance of the accepted stops.\n\n"
+                            "- Must be within comfortable walking distance of the accepted stops.\n"
+                            "- Every stop must be a real, named, geocodable PLACE (building, square, park, monument, library). "
+                            "NEVER name a stop after the tour's theme or an abstract topic.\n\n"
                             "Return ONLY a JSON array, no other text:\n"
                             '[{"name": "...", "address": "..."}, ...]'
                         )
@@ -13904,6 +14058,19 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
                                         name = (c.get('name') or '').strip()
                                         if not name or _normalize_name(name) in forbidden_norms:
                                             continue
+                                        # [LOCAL-650B] Reject theme/topic candidates
+                                        # from GEO-CHECK replacements too — same
+                                        # filter as the Phase 3A loop.
+                                        try:
+                                            import theme_stop_guard as _tsg_geo
+                                            _geo_theme = _tsg_geo.extract_request_theme(user_request) \
+                                                or _tsg_geo.extract_request_theme(location)
+                                            if _tsg_geo.stop_name_is_not_a_place(name, _geo_theme):
+                                                print(f"   GEO-CHECK: rejected theme/topic "
+                                                      f"replacement '{name[:60]}'")
+                                                continue
+                                        except Exception:
+                                            pass
                                         new_stops.append(_new_poi(name, c.get('address') or ''))
                                         forbidden_norms.add(_normalize_name(name))
                                     poi_list.extend(new_stops[:needed])
