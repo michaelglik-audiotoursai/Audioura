@@ -539,3 +539,150 @@ def parse_tour_to_records(tour_text: str):
     _flush_opening()
     _flush_narration()
     return title, stops, opening, closing
+
+
+# ── (De)serialization (LOCAL-644) ────────────────────────────────────────────
+#
+# The STOP-POOL delivery (stop_pool_orchestrator → stop_pool_assembly) is a
+# SEPARATE path from the normal _generate_tour_text_impl render loop. LOCAL-643
+# rendered from records only on the normal path; a fresh/first tour that goes
+# through the pool orchestrator was re-parsed from TEXT and the records were
+# thrown away, so STRUCTURED_STOPS=1 had no effect on any pooled delivery (R14
+# A/B logged "path = structured" 0 times).
+#
+# To carry the generator's records THROUGH the pool, a Stop/Opening/Closing must
+# survive two hops that only move JSON: (1) from generate_tour_text to the
+# orchestrator (via a per-job _J holder), and (2) into the pool store's additive
+# `stop_record_json` column and back out on reuse. These helpers are the lossless
+# JSON bridge. ``to_dict`` emits every field (including the list ``narration`` and
+# the ``_SCHEMA`` version tag); ``Stop.from_dict`` tolerates missing keys so a
+# record written by an older schema still loads. Nothing here parses prose — a
+# round-trip of our own records is exact.
+
+_RECORD_SCHEMA = 1
+
+
+def _stop_to_dict(stop: "Stop") -> dict:
+    """Serialize a Stop to a JSON-safe dict (lossless for our own records)."""
+    return {
+        "_schema": _RECORD_SCHEMA,
+        "index": stop.index,
+        "title": stop.title,
+        "artist": stop.artist,
+        "year": stop.year,
+        "address": stop.address,
+        "coordinates": stop.coordinates,
+        "type_specialty": stop.type_specialty,
+        "specific_examples": stop.specific_examples,
+        "operational_details": stop.operational_details,
+        "operational_label": stop.operational_label,
+        "emit_operational": bool(stop.emit_operational),
+        "orientation": stop.orientation,
+        "narration": list(stop.narration or []),
+        "directions": stop.directions,
+    }
+
+
+def _stop_from_dict(d: dict) -> "Stop":
+    """Rebuild a Stop from a dict. Tolerant of missing keys (older schema)."""
+    d = d or {}
+    narration = d.get("narration") or []
+    if isinstance(narration, str):
+        narration = [p.strip() for p in re.split(r'\n\s*\n', narration) if p.strip()]
+    return Stop(
+        index=int(d.get("index", 0) or 0),
+        title=str(d.get("title", "") or ""),
+        artist=str(d.get("artist", "") or ""),
+        year=str(d.get("year", "") or ""),
+        address=str(d.get("address", "") or ""),
+        coordinates=str(d.get("coordinates", "") or ""),
+        type_specialty=str(d.get("type_specialty", "") or ""),
+        specific_examples=str(d.get("specific_examples", "") or ""),
+        operational_details=str(d.get("operational_details", "") or ""),
+        operational_label=str(d.get("operational_label", "Operational Details")
+                              or "Operational Details"),
+        emit_operational=bool(d.get("emit_operational", True)),
+        orientation=str(d.get("orientation", "") or ""),
+        narration=[str(p) for p in narration],
+        directions=str(d.get("directions", "") or ""),
+    )
+
+
+def _opening_to_dict(opening: Optional["Opening"]) -> Optional[dict]:
+    if opening is None:
+        return None
+    return {
+        "_schema": _RECORD_SCHEMA,
+        "shortfall": opening.shortfall,
+        "about": opening.about,
+        "first_stop_sentence": opening.first_stop_sentence,
+        "entrance_directive": opening.entrance_directive,
+        "about_paragraphs": list(opening.about_paragraphs or []),
+        "fold_into_orientation": bool(opening.fold_into_orientation),
+        "inline_prefix": opening.inline_prefix,
+    }
+
+
+def _opening_from_dict(d: Optional[dict]) -> Optional["Opening"]:
+    if not d:
+        return None
+    return Opening(
+        shortfall=str(d.get("shortfall", "") or ""),
+        about=str(d.get("about", "") or ""),
+        first_stop_sentence=str(d.get("first_stop_sentence", "") or ""),
+        entrance_directive=str(d.get("entrance_directive", "") or ""),
+        about_paragraphs=[str(p) for p in (d.get("about_paragraphs") or [])],
+        fold_into_orientation=bool(d.get("fold_into_orientation", True)),
+        inline_prefix=str(d.get("inline_prefix", "") or ""),
+    )
+
+
+def _closing_to_dict(closing: Optional["Closing"]) -> Optional[dict]:
+    if closing is None:
+        return None
+    return {
+        "_schema": _RECORD_SCHEMA,
+        "conclusion": closing.conclusion,
+        "offer": closing.offer,
+        "sources": closing.sources,
+        "raw_tail": closing.raw_tail,
+    }
+
+
+def _closing_from_dict(d: Optional[dict]) -> Optional["Closing"]:
+    if not d:
+        return None
+    return Closing(
+        conclusion=str(d.get("conclusion", "") or ""),
+        offer=str(d.get("offer", "") or ""),
+        sources=str(d.get("sources", "") or ""),
+        raw_tail=str(d.get("raw_tail", "") or ""),
+    )
+
+
+# Public aliases (methods on the dataclasses would be nicer, but keeping the
+# dataclasses pure keeps them trivially picklable/compat; these are the API).
+def stop_to_dict(stop: "Stop") -> dict:
+    return _stop_to_dict(stop)
+
+
+def stop_from_dict(d: dict) -> "Stop":
+    return _stop_from_dict(d)
+
+
+def tour_to_record_dicts(tour_text: str):
+    """Parse a delivered tour string into JSON-safe record dicts.
+
+    Convenience for the pool store's back-compat path: a stored tour that has no
+    carried records is parsed ONCE (``parse_tour_to_records``) and each stop is
+    emitted as a serializable dict keyed by its bare title, alongside the opening
+    and closing dicts. Returns ``(title, {bare_title: stop_dict}, opening_dict,
+    closing_dict)``. The bare title is the renderer's ``_header_value`` inverse —
+    the same key the pool uses — so a reader can look up a stored stop's record by
+    its pooled title.
+    """
+    title, stops, opening, closing = parse_tour_to_records(tour_text)
+    by_title = {}
+    for s in stops:
+        by_title[s.title] = _stop_to_dict(s)
+    return title, by_title, _opening_to_dict(opening), _closing_to_dict(closing)

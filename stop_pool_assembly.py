@@ -384,6 +384,127 @@ def _closing_recap(ordered_stops: List[Dict],
     return "\n".join(lines)
 
 
+# ── Structured render (LOCAL-644) ─────────────────────────────────────────────
+#
+# One renderer for every path. When STRUCTURED_STOPS=1 the pool/reuse delivery is
+# produced from Stop/Opening records by stop_records.render_tour — exactly the
+# renderer the normal fresh path uses — so a header/field line is emitted ONCE and
+# the whole-string flattening/duplication bug class cannot occur on a pooled tour
+# either. The legacy string loop (_render_stop_block) remains the default and is
+# byte-for-byte unchanged when the flag is OFF.
+
+
+def _structured_enabled() -> bool:
+    try:
+        import stop_records as _sr
+        return _sr.structured_stops_enabled()
+    except Exception:
+        return False
+
+
+def _stop_record_for_unit(unit: Dict, index: int, orientation: str,
+                          directions: str):
+    """Build a stop_records.Stop for one assembly unit, in the delivered order.
+
+    Prefers the unit's carried structured record (``_stop_record`` / ``stop_record``
+    — the generator's own record for a new stop, or the pooled/back-compat record
+    for a reused stop) and overlays the SEQUENCE values recomputed by the
+    assembler: the 1-based index, this stop's orientation, the guard-cleaned
+    narration (the authoritative body after all the cross-stop guards ran), and
+    the transition to the next stop. When no record is carried, one is built from
+    the unit's own fields so the structured path still renders every unit.
+    """
+    import stop_records as _sr
+    rec_dict = unit.get("_stop_record") or unit.get("stop_record")
+    if rec_dict:
+        stop = _sr.stop_from_dict(rec_dict)
+    else:
+        stop = _sr.Stop(index=index, title=unit.get("title", "") or "")
+        stop.artist = unit.get("artist", "") or ""
+        stop.year = unit.get("year", "") or ""
+        stop.address = unit.get("address", "") or ""
+        stop.coordinates = unit.get("coordinates", "") or ""
+        stop.type_specialty = unit.get("type_specialty", "") or ""
+        stop.specific_examples = unit.get("specific_examples", "") or ""
+        stop.operational_details = unit.get("operational_details", "") or ""
+    # Overlay the authoritative delivered values. Narration is the guard-cleaned
+    # body on the unit (split into the renderer's paragraph list); orientation and
+    # directions are the sequence values recomputed for THIS delivery.
+    narration = (unit.get("narration") or "").strip()
+    stop.narration = [p.strip() for p in re.split(r'\n\s*\n', narration) if p.strip()]
+    stop.index = index
+    stop.orientation = (orientation or "").strip()
+    stop.directions = (directions or "").strip()
+    return stop
+
+
+def _render_building_body(ordered: List[Dict], n: int, tour_category: str,
+                          venue_name: str, title_block: str) -> str:
+    """Render the single-building tour body — structured when the flag is ON, else
+    the legacy per-stop block loop. The ``ordered`` dicts already carry the folded
+    opening section (``_opening_section`` on Stop 1) and the merged
+    ``orientation`` (overall + stop's own) from the caller.
+    """
+    if not _structured_enabled():
+        body = title_block
+        for i, stop in enumerate(ordered):
+            directions = (_museum_transition(i, n, ordered[i + 1]["title"], venue_name)
+                          if i < n - 1 else None)
+            body += _render_stop_block(stop, i + 1, tour_category, directions)
+        return body
+
+    # Structured path: build records and render ONCE.
+    import stop_records as _sr
+    _contained = tour_category in ("museum", "facility")
+    records = []
+    opening = None
+    for i, unit in enumerate(ordered):
+        directions = (_museum_transition(i, n, ordered[i + 1]["title"], venue_name)
+                      if i < n - 1 else "")
+        # [LOCAL-623 defect 3] Validate the Address exactly as the legacy block
+        # does, so a mis-parsed narrative fragment never ships as an Address line.
+        _addr = (unit.get("address") or "").strip()
+        if _addr:
+            try:
+                from about_museum_stop import is_valid_street_address as _ivsa
+                if not _ivsa(_addr):
+                    _addr = ""
+            except Exception:
+                pass
+        _unit2 = dict(unit)
+        _unit2["address"] = _addr
+        rec = _stop_record_for_unit(_unit2, i + 1, unit.get("orientation", ""),
+                                    directions)
+        # Mirror the legacy block's field suppression for contained venues:
+        # Type/Specialty + Specific Examples are omitted; Operational Details is
+        # shown only on Stop 1 (as "Museum Information" is handled upstream).
+        if _contained:
+            rec.type_specialty = ""
+            rec.specific_examples = ""
+            # Legacy _render_stop_block renders Operational Details only for
+            # non-contained categories (it sits inside the same `tour_category not
+            # in (museum, facility)` block as Type/Specialty). Match that exactly.
+            rec.emit_operational = False
+        else:
+            rec.emit_operational = bool(rec.operational_details)
+        records.append(rec)
+        # Stop 1's folded opening section becomes the Opening record's about
+        # paragraphs (section layout: rendered BEFORE the Orientation line, D640).
+        if i == 0:
+            _opening_text = (unit.get("_opening_section") or "").strip()
+            if _opening_text:
+                opening = _sr.Opening(
+                    fold_into_orientation=False,
+                    about_paragraphs=[p.strip() for p in
+                                      re.split(r'\n\s*\n', _opening_text) if p.strip()],
+                )
+    rendered = _sr.render_tour(records, title=title_block, opening=opening,
+                               closing=None)
+    # render_tour trims to a single trailing newline; the caller appends the
+    # recap/sources tail onto body.rstrip(), so return as-is.
+    return rendered
+
+
 # ── SINGLE-BUILDING assembly ─────────────────────────────────────────────────
 
 def assemble_building_tour(
@@ -591,13 +712,20 @@ def assemble_building_tour(
         s0["orientation"] = (overall_orientation.strip() + ("\n\n" + base if base else "")).strip()
         ordered[0] = s0
 
-    body = _title_line(location, tour_type, header_category, display_category)
-    for i, stop in enumerate(ordered):
-        if i < n - 1:
-            directions = _museum_transition(i, n, ordered[i + 1]["title"], venue_name)
-        else:
-            directions = None
-        body += _render_stop_block(stop, i + 1, tour_category, directions)
+    # ── Render body: structured (one renderer for every path) or legacy ──────
+    # [LOCAL-644] When STRUCTURED_STOPS=1 the delivered body is produced ONCE from
+    # Stop/Opening records (stop_records.render_tour) — the SAME renderer the
+    # normal fresh path uses — so headers and field lines are emitted a single
+    # time and no late text pass can glue/duplicate them. Each stop renders from
+    # its carried structured record (generator record for a new stop, or the
+    # pooled/back-compat record for a reused stop); its narration is the guard-
+    # cleaned narration computed above, and its orientation + the transition to
+    # the next stop are the sequence values just recomputed here. The opening
+    # section folds into Stop 1 as the Opening record's about-paragraphs (D640:
+    # about → practical facts → orientation). Default OFF: the legacy per-stop
+    # block loop below is byte-for-byte unchanged.
+    title_block = _title_line(location, tour_type, header_category, display_category)
+    body = _render_building_body(ordered, n, tour_category, venue_name, title_block)
 
     walk_back = [s["title"] for s in pooled_stops] if pooled_stops and new_stops else None
     recap = _closing_recap(ordered, venue_name=_venue_name(venue_name or location),
@@ -788,7 +916,10 @@ def assemble_outdoor_tour(
         ordered[0]["_opening_section"] = (
             f"{_sf}\n\n{_existing_open}" if _existing_open else _sf)
 
-    body = _title_line(location, tour_type, header_category, display_category)
+    # Compute the per-stop transition line in the delivered order (the rewrite
+    # logic — LLM when available, else template — is unchanged); then render the
+    # body ONCE, structured when STRUCTURED_STOPS=1 else the legacy block loop.
+    directions_by_pos: List[Optional[str]] = []
     rewritten = 0
     for i, stop in enumerate(ordered):
         if i < n - 1:
@@ -804,7 +935,31 @@ def assemble_outdoor_tour(
                 directions = (stop.get("directions") or "").strip() or f"Continue to {next_stop['title']}."
         else:
             directions = None
-        body += _render_stop_block(stop, i + 1, tour_category, directions)
+        directions_by_pos.append(directions)
+
+    title_block = _title_line(location, tour_type, header_category, display_category)
+    if _structured_enabled():
+        import stop_records as _sr
+        records = []
+        opening = None
+        for i, unit in enumerate(ordered):
+            rec = _stop_record_for_unit(unit, i + 1, unit.get("orientation", ""),
+                                        directions_by_pos[i] or "")
+            rec.emit_operational = bool(rec.operational_details)
+            records.append(rec)
+            if i == 0:
+                _opening_text = (unit.get("_opening_section") or "").strip()
+                if _opening_text:
+                    opening = _sr.Opening(
+                        fold_into_orientation=False,
+                        about_paragraphs=[p.strip() for p in
+                                          re.split(r'\n\s*\n', _opening_text) if p.strip()],
+                    )
+        body = _sr.render_tour(records, title=title_block, opening=opening, closing=None)
+    else:
+        body = title_block
+        for i, stop in enumerate(ordered):
+            body += _render_stop_block(stop, i + 1, tour_category, directions_by_pos[i])
 
     recap = _closing_recap(ordered, venue_name=_venue_name(location))
     tail = recap

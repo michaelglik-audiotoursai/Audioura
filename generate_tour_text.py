@@ -4240,6 +4240,15 @@ _J = _jss.attach_to_module(__name__, {
     "_LAST_VENUE_PREFLIGHT": dict,
     "_LAST_PREFLIGHT_COST": dict,
     "_DIRECT_SNIPPETS_PER_STOP": dict,
+    # [LOCAL-644] The LAST generation's structured records (Stop/Opening/Closing),
+    # serialized to JSON-safe dicts, so the STOP-POOL orchestrator can carry the
+    # generator's OWN records through the pool delivery instead of re-parsing the
+    # delivered text. Populated ONLY when STRUCTURED_STOPS=1 renders from records
+    # (the normal path's structured block); otherwise it stays an empty dict and
+    # the orchestrator falls back to parse_tour_to_records (back-compat). Shape:
+    #   {"stops": [stop_dict, ...], "opening": opening_dict|None,
+    #    "closing": closing_dict|None}
+    "_LAST_STRUCTURED_RECORDS": dict,
 })
 
 # [LOCAL-582] Module-level: how the LAST generation was delivered.
@@ -25251,6 +25260,21 @@ RULES:
                   f"{', '.join(_ss_pass_log) or 'none changed'}")
             complete_tour = _ss_rendered
             _J._LAST_DELIVERY_PATH = 'structured'
+            # [LOCAL-644] Expose the records so a caller on the STOP-POOL path can
+            # carry them THROUGH the pool (store them per unit, render reuse from
+            # them) instead of re-parsing the delivered text. Serialized to
+            # JSON-safe dicts via the stop_records helpers; the per-job _J holder
+            # keeps them isolated across concurrent jobs. Best-effort: a failure
+            # here never affects the already-rendered delivered text.
+            try:
+                _J._LAST_STRUCTURED_RECORDS = {
+                    "stops": [_ss_mod.stop_to_dict(s) for s in _ss_stops],
+                    "opening": _ss_mod._opening_to_dict(_ss_opening),
+                    "closing": _ss_mod._closing_to_dict(_ss_closing),
+                }
+            except Exception as _ss_exp_e:
+                _import_logger.error(
+                    f"[LOCAL-644] could not expose structured records: {_ss_exp_e}")
         except Exception as _ss_e:
             _import_logger.error(
                 f"[LOCAL-643] structured render failed, keeping legacy string: {_ss_e}")

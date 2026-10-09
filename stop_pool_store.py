@@ -384,6 +384,23 @@ def parse_delivered_stops(tour_content: str) -> List[Dict]:
     whole, not to a stop, so they are excluded from every unit.
     """
     text = tour_content or ""
+    # [LOCAL-644] Un-glue any field labels flattened onto a single line BEFORE
+    # parsing, exactly as stop_records.parse_tour_to_records does. A tour stored
+    # before the structured path (NG 495 R9/R12) had a whole stop block collapsed
+    # onto one line ("Stop 2: … Address: … Coordinates: … Orientation: …"); the
+    # line-based header/field regexes below would otherwise swallow the entire
+    # block as the stop TITLE. Recovering the inline labels first means a legacy
+    # pooled stop is parsed into a CLEAN unit (and thus a clean record), so reuse
+    # renders it the same way a well-formed stop renders — the ticket's "parse the
+    # old units once into records and render the same way" back-compat rule.
+    try:
+        from stop_records import _recover_inline_labels as _ril
+        _recovered = []
+        for _ln in text.split("\n"):
+            _recovered.extend(_ril(_ln))
+        text = "\n".join(_recovered)
+    except Exception:
+        pass
     headers = list(_STOP_HEADER.finditer(text))
     if not headers:
         return []
@@ -447,6 +464,39 @@ def parse_delivered_stops(tour_content: str) -> List[Dict]:
         units.append(unit)
     return units
 
+def _record_from_unit(unit: Dict, index: int) -> Dict:
+    """[LOCAL-644] Build a JSON-safe structured Stop record from a parsed pool unit.
+
+    A pooled stop is AUDIO-INDEPENDENT (D581.1): orientation and directions are
+    properties of a SEQUENCE, recomputed per selection by the assembler — so they
+    are deliberately NOT carried in the pooled record (left empty). The narration
+    is split into paragraphs (the record's narration is a LIST, matching the
+    generator's own capture) and the structured fields are copied verbatim. This
+    is the derived record used when a delivery carried no generator record for a
+    stop, so even a legacy/text-only delivery renders via the record path on reuse
+    with the SAME field values the legacy renderer read.
+    """
+    narration = (unit.get("narration") or "").strip()
+    paras = [p.strip() for p in re.split(r'\n\s*\n', narration) if p.strip()]
+    return {
+        "_schema": 1,
+        "index": index,
+        "title": unit.get("title", "") or "",
+        "artist": unit.get("artist", "") or "",
+        "year": unit.get("year", "") or "",
+        "address": unit.get("address", "") or "",
+        "coordinates": unit.get("coordinates", "") or "",
+        "type_specialty": unit.get("type_specialty", "") or "",
+        "specific_examples": unit.get("specific_examples", "") or "",
+        "operational_details": unit.get("operational_details", "") or "",
+        "operational_label": "Operational Details",
+        "emit_operational": bool(unit.get("operational_details")),
+        "orientation": "",   # sequence-dependent — recomputed on reuse
+        "narration": paras,
+        "directions": "",    # sequence-dependent — recomputed on reuse
+    }
+
+
 
 # ── Schema (additive; never DELETE) ──────────────────────────────────────────
 
@@ -497,6 +547,16 @@ def _ensure_table(conn) -> None:
         cur.execute("""
             ALTER TABLE stop_pool ADD COLUMN IF NOT EXISTS research_cost_usd NUMERIC(12, 6) DEFAULT 0
         """)
+        # [LOCAL-644] Additive migration: the generator's structured Stop record
+        # (title/artist/orientation/narration paragraphs/directions/fields) as
+        # JSON, stored when a stop is pooled from a STRUCTURED_STOPS delivery. On
+        # reuse the pool renders FROM this record (one renderer for every path),
+        # so STRUCTURED_STOPS=1 reaches pooled/reuse tours too. A row stored before
+        # this change has NULL here; the reader parses it once into a record for
+        # back-compat (never DELETE/DROP — ticket LOCAL-644).
+        cur.execute("""
+            ALTER TABLE stop_pool ADD COLUMN IF NOT EXISTS stop_record_json TEXT
+        """)
         cur.execute("""
             CREATE INDEX IF NOT EXISTS idx_stop_pool_key
             ON stop_pool (pool_key)
@@ -520,6 +580,7 @@ def store_delivered_tour(
     sources: Optional[List[str]] = None,
     story_elements_by_title: Optional[Dict[str, dict]] = None,
     research_cost_usd_per_stop: float = 0.0,
+    records_by_title: Optional[Dict[str, dict]] = None,
 ) -> int:
     """Parse a delivered tour and UPSERT each stop into the pool.
 
@@ -528,6 +589,13 @@ def store_delivered_tour(
     `generated_at`; no row is ever removed. `sources` (tour-level source URLs)
     are stored on each stop as a reasonable default; `story_elements_by_title`
     (keyed by bare title) overrides per stop when the caller has them.
+
+    [LOCAL-644] `records_by_title` (keyed by bare stop title) carries the
+    generator's structured Stop record as a JSON-safe dict for each stop. When
+    present for a stop, it is stored in `stop_record_json`; on reuse the pool
+    renders from this record (one renderer for every path), so STRUCTURED_STOPS=1
+    reaches pooled/reuse tours. When absent (legacy caller, or a stop the records
+    do not cover) the column is left NULL and the reader back-compat-parses it.
 
     [LOCAL-609] `research_cost_usd_per_stop` is the one-time research cost
     attributed to EACH stop of this delivery (the caller divides the tour's
@@ -564,6 +632,15 @@ def store_delivered_tour(
                     continue
                 se = (story_elements_by_title or {}).get(u["title"])
                 se_json = json.dumps(se) if se else None
+                # [LOCAL-644] Prefer the generator's carried structured record for
+                # this stop (lossless). When absent, derive one from the parsed
+                # unit so the stored row still renders via the record path on reuse
+                # (the derived record has the SAME fields as the legacy renderer
+                # read, so reuse is byte-compatible with the old TEXT path).
+                _rec = (records_by_title or {}).get(u["title"])
+                if not _rec:
+                    _rec = _record_from_unit(u, seq_i + 1)
+                rec_json = json.dumps(_rec) if _rec else None
                 cur.execute(
                     """
                     INSERT INTO stop_pool (
@@ -571,8 +648,8 @@ def store_delivered_tour(
                         title, artist, year, narration, raw_block,
                         address, coordinates, type_specialty, specific_examples,
                         operational_details, sources_json, story_elements_json,
-                        order_seq, research_cost_usd, generated_at
-                    ) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,NOW())
+                        order_seq, research_cost_usd, stop_record_json, generated_at
+                    ) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,NOW())
                     ON CONFLICT (pool_key, title_norm) DO UPDATE SET
                         title = EXCLUDED.title,
                         artist = EXCLUDED.artist,
@@ -587,6 +664,9 @@ def store_delivered_tour(
                         sources_json = COALESCE(EXCLUDED.sources_json, stop_pool.sources_json),
                         story_elements_json = COALESCE(EXCLUDED.story_elements_json, stop_pool.story_elements_json),
                         order_seq = LEAST(stop_pool.order_seq, EXCLUDED.order_seq),
+                        -- [LOCAL-644] Refresh the structured record with the newest
+                        -- delivery's record (the narration/fields just stored).
+                        stop_record_json = COALESCE(EXCLUDED.stop_record_json, stop_pool.stop_record_json),
                         -- [LOCAL-609] Keep the ORIGINAL research cost on re-pool
                         -- (first-pooled semantics): only adopt the new value when
                         -- the stored one is 0/NULL (never seen a real cost yet).
@@ -603,7 +683,7 @@ def store_delivered_tour(
                         u["address"], u["coordinates"], u["type_specialty"],
                         u["specific_examples"], u["operational_details"],
                         sources_json_default, se_json, base_seq + seq_i,
-                        float(research_cost_usd_per_stop or 0.0),
+                        float(research_cost_usd_per_stop or 0.0), rec_json,
                     ),
                 )
                 written += 1
@@ -657,7 +737,8 @@ def get_pool_stops(
                 SELECT title, artist, year, narration, raw_block,
                        address, coordinates, type_specialty, specific_examples,
                        operational_details, sources_json, story_elements_json,
-                       generated_at, hit_count, title_norm, research_cost_usd
+                       generated_at, hit_count, title_norm, research_cost_usd,
+                       stop_record_json
                 FROM stop_pool
                 WHERE pool_key = ANY(%s)
                 ORDER BY order_seq ASC, generated_at ASC, title_norm ASC
@@ -677,6 +758,34 @@ def get_pool_stops(
         if tnorm in _seen_titles:
             continue  # same stop under both keys — keep the first (earliest order_seq)
         _seen_titles.add(tnorm)
+        # [LOCAL-607 defect 1/5] Clean body the delivery renders from.
+        _clean_narration = strip_opening_section(strip_epilog(r[3]))
+        # [LOCAL-644] The carried structured record for this pooled stop. When the
+        # row has one (stored from a STRUCTURED_STOPS delivery, or derived at store
+        # time), load it; otherwise build one from the row now (back-compat parse —
+        # a row pooled before LOCAL-644 is parsed ONCE here into a record). Either
+        # way the record's narration is re-aligned to the SAME epilog/opening-
+        # stripped body the dict carries, so the record render and the legacy
+        # render deliver identical narration. Orientation/directions stay empty on
+        # the pooled record (sequence-dependent — the assembler recomputes them).
+        _rec = None
+        if r[16]:
+            try:
+                _rec = json.loads(r[16])
+            except Exception:
+                _rec = None
+        if not _rec:
+            _rec = _record_from_unit({
+                "title": r[0], "artist": r[1] or "", "year": r[2] or "",
+                "address": r[5] or "", "coordinates": r[6] or "",
+                "type_specialty": r[7] or "", "specific_examples": r[8] or "",
+                "operational_details": r[9] or "", "narration": _clean_narration,
+            }, 0)
+        _rec_paras = [p.strip() for p in re.split(r'\n\s*\n', _clean_narration)
+                      if p.strip()]
+        _rec["narration"] = _rec_paras
+        _rec["orientation"] = ""   # recomputed per sequence on reuse
+        _rec["directions"] = ""    # recomputed per sequence on reuse
         stops.append({
             "title": r[0],
             "artist": r[1] or "",
@@ -688,7 +797,7 @@ def get_pool_stops(
             # not run against this database yet. Idempotent on already-clean rows.
             # [LOCAL-607 defect 5] Also strip the opening section (About prolog +
             # stale "Check … bc.edu" fallback), regenerated fresh per tour.
-            "narration": strip_opening_section(strip_epilog(r[3])),
+            "narration": _clean_narration,
             "raw_block": r[4] or "",
             "address": r[5] or "",
             "coordinates": r[6] or "",
@@ -702,6 +811,8 @@ def get_pool_stops(
             # [LOCAL-609] the one-time research cost stored when this stop was
             # first pooled; summed into research_cost_reused on reuse.
             "research_cost_usd": float(r[15]) if r[15] is not None else 0.0,
+            # [LOCAL-644] the structured record this stop renders from on reuse.
+            "stop_record": _rec,
         })
     logger.info(f"[POOL] {len(stops)} pooled stop(s) across keys {keys}")
     return stops
