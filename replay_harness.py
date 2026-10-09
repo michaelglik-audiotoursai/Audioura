@@ -416,7 +416,7 @@ def call_gemini(model, system_msg, user_msg, timeout=120):
     return text, usage, status
 
 
-def run_arm(arm, out_dir, diet=False, fixed_first=False, stops=None):
+def run_arm(arm, out_dir, diet=False, fixed_first=False, stops=None, limit=None):
     provider, model = ARMS[arm]
     # drive the production env hook so the model under test is selected the
     # production way (and prove the default path is untouched when unset).
@@ -428,6 +428,8 @@ def run_arm(arm, out_dir, diet=False, fixed_first=False, stops=None):
 
     os.makedirs(out_dir, exist_ok=True)
     stops = stops if stops is not None else load_stops()
+    if limit:
+        stops = stops[:int(limit)]
     results = []
     for stop in stops:
         si = stop.setdefault("_input", build_stop_input(stop))
@@ -496,7 +498,21 @@ def _main():
     if cmd == "run":
         arm = opt("--arm", "A")
         out = opt("--out", f"/app/bench_out/{arm}")
-        run_arm(arm, out, diet=diet, fixed_first=fixed_first)
+        limit = opt("--limit", None)
+        run_arm(arm, out, diet=diet, fixed_first=fixed_first, limit=limit)
+    elif cmd == "run-all":
+        base = opt("--out", "/app/bench_out")
+        limit = opt("--limit", None)
+        only = opt("--arms", "ABCDE")
+        # load stops ONCE so every arm runs on byte-for-byte identical inputs
+        stops = load_stops()
+        for st in stops:
+            st["_input"] = build_stop_input(st)
+        for arm in only:
+            if arm not in ARMS:
+                continue
+            run_arm(arm, os.path.join(base, arm), diet=diet,
+                    fixed_first=fixed_first, stops=stops, limit=limit)
     elif cmd == "build-only":
         out = opt("--out", "/app/bench_out/_prompts")
         build_only(out, diet=diet, fixed_first=fixed_first)
