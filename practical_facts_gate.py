@@ -1365,6 +1365,215 @@ def collapse_admission_statements(text: str) -> "Tuple[str, int]":
 
 
 # ---------------------------------------------------------------------------
+# [LOCAL-638 Note 1] Practical facts belong in the OPENING section, never inside
+# any stop's Orientation or narration.
+# ---------------------------------------------------------------------------
+#
+# Michael listened to Frick tour 523 (D640): "it starts telling about the
+# painting, then the museum information, how much it costs and when it is open,
+# then goes back to the painting. Location, price, open hours should be part of
+# the general description." The composed practical-facts sentence (LOCAL-633)
+# had landed INSIDE Stop 1's Orientation paragraph.
+#
+# D633 already says practical facts are spoken ONCE, in the Stop-1 opening section
+# (before the first Orientation). The two functions below are the FINAL, every-path
+# guarantee on the DELIVERED text:
+#
+#   * count_practical_facts_after_first_orientation(text) — the detector the test
+#     asserts is 0: how many spoken hours/admission SENTENCES sit at or after the
+#     first stop's first Orientation sentence.
+#   * relocate_practical_facts_to_opening(text) — moves any such sentence OUT of an
+#     Orientation paragraph (and out of any stop body) and into the Stop-1 opening
+#     section, placed BEFORE the first Orientation. Deterministic, pure, idempotent.
+#     It never invents a fact and never drops one — it relocates whole sentences so
+#     the listener still hears the hours/price, just in the right place.
+
+# A spoken sentence that STATES hours or admission (the thing that must live in the
+# opening section). Reuses the hours cue and the admission sentence shape already
+# defined above. The "Museum Information:" value counts (TTS strips the label and
+# speaks the value), so the opening target is matched after label-stripping too.
+_PRACTICAL_HOURS_CUE_RE = re.compile(
+    r"(?i)(\bis\s+open\b|\bopen\s+daily\b|\bopen\s+(?:mon|tue|wed|thu|fri|sat|sun)"
+    r"|\bclosed\s+on\b|\d\s*(?:am|pm)\b|\d{1,2}:\d{2}\b|\bnoon\b|\bmidnight\b)")
+
+
+def _is_practical_facts_sentence(sentence: str) -> bool:
+    """True when a sentence STATES opening hours or admission (a hours cue or an
+    admission statement). This is the sentence that must live in the opening
+    section, never inside an Orientation or a stop body. Pure."""
+    s = (sentence or "").strip()
+    if not s:
+        return False
+    if _PRACTICAL_HOURS_CUE_RE.search(s):
+        return True
+    if _ADMISSION_SENTENCE_RE.search(s):
+        return True
+    return False
+
+
+def _split_sentences_keep(text: str) -> "List[str]":
+    """Sentence-split keeping terminal punctuation on each piece. Pure."""
+    if not text:
+        return []
+    return [m.group(0).strip()
+            for m in re.finditer(r"[^.!?]*[.!?]+|\S[^.!?]*$", text)
+            if m.group(0).strip()]
+
+
+def _stop_paragraph_bounds(text: str) -> "Tuple[List[str], int, int]":
+    """Return (paragraphs, first_stop_idx, first_orientation_idx) for the delivered
+    text split on blank lines. first_* are -1 when absent. Pure."""
+    paras = text.split("\n\n")
+    first_stop = next((i for i, p in enumerate(paras)
+                       if re.match(r"(?i)^\s*stop\s*\d+\s*:", p.strip())), -1)
+    first_orient = next((i for i, p in enumerate(paras)
+                         if "Orientation:" in p), -1)
+    return paras, first_stop, first_orient
+
+
+def count_practical_facts_after_first_orientation(text: str) -> int:
+    """[LOCAL-638 Note 1] The detector the test asserts is 0.
+
+    Count the spoken hours/admission SENTENCES that appear at or AFTER the first
+    stop's first Orientation sentence — i.e. anywhere a practical fact must NOT be
+    (inside an Orientation, a stop narration, or a later stop). Practical facts
+    belong in the opening section, before the first Orientation; anything counted
+    here is a Note-1 defect. Field LABELS the TTS strips are removed first so a
+    non-spoken "Address:"/"Coordinates:" line never counts, while a spoken
+    "Museum Information:" value does. Pure.
+    """
+    if not text or not text.strip():
+        return 0
+    _paras, _first_stop, first_orient = _stop_paragraph_bounds(text)
+    if first_orient < 0:
+        return 0
+    paras = text.split("\n\n")
+    # The region from the first Orientation paragraph onward, label-stripped.
+    region_paras = paras[first_orient:]
+    count = 0
+    for p in region_paras:
+        for line in p.split("\n"):
+            if _NONSPOKEN_FIELD_RE.match(line):
+                continue
+            spoken = _HOURS_VALUE_LABEL_RE.sub("", line)
+            # Strip a leading "Orientation:" label — its VALUE is spoken.
+            spoken = re.sub(r"(?i)^\s*orientation:\s*", "", spoken)
+            for sent in _split_sentences_keep(spoken):
+                if _is_practical_facts_sentence(sent):
+                    count += 1
+    return count
+
+
+def relocate_practical_facts_to_opening(text: str) -> "Tuple[str, int]":
+    """[LOCAL-638 Note 1] Move any practical-facts sentence out of an Orientation
+    paragraph (or any stop body) into the Stop-1 OPENING section, before the first
+    Orientation. Returns ``(text, n_moved)``.
+
+    The practical facts are spoken ONCE, in the general description at the top of
+    Stop 1 (D633 / D611). This final guarantee enforces that on the delivered text,
+    on EVERY path: it extracts whole hours/admission sentences that landed at or
+    after the first Orientation and re-homes them in the opening-section prose
+    paragraph (the Stop-1 narration prose that precedes the first Orientation). If
+    no such opening paragraph exists yet, the moved sentences are inserted as their
+    own paragraph immediately after the first stop header — still before the first
+    Orientation. Deterministic, pure, idempotent; never invents or drops a fact.
+    """
+    if not text or not text.strip():
+        return text or "", 0
+    paras = text.split("\n\n")
+    first_stop = next((i for i, p in enumerate(paras)
+                       if re.match(r"(?i)^\s*stop\s*\d+\s*:", p.strip())), -1)
+    first_orient = next((i for i, p in enumerate(paras)
+                         if "Orientation:" in p), -1)
+    if first_orient < 0:
+        return text, 0
+
+    moved: List[str] = []
+
+    # Walk every paragraph from the first Orientation onward and pull practical
+    # sentences out of the SPOKEN lines (never out of a non-spoken field line).
+    for pi in range(first_orient, len(paras)):
+        lines = paras[pi].split("\n")
+        for li, line in enumerate(lines):
+            if _NONSPOKEN_FIELD_RE.match(line):
+                continue
+            # Preserve a leading label ("Orientation:") on the line; only operate
+            # on the spoken VALUE after it.
+            m_lbl = re.match(r"(?i)^(\s*orientation:\s*)", line)
+            label = m_lbl.group(1) if m_lbl else ""
+            body = line[len(label):] if label else line
+            sents = _split_sentences_keep(body)
+            if not sents:
+                continue
+            kept, pulled = [], []
+            for s in sents:
+                (pulled if _is_practical_facts_sentence(s) else kept).append(s)
+            if not pulled:
+                continue
+            moved.extend(pulled)
+            new_body = " ".join(kept).strip()
+            lines[li] = (label + new_body).rstrip() if (label or new_body) else ""
+        paras[pi] = "\n".join(l for l in lines if l is not None)
+
+    if not moved:
+        return text, 0
+
+    # Re-home the moved sentences into the opening-section prose paragraph: the
+    # Stop-1 narration prose that appears BEFORE the first Orientation and is not a
+    # header/field/stop block. If none exists, insert a new paragraph right after
+    # the first stop header.
+    _FIELD_OR_HEADER = re.compile(
+        r"(?i)^\s*(step-by-step\b|tour-category:|type/specialty:|address:|"
+        r"coordinates:|directions:|sources?:|stop\s*\d+\s*:|orientation:|"
+        r"museum information:|operational details:|visiting hours:|opening hours:|"
+        r"hours:|specific examples:)")
+
+    def _is_prose_para(p: str) -> bool:
+        for ln in p.split("\n"):
+            s = ln.strip()
+            if s and not _FIELD_OR_HEADER.match(s):
+                return True
+        return False
+
+    moved_text = " ".join(s.strip() for s in moved).strip()
+    moved_text = re.sub(r"\s{2,}", " ", moved_text)
+
+    target = None
+    search_hi = first_orient if first_orient >= 0 else len(paras)
+    lo = first_stop + 1 if first_stop >= 0 else 0
+    for i in range(lo, search_hi):
+        if "Orientation:" in paras[i]:
+            continue
+        if _is_prose_para(paras[i]):
+            target = i
+            break
+
+    if target is not None:
+        lines = paras[target].split("\n")
+        _li = next((j for j in range(len(lines) - 1, -1, -1)
+                    if lines[j].strip() and not _FIELD_OR_HEADER.match(lines[j].strip())),
+                   None)
+        if _li is not None:
+            sep = "" if lines[_li].rstrip().endswith((".", "!", "?")) else "."
+            lines[_li] = lines[_li].rstrip() + sep + " " + moved_text
+            paras[target] = "\n".join(lines)
+        else:
+            target = None
+    if target is None:
+        insert_at = (first_stop + 1) if first_stop >= 0 else 0
+        paras.insert(insert_at, moved_text)
+
+    out = "\n\n".join(paras)
+    # Tidy whitespace / orphaned punctuation a pull can leave behind.
+    out = re.sub(r"[ \t]{2,}", " ", out)
+    out = re.sub(r"\s+([.!?,;])", r"\1", out)
+    out = re.sub(r"\n{3,}", "\n\n", out)
+    # Collapse an Orientation line left empty by the pull ("Orientation:" alone).
+    out = re.sub(r"(?im)^\s*orientation:\s*$\n?", "", out)
+    return out, len(moved)
+
+
+# ---------------------------------------------------------------------------
 # [LOCAL-633] compose_practical_facts — ONE short spoken sentence pair
 # ---------------------------------------------------------------------------
 #

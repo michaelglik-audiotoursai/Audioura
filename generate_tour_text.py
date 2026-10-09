@@ -7916,6 +7916,24 @@ def _apply_delivery_hours_guard(result):
                       flush=True)
         except Exception as _ao:  # pragma: no cover
             _import_logger.error(f"[LOCAL-630] admission-collapse skipped: {_ao}")
+        # 2c-ter. [LOCAL-638 Note 1] Practical facts (hours/price/admission) belong
+        #     in the OPENING general description at the top of Stop 1, never inside
+        #     a stop's Orientation or narration. Michael, Frick 523 (D640): the
+        #     composed facts sentence had landed INSIDE Stop 1's Orientation. Move
+        #     any hours/admission sentence that sits at or after the first
+        #     Orientation back into the opening section, before the first
+        #     Orientation. Deterministic; never invents or drops a fact; no-op when
+        #     the facts are already in the opening section.
+        try:
+            import practical_facts_gate as _pfg_reloc
+            final, _reloc = _pfg_reloc.relocate_practical_facts_to_opening(final)
+            if _reloc:
+                print(f"  [LOCAL-638 Note 1] moved {_reloc} practical-facts "
+                      f"sentence(s) out of a stop Orientation/body into the Stop-1 "
+                      f"opening section (hours/price belong in the general "
+                      f"description)", flush=True)
+        except Exception as _rl:  # pragma: no cover
+            _import_logger.error(f"[LOCAL-638] practical-facts relocation skipped: {_rl}")
         # 2d. [LOCAL-630 item 8] Computed year-spans ("N years after/later") must
         #     equal the difference between two dates the text states, or be
         #     dropped. NG 495 said "Nearly 247 years after it was painted" for a
@@ -7944,6 +7962,42 @@ def _apply_delivery_hours_guard(result):
                       f"sentence(s) from delivered text (every-path guard)", flush=True)
         except Exception as _fe:  # pragma: no cover
             _import_logger.error(f"[LOCAL-616] foreign-sentence sweep skipped: {_fe}")
+        # 3a. [LOCAL-638 Note 2] A stop must not END on an unpaid teaser — a closing
+        #     gesture at a story the stop never tells ("deeper stories", "hint at",
+        #     "more to discover", "secrets", "beneath the calm"). Michael, Frick 523
+        #     (D640): the tour ended "unexpected details hint at the deeper stories
+        #     beneath the calm". The editor (LOCAL-628) is asked to deliver-or-drop,
+        #     but it is disabled on cache/pool/by-reference paths — this text-level
+        #     guard is the universal fallback: drop a trailing unpaid-teaser sentence
+        #     from each stop body. Runs BEFORE the directions guarantee so a stop
+        #     whose last sentence was a teaser still gets its hand-off appended.
+        try:
+            import stop_editor as _se_tz
+            final, _tz_dropped = _se_tz.strip_unpaid_teaser_in_text(final)
+            if _tz_dropped:
+                print(f"  [LOCAL-638 Note 2] dropped {_tz_dropped} unpaid-teaser "
+                      f"ending(s) (a stop must deliver the story it teases, or not "
+                      f"tease)", flush=True)
+        except Exception as _tze:  # pragma: no cover
+            _import_logger.error(f"[LOCAL-638] unpaid-teaser guard skipped: {_tze}")
+        # 3b. [LOCAL-638 Note 4] Every stop except the last must end with directions
+        #     to the next stop, on EVERY path. Michael, Frick 523 (D640): "The story
+        #     stops abruptly and has no directions to the next exhibit" — Stop 2 had
+        #     no "Your final stop…" transition before Stop 3. Both base paths attach
+        #     a transition per non-last stop, but a later pass (editor / dedupe /
+        #     conclusion) can drop it. This final guarantee appends a deterministic
+        #     museum hand-off to any non-last stop that lacks one, naming the next
+        #     stop. Runs BEFORE the conclusion rebuild so the conclusion sees the
+        #     finalized bodies. Deterministic; never removes content.
+        try:
+            import directions_guarantee as _dg
+            _dg_venue = _recover_tour_venue(final) or ""
+            final, _dir_added = _dg.ensure_directions_between_stops(final, _dg_venue)
+            if _dir_added:
+                print(f"  [LOCAL-638 Note 4] added directions to {_dir_added} stop(s) "
+                      f"that ended with no hand-off to the next stop", flush=True)
+        except Exception as _dge:  # pragma: no cover
+            _import_logger.error(f"[LOCAL-638] directions guarantee skipped: {_dge}")
         # 4. [LOCAL-619] THE ONE CONCLUSION — built from the FINAL delivered text,
         #    as the LAST step on EVERY path (fresh, pool, cache, by_reference,
         #    overview), after every other gate above. This is the single choke

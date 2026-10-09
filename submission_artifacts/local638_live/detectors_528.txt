@@ -1,0 +1,33 @@
+LOCAL-638 Note 6 — live run detectors on tour 528 (The Frick Collection, 3 stops)
+Fresh tour, cache OFF + pool OFF, HARD CAP $1.00. git SHA stamped at build.
+
+Container  : local638-gen (--rm, port 5098, network development_default)
+DB         : development-postgres-2-1 (audiotours), additive is_test row only
+Tour id    : 528  (is_test = true)
+Delivered  : 3 stops, 5591 chars, wall 453.9s
+Cost       : meter TOTAL $0.7357 (openai $0.5834 + gemini_grounding $0.0700 +
+             gemini_tokens $0.0343 + serper $0.0480 + preflight $0.0454)
+             ledger tour_total $0.7810 — both UNDER the $1.00 cap.
+Row counts : audio_tours 333 -> 334 ; is_test rows 270 -> 271.
+
+LOCAL-638 DETECTORS on the delivered spoken text (tour 528):
+  Note 1  count_practical_facts_after_first_orientation  = 0   PASS
+  Note 2  stops ending on an unpaid teaser               = 0   PASS
+  Note 3  Thomas More consequence (execution in 1535)    = True PASS
+  Note 4  count_stops_missing_directions                 = 0   PASS
+
+Delivery-guard log lines observed in the live run:
+  [LOCAL-629 item 4] spoke the preflight's known hours/admission in Stop 1
+  [LOCAL-638 Note 4] added directions to 1 stop(s) that ended with no hand-off
+    to the next stop        <-- the exact Frick-523 defect (Stop 2 had no
+                                "Your final stop…"), corrected on the live path.
+
+Independent kiro-cli listener critique (critique.sh 528 3): 7/10.
+  Confirms: narration leads with work+artist; HOURS AND ADMISSION ARE SPOKEN
+  (Note 1); no teaser defect (Note 2); Thomas More consequence present (Note 3);
+  no "ends abruptly / no directions" defect (Note 4).
+  Remaining flagged defects are OUT OF SCOPE for LOCAL-638 and owned by other
+  LOCALs: a garbled Vermeer clause "crafted. van Berckenrode." (sentence-stitch,
+  LOCAL-635), institutional-filler provenance (LOCAL-617/story-type), and a
+  conclusion that omits Vermeer (LOCAL-619). None of these is one of the four
+  listening notes; all four notes verify clean.

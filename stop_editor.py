@@ -289,6 +289,13 @@ lead with the work itself before its later story.
 rewrite the sentence so it stands on its own.
 - Delete orphan sentence fragments and evasive filler (e.g. \"must be appreciated \
 in person\").
+- Do NOT let the stop END on an unpaid teaser — a closing gesture at a story the \
+stop never tells (\"deeper stories\", \"hint at\", \"more to discover\", \
+\"secrets\", \"beneath the calm\", \"waiting to be discovered\"). If the body \
+already contains the facts that pay off such a promise, rewrite the ending to \
+DELIVER that story in a concrete sentence (naming the fact, from the text). If the \
+body does NOT contain those facts, DELETE the teaser sentence so the stop ends on \
+something it actually told. Never leave an empty promise as the last sentence.
 - Fix dropped words so every sentence is grammatical.
 - Introduce a person on first mention using ONLY information already in this stop \
 (e.g. if the text elsewhere says \"Archduke Ernest\", use that full form on first \
@@ -897,6 +904,164 @@ def repair_garbled_names_in_text(tour_text: str) -> Tuple[str, int]:
     return repaired, n
 
 
+# ─────────────────────────────────────────────────────────────────────────────
+# [LOCAL-638 Note 2] A stop must not END on an unpaid teaser
+# ─────────────────────────────────────────────────────────────────────────────
+#
+# Michael listened to Frick tour 523 (D640):
+#   "It ends with 'unexpected details hint at the deeper stories beneath the
+#    calm'; I wish it says something about these deeper stories."
+#
+# A stop must not end on an unpaid teaser — a closing gesture at a story the stop
+# never tells ("deeper stories", "hint at", "more to discover", "secrets",
+# "waiting to be discovered", "beneath the surface"). The editor must either
+# DELIVER the story the teaser points to (from the stop's own sources — the prompt
+# asks for this) or DROP the teaser. The deterministic fallback below DROPS the
+# trailing teaser sentence when the LLM has not delivered a concrete story, so the
+# stop never ends on an empty promise.
+
+# Teaser cue phrases: a vague gesture at an untold story.
+_TEASER_CUE_RE = re.compile(
+    r"(?i)\b("
+    r"deeper\s+stor(?:y|ies)|hint(?:s|ing|ed)?\s+at\b|hints?\s+of\b|"
+    r"more\s+to\s+(?:discover|explore|uncover|be\s+(?:discovered|found|told))|"
+    r"secrets?\b|untold\s+stor|stor(?:y|ies)\s+(?:yet\s+)?to\s+be\s+told|"
+    r"waiting\s+to\s+be\s+(?:discovered|uncovered|told|found)|"
+    r"beneath\s+the\s+(?:surface|calm|stillness|quiet)|"
+    r"mysteries?\s+(?:that|which|waiting|yet)|hidden\s+(?:stor|depths|meanings?)|"
+    r"so\s+much\s+more\s+(?:to|than)|whispers?\s+of\b|"
+    r"layers?\s+(?:of\s+(?:meaning|story|history)\s+)?(?:yet\s+)?to\s+(?:uncover|reveal)"
+    r")\b")
+
+# A concrete follow-through marker: the sentence is NOT a bare teaser because it
+# states a specific noun/fact (a name, a year, a place) — it DELIVERS rather than
+# merely gestures. Used to spare a sentence that happens to contain "secrets" but
+# actually tells one ("the secret compartment held a 1527 letter from More").
+# NOTE: the proper-name branch is CASE-SENSITIVE (no (?i)) so a sentence-initial
+# "Its unexpected" is not mistaken for a two-word proper name.
+_CONCRETE_PAYOFF_YEAR_RE = re.compile(r"\b\d{3,4}\b")
+_CONCRETE_PAYOFF_NAME_RE = re.compile(r"\b[A-Z][a-z]{2,}\s+[A-Z][a-z]{2,}")
+_CONCRETE_PAYOFF_CAUSE_RE = re.compile(
+    r"(?i)\b(because|when|after|during|which\s+(?:is|was|shows|depicts|holds|held)|"
+    r"executed|killed|died|destroyed|stolen|burned|exiled|imprisoned|beheaded|"
+    r"so\s+that|resulted\s+in|led\s+to)\b")
+
+
+def _has_concrete_payoff(text: str) -> bool:
+    """True when ``text`` carries a concrete fact (a year, a two-word proper name,
+    or a cause/consequence verb) — i.e. it DELIVERS, not merely gestures. Pure."""
+    t = text or ""
+    return bool(_CONCRETE_PAYOFF_YEAR_RE.search(t)
+                or _CONCRETE_PAYOFF_NAME_RE.search(t)
+                or _CONCRETE_PAYOFF_CAUSE_RE.search(t))
+
+
+def _sentences_for_teaser(body: str) -> List[str]:
+    """Split a stop body into sentences for the teaser check (keeps punctuation)."""
+    if not body:
+        return []
+    return [m.group(0).strip()
+            for m in re.finditer(r"[^.!?]*[.!?]+(?=\s|$)|[^.!?]+$", body)
+            if m.group(0).strip()]
+
+
+def ends_on_unpaid_teaser(body: str) -> bool:
+    """[LOCAL-638 Note 2] True when the LAST sentence of ``body`` is an UNPAID
+    teaser: it gestures at an untold story ("hint at the deeper stories beneath
+    the calm") without delivering a concrete fact. A teaser sentence that actually
+    pays off (names a year, a person, or a cause/consequence) is NOT flagged.
+    Pure, deterministic."""
+    sents = _sentences_for_teaser(body)
+    if not sents:
+        return False
+    last = sents[-1]
+    if not _TEASER_CUE_RE.search(last):
+        return False
+    # A teaser that delivers a concrete payoff IN THE SAME sentence is kept.
+    # Strip the teaser clause itself before testing for a concrete payoff so the
+    # proper-name test does not pass on words inside the teaser phrase.
+    without_cue = _TEASER_CUE_RE.sub(" ", last)
+    if _has_concrete_payoff(without_cue):
+        return False
+    return True
+
+
+def drop_unpaid_teaser(body: str) -> Tuple[str, bool]:
+    """[LOCAL-638 Note 2] Drop a trailing UNPAID teaser sentence from ``body``.
+
+    Returns ``(new_body, dropped)``. Removes ONLY the final sentence, and only when
+    it is an unpaid teaser (``ends_on_unpaid_teaser``). Deterministic, pure,
+    idempotent; never touches a sentence that delivers a concrete story."""
+    if not ends_on_unpaid_teaser(body):
+        return body, False
+    sents = _sentences_for_teaser(body)
+    kept = sents[:-1]
+    new_body = " ".join(s.strip() for s in kept).strip()
+    new_body = re.sub(r"\s{2,}", " ", new_body)
+    return new_body, True
+
+
+def _teaser_delivered_by_edit(edited_body: str) -> bool:
+    """True when the editor's rewrite ends on a teaser that it ALSO delivered (the
+    final sentence pays off with a concrete fact). Used so an LLM edit that turned
+    the empty promise into a real story is accepted, not dropped."""
+    return bool(edited_body) and not ends_on_unpaid_teaser(edited_body)
+
+
+def strip_unpaid_teaser_in_text(tour_text: str) -> Tuple[str, int]:
+    """[LOCAL-638 Note 2] Text-level guard for EVERY delivery path: drop a trailing
+    unpaid-teaser sentence from each stop body (the stop editor is disabled on
+    cache/pool/by-reference paths, so this is the universal fallback).
+
+    A stop body is the narration between its Orientation/field block and its
+    Directions/Sources tail. Only the body's final sentence is considered, and only
+    when it is an unpaid teaser. The teaser is dropped; a transition line that
+    follows (the Directions tail) is preserved. Returns ``(cleaned, n_dropped)``.
+    Deterministic, pure, idempotent."""
+    if not tour_text:
+        return tour_text or "", 0
+    spans = _split_tour_into_stops(tour_text)
+    if not spans:
+        return tour_text, 0
+    out = tour_text
+    dropped = 0
+    # A trailing conclusion/recap that may live inside the LAST stop's body span.
+    _concl_re = re.compile(
+        r"(?is)(\bThat['\u2019]s\s+\d+\s+stops?\b.*|"
+        r"On this tour you have followed the thread\b.*|"
+        r"From\s+.+?\s+to\s+.+?,\s+you have followed the thread\b.*|"
+        r"^\s*Sources:\s.*)\Z")
+    # Walk back-to-front so span offsets stay valid as we rewrite blocks.
+    for (start, end) in reversed(spans):
+        block = out[start:end]
+        header_line, preserved_meta, body, tail_meta = _split_stop_block(block)
+        if not (body or "").strip():
+            continue
+        # Protect a trailing conclusion/recap/Sources that landed in this body (it
+        # happens on the LAST stop, whose span runs to end of text). Split it off,
+        # run the teaser check on the real narration, then re-attach it verbatim.
+        concl = ""
+        m_concl = _concl_re.search(body)
+        if m_concl:
+            concl = body[m_concl.start():]
+            narration = body[:m_concl.start()].rstrip()
+        else:
+            narration = body
+        if not narration.strip():
+            continue
+        new_narration, did = drop_unpaid_teaser(narration)
+        if not did or not new_narration.strip():
+            continue
+        new_body = new_narration
+        if concl:
+            new_body = new_narration.rstrip() + "\n\n" + concl.lstrip()
+        new_block = _reassemble_block(block, header_line, preserved_meta,
+                                      new_body, tail_meta)
+        out = out[:start] + new_block + out[end:]
+        dropped += 1
+    return out, dropped
+
+
 def validate_edit(
     edited_body: str,
     original_body: str,
@@ -1056,6 +1221,18 @@ def edit_stop(
                             f"repaired deterministically ({n_fixed} fixed; "
                             f"no LLM edit)")
                     return (new_block, True, "dropped-word-repaired")
+        # [LOCAL-638 Note 2] No usable LLM edit → original ships. If the original
+        # ends on an unpaid teaser, drop it deterministically. Removing a sentence
+        # introduces no new claim, so no claim_check re-validation is needed.
+        if ends_on_unpaid_teaser(body):
+            _cand0, _did0 = drop_unpaid_teaser(body)
+            if _did0 and _cand0.strip():
+                new_block = _reassemble_block(
+                    stop_block, header_line, preserved_meta, _cand0, tail_meta)
+                if log:
+                    log(f"[LOCAL-628] stop {stop_number}: dropped unpaid "
+                        f"teaser from original body (no LLM edit)")
+                return (new_block, True, "teaser-dropped")
         if log:
             log(f"[LOCAL-628] stop {stop_number}: rejected({reason})")
         return (stop_block, False, reason)
@@ -1106,15 +1283,40 @@ def edit_stop(
                         log(f"[LOCAL-628] stop {stop_number}: dropped-word "
                             f"repaired deterministically ({n_fixed} fixed)")
                     return (new_block, True, "dropped-word-repaired")
+        # [LOCAL-638 Note 2] The LLM edit was rejected, so the ORIGINAL body ships.
+        # If the original ends on an unpaid teaser, drop it deterministically so a
+        # rejected edit never ships an empty promise. Dropping a sentence adds no
+        # new claim, so no claim_check re-validation is needed.
+        if ends_on_unpaid_teaser(body):
+            _candidate, _did = drop_unpaid_teaser(body)
+            if _did and _candidate.strip():
+                new_block = _reassemble_block(
+                    stop_block, header_line, preserved_meta, _candidate, tail_meta)
+                if log:
+                    log(f"[LOCAL-628] stop {stop_number}: dropped unpaid "
+                        f"teaser from original body (edit rejected: {reason})")
+                return (new_block, True, "teaser-dropped")
         if log:
             log(f"[LOCAL-628] stop {stop_number}: rejected({reason})")
         return (stop_block, False, reason)
+
+    # [LOCAL-638 Note 2] The stop must not end on an unpaid teaser. The prompt asks
+    # the LLM to DELIVER or DROP it; as a deterministic guarantee, if the accepted
+    # edit STILL ends on an unpaid teaser (the LLM gestured without delivering),
+    # drop that trailing teaser sentence so the stop ends on content it told.
+    _teaser_dropped = False
+    if ends_on_unpaid_teaser(edited_body):
+        _candidate, _did = drop_unpaid_teaser(edited_body)
+        if _did and _candidate.strip():
+            edited_body = _candidate
+            _teaser_dropped = True
 
     # Reassemble: preserved prefix + edited body + preserved tail.
     new_block = _reassemble_block(
         stop_block, header_line, preserved_meta, edited_body, tail_meta)
     if log:
-        log(f"[LOCAL-628] stop {stop_number}: edited")
+        log(f"[LOCAL-628] stop {stop_number}: edited"
+            + (" (dropped unpaid teaser)" if _teaser_dropped else ""))
     return (new_block, True, "edited")
 
 
