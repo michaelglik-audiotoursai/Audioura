@@ -1412,12 +1412,20 @@ def _is_practical_facts_sentence(sentence: str) -> bool:
 
 
 def _split_sentences_keep(text: str) -> "List[str]":
-    """Sentence-split keeping terminal punctuation on each piece. Pure."""
+    """Sentence-split keeping terminal punctuation on each piece. Pure.
+
+    [LEAD 2026-10-09] Never split inside a number or an abbreviation: "9.00 pounds",
+    "10.00–18.00", "Florisz. van" were cut into fragments ("Admission is 9." / "00 pounds",
+    Courtauld 545, LOCAL-641 live run)."""
     if not text:
         return []
-    return [m.group(0).strip()
-            for m in re.finditer(r"[^.!?]*[.!?]+|\S[^.!?]*$", text)
-            if m.group(0).strip()]
+    _PH = "\u2063"  # invisible separator, restored after splitting
+    t = re.sub(r"(?<=\d)\.(?=\d)", _PH, text)
+    t = re.sub(r"\b([A-Z][a-z]{0,6}|[A-Z])\.(?=\s+[a-z])", lambda m: m.group(1) + _PH, t)
+    parts = [m.group(0).strip()
+             for m in re.finditer(r"[^.!?]*[.!?]+|\S[^.!?]*$", t)
+             if m.group(0).strip()]
+    return [p.replace(_PH, ".") for p in parts]
 
 
 def _stop_paragraph_bounds(text: str) -> "Tuple[List[str], int, int]":
@@ -1815,7 +1823,15 @@ def _compose_admission_phrase(admission_text: str) -> str:
     # The FIRST currency amount is taken as the adult/general price (sources lead
     # with the general ticket). Symbol-led ("€12", "$30") or amount-led ("12 EUR").
     price = ""
-    m = re.search(r"([$€£¥])\s?(\d{1,4}(?:\.\d{2})?)", cleaned)
+    # [LEAD 2026-10-09] Prefer the amount tied to adult/standard/general admission. The FIRST
+    # amount can be a concession: Courtauld 545 spoke "9 pounds" while the field line said £16.
+    m = (re.search(r"(?i)(?:adults?|standard|general|full[- ]price|regular)[^.;$€£¥\d]{0,40}([$€£¥])\s?(\d{1,4}(?:\.\d{2})?)", cleaned)
+         or re.search(r"(?i)([$€£¥])\s?(\d{1,4}(?:\.\d{2})?)[^.;$€£¥\d]{0,25}\b(?:adults?|standard|general)\b", cleaned))
+    if m and len(m.groups()) >= 2:
+        _sym, _amt = m.group(1), re.sub(r"\.00$", "", m.group(2))
+        m = type("M", (), {"group": lambda self, i: {1: _sym, 2: _amt}[i]})()
+    else:
+        m = re.search(r"([$€£¥])\s?(\d{1,4}(?:\.\d{2})?)", cleaned)
     if m:
         price = _spoken_price(m.group(1), m.group(2))
     else:
