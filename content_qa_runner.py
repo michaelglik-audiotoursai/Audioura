@@ -135,6 +135,44 @@ def extract_g4_proper_nouns(claim_text: str, venue_context: dict = None,
     return _claim_proper_nouns
 
 
+# [LOCAL-639 defect 2] A run-on ``Stop N:`` header whose trailing newline was
+# lost absorbs its OWN body — the live National Gallery 495 round-1 artifact
+# "Stop 2: The Toilet of Venus ('The Rokeby Venus') Address: Trafalgar Square …"
+# (320 "title" words). The title-sanity (D3(a)) and grounding (D3(d)) checks
+# measured the WHOLE run-on line, so a cosmetic lost newline looked like a
+# 320-word title and D3(d) — a FACTUAL check — refused one of the world's best-
+# documented museums (389 verified works). The fix: measure the TRUE title by
+# cutting at the first embedded structural field label. A genuinely long title
+# (a sentence masquerading as an entity, with NO field label) is still measured
+# in full and still caught. Deterministic, pure.
+_EMBEDDED_FIELD_LABEL_RE = re.compile(
+    r'\s+(?:Address|Coordinates|Type/?Specialty|Specific Examples?|'
+    r'Operational Details?|Operational|Orientation|Museum Information|'
+    r'Visiting Hours|Opening Hours|Hours|Directions|Sources?|Description)\s*:',
+    re.IGNORECASE)
+
+
+def _stop_title_from_header(header: str) -> str:
+    """Return the true stop title from a ``Stop N: …`` header line.
+
+    Strips the "Stop N:" prefix and a trailing ", <year>" / " by <artist>"
+    decoration, and — crucially — cuts the title at the FIRST embedded field
+    label (Address:/Coordinates:/Orientation:/…). When the render lost the
+    newline after the header, the header line runs into the stop body; without
+    this cut the "title" would be the whole stop. A header with no embedded
+    label is returned unchanged (minus the decoration), so a real long title is
+    still measured in full.
+    """
+    name = re.sub(r'^Stop\s+\d+:\s*', '', header or '').strip()
+    # Cut at the first embedded structural field label (lost-newline run-on).
+    m = _EMBEDDED_FIELD_LABEL_RE.search(name)
+    if m:
+        name = name[:m.start()].strip()
+    name = re.sub(r'\s+by\s+[A-Z][^,]*$', '', name)
+    name = re.sub(r',\s*\d{4}$', '', name).strip()
+    return name
+
+
 # [LOCAL-631] G4_UNGROUNDED_SENTENCES is job-scoped (registered above).
 
 
@@ -299,12 +337,11 @@ def run_qa(tour_text, tour_file="", story_elements=None, venue_context=None):
     _title_issues = []
     _stop_headers = re.findall(r'^(Stop\s+\d+:.+)$', tour_text, re.MULTILINE)
     for _header in _stop_headers:
-        # Extract just the name part (after "Stop N: ")
-        _name_part = re.sub(r'^Stop\s+\d+:\s*', '', _header).strip()
-        # Remove " by Artist" and ", Year" suffixes
-        _name_part = re.sub(r'\s+by\s+[A-Z][^,]*$', '', _name_part)
-        _name_part = re.sub(r',\s*\d{4}$', '', _name_part).strip()
-        
+        # [LOCAL-639 defect 2] Extract the TRUE title — cut a run-on header (lost
+        # newline before the body) at its first embedded field label so a
+        # cosmetic formatting defect is not read as a 300-word title.
+        _name_part = _stop_title_from_header(_header)
+
         _word_count = len(_name_part.split())
         if _word_count > 15:
             _title_issues.append(f"'{_header[:60]}...' ({_word_count} words — too long)")
@@ -408,9 +445,15 @@ def run_qa(tour_text, tour_file="", story_elements=None, venue_context=None):
     # For now: check that stop titles are short, real-looking noun phrases (proxy for grounding)
     _ungrounded = []
     for _header in _stop_headers:
-        _name_part = re.sub(r'^Stop\s+\d+:\s*', '', _header).strip()
-        _name_part = re.sub(r'\s+by\s+[A-Z][^,]*$', '', _name_part)
-        _name_part = re.sub(r',\s*\d{4}$', '', _name_part).strip()
+        # [LOCAL-639 defect 2] Measure the TRUE title. The live National Gallery
+        # (495, round 1) was REFUSED here — "Stop 2: The Toilet of Venus ('The
+        # Rokeby Venus') Address: Trafalgar Square …" ran on because the newline
+        # after the header was lost, so the "title" was 320 words and this FACTUAL
+        # check discarded a 389-work museum. Cutting the run-on at the first
+        # embedded field label measures the real title (five words), so a cosmetic
+        # formatting defect can no longer destroy the tour — exactly the LOCAL-554
+        # principle (a cosmetic property must never fail a tour on a factual gate).
+        _name_part = _stop_title_from_header(_header)
         # [LOCAL-554] Capitalisation is NOT evidence about the world, and this is a
         # FACTUAL check -- a failure here destroys the whole tour.
         #
