@@ -196,6 +196,28 @@ def memo_miss_sentinel() -> Any:
     return _MISS
 
 
+def seed(namespace: str, args: Tuple[Any, ...], kwargs: Dict[str, Any],
+         value: Any) -> None:
+    """Pre-populate the current context's memo for ``namespace`` with ``value``,
+    keyed exactly as ``memoize_per_tour`` would key the call ``fn(*args, **kwargs)``.
+
+    This is how an up-front OVERLAP group (which computes a resolve on a worker
+    thread, in its own ``contextvars`` context) hands its result back to the main
+    tour context so the first in-pipeline call is a memo HIT rather than a second
+    network fetch. A no-op when FAST_PIPELINE is OFF (the memo is never consulted).
+    """
+    if not is_enabled():
+        return
+    key = _make_key(args, kwargs)
+    with _MEMO_LOCK:
+        store = _memo_store()
+        ns = store.get(namespace)
+        if ns is None:
+            ns = {}
+            store[namespace] = ns
+        ns[key] = value
+
+
 def _make_key(args: Tuple[Any, ...], kwargs: Dict[str, Any]) -> Any:
     """Build a hashable cache key from a call's positional + keyword arguments.
 

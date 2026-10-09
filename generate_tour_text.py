@@ -8855,9 +8855,78 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                     _pf_acc = None
                     _pf_scope = _ctxlib.nullcontext()
                     _pf_ctx = _ctxlib.nullcontext()
+                # [LOCAL-656] Overlap the venue RESOLUTION (Wikidata resolve_venue —
+                # a free wbsearchentities/SPARQL call, no paid-API spend) with the
+                # preflight (the up-front grounded venue call, ~14 s). Both depend
+                # only on the venue name, and today run strictly one-after-another:
+                # the preflight here in the wrapper, then resolve_venue in the impl's
+                # poi_selection. When FAST_PIPELINE is ON we start the resolve on a
+                # worker thread (its own contextvars Context) while the preflight
+                # runs on THIS thread inside its unchanged cost scope, then seed the
+                # per-tour memo with the resolved entity so the impl's first
+                # resolve_venue is a memo HIT instead of a second serial fetch. When
+                # OFF, no thread is started and the preflight runs exactly as before
+                # (byte-identical). resolve_venue makes no metered call, so the paid
+                # call count is identical ON vs OFF.
+                _rv_future = None
+                _rv_executor = None
+                _fp656_on = False
+                try:
+                    import fast_pipeline as _fp656chk
+                    _fp656_on = _fp656chk.is_enabled()
+                except Exception:
+                    _fp656_on = False
+                if _fp656_on:
+                    try:
+                        import concurrent.futures as _cf656
+                        import contextvars as _cv656
+                        import venue_resolver as _vr656
+                        import fast_pipeline as _fp656o
+                        _rv_ctx = _cv656.copy_context()
+
+                        def _prewarm_resolve(_v=_pf_venue, _c=_pf_city,
+                                             _vr=_vr656, _fp=_fp656o):
+                            # Runs in a COPY of this context; compute the resolve and
+                            # return it. We seed the MAIN context's memo after join.
+                            try:
+                                return _vr.resolve_venue(_v, _c)
+                            except Exception:
+                                return None
+
+                        _rv_executor = _cf656.ThreadPoolExecutor(max_workers=1)
+                        _rv_future = _rv_executor.submit(_rv_ctx.run, _prewarm_resolve)
+                    except Exception as _rv_err:
+                        print(f"  [LOCAL-656] resolve prewarm not started "
+                              f"(non-fatal): {_rv_err}")
+                        _rv_future = None
+                        _rv_executor = None
                 with _pf_scope:
                     with _pf_ctx:
-                        _pf = _vpf.safe_preflight(_pf_venue, _pf_city)
+                        try:
+                            _pf = _vpf.safe_preflight(_pf_venue, _pf_city)
+                        finally:
+                            # [LOCAL-656] Always join + clean up the resolve prewarm,
+                            # even if the preflight raised, so the worker thread/
+                            # executor never leaks. Seed the per-tour memo on THIS
+                            # (main) context so the impl's resolve_venue(_pf_venue,
+                            # _pf_city) is a memo HIT instead of a second serial
+                            # fetch. The impl may derive a slightly different
+                            # (venue_string, city) for its own first resolve; if so
+                            # it simply misses and resolves once (free), then
+                            # memoizes — correctness holds either way. Never raises.
+                            if _rv_future is not None:
+                                try:
+                                    _rv_entity = _rv_future.result()
+                                    import fast_pipeline as _fp656s
+                                    _fp656s.seed("resolve_venue",
+                                                 (_pf_venue, _pf_city), {},
+                                                 _rv_entity)
+                                except Exception as _rv_join_err:
+                                    print(f"  [LOCAL-656] resolve prewarm join "
+                                          f"skipped (non-fatal): {_rv_join_err}")
+                                finally:
+                                    if _rv_executor is not None:
+                                        _rv_executor.shutdown(wait=False)
                 if _pf_acc is not None:
                     try:
                         _pf_snap = _pf_acc.snapshot()
