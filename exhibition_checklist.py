@@ -966,6 +966,57 @@ def _fetch_page(url: str, timeout: int = 15) -> Tuple[str, List[Tuple[str, str]]
     return full_text, links
 
 
+# [LOCAL-659] Separate small cache of RAW HTML HEADS, keyed by url. The news
+# pipeline needs the raw <head> (meta/JSON-LD/time tags) to read an article's
+# EXACT publication date, which _fetch_page discards when it reduces the page to
+# paragraph text. We keep only the first ~60KB (the head and lede), politely and
+# cached, so this adds at most one extra GET per fetched article.
+_RAW_HTML_CACHE: dict = {}
+_RAW_HTML_CACHE_LOCK = threading.Lock()
+_RAW_HTML_MAX_BYTES = 60000
+
+
+def _fetch_raw_html(url: str, timeout: int = 15) -> str:
+    """Return the first ~60KB of an article page's RAW HTML (for metadata reads),
+    or '' on any failure. Polite and cached; never raises."""
+    if not url:
+        return ''
+    with _RAW_HTML_CACHE_LOCK:
+        if url in _RAW_HTML_CACHE:
+            return _RAW_HTML_CACHE[url]
+    html = ''
+    try:
+        host = _get_host(url)
+        _polite_wait(host)
+        _record_request(host)
+        resp = requests.get(
+            url,
+            headers={'User-Agent': 'Audioura/2.2 ExhibitionChecker'},
+            timeout=timeout,
+            allow_redirects=True,
+            stream=True,
+        )
+        if resp.status_code == 200:
+            chunks, total = [], 0
+            for chunk in resp.iter_content(chunk_size=8192, decode_unicode=True):
+                if not chunk:
+                    continue
+                if isinstance(chunk, bytes):
+                    chunk = chunk.decode('utf-8', errors='replace')
+                chunks.append(chunk)
+                total += len(chunk)
+                if total >= _RAW_HTML_MAX_BYTES:
+                    break
+            html = ''.join(chunks)
+        resp.close()
+    except Exception as e:  # pragma: no cover
+        logger.debug(f"exhibition_checklist: raw-html fetch failed for {url}: {e}")
+        html = ''
+    with _RAW_HTML_CACHE_LOCK:
+        _RAW_HTML_CACHE[url] = html
+    return html
+
+
 def _normalize_for_match(text: str) -> str:
     """Normalize text for fuzzy title matching: lowercase, strip punct, collapse space."""
     # Decompose accents

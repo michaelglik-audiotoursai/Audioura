@@ -7991,7 +7991,9 @@ def _apply_current_affairs_news(final: str) -> str:
         for _a in log.get('accepted', []):
             print(f"  [LOCAL-655]   ACCEPT -> [{_a.get('stop','?')}] "
                   f"{_a.get('title','')!r} ({_a.get('source','')}, "
-                  f"{_a.get('date','')}) — {_a.get('reason','')}")
+                  f"{_a.get('date','')}) — {_a.get('reason','')} "
+                  f"[date: {_a.get('date_precision','?')} "
+                  f"{_a.get('resolved_date','')} via {_a.get('date_source','?')}]")
         for _r in log.get('rejected', []):
             print(f"  [LOCAL-655]   REJECT    {_r.get('title','')!r} "
                   f"({_r.get('source','')}, {_r.get('date','')}) — "

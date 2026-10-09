@@ -413,7 +413,7 @@ class TestDatedComposition(unittest.TestCase):
         self.assertTrue(ok)
         self.assertEqual(item["_parsed_date"], "2026-10-08")
 
-    def test_prompt_carries_date_and_forbids_recently(self):
+    def test_prompt_carries_date_and_forbids_invented_day(self):
         captured = {}
 
         def spy_answer(prompt, model=None, max_tokens=None):
@@ -422,11 +422,13 @@ class TestDatedComposition(unittest.TestCase):
                     "error": ""}
 
         item = dict(DEBATE_ITEM, text=DEBATE_ITEM["snippet"],
-                    _parsed_date="2026-10-08")
+                    _parsed_date="2026-10-08", _exact_date="2026-10-08",
+                    _date_precision=ca.DATE_EXACT)
         ca.compose_news_sentences("Massachusetts State House", [item],
                                   answer=spy_answer, locale="Boston, MA")
-        self.assertIn("DATE: 2026-10-08", captured["prompt"])
-        self.assertIn('NEVER write "Recently"', captured["prompt"])
+        self.assertIn("DATE: 2026-10-08 (exact)", captured["prompt"])
+        # LOCAL-659: the prompt forbids inventing a day for an approximate item.
+        self.assertIn("never invent a day", captured["prompt"].lower())
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -640,6 +642,232 @@ class TestTTLDatabase(unittest.TestCase):
                 conn.commit()
         finally:
             conn.close()
+
+# ─────────────────────────────────────────────────────────────────────────────
+# LOCAL-659 — round 3: approximate dates, newest-first, short theme queries,
+# tighter politics theme gate. The fixtures reproduce the exact tour-557 v5
+# failures the LEAD flagged (generator.log lines ~1003–1060).
+# ─────────────────────────────────────────────────────────────────────────────
+NOW659 = _dt.date(2026, 10, 9)  # the live context date of the tour-557 v5 run.
+
+
+class TestL659Defect1ApproximateDates(unittest.TestCase):
+    """Defect 1: a relative Serper date ('1 month ago') must NOT become an exact
+    day. The exact day comes ONLY from the article's own metadata."""
+
+    def test_relative_resolves_as_approximate_not_a_day(self):
+        d, precision, phrase = ca.resolve_news_date("1 month ago", now=NOW659)
+        self.assertEqual(precision, ca.DATE_APPROX)
+        self.assertEqual(phrase, "last month")
+        # the window estimate exists (for freshness) but it is NOT a known day
+        self.assertIsNotNone(d)
+
+    def test_relative_weeks_phrase(self):
+        _, precision, phrase = ca.resolve_news_date("3 weeks ago", now=NOW659)
+        self.assertEqual(precision, ca.DATE_APPROX)
+        self.assertEqual(phrase, "about three weeks ago")
+
+    def test_absolute_is_exact(self):
+        d, precision, phrase = ca.resolve_news_date("Oct 8, 2026", now=NOW659)
+        self.assertEqual(precision, ca.DATE_EXACT)
+        self.assertEqual(d, _dt.date(2026, 10, 8))
+        self.assertEqual(phrase, "")
+
+    def test_gate_marks_relative_item_approximate(self):
+        """The 9/11-remembrance item (Serper '1 month ago') is accepted but marked
+        approximate, with NO exact day stashed — the composer cannot print one."""
+        item = {"title": "How 9/11 is being remembered at the Mass. State House",
+                "source": "WBUR", "date": "1 month ago",
+                "link": "https://wbur.example/911",
+                "snippet": ("Massachusetts Governor Maura Healey led a remembrance "
+                            "at the State House in Boston.")}
+        ok, reason = ca.gate_item(item, BOSTON_REQ, fresh_days=365, now=NOW659)
+        self.assertTrue(ok, reason)
+        self.assertEqual(item["_date_precision"], ca.DATE_APPROX)
+        self.assertNotIn("_exact_date", item)
+        self.assertIn("approx", reason)
+
+    def test_composer_prompt_uses_WHEN_for_approximate_item(self):
+        captured = {}
+
+        def spy(prompt, model=None, max_tokens=None):
+            captured["p"] = prompt
+            return {"text": "Last month, the governor led a ceremony [1].",
+                    "error": ""}
+
+        item = {"title": "9/11 remembrance", "source": "WBUR",
+                "date": "1 month ago", "link": "u",
+                "snippet": "The governor led a ceremony at the State House.",
+                "text": "The governor led a ceremony at the State House.",
+                "_parsed_date": "2026-09-09", "_date_precision": ca.DATE_APPROX,
+                "_approx_phrase": "last month"}
+        ca.compose_news_sentences("Massachusetts State House", [item],
+                                  answer=spy, locale="Boston, MA")
+        self.assertIn("WHEN: Last month (approximate", captured["p"])
+        # the exact ISO day must NOT be offered to the model for this item
+        self.assertNotIn("DATE: 2026-09-09", captured["p"])
+
+    def test_article_meta_date_extracted_from_html(self):
+        html = ('<html><head>'
+                '<meta property="article:published_time" '
+                'content="2026-09-11T08:46:00-04:00"></head><body>x</body></html>')
+        self.assertEqual(ca.extract_published_date(html, now=NOW659),
+                         _dt.date(2026, 9, 11))
+
+    def test_article_meta_jsonld_date(self):
+        html = '<script>{"@type":"NewsArticle","datePublished":"2026-10-02"}</script>'
+        self.assertEqual(ca.extract_published_date(html, now=NOW659),
+                         _dt.date(2026, 10, 2))
+
+    def test_meta_date_upgrades_relative_to_exact_in_research(self):
+        """A relative-dated item whose fetched article carries a meta published_time
+        is upgraded to EXACT and the exact day stated (Defect 1 end-to-end)."""
+        item = {"title": "Healey leads 9/11 remembrance at the State House",
+                "source": "WBUR", "date": "1 month ago",
+                "link": "https://wbur.example/911",
+                "snippet": ("Massachusetts Governor Maura Healey led a 9/11 "
+                            "remembrance at the State House in Boston.")}
+
+        def serp(q, tbs='qdr:w', num=8):
+            return [dict(item)] if tbs == 'qdr:w' else []
+
+        def fetch(url):
+            # the real _fetch_article returns (text, exact_pub_date)
+            return ("On September 11, 2026, Governor Maura Healey led a 9/11 "
+                    "remembrance at the Massachusetts State House in Boston.",
+                    _dt.date(2026, 9, 11))
+
+        def answer(prompt, model=None, max_tokens=None):
+            return {"text": "On September 11, 2026, the governor led a ceremony [1].",
+                    "error": ""}
+
+        log = ca.research_news_for_stops(
+            BOSTON_REQ, ["Massachusetts State House"],
+            serp=serp, fetch=fetch, answer=answer, now=NOW659)
+        acc = [a for a in log["accepted"] if a["link"] == item["link"]]
+        self.assertEqual(len(acc), 1)
+        self.assertEqual(acc[0]["date_precision"], ca.DATE_EXACT)
+        self.assertEqual(acc[0]["resolved_date"], "2026-09-11")
+        self.assertEqual(acc[0]["date_source"], "article meta")
+
+
+class TestL659Defect2NewestFirst(unittest.TestCase):
+    """Defect 2: rank items newest-first; search qdr:w before qdr:m before y."""
+
+    def test_rank_orders_newest_first(self):
+        items = [
+            {"title": "old", "link": "a", "date": "Sep 9, 2026"},
+            {"title": "new", "link": "b", "date": "Oct 8, 2026"},
+            {"title": "mid", "link": "c", "date": "Sep 25, 2026"},
+            {"title": "undated", "link": "d", "date": ""},
+        ]
+        ranked = ca._rank_items(items)
+        self.assertEqual([it["link"] for it in ranked], ["b", "c", "a", "d"])
+
+    def test_news_for_query_tries_week_before_month(self):
+        order = []
+
+        def serp(q, tbs='qdr:w', num=8):
+            order.append(tbs)
+            # only the week window has results
+            return [{"title": "t", "link": "l", "date": "Oct 8, 2026"}] if tbs == 'qdr:w' else []
+
+        items, used = ca.news_for_query("Massachusetts governor", serp=serp)
+        self.assertEqual(used, "qdr:w")
+        self.assertEqual(order[0], "qdr:w")
+        self.assertTrue(items)
+
+    def test_news_for_query_widens_when_week_empty(self):
+        tried = []
+
+        def serp(q, tbs='qdr:w', num=8):
+            tried.append(tbs)
+            return [{"title": "t", "link": "l", "date": "Sep 1, 2026"}] if tbs == 'qdr:m' else []
+
+        items, used = ca.news_for_query("x", serp=serp)
+        self.assertEqual(tried, ["qdr:w", "qdr:m"])
+        self.assertEqual(used, "qdr:m")
+
+
+class TestL659Defect3ShortThemeQueries(unittest.TestCase):
+    """Defect 3: the raw theme phrase returned 0; derive short queries."""
+
+    def test_theme_subject_stripped(self):
+        self.assertEqual(ca._theme_subject(BOSTON_REQ), "Massachusetts politics")
+
+    def test_short_theme_queries(self):
+        qs = ca.derive_theme_queries(BOSTON_REQ)
+        # the over-long raw phrase must NOT be issued
+        self.assertNotIn("massachusetts politics and current affairs boston, ma",
+                         [q.lower() for q in qs])
+        # the ticket's short, derived queries ARE issued
+        self.assertIn("Massachusetts politics", qs)
+        self.assertIn("Massachusetts governor", qs)
+        self.assertIn("Massachusetts legislature", qs)
+        self.assertIn("Boston city council", qs)
+        # every query is short (<= 5 words), the whole point of the fix
+        for q in qs:
+            self.assertLessEqual(len(q.split()), 5, f"query too long: {q!r}")
+
+
+class TestL659Defect4TighterThemeGate(unittest.TestCase):
+    """Defect 4: cultural events (open house, festival, exhibit) are rejected."""
+
+    def _item(self, title, snippet):
+        return {"title": title, "source": "WBUR", "date": "3 weeks ago",
+                "link": "https://wbur.example/" + title.replace(" ", "-"),
+                "snippet": snippet}
+
+    def test_athenaeum_open_house_rejected(self):
+        it = self._item(
+            "Boston Athenaeum open house",
+            ("The Boston Athenaeum hosted an open house where visitors examined "
+             "historic objects and artifacts in the city."))
+        ok, reason = ca.gate_item(it, BOSTON_REQ, fresh_days=365, now=NOW659)
+        self.assertFalse(ok)
+        self.assertIn("cultural event", reason.lower())
+
+    def test_weekend_festival_roundup_rejected(self):
+        it = self._item(
+            "5 things to do this weekend in Boston",
+            ("Five things to do this weekend in Boston, including Somerville's "
+             "Fluff festival and South End Open Studios."))
+        ok, reason = ca.gate_item(it, BOSTON_REQ, fresh_days=365, now=NOW659)
+        self.assertFalse(ok, reason)
+
+    def test_concert_at_faneuil_hall_rejected(self):
+        it = self._item(
+            "East Meets West concert fills Faneuil Hall",
+            ("Siqing Lu's East Meets West concert filled historic Faneuil Hall in "
+             "Boston, bringing Eastern and Western music together."))
+        ok, reason = ca.gate_item(it, BOSTON_REQ, fresh_days=365, now=NOW659)
+        self.assertFalse(ok, reason)
+
+    def test_real_politics_still_accepted(self):
+        it = self._item(
+            "Boston city councilor pitches citywide data center ban",
+            ("A Boston city councilor proposed an ordinance at City Hall to ban "
+             "new data centers, following an executive order from the governor."))
+        ok, reason = ca.gate_item(it, BOSTON_REQ, fresh_days=365, now=NOW659)
+        self.assertTrue(ok, reason)
+
+    def test_governor_debate_accepted(self):
+        it = self._item(
+            "Healey debates Republican challenger",
+            ("Massachusetts Governor Maura Healey debated her Republican "
+             "challenger over the state budget at the State House in Boston."))
+        ok, reason = ca.gate_item(it, BOSTON_REQ, fresh_days=365, now=NOW659)
+        self.assertTrue(ok, reason)
+
+    def test_protest_at_festival_kept(self):
+        """A civic protest that happens to mention a festival is still news."""
+        it = self._item(
+            "Protest at Boston festival over new ordinance",
+            ("Activists staged a protest at a Boston festival against a city "
+             "council ordinance; the mayor responded."))
+        ok, reason = ca.gate_item(it, BOSTON_REQ, fresh_days=365, now=NOW659)
+        self.assertTrue(ok, reason)
+
 
 
 if __name__ == "__main__":
