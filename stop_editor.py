@@ -47,6 +47,13 @@ import os
 import re
 from typing import Callable, Dict, List, Optional, Tuple
 
+# ── LOCAL-651: FAST_PIPELINE overlap of the independent per-stop editor passes
+# (safe no-op import; the flag defaults OFF so the serial path is unchanged).
+try:
+    import fast_pipeline as _fast_pipeline
+except Exception:  # pragma: no cover
+    _fast_pipeline = None
+
 try:  # logging is best-effort; never let a logger import fail the pass
     import logging
     _log = logging.getLogger("stop_editor")
@@ -1441,11 +1448,13 @@ def edit_tour_text(
     cursor = 0
     n_edited = 0
     n_rejected = 0
+
+    # Pre-compute each span's (pre-text, block, stop_no, title, passages). This is
+    # pure string slicing — no network — and identical regardless of the flag.
+    _plan = []
+    _cur = 0
     for (start, end) in spans:
-        # Preserve any text before the first stop (title/category banner) and
-        # between stop spans (there is none — spans are contiguous by header).
-        if start > cursor:
-            out_parts.append(tour_text[cursor:start])
+        _pre = tour_text[_cur:start] if start > _cur else ""
         block = tour_text[start:end]
         m = _STOP_HEADER.search(block)
         stop_no = int(m.group(1)) if m else 0
@@ -1455,18 +1464,44 @@ def edit_tour_text(
             passages = (passages_by_stop.get(stop_no)
                         or passages_by_stop.get(title)
                         or passages_by_stop.get(f"__stop_{stop_no}__"))
-        new_block, edited, _reason = edit_stop(
-            block, stop_number=stop_no, venue_name=venue_name,
-            passages=passages, llm_fn=llm_fn, api_key=api_key, log=_logf)
+        _plan.append((_pre, block, stop_no, title, passages))
+        _cur = end
+    _tail = tour_text[_cur:] if _cur < len(tour_text) else ""
+
+    def _edit_one(_block, _stop_no, _title, _passages):
+        return edit_stop(
+            _block, stop_number=_stop_no, venue_name=venue_name,
+            passages=_passages, llm_fn=llm_fn, api_key=api_key, log=_logf)
+
+    # [LOCAL-651] FAST_PIPELINE: edit every stop CONCURRENTLY (each edit_stop is
+    # independent — it edits one block and returns it; the ONE cross-stop pass,
+    # the trailing conclusion, is built later in the pipeline, after this). When
+    # the flag is OFF, edits run serially in order exactly as before. Either way
+    # the ordered assembly, counters and marker below are identical.
+    _use_parallel = (_fast_pipeline is not None and _fast_pipeline.is_enabled()
+                     and len(_plan) > 1)
+    if _use_parallel:
+        try:
+            _jobs = [(lambda p=p: _edit_one(p[1], p[2], p[3], p[4])) for p in _plan]
+            _edited_results = _fast_pipeline.run_parallel(_jobs, label='stop_editor')
+        except Exception as _ed_err:
+            _logf(f"[LOCAL-651] parallel editor fell back to serial "
+                  f"(non-fatal): {type(_ed_err).__name__}: {_ed_err}")
+            _edited_results = [_edit_one(p[1], p[2], p[3], p[4]) for p in _plan]
+    else:
+        _edited_results = [_edit_one(p[1], p[2], p[3], p[4]) for p in _plan]
+
+    for (_pre, _block, _stop_no, _title, _passages), (new_block, edited, _reason) in zip(_plan, _edited_results):
+        if _pre:
+            out_parts.append(_pre)
         if edited:
             n_edited += 1
         else:
             n_rejected += 1
         out_parts.append(new_block)
-        cursor = end
 
-    if cursor < len(tour_text):
-        out_parts.append(tour_text[cursor:])
+    if _tail:
+        out_parts.append(_tail)
 
     new_text = "".join(out_parts)
     _logf(f"[LOCAL-628] editor pass complete: {n_edited} edited, "

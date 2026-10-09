@@ -13642,8 +13642,39 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
                             print(f"  [LOCAL-355] museum building: no practical facts in OSM")
                     else:
                         print(f"  [LOCAL-355] Querying OSM for venue facts (city: {_osm_city}, hint: {_venue_hint or 'auto'})")
+                        # [LOCAL-651] FAST_PIPELINE: the per-POI OSM fetches are
+                        # INDEPENDENT (each queries OSM for one POI and writes only
+                        # that POI's operational_details). Prefetch them CONCURRENTLY
+                        # here, then the serial loop below consumes the prefetched
+                        # result unchanged — same calls, same per-POI assignment,
+                        # same append order. When the flag is OFF the prefetch dict
+                        # is empty and the loop issues each call inline exactly as
+                        # before (byte-identical).
+                        _osm_prefetch = {}
+                        try:
+                            import fast_pipeline as _fp355
+                            if _fp355.is_enabled() and len(poi_list) > 1:
+                                _osm_names = [poi['name'] for poi in poi_list]
+                                def _osm_one(_nm=None):
+                                    return fetch_osm_venue_facts(
+                                        _nm, _osm_city, venue_hint=_venue_hint,
+                                        budget=_osm_budget)
+                                _osm_jobs = [(lambda _n=_n: _osm_one(_n)) for _n in _osm_names]
+                                _osm_vals = _fp355.run_parallel(
+                                    _osm_jobs, label='osm_venue_facts')
+                                _osm_prefetch = dict(zip(_osm_names, _osm_vals))
+                        except Exception as _osm_pf_err:
+                            # Prefetch is a pure optimisation; on any failure the
+                            # loop below runs each fetch inline, unchanged.
+                            print(f"  [LOCAL-651] OSM prefetch skipped (non-fatal, "
+                                  f"loop runs inline): "
+                                  f"{type(_osm_pf_err).__name__}: {_osm_pf_err}")
+                            _osm_prefetch = {}
                         for poi in poi_list:
-                            _osm_facts = fetch_osm_venue_facts(poi['name'], _osm_city, venue_hint=_venue_hint, budget=_osm_budget)
+                            if poi['name'] in _osm_prefetch:
+                                _osm_facts = _osm_prefetch[poi['name']]
+                            else:
+                                _osm_facts = fetch_osm_venue_facts(poi['name'], _osm_city, venue_hint=_venue_hint, budget=_osm_budget)
                             if not _osm_facts.is_empty():
                                 # Only replace if no visitor info was already sourced (LOCAL-34/39)
                                 if not poi.get('operational_details'):
@@ -16093,6 +16124,39 @@ Exempt: navigation directions ("Turn left", "Continue past").
             from stop_knowledge_fallback import fetch_stop_knowledge, facts_as_snippets
             _kf_venue = _museum_venue_name or location
             _kf_filled = 0
+            _kf_focus = 'object' if tour_category == 'museum' else 'place'
+            # [LOCAL-651] FAST_PIPELINE: the knowledge-fallback fetches are
+            # INDEPENDENT per stop (each asks for ONE stop's object/place facts and
+            # extends only that stop's snippet list). Prefetch the QUALIFYING stops'
+            # fetches CONCURRENTLY (identical qualification predicate as the loop
+            # body below), then the loop consumes the prefetched result — same
+            # calls, same per-stop mutations, same count. Flag OFF ⇒ empty prefetch
+            # dict ⇒ the loop issues each call inline exactly as before.
+            _kf_prefetch = {}
+            try:
+                import fast_pipeline as _fp533
+                if _fp533.is_enabled() and len(poi_list) > 1:
+                    _kf_q = []
+                    for _qi, _qpoi in enumerate(poi_list):
+                        _qn = _qpoi.get('name', '')
+                        _qhave = (_J._DIRECT_SNIPPETS_PER_STOP.get(_qn, [])
+                                  or _J._DIRECT_SNIPPETS_PER_STOP.get(f"__stop_{_qi}__", []))
+                        _qvenue_only = (_qn in _corpus_gate_shortened_stops
+                                        or _qn in _corpus_gate_empty_stops)
+                        if len(_qhave) >= 2 and not _qvenue_only:
+                            continue  # same skip as the loop: no fetch for this stop
+                        if _qn:
+                            _kf_q.append(_qn)
+                    if _kf_q:
+                        _kf_jobs = [(lambda _n=_n: fetch_stop_knowledge(
+                            _n, _kf_venue, api_key, focus=_kf_focus)) for _n in _kf_q]
+                        _kf_vals = _fp533.run_parallel(_kf_jobs, label='fetch_stop_knowledge')
+                        _kf_prefetch = dict(zip(_kf_q, _kf_vals))
+            except Exception as _kf_pf_err:
+                print(f"  [LOCAL-651] knowledge-fallback prefetch skipped "
+                      f"(non-fatal, loop runs inline): "
+                      f"{type(_kf_pf_err).__name__}: {_kf_pf_err}")
+                _kf_prefetch = {}
             for _kf_idx, _kf_poi in enumerate(poi_list):
                 _kf_name = _kf_poi.get('name', '')
                 _kf_have = (_J._DIRECT_SNIPPETS_PER_STOP.get(_kf_name, [])
@@ -16124,8 +16188,11 @@ Exempt: navigation directions ("Turn left", "Continue past").
                 # late-release prompt change there risks a regression for no
                 # stated benefit.
                 _kf_focus = 'object' if tour_category == 'museum' else 'place'
-                _kf_res = fetch_stop_knowledge(_kf_name, _kf_venue, api_key,
-                                               focus=_kf_focus)
+                if _kf_name in _kf_prefetch:
+                    _kf_res = _kf_prefetch[_kf_name]
+                else:
+                    _kf_res = fetch_stop_knowledge(_kf_name, _kf_venue, api_key,
+                                                   focus=_kf_focus)
                 if not _kf_res['ok']:
                     print(f"  [D533] fallback returned nothing: {_kf_res['reason']}")
                     continue
