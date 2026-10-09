@@ -1,0 +1,4 @@
+FAIL dangling_opener: 
+FAIL title_line_rewritten: 
+FAIL recall_unseen_work: ortraiture seen in works like the Self Portrait in a Straw Hat, which 
+516: 3 detector failure(s)
