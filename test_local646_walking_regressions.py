@@ -29,6 +29,12 @@ The fixtures below are the REAL tour-557 Stop 3 and Stop 4 blocks (verbatim from
 audio_tours.id=557). A third, DB-backed test reads the live row when it is
 reachable and otherwise skips, so the suite runs offline.
 
+A third fix covers the museum CANARY (the Courtauld, tour 559): the stop_editor
+fix exposed a pre-existing LEAD field-sync bug where the composed hours/admission
+were placed BOTH as the Stop-1 spoken opening paragraph AND copied into the
+(TTS-stripped) "Museum Information:" field line, so the bench detector counted
+hours/admission twice. The fix clears that field line.
+
 Run: python3 -m pytest test_local646_walking_regressions.py -q
      python3 test_local646_walking_regressions.py
 """
@@ -40,6 +46,7 @@ os.environ.setdefault("STOP_EDITOR", "1")
 
 import stop_editor as se
 import directions_guarantee as dg
+import practical_facts_gate as pfg
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -216,6 +223,67 @@ class TestReg2DirectionsGuaranteeNoDuplicate(unittest.TestCase):
         fixed, added = dg.ensure_directions_between_stops(t, "Test Museum")
         self.assertEqual(added, 1)
         self.assertIn("Your final stop in Test Museum: Beta.", fixed)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# MUSEUM CANARY — Museum Information field must not duplicate the spoken facts
+# ─────────────────────────────────────────────────────────────────────────────
+#
+# A SEPARATE, pre-existing bug (LEAD 2026-10-09, place_practical_facts_in_opening)
+# that the stop_editor fix EXPOSED on the museum canary (the Courtauld, tour 559):
+# the composed hours/admission are placed as the Stop-1 spoken opening paragraph,
+# and the LEAD field-sync ALSO copied the SAME composed facts into the
+# "Museum Information:" field line. The TTS extractor strips the whole
+# "Museum Information:" line, so the audio spoke the facts once — but the bench
+# detector (and count_spoken_hours_statements) count the field-line value too, so
+# the canary showed hours_said_twice / admission_twice. The fix clears the field
+# line (the facts stay in the spoken opening paragraph), so hours/admission appear
+# exactly ONCE in the delivered text.
+
+class TestMuseumCanaryNoHoursDuplication(unittest.TestCase):
+    _STOP1_BOTH = (
+        "Step-by-Step Audio Guided Tour: The Courtauld Gallery - Museum Tour\n\n"
+        "Stop 1: Georges Seurat\n\n"
+        "Coordinates: 51.5115, -0.1195\n\n"
+        "Museum Information: The museum is open Monday to Sunday from 10:00 to "
+        "18:00. Admission is 14 pounds for adults.\n\n"
+        "Orientation: Stand before Seurat's painting.\n\n"
+        "The museum is open Monday to Sunday from 10:00 to 18:00. Admission is 14 "
+        "pounds for adults.\n\n"
+        "Georges Seurat pioneered pointillism.\n\n"
+        "Stop 2: Van Gogh\n\n"
+        "Orientation: Stand before it.\n"
+    )
+
+    def test_place_practical_facts_clears_museum_information_line(self):
+        """After placement, the composed facts are spoken once and the
+        Museum Information field line carries no duplicate value."""
+        out, _n = pfg.place_practical_facts_in_opening(self._STOP1_BOTH)
+        # Hours/admission spoken exactly once (as the listener hears it).
+        self.assertEqual(pfg.count_spoken_hours_statements(out), 1)
+        self.assertEqual(out.count("The museum is open Monday to Sunday"), 1)
+        # The Museum Information field line is present but EMPTY (no duplicate).
+        mi = re.search(r"(?m)^Museum Information:(.*)$", out)
+        self.assertIsNotNone(mi)
+        self.assertEqual(mi.group(1).strip(), "")
+
+    def test_bench_detector_shape_passes(self):
+        """Mirror the bench detectors (hours_said_twice / admission_twice) on the
+        delivered text: both must be clear after placement."""
+        out, _n = pfg.place_practical_facts_in_opening(self._STOP1_BOTH)
+        spoken = out.split("\nSources:")[0]
+        hours = re.findall(
+            r"(?i)\b(?:is open|open daily|open (?:mon|tue|wed|thu|fri|sat|sun)\w*|"
+            r"opening hours)\b", spoken)
+        adm = re.findall(r"(?i)admission[^.]*\.", spoken)
+        self.assertLessEqual(len(hours), 1, f"hours_said_twice: {hours}")
+        self.assertLessEqual(len(adm), 1, f"admission_twice: {adm}")
+
+    def test_idempotent(self):
+        out, _n = pfg.place_practical_facts_in_opening(self._STOP1_BOTH)
+        out2, n2 = pfg.place_practical_facts_in_opening(out)
+        self.assertEqual(n2, 0)
+        self.assertEqual(out2, out)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
