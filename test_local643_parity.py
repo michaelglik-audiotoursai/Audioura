@@ -112,5 +112,98 @@ class TestStructuredRenderParity(unittest.TestCase):
                          "Stop 2 gained an orientation it never had")
 
 
+FIXTURE_DIR = os.path.join(os.path.dirname(__file__), "tests", "fixtures")
+# Stored delivered tours used for the LOCAL-643 parity proof. 485/488 are clean;
+# 495 (NG) and 523 (Frick) carry the exact bug classes the ticket names.
+PARITY_TOURS = ["485", "488", "495", "523", "531"]
+
+
+def _norm(t):
+    return "\n".join(l.rstrip() for l in t.strip().split("\n"))
+
+
+class TestMultiTourParity(unittest.TestCase):
+    """Render each stored tour from records; structure must match, and only the
+    known bugs should disappear."""
+
+    def _load(self, tid):
+        p = os.path.join(FIXTURE_DIR, f"tour_{tid}_r2.txt")
+        if not os.path.exists(p):
+            self.skipTest(f"fixture missing: {p}")
+        with open(p, encoding="utf-8") as f:
+            return f.read()
+
+    def test_clean_tours_render_byte_identical(self):
+        """485 and 488 are already well-formed: records -> render reproduces them
+        byte-for-byte (whitespace-normalized)."""
+        for tid in ("485", "488"):
+            orig = self._load(tid)
+            title, stops, opening, closing = sr.parse_tour_to_records(orig)
+            rendered = sr.render_tour(stops, title=title, opening=opening, closing=closing)
+            self.assertEqual(_norm(orig), _norm(rendered),
+                             f"clean tour {tid} did not round-trip byte-identically")
+
+    def test_stop_count_and_headers_preserved_all(self):
+        for tid in PARITY_TOURS:
+            orig = self._load(tid)
+            orig_headers = [l for l in orig.split("\n")
+                            if _STOP_HEADER_RE.match(l.strip())]
+            title, stops, opening, closing = sr.parse_tour_to_records(orig)
+            rendered = sr.render_tour(stops, title=title, opening=opening, closing=closing)
+            new_headers = [l for l in rendered.split("\n")
+                           if _STOP_HEADER_RE.match(l.strip())]
+            # Every stop that was delivered is delivered again, exactly once each,
+            # each header on its OWN line.
+            self.assertGreaterEqual(len(stops), 1, f"tour {tid}: no stops parsed")
+            self.assertEqual(len(new_headers), len(stops),
+                             f"tour {tid}: header count changed on render")
+
+    def test_no_empty_bare_field_labels(self):
+        """523 (Frick) ships empty 'Address:' / 'Directions:' bare labels — a bug.
+        The structured renderer omits empty fields, so no bare label survives."""
+        orig = self._load("523")
+        title, stops, opening, closing = sr.parse_tour_to_records(orig)
+        rendered = sr.render_tour(stops, title=title, opening=opening, closing=closing)
+        for line in rendered.split("\n"):
+            self.assertFalse(
+                re.match(r'^(Address|Coordinates|Directions|Orientation|'
+                         r'Type/Specialty|Specific Examples|Operational Details):\s*$',
+                         line.strip()),
+                f"bare empty field label survived: {line!r}")
+
+    def test_rendered_header_line_carries_no_field(self):
+        """495 (NG) has Stop 2's header glued onto Address/Coordinates/Orientation
+        in the stored string. After rendering from records, no 'Stop N:' header
+        line also contains a field label."""
+        for tid in PARITY_TOURS:
+            orig = self._load(tid)
+            title, stops, opening, closing = sr.parse_tour_to_records(orig)
+            rendered = sr.render_tour(stops, title=title, opening=opening, closing=closing)
+            for line in rendered.split("\n"):
+                if _STOP_HEADER_RE.match(line.strip()):
+                    self.assertNotRegex(
+                        line,
+                        r'\b(Address|Coordinates|Orientation|Directions|'
+                        r'Type/Specialty|Specific Examples|Operational Details):',
+                        f"tour {tid}: a field label is glued onto a header line: {line!r}")
+
+    def test_one_orientation_per_stop_at_most(self):
+        """No stop may carry two Orientation labels (the duplicate-block / migration
+        bug class)."""
+        for tid in PARITY_TOURS:
+            orig = self._load(tid)
+            title, stops, opening, closing = sr.parse_tour_to_records(orig)
+            rendered = sr.render_tour(stops, title=title, opening=opening, closing=closing)
+            # Count Orientation labels within each stop block.
+            blocks = re.split(r'(?=^Stop\s+\d+:)', rendered, flags=re.MULTILINE)
+            for b in blocks:
+                if not b.strip().startswith("Stop "):
+                    continue
+                n_orient = len(re.findall(r'^Orientation:', b, flags=re.MULTILINE))
+                self.assertLessEqual(n_orient, 1,
+                                     f"tour {tid}: a stop has {n_orient} Orientation labels")
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
+

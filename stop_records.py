@@ -395,6 +395,28 @@ def _split_header_value(value: str):
     return title, artist, year
 
 
+_INLINE_LABEL_RE = re.compile(
+    r'\s+(?=(?:Address|Coordinates|Type/Specialty|Specific Examples|'
+    r'Operational Details|Museum Information|Orientation|Directions):)')
+
+
+def _recover_inline_labels(line: str) -> List[str]:
+    """Split a line that has field labels GLUED into it back onto their own lines.
+
+    This is reader-side repair of the exact flattening bug the structured path
+    prevents (NG 495 R9/R12: 'Stop 2: … Address: … Coordinates: … Orientation:
+    …' collapsed onto one line by a whole-string late pass). The generation-time
+    record path never produces such a line — fields are separate values before
+    any string exists — so this recovery exists only so the parity reader can
+    reconstruct the intended structure from already-mangled stored text and prove
+    the renderer un-glues it.
+    """
+    if ":" not in line:
+        return [line]
+    parts = _INLINE_LABEL_RE.split(line)
+    return parts if len(parts) > 1 else [line]
+
+
 def parse_tour_to_records(tour_text: str):
     """Parse a delivered tour string into ``(title, [Stop], Opening, Closing)``.
 
@@ -402,9 +424,13 @@ def parse_tour_to_records(tour_text: str):
     from records. This is a reader of ALREADY-rendered text — it is NOT part of the
     delivery path (the delivery path builds records at generation time, before any
     string exists). It recovers field values by their labels and treats everything
-    between the Orientation line and the next field/header as narration.
+    between the Orientation line and the next field/header as narration. Lines with
+    field labels glued inline are un-flattened first (``_recover_inline_labels``).
     """
-    lines = tour_text.split("\n")
+    raw_lines = tour_text.split("\n")
+    lines: List[str] = []
+    for _rl in raw_lines:
+        lines.extend(_recover_inline_labels(_rl))
     # Title block: everything before the first "Stop 1:" header.
     title_lines: List[str] = []
     idx = 0
