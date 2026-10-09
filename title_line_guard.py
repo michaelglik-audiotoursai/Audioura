@@ -44,8 +44,8 @@ _CANONICAL_RE = re.compile(r"(?i)^\s*Step-by-Step\s+Audio\s+Guided\s+Tour:\s*\S"
 # lowercased stem are the tells.
 _REWRITTEN_RE = re.compile(
     r"(?i)^\s*step-by-step\s+audio\s+guided\s+tour\s+of\s+(?:the\s+)?"
-    r"(?P<venue>.+?)\s+in\s+(?P<place>.+?)\s*,\s*"
-    r"is\s+a[n]?\s+(?P<category>[a-z\u00C0-\u017F]+)\s+tour\.?\s*$")
+    r"(?P<venue>.+?)\s+in\s+(?P<place>.+?)\s*(?:,\s*"
+    r"is\s+a[n]?\s+(?P<category>[a-z\u00C0-\u017F]+)\s+tour)?\.?\s*$")  # LEAD 2026-10-09: R11 Bern/Bordeaux had no "is a … tour" tail
 
 
 def is_canonical_header(line: str) -> bool:
@@ -62,7 +62,7 @@ def detect_rewritten_title(line: str):
         return None
     venue = m.group("venue").strip().strip(",").strip()
     place = m.group("place").strip().strip(",").strip()
-    category = m.group("category").strip().lower()
+    category = (m.group("category") or "museum").strip().lower()
     if not venue:
         return None
     return (venue, place, category)

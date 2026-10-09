@@ -7736,6 +7736,12 @@ def _apply_delivery_hours_guard(result):
         try:
             import title_line_guard as _tlg
             final, _title_restored = _tlg.restore_title_line(final)
+            # [LEAD 2026-10-09] A year/date parenthetical is a catalogue label, not a spoken title:
+            # "Danaë (1802)" (St Louis 548). Strip it from every occurrence of each stop title.
+            for _ht in re.findall(r"(?m)^Stop\s+\d+:\s*(.+?)\s*$", final):
+                _m_yr = re.search(r"\s*\((?:c\.\s*|ca\.\s*|circa\s*)?\d{3,4}(?:\s*[–-]\s*\d{2,4})?\)\s*$", _ht)
+                if _m_yr:
+                    final = final.replace(_ht, _ht[:_m_yr.start()].rstrip())
             if _title_restored:
                 print("  [LOCAL-634] restored the canonical title/header line "
                       "(a pass had rewritten it into a spoken sentence)", flush=True)

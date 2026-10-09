@@ -73,6 +73,8 @@ _SECTION_LABELS = frozenset({
     "page not found", "404", "error", "login", "log in", "sign in", "account",
     "newsletter", "subscribe", "gallery", "galleries", "venue hire",
     "group visits", "schools", "families", "getting here",
+    # [LEAD 2026-10-09] St Louis 548 "Collection Guide"
+    "collection guide", "audio guide", "highlights", "collection highlights", "floor plan", "map", "museum map",
 })
 
 # Leading article across the live-venue languages (reuse the room-guard pattern).
