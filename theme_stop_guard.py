@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""theme_stop_guard.py — LOCAL-650 fix 1.
+"""theme_stop_guard.py — LOCAL-650B: SELECTION-time rejection of theme-as-stop.
 
 A WALKING-tour stop must be a real, geocodable PLACE, never the request's THEME.
 
@@ -11,26 +11,29 @@ Boston, MA", 5 stops):
 
 The request's THEME phrase had become a point of interest. A POI must be a real
 place a listener can stand at. A candidate whose NAME is the request's theme
-phrase — or a subset of it — must be rejected and replaced by a real place that
-fits the theme. The same goes for any TOPIC-LIKE name: a phrase with no proper
-noun of a place in it, or one that joins abstract nouns with "and"
-("politics and current affairs", "power and public engagement").
+phrase — or a subset of it — must be REJECTED AT SELECTION and replaced by a
+real nearby place from the candidate pool. The same goes for any TOPIC-LIKE
+name: a phrase with no proper noun of a place in it, or one that joins abstract
+nouns with "and" ("politics and current affairs", "power and public engagement").
 
-This module is pure, deterministic and offline. It is used two ways:
+This module provides pure, deterministic, offline DETECTORS:
 
-  * As DETECTORS at selection time (``is_theme_phrase_stop`` / ``topic_like_name``)
-    so the generator never promotes a theme phrase to a stop, and in the Phase 3A
-    prompt as an explicit constraint.
-  * As a FINAL, every-path TEXT guard on the delivered tour
-    (``rename_theme_phrase_stops``) that recovers the request theme from the tour's
-    own title line, finds a stop whose header is the theme phrase (or topic-like),
-    and renames it to a REAL place — preferring a proper-noun place the stop's own
-    narration already names (tour 557's Stop 5 narration names "University of
-    Massachusetts Boston", which is exactly where its coordinates sit), then a
-    theme-appropriate curated fallback. The stop keeps its coordinates and body;
-    only the misleading header (and, when derivable, the Address) changes.
+  * ``is_theme_phrase_stop``  — True when a name IS the request theme (or subset).
+  * ``topic_like_name``       — True when a name reads like a topic, not a place.
+  * ``stop_name_is_not_a_place`` — convenience OR of the above two.
+  * ``extract_request_theme`` — recovers the theme phrase from a request/title.
+  * ``find_theme_phrase_stops`` — scans delivered text for any surviving offenders.
 
-Nothing here calls the network or an LLM.
+These are used:
+  * At SELECTION time (Phase 3A candidate loop) to reject theme/topic candidates.
+  * In the GEO-CHECK replacement loop to prevent a theme phrase from re-entering.
+  * As a DIAGNOSTIC on delivered text (never mutating it) to confirm selection
+    caught everything.
+
+LOCAL-650B CHANGE (2026-10-09): the old ``rename_theme_phrase_stops`` every-path
+text-surgery is DELETED. It was the D643 anti-pattern: renaming a stop after
+narration manufactured a false place with wrong coordinates. Theme rejection
+now happens at selection; the rename is never needed.
 """
 import re
 from typing import List, Optional, Tuple
@@ -257,85 +260,7 @@ def stop_name_is_not_a_place(stop_name: str, request_theme: str = "") -> bool:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Deriving a real place to replace a theme-phrase stop
-# ─────────────────────────────────────────────────────────────────────────────
-
-# Theme-appropriate curated fallbacks, keyed by a topic token found in the theme.
-# Used ONLY when the stop's own narration names no proper-noun place. Each is a
-# real, geocodable place that fits the theme.
-_CURATED_BY_TOPIC = {
-    'politics': "Massachusetts State House",
-    'political': "Massachusetts State House",
-    'government': "Massachusetts State House",
-    'governance': "Massachusetts State House",
-    'affairs': "Boston Public Library",
-    'history': "Old South Meeting House",
-    'revolution': "Old South Meeting House",
-    'literature': "Boston Public Library",
-    'art': "Museum of Fine Arts, Boston",
-}
-
-# A proper-noun place phrase inside narration: a run of Capitalised words,
-# optionally containing small joiners (of/the/and), ending on a place noun OR
-# being a multi-word proper name. We extract candidates and prefer the one that
-# carries a place noun.
-_PROPER_RUN_RE = re.compile(
-    r"\b([A-Z][A-Za-z'’.\-]+(?:\s+(?:of|the|and|de|du|la|le|at|for)\s+|\s+)"
-    r"(?:[A-Z][A-Za-z'’.\-]+)(?:\s+(?:of|the|and)\s+[A-Z][A-Za-z'’.\-]+|\s+"
-    r"[A-Z][A-Za-z'’.\-]+)*)")
-
-
-def derive_real_place_from_block(block_text: str) -> str:
-    """Find the best real PLACE named in a stop's own narration.
-
-    Prefers the longest proper-noun run that contains a place noun (e.g.
-    "University of Massachusetts Boston"); otherwise the longest proper-noun run.
-    Returns "" when the narration names no proper place.
-    """
-    if not block_text:
-        return ""
-    # Strip the header and field lines; only look at narration/orientation prose.
-    lines = []
-    for ln in block_text.split("\n"):
-        if _STOP_HEADER.match(ln):
-            continue
-        if re.match(r'(?i)^\s*(address|coordinates|type/specialty|specific '
-                    r'examples|operational details|museum information|orientation|'
-                    r'directions|sources?|hours|opening hours|visiting hours)\s*:',
-                    ln):
-            # keep the Orientation VALUE (prose after the label) — it often names
-            # the place ("at the edge of the University of Massachusetts Boston").
-            m = re.match(r'(?i)^\s*orientation\s*:\s*(.+)$', ln)
-            if m:
-                lines.append(m.group(1))
-            continue
-        lines.append(ln)
-    prose = " ".join(l for l in lines if l.strip())
-    cands = []
-    for m in _PROPER_RUN_RE.finditer(prose):
-        phrase = re.sub(r'\s+', ' ', m.group(1)).strip(' .,')
-        if len(phrase.split()) < 2:
-            continue
-        cands.append(phrase)
-    if not cands:
-        return ""
-    # Prefer a candidate carrying a place noun; among those, the longest.
-    with_place = [c for c in cands if _has_place_noun(c)]
-    pool = with_place or cands
-    pool.sort(key=lambda c: (len(c.split()), len(c)), reverse=True)
-    return pool[0]
-
-
-def _curated_fallback(request_theme: str) -> str:
-    tw = set(_content_words(request_theme))
-    for topic, place in _CURATED_BY_TOPIC.items():
-        if topic in tw:
-            return place
-    return ""
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-# Every-path TEXT guard
+# Delivered-text diagnostics (read-only — never mutates the text)
 # ─────────────────────────────────────────────────────────────────────────────
 
 def _tour_category(text: str) -> str:
@@ -358,7 +283,11 @@ def _stop_blocks(text: str) -> List[Tuple[int, int, str]]:
 
 def find_theme_phrase_stops(text: str) -> List[Tuple[int, str, str]]:
     """Return [(stop_number, header_name, reason)] for stops that are the theme
-    phrase or topic-like. Walking/outdoor tours only (museum headers are works)."""
+    phrase or topic-like. Walking/outdoor tours only (museum headers are works).
+
+    This is a READ-ONLY diagnostic. Use it to confirm selection caught everything.
+    It never mutates the text.
+    """
     cat = _tour_category(text)
     if cat in ('museum', 'building', 'venue'):
         return []
@@ -374,83 +303,9 @@ def find_theme_phrase_stops(text: str) -> List[Tuple[int, str, str]]:
     return out
 
 
-def rename_theme_phrase_stops(text: str,
-                              curated_fallback: Optional[str] = None
-                              ) -> Tuple[str, List[dict]]:
-    """Rename any theme-phrase / topic-like WALKING stop to a real place.
-
-    For each offending stop, choose a replacement name:
-      1. a proper-noun place its own narration names (preferred — matches the
-         stop's coordinates, as tour 557's Stop 5 narrates "University of
-         Massachusetts Boston" at its UMass coordinates), else
-      2. the caller-supplied ``curated_fallback``, else
-      3. a theme-appropriate curated place.
-    The stop keeps its coordinates and body; only the ``Stop N:`` header is
-    rewritten (and, when the stop had an empty/absent Address, a note is NOT
-    fabricated — the real name + existing coordinates are enough for the map).
-
-    Returns ``(new_text, changes)`` where ``changes`` is a list of
-    ``{'stop': n, 'from': old, 'to': new, 'source': 'narration'|'curated'}``.
-    Idempotent: a stop already named a real place is left untouched.
-    """
-    cat = _tour_category(text)
-    if cat in ('museum', 'building', 'venue'):
-        return text, []
-    theme = extract_request_theme(text)
-    blocks = _stop_blocks(text)
-    if not blocks:
-        return text, []
-
-    # Names already used by OTHER stops — never rename to a duplicate.
-    all_names = {_norm(n) for (_s, _e, n) in blocks}
-
-    changes: List[dict] = []
-    # Rebuild back-to-front so offsets stay valid.
-    pieces: List[str] = []
-    prev_end = len(text)
-    # Tail after the last block (Sources etc.)
-    pieces.append(text[blocks[-1][1]:prev_end])
-    for i in range(len(blocks) - 1, -1, -1):
-        start, end, name = blocks[i]
-        seg = text[start:end]
-        num_m = _STOP_HEADER.match(seg)
-        num = int(num_m.group(1)) if num_m else (i + 1)
-
-        offending = (theme and is_theme_phrase_stop(name, theme)) or topic_like_name(name)
-        if offending:
-            replacement = derive_real_place_from_block(seg)
-            source = 'narration'
-            if (not replacement) or _norm(replacement) in (all_names - {_norm(name)}) \
-                    or is_theme_phrase_stop(replacement, theme) or topic_like_name(replacement):
-                replacement = (curated_fallback or _curated_fallback(theme) or "").strip()
-                source = 'curated'
-            # Only rewrite if we found a genuine, distinct, real place name.
-            if replacement and _norm(replacement) != _norm(name) \
-                    and _norm(replacement) not in (all_names - {_norm(name)}) \
-                    and not topic_like_name(replacement) \
-                    and not (theme and is_theme_phrase_stop(replacement, theme)):
-                new_header = re.sub(
-                    r'^(Stop\s+\d+:\s*).+?(\s*)$',
-                    lambda m: f"{m.group(1)}{replacement}",
-                    seg.split("\n", 1)[0])
-                rest = seg.split("\n", 1)[1] if "\n" in seg else ""
-                seg = new_header + ("\n" + rest if rest else "")
-                all_names.discard(_norm(name))
-                all_names.add(_norm(replacement))
-                changes.append({'stop': num, 'from': name, 'to': replacement,
-                                'source': source})
-        pieces.append(seg)
-        prev_end = start
-    pieces.append(text[:blocks[0][0]])
-    new_text = "".join(reversed(pieces))
-    return new_text, changes
-
-
 if __name__ == "__main__":  # pragma: no cover
     import sys
     with open(sys.argv[1], encoding="utf-8") as f:
         t = f.read()
     print("request theme:", repr(extract_request_theme(t)))
     print("offending stops:", find_theme_phrase_stops(t))
-    fixed, ch = rename_theme_phrase_stops(t)
-    print("changes:", ch)
