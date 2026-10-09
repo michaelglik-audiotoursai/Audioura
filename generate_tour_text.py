@@ -197,6 +197,32 @@ def story_pass_model() -> str:
     return os.environ.get("TOUR_STORY_MODEL", "gpt-4o")
 
 
+def narration_model_route() -> tuple:
+    """[LOCAL-647] Model-selection env hook for the per-stop narration call.
+
+    Returns ``(provider, model)`` for the narration ("story pass") request.
+
+    DEFAULT BEHAVIOUR IS UNCHANGED. With no LOCAL-647 env set this returns
+    ``("openai", story_pass_model())`` — i.e. exactly today's OpenAI call on
+    ``TOUR_STORY_MODEL`` (gpt-4.1 in production). The hook only diverges when
+    ``NARRATION_PROVIDER``/``NARRATION_MODEL`` are explicitly set, which the
+    LOCAL-647 replay harness does to drive the five bake-off arms:
+
+      * NARRATION_PROVIDER=openai  (or unset)  -> OpenAI chat-completions
+      * NARRATION_PROVIDER=gemini               -> Gemini generateContent, NO grounding/tools
+
+    ``NARRATION_MODEL`` overrides the model string for whichever provider is
+    chosen; when it is unset the OpenAI path falls back to story_pass_model()
+    so the production default (gpt-4.1) is preserved byte-for-byte.
+    """
+    provider = (os.environ.get("NARRATION_PROVIDER", "") or "openai").strip().lower()
+    model = os.environ.get("NARRATION_MODEL", "").strip()
+    if provider == "gemini":
+        return ("gemini", model or "gemini-2.5-flash")
+    # OpenAI (default): preserve the existing story_pass_model() default exactly.
+    return ("openai", model or story_pass_model())
+
+
 def _tour_llm_cost(tokens: int, model: str = None) -> float:
     """Cost of a call at the model actually in use.
 
