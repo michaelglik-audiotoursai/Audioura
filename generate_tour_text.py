@@ -23590,12 +23590,14 @@ RULES:
 
         _orientation_prefix += _entrance_directive
 
-        # [LOCAL-643] Capture the Stop-1 opening as a record. The verbatim inline
-        # prefix is exactly what sits between 'Orientation: ' and Stop 1's own
-        # orientation, so re-rendering reproduces the fold byte-for-byte.
+        # [LOCAL-643] Capture the Stop-1 opening as a record. The loop's
+        # _orientation_prefix ALREADY begins with the literal "Orientation: "
+        # label; the structured renderer emits that label itself, so strip it here
+        # to avoid a doubled "Orientation: Orientation:" on render.
         if _ss_mod is not None and i == 0:
+            _ss_prefix_capture = re.sub(r'^Orientation:\s*', '', _orientation_prefix, count=1)
             _ss_opening = _ss_mod.Opening(
-                inline_prefix=_orientation_prefix, fold_into_orientation=True)
+                inline_prefix=_ss_prefix_capture, fold_into_orientation=True)
 
         # Add the orientation text — [LOCAL-388] Uniform: all stops get orientation
         # Strip any leading "Orientation:" from the LLM text to avoid duplication

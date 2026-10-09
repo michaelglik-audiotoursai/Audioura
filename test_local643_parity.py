@@ -204,6 +204,20 @@ class TestMultiTourParity(unittest.TestCase):
                                      f"tour {tid}: a stop has {n_orient} Orientation labels")
 
 
+class TestOrientationLabelNotDoubled(unittest.TestCase):
+    def test_inline_prefix_with_label_not_doubled(self):
+        """An Opening.inline_prefix that accidentally carries a leading
+        'Orientation:' must not produce 'Orientation: Orientation:' (the live NG
+        defect seen on the first structured run)."""
+        stop = sr.Stop(index=1, title="X", orientation="Stand here.",
+                       narration=["Body."])
+        opening = sr.Opening(inline_prefix="Orientation: Welcome. ",
+                             fold_into_orientation=True)
+        rendered = sr.render_tour([stop], title="T\n\n", opening=opening)
+        self.assertNotIn("Orientation: Orientation:", rendered)
+        self.assertIn("Orientation: Welcome. Stand here.", rendered)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
 

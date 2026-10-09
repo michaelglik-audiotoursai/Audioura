@@ -297,6 +297,10 @@ def render_stop_block(stop: Stop, *, opening: Optional[Opening] = None,
     # path, which carry no orientation line when there is no orientation.
     prefix = opening.prefix() if (opening is not None and stop.index == 1) else ""
     orientation = (stop.orientation or "").strip()
+    # Defensive: never emit a doubled "Orientation:" label even if a caller's
+    # inline prefix or the stop's orientation value carries one.
+    prefix = re.sub(r'^\s*Orientation:\s*', '', prefix)
+    orientation = re.sub(r'^\s*Orientation:\s*', '', orientation)
     if prefix or orientation:
         poi_content += f"Orientation: {prefix}{orientation}".rstrip() + "\n\n"
 
