@@ -1212,3 +1212,21 @@ def edit_tour_text(
     _logf(f"[LOCAL-628] editor pass complete: {n_edited} edited, "
           f"{n_rejected} kept original")
     return _mark_edited(new_text)
+
+
+def repair_stray_quotes_in_text(tour_text: str) -> Tuple[str, int]:
+    """[LEAD 2026-10-08] Drop a lone straight double quote in a line that holds an odd number
+    of them, when it sits at a sentence end or right after a title that was never opened
+    (Frick 523: 'Your first stop is Officer and Laughing Girl."'). Header and field lines
+    are left untouched."""
+    out, n = [], 0
+    for line in (tour_text or "").split("\n"):
+        if line.count('"') % 2 == 1 and not re.match(r"^(Stop \d+:|Address:|Coordinates:|Sources:)", line):
+            fixed = re.sub(r'(?<=[.!?])"(?=\s|$)', "", line, count=1)
+            if fixed == line:
+                fixed = re.sub(r'(?<=\w)"(?=[\s.,;:!?]|$)', "", line, count=1)
+            if fixed != line:
+                n += 1
+                line = fixed
+        out.append(line)
+    return "\n".join(out), n

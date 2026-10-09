@@ -1510,6 +1510,15 @@ def _insert_composed_gloss(sentence: str, entity: str, gloss: str) -> str:
     end_pos = pos + len(entity)
     after = sentence[end_pos:]
 
+    # [LEAD 2026-10-08] A name SUFFIX belongs to the name: "Hans Holbein the Younger",
+    # "Pieter Bruegel the Elder", "Charles I", "Lorenzo de' Medici", "Jr.". The gloss went
+    # BETWEEN them ("Hans Holbein, the German-born artist of the time, the Younger painted…",
+    # Frick 523; the Bruegel case at KHM 490). Extend the entity over the suffix first.
+    _suf = re.match(r"(?:,?\s+(?:the\s+(?:Elder|Younger)|[IVX]{1,4}\b|Jr\.?|Sr\.?|il\s+Vecchio|il\s+Giovane|le\s+Jeune|der\s+(?:Ältere|Jüngere)))+", after)
+    if _suf:
+        end_pos += _suf.end()
+        after = sentence[end_pos:]
+
     # Handle possessive: "Entity's ..." / "Entity’s ..."
     #
     # [LOCAL-475] This line used to test the SAME ASCII literal twice —

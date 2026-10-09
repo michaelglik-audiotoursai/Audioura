@@ -7775,6 +7775,12 @@ def _apply_delivery_hours_guard(result):
         try:
             import stop_editor as _se_bj
             final, _n_bj = _se_bj.repair_broken_joins_in_text(final)
+            try:
+                final, _n_sq = _se_bj.repair_stray_quotes_in_text(final)  # LEAD 2026-10-08
+                if _n_sq:
+                    print(f"  [LEAD] stray quote(s) removed: {_n_sq}", flush=True)
+            except Exception as _sq_e:
+                print(f"  [LEAD] stray-quote repair skipped: {_sq_e}", flush=True)
             if _n_bj:
                 print(f"  [LOCAL-635] repaired {_n_bj} broken sentence-join(s) "
                       f"in delivered text", flush=True)
