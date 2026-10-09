@@ -34,13 +34,13 @@
     }
   },
   "overlap": {
-    "rows": 414,
+    "rows": 393,
     "distinct_works": 8,
-    "total_grounded_passes": 414,
+    "total_grounded_passes": 393,
     "works": [
       {
         "work": "Le Lézard aux plumes d'or",
-        "grounded_passes": 294,
+        "grounded_passes": 273,
         "distinct_angles": 4,
         "mean_overlap": 1.0,
         "max_overlap": 1.0,
@@ -147,6 +147,38 @@
           "blending activism with powerful visual narratives",
           "embraced the social"
         ]
+      }
+    ]
+  },
+  "projected_savings": {
+    "rate_tag": "2026-10-08-r4",
+    "grounded_request_usd": 0.035,
+    "rows": [
+      {
+        "tour": "3-stop",
+        "off_requests": 4,
+        "on_fresh_requests": 2,
+        "on_cachehit_requests": 0,
+        "off_usd": 0.14,
+        "on_fresh_usd": 0.07,
+        "on_cachehit_usd": 0.0,
+        "saving_fresh_usd": 0.07,
+        "saving_fresh_pct": 50.0,
+        "saving_cachehit_usd": 0.14,
+        "saving_cachehit_pct": 100.0
+      },
+      {
+        "tour": "5-stop",
+        "off_requests": 6,
+        "on_fresh_requests": 2,
+        "on_cachehit_requests": 0,
+        "off_usd": 0.21,
+        "on_fresh_usd": 0.07,
+        "on_cachehit_usd": 0.0,
+        "saving_fresh_usd": 0.14,
+        "saving_fresh_pct": 66.7,
+        "saving_cachehit_usd": 0.21,
+        "saving_cachehit_pct": 100.0
       }
     ]
   }

@@ -82,6 +82,56 @@ def grounded_calls_per_tour(n_stops: int, pre_cap: bool = False,
     }
 
 
+def _grounded_request_usd() -> float:
+    """The price-card r4 rate for one search-enabled Gemini request, read from the
+    meter so no rate is hardcoded here (RATE_TAG 2026-10-08-r4,
+    GROUNDED_REQUEST_USD = $0.035 — Google list $35/1,000 grounded prompts)."""
+    try:
+        sys.path.insert(0, os.path.join(HERE, '_meter'))
+        import paid_api_meter as _m
+        return float(_m.GROUNDED_REQUEST_USD), _m.RATE_TAG
+    except Exception:
+        return 0.035, '2026-10-08-r4 (fallback literal)'
+
+
+def projected_savings() -> dict:
+    """Projected grounded-request saving per 3-stop and 5-stop tour under
+    GEMINI_PER_VENUE, priced at the price-card r4 per-request rate. NO quality
+    claim — LEAD runs the live A/B (flag OFF vs ON) in the morning.
+
+    Model (search-enabled REQUESTS per fresh tour):
+      flag OFF (shipped cut): preflight(1) + D511 per-stop grounded(1 * N) = N + 1
+      flag ON, FRESH venue  : preflight(1) + ONE venue research pass(1)    = 2
+                              (per-stop grounded replaced by the venue pass; a
+                               per-work fallback fires only when the venue pass
+                               found nothing about a work — 0 in the expected case)
+      flag ON, CACHE HIT    : a later tour of the same museum within 30 days reuses
+                              the venue pass (0 grounded) and the 7-day preflight
+                              cache (0 grounded) -> approaches 0 search-enabled
+                              requests on the grounded channel.
+    """
+    rate, tag = _grounded_request_usd()
+    rows = []
+    for n in (3, 5):
+        off = n + 1                       # preflight + N per-stop grounded
+        on_fresh = 2                      # preflight + 1 venue pass
+        on_hit = 0                        # both caches hit
+        rows.append({
+            'tour': f'{n}-stop',
+            'off_requests': off,
+            'on_fresh_requests': on_fresh,
+            'on_cachehit_requests': on_hit,
+            'off_usd': round(off * rate, 4),
+            'on_fresh_usd': round(on_fresh * rate, 4),
+            'on_cachehit_usd': round(on_hit * rate, 4),
+            'saving_fresh_usd': round((off - on_fresh) * rate, 4),
+            'saving_fresh_pct': round(100.0 * (off - on_fresh) / off, 1),
+            'saving_cachehit_usd': round((off - on_hit) * rate, 4),
+            'saving_cachehit_pct': round(100.0 * (off - on_hit) / off, 1),
+        })
+    return {'rate_tag': tag, 'grounded_request_usd': rate, 'rows': rows}
+
+
 def analyse_candidate_log(path: str = CAND_LOG) -> dict:
     if not os.path.exists(path):
         return {'error': f'no candidate log at {path}'}
@@ -169,6 +219,24 @@ def main():
         print("       A per-VENUE pass answers the venue+works ONCE and is reused "
               "by every\n       later stop and later tour of the same museum "
               "(cached 30 days).")
+
+    print("\n(C) PROJECTED SAVING per tour (price card r4; NO quality claim)")
+    ps = projected_savings()
+    print(f"    rate: ${ps['grounded_request_usd']:.3f} per search-enabled request "
+          f"(RATE_TAG {ps['rate_tag']})\n")
+    print(f"    {'tour':<9}{'OFF req':>8}{'ON req':>7}{'OFF $':>8}{'ON $':>7}"
+          f"{'save $':>8}{'save %':>8}")
+    for r in ps['rows']:
+        print(f"    {r['tour']:<9}{r['off_requests']:>8}{r['on_fresh_requests']:>7}"
+              f"{r['off_usd']:>8.3f}{r['on_fresh_usd']:>7.3f}"
+              f"{r['saving_fresh_usd']:>8.3f}{r['saving_fresh_pct']:>7.0f}%")
+    print("    (ON = fresh venue, per-stop grounded replaced by ONE venue pass.)")
+    for r in ps['rows']:
+        print(f"    {r['tour']} repeat within 30d (cache hit): "
+              f"ON={r['on_cachehit_requests']} grounded req "
+              f"-> save ${r['saving_cachehit_usd']:.3f} "
+              f"({r['saving_cachehit_pct']:.0f}%)")
+
     out = os.path.join(HERE, 'LOCAL645_overlap_measurement.json')
     with open(out, 'w', encoding='utf-8') as fh:
         json.dump({'grounded_call_map': {
@@ -176,7 +244,7 @@ def main():
             '5_stop_cut': grounded_calls_per_tour(5),
             '3_stop_precap': grounded_calls_per_tour(3, pre_cap=True, leads_grounded=True),
             '5_stop_precap': grounded_calls_per_tour(5, pre_cap=True, leads_grounded=True),
-        }, 'overlap': a}, fh, indent=2, ensure_ascii=False)
+        }, 'overlap': a, 'projected_savings': ps}, fh, indent=2, ensure_ascii=False)
     print(f"\n    wrote {os.path.basename(out)}")
     print("=" * 78)
 
