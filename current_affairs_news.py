@@ -1235,11 +1235,18 @@ def research_news_for_stops(request_text: str, stop_names: List[str],
                                     'resolved_date': a.get('_parsed_date', ''),
                                     'date_source': a.get('_date_source', '')})
 
-    # 5. compose per stop.
+    # 5. compose per stop. The composer writes about the tour's THEME SUBJECT
+    # (e.g. "Massachusetts politics"), NOT the narrow stop building name — an
+    # article about the governor's debate is current affairs for the State House
+    # stop even though it never names the building. Passing the building name as
+    # the subject made the cheap model answer NO MATERIAL FOUND for clearly
+    # on-theme items (observed in the LOCAL-659 live run). The item is still
+    # PLACED at its assigned stop; only the composer's framing uses the theme.
+    theme_subject = _theme_subject(request_text) or request_text
     for stop, articles in per_stop_articles.items():
         if not articles:
             continue
-        composed = compose_news_sentences(stop, articles, answer=answer,
+        composed = compose_news_sentences(theme_subject, articles, answer=answer,
                                           locale=_region_phrase(request_text))
         if composed.get('text'):
             log['by_stop'][stop] = {
