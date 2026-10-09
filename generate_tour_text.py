@@ -7972,10 +7972,20 @@ def _apply_current_affairs_news(final: str) -> str:
         # Always log the queries + per-query counts (the ticket requires it).
         print(f"  [LOCAL-655] NEWS search: {len(log['queries'])} queries issued, "
               f"{log['items_total']} items returned, "
+              f"{len(log.get('accepted', []))} accepted, "
+              f"{len(log.get('rejected', []))} rejected, "
               f"{log['articles_fetched']} article(s) fetched, "
               f"{len(log['by_stop'])} stop(s) received news.")
         for _q in log['queries']:
             print(f"  [LOCAL-655]   query: {_q!r} -> {log['result_counts'].get(_q, 0)} item(s)")
+        for _a in log.get('accepted', []):
+            print(f"  [LOCAL-655]   ACCEPT -> [{_a.get('stop','?')}] "
+                  f"{_a.get('title','')!r} ({_a.get('source','')}, "
+                  f"{_a.get('date','')}) — {_a.get('reason','')}")
+        for _r in log.get('rejected', []):
+            print(f"  [LOCAL-655]   REJECT    {_r.get('title','')!r} "
+                  f"({_r.get('source','')}, {_r.get('date','')}) — "
+                  f"{_r.get('reason','')}")
         out, n_added = _ca.inject_news_into_text(final, log['by_stop'])
         if n_added:
             print(f"  [LOCAL-655] injected dated news into {n_added} stop(s).")

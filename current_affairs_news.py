@@ -320,6 +320,237 @@ def _rank_items(items: List[Dict]) -> List[Dict]:
     return dated + undated
 
 
+# ── 3b. relevance gate — place / theme / dated-in-window ──────────────────────
+#
+# WHY DETERMINISTIC, NOT A MODEL CALL. The LOCAL-655 live run (tour 618) proved
+# the model-only approach leaks: the cheap composer was the ONLY filter, and it
+# happily wrote dated, attributed sentences about the Arkansas "Old State House
+# Museum" (Arkansas Times, KARK) on a Boston stop, and about a burger restaurant
+# ("Smashed by BRED") on a politics tour, and presented an undated "2022 strategy"
+# item as "Recently". A gate must run BEFORE composition and must not itself be a
+# fallible generative step. These three checks are cheap, free, auditable, and
+# their rejection reasons are logged for the ticket:
+#   (a) PLACE  — the article (title+snippet+fetched text) names the request's city
+#                or its state/region. A bare same-named building elsewhere, whose
+#                text names a DIFFERENT US state and never the request's place,
+#                fails. (Arkansas item: names "Arkansas"/"Hot Springs", never
+#                "Boston"/"Massachusetts" -> rejected.)
+#   (b) THEME  — the article names at least one civic/politics theme word
+#                (government, election, legislation, protest, …). A restaurant
+#                opening names none -> rejected. (burger item -> rejected.)
+#   (c) DATE   — a real date parses from the item AND falls inside the freshness
+#                window. Undated -> dropped (never "Recently" without a date).
+
+import datetime as _dt
+
+# US state names + common abbreviations, so a wrong-state article (Arkansas) is
+# detected even when the request's own state is absent. Kept lowercase.
+_US_STATES = {
+    'alabama', 'alaska', 'arizona', 'arkansas', 'california', 'colorado',
+    'connecticut', 'delaware', 'florida', 'georgia', 'hawaii', 'idaho',
+    'illinois', 'indiana', 'iowa', 'kansas', 'kentucky', 'louisiana', 'maine',
+    'maryland', 'massachusetts', 'michigan', 'minnesota', 'mississippi',
+    'missouri', 'montana', 'nebraska', 'nevada', 'new hampshire', 'new jersey',
+    'new mexico', 'new york', 'north carolina', 'north dakota', 'ohio',
+    'oklahoma', 'oregon', 'pennsylvania', 'rhode island', 'south carolina',
+    'south dakota', 'tennessee', 'texas', 'utah', 'vermont', 'virginia',
+    'washington', 'west virginia', 'wisconsin', 'wyoming',
+}
+_STATE_ABBR = {
+    'al': 'alabama', 'ak': 'alaska', 'az': 'arizona', 'ar': 'arkansas',
+    'ca': 'california', 'co': 'colorado', 'ct': 'connecticut', 'de': 'delaware',
+    'fl': 'florida', 'ga': 'georgia', 'hi': 'hawaii', 'id': 'idaho',
+    'il': 'illinois', 'in': 'indiana', 'ia': 'iowa', 'ks': 'kansas',
+    'ky': 'kentucky', 'la': 'louisiana', 'me': 'maine', 'md': 'maryland',
+    'ma': 'massachusetts', 'mi': 'michigan', 'mn': 'minnesota', 'ms': 'mississippi',
+    'mo': 'missouri', 'mt': 'montana', 'ne': 'nebraska', 'nv': 'nevada',
+    'nh': 'new hampshire', 'nj': 'new jersey', 'nm': 'new mexico', 'ny': 'new york',
+    'nc': 'north carolina', 'nd': 'north dakota', 'oh': 'ohio', 'ok': 'oklahoma',
+    'or': 'oregon', 'pa': 'pennsylvania', 'ri': 'rhode island', 'sc': 'south carolina',
+    'sd': 'south dakota', 'tn': 'tennessee', 'tx': 'texas', 'ut': 'utah',
+    'vt': 'vermont', 'va': 'virginia', 'wa': 'washington', 'wv': 'west virginia',
+    'wi': 'wisconsin', 'wy': 'wyoming',
+}
+
+# Theme vocabulary for (b). Civic / politics / government / elections /
+# legislation / civic protest. A restaurant/food/sport item names none of these.
+_THEME_WORDS = {
+    'politic', 'political', 'government', 'governor', 'gubernatorial', 'mayor',
+    'mayoral', 'council', 'councillor', 'councilmember', 'councilwoman',
+    'councilman', 'election', 'ballot', 'vote', 'voting', 'campaign', 'candidate',
+    'legislature', 'legislative', 'legislator', 'senate', 'senator', 'house',
+    'representative', 'congress', 'congressional', 'bill', 'law', 'statute',
+    'policy', 'referendum', 'protest', 'rally', 'demonstration', 'march',
+    'activist', 'civic', 'democrat', 'democratic', 'republican', 'gop',
+    'statehouse', 'city hall', 'town hall', 'debate', 'primary', 'caucus',
+    'commissioner', 'alderman', 'selectboard', 'veto', 'budget', 'hearing',
+    'lawsuit', 'court', 'ruling', 'reform', 'measure', 'ordinance',
+}
+
+_MONTHS = {m.lower(): i for i, m in enumerate(
+    ['', 'January', 'February', 'March', 'April', 'May', 'June', 'July',
+     'August', 'September', 'October', 'November', 'December'], 0)}
+for _i, _ab in enumerate(['', 'jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul',
+                          'aug', 'sep', 'oct', 'nov', 'dec'], 0):
+    if _ab:
+        _MONTHS[_ab] = _i
+
+_REL_RE = re.compile(
+    r'(?i)\b(?:(a|an|one|two|three|four|five|six|seven|eight|nine|ten|\d+)\s+'
+    r'(second|minute|hour|day|week|month|year)s?\s+ago|yesterday|today)\b')
+_WORD_NUM = {'a': 1, 'an': 1, 'one': 1, 'two': 2, 'three': 3, 'four': 4,
+             'five': 5, 'six': 6, 'seven': 7, 'eight': 8, 'nine': 9, 'ten': 10}
+
+
+def parse_news_date(raw: str, now: Optional[_dt.date] = None) -> Optional[_dt.date]:
+    """Parse a Serper-news date into a real calendar date, or None if undated.
+
+    Serper returns either a relative string ("Six days ago", "4 days ago",
+    "2 hours ago", "yesterday") or an absolute one ("Oct 8, 2026", "October 8,
+    2026", "2026-10-08"). Returns the resolved date, or None when nothing parses —
+    which the gate treats as UNDATED and drops."""
+    s = (raw or '').strip()
+    if not s:
+        return None
+    today = now or _dt.date.today()
+    # relative
+    m = _REL_RE.search(s)
+    if m:
+        low = s.lower()
+        if 'today' in low:
+            return today
+        if 'yesterday' in low:
+            return today - _dt.timedelta(days=1)
+        qty_raw, unit = m.group(1), (m.group(2) or '').lower()
+        qty = _WORD_NUM.get((qty_raw or '').lower(), None)
+        if qty is None:
+            try:
+                qty = int(qty_raw)
+            except (TypeError, ValueError):
+                qty = None
+        if qty is not None:
+            if unit in ('second', 'minute', 'hour'):
+                return today
+            if unit == 'day':
+                return today - _dt.timedelta(days=qty)
+            if unit == 'week':
+                return today - _dt.timedelta(days=7 * qty)
+            if unit == 'month':
+                return today - _dt.timedelta(days=30 * qty)
+            if unit == 'year':
+                return today - _dt.timedelta(days=365 * qty)
+    # ISO
+    mi = re.search(r'\b(\d{4})-(\d{2})-(\d{2})\b', s)
+    if mi:
+        try:
+            return _dt.date(int(mi.group(1)), int(mi.group(2)), int(mi.group(3)))
+        except ValueError:
+            return None
+    # "Month D, YYYY" or "D Month YYYY"
+    mo = re.search(r'(?i)\b([A-Za-z]{3,9})\.?\s+(\d{1,2}),?\s+(\d{4})\b', s)
+    if mo and mo.group(1).lower() in _MONTHS:
+        try:
+            return _dt.date(int(mo.group(3)), _MONTHS[mo.group(1).lower()],
+                            int(mo.group(2)))
+        except ValueError:
+            return None
+    md = re.search(r'(?i)\b(\d{1,2})\s+([A-Za-z]{3,9})\.?\s+(\d{4})\b', s)
+    if md and md.group(2).lower() in _MONTHS:
+        try:
+            return _dt.date(int(md.group(3)), _MONTHS[md.group(2).lower()],
+                            int(md.group(1)))
+        except ValueError:
+            return None
+    return None
+
+
+def _place_tokens(request_text: str) -> Tuple[str, str]:
+    """(city_lower, state_lower) parsed from the request's region tail.
+
+    'Boston, MA' -> ('boston', 'massachusetts'); the state abbreviation is
+    expanded to its full name so an article that writes 'Massachusetts' matches."""
+    region = _region_phrase(request_text)
+    city, state = '', ''
+    if region:
+        parts = [p.strip() for p in region.split(',') if p.strip()]
+        if parts:
+            city = parts[0].lower()
+        if len(parts) >= 2:
+            st = parts[1].lower().strip('.')
+            state = _STATE_ABBR.get(st, st if st in _US_STATES else st)
+    return city, state
+
+
+def _item_text_blob(item: Dict) -> str:
+    """All available text for an item, lowercased, for gate matching."""
+    return ' '.join(str(item.get(k, '') or '') for k in
+                    ('title', 'snippet', 'text')).lower()
+
+
+def gate_item(item: Dict, request_text: str, *,
+              fresh_days: int, now: Optional[_dt.date] = None) -> Tuple[bool, str]:
+    """Deterministic relevance gate for ONE news item.
+
+    Returns (accepted, reason). `reason` names the first failed check (for the
+    audit log) or 'ok: place+theme+date' on acceptance. Order: date, place, theme
+    — date first so an undated item is reported as 'undated' regardless of place.
+
+    fresh_days bounds how old a dated item may be. Serper is queried at qdr:m then
+    widened to qdr:y, so the gate's window is the generous one-year bound by
+    default (the caller passes 365 for a widened query, fewer for a tight one); the
+    point of the gate is to KILL undated and clearly-stale items, not to re-impose
+    the search tbs."""
+    today = now or _dt.date.today()
+    blob = _item_text_blob(item)
+
+    # (c) DATE — must parse AND be inside the window. Undated -> drop.
+    d = parse_news_date(item.get('date', ''), now=today)
+    if d is None:
+        return False, 'undated (no real date in item -> dropped)'
+    age = (today - d).days
+    if age < 0:
+        # a future date is a parse artefact; treat as undated
+        return False, f'date in the future ({d.isoformat()}) -> dropped'
+    if age > fresh_days:
+        return False, f'stale ({d.isoformat()}, {age}d old > {fresh_days}d window)'
+
+    # (a) PLACE — names the request's city or state. If it names a DIFFERENT state
+    # and NOT the request's place, reject (the Arkansas Old State House case).
+    city, state = _place_tokens(request_text)
+    names_city = bool(city) and city in blob
+    names_state = bool(state) and re.search(r'\b' + re.escape(state) + r'\b', blob) is not None
+    if not (names_city or names_state):
+        other = sorted({s for s in _US_STATES
+                        if s != state and re.search(r'\b' + re.escape(s) + r'\b', blob)})
+        if other:
+            return False, (f"wrong place (names {other[0]}, not "
+                           f"{city or state or 'the request place'})")
+        return False, (f"place not confirmed (article never names "
+                       f"{city or state or 'the request place'})")
+
+    # (b) THEME — names at least one civic/politics theme word.
+    if not any(w in blob for w in _THEME_WORDS):
+        return False, 'off-theme (no politics/government/civic term)'
+
+    return True, f"ok: place({'city' if names_city else 'state'})+theme+dated({d.isoformat()})"
+
+
+def gate_items(items: List[Dict], request_text: str, *, fresh_days: int,
+               now: Optional[_dt.date] = None) -> Tuple[List[Dict], List[Dict]]:
+    """Apply gate_item to a list. Returns (accepted, rejected); each rejected item
+    carries a '_reject_reason' key for the audit log."""
+    accepted, rejected = [], []
+    for it in items:
+        ok, reason = gate_item(it, request_text, fresh_days=fresh_days, now=now)
+        if ok:
+            accepted.append(it)
+        else:
+            r = dict(it)
+            r['_reject_reason'] = reason
+            rejected.append(r)
+    return accepted, rejected
+
+
 # ── 4. compose dated, attributed, balanced sentences ──────────────────────────
 
 _NEWS_PROMPT = """\
@@ -432,68 +663,212 @@ def compose_news_sentences(subject: str, articles: List[Dict],
 
 # ── 5. research per stop ──────────────────────────────────────────────────────
 
+# ── 4b. assign a news item to the stop it belongs to ──────────────────────────
+
+# Signals that an item is STATE government (-> a "State House"/capitol stop) vs
+# CITY government (-> a "City Hall" stop). Checked against the item text blob.
+_STATE_GOV_WORDS = ('state house', 'statehouse', 'legislature', 'legislative',
+                    'state senate', 'state house of representatives', 'governor',
+                    'gubernatorial', 'state capitol', 'beacon hill', 'state rep',
+                    'state representative', 'general court', 'house speaker')
+_CITY_GOV_WORDS = ('city hall', 'city council', 'city councillor', 'councilmember',
+                   'councilwoman', 'councilman', 'mayor', 'mayoral', 'alderman',
+                   'board of selectmen', 'town hall', 'municipal')
+
+_STOPWORDS = {'the', 'a', 'an', 'of', 'and', 'in', 'at', 'on', 'to', 'for',
+              'house', 'hall', 'news', 'city', 'state', 'old', 'new'}
+
+
+def _norm_name(s: str) -> str:
+    return re.sub(r'[^a-z0-9 ]', ' ', (s or '').lower())
+
+
+def _name_tokens(s: str) -> set:
+    return {w for w in _norm_name(s).split() if w and w not in _STOPWORDS}
+
+
+def _find_stop(stop_names: List[str], *keywords: str) -> Optional[str]:
+    """First stop whose name contains any of the keywords (case-insensitive)."""
+    for name in stop_names:
+        nl = name.lower()
+        if any(k in nl for k in keywords):
+            return name
+    return None
+
+
+def assign_item_to_stop(item: Dict, stop_names: List[str]) -> Optional[str]:
+    """Pick the ONE stop a theme/news item belongs to.
+
+    Rule (ticket): state government -> the 'State House'/capitol stop; city
+    government -> the 'City Hall' stop. Otherwise fall back to the stop whose
+    NAME shares the most meaningful tokens with the item's text; ties and
+    no-overlap resolve to None (the item is theme-level and will be placed on the
+    best government stop by the caller, or dropped if none fits)."""
+    if not stop_names:
+        return None
+    blob = _item_text_blob(item)
+
+    is_state = any(w in blob for w in _STATE_GOV_WORDS)
+    is_city = any(w in blob for w in _CITY_GOV_WORDS)
+    # When both fire, prefer the more specific "city hall"/"city council" only if
+    # the state capitol words are absent as the dominant signal.
+    if is_state and not is_city:
+        s = _find_stop(stop_names, 'state house', 'statehouse', 'capitol',
+                       'legislature')
+        if s:
+            return s
+    if is_city and not is_state:
+        s = _find_stop(stop_names, 'city hall', 'town hall', 'city council')
+        if s:
+            return s
+
+    # Fallback: most NAME-token overlap with the item text words.
+    item_words = set(_norm_name(blob).split())
+    best, best_overlap = None, 0
+    for name in stop_names:
+        toks = _name_tokens(name)
+        overlap = len(toks & item_words)
+        if overlap > best_overlap:
+            best, best_overlap = name, overlap
+    if best_overlap > 0:
+        return best
+    # Still nothing: if exactly one of state/city fired but its canonical stop was
+    # missing, hand it to the other government stop if present.
+    if is_state or is_city:
+        return _find_stop(stop_names, 'state house', 'statehouse', 'capitol',
+                          'city hall', 'town hall', 'legislature', 'council')
+    return None
+
+
+# ── 5. research per stop ──────────────────────────────────────────────────────
+
 def research_news_for_stops(request_text: str, stop_names: List[str],
                             *, serp: Optional[Callable] = None,
                             fetch: Optional[Callable] = None,
                             answer: Optional[Callable] = None,
-                            max_articles: int = NEWS_MAX_ARTICLES_PER_STOP) -> Dict:
+                            max_articles: int = NEWS_MAX_ARTICLES_PER_STOP,
+                            fresh_days: int = 365,
+                            now: Optional["_dt.date"] = None) -> Dict:
     """Run the whole news research for a current-affairs tour.
 
-    For the theme and each stop: query Serper news (qdr:m -> qdr:y), fetch the best
-    articles, write dated/attributed/balanced sentences grounded in them.
+    Pipeline (LOCAL-655B):
+      1. Query Serper news for the THEME (derive_theme_queries) and for each STOP
+         (derive_stop_queries), qdr:m widening to qdr:y.
+      2. GATE every returned item deterministically (place / theme / dated-in-
+         window) BEFORE any article is fetched or composed. Rejections are logged
+         with a reason. Undated and wrong-place/off-theme items are dropped here.
+      3. For accepted items, fetch the article page, then re-GATE on the fuller
+         text (an item that passed on a thin snippet but whose full text names a
+         different state is dropped).
+      4. ASSIGN each surviving item to exactly ONE stop (state gov -> State House,
+         city gov -> City Hall, else most name-overlap). An item (by link) is
+         placed on one stop only — no duplicate across stops.
+      5. COMPOSE dated/attributed/balanced sentences per stop from its items.
 
     Returns:
         {
           'by_stop': {stop_name: {text, sources, articles}},
-          'queries': [str],            # every query actually issued
-          'result_counts': {query: n}, # items returned per query
+          'queries': [str],              # every query actually issued
+          'result_counts': {query: n},   # items returned per query
+          'accepted': [{title,source,date,link,stop,reason}],
+          'rejected': [{title,source,date,link,reason}],
           'articles_fetched': int,
           'items_total': int,
-          'searched': bool,            # True if at least one query ran
+          'searched': bool,
         }
     `serp`/`fetch`/`answer` are injectable for tests (default to metered helpers).
     """
     serp = serp or _serp_news
     fetch = fetch or _fetch_article
     answer = answer or _openai_chat
+    today = now or _dt.date.today()
 
     log = {'by_stop': {}, 'queries': [], 'result_counts': {},
+           'accepted': [], 'rejected': [],
            'articles_fetched': 0, 'items_total': 0, 'searched': False}
 
     def _run_queries(queries: List[str]) -> List[Dict]:
         items: List[Dict] = []
         for q in queries:
+            if q in log['result_counts']:
+                continue  # don't re-issue an identical query
             log['queries'].append(q)
             log['searched'] = True
-            got, tbs = news_for_query(q, serp=serp)
+            got, _tbs = news_for_query(q, serp=serp)
             log['result_counts'][q] = len(got)
             log['items_total'] += len(got)
             items.extend(got)
         return _rank_items(items)
 
+    # 1. gather candidates from BOTH the theme queries and every stop query.
+    theme_queries = derive_theme_queries(request_text)
+    all_queries = list(theme_queries)
     for name in stop_names:
-        queries = derive_stop_queries(name, request_text)
-        ranked = _run_queries(queries)
-        # fetch the best few article pages
-        articles: List[Dict] = []
-        for it in ranked:
-            if len(articles) >= max_articles:
-                break
-            text = fetch(it['link']) if it.get('link') else ''
-            a = dict(it)
-            a['text'] = text if (text and len(text) >= 120) else it.get('snippet', '')
-            if a['text']:
-                articles.append(a)
-        if articles:
-            log['articles_fetched'] += len(articles)
-            composed = compose_news_sentences(name, articles, answer=answer,
-                                              locale=_region_phrase(request_text))
-            if composed.get('text'):
-                log['by_stop'][name] = {
-                    'text': composed['text'],
-                    'sources': composed['sources'],
-                    'articles': articles,
-                }
+        all_queries.extend(derive_stop_queries(name, request_text))
+    candidates = _run_queries(all_queries)
+
+    # 2. gate on title+snippet (pre-fetch).
+    accepted0, rejected0 = gate_items(candidates, request_text,
+                                      fresh_days=fresh_days, now=today)
+    for r in rejected0:
+        log['rejected'].append({'title': r.get('title', ''),
+                                 'source': r.get('source', ''),
+                                 'date': r.get('date', ''),
+                                 'link': r.get('link', ''),
+                                 'reason': r.get('_reject_reason', '')})
+
+    # 3. fetch + re-gate on fuller text; 4. assign to exactly one stop (dedup).
+    seen_links = set()
+    per_stop_articles: Dict[str, List[Dict]] = {}
+    for it in accepted0:
+        link = it.get('link', '')
+        if link and link in seen_links:
+            continue
+        text = fetch(link) if link else ''
+        a = dict(it)
+        a['text'] = text if (text and len(text) >= 120) else it.get('snippet', '')
+        # re-gate with the fuller text so a thin-snippet pass is re-checked.
+        ok, reason = gate_item(a, request_text, fresh_days=fresh_days, now=today)
+        if not ok:
+            log['rejected'].append({'title': a.get('title', ''),
+                                     'source': a.get('source', ''),
+                                     'date': a.get('date', ''),
+                                     'link': link,
+                                     'reason': f'post-fetch: {reason}'})
+            continue
+        stop = assign_item_to_stop(a, stop_names)
+        if not stop:
+            log['rejected'].append({'title': a.get('title', ''),
+                                     'source': a.get('source', ''),
+                                     'date': a.get('date', ''),
+                                     'link': link,
+                                     'reason': 'no stop to assign (no government '
+                                               'stop / no name overlap)'})
+            continue
+        if link:
+            seen_links.add(link)
+        bucket = per_stop_articles.setdefault(stop, [])
+        if len(bucket) < max_articles:
+            bucket.append(a)
+            log['articles_fetched'] += 1
+            log['accepted'].append({'title': a.get('title', ''),
+                                    'source': a.get('source', ''),
+                                    'date': a.get('date', ''),
+                                    'link': link, 'stop': stop,
+                                    'reason': reason})
+
+    # 5. compose per stop.
+    for stop, articles in per_stop_articles.items():
+        if not articles:
+            continue
+        composed = compose_news_sentences(stop, articles, answer=answer,
+                                          locale=_region_phrase(request_text))
+        if composed.get('text'):
+            log['by_stop'][stop] = {
+                'text': composed['text'],
+                'sources': composed['sources'],
+                'articles': articles,
+            }
     return log
 
 
@@ -553,7 +928,7 @@ def inject_news_into_text(text: str, by_stop: Dict[str, Dict]) -> Tuple[str, int
                     sn = (s.get('source') or '').strip()
                     if sn and sn not in src_names:
                         src_names.append(sn)
-                attrib = f" (Reported by {', '.join(src_names)}.)" if src_names else ""
+                attrib = _attribution_suffix(news_text, src_names)
                 para = f"{_NEWS_MARK} {news_text}{attrib}"
                 block = _insert_news_paragraph(block, para)
                 n_added += 1
@@ -561,6 +936,23 @@ def inject_news_into_text(text: str, by_stop: Dict[str, Dict]) -> Tuple[str, int
         cursor = end
     out_parts.append(text[cursor:])
     return "".join(out_parts), n_added
+
+
+def _attribution_suffix(news_text: str, src_names: List[str]) -> str:
+    """Return the trailing '(Reported by …)' parenthetical, OMITTING any source
+    the sentences already name in-text, and dropping the parenthetical entirely
+    when every source is already attributed there (ticket item 3).
+
+    The composer is instructed to attribute each claim in prose ("according to the
+    State House News Service", "Governor Healey said"). When it does, repeating
+    the same outlet in a trailing "(Reported by X, Y.)" is redundant and reads
+    poorly aloud. So we keep in the parenthetical only the outlets NOT yet named in
+    the sentences; if that leaves nothing, there is no parenthetical."""
+    tl = (news_text or '').lower()
+    missing = [sn for sn in src_names if sn.lower() not in tl]
+    if not missing:
+        return ""
+    return f" (Reported by {', '.join(missing)}.)"
 
 
 def _insert_news_paragraph(block: str, para: str) -> str:
