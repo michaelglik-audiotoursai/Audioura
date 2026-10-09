@@ -1,0 +1,102 @@
+[db] audio_tours row count BEFORE: 400 (is_test rows BEFORE: 336)
+[TIMING] TOTAL wall=451.6s phases: story_first=212.9s, poi_selection=100.0s, packing=62.2s, external_lookups=60.2s, fact_sheets=12.4s, intent=3.9s, narration=0.0s, verification=0.0s
+[TIMING-SUB]   phase=story_first step=gemini_with_sources total=95.02s calls=24 max=10.41s
+[TIMING-SUB]   phase=external_lookups step=serp_search total=36.52s calls=24 max=3.82s
+[TIMING-SUB]   phase=external_lookups step=search_stories_for_stop total=24.26s calls=3 max=9.56s
+[TIMING-SUB]   phase=story_first step=serp_search total=20.43s calls=16 max=2.02s
+[TIMING-SUB]   phase=external_lookups step=fetch_stop_knowledge total=18.06s calls=3 max=6.96s
+[TIMING-SUB]   phase=external_lookups step=gemini_with_sources total=18.06s calls=3 max=6.96s
+[TIMING-SUB]   phase=unknown step=venue_preflight total=15.13s calls=1 max=15.13s
+[TIMING-SUB]   phase=poi_selection step=fetch_osm_venue_facts total=12.49s calls=3 max=5.02s
+[TIMING-SUB]   phase=unknown step=gemini_with_sources total=10.66s calls=1 max=10.66s
+[TIMING-SUB]   phase=poi_selection step=resolve_venue total=10.22s calls=4 max=2.65s
+[TIMING-SUB]   phase=poi_selection step=fetch_venue_works total=6.16s calls=3 max=5.97s
+[TIMING-SUB]   phase=packing step=packing_stop_editor_llm total=4.08s calls=1 max=4.08s
+[TIMING-SUB]   phase=external_lookups step=story_leads_openai total=3.71s calls=3 max=1.36s
+[TIMING-SUB]   phase=packing step=packing_rank_facts_llm total=2.66s calls=1 max=2.66s
+[TIMING-SUB]   phase=packing step=packing_prolog_llm total=2.53s calls=1 max=2.53s
+[TIMING-SUB]   phase=packing step=packing_part4_preview_llm total=1.52s calls=2 max=0.80s
+[TIMING-SUB]   phase=packing step=packing_conclusion_llm total=1.23s calls=1 max=1.23s
+  STOP TITLE: Manet’s A Bar at the Folies-Bergère
+  STOP TITLE: Courtauld Institute
+  STOP TITLE: Georges Seurat
+  [detectors] delivered=3 stated='3' runon_header=False callbacks_in_text=0 (budget=1)
+  [paid_api_calls] tour_calls=221 tour_spend=$0.8333 by_kind={'gemini': 32, 'openai': 117, 'serper': 72}
+  LOCAL651_TOUR_ID_COURTAULD_OFF=601
+[TIMING] TOTAL wall=423.2s phases: story_first=186.3s, poi_selection=107.6s, packing=61.9s, external_lookups=53.2s, fact_sheets=12.6s, intent=1.5s, narration=0.0s, verification=0.0s
+[TIMING-SUB]   phase=story_first step=gemini_with_sources total=139.40s calls=22 max=31.41s
+[TIMING-SUB]   phase=external_lookups step=serp_search total=40.43s calls=24 max=5.05s
+[TIMING-SUB]   phase=story_first step=serp_search total=25.00s calls=20 max=1.95s
+[TIMING-SUB]   phase=external_lookups step=search_stories_for_stop total=22.67s calls=3 max=8.47s
+[TIMING-SUB]   phase=poi_selection step=fetch_osm_venue_facts total=22.57s calls=3 max=12.50s
+[TIMING-SUB]   phase=external_lookups step=fetch_stop_knowledge total=18.02s calls=3 max=7.00s
+[TIMING-SUB]   phase=external_lookups step=gemini_with_sources total=18.02s calls=3 max=7.00s
+[TIMING-SUB]   phase=verification step=venue_preflight total=15.45s calls=1 max=15.45s
+[TIMING-SUB]   phase=poi_selection step=resolve_venue total=10.67s calls=4 max=2.71s
+[TIMING-SUB]   phase=verification step=gemini_with_sources total=10.61s calls=1 max=10.61s
+[TIMING-SUB]   phase=poi_selection step=fetch_venue_works total=10.28s calls=3 max=10.09s
+[TIMING-SUB]   phase=external_lookups step=story_leads_openai total=5.78s calls=3 max=2.10s
+[TIMING-SUB]   phase=packing step=packing_stop_editor_llm total=3.72s calls=1 max=3.72s
+[TIMING-SUB]   phase=packing step=packing_rank_facts_llm total=2.72s calls=1 max=2.72s
+[TIMING-SUB]   phase=packing step=packing_prolog_llm total=2.19s calls=1 max=2.19s
+[TIMING-SUB]   phase=packing step=packing_part4_preview_llm total=1.75s calls=1 max=1.75s
+[TIMING-SUB]   phase=packing step=packing_conclusion_llm total=0.98s calls=1 max=0.98s
+  STOP TITLE: Manet’s A Bar at the Folies-Bergère
+  STOP TITLE: Courtauld Institute
+  STOP TITLE: Georges Seurat
+  [detectors] delivered=3 stated='3' runon_header=False callbacks_in_text=0 (budget=1)
+  [paid_api_calls] tour_calls=212 tour_spend=$0.6938 by_kind={'gemini': 30, 'openai': 105, 'serper': 77}
+  LOCAL651_TOUR_ID_COURTAULD_ON=602
+[TIMING] TOTAL wall=337.0s phases: story_first=164.8s, external_lookups=81.0s, poi_selection=53.9s, fact_sheets=20.7s, packing=14.9s, intent=1.7s, narration=0.0s, verification=0.0s
+[TIMING-SUB]   phase=story_first step=gemini_with_sources total=118.58s calls=25 max=15.67s
+[TIMING-SUB]   phase=external_lookups step=serp_search total=51.94s calls=28 max=4.92s
+[TIMING-SUB]   phase=external_lookups step=search_stories_for_stop total=29.15s calls=3 max=10.56s
+[TIMING-SUB]   phase=external_lookups step=fetch_stop_knowledge total=22.05s calls=3 max=7.70s
+[TIMING-SUB]   phase=external_lookups step=gemini_with_sources total=22.04s calls=3 max=7.70s
+[TIMING-SUB]   phase=verification step=venue_preflight total=13.49s calls=1 max=13.49s
+[TIMING-SUB]   phase=story_first step=serp_search total=13.29s calls=9 max=1.73s
+[TIMING-SUB]   phase=poi_selection step=fetch_osm_venue_facts total=12.47s calls=3 max=5.01s
+[TIMING-SUB]   phase=verification step=gemini_with_sources total=10.39s calls=1 max=10.39s
+[TIMING-SUB]   phase=poi_selection step=resolve_venue total=8.79s calls=4 max=2.38s
+[TIMING-SUB]   phase=external_lookups step=story_leads_openai total=7.44s calls=3 max=4.54s
+[TIMING-SUB]   phase=packing step=packing_stop_editor_llm total=4.46s calls=1 max=4.46s
+[TIMING-SUB]   phase=packing step=packing_rank_facts_llm total=1.99s calls=1 max=1.99s
+[TIMING-SUB]   phase=packing step=packing_part4_preview_llm total=1.65s calls=2 max=0.92s
+[TIMING-SUB]   phase=packing step=packing_prolog_llm total=1.65s calls=1 max=1.65s
+[TIMING-SUB]   phase=packing step=packing_conclusion_llm total=1.26s calls=1 max=1.26s
+[TIMING-SUB]   phase=poi_selection step=fetch_venue_works total=0.98s calls=3 max=0.71s
+  STOP TITLE: Sappho and Alcaeus
+  STOP TITLE: Springtime
+  STOP TITLE: The Death of Caesar
+  [detectors] delivered=3 stated='3' runon_header=False callbacks_in_text=0 (budget=1)
+  [paid_api_calls] tour_calls=186 tour_spend=$0.8213 by_kind={'gemini': 33, 'openai': 103, 'serper': 50}
+  LOCAL651_TOUR_ID_WALTERS_OFF=603
+[TIMING] TOTAL wall=394.9s phases: story_first=228.4s, external_lookups=74.6s, poi_selection=57.9s, fact_sheets=19.3s, packing=13.1s, intent=1.4s, narration=0.0s, verification=0.0s
+[TIMING-SUB]   phase=story_first step=gemini_with_sources total=126.08s calls=24 max=14.58s
+[TIMING-SUB]   phase=external_lookups step=serp_search total=53.71s calls=28 max=6.18s
+[TIMING-SUB]   phase=external_lookups step=fetch_stop_knowledge total=25.86s calls=3 max=12.29s
+[TIMING-SUB]   phase=external_lookups step=gemini_with_sources total=25.86s calls=3 max=12.29s
+[TIMING-SUB]   phase=poi_selection step=fetch_osm_venue_facts total=22.50s calls=3 max=12.58s
+[TIMING-SUB]   phase=external_lookups step=search_stories_for_stop total=20.64s calls=3 max=8.32s
+[TIMING-SUB]   phase=verification step=venue_preflight total=13.88s calls=1 max=13.88s
+[TIMING-SUB]   phase=story_first step=serp_search total=13.76s calls=11 max=1.74s
+[TIMING-SUB]   phase=verification step=gemini_with_sources total=9.37s calls=1 max=9.37s
+[TIMING-SUB]   phase=poi_selection step=resolve_venue total=8.56s calls=4 max=2.29s
+[TIMING-SUB]   phase=poi_selection step=fetch_venue_works total=5.02s calls=3 max=4.81s
+[TIMING-SUB]   phase=external_lookups step=story_leads_openai total=4.74s calls=3 max=1.71s
+[TIMING-SUB]   phase=packing step=packing_rank_facts_llm total=2.88s calls=1 max=2.88s
+[TIMING-SUB]   phase=packing step=packing_stop_editor_llm total=2.12s calls=1 max=2.12s
+[TIMING-SUB]   phase=packing step=packing_prolog_llm total=1.32s calls=1 max=1.32s
+[TIMING-SUB]   phase=packing step=packing_part4_preview_llm total=1.04s calls=1 max=1.04s
+[TIMING-SUB]   phase=packing step=packing_conclusion_llm total=1.01s calls=1 max=1.01s
+  STOP TITLE: Sappho and Alcaeus
+  STOP TITLE: Springtime
+  STOP TITLE: The Death of Caesar
+  [detectors] delivered=3 stated='3' runon_header=False callbacks_in_text=0 (budget=1)
+  [paid_api_calls] tour_calls=186 tour_spend=$0.7617 by_kind={'gemini': 32, 'openai': 103, 'serper': 51}
+  LOCAL651_TOUR_ID_WALTERS_ON=605
+[db] audio_tours row count AFTER: 409 (is_test rows AFTER: 345)
+RESULT COURTAULD_OFF: id=601 outcome=DELIVERED wall=466.8s cost=$1.0285454499999998 calls=221 stops=3 callbacks=0/1
+RESULT COURTAULD_ON: id=602 outcome=DELIVERED wall=438.7s cost=$0.7927629 calls=212 stops=3 callbacks=0/1
+RESULT WALTERS_OFF: id=603 outcome=DELIVERED wall=350.6s cost=$1.00764555 calls=186 stops=3 callbacks=0/1
+RESULT WALTERS_ON: id=605 outcome=DELIVERED wall=408.8s cost=$0.96064115 calls=186 stops=3 callbacks=0/1

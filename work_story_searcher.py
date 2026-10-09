@@ -8,6 +8,15 @@ import concurrent.futures
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Set, Tuple
 
+# ── LOCAL-651: [TIMING-SUB] decorator (safe no-op if phase_timer unavailable).
+try:
+    from phase_timer import timed_step as _sub_timed
+except Exception:  # pragma: no cover
+    def _sub_timed(_name):
+        def _wrap(fn):
+            return fn
+        return _wrap
+
 # --- Configuration ---
 RULES_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'source_tier_rules.json')
 GENERATION_TIER = os.environ.get('GENERATION_TIER', 'plus')
@@ -845,6 +854,7 @@ def synthesize_fact_targeted_queries(stop: Dict, reported_elements: List[Dict]) 
 
 
 # --- SERP Execution ---
+@_sub_timed('serp_search')
 def _serp_search(query: str) -> Tuple[List[Dict], float]:
     """Execute a single SERP query via Serper.dev. Returns (results, latency_ms).
     On failure → ([], latency_ms) + logged with full request/response detail."""
@@ -913,6 +923,7 @@ def _serp_search(query: str) -> Tuple[List[Dict], float]:
 
 
 # --- Main search function ---
+@_sub_timed('search_stories_for_stop')
 def search_stories_for_stop(stop: Dict, tour_type: str = 'contained',
                             generation_tier: str = None,
                             query_budget: int = None) -> Dict:

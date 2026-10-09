@@ -35,6 +35,15 @@ import re
 import sys
 from typing import Dict, List
 
+# ── LOCAL-651: [TIMING-SUB] decorator (safe no-op if phase_timer unavailable).
+try:
+    from phase_timer import timed_step as _sub_timed
+except Exception:  # pragma: no cover
+    def _sub_timed(_name):
+        def _wrap(fn):
+            return fn
+        return _wrap
+
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 # [D549] A convenience, not a requirement. This unconditional open() raised
@@ -269,6 +278,7 @@ def _count_grounding_queries(web_search_queries) -> None:
 
 # ── providers ────────────────────────────────────────────────────────────────
 
+@_sub_timed('story_leads_openai')
 def _openai(prompt: str, model: str = 'gpt-4o') -> str:
     import requests
     key = os.environ.get('OPENAI_API_KEY')
@@ -378,6 +388,7 @@ def _gemini_post(model, key, prompt, grounded, timeout):
               **({'tools': [{'google_search': {}}]} if grounded else {})},
         timeout=timeout)
 
+@_sub_timed('gemini_with_sources')
 def gemini_with_sources(prompt: str, model: str = None,
                         resolve: bool = True, timeout: int = 90,
                         grounded: bool = True) -> Dict:

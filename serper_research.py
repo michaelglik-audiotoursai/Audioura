@@ -38,6 +38,15 @@ import sys
 import time
 from typing import Callable, Dict, List, Optional, Tuple
 
+# ── LOCAL-651: [TIMING-SUB] decorator (safe no-op if phase_timer unavailable).
+try:
+    from phase_timer import timed_step as _sub_timed
+except Exception:  # pragma: no cover
+    def _sub_timed(_name):
+        def _wrap(fn):
+            return fn
+        return _wrap
+
 HERE = os.path.dirname(os.path.abspath(__file__))
 if HERE not in sys.path:
     sys.path.insert(0, HERE)
@@ -354,6 +363,7 @@ def _attribute(answer_text: str, pages: List[Dict]) -> List[Dict]:
     return supports
 
 
+@_sub_timed('serper_research')
 def serper_research(prompt: str, model: str = None, resolve: bool = True,
                     timeout: int = 90, grounded: bool = True,
                     *, serp: Optional[Callable] = None,
