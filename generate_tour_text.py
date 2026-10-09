@@ -13934,7 +13934,9 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
                             "Requirements:\n"
                             "- REAL, SPECIFIC names; never generic placeholders.\n"
                             "- Complete street address with ZIP where applicable.\n"
-                            "- Must be within comfortable walking distance of the accepted stops.\n\n"
+                            "- Must be within comfortable walking distance of the accepted stops.\n"
+                            "- Every stop must be a real, named, geocodable PLACE (building, square, park, monument, library). "
+                            "NEVER name a stop after the tour's theme or an abstract topic.\n\n"
                             "Return ONLY a JSON array, no other text:\n"
                             '[{"name": "...", "address": "..."}, ...]'
                         )
@@ -13966,6 +13968,19 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
                                         name = (c.get('name') or '').strip()
                                         if not name or _normalize_name(name) in forbidden_norms:
                                             continue
+                                        # [LOCAL-650B] Reject theme/topic candidates
+                                        # from GEO-CHECK replacements too — same
+                                        # filter as the Phase 3A loop.
+                                        try:
+                                            import theme_stop_guard as _tsg_geo
+                                            _geo_theme = _tsg_geo.extract_request_theme(user_request) \
+                                                or _tsg_geo.extract_request_theme(location)
+                                            if _tsg_geo.stop_name_is_not_a_place(name, _geo_theme):
+                                                print(f"   GEO-CHECK: rejected theme/topic "
+                                                      f"replacement '{name[:60]}'")
+                                                continue
+                                        except Exception:
+                                            pass
                                         new_stops.append(_new_poi(name, c.get('address') or ''))
                                         forbidden_norms.add(_normalize_name(name))
                                     poi_list.extend(new_stops[:needed])
