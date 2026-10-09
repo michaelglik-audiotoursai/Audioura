@@ -139,18 +139,29 @@ def _pooled_unit_from_row(row: Dict) -> Dict:
         "type_specialty": row.get("type_specialty", ""),
         "specific_examples": row.get("specific_examples", ""),
         "operational_details": row.get("operational_details", ""),
+        # [LOCAL-644] carry the pooled stop's structured record so a reuse delivery
+        # renders FROM the record under STRUCTURED_STOPS=1 (the assembler overlays
+        # the sequence orientation/directions it recomputes).
+        "_stop_record": row.get("stop_record"),
         "_pool_reused": True,
     }
 
 
-def _new_unit_from_parsed(stop: Dict) -> Dict:
+def _new_unit_from_parsed(stop: Dict, records_by_title: Optional[Dict[str, dict]] = None) -> Dict:
     """Convert a parsed delivered stop (stop_pool_store.parse_delivered_stops) into
-    an assembly stop unit, recovering the per-stop orientation from raw_block."""
+    an assembly stop unit, recovering the per-stop orientation from raw_block.
+
+    [LOCAL-644] When ``records_by_title`` (the generator's structured records,
+    keyed by bare title) covers this stop, its record is carried on the unit so a
+    STRUCTURED_STOPS delivery renders the new stop FROM the generator's own record
+    rather than from the parsed text. Absent a record (flag OFF, or a title the
+    records do not cover), the unit renders from its parsed fields as before."""
     orientation = ""
     raw = stop.get("raw_block") or ""
     m = re.search(r'^Orientation:\s*(.+?)\s*$', raw, re.M)
     if m:
         orientation = m.group(1).strip()
+    _rec = (records_by_title or {}).get(stop["title"])
     return {
         "title": stop["title"],
         "artist": stop.get("artist", ""),
@@ -162,8 +173,31 @@ def _new_unit_from_parsed(stop: Dict) -> Dict:
         "type_specialty": stop.get("type_specialty", ""),
         "specific_examples": stop.get("specific_examples", ""),
         "operational_details": stop.get("operational_details", ""),
+        "_stop_record": _rec,
         "_pool_reused": False,
     }
+
+
+def _structured_records_by_title() -> Dict[str, dict]:
+    """[LOCAL-644] The generator's structured records from the LAST generate_fn
+    call, keyed by bare stop title.
+
+    generate_tour_text populates ``_LAST_STRUCTURED_RECORDS`` (a per-job holder)
+    only when STRUCTURED_STOPS=1 rendered from records. Reading it here lets the
+    orchestrator (a) carry each new stop's own record into assembly, and (b) store
+    the records with the pooled stops so a later reuse renders from them. Returns
+    {} when the flag is off or the holder is empty — the caller then falls back to
+    parsing the delivered text (back-compat). Never raises."""
+    try:
+        from generate_tour_text import _LAST_STRUCTURED_RECORDS as _rec
+    except Exception:
+        return {}
+    out = {}
+    for s in (_rec or {}).get("stops", []) or []:
+        t = s.get("title")
+        if t:
+            out[t] = s
+    return out
 
 
 def _header_categories(tour_category: str, tour_type: str) -> Tuple[str, str]:
@@ -285,7 +319,10 @@ def maybe_generate_with_pool(
             except Exception:
                 first_cost = 0.0
             parsed = pool.parse_delivered_stops(gen_text)
-            new_units = [_new_unit_from_parsed(s) for s in parsed]
+            # [LOCAL-644] The generator's structured records from this generate_fn
+            # call (keyed by bare title) when STRUCTURED_STOPS rendered from them.
+            _gen_records = _structured_records_by_title()
+            new_units = [_new_unit_from_parsed(s, _gen_records) for s in parsed]
             if not new_units:
                 return None
             # [LOCAL-600 / D616] If the site-first exhibition path could not reach
@@ -335,7 +372,8 @@ def maybe_generate_with_pool(
             # NOT pooled; it is a sequence-level opener, regenerated per tour like
             # orientation — LOCAL-590/592).
             try:
-                pool.store_delivered_tour(location, tour_type, gen_text, db_url, qid=qid)
+                pool.store_delivered_tour(location, tour_type, gen_text, db_url,
+                                          qid=qid, records_by_title=_gen_records)
             except Exception as _se:
                 logger.info(f"[LOCAL-592] pool store (first tour) skipped: {_se}")
             print(f"  [LOCAL-592] FIRST-TOUR opening section folded into Stop 1: "
@@ -490,9 +528,11 @@ def maybe_generate_with_pool(
     _new_breakdown = _new_breakdown_from_last()
 
     parsed_new = pool.parse_delivered_stops(gen_text)
+    # [LOCAL-644] Generator records for the freshly generated new stops.
+    _gen_records = _structured_records_by_title()
     # De-dup: never let a freshly generated stop collide with a pooled title.
     pooled_norm = {pool._title_norm(t) for t in pooled_titles}
-    new_units = [_new_unit_from_parsed(s) for s in parsed_new
+    new_units = [_new_unit_from_parsed(s, _gen_records) for s in parsed_new
                  if pool._title_norm(s["title"]) not in pooled_norm]
     pooled_units = [_pooled_unit_from_row(r) for r in pooled_rows]
     if contained:
@@ -584,7 +624,17 @@ def maybe_generate_with_pool(
 
     _emit_result(output_file, result)
     # Store the delivered tour back: adds the new stops to the pool (additive).
-    pool.store_delivered_tour(location, tour_type, result.tour_text, db_url, qid=qid)
+    # [LOCAL-644] Carry the structured records so the stored rows render from
+    # records on a later reuse: the generator's records for the NEW stops, and the
+    # pooled stops' existing records (so re-storing the assembled tour does not
+    # overwrite a good pooled record with a derived one).
+    _store_records = dict(_gen_records)
+    for r in pooled_rows:
+        _rec = r.get("stop_record")
+        if _rec and r.get("title"):
+            _store_records.setdefault(r["title"], _rec)
+    pool.store_delivered_tour(location, tour_type, result.tour_text, db_url, qid=qid,
+                              records_by_title=_store_records)
     pool.bump_hit_counts(location, tour_type, [u["title"] for u in pooled_units], db_url, qid=qid)
 
     return {
