@@ -7767,6 +7767,20 @@ def _apply_delivery_hours_guard(result):
                       f"artist/work not delivered in this tour", flush=True)
         except Exception as _uce:  # pragma: no cover
             _import_logger.error(f"[LOCAL-634] unseen-callback guard skipped: {_uce}")
+        # 1d-i. [LOCAL-640] Drop any COMPARISON to a NAMED work not delivered in
+        #     this tour ("echoes the way Gauguin, in the 'Græshopperne og
+        #     myrerne'", Ny Carlsberg 532). The recall guard above covers "you
+        #     saw / may recall"; this covers the comparison verbs (echoes /
+        #     mirrors / evokes / reminiscent of …). D636 keeps comparisons to a
+        #     DELIVERED stop; only a named undelivered work is removed.
+        try:
+            import cross_stop_reference_guard as _csrg3
+            final, _n_cmp = _csrg3.strip_unseen_comparisons_in_text(final)
+            if _n_cmp:
+                print(f"  [LOCAL-640] dropped {_n_cmp} comparison(s) to a work "
+                      f"not delivered in this tour", flush=True)
+        except Exception as _cce:  # pragma: no cover
+            _import_logger.error(f"[LOCAL-640] unseen-comparison guard skipped: {_cce}")
         # 1d-ii. [LOCAL-635] Repair any broken sentence-join on the DELIVERED TEXT
         #     — a removal/splice pass can run a lowercase word straight into a
         #     capitalised sentence-starter ("…the tragedies surrounding During
