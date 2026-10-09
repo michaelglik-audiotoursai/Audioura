@@ -1,15 +1,16 @@
 #!/usr/bin/env bash
-# run_local650_live.sh — LOCAL-650 isolated live run in a DISPOSABLE container
-# (name: local650-gen; --rm; spare published port 5115; NEVER an audioura-*
+# run_local650_live.sh — LOCAL-650B isolated live run in a DISPOSABLE container
+# (name: local650b-gen; --rm; spare published port 5116; NEVER an audioura-*
 # service container, never `docker compose -p audioura`). Builds
-# Dockerfile.generator from the LOCAL-650 branch tree (so theme_stop_guard.py,
-# walking_directions_guard.py, current_affairs_coverage.py, the
-# directions_generator target guard and the PHASE 3A theme constraint are in the
-# image) and runs TWO FRESH tours:
-#   1. Boston walking (5 stops) — the evidence tour (557): no theme-phrase stop,
-#      directions lead to the NEXT stop with a distance, current-affairs honesty.
+# Dockerfile.generator from the LOCAL-650B branch tree (theme_stop_guard
+# selection-time detectors, walking_directions_guard with verified-coords-only
+# distances, current_affairs_coverage, the directions_generator target guard,
+# the PHASE 3A + GEO-CHECK theme constraint) and runs TWO FRESH tours:
+#   1. Boston walking (5 stops) — the evidence tour (557): no theme-phrase stop
+#      (rejected at SELECTION), directions lead to the NEXT stop, distances only
+#      from verified P625 coords, current-affairs honesty.
 #   2. The Courtauld Gallery museum canary (3 stops) — the museum path must not
-#      change (0 directions missing, no run-on header, LOCAL-650 guards no-op).
+#      change (0 directions missing, no run-on header, LOCAL-650B guards no-op).
 # Metered + HARD-CAPPED at $1.20 COMBINED by tests/live_run_meter.py with a
 # RESERVE GATE before each tour.
 #
@@ -23,12 +24,12 @@
 set -uo pipefail
 
 HERE="$(cd "$(dirname "$0")" && pwd)"
-IMAGE="local650-gen-img"
+IMAGE="local650b-gen-img"
 ENV_FILE="${HERE}/.env"
-OUT_DIR="${HERE}/tours/local650_live"
+OUT_DIR="${HERE}/tours/local650b_live"
 NET="development_default"
-GEN="local650-gen"
-PORT="5115"          # spare published port (ticket: docker run ... -p <spare port>)
+GEN="local650b-gen"
+PORT="5116"          # spare published port (ticket: docker run ... -p <spare port>)
 mkdir -p "${OUT_DIR}"
 LOG="${OUT_DIR}/local650_live.log"
 
@@ -73,6 +74,6 @@ echo "[local650] ===== running Boston walking (5) + Courtauld museum (3), combin
 "${args[@]}" 2>&1 | tee "${LOG}" || true
 
 echo ""
-echo "#################### LOCAL-650 full log at ${LOG} ####################"
-echo "[local650] tour IDs (for critique.sh / detectors.py):"
-grep -E "LOCAL650_TOUR_ID_|RESULT |WALKING RESULT|MUSEUM RESULT|FIX1|FIX2|FIX3" "${LOG}" || true
+echo "#################### LOCAL-650B full log at ${LOG} ####################"
+echo "[local650b] tour IDs (for critique.sh / detectors.py):"
+grep -E "LOCAL650_TOUR_ID_|RESULT |WALKING RESULT|MUSEUM RESULT|FIX1|FIX2|FIX3|LOCAL-650B" "${LOG}" || true

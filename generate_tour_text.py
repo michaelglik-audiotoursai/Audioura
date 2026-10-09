@@ -11553,6 +11553,29 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
             print(f"  [LOCAL-576] named anchors: {_lr576_anchors} "
                   f"start={_lr576['start']!r} end={_lr576['end']!r} "
                   f"is_loop={_lr576['is_loop']}")
+        # [LOCAL-650B] A WALKING/outdoor tour's "dedicated to <theme>" is NOT a
+        # route anchor — named_anchors misreads "dedicated TO X" as a "to Y" end
+        # anchor and would INSERT the theme phrase as a stop (tour 557: Stop 5
+        # "Massachusetts politics and current affairs"). This is the anchor path
+        # that bypasses the Phase 3A selection filter, so apply the SAME detector
+        # here: drop any anchor that is the request theme phrase or topic-like.
+        # Museum/building/venue anchors are left alone (not theme-driven).
+        if tour_category not in ('museum', 'building', 'venue') and _lr576_anchors:
+            try:
+                import theme_stop_guard as _tsg_anc
+                _anc_theme = _tsg_anc.extract_request_theme(user_request) \
+                    or _tsg_anc.extract_request_theme(location)
+                _kept_anchors = []
+                for _a in _lr576_anchors:
+                    if _tsg_anc.stop_name_is_not_a_place(_a, _anc_theme):
+                        print(f"  [LOCAL-650B] Dropped theme/topic anchor "
+                              f"(not a real place): '{_a[:80]}' — the request's "
+                              f"theme is not a stop", flush=True)
+                    else:
+                        _kept_anchors.append(_a)
+                _lr576_anchors = _kept_anchors
+            except Exception as _anc_err:  # pragma: no cover
+                print(f"  [LOCAL-650B] anchor theme filter skipped: {_anc_err}")
         # Inserted at index 0 one by one, so reverse to keep the request's order.
         poi_list, _wp_inserted = _apply_named_waypoints(
             poi_list, location, _new_poi, extra=list(reversed(_named_venues)),
