@@ -117,7 +117,8 @@ def share_tour():
         return jsonify({"error": "total_stops must be an integer"}), 400
 
     # Generate deterministic share ID
-    share_id = generate_shareable_tour_id(location, tour_type, total_stops)
+    share_id = generate_shareable_tour_id(location, tour_type, total_stops,
+                                          audio_tour_id=(int(audio_tour_id) if audio_tour_id else None))
 
     # Check if already stored (idempotent)
     existing = get_shared_tour(share_id, DATABASE_URL)

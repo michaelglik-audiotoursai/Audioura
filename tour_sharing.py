@@ -23,7 +23,8 @@ def _to_base62(num: int, length: int = 8) -> str:
     return "".join(reversed(chars))
 
 
-def generate_shareable_tour_id(location: str, tour_type: str, total_stops: int) -> str:
+def generate_shareable_tour_id(location: str, tour_type: str, total_stops: int,
+                               audio_tour_id=None) -> str:
     """Generate a deterministic 8-char URL-safe shareable tour ID.
 
     The ID is derived from SHA256 of the same cache key used by tour_cache_layer1,
@@ -37,7 +38,13 @@ def generate_shareable_tour_id(location: str, tour_type: str, total_stops: int) 
     Returns:
         8-character alphanumeric string, deterministic per inputs.
     """
-    raw = f"{location.strip().lower()}|{tour_type.strip().lower()}|{total_stops}"
+    # [LEAD 2026-10-09] A share points at ONE tour. Two tours with the same request text
+    # (Boston walking 557 vs Kiro's test copy 558) got the SAME code, and the code kept
+    # pointing at the first. When the tour id is known, the code derives from it.
+    if audio_tour_id is not None:
+        raw = f"audio_tour:{int(audio_tour_id)}"
+    else:
+        raw = f"{location.strip().lower()}|{tour_type.strip().lower()}|{total_stops}"
     digest = hashlib.sha256(raw.encode("utf-8")).digest()
     # Use first 6 bytes (48 bits) as integer for base62 encoding
     num = int.from_bytes(digest[:6], "big")
