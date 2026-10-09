@@ -404,8 +404,30 @@ def _new_proper_nouns(edited: str, original: str) -> List[str]:
         parts = re.findall(r"[a-zA-Z\u00C0-\u024F]+", tok)
         if parts and all(p in orig_words for p in parts):
             continue
+        # [LEAD 2026-10-08] An ordinary English word capitalised only because it starts a
+        # sentence is not a name. "However" and "Begun" rejected good edits in Bench R4 (the
+        # rejected "Begun" edit was the one that repaired "Began work on…" with no subject).
+        # A token passes when it is a common lowercase dictionary word AND never appears
+        # capitalised mid-sentence in the edit. Real names (Fouquart, Chabrier) are not
+        # lowercase dictionary words.
+        if _is_common_word(tok) and not re.search(r"[a-z,;]\s+" + re.escape(tok[:1].upper() + tok[1:]) + r"\b", edited or ""):
+            continue
         new.append(tok)
     return new
+
+
+_COMMON_WORDS = None
+
+
+def _is_common_word(tok: str) -> bool:
+    global _COMMON_WORDS
+    if _COMMON_WORDS is None:
+        try:
+            import json as _j
+            _COMMON_WORDS = frozenset(_j.load(open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "editor_common_words.json"))))
+        except Exception:
+            _COMMON_WORDS = frozenset()
+    return (tok or "").lower() in _COMMON_WORDS
 
 
 # ─────────────────────────────────────────────────────────────────────────────
