@@ -8184,6 +8184,28 @@ def _apply_delivery_hours_guard(result):
                       f"POI must be a real place, not the request theme", flush=True)
         except Exception as _tsge:  # pragma: no cover
             _import_logger.error(f"[LOCAL-650] theme-stop guard skipped: {_tsge}")
+        # 3a-quater. [LOCAL-650 fix 2] On a WALKING tour, each stop's Directions
+        #     must lead to the NEXT stop by name, and say roughly how far it is.
+        #     Michael, 2026-10-09 (tour 557): Stop 4's Directions read "… until you
+        #     reach the Massachusetts State House …" — that is STOP 1, not the next
+        #     stop. The route order is correct (_compute_route_order); the per-stop
+        #     Directions PROSE named the wrong landmark. directions_guarantee only
+        #     checks a hand-off is PRESENT, not that it points at the correct next
+        #     stop. This every-path text guard replaces a wrong-target line with a
+        #     deterministic hand-off naming the next stop, appends an approximate
+        #     straight-line distance from the two stops' coordinates, and runs
+        #     BEFORE the directions guarantee. Walking/outdoor only; museum/venue
+        #     tours (room-flow seams) are a no-op. Deterministic, idempotent.
+        try:
+            import walking_directions_guard as _wdg
+            final, _wdg_rep = _wdg.ensure_walking_directions_lead_to_next(final)
+            if _wdg_rep.get('corrected') or _wdg_rep.get('distance_added'):
+                print(f"  [LOCAL-650 fix2] walking directions: corrected "
+                      f"{_wdg_rep.get('corrected', 0)} wrong-target line(s), added "
+                      f"{_wdg_rep.get('distance_added', 0)} approximate distance(s) "
+                      f"— each hand-off now names the correct next stop", flush=True)
+        except Exception as _wdge:  # pragma: no cover
+            _import_logger.error(f"[LOCAL-650] walking-directions guard skipped: {_wdge}")
         # 3b. [LOCAL-638 Note 4] Every stop except the last must end with directions
         #     to the next stop, on EVERY path. Michael, Frick 523 (D640): "The story
         #     stops abruptly and has no directions to the next exhibit" — Stop 2 had

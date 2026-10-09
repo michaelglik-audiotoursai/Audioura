@@ -79,6 +79,44 @@ _MOTORWAY_FORBIDDEN_MODES = {'bike', 'on_foot', 'animal'}
 _TRANSPORT_FORBIDDEN_MODES = {'bike', 'on_foot', 'vehicle', 'animal'}
 
 
+# [LOCAL-650 fix 2] Significant words to ignore when checking that a directions
+# line names its destination stop (articles, generic place words that recur
+# across many names, and tour-form words).
+_DIR_NAME_STOPWORDS = frozenset({
+    'the', 'a', 'an', 'of', 'and', 'at', 'in', 'on', 'to', 'for', 'de', 'la',
+    'le', 'du', 'des', 'house', 'hall', 'building', 'museum', 'gallery', 'park',
+    'square', 'street', 'center', 'centre', 'old', 'new', 'the',
+})
+
+
+def _directions_name_destination(text: str, to_name: str) -> bool:
+    """[LOCAL-650] True when ``text`` plausibly names the destination ``to_name``.
+
+    The whole destination phrase appearing is the strongest signal. Otherwise we
+    require that EVERY distinctive word of the destination (its words minus
+    articles/common place nouns) appears in the text — so "Old State House"
+    passes on "the Old State House" and even on "State House", but a line that
+    names a totally different stop ("Massachusetts State House" when the next
+    stop is "University of Massachusetts Boston") fails because distinctive words
+    ("University", "Boston") are absent. When the destination has no distinctive
+    words left after filtering, fall back to a substring check on the full name.
+    """
+    if not text or not to_name:
+        return True  # nothing to validate against; don't reject
+    low = re.sub(r'\s+', ' ', text.lower())
+    full = re.sub(r'\s+', ' ', to_name.strip().lower())
+    if full and full in low:
+        return True
+    words = re.findall(r"[a-z0-9][a-z0-9'\-]*", full)
+    distinctive = [w for w in words if w not in _DIR_NAME_STOPWORDS and len(w) > 2]
+    if not distinctive:
+        # Name is all common words (e.g. "Old State House") — require the full
+        # phrase OR its last two words.
+        tail = " ".join(words[-2:]) if len(words) >= 2 else full
+        return bool(tail) and tail in low
+    return all(w in low for w in distinctive)
+
+
 def validate_directions_mode(directions_text: str, transport_mode: str) -> list:
     """Validate that directions text does not contain mode-inappropriate content.
 
@@ -367,6 +405,22 @@ def generate_walking_directions(
                 print(f"  ❌ [LOCAL-253] DIRECTIONS REJECTED: {v}")
             print(f"  ❌ [LOCAL-253] Rejected directions text: {text[:200]}")
             return ""  # Empty triggers the fallback "Continue to {next_stop}."
+
+        # [LOCAL-650 fix 2] Target guard — the directions MUST lead to the next
+        # stop. On tour 557 the model wrote Stop 4's directions as "… until you
+        # reach the Massachusetts State House …", which is STOP 1, not the next
+        # stop. If the generated prose never names the destination (to_name), it
+        # is not a hand-off to the next stop — return "" so the deterministic
+        # "Continue to {next_stop}." fallback (which names the correct stop) is
+        # used instead. A short, meaningful fragment of the destination name must
+        # appear in the text.
+        if not _directions_name_destination(text, to_name):
+            logger.error(
+                f"[LOCAL-650] DIRECTIONS TARGET GUARD REJECTED: prose does not "
+                f"name the next stop {to_name!r}: {text[:160]}")
+            print(f"  ❌ [LOCAL-650] DIRECTIONS do not lead to next stop "
+                  f"'{to_name}' — using deterministic fallback")
+            return ""
 
         return text
 
