@@ -1007,6 +1007,90 @@ def fetch_venue_works(venue_qid: str, language: str = "en",
         return []
 
 
+# ─── [LOCAL-639 defect 3] Related collection holders (part-of / ownership) ────
+# The Uffizi (Q51252) membership gate dropped works whose P195 collection is a
+# SIBLING sub-collection, not Q51252 itself ("Due storie di san Nicola di Bari"
+# P195=Q3683040; "Ritratto di giovane donna" P195=Q3756440). The LEAD derived-
+# holder rule only promotes a P195 that holds >= 10% of the venue's OWN SPARQL
+# set, so a sibling whose works are a minority stayed rejected. This one SPARQL
+# query (per venue QID, cached for the process) returns the venue's RELATED holder
+# QIDs by part-of / parent-org / ownership:
+#   * the venue's P361 (part of), P749 (parent org) and P127 (owned by) parents;
+#   * the venue's own P527 (has part) and P1830 (owner of) holdings;
+#   * siblings that share a P361/P749/P127/P1830 parent/owner with the venue.
+# These are passed as ``parent_qids`` to the collection-membership gate, so a work
+# held by a sibling/parent collection of the venue is kept. A one-off foreign leak
+# (Ophelia P195 = Tate in the NG set) is NOT in this family and stays rejected,
+# and so does a genuinely different museum (Arringatore P195 = the National
+# Archaeological Museum). NOTE: Wikidata does not always model a late administrative
+# merger — e.g. the Palazzo Pitti / Galleria Palatina (Q866498) carries no P361/
+# P749/P127 edge to Q51252 despite both being run as the "Gallerie degli Uffizi"
+# since 2015 — so a work held ONLY there is still (correctly, by the data we have)
+# treated as a different collection; this guard rescues every sub-collection the
+# graph actually relates, without hard-coding or over-admitting.
+_RELATED_HOLDERS_CACHE: Dict[str, Tuple[str, ...]] = {}
+
+
+def fetch_collection_holder_qids(venue_qid: str) -> Tuple[str, ...]:
+    """Return QIDs of collections RELATED to ``venue_qid`` by part-of / ownership.
+
+    One cached SPARQL query per venue QID (P361/P749/P127/P527/P1830). Returns a
+    tuple of related holder QIDs (parents, siblings, children/holdings) — never
+    includes ``venue_qid`` itself. Empty on any error or when the venue has no such
+    relations (so a standalone museum is a no-op). Deterministic within a process
+    via ``_RELATED_HOLDERS_CACHE``.
+    """
+    if not venue_qid or not re.fullmatch(r"Q\d+", venue_qid or ""):
+        return ()
+    if venue_qid in _RELATED_HOLDERS_CACHE:
+        return _RELATED_HOLDERS_CACHE[venue_qid]
+
+    # Parents (P361 part-of, P749 parent-org, P127 owned-by) of the venue; the
+    # venue's own parts/holdings (P527 has-part, P1830 owner-of); and siblings that
+    # share a parent/owner. One query, UNION of the shapes. Ownership edges
+    # (P127/P1830) capture a state-museum umbrella (e.g. the Gallerie degli Uffizi)
+    # that holds several sub-collections modelled as separate QIDs.
+    query = f"""
+    SELECT DISTINCT ?holder WHERE {{
+      {{ wd:{venue_qid} (wdt:P361|wdt:P749|wdt:P127|wdt:P527|wdt:P1830) ?holder. }}
+      UNION
+      {{ wd:{venue_qid} (wdt:P361|wdt:P749|wdt:P127|wdt:P1830) ?parent.
+         ?holder (wdt:P361|wdt:P749|wdt:P127|wdt:P1830) ?parent. }}
+      UNION
+      {{ ?holder (wdt:P361|wdt:P749|wdt:P127|wdt:P1830) wd:{venue_qid}. }}
+    }}
+    LIMIT 150
+    """
+    holders: Tuple[str, ...] = ()
+    try:
+        resp = _request_with_backoff(
+            _SPARQL_ENDPOINT,
+            params={"query": query, "format": "json"},
+            headers={"User-Agent": _USER_AGENT,
+                     "Accept": "application/sparql-results+json"},
+            timeout=30,
+            host_for_cold='https://www.wikidata.org',
+            label=f"fetch_collection_holder_qids({venue_qid})",
+        )
+        if resp is not None and resp.status_code == 200:
+            rows = resp.json().get("results", {}).get("bindings", [])
+            seen = []
+            for r in rows:
+                uri = r.get("holder", {}).get("value", "") or ""
+                q = uri.split("/")[-1] if uri else ""
+                if re.fullmatch(r"Q\d+", q) and q != venue_qid and q not in seen:
+                    seen.append(q)
+            holders = tuple(seen)
+            print(f"  [venue_resolver] [LOCAL-639] related collection holders "
+                  f"(P361/P749/P527) for {venue_qid}: {list(holders)}")
+    except Exception as e:
+        logger.warning(f"[LOCAL-639] fetch_collection_holder_qids failed for "
+                       f"{venue_qid}: {e}")
+        holders = ()
+    _RELATED_HOLDERS_CACHE[venue_qid] = holders
+    return holders
+
+
 def build_dynamic_aliases(works: List[Dict]) -> Dict[str, str]:
     """Build a CANONICAL_ALIASES dict from SPARQL-fetched works.
     

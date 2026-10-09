@@ -4456,6 +4456,24 @@ def _apply_artwork_guards(documented, sparql_works, venue_name, n_stops,
             print(f"  {_tag} [LEAD] venue collection holders (>= {_thr} works): {_derived}")
     except Exception as _pe:
         print(f"  {_tag} [LEAD] parent-collection derivation skipped: {_pe}")
+    # [LOCAL-639 defect 3] Also derive holders from the venue's P361/P749 parent
+    # and its SIBLING sub-collections (one cached SPARQL). The Uffizi (Q51252)
+    # dropped Raphael's "Ritratto di Agnolo Doni"/"Maddalena Strozzi" because their
+    # P195 is the Galleria Palatina / Palazzo Pitti (Q866498) — a sibling under the
+    # same umbrella (Gallerie degli Uffizi, Q734266), holding too few of Q51252's
+    # own works to clear the 10% rule above. Sibling/parent holders are legitimate
+    # homes for a work shown at the venue; a one-off foreign leak (Ophelia P195 =
+    # Tate) is not a sibling and still fails the gate.
+    if venue_qid:
+        try:
+            from venue_resolver import fetch_collection_holder_qids as _fchq
+            _related = tuple(_fchq(venue_qid) or ())
+            if _related:
+                parent_qids = tuple(set(parent_qids or ()) | set(_related))
+                print(f"  {_tag} [LOCAL-639] related (P361/P749/P527) holders "
+                      f"added: {list(_related)}")
+        except Exception as _re_err:
+            print(f"  {_tag} [LOCAL-639] related-holder derivation skipped: {_re_err}")
     try:
         from artwork_selection_guard import enforce_collection_membership
         _mem_kept, _mem_dropped = enforce_collection_membership(
