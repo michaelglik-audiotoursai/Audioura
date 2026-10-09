@@ -40,6 +40,8 @@ class TestFlagDefaultOff(unittest.TestCase):
             self.assertEqual(ps.is_enabled(), want, val)
         os.environ.pop("PARALLEL_STOPS", None)
 
+    @unittest.skipUnless(os.environ.get("LOCAL649_DIFF_CHECK") == "1",
+                         "LEAD 2026-10-09: diff-vs-base check is only meaningful on the task branch; after merge it counts other tasks' changes")
     def test_wiring_is_additive_only(self):
         """The generate_tour_text.py change must add lines, delete none — the
         guarantee that OFF is byte-identical."""
