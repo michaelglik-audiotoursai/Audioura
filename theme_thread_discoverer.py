@@ -100,6 +100,68 @@ class ThreadDiscoveryResult:
         }
 
 
+# ---------- LOCAL-652: delivered-stop grounding ----------
+
+# Words that are not distinctive enough to ground a thread on a stop. A thread
+# must share a *content* token (a work title word or an artist surname) with a
+# delivered stop — not a filler word like "the", "legacy", or "century".
+_GROUNDING_STOPWORDS = {
+    'the', 'a', 'an', 'of', 'and', 'in', 'on', 'at', 'to', 'for', 'with', 'by',
+    'from', 'this', 'that', 'these', 'those', 'its', 'their', 'his', 'her',
+    'art', 'arts', 'artist', 'artists', 'artistic', 'work', 'works', 'painting',
+    'paintings', 'sculpture', 'portrait', 'portraiture', 'self', 'style',
+    'styles', 'legacy', 'influence', 'technique', 'techniques', 'exhibition',
+    'exhibitions', 'reception', 'public', 'century', 'centuries', 'early', 'late',
+    'early', 'period', 'collection', 'museum', 'gallery', 'tour', 'story',
+    'theme', 'themes', 'narrative', 'master', 'masters', 'masterpiece',
+    'genre', 'subject', 'subjects', 'form', 'light', 'colour', 'color',
+}
+
+
+def _grounding_tokens(text: str) -> set:
+    """Content tokens from a stop name/artist used to ground a thread.
+
+    Lowercased words of length ≥4 that are not generic stopwords. These are the
+    tokens that a thread's NAMED artist or work must share with a delivered stop
+    to be considered grounded on the tour.
+    """
+    out = set()
+    for w in re.findall(r"[A-Za-zÀ-ÿ']+", text or ""):
+        wl = w.lower().strip("'")
+        if len(wl) >= 4 and wl not in _GROUNDING_STOPWORDS:
+            out.add(wl)
+    return out
+
+
+def _build_delivered_grounding(
+    poi_names: List[str],
+    poi_artists: Optional[List[str]],
+) -> set:
+    """Union of content tokens from every delivered stop's name and artist.
+
+    A thread whose named artist/work shares no token with this set names a
+    work/artist that is on no delivered stop (LOCAL-652 phantom thread).
+    """
+    grounding: set = set()
+    for name in (poi_names or []):
+        grounding |= _grounding_tokens(name)
+    for artist in (poi_artists or []):
+        grounding |= _grounding_tokens(artist)
+    return grounding
+
+
+def _name_mentions_delivered_entity(thread_name: str, delivered_grounding: set) -> bool:
+    """True if the thread name shares a distinctive token with a delivered stop.
+
+    e.g. 'Constable and the English Landscape' shares 'constable' with the
+    delivered Hay Wain's artist. Used so a thread whose name explicitly names a
+    delivered artist/work is never treated as a phantom.
+    """
+    if not delivered_grounding or not thread_name:
+        return False
+    return bool(_grounding_tokens(thread_name) & delivered_grounding)
+
+
 # ---------- Step 1: Deterministic entity-overlap clustering ----------
 
 def _extract_entities_from_element(element: dict) -> Dict[str, set]:
@@ -316,11 +378,14 @@ def _score_themes(
     elements_per_stop: Dict[int, List[dict]],
     all_elements: List[dict],
     total_stops: int,
+    delivered_grounding: Optional[set] = None,
 ) -> List[ThemeThread]:
     """Score candidate themes by coverage, evidence, distinctiveness, arc potential."""
 
     # Build element lookup by ID
     elem_by_id = {e.get("id", ""): e for e in all_elements if e.get("id")}
+
+    delivered_grounding = delivered_grounding or set()
 
     scored_threads = []
 
@@ -329,6 +394,9 @@ def _score_themes(
         description = cand.get("description", "")
         grounded_on = cand.get("grounded_on", [])
         stops_covered = cand.get("stops_covered", [])
+
+        # [LOCAL-652] Phantom-thread rejection happens after element grounding is
+        # computed below — see the combined check once valid_grounding is known.
 
         # [LOCAL-617] Reject INSTITUTIONAL themes. The critic flagged tours whose
         # organizing thread was the museum/collection itself ("19th-Century
@@ -366,6 +434,35 @@ def _score_themes(
         if len(stops_0based) < 2:
             print(f"  [SQ-S6b] Theme '{name}' rejected: covers <2 stops")
             continue
+
+        # [LOCAL-652] Reject PHANTOM threads: coverage computed over DELIVERED
+        # stops only. SQ-S6b assigns venue-wide story elements to stops by
+        # round-robin, so a thread built entirely from elements about a foreign
+        # artist/work (e.g. all of se_001..se_007 are about Vigée Le Brun's
+        # 'Self Portrait in a Straw Hat', none about the delivered Rokeby Venus /
+        # Supper at Emmaus / Hay Wain) still reports coverage=1.00 against the
+        # wrong set — the venue elements, not the delivered stops. A thread is
+        # grounded on the tour iff EITHER its name explicitly names a delivered
+        # work/artist, OR at least one supporting element's text names a
+        # delivered work/artist. A thread satisfying neither names a work/artist
+        # that is on no delivered stop and is rejected; with no valid thread,
+        # discover_theme_threads falls back to the existing degradation rule
+        # (organizing principle / mosaic), never a foreign thread. We only apply
+        # this when we have grounding tokens to test against (art tours with
+        # stop/artist metadata), so non-art tours (walking/history) are
+        # unaffected.
+        if delivered_grounding:
+            name_grounded = _name_mentions_delivered_entity(name, delivered_grounding)
+            grounded_elem_count = sum(
+                1 for eid in valid_grounding
+                if _grounding_tokens(elem_by_id.get(eid, {}).get("text", "")) & delivered_grounding
+            )
+            if not name_grounded and grounded_elem_count == 0:
+                print(f"  [LOCAL-652] Theme '{name}' rejected: named artist/work is on "
+                      f"no delivered stop — neither the thread name nor any supporting "
+                      f"element references a delivered work/artist (phantom thread)")
+                continue
+
 
         # --- Coverage score ---
         coverage = len(stops_0based) / total_stops
@@ -546,6 +643,7 @@ def discover_theme_threads(
     venue_name: str,
     api_key: str,
     elements_per_stop: Optional[Dict[int, List[dict]]] = None,
+    poi_artists: Optional[List[str]] = None,
 ) -> ThreadDiscoveryResult:
     """Main entry: discover cross-stop theme threads from story elements.
 
@@ -556,6 +654,9 @@ def discover_theme_threads(
         api_key: OpenAI API key.
         elements_per_stop: Optional pre-mapped dict {stop_index: [elements]}.
             If not provided, elements are distributed by matching element text to POI names.
+        poi_artists: Optional list (parallel to poi_names) of each delivered
+            stop's artist. Used by LOCAL-652 to reject phantom threads whose
+            named artist/work is on no delivered stop.
 
     Returns:
         ThreadDiscoveryResult with scored threads, mode, per-stop context,
@@ -589,7 +690,15 @@ def discover_theme_threads(
     print(f"  [SQ-S6b] LLM named {len(candidates)} candidate themes")
 
     # --- Step 3: Score themes ---
-    scored = _score_themes(candidates, elements_per_stop, story_elements, total_stops)
+    # [LOCAL-652] Build the delivered-stop grounding set (content tokens of the
+    # delivered stops' names + artists). A thread whose named artist/work shares
+    # no token with this set is a phantom thread and is rejected in _score_themes.
+    delivered_grounding = _build_delivered_grounding(poi_names, poi_artists)
+    if delivered_grounding:
+        print(f"  [LOCAL-652] Delivered-stop grounding tokens: "
+              f"{sorted(delivered_grounding)[:20]}")
+    scored = _score_themes(candidates, elements_per_stop, story_elements, total_stops,
+                           delivered_grounding=delivered_grounding)
     print(f"  [SQ-S6b] Scored themes: {len(scored)}")
     for t in scored:
         print(f"    → '{t.name}': coverage={t.coverage:.2f}, evidence={t.evidence_strength:.2f}, "

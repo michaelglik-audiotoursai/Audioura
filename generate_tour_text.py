@@ -14853,11 +14853,16 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
             _thread_result = None
             try:
                 from theme_thread_discoverer import discover_theme_threads
+                # [LOCAL-652] Pass the delivered stops' artists so the discoverer
+                # can reject phantom threads whose named artist/work is on no
+                # delivered stop.
+                _poi_artists = [str(p.get("artist", "") or "") for p in poi_list]
                 _thread_result = discover_theme_threads(
                     story_elements=_story_elements,
                     poi_names=_poi_names,
                     venue_name=_venue_name,
                     api_key=api_key,
+                    poi_artists=_poi_artists,
                 )
                 if _thread_result:
                     print(f"  [SQ-S6b] Thread discovery: mode={_thread_result.mode}, "
@@ -20200,11 +20205,17 @@ REWRITE RULES (all mandatory):
                 print(f"    Transferable (low conf, kept): {_ssg_stats['transferable_low_conf_kept']}")
                 print(f"    Last-paragraph protected: {_ssg_stats['last_paragraph_protected']}")
                 print(f"    Ungrounded named entities: {_ssg_stats['ungrounded_entities']}")
+                print(f"    [LOCAL-652] Foreign work/artist sentences removed: "
+                      f"{_ssg_stats.get('foreign_entity_sentences_removed', 0)}")
                 print(f"    Stops affected: {_ssg_stats['stops_affected']}")
                 for _rl in _ssg_stats['removal_log']:
                     print(f"    [LOCAL-472] REMOVED transferable paragraph "
                           f"stop='{_rl['stop']}' conf={_rl['confidence']} "
                           f"reason='{_rl['reason']}': \"{_rl['paragraph']}\"")
+                for _fl in _ssg_stats.get('foreign_entity_log', []):
+                    print(f"    [LOCAL-652] REMOVED foreign work/artist sentence "
+                          f"stop='{_fl['stop']}' entities={_fl['entities']} "
+                          f"({_fl['sentences_removed']} sentence(s)) in: \"{_fl['before']}\"")
                 for _el in _ssg_stats['entity_log']:
                     print(f"    [LOCAL-472] UNGROUNDED entity stop='{_el['stop']}' "
                           f"entity='{_el['entity']}' reason='{_el['reason']}' "

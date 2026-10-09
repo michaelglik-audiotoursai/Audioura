@@ -1394,7 +1394,18 @@ def collapse_admission_statements(text: str) -> "Tuple[str, int]":
 # speaks the value), so the opening target is matched after label-stripping too.
 _PRACTICAL_HOURS_CUE_RE = re.compile(
     r"(?i)(\bis\s+open\b|\bopen\s+daily\b|\bopen\s+(?:mon|tue|wed|thu|fri|sat|sun)"
-    r"|\bclosed\s+on\b|\d\s*(?:am|pm)\b|\d{1,2}:\d{2}\b|\bnoon\b|\bmidnight\b)")
+    r"|\bclosed\s+on\b|\d\s*(?:am|pm)\b|\d{1,2}:\d{2}\b"
+    # [LOCAL-652] noon/midnight count as an HOURS cue only in a clock/range/opening
+    # context — never as a bare word. A later stop's work TITLE ("Landscape: Noon",
+    # the Hay Wain's subtitle) was tripping the bare \bnoon\b alternative, so the
+    # placement passes (place_practical_facts_in_opening / relocate_practical_facts_
+    # to_opening) misclassified that Stop-3 description as a practical fact and
+    # moved it into the Stop-1 opening (the opening leak). Require an adjacent
+    # open-verb / to-from-until / dash + a time token so a page-literal
+    # "open Noon to 4 PM" still matches while a prose/title "Noon" does not.
+    r"|(?:open|from|until|till|to)\s+(?:noon|midnight)\b"
+    r"|\b(?:noon|midnight)\s*(?:to|until|till|[-–—])\s*\d"
+    r"|\d\s*(?:to|until|till|[-–—])\s*(?:noon|midnight)\b)")
 
 
 def _is_practical_facts_sentence(sentence: str) -> bool:
