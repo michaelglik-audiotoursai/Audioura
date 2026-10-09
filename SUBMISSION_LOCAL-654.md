@@ -1,8 +1,13 @@
 # SUBMISSION — LOCAL-654: mid-clause collisions under the cheap arm (ON)
 
 **Agent:** Mac Mini Kiro
-**Branch:** `LOCAL-654-collisions` (from `subscribed` @ `8e12c846`)
-**Base verified:** `git merge-base --is-ancestor 8e12c846 HEAD` → exit 0.
+**Branch:** `LOCAL-654-collisions` (rebased onto `subscribed` @ `db8b7cd0`)
+**Base verified:** `git merge-base --is-ancestor db8b7cd0 HEAD` → exit 0.
+(The branch was first cut at `8e12c846`; `subscribed` advanced to `db8b7cd0`
+during the task, so the two LOCAL-654 commits were rebased `--onto db8b7cd0` —
+clean, no conflicts; `sentence_split.py` was untouched by `subscribed` and
+`generate_tour_text.py` merged cleanly. `git rev-list --count
+origin/subscribed..HEAD` → 2.)
 
 ## The defect
 
@@ -15,7 +20,7 @@ PARALLEL_STOPS=1`), sentences collided mid-clause in 3 of 6 ON tours:
   extensively…"*
 - 592 (Courtauld): one more.
 
-## Root cause (found by offline replay — step 1, commit `33f6972f`)
+## Root cause (found by offline replay — step 1, commit `e9eb3d33`)
 
 `gpt-4.1-mini` routinely **drops the space after a sentence-ending period**:
 `…venture into its depths.Thousands of copies…`, `…two years to complete
@@ -128,9 +133,10 @@ Two fresh 3-stop tours, both DELIVERED 3/3:
 
 ### Rows & spend
 - `audio_tours`: additive **is_test only** — exactly two rows written, **627** and
-  **629**, both `is_test = true`, 3 stops each. **No DELETE.** (Snapshot counts in
-  the log, 424→427, span concurrent LOCAL-617 inserts by another agent on the
-  shared DB — id 628 is a LOCAL-617 row, not mine.)
+  **629**, both `is_test = true`, 3 stops each. **No DELETE.** (Snapshot counts
+  span concurrent inserts by other agents on the shared DB — id 628 is a
+  LOCAL-658 Boston walking row by another agent, not mine. Verified at
+  reconciliation: `audio_tours` count **427**, max id **629**.)
 - **Spend** (`paid_api_calls`, my host `c84f83946ba2`): **$1.0028** over 399
   calls — under the $1.20 whole-task cap. `cost_ledger` test row written
   (`user_id=TEST-LOCAL-654`, breakdown openai $0.3723 / gemini_tokens $0.0274 /
@@ -145,3 +151,33 @@ Two fresh 3-stop tours, both DELIVERED 3/3:
 - `repro_local654.py`, `repro_local654_hygiene.py` — offline replays.
 - `run_local654_container.py`, `run_local654_live.sh` — isolated live verify.
 - `SUBMISSION_LOCAL-654.md` — this file.
+
+## Re-verification (2026-10-09, post-rebase)
+
+After the branch was rebased onto `db8b7cd0`, every claim above was independently
+re-confirmed from tool output, not carried over on trust:
+
+- **Base:** `git merge-base --is-ancestor db8b7cd0 HEAD` → exit 0;
+  `git rev-list --count origin/subscribed..HEAD` → 2.
+- **Guard test:** `pytest tests/test_local654_no_midclause_collision.py` →
+  8 passed, exit 0.
+- **Suites (all exit 0):** `test_local611_canary` (museum, 7 passed),
+  `test_local646_walking_regressions` (walking, 13 passed),
+  `test_local614_sentence_splitter_initials` (6), `test_local635_sentence_integrity`
+  (4), `test_d523_story_selection_and_hygiene` (8),
+  `test_local626_{invented_facts(10),recruitment_copy(6),highlight_first(5),venue_not_a_stop(7)}`.
+- **Live rows:** DB `development-postgres-2-1` (`admin`/`audiotours`) —
+  627 (`LOCAL-654 Uffizi … UFFIZI_ON`, `is_test=t`, created 22:16:37 UTC) and
+  629 (`LOCAL-654 … AIC_ON`, `is_test=t`, created 22:23:34 UTC) both present.
+- **Collisions (none):** `grep -oE '[.!?][A-Z][a-z]'` on each stored
+  `tour_content` → 0 welds; 0 original evidence strings.
+- **Detectors:** `detectors.py 627 3 "Uffizi Gallery"` → 0 failures, exit 0;
+  `detectors.py 629 3 "The Art Institute of Chicago"` → 0 failures, exit 0.
+- **Kiro:** `critique_627.md` → 8/10; `critique_629.md` → 4.5/10 — neither flags a
+  mid-clause collision or sentence-boundary defect (the AIC score is driven by
+  content/factual issues unrelated to this ticket).
+- **Spend:** `paid_api_calls`, host `c84f83946ba2` → **$1.0028** over 399 calls
+  (the live window 22:11–22:23 UTC accounts for $0.9630 / 396 calls, matching the
+  627/629 creation times). Under the $1.20 whole-task cap. The live runs had
+  already been performed in the prior session; **no further live run was made**,
+  as re-running would have exceeded the combined cap.
