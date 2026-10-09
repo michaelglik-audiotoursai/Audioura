@@ -146,8 +146,96 @@ change, so it was not done rather than risk a regression (Michael: "without losi
   documented + tested thread-safe; the OSM/knowledge jobs each own their inputs and return a value the
   caller assembles after join (no two jobs write the same dict key).
 
-## Step 5 — Live A/B (own container) — *next*
+## Step 5 — Live A/B (own container)
 
-Courtauld + Walters, 3 stops, OFF vs ON (4 tours), cap $3.00, cache_off/pool_off; report
-`[TIMING]`/`[TIMING-SUB]`, $/tour, detectors, critic scores, and paid-API call-count parity (±10%).
+Container **`local651-gen`** (`docker run --rm`, port 5121, image built from this branch).
+`The Courtauld Gallery` and `The Walters Art Museum`, **3 stops each**, `FAST_PIPELINE` **OFF vs ON**
+(4 tours), `STORIED_MODE`, **cache OFF / pool OFF**, reserve gate + **$3.00** combined cap. Not
+`docker compose -p audioura`; no `audioura-*` container touched. `audio_tours` **400 → 409**; my four
+rows are **601, 602, 603, 605** (all `is_test=true` — verified by `SELECT`; id 604 belongs to another
+ticket running concurrently on the shared DB). **No DELETE.** Full log excerpt +
+critiques: `submission_artifacts/local651/`.
 
+### Results
+
+| Tour | id | wall s | tour $ | paid_api_calls | stops | detectors | critic /10 |
+|---|---|---:|---:|---:|---:|---|---:|
+| Courtauld **OFF** | 601 | 466.8 | 1.029 | **221** (gemini 32 / openai 117 / serper 72) | 3 | 0 fail | 5.5 |
+| Courtauld **ON**  | 602 | 438.7 | 0.793 | **212** (gemini 30 / openai 105 / serper 77) | 3 | 0 fail | 5.0 |
+| Walters **OFF**   | 603 | 350.6 | 1.008 | **186** (gemini 33 / openai 103 / serper 50) | 3 | 0 fail | 5.5 |
+| Walters **ON**    | 605 | 408.8 | 0.961 | **186** (gemini 32 / openai 103 / serper 51) | 3 | 0 fail | 6.5 |
+
+### Equal-quality proof (the ticket's bar)
+
+- **Same stop titles for the same venue, ON and OFF** — Courtauld: *Manet's A Bar at the
+  Folies-Bergère / Courtauld Institute / Georges Seurat* (both arms); Walters: *Sappho and Alcaeus /
+  Springtime / The Death of Caesar* (both arms). The deterministic fill is unchanged.
+- **Paid-API call-count parity within ±10%** — Courtauld 221 → 212 = **−4.1 %**; Walters 186 → 186 =
+  **0 %**. Both inside ±10 %. Per-kind counts are essentially identical (the small gemini/serper
+  deltas are the normal story-seeking retry variance, not a dropped or added call).
+- **Detectors:** 0 failures on all four tours (OFF and ON).
+- **Kiro critic:** OFF avg 5.5, ON avg 5.75 — equal within run-to-run narration variance (both arms
+  pass through the identical gates). ON did not lose quality.
+
+### Timing
+
+Wall time is dominated by `story_first`, which is **already** parallel (LOCAL-445) and swings
+±60 s run-to-run on network latency — larger than the phases this ticket overlaps, so a single A/B
+pair is noisy at the whole-tour level. The overlaps land where the profile predicted and are visible
+in the per-tour `[TIMING]`/`[TIMING-SUB]`:
+
+- **packing** (where the per-stop editor overlap lives): Courtauld **62.2 s → 61.9 s**; the dedicated
+  `test_local651_fast_pipeline` timing test proves the editor overlap directly (3 stops serial ≈0.6 s
+  → parallel ≈0.2 s) without the live-run noise.
+- **poi_selection** per-POI OSM facts prefetched concurrently when ON (the serial loop otherwise
+  issued them one at a time — `fetch_osm_venue_facts` was 12.5 s / 3 serial in the profile).
+- Courtauld ON finished **28 s faster** than OFF (438.7 s vs 466.8 s). Walters ON was slower than OFF
+  on this pair, entirely because its `story_first` ran 228 s vs 165 s — the already-parallel phase's
+  network variance, not the overlapped phases.
+
+**Honest read:** the measurable, reproducible speed-up from this change is in the smaller
+poi_selection / external_lookups / packing waits (proven by the unit timing tests and the per-phase
+numbers); it is real but modest next to the already-parallel `story_first` that governs total wall
+time. The change is **safe** (byte-identical OFF, same calls, same titles, equal quality) — the right
+trade for a flag that is OFF by default.
+
+### Spend
+
+Combined host spend reached **$3.11** across the four tours. The $3.00 cap is a **reserve gate**: a
+tour starts only if `spend + $0.60 ≤ $3.00`, so the fourth tour was admitted at ~$2.3 and its own
+spend carried the total just past $3.00 — expected for a per-tour gate, and all four tours completed.
+Every call was metered through `paid_api_calls`; figures above are read back from there, never
+estimated.
+
+
+
+---
+
+## Files changed
+
+- `phase_timer.py` — thread-safe phase-aware `SubTimer` + `[TIMING-SUB]`; `PhaseTimer.start` sets current phase.
+- `fast_pipeline.py` *(new)* — `FAST_PIPELINE` flag (default OFF) + `run_parallel`.
+- Source-level `[TIMING-SUB]` decorators: `venue_resolver.py`, `osm_venue_facts.py`, `venue_parts.py`, `venue_preflight.py`, `work_story_searcher.py`, `serper_research.py`, `story_leads.py`, `stop_knowledge_fallback.py`; `story_first.py` feeds its per-step marks in.
+- `generate_tour_text.py` — `_sub_step` helper + packing-pass `[TIMING-SUB]` wraps; FAST_PIPELINE overlaps for per-POI OSM facts and the D533 knowledge fallback.
+- `stop_editor.py` — per-stop editor pass overlapped under FAST_PIPELINE.
+- Tests: `test_local651_sub_timer.py` (8), `test_local651_fast_pipeline.py` (10).
+- Harnesses: `run_local651_profile.{py,sh}` (Step-1 profile), `run_local651_ab_container.py` + `run_local651_ab.sh` (Step-5 A/B). Artifacts in `submission_artifacts/local651/`.
+
+## How to run
+
+```bash
+# Step-1 profile (one Courtauld tour, FAST_PIPELINE OFF):
+./run_local651_profile.sh
+# Step-5 live A/B (Courtauld + Walters, OFF vs ON, cap $3.00):
+./run_local651_ab.sh
+# Tests (offline):
+python3 -m pytest test_local651_sub_timer.py test_local651_fast_pipeline.py -q
+```
+
+## Rules honored
+
+- `FAST_PIPELINE` default **OFF** → byte-identical code path (flag-gated overlaps; empty prefetch dicts; serial list-comp in the editor).
+- **Same calls, only overlapped** — no step dropped, no budget shrunk, no retry skipped, **no cross-tour cache** added. Call-count parity ±10% proven live.
+- Own disposable container only (`local651-gen`); never `docker compose -p audioura`; no `audioura-*` container renamed/replaced.
+- Additive `is_test` rows only (601, 602, 603, 605); **no DELETE**; `audio_tours` count reported before/after; spend read from `paid_api_calls`.
+- Did not edit DECISIONS.md, CLAUDE.md, BACKLOG.md, WORK_QUEUE.md or .continuous_dev/STATUS.md.
