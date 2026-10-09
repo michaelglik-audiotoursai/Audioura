@@ -1,0 +1,120 @@
+Create a detailed audio description for Van Gogh’s iconic Self-Portrait with Bandaged Ear at The Courtauld Gallery, London, United Kingdom, focusing on museum.
+
+Start with a brief orientation that names "Van Gogh’s iconic Self-Portrait with Bandaged Ear" specifically (not "the exhibit" or "this piece") and tells the listener WHERE to stand or look AND WHY — what becomes visible, legible, or striking from that position that they would miss otherwise.
+
+Then provide a detailed description of the exhibit, in THIS ORDER OF PRIORITY
+(LOCAL-607 — spend your words on the WORK and the ARTIST, not on how the museum
+acquired it):
+
+(a) THE WORK ITSELF — lead with it and give it the most words: what it shows or
+    consists of, how it was made (one specific technique, material, or
+    compositional choice and WHY it matters), why it was made, what it means, and
+    what critics or scholars have said about it. This is what the listener is
+    standing in front of.
+(b) THE ARTIST — the maker's life and the turning point this work marks for them:
+    where they were, what had just happened to them, what they were trying to do
+    at this moment in their career. Name the artist and anchor the work in their life.
+(c) THE EMOTIONAL READING — one or two sentences on what the work makes a viewer
+    feel or notice, grounded in (a) and (b), never free-floating.
+
+ACQUISITION / DONATION IS CAPPED AT ONE SENTENCE (hard limit): how the museum came
+to own the work (donor, gift, bequest, purchase, the collection it belongs to) may
+occupy AT MOST ONE sentence, and only if it is genuinely about THIS work. Do NOT
+retell the museum's founding, renaming, relocation, or the donors behind the
+building — that belongs to the tour's opening, not to a work's stop. If you have
+nothing to say about the work or the artist, write less; do not pad with provenance.
+Also include, when relevant: how this piece connects to the broader collection or museum.
+
+NAME THE OBJECT, AND SAY WHAT IT COST (D468-D471 — the two rules that moved the score):
+- AT LEAST ONE SENTENCE MUST NAME A PHYSICAL PROPERTY OF THE THING IN FRONT OF THE
+  LISTENER — its medium, material, technique, edition size, count, binding, colour or
+  condition — and tie that property to the story. "A set of ten drypoints and
+  lithographs on sheepskin" is the standard; "an important work" is not. The listener
+  is standing in front of the object; a story that never mentions it is a caption about
+  something else. Take the property from the source material. If the material names
+  none, write nothing about the physical object rather than inventing a property.
+- SAY WHAT IT COST OR WHAT WAS AT STAKE. What was lost, refused, destroyed, left
+  unfinished, done only once, done for the last time, or done despite something. That
+  is the difference between a story and a caption. It must come from the source
+  material — if there is no such consequence there, write without one rather than
+  inventing drama.
+
+EXPLAIN-WHAT-YOU-NAME RULE (critical):
+Every concept, motif, symbol, technique, cultural reference, or person you mention
+MUST get at least one clause of explanation. If you cannot explain it in a clause, cut it.
+- BAD: "the rich cultural heritage of Bengal" (names but explains nothing)
+- GOOD: "the Pala dynasty tradition of Bengal, where Buddhist monasteries commissioned
+  bronze casting between the 8th and 12th centuries"
+- BAD: "delicate floral motifs adorning the crown" (what do they mean?)
+- GOOD: "lotus petals on the crown — a symbol of spiritual purity in Hindu iconography,
+  also found on temple lintels across Southeast Asia"
+- BAD: "Each intricate detail tells a story of creation and rebirth"
+  (asserts meaning without delivering it)
+- GOOD: "The four arms each hold a specific object: the axe that severs attachment,
+  the rope that pulls devotees from illusion, the tusk broken as a writing implement,
+  and the sweetmeat representing the reward of a disciplined life"
+The stop's own subject (the exhibit itself) needs no gloss — the whole stop explains it.
+But a person referenced in passing (e.g. Ulysses Grant) needs one clause: "the American
+Civil War general who became president." If most visitors won't know it, explain it or cut it.
+
+NO UNSUPPORTED PRAISE: Do not end paragraphs with evaluative claims ("a truly remarkable
+achievement", "a testament to the artist's genius") unless you have just provided the
+specific evidence that earns the evaluation. If the preceding sentences do not contain
+that evidence, delete the praise — it is filler. A shorter stop that explains three things
+beats a longer one that names eight and explains none.
+
+AUDIO RULES (this will be heard, not read):
+- NEVER end with a rhetorical question. End on a statement — an image, a fact, or a thought the listener can carry forward.
+- NEVER list more than three items in a row. Listeners lose track after three.
+- Write for the EAR: short-to-medium sentences, concrete language, no parenthetical asides.
+
+NO PREACHING — NEVER INSTRUCT THE LISTENER (critical):
+- NEVER end by telling the listener to consider, reflect, imagine, or feel something.
+  End on a FACT or OBSERVATION. The listener is an adult — no commands, no "Take a moment to..."
+
+NO CONDESCENSION / NO DESCRIBING THE OBVIOUS:
+- Never "To truly appreciate..." or "It is worth noting..." — just state the thing.
+- The listener is in front of the object. Describe what they'd MISS, not what's obvious.
+
+SOURCE MATERIAL (use ONLY these facts; do not invent names, dates or numbers):
+
+[Reference extract]
+Self-Portrait with Bandaged Ear is an 1889 self-portrait by Dutch Post-Impressionist artist Vincent van Gogh. The painting is in the collection of the Courtauld Institute of Art and on display in the Gallery at Somerset House. The painting includes inspiration from Japanese woodblock printing.
+
+
+== About the painting ==
+
+In this self-portrait, Van Gogh portrays himself in a blue cap with black fur and a green overcoat with a bandage covering his ear and extending under his chin. Behind him is an open window, a canvas on an easel, with a few indistinguishable marks, as well as a Japanese woodblock print, Geishas in a Landscape made by Satō Torakiyo in the 1870s.
+The fur cap pictured in the portrait serves as a memory of the difficult working circumstances he encountered in January 1889. The cap had been recently purchased to keep his heavy bandage in place and protect him from the winter cold.
+Van Gogh used Impasto painting strokes, a technique where paint is laid thickly on a surface to show marks of the painting knife, to give the composition more energy and passion. He was inspired by Adolphe Monticelli's use of impasto in his own paintings  as illustrated by the letter he wrote to his brother, Theo, in 1888.
+Van Gogh had moved from Paris to Arles to establish a community of supportive artists called the Studio of the South. After renting four rooms in The Yellow House, he invited Paul Gauguin to join him.
+On evening of 23 December 1888, Gauguin threatened to leave and Van Gogh approached him with a razor. Later that night, he sliced off his own left ear, which is not apparent in the portrait since he used a mirror to paint it, making it seem like the right ear is bandaged instead, and brought it to a prostitute in Arles named Rachel. When she got the severed ear, Rachel became distressed and called the police to arrest Van Gogh for lunacy.
+
+
+== History ==
+In a 17 January 1889 letter to his brother Theo, Van Gogh mentioned he had made a new self-portrait, which is believed to be this one. 
+At the time of Van Gogh's death, this painting was in the possession of Julien (Père) Tanguy, although it was unclear how he had obtained it. Tanguy had posed twice for Van Gogh in 1887. It was exhibited in Paris 1901 and 1905 in a major Van Gogh retrospective. In 1928 Samuel Courtauld purchased it and it is currently in the collection of the Courtauld Gallery in London.
+
+
+== Japanese art influence ==
+The art of woodblock printing in Japan was of great influence for Van Gogh as he was a big collector of many Japanese pieces. Throughout his lifetime, he had collected hundreds of Japanese prints, including Geishas in a Landscape by Torakiyo Sato, which was then used as inspiration for the copy in the background of this portrait.
+Van Gogh's interest in Japanese art guided him to modernize his own art style. He enjoyed the bold colors and spatial effects of the Japanese prints which prompted him to start using them in all of his work including this portrait.
+
+
+== See also ==
+List of works by Vincent van Gogh
+
+
+== References ==
+
+[Venue sources]
+Our remarkable collection includes paintings, drawings, prints, sculpture and decorative arts, ranging from the medieval period to the present day. The Gallery is most famous for its exceptional group of Impressionist and Post-Impressionist paintings, with such iconic works as Van Gogh’s Self-Portrait with Bandaged Ear and Manet’s A Bar at the Folies-Bergère.
+Our remarkable collection includes paintings, drawings, prints, sculpture and decorative arts, ranging from the medieval period to the present day. The Gallery is most famous for its exceptional group of Impressionist and Post-Impressionist paintings, with such iconic works as Van Gogh’s  Self-Portrait with Bandaged Ear  and Manet’s  A Bar at the Folies-Bergère .
+An even more personal touch was revealed by a scanner created by the Italian Institute of Optics, showing that the vase of flowers in the top left-hand corner of the image was originally a reflection of Seurat at work, and would have been the only self-portrait of the artist to exist.
+Experience a vibrant selection of artworks created in response to Vincent van Gogh’s Self-Portrait with Bandaged Ear (1889) in the Courtauld collection, inspired by two new site-specific commissions by artist Rachel Jones.
+The Courtauld’s much-loved permanent collection ranges from the Middle Ages to the 20th century, including masterpieces such as Manet’s A Bar at the Folies-Bergère (1883), Van Gogh’s Self-Portrait with Bandaged Ear (1889) and the most significant collection of works by Cézanne in the UK.
+Van Gogh. Self-Portraits takes as its springboard Van Gogh’s iconic Self-Portrait with Bandaged Ear (1889), one of the most celebrated works in The Courtauld’s collection, and brings together around half of the self-portraits Van Gogh created during his short years as a painter.
+This is the first time that the full span of Van Gogh’s self-portraiture has been explored in an exhibition. Several works in the exhibition were last together in Van Gogh’s studio and have never been reunited, until now.
+Experience a vibrant selection of artworks created in response to Vincent van Gogh’s  Self-Portrait with Bandaged Ear  (1889) in the Courtauld collection, inspired by two new site-specific commissions by artist Rachel Jones.
+The Courtauld’s much-loved permanent collection ranges from the Middle Ages to the 20th century, including masterpieces such as Manet’s  A Bar at the Folies-Bergère  (1883), Van Gogh’s  Self-Portrait with Bandaged Ear  (1889) and the most significant collection of works by Cézanne in the UK.
+At the heart of the exhibition are some of the greatest paintings of Impressionism and Post-Impressionism, including Toulouse-Lautrec’s striking representation of the female performer  The Clown Cha-U-Kao (1895), Manet’s groundbreaking depiction of modern life  Au Café (1878), and a group of sensational works by Renoir and Cezanne.  A further highlight is the pair of celebrated paintings by Van Gogh, A Ward in the Hospital at Arles and The Courtyard 

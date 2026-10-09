@@ -1,0 +1,14 @@
+ARM E | gemini:gemini-flash-latest | Courtauld | Van Gogh’s iconic Self-Portrait with Bandaged Ear
+prompt_chars=11623 status=200 seconds=7.76 usage={'prompt_tokens': 2811, 'completion_tokens': 547, 'total_tokens': 3358}
+================================================================================
+Stand directly in front of Vincent van Gogh’s iconic *Self-Portrait with Bandaged Ear*, about two steps back from the frame. From here, you can see how the thick ridges of paint catch the gallery light, revealing that the artist worked with a mirror: the heavy white dressing appears over his right ear, though it was his left ear that he had actually severed.
+
+The painting depicts the Dutch Post-Impressionist artist in January 1889, dressed against the winter chill in a blue cap with black fur and a buttoned green overcoat. Van Gogh applied his oil paint using impasto—a technique where pigment is laid thickly onto the canvas to retain the distinct, raised ridges of the painting knife and brush. Inspired by Adolphe Monticelli, a French painter whose heavy impasto Van Gogh had admired in an 1888 letter to his brother Theo, he used these forceful strokes to bring energy and physical intensity to the surface. 
+
+To the left stands an easel holding a canvas marked with only a few indistinguishable strokes. To the right hangs a Japanese woodblock print, *Geishas in a Landscape* by Satō Torakiyo, published in the 1870s. Van Gogh was an avid collector of hundreds of Japanese woodcuts, drawing on their flat planes and bold coloration to modernize his own visual style. The fur cap itself was a recent purchase, bought to secure his thick gauze dressing and guard against the bitter drafts of his studio.
+
+This portrait marks the immediate aftermath of a catastrophic collapse. Van Gogh had moved to Arles to establish the Studio of the South, a planned communal haven for artists, and had leased four rooms in the Yellow House. He persuaded fellow painter Paul Gauguin to join him, but their intense collaboration fractured. On the evening of December 23, 1888, after Gauguin threatened to depart, Van Gogh approached him with an open razor. Later that night, Van Gogh mutilated his own ear, wrapped the severed flesh, and delivered it to a local prostitute named Rachel, who alerted the police. The artist’s dream of an artistic brotherhood was destroyed, and he was arrested for lunacy. 
+
+Painted mere weeks after that breakdown, the canvas records a painter determined to reassemble his working life despite the ruin of his community and his severe physical trauma. His gaze into the mirror is steady and clinical, presenting his wound not as an apology, but as an inescapable fact of his studio.
+
+In 1928, collector Samuel Courtauld purchased the painting, making it a cornerstone of the Courtauld Gallery’s world-renowned Post-Impressionist collection.

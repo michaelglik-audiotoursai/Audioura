@@ -1,0 +1,12 @@
+ARM E | gemini:gemini-flash-latest | Courtauld | Georges Seurat
+prompt_chars=11634 status=200 seconds=5.04 usage={'prompt_tokens': 3085, 'completion_tokens': 344, 'total_tokens': 3429}
+================================================================================
+Step up close to Georges Seurat’s *Young Woman Powdering Herself*, and then take two steps back. Standing close reveals individual dots of pure pigment applied separately to the surface, while stepping back allows your eyes to blend those dots into soft shadows across the wall.
+
+Georges Seurat painted this canvas between 1888 and 1890 using pointillism, a Neo-Impressionist method he invented with painter Paul Signac that builds form through small, juxtaposed dots of pure color rather than mixed strokes. The painting portrays a seated woman engaged in her daily grooming at a dressing table. Seurat modulates the light and shadow on the background wall by varying the concentration and intensity of these individual specks of pigment. In the upper left corner sits a small wall mirror reflecting a vase of flowers. An optical scan developed by the Italian Institute of Optics revealed that Seurat originally painted his own face in that mirror at his easel—a concealed image that would have stood as his only known self-portrait before he chose to cover it up. 
+
+Seurat’s model was Madeleine Knobloch, his mistress who bore him two sons. Living and working in Paris in the late 1880s, Seurat kept this domestic relationship private, turning this otherwise formal demonstration of pointillist theory into a deeply personal record near the close of his short life. 
+
+By painting over his own reflection, Seurat erased his presence, leaving the quiet ritual of the woman at her dressing table entirely on its own. 
+
+This painting belongs to the Samuel Courtauld Trust at The Courtauld Gallery, where it hangs alongside landmark works of nineteenth-century French painting.

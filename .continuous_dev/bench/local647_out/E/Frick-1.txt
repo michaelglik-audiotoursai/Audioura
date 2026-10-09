@@ -1,0 +1,12 @@
+ARM E | gemini:gemini-flash-latest | Frick | Portrait of Sir Thomas More
+prompt_chars=10338 status=200 seconds=5.53 usage={'prompt_tokens': 2431, 'completion_tokens': 413, 'total_tokens': 2844}
+================================================================================
+Stand directly in front of the *Portrait of Sir Thomas More* and lean slightly toward the upper-right corner of the composition. Looking closely at that specific area reveals a green hanging cord tied in a loose Franciscan knot, a delicate symbol easily missed from a distance that directly signals More’s private spiritual convictions.
+
+Painted in 1527 on an oak panel, this work captures the English statesman and humanist in a three-quarter right half-profile. Holbein uses the smooth, hard surface of the oak wood to render extraordinary surface textures with sharp clarity. More holds a book in his hands and wears a heavy coat lined with fur over rich fabrics of black satin and crimson red velvet. Draped across his shoulders is the Tudor Collar of Esses livery chain with a Tudor rose clasp, an official emblem signifying fealty to the English crown and his high public standing. On his left index finger, Holbein highlights a wedding ring inset with a stone, marking his domestic bond. While another large group portrait of More’s family by the same hand was tragically lost to history, this single oak panel preserves both the statesman's public allegiance and his hidden monastic piety.
+
+The German artist and printmaker Hans Holbein the Younger created this portrait during a critical turning point in his career, arriving to live in London in 1526. To establish himself in a new country, Holbein relied on the endorsement of the Dutch humanist Desiderius Erasmus, who wrote letters recommending that Holbein seek out More. At that time, More served as a knighted, politically influential speaker in the English Parliament, offering the immigrant painter vital access to the highest ranks of Tudor power. 
+
+The painting confronts the viewer with a sharp tension between worldly power and quiet restraint, balancing the heavy, lavish sheen of satin and civic gold against the modest knot and serious gaze of a man divided between royal duty and private faith. 
+
+Today, this 1527 oak panel forms part of the permanent painting collection at the Frick Collection in New York.

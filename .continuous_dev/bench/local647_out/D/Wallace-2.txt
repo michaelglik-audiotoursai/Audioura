@@ -1,0 +1,12 @@
+ARM D | gemini:gemini-flash-lite-latest | Wallace | Madame de Pompadour
+prompt_chars=5829 status=200 seconds=1.97 usage={'prompt_tokens': 1416, 'completion_tokens': 331, 'total_tokens': 1747}
+================================================================================
+Step closer to *Madame de Pompadour*, positioned directly in front of the canvas to catch the low sheen of the painted surface, which reveals the delicate, textured buildup of oil glazes that cheaper prints completely miss. 
+
+Painted in 1759, *Madame de Pompadour* is an oil-on-canvas portrait by the French Rococo artist François Boucher, a style defined by pastel palettes and playful, highly decorative scenes favored by the 18th-century French court. This work shows the chief mistress of King Louis XV—the monarch of France whose absolute rule preceded the French Revolution—seated amid opulent surroundings that signal her immense cultural and political patronage. It was the last of a series of seven portraits by the artist of Madame de Pompadour, making it the final visual collaboration between the era's most influential tastemaker and its most sought-after court painter. 
+
+The artist François Boucher was a leading figure of the French Rococo movement, a style patronized by the aristocracy that favored theatrical lightness, curving lines, and sensual mythological themes. At the time of this painting, Boucher was at the height of his career, enjoying the direct protection and patronage of Madame de Pompadour herself, which secured his position as the premier visual voice of the regime. 
+
+The work evokes a quiet, calculated intimacy, masking the immense political survival required of a royal favorite through an illusion of effortless domestic leisure. 
+
+This painting entered the Wallace Collection in London, a museum renowned for its 18th-century French paintings and decorative arts, as part of the founding bequest assembled by the Seymour family.

@@ -1,0 +1,338 @@
+[
+  {
+    "arm": "B",
+    "provider": "openai",
+    "model": "gpt-4.1-mini",
+    "stop_id": "Courtauld-0",
+    "museum": "Courtauld",
+    "title": "Manet’s A Bar at the Folies-Bergère",
+    "artist": "",
+    "prompt_chars": 9031,
+    "status": 200,
+    "seconds": 7.02,
+    "usage": {
+      "prompt_tokens": 2117,
+      "completion_tokens": 544,
+      "total_tokens": 2661,
+      "prompt_tokens_details": {
+        "cached_tokens": 1920,
+        "audio_tokens": 0
+      },
+      "completion_tokens_details": {
+        "reasoning_tokens": 0,
+        "audio_tokens": 0,
+        "accepted_prediction_tokens": 0,
+        "rejected_prediction_tokens": 0
+      }
+    },
+    "output": "You are standing in front of Édouard Manet’s A Bar at the Folies-Bergère, displayed here at The Courtauld Gallery in London. From this vantage point, look closely at the large mirror behind the barmaid, which reveals a complex reflection that changes everything you might assume about the scene. This subtle shift in perspective is crucial to understanding the painting’s composition and meaning.\n\nThis oil on canvas, painted in 1882, is Manet’s last major work and captures a moment in the bustling Folies Bergère nightclub in Paris. The central figure is a barmaid facing the viewer, set before a mirror that shows the crowded room behind her, including a man whose reflection appears oddly positioned. Manet’s use of the mirror is remarkable—rather than a straightforward reflection, the perspective is carefully constructed so that the man stands outside the painter’s field of vision and looks away from the barmaid. This deliberate choice unsettles the usual rules of perspective and invites viewers to question what they see. Critics once accused Manet of errors, but in 2000, art historian Malcolm Park demonstrated through a physical reconstruction that the perspective is indeed possible. The painting’s detailed realism and unusual viewpoint combine to reveal the complexities of modern urban life and social interaction.\n\nÉdouard Manet, born in 1832, painted this work at the end of his career, during a period when he was deeply engaged with depicting contemporary life with honesty and subtle irony. A Bar at the Folies-Bergère reflects his interest in modernity and the changing social landscape of Paris. Manet’s friendship with the composer Emmanuel Chabrier, the painting’s first owner, shows the close ties between artists and musicians of the time. This work marks a turning point as it encapsulates Manet’s mature style and his exploration of reflection, perspective, and the relationship between viewer and subject.\n\nStanding before this painting, viewers often sense a quiet tension—the barmaid’s detached expression and the mirrored space suggest themes of isolation amid the crowd and the performative nature of social roles. The work evokes a feeling of looking beyond appearances to the complexities beneath everyday interactions in a modern city.\n\nManet’s A Bar at the Folies-Bergère is part of The Courtauld’s renowned collection of Impressionist and Post-Impressionist masterpieces, assembled by Samuel Courtauld. His collection also includes another version of Manet’s Déjeuner sur l’Herbe, Renoir’s La Loge, landscapes by Monet and Pissarro, a ballet scene by Degas, and eight major works by Cézanne, making this painting a key highlight of a collection that shaped the understanding of modern art in Britain."
+  },
+  {
+    "arm": "B",
+    "provider": "openai",
+    "model": "gpt-4.1-mini",
+    "stop_id": "Courtauld-1",
+    "museum": "Courtauld",
+    "title": "Van Gogh’s iconic Self-Portrait with Bandaged Ear",
+    "artist": "",
+    "prompt_chars": 8558,
+    "status": 200,
+    "seconds": 5.3,
+    "usage": {
+      "prompt_tokens": 1980,
+      "completion_tokens": 558,
+      "total_tokens": 2538,
+      "prompt_tokens_details": {
+        "cached_tokens": 1792,
+        "audio_tokens": 0
+      },
+      "completion_tokens_details": {
+        "reasoning_tokens": 0,
+        "audio_tokens": 0,
+        "accepted_prediction_tokens": 0,
+        "rejected_prediction_tokens": 0
+      }
+    },
+    "output": "You are standing before Van Gogh’s iconic Self-Portrait with Bandaged Ear, displayed here at The Courtauld Gallery in London. From this close vantage point, your eyes catch the thick, textured brushstrokes that Van Gogh applied with impasto technique—where paint is laid on so heavily that the marks of the brush and knife remain visible, adding a lively, tactile energy to the surface. This detail might be lost from afar but reveals the passion and urgency behind the painting’s creation.\n\nThe portrait shows Vincent van Gogh wearing a blue cap trimmed with black fur and a green overcoat. A white bandage wraps firmly around his head, covering his ear and extending beneath his chin. Behind him, you can see an open window with a canvas resting on an easel, marked with indistinct strokes. Next to the easel hangs a Japanese woodblock print depicting geishas in a landscape, created by Satō Torakiyo in the 1870s. This inclusion reflects Van Gogh’s fascination with Japanese art, which influenced his style and composition. The fur cap itself is significant—it was bought to secure the heavy bandage covering his wound and to protect against the chill of winter. The thick application of paint and the vibrant colors convey a sense of both physical and emotional intensity.\n\nVincent van Gogh painted this self-portrait in 1889 during a critical moment in his life. He had moved to Arles in southern France to create a community of artists, known as the Studio of the South, and had invited Paul Gauguin to join him. However, after a tense confrontation on December 23, 1888, in which Gauguin threatened to leave, Van Gogh famously cut off part of his own left ear. The portrait shows the bandage on what appears to be his right ear due to the mirror image technique he used while painting himself. This work marks a turning point, capturing both his physical injury and his turbulent mental state. Van Gogh was striving to express his inner struggles through his art, using bold color and texture to communicate feelings that words could not.\n\nThe emotional impact of the painting lies in its raw honesty. The intensity of Van Gogh’s gaze, combined with the vivid impasto and the stark bandage, evokes a sense of vulnerability and resilience. It is a portrait not just of a man’s appearance but of his pain, determination, and creative spirit.\n\nThe Courtauld Gallery acquired this work as part of its outstanding collection of Impressionist and Post-Impressionist paintings, where it stands alongside masterpieces such as Manet’s A Bar at the Folies-Bergère. The painting’s thick oil paint on canvas and its intimate scale invite viewers into Van Gogh’s personal world, bridging his private suffering and his artistic innovation."
+  },
+  {
+    "arm": "B",
+    "provider": "openai",
+    "model": "gpt-4.1-mini",
+    "stop_id": "Courtauld-2",
+    "museum": "Courtauld",
+    "title": "Georges Seurat",
+    "artist": "",
+    "prompt_chars": 8488,
+    "status": 200,
+    "seconds": 4.29,
+    "usage": {
+      "prompt_tokens": 2004,
+      "completion_tokens": 518,
+      "total_tokens": 2522,
+      "prompt_tokens_details": {
+        "cached_tokens": 1792,
+        "audio_tokens": 0
+      },
+      "completion_tokens_details": {
+        "reasoning_tokens": 0,
+        "audio_tokens": 0,
+        "accepted_prediction_tokens": 0,
+        "rejected_prediction_tokens": 0
+      }
+    },
+    "output": "You are standing before Georges Seurat’s painting titled *Young Woman Powdering Herself*, created between 1888 and 1890, here at The Courtauld Gallery in London. From this close vantage point, notice how Seurat’s meticulous use of tiny dots of pure color, applied side by side, creates delicate gradations of light and shadow across the wall behind the figure. This technique, known as pointillism, becomes legible only when you focus on the surface texture of the painting, revealing the careful modulation that gives the image its quiet luminosity.\n\nThe painting shows a young woman, Seurat’s mistress Madeleine Knobloch, applying powder to her face in a moment of personal intimacy. The composition is restrained and vertical, with the figure occupying a softly lit interior space. Seurat’s methodical placement of thousands of small colored dots—using oil paint on canvas—builds the form and atmosphere through optical blending, a technique that was revolutionary in the late 19th century. This approach was part of Seurat’s scientific exploration of color and perception, aiming to create a harmony of light that pure brushstrokes could not achieve. Art historians recognize this work as deeply personal because Madeleine bore Seurat two sons, and recent technological scans revealed that the vase of flowers in the upper left originally contained a tiny self-portrait of Seurat at work, symbolizing his presence and connection to the scene.\n\nGeorges Seurat, born in 1859, was a leading figure in Neo-Impressionism, a movement that sought to apply scientific principles to painting. At the time he painted *Young Woman Powdering Herself*, Seurat was refining his pointillist technique, moving beyond earlier experiments to capture subtle emotional states and everyday moments with precision. This work marks a mature phase in his career, revealing his interest in private, domestic subjects alongside his well-known public scenes. Seurat’s efforts to reconcile color theory with human sensitivity reflect his ambition to elevate modern life through innovative artistic methods.\n\nThe painting evokes a quiet, reflective mood, inviting viewers to witness a fleeting gesture of self-care rendered with both emotional warmth and analytical rigor. It reveals the tension between the personal and the formal, the intimate subject and the detached technique, which defines much of Seurat’s late work.\n\n*Young Woman Powdering Herself* was acquired by The Courtauld through the Samuel Courtauld Trust. It complements the gallery’s renowned collection of Impressionist and Post-Impressionist paintings, illustrating the scientific and emotional advances that shaped modern art at the turn of the century."
+  },
+  {
+    "arm": "B",
+    "provider": "openai",
+    "model": "gpt-4.1-mini",
+    "stop_id": "Walters-0",
+    "museum": "Walters",
+    "title": "Springtime (1872)",
+    "artist": "",
+    "prompt_chars": 7265,
+    "status": 200,
+    "seconds": 4.59,
+    "usage": {
+      "prompt_tokens": 1708,
+      "completion_tokens": 530,
+      "total_tokens": 2238,
+      "prompt_tokens_details": {
+        "cached_tokens": 1536,
+        "audio_tokens": 0
+      },
+      "completion_tokens_details": {
+        "reasoning_tokens": 0,
+        "audio_tokens": 0,
+        "accepted_prediction_tokens": 0,
+        "rejected_prediction_tokens": 0
+      }
+    },
+    "output": "You are standing before *Springtime* or *The Reader* (1872) by Claude Monet in the Walters Art Museum’s European painting gallery, positioned close enough to see the delicate brushwork Monet used to capture light filtering through lilac blossoms above the seated figure. From this vantage point, you notice how the soft sunlight dapples the model’s face and dress—details that would blur from farther away, but here reveal Monet’s early Impressionist approach to capturing the fleeting effects of natural light.\n\nThe painting shows Monet’s first wife, Camille Doncieux, seated quietly in a garden, absorbed in reading beneath a canopy of lilacs. Monet painted this work in spring of 1872 while living in Argenteuil, a village near Paris, popular among leisure-seekers and Impressionist painters. The canvas is oil on canvas, about life-size, with loose, visible brushstrokes that suggest rather than define forms, especially in the foliage above. This technique captures the shimmering sunlight and the intimate, tranquil atmosphere of the moment. Monet’s choice to focus closely on Camille’s youthful face and figure, bathed in natural light, conveys a fresh sense of intimacy and the tender relationship between artist and model. Critics have noted how this painting marks Monet’s shift toward capturing everyday life with immediacy, using color and light to create mood rather than detailed realism.\n\nClaude Monet, the French Impressionist painter who created *Springtime*, was just emerging from difficult years marked by poverty and exile during the Franco-Prussian War. By 1872, Monet had married Camille, who had been his mistress and model for years, and settled in Argenteuil. This painting represents a turning point in Monet’s career as he embraced Impressionism’s focus on modern life, light, and atmosphere. Camille’s presence here is significant; she was more than a model—she was Monet’s muse during this formative period, appearing in many of his works before her early death. Monet’s portrayal of Camille in *Springtime* preserves her image at its most radiant, especially since his second wife later destroyed many mementos of Camille’s life.\n\nViewing *Springtime* evokes a quiet sense of intimacy and renewal, grounded in the artist’s personal life and his new Impressionist vision. The soft sunlight, gentle posture, and the tender focus on Camille convey calm and affection, reflecting Monet’s hope for both his art and marriage during this promising moment.\n\n*Springtime* was part of the Walters Art Museum’s collection through acquisition, joining the museum’s holdings of key Impressionist works that illustrate the movement’s evolution and its focus on light and modern subjects."
+  },
+  {
+    "arm": "B",
+    "provider": "openai",
+    "model": "gpt-4.1-mini",
+    "stop_id": "Walters-1",
+    "museum": "Walters",
+    "title": "The Death of Caesar",
+    "artist": "",
+    "prompt_chars": 7526,
+    "status": 200,
+    "seconds": 5.48,
+    "usage": {
+      "prompt_tokens": 1784,
+      "completion_tokens": 537,
+      "total_tokens": 2321,
+      "prompt_tokens_details": {
+        "cached_tokens": 1664,
+        "audio_tokens": 0
+      },
+      "completion_tokens_details": {
+        "reasoning_tokens": 0,
+        "audio_tokens": 0,
+        "accepted_prediction_tokens": 0,
+        "rejected_prediction_tokens": 0
+      }
+    },
+    "output": "You are standing before *The Death of Caesar*, an 1806 oil painting by the Italian artist Vincenzo Camuccini, displayed here at the Walters Art Museum. Position yourself a few steps back and slightly to the side to take in the full composition, where the arrangement of figures and their gestures become clear—details that a close-up view might obscure.\n\nThe painting depicts the dramatic moment of Julius Caesar’s assassination in 44 BCE, when Roman senators stabbed him in the Theatre of Pompey. Camuccini painted this scene on a large canvas using oil paint, a medium that allows for rich color and subtle gradations of light and shadow. The composition centers on Caesar, shown collapsing with a mix of shock and pain, his toga partly draped and his face turned toward the viewer. Around him, the conspirators are caught in the tense act of betrayal, their poses and expressions revealing fear, determination, and hesitation. Camuccini’s technique of chiaroscuro—contrasting strong light and deep shadows—heightens the emotional intensity and focuses attention on Caesar’s figure. This work was made during the Neoclassical period, which drew inspiration from ancient Roman history to explore themes of political power and moral conflict. Critics of Camuccini’s time praised the detailed draftsmanship and dramatic staging, though his first version of this painting was destroyed after poor reception, making this 1806 version the artist’s definitive statement on the subject.\n\nVincenzo Camuccini was an influential painter in early 19th-century Rome, known for reviving classical history painting. When he created *The Death of Caesar*, he was responding to a prestigious 1793 commission from Frederick Hervey, the 4th Earl of Bristol, although the patron died before the work was finished. Camuccini’s destruction of his initial 1796 attempt shows his commitment to artistic excellence and the challenges he faced in meeting critical expectations. By 1806, he had refined his vision to produce this version, marking a turning point in his career where he solidified his reputation for grand historical narratives rooted in classical antiquity.\n\nThe painting’s vivid portrayal of betrayal and political upheaval evokes a sense of tragic inevitability. It draws attention to the human drama behind momentous events, reflecting both Camuccini’s classical ideals and his personal struggle to capture history’s complexity through art.\n\n*The Death of Caesar* arrived at the Walters Art Museum as part of its commitment to presenting important works of European art that illuminate historical themes and artistic developments. This painting’s presence here connects to the museum’s broader collection of narrative history paintings that explore power, conflict, and legacy through masterful technique and storytelling."
+  },
+  {
+    "arm": "B",
+    "provider": "openai",
+    "model": "gpt-4.1-mini",
+    "stop_id": "Walters-2",
+    "museum": "Walters",
+    "title": "Sappho and Alcaeus",
+    "artist": "",
+    "prompt_chars": 6993,
+    "status": 200,
+    "seconds": 4.17,
+    "usage": {
+      "prompt_tokens": 1670,
+      "completion_tokens": 579,
+      "total_tokens": 2249,
+      "prompt_tokens_details": {
+        "cached_tokens": 1536,
+        "audio_tokens": 0
+      },
+      "completion_tokens_details": {
+        "reasoning_tokens": 0,
+        "audio_tokens": 0,
+        "accepted_prediction_tokens": 0,
+        "rejected_prediction_tokens": 0
+      }
+    },
+    "output": "You are standing before *Sappho and Alcaeus*, an oil-on-panel painting by Lawrence Alma-Tadema, made in 1881 and displayed here at the Walters Art Museum in Baltimore. From this central vantage point, you can take in the full horizontal sweep of the scene—the arrangement of figures, the marble architecture, and even the glimpse of sea in the background—which reveals the painting’s careful composition and narrative detail that might be lost from the side.\n\nThis 66 by 122 centimetres work shows a concert set in the late 7th century BC. At the center, the poet Alcaeus of Mytilene plays the kithara, an ancient Greek stringed instrument similar to a lyre, associated with formal musical performances. To the right, Sappho, the renowned female poet of the island of Lesbos, watches intently, resting her arm on a cushion embroidered with a laurel wreath—the traditional symbol of poetic honor, likely meant for Alcaeus. Surrounding her are several female companions, suggesting a private, cultivated audience. The setting resembles the Theatre of Dionysus in Athens, recognizable by its white marble tiers; however, Alma-Tadema replaced the original Athenian inscriptions on the seats with the names of Sappho’s friends, personalizing the scene. In the background, the Aegean Sea peeks through trees, anchoring the event in its geographic and cultural context. This scene visualizes a passage from the poet Hermesianax, as recorded by Athenaeus in his *Deipnosophistae*, a classical work describing learned banquets. The oil medium allows for rich textures and luminous colors, highlighting the marble’s sheen and the soft fabrics, while the horizontal format supports the unfolding musical narrative.\n\nLawrence Alma-Tadema, a Dutch-born British artist, was known for his detailed and historically informed depictions of classical antiquity. By 1881, when he painted *Sappho and Alcaeus*, Alma-Tadema was at a mature stage in his career, focusing on intimate moments from ancient life rather than grand historical events. This painting reflects his interest in blending archaeological accuracy with poetic atmosphere, aiming to bring ancient culture vividly to life for a Victorian audience fascinated by classical heritage.\n\nThe painting invites viewers to sense the quiet intensity of cultural exchange—the meeting of two great poets in a moment of shared inspiration. It captures a delicate balance between public performance and private appreciation, grounded in Alma-Tadema’s scholarly attention to detail and his personal vision of antiquity’s refined pleasures.\n\n*Sappho and Alcaeus* was acquired by William Thompson Walters of Baltimore and passed to his son Henry Walters, who bequeathed it to the Walters Art Museum in 1931, where it remains a key example of the museum’s collection of nineteenth-century European painting focused on classical themes."
+  },
+  {
+    "arm": "B",
+    "provider": "openai",
+    "model": "gpt-4.1-mini",
+    "stop_id": "Wallace-0",
+    "museum": "Wallace",
+    "title": "The Laughing Cavalier",
+    "artist": "",
+    "prompt_chars": 7439,
+    "status": 200,
+    "seconds": 4.21,
+    "usage": {
+      "prompt_tokens": 1743,
+      "completion_tokens": 449,
+      "total_tokens": 2192,
+      "prompt_tokens_details": {
+        "cached_tokens": 1536,
+        "audio_tokens": 0
+      },
+      "completion_tokens_details": {
+        "reasoning_tokens": 0,
+        "audio_tokens": 0,
+        "accepted_prediction_tokens": 0,
+        "rejected_prediction_tokens": 0
+      }
+    },
+    "output": "You are standing before The Laughing Cavalier, a striking oil portrait by Frans Hals, displayed at eye level in the Wallace Collection, London. From this vantage point, you can clearly see the intricate inscription in the upper right corner, which identifies the sitter’s age as 26 and the date as 1624—details easily missed from a distance but crucial for understanding the work’s historical context.\n\nThe Laughing Cavalier measures 83 by 67.3 centimeters and shows a young man dressed in an elaborately embroidered silk costume. Hals painted it with lively, confident brushstrokes, especially evident in the flowing textures of the fabric and the sitter’s upturned moustache, which amplifies his enigmatic smile. This use of quick, broad strokes was a deliberate technique to capture spontaneity and vitality, setting the portrait apart from more posed and polished works of the time. The costume’s lavish silk, a symbol of wealth and status in early 17th-century Dutch society, suggests the sitter was affluent—possibly a prosperous merchant rather than a military officer, despite Victorian-era assumptions. The sitter’s identity remains uncertain, though some scholars propose he may be Tieleman Roosterman, a cloth merchant known to Hals.\n\nFrans Hals, the Dutch Golden Age painter behind this work, was in the midst of his career when he created this portrait. Known for his ability to infuse portraits with life and immediacy, Hals often painted members of Haarlem’s wealthy bourgeoisie. The Laughing Cavalier marks a moment where he combined detailed costume rendering with his characteristic lively brushwork, moving beyond traditional formality to capture personality and mood in a fresh way.\n\nThe Laughing Cavalier invites a sense of intrigue and engagement; the sitter’s confident gaze and subtle smile suggest a complex character, blending charm with mystery. This effect reflects Hals’s skill in portraying not just appearance but presence, drawing the viewer into a silent conversation across centuries.\n\nThis portrait became part of the Wallace Collection through acquisition and has since been recognized as one of the finest examples of Baroque portraiture in Britain. It connects with the museum’s broader holdings of European art by exemplifying the Dutch Golden Age’s influence and the era’s social nuances captured through portraiture."
+  },
+  {
+    "arm": "B",
+    "provider": "openai",
+    "model": "gpt-4.1-mini",
+    "stop_id": "Wallace-1",
+    "museum": "Wallace",
+    "title": "A Dance to the Music of Time",
+    "artist": "",
+    "prompt_chars": 7504,
+    "status": 200,
+    "seconds": 5.7,
+    "usage": {
+      "prompt_tokens": 1736,
+      "completion_tokens": 606,
+      "total_tokens": 2342,
+      "prompt_tokens_details": {
+        "cached_tokens": 1536,
+        "audio_tokens": 0
+      },
+      "completion_tokens_details": {
+        "reasoning_tokens": 0,
+        "audio_tokens": 0,
+        "accepted_prediction_tokens": 0,
+        "rejected_prediction_tokens": 0
+      }
+    },
+    "output": "You are standing before *A Dance to the Music of Time* by Nicolas Poussin, located in the Wallace Collection in London. Position yourself slightly to the right and a bit back to take in the full sweep of the composition: from the four dancers locked hand-in-hand, moving in a circular dance, to the figure of Time playing a lyre on the right, and the celestial procession of Apollo and Aurora in the sky above. From this vantage, you witness the careful balance Poussin achieves between earthly life and cosmic order.\n\nThe painting, executed around 1634 to 1636, is an oil on canvas work that masterfully combines mythological symbolism with a complex allegory of human existence. It depicts four figures dancing in a circle: Poverty, Labour, Riches, and Pleasure or Luxury. These dancers represent a cycle in human life, where Pleasure leads back to Poverty, suggesting a continuous, inevitable progression. Behind them, Time, personified as an aging figure, plays a lyre, underscoring the rhythm and inevitability of this cycle. Above, the dawn goddess Aurora precedes Apollo, the sun god, whose chariot rides across the sky accompanied by the Hours and carrying a ring symbolizing the Zodiac, linking the human drama below to the celestial order and the passage of time. The composition’s circular arrangement, with figures interlocked by their hands, emphasizes the unending nature of life’s stages. The technique of layering mythological figures with astrological symbols reflects the 17th-century Baroque fascination with order, allegory, and cosmic harmony.\n\nNicolas Poussin, the French painter behind this work, was at a pivotal moment in his career when he created this painting. Commissioned by Giulio Rospigliosi, who later became Pope Clement IX, the work reflects a close collaboration in which Rospigliosi dictated much of the iconography, blending personal and philosophical ideas. Poussin, known for his classical style and intellectual approach to painting, sought to capture universal themes through clarity and structured composition. This work marks a mature phase where Poussin’s interest in allegory and classical mythology converged, showcasing his ability to convey complex ideas visually.\n\nEmotionally, *A Dance to the Music of Time* evokes a sense of inevitability and contemplation about the cycles that govern human life. The harmonious yet relentless dance suggests both the beauty and the constraint of existence, inviting viewers to recognize the interplay of fortune and fate as part of a larger cosmic rhythm.\n\nThe Wallace Collection acquired this painting as part of its significant holdings of Old Master paintings, where it connects to the museum’s broader focus on European art that explores classical and mythological themes.\n\nThis oil on canvas stands approximately life-sized, allowing the figures to engage the viewer directly; its cost was the investment in elaborate symbolism and the intellectual collaboration that shaped its detailed iconography. The painting’s layered meanings and classical references were at stake—crafted to endure as a visual meditation on time, life, and destiny."
+  },
+  {
+    "arm": "B",
+    "provider": "openai",
+    "model": "gpt-4.1-mini",
+    "stop_id": "Wallace-2",
+    "museum": "Wallace",
+    "title": "Madame de Pompadour",
+    "artist": "",
+    "prompt_chars": 5829,
+    "status": 200,
+    "seconds": 4.39,
+    "usage": {
+      "prompt_tokens": 1377,
+      "completion_tokens": 400,
+      "total_tokens": 1777,
+      "prompt_tokens_details": {
+        "cached_tokens": 1152,
+        "audio_tokens": 0
+      },
+      "completion_tokens_details": {
+        "reasoning_tokens": 0,
+        "audio_tokens": 0,
+        "accepted_prediction_tokens": 0,
+        "rejected_prediction_tokens": 0
+      }
+    },
+    "output": "You are standing before Madame de Pompadour, a 1759 oil-on-canvas portrait by François Boucher, positioned so that the full sweep of her elegant figure and the delicate textures of her attire come into clear view. From this vantage point, you can appreciate the fine brushwork that brings to life the softness of her silk gown and the subtle glow of her complexion, details that might blur from afar.\n\nThis painting depicts Madame de Pompadour, the influential mistress of King Louis XV of France, seated in a graceful pose that combines dignity with charm. Boucher used oil paint on canvas, a medium that allowed him to achieve rich color depth and smooth transitions of light and shadow. The composition highlights her refined taste and status, with elaborate fabrics and a poised expression that reflect her role as a patron of the arts and a political figure. This portrait was the final one in a series of seven that Boucher painted of her, marking the culmination of their artistic collaboration. Critics have noted how this work balances Rococo elegance with a subtle sense of the sitter’s intellect and influence at the French court.\n\nFrançois Boucher was a leading French Rococo painter known for his decorative and often playful style. By 1759, he was well established as the official court painter to Louis XV and closely connected to Madame de Pompadour herself. This portrait came at a turning point when Boucher was consolidating his reputation by capturing not only the beauty but also the complex personality of his patron through increasingly sophisticated portraits.\n\nViewing this portrait evokes a sense of the delicate power Madame de Pompadour wielded, combining soft visual beauty with the weight of her cultural and political importance—an impression shaped by Boucher’s mastery of color and form and their shared history.\n\nThe Wallace Collection acquired this painting after it had been shown at the Château de Versailles and subsequently passed to Madame de Pompadour’s brother, linking it to the museum’s broader holdings of French 18th-century art and decorative objects."
+  },
+  {
+    "arm": "B",
+    "provider": "openai",
+    "model": "gpt-4.1-mini",
+    "stop_id": "Frick-0",
+    "museum": "Frick",
+    "title": "Officer and Laughing Girl",
+    "artist": "",
+    "prompt_chars": 8458,
+    "status": 200,
+    "seconds": 5.54,
+    "usage": {
+      "prompt_tokens": 1923,
+      "completion_tokens": 559,
+      "total_tokens": 2482,
+      "prompt_tokens_details": {
+        "cached_tokens": 1792,
+        "audio_tokens": 0
+      },
+      "completion_tokens_details": {
+        "reasoning_tokens": 0,
+        "audio_tokens": 0,
+        "accepted_prediction_tokens": 0,
+        "rejected_prediction_tokens": 0
+      }
+    },
+    "output": "You are standing before Officer and Laughing Girl, an oil painting by Johannes Vermeer, measuring approximately 50.5 by 46 centimeters, displayed at the Frick Collection in New York. Position yourself close enough to see the delicate brushwork and the subtle gradations of light on the figures’ faces—details that reveal Vermeer’s mastery and would be lost from afar.\n\nThe painting shows a young woman dressed in a yellow schort, a braided bodice typical of everyday attire in 17th-century Netherlands, seated at a table. She laughs softly, her face illuminated by natural light streaming from a left-side window, which also casts gentle shadows that model her expression and the textures of her clothing. Opposite her sits a man in a military officer’s uniform, slightly turned away, suggesting a moment of intimate conversation or flirtation. Behind them, a large, detailed map by cartographer Balthasar Florisz. van Berckenrode fills the wall, grounding the scene in the Dutch Golden Age, a period of maritime trade and global exploration. Vermeer likely used a camera obscura, an early optical device, to achieve the precise perspective and soft focus that give the scene its quiet realism. X-ray analysis reveals changes Vermeer made during painting: the woman’s cap was extended to frame her face more clearly, and a large white collar was removed to reveal more of her yellow dress, emphasizing her warmth and vitality. The work’s meaning has been debated, with some scholars seeing it as a genre scene capturing everyday life, while others read subtle social or symbolic cues in the interaction and setting.\n\nJohannes Vermeer painted Officer and Laughing Girl around 1657, early in his career in Delft, a Dutch city flourishing with artists and merchants. At this time, Vermeer was developing his distinctive approach to light and composition, moving beyond his initial focus on history painting toward intimate interior scenes. This painting marks a turning point as he refined his technique and began to explore nuanced human relationships in quiet domestic settings. Vermeer’s wife, Catharina Bolnes, is believed to have modeled for the laughing girl, linking the work to his personal life and deepening its sense of immediacy and affection.\n\nThis painting invites viewers to notice the tender connection between the figures and the calm harmony of light and color that Vermeer crafted. The scene’s warmth and nuanced expression capture a fleeting moment of joy and companionship within the structured world of 17th-century Dutch society.\n\nOfficer and Laughing Girl joined the Frick Collection alongside Vermeer’s other works, such as Girl Interrupted at Her Music and Mistress and Maid, enriching the museum’s focus on Dutch Golden Age painting. The Frick’s intimate galleries provide a setting that highlights the delicate scale and refined detail of Vermeer’s art."
+  },
+  {
+    "arm": "B",
+    "provider": "openai",
+    "model": "gpt-4.1-mini",
+    "stop_id": "Frick-1",
+    "museum": "Frick",
+    "title": "Portrait of Sir Thomas More",
+    "artist": "",
+    "prompt_chars": 8500,
+    "status": 200,
+    "seconds": 5.32,
+    "usage": {
+      "prompt_tokens": 1957,
+      "completion_tokens": 494,
+      "total_tokens": 2451,
+      "prompt_tokens_details": {
+        "cached_tokens": 0,
+        "audio_tokens": 0
+      },
+      "completion_tokens_details": {
+        "reasoning_tokens": 0,
+        "audio_tokens": 0,
+        "accepted_prediction_tokens": 0,
+        "rejected_prediction_tokens": 0
+      }
+    },
+    "output": "You are standing in front of the Portrait of Sir Thomas More, a refined oak panel painting created in 1527 by the German artist Hans Holbein the Younger, at the Frick Collection in New York. From this vantage point, notice the intricate textures of More’s fur-lined coat and the subtle sheen of black satin and red velvet—details that highlight Holbein’s mastery of oil paint on wood, a technique that allows for meticulous rendering of fabric and skin, bringing the sitter vividly to life.\n\nThe portrait shows Thomas More, an English statesman and humanist, in a three-quarter right half-profile. He holds a book, symbolizing his scholarly pursuits, while wearing the Tudor Collar of Esses, a livery chain adorned with the Tudor rose, signaling his loyalty and high status at the English court. A loosely tied Franciscan cord appears near the upper right, representing More’s deep spiritual convictions as a devout Catholic. On his left index finger is a wedding ring set with a stone, marking his personal life and commitments. This painting was made during Holbein’s London period starting in 1526, when he moved to England and developed connections with prominent humanists like Desiderius Erasmus, who introduced him to More. The portrait exemplifies Holbein’s skill in combining precise realism with symbolic detail to convey More’s intellect, faith, and authority.\n\nHans Holbein the Younger was at a pivotal moment in his career when he painted this work. Having recently arrived in London from Germany, he sought to establish himself among the intellectual and political elite. His friendship with Erasmus and subsequent acquaintance with Sir Thomas More helped him secure commissions from England’s highest circles. This portrait marks Holbein’s early success in court portraiture, demonstrating his ability to capture both likeness and character, which would define his later works for the Tudor court.\n\nThe effect of this portrait is one of quiet dignity and thoughtful presence. Holbein’s detailed technique and his choice to include symbolic elements like the Tudor livery chain and Franciscan knot invite viewers to see More not just as a powerful politician, but as a learned and devout man. The painting conveys a balance of worldly authority and spiritual depth, qualities that defined More’s life and reputation.\n\nThe Frick Collection acquired this painting through a bequest, adding to its notable holdings of Northern Renaissance art. The Portrait of Sir Thomas More connects with the museum’s broader focus on intimate, expertly crafted portraits that reveal individual character and historical context."
+  },
+  {
+    "arm": "B",
+    "provider": "openai",
+    "model": "gpt-4.1-mini",
+    "stop_id": "Frick-2",
+    "museum": "Frick",
+    "title": "Portrait of Comtesse d'Haussonville",
+    "artist": "",
+    "prompt_chars": 8516,
+    "status": 200,
+    "seconds": 5.68,
+    "usage": {
+      "prompt_tokens": 1962,
+      "completion_tokens": 699,
+      "total_tokens": 2661,
+      "prompt_tokens_details": {
+        "cached_tokens": 1792,
+        "audio_tokens": 0
+      },
+      "completion_tokens_details": {
+        "reasoning_tokens": 0,
+        "audio_tokens": 0,
+        "accepted_prediction_tokens": 0,
+        "rejected_prediction_tokens": 0
+      }
+    },
+    "output": "You are standing before the Portrait of Comtesse d'Haussonville, an 1845 oil-on-canvas painting by the French Neoclassical artist Jean-Auguste-Dominique Ingres, here at the Frick Collection in New York. Position yourself close enough to observe the delicate brushwork and the subtle textures of the fabric, while stepping back slightly to take in the full composition, including the reflection in the mirror behind the sitter, which reveals a secondary image of the Comtesse, enriching the sense of depth and complexity.\n\nThis portrait shows Louise de Broglie, the Comtesse d'Haussonville, seated gracefully in an interior setting. Painted in oil on canvas, Ingres employs his signature smooth, polished technique, where surfaces appear almost porcelain-like, emphasizing clarity and idealized beauty. The composition features the Comtesse in a white dress with a high waist and delicate lace, holding a letter, which hints at her intellectual pursuits and refined character. Behind her, a mirror reflects her profile, a compositional choice that adds psychological depth, suggesting layers of identity and presence. This mirror image not only doubles the sitter but also reverses her pose, inviting viewers to consider the duality of appearance versus inner life. Critics have noted that this painting exemplifies Ingres's rare mastery of portraiture during a period when he preferred historical subjects, making it a standout work that bridges his classical ideals with the demands of capturing a living subject's personality.\n\nJean-Auguste-Dominique Ingres painted this portrait when he was at the height of his fame, around 1845. Known primarily for his Neoclassical history paintings inspired by ancient Greece and Rome, Ingres accepted few portrait commissions at this time, finding them less artistically satisfying though more financially rewarding. The Comtesse d'Haussonville was a challenging subject; Ingres began work on an earlier version but paused when Louise became pregnant and could no longer pose for extended sessions, which he required for his detailed technique. This painting marks a turning point as one of the few portraits he completed during this period, reflecting both his technical brilliance and the tension between his artistic ambitions and practical needs.\n\nEmotionally, the portrait conveys a sense of poised introspection and intellectual elegance. The Comtesse’s calm gaze and composed posture, combined with the reflective doubling in the mirror, evoke a quiet dignity and a complex inner life, shaped by her roles as aristocrat, writer, and thinker. The painting invites viewers to notice the interplay between external appearance and private identity, a theme resonant with Ingres’s broader artistic concerns.\n\nThe Frick Collection acquired the Portrait of Comtesse d'Haussonville as part of its focus on European Old Master paintings, where it complements other works by Ingres and his contemporaries, highlighting the evolution of French portraiture in the 19th century. The oil-on-canvas medium, with its rich but restrained color palette and meticulous surface finish, anchors the work firmly in the Neoclassical tradition while presenting an intimate and nuanced character study.\n\nThis painting was created during a moment when Ingres faced the challenge of balancing his dedication to idealized, historical subjects with the practical demands of commissioned portraiture, a tension that cost him time and required compromises, such as halting earlier versions. The Portrait of Comtesse d'Haussonville remains a singular testament to his skill in capturing both the elegance and complexity of a prominent woman of his era."
+  }
+]

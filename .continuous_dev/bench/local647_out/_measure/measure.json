@@ -1,0 +1,104 @@
+{
+  "mean_full_chars": 9913,
+  "mean_diet_chars": 7842,
+  "mean_full_tok_est": 2478,
+  "mean_diet_tok_est": 1960,
+  "rows": [
+    {
+      "stop_id": "Courtauld-0",
+      "full_chars": 13031,
+      "diet_chars": 9031,
+      "full_tok_est": 3257,
+      "diet_tok_est": 2257,
+      "saved_chars": 4000
+    },
+    {
+      "stop_id": "Courtauld-1",
+      "full_chars": 11623,
+      "diet_chars": 8558,
+      "full_tok_est": 2905,
+      "diet_tok_est": 2139,
+      "saved_chars": 3065
+    },
+    {
+      "stop_id": "Courtauld-2",
+      "full_chars": 11634,
+      "diet_chars": 8488,
+      "full_tok_est": 2908,
+      "diet_tok_est": 2122,
+      "saved_chars": 3146
+    },
+    {
+      "stop_id": "Walters-0",
+      "full_chars": 9465,
+      "diet_chars": 7265,
+      "full_tok_est": 2366,
+      "diet_tok_est": 1816,
+      "saved_chars": 2200
+    },
+    {
+      "stop_id": "Walters-1",
+      "full_chars": 7526,
+      "diet_chars": 7526,
+      "full_tok_est": 1881,
+      "diet_tok_est": 1881,
+      "saved_chars": 0
+    },
+    {
+      "stop_id": "Walters-2",
+      "full_chars": 6993,
+      "diet_chars": 6993,
+      "full_tok_est": 1748,
+      "diet_tok_est": 1748,
+      "saved_chars": 0
+    },
+    {
+      "stop_id": "Wallace-0",
+      "full_chars": 9639,
+      "diet_chars": 7439,
+      "full_tok_est": 2409,
+      "diet_tok_est": 1859,
+      "saved_chars": 2200
+    },
+    {
+      "stop_id": "Wallace-1",
+      "full_chars": 9704,
+      "diet_chars": 7504,
+      "full_tok_est": 2426,
+      "diet_tok_est": 1876,
+      "saved_chars": 2200
+    },
+    {
+      "stop_id": "Wallace-2",
+      "full_chars": 5829,
+      "diet_chars": 5829,
+      "full_tok_est": 1457,
+      "diet_tok_est": 1457,
+      "saved_chars": 0
+    },
+    {
+      "stop_id": "Frick-0",
+      "full_chars": 10658,
+      "diet_chars": 8458,
+      "full_tok_est": 2664,
+      "diet_tok_est": 2114,
+      "saved_chars": 2200
+    },
+    {
+      "stop_id": "Frick-1",
+      "full_chars": 10338,
+      "diet_chars": 8500,
+      "full_tok_est": 2584,
+      "diet_tok_est": 2125,
+      "saved_chars": 1838
+    },
+    {
+      "stop_id": "Frick-2",
+      "full_chars": 12516,
+      "diet_chars": 8516,
+      "full_tok_est": 3129,
+      "diet_tok_est": 2129,
+      "saved_chars": 4000
+    }
+  ]
+}

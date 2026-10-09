@@ -1,0 +1,12 @@
+ARM B | openai:gpt-4.1-mini | Wallace | Madame de Pompadour
+prompt_chars=5829 status=200 seconds=4.39 usage={'prompt_tokens': 1377, 'completion_tokens': 400, 'total_tokens': 1777, 'prompt_tokens_details': {'cached_tokens': 1152, 'audio_tokens': 0}, 'completion_tokens_details': {'reasoning_tokens': 0, 'audio_tokens': 0, 'accepted_prediction_tokens': 0, 'rejected_prediction_tokens': 0}}
+================================================================================
+You are standing before Madame de Pompadour, a 1759 oil-on-canvas portrait by François Boucher, positioned so that the full sweep of her elegant figure and the delicate textures of her attire come into clear view. From this vantage point, you can appreciate the fine brushwork that brings to life the softness of her silk gown and the subtle glow of her complexion, details that might blur from afar.
+
+This painting depicts Madame de Pompadour, the influential mistress of King Louis XV of France, seated in a graceful pose that combines dignity with charm. Boucher used oil paint on canvas, a medium that allowed him to achieve rich color depth and smooth transitions of light and shadow. The composition highlights her refined taste and status, with elaborate fabrics and a poised expression that reflect her role as a patron of the arts and a political figure. This portrait was the final one in a series of seven that Boucher painted of her, marking the culmination of their artistic collaboration. Critics have noted how this work balances Rococo elegance with a subtle sense of the sitter’s intellect and influence at the French court.
+
+François Boucher was a leading French Rococo painter known for his decorative and often playful style. By 1759, he was well established as the official court painter to Louis XV and closely connected to Madame de Pompadour herself. This portrait came at a turning point when Boucher was consolidating his reputation by capturing not only the beauty but also the complex personality of his patron through increasingly sophisticated portraits.
+
+Viewing this portrait evokes a sense of the delicate power Madame de Pompadour wielded, combining soft visual beauty with the weight of her cultural and political importance—an impression shaped by Boucher’s mastery of color and form and their shared history.
+
+The Wallace Collection acquired this painting after it had been shown at the Château de Versailles and subsequently passed to Madame de Pompadour’s brother, linking it to the museum’s broader holdings of French 18th-century art and decorative objects.

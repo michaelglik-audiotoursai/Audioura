@@ -1,0 +1,372 @@
+{
+  "A": [
+    {
+      "stop_id": "Courtauld-0",
+      "museum": "Courtauld",
+      "title": "Manet’s A Bar at the Folies-Bergère",
+      "score": 7.5
+    },
+    {
+      "stop_id": "Courtauld-1",
+      "museum": "Courtauld",
+      "title": "Van Gogh’s iconic Self-Portrait with Bandaged Ear",
+      "score": 7.5
+    },
+    {
+      "stop_id": "Courtauld-2",
+      "museum": "Courtauld",
+      "title": "Georges Seurat",
+      "score": 7.5
+    },
+    {
+      "stop_id": "Walters-0",
+      "museum": "Walters",
+      "title": "Springtime (1872)",
+      "score": 8.5
+    },
+    {
+      "stop_id": "Walters-1",
+      "museum": "Walters",
+      "title": "The Death of Caesar",
+      "score": 6.5
+    },
+    {
+      "stop_id": "Walters-2",
+      "museum": "Walters",
+      "title": "Sappho and Alcaeus",
+      "score": 7.5
+    },
+    {
+      "stop_id": "Wallace-0",
+      "museum": "Wallace",
+      "title": "The Laughing Cavalier",
+      "score": 7.5
+    },
+    {
+      "stop_id": "Wallace-1",
+      "museum": "Wallace",
+      "title": "A Dance to the Music of Time",
+      "score": 7.5
+    },
+    {
+      "stop_id": "Wallace-2",
+      "museum": "Wallace",
+      "title": "Madame de Pompadour",
+      "score": 7.5
+    },
+    {
+      "stop_id": "Frick-0",
+      "museum": "Frick",
+      "title": "Officer and Laughing Girl",
+      "score": 8.5
+    },
+    {
+      "stop_id": "Frick-1",
+      "museum": "Frick",
+      "title": "Portrait of Sir Thomas More",
+      "score": 7.5
+    },
+    {
+      "stop_id": "Frick-2",
+      "museum": "Frick",
+      "title": "Portrait of Comtesse d'Haussonville",
+      "score": 7.5
+    }
+  ],
+  "B": [
+    {
+      "stop_id": "Courtauld-0",
+      "museum": "Courtauld",
+      "title": "Manet’s A Bar at the Folies-Bergère",
+      "score": 8.0
+    },
+    {
+      "stop_id": "Courtauld-1",
+      "museum": "Courtauld",
+      "title": "Van Gogh’s iconic Self-Portrait with Bandaged Ear",
+      "score": 8.5
+    },
+    {
+      "stop_id": "Courtauld-2",
+      "museum": "Courtauld",
+      "title": "Georges Seurat",
+      "score": 8.5
+    },
+    {
+      "stop_id": "Walters-0",
+      "museum": "Walters",
+      "title": "Springtime (1872)",
+      "score": 7.0
+    },
+    {
+      "stop_id": "Walters-1",
+      "museum": "Walters",
+      "title": "The Death of Caesar",
+      "score": 4.5
+    },
+    {
+      "stop_id": "Walters-2",
+      "museum": "Walters",
+      "title": "Sappho and Alcaeus",
+      "score": 8.5
+    },
+    {
+      "stop_id": "Wallace-0",
+      "museum": "Wallace",
+      "title": "The Laughing Cavalier",
+      "score": 8.5
+    },
+    {
+      "stop_id": "Wallace-1",
+      "museum": "Wallace",
+      "title": "A Dance to the Music of Time",
+      "score": 7.5
+    },
+    {
+      "stop_id": "Wallace-2",
+      "museum": "Wallace",
+      "title": "Madame de Pompadour",
+      "score": 7.5
+    },
+    {
+      "stop_id": "Frick-0",
+      "museum": "Frick",
+      "title": "Officer and Laughing Girl",
+      "score": 8.5
+    },
+    {
+      "stop_id": "Frick-1",
+      "museum": "Frick",
+      "title": "Portrait of Sir Thomas More",
+      "score": 8.5
+    },
+    {
+      "stop_id": "Frick-2",
+      "museum": "Frick",
+      "title": "Portrait of Comtesse d'Haussonville",
+      "score": 8.5
+    }
+  ],
+  "C": [
+    {
+      "stop_id": "Courtauld-0",
+      "museum": "Courtauld",
+      "title": "Manet’s A Bar at the Folies-Bergère",
+      "score": 7.5
+    },
+    {
+      "stop_id": "Courtauld-1",
+      "museum": "Courtauld",
+      "title": "Van Gogh’s iconic Self-Portrait with Bandaged Ear",
+      "score": 6.5
+    },
+    {
+      "stop_id": "Courtauld-2",
+      "museum": "Courtauld",
+      "title": "Georges Seurat",
+      "score": 5.5
+    },
+    {
+      "stop_id": "Walters-0",
+      "museum": "Walters",
+      "title": "Springtime (1872)",
+      "score": 5.5
+    },
+    {
+      "stop_id": "Walters-1",
+      "museum": "Walters",
+      "title": "The Death of Caesar",
+      "score": 4.5
+    },
+    {
+      "stop_id": "Walters-2",
+      "museum": "Walters",
+      "title": "Sappho and Alcaeus",
+      "score": 7.5
+    },
+    {
+      "stop_id": "Wallace-0",
+      "museum": "Wallace",
+      "title": "The Laughing Cavalier",
+      "score": 5.5
+    },
+    {
+      "stop_id": "Wallace-1",
+      "museum": "Wallace",
+      "title": "A Dance to the Music of Time",
+      "score": 6.5
+    },
+    {
+      "stop_id": "Wallace-2",
+      "museum": "Wallace",
+      "title": "Madame de Pompadour",
+      "score": 6.0
+    },
+    {
+      "stop_id": "Frick-0",
+      "museum": "Frick",
+      "title": "Officer and Laughing Girl",
+      "score": 6.5
+    },
+    {
+      "stop_id": "Frick-1",
+      "museum": "Frick",
+      "title": "Portrait of Sir Thomas More",
+      "score": 5.5
+    },
+    {
+      "stop_id": "Frick-2",
+      "museum": "Frick",
+      "title": "Portrait of Comtesse d'Haussonville",
+      "score": 6.5
+    }
+  ],
+  "D": [
+    {
+      "stop_id": "Courtauld-0",
+      "museum": "Courtauld",
+      "title": "Manet’s A Bar at the Folies-Bergère",
+      "score": 7.5
+    },
+    {
+      "stop_id": "Courtauld-1",
+      "museum": "Courtauld",
+      "title": "Van Gogh’s iconic Self-Portrait with Bandaged Ear",
+      "score": 8.5
+    },
+    {
+      "stop_id": "Courtauld-2",
+      "museum": "Courtauld",
+      "title": "Georges Seurat",
+      "score": 7.5
+    },
+    {
+      "stop_id": "Walters-0",
+      "museum": "Walters",
+      "title": "Springtime (1872)",
+      "score": 6.5
+    },
+    {
+      "stop_id": "Walters-1",
+      "museum": "Walters",
+      "title": "The Death of Caesar",
+      "score": 5.5
+    },
+    {
+      "stop_id": "Walters-2",
+      "museum": "Walters",
+      "title": "Sappho and Alcaeus",
+      "score": 8.5
+    },
+    {
+      "stop_id": "Wallace-0",
+      "museum": "Wallace",
+      "title": "The Laughing Cavalier",
+      "score": 8.5
+    },
+    {
+      "stop_id": "Wallace-1",
+      "museum": "Wallace",
+      "title": "A Dance to the Music of Time",
+      "score": 8.5
+    },
+    {
+      "stop_id": "Wallace-2",
+      "museum": "Wallace",
+      "title": "Madame de Pompadour",
+      "score": 8.5
+    },
+    {
+      "stop_id": "Frick-0",
+      "museum": "Frick",
+      "title": "Officer and Laughing Girl",
+      "score": 8.5
+    },
+    {
+      "stop_id": "Frick-1",
+      "museum": "Frick",
+      "title": "Portrait of Sir Thomas More",
+      "score": 7.5
+    },
+    {
+      "stop_id": "Frick-2",
+      "museum": "Frick",
+      "title": "Portrait of Comtesse d'Haussonville",
+      "score": 8.5
+    }
+  ],
+  "E": [
+    {
+      "stop_id": "Courtauld-0",
+      "museum": "Courtauld",
+      "title": "Manet’s A Bar at the Folies-Bergère",
+      "score": 8.5
+    },
+    {
+      "stop_id": "Courtauld-1",
+      "museum": "Courtauld",
+      "title": "Van Gogh’s iconic Self-Portrait with Bandaged Ear",
+      "score": 8.5
+    },
+    {
+      "stop_id": "Courtauld-2",
+      "museum": "Courtauld",
+      "title": "Georges Seurat",
+      "score": 8.5
+    },
+    {
+      "stop_id": "Walters-0",
+      "museum": "Walters",
+      "title": "Springtime (1872)",
+      "score": 7.5
+    },
+    {
+      "stop_id": "Walters-1",
+      "museum": "Walters",
+      "title": "The Death of Caesar",
+      "score": 4.5
+    },
+    {
+      "stop_id": "Walters-2",
+      "museum": "Walters",
+      "title": "Sappho and Alcaeus",
+      "score": 8.5
+    },
+    {
+      "stop_id": "Wallace-0",
+      "museum": "Wallace",
+      "title": "The Laughing Cavalier",
+      "score": 9.0
+    },
+    {
+      "stop_id": "Wallace-1",
+      "museum": "Wallace",
+      "title": "A Dance to the Music of Time",
+      "score": 8.5
+    },
+    {
+      "stop_id": "Wallace-2",
+      "museum": "Wallace",
+      "title": "Madame de Pompadour",
+      "score": 5.5
+    },
+    {
+      "stop_id": "Frick-0",
+      "museum": "Frick",
+      "title": "Officer and Laughing Girl",
+      "score": 8.5
+    },
+    {
+      "stop_id": "Frick-1",
+      "museum": "Frick",
+      "title": "Portrait of Sir Thomas More",
+      "score": 8.5
+    },
+    {
+      "stop_id": "Frick-2",
+      "museum": "Frick",
+      "title": "Portrait of Comtesse d'Haussonville",
+      "score": 8.5
+    }
+  ]
+}
