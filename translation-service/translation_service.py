@@ -1396,9 +1396,15 @@ class TranslationService:
             # Check if a USABLE translation already exists. GCS-TR1: a row is only a valid
             # cache hit if it actually has a downloadable artifact. Artifact-less rows (the
             # historic bug) are ignored here and regenerated below.
+            # [LEAD 2026-10-09] A row flagged translation_stale (its original was replaced
+            # in place, LOCAL-606) is NOT a cache hit: it holds the old version. It is kept
+            # as history, never deleted; the fresh translation inserted below becomes the
+            # newest non-stale row and wins every later lookup.
             cursor.execute(
                 "SELECT id FROM audio_tours WHERE original_tour_id = %s AND content_language = %s "
-                "AND (audio_tour IS NOT NULL OR tour_blob_uri IS NOT NULL)",
+                "AND (audio_tour IS NOT NULL OR tour_blob_uri IS NOT NULL) "
+                "AND NOT COALESCE(translation_stale, FALSE) "
+                "ORDER BY id DESC LIMIT 1",
                 (original_tour_id, target_language)
             )
             existing = cursor.fetchone()
