@@ -1,0 +1,153 @@
+{
+  "grounded_call_map": {
+    "3_stop_cut": {
+      "n_stops": 3,
+      "preflight": 1,
+      "d511_per_stop": 1,
+      "d511_total": 3,
+      "leads_fanout": 0,
+      "total": 4
+    },
+    "5_stop_cut": {
+      "n_stops": 5,
+      "preflight": 1,
+      "d511_per_stop": 1,
+      "d511_total": 5,
+      "leads_fanout": 0,
+      "total": 6
+    },
+    "3_stop_precap": {
+      "n_stops": 3,
+      "preflight": 1,
+      "d511_per_stop": 8,
+      "d511_total": 24,
+      "leads_fanout": 3,
+      "total": 28
+    },
+    "5_stop_precap": {
+      "n_stops": 5,
+      "preflight": 1,
+      "d511_per_stop": 8,
+      "d511_total": 40,
+      "leads_fanout": 5,
+      "total": 46
+    }
+  },
+  "overlap": {
+    "rows": 414,
+    "distinct_works": 8,
+    "total_grounded_passes": 414,
+    "works": [
+      {
+        "work": "Le Lézard aux plumes d'or",
+        "grounded_passes": 294,
+        "distinct_angles": 4,
+        "mean_overlap": 1.0,
+        "max_overlap": 1.0,
+        "sample_angles": [
+          "Joan Miró",
+          "Louis Broder",
+          "Mourlot Frères",
+          "Tériade"
+        ]
+      },
+      {
+        "work": "Le Lézard aux plumes d’or (The Lizard with Golden Feathers)",
+        "grounded_passes": 38,
+        "distinct_angles": 5,
+        "mean_overlap": 0.17,
+        "max_overlap": 0.909,
+        "sample_angles": [
+          "Boris Fridman",
+          "Joan Miró",
+          "Louis Broder",
+          "Louis Broder, the publisher of this edition",
+          "Mourlot"
+        ]
+      },
+      {
+        "work": "Moses and Monotheism",
+        "grounded_passes": 24,
+        "distinct_angles": 14,
+        "mean_overlap": 0.209,
+        "max_overlap": 0.451,
+        "sample_angles": [
+          "Dalí's illustrations are visual",
+          "Dalí's previous works",
+          "Dalí's signature surrealist style",
+          "Freud's complex text",
+          "Freud's ideas to life"
+        ]
+      },
+      {
+        "work": "Au Soleil du Plafond",
+        "grounded_passes": 22,
+        "distinct_angles": 12,
+        "mean_overlap": 0.314,
+        "max_overlap": 0.535,
+        "sample_angles": [
+          "Gris's untimely death",
+          "Juan Gris",
+          "Juan Gris, a pivotal figure in Cubism",
+          "featuring lithographs based on Gris's designs and text by th",
+          "having completed only half of the intended artwork"
+        ]
+      },
+      {
+        "work": "Le Lézard aux plumes d’or (The Lizard with Golden Feathers) (detail)",
+        "grounded_passes": 12,
+        "distinct_angles": 4,
+        "mean_overlap": 0.122,
+        "max_overlap": 0.692,
+        "sample_angles": [
+          "Boris Fridman",
+          "Joan Miró",
+          "Louis Broder",
+          "Mourlot"
+        ]
+      },
+      {
+        "work": "The Great Good Man",
+        "grounded_passes": 8,
+        "distinct_angles": 7,
+        "mean_overlap": 0.235,
+        "max_overlap": 0.559,
+        "sample_angles": [
+          "Hartley's continued exploration",
+          "Jessie, a notable benefactor",
+          "Marsden Hartley",
+          "allowing countless visitors to engage with Hartley's interpr",
+          "enriching its collection and providing the public with acces"
+        ]
+      },
+      {
+        "work": "That Red One",
+        "grounded_passes": 8,
+        "distinct_angles": 6,
+        "mean_overlap": 0.238,
+        "max_overlap": 0.567,
+        "sample_angles": [
+          "Arthur Dove",
+          "Dove's career where he",
+          "Red One\" in 1944 amidst a fervor of artistic exploration",
+          "Red One\" using oil",
+          "reimagines the book as an artwork"
+        ]
+      },
+      {
+        "work": "Autorretrato con espejo (Self-Portrait with Mirror)",
+        "grounded_passes": 8,
+        "distinct_angles": 6,
+        "mean_overlap": 0.262,
+        "max_overlap": 0.674,
+        "sample_angles": [
+          "Charles H",
+          "David Alfaro Siqueiros",
+          "David Alfaro Siqueiros, a prominent Mexican muralist",
+          "blending activism with powerful visual narratives",
+          "embraced the social"
+        ]
+      }
+    ]
+  }
+}
