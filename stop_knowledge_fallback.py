@@ -44,6 +44,15 @@ import json
 import os
 import re
 
+# ── LOCAL-651: [TIMING-SUB] decorator (safe no-op if phase_timer unavailable).
+try:
+    from phase_timer import timed_step as _sub_timed
+except Exception:  # pragma: no cover
+    def _sub_timed(_name):
+        def _wrap(fn):
+            return fn
+        return _wrap
+
 _SYSTEM = (
     "You supply factual reference material about ONE museum object for an audio tour. "
     "The museum's own published sources produced nothing usable about this object, so "
@@ -414,6 +423,7 @@ _SYSTEM_RESTAURANT = (
 )
 
 
+@_sub_timed('fetch_stop_knowledge')
 def fetch_stop_knowledge(work, venue, api_key, prefer_gemini=True, timeout=45,
                          focus='object'):
     """Facts about one object when grounded retrieval came back empty.

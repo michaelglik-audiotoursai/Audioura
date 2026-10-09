@@ -66,6 +66,15 @@ import re
 import threading
 import unicodedata
 from datetime import datetime, timezone
+
+# ── LOCAL-651: [TIMING-SUB] decorator (safe no-op if phase_timer unavailable).
+try:
+    from phase_timer import timed_step as _sub_timed
+except Exception:  # pragma: no cover
+    def _sub_timed(_name):
+        def _wrap(fn):
+            return fn
+        return _wrap
 from typing import Dict, List, Optional
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -525,6 +534,7 @@ def record_confirmed_closure(venue: str, city: str, result: Dict) -> Dict:
 # ─────────────────────────────────────────────────────────────────────────────
 # THE PREFLIGHT CALL
 # ─────────────────────────────────────────────────────────────────────────────
+@_sub_timed('venue_preflight')
 def preflight(venue: str, city: str = '', db_url: Optional[str] = None,
               use_cache: bool = True) -> Dict:
     """One grounded Gemini question about a single venue, BEFORE we build.

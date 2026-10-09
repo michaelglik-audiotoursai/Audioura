@@ -21,6 +21,15 @@ import requests
 
 logger = logging.getLogger(__name__)
 
+# ── LOCAL-651: [TIMING-SUB] decorator (safe no-op if phase_timer is unavailable).
+try:
+    from phase_timer import timed_step as _sub_timed
+except Exception:  # pragma: no cover - defensive import
+    def _sub_timed(_name):
+        def _wrap(fn):
+            return fn
+        return _wrap
+
 # ─── LOCAL-230: Per-run failure counter ──────────────────────────────────────
 # Incremented when a network/API call fails (as opposed to returning a legitimate
 # empty result). Reported in the generation log so tours built during outages
@@ -491,6 +500,7 @@ def _is_high_confidence_candidate(qid: str, label: str, venue_string: str) -> bo
         return False
 
 
+@_sub_timed('resolve_venue')
 def resolve_venue(venue_string: str, city: str = "") -> Optional[VenueEntity]:
     """Resolve a venue string to a Wikidata entity.
     
@@ -835,6 +845,7 @@ def venue_is_modern_art(venue_name: str) -> bool:
     return bool(_MODERN_ART_MUSEUM_RE.search(venue_name or ""))
 
 
+@_sub_timed('fetch_venue_works')
 def fetch_venue_works(venue_qid: str, language: str = "en",
                       is_modern_art_museum=None, venue_name: str = "") -> List[Dict]:
     """Fetch canonical works for a venue via SPARQL (P195/P276).
@@ -2194,6 +2205,7 @@ def _parent_org_route(venue_string: str, searcher=None) -> Tuple[str, str, Dict]
     return '', '', diag
 
 
+@_sub_timed('discover_official_site')
 def discover_official_site(
     venue_string: str,
     city: str = "",

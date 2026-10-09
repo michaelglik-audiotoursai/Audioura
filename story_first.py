@@ -51,6 +51,14 @@ from typing import Dict, List, Optional, Tuple
 
 from cost_rates import llm_cost, search_cost
 
+# ── LOCAL-651: feed story_first per-step marks into the shared [TIMING-SUB]
+# aggregate (safe no-op if phase_timer is unavailable).
+try:
+    from phase_timer import get_sub_timer as _get_sub_timer
+except Exception:  # pragma: no cover
+    def _get_sub_timer():
+        return None
+
 # --- Configuration ---
 STORY_SEEKING_BUDGET_SECONDS = 15.0  # Per-stop wall budget for SERP queries
 STORY_SEEKING_POOL_SIZE = 5  # Concurrent query threads per stop
@@ -1222,6 +1230,15 @@ def story_first_pipeline(stop_data: Dict, fact_sheet: str = '',
         _step_times[step_name] = _step_times.get(step_name, 0.0) + dt
         print(f"    [SF-STEP] stop='{(stop_data.get('canonical_title') or stop_data.get('name','') or '')[:40]}' "
               f"step={step_name} elapsed={dt:.2f}s")
+        # LOCAL-651: also feed the shared [TIMING-SUB] aggregate. story_first runs
+        # inside the 'story_first' phase (the across-stop pool keeps that phase
+        # active for every worker), so attribution is correct.
+        _st = _get_sub_timer()
+        if _st is not None:
+            try:
+                _st.record('story_first', step_name, dt)
+            except Exception:
+                pass
 
     if _STORY_SEEKING_DISABLED:
         return {

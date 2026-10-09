@@ -27,6 +27,15 @@ import os
 import re
 import threading
 
+# ── LOCAL-651: [TIMING-SUB] decorator (safe no-op if phase_timer unavailable).
+try:
+    from phase_timer import timed_step as _sub_timed
+except Exception:  # pragma: no cover
+    def _sub_timed(_name):
+        def _wrap(fn):
+            return fn
+        return _wrap
+
 MAX_PARTS = 24
 
 # ── Q2 cache ────────────────────────────────────────────────────────────────
@@ -428,6 +437,7 @@ def _service_is_dead(payload):
     return bool(_DEAD_STATUS.search(blob))
 
 
+@_sub_timed('venue_parts_build_tour_stops')
 def build_tour_stops(venue_name, location, want, ask=None, ask_grounded=None,
                      use_cache=True):
     """The whole chain, production-shaped. Returns (stop_names, evidence).

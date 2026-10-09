@@ -16,6 +16,26 @@ if _MODULE_DIR not in _sys.path:
     _sys.path.insert(0, _MODULE_DIR)
 
 
+# ── LOCAL-651: [TIMING-SUB] step helper. Times a network/LLM block and records
+# it under the phase currently running (set by the PhaseTimer). Safe no-op if
+# phase_timer is unavailable; never swallows the wrapped block's own exception.
+from contextlib import contextmanager as _contextmanager
+@_contextmanager
+def _sub_step(_name):
+    _cm = None
+    try:
+        import phase_timer as _pt
+        _cm = _pt.get_sub_timer().step(_name)
+    except Exception:
+        _cm = None
+    if _cm is None:
+        # Timer unavailable — run the block untimed.
+        yield
+        return
+    with _cm:
+        yield
+
+
 # ──── [LOCAL-437] MODULE-SCOPE PREDICATE: checklist exemption from existence gate ────
 # This predicate is the SINGLE source of truth for whether exhibition-sourced
 # stops bypass the existence gate. Tests IMPORT this — do not re-type it.
@@ -22379,20 +22399,21 @@ NARRATIVE THREAD (weave into Part 3 as the central intrigue):
 
             while _prolog_attempt <= _PROLOG_MAX_RETRIES:
                 try:
-                    _prolog_resp = _prolog_requests.post(
-                        "https://api.openai.com/v1/chat/completions",
-                        headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
-                        json={
-                            "model": _write_model(site_default="gpt-3.5-turbo"),
-                            "messages": [
-                                {"role": "system", "content": "You write immersive, literary audio tour introductions."},
-                                {"role": "user", "content": _prolog_prompt},
-                            ],
-                            "temperature": 0.8,
-                            "max_tokens": 380,
-                        },
-                        timeout=15,
-                    )
+                    with _sub_step('packing_prolog_llm'):
+                        _prolog_resp = _prolog_requests.post(
+                            "https://api.openai.com/v1/chat/completions",
+                            headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
+                            json={
+                                "model": _write_model(site_default="gpt-3.5-turbo"),
+                                "messages": [
+                                    {"role": "system", "content": "You write immersive, literary audio tour introductions."},
+                                    {"role": "user", "content": _prolog_prompt},
+                                ],
+                                "temperature": 0.8,
+                                "max_tokens": 380,
+                            },
+                            timeout=15,
+                        )
                     _prolog_last_status = _prolog_resp.status_code
                     if _prolog_resp.status_code == 200:
                         _prolog_text = _prolog_resp.json()["choices"][0]["message"]["content"].strip()
@@ -22914,20 +22935,21 @@ Return ONLY the JSON array. Do not alter the fact text — copy it exactly as pr
                 _ranked_facts = None  # Will hold the parsed ranking if successful
 
                 try:
-                    _rank_resp = requests.post(
-                        "https://api.openai.com/v1/chat/completions",
-                        headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
-                        json={
-                            "model": _check_model(),
-                            "messages": [
-                                {"role": "system", "content": "You rank facts by narrative interest. You never invent facts. You return valid JSON only."},
-                                {"role": "user", "content": _rank_prompt},
-                            ],
-                            "temperature": 0.1,
-                            "max_tokens": 1200,
-                        },
-                        timeout=30,
-                    )
+                    with _sub_step('packing_rank_facts_llm'):
+                        _rank_resp = requests.post(
+                            "https://api.openai.com/v1/chat/completions",
+                            headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
+                            json={
+                                "model": _check_model(),
+                                "messages": [
+                                    {"role": "system", "content": "You rank facts by narrative interest. You never invent facts. You return valid JSON only."},
+                                    {"role": "user", "content": _rank_prompt},
+                                ],
+                                "temperature": 0.1,
+                                "max_tokens": 1200,
+                            },
+                            timeout=30,
+                        )
                     _rank_elapsed = time.time() - _rank_start
 
                     if _rank_resp.status_code == 200:
@@ -23057,20 +23079,21 @@ RULES:
 
                 for _p4_attempt in range(_p4_max_attempts):
                     try:
-                        _p4_resp = _p4_requests.post(
-                            "https://api.openai.com/v1/chat/completions",
-                            headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
-                            json={
-                                "model": _write_model(site_default="gpt-3.5-turbo"),
-                                "messages": [
-                                    {"role": "system", "content": "You write concise, factual tour preview sentences. Use ONLY facts from the provided content."},
-                                    {"role": "user", "content": _p4_prompt},
-                                ],
-                                "temperature": 0.3 + (_p4_attempt * 0.2),  # slightly higher on retry
-                                "max_tokens": 120,
-                            },
-                            timeout=15,
-                        )
+                        with _sub_step('packing_part4_preview_llm'):
+                            _p4_resp = _p4_requests.post(
+                                "https://api.openai.com/v1/chat/completions",
+                                headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
+                                json={
+                                    "model": _write_model(site_default="gpt-3.5-turbo"),
+                                    "messages": [
+                                        {"role": "system", "content": "You write concise, factual tour preview sentences. Use ONLY facts from the provided content."},
+                                        {"role": "user", "content": _p4_prompt},
+                                    ],
+                                    "temperature": 0.3 + (_p4_attempt * 0.2),  # slightly higher on retry
+                                    "max_tokens": 120,
+                                },
+                                timeout=15,
+                            )
                         if _p4_resp.status_code != 200:
                             print(f"    Part 4 LLM call failed (HTTP {_p4_resp.status_code}) — attempt {_p4_attempt+1}")
                             continue
@@ -25053,9 +25076,10 @@ RULES:
             except Exception:
                 _editor_passages = None
             _api_key = os.environ.get("OPENAI_API_KEY", "")
-            complete_tour = _stop_editor.edit_tour_text(
-                complete_tour, venue_name=_editor_venue,
-                passages_by_stop=_editor_passages, api_key=_api_key)
+            with _sub_step('packing_stop_editor_llm'):
+                complete_tour = _stop_editor.edit_tour_text(
+                    complete_tour, venue_name=_editor_venue,
+                    passages_by_stop=_editor_passages, api_key=_api_key)
     except ImportError:
         _import_logger.error("[LOCAL-628] MISSING: stop_editor — final per-stop "
                              "editor pass SKIPPED; tour shipped unedited")
@@ -25134,9 +25158,10 @@ RULES:
         # template ships. The every-path delivery guard downstream PRESERVES this
         # conclusion (it is thematic + count-correct), so the discovered theme and
         # the LLM body survive to delivery.
-        complete_tour = _rebuild_concl(
-            complete_tour, venue_name=_concl_venue, theme=_concl_theme,
-            use_llm=True)
+        with _sub_step('packing_conclusion_llm'):
+            complete_tour = _rebuild_concl(
+                complete_tour, venue_name=_concl_venue, theme=_concl_theme,
+                use_llm=True)
         _n_after = _count_delivered(complete_tour)
         print(f"  [LOCAL-619B] thematic conclusion built from final text: "
               f"{_n_after} delivered stop(s)"

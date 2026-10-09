@@ -36,6 +36,15 @@ import threading
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Tuple
 
+# ── LOCAL-651: [TIMING-SUB] decorator (safe no-op if phase_timer unavailable).
+try:
+    from phase_timer import timed_step as _sub_timed
+except Exception:  # pragma: no cover
+    def _sub_timed(_name):
+        def _wrap(fn):
+            return fn
+        return _wrap
+
 logger = logging.getLogger(__name__)
 
 _OVERPASS_URL = "https://overpass-api.de/api/interpreter"
@@ -489,6 +498,7 @@ def _score_element(element: dict) -> int:
 # Public API
 # ---------------------------------------------------------------------------
 
+@_sub_timed('fetch_osm_venue_facts')
 def fetch_osm_venue_facts(
     stop_title: str,
     city: str,
