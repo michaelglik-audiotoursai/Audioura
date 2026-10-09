@@ -8673,6 +8673,19 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
     # reads this to name the delivering path.
     _J._LAST_DELIVERY_PATH = 'fresh'
 
+    # [LOCAL-656] This wrapper is the per-tour boundary. Clear the per-tour
+    # resolve_venue / fetch_venue_works memo so this generation starts with an
+    # EMPTY store even if the same thread/context served a previous tour (worker
+    # reuse, a test re-using the main thread). A no-op when FAST_PIPELINE is OFF
+    # (the memo is never consulted), so the OFF path is unchanged. The reset is
+    # NOT skipped for the pool fast-path: the pool's recursive generate_fn call
+    # re-enters this wrapper and must get its own fresh memo for the new venue.
+    try:
+        import fast_pipeline as _fp656
+        _fp656.reset_tour_memo()
+    except Exception:
+        pass
+
     # [LOCAL-655] Prime the current-affairs news context from the RAW request at
     # the wrapper entry. The impl re-sets this precisely once tour_category is
     # known (gating out museum/facility); doing it here too means the pool / cache
