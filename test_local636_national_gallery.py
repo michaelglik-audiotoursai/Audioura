@@ -15,8 +15,9 @@ Two things are proven here, both offline/mocked (no network):
   2. The real gap was resilience: entity search (_search_entities) was a single
      shot, so one transient Wikidata 5xx/timeout returned None and the whole
      resolve_venue failed → the famous museum was refused. It now retries
-     transient 5xx/timeout (but still trips the dead-host breaker on 429), so a
-     passing stall no longer sinks the build.
+     transient 5xx/timeout AND 429 ([LOCAL-637]) with backoff + Retry-After, so a
+     passing stall no longer sinks the build. The dead-host breaker is marked cold
+     only AFTER the retries are exhausted, and only as a short cool-down.
 
 Run:  python3 -m pytest test_local636_national_gallery.py -q
 """
@@ -115,11 +116,58 @@ class TestSearchRetryResilience(unittest.TestCase):
         self.assertEqual(res, [(NG_QID, "National Gallery")])
         self.assertEqual(attempts, 1)
 
-    def test_429_does_not_retry(self):
-        # 429 must trip the dead-host breaker, not spin retries.
-        res, attempts = self._run_with_responses([429, 200, 200])
+    def test_429_retries_then_recovers(self):
+        # [LOCAL-637] A 429 is now retried (Bench R6: six concurrent tours, one
+        # 429 on the National Gallery city-validation search sank the venue). The
+        # first 429 retries and the following 200 recovers — the famous museum is
+        # no longer refused on a rate limit.
+        res, attempts = self._run_with_responses([429, 200])
+        self.assertEqual(res, [(NG_QID, "National Gallery")])
+        self.assertEqual(attempts, 2)
+
+    def test_429_exhausted_marks_cold_and_returns_none(self):
+        # When every attempt is a 429 the host is marked cold (as a short
+        # cool-down) ONLY after the retries are exhausted, and the search returns
+        # None. We assert the retries happened (4 attempts: first + 3 backoffs) and
+        # that mark_host_cold fired exactly once.
+        import requests
+        import time
+        import dead_host_breaker as _dhb
+
+        class _Resp:
+            status_code = 429
+            headers = {}
+
+            def json(self):
+                return {"search": []}
+
+        state = {"i": 0, "cold": 0}
+
+        def fake_get(*a, **k):
+            state["i"] += 1
+            return _Resp()
+
+        orig_get, orig_sleep = requests.get, time.sleep
+        orig_cold, orig_mark = _dhb.is_host_cold, _dhb.mark_host_cold
+        requests.get = fake_get
+        time.sleep = lambda *_a, **_k: None
+        _dhb.is_host_cold = lambda *_a, **_k: False
+
+        def _mark(*_a, **_k):
+            state["cold"] += 1
+            return "wikimedia"
+
+        _dhb.mark_host_cold = _mark
+        try:
+            res = vr._search_entities("The National Gallery")
+        finally:
+            requests.get = orig_get
+            time.sleep = orig_sleep
+            _dhb.is_host_cold = orig_cold
+            _dhb.mark_host_cold = orig_mark
         self.assertIsNone(res)
-        self.assertEqual(attempts, 1)
+        self.assertEqual(state["i"], 4)   # first try + 3 backoff retries
+        self.assertEqual(state["cold"], 1)  # cold marked only after exhaustion
 
 
 if __name__ == "__main__":
