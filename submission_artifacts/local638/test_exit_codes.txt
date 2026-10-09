@@ -1,0 +1,24 @@
+LOCAL-638 Note 5 — test-suite exit codes (base 841b073 + LOCAL-638 Notes 1-4)
+Run on: Mac Mini Kiro
+
+python3 -m pytest test_local60*.py          -> exit 0   (38 passed)
+python3 -m pytest test_local61*.py          -> exit 0   (80 passed)
+python3 -m pytest test_local62*.py          -> exit 0   (178 passed)
+python3 -m pytest test_local63*.py          -> exit 0   (130 passed, incl. 43 new LOCAL-638)
+python3 -m pytest tests/test_local63*.py    -> exit 0   (16 passed)
+python3 -m pytest tests/test_lead_*.py      -> exit 0   (5 passed)
+python3 -m pytest test_local590_*.py        -> exit 0   (42 passed)
+python3 test_sq4_merge.py                   -> exit 0   (ALL TESTS PASSED)
+
+python3 -m pytest test_local638_*.py        -> exit 0   (43 passed)
+  - test_local638_practical_facts_opening.py   (Note 1) 10 passed
+  - test_local638_no_unpaid_teaser.py          (Note 2) 13 passed
+  - test_local638_pivotal_consequence.py       (Note 3)  7 passed
+  - test_local638_directions_between_stops.py  (Note 4) 12 passed
+
+CAVEAT (pre-existing, unrelated to LOCAL-638):
+  tests/test_local597_by_reference.py::TestByReferencePartialRefusal::test_empty_pool_refuses
+  fails only under batched test-ordering; it PASSES in isolation and reproduces
+  on the clean base 841b073 (verified via `git stash`). It is a test-state /
+  ordering issue in the by_reference suite, not caused by any LOCAL-638 change.
+  It is NOT in any of the required Note-5 globs above.
