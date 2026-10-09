@@ -79,6 +79,10 @@ SERPER_COST_PER_QUERY = 0.001
 # depending on how many queries a request fanned out into. We now price the unit
 # Google prices.
 GROUNDING_COST_PER_QUERY = 0.014  # $14 / 1,000 search queries
+# [LEAD 2026-10-09, price card r4] Google bills each SEARCH-ENABLED request ($35 / 1,000), reconciled
+# against Michael's bills within 2% (PRICE_CARD.md). The ledger priced per reported query and showed
+# the Walters tour at $0.37 instead of ~$0.56. Ledger/plan caps now use the request price.
+GROUNDED_REQUEST_COST = 0.035
 
 # Legacy LOCAL-533 constant — DEPRECATED. The per-request rate never matched the
 # invoice. Kept only so older callers/tests import without breaking; new code
@@ -161,7 +165,7 @@ def preflight_cost(num_queries: int = 0, input_tokens: int = 0,
     queries priced at GROUNDING_COST_PER_QUERY plus its Gemini Flash tokens priced
     at the Flash token rates. Uses no new rate — the preflight is a grounded
     Gemini call, reported on its own line for visibility (ticket LOCAL-609)."""
-    return (grounding_query_cost(num_queries)
+    return (max(grounding_query_cost(num_queries), GROUNDED_REQUEST_COST)  # one grounded request
             + gemini_tokens_cost(input_tokens, output_tokens))
 
 

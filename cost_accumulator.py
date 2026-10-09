@@ -160,7 +160,9 @@ class CostAccumulator:
         """
         num_requests = int(num_requests or 0)
         num_queries = int(num_queries or 0)
-        cost = cost_rates.grounding_query_cost(num_queries)
+        # [LEAD 2026-10-09] bill per search-enabled request (price card r4); queries only as a floor
+        cost = max(num_requests * getattr(cost_rates, 'GROUNDED_REQUEST_COST', 0.035),
+                   cost_rates.grounding_query_cost(num_queries))
         with self._lock:
             self.grounding["usd"] += cost
             self.grounding["requests"] += num_requests
