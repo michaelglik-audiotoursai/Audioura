@@ -532,6 +532,9 @@ def gate_item(item: Dict, request_text: str, *,
     if not any(w in blob for w in _THEME_WORDS):
         return False, 'off-theme (no politics/government/civic term)'
 
+    # stash the resolved date on the item so the composer can state it exactly
+    # (never a bare "Recently" when the gate has confirmed a real date).
+    item['_parsed_date'] = d.isoformat()
     return True, f"ok: place({'city' if names_city else 'state'})+theme+dated({d.isoformat()})"
 
 
@@ -563,8 +566,10 @@ exactly:
 is about a same-named place or person somewhere ELSE, or is unrelated, IGNORE it.
 - Ground every statement in the articles. Do NOT use any outside knowledge, and \
 do NOT invent any quote, number, name or date that is not in an article.
-- Begin each sentence with the DATE of the event when the article gives one \
-(e.g. "On October 8, 2026, ..."). If no date is given, say "Recently, ...".
+- Begin each sentence with the EXACT DATE of the development. Every article below \
+is pre-verified to carry a real date, printed as "DATE: YYYY-MM-DD" in its header; \
+use that date, written out (e.g. "On October 8, 2026, ..."). NEVER write "Recently" \
+— every item here has a known date, so state it.
 - POLITICAL BALANCE IS MANDATORY. If the item concerns a dispute or an election, \
 report what EACH side said or did, attributed by name/party, with no editorialising \
 and no adjective that favours a side.
@@ -630,7 +635,13 @@ def compose_news_sentences(subject: str, articles: List[Dict],
     for i, a in enumerate(articles, 1):
         body = (a.get('text') or a.get('snippet') or '').strip()[:NEWS_PER_PAGE_CHARS]
         head = f"[{i}] {a.get('title','')} — {a.get('source','')}"
-        if a.get('date'):
+        # Prefer the gate-resolved ISO date (parse_news_date); fall back to the
+        # raw Serper date string. The gate guarantees _parsed_date on accepted
+        # items, so the composer always has an exact date to state.
+        iso = a.get('_parsed_date') or ''
+        if iso:
+            head += f"  DATE: {iso}"
+        elif a.get('date'):
             head += f" ({a['date']})"
         blocks.append(f"{head}\n{body}")
     prompt = _NEWS_PROMPT.format(

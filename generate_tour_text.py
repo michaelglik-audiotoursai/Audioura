@@ -8510,13 +8510,24 @@ def _apply_delivery_hours_guard(result):
         #    affairs AND no recent year appears in any stop) lands at the true end
         #    of the spoken text, before Sources. It NEVER invents a recent fact.
         #    Idempotent; a no-op when a recent item is already present.
+        #    [LOCAL-655B] CONTRADICTION GUARD: if the news pass above already
+        #    injected dated "In recent news:" items, do NOT add the "no verified
+        #    developments" note — that would flatly contradict the news just
+        #    delivered (live tour 623 shipped both because the composer wrote
+        #    "Recently" with no 4-digit year, so LOCAL-650's year-detector missed
+        #    the fresh items). The injected items ARE the recent coverage.
         try:
             import current_affairs_coverage as _cac
-            final, _cac_added = _cac.ensure_current_affairs_coverage(final)
-            if _cac_added:
-                print("  [LOCAL-650 fix3] request asked for current affairs but no "
-                      "verified item from the past five years was present — added "
-                      "one honest note (no fact invented)", flush=True)
+            if "In recent news:" in final:
+                print("  [LOCAL-655B] dated news injected — LOCAL-650 honesty "
+                      "note suppressed (would contradict the delivered news).",
+                      flush=True)
+            else:
+                final, _cac_added = _cac.ensure_current_affairs_coverage(final)
+                if _cac_added:
+                    print("  [LOCAL-650 fix3] request asked for current affairs but no "
+                          "verified item from the past five years was present — added "
+                          "one honest note (no fact invented)", flush=True)
         except Exception as _cace:  # pragma: no cover
             _import_logger.error(f"[LOCAL-650] current-affairs coverage skipped: {_cace}")
         if final != text and out_file:

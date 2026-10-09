@@ -403,6 +403,32 @@ class TestAttributionParenthetical(unittest.TestCase):
             " (Reported by Boston.com.)")
 
 
+class TestDatedComposition(unittest.TestCase):
+    """The gate records the resolved date and the composer is told to use it,
+    never a bare 'Recently' (ticket item 2c / 3)."""
+
+    def test_gate_stashes_parsed_date(self):
+        item = dict(DEBATE_ITEM)
+        ok, _ = ca.gate_item(item, BOSTON_REQ, fresh_days=365, now=NOW)
+        self.assertTrue(ok)
+        self.assertEqual(item["_parsed_date"], "2026-10-08")
+
+    def test_prompt_carries_date_and_forbids_recently(self):
+        captured = {}
+
+        def spy_answer(prompt, model=None, max_tokens=None):
+            captured["prompt"] = prompt
+            return {"text": "On October 8, 2026, the governor acted [1].",
+                    "error": ""}
+
+        item = dict(DEBATE_ITEM, text=DEBATE_ITEM["snippet"],
+                    _parsed_date="2026-10-08")
+        ca.compose_news_sentences("Massachusetts State House", [item],
+                                  answer=spy_answer, locale="Boston, MA")
+        self.assertIn("DATE: 2026-10-08", captured["prompt"])
+        self.assertIn('NEVER write "Recently"', captured["prompt"])
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # 3. EMPTY RESPONSE -> HONEST NOTE
 # ─────────────────────────────────────────────────────────────────────────────
@@ -473,6 +499,34 @@ class TestMuseumNoOp(unittest.TestCase):
             self.assertEqual(g._apply_current_affairs_news(text), text)
         finally:
             del os.environ["DISABLE_CURRENT_AFFAIRS_NEWS"]
+
+
+class TestNoHonestNoteContradiction(unittest.TestCase):
+    """LOCAL-655B: a tour that carries injected 'In recent news:' items must NOT
+    also carry the LOCAL-650 'no verified developments' honest note — live tour
+    623 shipped both because the composer wrote 'Recently' (no 4-digit year) so
+    the year-detector missed the fresh items. Two independent fixes guarantee it:
+    (1) the composer now states the gate-resolved date (year present); (2) the
+    delivery guard suppresses the note whenever 'In recent news:' is present."""
+
+    def test_year_detector_fix(self):
+        import current_affairs_coverage as cac
+        dated = ("Step-by-Step Audio Guided Tour: Walking tour in Boston "
+                 "dedicated to Massachusetts current affairs, Boston, MA\n\n"
+                 "Stop 1: State House\n\nBuilt in 1798.\n\n"
+                 "In recent news: On October 8, 2026, the governor signed a bill.\n")
+        self.assertTrue(cac.has_recent_item(dated))
+        _, changed = cac.ensure_current_affairs_coverage(dated)
+        self.assertFalse(changed, "a 2026-dated news item is recent coverage")
+
+    def test_marker_suppression_contract(self):
+        # Even if the composer somehow omitted a year, the guard's building block
+        # (the '"In recent news:" in final' check the delivery path uses) is the
+        # backstop: the honest note's own marker and the news marker are distinct,
+        # so the integration can detect the news and skip the note.
+        import current_affairs_coverage as cac
+        self.assertNotIn("In recent news:", cac._HONEST_NOTE)
+        self.assertIn("no verified developments", cac._HONEST_NOTE_MARK)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
