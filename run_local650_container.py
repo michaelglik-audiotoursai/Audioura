@@ -55,12 +55,38 @@ HARD_CAP_USD = 1.20
 RESERVE_USD = 0.55          # start a tour only if spend + 0.55 <= cap
 HOST = socket.gethostname()
 
+# [LOCAL-650B] The generation path WRITES output_file mid-pipeline (several
+# branches: generate_tour_text.py 14218/15376/19696/25581). In a fresh
+# `docker run --rm` container /app/tours does not exist (the compose stack
+# bind-mounts it from the host), so the write raised FileNotFoundError AFTER
+# the tour was fully assembled and PAID FOR — the text was then discarded and
+# the $1.20 budget wasted on nothing capturable. Create the directory up front
+# so a completed tour is never lost to a missing path. Configurable so the
+# harness can run outside a container too.
+OUT_DIR = os.environ.get('LOCAL650_OUT_DIR', '/app/tours')
+try:
+    os.makedirs(OUT_DIR, exist_ok=True)
+    print(f"[out] output dir ready: {OUT_DIR}", flush=True)
+except Exception as _od_err:
+    print(f"[out] WARNING: could not create {OUT_DIR} ({_od_err}); "
+          f"falling back to /tmp", flush=True)
+    OUT_DIR = '/tmp'
+
+# [LOCAL-650B] Optional selector so a single tour can be re-run within the
+# remaining budget (comma-separated slugs). Empty = run all.
+_ONLY = {s.strip().upper() for s in os.environ.get('LOCAL650_ONLY', '').split(',')
+         if s.strip()}
+
 # (location, stops, tour_type, slug)
 TOURS = [
     ('Walking tour in Boston dedicated to Massachusetts politics and current '
      'affairs, Boston, MA', 5, 'walking', 'BOSTONWALK'),
     ('The Courtauld Gallery, London, United Kingdom', 3, 'museum', 'COURTAULD'),
 ]
+if _ONLY:
+    TOURS = [t for t in TOURS if t[3].upper() in _ONLY]
+    print(f"[out] LOCAL650_ONLY set — running only: {[t[3] for t in TOURS]}",
+          flush=True)
 
 print("=== LOCAL-650 isolated live run (Boston walking 5 + Courtauld 3) ===",
       flush=True)
@@ -230,8 +256,8 @@ def _run_one(location, stops, tour_type, slug):
     t0 = time.time()
     try:
         text, _p, _c = generate_tour_text(
-            location, tour_type, f"/app/tours/LOCAL650_{slug}.txt", stops,
-            user_id=None)
+            location, tour_type, os.path.join(OUT_DIR, f"LOCAL650_{slug}.txt"),
+            stops, user_id=None)
     except Exception as e:
         print(f"RUN ERROR for {location}: {e}", flush=True)
         return None, f'ERROR:{e}'
