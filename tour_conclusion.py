@@ -46,7 +46,10 @@ from __future__ import annotations
 
 import os
 import re
+import logging
 from typing import Dict, List, Optional
+
+logger = logging.getLogger(__name__)
 
 # Reuse the one shared parser + the one shared recap-sentence picker so the
 # conclusion is built from exactly the units the rest of the pipeline sees.
@@ -1217,59 +1220,63 @@ def _bare_title(raw: str) -> str:
 
 
 def fix_orientation_work_mismatch(tour_text: str) -> str:
-    """[LOCAL-630 item 4] Ensure each stop's Orientation describes its OWN work.
+    """[LOCAL-641] Orientation-mismatch DETECTOR (logging only; text unchanged).
 
-    For every ``Stop N:`` block, if its ``Orientation:`` line references ANOTHER
-    delivered stop's work-title and does NOT reference its own, replace the foreign
-    title with this stop's own title. Only a foreign STOP title is rewritten — a
-    generic orientation that names no work is left untouched. Pure, idempotent.
+    LOCAL-630 item 4 originally RENAMED a foreign work-title in a stop's
+    Orientation to the stop's own title. That renaming hid the real defect: a
+    fresh tour was opening Stop 1 with a LATER stop's orientation (Courtauld R10:
+    Stop 1 "Van Gogh" carried Seurat's "tapestry of discrete points / pointillist"
+    orientation). The rename turned "Seurat" into "Van Gogh" so the mismatch was
+    invisible in the delivered text while Stop 2 lost its orientation entirely —
+    the same stops reused scored 8–8.5, fresh scored 4.
+
+    The root cause is fixed upstream (``stop_pool_orchestrator._overall_from_new``
+    is now scoped to the Stop-1 block, so no later stop's orientation is ever
+    hoisted onto Stop 1). Renaming is therefore both unnecessary and harmful: a
+    legitimately comparative orientation ("echoes Van Gogh's handling…") would be
+    corrupted, and any genuine desync would be silently papered over.
+
+    This function now ONLY detects and LOGS. For every ``Stop N:`` block whose
+    ``Orientation:`` names a DIFFERENT delivered stop's work-title (and not its
+    own), it emits ``[LOCAL-641] orientation mismatch`` with the stop, the foreign
+    title and the own title, then returns the text **unchanged**. Pure, idempotent,
+    never raises. A no-op (no log) when every Orientation names its own work, or
+    names no delivered work at all.
     """
     text = tour_text or ""
     headers = list(_STOP_HEADER.finditer(text))
     if len(headers) < 2:
         return text
 
-    titles = []
-    for h in headers:
-        titles.append(_bare_title(h.group(2)))
+    titles = [_bare_title(h.group(2)) for h in headers]
 
-    # Build the stop spans.
     spans = []
     for k, h in enumerate(headers):
         start = h.start()
         end = headers[k + 1].start() if k + 1 < len(headers) else len(text)
         spans.append((start, end))
 
-    out = text
-    # Work from the LAST span to the first so earlier char offsets stay valid.
-    for k in range(len(spans) - 1, -1, -1):
+    for k, (start, end) in enumerate(spans):
         own = titles[k]
         if not own:
             continue
-        start, end = spans[k]
-        block = out[start:end]
-        # Isolate the Orientation line within the block.
+        block = text[start:end]
         om = re.search(r'(?im)^(\s*Orientation:\s*)(.+)$', block)
         if not om:
             continue
-        orient_line = om.group(0)
         orient_val = om.group(2)
         if own.lower() in orient_val.lower():
             continue  # already references its own work
-        # Does it reference ANOTHER stop's title?
-        foreign = None
         for j, t in enumerate(titles):
             if j == k or not t:
                 continue
             if len(t) >= 4 and re.search(r'\b' + re.escape(t) + r'\b', orient_val,
                                          flags=re.IGNORECASE):
-                foreign = t
+                logger.warning(
+                    "[LOCAL-641] orientation mismatch: Stop %d (%r) Orientation "
+                    "names foreign stop work %r and not its own; leaving text "
+                    "unchanged (root cause fixed in _overall_from_new).",
+                    k + 1, own, t)
                 break
-        if not foreign:
-            continue
-        new_val = re.sub(r'\b' + re.escape(foreign) + r'\b', own, orient_val,
-                         flags=re.IGNORECASE)
-        new_line = om.group(1) + new_val
-        new_block = block[:om.start()] + new_line + block[om.end():]
-        out = out[:start] + new_block + out[end:]
-    return out
+    # Detector only — never mutate the delivered text.
+    return text
