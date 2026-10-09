@@ -23422,9 +23422,30 @@ RULES:
     # [LOCAL-361] Track actually-rendered headers for D2 and heading-count invariant
     _rendered_headers = []
 
+    # [LOCAL-643] Structured-stops capture. As the render loop computes each
+    # stop's exact header/field/orientation/narration/transition values, we also
+    # record them into Stop/Opening/Closing records. When STRUCTURED_STOPS=1 the
+    # delivered text is RE-RENDERED from these records at the end (headers and
+    # field lines produced ONCE), and the whole-string late passes that cause the
+    # header/orientation/duplication bugs are skipped in favour of narration-only
+    # passes run per stop. Default OFF: the records are built but ignored, so the
+    # legacy string path is byte-for-byte unchanged. Import is local and guarded
+    # so a missing module can never break generation.
+    _ss_stops = []
+    _ss_opening = None
+    _ss_closing = None
+    try:
+        import stop_records as _ss_mod
+        _ss_enabled = _ss_mod.structured_stops_enabled()
+    except Exception as _ss_imp_e:
+        _ss_mod = None
+        _ss_enabled = False
+        print(f"  [LOCAL-643] stop_records unavailable ({_ss_imp_e}); structured stops OFF")
+
     # Add each POI with its description and directions
     for i, poi in enumerate(poi_list):
         stop_num = i + 1   # always sequential; ignore whatever AI emitted
+        _ss_transition = ""  # [LOCAL-643] transition line captured for this stop
         poi_name = poi["name"]
         artist = poi["artist"]
         year = poi["year"]
@@ -23569,6 +23590,13 @@ RULES:
 
         _orientation_prefix += _entrance_directive
 
+        # [LOCAL-643] Capture the Stop-1 opening as a record. The verbatim inline
+        # prefix is exactly what sits between 'Orientation: ' and Stop 1's own
+        # orientation, so re-rendering reproduces the fold byte-for-byte.
+        if _ss_mod is not None and i == 0:
+            _ss_opening = _ss_mod.Opening(
+                inline_prefix=_orientation_prefix, fold_into_orientation=True)
+
         # Add the orientation text — [LOCAL-388] Uniform: all stops get orientation
         # Strip any leading "Orientation:" from the LLM text to avoid duplication
         _clean_orientation = re.sub(r'^Orientation:\s*', '', orientation, flags=re.IGNORECASE).strip()
@@ -23592,6 +23620,7 @@ RULES:
         
         # Add description
         poi_content += description + "\n\n"
+        _ss_after_narration_len = len(poi_content)  # [LOCAL-643] epilog tail starts here
         
         # Add directions to next stop or conclusion
         if i < len(poi_list) - 1:
@@ -23642,6 +23671,7 @@ RULES:
                     _transition = f"Continue to {next_poi['name']}."
             
             poi_content += f"\nDirections: {_transition}\n\n"
+            _ss_transition = _transition  # [LOCAL-643] carry into the Stop record
             print(f"  [T4] Transition to Stop {stop_num+1}: {_transition[:60]}...")
         else:
             # For the last POI — EPILOG when Storied, generic conclusion when Beta
@@ -23734,6 +23764,35 @@ RULES:
                 # Beta: factual closing (no preaching)
                 poi_content += ""  # No separate conclusion needed — last stop ends on its own content
         
+        # [LOCAL-643] Build this stop's record from the exact values the loop just
+        # computed. narration = the description paragraphs; directions = the
+        # transition to the next stop; the last stop also carries the epilog tail
+        # (conclusion + offer + Sources) verbatim as the Closing. Nothing here is
+        # re-parsed from a string — every field is the loop's own value.
+        if _ss_mod is not None:
+            _is_last_stop = (i == len(poi_list) - 1)
+            _ss_rec = _ss_mod.Stop(
+                index=stop_num,
+                title=poi_name,
+                artist=(artist or ""),
+                year=(year or ""),
+                address=(poi.get("address") or ""),
+                coordinates=(poi.get("coordinates") or "") if (coords_eligible and poi.get("coordinates")) else "",
+                type_specialty=(poi.get("type_specialty") or ""),
+                specific_examples=(poi.get("specific_examples") or ""),
+                operational_details=(poi.get("operational_details") or ""),
+                operational_label=("Museum Information" if (tour_category == 'museum' and _museum_venue_name) else "Operational Details"),
+                emit_operational=(bool(poi.get("operational_details")) and (not (tour_category == 'museum' and _museum_venue_name) or i == 0)),
+                orientation=_clean_orientation,
+                narration=[p.strip() for p in re.split(r'\n\s*\n', description.strip()) if p.strip()],
+                directions=(_ss_transition or ""),
+            )
+            _ss_stops.append(_ss_rec)
+            if _is_last_stop:
+                _ss_tail = poi_content[_ss_after_narration_len:]
+                if _ss_tail.strip():
+                    _ss_closing = _ss_mod.Closing(raw_tail=_ss_tail)
+
         # Add to complete tour
         complete_tour += poi_content + "\n\n"
     
@@ -25120,6 +25179,75 @@ RULES:
                   "tour_content (kept in cache/pool for idempotence)", flush=True)
     except Exception as _sm:  # pragma: no cover
         _import_logger.error(f"[LOCAL-630] marker strip skipped: {_sm}")
+
+    # ───────────────────────── [LOCAL-643] STRUCTURED STOPS ──────────────────
+    # When STRUCTURED_STOPS=1, the delivered text is produced ONCE from the Stop
+    # records captured during the render loop — headers and field lines are
+    # emitted a single time by the renderer and are never re-parsed. The late
+    # text passes that today edit the whole assembled string (and glue headers
+    # onto addresses, migrate orientation between stops, split "9.00", lose stop
+    # headers, duplicate blocks) are replaced by narration-ONLY passes run on ONE
+    # stop's narration paragraphs at a time, so a pass can never see or produce a
+    # header or a field line. Default OFF: the legacy string above is delivered
+    # unchanged. LEAD flips the default only after a benchmark round with the flag
+    # ON beats the flag OFF.
+    if _ss_enabled and _ss_mod is not None and _ss_stops:
+        try:
+            _ss_pass_log = []
+
+            def _ss_apply(name, fn):
+                try:
+                    n = _ss_mod.run_pass_per_stop(_ss_stops, fn)
+                    if n:
+                        _ss_pass_log.append(f"{name}:{n}")
+                except Exception as _e:
+                    _import_logger.error(f"[LOCAL-643] per-stop pass {name} skipped: {_e}")
+
+            # Narration-only hygiene, run per stop. Each pass sees ONLY one stop's
+            # narration block — never a header, field, Orientation or Directions
+            # line. These mirror the whole-string passes classified narration-only
+            # in the pipeline map; the header/field-parsing passes are intentionally
+            # NOT run, because the renderer guarantees those structures by
+            # construction.
+            try:
+                from spoken_text_hygiene import clean_spoken_text as _ss_clean
+                _ss_apply("clean_spoken_text",
+                          _ss_mod.as_text_pass(lambda b: _ss_clean(b, False)))
+            except Exception as _e:
+                _import_logger.error(f"[LOCAL-643] clean_spoken_text unavailable: {_e}")
+            try:
+                from spoken_text_hygiene import grammar_splice_lint as _ss_lint
+                _ss_apply("grammar_splice_lint",
+                          _ss_mod.as_text_pass(lambda b: _ss_lint(b, None, False)))
+            except Exception as _e:
+                _import_logger.error(f"[LOCAL-643] grammar_splice_lint unavailable: {_e}")
+
+            # Render ONCE from the records. The title block is taken verbatim from
+            # the top of the legacy string so the title line + Tour-Category match
+            # exactly; the opening folds into Stop 1 and the closing rides on the
+            # last stop, both captured during the loop.
+            _ss_title = complete_tour.split("\n\n", 1)[0] + "\n\n"
+            _ss_rendered = _ss_mod.render_tour(
+                _ss_stops, title=_ss_title,
+                opening=_ss_opening, closing=_ss_closing)
+
+            # Spoken-text hygiene is the ONLY whole-text pass allowed after the
+            # render (the ticket's one exception). It touches punctuation/spoken
+            # artifacts, never structure.
+            try:
+                from spoken_text_hygiene import clean_spoken_text as _ss_clean2
+                _ss_rendered, _ = _ss_clean2(_ss_rendered, False)
+            except Exception:
+                pass
+
+            print(f"  [LOCAL-643] STRUCTURED_STOPS=1 — delivered text rendered from "
+                  f"{len(_ss_stops)} records; per-stop passes: "
+                  f"{', '.join(_ss_pass_log) or 'none changed'}")
+            complete_tour = _ss_rendered
+            _J._LAST_DELIVERY_PATH = 'structured'
+        except Exception as _ss_e:
+            _import_logger.error(
+                f"[LOCAL-643] structured render failed, keeping legacy string: {_ss_e}")
 
     # Save to file if output_file is provided
     if not output_file:

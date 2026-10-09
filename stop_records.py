@@ -110,11 +110,17 @@ class Opening:
     # Orientation, one blank line between each (pool/D611 layout).
     about_paragraphs: List[str] = field(default_factory=list)
     fold_into_orientation: bool = True
+    # Verbatim inline prefix already composed by the caller (normal path): the
+    # exact text that sits between 'Orientation: ' and Stop 1's own orientation.
+    # When set, it is used as-is and the piecewise fields above are ignored.
+    inline_prefix: str = ""
 
     def prefix(self) -> str:
         """Inline opening text inserted between 'Orientation: ' and Stop 1's own
         orientation (normal-path layout).
         """
+        if self.inline_prefix:
+            return self.inline_prefix
         if not self.fold_into_orientation:
             return ""
         out = ""
@@ -153,6 +159,27 @@ class Closing:
     conclusion: str = ""
     offer: str = ""
     sources: str = ""
+    # Verbatim tail already composed by the caller (normal path): the exact
+    # epilog+sources blob appended to the last stop. When set, it is appended
+    # as-is and the piecewise fields above are ignored. The leading/trailing
+    # whitespace is preserved so re-rendering reproduces the delivered text.
+    raw_tail: str = ""
+
+    def render(self) -> str:
+        if self.raw_tail:
+            return self.raw_tail
+        out = ""
+        if (self.conclusion or "").strip():
+            out += self.conclusion.strip() + " "
+        if (self.offer or "").strip():
+            out += self.offer.strip()
+        out = out.rstrip()
+        tail = ""
+        if out:
+            tail += "\n\n" + out
+        if (self.sources or "").strip():
+            tail += f"\n\nSources: {self.sources.strip()}"
+        return tail
 
 
 # ── Per-stop pass wrapper ─────────────────────────────────────────────────────
@@ -286,16 +313,21 @@ def render_stop_block(stop: Stop, *, opening: Optional[Opening] = None,
 
     # Conclusion + offer + sources ride on the LAST stop's block.
     if closing is not None:
-        epilog = ""
-        if (closing.conclusion or "").strip():
-            epilog += closing.conclusion.strip() + " "
-        if (closing.offer or "").strip():
-            epilog += closing.offer.strip()
-        epilog = epilog.rstrip()
-        if epilog:
-            poi_content += "\n\n" + epilog
-        if (closing.sources or "").strip():
-            poi_content += f"\n\nSources: {closing.sources.strip()}"
+        if closing.raw_tail:
+            # Verbatim passthrough (normal path): append the exact epilog blob.
+            poi_content = poi_content.rstrip() + "\n\n" + closing.raw_tail.lstrip("\n")
+            poi_content += "\n\n"
+        else:
+            epilog = ""
+            if (closing.conclusion or "").strip():
+                epilog += closing.conclusion.strip() + " "
+            if (closing.offer or "").strip():
+                epilog += closing.offer.strip()
+            epilog = epilog.rstrip()
+            if epilog:
+                poi_content += "\n\n" + epilog
+            if (closing.sources or "").strip():
+                poi_content += f"\n\nSources: {closing.sources.strip()}"
 
     return poi_content
 
