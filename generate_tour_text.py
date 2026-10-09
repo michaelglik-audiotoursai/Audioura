@@ -8305,6 +8305,25 @@ def _apply_delivery_hours_guard(result):
                                  "trailing recap stub is NOT replaced")
         except Exception as _ce:  # pragma: no cover
             _import_logger.error(f"[LOCAL-619] conclusion rebuild skipped: {_ce}")
+        # 5. [LOCAL-650 fix 3] Current-affairs honesty. Michael, 2026-10-09 (tour
+        #    557, request "… Massachusetts politics and current affairs"): a tour
+        #    that advertises CURRENT AFFAIRS should carry at least one recent
+        #    (≤ 5 years) grounded item, or say honestly that there is none — not
+        #    leave the listener assuming decades-old events are "current". This
+        #    every-path text guard runs LAST, after the conclusion is built, so
+        #    the honest note (added only when the request asked for current
+        #    affairs AND no recent year appears in any stop) lands at the true end
+        #    of the spoken text, before Sources. It NEVER invents a recent fact.
+        #    Idempotent; a no-op when a recent item is already present.
+        try:
+            import current_affairs_coverage as _cac
+            final, _cac_added = _cac.ensure_current_affairs_coverage(final)
+            if _cac_added:
+                print("  [LOCAL-650 fix3] request asked for current affairs but no "
+                      "verified item from the past five years was present — added "
+                      "one honest note (no fact invented)", flush=True)
+        except Exception as _cace:  # pragma: no cover
+            _import_logger.error(f"[LOCAL-650] current-affairs coverage skipped: {_cace}")
         if final != text and out_file:
             # Rewrite the delivered file so the service (which reads the file,
             # not the return value) ships the cleaned text on every path.
