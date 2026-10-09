@@ -207,7 +207,9 @@ def _correct_handoff(next_name: str, dist_phrase: str) -> str:
     return base + "."
 
 
-def ensure_walking_directions_lead_to_next(text: str) -> Tuple[str, dict]:
+def ensure_walking_directions_lead_to_next(text: str,
+                                          verified_stop_coords: dict = None
+                                          ) -> Tuple[str, dict]:
     """Make every non-last WALKING stop's Directions lead to the NEXT stop, with
     an approximate distance. Returns ``(new_text, report)`` where report is
     ``{'corrected': n, 'distance_added': n, 'details': [...]}``.
@@ -218,6 +220,11 @@ def ensure_walking_directions_lead_to_next(text: str) -> Tuple[str, dict]:
       coordinates are known and no distance is already stated.
     • A non-last stop with NO Directions line gets one created (naming the next
       stop + distance). The last stop is never touched.
+
+    ``verified_stop_coords``: optional {stop_number: (lat, lng)} from verified
+    sources (Wikidata P625, geocoder). When provided, distances are computed ONLY
+    between stop pairs where BOTH stops appear in this dict. When omitted (None),
+    all coordinates parsed from the text are used (legacy behaviour).
 
     Deterministic and idempotent. Museum/building/venue tours are a no-op.
     """
@@ -241,7 +248,15 @@ def ensure_walking_directions_lead_to_next(text: str) -> Tuple[str, dict]:
             others = [o['name'] for j, o in enumerate(blocks)
                       if j != i and j != i + 1]
             km = None
-            if b['coord'] and nxt['coord']:
+            if verified_stop_coords is not None:
+                # [LOCAL-650B] Only compute distance when BOTH stops have verified
+                # coordinates. Unverified (LLM-guessed) coordinates can be wildly
+                # wrong, producing false distances (D643).
+                vc_a = verified_stop_coords.get(b['num'])
+                vc_b = verified_stop_coords.get(nxt['num'])
+                if vc_a and vc_b:
+                    km = _haversine_km(vc_a, vc_b)
+            elif b['coord'] and nxt['coord']:
                 km = _haversine_km(b['coord'], nxt['coord'])
             dist_phrase = _approx_distance_phrase(km)
 

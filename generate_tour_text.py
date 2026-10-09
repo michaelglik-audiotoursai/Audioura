@@ -8196,7 +8196,23 @@ def _apply_delivery_hours_guard(result):
         #     tours (room-flow seams) are a no-op. Deterministic, idempotent.
         try:
             import walking_directions_guard as _wdg
-            final, _wdg_rep = _wdg.ensure_walking_directions_lead_to_next(final)
+            # [LOCAL-650B] Build verified-coords dict from poi_list. Only use
+            # Wikidata P625 coordinates (set by WALK-D1 verify_landmarks / A7),
+            # which are independently verified. LLM-guessed coordinates can be
+            # wildly wrong (D643: UMass Boston "300 meters" from the Old State
+            # House when it is 5 km away). When a stop lacks verified coords,
+            # its distance is omitted rather than stated from a guess.
+            _verified_coords = {}
+            try:
+                for _si, _sp in enumerate(poi_list, 1):
+                    _wlat = _sp.get('wikidata_lat')
+                    _wlng = _sp.get('wikidata_lng')
+                    if _wlat and _wlng:
+                        _verified_coords[_si] = (float(_wlat), float(_wlng))
+            except Exception:
+                _verified_coords = None  # fall back to text-parsed coords
+            final, _wdg_rep = _wdg.ensure_walking_directions_lead_to_next(
+                final, verified_stop_coords=_verified_coords or None)
             if _wdg_rep.get('corrected') or _wdg_rep.get('distance_added'):
                 print(f"  [LOCAL-650 fix2] walking directions: corrected "
                       f"{_wdg_rep.get('corrected', 0)} wrong-target line(s), added "
