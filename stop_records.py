@@ -87,25 +87,36 @@ class Stop:
 
 @dataclass
 class Opening:
-    """The tour's opening SECTION, folded into Stop 1 per D640/D611 order:
+    """The tour's opening SECTION, placed at the top of Stop 1 per D640/D611 order:
     (a) honest shortfall → (b) About the venue / tour overview (the prolog) →
-    (c) 'Your first stop is X.' → (d) entrance directive. All four are optional;
-    whatever is present is concatenated, in this order, right after the literal
-    'Orientation: ' label so the verbalization/translation layer still keys on it
-    (LOCAL-264).
+    (c) 'Your first stop is X.' → (d) entrance directive. All four are optional.
+
+    Two house styles exist and the renderer reproduces BOTH, controlled by
+    ``fold_into_orientation``:
+
+    * NORMAL path (generate_tour_text.py:23555-23601): the pieces are folded
+      INSIDE the Orientation line, right after the literal 'Orientation: ' label
+      so the verbalization/translation layer still keys on it (LOCAL-264). Use
+      ``prefix()``.
+    * POOL / section path (stop_pool_assembly._render_stop_block, D611): the About
+      + visiting-information are their own leading paragraphs BEFORE the
+      Orientation line (``about_paragraphs``). Use ``section()``.
     """
     shortfall: str = ""        # (a) honest "we found N of M" clause
-    about: str = ""            # (b) the prolog / overall tour description
+    about: str = ""            # (b) the prolog / overall tour description (inline)
     first_stop_sentence: str = ""   # (c) "Your first stop is X."
     entrance_directive: str = ""    # (d) where to physically go first
+    # Section style: About + practical/visiting paragraphs rendered BEFORE
+    # Orientation, one blank line between each (pool/D611 layout).
+    about_paragraphs: List[str] = field(default_factory=list)
+    fold_into_orientation: bool = True
 
     def prefix(self) -> str:
-        """The text inserted between 'Orientation: ' and Stop 1's own orientation.
-
-        Mirrors generate_tour_text.py:23555-23601: each present piece ends with a
-        trailing space so it joins cleanly with the next, exactly as the string
-        path builds ``_orientation_prefix``.
+        """Inline opening text inserted between 'Orientation: ' and Stop 1's own
+        orientation (normal-path layout).
         """
+        if not self.fold_into_orientation:
+            return ""
         out = ""
         if self.shortfall.strip():
             out += self.shortfall.strip() + " "
@@ -116,6 +127,17 @@ class Opening:
         if self.entrance_directive.strip():
             out += self.entrance_directive.strip() + " "
         return out
+
+    def section(self) -> str:
+        """Standalone opening paragraphs rendered BEFORE Orientation (pool layout).
+
+        Returns the paragraphs joined with the house blank-line separator, or ""
+        when there are none / inline folding is in effect.
+        """
+        if self.fold_into_orientation:
+            return ""
+        paras = [p.strip() for p in self.about_paragraphs if p and p.strip()]
+        return "\n\n".join(paras)
 
 
 @dataclass
@@ -233,19 +255,34 @@ def render_stop_block(stop: Stop, *, opening: Optional[Opening] = None,
     if stop.emit_operational and (stop.operational_details or "").strip():
         poi_content += f"{stop.operational_label}: {stop.operational_details.strip()}\n\n"
 
+    # Opening SECTION (pool/D611 layout): About + visiting-information paragraphs
+    # BEFORE the Orientation line. Stop 1 only.
+    if opening is not None and stop.index == 1:
+        section = opening.section()
+        if section:
+            poi_content += section + "\n\n"
+
     # Orientation: the literal label first (LOCAL-264), then — on Stop 1 only —
-    # the opening-section prefix (D640 order), then the stop's own orientation.
+    # the inline opening prefix (D640 order), then the stop's own orientation.
+    # The label is emitted ONLY when there is something to say (an inline opening
+    # prefix or the stop's own orientation text), so an empty "Orientation:" label
+    # never reaches the listener — matching both the pool renderer and the fresh
+    # path, which carry no orientation line when there is no orientation.
     prefix = opening.prefix() if (opening is not None and stop.index == 1) else ""
     orientation = (stop.orientation or "").strip()
-    poi_content += f"Orientation: {prefix}{orientation}\n\n"
+    if prefix or orientation:
+        poi_content += f"Orientation: {prefix}{orientation}".rstrip() + "\n\n"
 
     # Narration body.
     poi_content += stop.narration_text() + "\n\n"
 
     # Directions to the next stop (never on the last stop). The transition line is
-    # supplied by the caller FROM the records — no inference here.
+    # supplied by the caller FROM the records — no inference here. One blank line
+    # separates narration from Directions (the canonical pool-renderer layout,
+    # stop_pool_assembly._render_stop_block; the fresh path's extra leading
+    # newline was whitespace noise the TTS ignores).
     if (stop.directions or "").strip():
-        poi_content += f"\nDirections: {stop.directions.strip()}\n\n"
+        poi_content += f"Directions: {stop.directions.strip()}\n\n"
 
     # Conclusion + offer + sources ride on the LAST stop's block.
     if closing is not None:
@@ -347,20 +384,33 @@ def parse_tour_to_records(tour_text: str):
         title += "\n\n"
 
     stops: List[Stop] = []
-    opening = Opening()
+    opening = Opening(fold_into_orientation=False)
     closing = Closing()
 
     cur: Optional[Stop] = None
-    section = None  # which field we are accumulating into
+    section = None            # "orientation" | "narration" | "opening" | None
     narration_buf: List[str] = []
+    opening_buf: List[str] = []
 
     def _flush_narration():
+        """Append the buffered prose to the current stop's narration (never
+        replaces — a stop may have prose before AND after its Orientation)."""
         nonlocal narration_buf
         if cur is not None and narration_buf:
             block = "\n".join(narration_buf).strip()
             if block:
-                cur.narration = [p.strip() for p in re.split(r'\n\s*\n', block) if p.strip()]
+                cur.narration.extend(
+                    p.strip() for p in re.split(r'\n\s*\n', block) if p.strip())
         narration_buf = []
+
+    def _flush_opening():
+        nonlocal opening_buf
+        if opening_buf:
+            block = "\n".join(opening_buf).strip()
+            if block:
+                opening.about_paragraphs.extend(
+                    p.strip() for p in re.split(r'\n\s*\n', block) if p.strip())
+        opening_buf = []
 
     i = idx
     while i < len(lines):
@@ -368,53 +418,62 @@ def parse_tour_to_records(tour_text: str):
         line = raw.strip()
         hm = _STOP_HEADER_RE.match(line)
         if hm:
+            _flush_opening()
             _flush_narration()
             n = int(hm.group(1))
             t, a, y = _split_header_value(hm.group(2))
             cur = Stop(index=n, title=t, artist=a, year=y)
             stops.append(cur)
-            section = None
+            # On Stop 1, prose before the Orientation line is the opening section;
+            # on every other stop it is narration.
+            section = "opening" if n == 1 else "narration"
             i += 1
             continue
         fm = _FIELD_RE.match(line)
         if fm and cur is not None:
-            _flush_narration()
             label, val = fm.group(1), fm.group(2).strip()
-            if label == "Address":
-                cur.address = val
-            elif label == "Coordinates":
-                cur.coordinates = val
-            elif label == "Type/Specialty":
-                cur.type_specialty = val
-            elif label == "Specific Examples":
-                cur.specific_examples = val
-            elif label == "Operational Details":
-                cur.operational_details = val
-                cur.operational_label = "Operational Details"
-            elif label == "Museum Information":
-                cur.operational_details = val
-                cur.operational_label = "Museum Information"
-                cur.emit_operational = True
-            elif label == "Orientation":
+            if label == "Orientation":
+                _flush_opening()
+                _flush_narration()
                 cur.orientation = val
                 section = "orientation"
             elif label == "Directions":
+                _flush_narration()
                 cur.directions = val
                 section = None
+            else:
+                if label == "Address":
+                    cur.address = val
+                elif label == "Coordinates":
+                    cur.coordinates = val
+                elif label == "Type/Specialty":
+                    cur.type_specialty = val
+                elif label == "Specific Examples":
+                    cur.specific_examples = val
+                elif label == "Operational Details":
+                    cur.operational_details = val
+                    cur.operational_label = "Operational Details"
+                elif label == "Museum Information":
+                    cur.operational_details = val
+                    cur.operational_label = "Museum Information"
+                    cur.emit_operational = True
             i += 1
             continue
-        # Non-field, non-header line: part of the current section's prose.
+        # Non-field, non-header line: prose for the current section.
         if cur is not None:
-            if section == "orientation" and not cur.narration and not line:
-                # blank line right after Orientation closes it; narration follows
-                section = "narration"
-            elif section == "orientation" and line:
-                # continuation of a multi-line orientation value
-                cur.orientation = (cur.orientation + " " + line).strip()
+            if section == "orientation":
+                if not line:
+                    # blank line after Orientation closes it; narration follows
+                    section = "narration"
+                else:
+                    cur.orientation = (cur.orientation + " " + line).strip()
+            elif section == "opening":
+                opening_buf.append(raw)
             else:
                 section = "narration"
                 narration_buf.append(raw)
         i += 1
 
+    _flush_opening()
     _flush_narration()
     return title, stops, opening, closing
