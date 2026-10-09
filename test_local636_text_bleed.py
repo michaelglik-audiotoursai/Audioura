@@ -17,6 +17,7 @@ Grounded on the REAL Bench R2 tours flagged by the critic:
 Pure/offline; no network, no LLM, no DB. Run:
     python3 -m pytest test_local636_text_bleed.py -q
 """
+import os
 import unittest
 
 import same_title_bleed_guard as stbg
@@ -100,7 +101,7 @@ class TestPossessiveTechniqueBleed(unittest.TestCase):
     def test_whole_tour_drops_only_the_bleed_and_empties_no_stop(self):
         import re
         tour = open(
-            "/Users/micha/Audioura/.continuous_dev/calib/critique/tour_485.txt"
+            os.path.join(os.path.dirname(os.path.abspath(__file__)), "tests", "fixtures", "tour_485_r2.txt")
         ).read() if _tour485_available() else None
         if tour is None:
             self.skipTest("tour_485.txt not present in this checkout")
@@ -120,7 +121,7 @@ class TestPossessiveTechniqueBleed(unittest.TestCase):
 def _tour485_available() -> bool:
     import os
     return os.path.exists(
-        "/Users/micha/Audioura/.continuous_dev/calib/critique/tour_485.txt")
+        os.path.join(os.path.dirname(os.path.abspath(__file__)), "tests", "fixtures", "tour_485_r2.txt"))
 
 
 if __name__ == "__main__":

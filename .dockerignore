@@ -72,6 +72,7 @@ Temp/
 # excludes it and the lookup silently finds nothing in the container.
 !tests/known_closed_venues.json
 !source_tier_rules.json
+!editor_common_words.json
 !docker-compose-master.yml
 !templates/
 !templates/**
