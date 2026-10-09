@@ -44,6 +44,49 @@ import threading
 import re
 import logging
 
+# [LOCAL-639 defect 2] A ``Stop N:`` header whose trailing newline was lost runs
+# into its own field-labelled body ("Stop 2: The Toilet of Venus ('The Rokeby
+# Venus') Address: Trafalgar Square …" — the live National Gallery 495 round-1
+# artifact). The title-sanity / grounding QA checks then read a 300-word "title"
+# and the FACTUAL gate refused a 389-work museum. These two deterministic helpers
+# let the QA loop CORRECT that formatting defect and re-check, instead of refusing
+# the tour. A header already followed by its content on its own line is untouched.
+_RUN_ON_STOP_HEADER_RE = re.compile(
+    r'(?m)^(Stop\s+\d+:\s*.*?)[ \t]+'
+    r'(Address|Coordinates|Type/?Specialty|Specific Examples?|Operational Details?|'
+    r'Operational|Orientation|Museum Information|Visiting Hours|Opening Hours|Hours|'
+    r'Directions|Sources?|Description)\s*:')
+
+
+def _split_run_on_stop_headers(tour_text: str) -> str:
+    """Restore the lost newline AFTER a ``Stop N:`` header that ran into its own
+    field-labelled body. Deterministic and idempotent. A header already on its own
+    line (field label on the next line) is unchanged."""
+    if not tour_text:
+        return tour_text
+    out = _RUN_ON_STOP_HEADER_RE.sub(r'\1\n\n\2:', tour_text)
+    out = re.sub(r'\n{3,}', '\n\n', out)
+    return out
+
+
+def _header_formatting_defect(tour_text: str) -> bool:
+    """True when the text carries a lost-newline header artifact that a
+    deterministic reflow can repair — a ``Stop N:`` header glued to a field label
+    on the SAME line (run-on body), or a header glued onto a prior empty label /
+    sentence. Used to gate the QA formatting corrective (retry, don't refuse)."""
+    if not tour_text:
+        return False
+    if _RUN_ON_STOP_HEADER_RE.search(tour_text):
+        return True
+    try:
+        from tour_conclusion import normalise_stop_headers as _nh
+        if _nh(tour_text) != tour_text:
+            return True
+    except Exception:
+        pass
+    return False
+
+
 # [GCS-KS1] Env kill switch for user-chosen stops (D591). Guards this service's
 # own /generate boundary too, so the switch holds even if the generator is called
 # directly (or reached on the Cloud Tasks path via the worker). Default OFF.
@@ -704,7 +747,35 @@ def generate_tour_async(job_id, location, tour_type, total_stops=10, user_id=Non
                         print(f"[BLOCKER4c] G4 corrective: removed ungrounded sentence: {_g4s[:100]!r}")
                     _g4_corrected_text = tour_text
                     continue
-                elif content_qa_runner.FACTUAL_FAIL_COUNT > 0:
+                elif (content_qa_runner.FACTUAL_FAIL_COUNT > 0
+                      and _qa_round < _QA_MAX_ROUNDS
+                      and _header_formatting_defect(tour_text)):
+                    # [LOCAL-639 defect 2] A factual failure caused by a LOST-NEWLINE
+                    # header artifact is a formatting defect, not a grounding one, and
+                    # must be CORRECTED and re-checked — never a reason to refuse the
+                    # tour. The live National Gallery (495, round 1) was refused when
+                    # "Stop 2: The Toilet of Venus ('The Rokeby Venus') Address: …"
+                    # ran on (the newline after the header was lost), so D3(d) read a
+                    # 320-word "title" and failed-closed on a 389-work museum. Restore
+                    # the lost newline (deterministic, idempotent) and re-run QA on the
+                    # repaired text, the same corrective pattern as the G4 branch above.
+                    try:
+                        from tour_conclusion import normalise_stop_headers as _norm_hdr_qa
+                        _repaired = _norm_hdr_qa(tour_text)
+                    except Exception:
+                        _repaired = tour_text
+                    _repaired = _split_run_on_stop_headers(_repaired)
+                    if _repaired != tour_text:
+                        tour_text = _repaired
+                        _g4_corrected_text = tour_text
+                        print(f"[BLOCKER4c] [LOCAL-639] header-formatting corrective: "
+                              f"restored lost newline(s) around a Stop header; re-checking")
+                        continue
+                    # No change possible → fall through to the refusal below.
+                    print(f"[BLOCKER4c] [LOCAL-639] header-formatting corrective made no "
+                          f"change; proceeding to factual verdict")
+                    # (fall through)
+                if content_qa_runner.FACTUAL_FAIL_COUNT > 0:
                     # Factual failure — reject entirely (upstream pipeline bug, not fixable here)
                     # [LOCAL-593 #5] The internal failure count stays in the LOG.
                     # The listener gets the LOCAL-580 actionable contract: a stable
