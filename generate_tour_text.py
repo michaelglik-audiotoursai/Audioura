@@ -20118,11 +20118,17 @@ REWRITE RULES (all mandatory):
                 print(f"    Transferable (low conf, kept): {_ssg_stats['transferable_low_conf_kept']}")
                 print(f"    Last-paragraph protected: {_ssg_stats['last_paragraph_protected']}")
                 print(f"    Ungrounded named entities: {_ssg_stats['ungrounded_entities']}")
+                print(f"    [LOCAL-652] Foreign work/artist sentences removed: "
+                      f"{_ssg_stats.get('foreign_entity_sentences_removed', 0)}")
                 print(f"    Stops affected: {_ssg_stats['stops_affected']}")
                 for _rl in _ssg_stats['removal_log']:
                     print(f"    [LOCAL-472] REMOVED transferable paragraph "
                           f"stop='{_rl['stop']}' conf={_rl['confidence']} "
                           f"reason='{_rl['reason']}': \"{_rl['paragraph']}\"")
+                for _fl in _ssg_stats.get('foreign_entity_log', []):
+                    print(f"    [LOCAL-652] REMOVED foreign work/artist sentence "
+                          f"stop='{_fl['stop']}' entities={_fl['entities']} "
+                          f"({_fl['sentences_removed']} sentence(s)) in: \"{_fl['before']}\"")
                 for _el in _ssg_stats['entity_log']:
                     print(f"    [LOCAL-472] UNGROUNDED entity stop='{_el['stop']}' "
                           f"entity='{_el['entity']}' reason='{_el['reason']}' "

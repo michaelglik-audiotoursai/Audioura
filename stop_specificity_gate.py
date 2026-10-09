@@ -309,6 +309,94 @@ def _fold(s: str) -> str:
                    if unicodedata.category(c) != 'Mn')
 
 
+# ═══════════════════════════════════════════════════════════════════════════════
+# [LOCAL-652] FOREIGN WORK/ARTIST removal — delivered-stop grounding
+# ═══════════════════════════════════════════════════════════════════════════════
+#
+# LOCAL-472 reports ungrounded named entities but never acts on them, by design
+# ("a flag for the retry/rewrite path, not a destructive action"). LOCAL-652
+# overrides that for ONE case: an ungrounded entity that is a WORK or ARTIST from
+# OUTSIDE the tour. The phantom-thread defect (SQ-S6b naming a tour after Vigée
+# Le Brun, whose 'Self Portrait in a Straw Hat' is on no stop) leaks that foreign
+# work/artist into stop bodies as a bogus cross-stop callback —
+#   "...echoes ... Vigée Le Brun's Self Portrait in a Straw Hat from your earlier
+#    stop past The Toilet of Venus."
+# An ungrounded entity whose name shares no token with any delivered stop's
+# work/artist is a foreign work/artist; the sentence that carries it is removed
+# (never emptying the paragraph or the stop).
+
+_SSG_GROUNDING_STOPWORDS = {
+    'the', 'a', 'an', 'of', 'and', 'in', 'on', 'at', 'to', 'for', 'with', 'by',
+    'from', 'this', 'that', 'these', 'those', 'its', 'their', 'his', 'her',
+    'self', 'portrait', 'portraits', 'study', 'studies', 'view', 'scene',
+    'untitled', 'number', 'saint', 'sainte', 'san', 'santa',
+}
+
+
+def _ssg_grounding_tokens(text: str) -> set:
+    """Content tokens (len≥4, not generic) from a stop name/artist/entity, folded
+    for accent-insensitive comparison."""
+    out = set()
+    for w in re.findall(r"[A-Za-zÀ-ÿ']+", text or ""):
+        wl = _fold(w.lower()).strip("'")
+        if len(wl) >= 4 and wl not in _SSG_GROUNDING_STOPWORDS:
+            out.add(wl)
+    return out
+
+
+def _build_delivered_grounding(poi_list: List[Dict]) -> set:
+    """Union of content tokens from every delivered stop's name and artist."""
+    grounding: set = set()
+    for poi in poi_list or []:
+        grounding |= _ssg_grounding_tokens(_norm(poi.get('name', '') or ''))
+        grounding |= _ssg_grounding_tokens(_norm(str(poi.get('artist', '') or '')))
+    return grounding
+
+
+def _entity_is_foreign_work_or_artist(entity: str, delivered_grounding: set) -> bool:
+    """[LOCAL-652] True if a named entity references a work/artist on no delivered
+    stop. The entity's distinctive tokens share nothing with the delivered stops'
+    works/artists. Only meaningful when we have grounding to test against; with an
+    empty grounding set (non-art tour) we never classify an entity as foreign."""
+    if not delivered_grounding or not entity:
+        return False
+    ent_tokens = _ssg_grounding_tokens(entity)
+    if not ent_tokens:
+        return False
+    return not (ent_tokens & delivered_grounding)
+
+
+def _split_sentences(paragraph: str) -> List[str]:
+    """Split a paragraph into sentences, keeping terminal punctuation. Good enough
+    for prose sentence removal (abbreviations are rare in this tour prose)."""
+    if not paragraph:
+        return []
+    parts = re.split(r'(?<=[.!?])\s+', paragraph.strip())
+    return [p for p in parts if p.strip()]
+
+
+def _remove_sentences_naming(paragraph: str, entities: List[str]) -> (str, int):
+    """Remove whole sentences from `paragraph` that name any of `entities`.
+    Returns (new_paragraph, n_removed). Never returns an empty paragraph: if
+    every sentence names a foreign entity, the paragraph is left unchanged (the
+    caller treats that as "could not safely strip")."""
+    sents = _split_sentences(paragraph)
+    if not sents:
+        return paragraph, 0
+    folded_entities = [_fold(e.lower()) for e in entities if e]
+    kept, removed = [], 0
+    for s in sents:
+        s_fold = _fold(s.lower())
+        if any(fe and fe in s_fold for fe in folded_entities):
+            removed += 1
+            continue
+        kept.append(s)
+    if removed == 0 or not kept:
+        # Nothing matched, or removing would empty the paragraph — do not strip.
+        return paragraph, 0
+    return ' '.join(kept), removed
+
+
 def _is_geography(name_low: str) -> bool:
     f = _fold(name_low)
     terms = {_fold(t) for t in _GEOGRAPHY_TERMS}
@@ -679,11 +767,17 @@ def apply_stop_specificity_gate(poi_list: List[Dict],
         'transferable_low_conf_kept': 0,
         'last_paragraph_protected': 0,
         'ungrounded_entities': 0,
+        'foreign_entity_sentences_removed': 0,
         'removal_log': [],
         'entity_log': [],
+        'foreign_entity_log': [],
     }
 
     stop_names = [p.get('name', '') for p in poi_list if p.get('name')]
+    # [LOCAL-652] Delivered-stop grounding: the works/artists actually on the
+    # tour. An ungrounded entity whose tokens appear nowhere here is a foreign
+    # work/artist, and the sentence naming it is removed below.
+    _delivered_grounding = _build_delivered_grounding(poi_list)
 
     for si, poi in enumerate(poi_list):
         desc = poi.get('description', '')
@@ -699,6 +793,7 @@ def apply_stop_specificity_gate(poi_list: List[Dict],
 
         kept: List[str] = []
         removed_here = 0
+        changed_here = False  # [LOCAL-652] True if any paragraph text was altered
         for pi, para in enumerate(paragraphs):
             stats['paragraphs_checked'] += 1
 
@@ -706,12 +801,35 @@ def apply_stop_specificity_gate(poi_list: List[Dict],
             ent = check_named_entity_relationships(
                 para, stop_name, siblings, api_key=api_key, llm_fn=llm_fn, model=model,
             )
+            _foreign_ungrounded = []
             for u in ent['ungrounded']:
                 stats['ungrounded_entities'] += 1
                 stats['entity_log'].append({
                     'stop': stop_name, 'entity': u['entity'], 'reason': u['reason'],
                     'paragraph': para[:100],
                 })
+                # [LOCAL-652] An ungrounded entity that is a WORK or ARTIST from
+                # outside the tour (shares no token with any delivered stop's
+                # work/artist) must be removed, not just logged — it is the
+                # phantom thread leaking a foreign work/artist into a stop body
+                # (e.g. a bogus "Vigée Le Brun's Self Portrait in a Straw Hat
+                # from your earlier stop" callback). Collect such entities and
+                # strip the sentence(s) that name them.
+                if _entity_is_foreign_work_or_artist(u['entity'], _delivered_grounding):
+                    _foreign_ungrounded.append(u['entity'])
+
+            if _foreign_ungrounded:
+                _stripped, _n_removed = _remove_sentences_naming(para, _foreign_ungrounded)
+                if _n_removed > 0:
+                    stats['foreign_entity_sentences_removed'] += _n_removed
+                    stats['foreign_entity_log'].append({
+                        'stop': stop_name,
+                        'entities': list(_foreign_ungrounded),
+                        'sentences_removed': _n_removed,
+                        'before': para[:120],
+                    })
+                    para = _stripped  # downstream checks + kept[] use the stripped text
+                    changed_here = True
 
             # Part 1 — the substitution test. [LOCAL-473] The whole stop
             # description is passed so kind classification can fall back to the
@@ -749,8 +867,9 @@ def apply_stop_specificity_gate(poi_list: List[Dict],
                 stats['transferable_low_conf_kept'] += 1
             kept.append(para)
 
-        if removed_here > 0:
-            stats['stops_affected'] += 1
+        if removed_here > 0 or changed_here:
+            if removed_here > 0:
+                stats['stops_affected'] += 1
             poi_list[si]['description'] = '\n\n'.join(kept)
 
     return stats
