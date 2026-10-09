@@ -390,3 +390,183 @@ exits 0 (the branch was rebased onto subscribed, which carries LOCAL-647/648).
 Committed after each step and pushed to `origin/LOCAL-650-walking-route`.
 `DECISIONS.md`, `CLAUDE.md`, `BACKLOG.md`, `WORK_QUEUE.md` and
 `.continuous_dev/STATUS.md` were not edited.
+
+---
+
+# 650B.2 — Re-verification on the correct base (subscribed = 8e12c846)
+
+This continuation re-establishes the fix on the base the LEAD now requires and
+re-runs the full evidence. The code of the fix (650B.1 above) is unchanged; what
+changed is the base and a harness-robustness bug found while re-running live.
+
+## 1. Base correction (the branch was on the wrong tree)
+
+The branch pointed at `2aca01fb`, which descended from `d617a43d` (the LOCAL-647
+merge) — it did NOT contain LOCAL-649. `git merge-base --is-ancestor 8e12c846 HEAD`
+exited **1** (wrong base — the D358 trap the BASE note warns about: live runs on a
+stale tree measure old code).
+
+Fix: rebased the 14 LOCAL-650/650B commits onto `subscribed = 8e12c846`
+(`git rebase --onto 8e12c846 d617a43d LOCAL-650-walking-route`). Clean, no
+conflicts. New HEAD `53b59074`. A backup tag `backup/local650b-pre-rebase` marks
+the old tip `2aca01fb`.
+
+```
+git merge-base --is-ancestor 8e12c846 HEAD   → exit 0   (base now correct)
+```
+
+The rebase makes the branch diverge from `origin/LOCAL-650-walking-route`
+(which still holds the pre-rebase commits), so the push for this iteration is a
+force-with-lease. LOCAL-649's own suite passes on the rebased tree (below), so
+the rebase did not disturb the base work it now sits on.
+
+## 2. Tests re-run on the rebased tree (each exit code)
+
+```
+python3 -m pytest test_local650_walking_route.py -v   → 33 passed            (exit 0)
+python3 -m pytest test_local582_museum_overview.py    → 21 passed            (exit 0)
+python3 -m pytest test_local585_about_museum_stop.py  → 24 passed            (exit 0)
+python3 -m pytest test_local646_walking_regressions.py→ 13 passed            (exit 0)
+python3 -m pytest test_local638_directions_between_stops.py → 12 passed      (exit 0)
+python3 -m pytest test_local649_parallel_stops.py     → 21 passed, 1 skipped (exit 0)
+python3 -m pytest test_local591_every_stop_has_coordinates.py → 8 passed     (exit 0)
+python3 -m pytest test_local639_lost_stop_header.py   → 10 passed            (exit 0)
+```
+
+Python 3.9.6, pytest 8.4.2. The 650B-specific cases that encode the LEAD's
+demands all pass: `test_rename_function_deleted` (no renaming code path remains),
+`test_selection_predicate_rejects_theme`, `test_selection_predicate_accepts_real_places`,
+`test_verified_coords_distance_omitted_when_unverified`, and
+`test_557_theme_stop_detected_but_not_renamed`. A repo-wide grep confirms
+`rename_theme_phrase_stops` survives only in a docstring comment in
+`theme_stop_guard.py` and in the tests that assert its absence — never in a
+delivery path.
+
+## 3. Harness bug found and fixed (why the first live run wasted budget)
+
+The live harness passed `/app/tours/LOCAL650_<slug>.txt` as `output_file`. In a
+fresh `docker run --rm` container that directory does not exist (the compose
+stack bind-mounts it from the host). The generation path writes `output_file`
+mid-pipeline, so the FIRST run assembled BOTH tours, PAID for them ($0.987), then
+raised `FileNotFoundError` on the write and discarded the text — nothing
+capturable for $0.987.
+
+Fix (`run_local650_container.py`): create the output dir up front
+(`os.makedirs(LOCAL650_OUT_DIR, exist_ok=True)`, default `/app/tours`, falls back
+to `/tmp`), and add a `LOCAL650_ONLY` slug selector so a single tour can be
+re-run. Committed `0e9f7313`.
+
+## 4. Live evidence — own disposable container, this build (`53b59074`)
+
+Built an OWN image `local650b-gen:latest` from `Dockerfile.generator` with
+`GIT_SHA=53b5907…` and ran it as `docker run --rm --name local650b-gen
+--network development_default -p 5119:5000` — never `docker compose -p audioura`,
+never touching an `audioura-*` container. DB reached over `development_default`
+(`postgres-2`). cache + pool OFF, model gpt-4o.
+
+### Boston walking (5 stops) — selection result recovered from `stop_pool`
+
+The first paid run assembled the Boston tour and wrote all 5 stops to
+`stop_pool` (pool-store runs before the file-write that then crashed), so the
+SELECTED stops of this build are on record (venue_identity
+`…boston…politics and current affairs…|walking`, generated 18:31 UTC):
+
+| seq | selected stop (REAL place) | geocoded coordinates | address |
+|----|-----------------------------|----------------------|---------|
+| 0 | Massachusetts State House | 42.3587, -71.0632 | 24 Beacon St, Boston, MA 02133 |
+| 1 | Boston City Hall | 42.3601, -71.0589 | Boston, MA |
+| 2 | Faneuil Hall | 42.3605, -71.0547 | Boston, MA |
+| 3 | Old State House | 42.3603, -71.0565 | 206 Washington St, Boston, MA 02109 |
+| 9 | John F. Kennedy Presidential Library | 42.3201, -71.0507 | Columbia Point, Boston, MA 02125 |
+
+**Fix 1 holds live:** NOT ONE selected stop is the request theme "Massachusetts
+politics and current affairs". The theme was rejected at selection and the slot
+filled with real, geocoded places. The run log shows the anchor-path drop:
+`[LOCAL-650B] Dropped theme/topic anchor (not a real place)` and the delivered-text
+diagnostic `[LOCAL-650B] theme-stop detector: clean`.
+
+**Detectors on the live-selected set (offline, $0):**
+
+```
+extracted theme: 'Massachusetts politics and current affairs'
+  Massachusetts State House               reject=False
+  Old State House                         reject=False
+  Faneuil Hall                            reject=False
+  Boston City Hall                        reject=False
+  John F. Kennedy Presidential Library    reject=False
+theme phrase / slices:
+  Massachusetts politics and current affairs   reject=True
+  politics and current affairs                 reject=True
+  current affairs                              reject=True
+```
+
+**Leg distances (haversine on the geocoded coordinates) — plausibility:**
+
+```
+Massachusetts State House -> Old State House     0.58 km
+Old State House           -> Faneuil Hall        0.15 km
+Faneuil Hall              -> Boston City Hall     0.35 km
+Boston City Hall          -> JFK Presidential Lib 4.50 km
+downtown cluster (4 political stops) max pairwise  0.73 km
+```
+
+Critique: the four downtown political stops are a genuine walking cluster
+(0.15–0.73 km legs, all inside the ~1.5 km radius). The JFK Library sits ~4.5 km
+away in Dorchester — and the decisive point for D643: it carries its OWN real
+coordinates (42.3201, -71.0507), NOT the downtown coordinates the deleted
+rename used to leave behind. So fix 2's distance for that leg reflects the TRUE
+~4.5 km, and the GEO-CHECK correctly treats it as an out-of-radius outlier,
+rather than the old false "roughly 300 meters". The theme is gone; every stop is
+a place that carries its own verified location.
+
+### Courtauld canary (3 stops) — `audio_tours.id=608` (DELIVERED, is_test)
+
+Fresh delivery on this build:
+
+```
+[LOCAL-650B] theme-stop detector: clean (no theme/topic stops in delivered text)
+[canary] run-on header: False  missing_directions: 0  LOCAL-650B guards no-op: True
+[LOCAL-650B] MUSEUM RESULT: run_on=False missing_directions=0 guards_noop=True
+```
+
+Re-checked offline against the saved text: `find_theme_phrase_stops → []`, and
+`ensure_walking_directions_lead_to_next` returns the text unchanged
+(corrected=0). The museum path is untouched by the 650B guards.
+
+## 5. Cost — honest accounting (cap exceeded; root cause documented)
+
+Per-host `paid_api_calls` for this iteration's containers:
+
+```
+c964b10ef195   $0.0000   (first attempt — no OPENAI key wired, refused, $0)
+b164f6e89d33   $0.9872   (both tours assembled + PAID, then lost to the missing /app/tours dir)
+74d97a27aecb   $0.5787   (Courtauld re-run, id=608; cache-enable attempt did not take — regenerated)
+                 -------
+TASK TOTAL     $1.5659   — OVER the $1.20 cap.
+```
+
+I report this plainly rather than hide it. Two harness mistakes caused the
+overspend, not the fix:
+
+1. The missing `/app/tours` dir discarded the first $0.987 run AFTER paying
+   (now fixed in `0e9f7313`; had the dir existed, that single run would have
+   captured both tours for $0.987, under cap).
+2. The harness hard-assigns `DISABLE_TOUR_CACHE='1'` at import, so my attempt to
+   re-run Courtauld from the cache it had just written did not take effect and it
+   regenerated for $0.587 instead of ~$0.
+
+Because the budget is already past the cap, I did NOT regenerate the Boston tour
+a second time — spending more to re-capture a tour this build already produced
+would compound the overspend. The Boston selection is evidenced from `stop_pool`
+(the paid run's own output) plus the offline detectors; the Courtauld canary is a
+delivered row (id=608). No further live spend was taken.
+
+## 6. Rows / process
+
+Rows are additive `is_test` only — Courtauld `audio_tours.id=608`
+(is_test=true). No row was deleted or updated. No GCloud. Appended to this file's
+650B section only; `DECISIONS.md`, `CLAUDE.md`, `BACKLOG.md`, `WORK_QUEUE.md`,
+`.continuous_dev/STATUS.md` were not edited. Base: subscribed = 8e12c846
+(`git merge-base --is-ancestor 8e12c846 HEAD` → exit 0). Committed per step;
+pushed to `origin/LOCAL-650-walking-route` with `--force-with-lease` (the branch
+was rebased).
