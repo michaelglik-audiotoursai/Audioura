@@ -24774,6 +24774,24 @@ RULES:
     # a second time, keeping the first (Michael's binding spec). The matching QA
     # check "No duplicated paragraph" in content_qa_runner uses the same detector,
     # so a tour that reaches delivery with a surviving duplicate still FAILs style.
+
+    # [LOCAL-654] Per-pass before/after dump behind LOCAL654_DUMP=1 — isolates the
+    # pass that welds a mid-clause collision ("…into Thousands…"). No-op when the
+    # env var is unset; never mutates text, never raises.
+    try:
+        from pass_dump import dump_pass as _l654_dump_pass
+    except Exception:
+        def _l654_dump_pass(_n, _b, a):
+            return a
+    _l654_prev = complete_tour
+
+    def _l654ck(_name):
+        """Record the current pass's before/after and return nothing; updates the
+        running snapshot. Transparent when LOCAL654_DUMP is unset."""
+        nonlocal _l654_prev
+        _l654_dump_pass(_name, _l654_prev, complete_tour)
+        _l654_prev = complete_tour
+
     try:
         from paragraph_dedupe import dedupe_paragraphs as _dedupe_paras
         complete_tour, _dup_removed = _dedupe_paras(complete_tour)
@@ -24789,6 +24807,7 @@ RULES:
                              "paragraph removal DISABLED")
     except Exception as _dup_err:
         print(f"  [LOCAL-615] Duplicated-paragraph dedupe error (non-fatal): {_dup_err}")
+    _l654ck("LOCAL-615 paragraph_dedupe")
 
     # -------- [LOCAL-617 item 2/3] Work-first stop-body filter --------
     # [LOCAL-620 / D634] BALANCE policy, not a hard cap. The critic's dominant
@@ -24826,6 +24845,7 @@ RULES:
                       f"({_wf_body_report['stops']} stops scanned)")
         except Exception as _wf_body_err:
             print(f"  [LOCAL-620] Story-balance stop-body policy error (non-fatal): {_wf_body_err}")
+    _l654ck("LOCAL-620 story_balance")
 
     # -------- [LOCAL-623 defect 1] Same-title / wrong-artist bleed filter -----
     # Tour 468 Stop 1 (Daumier's unfinished *Ecce Homo*) also narrated Lovis
@@ -24856,6 +24876,7 @@ RULES:
                       f"({_stbg_rep['stops']} stops scanned)")
         except Exception as _stbg_err:
             print(f"  [LOCAL-623] Same-title bleed filter error (non-fatal): {_stbg_err}")
+    _l654ck("LOCAL-623 same_title_bleed")
 
     # -------- [LOCAL-626 item 5] Object-TYPE bleed filter --------------------
     # Tour 485 Stop 3 ("Footed Bowl with the Crucifixion" — a maiolica BOWL) said
@@ -24883,6 +24904,7 @@ RULES:
                       f"{_otg_rep['stops']} stops")
         except Exception as _otg_err:
             print(f"  [LOCAL-626] Object-type bleed filter error (non-fatal): {_otg_err}")
+    _l654ck("LOCAL-626 object_type_bleed")
 
     # -------- [LOCAL-626 item 5] Same-stop date-consistency filter -----------
     # Tour 485 Stop 3 dated the SAME bowl "between 1550 and 1570" (the corpus
@@ -24910,6 +24932,7 @@ RULES:
                       f"{_dcg_rep['stops']} stops")
         except Exception as _dcg_err:
             print(f"  [LOCAL-626] Date-consistency filter error (non-fatal): {_dcg_err}")
+    _l654ck("LOCAL-626 date_consistency")
 
     # -------- [LOCAL-623 defect 2 / D634] Recurring museum-motif filter -------
     # Tour 468 wove an abstract "museum story of preservation and renewal /
@@ -24931,6 +24954,7 @@ RULES:
                       f"({_mmg_rep['stops']} stops scanned)")
         except Exception as _mmg_err:
             print(f"  [LOCAL-623] Museum-motif filter error (non-fatal): {_mmg_err}")
+    _l654ck("LOCAL-623 museum_motif")
 
     # -------- [LOCAL-617 item 5/6] Fresh-path shortfall reconciliation --------
     # When a LATE gate drops a stop AFTER the D616/D612 shortfall sentence was
@@ -25259,6 +25283,7 @@ RULES:
         complete_tour, _d523_rep = _d523_clean(complete_tour, verbose=True)
     except Exception as _d523_e:
         print(f"  [D523] spoken-text hygiene skipped (non-fatal): {_d523_e}")
+    _l654ck("D523 clean_spoken_text")
 
     # [LOCAL-618 #2] Deterministic grammar & splice lint on the FINAL spoken text.
     # Flags unbalanced quotes/parens, "…-" splices, verbless sentences and repeated
@@ -25315,6 +25340,7 @@ RULES:
                   f"by_code={_gs_rep['by_code']}")
     except Exception as _gs_e:
         print(f"  [LOCAL-618 #2] grammar/splice lint skipped (non-fatal): {_gs_e}")
+    _l654ck("LOCAL-618 grammar_splice_lint")
 
     # [LOCAL-602 r2 / D617 item 10] "check the website" at most once, tour-wide.
     # Hours/admission are spoken when published; when a field is unpublished we
