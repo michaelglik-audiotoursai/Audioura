@@ -45,6 +45,13 @@ from typing import Optional
 
 logger = logging.getLogger(__name__)
 
+# [LOCAL-655] A cached current-affairs tour (one carrying dated news) is reusable
+# only while fresh. Default 7 days, matching current_affairs_news.CA_NEWS_FRESH_DAYS
+# and the stop-pool news TTL. A history-only tour is never aged out.
+import os as _os_ttl
+NEWS_FRESH_DAYS = int(_os_ttl.environ.get('CA_NEWS_FRESH_DAYS', '7'))
+_NEWS_MARKER = 'In recent news:'
+
 
 # ── Cache version (LOCAL-588 / D359) ─────────────────────────────────────────
 #
@@ -385,6 +392,13 @@ def _ensure_table(conn) -> None:
                 hit_count INTEGER DEFAULT 0
             )
         """)
+        # [LOCAL-655] Additive migration: mark a cached CURRENT-AFFAIRS tour (one
+        # carrying dated news) so it can be aged out after CA_NEWS_FRESH_DAYS. A
+        # history-only tour has has_news = FALSE and is never aged out — today's
+        # behaviour is unchanged. Never DELETE/DROP.
+        cur.execute(
+            "ALTER TABLE tour_cache ADD COLUMN IF NOT EXISTS has_news BOOLEAN DEFAULT FALSE"
+        )
     conn.commit()
 
 
@@ -413,15 +427,25 @@ def get_cached_tour(
         with conn.cursor() as cur:
             cur.execute(
                 "UPDATE tour_cache SET hit_count = hit_count + 1 "
-                "WHERE cache_key = %s RETURNING tour_content, total_stops",
-                (key,),
+                "WHERE cache_key = %s "
+                # [LOCAL-655] A cached current-affairs tour is a HIT only while
+                # fresh; a stale news tour is treated as a MISS (not deleted), so
+                # the generator produces freshly-searched news. A history-only
+                # tour has has_news = FALSE and is always eligible.
+                "AND (COALESCE(has_news, FALSE) = FALSE "
+                "     OR created_at >= NOW() - (%s || ' days')::interval) "
+                "RETURNING tour_content, total_stops",
+                (key, str(NEWS_FRESH_DAYS)),
             )
             row = cur.fetchone()
             if not row and legacy_key != key:
                 # Fall back to a pre-normalisation entry, if one exists.
                 cur.execute(
-                    "UPDATE tour_cache SET hit_count = hit_count + 1 WHERE cache_key = %s RETURNING tour_content",
-                    (legacy_key,),
+                    "UPDATE tour_cache SET hit_count = hit_count + 1 WHERE cache_key = %s "
+                    "AND (COALESCE(has_news, FALSE) = FALSE "
+                    "     OR created_at >= NOW() - (%s || ' days')::interval) "
+                    "RETURNING tour_content",
+                    (legacy_key, str(NEWS_FRESH_DAYS)),
                 )
                 row = cur.fetchone()
                 if row:
@@ -484,22 +508,24 @@ def store_tour(
     smaller one, a smaller generation does NOT overwrite a bigger one.
     """
     key = _cache_key(location, tour_type, total_stops)
+    _has_news = _NEWS_MARKER in (tour_content or '')
     try:
         conn = psycopg2.connect(db_url)
         _ensure_table(conn)
         with conn.cursor() as cur:
             cur.execute(
                 """
-                INSERT INTO tour_cache (cache_key, location, tour_type, total_stops, tour_content, spine_json)
-                VALUES (%s, %s, %s, %s, %s, %s)
+                INSERT INTO tour_cache (cache_key, location, tour_type, total_stops, tour_content, spine_json, has_news)
+                VALUES (%s, %s, %s, %s, %s, %s, %s)
                 ON CONFLICT (cache_key) DO UPDATE
                 SET tour_content = EXCLUDED.tour_content,
                     spine_json = EXCLUDED.spine_json,
                     total_stops = EXCLUDED.total_stops,
+                    has_news = EXCLUDED.has_news,
                     created_at = NOW()
                 WHERE EXCLUDED.total_stops > tour_cache.total_stops
                 """,
-                (key, location, tour_type, total_stops, tour_content, spine_json),
+                (key, location, tour_type, total_stops, tour_content, spine_json, _has_news),
             )
         conn.commit()
         conn.close()
