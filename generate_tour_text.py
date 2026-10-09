@@ -8162,28 +8162,26 @@ def _apply_delivery_hours_guard(result):
                       f"tease)", flush=True)
         except Exception as _tze:  # pragma: no cover
             _import_logger.error(f"[LOCAL-638] unpaid-teaser guard skipped: {_tze}")
-        # 3a-ter. [LOCAL-650 fix 1] A WALKING stop must be a real, geocodable PLACE,
-        #     never the request's THEME. Michael, 2026-10-09 (tour 557 + the Oct-6
-        #     baseline, "Walking tour in Boston dedicated to Massachusetts politics
-        #     and current affairs"): Stop 5 was "Massachusetts politics and current
-        #     affairs", Address N/A — the theme phrase had become a POI. This every-
-        #     path text guard recovers the theme from the tour's own title line,
-        #     finds a stop whose header is the theme phrase (or any topic-like name
-        #     with no proper place), and renames it to a REAL place — preferring one
-        #     the stop's own narration already names (557's Stop 5 narrates
-        #     "University of Massachusetts Boston", where its coordinates sit), else
-        #     a theme-appropriate curated place. Museum headers (works) are left
-        #     untouched. Runs BEFORE the directions guarantee so hand-offs name the
-        #     corrected stop. Deterministic, idempotent.
+        # 3a-ter. [LOCAL-650B] Theme-phrase / topic-like stops are now rejected at
+        #     SELECTION (Phase 3A candidate loop), never renamed after the fact.
+        #     The old rename_theme_phrase_stops text-surgery (LOCAL-650 fix 1) is
+        #     DELETED — it manufactured a false place by renaming a stop whose
+        #     coordinates pointed elsewhere (D643 anti-pattern). This diagnostic
+        #     block only DETECTS; it never mutates the text. A non-empty result
+        #     means the selection gate missed one — log it loudly.
         try:
             import theme_stop_guard as _tsg
-            final, _theme_changes = _tsg.rename_theme_phrase_stops(final)
-            for _ch in _theme_changes:
-                print(f"  [LOCAL-650 fix1] Stop {_ch['stop']}: renamed theme/topic "
-                      f"stop {_ch['from']!r} -> {_ch['to']!r} ({_ch['source']}) — a "
-                      f"POI must be a real place, not the request theme", flush=True)
+            _theme_leftovers = _tsg.find_theme_phrase_stops(final)
+            if _theme_leftovers:
+                for _tl in _theme_leftovers:
+                    print(f"  [LOCAL-650B] WARNING: theme/topic stop survived "
+                          f"selection — Stop {_tl[0]}: {_tl[1]!r} ({_tl[2]})",
+                          flush=True)
+            else:
+                print(f"  [LOCAL-650B] theme-stop detector: clean (no theme/topic "
+                      f"stops in delivered text)", flush=True)
         except Exception as _tsge:  # pragma: no cover
-            _import_logger.error(f"[LOCAL-650] theme-stop guard skipped: {_tsge}")
+            _import_logger.error(f"[LOCAL-650B] theme-stop detector skipped: {_tsge}")
         # 3a-quater. [LOCAL-650 fix 2] On a WALKING tour, each stop's Directions
         #     must lead to the NEXT stop by name, and say roughly how far it is.
         #     Michael, 2026-10-09 (tour 557): Stop 4's Directions read "… until you
