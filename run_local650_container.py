@@ -1,22 +1,24 @@
 #!/usr/bin/env python3
-"""run_local650_container.py — LOCAL-650 live acceptance (ISOLATED container).
+"""run_local650_container.py — LOCAL-650B live acceptance (ISOLATED container).
 
-Generates TWO fresh tours through the REAL generation path with the LOCAL-650
-branch code in the image (theme_stop_guard, walking_directions_guard,
+Generates TWO fresh tours through the REAL generation path with the LOCAL-650B
+branch code in the image (theme_stop_guard selection-time detectors,
+walking_directions_guard with verified-coords-only distances,
 current_affairs_coverage + the directions_generator target guard + the PHASE 3A
-theme constraint), cache + pool OFF:
+theme constraint + GEO-CHECK theme filter), cache + pool OFF:
 
   1. WALKING: "Walking tour in Boston dedicated to Massachusetts politics and
      current affairs, Boston, MA" — 5 stops. The evidence tour (557). Must show:
        • NO stop whose name is the request theme phrase / a topic
          (theme_stop_guard.find_theme_phrase_stops == []);
-       • EVERY non-last stop's Directions names the NEXT stop with a distance
+       • EVERY non-last stop's Directions names the NEXT stop
          (walking_directions_guard.count_wrong_target_directions == 0, and no
          stop missing a hand-off);
+       • distances only between stops with verified (P625) coordinates;
        • current-affairs honesty: a recent (<=5y) item OR the honest note.
   2. MUSEUM CANARY: "The Courtauld Gallery, London, United Kingdom" — 3 stops.
      The museum path MUST NOT change: 0 directions missing, no run-on header,
-     and every LOCAL-650 guard is a no-op (museum headers are works).
+     and every LOCAL-650B guard is a no-op (museum headers are works).
 
 HARD CAP $1.20 COMBINED (ticket), enforced by tests/live_run_meter.py across ALL
 providers, plus a RESERVE GATE before each tour. The delivered SPOKEN text of
@@ -181,15 +183,15 @@ def _report_museum(text):
     glued = re.search(r"(?mi)^Stop\s+\d+:.*\b(?:Address|Coordinates|Orientation|"
                       r"Directions):", text)
     missing = _dg.count_stops_missing_directions(text)
-    # The LOCAL-650 guards must be no-ops on a museum tour.
-    t1, ch1 = _tsg.rename_theme_phrase_stops(text)
+    # The LOCAL-650B guards must be no-ops on a museum tour.
+    theme_stops = _tsg.find_theme_phrase_stops(text)
     t2, rep2 = _wdg.ensure_walking_directions_lead_to_next(text)
     t3, ch3 = _cac.ensure_current_affairs_coverage(text)
-    noop = (ch1 == [] and rep2['corrected'] == 0 and not ch3
-            and t1 == text and t2 == text and t3 == text)
+    noop = (theme_stops == [] and rep2['corrected'] == 0 and not ch3
+            and t2 == text and t3 == text)
     print(f"  [canary] run-on header: {bool(glued)}  missing_directions: {missing}  "
-          f"LOCAL-650 guards no-op: {noop}", flush=True)
-    print(f"  [LOCAL-650] MUSEUM RESULT: run_on={bool(glued)} "
+          f"LOCAL-650B guards no-op: {noop}", flush=True)
+    print(f"  [LOCAL-650B] MUSEUM RESULT: run_on={bool(glued)} "
           f"missing_directions={missing} guards_noop={noop} "
           f"(run_on False, missing 0, noop True)", flush=True)
 
