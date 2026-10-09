@@ -19116,6 +19116,67 @@ Write the story FIRST, then add physical description if space allows.
         # [S9/S10/S11] Pass spine_stop and fact_sheet per stop (None when not in Storied mode)
         _spine_arc = _storied_spine.get("arc", []) if _storied_mode and _storied_spine else []
         _fact_sheets_list = _storied_fact_sheets if _storied_mode and _storied_fact_sheets else []
+
+        # [LOCAL-649] PARALLEL_STOPS (flag, default OFF). When set, run ONE plan
+        # call after stop selection and feed its per-stop context to the EXISTING
+        # narration prompt through this same _spine_arc channel. The write below is
+        # already a ThreadPool over _generate_description; the plan only changes the
+        # cross-stop context each stop sees (assigned story, varied angle, budgeted
+        # callbacks naming earlier delivered stops, do_not_tell). STITCH (directions,
+        # D636 limit_thematic_bridges_in_text, LOCAL-628 editor, LOCAL-619B
+        # conclusion) runs unchanged downstream. When the flag is unset this whole
+        # block is skipped and _spine_arc keeps its original value — byte-identical.
+        try:
+            import parallel_stops as _ps649
+            _parallel_on = _ps649.is_enabled()
+        except Exception as _ps649_imp:
+            _parallel_on = False
+            _import_logger.error(f"[LOCAL-649] parallel_stops import failed — PARALLEL_STOPS DISABLED: {_ps649_imp}")
+        if _parallel_on:
+            try:
+                _p649_venue = (_museum_venue_name or location) if tour_category == 'museum' else location
+                # Fix 2: name the WORK when the stored title is an artist name.
+                _p649_works = getattr(_exhibition_checklist_result, 'works', None) or []
+                _p649_research = []
+                for _p649_i, _p649_poi in enumerate(poi_list):
+                    _p649_title = (_p649_poi.get('name') or f'Stop {_p649_i+1}')
+                    if _p649_works:
+                        try:
+                            _p649_rec = match_work_for_stop(_p649_poi.get('name'), _p649_works)
+                            _p649_work_name = _ps649.resolve_stop_work_name(_p649_poi, _p649_rec)
+                            if _p649_work_name:
+                                _p649_title = _p649_work_name
+                                _p649_poi['_parallel_work_title'] = _p649_work_name
+                        except Exception:
+                            pass
+                    # Each stop's OWN research: the writer's _lore channel plus any
+                    # pre-narration description/snippets already attached to the poi.
+                    _p649_bits = []
+                    _p649_lore = _p649_poi.get('_lore')
+                    if _p649_lore:
+                        try:
+                            from stop_knowledge_fallback import story_prompt_block as _p649_spb
+                            _p649_bits.append(_p649_spb(_p649_lore, _p649_poi.get('name', '')))
+                        except Exception:
+                            _p649_bits.append(str(_p649_lore)[:1500])
+                    for _p649_k in ('specific_examples', 'description', '_research'):
+                        _p649_v = _p649_poi.get(_p649_k)
+                        if isinstance(_p649_v, str) and _p649_v.strip():
+                            _p649_bits.append(_p649_v.strip())
+                    _p649_research.append({
+                        'title': _p649_title,
+                        'research': "\n".join(_p649_bits).strip(),
+                    })
+                _p649_plan = _ps649.plan_tour(_p649_venue, _p649_research, api_key)
+                _spine_arc = _ps649.plan_to_spine_arc(_p649_plan, poi_list)
+                print(f"  [LOCAL-649] PARALLEL_STOPS plan built: thread='{_p649_plan.get('thread','')[:80]}' "
+                      f"stops={len(_spine_arc)} callbacks={sum(1 for s in _p649_plan['stops'] if s.get('callbacks'))} "
+                      f"budget={_ps649.callback_budget(len(poi_list))}")
+            except Exception as _p649_err:
+                # On ANY planning failure, fall back to the existing _spine_arc so
+                # the tour still ships — never worse than today.
+                _import_logger.error(f"[LOCAL-649] plan step failed — falling back to default spine: {type(_p649_err).__name__}: {_p649_err}")
+                print(f"  [LOCAL-649] plan step FAILED ({type(_p649_err).__name__}); using default spine")
         futures = {}
         # [LOCAL-474] Keep each stop's generation arguments so the post-gate retry
         # can re-run _generate_description for a stop the gates hollowed out. These
