@@ -1,0 +1,122 @@
+Create a detailed audio description for Manet’s A Bar at the Folies-Bergère at The Courtauld Gallery, London, United Kingdom, focusing on museum.
+
+━━━ NAMES THAT MUST APPEAR (your text is rejected without these) ━━━
+  • Courtauld (Samuel Courtauld)
+  • Manet (Édouard Manet)
+━━━ END REQUIRED NAMES ━━━
+
+━━━ CONCRETE FACTS TO USE (prefer these over general claims) ━━━
+  • His collection included Manet's A Bar at the Folies-Bergère and a version of the Déjeuner sur l'Herbe, Renoir's La Loge, landscapes by Claude Monet and Camille Pissarro, a ballet scene by Edgar Degas, and a group of eight major works by Cézanne.
+━━━ END CONCRETE FACTS ━━━
+
+
+
+Start with a brief orientation that names "Manet’s A Bar at the Folies-Bergère" specifically (not "the exhibit" or "this piece") and tells the listener WHERE to stand or look AND WHY — what becomes visible, legible, or striking from that position that they would miss otherwise.
+
+Then provide a detailed description of the exhibit, in THIS ORDER OF PRIORITY
+(LOCAL-607 — spend your words on the WORK and the ARTIST, not on how the museum
+acquired it):
+
+(a) THE WORK ITSELF — lead with it and give it the most words: what it shows or
+    consists of, how it was made (one specific technique, material, or
+    compositional choice and WHY it matters), why it was made, what it means, and
+    what critics or scholars have said about it. This is what the listener is
+    standing in front of.
+(b) THE ARTIST — the maker's life and the turning point this work marks for them:
+    where they were, what had just happened to them, what they were trying to do
+    at this moment in their career. Name the artist and anchor the work in their life.
+(c) THE EMOTIONAL READING — one or two sentences on what the work makes a viewer
+    feel or notice, grounded in (a) and (b), never free-floating.
+
+ACQUISITION / DONATION IS CAPPED AT ONE SENTENCE (hard limit): how the museum came
+to own the work (donor, gift, bequest, purchase, the collection it belongs to) may
+occupy AT MOST ONE sentence, and only if it is genuinely about THIS work. Do NOT
+retell the museum's founding, renaming, relocation, or the donors behind the
+building — that belongs to the tour's opening, not to a work's stop. If you have
+nothing to say about the work or the artist, write less; do not pad with provenance.
+Also include, when relevant: how this piece connects to the broader collection or museum.
+
+NAME THE OBJECT, AND SAY WHAT IT COST (D468-D471 — the two rules that moved the score):
+- AT LEAST ONE SENTENCE MUST NAME A PHYSICAL PROPERTY OF THE THING IN FRONT OF THE
+  LISTENER — its medium, material, technique, edition size, count, binding, colour or
+  condition — and tie that property to the story. "A set of ten drypoints and
+  lithographs on sheepskin" is the standard; "an important work" is not. The listener
+  is standing in front of the object; a story that never mentions it is a caption about
+  something else. Take the property from the source material. If the material names
+  none, write nothing about the physical object rather than inventing a property.
+- SAY WHAT IT COST OR WHAT WAS AT STAKE. What was lost, refused, destroyed, left
+  unfinished, done only once, done for the last time, or done despite something. That
+  is the difference between a story and a caption. It must come from the source
+  material — if there is no such consequence there, write without one rather than
+  inventing drama.
+
+EXPLAIN-WHAT-YOU-NAME RULE (critical):
+Every concept, motif, symbol, technique, cultural reference, or person you mention
+MUST get at least one clause of explanation. If you cannot explain it in a clause, cut it.
+- BAD: "the rich cultural heritage of Bengal" (names but explains nothing)
+- GOOD: "the Pala dynasty tradition of Bengal, where Buddhist monasteries commissioned
+  bronze casting between the 8th and 12th centuries"
+- BAD: "delicate floral motifs adorning the crown" (what do they mean?)
+- GOOD: "lotus petals on the crown — a symbol of spiritual purity in Hindu iconography,
+  also found on temple lintels across Southeast Asia"
+- BAD: "Each intricate detail tells a story of creation and rebirth"
+  (asserts meaning without delivering it)
+- GOOD: "The four arms each hold a specific object: the axe that severs attachment,
+  the rope that pulls devotees from illusion, the tusk broken as a writing implement,
+  and the sweetmeat representing the reward of a disciplined life"
+The stop's own subject (the exhibit itself) needs no gloss — the whole stop explains it.
+But a person referenced in passing (e.g. Ulysses Grant) needs one clause: "the American
+Civil War general who became president." If most visitors won't know it, explain it or cut it.
+
+NO UNSUPPORTED PRAISE: Do not end paragraphs with evaluative claims ("a truly remarkable
+achievement", "a testament to the artist's genius") unless you have just provided the
+specific evidence that earns the evaluation. If the preceding sentences do not contain
+that evidence, delete the praise — it is filler. A shorter stop that explains three things
+beats a longer one that names eight and explains none.
+
+AUDIO RULES (this will be heard, not read):
+- NEVER end with a rhetorical question. End on a statement — an image, a fact, or a thought the listener can carry forward.
+- NEVER list more than three items in a row. Listeners lose track after three.
+- Write for the EAR: short-to-medium sentences, concrete language, no parenthetical asides.
+
+NO PREACHING — NEVER INSTRUCT THE LISTENER (critical):
+- NEVER end by telling the listener to consider, reflect, imagine, or feel something.
+  End on a FACT or OBSERVATION. The listener is an adult — no commands, no "Take a moment to..."
+
+NO CONDESCENSION / NO DESCRIBING THE OBVIOUS:
+- Never "To truly appreciate..." or "It is worth noting..." — just state the thing.
+- The listener is in front of the object. Describe what they'd MISS, not what's obvious.
+
+SOURCE MATERIAL (use ONLY these facts; do not invent names, dates or numbers):
+
+[Reference extract]
+A Bar at the Folies-Bergère (French: Un bar aux Folies Bergère) is a painting by Édouard Manet, considered to be his last major work. It was painted in 1882 and exhibited at the Paris Salon of that year. It depicts a scene in the Folies Bergère nightclub in Paris. The painting originally belonged to the composer Emmanuel Chabrier, a close friend of Manet, and hung over his piano. It is now in the Courtauld Gallery in London.
+
+
+== Analysis ==
+
+
+=== Description ===
+The central figure stands before a mirror, although critics—accusing Manet of ignorance of perspective and alleging various impossibilities in the painting—have debated this point since the earliest reviews were published. In 2000, however, art historian Malcolm Park proved the perspective was physically possible by staging a reconstruction shown to reproduce the scene as painted by Manet. 
+According to this reconstruction, "the conversation that many have assumed was transpiring between the barmaid and gentleman is revealed to be an optical trick—the man stands outside the painter's field of vision, to the left, and looks away from the barmaid, rather than standing right in front of her." As it appears, the observer should be standing to the right and closer to the bar than the man whose reflection appears at the right edge of the picture. This is an unusual departure from the central point of view usually assumed when viewing pictures drawn according to perspective.
+
+
+=== Interpretation and iconography ===
+
+The painting exemplifies Manet's commitment to realism in its detailed representation of a contemporary scene. Many features have puzzled critics but almost all of them have been shown to have a rationale, and the painting has been the subject of numerous popular and scholarly articles. Asserting the presence of the mirror has been crucial for many modern interpreters. It provides a meaningful parallel with Las Meninas, a masterpiece by an artist Manet admired, Diego Velázquez. There has been a considerable development of this topic since Michel Foucault broached it in his book The Order of Things (1966).
+The art historian Jeffrey Meyers describes the intentional play on perspective and the apparent violation of the operations of mirrors: "Behind her, and extending for the entire length of the four-and-a-quarter-foot painting, is the gold frame of an enormous mirror. The French philosopher Maurice Merleau-Ponty has called a mirror 'the instrument of a universal magic that changes things into spectacles, spectacles into things, me into others, and others into me.' We, the viewers, stand opposite the barmaid on the other side of the counter and, looking at the reflection in the mirror, see exactly what she sees... A critic has noted that Manet's 'preliminary study shows her placed off to the right, whereas in the finished canvas she is very much the centre of attention.' Though Manet shifted her from the right to the center, he kept her reflection on the right. Seen in the mirror, she seems engaged with a customer; in full face, she's self-protectively withdrawn and remote."
+The painting is rich in details which provide clues to social class and milieu. The woman at the bar is a real person, known as Suzon, who worked at the Folies-Bergère in the early 1880s. For his painting, Manet posed her in his studio. By including a dish of oranges in the foreground, Manet identifies the barmaid as a prostitute, according to art historian Larry L. Ligo, who says that Manet habitually associated oranges with prostitution in his paintings. T. J. Clark says that the barmaid is "intended to represent one of the prostitutes for which the Folies-Bergère was well-known", who is represented "as both a salesperson and a commodity—something to be purchased along with a drink."
+Other notable details include the pair of green feet in the upper left-hand corner, which belong to a trapeze artist who is performing above the restaurant's patrons. The beer bottles depicted are easily identifi
+
+[Venue sources]
+Édouard Manet (1832-1883), A Bar at the Folies-Bergère (1882), oil on canvas, The Courtauld, London (Samuel Courtauld Trust © The Courtauld
+Our remarkable collection includes paintings, drawings, prints, sculpture and decorative arts, ranging from the medieval period to the present day. The Gallery is most famous for its exceptional group of Impressionist and Post-Impressionist paintings, with such iconic works as Van Gogh’s Self-Portrait with Bandaged Ear and Manet’s A Bar at the Folies-Bergère.
+Our remarkable collection includes paintings, drawings, prints, sculpture and decorative arts, ranging from the medieval period to the present day. The Gallery is most famous for its exceptional group of Impressionist and Post-Impressionist paintings, with such iconic works as Van Gogh’s  Self-Portrait with Bandaged Ear  and Manet’s  A Bar at the Folies-Bergère .
+The Courtauld’s much-loved permanent collection ranges from the Middle Ages to the 20th century, including masterpieces such as Manet’s A Bar at the Folies-Bergère (1883), Van Gogh’s Self-Portrait with Bandaged Ear (1889) and the most significant collection of works by Cézanne in the UK.
+This exhibition showcases a selection of outstanding works made by students aged 14–18 from across the UK. They are creative responses to Édouard Manet’s famous painting A Bar at the Folies-Bergère (1882) in The Courtauld collection.
+The Courtauld’s much-loved permanent collection ranges from the Middle Ages to the 20th century, including masterpieces such as Manet’s  A Bar at the Folies-Bergère  (1883), Van Gogh’s  Self-Portrait with Bandaged Ear  (1889) and the most significant collection of works by Cézanne in the UK.
+The Gallery is renowned for its remarkable group of Impressionist and Post-Impressionist paintings, including the world-famous A Bar at the Folies Bergère by Édouard Manet, Self-Portrait with Bandaged Ear by Vincent van Gogh and the most significant collection of works by Cézanne in the UK. These masterpieces are presented in the Courtauld Gallery’s spectacular LVMH Great Room, alongside works by artists including Degas, Monet, Renoir, Seurat and more.
+Édouard Manet (1832-1883), A Bar at the Folies-Bergère (1882), The Courtauld, London (Samuel Courtauld Trust) © The Courtauld
+Highlights on display include Manet’s A Bar at the Folies-Bergère (1882), Van Gogh’s Self-Portrait with Bandaged Ear (1889), and the most significant collection of paintings by Cézanne in the UK.
+Highlights on display include Manet’s  A Bar at the Folies-Bergère  (1882), Van Gogh’s  Self-Portrait with Bandaged Ear  (1889), and the most significant collection of paintings by Cézanne in the UK.
+His collection included Manet's A Bar at the Folies-Bergère and a version of the Déjeuner sur l'Herbe, Renoir's La Loge, landscapes by Claude Monet and Camille Pissarro, a ballet scene by Edgar Degas, and a group of eight major works by Cézanne. Other paintings include Vincent van Gogh's Self-Portrait with Bandaged Ear  and Peach Bloss

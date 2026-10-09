@@ -1,0 +1,12 @@
+ARM D | gemini:gemini-flash-lite-latest | Walters | Springtime (1872)
+prompt_chars=9465 status=200 seconds=2.06 usage={'prompt_tokens': 2388, 'completion_tokens': 435, 'total_tokens': 2823}
+================================================================================
+Step closer to the painting Springtime, also known as The Reader, and look specifically at the ground beneath the figure. From this vantage point, you will see how sunlight peeks through the trees to create distinct patches of light on the earth and on her muslin dress, a textural detail that establishes the bright, open-air setting.
+
+Painted in 1872 by the French Impressionist Claude Monet, the work depicts his first wife, Camille Doncieux, seated serenely and reading beneath a dense canopy of lilacs. Monet constructed the scene in close focus, capturing her face and form with a clarity that differs sharply from later depictions portraying her as older. Sunlight filters through the foliage to illuminate her muslin dress, a material rendered with rapid, visible brushstrokes that define the new outdoor aesthetic of the 1870s. The canvas was displayed at the second Impressionist exhibition organized at Paul Durand-Ruel's Paris gallery in 1876, where it was listed under the more generic title Woman Reading. 
+
+The artist, Claude Monet, was a central figure of the French Impressionist movement who spent late 1871 settling his family in Argenteuil, a village northwest of Paris that served as a resort for urban pleasure-seekers. In this garden setting, Monet frequently painted Camille alongside Adélaïde-Eugénie Lescouezec, the companion of fellow painter Alfred Sisley. The model, Camille Doncieux, had been Monet's mistress before their marriage in 1870 and served as his primary subject for figurative paintings throughout the 1860s and 1870s, while also posing for Auguste Renoir and Édouard Manet. 
+
+The physical survival of Camille's likeness in this painting carries a heavy cost. Following her death, Monet's second wife, Alice Hoschedé, ordered the complete destruction of pictures and mementos from Camille's life with Monet, leaving Camille's image to survive almost solely through the artist's surviving paintings. 
+
+The Walters Art Museum holds the painting within its permanent collection.

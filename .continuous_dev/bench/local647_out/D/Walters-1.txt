@@ -1,0 +1,10 @@
+ARM D | gemini:gemini-flash-lite-latest | Walters | The Death of Caesar
+prompt_chars=7526 status=200 seconds=1.68 usage={'prompt_tokens': 1852, 'completion_tokens': 264, 'total_tokens': 2116}
+================================================================================
+Please stand directly in front of *The Death of Caesar* and look closely at the central figures under the direct gallery lighting. From this exact vantage point, you will notice the precise grouping of the Roman senators surrounding the falling dictator, a compositional focus that you would miss if you viewed the painting from across the room.
+
+*The Death of Caesar* is an 1806 oil painting by the neoclassical painter Vincenzo Camuccini depicting the assassination of Julius Caesar, the Roman general and statesman who established his dictatorship before his murder on the Ides of March. The canvas demonstrates a monumental academic style that was designed to revive the grand historical manner of ancient Rome through rigid, theatrical staging and sharply defined classical drapery. Critics in Rome warmly praised his initial full-scale drawing, but when his first painted version received a poor reception in 1796, Camuccini destroyed that entire canvas with his own hands and started completely from scratch. 
+
+The artist Vincenzo Camuccini was working in Rome during a turbulent era when political upheaval across Europe mirrored the violent dynastic and imperial themes of classical antiquity. 
+
+What was lost here was an entire finished painting, destroyed by the artist himself out of a refusal to accept flawed work, which forced him to spend a decade rebuilding the composition from the ground up.

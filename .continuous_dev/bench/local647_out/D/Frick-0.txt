@@ -1,0 +1,12 @@
+ARM D | gemini:gemini-flash-lite-latest | Frick | Officer and Laughing Girl
+prompt_chars=10658 status=200 seconds=2.4 usage={'prompt_tokens': 2427, 'completion_tokens': 436, 'total_tokens': 2863}
+================================================================================
+Step up to *Officer and Laughing Girl*, positioned so you can see the deep recess of the left wall. From this exact spot, the perspective pulls your eye past the towering figure in the foreground straight toward the sunlit face across the table, a three-dimensional depth achieved by placing the soldier close to the picture plane. 
+
+This oil painting on canvas, measuring 50.5 by 46 centimeters and executed around 1657 by the Dutch artist Johannes Vermeer, shows a seated woman in a yellow dress lit by an open window. X-ray photographs reveal that Vermeer originally planned to give her a large white collar that would have hidden much of her yellow bodice—known as a schort, which was an everyday dress—before altering her cap to cover all her hair and draw more attention to her expression. Opposite her sits a cavalier wearing a red coat associated with power and passion, and a wide-brimmed hat made of beaver pelt imported from the New World by the Dutch West India Company. Behind them hangs an identifiable 1621 map of Holland and West Friesland by Willem Blaeu and Balthasar Florisz van Berckenrode, mounted on linen and wooden rods. Art historians suggest that a painting by Gerard van Honthorst—the Dutch Golden Age painter known for dramatic lighting—inspired the composition, and that Vermeer used a camera obscura, an optical device that projects an image onto a surface, to create the precise perspective. While some scholars interpret the scene as an innocent courtship, others suggest the woman's open hand and smile indicate a willingness to engage in sex. 
+
+Johannes Vermeer was a seventeenth-century Dutch artist working in Delft whose career was marked by his mastery of domestic interior scenes and domestic light. 
+
+The painting makes the viewer notice the stark contrast between the shadowed, dominant soldier and the brightly illuminated woman holding a white wine glass, an expensive drink that indicates wealth. 
+
+*Officer and Laughing Girl* belongs to the Frick Collection in New York, alongside two other paintings by the artist: *Girl Interrupted at Her Music* and *Mistress and Maid*.

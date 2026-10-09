@@ -1,0 +1,10 @@
+ARM D | gemini:gemini-flash-lite-latest | Frick | Portrait of Sir Thomas More
+prompt_chars=10338 status=200 seconds=1.35 usage={'prompt_tokens': 2431, 'completion_tokens': 255, 'total_tokens': 2686}
+================================================================================
+Stand directly in front of the oak panel painting to study the fine details of the surface, where the rigid grain of the wood provides a firm foundation for the oil pigments. 
+
+The portrait shows the English statesman and humanist Thomas More in three-quarter right half-profile, holding a book, dressed in a fur-lined coat of rich fabrics, black satin, and red velvet. He wears his Tudor Collar of Esses livery chain with a Tudor rose, a sign of fealty and high office. A cord in the upper right is tied in a loose Franciscan knot, a sign of More's spiritual convictions, while his left index finger bears a wedding ring inset with a stone. 
+
+The work was created in 1527 by the German artist and printmaker Hans Holbein the Younger during the period starting in 1526 when the artist lived in London. Arriving in England, Holbein gained the friendship of the Dutch humanist Desiderius Erasmus, who recommended that he befriend More, who was then a powerful, knighted speaker at the English Parliament. 
+
+The Frick Collection acquired the painting that now preserves the likeness of the Tudor statesman who was later executed for refusing to acknowledge King Henry VIII as supreme head of the Church.

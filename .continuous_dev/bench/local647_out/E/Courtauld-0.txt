@@ -1,0 +1,16 @@
+ARM E | gemini:gemini-flash-latest | Courtauld | Manet’s A Bar at the Folies-Bergère
+prompt_chars=13031 status=200 seconds=6.81 usage={'prompt_tokens': 3174, 'completion_tokens': 590, 'total_tokens': 3764}
+================================================================================
+To view Manet’s *A Bar at the Folies-Bergère*, step slightly to the right of the canvas rather than standing directly in front of it. From this shifted angle, the puzzling geometry of the painting aligns with how Édouard Manet constructed the scene: you occupy the perspective of the approaching gentleman, whose reflection appears along the far right edge of the mirror.
+
+Rendered in oil on canvas across a four-and-a-quarter-foot expanse, the painting portrays a contemporary scene inside the Folies-Bergère nightclub in Paris. The central barmaid was modeled by Suzon, an actual employee of the venue who posed in Manet’s studio. Behind her runs the gilded frame of a massive wall mirror, which reflects the bustling crowd and the venue’s entertainment—including the dangling green feet of a trapeze artist visible in the upper left corner. 
+
+Manet’s compositional strategy hinges on this mirror. Early critics attacked the canvas, accusing Manet of ignorance of perspective because the barmaid stands front and center, yet her reflected back and her customer appear pushed far to the right. A preliminary study shows Manet originally placed Suzon on the right, but on the finished canvas he moved her to the center while retaining her reflection on the right edge. In 2000, art historian Malcolm Park demonstrated through a staged reconstruction that this arrangement is an optical trick: the observer actually stands to the right, looking across the bar, meaning the man is stationed outside the painter’s direct line of sight rather than squarely facing Suzon. 
+
+The composition carries sharp social commentary. On the marble counter sits a glass dish of oranges—a motif art historian Larry L. Ligo notes Manet used to signal prostitution. As art historian T. J. Clark observes, the barmaid functions simultaneously as a salesperson and as a commodity to be purchased along with the drinks. While her reflection leans forward in an apparent transaction with her patron, her frontal figure remains self-protectively withdrawn and distant.
+
+This canvas was the last major work Édouard Manet completed before his death, painted in 1882 and exhibited at the Paris Salon that same year. Working near the very end of his life, Manet took the risk of challenging conventional perspective to capture modern urban estrangement, even in the face of hostile reviews. 
+
+The painting makes the viewer confront a jarring divide: the public spectacle of entertainment reflected in the glass contrasts sharply with the silent, inward exhaustion on Suzon’s face.
+
+The canvas entered the museum through the collector Samuel Courtauld, whose collection also included Manet's version of the *Déjeuner sur l'Herbe*, Renoir's *La Loge*, and a group of eight major works by Cézanne. Today, it hangs among these Impressionist holdings in the Courtauld Gallery.

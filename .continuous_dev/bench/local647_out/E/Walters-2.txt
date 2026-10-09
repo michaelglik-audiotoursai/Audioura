@@ -1,0 +1,12 @@
+ARM E | gemini:gemini-flash-latest | Walters | Sappho and Alcaeus
+prompt_chars=6993 status=200 seconds=6.09 usage={'prompt_tokens': 1722, 'completion_tokens': 463, 'total_tokens': 2185}
+================================================================================
+Stand about six feet back from *Sappho and Alcaeus*, directly facing the center of the panel. From here, your eye can sweep across the curving tiers of the amphitheater, catching how the pale stone recedes toward the deep blue of the Aegean Sea visible through the trees behind it.
+
+Rendered in oil on a wooden panel measuring 66 by 122 centimeters, the scene re-creates a private performance in the late seventh century BC. The poet Alcaeus of Mytilene sits at the center playing the kithara, a stringed wooden instrument used in ancient Greece to accompany lyric verse. Watching him intently from the curved bench is the poet Sappho, who rests her arm on a cushion holding a laurel wreath meant for the performer, surrounded by several of her female companions. Lawrence Alma-Tadema based this setting on the Theatre of Dionysus in Athens—an ancient open-air performance space carved into the southern cliff of the Acropolis—but he altered historical fact by substituting the inscribed Athenian names on the stone seats with the names of Sappho's friends. The scene illustrates a literary passage by the Hellenistic poet Hermesianax, preserved in *The Philosophers' Banquet* by the writer Athenaeus, an ancient Greek compilation of dining conversations. The satirical British magazine *Punch* praised Alma-Tadema's meticulous rendering of polished stone, calling the painting "marbellous."
+
+Completed in 1881, the painting marked a high point in the London career of the Dutch-born British painter, who had built his reputation on reconstructions of classical antiquity. That same year, the artist put his professional status on the line at the Royal Academy's annual summer exhibition, where his work drew the attention of leading peers—a moment captured when painter William Powell Frith depicted artist John Everett Millais closely examining this very panel in his commemorative group portrait *A Private View*.
+
+The cool, reflective surfaces of the white marble contrast against the intense focus between the two poets, turning an ancient historical concert into an intimate exchange held under the open Mediterranean sky.
+
+William Thompson Walters purchased the painting, passing it to his son Henry Walters, who bequeathed it to the Walters Art Museum upon his death in 1931.

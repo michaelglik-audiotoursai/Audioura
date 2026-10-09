@@ -1,0 +1,14 @@
+ARM D | gemini:gemini-flash-lite-latest | Wallace | A Dance to the Music of Time
+prompt_chars=9704 status=200 seconds=2.52 usage={'prompt_tokens': 2247, 'completion_tokens': 454, 'total_tokens': 2701}
+================================================================================
+Stand just to the right of the canvas, roughly a few paces back. From this angle, the raking light catches the fine craquelure across the paint surface and reveals a hidden pentimento, where the artist removed a larger tree that once stood between the figure of Winter and the winged musician.
+
+*A Dance to the Music of Time* is an oil painting on canvas by Nicolas Poussin, a leading French classical painter who spent most of his career in Rome developing a rigorous, intellectual style based on ancient sculpture and clear compositional geometry. Painted between 1634 and 1636, the work was executed as a commission for Giulio Rospigliosi, an Italian cardinal and dramatist who later became Pope Clement IX. Rospigliosi dictated its detailed iconography, which features four figures holding hands in a tight circle while an aged, winged personification of Time plays a lyre on the right. 
+
+The identity of the dancers has long been debated by scholars. Gian Pietro Bellori, the seventeenth-century art biographer, recorded that they represent human progression through Poverty, Labour, Riches, and Pleasure. In this allegorical reading, the cycle moves from hardship back to destitution, mirroring the changing cycle of the Four Seasons. An alternative interpretation proposed by the scholar Malcolm Bull traces the imagery to the Greek poet Nonnus, identifying the figures simply as Spring, Summer, Autumn, and Winter based on botanical attributes like corn braids and olive wreaths. 
+
+Poussin painted this work during a crucial turning point in his career in Rome, when he was moving away from dramatic Venetian colourism toward a severe, sculptural classicism that prioritized narrative clarity and philosophical depth. The picture is in generally good condition despite having been retouched over a large L-shaped tear that once ran straight through the central group of dancers. 
+
+This painting entered the Wallace Collection as part of the bequest that formed the museum's core holdings of French seventeenth-century art. 
+
+The canvas gave its name to the twelve-volume novel sequence *A Dance to the Music of Time* by the English author Anthony Powell, whose narrator contemplates the figures as an emblem of human mortality and the stately, inexorable measure of generations moving through time.

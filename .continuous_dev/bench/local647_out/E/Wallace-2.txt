@@ -1,0 +1,10 @@
+ARM E | gemini:gemini-flash-latest | Wallace | Madame de Pompadour
+prompt_chars=5829 status=200 seconds=4.92 usage={'prompt_tokens': 1416, 'completion_tokens': 346, 'total_tokens': 1762}
+================================================================================
+Step slightly back from *Madame de Pompadour* so you can take in the entire vertical span of the canvas. Standing at this distance allows you to see how the subject's figure commands the full height of the composition, a scale that is easily lost if you examine the painted surface from too close.
+
+This 1759 oil-on-canvas painting is the final work in a sequence of seven portraits that François Boucher created of Madame de Pompadour. Painted using rich oil pigments applied to a woven canvas ground, the work served as a deliberate visual record of its sitter before it was displayed at the Château de Versailles, the royal palace that functioned as the center of French political power. Following its debut at the royal court, ownership of the canvas passed directly to her brother. What was at stake here was the conclusion of a major creative partnership: this painting marks the very last time Boucher would ever portray her on canvas, bringing an end to the sequence of seven portraits that documented her image over the course of their collaboration. 
+
+François Boucher was a French Rococo artist, working in the ornate eighteenth-century style that favored pastel tones, fluid brushwork, and lighthearted decorative themes. At this moment in 1759, Boucher reached the definitive turning point of his career with this sitter, concluding his extensive portrait cycle of Madame de Pompadour with this seventh and final canvas. 
+
+Because this was Boucher's ultimate portrait of his most prominent patron, the composition carries a lingering sense of finality that anchors the viewer's gaze. Now housed in the Wallace Collection, the canvas stands as a prominent centerpiece within the museum's extensive holdings of eighteenth-century French fine art.

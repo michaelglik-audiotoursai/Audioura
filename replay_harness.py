@@ -65,8 +65,12 @@ ARMS = {
     "A": ("openai", "gpt-4.1"),
     "B": ("openai", "gpt-4.1-mini"),
     "C": ("openai", "gpt-4.1-nano"),
-    "D": ("gemini", "gemini-2.5-flash-lite"),
-    "E": ("gemini", "gemini-2.5-flash"),
+    # The dated 2.5 ids (gemini-2.5-flash[-lite]) are 404 "no longer available to
+    # new users" on this API key; the live aliases resolve to the SAME 2.5 Flash
+    # family (cost_rates.py: "gemini-flash-latest ... resolves to the Gemini 2.5
+    # Flash family"). So D/E use the working 2.5 aliases.
+    "D": ("gemini", "gemini-flash-lite-latest"),  # Gemini 2.5 Flash-Lite
+    "E": ("gemini", "gemini-flash-latest"),        # Gemini 2.5 Flash
 }
 
 # ─── the 12 stops: (museum label, venue_corpus qid, stop_pool venue_identity,
@@ -386,15 +390,16 @@ def call_gemini(model, system_msg, user_msg, timeout=120):
     """Ungrounded Gemini generateContent — NO tools, NO grounding."""
     key = os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
     prompt = system_msg + "\n\n" + user_msg
+    gen_cfg = {"temperature": 0.7, "maxOutputTokens": 1400}
+    # gemini-flash-latest (2.5 Flash) accepts thinkingConfig; gemini-flash-lite-latest
+    # (2.5 Flash-Lite) rejects it with HTTP 400. Only send it to the full Flash.
+    if "lite" not in model:
+        gen_cfg["thinkingConfig"] = {"thinkingBudget": 0}
     r = requests.post(
         f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent",
         headers={"Content-Type": "application/json", "x-goog-api-key": key},
         json={"contents": [{"parts": [{"text": prompt}]}],
-              "generationConfig": {
-                  "temperature": 0.7,
-                  "maxOutputTokens": 1400,
-                  "thinkingConfig": {"thinkingBudget": 0},
-              }},  # NO 'tools' key -> no google_search -> ungrounded
+              "generationConfig": gen_cfg},  # NO 'tools' key -> ungrounded
         timeout=timeout)
     status = r.status_code
     j = r.json()
