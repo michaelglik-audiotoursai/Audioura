@@ -58,7 +58,10 @@ _ARRIVAL_CUE_RE = re.compile(
 _DISTANCE_RE = re.compile(
     r'(?i)\b(?:about|approximately|roughly|around)?\s*'
     r'\d+(?:\.\d+)?\s*(?:m|meters?|metres?|km|kilometers?|kilometres?|'
-    r'miles?|min(?:ute)?s?)\b|\ba (?:short|quick|brief) (?:walk|stroll)\b')
+    r'miles?|min(?:ute)?s?)\b'
+    r"|\ba (?:short|quick|brief) (?:walk|stroll)\b"
+    r"|\bminutes?[\u2019']?s?\s+walk\b"
+    r"|\bminute[\u2019']?s\s+walk\b")
 
 
 # ─────────────────────────────────────────────────────────────────────────────
