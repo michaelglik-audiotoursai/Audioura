@@ -214,3 +214,179 @@ Committed after each step; `git rev-list --count origin/subscribed..HEAD` ≥ 1 
 every step (final count 6 with this submission). `DECISIONS.md`, `CLAUDE.md`,
 `BACKLOG.md`, `WORK_QUEUE.md` and `.continuous_dev/STATUS.md` were not edited.
 Pushed to `origin/LOCAL-650-walking-route`.
+
+
+---
+
+# 650B — Theme-as-stop fixed at SELECTION, not by renaming text
+
+**Bounce of LOCAL-650 fix 1.** LEAD accepted fix 2 (directions name the next stop
++ distance) and fix 3 (current-affairs honesty), and REJECTED fix 1.
+
+## 1. Why fix 1 was rejected (D643 text-surgery)
+
+`rename_theme_phrase_stops` renamed Stop 5 "Massachusetts politics and current
+affairs" to "University of Massachusetts Boston" — a place its own narration
+mentioned — but KEPT Stop 5's downtown coordinates (42.3584, -71.0598). UMass
+Boston is in Dorchester, ~5 km away. Fix 2 then announced "roughly 300 meters"
+from the Old State House. Renaming after the narration is written manufactures a
+false place AND a false distance. The theme must be rejected at POI selection,
+before any narration, and replaced with a REAL nearby place.
+
+## 2. Root cause (found by the live run, not assumed)
+
+The theme phrase did NOT enter through the Phase 3A candidate loop (where the
+LOCAL-650 selection filter already sat). The FIRST 650B live run still delivered
+the theme stop, and the log showed why:
+
+```
+[LOCAL-576] named anchors: ['Massachusetts politics and current affairs']
+            start=None end='Massachusetts politics and current affairs' is_loop=False
+[LOCAL-576 anchor] Requested stop 'Massachusetts politics and current affairs'
+            was NOT among the candidates — INSERTED as a user-explicit/_anchor stop
+```
+
+`named_anchors()` reads "Walking tour ... dedicated **TO** Massachusetts politics
+and current affairs" as a "**to** Y" route END anchor, and the LOCAL-576/547
+anchor-insertion path INSERTS that anchor as a user-explicit stop — bypassing the
+Phase 3A selection filter entirely. That is the leak.
+
+## 3. The fix
+
+1. **Reject the theme/topic candidate at SELECTION.**
+   - Phase 3A candidate loop already runs `stop_name_is_not_a_place` (LOCAL-650).
+   - **NEW:** the LOCAL-576 anchor list is filtered with the SAME detector before
+     `_apply_named_waypoints` inserts it. A theme-phrase / topic-like anchor on a
+     walking/outdoor tour is dropped — it is the theme, not a route anchor.
+     Museum/building/venue anchors are untouched.
+   - **NEW:** the GEO-CHECK replacement-fetch loop also runs the detector, so a
+     theme phrase cannot re-enter via a distance-triggered replacement.
+2. **Replace with a REAL nearby place.** The Phase 3A pool is N+3 candidates, so
+   dropping the theme leaves real places to fill the slot. The live run replaced
+   the theme with **Parkman Bandstand** (Boston Common) — a real, geocoded place
+   within the walking radius (GEO-CHECK: max leg 0.93 km, total 1.85 km) that
+   fits the theme (Boston Freedom Rally, suffragist free-speech protests). No
+   place is invented; if the pool were exhausted, the honest shortfall sentence
+   (LOCAL-632) delivers N-1.
+3. **`rename_theme_phrase_stops` DELETED** from the delivery path and from
+   `theme_stop_guard.py` (148 lines removed, incl. `derive_real_place_from_block`,
+   `_curated_fallback`). The detectors (`is_theme_phrase_stop`, `topic_like_name`,
+   `stop_name_is_not_a_place`, `extract_request_theme`, `find_theme_phrase_stops`)
+   are KEPT as selection-time guards and a read-only delivered-text diagnostic.
+4. **Distances use only VERIFIED coordinates.** `walking_directions_guard` now
+   takes `verified_stop_coords` (Wikidata P625 from WALK-D1 / A7). A leg's
+   distance is computed only when BOTH stops are verified; an unverified
+   (LLM-guessed) coordinate omits the distance rather than state a false one.
+
+### Files
+- `generate_tour_text.py` — deleted the 3a-ter rename call (now a read-only
+  detector log); anchor theme filter; GEO-CHECK replacement theme filter;
+  verified-coords dict passed to the directions guard.
+- `theme_stop_guard.py` — rename + helpers deleted; detectors + diagnostics kept.
+- `walking_directions_guard.py` — `verified_stop_coords` gate on distances.
+- `run_local650_container.py`, `run_local650_live.sh` — 650B harness (detector,
+  not rename).
+- `test_local650_walking_route.py` — rewritten for 650B.
+
+## 4. Tests (exit codes)
+
+```
+python3 -m pytest test_local650_walking_route.py -q           → 33 passed  (exit 0)
+python3 -m pytest test_local646_walking_regressions.py -q      → 13 passed  (exit 0)
+python3 -m pytest tests/test_local600_order_and_shortfall.py -q→ 24 passed  (exit 0)
+python3 -m pytest tests/test_local612_shortfall_everywhere.py -q→ 21 passed (exit 0)
+python3 -m pytest test_local642_paren_title_flatten.py -q      → 14 passed  (exit 0)
+                                                       TOTAL   → 105 passed (exit 0)
+```
+
+New/updated tests prove: a theme candidate is rejected at selection
+(`stop_name_is_not_a_place`); `rename_theme_phrase_stops` and
+`derive_real_place_from_block` are gone (`hasattr` is False); distances are
+computed only between stops with verified coords (both verified → distance; one
+unverified → omitted; empty dict → none; None → legacy text-coords); the museum
+path is a no-op for all guards.
+
+## 5. Live run (own container, cap $1.20)
+
+Built `Dockerfile.generator` from this branch into image `local650b-gen-img`;
+ran as `docker run --rm --name local650b-gen -p 5116:5000` (never
+`docker compose -p audioura`, never an `audioura-*` container). Cache + pool OFF.
+Rows: additive `is_test` only; no DELETE.
+
+### Boston walking (5 stops) — audio_tours id=587
+
+```
+Stop 1: Massachusetts State House   Coordinates: 42.3587, -71.0637
+Stop 2: Boston City Hall            Coordinates: 42.3601, -71.0589
+Stop 3: Faneuil Hall                Coordinates: 42.3605, -71.0547
+Stop 4: Old State House             Coordinates: 42.3604, -71.0566
+Stop 5: Parkman Bandstand           Coordinates: 42.3552, -71.0654
+```
+
+Leg distances in the delivered Directions, checked against haversine of the
+coordinates (verified via WALK-D1, 4/5 stops verified):
+
+```
+Stop 1 → Stop 2  stated 400 m   haversine 424 m   ✓
+Stop 2 → Stop 3  stated 350 m   haversine 348 m   ✓
+Stop 3 → Stop 4  stated 150 m   haversine 157 m   ✓
+Stop 4 → Stop 5  stated 950 m   haversine 926 m   ✓
+```
+
+Detectors (in-container `_report_walking`):
+
+```
+[LOCAL-650B] Dropped theme/topic anchor (not a real place):
+             'Massachusetts politics and current affairs' — the request's theme is not a stop
+[LOCAL-650B] theme-stop detector: clean (no theme/topic stops in delivered text)
+[FIX1] request theme: 'Massachusetts politics and current affairs'  theme/topic stops: []  → ok=True
+[FIX2] wrong_target=0  missing_directions=0  legs_with_distance=4/4  → ok=True
+[FIX3] wants_current_affairs=True  has_recent_<=5y=False  honest_note=True  most_recent_year=2011  → ok=True
+WALKING RESULT: fix1=True fix2=True fix3=True
+```
+
+**Critique.** Every stop is a real, geocodable place. Parkman Bandstand is a
+genuine theme-fitting replacement (it hosts the Boston Freedom Rally and was the
+site of 1919 suffragist free-speech protests). Narration is grounded (DiMasi's
+2011 conviction, Chuck Turner's 2008 arrest, the 1976 Ted Landsmark attack, the
+1849 Parkman-Webster murder). The honest current-affairs note is present (newest
+grounded item is 2011, so no false recency is claimed). Minor non-650 blemishes:
+a stray "**" opening Stop 4's Orientation, and Stop 1's lead sentence conflates a
+1969 cost figure with the 1798 Bulfinch building — narration-grounding nits, not
+theme/distance/honesty defects.
+
+### Courtauld canary (3 stops) — audio_tours id=594
+
+```
+Stop 1: Manet's A Bar at the Folies-Bergère   Coordinates: 51.5117, -0.1163
+Stop 2: Courtauld Institute                   Coordinates: 51.5117, -0.1163
+Stop 3: Georges Seurat                        Coordinates: 51.5117, -0.1163
+[LOCAL-650B] theme-stop detector: clean (no theme/topic stops in delivered text)
+MUSEUM RESULT: run_on=False missing_directions=0 guards_noop=True
+```
+
+The museum path is unchanged — every 650B guard is a no-op (museum headers are
+works, not places).
+
+### Cost (combined, all providers, by live_run_meter)
+
+```
+openai            $0.5737
+gemini_grounding  $0.2310  (requests=6, queries=4)
+gemini_tokens     $0.0277
+serper            $0.0410
+preflight         $0.0727
+TOTAL             $0.8735   < $1.20 cap
+```
+
+Rows: `audio_tours` → 398 total, `is_test` → 334 (additive is_test only). An
+earlier verification run (pre-anchor-fix build) wrote is_test ids 578/583; no
+rows were deleted or updated.
+
+## 6. Process
+
+Based on subscribed = d617a43d; `git merge-base --is-ancestor d617a43d HEAD`
+exits 0 (the branch was rebased onto subscribed, which carries LOCAL-647/648).
+Committed after each step and pushed to `origin/LOCAL-650-walking-route`.
+`DECISIONS.md`, `CLAUDE.md`, `BACKLOG.md`, `WORK_QUEUE.md` and
+`.continuous_dev/STATUS.md` were not edited.
