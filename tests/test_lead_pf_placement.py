@@ -30,3 +30,12 @@ def test_facts_become_first_paragraph_of_stop1():
 def test_idempotent():
     out, _ = place_practical_facts_in_opening(T)
     assert place_practical_facts_in_opening(out)[1] == 0
+
+
+def test_single_newline_blocks_never_flattened_R9():
+    """NG 495 (R9): a Stop block joined by single newlines was flattened into one line."""
+    t = ("T\n\nStop 1: A\n\nThe X is an art museum in London.\n\nOrientation: Stand. The museum is open daily from 10:00 to 6:00.\n\n"
+         "Directions: Your final stop: B.\nStop 2: B\nAddress: Trafalgar Square\nCoordinates: 51.5, -0.12\nOrientation: Stand back. Admission is free.\nNarr.\n")
+    out, _ = place_practical_facts_in_opening(t)
+    assert "\nStop 2: B\nAddress: Trafalgar Square\nCoordinates: 51.5, -0.12\n" in out
+    assert out.count("Your final stop") == 1

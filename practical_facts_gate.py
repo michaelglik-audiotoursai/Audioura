@@ -2005,16 +2005,30 @@ def place_practical_facts_in_opening(text: str) -> "Tuple[str, int]":
         if i <= s1 or _FIELD_PARA_RE.match(p.strip() or "x") or re.match(r"(?i)^\s*(stop\s*\d+\s*:|sources:)", p.strip()):
             out.append(p)
             continue
-        kept = []
-        for sent in _split_sentences_keep(p):
-            if _is_practical_facts_sentence(sent):
-                if sent.strip() not in facts:
-                    facts.append(sent.strip())
-                moved += 1
-            else:
-                kept.append(sent)
-        if kept:
-            out.append(" ".join(kept) if len(kept) != len(_split_sentences_keep(p)) else p)
+        # [LEAD 2026-10-08 r2] Work LINE BY LINE: a block can hold a header, field lines and prose
+        # joined by single newlines. Re-joining a whole block with spaces flattened Stop 3's header,
+        # Address and Orientation into one line (NG 495, R9). Header/field lines are never touched.
+        new_lines = []
+        for line in p.split("\n"):
+            if (re.match(r"(?i)^\s*(stop\s*\d+\s*:|sources:)", line) or _FIELD_PARA_RE.match(line or "x")
+                    or re.match(r"(?i)^\s*(orientation|directions)\s*:\s*$", line)):
+                new_lines.append(line)
+                continue
+            sents = _split_sentences_keep(line)
+            kept = []
+            for sent in sents:
+                if _is_practical_facts_sentence(sent):
+                    if sent.strip() not in facts:
+                        facts.append(sent.strip())
+                    moved += 1
+                else:
+                    kept.append(sent)
+            if len(kept) == len(sents):
+                new_lines.append(line)
+            elif kept:
+                new_lines.append(" ".join(kept))
+        if any(l.strip() for l in new_lines):
+            out.append("\n".join(new_lines))
     if not facts:
         return text, 0
     # insertion point: after leading museum-introduction paragraphs in Stop 1, else first prose slot
