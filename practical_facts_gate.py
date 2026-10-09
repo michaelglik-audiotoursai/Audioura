@@ -1276,7 +1276,12 @@ _ADMISSION_SENTENCE_RE = re.compile(
     r"(?i)(\badmission\s+is\b|\badmission:\b|\bfree\s+admission\b|"
     r"\bfree\s+(?:to\s+(?:enter|all)|for\s+general)\b|\bentry\s+is\b|"
     r"\ba\s+ticket\s+is\b|\btickets?\s+(?:are|cost|start)\b|"
-    r"\bgeneral\s+admission\b|[£€$¥]\s?\d)")
+    r"\bgeneral\s+admission\b)")
+_PRICE_AMOUNT_RE = re.compile(
+    r"[£€$¥]\s?\d[\d.,]*(?!\s*(?:million|billion|thousand|bn|m\b|k\b))", re.I)
+_ADMISSION_CUE_RE = re.compile(
+    r"(?i)\b(admission|tickets?|entry|entrance|fee|adults?|children|seniors?|"
+    r"students?|concessions?|per\s+person|visitors?\s+pay|costs?)\b")
 
 # A GENERAL-FREE admission statement (not "free for residents/under-18s only",
 # which is conditional). "the gallery is free", "admission is free", "free to
@@ -1418,6 +1423,11 @@ def _is_practical_facts_sentence(sentence: str) -> bool:
     if _PRACTICAL_HOURS_CUE_RE.search(s):
         return True
     if _ADMISSION_SENTENCE_RE.search(s):
+        return True
+    # [LEAD 2026-10-09] A bare currency amount is an admission fact ONLY next to a
+    # ticket cue, and never as "$5 million": tour 557 v7 moved "Parkman ... left a
+    # $5 million bequest" (Stop 3's history) into the Stop-1 opening.
+    if _PRICE_AMOUNT_RE.search(s) and _ADMISSION_CUE_RE.search(s):
         return True
     return False
 

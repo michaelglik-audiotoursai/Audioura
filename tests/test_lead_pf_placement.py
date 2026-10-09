@@ -39,3 +39,12 @@ def test_single_newline_blocks_never_flattened_R9():
     out, _ = place_practical_facts_in_opening(t)
     assert "\nStop 2: B\nAddress: Trafalgar Square\nCoordinates: 51.5, -0.12\n" in out
     assert out.count("Your final stop") == 1
+
+
+def test_bequest_amount_is_not_an_admission_fact():
+    # LEAD 2026-10-09: tour 557 v7 moved Stop 3's Parkman bequest into the Stop-1 opening.
+    import practical_facts_gate as g
+    assert not g._is_practical_facts_sentence(
+        "The bandstand honors George Francis Parkman, who left a $5 million bequest for Boston Common.")
+    assert not g._is_practical_facts_sentence("He sold it for $500.")
+    assert g._is_practical_facts_sentence("Tickets are $25 for adults.")
