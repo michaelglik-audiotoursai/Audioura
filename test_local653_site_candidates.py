@@ -222,6 +222,19 @@ class TestFilterSiteCandidates(unittest.TestCase):
         self.assertIn(dropped[0]["_reject_reason"],
                       {"junk_page_title", "venue_or_sibling_institution"})
 
+    def test_shape_fallback_drops_scraped_artist_link_but_keeps_protected(self):
+        # The "Georges Seurat" live leak: a scraped artist link that is NOT one of
+        # the SPARQL creator labels, so the precise match misses it. With the shape
+        # fallback ON it is dropped, while a SPARQL-protected real work with a bare
+        # personal-name shape ("Jan van Montfort") is kept.
+        kept, dropped = filter_site_candidates(
+            ["Georges Seurat", "Jan van Montfort", "The Card Players"],
+            VENUE, artist_names=[],  # Seurat absent from creators (the leak)
+            protected_titles=["Jan van Montfort", "The Card Players"],
+            allow_shape_fallback=True)
+        self.assertEqual(kept, ["Jan van Montfort", "The Card Players"])
+        self.assertEqual(dropped, ["Georges Seurat"])
+
     def test_order_preserving(self):
         candidates = ["The Card Players", "Courtauld Institute",
                       "Mont Sainte-Victoire with Large Pine", "Paul Cézanne"]

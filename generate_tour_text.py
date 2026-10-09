@@ -5781,7 +5781,8 @@ def _verify_works_v2(poi_list, venue_name, exhibition_scope=None):
             _lc653_kept, _lc653_dropped = _filter_site(
                 sorted(canonical_titles), venue_name,
                 artist_names=_lc653_artists,
-                protected_titles=sparql_titles)
+                protected_titles=sparql_titles,
+                allow_shape_fallback=True)
             if _lc653_dropped:
                 canonical_titles = set(_lc653_kept)
                 print(f"  [LOCAL-653] rejected site-listed junk/sibling/artist "

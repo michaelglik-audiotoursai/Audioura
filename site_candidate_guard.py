@@ -399,6 +399,7 @@ def filter_site_candidates(
     *,
     protected_titles: Iterable[str] = (),
     title_key: str = "title",
+    allow_shape_fallback: bool = False,
 ) -> Tuple[List, List]:
     """Split site-listed candidates by the LOCAL-653 guards + junk_title_guard.
 
@@ -415,13 +416,21 @@ def filter_site_candidates(
       3. is_artist_name_alone (a bare artist/person name — "Paul Cézanne").
 
     A title in ``protected_titles`` (e.g. a SPARQL/Wikidata-confirmed work label)
-    is kept against the junk/sibling heuristics so a legitimate work is never
-    dropped. EXCEPTION: a bare title that exactly matches one of ``artist_names``
-    (a precise creator match) is dropped even when protected — an artist name is
-    never a work, even when it leaked into the SPARQL label set (the "Georges
-    Seurat"/"Edgar Degas" live leak). The marketing-prefix strip is NOT applied
-    here (it is a renaming, not a drop); callers apply ``strip_marketing_prefix``
-    when assigning the stop name.
+    is kept against the junk/sibling/shape heuristics so a legitimate work is
+    never dropped. EXCEPTION: a bare title that exactly matches one of
+    ``artist_names`` (a precise creator match) is dropped even when protected — an
+    artist name is never a work, even when it leaked into the SPARQL label set (the
+    "Georges Seurat"/"Edgar Degas" live leak).
+
+    ``allow_shape_fallback`` extends the artist-name drop to a bare personal-name
+    SHAPE (2–3 capitalised tokens, no work-signal word) for NON-protected titles —
+    needed because a scraped artist link ("Georges Seurat") is often NOT one of the
+    venue's SPARQL creator labels, yet is plainly not a work. Protected SPARQL
+    works are shielded (the protection short-circuit runs first), so enabling it on
+    a canonical set whose real works are SPARQL-confirmed is safe.
+
+    The marketing-prefix strip is NOT applied here (it is a renaming, not a drop);
+    callers apply ``strip_marketing_prefix`` when assigning the stop name.
     """
     try:
         from junk_title_guard import is_junk_page_title as _is_junk
@@ -460,7 +469,8 @@ def filter_site_candidates(
             reason = "junk_page_title"
         elif title and is_venue_or_sibling_title(title, venue_name):
             reason = "venue_or_sibling_institution"
-        elif title and is_artist_name_alone(title, artist_names):
+        elif title and is_artist_name_alone(
+                title, artist_names, allow_shape_fallback=allow_shape_fallback):
             reason = "artist_name_alone"
 
         if reason:
