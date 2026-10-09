@@ -14232,6 +14232,13 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
                     poi_list = [p for p in poi_list if p not in outliers]
                     print(f"   GEO-CHECK: {len(outliers)} dispersed stop(s) removed; {len(poi_list)} remain")
 
+                    # [LOCAL-658] Snapshot the survivors — these already passed the
+                    # distance check above and must never be dropped by the
+                    # replacement re-validation. Replacements are tracked separately
+                    # so they can be held to the SAME walking-distance limit.
+                    _geo_survivors = list(poi_list)
+                    _geo_replacements = []
+
                     # Fetch replacements for removed stops
                     needed = total_stops - len(poi_list)
                     if needed > 0:
@@ -14295,7 +14302,9 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
                                             pass
                                         new_stops.append(_new_poi(name, c.get('address') or ''))
                                         forbidden_norms.add(_normalize_name(name))
-                                    poi_list.extend(new_stops[:needed])
+                                    _geo_added = new_stops[:needed]
+                                    poi_list.extend(_geo_added)
+                                    _geo_replacements.extend(_geo_added)
                                     print(f"   GEO-CHECK replacement: {min(len(new_stops), needed)} stop(s) added; total now {len(poi_list)}")
                         except Exception as e:
                             print(f"   GEO-CHECK replacement exception: {e}")
@@ -14315,6 +14324,69 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
                                     print(f"   GEO-CHECK coords OK '{poi_r['name']}': {coords_r}")
                                 else:
                                     print(f"   GEO-CHECK coords FAILED '{poi_r['name']}'")
+
+                    # [LOCAL-658] Re-validate replacements against the SAME walking-
+                    # distance limit as the original stops. The removal check above
+                    # only ran on the pre-replacement list; a far replacement (e.g. a
+                    # 4.6 km leg on a downtown walking tour) would otherwise be
+                    # delivered unchecked. A replacement is accepted ONLY if, placed in
+                    # the route-ordered set, it introduces no leg over WALKING_LEG_HARD_KM
+                    # (on_foot) and keeps the total under the mode's hard limit. Any
+                    # replacement that fails is dropped; if that leaves fewer than
+                    # total_stops, we deliver N-1 with the honest shortfall (LOCAL-632)
+                    # rather than a far stop.
+                    if _geo_replacements and transport_mode != 'country_scale':
+                        _survivor_ids = {id(p) for p in _geo_survivors}
+
+                        def _route_leg_ok(candidate_list):
+                            """Return (ok, max_leg_km, total_km) for a candidate stop list.
+                            ok is False if any sequential leg exceeds the per-leg hard
+                            limit (on_foot only) or the total exceeds the mode total."""
+                            ordered = candidate_list
+                            if tour_category == 'walking' and len(candidate_list) >= 3:
+                                try:
+                                    ordered = _compute_route_order(list(candidate_list))
+                                except Exception:
+                                    ordered = candidate_list
+                            cpts = [(p, _parse_coords(p.get('coordinates', ''))) for p in ordered]
+                            cpts = [(p, c) for p, c in cpts if c]
+                            if len(cpts) < 2:
+                                return True, 0.0, 0.0
+                            clegs = [_haversine_km(cpts[i][1], cpts[i + 1][1]) for i in range(len(cpts) - 1)]
+                            ctotal = sum(clegs)
+                            cmax = max(clegs) if clegs else 0.0
+                            if transport_mode == 'on_foot' and cmax > WALKING_LEG_HARD_KM:
+                                return False, cmax, ctotal
+                            if ctotal > _total_limit:
+                                return False, cmax, ctotal
+                            return True, cmax, ctotal
+
+                        # Greedily keep replacements that still produce a valid route.
+                        # Start from the validated survivors and admit replacements one
+                        # at a time; reject any that breaks the limit.
+                        kept = list(_geo_survivors)
+                        for rep in _geo_replacements:
+                            if not _parse_coords(rep.get('coordinates', '')):
+                                print(f"   GEO-CHECK: dropped replacement '{rep['name']}' — no coordinates to distance-check")
+                                forbidden_norms.add(_normalize_name(rep['name']))
+                                continue
+                            trial = kept + [rep]
+                            ok, cmax, ctotal = _route_leg_ok(trial)
+                            if ok:
+                                kept.append(rep)
+                            else:
+                                _limit_word = (f"{WALKING_LEG_HARD_KM:.2f} km per-leg"
+                                               if transport_mode == 'on_foot' and cmax > WALKING_LEG_HARD_KM
+                                               else f"{_total_limit:.0f} km total")
+                                print(f"   GEO-CHECK: REJECTED replacement '{rep['name']}' — "
+                                      f"exceeds walking limit (max leg {cmax:.2f} km, total {ctotal:.2f} km > {_limit_word})")
+                                forbidden_norms.add(_normalize_name(rep['name']))
+                        # Preserve survivor order; keep accepted replacements.
+                        poi_list = [p for p in poi_list
+                                    if id(p) in _survivor_ids or p in kept]
+                        if len(poi_list) < total_stops:
+                            print(f"   [LOCAL-632] GEO-CHECK: no walkable replacement for all removed stop(s); "
+                                  f"delivering {len(poi_list)} of {total_stops} with honest shortfall")
 
                     # Re-order the combined set (survivors + replacements)
                     if len(poi_list) > 1:
