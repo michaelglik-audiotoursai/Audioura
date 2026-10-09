@@ -4440,6 +4440,22 @@ def _apply_artwork_guards(documented, sparql_works, venue_name, n_stops,
     # Raphael's "Madonna del Prato" (KHM) — is NOT in this venue's collection and
     # is rejected here, before the artworks-only / variety passes. No-op when there
     # is no SPARQL/site collection to check against (never strands a sparse venue).
+    # [LEAD 2026-10-08] Parent collections derived from the venue's OWN SPARQL set. parent_qids
+    # was never populated, so works held by the venue's parent body were rejected wholesale:
+    # Courtauld 146 dropped (P195 = Courtauld Institute), Getty 100% (P195 = J. Paul Getty Museum,
+    # venue resolved to the Getty Center campus), Uffizi (Gallerie degli Uffizi). Any P195 that
+    # holds >= max(3, 10%) of the venue's works IS the venue's collection; one-off leaks (Ophelia
+    # P195 = Tate in the NG set) stay rejected.
+    try:
+        from collections import Counter as _Ctr
+        _p195 = _Ctr(q for w in (sparql_works or []) for q in set(w.get('collection_qids') or []))
+        _thr = max(3, int(0.10 * max(1, len(sparql_works or []))))
+        _derived = [q for q, c in _p195.items() if c >= _thr and q != venue_qid]
+        if _derived:
+            parent_qids = tuple(set(parent_qids or ()) | set(_derived))
+            print(f"  {_tag} [LEAD] venue collection holders (>= {_thr} works): {_derived}")
+    except Exception as _pe:
+        print(f"  {_tag} [LEAD] parent-collection derivation skipped: {_pe}")
     try:
         from artwork_selection_guard import enforce_collection_membership
         _mem_kept, _mem_dropped = enforce_collection_membership(

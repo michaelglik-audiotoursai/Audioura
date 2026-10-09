@@ -26,6 +26,11 @@ import derepetition_guard as d
 
 
 def _tour(tid):
+    # [LEAD 2026-10-08] Frozen Bench-R2 fixtures: the critique folder is overwritten by
+    # every benchmark round (R3 replaced tour_485.txt and broke this test).
+    here = os.path.join(os.path.dirname(os.path.abspath(__file__)), "tests", "fixtures", "tour_%d_r2.txt" % tid)
+    if os.path.exists(here):
+        return open(here).read()
     p = "/Users/micha/Audioura/.continuous_dev/calib/critique/tour_%d.txt" % tid
     return open(p).read() if os.path.exists(p) else None
 

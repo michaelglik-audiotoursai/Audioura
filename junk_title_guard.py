@@ -122,9 +122,21 @@ def is_junk_page_title(title: str, venue_name: str = "") -> bool:
     if not t:
         return True  # an empty title can never be a stop
 
-    # 1. page-chrome separator anywhere.
-    if _CHROME_SEPARATOR_RE.search(t):
+    # 1. page-chrome separator anywhere. [LEAD 2026-10-08] A spaced DASH alone is NOT chrome:
+    # real titles use it ("Rain, Steam and Speed – The Great Western Railway", "Nocturne: Blue
+    # and Gold – Old Battersea Bridge", "Landscape – Capriccio"), and rejecting them cost the NG
+    # 2 of 3 stops in Bench R3. A dash is chrome only when one side is a section label, the
+    # venue, or a site brand. Guillemets and pipes stay unconditional.
+    if re.search(r"[«»]|\|", t):
         return True
+    _dash = re.split(r"\s[-–—]\s", t)
+    if len(_dash) > 1:
+        _vn = _norm(venue_name)
+        for _side in _dash:
+            _ns = _norm(_side)
+            if (_ns in _SECTION_LABELS or (_vn and (_ns == _vn or _vn in _ns))
+                    or re.search(r"(?i)\b(official (site|website)|home ?page|website|choose [a-z]+|visit [a-z]+)\b", _side)):
+                return True
 
     # 2. the whole title is a bare section/navigation label.
     if _norm(t) in _SECTION_LABELS:
