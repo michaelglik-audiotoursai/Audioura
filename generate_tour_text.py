@@ -7917,6 +7917,81 @@ def _recover_tour_venue(tour_text):
     return ""
 
 
+# ─── [LOCAL-655] current-affairs news context + delivery-time news pass ────────
+# A module-level context, set in _generate_tour_text_impl once the tour category
+# and request are known, and read at the single delivery choke point
+# (_apply_delivery_hours_guard) so the dated-news pass runs on EVERY delivery path
+# without threading the request through every return. Thread-safe enough for the
+# generator's one-tour-per-process / per-request model: it is set at the start of a
+# generation and consumed at that generation's return. Defaults to "not wanted" so
+# any path that never set it (and the museum path, which sets wanted=False) is
+# untouched.
+import threading as _ca_threading
+_CA_CTX = _ca_threading.local()
+
+
+def _set_current_affairs_context(*, wanted: bool, request: str, tour_category: str):
+    """Record whether the in-flight tour wants dated news (LOCAL-655)."""
+    _CA_CTX.wanted = bool(wanted)
+    _CA_CTX.request = request or ''
+    _CA_CTX.tour_category = tour_category or ''
+
+
+def _get_current_affairs_context():
+    return (getattr(_CA_CTX, 'wanted', False),
+            getattr(_CA_CTX, 'request', ''),
+            getattr(_CA_CTX, 'tour_category', ''))
+
+
+def _apply_current_affairs_news(final: str) -> str:
+    """[LOCAL-655] For a current-affairs tour only, search dated NEWS for the theme
+    and each delivered stop, inject 1-3 grounded, dated, attributed, politically-
+    balanced sentences into the stops they belong to, and append the honest note
+    ONLY when the search ran and returned nothing usable. The queries and counts
+    are logged. Additive and idempotent; non-fatal; a museum / non-current-affairs
+    tour is a strict no-op (wanted is False)."""
+    wanted, request, _cat = _get_current_affairs_context()
+    if not wanted or not final:
+        return final
+    if os.environ.get('DISABLE_CURRENT_AFFAIRS_NEWS', '').strip() == '1':
+        print("  [LOCAL-655] current-affairs news pass disabled by env — skipped")
+        return final
+    try:
+        import current_affairs_news as _ca
+    except Exception as _ie:  # pragma: no cover
+        print(f"  [LOCAL-655] news module import failed (non-fatal): {_ie}")
+        return final
+    try:
+        spans = _ca._split_stops(final)
+        stop_names = [s[2] for s in spans]
+        if not stop_names:
+            print("  [LOCAL-655] no 'Stop N:' blocks found in delivered text — "
+                  "news pass skipped")
+            return final
+        log = _ca.research_news_for_stops(request, stop_names)
+        # Always log the queries + per-query counts (the ticket requires it).
+        print(f"  [LOCAL-655] NEWS search: {len(log['queries'])} queries issued, "
+              f"{log['items_total']} items returned, "
+              f"{log['articles_fetched']} article(s) fetched, "
+              f"{len(log['by_stop'])} stop(s) received news.")
+        for _q in log['queries']:
+            print(f"  [LOCAL-655]   query: {_q!r} -> {log['result_counts'].get(_q, 0)} item(s)")
+        out, n_added = _ca.inject_news_into_text(final, log['by_stop'])
+        if n_added:
+            print(f"  [LOCAL-655] injected dated news into {n_added} stop(s).")
+            for _sn, _d in log['by_stop'].items():
+                _srcs = ', '.join(sorted({(s.get('source') or '') for s in _d.get('sources', []) if s.get('source')}))
+                print(f"  [LOCAL-655]   {_sn}: {_d['text'][:160]!r} [sources: {_srcs}]")
+        out, _note = _ca.append_honest_note(out, log)
+        if _note:
+            print("  [LOCAL-655] no usable news found after searching — honest "
+                  "note appended (the search DID run; see query log above).")
+        return out
+    except Exception as _ne:  # pragma: no cover
+        print(f"  [LOCAL-655] news pass failed (non-fatal, tour unchanged): {_ne}")
+        return final
+
+
 def _apply_delivery_hours_guard(result):
     """[LOCAL-616 item 1] Run the belt-and-braces delivery guards on the FINAL
     delivered text of EVERY delivery path — not just the fresh/first-tour path
@@ -8407,6 +8482,14 @@ def _apply_delivery_hours_guard(result):
                                  "trailing recap stub is NOT replaced")
         except Exception as _ce:  # pragma: no cover
             _import_logger.error(f"[LOCAL-619] conclusion rebuild skipped: {_ce}")
+        # ─── [LOCAL-655] dated-news pass — current-affairs tours only ─────────
+        # Runs AFTER every other delivery guard so it sees the final stop layout,
+        # and BEFORE the file write so the service (which reads the file) ships the
+        # news. A strict no-op for museum / non-current-affairs tours (the context
+        # flag is False), so the museum canary stays byte-for-byte identical.
+        # It runs BEFORE the LOCAL-650 honesty fallback below so that fallback only
+        # fires when the news pass genuinely found nothing to inject.
+        final = _apply_current_affairs_news(final)
         # 5. [LOCAL-650 fix 3] Current-affairs honesty. Michael, 2026-10-09 (tour
         #    557, request "… Massachusetts politics and current affairs"): a tour
         #    that advertises CURRENT AFFAIRS should carry at least one recent
@@ -8470,6 +8553,28 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
     # path below overwrites it. The service's fail-closed coordinate assertion
     # reads this to name the delivering path.
     _J._LAST_DELIVERY_PATH = 'fresh'
+
+    # [LOCAL-655] Prime the current-affairs news context from the RAW request at
+    # the wrapper entry. The impl re-sets this precisely once tour_category is
+    # known (gating out museum/facility); doing it here too means the pool / cache
+    # / by_reference short-circuit paths (which return from THIS wrapper without
+    # entering the impl) still get the dated-news pass, and a museum tour on any
+    # path never inherits a previous current-affairs tour's stale flag. Museum
+    # requests are excluded by keyword here as a conservative first gate; the impl
+    # tightens it with the authoritative tour_category.
+    try:
+        import current_affairs_news as _ca_entry
+        _loc_l = (location or '').lower()
+        _looks_museum = any(w in _loc_l for w in (
+            'museum', 'gallery', 'mfa', 'moma', 'exhibition', 'collection',
+            'art center', 'cultural center', 'palais', 'palazzo'))
+        _set_current_affairs_context(
+            wanted=(not _looks_museum
+                    and _ca_entry.wants_current_affairs(location or '')),
+            request=(location or ''),
+            tour_category='')
+    except Exception:
+        _set_current_affairs_context(wanted=False, request='', tour_category='')
 
     # [LOCAL-597] L2 by-reference path. Terminal: it either delivers a tour built
     # entirely from reused material (zero grounding / zero SERP, enforced by the
@@ -9440,7 +9545,35 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
         print(f"  [LOCAL-485] VENUE-CLASS GUARD: overriding 'museum' → walking "
               f"(request names a worship/civic place class — its stops are places, not works)")
         tour_category = 'walking'
-    
+
+    # ─── [LOCAL-655] CURRENT-AFFAIRS INTENT ───────────────────────────────────
+    # Tour 557 ("…Massachusetts politics and current affairs") ended with a false
+    # "no verified developments" note because NOTHING in the pipeline searched the
+    # news. Detect a current-affairs request here, where tour_category is final and
+    # location/user_request are in scope, and stash it in a module-level context the
+    # single delivery choke point (_apply_delivery_hours_guard) reads to run the
+    # dated-news pass. GATED on NOT a museum tour, so the museum path is byte-for-
+    # byte unchanged, and on NOT a facility/overview errand. Any failure here is
+    # non-fatal and leaves the tour exactly as it was.
+    try:
+        import current_affairs_news as _ca_news
+        _ca_wanted = (tour_category not in ('museum', 'facility')
+                      and _ca_news.wants_current_affairs(user_request or location))
+        _set_current_affairs_context(
+            wanted=_ca_wanted,
+            request=(user_request or location),
+            tour_category=tour_category)
+        if _ca_wanted:
+            print(f"  [LOCAL-655] CURRENT-AFFAIRS intent DETECTED "
+                  f"(category='{tour_category}') — dated news research will run on "
+                  f"delivery; theme queries={_ca_news.derive_theme_queries(user_request or location)}")
+        else:
+            print(f"  [LOCAL-655] no current-affairs intent "
+                  f"(category='{tour_category}') — news research NOT run")
+    except Exception as _ca_err:  # pragma: no cover
+        _set_current_affairs_context(wanted=False, request='', tour_category=tour_category)
+        print(f"  [LOCAL-655] current-affairs detection skipped (non-fatal): {_ca_err}")
+
     # PHASE 2: Detect tour type and get appropriate template
     _phase_timer.start('poi_selection')
     # NOTE: tour_category already set above — do NOT call _classify_tour_category again here
