@@ -70,3 +70,5 @@ services:
     volumes:
       - /Users/micha/audioura-subscribed-local/_meter:/opt/meter:ro
       - /Users/micha/Audioura/meterlogs:/meterlogs
+  map-delivery:                           # LOCAL-657 version/updated_at on /tours-near + /tour-by-code
+    build: {context: /Users/micha/audioura-subscribed-local/map_delivery}

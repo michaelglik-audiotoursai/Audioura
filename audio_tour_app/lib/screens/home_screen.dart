@@ -614,6 +614,15 @@ class _HomeScreenState extends State<HomeScreen> {
               children: [
                 Text('Distance: ${item['distance_km']} km'),
                 Text('Downloads: ${item['popularity']}'),
+                if (_tourVersionLabel(item) != null)
+                  Text(
+                    _tourVersionLabel(item)!,
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.blue.shade700,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
                 SizedBox(height: 10),
                 Text(item['request_string']),
                 SizedBox(height: 16),
@@ -721,6 +730,41 @@ class _HomeScreenState extends State<HomeScreen> {
       case 'history_tour': return 'History';
       default: return 'Tour';
     }
+  }
+
+  // [LOCAL-657] "v{version} · updated {Mon D}" shown next to Downloads, but only
+  // when a tour has actually been replaced (version >= 2). Returns null when the
+  // label should not appear: version is missing (an old map-delivery that does
+  // not send the field), unparseable, or still 1. A missing field must never
+  // crash the dialog, so every read is defensive.
+  static const List<String> _monthAbbr = [
+    'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+  ];
+
+  String? _tourVersionLabel(Map<String, dynamic> tour) {
+    final rawVersion = tour['version'];
+    int? version;
+    if (rawVersion is int) {
+      version = rawVersion;
+    } else if (rawVersion is num) {
+      version = rawVersion.toInt();
+    } else if (rawVersion is String) {
+      version = int.tryParse(rawVersion);
+    }
+    if (version == null || version < 2) {
+      return null;
+    }
+
+    String label = 'v$version';
+    final updatedAt = tour['updated_at'];
+    if (updatedAt is String && updatedAt.isNotEmpty) {
+      final parsed = DateTime.tryParse(updatedAt);
+      if (parsed != null && parsed.month >= 1 && parsed.month <= 12) {
+        label += ' · updated ${_monthAbbr[parsed.month - 1]} ${parsed.day}';
+      }
+    }
+    return label;
   }
   
   String _getLanguageName(String? language) {
@@ -865,6 +909,17 @@ class _HomeScreenState extends State<HomeScreen> {
                                 ),
                               ],
                             ),
+                            if (_tourVersionLabel(tour) != null) ...[
+                              SizedBox(height: 2),
+                              Text(
+                                _tourVersionLabel(tour)!,
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.blue.shade700,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
                             SizedBox(height: 2),
                             Row(
                               children: [
