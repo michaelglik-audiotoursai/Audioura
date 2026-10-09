@@ -525,6 +525,68 @@ def measure_prompts(out_dir):
           flush=True)
 
 
+def _audio_tours_counts(con):
+    cur = con.cursor()
+    cur.execute("SELECT count(*) FROM audio_tours")
+    total = cur.fetchone()[0]
+    cur.execute("SELECT count(*) FROM audio_tours WHERE is_test = true")
+    test = cur.fetchone()[0]
+    cur.close()
+    return total, test
+
+
+def store_results(base_dir, arms=None):
+    """Persist each arm's 12 stops as ONE additive is_test audio_tours row.
+
+    Additive only — no UPDATE, no DELETE. Reports row counts before and after so
+    the additive, test-only nature is auditable. Returns the new ids.
+    """
+    arms = arms or list(ARMS.keys())
+    con = _conn()
+    con.autocommit = True
+    before_total, before_test = _audio_tours_counts(con)
+    print(f"[store] audio_tours BEFORE: total={before_total} is_test={before_test}",
+          flush=True)
+    new_ids = []
+    cur = con.cursor()
+    for arm in arms:
+        recs = json.load(open(os.path.join(base_dir, arm, f"arm_{arm}_results.json"),
+                              encoding="utf-8"))
+        provider, model = ARMS[arm]
+        lines = [f"LOCAL-647 bake-off arm {arm} ({provider}:{model}) — "
+                 f"{len(recs)} museum stops, one draft each.", ""]
+        for i, r in enumerate(recs, 1):
+            lines.append(f"Stop {i}: {r['title']} ({r['museum']})")
+            lines.append("")
+            lines.append(r["output"])
+            lines.append("")
+        content = "\n".join(lines)
+        name = f"LOCAL-647 bakeoff arm {arm} {model} {int(time.time())}"
+        cur.execute(
+            """
+            INSERT INTO audio_tours
+                (tour_name, request_string, number_requested, tour_content,
+                 stops_count, creator_type, storied_mode, is_test, track,
+                 tour_kind, description)
+            VALUES (%s, %s, %s, %s, %s, 'Test', false, true, 'beta', 'full', %s)
+            RETURNING id
+            """,
+            (name, f"LOCAL-647 narration bake-off arm {arm}", len(recs), content,
+             len(recs), f"LOCAL-647 arm {arm} {provider}:{model} (replay harness, is_test)"))
+        nid = cur.fetchone()[0]
+        new_ids.append(nid)
+        print(f"[store] arm {arm}: inserted is_test audio_tours id={nid}", flush=True)
+    cur.close()
+    after_total, after_test = _audio_tours_counts(con)
+    con.close()
+    print(f"[store] audio_tours AFTER:  total={after_total} is_test={after_test}",
+          flush=True)
+    print(f"[store] added {after_total - before_total} rows "
+          f"({after_test - before_test} is_test); new ids: {new_ids}", flush=True)
+    print(f"LOCAL647_NEW_TEST_IDS={','.join(str(i) for i in new_ids)}", flush=True)
+    return new_ids
+
+
 def _main():
     if len(sys.argv) < 2:
         print(__doc__)
@@ -563,6 +625,9 @@ def _main():
     elif cmd == "measure":
         out = opt("--out", "/app/bench_out/_measure")
         measure_prompts(out)
+    elif cmd == "store":
+        base = opt("--dir", "/app/bench_out")
+        store_results(base, list(opt("--arms", "ABCDE")))
     else:
         print(f"unknown command: {cmd}")
         print(__doc__)
