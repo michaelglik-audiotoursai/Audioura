@@ -204,6 +204,13 @@ def _gemini_facts(work, venue, timeout=45, focus='object'):
     """
     try:
         from story_leads import gemini_with_sources
+        # [LOCAL-648] Route the grounded research calls through the backend router
+        # so RESEARCH_BACKEND=serper answers them with Serper instead of a billable
+        # grounded Gemini request. Default (gemini) == gemini_with_sources.
+        try:
+            from story_leads import research_with_sources as _research
+        except Exception:
+            _research = gemini_with_sources
     except Exception as e:
         return None, f"gemini unavailable: {e}"
     try:
@@ -230,7 +237,7 @@ def _gemini_facts(work, venue, timeout=45, focus='object'):
             #
             # [D550] His question, verbatim. Prose in, structure after.
             _q = _JUICY_QUESTION.format(name=work, city=venue)
-            res = gemini_with_sources(_q)
+            res = _research(_q, grounded=True)
             _text = res.get('text', '') if isinstance(res, dict) else str(res)
             if not _text.strip():
                 return None, 'gemini returned nothing'
@@ -248,8 +255,9 @@ def _gemini_facts(work, venue, timeout=45, focus='object'):
                                'actually happened? Real incidents with named people and dates.'),
                 'place': 'What actually happened at this place, and to whom?'
                 }.get(focus, 'What is actually known about this specific object?')
-        res = gemini_with_sources(
-            f"{_sys}\n\n{_noun}: {work}\n{_ctx}: {venue}\n\n{_ask} Return only the JSON.")
+        res = _research(
+            f"{_sys}\n\n{_noun}: {work}\n{_ctx}: {venue}\n\n{_ask} Return only the JSON.",
+            grounded=True)
         text = res.get('text', '') if isinstance(res, dict) else str(res)
         m = re.search(r'\{.*\}', text, re.S)
         if not m:

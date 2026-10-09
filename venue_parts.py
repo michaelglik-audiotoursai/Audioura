@@ -363,12 +363,22 @@ def default_ask(prompt, timeout=60):
 
 
 def default_ask_grounded(prompt, timeout=90):
-    """Grounded asker for Q3 and the story questions — returns (text, sources)."""
+    """Grounded asker for Q3 and the story questions — returns (text, sources).
+
+    [LOCAL-648] Routed through story_leads.research_with_sources so that, under
+    RESEARCH_BACKEND=serper, this per-stop research is answered by Serper + page
+    fetch + a cheap model instead of a billable grounded Gemini request. Default
+    backend (gemini) makes research_with_sources == gemini_with_sources, so this
+    is unchanged. The venue preflight is NOT routed (it calls gemini_with_sources
+    directly), so it stays on Gemini."""
     try:
-        from story_leads import gemini_with_sources
+        from story_leads import research_with_sources as _ask
     except Exception:
-        return '', []
-    out = gemini_with_sources(prompt, resolve=True, timeout=timeout) or {}
+        try:
+            from story_leads import gemini_with_sources as _ask
+        except Exception:
+            return '', []
+    out = _ask(prompt, resolve=True, timeout=timeout, grounded=True) or {}
     srcs = [s.get('url') or s.get('domain') for s in (out.get('sources') or [])]
     return out.get('text', '') or '', [s for s in srcs if s]
 
