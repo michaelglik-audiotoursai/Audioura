@@ -158,6 +158,108 @@ _LABEL_GLUED_STOP_HEADER = re.compile(
     r'(?im)^[ \t]*(?:Address|Directions|Coordinates|Orientation):[ \t]*(Stop\s+\d+:\s)')
 
 
+# ─── [LOCAL-642] Flattened-block / duplicated-transition invariant ────────────
+#
+# National Gallery 495 (Bench R9, R12): the stop whose title carries parentheses
+# and quotes — "The Toilet of Venus ('The Rokeby Venus')" — was delivered with
+# its header, Address, Coordinates and Orientation JOINED onto one line, and the
+# flattened block was DUPLICATED under a "Continue to …" transition:
+#
+#   Directions: Continue through The National Gallery — next is The Toilet of Venus ('The Rokeby Venus').
+#   Continue to The Toilet of Venus ('The Rokeby Venus') Address: … Coordinates: … Orientation: …
+#   Stop 2: The Toilet of Venus ('The Rokeby Venus') Address: … Coordinates: … Orientation: …
+#
+# These two symptoms are repaired deterministically here, regardless of which
+# upstream pass lost the newlines (a title-built regex whose unescaped "(" opened
+# a group, or a block re-join). The repair keys ONLY on the house field labels
+# (Address/Coordinates/Orientation/Directions) and the "Stop N:" header — never
+# on the title text — so a title containing "(", ")", "'", "[", "]", "+" or "?"
+# is carried through byte-for-byte.
+
+# The house field labels, as a line-anchored alternation. A label "starts a
+# line" when it is at the beginning of a physical line (optionally indented).
+_FIELD_LABELS_TC = ("Address", "Coordinates", "Orientation", "Directions")
+_FIELD_LABEL_ALT = "(?:" + "|".join(_FIELD_LABELS_TC) + ")"
+
+# A field label that is glued AFTER other content on the same physical line —
+# i.e. preceded by a non-newline, non-space char then whitespace, OR directly by
+# a word char. Used to re-break "… whole canvas. Address: …" and the run-on
+# header "Stop 2: Title Address: …". We split BEFORE the label.
+_INLINE_FIELD_LABEL = re.compile(
+    r'(?m)(?<=\S)[ \t]+(' + _FIELD_LABEL_ALT + r':\s)')
+
+# A transition line that names the next stop and then carries a flattened field
+# block ("Continue to <title> Address: … Coordinates: …"). The transition cue is
+# fixed; the "<title>" between the cue and the first field label is whatever the
+# generator wrote. We keep the cue+title (ending it with a period) and DROP the
+# glued field block, because the real "Stop N:" header for that title follows and
+# carries the same fields. Cue list mirrors the deterministic museum/outdoor
+# hand-offs (stop_pool_assembly, directions_guarantee, generate_tour_text T4).
+_TRANSITION_CUE = (
+    r'(?:Continue to|Continue through|Proceed to|Next:|Head towards|'
+    r'Your final stop(?:\s+in\s+[^:]+)?:)')
+_TRANSITION_WITH_GLUED_BLOCK = re.compile(
+    r'(?im)^((?:Directions:\s*)?' + _TRANSITION_CUE + r'.*?)'
+    r'[ \t]+(' + _FIELD_LABEL_ALT + r':.*)$')
+
+
+def enforce_header_field_line_invariant(tour_text: str):
+    """[LOCAL-642] Guarantee the house line invariant, deterministically.
+
+    Invariant (binding):
+      1. Every ``Stop N:`` header line contains ONLY the header (title +
+         optional "by Artist, year") — never a field label.
+      2. Every field label (Address:/Coordinates:/Orientation:/Directions:)
+         starts its own physical line.
+      3. A "Continue to <next>" transition carries ONLY the hand-off sentence,
+         never a copy of the next stop's field block.
+
+    Returns ``(repaired_text, actions)`` where ``actions`` is a list of short
+    strings describing each re-break/de-dup performed (for logging). Pure,
+    offline, idempotent. Keys only on field labels and the ``Stop N:`` header, so
+    a title with "(", ")", "'", "[", "]", "+", "?" is never touched.
+    """
+    if not tour_text:
+        return tour_text or "", []
+    actions: List[str] = []
+
+    # (C) First, repair a transition line that duplicates the next stop's field
+    #     block: keep the hand-off sentence, drop the glued block. Done before the
+    #     generic re-break so we DELETE the duplicate rather than merely re-break
+    #     it into a second, header-less copy of the fields.
+    def _dedup_transition(m):
+        cue_and_title = m.group(1).rstrip()
+        # Ensure the hand-off sentence ends on a period (it lost its "." when the
+        # block was glued on). Do not add one if a terminal punctuation is there.
+        if cue_and_title and cue_and_title[-1] not in ".!?":
+            cue_and_title += "."
+        actions.append("dropped duplicated field block after transition: "
+                        + repr(m.group(2)[:60]))
+        return cue_and_title
+
+    out = _TRANSITION_WITH_GLUED_BLOCK.sub(_dedup_transition, tour_text)
+
+    # (A+B) Re-break any field label glued after other content on its line. This
+    #       un-flattens both a run-on header ("Stop 2: Title Address: …") and a
+    #       run-on field chain ("Address: X Coordinates: Y"). We iterate until no
+    #       inline label remains (one pass splits only the FIRST glued label on a
+    #       line because the replacement inserts a newline before it; repeat to
+    #       peel the rest). Idempotent: a well-formed tour has no inline label.
+    for _ in range(12):  # bounded; a stop has at most ~4 field labels
+        new_out, n = _INLINE_FIELD_LABEL.subn(r'\n\1', out)
+        if n:
+            actions.append(f"re-broke {n} glued field label(s) onto their own line")
+        out = new_out
+        if not n:
+            break
+
+    # Collapse any 3+ newline run the re-breaks may create, but DO NOT merge the
+    # single-newline re-breaks into blanks here — downstream render spacing is
+    # handled by normalise_stop_headers' final collapse.
+    out = re.sub(r'\n{3,}', '\n\n', out)
+    return out, actions
+
+
 def normalise_stop_headers(tour_text: str) -> str:
     """Restore a line break before any ``Stop N:`` header glued to prior text.
 
@@ -175,6 +277,11 @@ def normalise_stop_headers(tour_text: str) -> str:
     out = _LABEL_GLUED_STOP_HEADER.sub(r'\n\n\1', tour_text)
     # (2) A header glued onto the end of a sentence ("…once more.Stop 3:").
     out = _GLUED_STOP_HEADER.sub(r'\n\n\1', out)
+    # (3) [LOCAL-642] Un-flatten a run-on header / field chain and drop a
+    #     transition line that duplicated the next stop's field block (NG 495).
+    out, _inv_actions = enforce_header_field_line_invariant(out)
+    for _a in _inv_actions:
+        print(f"  [LOCAL-642] header/field invariant: {_a}")
     # Collapse any 3+ newline run the re-breaks may create.
     out = re.sub(r'\n{3,}', '\n\n', out)
     return out

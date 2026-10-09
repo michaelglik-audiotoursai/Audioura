@@ -6224,7 +6224,7 @@ def _verify_works_in_collection(poi_list, venue_name):
             _rejected = False
             for _other in _rejection_indicators:
                 if _other in _work_lower and _other not in venue_name.lower():
-                    if _d1_re.search(rf'(located|housed|installed|displayed|held|collection|synagogue|opera|commission)\s*.{{0,40}}{_other}', _work_lower):
+                    if _d1_re.search(rf'(located|housed|installed|displayed|held|collection|synagogue|opera|commission)\s*.{{0,40}}{_d1_re.escape(_other)}', _work_lower):  # [LOCAL-642] escape interpolated indicator
                         print(f"  [D1] REJECTED '{work_name}' — located elsewhere ({_other})")
                         _evidence_log[work_name] = f"REJECTED: located at {_other}"
                         _rejected = True
