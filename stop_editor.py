@@ -78,7 +78,22 @@ _STOP_HEADER = re.compile(r'^Stop (\d+):\s*(.+?)\s*$', re.M)
 # Lines that are STRUCTURAL metadata, preserved verbatim (never sent to the
 # editor as rewritable body). A line is structural if it starts with one of
 # these labels.
-_STRUCT_LABELS = ("Address:", "Coordinates:", "Orientation:", "Directions:",
+#
+# [LOCAL-646 reg1] ``Type/Specialty:``, ``Specific Examples:``,
+# ``Operational Details:`` and ``Museum Information:`` were ADDED here. The
+# museum work (LOCAL-642/643) made non-museum stops carry these fields too, but
+# this split-set still only knew Address/Coordinates/Orientation/Directions. A
+# stop that carried a ``Type/Specialty:`` line therefore had that line — and
+# EVERYTHING after it, including ``Specific Examples:``, the ``Orientation:``
+# block and the narration — mis-classified as rewritable *body*. The LLM editor
+# then reflowed that "body" into one run-on paragraph, producing the tour-557
+# Stop-4 collapse: "Type/Specialty: … Specific Examples: … Orientation: <the
+# whole narration on the Orientation line>". With these labels recognised as
+# structural, each field line is preserved verbatim on its own line and only the
+# true narration paragraphs (after the Orientation block) are sent to the editor.
+_STRUCT_LABELS = ("Address:", "Coordinates:", "Type/Specialty:",
+                  "Specific Examples:", "Operational Details:",
+                  "Museum Information:", "Orientation:", "Directions:",
                   "Hours/admission source:", "Sources:")
 
 # A proper noun for the "no new proper noun" guard: a capitalised word (optionally

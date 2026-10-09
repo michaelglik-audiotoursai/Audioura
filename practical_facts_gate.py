@@ -2060,5 +2060,16 @@ def place_practical_facts_in_opening(text: str) -> "Tuple[str, int]":
     # [LEAD 2026-10-09] The text-view "Museum Information:" field must agree with what is spoken.
     # Walters 555 showed "Closed on Tuesday. Saturday, 12:30–4. $500" (a scraped membership/event
     # line) while the spoken, composed sentence said "open Wednesday to Sunday. Admission is free."
-    new = re.sub(r"(?m)^Museum Information:.*$", lambda _m: "Museum Information: " + " ".join(facts), new)
+    #
+    # [LOCAL-646] But the composed facts are now spoken as the opening paragraph above, and the
+    # TTS extractor (translation_service._strip_nav_fields_for_tts) drops the whole
+    # "Museum Information:" line — so copying the SAME composed facts into that field line left the
+    # hours/admission in TWO places in the delivered tour_content. The spoken audio was correct
+    # (one statement — the field line is stripped), but the bench detector (and
+    # count_spoken_hours_statements) count the field-line value too, so the Courtauld canary
+    # (tour 559) showed hours_said_twice / admission_twice. CLEAR the field line instead of
+    # mirroring the composed facts into it: the facts remain in the text view via the opening
+    # paragraph we just inserted, no stale/scraped value is shown (the Walters-555 concern), and
+    # the hours/admission appear exactly ONCE in the delivered text.
+    new = re.sub(r"(?m)^Museum Information:.*$", "Museum Information:", new)
     return new, (0 if new == text else moved)

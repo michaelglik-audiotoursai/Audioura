@@ -48,7 +48,19 @@ _FIELD_LINE_RE = re.compile(
     r'sources?|tour-category|hours?/admission source)\s*:')
 
 # A line that is itself an explicit directions label.
-_DIRECTIONS_LABEL_RE = re.compile(r'(?i)^\s*directions:\s*\S')
+#
+# [LOCAL-646 reg2] ``re.MULTILINE`` is REQUIRED. ``_block_has_transition`` tests
+# this regex against the LAST few spoken lines of a stop joined with newlines
+# ("\n".join(spoken_lines[-4:])). Without MULTILINE, ``^`` anchors only to the
+# very start of that joined string, so an existing walking "Directions:" line
+# that is NOT the first of the joined lines is never recognised. In tour 557 the
+# "Directions:" line was the 4th (last) of the joined lines, so the guarantee
+# treated the stop as missing a hand-off and appended a DUPLICATE "Continue to
+# The Old State House." right after the real "Directions: … until you reach the
+# iconic Old State House" line. MULTILINE makes ``^`` match the start of each
+# physical line, so an existing Directions line anywhere in the tail is seen and
+# nothing is added.
+_DIRECTIONS_LABEL_RE = re.compile(r'(?im)^\s*directions:\s*\S')
 
 # Transition template cues the assembler/fresh-path emit as the hand-off sentence.
 _TRANSITION_CUE_RE = re.compile(
