@@ -33,6 +33,7 @@ NOTHING here runs unless wants_current_affairs(request) is true AND the tour is 
 a museum tour — so the museum path and any non-current-affairs tour are byte-for-
 byte unchanged.
 """
+import datetime as _dt
 import json
 import os
 import re
@@ -147,24 +148,89 @@ def _region_phrase(request_text: str) -> str:
     return ''
 
 
+# Boilerplate stripped from a theme phrase to leave a short, searchable subject.
+# "Massachusetts politics and current affairs" -> "Massachusetts politics".
+_THEME_BOILERPLATE_RE = re.compile(
+    r'(?i)\b(?:and\s+)?(?:current\s+affairs|current\s+events|recent\s+'
+    r'developments|latest\s+developments|in\s+the\s+news|news|today|'
+    r'present[- ]day|contemporary|recent|latest|ongoing)\b')
+
+
+def _theme_subject(request_text: str) -> str:
+    """The SHORT subject of the theme, stripped of 'current affairs'/'news' tails
+    and the trailing address. 'Massachusetts politics and current affairs,
+    Boston, MA' -> 'Massachusetts politics' (Defect 3)."""
+    t = _theme_phrase(request_text)
+    t = _THEME_BOILERPLATE_RE.sub(' ', t)
+    t = re.sub(r'\s*&\s*', ' ', t)
+    t = re.sub(r'[,;]+', ' ', t)
+    t = re.sub(r'\s+', ' ', t).strip(' -')
+    # trim a dangling 'and'/'of' left by the strip
+    t = re.sub(r'(?i)\s+(?:and|of|the)\s*$', '', t).strip()
+    return t
+
+
+# Government facets a politics subject expands into. Each is combined with the
+# subject's PLACE word so the queries stay short and local, e.g.
+# "Massachusetts governor", "Massachusetts legislature", "Boston city council".
+_POLITICS_FACETS = ('politics', 'governor', 'legislature', 'election')
+_CITY_FACETS = ('city council', 'mayor')
+
+
 def derive_theme_queries(request_text: str) -> List[str]:
-    """Theme-level news queries from the request. Deterministic."""
-    theme = _theme_phrase(request_text)
-    region = _region_phrase(request_text)
+    """Short, derived theme-level news queries (LOCAL-659 Defect 3).
+
+    The raw theme phrase ('Massachusetts politics and current affairs Boston, MA')
+    returned 0 items — too long. We derive SHORT queries instead: the stripped
+    subject itself, then a handful of government facets anchored to the subject's
+    place and the tour city:
+        'Massachusetts politics', 'Massachusetts governor',
+        'Massachusetts legislature', 'Boston city council'.
+    Deterministic; de-duplicated; capped so the paid-query budget stays small."""
+    subject = _theme_subject(request_text)
+    city = _city_token(request_text)
     out: List[str] = []
-    if theme:
-        out.append(theme if region and region.lower() in theme.lower()
-                   else (f"{theme} {region}".strip() if region else theme))
-    # a tighter "<region> politics current affairs" style query as a second angle
-    if region:
-        out.append(f"{region} latest news")
+
+    # the stripped subject on its own (short) — e.g. 'Massachusetts politics'.
+    if subject:
+        out.append(subject)
+
+    # the "place" word that anchors facets: prefer a state/region named in the
+    # subject (e.g. 'Massachusetts'); else fall back to the tour city.
+    place = ''
+    msub = re.match(r'\s*([A-Z][A-Za-z]+(?:\s+[A-Z][A-Za-z]+)?)', subject or '')
+    if msub:
+        cand = msub.group(1).strip()
+        # keep it only if it looks like a place (a known US state) — otherwise the
+        # first word of the subject is itself the topic (e.g. 'politics').
+        if cand.lower() in _US_STATES:
+            place = cand
+    if not place:
+        place = city
+
+    is_politics = wants_current_affairs(request_text) and (
+        'politic' in (subject or '').lower()
+        or any(_word_in((subject or '').lower(), w) for w in _STRONG_POLITICS)
+        or any(_word_in((request_text or '').lower(), w) for w in _STRONG_POLITICS))
+
+    if is_politics and place:
+        for facet in _POLITICS_FACETS:
+            out.append(f"{place} {facet}")
+        # city-government facets anchored to the tour city (e.g. 'Boston city council')
+        if city:
+            for facet in _CITY_FACETS:
+                out.append(f"{city} {facet}")
+    elif place:
+        out.append(f"{place} latest news")
+
+    # de-dupe, keep order, cap to keep the paid-query budget small.
     seen, uniq = set(), []
     for q in out:
         q = re.sub(r'\s+', ' ', q).strip()
         if q and q.lower() not in seen:
             seen.add(q.lower())
             uniq.append(q)
-    return uniq
+    return uniq[:6]
 
 
 def _city_token(request_text: str) -> str:
@@ -277,27 +343,103 @@ def _serp_news(query: str, tbs: str = 'qdr:m',
 
 
 def news_for_query(query: str, serp: Optional[Callable] = None) -> Tuple[List[Dict], str]:
-    """Run one news query at qdr:m, widening to qdr:y when the month is empty.
+    """Run one news query, widening the time window ONLY when a tighter one is
+    empty: past WEEK first, then past MONTH, then past YEAR (LOCAL-659 Defect 2).
 
+    A current-affairs tour must lead with this week's news when there is any, so
+    we ask Serper for qdr:w first and stop at the first non-empty window.
     Returns (items, tbs_used). `serp` is injectable for tests."""
     serp = serp or _serp_news
-    items = serp(query, 'qdr:m')
-    if items:
-        return items, 'qdr:m'
-    items = serp(query, 'qdr:y')
-    return items, 'qdr:y'
+    for tbs in ('qdr:w', 'qdr:m', 'qdr:y'):
+        items = serp(query, tbs)
+        if items:
+            return items, tbs
+    return [], 'qdr:y'
 
 
-def _fetch_article(url: str) -> str:
-    """Fetch an article page's clean text via the shared polite/cached helper."""
+def _rank_items(items: List[Dict]) -> List[Dict]:
+    """De-dupe by link and order NEWEST FIRST (LOCAL-659 Defect 2).
+
+    Tour 557 v5 led with month-old items while the Oct 8 governor debate and an
+    Oct 8 story were present but lost placement. A current-affairs tour must lead
+    with the freshest news, so items are sorted by their resolved date descending
+    (today's news first), dated ahead of undated, original order breaking ties."""
+    seen, kept = set(), []
+    for i, it in enumerate(items):
+        link = it.get('link')
+        if not link or link in seen:
+            continue
+        seen.add(link)
+        d = parse_news_date(it.get('date', ''))
+        # sort key: has-a-date first (1/0), then the date itself, then input order.
+        kept.append((1 if d else 0, d or _dt.date.min, -i, it))
+    kept.sort(key=lambda t: (t[0], t[1], t[2]), reverse=True)
+    return [t[3] for t in kept]
+
+
+# Published-date metadata patterns, in order of trust: an explicit article
+# publication meta tag, JSON-LD datePublished, then OpenGraph/other time tags.
+# A hit here gives an EXACT day (unlike a relative Serper string), so when the
+# fetched page carries one we use it as the authoritative date (Defect 1).
+_META_DATE_RES = (
+    re.compile(r'(?is)<meta[^>]+property=["\']article:published_time["\'][^>]*\bcontent=["\']([^"\']+)["\']'),
+    re.compile(r'(?is)<meta[^>]+\bcontent=["\']([^"\']+)["\'][^>]*property=["\']article:published_time["\']'),
+    re.compile(r'(?is)<meta[^>]+itemprop=["\']datePublished["\'][^>]*\bcontent=["\']([^"\']+)["\']'),
+    re.compile(r'(?is)<meta[^>]+name=["\'](?:date|pubdate|publishdate|publish-date|article:published_time|sailthru\.date)["\'][^>]*\bcontent=["\']([^"\']+)["\']'),
+    re.compile(r'(?is)"datePublished"\s*:\s*"([^"]+)"'),
+    re.compile(r'(?is)<time[^>]+datetime=["\']([^"\']+)["\'][^>]*>'),
+)
+
+
+def extract_published_date(html: str, now: Optional[_dt.date] = None
+                           ) -> Optional[_dt.date]:
+    """Extract an EXACT publication date from an article page's RAW HTML.
+
+    Looks (in trust order) at <meta property="article:published_time">, JSON-LD
+    "datePublished", common name=date meta variants, and <time datetime=...>.
+    Returns the parsed date (exact), or None when the page carries no usable
+    publication metadata. This is how the composer gets a real DAY for an item
+    whose Serper date was only relative ("1 month ago") — the article's own
+    metadata, not an arithmetic guess (LOCAL-659 Defect 1)."""
+    if not html:
+        return None
+    today = now or _dt.date.today()
+    for rx in _META_DATE_RES:
+        m = rx.search(html)
+        if not m:
+            continue
+        d = _parse_absolute_date(m.group(1))
+        if d is not None and _dt.date(2000, 1, 1) <= d <= today:
+            return d
+    return None
+
+
+def _fetch_article(url: str) -> Tuple[str, Optional[_dt.date]]:
+    """Fetch an article page's clean text AND its exact published date (if any).
+
+    Returns (clean_text, published_date). The published date is parsed from the
+    raw HTML head (meta/JSON-LD/time) BEFORE the HTML is reduced to paragraph
+    text, so an item whose Serper date was only relative can still be stated with
+    a real day when the article itself declares one (LOCAL-659 Defect 1)."""
+    pub_date = None
+    try:
+        from exhibition_checklist import _fetch_raw_html
+    except Exception:
+        _fetch_raw_html = None
+    if _fetch_raw_html is not None:
+        try:
+            html = _fetch_raw_html(url)
+            pub_date = extract_published_date(html)
+        except Exception:
+            pub_date = None
     try:
         from exhibition_checklist import _fetch_page
     except Exception:
-        return ''
+        return '', pub_date
     try:
         text, _links = _fetch_page(url)
     except Exception:
-        return ''
+        return '', pub_date
     text = text or ''
     if '<' in text[:200] and ('</' in text or '<p' in text.lower()):
         try:
@@ -305,19 +447,7 @@ def _fetch_article(url: str) -> str:
             text = extract_clean_text(text) or text
         except Exception:
             pass
-    return text
-
-
-def _rank_items(items: List[Dict]) -> List[Dict]:
-    """Prefer items that carry a date, de-dupe by link, keep order otherwise."""
-    seen, dated, undated = set(), [], []
-    for it in items:
-        link = it.get('link')
-        if not link or link in seen:
-            continue
-        seen.add(link)
-        (dated if it.get('date') else undated).append(it)
-    return dated + undated
+    return text, pub_date
 
 
 # ── 3b. relevance gate — place / theme / dated-in-window ──────────────────────
@@ -340,8 +470,6 @@ def _rank_items(items: List[Dict]) -> List[Dict]:
 #                opening names none -> rejected. (burger item -> rejected.)
 #   (c) DATE   — a real date parses from the item AND falls inside the freshness
 #                window. Undated -> dropped (never "Recently" without a date).
-
-import datetime as _dt
 
 # US state names + common abbreviations, so a wrong-state article (Arkansas) is
 # detected even when the request's own state is absent. Kept lowercase.
@@ -374,18 +502,88 @@ _STATE_ABBR = {
 
 # Theme vocabulary for (b). Civic / politics / government / elections /
 # legislation / civic protest. A restaurant/food/sport item names none of these.
-_THEME_WORDS = {
-    'politic', 'political', 'government', 'governor', 'gubernatorial', 'mayor',
-    'mayoral', 'council', 'councillor', 'councilmember', 'councilwoman',
-    'councilman', 'election', 'ballot', 'vote', 'voting', 'campaign', 'candidate',
-    'legislature', 'legislative', 'legislator', 'senate', 'senator', 'house',
-    'representative', 'congress', 'congressional', 'bill', 'law', 'statute',
-    'policy', 'referendum', 'protest', 'rally', 'demonstration', 'march',
-    'activist', 'civic', 'democrat', 'democratic', 'republican', 'gop',
-    'statehouse', 'city hall', 'town hall', 'debate', 'primary', 'caucus',
-    'commissioner', 'alderman', 'selectboard', 'veto', 'budget', 'hearing',
-    'lawsuit', 'court', 'ruling', 'reform', 'measure', 'ordinance',
+#
+# LOCAL-659 Defect 4: this is now split and matched on WORD BOUNDARIES.
+#   _STRONG_POLITICS — unambiguous government/elections/legislation/official/
+#       civic-protest terms. A single one is decisive and overrides a cultural
+#       word (a protest AT a festival is still news; a "budget vote" is politics).
+#   _THEME_WORDS — the broader civic vocabulary. A hit here passes the theme test
+#       ON ITS OWN only when the item is not ALSO a pure cultural-event listing.
+# Ambiguous words that leaked cultural/weather/crime items in the tour-557 run
+# ('house', 'march', 'measure', 'court', 'budget', 'hearing', 'primary', 'rally')
+# are kept OUT of the bare theme set; their politics senses live in the strong
+# set as multi-word anchors ('state house', 'city council', 'ballot question').
+_STRONG_POLITICS = {
+    'governor', 'gubernatorial', 'mayor', 'mayoral', 'legislature',
+    'legislative', 'legislator', 'lawmaker', 'senate', 'senator',
+    'congress', 'congressional', 'congressman', 'congresswoman',
+    'representative', 'statehouse', 'election', 'elections', 'electoral',
+    'ballot', 'referendum', 'primary election', 'caucus', 'candidate',
+    'campaign', 'incumbent', 'city council', 'city councillor',
+    'city councilor', 'town council', 'councilmember', 'councilwoman',
+    'councilman', 'alderman', 'selectboard', 'select board', 'commissioner',
+    'legislation', 'ordinance', 'statute', 'veto', 'filibuster',
+    'attorney general', 'secretary of state', 'state house', 'town hall meeting',
+    'city hall', 'beacon hill', 'general court', 'house speaker',
+    'ballot question', 'ballot measure', 'voters', 'constituents',
+    'democrat', 'democrats', 'republican', 'republicans', 'gop',
+    'political party', 'governance', 'gerrymander', 'impeach', 'impeachment',
 }
+_THEME_WORDS = {
+    'politic', 'political', 'politics', 'government', 'governmental', 'policy',
+    'policies', 'vote', 'votes', 'voting', 'protest', 'protests', 'demonstration',
+    'activist', 'activism', 'civic', 'bill', 'law', 'lawsuit', 'reform',
+    'official', 'officials', 'administration', 'cabinet', 'agency', 'budget',
+    'taxpayer', 'constituency', 'municipal', 'federal', 'statewide',
+} | _STRONG_POLITICS
+
+# Cultural / lifestyle / arts / events vocabulary. An item that is ONLY one of
+# these (an open house, festival, concert, exhibit, weekend-things-to-do round-up)
+# is NOT current affairs for a politics tour, even if a stray civic word appears.
+_CULTURAL_WORDS = {
+    'open house', 'festival', 'concert', 'recital', 'exhibit', 'exhibition',
+    'gallery', 'museum', 'art show', 'artwork', 'performance', 'theater',
+    'theatre', 'screening', 'film festival', 'book event', 'reading',
+    'things to do', 'this weekend', 'open studios', 'tour of', 'workshop',
+    'fair', 'parade', 'fireworks', 'tasting', 'brunch', 'pop-up', 'popup',
+    'restaurant', 'menu', 'cuisine', 'cocktail', 'brewery', 'market opening',
+    'historic objects', 'artifacts', 'collection on view', 'celebration',
+    'anniversary celebration', 'gala', 'fundraiser gala',
+}
+
+
+def _word_in(blob: str, term: str) -> bool:
+    """True if `term` occurs in `blob` as a whole word / phrase (boundaries),
+    so 'house' does not match 'warehouse' and 'march' does not match the month."""
+    return re.search(r'(?<![a-z])' + re.escape(term) + r'(?![a-z])', blob) is not None
+
+
+def _theme_term_in(blob: str) -> str:
+    """First genuine politics/government theme term present (word-boundary), or ''."""
+    # strong terms first so the reason names the most specific match
+    for w in sorted(_STRONG_POLITICS, key=len, reverse=True):
+        if _word_in(blob, w):
+            return w
+    for w in sorted(_THEME_WORDS - _STRONG_POLITICS, key=len, reverse=True):
+        if _word_in(blob, w):
+            return w
+    return ''
+
+
+def _cultural_term_in(blob: str) -> str:
+    """First cultural-event term present (word-boundary), or ''."""
+    for w in sorted(_CULTURAL_WORDS, key=len, reverse=True):
+        if _word_in(blob, w):
+            return w
+    return ''
+
+
+def _has_strong_politics(blob: str) -> bool:
+    """True if the blob names an unambiguous government/elections/official term —
+    enough to keep an item that ALSO mentions a cultural event (e.g. a protest at
+    a festival, a governor speaking at a gala)."""
+    return any(_word_in(blob, w) for w in _STRONG_POLITICS)
+
 
 _MONTHS = {m.lower(): i for i, m in enumerate(
     ['', 'January', 'February', 'March', 'April', 'May', 'June', 'July',
@@ -402,51 +600,34 @@ _WORD_NUM = {'a': 1, 'an': 1, 'one': 1, 'two': 2, 'three': 3, 'four': 4,
              'five': 5, 'six': 6, 'seven': 7, 'eight': 8, 'nine': 9, 'ten': 10}
 
 
-def parse_news_date(raw: str, now: Optional[_dt.date] = None) -> Optional[_dt.date]:
-    """Parse a Serper-news date into a real calendar date, or None if undated.
+# precision of a resolved news date:
+#   'exact'  — a specific calendar day is KNOWN (an absolute string with a day,
+#              or article meta/JSON-LD/dateline). The composer may print the day.
+#   'approx' — only a relative string ("1 month ago") was available; we know the
+#              rough age but NOT the day. The composer must speak approximately
+#              ("last month", "about three weeks ago") and never print a day.
+DATE_EXACT = 'exact'
+DATE_APPROX = 'approx'
 
-    Serper returns either a relative string ("Six days ago", "4 days ago",
-    "2 hours ago", "yesterday") or an absolute one ("Oct 8, 2026", "October 8,
-    2026", "2026-10-08"). Returns the resolved date, or None when nothing parses —
-    which the gate treats as UNDATED and drops."""
-    s = (raw or '').strip()
+
+def _parse_absolute_date(s: str) -> Optional[_dt.date]:
+    """Parse an ABSOLUTE date string ("Oct 8, 2026", "8 October 2026",
+    "2026-10-08", or an ISO datetime) into a date. None if it is not absolute.
+
+    Absolute strings always name a specific day, so a hit here is EXACT."""
+    s = (s or '').strip()
     if not s:
         return None
-    today = now or _dt.date.today()
-    # relative
-    m = _REL_RE.search(s)
-    if m:
-        low = s.lower()
-        if 'today' in low:
-            return today
-        if 'yesterday' in low:
-            return today - _dt.timedelta(days=1)
-        qty_raw, unit = m.group(1), (m.group(2) or '').lower()
-        qty = _WORD_NUM.get((qty_raw or '').lower(), None)
-        if qty is None:
-            try:
-                qty = int(qty_raw)
-            except (TypeError, ValueError):
-                qty = None
-        if qty is not None:
-            if unit in ('second', 'minute', 'hour'):
-                return today
-            if unit == 'day':
-                return today - _dt.timedelta(days=qty)
-            if unit == 'week':
-                return today - _dt.timedelta(days=7 * qty)
-            if unit == 'month':
-                return today - _dt.timedelta(days=30 * qty)
-            if unit == 'year':
-                return today - _dt.timedelta(days=365 * qty)
-    # ISO
-    mi = re.search(r'\b(\d{4})-(\d{2})-(\d{2})\b', s)
+    # ISO date or datetime (meta/JSON-LD give "2026-09-11T08:46:00-04:00").
+    # No trailing \b: an ISO datetime has 'T' right after the day (…-11T08…),
+    # which is a word char, so a \b there would fail the match.
+    mi = re.search(r'(?<!\d)(\d{4})-(\d{2})-(\d{2})(?!\d)', s)
     if mi:
         try:
             return _dt.date(int(mi.group(1)), int(mi.group(2)), int(mi.group(3)))
         except ValueError:
             return None
-    # "Month D, YYYY" or "D Month YYYY"
+    # "Month D, YYYY"
     mo = re.search(r'(?i)\b([A-Za-z]{3,9})\.?\s+(\d{1,2}),?\s+(\d{4})\b', s)
     if mo and mo.group(1).lower() in _MONTHS:
         try:
@@ -454,6 +635,7 @@ def parse_news_date(raw: str, now: Optional[_dt.date] = None) -> Optional[_dt.da
                             int(mo.group(2)))
         except ValueError:
             return None
+    # "D Month YYYY"
     md = re.search(r'(?i)\b(\d{1,2})\s+([A-Za-z]{3,9})\.?\s+(\d{4})\b', s)
     if md and md.group(2).lower() in _MONTHS:
         try:
@@ -462,6 +644,98 @@ def parse_news_date(raw: str, now: Optional[_dt.date] = None) -> Optional[_dt.da
         except ValueError:
             return None
     return None
+
+
+def _approx_phrase_for(raw: str, unit: str, qty: int) -> str:
+    """A human approximate phrase for a relative age, relative to TODAY, that
+    never commits to a day. e.g. 'last month', 'about three weeks ago'."""
+    low = (raw or '').lower()
+    if 'today' in low:
+        return 'earlier today'
+    if 'yesterday' in low:
+        return 'yesterday'
+    if unit in ('second', 'minute', 'hour'):
+        return 'earlier today'
+    names = {1: 'one', 2: 'two', 3: 'three', 4: 'four', 5: 'five', 6: 'six',
+             7: 'seven', 8: 'eight', 9: 'nine', 10: 'ten'}
+    if unit == 'day':
+        if qty == 1:
+            return 'yesterday'
+        return f"about {names.get(qty, qty)} days ago"
+    if unit == 'week':
+        if qty == 1:
+            return 'last week'
+        return f"about {names.get(qty, qty)} weeks ago"
+    if unit == 'month':
+        if qty == 1:
+            return 'last month'
+        return f"about {names.get(qty, qty)} months ago"
+    if unit == 'year':
+        if qty == 1:
+            return 'last year'
+        return f"about {names.get(qty, qty)} years ago"
+    return 'recently'
+
+
+def resolve_news_date(raw: str, now: Optional[_dt.date] = None
+                      ) -> Tuple[Optional[_dt.date], Optional[str], str]:
+    """Resolve a Serper-news date string into (date, precision, approx_phrase).
+
+    Serper returns either an ABSOLUTE string ("Oct 8, 2026", "2026-10-08") or a
+    RELATIVE one ("Six days ago", "1 month ago", "yesterday"). The two carry very
+    different information and LOCAL-659 keeps them apart:
+
+      * ABSOLUTE  -> (the_day, 'exact', ''). We know the day; the composer may
+                     print it. ("Oct 8, 2026" -> 2026-10-08, exact.)
+      * RELATIVE  -> (approx_day, 'approx', phrase). We can estimate the age for
+                     the freshness window (approx_day = today - N units) but we do
+                     NOT know the calendar day — a relative "1 month ago" is NOT
+                     September 9th. The composer must use `phrase` ("last month")
+                     and never print a day. (This is Defect 1: parse_news_date used
+                     to turn "1 month ago" into an exact day and the composer stated
+                     it as fact — "On September 9, 2026 … led a 9/11 ceremony".)
+      * NEITHER   -> (None, None, ''). Undated; the gate drops it.
+    """
+    s = (raw or '').strip()
+    if not s:
+        return None, None, ''
+    today = now or _dt.date.today()
+    # ABSOLUTE first — a specific day is always exact.
+    d = _parse_absolute_date(s)
+    if d is not None:
+        return d, DATE_EXACT, ''
+    # RELATIVE — estimate the age for the window, but mark it approximate.
+    m = _REL_RE.search(s)
+    if m:
+        low = s.lower()
+        if 'today' in low:
+            return today, DATE_APPROX, _approx_phrase_for(s, 'day', 0)
+        if 'yesterday' in low:
+            return today - _dt.timedelta(days=1), DATE_APPROX, 'yesterday'
+        qty_raw, unit = m.group(1), (m.group(2) or '').lower()
+        qty = _WORD_NUM.get((qty_raw or '').lower(), None)
+        if qty is None:
+            try:
+                qty = int(qty_raw)
+            except (TypeError, ValueError):
+                qty = None
+        if qty is not None:
+            delta_days = {'second': 0, 'minute': 0, 'hour': 0, 'day': qty,
+                          'week': 7 * qty, 'month': 30 * qty,
+                          'year': 365 * qty}.get(unit)
+            if delta_days is not None:
+                approx = today - _dt.timedelta(days=delta_days)
+                return approx, DATE_APPROX, _approx_phrase_for(s, unit, qty)
+    return None, None, ''
+
+
+def parse_news_date(raw: str, now: Optional[_dt.date] = None) -> Optional[_dt.date]:
+    """Resolve a Serper-news date into a calendar date for the freshness window
+    (or None if undated). This is the age estimate ONLY — it does NOT tell the
+    caller whether the day is known. Use `resolve_news_date` when the precision
+    (exact vs approximate) matters, as the gate and composer now do (LOCAL-659)."""
+    d, _precision, _phrase = resolve_news_date(raw, now=now)
+    return d
 
 
 def _place_tokens(request_text: str) -> Tuple[str, str]:
@@ -492,19 +766,26 @@ def gate_item(item: Dict, request_text: str, *,
     """Deterministic relevance gate for ONE news item.
 
     Returns (accepted, reason). `reason` names the first failed check (for the
-    audit log) or 'ok: place+theme+date' on acceptance. Order: date, place, theme
-    — date first so an undated item is reported as 'undated' regardless of place.
+    audit log) or an 'ok: …' string on acceptance. Order: date, place, theme —
+    date first so an undated item is reported as 'undated' regardless of place.
 
-    fresh_days bounds how old a dated item may be. Serper is queried at qdr:m then
-    widened to qdr:y, so the gate's window is the generous one-year bound by
-    default (the caller passes 365 for a widened query, fewer for a tight one); the
-    point of the gate is to KILL undated and clearly-stale items, not to re-impose
-    the search tbs."""
+    DATE PRECISION (LOCAL-659 Defect 1): the item's Serper date is resolved to an
+    age estimate for the freshness window AND a precision flag. An ABSOLUTE string
+    ("Oct 8, 2026") is EXACT — the day is stashed in `_exact_date`. A RELATIVE
+    string ("1 month ago") is APPROXIMATE — only `_approx_phrase` ("last month")
+    is stashed and `_exact_date` is left empty, so the composer never prints an
+    invented day. (An exact day may still be recovered later from the fetched
+    article's own metadata; see research_news_for_stops.)
+
+    THEME (LOCAL-659 Defect 4): for a politics/current-affairs request the item
+    must name a GENUINE government / elections / legislation / official / civic-
+    protest term AND must not be a pure cultural-event listing (open house,
+    festival, concert, exhibit). A building open house fails."""
     today = now or _dt.date.today()
     blob = _item_text_blob(item)
 
-    # (c) DATE — must parse AND be inside the window. Undated -> drop.
-    d = parse_news_date(item.get('date', ''), now=today)
+    # (c) DATE — must resolve AND be inside the window. Undated -> drop.
+    d, precision, approx_phrase = resolve_news_date(item.get('date', ''), now=today)
     if d is None:
         return False, 'undated (no real date in item -> dropped)'
     age = (today - d).days
@@ -528,14 +809,30 @@ def gate_item(item: Dict, request_text: str, *,
         return False, (f"place not confirmed (article never names "
                        f"{city or state or 'the request place'})")
 
-    # (b) THEME — names at least one civic/politics theme word.
-    if not any(w in blob for w in _THEME_WORDS):
-        return False, 'off-theme (no politics/government/civic term)'
+    # (b) THEME — must name a genuine politics/government term, and must not be a
+    # pure cultural-event listing. (Defect 4: "the Boston Athenaeum hosted an open
+    # house … historic objects" and weekend-festival round-ups slipped through.)
+    cultural_hit = _cultural_term_in(blob)
+    strong = _has_strong_politics(blob)
+    if cultural_hit and not strong:
+        return False, (f"off-theme (cultural event: '{cultural_hit}', no governing "
+                       f"action)")
+    theme_hit = _theme_term_in(blob)
+    if not theme_hit:
+        return False, 'off-theme (no government/elections/legislation/official/protest term)'
 
-    # stash the resolved date on the item so the composer can state it exactly
-    # (never a bare "Recently" when the gate has confirmed a real date).
+    # stash the resolved date + precision so the composer states it correctly:
+    # an exact day only when known, else an approximate phrase (never a guessed day).
     item['_parsed_date'] = d.isoformat()
-    return True, f"ok: place({'city' if names_city else 'state'})+theme+dated({d.isoformat()})"
+    item['_date_precision'] = precision
+    item['_approx_phrase'] = approx_phrase or ''
+    if precision == DATE_EXACT:
+        item['_exact_date'] = d.isoformat()
+    else:
+        item.pop('_exact_date', None)
+    date_desc = (f"exact({d.isoformat()})" if precision == DATE_EXACT
+                 else f"approx({approx_phrase or 'recent'})")
+    return True, f"ok: place({'city' if names_city else 'state'})+theme({theme_hit})+{date_desc}"
 
 
 def gate_items(items: List[Dict], request_text: str, *, fresh_days: int,
@@ -558,7 +855,7 @@ def gate_items(items: List[Dict], request_text: str, *, fresh_days: int,
 
 _NEWS_PROMPT = """\
 You are a careful news writer for a walking-tour audio guide in {locale}. Using \
-ONLY the numbered ARTICLES below, write {max_items} short, DATED sentence(s) about \
+ONLY the numbered ARTICLES below, write {max_items} short sentence(s) about \
 recent developments connected to "{subject}" in {locale}. Rules you must follow \
 exactly:
 
@@ -566,10 +863,14 @@ exactly:
 is about a same-named place or person somewhere ELSE, or is unrelated, IGNORE it.
 - Ground every statement in the articles. Do NOT use any outside knowledge, and \
 do NOT invent any quote, number, name or date that is not in an article.
-- Begin each sentence with the EXACT DATE of the development. Every article below \
-is pre-verified to carry a real date, printed as "DATE: YYYY-MM-DD" in its header; \
-use that date, written out (e.g. "On October 8, 2026, ..."). NEVER write "Recently" \
-— every item here has a known date, so state it.
+- DATES — follow each article's WHEN line EXACTLY, and never invent a day:
+  * If the header says 'DATE: YYYY-MM-DD (exact)', that calendar day is known. \
+Begin the sentence with it written out, e.g. "On October 8, 2026, ...".
+  * If the header says 'WHEN: <phrase> (approximate)', the exact day is NOT known. \
+Begin the sentence with that approximate phrase EXACTLY as given, e.g. "Last \
+month, ..." or "About three weeks ago, ...". You MUST NOT state or guess a \
+specific day, date number or month name for these — doing so is a factual error.
+  * Never write a specific date that is not printed in the header.
 - POLITICAL BALANCE IS MANDATORY. If the item concerns a dispute or an election, \
 report what EACH side said or did, attributed by name/party, with no editorialising \
 and no adjective that favours a side.
@@ -635,12 +936,22 @@ def compose_news_sentences(subject: str, articles: List[Dict],
     for i, a in enumerate(articles, 1):
         body = (a.get('text') or a.get('snippet') or '').strip()[:NEWS_PER_PAGE_CHARS]
         head = f"[{i}] {a.get('title','')} — {a.get('source','')}"
-        # Prefer the gate-resolved ISO date (parse_news_date); fall back to the
-        # raw Serper date string. The gate guarantees _parsed_date on accepted
-        # items, so the composer always has an exact date to state.
-        iso = a.get('_parsed_date') or ''
-        if iso:
-            head += f"  DATE: {iso}"
+        # LOCAL-659 Defect 1: tell the composer EXACTLY what it may say about time.
+        # An exact day is printed as 'DATE: YYYY-MM-DD (exact)'; a relative-only
+        # item is printed as 'WHEN: <phrase> (approximate)' and the composer is
+        # forbidden (in the prompt) from inventing a day for it.
+        exact = a.get('_exact_date') or ''
+        precision = a.get('_date_precision') or ''
+        if exact and precision == DATE_EXACT:
+            head += f"  DATE: {exact} (exact)"
+        elif precision == DATE_APPROX:
+            phrase = (a.get('_approx_phrase') or 'recently').strip()
+            # capitalise for sentence-start use ("Last month", "About three weeks ago")
+            phrase_cap = phrase[:1].upper() + phrase[1:] if phrase else 'Recently'
+            head += f"  WHEN: {phrase_cap} (approximate — do NOT state a specific day)"
+        elif a.get('_parsed_date'):
+            # a bare resolved date with unknown precision — treat as exact day known
+            head += f"  DATE: {a['_parsed_date']} (exact)"
         elif a.get('date'):
             head += f" ({a['date']})"
         blocks.append(f"{head}\n{body}")
@@ -862,7 +1173,16 @@ def research_news_for_stops(request_text: str, stop_names: List[str],
         link = it.get('link', '')
         if link and link in seen_links:
             continue
-        text = fetch(link) if link else ''
+        # fetch() may return either clean text (test fakes) or (text, pub_date)
+        # (the real _fetch_article, which also reads the article's exact published
+        # date from the page metadata — LOCAL-659 Defect 1).
+        fetched = fetch(link) if link else ''
+        pub_date = None
+        if isinstance(fetched, tuple):
+            text = fetched[0] or ''
+            pub_date = fetched[1] if len(fetched) > 1 else None
+        else:
+            text = fetched or ''
         a = dict(it)
         a['text'] = text if (text and len(text) >= 120) else it.get('snippet', '')
         # re-gate with the fuller text so a thin-snippet pass is re-checked.
@@ -874,6 +1194,23 @@ def research_news_for_stops(request_text: str, stop_names: List[str],
                                      'link': link,
                                      'reason': f'post-fetch: {reason}'})
             continue
+        # LOCAL-659 Defect 1: if the article's own metadata gave an EXACT published
+        # date, upgrade the item from approximate ("last month") to exact — a day
+        # we can state because the ARTICLE declares it, never arithmetic from a
+        # relative Serper string. Only accept a meta date inside the window.
+        if pub_date is not None:
+            age = (today - pub_date).days
+            if 0 <= age <= fresh_days:
+                a['_parsed_date'] = pub_date.isoformat()
+                a['_exact_date'] = pub_date.isoformat()
+                a['_date_precision'] = DATE_EXACT
+                a['_approx_phrase'] = ''
+                a['_date_source'] = 'article meta'
+        else:
+            a.setdefault('_date_source',
+                         'approximate (relative Serper date)'
+                         if a.get('_date_precision') == DATE_APPROX
+                         else 'Serper date')
         stop = assign_item_to_stop(a, stop_names)
         if not stop:
             log['rejected'].append({'title': a.get('title', ''),
@@ -893,13 +1230,23 @@ def research_news_for_stops(request_text: str, stop_names: List[str],
                                     'source': a.get('source', ''),
                                     'date': a.get('date', ''),
                                     'link': link, 'stop': stop,
-                                    'reason': reason})
+                                    'reason': reason,
+                                    'date_precision': a.get('_date_precision', ''),
+                                    'resolved_date': a.get('_parsed_date', ''),
+                                    'date_source': a.get('_date_source', '')})
 
-    # 5. compose per stop.
+    # 5. compose per stop. The composer writes about the tour's THEME SUBJECT
+    # (e.g. "Massachusetts politics"), NOT the narrow stop building name — an
+    # article about the governor's debate is current affairs for the State House
+    # stop even though it never names the building. Passing the building name as
+    # the subject made the cheap model answer NO MATERIAL FOUND for clearly
+    # on-theme items (observed in the LOCAL-659 live run). The item is still
+    # PLACED at its assigned stop; only the composer's framing uses the theme.
+    theme_subject = _theme_subject(request_text) or request_text
     for stop, articles in per_stop_articles.items():
         if not articles:
             continue
-        composed = compose_news_sentences(stop, articles, answer=answer,
+        composed = compose_news_sentences(theme_subject, articles, answer=answer,
                                           locale=_region_phrase(request_text))
         if composed.get('text'):
             log['by_stop'][stop] = {
