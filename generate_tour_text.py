@@ -870,8 +870,18 @@ def _is_name_corrupted(name):
     # Criterion 2: Contains sentence-terminating punctuation mid-string
     # (Allow commas for things like "The Starry Night, 1889" or apostrophes)
     # Strip trailing punctuation first — some names legitimately end with a period
+    # [LOCAL-658] A single-letter initial ("A." .. "Z.") is NOT sentence
+    # punctuation. "John F. Kennedy Presidential Library and Museum",
+    # "I. M. Pei", "W. E. B. Du Bois" and "J. P. Morgan" are clean entity names,
+    # not corrupted sentences. Neutralize initials (and dotted acronyms like
+    # "U.S.") before the mid-string period test so they survive ingestion.
     _inner = name.rstrip('.!?;')
-    if any(c in _inner for c in '.!?;'):
+    # Dotted acronyms first (U.S., U.K., D.C.), then single-letter initials.
+    _inner_no_initials = re.sub(r'\b(?:[A-Za-z]\.){2,}', '_', _inner)
+    _inner_no_initials = re.sub(r'(?:(?<=\s)|^)[A-Za-z](?=\.)', '_', _inner_no_initials)
+    # Drop the dots that belonged to the neutralized initials/acronyms.
+    _inner_no_initials = _inner_no_initials.replace('_.', '_').replace('_', '')
+    if any(c in _inner_no_initials for c in '.!?;'):
         return True
     
     # Criterion 3: Matches sentence/description patterns

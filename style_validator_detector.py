@@ -497,10 +497,24 @@ def _is_likely_noun_subject(sentence: str) -> bool:
 
 
 def _split_sentences(text: str) -> List[str]:
-    """Split text into sentences. Handles abbreviations minimally."""
-    # Split on sentence-ending punctuation followed by space+capital or end
-    parts = re.split(r'(?<=[.!?])\s+(?=[A-Z"\'])', text)
-    # Also split on ? and ! that might not be followed by space
+    """Split text into sentences. Abbreviation- and initial-safe.
+
+    [LOCAL-658] The old implementation split on ``(?<=[.!?])\\s+(?=[A-Z"'])``,
+    which cut "architect I. M. Pei" into "...architect I." + "M. Pei..." — a
+    gate then dropped the "...I." fragment as unsupported and the rejoin left
+    "architect M. Pei". A single-letter initial (A-Z followed by ".") must never
+    end a sentence. Boundary detection now delegates to the shared, abbreviation-
+    aware ``sentence_split.split_sentences`` (which keeps "J. F. Kennedy",
+    "I. M. Pei", "W. E. B. Du Bois", "U.S.", "St. Mary's" intact). The in-fragment
+    "?" splitting is preserved for detectors that depend on it.
+    """
+    try:
+        from sentence_split import split_sentences as _ss_split
+        parts = _ss_split(text)
+    except Exception:
+        # Fallback: original behaviour, but never break on a single-letter initial.
+        parts = re.split(r'(?<![A-Z])(?<=[.!?])\s+(?=[A-Z"\'])', text)
+    # Also split on ? that might not be followed by space+capital
     result = []
     for part in parts:
         # Further split on ? if there's content after it
