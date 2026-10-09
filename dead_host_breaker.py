@@ -101,18 +101,53 @@ _WIKIMEDIA_GROUP = 'wikimedia'
 # would again poison the whole long-lived process. Entries older than
 # _DEFAULT_COLD_TTL_SECONDS are treated as expired (purged on next read/write).
 #
-# IMPORTANT: expiry applies ONLY to this module-level default set. Inside a tour
-# scope the cold set is a plain set() and nothing expires — Michael's rule is
-# unchanged: the first 429/timeout keeps a host cold for the REST OF THE TOUR,
-# with no time-based recovery mid-tour.
+# IMPORTANT: both the module-level default set and the per-tour cold set now
+# expire entries. The default set uses a 15-minute TTL (below); the per-tour set
+# uses a short cool-down (_TOUR_COLD_COOLDOWN_SECONDS). [LOCAL-637] revised
+# Michael's "cold for the rest of the tour" rule to a short COOL-DOWN after Bench
+# R6 showed one Wikidata 429 permanently disabling Wikidata for the rest of a tour
+# and discarding an already-resolved famous museum on a rate limit. See the
+# _TOUR_COLD_COOLDOWN_SECONDS block for the full rationale.
 _DEFAULT_COLD_TTL_SECONDS: float = 15 * 60  # 15 minutes
 _default_cold_hosts: "dict[str, float]" = {}
 _cold_lock = threading.RLock()
 
-# Holds the active tour's cold set, or None when no tour scope is active.
-_tour_cold_hosts: "contextvars.ContextVar[Optional[Set[str]]]" = contextvars.ContextVar(
+# [LOCAL-637] Per-tour cold cool-down.
+#
+# Michael's original rule (LOCAL-445-C) was "the FIRST 429/timeout keeps the host
+# cold for the rest of the tour, never retry". Bench R6 showed the failure mode of
+# a permanent-within-tour cold mark: six tours ran at once, one Wikidata 429 landed
+# on the National Gallery's city-validation search, and because the mark never
+# expired every later Wikidata call in that tour short-circuited to None. A famous,
+# already-resolved museum (Q180788, 389 works) was then discarded on a RATE LIMIT.
+#
+# The cold mark is now a short COOL-DOWN, not a tour-long death sentence: a cold
+# host is retried once the cool-down elapses. The cool-down still protects the
+# shared Wikimedia rate-limit bucket (we stop hammering a 429ing host for a beat)
+# but a single transient 429 can no longer sink the rest of the tour. This is the
+# tour-scope analogue of the module-level TTL that already existed for the default
+# set. Combined with the request-level 429/5xx retry+backoff in venue_resolver /
+# story_miner (which only marks cold AFTER retries are exhausted), one 429 costs a
+# bounded pause, never a run-wide failure.
+_TOUR_COLD_COOLDOWN_SECONDS: float = 20.0
+
+# Holds the active tour's cold set, or None when no tour scope is active. The set
+# is a timestamped dict (host -> monotonic mark time) so a cold mark can expire
+# after _TOUR_COLD_COOLDOWN_SECONDS and the host is retried. It is a shared mutable
+# object re-bound into worker threads by run_in_tour_context(), so a cold mark made
+# in one worker is still visible tour-wide (LOCAL-572 concurrency isolation holds).
+_tour_cold_hosts: "contextvars.ContextVar[Optional[dict]]" = contextvars.ContextVar(
     'dead_host_breaker_tour_cold_hosts', default=None
 )
+
+
+def _purge_expired_tour_locked(cold: dict) -> None:
+    """Drop cold marks older than the tour cool-down. Caller holds the lock."""
+    if not cold:
+        return
+    cutoff = _now() - _TOUR_COLD_COOLDOWN_SECONDS
+    for h in [h for h, t in cold.items() if t < cutoff]:
+        del cold[h]
 
 
 def _now() -> float:
@@ -137,9 +172,10 @@ def _active_cold_set():
     """Return the cold set in effect for the current context.
 
     Inside a tour scope (begin_tour_scope / tour_scope), this is that tour's
-    private plain set(). Otherwise it is the module-level default dict (host ->
-    mark time). Returning either type is fine because the public API functions
-    branch on whether a tour scope is active before touching it.
+    private timestamped dict (host -> monotonic mark time). Otherwise it is the
+    module-level default dict (host -> mark time). Returning either is fine
+    because the public API functions branch on whether a tour scope is active
+    before touching it.
     """
     s = _tour_cold_hosts.get()
     if s is None:
@@ -207,10 +243,11 @@ def mark_host_cold(host_or_url: str, reason: str = '') -> str:
 
     with _cold_lock:
         if _in_tour_scope():
-            # Tour set: plain set, never expires. Michael's rule within a tour.
+            # Tour set: timestamped dict with a short cool-down ([LOCAL-637]).
             cold = _active_cold_set()
+            _purge_expired_tour_locked(cold)
             is_new = host not in cold
-            cold.add(host)
+            cold[host] = _now()
         else:
             # Module-level default set: timestamped dict with 15-min TTL.
             _purge_expired_default_locked()
@@ -235,7 +272,10 @@ def is_host_cold(host_or_url: str) -> bool:
 
     with _cold_lock:
         if _in_tour_scope():
-            return host in _active_cold_set()
+            # Tour set: expire stale cool-down marks first, then check.
+            cold = _active_cold_set()
+            _purge_expired_tour_locked(cold)
+            return host in cold
         # Default set: expire stale entries first, then check.
         _purge_expired_default_locked()
         return host in _default_cold_hosts
@@ -245,7 +285,9 @@ def get_cold_hosts() -> Set[str]:
     """Return a copy of the current cold-host set (for diagnostics)."""
     with _cold_lock:
         if _in_tour_scope():
-            return set(_active_cold_set())
+            cold = _active_cold_set()
+            _purge_expired_tour_locked(cold)
+            return set(cold)
         _purge_expired_default_locked()
         return set(_default_cold_hosts.keys())
 
@@ -275,7 +317,7 @@ def begin_tour_scope() -> "contextvars.Token":
     but is optional: when the tour's call stack unwinds the context var simply
     goes out of scope.
     """
-    return _tour_cold_hosts.set(set())
+    return _tour_cold_hosts.set({})
 
 
 def end_tour_scope(token: "contextvars.Token") -> None:
@@ -309,7 +351,7 @@ class tour_scope:
         return False
 
 
-def copy_tour_context() -> Optional[Set[str]]:
+def copy_tour_context() -> Optional[dict]:
     """Capture the active tour's cold set for propagation to worker threads.
 
     Worker threads and ThreadPoolExecutor workers do NOT inherit context vars
@@ -327,7 +369,7 @@ def copy_tour_context() -> Optional[Set[str]]:
     return _tour_cold_hosts.get()
 
 
-def run_in_tour_context(cold_set: Optional[Set[str]], fn, *args, **kwargs):
+def run_in_tour_context(cold_set: Optional[dict], fn, *args, **kwargs):
     """Run fn(*args, **kwargs) with the captured tour cold set re-bound.
 
     Helper for thread-pool submissions:
