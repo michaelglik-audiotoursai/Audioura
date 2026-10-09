@@ -102,6 +102,52 @@ conclusion 0.93s, part4 0.70s).
 
 ---
 
-## Step 2 — Overlap the independent waits (FAST_PIPELINE) — *in progress*
+## Step 2 — Overlap the independent waits (`FAST_PIPELINE`, default OFF)
 
-(Design + implementation below; default OFF byte-identical.)
+New module **`fast_pipeline.py`**:
+
+- `is_enabled()` — True only when `FAST_PIPELINE=1`. **Default OFF.** No call site touches a thread
+  pool when OFF, so the pipeline is byte-identical to today.
+- `run_parallel(jobs)` — runs a list of **independent zero-arg callables** concurrently and returns
+  their results **in submit order**, re-raising the first exception exactly as the serial code would.
+  With 0/1 jobs it runs inline. The only ON-vs-OFF difference is **when** the identical calls are
+  issued, never which calls or how their results are consumed.
+
+Three overlaps were wired, each guarded by the flag so the OFF path is unchanged:
+
+| Overlap | Where | How (ON) | OFF = identical because |
+|---|---|---|---|
+| **poi_selection — per-POI OSM facts** | `generate_tour_text.py` LOCAL-355 non-exhibition branch | `fetch_osm_venue_facts(poi)` for every POI prefetched via `run_parallel`, then the existing serial loop consumes the prefetch | prefetch dict is empty when OFF ⇒ loop issues each call inline; same per-POI assignment + append order; shared `LookupBudget` is documented thread-safe |
+| **external_lookups — D533 knowledge fallback** | `generate_tour_text.py` D533 loop | the **qualifying** stops (same predicate as the loop) get `fetch_stop_knowledge` prefetched concurrently; loop consumes | empty prefetch when OFF; identical qualification, per-stop mutation and call count |
+| **packing — per-stop editor** | `stop_editor.edit_tour_text` | every stop block edited concurrently via `run_parallel`; ordered assembly after join | serial list-comp when OFF, same order; `edit_stop` has no shared mutable state (debug dumps keyed by stop number); the ONE cross-stop pass (trailing conclusion) is still built later, after this |
+
+**Not overlapped (deliberately, and why):** `story_first` already runs stops in parallel (LOCAL-445
+pool=6) — the dominant 193s is that already-parallel phase. The up-front `venue_preflight` and the
+cross-phase *fact_sheets ∥ external_lookups* overlap were left out: the preflight runs in the wrapper
+(a different function) and feeds downstream closure/hours decisions, and `fact_sheets` writes
+corpus-gate state (`_corpus_gate_shortened_stops`, `_stop_corpus_data`) that `external_lookups` reads
+— reordering them across ~750 lines of the orchestrator could not be proven quality-safe within this
+change, so it was not done rather than risk a regression (Michael: "without losing quality").
+
+## Step 3+4 — Tests
+
+- **Flag OFF unchanged:** `test_local628_stop_editor.py` (23) and `test_local622_lookup_budget.py`
+  (21) pass with the flag OFF; the Step-1 `test_local445` run has the same 2 pre-existing network
+  failures on the clean base.
+- **New concurrency, fakes + timing proof** — `test_local651_fast_pipeline.py` (10):
+  `run_parallel` order preservation, exception re-raise, 0/1-job inline; a **timing proof** that five
+  0.2 s fake jobs finish in ≈0.2 s (not the ≈1.0 s serial baseline, which a sibling test confirms is
+  really slow); thread-safety on 20 distinct keys; and `stop_editor.edit_tour_text` producing the
+  **identical text** ON vs OFF with a deterministic fake LLM while ON **overlaps** the per-stop waits
+  (serial ≈0.6 s → parallel ≈0.2 s).
+- **Thread-safety of shared state:** the `[TIMING-SUB]` `SubTimer` accumulates under a lock
+  (`test_local651_sub_timer.py`, 8, incl. 16×50 concurrent records with no loss); the paid-API meter
+  serialises its log write under its own lock and uses a per-call DB connection; `LookupBudget` is
+  documented + tested thread-safe; the OSM/knowledge jobs each own their inputs and return a value the
+  caller assembles after join (no two jobs write the same dict key).
+
+## Step 5 — Live A/B (own container) — *next*
+
+Courtauld + Walters, 3 stops, OFF vs ON (4 tours), cap $3.00, cache_off/pool_off; report
+`[TIMING]`/`[TIMING-SUB]`, $/tour, detectors, critic scores, and paid-API call-count parity (±10%).
+
