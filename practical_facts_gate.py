@@ -2057,4 +2057,8 @@ def place_practical_facts_in_opening(text: str) -> "Tuple[str, int]":
     k = j + 1 if (j < len(out) and _ABOUT_PARA_RE.search(out[j])) else j
     out.insert(k, " ".join(facts))
     new = "\n\n".join(out)
+    # [LEAD 2026-10-09] The text-view "Museum Information:" field must agree with what is spoken.
+    # Walters 555 showed "Closed on Tuesday. Saturday, 12:30–4. $500" (a scraped membership/event
+    # line) while the spoken, composed sentence said "open Wednesday to Sunday. Admission is free."
+    new = re.sub(r"(?m)^Museum Information:.*$", lambda _m: "Museum Information: " + " ".join(facts), new)
     return new, (0 if new == text else moved)
