@@ -56,6 +56,13 @@ NEWS_PER_PAGE_CHARS = int(os.environ.get('CA_NEWS_PER_PAGE_CHARS', '2500'))
 NEWS_ANSWER_MAX_TOKENS = int(os.environ.get('CA_NEWS_MAX_TOKENS', '320'))
 NEWS_FRESH_DAYS = int(os.environ.get('CA_NEWS_FRESH_DAYS', '7'))
 
+# [LOCAL-662 Defect 3] Hard caps so a current-affairs tour carries a little recent
+# news, not a news feed. Tour 557 v9 put news on 4 of 5 stops and read like a feed
+# (critic). Cap at the 2 BEST stops and at most 3 items in TOTAL across the tour,
+# newest first. Env-overridable for tuning, but the defaults are the ticket's.
+NEWS_MAX_STOPS = int(os.environ.get('CA_NEWS_MAX_STOPS', '2'))
+NEWS_MAX_ITEMS_TOTAL = int(os.environ.get('CA_NEWS_MAX_ITEMS_TOTAL', '3'))
+
 SERP_NEWS_URL = 'https://google.serper.dev/news'
 
 # The honest note — used ONLY when a search ran and returned nothing usable.
@@ -880,7 +887,11 @@ it onto the publication date.
 report what EACH side said or did, attributed by name/party, with no editorialising \
 and no adjective that favours a side.
 - Attribute claims ("Governor Healey said ...", "according to the State House \
-News Service ..."). End each sentence with its source number in brackets, like [2].
+News Service ..."). Every sentence MUST name its SOURCE OUTLET in the prose \
+itself — begin or end the sentence with the outlet, e.g. "the Boston Herald \
+reported that ..." or "..., according to NBC Boston." Do NOT rely on a trailing \
+source list; there will be none. End each sentence with its source number in \
+brackets, like [2], in addition to naming the outlet in words.
 - If the articles contain nothing of substance about the subject in {locale}, \
 reply with exactly: NO MATERIAL FOUND
 
@@ -1240,6 +1251,50 @@ def research_news_for_stops(request_text: str, stop_names: List[str],
                                     'resolved_date': a.get('_parsed_date', ''),
                                     'date_source': a.get('_date_source', '')})
 
+    # [LOCAL-662 Defect 3] CAP the news: at most NEWS_MAX_STOPS stops carry news,
+    # and at most NEWS_MAX_ITEMS_TOTAL items in TOTAL across the tour, NEWEST
+    # FIRST. Tour 557 v9 put news on 4 of 5 stops and read like a feed. We rank
+    # every assigned item by its resolved date (newest first), keep the top
+    # NEWS_MAX_ITEMS_TOTAL, then keep only the stops those items fall on, capped
+    # at NEWS_MAX_STOPS stops (preferring the stops whose items are freshest).
+    def _item_date(a: Dict) -> "_dt.date":
+        iso = a.get('_parsed_date') or a.get('_exact_date') or ''
+        try:
+            return _dt.date.fromisoformat(iso) if iso else _dt.date.min
+        except Exception:
+            return _dt.date.min
+
+    if per_stop_articles:
+        # Flatten to (stop, article) preserving per-stop order, then sort the whole
+        # pool newest-first and take the global top-N items.
+        _flat = [(stop, a) for stop, arts in per_stop_articles.items() for a in arts]
+        _flat.sort(key=lambda sa: _item_date(sa[1]), reverse=True)
+        _kept_items = _flat[:NEWS_MAX_ITEMS_TOTAL]
+        # Order the stops by the freshest item each still has, cap to MAX_STOPS.
+        _stop_best_date: Dict[str, "_dt.date"] = {}
+        for stop, a in _kept_items:
+            d = _item_date(a)
+            if stop not in _stop_best_date or d > _stop_best_date[stop]:
+                _stop_best_date[stop] = d
+        _ranked_stops = sorted(_stop_best_date, key=lambda s: _stop_best_date[s],
+                               reverse=True)[:NEWS_MAX_STOPS]
+        _ranked_set = set(_ranked_stops)
+        # Rebuild per_stop_articles keeping only the kept items on the kept stops,
+        # preserving each stop's original (newest-first) article order.
+        _capped: Dict[str, List[Dict]] = {}
+        for stop, a in _kept_items:
+            if stop in _ranked_set:
+                _capped.setdefault(stop, []).append(a)
+        _n_before_stops = len(per_stop_articles)
+        _n_before_items = sum(len(v) for v in per_stop_articles.values())
+        per_stop_articles = _capped
+        _n_after_items = sum(len(v) for v in per_stop_articles.values())
+        log['capped'] = {
+            'stops_before': _n_before_stops, 'stops_after': len(per_stop_articles),
+            'items_before': _n_before_items, 'items_after': _n_after_items,
+            'max_stops': NEWS_MAX_STOPS, 'max_items_total': NEWS_MAX_ITEMS_TOTAL,
+        }
+
     # 5. compose per stop. The composer writes about the tour's THEME SUBJECT
     # (e.g. "Massachusetts politics"), NOT the narrow stop building name — an
     # article about the governor's debate is current affairs for the State House
@@ -1251,7 +1306,10 @@ def research_news_for_stops(request_text: str, stop_names: List[str],
     for stop, articles in per_stop_articles.items():
         if not articles:
             continue
-        composed = compose_news_sentences(theme_subject, articles, answer=answer,
+        composed = compose_news_sentences(theme_subject, articles,
+                                          max_items=min(len(articles),
+                                                        NEWS_MAX_ITEMS_TOTAL),
+                                          answer=answer,
                                           locale=_region_phrase(request_text))
         if composed.get('text'):
             log['by_stop'][stop] = {
@@ -1329,20 +1387,19 @@ def inject_news_into_text(text: str, by_stop: Dict[str, Dict]) -> Tuple[str, int
 
 
 def _attribution_suffix(news_text: str, src_names: List[str]) -> str:
-    """Return the trailing '(Reported by …)' parenthetical, OMITTING any source
-    the sentences already name in-text, and dropping the parenthetical entirely
-    when every source is already attributed there (ticket item 3).
+    """[LOCAL-662 Defect 3] No trailing parenthetical, ever.
 
-    The composer is instructed to attribute each claim in prose ("according to the
-    State House News Service", "Governor Healey said"). When it does, repeating
-    the same outlet in a trailing "(Reported by X, Y.)" is redundant and reads
-    poorly aloud. So we keep in the parenthetical only the outlets NOT yet named in
-    the sentences; if that leaves nothing, there is no parenthetical."""
-    tl = (news_text or '').lower()
-    missing = [sn for sn in src_names if sn.lower() not in tl]
-    if not missing:
-        return ""
-    return f" (Reported by {', '.join(missing)}.)"
+    Tour 557 v9 ended every news block with "(Reported by NBC Boston, Boston
+    Herald.)" — a source list in narration (critic, criterion 4). The composer is
+    now REQUIRED to name the outlet inline in each sentence ("according to the
+    State House News Service", "the Boston Herald reported"), so a trailing
+    "(Reported by …)" is redundant and reads poorly aloud. LOCAL-655B kept the
+    parenthetical only for sources not named inline; the fix is to name the source
+    inline instead and drop the parenthetical entirely. Always returns "".
+
+    (Signature kept for callers/tests; args are unused.)
+    """
+    return ""
 
 
 # A paragraph that belongs to the whole tour, not to the last stop: the closing
