@@ -8185,6 +8185,19 @@ def _apply_delivery_hours_guard(result):
                       f"delivered text", flush=True)
         except Exception as _doe:  # pragma: no cover
             _import_logger.error(f"[LOCAL-634] text dangling-opener guard skipped: {_doe}")
+        # 1e-ii. [LOCAL-660 defect 3] Dangling PERSONAL-pronoun opener guard. The
+        #     same late removals (and a LEAD relocation of a stop's lead-in fact)
+        #     can leave a stop body opening on He/His/She/Her/They with no person
+        #     antecedent in the stop (tour 557 Stop 3 "His legacy…"). Mirror of
+        #     the demonstrative guard above, for personal pronouns.
+        try:
+            import dangling_pronoun_gate as _dpg_txt
+            final, _n_pron = _dpg_txt.strip_dangling_pronoun_openers_in_text(final)
+            if _n_pron:
+                print(f"  [LOCAL-660] dropped {_n_pron} dangling personal-pronoun "
+                      f"opener(s) from delivered text", flush=True)
+        except Exception as _dpe:  # pragma: no cover
+            _import_logger.error(f"[LOCAL-660] text dangling-pronoun guard skipped: {_dpe}")
         # 2. Drop duplicated paragraphs (e.g. the twice-printed orientation block).
         try:
             import paragraph_dedupe as _pd
@@ -25021,6 +25034,24 @@ RULES:
     except Exception as _mid_err:
         print(f"  [LOCAL-660] Mid-sentence truncation repair error (non-fatal): {_mid_err}")
     _l654ck("LOCAL-660 midsentence_truncation")
+
+    # -------- [LOCAL-660 defect 3] Drop a dangling personal-pronoun opener -----
+    # Runs AFTER every sentence-removal pass (D533/S27 strips, same-title/motif
+    # filters) and after the LEAD relocation of a stop's lead-in fact, so a
+    # sentence left opening on He/His/She/Her/They with no antecedent in the SAME
+    # stop is caught at the delivery boundary. Tour 557 v7 Stop 3 opened "His
+    # legacy is carved…" after the sentence that introduced George Francis
+    # Parkman was moved to Stop 1; this drops the orphaned sentence. The
+    # companion dangling_demonstrative gate handles This/These/That/Those.
+    try:
+        import dangling_pronoun_gate as _dpg
+        complete_tour, _n_dp = _dpg.strip_dangling_pronoun_openers_in_text(complete_tour)
+        if _n_dp:
+            print(f"  [LOCAL-660] dropped {_n_dp} dangling personal-pronoun "
+                  f"opener(s) (He/His/She/Her/They with no antecedent in the stop)")
+    except Exception as _dp_err:
+        print(f"  [LOCAL-660] Dangling-pronoun gate error (non-fatal): {_dp_err}")
+    _l654ck("LOCAL-660 dangling_pronoun")
 
     # -------- [LOCAL-36] Practical facts QA gate --------
     # Verify provenance of every practical claim before delivery.
