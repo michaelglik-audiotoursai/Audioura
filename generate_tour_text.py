@@ -12668,6 +12668,45 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
                 except Exception as _thin_err:
                     print(f"  [LOCAL-667 THIN-VERIFY] skipped ({_thin_err})")
 
+            # -------- [LOCAL-667] Building + collection-area stops (last resort) --------
+            # Still short after thin-source verification? A museum tour has real
+            # stops beyond individually catalogued artworks: the HISTORIC BUILDING
+            # (HCMC occupies the Hui Bon Hoa mansion, 1929-1934 — a highlight in
+            # itself) and NAMED COLLECTION AREAS (lacquer, Champa sculpture, Óc Eo).
+            # Both are grounded in the already-fetched corpus — nothing invented: a
+            # building/area ships only when the corpus names it. These are verified,
+            # typed stops; the LOCAL-632 shortfall line is then only for what is
+            # TRULY left. Thin tier only, so a well-documented museum never gets
+            # area padding ahead of its real works.
+            if (tour_category == 'museum' and _verification_tier == 'thin'
+                    and len(poi_list) < total_stops):
+                try:
+                    from museum_fallback_stops import build_fallback_stops
+                    _fb_pages = (_story_corpus_result or {}).get('pages', []) or []
+                    _fb_combined = (_story_corpus_result or {}).get('combined_text', '') \
+                        or _d1_venue_corpus or ''
+                    _fb_exclude = [p.get('name', '') for p in poi_list]
+                    _fb_needed = total_stops - len(poi_list)
+                    _fb_stops = build_fallback_stops(
+                        _museum_venue_name or location, _fb_pages, _fb_combined,
+                        needed=_fb_needed, exclude_names=_fb_exclude)
+                    for _fb in _fb_stops:
+                        _d1_evidence_log[_fb['name']] = {
+                            "status": "VERIFIED",
+                            "canonical_title": _fb['name'],
+                            "snippet": "",
+                            "method": f"museum_fallback_{_fb.get('_stop_kind','')}",
+                            "fallback_source": _fb.get('_fallback_source', ''),
+                        }
+                        poi_list.append(_fb)
+                        print(f"  [LOCAL-667 FALLBACK] added {_fb.get('_stop_kind','')} stop "
+                              f"'{_fb['name']}' ({_fb.get('_fallback_source','')})")
+                    if _fb_stops:
+                        print(f"  [LOCAL-667 FALLBACK] building/collection-area stops: "
+                              f"+{len(_fb_stops)}, total now {len(poi_list)}/{total_stops}")
+                except Exception as _fb_err:
+                    print(f"  [LOCAL-667 FALLBACK] skipped ({_fb_err})")
+
             # -------- [UNIFIED-FILL] Runs AFTER R4 (unverified last-resort padding) --------
             # [LOCAL-19] Moved here from before R4. Now R4 has already had its chance
             # to find verified replacements. UNIFIED-FILL only pads remaining gaps.
@@ -12864,6 +12903,11 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
                 _venue_norm = _museum_venue_name.lower()
                 _suspect_venues = []
                 for p in poi_list:
+                    # [LOCAL-667] A building / collection-area fallback stop is a
+                    # legitimate interior stop of THIS venue (grounded in its own
+                    # corpus), not another venue — never count it as a suspect.
+                    if p.get('_stop_kind') in ('building', 'collection_area'):
+                        continue
                     _pname = p['name'].lower()
                     # Check if POI name contains a venue-type word AND is not the target venue
                     for indicator in _VENUE_INDICATORS:
