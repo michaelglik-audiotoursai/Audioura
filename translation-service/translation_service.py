@@ -168,6 +168,52 @@ class TranslationService:
             port=os.getenv('DB_PORT', '5432')
         )
     
+    def _ensure_source_version_column(self, cursor):
+        """[LOCAL-666] Self-heal: make sure audio_tours.source_version exists before we
+        write a translation row. Additive and idempotent, mirroring the inline 'track'
+        column guard already used on the INSERT paths and the orchestrator's
+        _ensure_versioning_objects. Safe on any Postgres (Cloud SQL, Mac Mini local, a
+        fresh checkout, a throwaway test schema) whether or not migration 018 ran.
+
+        Returns True when the column is present (either already, or after we added it),
+        False only if we could not add it — in which case the caller must omit
+        source_version from its INSERT so an older schema still works.
+        """
+        try:
+            cursor.execute("""
+                SELECT column_name FROM information_schema.columns
+                WHERE table_name = 'audio_tours' AND column_name = 'source_version'
+            """)
+            if cursor.fetchone() is not None:
+                return True
+            logging.info("[LOCAL-666] Adding audio_tours.source_version column...")
+            cursor.execute("ALTER TABLE audio_tours ADD COLUMN IF NOT EXISTS source_version INTEGER")
+            return True
+        except Exception as e:
+            logging.warning(f"[LOCAL-666] Could not ensure source_version column (non-fatal): {e}")
+            return False
+
+    def _source_tour_version(self, cursor, source_tour_id):
+        """[LOCAL-666] The SOURCE tour's current version at translation time:
+        COALESCE(MAX(version_no), 0) + 1 over audio_tour_versions for the source id.
+
+        A never-replaced source has no archive rows → version 1. Two replacements
+        (archived version_no 1 and 2) → the live source is version 3. This is exactly
+        the number LOCAL-657 shows for the ORIGINAL, and the number the translation must
+        inherit so a translation of v10 says v10. Returns an int, or None if the versions
+        table is absent/unreadable (the caller then stores NULL and map-delivery falls
+        back to the source's live version)."""
+        try:
+            cursor.execute(
+                "SELECT COALESCE(MAX(version_no), 0) + 1 FROM audio_tour_versions WHERE tour_id = %s",
+                (source_tour_id,),
+            )
+            row = cursor.fetchone()
+            return int(row[0]) if row and row[0] is not None else 1
+        except Exception as e:
+            logging.warning(f"[LOCAL-666] Could not read source version for {source_tour_id} (non-fatal): {e}")
+            return None
+
     # Only these two labels must stay in English — mobile app parses them by exact string match.
     # All other labels (Type/Specialty, Orientation, etc.) should be translated normally.
     _METADATA_LABELS = ['Coordinates', 'Address']
@@ -1506,6 +1552,12 @@ class TranslationService:
             # Create new tour record.
             # [LOCAL-162] Carry the source tour's stops_count onto the translation.
             _original_stops_count = original_tour[10] if len(original_tour) > 10 else None
+            # [LOCAL-666] Pin the SOURCE tour's version at translation time so a
+            # translation of v10 displays v10 (LOCAL-657 computes a translation's OWN id
+            # as v1 — it is never replaced in place). Column guarded like 'track' so the
+            # INSERT still works on an older schema; version read is best-effort.
+            _has_source_version = self._ensure_source_version_column(cursor)
+            _source_version = self._source_tour_version(cursor, original_tour_id) if _has_source_version else None
             # [GCS-TR1 + LOCAL-162] Track resolution: a translation inherits its source
             # tour's track (the service is shared by both Beta and Storied, so an env var
             # alone cannot know the caller). If the source row has no track (older rows),
@@ -1514,26 +1566,26 @@ class TranslationService:
             if _env_track not in ('beta', 'storied'):
                 _env_track = 'beta'
             _track = source_track if (has_track and source_track) else _env_track
+            # [LOCAL-666] Build the column/value lists so source_version is appended only
+            # when the column exists. Keeps the two historic branches (track present/absent)
+            # intact and adds source_version orthogonally.
+            _cols = ["tour_name", "request_string", "audio_tour", "number_requested",
+                     "lat", "lng", "content_language", "original_tour_id", "tour_content",
+                     "stops_count"]
+            _vals = [translated_name, translated_request, translated_zip_data, original_tour[4],
+                     original_tour[5], original_tour[6], target_language, original_tour_id,
+                     translated_tour_content, _original_stops_count]
             if has_track:
-                cursor.execute("""
-                    INSERT INTO audio_tours (tour_name, request_string, audio_tour, number_requested,
-                                           lat, lng, content_language, original_tour_id, tour_content, stops_count, track)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s) RETURNING id
-                """, (
-                    translated_name, translated_request, translated_zip_data, original_tour[4],
-                    original_tour[5], original_tour[6], target_language, original_tour_id,
-                    translated_tour_content, _original_stops_count, _track
-                ))
-            else:
-                cursor.execute("""
-                    INSERT INTO audio_tours (tour_name, request_string, audio_tour, number_requested,
-                                           lat, lng, content_language, original_tour_id, tour_content, stops_count)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s) RETURNING id
-                """, (
-                    translated_name, translated_request, translated_zip_data, original_tour[4],
-                    original_tour[5], original_tour[6], target_language, original_tour_id,
-                    translated_tour_content, _original_stops_count
-                ))
+                _cols.append("track")
+                _vals.append(_track)
+            if _has_source_version:
+                _cols.append("source_version")
+                _vals.append(_source_version)
+            _placeholders = ", ".join(["%s"] * len(_vals))
+            cursor.execute(
+                f"INSERT INTO audio_tours ({', '.join(_cols)}) VALUES ({_placeholders}) RETURNING id",
+                tuple(_vals),
+            )
             
             new_tour_id = cursor.fetchone()[0]
             conn.commit()
@@ -2948,26 +3000,25 @@ Say 'What are my options' to hear this help again"""
             if _env_track not in ('beta', 'storied'):
                 _env_track = 'beta'
             _track = source_track if (has_track and source_track) else _env_track
+            # [LOCAL-666] Same source-version pin as the main path, for the ZIP fallback.
+            _has_source_version = self._ensure_source_version_column(cursor)
+            _source_version = self._source_tour_version(cursor, original_tour[0]) if _has_source_version else None
+            _cols = ["tour_name", "request_string", "audio_tour", "number_requested",
+                     "lat", "lng", "content_language", "original_tour_id", "stops_count"]
+            _vals = [translated_name, translated_request, translated_zip_data, original_tour[4],
+                     original_tour[5], original_tour[6], target_language, original_tour[0],
+                     _fallback_stops_count]
             if has_track:
-                cursor.execute("""
-                    INSERT INTO audio_tours (tour_name, request_string, audio_tour, number_requested,
-                                           lat, lng, content_language, original_tour_id, stops_count, track)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s) RETURNING id
-                """, (
-                    translated_name, translated_request, translated_zip_data, original_tour[4],
-                    original_tour[5], original_tour[6], target_language, original_tour[0],
-                    _fallback_stops_count, _track
-                ))
-            else:
-                cursor.execute("""
-                    INSERT INTO audio_tours (tour_name, request_string, audio_tour, number_requested,
-                                           lat, lng, content_language, original_tour_id, stops_count)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s) RETURNING id
-                """, (
-                    translated_name, translated_request, translated_zip_data, original_tour[4],
-                    original_tour[5], original_tour[6], target_language, original_tour[0],
-                    _fallback_stops_count
-                ))
+                _cols.append("track")
+                _vals.append(_track)
+            if _has_source_version:
+                _cols.append("source_version")
+                _vals.append(_source_version)
+            _placeholders = ", ".join(["%s"] * len(_vals))
+            cursor.execute(
+                f"INSERT INTO audio_tours ({', '.join(_cols)}) VALUES ({_placeholders}) RETURNING id",
+                tuple(_vals),
+            )
             
             new_tour_id = cursor.fetchone()[0]
             conn.commit()
@@ -2987,6 +3038,57 @@ Say 'What are my options' to hear this help again"""
 
 # Initialize translation service
 translation_service = TranslationService()
+
+
+def _translation_version_fields(conn, translated_id):
+    """[LOCAL-666] Derive (version, updated_at) for a freshly created TRANSLATION row,
+    using the same rule map-delivery applies: version is the translation's pinned
+    source_version (set at translation time), falling back to the SOURCE tour's live
+    version (COALESCE(MAX(version_no),0)+1) when source_version is NULL (pre-666 rows
+    or an older schema); updated_at is the translation row's own created_at as an ISO
+    date (YYYY-MM-DD). Best-effort: returns (None, None) on any error so the endpoint
+    simply omits the fields and an old app shows no label (never crashes).
+    """
+    try:
+        cur = conn.cursor()
+        # source_version may not exist on an older schema — probe it first.
+        cur.execute("""
+            SELECT column_name FROM information_schema.columns
+            WHERE table_name = 'audio_tours' AND column_name = 'source_version'
+        """)
+        has_sv = cur.fetchone() is not None
+        sv_sel = "source_version" if has_sv else "NULL::integer AS source_version"
+        cur.execute(
+            f"SELECT original_tour_id, {sv_sel}, created_at FROM audio_tours WHERE id = %s",
+            (translated_id,),
+        )
+        row = cur.fetchone()
+        if not row:
+            cur.close()
+            return None, None
+        original_tour_id, source_version, created_at = row
+        version = None
+        if source_version is not None:
+            version = int(source_version)
+        elif original_tour_id is not None:
+            # Fall back to the source's live version.
+            cur.execute(
+                "SELECT COALESCE(MAX(version_no), 0) + 1 FROM audio_tour_versions WHERE tour_id = %s",
+                (original_tour_id,),
+            )
+            vrow = cur.fetchone()
+            version = int(vrow[0]) if vrow and vrow[0] is not None else 1
+        updated_at = None
+        if created_at is not None:
+            try:
+                updated_at = created_at.date().isoformat()
+            except AttributeError:
+                updated_at = str(created_at)[:10]
+        cur.close()
+        return version, updated_at
+    except Exception as e:
+        logging.warning(f"[LOCAL-666] version/updated_at derive failed for {translated_id}: {e}")
+        return None, None
 
 def add_cors_headers(response):
     response.headers['Access-Control-Allow-Origin'] = '*'
@@ -3054,6 +3156,13 @@ def translate_content_with_audio():
         if translated_id:
             # Include translated tour_name so the mobile app can display the correct title
             translated_name = None
+            # [LOCAL-666] Per-language version + updated_at so the app can show the same
+            # "v{n} · updated {Mon D}" label on a translation (found-tour dialogs AND the
+            # My Tours list) as on the English original. Rule mirrors map-delivery: version
+            # = the translation's source_version (else the source's live version), updated_at
+            # = the translation row's created_at. Tours only; articles have no version label.
+            _version = None
+            _updated_at = None
             try:
                 conn = translation_service.get_db_connection()
                 cur = conn.cursor()
@@ -3064,6 +3173,8 @@ def translate_content_with_audio():
                 if row:
                     translated_name = row[0]
                 cur.close()
+                if content_type == 'tour':
+                    _version, _updated_at = _translation_version_fields(conn, translated_id)
                 conn.close()
             except Exception as e:
                 logging.warning(f"Could not fetch translated name for {translated_id}: {e}")
@@ -3071,6 +3182,12 @@ def translate_content_with_audio():
             result_entry = {'status': 'translated', 'id': translated_id, 'cache_hit': _cache_hit}
             if translated_name:
                 result_entry['name'] = translated_name
+            # Additive: only present for tours, and only when derivable. An old app
+            # ignores unknown keys; a new app reads them defensively.
+            if _version is not None:
+                result_entry['version'] = _version
+            if _updated_at is not None:
+                result_entry['updated_at'] = _updated_at
             results[lang] = result_entry
         else:
             results[lang] = {'status': 'failed', 'id': None}

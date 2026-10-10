@@ -49,6 +49,10 @@ class TourTranslationHelper {
 
       if (result['status'] == 'completed') {
         final translatedIds = _extractTranslatedIds(result);
+        // [LOCAL-666] Per-language version/updated_at from the translate-with-audio
+        // response, so each saved translation carries the SOURCE tour's version and
+        // the My Tours list shows "v{n} · updated {Mon D}" for it just like English.
+        final translations = result['translations'] as Map<String, dynamic>?;
         if (translatedIds != null) {
           for (final lang in nonEnglish) {
             final translatedId = translatedIds[lang];
@@ -57,13 +61,17 @@ class TourTranslationHelper {
               await DebugLogHelper.addDebugLog('TRANSLATE: Translation failed for $lang (id=null or status=failed)');
               continue;
             }
+            final langEntry = translations?[lang];
+            final version = (langEntry is Map) ? langEntry['version'] : null;
+            final updatedAt = (langEntry is Map) ? langEntry['updated_at'] : null;
             try {
               final translatedUri = await Endpoints.url(Service.mapDelivery, '/download-tour/$translatedId');
               final translatedResponse = await http.get(translatedUri, headers: await Endpoints.apiHeaders(Service.mapDelivery)).timeout(const Duration(seconds: 120));
               if (translatedResponse.statusCode == 200) {
                 final prefs = await SharedPreferences.getInstance();
                 final appDir = await getApplicationDocumentsDirectory();
-                await _saveTranslatedTour(translatedId, translatedResponse.bodyBytes, appDir.path, prefs, parentEditTourId, lang);
+                await _saveTranslatedTour(translatedId, translatedResponse.bodyBytes, appDir.path, prefs, parentEditTourId, lang,
+                    version: version, updatedAt: updatedAt);
                 await DebugLogHelper.addDebugLog('TRANSLATE: Saved translated tour ($lang) ID: $translatedId');
               } else {
                 failures.add(lang);
@@ -108,7 +116,8 @@ class TourTranslationHelper {
   }
 
   /// Saves a translated tour ZIP to the local filesystem and SharedPreferences.
-  static Future<void> _saveTranslatedTour(dynamic tourId, List<int> zipBytes, String appDirPath, SharedPreferences prefs, String parentEditTourId, String lang) async {
+  static Future<void> _saveTranslatedTour(dynamic tourId, List<int> zipBytes, String appDirPath, SharedPreferences prefs, String parentEditTourId, String lang,
+      {dynamic version, dynamic updatedAt}) async {
     final archive = ZipDecoder().decodeBytes(zipBytes);
     String tourName = 'Translated Tour $tourId';
     // Try to extract tour name from ZIP manifest
@@ -145,6 +154,11 @@ class TourTranslationHelper {
       'is_translation': true,
       'parent_tour_id': parentEditTourId.isEmpty ? null : parentEditTourId,
     };
+    // [LOCAL-666] Persist the source version + updated date so the My Tours list can
+    // label this translation (v{n} · updated {Mon D}) exactly like the English tour.
+    // Additive: omitted entirely when the server sent none (an older map-delivery).
+    if (version != null) tourData['version'] = version;
+    if (updatedAt != null) tourData['updated_at'] = updatedAt;
     savedTours.add(json.encode(tourData));
     await prefs.setStringList('saved_tours', savedTours);
   }

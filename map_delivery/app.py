@@ -70,10 +70,12 @@ def get_tour_by_code(code):
             conn.close()
             return jsonify({'error': 'tour not found'}), 404
 
-        cur.execute("""
+        cur.execute(f"""
             SELECT t.id, t.tour_name, t.request_string, t.lat, t.lng,
                    t.number_requested, t.language, t.original_tour_id,
-                   v.max_version_no, v.last_replaced_at, t.created_at
+                   v.max_version_no, v.last_replaced_at, t.created_at,
+                   {_source_version_select(cur)} AS source_version,
+                   sv.max_version_no AS source_max_version_no
             FROM audio_tours t
             LEFT JOIN (
                 SELECT tour_id,
@@ -83,6 +85,11 @@ def get_tour_by_code(code):
                 WHERE tour_id = %s
                 GROUP BY tour_id
             ) v ON v.tour_id = t.id
+            LEFT JOIN (
+                SELECT tour_id, MAX(version_no) AS max_version_no
+                FROM audio_tour_versions
+                GROUP BY tour_id
+            ) sv ON sv.tour_id = t.original_tour_id
             WHERE t.id = %s
         """, (row[0], row[0]))
         t = cur.fetchone()
@@ -92,12 +99,17 @@ def get_tour_by_code(code):
             return jsonify({'error': 'tour not found'}), 404
 
         (tour_id, tour_name, request_string, tour_lat, tour_lng, requests,
-         language, original_id, max_vn, last_replaced, created_at) = t
-        # [LOCAL-657] A share code can point at a translation row as well as an
-        # original; either way we join on that row's own id, so the version is the
-        # version of the exact tour the listener will download. Translations carry
-        # their own version per the task.
-        version, updated_at = _version_fields(max_vn, last_replaced, created_at)
+         language, original_id, max_vn, last_replaced, created_at,
+         source_version, source_max_vn) = t
+        # [LOCAL-666] A share code can point at a translation row (original_tour_id
+        # set, e.g. Russian 615 of 557) as well as an original. For a translation we
+        # report the SOURCE tour's version (its pinned source_version, else the
+        # source's live version) with the translation's own created_at as the
+        # "updated" date — so the Russian copy of v10 says v10, not v1 (the number
+        # LOCAL-657 produced by joining on the translation's never-replaced own id).
+        # Originals are unchanged.
+        version, updated_at = _resolved_version_fields(
+            original_id, source_version, source_max_vn, max_vn, last_replaced, created_at)
         # Same keys as a /tours-near element. distance_km is None, not 0: the listener
         # is not near it, and 0 would sort it to the top under false pretences.
         return jsonify({
@@ -178,6 +190,73 @@ def _version_fields(max_version_no, last_replaced_at, created_at):
     return version, updated_at
 
 
+def _iso_date(stamp):
+    """Format a timestamp/date (or ISO string) as YYYY-MM-DD, or None."""
+    if stamp is None:
+        return None
+    try:
+        return stamp.date().isoformat()
+    except AttributeError:
+        return str(stamp)[:10]
+
+
+def _resolved_version_fields(original_tour_id, source_version,
+                             source_max_version_no, own_max_version_no,
+                             own_last_replaced_at, created_at):
+    """[LOCAL-666] Version + updated_at for a row that may be an ORIGINAL or a TRANSLATION.
+
+    A translation row (original_tour_id set) is never replaced in place, so joining
+    audio_tour_versions on its OWN id always yields v1 (the LOCAL-657 bug for
+    translations). Instead a translation reports:
+      * version    = its pinned source_version (snapshot taken at translation time),
+                     falling back to the SOURCE tour's live version
+                     (COALESCE(MAX(version_no),0)+1 over the source id) when
+                     source_version is NULL (pre-666 rows, or source_version column
+                     absent → passed as None here).
+      * updated_at = the translation row's OWN created_at — the day this translated
+                     copy was produced — NOT the source's replaced_at.
+
+    An ORIGINAL row (original_tour_id is None) is unchanged from LOCAL-657: version
+    from its own archive rows, updated_at = newest replaced_at else created_at.
+    """
+    if original_tour_id is None:
+        return _version_fields(own_max_version_no, own_last_replaced_at, created_at)
+    # Translation row.
+    if source_version is not None:
+        version = int(source_version)
+    else:
+        version = (source_max_version_no or 0) + 1
+    return version, _iso_date(created_at)
+
+
+# [LOCAL-666] Cache the one-time schema probe for the optional source_version column
+# so each request does not re-query information_schema. None until first checked.
+_HAS_SOURCE_VERSION = None
+
+
+def _has_source_version_column(cur):
+    """True if audio_tours.source_version exists. Probed once per process and cached.
+    When absent (older schema), the SELECTs below omit the column and translations
+    fall back to the SOURCE tour's live version — the ticket's 'column absent → falls
+    back' requirement."""
+    global _HAS_SOURCE_VERSION
+    if _HAS_SOURCE_VERSION is None:
+        try:
+            cur.execute("""
+                SELECT column_name FROM information_schema.columns
+                WHERE table_name = 'audio_tours' AND column_name = 'source_version'
+            """)
+            _HAS_SOURCE_VERSION = cur.fetchone() is not None
+        except Exception:
+            _HAS_SOURCE_VERSION = False
+    return _HAS_SOURCE_VERSION
+
+
+def _source_version_select(cur):
+    """SQL fragment selecting source_version (or a NULL literal on an older schema)."""
+    return "t.source_version" if _has_source_version_column(cur) else "NULL::integer"
+
+
 def calculate_distance(lat1, lng1, lat2, lng2):
     """Calculate distance between two points in kilometers"""
     R = 6371
@@ -221,10 +300,16 @@ def get_tours_near_location(lat, lng):
         # Exclude test-generated tours (is_test flag set by test-mode generation)
         # [LOCAL-657] LEFT JOIN one grouped pass over audio_tour_versions (not a
         # query per tour) to carry each tour's version + last-replaced timestamp.
-        cur.execute("""
+        # [LOCAL-666] source_version + a source-id aggregate are selected too so the
+        # shared _resolved_version_fields helper works uniformly; this list is
+        # originals-only (original_tour_id IS NULL) so they are inert here, but keep
+        # the shape identical to the other endpoints that DO surface translations.
+        cur.execute(f"""
             SELECT t.id, t.tour_name, t.request_string, t.lat, t.lng,
                    t.number_requested, t.content_language, t.original_tour_id,
-                   v.max_version_no, v.last_replaced_at, t.created_at
+                   v.max_version_no, v.last_replaced_at, t.created_at,
+                   {_source_version_select(cur)} AS source_version,
+                   sv.max_version_no AS source_max_version_no
             FROM audio_tours t
             LEFT JOIN (
                 SELECT tour_id,
@@ -233,6 +318,11 @@ def get_tours_near_location(lat, lng):
                 FROM audio_tour_versions
                 GROUP BY tour_id
             ) v ON v.tour_id = t.id
+            LEFT JOIN (
+                SELECT tour_id, MAX(version_no) AS max_version_no
+                FROM audio_tour_versions
+                GROUP BY tour_id
+            ) sv ON sv.tour_id = t.original_tour_id
             WHERE t.lat IS NOT NULL AND t.lng IS NOT NULL
             AND (t.content_language = 'en' OR t.content_language IS NULL)
             AND t.original_tour_id IS NULL
@@ -244,13 +334,16 @@ def get_tours_near_location(lat, lng):
         
         for tour in tours:
             (tour_id, tour_name, request_string, tour_lat, tour_lng, requests,
-             language, original_id, max_vn, last_replaced, created_at) = tour
+             language, original_id, max_vn, last_replaced, created_at,
+             source_version, source_max_vn) = tour
             
             if tour_lat and tour_lng:
                 distance = calculate_distance(lat, lng, tour_lat, tour_lng)
                 
                 if distance <= radius_km:
-                    version, updated_at = _version_fields(max_vn, last_replaced, created_at)
+                    version, updated_at = _resolved_version_fields(
+                        original_id, source_version, source_max_vn,
+                        max_vn, last_replaced, created_at)
                     tour_data = {
                         'id': tour_id,
                         'name': tour_name,
@@ -372,10 +465,26 @@ def get_tour_info(tour_id):
         conn = get_db_connection()
         cur = conn.cursor()
         
-        cur.execute("""
-            SELECT id, tour_name, request_string, lat, lng, number_requested, content_language, original_tour_id
-            FROM audio_tours 
-            WHERE id = %s
+        # [LOCAL-666] Carry version + updated_at here too (the ticket lists /tour-info),
+        # using the same rule as the list endpoints: a translation reports its SOURCE
+        # version (pinned source_version, else the source's live version) with its own
+        # created_at as the updated date; an original is unchanged from LOCAL-657.
+        cur.execute(f"""
+            SELECT t.id, t.tour_name, t.request_string, t.lat, t.lng,
+                   t.number_requested, t.content_language, t.original_tour_id,
+                   v.max_version_no, v.last_replaced_at, t.created_at,
+                   {_source_version_select(cur)} AS source_version,
+                   sv.max_version_no AS source_max_version_no
+            FROM audio_tours t
+            LEFT JOIN (
+                SELECT tour_id, MAX(version_no) AS max_version_no, MAX(replaced_at) AS last_replaced_at
+                FROM audio_tour_versions GROUP BY tour_id
+            ) v ON v.tour_id = t.id
+            LEFT JOIN (
+                SELECT tour_id, MAX(version_no) AS max_version_no
+                FROM audio_tour_versions GROUP BY tour_id
+            ) sv ON sv.tour_id = t.original_tour_id
+            WHERE t.id = %s
         """, (tour_id,))
         
         result = cur.fetchone()
@@ -385,11 +494,14 @@ def get_tour_info(tour_id):
             sys.stdout.flush()
             return jsonify({'error': 'Tour not found'}), 404
         
-        tour_id, tour_name, request_string, lat, lng, requests, language, original_id = result
+        (tour_id, tour_name, request_string, lat, lng, requests, language, original_id,
+         max_vn, last_replaced, created_at, source_version, source_max_vn) = result
         cur.close()
         conn.close()
         
         is_translation = original_id is not None and (language and language != 'en')
+        version, updated_at = _resolved_version_fields(
+            original_id, source_version, source_max_vn, max_vn, last_replaced, created_at)
         
         return jsonify({
             'id': tour_id,
@@ -401,7 +513,9 @@ def get_tour_info(tour_id):
             'has_audio': True,
             'language': language or 'en',
             'is_translation': is_translation,
-            'parent_tour_id': original_id
+            'parent_tour_id': original_id,
+            'version': version,
+            'updated_at': updated_at
         })
         
     except Exception as e:
@@ -429,15 +543,24 @@ def search_tours():
         
         # [LOCAL-657, LEAD] Search results open the same tour dialogs, so they carry
         # the version label fields too (one grouped LEFT JOIN, as in /tours-near).
-        cur.execute("""
+        # [LOCAL-666] Search surfaces translations (no original_tour_id IS NULL filter),
+        # so a translation must show its SOURCE version, not v1. Join the versions
+        # aggregate on the source id as well and resolve via _resolved_version_fields.
+        cur.execute(f"""
             SELECT t.id, t.tour_name, t.request_string, t.lat, t.lng, t.number_requested,
                    t.content_language, t.original_tour_id,
-                   v.max_version_no, v.last_replaced_at, t.created_at
+                   v.max_version_no, v.last_replaced_at, t.created_at,
+                   {_source_version_select(cur)} AS source_version,
+                   sv.max_version_no AS source_max_version_no
             FROM audio_tours t
             LEFT JOIN (
                 SELECT tour_id, MAX(version_no) AS max_version_no, MAX(replaced_at) AS last_replaced_at
                 FROM audio_tour_versions GROUP BY tour_id
             ) v ON v.tour_id = t.id
+            LEFT JOIN (
+                SELECT tour_id, MAX(version_no) AS max_version_no
+                FROM audio_tour_versions GROUP BY tour_id
+            ) sv ON sv.tour_id = t.original_tour_id
             WHERE (t.tour_name ILIKE %s OR t.request_string ILIKE %s)
             AND t.lat IS NOT NULL AND t.lng IS NOT NULL
             AND (t.is_test IS NOT TRUE)
@@ -450,8 +573,9 @@ def search_tours():
         
         for tour in tours:
             (tour_id, tour_name, request_string, tour_lat, tour_lng, requests, language, original_id,
-             max_vn, last_replaced, created_at) = tour
-            version, updated_at = _version_fields(max_vn, last_replaced, created_at)
+             max_vn, last_replaced, created_at, source_version, source_max_vn) = tour
+            version, updated_at = _resolved_version_fields(
+                original_id, source_version, source_max_vn, max_vn, last_replaced, created_at)
             
             if tour_lat and tour_lng:
                 distance = calculate_distance(lat, lng, tour_lat, tour_lng)

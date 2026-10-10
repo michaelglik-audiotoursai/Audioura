@@ -91,10 +91,14 @@ def _install_db(plan):
 class VersionLabelTest(unittest.TestCase):
     def setUp(self):
         self._orig_db = map_app.get_db_connection
+        # [LOCAL-666] Reset the cached source_version schema probe so each test starts
+        # from a clean slate (the plans below answer the information_schema query).
+        map_app._HAS_SOURCE_VERSION = None
         self.client = map_app.app.test_client()
 
     def tearDown(self):
         map_app.get_db_connection = self._orig_db
+        map_app._HAS_SOURCE_VERSION = None
 
     # ── /tours-near ────────────────────────────────────────────────────────
     # tours-near column order:
@@ -105,9 +109,10 @@ class VersionLabelTest(unittest.TestCase):
         """A never-replaced tour → version 1, updated_at = created_at date."""
         created = datetime.datetime(2026, 10, 1, 8, 30, 0)
         _install_db([
+            ("information_schema", [("source_version",)]),
             ("from audio_tours t", [
                 (557, "Old Town", "old town walk", 43.70, 7.26, 12,
-                 "en", None, None, None, created),
+                 "en", None, None, None, created, None, None),
             ]),
         ])
         resp = self.client.get("/tours-near/43.70/7.26?radius=50")
@@ -123,9 +128,10 @@ class VersionLabelTest(unittest.TestCase):
         created = datetime.datetime(2026, 1, 1, 0, 0, 0)
         last_replaced = datetime.datetime(2026, 10, 9, 15, 42, 0)
         _install_db([
+            ("information_schema", [("source_version",)]),
             ("from audio_tours t", [
                 (557, "Old Town", "old town walk", 43.70, 7.26, 30,
-                 "en", None, 2, last_replaced, created),
+                 "en", None, 2, last_replaced, created, None, None),
             ]),
         ])
         resp = self.client.get("/tours-near/43.70/7.26?radius=50")
@@ -137,18 +143,20 @@ class VersionLabelTest(unittest.TestCase):
     # ── /tour-by-code ───────────────────────────────────────────────────────
     # tour-by-code first resolves the share code, then selects the row.
     # row order: id, tour_name, request_string, lat, lng, number_requested,
-    # language, original_tour_id, max_version_no, last_replaced_at, created_at
+    # language, original_tour_id, max_version_no, last_replaced_at, created_at,
+    # source_version, source_max_version_no
     def test_tour_by_code_returns_version_ge_2_for_replaced_tour(self):
         """The live check's shape: q9oSUebU → tour 557, replaced once → v2."""
         created = datetime.datetime(2026, 1, 1, 0, 0, 0)
         last_replaced = datetime.datetime(2026, 10, 9, 12, 0, 0)
         _install_db([
+            ("information_schema", [("source_version",)]),
             # share-code resolution: SELECT audio_tour_id FROM shared_tours ...
             ("from shared_tours", [(557,)]),
             # the row select (joined with the versions aggregate)
             ("from audio_tours t", [
                 (557, "Old Town", "old town walk", 43.70, 7.26, 25,
-                 "en", None, 1, last_replaced, created),
+                 "en", None, 1, last_replaced, created, None, None),
             ]),
         ])
         resp = self.client.get("/tour-by-code/q9oSUebU")
@@ -166,10 +174,11 @@ class VersionLabelTest(unittest.TestCase):
         """A share code to a fresh tour → version 1, updated_at = created_at."""
         created = datetime.datetime(2026, 9, 15, 9, 0, 0)
         _install_db([
+            ("information_schema", [("source_version",)]),
             ("from shared_tours", [(900,)]),
             ("from audio_tours t", [
                 (900, "Fresh Tour", "fresh", 48.85, 2.35, 3,
-                 "en", None, None, None, created),
+                 "en", None, None, None, created, None, None),
             ]),
         ])
         resp = self.client.get("/tour-by-code/freshcode")
@@ -179,18 +188,20 @@ class VersionLabelTest(unittest.TestCase):
         self.assertEqual(tour["updated_at"], "2026-09-15")
 
     def test_tour_by_code_translation_carries_own_version(self):
-        """A share code that resolves to a TRANSLATION row (original_tour_id set)
-        carries that translation row's own version — the join is on the resolved
-        row id, so this is the version of the exact tour the listener downloads."""
-        created = datetime.datetime(2026, 2, 1, 0, 0, 0)
-        last_replaced = datetime.datetime(2026, 10, 8, 10, 0, 0)
+        """[LOCAL-657 → superseded by LOCAL-666] A share code resolving to a
+        TRANSLATION row (original_tour_id set) now reports the SOURCE tour's version
+        via its pinned source_version — NOT the translation's own (always-v1) archive.
+        Here the ES translation of 557 pins source_version=5, so it shows v5 with its
+        OWN created_at as the updated date."""
+        created = datetime.datetime(2026, 10, 8, 10, 0, 0)
         _install_db([
+            ("information_schema", [("source_version",)]),
             ("from shared_tours", [(1201,)]),
             ("from audio_tours t", [
-                # id=1201 is an ES translation of original 557; it has its own
-                # single archived version (max_version_no=1 → live is v2).
+                # id=1201 is an ES translation of original 557; its own archive is
+                # empty (max_version_no NULL) but source_version=5 is pinned.
                 (1201, "Old Town [es]", "old town walk", 43.70, 7.26, 4,
-                 "es", 557, 1, last_replaced, created),
+                 "es", 557, None, None, created, 5, 4),
             ]),
         ])
         resp = self.client.get("/tour-by-code/estrans")
@@ -199,8 +210,8 @@ class VersionLabelTest(unittest.TestCase):
         self.assertEqual(tour["id"], 1201)
         self.assertEqual(tour["original_tour_id"], 557)
         self.assertEqual(tour["language"], "es")
-        self.assertEqual(tour["version"], 2)           # its OWN version
-        self.assertEqual(tour["updated_at"], "2026-10-08")
+        self.assertEqual(tour["version"], 5)           # the SOURCE version it pins
+        self.assertEqual(tour["updated_at"], "2026-10-08")  # its OWN created_at
 
     # ── the _version_fields helper directly ─────────────────────────────────
     def test_version_fields_helper(self):
