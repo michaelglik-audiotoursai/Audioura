@@ -205,6 +205,13 @@ def seed(namespace: str, args: Tuple[Any, ...], kwargs: Dict[str, Any],
     thread, in its own ``contextvars`` context) hands its result back to the main
     tour context so the first in-pipeline call is a memo HIT rather than a second
     network fetch. A no-op when FAST_PIPELINE is OFF (the memo is never consulted).
+
+    [LOCAL-656B] For the ``resolve_venue`` namespace the SINGLE venue memo is the
+    LOCAL-661 resolution memo in ``venue_resolver`` (that is the store the merged
+    ``resolve_venue`` reads on its FAST_PIPELINE hit — there is no second cache).
+    So a resolve seed is also written there, keyed by venue/city, so the impl's
+    first ``resolve_venue(venue, city)`` is a real hit. The ``args`` for the
+    resolve namespace are ``(venue_string, city)``.
     """
     if not is_enabled():
         return
@@ -216,6 +223,16 @@ def seed(namespace: str, args: Tuple[Any, ...], kwargs: Dict[str, Any],
             ns = {}
             store[namespace] = ns
         ns[key] = value
+    if namespace == "resolve_venue" and value is not None:
+        # Hand the prewarmed entity to the unified LOCAL-661 venue memo so the
+        # merged resolve_venue's fast-path hit sees it. Non-fatal, best-effort.
+        try:
+            import venue_resolver as _vr
+            _v = args[0] if len(args) >= 1 else ""
+            _c = args[1] if len(args) >= 2 else ""
+            _vr._resolve_memo_remember(_v, _c, value)
+        except Exception:
+            pass
 
 
 def _make_key(args: Tuple[Any, ...], kwargs: Dict[str, Any]) -> Any:
