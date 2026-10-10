@@ -1,0 +1,30 @@
+LOCAL-656B OFFLINE proof — no network, no DB, no paid API, no live run.
+Profile: resolve=2.7s ×4, preflight=14.0s
+
+========================================================================
+CLAIM 1 — resolve_venue call count: 4 → 1
+========================================================================
+[TIMING-SUB] phase=unknown step=resolve_venue elapsed=2.70s
+[TIMING-SUB] phase=unknown step=resolve_venue elapsed=2.77s
+[TIMING-SUB] phase=unknown step=resolve_venue elapsed=2.75s
+[TIMING-SUB] phase=unknown step=resolve_venue elapsed=2.74s
+  FAST_PIPELINE OFF : 4 resolve_venue() calls -> 4 impl call(s), wall=10.98s (serial 4×2.7s)
+[TIMING-SUB] phase=unknown step=resolve_venue elapsed=2.77s
+[TIMING-SUB] phase=unknown step=resolve_venue elapsed=0.00s
+[TIMING-SUB] phase=unknown step=resolve_venue elapsed=0.00s
+[TIMING-SUB] phase=unknown step=resolve_venue elapsed=0.00s
+  FAST_PIPELINE ON  : 4 resolve_venue() calls -> 1 impl call(s), wall=2.77s (1 real resolve, 3 memo hits)
+  RESULT: 4→1 drop PROVEN (OFF=4, ON=1); wall saved ≈ 8.21s on the duplicate resolves
+
+========================================================================
+CLAIM 2 — poi_selection wall drops by the preflight ∥ resolve overlap
+========================================================================
+[TIMING-SUB] phase=unknown step=resolve_venue elapsed=2.77s
+[TIMING-SUB] phase=unknown step=resolve_venue elapsed=2.77s
+[TIMING-SUB] phase=unknown step=resolve_venue elapsed=0.00s
+  SERIAL  (today)   : preflight 14.0s + resolve 2.7s = wall 16.84s  (impl calls=1)
+  OVERLAP (ON)      : max(preflight 14.0s, resolve 2.7s) = wall 14.08s  (impl calls=1, in-pipeline resolve was a memo HIT: True)
+  RESULT: overlap PROVEN — poi_selection wall dropped ≈ 2.76s (≈ the 2.7s resolve now hidden under the 14.0s preflight)
+
+========================================================================
+ALL CLAIMS PROVEN (offline).
