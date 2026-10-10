@@ -249,3 +249,207 @@ tests/test_local662_walking_v9_defects.py               | 278 +++    (new suite)
 tests/fixtures/local662/tour_557_v9_stop3_...txt        |  28 +++    (new fixture)
 run_local662_container.py                               | 278 +++    (live harness)
 ```
+
+---
+---
+
+# 662B — Bounce: the walking existence gate dropped REAL places, and the shortfall slot was refilled with a 4.3 km "John F."
+
+**Agent:** Mac Mini Kiro · **Branch:** `LOCAL-662-walking-v9` (continued) ·
+**Base:** `subscribed` @ `0e0b4897` — `git merge-base --is-ancestor 0e0b4897 HEAD` → 0 ✓
+
+The LEAD review of the v9 live run bounced two things the v9 fixes did not
+address. Both are fixed, with a dedicated offline suite and ONE new paid tour
+that reproduces the exact request and proves both gone. **Defects 2–4 are
+untouched and still green.**
+
+## The two bounced defects
+
+### B1. The gate dropped REAL places (coverage ≠ existence)
+
+**Cause.** "Verified" meant *named in the stop corpus* — a **coverage** test, not
+an **existence** test. A city walking tour's venue ("Walking tour in Boston …,
+Boston, MA") has no `venue_corpus` row, so `_classify_venue_kind` returns
+`unknown` and the stop fell to the institution/unknown branch, which runs
+`_check_stop_corpus` **only**. Real, geocodable landmarks that we simply have not
+scraped — **Parkman Bandstand**, **the Boston Athenaeum** — had no corpus row, so
+they were `UNVERIFIED → DROPPED` though they plainly exist. (The
+`geographic_area` and `dining` kinds already had a Wikidata/Wikipedia/OSM tier-1
+check; the walking/unknown kind did not.)
+
+**Fix.** `stop_existence_gate._check_walking_stop_existence`: for
+`walking`/`specialized` tours, after corpus coverage fails, ask the existence
+question the LEAD specified —
+
+* a **Wikidata** item whose **label OR alias** matches the stop, with **P625**
+  coordinates within the toured-city metro radius, **OR**
+* an **OSM named feature** (Nominatim) matching the stop, in the toured city.
+
+Only a stop that fails **both** is dropped. The OSM query tries the title and the
+title with a leading article stripped (`The Boston Athenaeum` → `Boston
+Athenaeum`, which is how OSM indexes it) and binds the match to the feature's
+**own name** (a bare generic place-type word like "park" never matches), so
+**"The State House Park"** — no distinct Wikidata item, no OSM feature — **still
+fails**. A Wikimedia/OSM search that could not run (429 / timeout / connection)
+raises `RuntimeError` → classified `search_failed` → the stop is **kept** as
+UNKNOWN, never dropped on non-evidence (LOCAL-661 / D162). Proximity binds to the
+toured **city** (metro radius 35 km — this is existence, not walkability; the
+walking distance limit is GEO-CHECK's job).
+
+Verdicts, verified live against free Wikidata/Nominatim (the 7 candidates from the
+LEAD's run):
+
+| stop | verdict | evidence |
+|---|---|---|
+| Faneuil Hall | **VERIFIED** | wikidata Q49137, P625 in metro |
+| Massachusetts State House | **VERIFIED** | wikidata Q1150259 |
+| Old State House | **VERIFIED** | wikidata Q1320533 |
+| Boston City Hall | **VERIFIED** | wikidata Q250773 |
+| **Parkman Bandstand** | **VERIFIED** | wikidata Q7138603 |
+| **The Boston Athenaeum** | **VERIFIED** | nominatim_osm `amenity/library` in Boston |
+| **The State House Park** | **FAILS** | no Wikidata item, no OSM feature |
+
+`stop_existence_gate.py` — commit `e1fd7903`.
+
+### B2. The "4 of 5" shortfall was undone by a back-fill, delivering a 4.3 km "John F."
+
+**Cause (2a — the back-fill).** GEO-CHECK re-validates **its own** replacements
+against the LOCAL-658 walking limit and correctly refused the far JFK Library,
+logging "delivering 4 of 5 … honest shortfall". But the **D558
+`replenish_to_count` block runs AFTER GEO-CHECK**, and on a city walking tour its
+containment scope `_gp_scope` is `''`, so `_validate_stops_within_scope` never
+ran — **no distance check**. It re-added the JFK Presidential Library (≈4.3 km, in
+Dorchester) to reach the requested count. (Tour 648: Stop 5 "John F.",
+`Directions: … Continue to John F. — it is roughly 4.3 km away.`,
+`Coordinates: 42.3201, -71.0523`, no Address line.)
+
+**Fix (2a).** After the D558 replenishment resolves coordinates and route-orders,
+a walking-distance prune (for `walking` + not `country_scale`) holds the
+replenished stops to the **same** LOCAL-658 limit the originals passed: keep the
+pre-replenishment stops, then admit each replenished stop **only if** the
+route-ordered set adds no leg over `WALKING_LEG_HARD_KM` (on_foot, 1.75 km) and
+keeps the total under the mode hard limit. A far stop (or one with no coordinate
+to check) is refused → `forbidden_norms`, the route is recomputed, and the tour
+ships **N−1 with the honest shortfall** (LOCAL-632). Covers both the D558
+replenishment and the centroid-collapse refill (both add stops not in the
+pre-replenishment set). Verified against real coords: the four downtown-Boston
+originals pass (max leg **0.52 km**); adding the JFK Library is **refused** (max
+leg **4.32 km** > 1.75 km).
+
+**Cause (2b — the "John F." header).** `poi['name']` was `"John F."` the whole
+time — the replenishment proposer returned a **truncation artifact** (first name
++ a bare trailing initial). The narration LLM expanded it to the full "John F.
+Kennedy Presidential Library and Museum", but the header and directions render
+`poi['name']` **verbatim** → `Stop 5: John F.`. The LOCAL-658 initials fix in
+`_is_name_corrupted` neutralized trailing initials so aggressively (to protect
+"I. M. Pei", "John F. Kennedy …") that it **also waved through** a name that is
+*nothing but* a first name plus a bare initial. That is the "bypass".
+
+**Fix (2b).** `_is_name_corrupted` Criterion 5: a name whose **last token is a
+lone letter** (with or without the dot) is a truncation → corrupt. A real
+initial-bearing name ends on a real word and stays clean. Verified:
+`John F.` / `John F` → corrupt; `I. M. Pei`, `W. E. B. Du Bois`, `J. P. Morgan`,
+`John F. Kennedy Presidential Library and Museum`, and all the Boston landmarks →
+clean. Wired into `replenish_to_count` so a truncated proposed name is rejected
+**at proposal** (the LOCAL-290 / LOCAL-320 replenishment paths already call
+`_is_name_corrupted`).
+
+`generate_tour_text.py` — commit `7cf8f219`.
+
+## Tests (offline, with exit codes)
+
+`tests/test_local662b_bounce.py` — one class per bounce defect:
+
+| class | defect | result |
+|---|---|---|
+| `TestNameTruncationGuard` | 2b | deterministic; truncations corrupt, real names clean |
+| `TestWalkingDistancePrune` | 2a | deterministic real coords: downtown pass, +JFK refused; `replenish_to_count` rejects a truncated name |
+| `TestWalkingExistenceVerdictsLive` | 1 | 7 verdicts via live Wikidata/OSM (**free**), gated `LOCAL662B_LIVE=1` |
+
+Offline **7 passed, 2 skipped**; live (`LOCAL662B_LIVE=1`) **9 passed**. Commit `1c1884af`.
+
+Regression sweep — all green (no regression from the walking-only changes):
+`test_local658_walking_v4` (22), `test_local614_sentence_splitter_initials` (6),
+`test_d558_replenish_loop` (18), `test_local662_walking_v9_defects` (17),
+`test_local654` (8), `test_local655` (58), `test_local628` (23),
+`test_local660` (14), `test_local646` (13), `test_local630` (24),
+`test_local320_inconclusive` (5); **museum canaries** `test_local652` (12),
+`test_local611` (7), `test_local286` (31), `test_local615` (7),
+`test_local616` (6).
+
+**Pre-existing failure (NOT this work):**
+`tests/test_local320_nondining_regression.py::test_8stop_museum_gate` fails
+**identically** with the base `stop_existence_gate.py` checked out at `0e0b4897`
+(the localhost:5433 test DB lacks the Asian-arts `venue_corpus` rows). All 662B
+changes are gated to `walking`/`specialized`; the museum path is untouched.
+
+## Live run (own container; ONE paid tour; cap $0.65)
+
+Built **`local662b-gen-img`** from `Dockerfile.generator` and ran a disposable
+`docker run --rm --name local662b-gen --network development_default` container
+(the harness file is mounted in — `.dockerignore` excludes `*_container.py`). It
+joined `development_default` **only** to INSERT one additive `is_test` row into
+`development-postgres-2-1`. **Never** `docker compose -p audioura`; **never** an
+`audioura-*` container (`audioura-tour-generator-1` stayed healthy throughout);
+cache + stop pool **OFF** (fresh); **NORMAL arm**.
+
+* **Request:** "Walking tour in Boston dedicated to Massachusetts politics and
+  current affairs, Boston, MA" — 5 stops, walking, fresh.
+* **Outcome:** DELIVERED — `audio_tours` **id = 649** (`is_test = true`), 11 109
+  chars, 5 stops.
+* **Stops:** Massachusetts State House · Boston City Hall · Bunker Hill Monument ·
+  Faneuil Hall · Old State House — **all real landmarks**. No "John F." header
+  ("John F. Kennedy" appears only inside Stop 1's narration, the 1961 speech).
+  Directions legs **1.5 km** (walkable); **no 4.3 km far stop**.
+* **`audio_tours` count:** BEFORE **446** (381 `is_test`) → AFTER **447** (382
+  `is_test`). **Additive only. No DELETE.**
+* **Spend (`live_run_meter` TOTAL): $0.5410** — under the $0.65 cap. openai
+  $0.3048, gemini_grounding $0.2170 (6 requests / 10 queries), gemini_tokens
+  $0.0182, serper $0.0010, preflight $0.0000. `cost_ledger` row
+  `db4c8630-…`; `paid_api_calls` for the container host = **$0.51896**. ONE paid
+  tour only.
+
+### The gate log proves fix B1
+
+```
+[LOCAL-662] EXISTENCE-GATE: forcing ENFORCE for 'walking' tour (global mode LOG_ONLY)
+[EXISTENCE-GATE] … 7/7 stops verified (100%), 0 would be dropped
+  [VERIFIED] 'Bunker Hill Monument' — wikidata_en: 'Bunker Hill Monument' (QID:Q1009561) at 42.3764,-71.0608 within metro
+  [VERIFIED] 'The Boston Athenaeum'  — nominatim_osm: 'Boston Athenaeum' in boston [category=amenity/library]
+```
+
+The new Wikidata and OSM existence checks fire and verify the exact landmarks the
+LEAD said were wrongly dropped — the gate dropped **nothing**. (The Athenaeum and
+"The State House Plaza" were removed earlier by a *separate, pre-existing*
+SELECTION stage — `LOCAL-212 VENUE_ONLY` / `LOCAL-349` yield-scoring — not the
+existence gate; the gate itself verified all 7 it received, the Athenaeum via the
+new OSM check.)
+
+### Bounce detectors on the delivered text — all PASS
+
+| detector | result |
+|---|---|
+| DEFECT1 real landmarks kept | **PASS** — `wrongly_dropped_real_landmarks=[]` |
+| DEFECT2a no far stop | **PASS** — `far_legs=[]`, `jfk_stop5=False` |
+| DEFECT2b no truncated header | **PASS** — `truncated_headers=[]` |
+
+## Process / safety
+
+* Continued `LOCAL-662-walking-v9`; `git merge-base --is-ancestor 0e0b4897 HEAD`
+  → 0. Never branched from `origin/*`.
+* Committed after each step: `e1fd7903` (B1), `7cf8f219` (B2a+B2b),
+  `1c1884af` (tests), `10e71428` (live harness), + this submission.
+* Did **not** edit `DECISIONS.md`, `CLAUDE.md`, `BACKLOG.md`, `WORK_QUEUE.md`, or
+  `.continuous_dev/STATUS.md`.
+* Live run: own `--rm` container only; no `docker compose -p audioura`; no
+  `audioura-*` container renamed/replaced; additive `is_test` row only; **No
+  DELETE**; **No GCloud**. Spend reported from `live_run_meter` / `paid_api_calls`.
+
+## Files changed (662B)
+
+```
+stop_existence_gate.py                    | +250  (B1: walking existence check)
+generate_tour_text.py                     |  +95  (B2a distance prune, B2b guard)
+tests/test_local662b_bounce.py            | +205  (new bounce suite)
+run_local662b_container.py                | +285  (live harness)
+```
