@@ -8298,7 +8298,15 @@ def _apply_delivery_hours_guard(result):
         #     Orientation back into the opening section, before the first
         #     Orientation. Deterministic; never invents or drops a fact; no-op when
         #     the facts are already in the opening section.
+        # [LEAD 2026-10-09] Venue practical facts exist only for a single-venue (museum)
+        # tour. On a walking tour there is no venue to open the tour with, and the
+        # relocation moved other stops' sentences ("cost $26.5 million by 1969",
+        # "is open to debate") into Stop 1 (Boston 557 v8, Kiro 5.5).
+        _pf_cat = re.search(r"(?mi)^Tour-Category:\s*(\w+)", final or "")
+        _pf_single_venue = (not _pf_cat) or _pf_cat.group(1).lower() == "museum"
         try:
+            if not _pf_single_venue:
+                raise StopIteration
             import practical_facts_gate as _pfg_reloc
             final, _reloc = _pfg_reloc.relocate_practical_facts_to_opening(final)
             # [LEAD 2026-10-08] label-independent placement (Frick 528: no Orientation label in Stop 1)
@@ -8312,6 +8320,8 @@ def _apply_delivery_hours_guard(result):
                       f"sentence(s) out of a stop Orientation/body into the Stop-1 "
                       f"opening section (hours/price belong in the general "
                       f"description)", flush=True)
+        except StopIteration:
+            pass
         except Exception as _rl:  # pragma: no cover
             _import_logger.error(f"[LOCAL-638] practical-facts relocation skipped: {_rl}")
         # 2d. [LOCAL-630 item 8] Computed year-spans ("N years after/later") must

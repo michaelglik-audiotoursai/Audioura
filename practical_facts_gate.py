@@ -945,7 +945,7 @@ _UNPUBLISHED_HOURS_LINE = "Opening hours weren't published where we could read t
 # A sentence that STATES concrete opening hours (a time, a weekday range, "open
 # daily"), or admission — anything that means the tour already speaks visiting info.
 _SPOKEN_HOURS_RE = re.compile(
-    r"(?i)(\bis\s+open\b|\bopen\s+daily\b|\d\s*(?:am|pm)\b|\d{1,2}:\d{2}|"
+    r"(?i)(\bis\s+open\b(?!\s+to\s+(?:debate|question|interpretation|discussion|doubt|dispute|speculation)\b)|\bopen\s+daily\b|\d\s*(?:am|pm)\b|\d{1,2}:\d{2}|"
     r"\bopen\s+(?:mon|tue|wed|thu|fri|sat|sun)|admission\s+is\b|\bfree\s+admission\b|"
     r"Museum Information)")
 
@@ -1033,7 +1033,7 @@ def ensure_unpublished_hours_line(text: str,
 # "Museum Information" field label (that label is a non-spoken field line that the
 # audio/critique strip, so its presence must NOT be read as "hours spoken").
 _SPOKEN_HOURS_PROSE_RE = re.compile(
-    r"(?i)(\bis\s+open\b|\bopen\s+daily\b|\d\s*(?:am|pm)\b|\d{1,2}:\d{2}|"
+    r"(?i)(\bis\s+open\b(?!\s+to\s+(?:debate|question|interpretation|discussion|doubt|dispute|speculation)\b)|\bopen\s+daily\b|\d\s*(?:am|pm)\b|\d{1,2}:\d{2}|"
     r"\bopen\s+(?:mon|tue|wed|thu|fri|sat|sun)|admission\s+is\b|\bfree\s+admission\b|"
     r"\ba\s+ticket\s+is\b)")
 
@@ -1191,7 +1191,7 @@ def _hours_bearing_sentences(text: str) -> "List[str]":
         return []
     # Hours cue: an opening phrase or a clock/day time — NOT the admission cue.
     _hours_cue = re.compile(
-        r"(?i)(\bis\s+open\b|\bopen\s+daily\b|\d\s*(?:am|pm)\b|\d{1,2}:\d{2}|"
+        r"(?i)(\bis\s+open\b(?!\s+to\s+(?:debate|question|interpretation|discussion|doubt|dispute|speculation)\b)|\bopen\s+daily\b|\d\s*(?:am|pm)\b|\d{1,2}:\d{2}|"
         r"\bopen\s+(?:mon|tue|wed|thu|fri|sat|sun))")
     spoken_lines = []
     for line in text.split("\n"):
@@ -1278,7 +1278,7 @@ _ADMISSION_SENTENCE_RE = re.compile(
     r"\ba\s+ticket\s+is\b|\btickets?\s+(?:are|cost|start)\b|"
     r"\bgeneral\s+admission\b)")
 _PRICE_AMOUNT_RE = re.compile(
-    r"[£€$¥]\s?\d[\d.,]*(?!\s*(?:million|billion|thousand|bn|m\b|k\b))", re.I)
+    r"[£€$¥]\s?\d[\d.,]*(?![\d.,])(?!\s*(?:million|billion|thousand|bn|m\b|k\b))", re.I)
 _ADMISSION_CUE_RE = re.compile(
     r"(?i)\b(admission|tickets?|entry|entrance|fee|adults?|children|seniors?|"
     r"students?|concessions?|per\s+person|visitors?\s+pay|costs?)\b")
@@ -1398,7 +1398,7 @@ def collapse_admission_statements(text: str) -> "Tuple[str, int]":
 # defined above. The "Museum Information:" value counts (TTS strips the label and
 # speaks the value), so the opening target is matched after label-stripping too.
 _PRACTICAL_HOURS_CUE_RE = re.compile(
-    r"(?i)(\bis\s+open\b|\bopen\s+daily\b|\bopen\s+(?:mon|tue|wed|thu|fri|sat|sun)"
+    r"(?i)(\bis\s+open\b(?!\s+to\s+(?:debate|question|interpretation|discussion|doubt|dispute|speculation)\b)|\bopen\s+daily\b|\bopen\s+(?:mon|tue|wed|thu|fri|sat|sun)"
     r"|\bclosed\s+on\b|\d\s*(?:am|pm)\b|\d{1,2}:\d{2}\b"
     # [LOCAL-652] noon/midnight count as an HOURS cue only in a clock/range/opening
     # context — never as a bare word. A later stop's work TITLE ("Landscape: Noon",

@@ -48,3 +48,12 @@ def test_bequest_amount_is_not_an_admission_fact():
         "The bandstand honors George Francis Parkman, who left a $5 million bequest for Boston Common.")
     assert not g._is_practical_facts_sentence("He sold it for $500.")
     assert g._is_practical_facts_sentence("Tickets are $25 for adults.")
+
+
+def test_open_to_debate_and_decimal_millions_are_not_practical_facts():
+    # LEAD 2026-10-09: 557 v8 moved "cost $26.5 million by 1969" and "is open to debate" into the Stop-1 opening.
+    import practical_facts_gate as g
+    assert not g._is_practical_facts_sentence("Their design cost $26.5 million by 1969.")
+    assert not g._is_practical_facts_sentence("The truth of that binding is open to debate.")
+    assert g._is_practical_facts_sentence("The museum is open daily from 10 AM.")
+    assert g._is_practical_facts_sentence("Admission is $12.50 for adults.")
