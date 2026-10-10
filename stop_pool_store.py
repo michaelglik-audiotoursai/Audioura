@@ -66,7 +66,7 @@ try:
     from tour_cache_layer1 import TOUR_CACHE_VERSION as _POOL_VERSION
     from tour_cache_layer1 import _normalize_location as _normalize_location
 except Exception:  # pragma: no cover - import shim for isolated tests
-    _POOL_VERSION = 32
+    _POOL_VERSION = 33
 
     _MEANINGLESS_PUNCT = re.compile(r"[,\.\u2019\u2018']")
 
