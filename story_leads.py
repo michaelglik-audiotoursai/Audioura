@@ -530,8 +530,18 @@ RESEARCH_BACKEND_ENV = 'RESEARCH_BACKEND'
 
 def research_backend() -> str:
     """The selected research backend: 'serper' or 'gemini' (default). Case- and
-    whitespace-insensitive; anything other than 'serper' means 'gemini'."""
-    v = os.environ.get(RESEARCH_BACKEND_ENV, '').strip().lower()
+    whitespace-insensitive; anything other than 'serper' means 'gemini'.
+
+    [LOCAL-664] RESEARCH_BACKEND is routed through the cheap-arm gate. When
+    CHEAP_ARM_CATEGORIES is set, this env applies ONLY to a tour whose category
+    is in the list; for any other category effective_env returns '' so the default
+    (gemini) is used. When CHEAP_ARM_CATEGORIES is unset, effective_env returns the
+    raw env, so behaviour is byte-for-byte unchanged."""
+    try:
+        import cheap_arm as _cheap_arm
+        v = (_cheap_arm.effective_env(RESEARCH_BACKEND_ENV, '') or '').strip().lower()
+    except Exception:  # pragma: no cover - gate must never break research
+        v = os.environ.get(RESEARCH_BACKEND_ENV, '').strip().lower()
     return 'serper' if v == 'serper' else 'gemini'
 
 

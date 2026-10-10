@@ -235,8 +235,15 @@ def narration_model_route() -> tuple:
     chosen; when it is unset the OpenAI path falls back to story_pass_model()
     so the production default (gpt-4.1) is preserved byte-for-byte.
     """
-    provider = (os.environ.get("NARRATION_PROVIDER", "") or "openai").strip().lower()
-    model = os.environ.get("NARRATION_MODEL", "").strip()
+    # [LOCAL-664] Route NARRATION_PROVIDER/NARRATION_MODEL through the cheap-arm
+    # gate. When CHEAP_ARM_CATEGORIES is set, these envs apply ONLY to a tour whose
+    # category is in the list; for any other category effective_env returns the
+    # default so the production path (openai + story_pass_model()) is preserved.
+    # When CHEAP_ARM_CATEGORIES is unset, effective_env returns the raw env, so
+    # behaviour is byte-for-byte unchanged from before this change.
+    import cheap_arm as _cheap_arm
+    provider = (_cheap_arm.effective_env("NARRATION_PROVIDER", "") or "openai").strip().lower()
+    model = (_cheap_arm.effective_env("NARRATION_MODEL", "") or "").strip()
     if provider == "gemini":
         return ("gemini", model or "gemini-2.5-flash")
     # OpenAI (default): preserve the existing story_pass_model() default exactly.
@@ -9761,6 +9768,22 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
         print(f"  [LOCAL-485] VENUE-CLASS GUARD: overriding 'museum' → walking "
               f"(request names a worship/civic place class — its stops are places, not works)")
         tour_category = 'walking'
+
+    # ─── [LOCAL-664] CHEAP ARM BY CATEGORY ────────────────────────────────────
+    # tour_category is now FINAL (after S15 / CLASSIFY-FIX / FACILITY & VENUE-CLASS
+    # guards). Bind it into the cheap-arm contextvar so every downstream call site
+    # — _narration_provider_and_model (narration_model_route), story_leads's
+    # research backend, and the per-stop pool workers (which inherit this context
+    # via cost_accumulator's ThreadPoolExecutor patch, exactly as LOCAL-651/656
+    # rely on) — gates NARRATION_* / RESEARCH_BACKEND to this category. With
+    # CHEAP_ARM_CATEGORIES unset this is a pure no-op (the envs still apply to
+    # everything). Log the decision ONCE here. Non-fatal.
+    try:
+        import cheap_arm as _cheap_arm
+        _cheap_arm.set_tour_category(tour_category)
+        _cheap_arm.log_decision(tour_category)
+    except Exception as _ca664_err:  # pragma: no cover - gate must never block generation
+        print(f"  [LOCAL-664] cheap-arm setup skipped (non-fatal): {_ca664_err}")
 
     # ─── [LOCAL-655] CURRENT-AFFAIRS INTENT ───────────────────────────────────
     # Tour 557 ("…Massachusetts politics and current affairs") ended with a false
