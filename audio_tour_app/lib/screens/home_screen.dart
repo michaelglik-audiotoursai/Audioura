@@ -23,6 +23,7 @@ import '../services/error_handler_service.dart';
 import '../config.dart';
 import '../config/endpoints.dart';
 import '../utils/share_code.dart';
+import '../utils/search_dispatch.dart';
 // import '../services/credential_storage_service.dart';  // TEMPORARILY DISABLED - CAUSING BUILD ERRORS
 // import '../services/subscription_article_storage.dart';  // TEMPORARILY DISABLED - CAUSING BUILD ERRORS
 import '../widgets/subscription_credential_dialog.dart';
@@ -418,31 +419,41 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
   
-  void _showLocationSearchDialog() {
+  /// [LOCAL-665] The one Home search dialog. Same visuals as the old shared
+  /// dialogs (a title, a single text field, Cancel + Search), but a single box
+  /// whose hint — "Share code, tour name, or place" — says it takes all three.
+  /// On submit it hands the raw text to [classifySearchInput] and runs
+  /// [_dispatchSearch]; the FORMAT decides what happens, not which button the
+  /// listener happened to press.
+  void _showSearchDialog() {
     final TextEditingController controller = TextEditingController();
-    
+
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text('Search Location'),
+        title: const Text('Search'),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             TextField(
               controller: controller,
-              decoration: InputDecoration(
-                hintText: 'Buenos Aires, Argentina',
-                labelText: 'City, Country or Address',
+              decoration: const InputDecoration(
+                hintText: 'Share code, tour name, or place',
+                labelText: 'Search',
               ),
               autofocus: true,
+              onSubmitted: (value) async {
+                final query = value.trim();
+                if (query.isEmpty) return;
+                Navigator.pop(context);
+                await _dispatchSearch(query);
+              },
             ),
-            SizedBox(height: 16),
-
-            SizedBox(height: 16),
+            const SizedBox(height: 16),
             if (_locationHistory.isNotEmpty) ...[
-              Text('Recent Locations:', style: TextStyle(fontWeight: FontWeight.bold)),
-              SizedBox(height: 8),
-              Expanded(
+              const Text('Recent Locations:', style: TextStyle(fontWeight: FontWeight.bold)),
+              const SizedBox(height: 8),
+              Flexible(
                 child: ListView.builder(
                   shrinkWrap: true,
                   itemCount: _locationHistory.length,
@@ -450,8 +461,8 @@ class _HomeScreenState extends State<HomeScreen> {
                     final location = _locationHistory[index];
                     return ListTile(
                       dense: true,
-                      leading: Icon(Icons.history, size: 16),
-                      title: Text(location['name'], style: TextStyle(fontSize: 14)),
+                      leading: const Icon(Icons.history, size: 16),
+                      title: Text(location['name'], style: const TextStyle(fontSize: 14)),
                       onTap: () {
                         Navigator.pop(context);
                         _useCustomLocation(
@@ -469,55 +480,125 @@ class _HomeScreenState extends State<HomeScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: Text('Cancel'),
+            child: const Text('Cancel'),
           ),
           TextButton(
             onPressed: () {
               Navigator.pop(context);
               _resetToCurrentLocation();
             },
-            child: Text('Use Current Location'),
+            child: const Text('Use Current Location'),
           ),
           ElevatedButton(
             onPressed: () async {
               final query = controller.text.trim();
               if (query.isEmpty) return;
-              
               Navigator.pop(context);
-              await _searchAndUseLocation(query);
+              await _dispatchSearch(query);
             },
-            child: Text('Search'),
+            child: const Text('Search'),
           ),
         ],
       ),
     );
   }
-  
-  Future<void> _searchAndUseLocation(String query) async {
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => AlertDialog(
-        content: Row(
-          children: [
-            CircularProgressIndicator(),
-            SizedBox(width: 20),
-            Text('Searching location...'),
-          ],
-        ),
-      ),
-    );
-    
-    final location = await _geocodeLocation(query);
-    Navigator.pop(context);
-    
-    if (location != null) {
-      await _useCustomLocation(location, query);
+
+  /// [LOCAL-665] Act on one search string by its format, in a fixed order:
+  ///   a. share code  → resolve, open the single/multi-tour dialog; if unknown,
+  ///      say so and STOP (no fall-through to a place search).
+  ///   b. coordinates → move the map there.
+  ///   c. otherwise   → run the tour-name search AND the place lookup together.
+  Future<void> _dispatchSearch(String query) async {
+    final dispatch = classifySearchInput(query);
+    switch (dispatch.kind) {
+      case SearchKind.shareCode:
+        await _dispatchShareCode(dispatch.shareCode!);
+        return;
+      case SearchKind.coordinates:
+        _useCustomLocation(
+          LatLng(dispatch.latitude!, dispatch.longitude!),
+          '${dispatch.latitude}, ${dispatch.longitude}',
+        );
+        return;
+      case SearchKind.text:
+        await _dispatchTextSearch(dispatch.query);
+        return;
+    }
+  }
+
+  /// [LOCAL-665] (a) A share code: resolve it to tours and open the SAME dialogs
+  /// the map uses. An unknown code is a dead end on purpose — we tell the user to
+  /// check their server rather than silently searching for a place by that code.
+  Future<void> _dispatchShareCode(String code) async {
+    final tours = await _resolveShareCode(code);
+    if (!mounted) return;
+    if (tours.isNotEmpty) {
+      _presentFoundTours(tours);
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Location not found. Please try a different search.')),
+        const SnackBar(
+          content: Text('No tour with that code on this server (check Settings → server)'),
+          backgroundColor: Colors.orange,
+          duration: Duration(seconds: 5),
+        ),
       );
     }
+  }
+
+  /// [LOCAL-665] (c) Not a code, not coordinates: run the tour-name search and
+  /// the place geocoder CONCURRENTLY, then present the single combined outcome
+  /// (resolveTextSearch): tours+place, tours only, place only, or nothing.
+  Future<void> _dispatchTextSearch(String query) async {
+    final results = await Future.wait([
+      _searchTours(query),
+      _geocodeLocation(query),
+    ]);
+    if (!mounted) return;
+
+    final tours = results[0] as List<Map<String, dynamic>>;
+    final place = results[1] as LatLng?;
+
+    final outcome = resolveTextSearch(
+      tourCount: tours.length,
+      placeFound: place != null,
+    );
+
+    switch (outcome) {
+      case TextSearchOutcome.toursAndPlace:
+        _presentFoundToursWithPlace(tours, place!, query);
+        return;
+      case TextSearchOutcome.toursOnly:
+        _presentFoundTours(tours);
+        return;
+      case TextSearchOutcome.placeOnly:
+        await _useCustomLocation(place!, query);
+        return;
+      case TextSearchOutcome.nothing:
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Nothing found for "$query"')),
+        );
+        return;
+    }
+  }
+
+  /// [LOCAL-665] Tours AND a place both matched the text. Show the found tours
+  /// (the shared single/multi-tour dialogs, exactly as the map does), but first
+  /// offer one extra action — "Show <place> on the map" — so the listener can
+  /// jump to the place instead of, or after, picking a tour.
+  void _presentFoundToursWithPlace(
+      List<Map<String, dynamic>> tours, LatLng place, String placeName) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+            'Found ${tours.length} tour${tours.length == 1 ? '' : 's'} and a place for "$placeName"'),
+        action: SnackBarAction(
+          label: 'Show $placeName on the map',
+          onPressed: () => _useCustomLocation(place, placeName),
+        ),
+        duration: const Duration(seconds: 6),
+      ),
+    );
+    _presentFoundTours(tours);
   }
   
   Future<void> _useCustomLocation(LatLng location, String name) async {
@@ -1345,168 +1426,6 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
       );
     }
-  }
-  
-  void _showTourSearchDialog() {
-    final TextEditingController controller = TextEditingController();
-    List<Map<String, dynamic>> searchResults = [];
-    List<bool> selectedTours = [];
-    bool isSearching = false;
-    
-    showDialog(
-      context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          title: Text('Search Tours'),
-          content: Container(
-            width: double.maxFinite,
-            height: MediaQuery.of(context).size.height * 0.6,
-            child: Column(
-              children: [
-                TextField(
-                  controller: controller,
-                  decoration: InputDecoration(
-                    hintText: 'enter your search parameters here',
-                    labelText: 'Search tours (use * for wildcards)',
-                    helperText: 'Examples: "Boston", "walking*tour", "museum*history", "art*gallery"',
-                    helperMaxLines: 2,
-                    labelStyle: TextStyle(fontSize: 12),
-                    suffixIcon: IconButton(
-                      icon: Icon(Icons.search),
-                      onPressed: () async {
-                        if (controller.text.trim().isEmpty) return;
-                        
-                        setDialogState(() {
-                          isSearching = true;
-                          searchResults = [];
-                          selectedTours = [];
-                        });
-                        
-                        final results = await _searchTours(controller.text.trim());
-                        // [LEAD 2026-10-09] Michael: dialogs with the same purpose must look the same and share
-                        // code. Found tours go to the SAME dialogs as the map: one → single-tour dialog,
-                        // several → multi-tour dialog (both with the shared LanguageSelector).
-                        if (results.isNotEmpty) { Navigator.pop(context); _presentFoundTours(results); return; }
-                        
-                        setDialogState(() {
-                          isSearching = false;
-                          searchResults = results;
-                          selectedTours = List.filled(results.length, false);
-                        });
-                      },
-                    ),
-                  ),
-                  onSubmitted: (value) async {
-                    if (value.trim().isEmpty) return;
-                    
-                    setDialogState(() {
-                      isSearching = true;
-                      searchResults = [];
-                      selectedTours = [];
-                    });
-                    
-                    final results = await _searchTours(value.trim());
-                    if (results.isNotEmpty) { Navigator.pop(context); _presentFoundTours(results); return; }  // [LEAD 2026-10-09] same dialogs as the map
-                    
-                    setDialogState(() {
-                      isSearching = false;
-                      searchResults = results;
-                      selectedTours = List.filled(results.length, false);
-                    });
-                  },
-                ),
-                SizedBox(height: 16),
-                if (isSearching)
-                  Center(child: CircularProgressIndicator())
-                else if (searchResults.isNotEmpty) ...[
-                  Row(
-                    children: [
-                      Expanded(
-                        child: ElevatedButton(
-                          onPressed: () {
-                            setDialogState(() {
-                              for (int i = 0; i < selectedTours.length; i++) {
-                                selectedTours[i] = true;
-                              }
-                            });
-                          },
-                          child: Text('Select All'),
-                        ),
-                      ),
-                      SizedBox(width: 8),
-                      Expanded(
-                        child: OutlinedButton(
-                          onPressed: () {
-                            setDialogState(() {
-                              for (int i = 0; i < selectedTours.length; i++) {
-                                selectedTours[i] = false;
-                              }
-                            });
-                          },
-                          child: Text('Clear All'),
-                        ),
-                      ),
-                    ],
-                  ),
-                  SizedBox(height: 16),
-                  Expanded(
-                    child: ListView.builder(
-                      itemCount: searchResults.length,
-                      itemBuilder: (context, index) {
-                        final tour = searchResults[index];
-                        return CheckboxListTile(
-                          value: selectedTours[index],
-                          onChanged: (bool? value) {
-                            setDialogState(() {
-                              selectedTours[index] = value ?? false;
-                            });
-                          },
-                          title: Text(
-                            tour['name'],
-                            style: TextStyle(fontWeight: FontWeight.bold),
-                          ),
-                          subtitle: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text('Distance: ${tour['distance_km']} km'),
-                              Text('Downloads: ${tour['popularity']}'),
-                            ],
-                          ),
-                          dense: true,
-                        );
-                      },
-                    ),
-                  ),
-                ] else if (controller.text.isNotEmpty && !isSearching)
-                  Center(child: Text('No tours found')),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: Text('Cancel'),
-            ),
-            if (searchResults.isNotEmpty)
-              ElevatedButton(
-                onPressed: () {
-                  Navigator.pop(context);
-                  final selected = <Map<String, dynamic>>[];
-                  for (int i = 0; i < searchResults.length; i++) {
-                    if (selectedTours[i]) {
-                      selected.add(searchResults[i]);
-                    }
-                  }
-                  if (selected.isNotEmpty) {
-                    _downloadMultipleTours(selected);
-                  }
-                },
-                child: Text('Download Selected (${selectedTours.where((s) => s).length})'),
-              ),
-          ],
-        ),
-      ),
-    );
   }
   
   /// [ST-3] Does this look like a share code rather than a place?
@@ -2976,15 +2895,14 @@ class _HomeScreenState extends State<HomeScreen> {
         backgroundColor: Color(0xFF2c3e50),
         foregroundColor: Colors.white,
         actions: [
-          IconButton(
-            icon: Icon(Icons.tour),
-            onPressed: _showTourSearchDialog,
-            tooltip: 'Search Tours',
-          ),
+          // [LOCAL-665] One search button for everything. Michael: the two old
+          // buttons (flag = tours, arrow-glass = location) were easy to confuse.
+          // Now a single box tells a share code, a tour name and a place apart by
+          // their format and dispatches accordingly (_showSearchDialog).
           IconButton(
             icon: Icon(Icons.search),
-            onPressed: _showLocationSearchDialog,
-            tooltip: 'Search Location',
+            onPressed: _showSearchDialog,
+            tooltip: 'Search',
           ),
           IconButton(
             icon: Icon(Icons.refresh),
