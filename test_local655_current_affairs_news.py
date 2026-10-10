@@ -166,7 +166,8 @@ class TestComposeAndResearch(unittest.TestCase):
         out, n = ca.inject_news_into_text(text, by_stop)
         self.assertEqual(n, 1)
         self.assertIn(ca._NEWS_MARK, out)
-        self.assertIn("Reported by State House News Service", out)
+        # [LOCAL-662 Defect 3] No trailing "(Reported by …)" source list.
+        self.assertNotIn("Reported by", out)
         self.assertIn("The State House has stood since 1798.", out)
         s1 = out.split("Stop 2:")[0]
         self.assertIn(ca._NEWS_MARK, s1)
@@ -382,7 +383,11 @@ class TestAttributionParenthetical(unittest.TestCase):
         self.assertNotIn("Reported by", out,
                          "parenthetical must be dropped when source named in text")
 
-    def test_parenthetical_kept_for_unnamed_source(self):
+    def test_parenthetical_never_added_even_when_source_unnamed(self):
+        # [LOCAL-662 Defect 3] The trailing "(Reported by X.)" source list is
+        # dropped ENTIRELY — the composer names the outlet inline instead. Even
+        # when the composed text happens not to name the outlet, no parenthetical
+        # is appended (it read like a news feed in tour 557 v9).
         by_stop = {"Massachusetts State House": {
             "text": "On October 8, 2026, the governor debated her challenger.",
             "sources": [{"source": "State House News Service", "url": "u",
@@ -391,16 +396,17 @@ class TestAttributionParenthetical(unittest.TestCase):
                 "Directions: Walk on.\n")
         out, n = ca.inject_news_into_text(text, by_stop)
         self.assertEqual(n, 1)
-        self.assertIn("Reported by State House News Service", out)
+        self.assertNotIn("Reported by", out)
+        self.assertNotIn("(Reported", out)
 
     def test_attribution_suffix_helper(self):
+        # [LOCAL-662 Defect 3] Always empty — the parenthetical is gone entirely.
         self.assertEqual(ca._attribution_suffix(
             "x according to Axios", ["Axios"]), "")
         self.assertEqual(ca._attribution_suffix(
-            "x happened", ["Axios"]), " (Reported by Axios.)")
+            "x happened", ["Axios"]), "")
         self.assertEqual(ca._attribution_suffix(
-            "named WGBH only", ["WGBH", "Boston.com"]),
-            " (Reported by Boston.com.)")
+            "named WGBH only", ["WGBH", "Boston.com"]), "")
 
 
 class TestDatedComposition(unittest.TestCase):

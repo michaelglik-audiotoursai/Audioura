@@ -629,6 +629,102 @@ _JOIN_SENTENCE_STARTERS = ("During", "After", "Before", "In", "The", "This", "Wh
 _BROKEN_JOIN_RE = re.compile(
     r"\b([a-z]{3,})\s+(" + "|".join(_JOIN_SENTENCE_STARTERS) + r")\s+([a-z])")
 
+# [LOCAL-662] A SECOND broken-join shape, open-starter. Tour 557 v9 Stop 3:
+#   "…the national conversation about what civic architecture could Seven years
+#    later, in 1976, a poll…"
+# The sentence lost its tail ("…could be." / "…could achieve.") AND its period,
+# so a dangling MODAL / AUXILIARY / COPULA / infinitive-marker ("could") runs
+# straight into a capitalised sentence-starter ("Seven") that the closed set
+# above does not know. These left-hand words are safe anchors precisely because
+# a capitalised proper noun CANNOT be their grammatical complement: "architecture
+# could Seven" is never one clause — "could" demands a bare verb to its right, so
+# a following Capital must open a new sentence. We only fire when the capitalised
+# word is a real word (Capital + lowercase) and is itself followed by a lowercase
+# word (a sentence, not a lone proper-noun object). This is the general
+# dangling-modal collision the D638/closed-set detector misses.
+_DANGLING_TAIL_WORDS = (
+    # Modals and the dummy auxiliaries do/does/did. These are the ONLY left-hand
+    # words that CANNOT take a noun phrase as a complement — a modal demands a
+    # BARE VERB to its right ("could be", "would rank", "did open"), so a modal
+    # welded to a capitalised word is always a tail-truncation collision
+    # ("architecture could Seven"). Copulas (is/was), prepositions (to/of/into)
+    # and transitive verbs (had) are EXCLUDED because each legitimately takes a
+    # capitalised proper-noun complement ("is Mona Lisa", "to Paris", "had
+    # Boston"), which would make this a false positive.
+    "could", "would", "should", "shall", "will", "might", "must", "can", "may",
+    "do", "does", "did",
+)
+# The capitalised starter must be a real word (Capital + lowercase run) and NOT
+# an ALL-CAPS acronym; the trailing lowercase word confirms a new sentence.
+_DANGLING_MODAL_JOIN_RE = re.compile(
+    r"(?<![.!?:;,])\b(" + "|".join(_DANGLING_TAIL_WORDS) + r")\s+"
+    r"([A-Z][a-zà-ÿ]+)\s+([a-z])")
+
+
+def _dangling_modal_hits(text: str):
+    """[LOCAL-662] Non-overlapping dangling-modal collision matches in ``text``.
+    Each is (left_word, Capital_word, following_lowercase, match_object)."""
+    out = []
+    for m in _DANGLING_MODAL_JOIN_RE.finditer(text or ""):
+        out.append((m.group(1), m.group(2), m.group(3), m))
+    return out
+
+
+def detect_dangling_modal_join(text: str) -> Optional[str]:
+    """[LOCAL-662] First dangling-modal collision ("…could Seven years…"), or None."""
+    hits = _dangling_modal_hits(text)
+    if hits:
+        lw, cap, _f, _m = hits[0]
+        return f"dangling-modal join: '{lw} {cap}…'"
+    return None
+
+
+def repair_dangling_modal_joins(text: str) -> Tuple[str, int]:
+    """[LOCAL-662] Repair "…<modal/do-aux> <Capital><lower>…" collisions.
+
+    The sentence lost its complement AND its terminator, welding a dangling modal
+    (could/would/should/…/do/does/did) into a capitalised sentence-start. We DROP
+    the orphaned trailing modal word (it has no recoverable complement — "could"
+    alone adds nothing a listener can parse), terminate the surviving clause with
+    a period, and let the capitalised word begin its own sentence:
+        "…civic architecture could Seven years later, in 1976, a poll…"
+        → "…civic architecture. Seven years later, in 1976, a poll…"
+    Deterministic; adds no new word, number or name — it only removes the
+    unrecoverable dangling modal and inserts a sentence boundary. The left word
+    set is restricted to modals + do/does/did, the only words that cannot take a
+    noun complement, so a copula predicate ("is Mona Lisa"), a prepositional
+    object ("to Paris", "of Architects") or a transitive object ("had Boston")
+    is never a hit.
+    """
+    if not text:
+        return text or "", 0
+    n = 0
+    out = text
+    for _ in range(20):
+        hits = _dangling_modal_hits(out)
+        if not hits:
+            break
+        lw, cap, _f, m = hits[0]
+        # The dangling left word spans [m.start(1), m.end(1)]; the capital starts
+        # at m.start(2). Replace "<lw> <Cap" with "<...>. <Cap" — drop lw, add a
+        # period to the clause that precedes it.
+        head = out[:m.start(1)].rstrip().rstrip(",;:")
+        if not head or not re.search(r"[A-Za-z0-9]", head):
+            # Nothing solid before the modal — fall back to a bare split so we
+            # never drop the whole lead: keep lw, just terminate before the Cap.
+            head2 = out[:m.start(2)].rstrip()
+            if not head2.endswith((".", "!", "?")):
+                head2 = head2 + "."
+            out = head2 + " " + out[m.start(2):]
+            n += 1
+            continue
+        if not head.endswith((".", "!", "?")):
+            head = head + "."
+        out = head + " " + out[m.start(2):]
+        n += 1
+    out = re.sub(r"\s{2,}", " ", out).strip()
+    return out, n
+
 # Dangling clause lead-ins: a trailing conjunction/participle fragment left when
 # the clause object was removed. We cut the SHORTEST such trailing fragment (from
 # the LAST boundary before the break) so the surviving sentence keeps as much
@@ -651,7 +747,8 @@ def detect_broken_join(text: str) -> Optional[str]:
     m = _BROKEN_JOIN_RE.search(text)
     if m:
         return f"broken sentence join: '{m.group(1)} {m.group(2)} {m.group(3)}…'"
-    return None
+    # [LOCAL-662] Also report the open-starter dangling-modal shape.
+    return detect_dangling_modal_join(text)
 
 
 def repair_broken_joins(text: str) -> Tuple[str, int]:
@@ -663,6 +760,12 @@ def repair_broken_joins(text: str) -> Tuple[str, int]:
     sentence-terminating period, and (c) let the <Starter> word open its own
     sentence. If no clear lead-in boundary is found, we simply insert a period
     before the <Starter> (split the run in two) rather than drop content.
+
+    [LOCAL-662] After the closed-starter pass, also repair the open-starter
+    dangling-modal shape ("…civic architecture could Seven years later…"), where
+    a sentence lost its complement AND its terminator and welded a dangling modal
+    into a capitalised sentence-start.
+
     Returns ``(repaired, n_repaired)``. Deterministic; adds no new token.
     """
     if not text:
@@ -692,7 +795,9 @@ def repair_broken_joins(text: str) -> Tuple[str, int]:
             trimmed = trimmed + "."
         out = trimmed + " " + after
     out = re.sub(r"\s{2,}", " ", out).strip()
-    return out, n
+    # [LOCAL-662] Open-starter dangling-modal repair (adds its own count).
+    out, n2 = repair_dangling_modal_joins(out)
+    return out, n + n2
 
 
 def repair_dropped_words_and_joins(text: str) -> Tuple[str, int]:

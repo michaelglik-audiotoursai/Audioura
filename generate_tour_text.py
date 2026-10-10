@@ -891,6 +891,25 @@ def _is_name_corrupted(name):
     # Criterion 4: Contains address fragments
     if _ADDRESS_IN_NAME_RE.search(name):
         return True
+
+    # Criterion 5: [LOCAL-662B] A bare truncation that ENDS in a single-letter
+    # initial with no real word after it. The LOCAL-658 fix above neutralizes
+    # initials so a full name carrying them ("John F. Kennedy Presidential
+    # Library and Museum", "I. M. Pei", "W. E. B. Du Bois", "J. P. Morgan")
+    # survives Criterion 2 — but it over-corrected: it ALSO waved through a name
+    # that is NOTHING BUT a first name plus a trailing bare initial ("John F."),
+    # a truncation artifact from the replenishment proposer. Delivered verbatim it
+    # became "Stop 5: John F." (tour 648, LOCAL-662 LEAD bounce). A legitimate
+    # initial is always FOLLOWED by a real word (the surname / the institution);
+    # a truncation ends ON the initial. So a name whose LAST token is a lone
+    # letter (with or without the dot) and which carries no real word after that
+    # final initial is corrupt. 'I. M. Pei' ends on 'Pei', 'John F. Kennedy …
+    # Museum' ends on 'Museum' — both keep corrupt=False.
+    _trunc_tokens = name.strip().split()
+    if _trunc_tokens:
+        _last = _trunc_tokens[-1].rstrip('.')
+        if len(_last) == 1 and _last.isalpha():
+            return True
     
     return False
 
@@ -2111,6 +2130,19 @@ def replenish_to_count(poi_list, want, scope, headers, propose, make_poi,
             if not name or name.lower() in seen:
                 continue
             seen.add(name.lower())          # never re-propose it, valid or not
+            # [LOCAL-662B] Reject a corrupted / truncated name the same way Phase
+            # 3A and the LOCAL-290 replenishment do. A proposer that returned a
+            # truncation artifact ("John F." — a first name + a bare trailing
+            # initial, no surname after it) must not become a stop; delivered
+            # verbatim it reads "Stop N: John F." (tour 648, LOCAL-662 bounce).
+            # _is_name_corrupted now flags that shape while keeping real
+            # initial-bearing names ("I. M. Pei", "John F. Kennedy Presidential
+            # Library and Museum") clean.
+            if _is_name_corrupted(name):
+                rejected += 1
+                print(f"  [LOCAL-662B] Replenish: rejected corrupted/truncated "
+                      f"name {name[:44]!r}")
+                continue
             poi = make_poi(name)
             if c.get('why'):
                 poi['_replenish_why'] = c['why']
@@ -7966,6 +7998,20 @@ def _apply_current_affairs_news(final: str) -> str:
     if os.environ.get('DISABLE_CURRENT_AFFAIRS_NEWS', '').strip() == '1':
         print("  [LOCAL-655] current-affairs news pass disabled by env — skipped")
         return final
+    # [LOCAL-662] Strip the stop-editor idempotence marker BEFORE injecting news.
+    # The editor appends '<!-- LOCAL-628:stop-editor:v1 -->' as the LAST line; this
+    # news pass runs after it and appends news to the LAST stop block — whose span
+    # runs to end of text and so INCLUDES the marker line. Injecting news then left
+    # the marker mid-text, before Stop 5's news (tour 557 v9, 'markers' detector
+    # FAIL). Removing the marker here means the news pass only ever sees narration,
+    # and the delivery guard re-marks nothing — the marker is re-added only for the
+    # cache/pool copies, never the delivered text. Idempotent; no-op when absent.
+    try:
+        import stop_editor as _se_news_strip
+        if _se_news_strip.already_edited(final):
+            final = _se_news_strip.strip_marker(final)
+    except Exception:
+        pass
     try:
         import current_affairs_news as _ca
     except Exception as _ie:  # pragma: no cover
@@ -8565,6 +8611,23 @@ def _apply_delivery_hours_guard(result):
                           "one honest note (no fact invented)", flush=True)
         except Exception as _cace:  # pragma: no cover
             _import_logger.error(f"[LOCAL-650] current-affairs coverage skipped: {_cace}")
+        # [LOCAL-662] FINAL STEP: strip the stop-editor idempotence marker from the
+        # DELIVERED text on EVERY path. The marker is an internal flag and must
+        # never reach TTS, the critic, or the on-disk file (the 'markers' detector
+        # fails on '<!--'). The inner impl strips it before returning, but the
+        # news/coverage passes above (and the cache/pool/by_reference paths that
+        # bypass the inner strip) can reintroduce or carry it — so this guard,
+        # which every delivery path returns through, strips it LAST, after all
+        # text mutation and before the file write. Idempotent; no-op when absent.
+        try:
+            import stop_editor as _se_final_strip
+            if final and _se_final_strip.already_edited(final):
+                final = _se_final_strip.strip_marker(final)
+                print("  [LOCAL-662] stripped editor marker from delivered text "
+                      "(final delivery-guard step; kept in cache/pool for "
+                      "idempotence)", flush=True)
+        except Exception as _msf:  # pragma: no cover
+            _import_logger.error(f"[LOCAL-662] final marker strip skipped: {_msf}")
         if final != text and out_file:
             # Rewrite the delivered file so the service (which reads the file,
             # not the return value) ships the cleaned text on every path.
@@ -13262,7 +13325,24 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
         try:
             from stop_existence_gate import get_gate_mode, run_existence_gate, verify_stop_existence
 
-            _seg_mode = get_gate_mode()
+            # [LOCAL-662] WALKING tours force ENFORCE. A walking/outdoor tour has no
+            # venue page to ground a stop against, so an invented stop ("The State
+            # House Park", tour 557 v9 Stop 4) has only the model's word behind it.
+            # get_gate_mode_for_category raises the shared-stack log_only to enforce
+            # for a walking tour (museum/dining keep the global mode), unless the
+            # gate is explicitly off. An unverified walking stop is then dropped and
+            # replaced via GEO-CHECK / LOCAL-290 replenishment, else the tour ships
+            # N−1 with the honest shortfall — never an unverified stop.
+            try:
+                from stop_existence_gate import get_gate_mode_for_category as _eg_cat_mode
+                _seg_mode = _eg_cat_mode(tour_category)
+            except Exception:
+                _seg_mode = get_gate_mode()
+            if _seg_mode == 'enforce' and get_gate_mode() != 'enforce':
+                print(f"  [LOCAL-662] EXISTENCE-GATE: forcing ENFORCE for "
+                      f"{tour_category!r} tour (global mode "
+                      f"{get_gate_mode().upper()}); unverified stops will be "
+                      f"dropped/replaced, else N−1 with honest shortfall")
             if _seg_mode != 'off' and not _seg_checklist_exempt:
                 # Get DB connection (same pattern as LOCAL-212)
                 _seg_conn = None
@@ -15181,6 +15261,94 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
                           f"preceding stop changed")
                 for _i, _p in enumerate(poi_list):
                     _p['stop_number'] = _i + 1
+
+                # [LOCAL-662B] WALKING DISTANCE LIMIT on the post-GEO-CHECK
+                # back-fill. GEO-CHECK (above) re-validated ITS OWN replacements
+                # against the LOCAL-658 walking limit and correctly refused a far
+                # one — but THIS D558 replenishment runs AFTER GEO-CHECK and, on a
+                # city walking tour, _gp_scope is '' so _validate_stops_within_scope
+                # never ran. That is how a 4.3 km stop (the JFK Library, "John F.")
+                # was re-added past the honest shortfall (tour 648, LOCAL-662 LEAD
+                # bounce). Hold replenished stops to the SAME walking-distance limit
+                # the originals passed: keep the pre-replenishment stops, then admit
+                # each replenished stop ONLY if, in the route-ordered set, it adds
+                # no leg over WALKING_LEG_HARD_KM (on_foot) and keeps the total
+                # under the mode's hard limit. A far replenished stop is dropped and
+                # the tour ships the honest shortfall (LOCAL-632) — never a stop
+                # nobody can walk to.
+                if (tour_category == 'walking'
+                        and transport_mode != 'country_scale'
+                        and len(poi_list) >= 3):
+                    _wl_total_limit = _TRANSPORT_TOTAL_HARD_KM.get(
+                        transport_mode, WALKING_TOTAL_HARD_KM)
+                    _wl_initial = set(_gp_initial)
+                    _wl_orig = [p for p in poi_list
+                                if p.get('name', '') in _wl_initial]
+                    _wl_added = [p for p in poi_list
+                                 if p.get('name', '') not in _wl_initial]
+
+                    def _wl_route_ok(cand_list):
+                        """(ok, max_leg_km, total_km) for a candidate stop list,
+                        route-ordered. Mirrors the GEO-CHECK LOCAL-658 check."""
+                        ordered = cand_list
+                        if len(cand_list) >= 3:
+                            try:
+                                ordered = _compute_route_order(list(cand_list))
+                            except Exception:
+                                ordered = cand_list
+                        pts = [(p, _parse_coords(p.get('coordinates', '')))
+                               for p in ordered]
+                        pts = [(p, c) for p, c in pts if c]
+                        if len(pts) < 2:
+                            return True, 0.0, 0.0
+                        legs = [_haversine_km(pts[k][1], pts[k + 1][1])
+                                for k in range(len(pts) - 1)]
+                        tot = sum(legs)
+                        mx = max(legs) if legs else 0.0
+                        if transport_mode == 'on_foot' and mx > WALKING_LEG_HARD_KM:
+                            return False, mx, tot
+                        if tot > _wl_total_limit:
+                            return False, mx, tot
+                        return True, mx, tot
+
+                    if _wl_added:
+                        _wl_kept = list(_wl_orig)
+                        _wl_dropped = []
+                        for _rep in _wl_added:
+                            if not _parse_coords(_rep.get('coordinates', '')):
+                                # No coordinate to distance-check — cannot prove it
+                                # is walkable; refuse rather than ship an unchecked
+                                # far stop (shortfall is honest, a far stop is not).
+                                _wl_dropped.append((_rep, 'no coordinates'))
+                                continue
+                            _ok, _mx, _tot = _wl_route_ok(_wl_kept + [_rep])
+                            if _ok:
+                                _wl_kept.append(_rep)
+                            else:
+                                _lim = (f"{WALKING_LEG_HARD_KM:.2f} km per-leg"
+                                        if transport_mode == 'on_foot'
+                                        and _mx > WALKING_LEG_HARD_KM
+                                        else f"{_wl_total_limit:.0f} km total")
+                                _wl_dropped.append(
+                                    (_rep, f"max leg {_mx:.2f} km, total {_tot:.2f} km "
+                                           f"> {_lim}"))
+                        if _wl_dropped:
+                            _wl_keep_ids = {id(p) for p in _wl_kept}
+                            for _d, _why in _wl_dropped:
+                                print(f"  [LOCAL-662B] D558 replenishment: REFUSED "
+                                      f"'{_d.get('name','')[:44]}' — exceeds walking "
+                                      f"limit ({_why})")
+                                forbidden_norms.add(_normalize_name(_d.get('name', '')))
+                            poi_list = [p for p in poi_list if id(p) in _wl_keep_ids]
+                            if len(poi_list) >= 3:
+                                poi_list = _compute_route_order(poi_list)
+                            for _i, _p in enumerate(poi_list):
+                                _p['stop_number'] = _i + 1
+                            if len(poi_list) < _gp_want:
+                                print(f"  [LOCAL-632] D558 replenishment: no walkable "
+                                      f"candidate for all slots; delivering "
+                                      f"{len(poi_list)} of {_gp_want} with honest "
+                                      f"shortfall")
         except ImportError as _gp_err:
             _import_logger.error(f"[D556] MISSING module — replenishment and lore "
                                  f"DISABLED for {tour_category}: {_gp_err}")
