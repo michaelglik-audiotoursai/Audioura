@@ -25003,6 +25003,23 @@ RULES:
     except Exception as _tail_err:
         print(f"  [LOCAL-617] Truncated-tail repair error (non-fatal): {_tail_err}")
 
+    # -------- [LOCAL-660 defect 1] Repair a STOP narration cut mid-sentence --
+    # repair_truncated_tail (above) only inspects the tour's FINAL sentence (the
+    # conclusion). Tour 557 v7 Stop 5 was cut mid-sentence — "…the centuries
+    # gather and do not let" — and the conclusion ("Together, these stops reveal
+    # …") followed it, so the final-sentence repair never saw the broken stop.
+    # This repair runs over EVERY stop body (and the conclusion), dropping a
+    # trailing fragment so each stop's narration ends on a sentence boundary.
+    try:
+        import work_first_evidence as _wfe_mid
+        complete_tour, _mid_rep = _wfe_mid.repair_midsentence_truncation(complete_tour)
+        if _mid_rep.get('repaired'):
+            print(f"  [LOCAL-660] Repaired {_mid_rep['repaired']} stop narration(s) "
+                  f"cut mid-sentence (dropped trailing fragment to a sentence boundary)")
+    except Exception as _mid_err:
+        print(f"  [LOCAL-660] Mid-sentence truncation repair error (non-fatal): {_mid_err}")
+    _l654ck("LOCAL-660 midsentence_truncation")
+
     # -------- [LOCAL-36] Practical facts QA gate --------
     # Verify provenance of every practical claim before delivery.
     # Claims without traceable source are DROPPED — silence is correct.
