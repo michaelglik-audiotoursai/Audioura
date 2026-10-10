@@ -12619,6 +12619,27 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
                     for _p in _pre_d1v2_candidates:
                         if _normalize_name(_p.get('name', '')) not in _already:
                             _thin_pool.append(_p)
+                    # [LOCAL-667] Drop pool candidates that are FRAGMENTS of a work
+                    # already verified (the split-title pieces North/Central/South/
+                    # Spring Garden/Garden of the one SPARQL work). Admitting a
+                    # fragment would only be dedup-dropped by the LOCAL-16 gate as a
+                    # duplicate canonical — wasting a slot. The whole work is already
+                    # in poi_list; its pieces are not separate stops.
+                    try:
+                        from candidate_collapse_guard import (_is_fragment_of as _frag_of,
+                                                              _norm_tokens as _frag_toks,
+                                                              _content_tokens as _frag_content)
+                        _verified_titles_now = [p.get('name', '') for p in poi_list]
+                        _frag_targets = [(_frag_toks(t), _frag_content(t))
+                                         for t in _verified_titles_now
+                                         if len(_frag_content(t)) >= 3]
+                        _thin_pool = [
+                            _c for _c in _thin_pool
+                            if not any(_frag_of(_c.get('name', ''), _tt, _tc)
+                                       for _tt, _tc in _frag_targets)
+                        ]
+                    except Exception:
+                        pass
                     # Grounded search only when a backend is configured; corpus-only
                     # otherwise. Cost-bounded by max_grounded.
                     _thin_research_fn = None
