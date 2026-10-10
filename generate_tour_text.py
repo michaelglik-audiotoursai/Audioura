@@ -8185,6 +8185,19 @@ def _apply_delivery_hours_guard(result):
                       f"delivered text", flush=True)
         except Exception as _doe:  # pragma: no cover
             _import_logger.error(f"[LOCAL-634] text dangling-opener guard skipped: {_doe}")
+        # 1e-ii. [LOCAL-660 defect 3] Dangling PERSONAL-pronoun opener guard. The
+        #     same late removals (and a LEAD relocation of a stop's lead-in fact)
+        #     can leave a stop body opening on He/His/She/Her/They with no person
+        #     antecedent in the stop (tour 557 Stop 3 "His legacy…"). Mirror of
+        #     the demonstrative guard above, for personal pronouns.
+        try:
+            import dangling_pronoun_gate as _dpg_txt
+            final, _n_pron = _dpg_txt.strip_dangling_pronoun_openers_in_text(final)
+            if _n_pron:
+                print(f"  [LOCAL-660] dropped {_n_pron} dangling personal-pronoun "
+                      f"opener(s) from delivered text", flush=True)
+        except Exception as _dpe:  # pragma: no cover
+            _import_logger.error(f"[LOCAL-660] text dangling-pronoun guard skipped: {_dpe}")
         # 2. Drop duplicated paragraphs (e.g. the twice-printed orientation block).
         try:
             import paragraph_dedupe as _pd
@@ -24383,6 +24396,23 @@ RULES:
                 else:
                     _transition = f"Continue to {next_poi['name']}."
             
+            # [LOCAL-660 defect 4] A directions line may announce the end of the
+            # walk ONLY on the leg into the LAST stop, and must never echo the
+            # tour theme. Tour 557 Stop 1→2 said "…marking the end of your walk
+            # exploring Massachusetts politics and current affairs" on stop 2 of
+            # 5. Sanitize every leg by position (covers LLM and POI directions).
+            try:
+                from directions_generator import sanitize_directions_leg as _san_dir
+                _is_last_leg = (i == len(poi_list) - 2)
+                _san = _san_dir(_transition, is_last_leg=_is_last_leg,
+                                next_name=next_poi.get('name', ''))
+                if _san != _transition:
+                    print(f"  [LOCAL-660] directions leg {i+1}→{i+2} sanitized "
+                          f"(is_last_leg={_is_last_leg}): dropped end/theme-echo language")
+                    _transition = _san
+            except Exception as _san_err:
+                print(f"  [LOCAL-660] directions sanitize error (non-fatal): {_san_err}")
+
             poi_content += f"\nDirections: {_transition}\n\n"
             _ss_transition = _transition  # [LOCAL-643] carry into the Stop record
             print(f"  [T4] Transition to Stop {stop_num+1}: {_transition[:60]}...")
@@ -24629,9 +24659,11 @@ RULES:
             complete_tour, _fact_actions = strip_repeated_facts(complete_tour)
             if _fact_actions:
                 for _fa in _fact_actions:
+                    _where = ("twice in the same stop" if _fa.get('within_stop')
+                              else f"first told at stop {_fa['first_stop']}")
                     if _fa['removed']:
                         print(f"  [D533] REPEATED FACT removed from stop {_fa['repeat_stop']} "
-                              f"(first told at stop {_fa['first_stop']}, {_fa['signature']}): "
+                              f"({_where}, {_fa['signature']}): "
                               f"{_fa['sentence'][:80]}")
                     else:
                         print(f"  [D533] REPEATED FACT kept in stop {_fa['repeat_stop']} "
@@ -25002,6 +25034,56 @@ RULES:
             print(f"  [LOCAL-617] Repaired truncated final sentence (dropped mid-clause fragment)")
     except Exception as _tail_err:
         print(f"  [LOCAL-617] Truncated-tail repair error (non-fatal): {_tail_err}")
+
+    # -------- [LOCAL-660 defect 1] Repair a STOP narration cut mid-sentence --
+    # repair_truncated_tail (above) only inspects the tour's FINAL sentence (the
+    # conclusion). Tour 557 v7 Stop 5 was cut mid-sentence — "…the centuries
+    # gather and do not let" — and the conclusion ("Together, these stops reveal
+    # …") followed it, so the final-sentence repair never saw the broken stop.
+    # This repair runs over EVERY stop body (and the conclusion), dropping a
+    # trailing fragment so each stop's narration ends on a sentence boundary.
+    try:
+        import work_first_evidence as _wfe_mid
+        complete_tour, _mid_rep = _wfe_mid.repair_midsentence_truncation(complete_tour)
+        if _mid_rep.get('repaired'):
+            print(f"  [LOCAL-660] Repaired {_mid_rep['repaired']} stop narration(s) "
+                  f"cut mid-sentence (dropped trailing fragment to a sentence boundary)")
+    except Exception as _mid_err:
+        print(f"  [LOCAL-660] Mid-sentence truncation repair error (non-fatal): {_mid_err}")
+    _l654ck("LOCAL-660 midsentence_truncation")
+
+    # -------- [LOCAL-660 defect 3] Drop a dangling personal-pronoun opener -----
+    # Runs AFTER every sentence-removal pass (D533/S27 strips, same-title/motif
+    # filters) and after the LEAD relocation of a stop's lead-in fact, so a
+    # sentence left opening on He/His/She/Her/They with no antecedent in the SAME
+    # stop is caught at the delivery boundary. Tour 557 v7 Stop 3 opened "His
+    # legacy is carved…" after the sentence that introduced George Francis
+    # Parkman was moved to Stop 1; this drops the orphaned sentence. The
+    # companion dangling_demonstrative gate handles This/These/That/Those.
+    try:
+        import dangling_pronoun_gate as _dpg
+        complete_tour, _n_dp = _dpg.strip_dangling_pronoun_openers_in_text(complete_tour)
+        if _n_dp:
+            print(f"  [LOCAL-660] dropped {_n_dp} dangling personal-pronoun "
+                  f"opener(s) (He/His/She/Her/They with no antecedent in the stop)")
+    except Exception as _dp_err:
+        print(f"  [LOCAL-660] Dangling-pronoun gate error (non-fatal): {_dp_err}")
+    _l654ck("LOCAL-660 dangling_pronoun")
+
+    # -------- [LOCAL-660 defect 4] Directions must not pre-announce the end ----
+    # Every-path text guard: only the Directions line of the leg INTO THE LAST
+    # stop may say the walk is ending, and no Directions line may echo the tour
+    # theme. Tour 557 v7 Stop 1→2 said "…marking the end of your walk exploring
+    # Massachusetts politics and current affairs" on stop 2 of 5.
+    try:
+        from directions_generator import sanitize_directions_in_text as _san_dirs
+        complete_tour, _n_dir = _san_dirs(complete_tour)
+        if _n_dir:
+            print(f"  [LOCAL-660] sanitized {_n_dir} directions line(s): only the "
+                  f"leg into the last stop may say final/end; theme echo dropped")
+    except Exception as _sdt_err:
+        print(f"  [LOCAL-660] Directions text sanitize error (non-fatal): {_sdt_err}")
+    _l654ck("LOCAL-660 directions_final_theme")
 
     # -------- [LOCAL-36] Practical facts QA gate --------
     # Verify provenance of every practical claim before delivery.

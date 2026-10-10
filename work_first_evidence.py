@@ -77,6 +77,7 @@ __all__ = [
     "looks_like_non_artwork_listing",
     "dedupe_conclusion",
     "repair_truncated_tail",
+    "repair_midsentence_truncation",
 ]
 
 
@@ -1087,7 +1088,16 @@ _TRUNCATED_TAIL_RE = re.compile(
     r"as\s+well\s+as|in\s+order\s+to|skill\s+in|mastery\s+of|gift\s+for|"
     r"capturing|showcasing|depicting|portraying|rendering|conveying|evoking|"
     r"exploring|revealing|the|a|an|his|her|their|its|of|to|for|and|"
-    r"with|that|which|was|were|is|are"
+    r"with|that|which|was|were|is|are|"
+    # [LOCAL-660 defect 1] A trailing bare transitive/modal/auxiliary verb or
+    # conjunction/preposition leaves the clause expecting a complement. Tour 557
+    # Stop 5 was cut at "…the centuries gather and do not let" — a bare "let"
+    # (and the preceding "do not") expects an object that never arrives.
+    r"let|make|makes|made|keep|keeps|kept|give|gives|gave|take|takes|took|"
+    r"bring|brings|brought|hold|holds|held|turn|turns|turned|leave|leaves|"
+    r"do\s+not|does\s+not|did\s+not|will|would|shall|should|can|could|may|"
+    r"might|must|but|or|nor|yet|so|than|then|while|when|where|whom|whose|"
+    r"into|onto|upon|from|at|by|as|not|no|both|either|neither|each|every"
     r")\s*[.!?]?\s*$")
 
 
@@ -1116,4 +1126,170 @@ def repair_truncated_tail(tour_text: str) -> Tuple[str, Dict]:
             report["repaired"] = True
             # preserve a trailing newline convention
             return new_text + "\n", report
+    return tour_text, report
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# [LOCAL-660 defect 1] Mid-sentence truncation inside a STOP BODY
+# ─────────────────────────────────────────────────────────────────────────────
+#
+# ``repair_truncated_tail`` above only looks at the LAST sentence of the WHOLE
+# tour (the conclusion). Tour 557 v7 Stop 5 was cut mid-sentence — "…here, the
+# centuries gather and do not let" — and that broken sentence is NOT the tour's
+# last sentence: the conclusion ("Together, these stops reveal…") follows it. So
+# the final-sentence repair never saw it, and the stop shipped ending on a bare
+# verb.
+#
+# This repair runs over EVERY stop's narration (and the conclusion), dropping a
+# trailing fragment at the end of a stop's spoken prose that either lacks any
+# terminal punctuation or ends mid-clause (``_TRUNCATED_TAIL_RE``). The cut then
+# lands on the previous complete sentence — a sentence boundary — which is the
+# contract. Field/label lines (Directions:, Address:, Coordinates:, Sources:,
+# etc.) and the stop header are never touched, so a stop that ends on its
+# ``Directions:`` hand-off is left alone; only the narration prose that precedes
+# the hand-off is inspected.
+#
+# Pure, deterministic, idempotent.
+
+# Lines that are machine scaffolding / navigation, never spoken narration prose.
+_WFE_NONPROSE_LINE_RE = re.compile(
+    r'(?i)^\s*(stop\s+\d+\s*[:\-]|address|coordinates|type/specialty|'
+    r'specific examples|orientation|operational details|museum information|'
+    r'visiting hours|opening hours|hours|hours?/admission source|sources?|'
+    r'tour-category|directions)\s*[:\-]')
+
+
+def _ends_midsentence(sentence: str) -> bool:
+    """True when ``sentence`` is a truncated fragment, not a complete sentence.
+
+    A fragment either (a) carries no terminal punctuation at all, or (b) ends on
+    a token that still expects a complement (``_TRUNCATED_TAIL_RE``). A sentence
+    that merely ends on a quote/paren after terminal punctuation is complete.
+    """
+    s = (sentence or '').strip()
+    if not s:
+        return False
+    # Strip a trailing closing quote/paren/bracket so '…gather."' is seen as
+    # terminated and '…do not let' is seen as not.
+    tail = s.rstrip('"\u201d\u2019\')]}')
+    if not tail:
+        return False
+    if tail[-1] not in '.!?':
+        return True
+    # Terminated — but a template cut mid-clause can still end on a period
+    # ("…talent for."). Reuse the shared tail regex.
+    return bool(_TRUNCATED_TAIL_RE.search(tail))
+
+
+def _repair_prose_block_tail(block: str) -> Tuple[str, bool]:
+    """Drop a trailing mid-sentence fragment from one block of spoken prose.
+
+    ``block`` is a run of narration (no field/label/header lines). Returns
+    ``(new_block, repaired)``. Never empties the block below one sentence: if the
+    only sentence is itself a fragment it is left in place (dropping it would
+    orphan the stop — the caller's upstream gates own that case).
+    """
+    if not block or not block.strip():
+        return block, False
+    stripped = block.rstrip()
+    trailing_ws = block[len(stripped):]
+    sents = split_sentences(stripped)
+    if len(sents) < 2:
+        return block, False
+    last = sents[-1].strip()
+    if not _ends_midsentence(last):
+        return block, False
+    idx = stripped.rfind(last)
+    if idx <= 0:
+        return block, False
+    new_block = stripped[:idx].rstrip()
+    if not new_block.strip():
+        return block, False
+    return new_block + trailing_ws, True
+
+
+def repair_midsentence_truncation(tour_text: str) -> Tuple[str, Dict]:
+    """[LOCAL-660 defect 1] Never ship a STOP whose narration ends mid-sentence.
+
+    For every stop body (and the trailing conclusion), repair the last paragraph
+    of spoken prose so it ends on a complete sentence: if that paragraph's final
+    sentence is a truncated fragment (no terminal punctuation, or ends on a token
+    expecting a complement), drop the fragment so the cut lands on the previous
+    sentence boundary. Field/label lines (Directions:, Address:, …), stop headers
+    and the conclusion recap line are left intact. Pure string→string.
+
+    Returns ``(new_text, report)`` with ``report['repaired']`` = number of blocks
+    whose trailing fragment was dropped.
+    """
+    report = {"repaired": 0}
+    if not tour_text or not tour_text.strip():
+        return tour_text, report
+
+    # Segment the tour on real Stop headers so each stop body is repaired on its
+    # OWN last prose paragraph (the narration that ends the stop, whether a
+    # Directions line follows or not). Everything after the last stop body — the
+    # conclusion — is one more segment and is repaired the same way, so a tour
+    # whose narration was cut mid-sentence just before the conclusion is caught.
+    parts = _STOP_HEADER_RE.split(tour_text)  # [preamble, hdr1, body1, hdr2, body2, ...]
+    repaired = 0
+
+    def _repair_segment(seg: str) -> str:
+        """Repair any spoken-prose paragraph in one segment that ends mid-sentence.
+
+        We inspect EVERY prose paragraph (not only the last) because the cut can
+        sit in the narration paragraph that PRECEDES the conclusion — tour 557's
+        Stop 5 ended "…do not let" and the conclusion paragraph followed it, so
+        repairing only the last paragraph would miss it. A complete paragraph is
+        never touched (``_ends_midsentence`` returns False), so scanning all of
+        them is safe. Field/label lines inside a paragraph (a trailing
+        Directions: line) are preserved — only the prose run is inspected.
+        """
+        nonlocal repaired
+        if not seg or not seg.strip():
+            return seg
+        paras = re.split(r'(\n[ \t]*\n)', seg)  # keep separators
+        for pi in range(len(paras)):
+            chunk = paras[pi]
+            if not chunk.strip() or re.fullmatch(r'\n[ \t]*\n', chunk):
+                continue
+            plines = chunk.split('\n')
+            # The paragraph's trailing run of PROSE (a Directions:/field line at
+            # the end means the prose is above it).
+            last_prose = -1
+            for li in range(len(plines) - 1, -1, -1):
+                if plines[li].strip() == '':
+                    continue
+                if _WFE_NONPROSE_LINE_RE.match(plines[li]):
+                    break
+                last_prose = li
+                break
+            if last_prose < 0:
+                continue
+            # Find the start of the trailing prose run (first prose line after any
+            # leading field lines in this paragraph).
+            first_prose = 0
+            for li in range(last_prose + 1):
+                if plines[li].strip() == '' or _WFE_NONPROSE_LINE_RE.match(plines[li]):
+                    first_prose = li + 1
+            prose_block = '\n'.join(plines[first_prose: last_prose + 1])
+            new_block, did = _repair_prose_block_tail(prose_block)
+            if did:
+                plines[first_prose: last_prose + 1] = new_block.split('\n')
+                paras[pi] = '\n'.join(plines)
+                repaired += 1
+        return ''.join(paras)
+
+    out = [_repair_segment(parts[0])]
+    i = 1
+    while i < len(parts):
+        out.append(parts[i])  # header verbatim
+        if i + 1 < len(parts):
+            out.append(_repair_segment(parts[i + 1]))
+        i += 2
+
+    report["repaired"] = repaired
+    if repaired:
+        new_text = ''.join(out)
+        new_text = re.sub(r'\n{3,}', '\n\n', new_text)
+        return new_text, report
     return tour_text, report

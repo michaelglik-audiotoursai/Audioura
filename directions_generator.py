@@ -158,6 +158,131 @@ def validate_directions_mode(directions_text: str, transport_mode: str) -> list:
     return violations
 
 
+# ─── [LOCAL-660 defect 4] Directions must not pre-announce the end ──────────
+# Tour 557 v7 Stop 1→2 directions said:
+#   "…you'll soon arrive at Boston City Hall, …, marking the end of your walk
+#    exploring Massachusetts politics and current affairs in Boston."
+# This is the leg into STOP 2 of 5. Only the leg INTO THE LAST STOP may say the
+# walk is ending. And a directions line is a navigation cue, not a place to echo
+# the tour's THEME ("exploring Massachusetts politics and current affairs") — a
+# D636/D634 echo that belongs to the orientation/conclusion, not the hand-off.
+
+# "final"/"end" language that claims the walk/tour/journey is concluding.
+_DIRECTIONS_END_RE = re.compile(
+    r'(?i)\b('
+    r'mark(?:ing|s|ed)?\s+the\s+(?:end|close|conclusion|finale)\b[^.?!]*|'
+    r'the\s+(?:end|close|conclusion|finale)\s+of\s+your\s+(?:walk|tour|journey|visit|stroll|ride)\b[^.?!]*|'
+    r'(?:your|the)\s+(?:final|last)\s+stop\b[^.?!]*|'
+    r'(?:this|that)\s+(?:is|marks)\s+(?:the\s+)?(?:final|last)\b[^.?!]*|'
+    r'(?:ending|concluding|finishing|completing)\s+(?:your|the|this)\s+(?:walk|tour|journey|visit)\b[^.?!]*|'
+    r'where\s+your\s+(?:walk|tour|journey)\s+(?:ends|concludes)\b[^.?!]*'
+    r')')
+
+# A theme echo attached to a walk/tour/journey noun: "…your walk exploring
+# <theme>", "…tour dedicated to <theme>". Restricted to clearly THEMATIC
+# connectors so a spatial navigation phrase ("walk through the park", "walk down
+# Congress Street", "stroll along the Common") is never mistaken for a theme
+# echo — those are the directions, not a restatement of the tour subject.
+_DIRECTIONS_THEME_ECHO_RE = re.compile(
+    r'(?i)\b(?:walk|tour|journey|visit|stroll|ride|exploration)\s+'
+    r'(?:exploring|dedicated\s+to|celebrating|devoted\s+to|focused\s+on|'
+    r'centered\s+on|centred\s+on|themed\s+(?:on|around))\s+'
+    r'[^.?!]*')
+
+
+def _strip_dangling_connectors(text: str) -> str:
+    """Tidy a sentence after an end/theme clause was excised from its middle:
+    drop a dangling trailing connector/comma and re-terminate."""
+    s = re.sub(r'[ \t]{2,}', ' ', text)
+    # Remove a trailing comma + connector left hanging ("…City Hall, .")
+    s = re.sub(r'[\s,;:–—-]+(?=[.?!]|$)', '', s)
+    s = re.sub(r'[ \t]+([.?!])', r'\1', s)
+    s = s.strip()
+    if s and s[-1] not in '.?!':
+        s += '.'
+    return s
+
+
+def sanitize_directions_leg(text: str, is_last_leg: bool,
+                            next_name: str = "") -> str:
+    """[LOCAL-660 defect 4] Clean a directions line for its position in the tour.
+
+    * On a NON-final leg, remove any clause that announces the walk/tour is
+      ending ("marking the end of your walk", "your final stop", …). Only the leg
+      into the LAST stop may say the walk is finishing.
+    * On EVERY leg, strip the tour-theme echo ("…your walk exploring Massachusetts
+      politics and current affairs") — a directions line is a navigation cue, not
+      a place to restate the theme.
+
+    If stripping empties the line, fall back to "Continue to <next_name>." when a
+    destination name is known. Pure, deterministic, idempotent.
+    """
+    if not text or not text.strip():
+        return text
+    out = text
+
+    # 1) Theme echo — remove the "<walk/tour> exploring <theme>…" clause on all legs.
+    def _theme_sub(m):
+        # Keep the leading noun ("walk"/"tour") so the sentence still reads if the
+        # echo was the whole predicate; drop the "exploring <theme>" tail.
+        head = m.group(0).split()[0]
+        return head
+    out = _DIRECTIONS_THEME_ECHO_RE.sub(_theme_sub, out)
+
+    # 2) End/final language — only forbidden on a non-final leg.
+    if not is_last_leg:
+        out = _DIRECTIONS_END_RE.sub('', out)
+
+    if out != text:
+        # Re-tidy each sentence after excisions.
+        out = _strip_dangling_connectors(out)
+
+    # If we emptied the line (or left only a fragment), fall back to a clean cue.
+    if not out or len(out.strip(' .?!,;:')) < 3:
+        if next_name:
+            return f"Continue to {next_name}."
+        return text
+    return out
+
+
+_DIR_STOP_HEADER_RE = re.compile(r'(?mi)^Stop\s+\d+:\s*(.+?)\s*$')
+_DIR_LINE_RE = re.compile(r'(?mi)^(\s*Directions:\s*)(\S.*)$')
+
+
+def sanitize_directions_in_text(tour_text: str) -> "tuple":
+    """[LOCAL-660 defect 4] Text-level, every-path guard: sanitize each
+    ``Directions:`` line by its position in the tour. Only the Directions line of
+    the SECOND-TO-LAST stop (the leg into the last stop) may announce the end of
+    the walk; every Directions line is stripped of a tour-theme echo. Returns
+    ``(new_text, n_changed)``. Deterministic and idempotent."""
+    if not tour_text or 'Directions:' not in tour_text:
+        return tour_text, 0
+    headers = list(_DIR_STOP_HEADER_RE.finditer(tour_text))
+    n_stops = len(headers)
+    if n_stops < 2:
+        return tour_text, 0
+    # The leg into the last stop departs the second-to-last stop; its Directions
+    # line sits inside the second-to-last stop's block.
+    last_leg_start = headers[n_stops - 2].start()
+    last_leg_end = headers[n_stops - 1].start()
+
+    changed = 0
+
+    def _repl(m):
+        nonlocal changed
+        label, body = m.group(1), m.group(2)
+        pos = m.start()
+        is_last_leg = (last_leg_start <= pos < last_leg_end)
+        new_body = sanitize_directions_leg(body, is_last_leg=is_last_leg)
+        if new_body != body:
+            changed += 1
+            return label + new_body
+        return m.group(0)
+
+    out = _DIR_LINE_RE.sub(_repl, tour_text)
+    return out, changed
+
+
 def generate_real_directions(
     from_poi: dict,
     to_poi: dict,
