@@ -9145,6 +9145,20 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
     except ImportError:
         pass
 
+    # [LOCAL-661] Start a fresh per-tour venue-resolution memo for THIS tour,
+    # alongside the dead-host scope above. Once a venue resolves to a QID in this
+    # tour, that QID is KNOWN for the rest of the tour: a later resolve_venue()
+    # that fails under a 429/timeout/dead-host (UNKNOWN, never a verified
+    # absence) reuses the memoised entity instead of returning None and flipping
+    # a famous collection onto the exhibition site-first path (Frick/Bench AB6
+    # tour 639). Same ContextVar scoping as the dead-host breaker, so concurrent
+    # tours never share QIDs.
+    try:
+        import venue_resolver as _vr_scope
+        _vr_scope.begin_resolution_scope()
+    except Exception:
+        pass
+
     # [D536] The listener's ask, captured at the top of the function, before any
     # gate, scope check, dedupe or filter can touch it. Every other stop-count
     # variable in this function is downstream of something that can reduce it —

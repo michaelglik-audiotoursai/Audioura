@@ -47,6 +47,144 @@ def reset_network_failure_count() -> None:
     global _network_failure_count
     _network_failure_count = 0
 
+
+# ─── [LOCAL-661] Per-tour venue resolution memo (UNKNOWN ≠ absent) ───────────
+# Bench AB6 tour 639 (The Frick Collection → Q682827, 211 works) resolved the
+# venue cleanly in the poi_selection phase, then a Wikidata 429 storm hit. The
+# deterministic-fill block re-called resolve_venue() for the SAME venue; this
+# second call's Wikidata searches all returned None under the rate limit, so
+# resolve_venue() returned None. The caller read that None as "this museum has
+# no Wikidata entity" (LOCAL-599) and flipped the famous collection onto the
+# exhibition site-first path — 2 of 3 stops, Kiro 2.5. The OFF arm of the same
+# venue, resolved once and never re-asked under load, delivered 6.5.
+#
+# The rule: once a venue string has resolved to a QID in THIS tour, that QID is
+# KNOWN for the rest of the tour. A later resolve_venue() for the same venue that
+# would otherwise return None *because of a network/429/dead-host condition*
+# (UNKNOWN, never a verified absence) returns the memoised entity instead. A
+# genuine "no Wikidata entity" (searches completed and returned zero candidates,
+# with no network failures observed) is NOT memoised and still returns None, so
+# the real LOCAL-599 no-entity museums (MassArt) keep their site-first path.
+#
+# Scope: like the dead-host breaker (LOCAL-572), the memo lives in a ContextVar
+# so concurrent tours in one long-lived process never see each other's QIDs, and
+# worker threads that copy the tour context share it. When no tour scope is
+# active (unit tests, callers that never enter a tour) a module-level default
+# dict is used so the API behaves identically.
+import contextvars as _contextvars
+
+_resolve_memo_default: "dict" = {}
+_resolve_memo_var: "_contextvars.ContextVar[Optional[dict]]" = _contextvars.ContextVar(
+    'venue_resolver_resolution_memo', default=None
+)
+
+
+def _resolve_memo_key(venue_string: str, city: str) -> str:
+    """Normalised memo key for a (venue, city) resolution request."""
+    return f"{(venue_string or '').strip().lower()}|{(city or '').strip().lower()}"
+
+
+def _resolve_memo_namekey(venue_string: str) -> str:
+    """Name-only memo key, so two call sites that parsed the city hint
+    differently (generate_tour_text parses "A, B, C" into venue/city one way in
+    the D1v2 block and another in the deterministic block) still share a hit.
+    Normalises away leading articles and trailing comma-qualifiers.
+    """
+    v = (venue_string or '').strip().lower()
+    # Drop ALL trailing comma-separated place qualifiers (", New York, USA").
+    while ',' in v:
+        _head = v.rsplit(',', 1)[0].strip()
+        if not _head:
+            break
+        v = _head
+    # Drop a leading article in common tour languages.
+    v = re.sub(r"^(the|le|la|les|l[\'’]|il|lo|el|das|der|die)\s+", '', v).strip()
+    return f"name|{v}"
+
+
+def _resolve_memo_active() -> dict:
+    """Return the resolution memo in effect for the current context."""
+    m = _resolve_memo_var.get()
+    return _resolve_memo_default if m is None else m
+
+
+def begin_resolution_scope() -> "_contextvars.Token":
+    """Start a fresh per-tour venue-resolution memo. Returns the ContextVar token.
+
+    generate_tour_text() calls this at tour entry (alongside the dead-host
+    breaker's begin_tour_scope) so a QID resolved earlier in THIS tour is
+    remembered and a later 429 cannot make the same venue look absent.
+    """
+    return _resolve_memo_var.set({})
+
+
+def end_resolution_scope(token: "_contextvars.Token") -> None:
+    """Restore the resolution-memo scope active before begin_resolution_scope()."""
+    try:
+        _resolve_memo_var.reset(token)
+    except (ValueError, LookupError):
+        pass
+
+
+def copy_resolution_memo() -> Optional[dict]:
+    """Capture the active tour's resolution memo for propagation to worker threads.
+
+    Mirrors dead_host_breaker.copy_tour_context: worker threads do not inherit
+    ContextVars, so a pool reachable from a tour captures the memo here and
+    re-binds it (run_in_resolution_memo) so a QID resolved in a worker is visible
+    tour-wide. Returns None when no scope is active (workers then use the
+    module-level default).
+    """
+    return _resolve_memo_var.get()
+
+
+def run_in_resolution_memo(memo: Optional[dict], fn, *args, **kwargs):
+    """Run fn with the captured tour resolution memo re-bound (worker-thread helper)."""
+    if memo is None:
+        return fn(*args, **kwargs)
+    token = _resolve_memo_var.set(memo)
+    try:
+        return fn(*args, **kwargs)
+    finally:
+        _resolve_memo_var.reset(token)
+
+
+def reset_resolution_memo() -> None:
+    """Clear the resolution memo in effect for the current context (test teardown)."""
+    _resolve_memo_active().clear()
+
+
+def _resolve_memo_remember(venue_string: str, city: str, entity: "VenueEntity") -> None:
+    """Remember a successful resolution for the rest of this tour."""
+    if entity is None or not getattr(entity, 'qid', ''):
+        return
+    try:
+        _m = _resolve_memo_active()
+        _m[_resolve_memo_key(venue_string, city)] = entity
+        # Name-only key too, so a different-city-parse call site still matches.
+        # Do not clobber an exact-key hit from a different QID: name-only is a
+        # best-effort fallback, first writer wins.
+        _nk = _resolve_memo_namekey(venue_string)
+        _m.setdefault(_nk, entity)
+    except Exception:
+        pass
+
+
+def _resolve_memo_recall(venue_string: str, city: str) -> "Optional[VenueEntity]":
+    """Return a previously-resolved entity for this (venue, city), or None.
+
+    Tries the exact (venue, city) key first, then the name-only fallback key.
+    """
+    try:
+        _m = _resolve_memo_active()
+        _hit = _m.get(_resolve_memo_key(venue_string, city))
+        if _hit is not None:
+            return _hit
+        return _m.get(_resolve_memo_namekey(venue_string))
+    except Exception:
+        return None
+
+
 _USER_AGENT = "Audioura/2.2 (tour-generation; contact: support@audioura.com)"
 _WIKIDATA_API = "https://www.wikidata.org/w/api.php"
 _SPARQL_ENDPOINT = "https://query.wikidata.org/sparql"
@@ -502,6 +640,44 @@ def _is_high_confidence_candidate(qid: str, label: str, venue_string: str) -> bo
 
 @_sub_timed('resolve_venue')
 def resolve_venue(venue_string: str, city: str = "") -> Optional[VenueEntity]:
+    """Resolve a venue string to a Wikidata entity, UNKNOWN-safe within a tour.
+
+    [LOCAL-661] Thin memo wrapper over _resolve_venue_impl. Once a venue string
+    has resolved to a QID in THIS tour, that QID is KNOWN for the rest of the
+    tour: a later call for the same venue that returns None *while a network
+    failure was observed during the call* (429/timeout/dead-host — UNKNOWN,
+    never a verified absence) returns the memoised entity instead of None. A
+    clean "no candidates" result (no network failures observed) is returned as
+    None unchanged, so genuine no-Wikidata-entity museums keep their site-first
+    path. On success the resolution is memoised for the rest of the tour.
+    """
+    _failures_before = _network_failure_count
+    entity = _resolve_venue_impl(venue_string, city)
+    if entity is not None and getattr(entity, 'qid', ''):
+        _resolve_memo_remember(venue_string, city, entity)
+        return entity
+
+    # Impl returned None. Distinguish UNKNOWN (network failure seen during this
+    # call OR Wikidata currently cold) from a verified absence (clean zero hits).
+    _failures_during = _network_failure_count - _failures_before
+    _host_cold = False
+    try:
+        from dead_host_breaker import is_host_cold as _ihc
+        _host_cold = _ihc('https://www.wikidata.org')
+    except Exception:
+        _host_cold = False
+    if _failures_during > 0 or _host_cold:
+        _memo = _resolve_memo_recall(venue_string, city)
+        if _memo is not None:
+            print(f"  [LOCAL-661] resolve_venue('{venue_string}') UNKNOWN "
+                  f"({'network/429' if _failures_during > 0 else 'host cold'}); "
+                  f"reusing in-tour resolution {_memo.qid} ({_memo.name}) — "
+                  f"a rate limit is not 'no entity'")
+            return _memo
+    return entity
+
+
+def _resolve_venue_impl(venue_string: str, city: str = "") -> Optional[VenueEntity]:
     """Resolve a venue string to a Wikidata entity.
     
     Args:
