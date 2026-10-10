@@ -1405,6 +1405,286 @@ def _check_dining_nominatim(
     return False, ""
 
 
+# ──── [LOCAL-662B] WALKING-STOP EXISTENCE CHECK ───────────────────────────────
+# A city walking tour's venue (e.g. "Walking tour in Boston …, Boston, MA") has
+# NO venue_corpus row, so _classify_venue_kind returns 'unknown' and the stop
+# falls to the institution/unknown branch — _check_stop_corpus ONLY. That is a
+# COVERAGE test (is this stop in our scraped corpus?), not an EXISTENCE test.
+# Parkman Bandstand and the Boston Athenaeum are real, geocodable Boston
+# landmarks that are simply not in our corpus, so they were VERIFIED=False and
+# DROPPED (LOCAL-662 LEAD bounce). The right question for a walking stop is the
+# same one geographic_area / dining already ask: does this place actually exist
+# at this location?
+#
+# existence (LEAD's rule) = a Wikidata item (label OR alias match, with P625
+#   coordinates near the toured city) OR an OSM named feature at those
+#   coordinates (Nominatim). A stop that fails BOTH is dropped. "The State House
+#   Park" (no distinct Wikidata item, no OSM feature) still fails.
+#
+# LOCAL-661 / D162: a Wikimedia or OSM search that could NOT run (429, timeout,
+# connection error) is UNKNOWN, never "absent" — it raises RuntimeError so the
+# caller keeps the stop and never drops it on non-evidence.
+
+def _city_signals_from_venue(venue_name: str) -> Set[str]:
+    """Extract city/region proper-noun signals from a walking-tour venue label.
+
+    "Walking tour in Boston dedicated to Massachusetts politics …, Boston, MA"
+    → {'boston', 'massachusetts'} (noise words — walking/tour/dedicated/politics
+    and bare US state abbreviations — are dropped). Used to confirm a Wikidata /
+    OSM hit is in the toured city, not a same-named place elsewhere.
+    """
+    _NOISE = {
+        'walking', 'cycling', 'biking', 'driving', 'tour', 'tours', 'area',
+        'dedicated', 'politics', 'current', 'affairs', 'history', 'historical',
+        'the', 'and', 'for', 'with', 'from', 'that', 'this', 'about', 'through',
+        'usa', 'uk', 'stop', 'stops', 'visit', 'guide', 'self', 'guided',
+        'downtown', 'old', 'new', 'city', 'town', 'center', 'centre', 'district',
+    }
+    _US_STATE_ABBR = {
+        'al', 'ak', 'az', 'ar', 'ca', 'co', 'ct', 'de', 'fl', 'ga', 'hi', 'id',
+        'il', 'in', 'ia', 'ks', 'ky', 'la', 'me', 'md', 'ma', 'mi', 'mn', 'ms',
+        'mo', 'mt', 'ne', 'nv', 'nh', 'nj', 'nm', 'ny', 'nc', 'nd', 'oh', 'ok',
+        'or', 'pa', 'ri', 'sc', 'sd', 'tn', 'tx', 'ut', 'vt', 'va', 'wa', 'wv',
+        'wi', 'wy', 'dc',
+    }
+    signals: Set[str] = set()
+    _cleaned = re.sub(r'\([^)]*\)', ' ', venue_name or '')
+    for part in re.split(r'[,\s]+', _cleaned):
+        p = _strip_accents(part).lower().strip()
+        p = re.sub(r'[^a-z]', '', p)
+        if len(p) < 3:
+            continue
+        if p in _NOISE or p in _US_STATE_ABBR:
+            continue
+        signals.add(p)
+    return signals
+
+
+def _geocode_city_center(venue_name: str, city_signals: Set[str]):
+    """Geocode the toured city to a (lat, lng) center via Nominatim.
+
+    Returns None when no usable city token is found. Raises RuntimeError on a
+    throttled/failed lookup (LOCAL-320) so the caller classifies the stop as
+    UNKNOWN rather than searched-and-absent.
+    """
+    # Prefer a proper-noun city token (first capitalized word) from the raw label.
+    _cleaned = re.sub(r'\([^)]*\)', ' ', venue_name or '')
+    city_hint = ''
+    _NOISE = {'walking', 'cycling', 'biking', 'driving', 'tour', 'tours', 'in',
+              'the', 'area', 'dedicated', 'to', 'of', 'a', 'self', 'guided'}
+    for part in re.split(r'[,\s]+', _cleaned):
+        p = part.strip()
+        alpha = re.sub(r'[^a-zA-ZÀ-ÿ]', '', p)
+        if len(alpha) >= 3 and alpha.lower() not in _NOISE and alpha[0].isupper():
+            city_hint = alpha
+            break
+    if not city_hint and city_signals:
+        city_hint = next(iter(city_signals))
+    if not city_hint:
+        return None
+    params = {
+        "q": city_hint,
+        "format": "jsonv2",
+        "limit": "1",
+        "accept-language": "en",
+    }
+    resp = _nominatim_request(params, context=f"city:{city_hint}")
+    results = resp.json()
+    if not results:
+        return None
+    try:
+        return (float(results[0]["lat"]), float(results[0]["lon"]))
+    except (KeyError, ValueError, IndexError):
+        return None
+
+
+def _check_walking_stop_existence(
+    stop_title: str, venue_name: str
+) -> Tuple[bool, str]:
+    """[LOCAL-662B] Existence check for a WALKING-tour stop (unknown/institution).
+
+    Verified when EITHER:
+      (A) A Wikidata item whose label OR alias matches the stop title has P625
+          coordinates within the toured-city metro radius, OR
+      (B) An OSM named feature (Nominatim) matching the stop title is in the
+          toured city.
+
+    Proximity binds to the toured CITY (the gate has no per-stop coordinates yet
+    — it runs before geocoding). Metro radius is generous on purpose: this is an
+    EXISTENCE test ("is this a real place in this city?"), not a walkability test
+    (GEO-CHECK / LOCAL-658 enforces the walking distance limit downstream). A
+    place in the wrong city (e.g. a Boston-named landmark that only exists in
+    another state) still fails.
+
+    Raises RuntimeError on a Wikimedia/OSM search failure (429/timeout/
+    connection) so the caller keeps the stop as UNKNOWN (LOCAL-661 / D162) — a
+    search that did not run is never evidence of absence.
+    """
+    import requests as _http
+
+    _HEADERS = {
+        "User-Agent": "Audioura/2.2 (tour-generation; contact: support@audioura.com)",
+        "Accept": "application/json",
+    }
+    _METRO_RADIUS_KM = 35.0  # generous metro reach; walkability is GEO-CHECK's job
+
+    city_signals = _city_signals_from_venue(venue_name)
+
+    # City center for the proximity check. A failed geocode is a SEARCH FAILURE
+    # (not "no evidence") — propagate so the stop is kept as UNKNOWN.
+    city_center = _geocode_city_center(venue_name, city_signals)
+
+    def _haversine_km_local(a, b) -> float:
+        import math
+        lat1, lon1 = a
+        lat2, lon2 = b
+        r = 6371.0
+        p1, p2 = math.radians(lat1), math.radians(lat2)
+        dp = math.radians(lat2 - lat1)
+        dl = math.radians(lon2 - lon1)
+        h = (math.sin(dp / 2) ** 2
+             + math.cos(p1) * math.cos(p2) * math.sin(dl / 2) ** 2)
+        return 2 * r * math.asin(min(1.0, math.sqrt(h)))
+
+    def _in_metro(lat: float, lng: float) -> bool:
+        if not city_center:
+            # No city anchor resolved but no error either — accept proximity on
+            # the city-signal text match alone (handled by caller paths below).
+            return True
+        return _haversine_km_local(city_center, (lat, lng)) <= _METRO_RADIUS_KM
+
+    # ---- (A) Wikidata: label/alias match + P625 near the city ----
+    # A Wikimedia error here is a SEARCH FAILURE → raise (UNKNOWN, keep stop).
+    try:
+        wd_url = "https://www.wikidata.org/w/api.php"
+        for lang in ('en', 'fr'):
+            wd_params = {
+                "action": "wbsearchentities",
+                "search": stop_title,
+                "language": lang,
+                "limit": "7",
+                "format": "json",
+            }
+            resp = _http.get(wd_url, params=wd_params, headers=_HEADERS, timeout=8)
+            if resp.status_code != 200:
+                raise RuntimeError(f"Wikidata HTTP {resp.status_code} for {stop_title!r}")
+            for wd_r in resp.json().get("search", []):
+                # wbsearchentities matches labels AND aliases; the returned
+                # 'match' carries the aliased text, so check both.
+                wd_label = wd_r.get("label", "")
+                wd_match = (wd_r.get("match", {}) or {}).get("text", "")
+                if not (_title_match(stop_title, wd_label)
+                        or (wd_match and _title_match(stop_title, wd_match))):
+                    continue
+                qid = wd_r.get("id", "")
+                if not qid:
+                    continue
+                coords = _fetch_wikidata_coords(qid, _HEADERS)
+                if coords and _in_metro(coords[0], coords[1]):
+                    return True, (f"wikidata_{lang}: '{wd_label or wd_match}' "
+                                  f"(QID:{qid}) at {coords[0]:.4f},{coords[1]:.4f} "
+                                  f"within {('metro' if city_center else 'city')} of "
+                                  f"{venue_name[:40]!r}")
+    except (_http.exceptions.Timeout, _http.exceptions.ConnectionError) as e:
+        raise RuntimeError(f"Wikidata connection failed for {stop_title!r}: {e}")
+
+    # ---- (B) OSM named feature (Nominatim) in the toured city ----
+    # _nominatim_request raises RuntimeError on 429/timeout → UNKNOWN (keep).
+    city_hint = ""
+    _cleaned = re.sub(r'\([^)]*\)', ' ', venue_name or '')
+    _NOISE2 = {'walking', 'cycling', 'biking', 'driving', 'tour', 'tours', 'in',
+               'the', 'area', 'dedicated', 'to', 'of', 'a', 'self', 'guided'}
+    for part in re.split(r'[,\s]+', _cleaned):
+        alpha = re.sub(r'[^a-zA-ZÀ-ÿ]', '', part.strip())
+        if len(alpha) >= 3 and alpha.lower() not in _NOISE2 and alpha[0].isupper():
+            city_hint = alpha
+            break
+    if not city_hint and city_signals:
+        city_hint = next(iter(city_signals))
+
+    norm_stop = _strip_accents(stop_title).lower()
+    _stop_words = [w for w in re.split(r"[\s'\u2019-]+", norm_stop)
+                   if len(w) >= 3 and w not in ('the', 'les', 'des', 'une', 'la',
+                                                'le', 'du', 'of', 'and')]
+
+    # Query variants: full title, and the title with a leading article stripped
+    # ("The Boston Athenaeum" → "Boston Athenaeum" — OSM indexes the bare name).
+    _title_variants = [stop_title]
+    _no_article = re.sub(r"^(the|a|an|le|la|les|l')\s+", "", stop_title,
+                         flags=re.IGNORECASE).strip()
+    if _no_article and _no_article != stop_title:
+        _title_variants.append(_no_article)
+
+    for _tv in _title_variants:
+        search_query = f"{_tv}, {city_hint}" if city_hint else _tv
+        params = {
+            "q": search_query,
+            "format": "jsonv2",
+            "addressdetails": "1",
+            "limit": "5",
+            "accept-language": "en",
+        }
+        resp = _nominatim_request(params, context=_tv)  # raises → UNKNOWN
+        results = resp.json()
+        for result in results or []:
+            display_name = _strip_accents(result.get("display_name", "")).lower()
+            name = _strip_accents(result.get("name", "") or "").lower()
+            address = result.get("address", {})
+
+            # Name match: the OSM feature's OWN name must match the stop title —
+            # token overlap against the result name (NOT the broad display_name,
+            # which carries street/city context and would let "State House Park"
+            # match a different "… Park" whose address happens to sit on a
+            # "State House" street, D-false-positive). A bare generic place-type
+            # word ("park", "square", "hall") alone is never a match.
+            if not name:
+                continue
+            _name_match = _title_match(_tv, name) or _title_match(stop_title, name)
+            if not _name_match:
+                # Fallback: count DISTINCTIVE word hits in the feature name only
+                # (drop the generic place-type tail word so "… Park" ≠ "… Park").
+                _generic = {'park', 'square', 'hall', 'house', 'building',
+                            'street', 'avenue', 'garden', 'gardens', 'bridge',
+                            'library', 'museum', 'church', 'cemetery', 'common'}
+                _distinct = [w for w in _stop_words if w not in _generic]
+                if not _distinct:
+                    continue
+                _name_hits = sum(1 for w in _distinct if w in name)
+                if _name_hits < max(1, (len(_distinct) + 1) // 2):
+                    continue
+
+            # City/proximity match. Prefer structured address fields; fall back
+            # to a metro-radius coordinate check against the city center.
+            result_city = _strip_accents(
+                address.get("city", "") or address.get("town", "")
+                or address.get("municipality", "") or address.get("village", "")
+                or address.get("county", "")).lower()
+            result_state = _strip_accents(address.get("state", "")).lower()
+            city_ok = False
+            for sig in city_signals:
+                if sig in result_city or sig in result_state or sig in display_name:
+                    city_ok = True
+                    break
+            if not city_ok and city_center:
+                try:
+                    city_ok = _in_metro(float(result.get("lat")),
+                                        float(result.get("lon")))
+                except (TypeError, ValueError):
+                    city_ok = False
+            if not city_ok:
+                continue
+            _osm_name = result.get("name") or result.get("display_name", "")[:60]
+            _cat = result.get("category", "")
+            _typ = result.get("type", "")
+            return True, (f"nominatim_osm: '{_osm_name}' in "
+                          f"{result_city or city_hint} [category={_cat}/{_typ}]")
+
+    return False, ""
+
+
+# ──── END [LOCAL-662B] ────────────────────────────────────────────────────────
+
+
 def verify_stop_existence(
     stop_title: str,
     venue_name: str,
@@ -1504,6 +1784,36 @@ def verify_stop_existence(
             result['evidence'] = evidence
             result['source'] = 'stop_corpus'
             return result
+
+        # [LOCAL-662B] WALKING-TOUR EXISTENCE FALLBACK. A city walking tour's
+        # venue has no venue_corpus row, so a real-but-unscraped landmark
+        # (Parkman Bandstand, the Boston Athenaeum) reaches here with venue_kind
+        # 'unknown' and fails the corpus COVERAGE test above. Before dropping it,
+        # ask the EXISTENCE question the LEAD requires: is there a Wikidata item
+        # (label/alias + P625 near the city) or an OSM named feature for it? Only
+        # for walking/specialized outdoor tours — museum/dining keep their own
+        # paths, and a tour with its own venue page never routes here.
+        #
+        # LOCAL-661 / D162: a Wikimedia/OSM search that could not run (429,
+        # timeout, connection error) raises RuntimeError → classified 'unknown'
+        # (search_failed) so the stop is KEPT, never dropped on non-evidence.
+        _tt = (tour_type or '').strip().lower()
+        _WALKING_KINDS = ('walking', 'specialized')
+        if _tt in _WALKING_KINDS:
+            try:
+                verified, evidence = _check_walking_stop_existence(stop_title, venue_name)
+                if verified:
+                    result['verified'] = True
+                    result['evidence'] = evidence
+                    result['source'] = 'walking_existence'
+                    return result
+            except RuntimeError as e:
+                result['evidence'] = f'search_failed: {e}'
+                result['source'] = 'search_failed'
+                result['search_failed'] = True
+                logger.warning(f"[EXISTENCE-GATE] Walking existence search failed "
+                               f"for {stop_title!r}: {e}")
+                return result
 
     # Check 3: venue catalogue page — not implemented yet
     # (would require fetching venue's official collection page and checking)
