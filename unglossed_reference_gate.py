@@ -1603,7 +1603,7 @@ def _degrade_reference_in_text(text: str, entity: str, sentence: str) -> str:
     new_sentence = _excise_governed_construction(sentence, entity)
 
     # Validate the degraded sentence with post-hoc guards
-    if new_sentence != sentence and _degrade_sentence_is_wellformed(new_sentence):
+    if new_sentence != sentence and _degrade_sentence_is_wellformed(new_sentence, entity):
         return text.replace(sentence, new_sentence, 1)
 
     # Sentence cannot be repaired — drop it entirely
@@ -2160,6 +2160,48 @@ _DEGRADE_GUARD_STRANDED_BARE_OBJECT = re.compile(
     re.IGNORECASE,
 )
 
+# [LOCAL-660 defect 2] A copula welded directly onto a BARE named entity at the
+# end of the sentence — "<subject> (was|were|is|are) [the] <ProperNoun>." Tour
+# 557 v7 Stop 5 shipped
+#
+#   "...mortally wounding Crispus Attucks, Samuel Gray, James Caldwell, Samuel
+#    Maverick, and Patrick Carr. The victims were Boston Massacre."
+#
+# The degrade path cut the predicate out from between the copula and a reference
+# ("The victims were [killed in what became known as the] Boston Massacre"),
+# leaving the subject equated with an event name — a sentence that is false and
+# meaningless. Every existing degrade guard passed it (it has a subject, is >15
+# chars, ends on a capitalised word not a function word). Two detectors:
+#
+#   GENERAL (FIX B): a copula immediately before a MULTI-WORD proper noun that
+#   ends the sentence, with no connective ("of"/"in"/a role noun) between them.
+#   Requires ≥2 consecutive Capitalised tokens so it never fires on a legitimate
+#   single-name predicate ("The author was Shakespeare.") or a role nominative
+#   ("He was President of the United States."). A leading "the"/"a" before the
+#   entity is allowed, as that is exactly the degrade residue.
+_DEGRADE_GUARD_COPULA_BARE_ENTITY = re.compile(
+    r'\b(?:was|were|is|are)\s+(?:the\s+|a\s+|an\s+)?'
+    r'(?:[A-Z][A-Za-zà-ÿ\'\u2019\-]+\s+){1,4}'   # ≥1 leading Capitalised word(s)…
+    r'[A-Z][A-Za-zà-ÿ\'\u2019\-]+\s*\.\s*$'      # …+ a final Capitalised word, then '.'
+)
+
+
+def _degrade_copula_equates_entity(sentence: str, entity: str) -> bool:
+    """[LOCAL-660 defect 2 / FIX A] True when degrading welded a copula directly
+    onto the degraded ``entity`` at the sentence end: "... (was|were|is|are)
+    [the] <entity>." Entity-aware and surgical — fires only on the exact name the
+    gate just degraded, so it cannot touch an unrelated well-formed sentence.
+    """
+    s = (sentence or '').strip()
+    ent = (entity or '').strip()
+    if not s or not ent:
+        return False
+    pat = re.compile(
+        r'\b(?:was|were|is|are)\s+(?:the\s+|a\s+|an\s+)?'
+        + re.escape(ent) + r'\s*\.\s*$',
+        re.IGNORECASE)
+    return bool(pat.search(s))
+
 
 def _ends_in_transitive_verb_without_object(sentence: str) -> bool:
     """[LOCAL-624] True when a sentence ends with a verb whose object is gone.
@@ -2296,10 +2338,12 @@ def _tail_starts_with_past_verb(tail: str) -> bool:
     return first.endswith('ed') or first in _IRREGULAR_PAST
 
 
-def _degrade_sentence_is_wellformed(sentence: str) -> bool:
-    """Check that a degraded sentence passes all five degrade guards.
+def _degrade_sentence_is_wellformed(sentence: str, entity: str = "") -> bool:
+    """Check that a degraded sentence passes all degrade guards.
 
-    Returns True if well-formed, False if any guard fires.
+    Returns True if well-formed, False if any guard fires. ``entity`` (optional)
+    is the exact name the gate just degraded; when given, the LOCAL-660 copula
+    guard rejects a sentence that equates its subject with that bare entity.
     """
     if len(sentence.strip()) < 15:
         return False
@@ -2322,6 +2366,11 @@ def _degrade_sentence_is_wellformed(sentence: str) -> bool:
     if _DEGRADE_GUARD_OBJECT_DROPPED.search(sentence):   # [LOCAL-530]
         return False
     if _ends_in_transitive_verb_without_object(sentence):   # [LOCAL-624]
+        return False
+    # [LOCAL-660 defect 2] A copula welded onto a bare named entity.
+    if entity and _degrade_copula_equates_entity(sentence, entity):   # FIX A
+        return False
+    if _DEGRADE_GUARD_COPULA_BARE_ENTITY.search(sentence):   # FIX B
         return False
     return True
 

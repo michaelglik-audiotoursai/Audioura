@@ -24629,9 +24629,11 @@ RULES:
             complete_tour, _fact_actions = strip_repeated_facts(complete_tour)
             if _fact_actions:
                 for _fa in _fact_actions:
+                    _where = ("twice in the same stop" if _fa.get('within_stop')
+                              else f"first told at stop {_fa['first_stop']}")
                     if _fa['removed']:
                         print(f"  [D533] REPEATED FACT removed from stop {_fa['repeat_stop']} "
-                              f"(first told at stop {_fa['first_stop']}, {_fa['signature']}): "
+                              f"({_where}, {_fa['signature']}): "
                               f"{_fa['sentence'][:80]}")
                     else:
                         print(f"  [D533] REPEATED FACT kept in stop {_fa['repeat_stop']} "

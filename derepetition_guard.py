@@ -700,21 +700,33 @@ def _stop_blocks(tour_text: str):
     return blocks
 
 
-def check_cross_stop_fact_repetition(tour_text: str, min_stops: int = 2):
-    """Facts asserted in more than one stop.
+def check_cross_stop_fact_repetition(tour_text: str, min_stops: int = 2,
+                                     include_within_stop: bool = True):
+    """Facts asserted more than once — across stops, and (LOCAL-660) within a stop.
 
-    Returns [{signature, first_stop, repeat_stop, sentence}] — one entry per
-    REPEAT (the first telling is never reported; it is the one to keep).
+    Returns [{signature, first_stop, repeat_stop, sentence, first_sentence}] —
+    one entry per REPEAT (the first telling is never reported; it is the one to
+    keep). A within-stop repeat has ``first_stop == repeat_stop`` and
+    ``within_stop: True``; set ``include_within_stop=False`` for cross-stop only.
     """
     blocks = _stop_blocks(tour_text)
-    if len(blocks) < min_stops:
+    if len(blocks) < min_stops and not include_within_stop:
         return []
     seen = {}          # signature -> (stop_number, sentence)
     repeats = []
     for num, block in blocks:
         # A stop repeating itself is a different problem; dedupe within the stop
         # first so one stop's two mentions do not both count against the next.
-        local = set()
+        #
+        # [LOCAL-660 defect 2] …but intra-stop double-telling is a defect in its
+        # own right. Tour 557 v7 Stop 5 told the Boston Massacre twice — once in
+        # the narration ("…would be named the Boston Massacre") and again in an
+        # inserted fact sentence ("On King Street … March 5, 1770 …") — and the
+        # old within-stop set silently swallowed the repeat so it was never
+        # flagged. ``local`` now maps a signature to its FIRST sentence in the
+        # stop, so a second telling in the SAME stop is reported as a repeat with
+        # first_stop == repeat_stop.
+        local = {}
         # Drop the block's FIRST line: _stop_blocks splits on "Stop N:", so each
         # block opens with the stop TITLE, which _FACT_SKIP_LINE cannot match and
         # which otherwise reads as a fact ("... (Nuremberg, 1581)").
@@ -733,9 +745,23 @@ def check_cross_stop_fact_repetition(tour_text: str, min_stops: int = 2):
         for sent in _split_into_sentences(narration):
             for sig in fact_signatures(sent) | keyphrase_signatures(sent):
                 if sig in local:
+                    # Same fact told twice IN THIS STOP — the later telling is
+                    # the repeat (keep the first). Report once per signature.
+                    if (include_within_stop and len(blocks) >= 1
+                            and local[sig] != sent):
+                        repeats.append({
+                            'signature': f"{sig[0]}/{sig[1]}",
+                            'first_stop': num,
+                            'repeat_stop': num,
+                            'sentence': sent,
+                            'first_sentence': local[sig],
+                            'within_stop': True,
+                        })
+                        # Collapse to one report for this signature in this stop.
+                        local[sig] = sent
                     continue
-                local.add(sig)
-                if sig in seen and seen[sig][0] != num:
+                local[sig] = sent
+                if len(blocks) >= min_stops and sig in seen and seen[sig][0] != num:
                     repeats.append({
                         'signature': f"{sig[0]}/{sig[1]}",
                         'first_stop': seen[sig][0],
