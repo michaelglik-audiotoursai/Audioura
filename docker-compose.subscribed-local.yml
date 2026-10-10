@@ -18,6 +18,9 @@ services:
       - STORY_RETRY_KEEP_BEST=1
       - STORY_RETRY_EARLY_STOP=1
       - TOUR_STORY_MODEL=gpt-4.1
+      # D645 (LEAD 2026-10-09): cheap arm ON for the local stack. Rollback = delete these two lines and recreate tour-generator.
+      - NARRATION_MODEL=gpt-4.1-mini
+      - RESEARCH_BACKEND=serper
     volumes:
       - /Users/micha/audioura-subscribed-local/_meter:/opt/meter:ro
       - /Users/micha/Audioura/meterlogs:/meterlogs
