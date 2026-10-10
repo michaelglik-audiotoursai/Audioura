@@ -118,3 +118,78 @@ class TestSearchBeforeDelete(unittest.TestCase):
         text, recovered, removed = res(self.S, "", "", None)
         self.assertEqual(recovered, [])
         self.assertTrue(removed)
+
+
+class TestVictimNameBackfillIsPeopleOnly(unittest.TestCase):
+    """[LOCAL-663] "The victims were Boston Massacre." survived LOCAL-660.
+
+    The producer is NOT the degrade path (where LOCAL-660's entity-gated copula
+    guard runs) — it is this gate's `_as_narration`. When recovered circumstances
+    drop a victim surname it back-fills "...The victims were <names>.", and the
+    names came from a bare two-capitalised-token regex (`_NAME_IN`) with no
+    filtering, which matched the EVENT ("Boston Massacre") and a DATE FRAGMENT
+    ("On March") as victims. The fix filters to real person names and emits NO
+    sentence when none remain.
+    """
+
+    # The exact death sentence from tour 557 Stop 5 (Boston Massacre), where
+    # five colonists are named and the event is "the Boston Massacre".
+    MASSACRE = ("On March 5, 1770, British soldiers fired into a crowd on King "
+                "Street in the Boston Massacre.")
+
+    def test_event_name_is_not_a_victim(self):
+        import tragedy_context_gate as g
+        self.assertNotIn("Boston Massacre", g._victim_names(self.MASSACRE))
+
+    def test_date_fragment_is_not_a_victim(self):
+        import tragedy_context_gate as g
+        self.assertNotIn("On March", g._victim_names(self.MASSACRE))
+
+    def test_no_victims_copula_when_no_real_names(self):
+        """The red state: recovered prose that omits the event word must NOT
+        be force-fed "The victims were Boston Massacre."."""
+        import tragedy_context_gate as g
+        recovered = ("British troops opened fire on a hostile crowd, killing "
+                     "five men on King Street.")
+        out = g._as_narration(recovered, g._victim_names(self.MASSACRE))
+        self.assertNotIn("The victims were", out)
+        self.assertNotIn("Boston Massacre", out)
+        self.assertNotIn("On March", out)
+
+    def test_as_narration_backstops_an_unfiltered_name_list(self):
+        """Even if a caller passes raw `_NAME_IN` matches, the backfill still
+        drops the event and the date fragment."""
+        import tragedy_context_gate as g
+        raw = g._NAME_IN.findall(self.MASSACRE)      # ['On March', 'Boston Massacre']
+        self.assertIn("Boston Massacre", raw)         # the unfiltered input really has it
+        out = g._as_narration("Soldiers fired into the crowd on King Street.", raw)
+        self.assertNotIn("The victims were", out)
+
+    def test_real_people_are_still_named(self):
+        """D577 narrow exception must still work: when the recovered prose drops
+        a real victim's surname, it is restored."""
+        import tragedy_context_gate as g
+        sent = ("Tragedy struck with the murder of Bruno D'Amore, "
+                "Gilda 'Jill' D'Amore, and Lucia Arpino.")
+        names = g._victim_names(sent)
+        self.assertIn("Bruno D'Amore", names)
+        self.assertIn("Lucia Arpino", names)
+        out = g._as_narration("They were killed during a burglary at home.", names)
+        self.assertIn("The victims were", out)
+        self.assertIn("Arpino", out)
+
+    def test_full_recover_path_never_emits_event_as_victim(self):
+        """End-to-end through resolve_uncontextualised_deaths with a grounded
+        answer that omits the event word — the spliced circumstances must carry
+        no "The victims were Boston Massacre." sentence."""
+        from tragedy_context_gate import resolve_uncontextualised_deaths as res
+        text = (self.MASSACRE + " It became a rallying cry for the colonists.")
+
+        def grounded(_p):
+            return ("Soldiers of the 29th Regiment fired into a crowd on King "
+                    "Street; the soldiers were later tried and most acquitted."), \
+                   ["https://example.org/boston-massacre"]
+
+        out, recovered, removed = res(text, "Old State House", "Boston MA", grounded)
+        self.assertNotIn("The victims were", out)
+        self.assertNotIn("were Boston Massacre", out)

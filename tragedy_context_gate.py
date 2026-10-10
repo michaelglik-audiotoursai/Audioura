@@ -131,6 +131,83 @@ _NAME_IN = re.compile(r"\b[A-Z][\w’'\-]+(?:\s+(?:'[^']+'\s+)?[A-Z][\w’'\-]+)
 _YEAR_IN = re.compile(r'\b(1[5-9]\d\d|20\d\d)\b')
 MAX_CIRCUMSTANCE_CHARS = 420
 
+# [LOCAL-663] `_NAME_IN` is a bare two-capitalised-token regex with no filtering.
+# On the Boston Massacre stop it matched the EVENT ("Boston Massacre") and a
+# DATE FRAGMENT ("On March") as if they were victims, and `_as_narration`
+# back-filled "The victims were On March, Boston Massacre." — a false,
+# meaningless copula that LOCAL-660's degrade guard never saw because this is
+# the tragedy-context composer, not the degrade path. A victim is a PERSON, so a
+# candidate span is kept only when every token is name-shaped: no leading
+# preposition/temporal opener ("On", "In"), no month/weekday, no event-type head
+# word (Massacre, War, Riot, Battle, Party, …). When nothing name-shaped remains
+# we emit NO "The victims were" sentence at all.
+
+# A span whose FIRST token is one of these is a prepositional/temporal fragment
+# the regex happened to glue to a following capital ("On March", "In June",
+# "At Boston"), never a person's given name.
+_NAME_LEADING_STOPWORD = frozenset({
+    'on', 'in', 'at', 'by', 'to', 'of', 'from', 'during', 'after', 'before',
+    'since', 'around', 'near', 'the', 'a', 'an', 'and', 'but', 'with', 'as',
+    'into', 'onto', 'over', 'under', 'between', 'among', 'through',
+})
+
+# Calendar words — a capitalised month/weekday is a date, not a name.
+_NAME_TEMPORAL_WORD = frozenset({
+    'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday',
+    'january', 'february', 'march', 'april', 'may', 'june', 'july', 'august',
+    'september', 'october', 'november', 'december',
+    'spring', 'summer', 'autumn', 'fall', 'winter',
+})
+
+# Event / incident head-words. A span containing one of these names an EVENT
+# ("Boston Massacre", "Boston Tea Party", "Haymarket Riot", "Civil War"), which
+# is precisely the false positive this bug is about — not a victim.
+_NAME_EVENT_WORD = frozenset({
+    'massacre', 'war', 'riot', 'riots', 'battle', 'siege', 'uprising', 'revolt',
+    'revolution', 'rebellion', 'insurrection', 'party', 'raid', 'bombing',
+    'shooting', 'crash', 'fire', 'disaster', 'strike', 'protest', 'march',
+    'rally', 'affair', 'incident', 'tragedy', 'crisis', 'conspiracy', 'plot',
+    'trial', 'hanging', 'execution', 'assassination', 'murders',
+})
+
+
+def _is_person_name(span):
+    """[LOCAL-663] True when `span` is a plausible person name, not an event,
+    a date fragment, or a place-phrase the two-token regex over-matched.
+
+    Structural, not a lookup of names we have seen: a span is a person only when
+    every token is name-shaped — the first token is not a preposition/temporal
+    opener, no token is a month/weekday, and no token is an event head-word.
+    """
+    s = (span or '').strip()
+    if not s:
+        return False
+    tokens = [t for t in re.split(r'\s+', s) if t]
+    if len(tokens) < 2:
+        return False
+    first = re.sub(r"[^A-Za-z]", '', tokens[0]).lower()
+    if first in _NAME_LEADING_STOPWORD:
+        return False
+    for tok in tokens:
+        # Keep a quoted nickname token ("'Jill'") — it is part of the name.
+        if tok.startswith(("'", '"', '’')):
+            continue
+        w = re.sub(r"[^A-Za-z]", '', tok).lower()
+        if not w:
+            continue
+        if w in _NAME_TEMPORAL_WORD or w in _NAME_EVENT_WORD:
+            return False
+    return True
+
+
+def _victim_names(sentence):
+    """[LOCAL-663] Person names from a death sentence, filtered to real people.
+
+    Replaces the raw `_NAME_IN.findall(...)` the back-fill used, so an event or
+    a date fragment can never be reported as a victim.
+    """
+    return [n for n in _NAME_IN.findall(sentence or '') if _is_person_name(n)]
+
 
 def _as_narration(raw, names):
     """Turn the grounded answer into a spoken sentence, not pasted markdown.
@@ -172,8 +249,15 @@ def _as_narration(raw, names):
     txt = ' '.join(out).strip() or ''
     if txt and not txt.endswith(('.', '!', '?')):
         txt += '.'
-    # The names are the point. If the recovered prose dropped them, put them back.
-    missing = [n for n in (names or []) if n and n.split()[-1] not in txt]
+    # The names are the point. If the recovered prose dropped them, put them back
+    # — but ONLY real person names. [LOCAL-663] The caller used to pass raw
+    # `_NAME_IN` matches, which on the Boston Massacre stop included the event
+    # ("Boston Massacre") and a date fragment ("On March"); filtering here is the
+    # backstop that keeps "The victims were Boston Massacre." out of the tour
+    # even if an unfiltered list is passed in. When no real name is left, no
+    # "The victims were" sentence is emitted at all.
+    people = [n for n in (names or []) if n and _is_person_name(n)]
+    missing = [n for n in people if n.split()[-1] not in txt]
     if txt and missing:
         txt = txt.rstrip('.') + '. The victims were ' + ', '.join(missing) + '.'
     return txt
@@ -233,7 +317,7 @@ def resolve_uncontextualised_deaths(text, venue_name='', location='',
                 or not _CIRCUMSTANCE.search(answer)):
             still_bare.append(sent)      # nothing solid came back — delete it
             continue
-        _names = _NAME_IN.findall(sent or '')
+        _names = _victim_names(sent)   # [LOCAL-663] people only, never the event
         _clean = _as_narration(answer, _names)
         if not _clean:
             still_bare.append(sent)
