@@ -7966,6 +7966,20 @@ def _apply_current_affairs_news(final: str) -> str:
     if os.environ.get('DISABLE_CURRENT_AFFAIRS_NEWS', '').strip() == '1':
         print("  [LOCAL-655] current-affairs news pass disabled by env — skipped")
         return final
+    # [LOCAL-662] Strip the stop-editor idempotence marker BEFORE injecting news.
+    # The editor appends '<!-- LOCAL-628:stop-editor:v1 -->' as the LAST line; this
+    # news pass runs after it and appends news to the LAST stop block — whose span
+    # runs to end of text and so INCLUDES the marker line. Injecting news then left
+    # the marker mid-text, before Stop 5's news (tour 557 v9, 'markers' detector
+    # FAIL). Removing the marker here means the news pass only ever sees narration,
+    # and the delivery guard re-marks nothing — the marker is re-added only for the
+    # cache/pool copies, never the delivered text. Idempotent; no-op when absent.
+    try:
+        import stop_editor as _se_news_strip
+        if _se_news_strip.already_edited(final):
+            final = _se_news_strip.strip_marker(final)
+    except Exception:
+        pass
     try:
         import current_affairs_news as _ca
     except Exception as _ie:  # pragma: no cover
@@ -8565,6 +8579,23 @@ def _apply_delivery_hours_guard(result):
                           "one honest note (no fact invented)", flush=True)
         except Exception as _cace:  # pragma: no cover
             _import_logger.error(f"[LOCAL-650] current-affairs coverage skipped: {_cace}")
+        # [LOCAL-662] FINAL STEP: strip the stop-editor idempotence marker from the
+        # DELIVERED text on EVERY path. The marker is an internal flag and must
+        # never reach TTS, the critic, or the on-disk file (the 'markers' detector
+        # fails on '<!--'). The inner impl strips it before returning, but the
+        # news/coverage passes above (and the cache/pool/by_reference paths that
+        # bypass the inner strip) can reintroduce or carry it — so this guard,
+        # which every delivery path returns through, strips it LAST, after all
+        # text mutation and before the file write. Idempotent; no-op when absent.
+        try:
+            import stop_editor as _se_final_strip
+            if final and _se_final_strip.already_edited(final):
+                final = _se_final_strip.strip_marker(final)
+                print("  [LOCAL-662] stripped editor marker from delivered text "
+                      "(final delivery-guard step; kept in cache/pool for "
+                      "idempotence)", flush=True)
+        except Exception as _msf:  # pragma: no cover
+            _import_logger.error(f"[LOCAL-662] final marker strip skipped: {_msf}")
         if final != text and out_file:
             # Rewrite the delivered file so the service (which reads the file,
             # not the return value) ships the cleaned text on every path.
