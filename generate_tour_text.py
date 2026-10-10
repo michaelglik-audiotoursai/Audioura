@@ -10057,6 +10057,17 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
             
             if _det_entity and _det_entity.qid:
                 # Gather documented works from all sources
+                # [LOCAL-661] Snapshot the Wikidata/Wikipedia network-failure
+                # counter now. If the works lookups below come back empty while a
+                # 429/timeout fired during them, "0 documented works" is UNKNOWN,
+                # not a verified empty catalogue — a famous collection (the Frick,
+                # 211 works) must NOT be declared an exhibition museum on a rate
+                # limit. The guard on the ==0 eligibility below reads this delta.
+                try:
+                    from venue_resolver import get_network_failure_count as _gnfc661
+                    _det_fail_before = _gnfc661()
+                except Exception:
+                    _det_fail_before = None
                 _det_documented = []  # List of {title, source} dicts
                 _det_seen_titles_norm = set()
                 
@@ -10131,16 +10142,39 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
                 # count, NOT on canonical titles — a cache full of site chrome
                 # must not keep the site-first path from running.
                 if _det_documented_count == 0:
-                    _museum_site_first_eligible = True
-                    _museum_site_url = getattr(_det_entity, 'official_url', '') or ''
-                    _museum_site_language = getattr(_det_entity, 'language', 'en') or 'en'
-                    # [LOCAL-580 D4] Remember the locality (city hint from the
-                    # request tail) so a clean fail can suggest a locality-based
-                    # walking tour instead of a dead end.
-                    _museum_resolved_locality = _det_city_hint or ''
-                    print(f"  [LOCAL-580] 0 documented works for '{_museum_venue_name}' — "
-                          f"exhibition-museum site-first path ELIGIBLE "
-                          f"(site='{_museum_site_url}')")
+                    # [LOCAL-661] UNKNOWN-safe: if a Wikidata 429/timeout fired
+                    # while gathering works, "0 documented works" is UNKNOWN, not a
+                    # verified empty catalogue. Declaring an exhibition museum here
+                    # is exactly the Frick flip (Bench AB6 639): the venue resolved
+                    # to Q682827 with 211 works, but a later 429 on the works query
+                    # read as "0 documented". Do NOT make the site-first path
+                    # eligible on a rate limit — keep the collection path. A genuine
+                    # 0-work exhibition museum (no failures observed) still flips.
+                    _det_works_unknown = False
+                    try:
+                        if _det_fail_before is not None:
+                            from venue_resolver import get_network_failure_count as _gnfc661b
+                            _det_works_unknown = (_gnfc661b() - _det_fail_before) > 0
+                    except Exception:
+                        _det_works_unknown = False
+                    if _det_works_unknown:
+                        print(f"  [LOCAL-661] 0 documented works for "
+                              f"'{_museum_venue_name}' but a Wikidata 429/timeout "
+                              f"fired during the works lookup — UNKNOWN, not empty. "
+                              f"Keeping the collection path for resolved "
+                              f"{_det_entity.qid}; NOT eligible for the exhibition "
+                              f"site-first path on a rate limit.")
+                    else:
+                        _museum_site_first_eligible = True
+                        _museum_site_url = getattr(_det_entity, 'official_url', '') or ''
+                        _museum_site_language = getattr(_det_entity, 'language', 'en') or 'en'
+                        # [LOCAL-580 D4] Remember the locality (city hint from the
+                        # request tail) so a clean fail can suggest a locality-based
+                        # walking tour instead of a dead end.
+                        _museum_resolved_locality = _det_city_hint or ''
+                        print(f"  [LOCAL-580] 0 documented works for '{_museum_venue_name}' — "
+                              f"exhibition-museum site-first path ELIGIBLE "
+                              f"(site='{_museum_site_url}')")
 
                 # If DOCUMENTED works (catalogue+SPARQL) >= total_stops, fill
                 # deterministically. [LOCAL-583 D1] canonical titles do NOT count
@@ -11237,6 +11271,17 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
             
             if _det_entity and _det_entity.qid:
                 # Gather documented works from all sources
+                # [LOCAL-661] Snapshot the Wikidata/Wikipedia network-failure
+                # counter now. If the works lookups below come back empty while a
+                # 429/timeout fired during them, "0 documented works" is UNKNOWN,
+                # not a verified empty catalogue — a famous collection (the Frick,
+                # 211 works) must NOT be declared an exhibition museum on a rate
+                # limit. The guard on the ==0 eligibility below reads this delta.
+                try:
+                    from venue_resolver import get_network_failure_count as _gnfc661
+                    _det_fail_before = _gnfc661()
+                except Exception:
+                    _det_fail_before = None
                 _det_documented = []  # List of {title, source} dicts
                 _det_seen_titles_norm = set()
                 

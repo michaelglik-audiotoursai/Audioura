@@ -577,6 +577,12 @@ def _fetch_works_count(qid: str) -> Tuple[int, int]:
         return wc, sl
     except Exception as e:
         logger.warning(f"[LOCAL-618] _fetch_works_count failed for {qid}: {e}")
+        # [LOCAL-661] A failure here is UNKNOWN, not a verified 0-work collection.
+        # fetch_venue_works already counts its own 429/timeout failures; count the
+        # remaining exception paths so a caller ranking candidates by collection
+        # size does not read a rate limit as "this museum holds nothing".
+        global _network_failure_count
+        _network_failure_count += 1
         return 0, 0
 
 
@@ -1039,6 +1045,7 @@ def fetch_venue_works(venue_qid: str, language: str = "en",
     """
     if is_modern_art_museum is None:
         is_modern_art_museum = venue_is_modern_art(venue_name)
+    global _network_failure_count   # [LOCAL-661] UNKNOWN-vs-empty signalling
     # [LOCAL-632] GROUP the multi-valued properties (creator, instance_of,
     # collection) with GROUP_CONCAT so each work is ONE row. Before this, adding
     # the P195 ?collection OPTIONAL multiplied rows (creator × instance_of ×
@@ -1087,9 +1094,16 @@ def fetch_venue_works(venue_qid: str, language: str = "en",
             label=f"fetch_venue_works({venue_qid})",
         )
         if resp is None:
+            # [LOCAL-661] UNKNOWN, not an empty catalogue. Count the failure so a
+            # caller (the LOCAL-30/580 deterministic block) can tell "SPARQL fell
+            # over under a 429/timeout" (0 works == UNKNOWN) apart from a genuine
+            # 0-work exhibition museum. A rate limit on the works query must not
+            # read as "this famous collection has no documented works".
+            _network_failure_count += 1
             raise RuntimeError("SPARQL unavailable after retries")
         if resp.status_code != 200:
             logger.warning(f"SPARQL error: {resp.status_code}")
+            _network_failure_count += 1   # [LOCAL-661] UNKNOWN, not empty.
             return []
         
         data = resp.json()
