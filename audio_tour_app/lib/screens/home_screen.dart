@@ -647,7 +647,7 @@ class _HomeScreenState extends State<HomeScreen> {
               ElevatedButton(
                 onPressed: () {
                   Navigator.pop(context);
-                  _downloadSingleTour(item['id'], selectedLanguages);
+                  _downloadSingleTour(item['id'], selectedLanguages, item);
                 },
                 child: Text('Download Tour'),
               ),
@@ -1015,7 +1015,7 @@ class _HomeScreenState extends State<HomeScreen> {
     final Map<String, List<String>> failuresByTour = {};
     for (final tour in toursToDownload) {
       try {
-        final failures = await _downloadSingleTourSilent(tour['id'], languages);
+        final failures = await _downloadSingleTourSilent(tour['id'], languages, tour);
         successCount++;
         final nonEnglish = (languages ?? []).where((l) => l != 'en').toList();
         translationSuccessCount += nonEnglish.length - failures.length;
@@ -1232,13 +1232,13 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
 
-  Future<List<String>> _downloadSingleTourSilent(int tourId, [List<String>? languages]) async {
+  Future<List<String>> _downloadSingleTourSilent(int tourId, [List<String>? languages, Map<String, dynamic>? sourceItem]) async {
     final prefs = await SharedPreferences.getInstance();
 
     final uri = await Endpoints.url(Service.mapDelivery, '/download-tour/$tourId');
     final response = await http.get(uri, headers: await Endpoints.apiHeaders(Service.mapDelivery)).timeout(Duration(seconds: 120));
     if (response.statusCode == 200) {
-      await _saveTourToMyTours(tourId, response.bodyBytes);
+      await _saveTourToMyTours(tourId, response.bodyBytes, sourceItem: sourceItem);
     } else {
       throw Exception('Failed to download tour: ${response.statusCode}');
     }
@@ -1251,7 +1251,7 @@ class _HomeScreenState extends State<HomeScreen> {
     return await TourTranslationHelper.downloadTranslatedVersions(tourId: tourId, languages: nonEnglish, parentEditTourId: parentEditTourId);
   }
 
-  Future<void> _downloadSingleTour(int tourId, [List<String>? languages]) async {
+  Future<void> _downloadSingleTour(int tourId, [List<String>? languages, Map<String, dynamic>? sourceItem]) async {
     final prefs = await SharedPreferences.getInstance();
     
     showDialog(
@@ -1273,7 +1273,7 @@ class _HomeScreenState extends State<HomeScreen> {
       final dlUri = await Endpoints.url(Service.mapDelivery, '/download-tour/$tourId');
       final response = await http.get(dlUri, headers: await Endpoints.apiHeaders(Service.mapDelivery)).timeout(Duration(seconds: 120));
       if (response.statusCode == 200) {
-        await _saveTourToMyTours(tourId, response.bodyBytes);
+        await _saveTourToMyTours(tourId, response.bodyBytes, sourceItem: sourceItem);
       } else {
         throw Exception('Failed to download tour: ${response.statusCode}');
       }
@@ -1665,7 +1665,7 @@ class _HomeScreenState extends State<HomeScreen> {
     await DebugLogHelper.addDebugLog('HOME: Saved translated tour $tourId as: $tourName');
   }
 
-  Future<void> _saveTourToMyTours(int tourId, List<int> zipBytes, {bool isTranslation = false}) async {
+  Future<void> _saveTourToMyTours(int tourId, List<int> zipBytes, {bool isTranslation = false, Map<String, dynamic>? sourceItem}) async {
     try {
       await DebugLogHelper.addDebugLog('HOME: SAVE - Starting _saveTourToMyTours');
       
@@ -1845,6 +1845,17 @@ class _HomeScreenState extends State<HomeScreen> {
         'editable': isEditable,
         'is_web_storage': kIsWeb, // Flag to indicate storage type
       };
+      // [LOCAL-666] Carry the version + updated date from the found-tour entry
+      // (map-delivery sends them on /tours-near, /search-tours, /tour-by-code) so the
+      // My Tours list shows "v{n} · updated {Mon D}" for a downloaded English tour, the
+      // same label the found-tour dialog showed. Defensive: only stored when present
+      // (an old server omits them), so a tour saved without them simply shows no label.
+      if (sourceItem != null) {
+        final version = sourceItem['version'];
+        final updatedAt = sourceItem['updated_at'];
+        if (version != null) tourData['version'] = version;
+        if (updatedAt != null) tourData['updated_at'] = updatedAt;
+      }
       
       await DebugLogHelper.addDebugLog('HOME: SAVE - Adding to saved tours list');
       savedTours.add(json.encode(tourData));

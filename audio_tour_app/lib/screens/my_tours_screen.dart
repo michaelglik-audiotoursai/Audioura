@@ -41,6 +41,46 @@ String tourSubtitleLine(Map<String, dynamic> tour) {
   return '$stops stops • Created: $created';
 }
 
+/// [LOCAL-666] "v{version} · updated {Mon D}" shown on the My Tours (Listen) list
+/// under each tour, mirroring the found-tour dialogs (LOCAL-657). Returns null —
+/// so the list shows nothing extra — when the label should not appear: version is
+/// missing (an old server/an older saved entry stored none), unparseable, or still
+/// 1. For a translation the version is the SOURCE tour's version (the server pins
+/// it via source_version), so the Russian copy of v10 reads "v10" here too.
+///
+/// Kept a top-level pure function (like tourSubtitleLine) so the "no version → no
+/// label" and "v1 → no label" behaviour is unit-testable without the widget, and
+/// every field read is defensive so a missing/garbled value never throws.
+const List<String> _kMonthAbbr = [
+  'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+  'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+];
+
+String? tourVersionLabel(Map<String, dynamic> tour) {
+  final rawVersion = tour['version'];
+  int? version;
+  if (rawVersion is int) {
+    version = rawVersion;
+  } else if (rawVersion is num) {
+    version = rawVersion.toInt();
+  } else if (rawVersion is String) {
+    version = int.tryParse(rawVersion);
+  }
+  if (version == null || version < 2) {
+    return null;
+  }
+
+  String label = 'v$version';
+  final updatedAt = tour['updated_at'];
+  if (updatedAt is String && updatedAt.isNotEmpty) {
+    final parsed = DateTime.tryParse(updatedAt);
+    if (parsed != null && parsed.month >= 1 && parsed.month <= 12) {
+      label += ' · updated ${_kMonthAbbr[parsed.month - 1]} ${parsed.day}';
+    }
+  }
+  return label;
+}
+
 class MyToursScreen extends StatefulWidget {
   const MyToursScreen({super.key});
 
@@ -1390,6 +1430,20 @@ class _MyToursScreenState extends State<MyToursScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(tourSubtitleLine(tour)),
+                        // [LOCAL-666] Same "v{n} · updated {Mon D}" label the found-tour
+                        // dialogs show (LOCAL-657), now on the My Tours list for English
+                        // AND translated tours (a translation shows its source version).
+                        // Only when version >= 2; defensive, so a tour saved without the
+                        // fields simply shows nothing extra.
+                        if (tourVersionLabel(tour) != null)
+                          Text(
+                            tourVersionLabel(tour)!,
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.blue.shade700,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
                         if (tour['original_request'] != null && tour['original_request'] != tour['title'])
                           Text(
                             'Original: ${tour['original_request']}',
