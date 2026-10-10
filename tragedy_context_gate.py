@@ -80,7 +80,23 @@ def strip_uncontextualised_deaths(text):
     flagged = find_uncontextualised_deaths(text)
     if not flagged:
         return text, []
-    keep = [s for s in _split(text or '') if s not in flagged]
+
+    # [LOCAL-663] Faneuil Hall Stop 4 (1837 Lovejoy meeting) shipped
+    #   "In late 1837, the hall hosted another turning point. The outcry in the
+    #    hall was immediate."
+    # with the EVENT itself (the abolitionist meeting after Elijah Lovejoy's
+    # murder) gone — this gate removed the death sentence and left both the
+    # cataphoric LEAD-IN that announced it ("hosted another turning point") and
+    # the backward CONSEQUENCE ("The outcry ... was immediate"). The existing
+    # cut only looked backward with a tiny hardcoded phrase list ("once again",
+    # "in response"), so neither orphan was caught. Capture the removed
+    # sentences' POSITIONS first so a lead-in before, and a consequence after,
+    # can both be swept.
+    _orig_sents = _split(text or '')
+    _flagged_set = set(flagged)
+    _removed_idx = [i for i, s in enumerate(_orig_sents) if s in _flagged_set]
+
+    keep = [s for s in _orig_sents if s not in _flagged_set]
     clean = ' '.join(keep).strip()
     try:
         from unglossed_reference_gate import cut_orphaned_dependants
@@ -88,17 +104,63 @@ def strip_uncontextualised_deaths(text):
         flagged = list(flagged) + list(orphans or [])
     except Exception:
         pass
-    # LOCAL-479 cuts dependants of a removed PERSON ("Walter", "Reid"). What is
-    # left here depends on a removed EVENT: "The narthex ONCE AGAIN became a focal
-    # point, hosting a 'Mass of Peace'" — the "once again" now refers to nothing and
-    # the Mass is unexplained. Narrow sweep for that, adjacent sentences only.
+
+    # ── 1. Cataphoric LEAD-IN sweep (sentence BEFORE a removed death) ─────────
+    # A lead-in sentence forward-references the event the next sentence was going
+    # to tell — "the hall hosted another turning point", "this was a pivotal
+    # moment", "a defining chapter followed". Once the event is gone the lead-in
+    # promises something that never arrives. It is a lead-in (not real content)
+    # when it carries a cataphoric placeholder noun AND names no person/number of
+    # its own that would make it stand alone.
+    _CATAPHORIC_LEAD = re.compile(
+        r'\b(?:another|a|the|its|this)\s+'
+        r'(?:(?:great|defining|pivotal|dramatic|significant|major|notable|'
+        r'fateful|turning|new|next|further|final|lasting)\s+)*'
+        r'(?:turning\s+point|point|moment|chapter|episode|scene|'
+        r'confrontation|reckoning|crisis|controversy|debate|gathering|'
+        r'meeting|assembly|flashpoint|milestone)\b',
+        re.I)
+
+    def _is_bare_lead_in(sent):
+        if _NAMED.search(sent):
+            return False          # names a person → it is real content, keep it
+        return bool(_CATAPHORIC_LEAD.search(sent))
+
+    lead_ins = set()
+    for idx in _removed_idx:
+        j = idx - 1
+        if 0 <= j < len(_orig_sents):
+            prev = _orig_sents[j]
+            if prev not in _flagged_set and _is_bare_lead_in(prev):
+                lead_ins.add(prev)
+
+    # ── 2. CONSEQUENCE sweep (anaphor pointing back at the removed event) ────
+    # Backward anaphors: the explicit phrase list we already had, PLUS a generic
+    # definite-NP subject whose head noun is a reaction/aftermath word
+    # ("The outcry", "The response", "The reaction") — the event it reacts to is
+    # gone, so the reaction refers to nothing. Only applied to a sentence that
+    # names no one of its own.
     _ANAPHORIC = re.compile(r'\b(once again|in response|this (?:gathering|somber|'
-                            r'tragedy|loss|event)|the (?:gathering|memorial|vigil))\b',
-                            re.I)
+                            r'tragedy|loss|event|meeting|protest)|'
+                            r'the (?:gathering|memorial|vigil))\b', re.I)
+    _CONSEQUENCE_SUBJECT = re.compile(
+        r'^\s*(?:And\s+|But\s+|Then\s+)?The\s+'
+        r'(?:immediate\s+|public\s+|ensuing\s+|resulting\s+|widespread\s+)*'
+        r'(?:outcry|outrage|response|reaction|backlash|uproar|protest|protests|'
+        r'fallout|aftermath|controversy|furore|furor|indignation|repercussions?)'
+        r'\b',
+        re.I)
+
     remaining = _split(clean)
     survivors, cut_extra = [], []
     for sent in remaining:
-        if _ANAPHORIC.search(sent) and not _NAMED.search(sent):
+        if sent in lead_ins:
+            cut_extra.append(sent)
+            continue
+        if _NAMED.search(sent):
+            survivors.append(sent)
+            continue
+        if _ANAPHORIC.search(sent) or _CONSEQUENCE_SUBJECT.match(sent):
             cut_extra.append(sent)
         else:
             survivors.append(sent)
@@ -130,6 +192,83 @@ def strip_uncontextualised_deaths(text):
 _NAME_IN = re.compile(r"\b[A-Z][\w’'\-]+(?:\s+(?:'[^']+'\s+)?[A-Z][\w’'\-]+)+\b")
 _YEAR_IN = re.compile(r'\b(1[5-9]\d\d|20\d\d)\b')
 MAX_CIRCUMSTANCE_CHARS = 420
+
+# [LOCAL-663] `_NAME_IN` is a bare two-capitalised-token regex with no filtering.
+# On the Boston Massacre stop it matched the EVENT ("Boston Massacre") and a
+# DATE FRAGMENT ("On March") as if they were victims, and `_as_narration`
+# back-filled "The victims were On March, Boston Massacre." — a false,
+# meaningless copula that LOCAL-660's degrade guard never saw because this is
+# the tragedy-context composer, not the degrade path. A victim is a PERSON, so a
+# candidate span is kept only when every token is name-shaped: no leading
+# preposition/temporal opener ("On", "In"), no month/weekday, no event-type head
+# word (Massacre, War, Riot, Battle, Party, …). When nothing name-shaped remains
+# we emit NO "The victims were" sentence at all.
+
+# A span whose FIRST token is one of these is a prepositional/temporal fragment
+# the regex happened to glue to a following capital ("On March", "In June",
+# "At Boston"), never a person's given name.
+_NAME_LEADING_STOPWORD = frozenset({
+    'on', 'in', 'at', 'by', 'to', 'of', 'from', 'during', 'after', 'before',
+    'since', 'around', 'near', 'the', 'a', 'an', 'and', 'but', 'with', 'as',
+    'into', 'onto', 'over', 'under', 'between', 'among', 'through',
+})
+
+# Calendar words — a capitalised month/weekday is a date, not a name.
+_NAME_TEMPORAL_WORD = frozenset({
+    'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday',
+    'january', 'february', 'march', 'april', 'may', 'june', 'july', 'august',
+    'september', 'october', 'november', 'december',
+    'spring', 'summer', 'autumn', 'fall', 'winter',
+})
+
+# Event / incident head-words. A span containing one of these names an EVENT
+# ("Boston Massacre", "Boston Tea Party", "Haymarket Riot", "Civil War"), which
+# is precisely the false positive this bug is about — not a victim.
+_NAME_EVENT_WORD = frozenset({
+    'massacre', 'war', 'riot', 'riots', 'battle', 'siege', 'uprising', 'revolt',
+    'revolution', 'rebellion', 'insurrection', 'party', 'raid', 'bombing',
+    'shooting', 'crash', 'fire', 'disaster', 'strike', 'protest', 'march',
+    'rally', 'affair', 'incident', 'tragedy', 'crisis', 'conspiracy', 'plot',
+    'trial', 'hanging', 'execution', 'assassination', 'murders',
+})
+
+
+def _is_person_name(span):
+    """[LOCAL-663] True when `span` is a plausible person name, not an event,
+    a date fragment, or a place-phrase the two-token regex over-matched.
+
+    Structural, not a lookup of names we have seen: a span is a person only when
+    every token is name-shaped — the first token is not a preposition/temporal
+    opener, no token is a month/weekday, and no token is an event head-word.
+    """
+    s = (span or '').strip()
+    if not s:
+        return False
+    tokens = [t for t in re.split(r'\s+', s) if t]
+    if len(tokens) < 2:
+        return False
+    first = re.sub(r"[^A-Za-z]", '', tokens[0]).lower()
+    if first in _NAME_LEADING_STOPWORD:
+        return False
+    for tok in tokens:
+        # Keep a quoted nickname token ("'Jill'") — it is part of the name.
+        if tok.startswith(("'", '"', '’')):
+            continue
+        w = re.sub(r"[^A-Za-z]", '', tok).lower()
+        if not w:
+            continue
+        if w in _NAME_TEMPORAL_WORD or w in _NAME_EVENT_WORD:
+            return False
+    return True
+
+
+def _victim_names(sentence):
+    """[LOCAL-663] Person names from a death sentence, filtered to real people.
+
+    Replaces the raw `_NAME_IN.findall(...)` the back-fill used, so an event or
+    a date fragment can never be reported as a victim.
+    """
+    return [n for n in _NAME_IN.findall(sentence or '') if _is_person_name(n)]
 
 
 def _as_narration(raw, names):
@@ -172,8 +311,15 @@ def _as_narration(raw, names):
     txt = ' '.join(out).strip() or ''
     if txt and not txt.endswith(('.', '!', '?')):
         txt += '.'
-    # The names are the point. If the recovered prose dropped them, put them back.
-    missing = [n for n in (names or []) if n and n.split()[-1] not in txt]
+    # The names are the point. If the recovered prose dropped them, put them back
+    # — but ONLY real person names. [LOCAL-663] The caller used to pass raw
+    # `_NAME_IN` matches, which on the Boston Massacre stop included the event
+    # ("Boston Massacre") and a date fragment ("On March"); filtering here is the
+    # backstop that keeps "The victims were Boston Massacre." out of the tour
+    # even if an unfiltered list is passed in. When no real name is left, no
+    # "The victims were" sentence is emitted at all.
+    people = [n for n in (names or []) if n and _is_person_name(n)]
+    missing = [n for n in people if n.split()[-1] not in txt]
     if txt and missing:
         txt = txt.rstrip('.') + '. The victims were ' + ', '.join(missing) + '.'
     return txt
@@ -233,7 +379,7 @@ def resolve_uncontextualised_deaths(text, venue_name='', location='',
                 or not _CIRCUMSTANCE.search(answer)):
             still_bare.append(sent)      # nothing solid came back — delete it
             continue
-        _names = _NAME_IN.findall(sent or '')
+        _names = _victim_names(sent)   # [LOCAL-663] people only, never the event
         _clean = _as_narration(answer, _names)
         if not _clean:
             still_bare.append(sent)
