@@ -8893,7 +8893,8 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                             except Exception:
                                 return None
 
-                        _rv_executor = _cf656.ThreadPoolExecutor(max_workers=1)
+                        from dead_host_breaker import tour_executor as _tour_exec656  # LOCAL-572 rule: tour-scoped pools only
+                        _rv_executor = _tour_exec656(max_workers=1)
                         _rv_future = _rv_executor.submit(_rv_ctx.run, _prewarm_resolve)
                     except Exception as _rv_err:
                         print(f"  [LOCAL-656] resolve prewarm not started "
