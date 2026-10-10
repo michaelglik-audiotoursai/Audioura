@@ -6010,6 +6010,24 @@ def _verify_works_v2(poi_list, venue_name, exhibition_scope=None):
                              'new york', 'pompidou', 'louvre', 'hermitage',
                              'uffizi', 'tate', 'prado', 'moma', 'guggenheim']
 
+    # [LOCAL-667] Collapse split-title candidates. When the Phase-3A model has
+    # atomised ONE list-like canonical title into several fragment "works"
+    # (HCMC: "North Central South Spring Garden" → North / Central / South /
+    # Spring Garden / Garden), fold the fragments back into the single canonical
+    # title BEFORE verification, so the one real work verifies once and the wasted
+    # slots are freed for genuine replenishment. Only collapses into a title
+    # already in the known SPARQL/canonical set; never invents or merges distinct
+    # works. Pure, deterministic, no network.
+    try:
+        from candidate_collapse_guard import collapse_split_title_candidates
+        _collapse_targets = set(canonical_titles) | set(sparql_titles or ())
+        poi_list, _collapses = collapse_split_title_candidates(poi_list, _collapse_targets)
+        for _c in _collapses:
+            print(f"  [LOCAL-667] Collapsed split-title fragments {_c['fragments']} "
+                  f"→ one candidate: '{_c['title']}'")
+    except Exception as _collapse_err:
+        print(f"  [LOCAL-667] candidate-collapse skipped ({_collapse_err})")
+
     for poi in poi_list:
         work_name = poi.get('name', '')
         
@@ -10130,9 +10148,20 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
                             # Prefer local label (what the museum displays)
                             _deduped_hints.append(w.get('label_local', '') or w.get('label_en', ''))
                         _hint_sample = sorted(_deduped_hints)[:12]
+                        # [LOCAL-667] Quote multi-word titles so a list-like title
+                        # ("North Central South Spring Garden") reads to the model
+                        # as ONE unit, not an enumeration to atomise into North /
+                        # Central / South / Garden. Each quoted title is one work.
+                        try:
+                            from candidate_collapse_guard import quote_multiword_hint_titles
+                            _hint_display = quote_multiword_hint_titles(_hint_sample)
+                        except Exception:
+                            _hint_display = _hint_sample
                         _museum_venue_constraint += (
                             f"\n\nKNOWN WORKS AT THIS VENUE (use these as guidance — include some from this list):\n"
-                            f"  {'; '.join(_hint_sample)}\n"
+                            f"  {'; '.join(_hint_display)}\n"
+                            f"Each quoted title is ONE single work — treat the whole quoted string as one name, "
+                            f"never split it into separate works on its commas, 'and', or internal words.\n"
                             f"Each work should appear ONLY ONCE in your list — do NOT list the same work under multiple names.\n"
                         )
                         print(f"  [Phase3A] Injected {len(_hint_sample)} canonical title hints from Wikidata (QID-deduped)")
@@ -12566,6 +12595,139 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
             else:
                 print(f"  [R4] Target reached: {len(poi_list)}/{total_stops} stops")
 
+            # -------- [LOCAL-667] THIN-WIKIDATA verification (before giving up) --------
+            # A real museum with a thin Wikidata catalogue (HCMC: 1 SPARQL work) has
+            # R4 propose genuine works (The Fisherman, Lotus Pond, …) that the
+            # thin canonical set cannot verify, so they are dropped and the tour
+            # ships "1 of 5". Before any unverified padding or shortfall, try to
+            # VERIFY those dropped works against sources Wikidata is not: the
+            # museum's own site (local + EN) and Wikipedia (local + EN) — already
+            # fetched, so free — plus a grounded search (the active research
+            # backend) to reach the bar. HONESTY RULE: a work is admitted only when
+            # TWO INDEPENDENT sources name it at this museum; one mention or zero is
+            # never a stop. Never invents a work.
+            if (tour_category == 'museum' and _verification_tier == 'thin'
+                    and len(poi_list) < total_stops and _story_corpus_result):
+                try:
+                    from thin_wikidata_fallback import verify_thin_candidates
+                    _thin_pages = _story_corpus_result.get('pages', []) or []
+                    # Pool: R4-dropped works + the pre-D1v2 candidates D1v2 dropped
+                    # (deduped by name inside verify_thin_candidates). These are
+                    # model-proposed, never invented here.
+                    _thin_pool = list(_r4_all_dropped_pois)
+                    _already = set(_normalize_name(p['name']) for p in poi_list)
+                    for _p in _pre_d1v2_candidates:
+                        if _normalize_name(_p.get('name', '')) not in _already:
+                            _thin_pool.append(_p)
+                    # [LOCAL-667] Drop pool candidates that are FRAGMENTS of a work
+                    # already verified (the split-title pieces North/Central/South/
+                    # Spring Garden/Garden of the one SPARQL work). Admitting a
+                    # fragment would only be dedup-dropped by the LOCAL-16 gate as a
+                    # duplicate canonical — wasting a slot. The whole work is already
+                    # in poi_list; its pieces are not separate stops.
+                    try:
+                        from candidate_collapse_guard import (_is_fragment_of as _frag_of,
+                                                              _norm_tokens as _frag_toks,
+                                                              _content_tokens as _frag_content)
+                        _verified_titles_now = [p.get('name', '') for p in poi_list]
+                        _frag_targets = [(_frag_toks(t), _frag_content(t))
+                                         for t in _verified_titles_now
+                                         if len(_frag_content(t)) >= 3]
+                        _thin_pool = [
+                            _c for _c in _thin_pool
+                            if not any(_frag_of(_c.get('name', ''), _tt, _tc)
+                                       for _tt, _tc in _frag_targets)
+                        ]
+                    except Exception:
+                        pass
+                    # Grounded search only when a backend is configured; corpus-only
+                    # otherwise. Cost-bounded by max_grounded.
+                    _thin_research_fn = None
+                    try:
+                        import story_leads as _sl
+                        if os.environ.get('GEMINI_API_KEY') or os.environ.get('GOOGLE_API_KEY') \
+                                or os.environ.get('SERPER_API_KEY'):
+                            _thin_research_fn = lambda _q: _sl.research_with_sources(_q, grounded=True)
+                    except Exception:
+                        _thin_research_fn = None
+                    _thin_city = ''
+                    if ',' in location:
+                        _thin_city = location.split(',', 1)[1].strip()
+                    _thin_needed = total_stops - len(poi_list)
+                    _thin_verified, _thin_verdicts = verify_thin_candidates(
+                        _thin_pool, _thin_pages, _museum_venue_name or location,
+                        venue_language=_museum_site_language,
+                        research_fn=_thin_research_fn, city=_thin_city,
+                        max_grounded=min(_thin_needed + 2, 8))
+                    print(f"  [LOCAL-667 THIN-VERIFY] {len(_thin_verified)} of "
+                          f"{len(_thin_verdicts)} thin candidate(s) reached the "
+                          f"two-independent-source bar")
+                    _thin_added = 0
+                    for _tv in _thin_verified:
+                        if _thin_added >= _thin_needed:
+                            break
+                        _tn = _normalize_name(_tv['name'])
+                        if _tn in _already:
+                            continue
+                        _already.add(_tn)
+                        _tv['verified'] = True
+                        _d1_evidence_log[_tv['name']] = {
+                            "status": "VERIFIED",
+                            "canonical_title": _tv['name'],
+                            "snippet": "",
+                            "method": "thin_wikidata_fallback",
+                            "sources": _tv.get('thin_sources', []),
+                        }
+                        poi_list.append(_tv)
+                        _thin_added += 1
+                        _srcs = ', '.join(s['origin'] for s in _tv.get('thin_sources', []))
+                        print(f"    [LOCAL-667 THIN-VERIFY] VERIFIED '{_tv['name']}' "
+                              f"({_srcs})")
+                    if _thin_added:
+                        print(f"  [LOCAL-667 THIN-VERIFY] added {_thin_added} source-verified "
+                              f"work(s), total now {len(poi_list)}/{total_stops}")
+                except Exception as _thin_err:
+                    print(f"  [LOCAL-667 THIN-VERIFY] skipped ({_thin_err})")
+
+            # -------- [LOCAL-667] Building + collection-area stops (last resort) --------
+            # Still short after thin-source verification? A museum tour has real
+            # stops beyond individually catalogued artworks: the HISTORIC BUILDING
+            # (HCMC occupies the Hui Bon Hoa mansion, 1929-1934 — a highlight in
+            # itself) and NAMED COLLECTION AREAS (lacquer, Champa sculpture, Óc Eo).
+            # Both are grounded in the already-fetched corpus — nothing invented: a
+            # building/area ships only when the corpus names it. These are verified,
+            # typed stops; the LOCAL-632 shortfall line is then only for what is
+            # TRULY left. Thin tier only, so a well-documented museum never gets
+            # area padding ahead of its real works.
+            if (tour_category == 'museum' and _verification_tier == 'thin'
+                    and len(poi_list) < total_stops):
+                try:
+                    from museum_fallback_stops import build_fallback_stops
+                    _fb_pages = (_story_corpus_result or {}).get('pages', []) or []
+                    _fb_combined = (_story_corpus_result or {}).get('combined_text', '') \
+                        or _d1_venue_corpus or ''
+                    _fb_exclude = [p.get('name', '') for p in poi_list]
+                    _fb_needed = total_stops - len(poi_list)
+                    _fb_stops = build_fallback_stops(
+                        _museum_venue_name or location, _fb_pages, _fb_combined,
+                        needed=_fb_needed, exclude_names=_fb_exclude)
+                    for _fb in _fb_stops:
+                        _d1_evidence_log[_fb['name']] = {
+                            "status": "VERIFIED",
+                            "canonical_title": _fb['name'],
+                            "snippet": "",
+                            "method": f"museum_fallback_{_fb.get('_stop_kind','')}",
+                            "fallback_source": _fb.get('_fallback_source', ''),
+                        }
+                        poi_list.append(_fb)
+                        print(f"  [LOCAL-667 FALLBACK] added {_fb.get('_stop_kind','')} stop "
+                              f"'{_fb['name']}' ({_fb.get('_fallback_source','')})")
+                    if _fb_stops:
+                        print(f"  [LOCAL-667 FALLBACK] building/collection-area stops: "
+                              f"+{len(_fb_stops)}, total now {len(poi_list)}/{total_stops}")
+                except Exception as _fb_err:
+                    print(f"  [LOCAL-667 FALLBACK] skipped ({_fb_err})")
+
             # -------- [UNIFIED-FILL] Runs AFTER R4 (unverified last-resort padding) --------
             # [LOCAL-19] Moved here from before R4. Now R4 has already had its chance
             # to find verified replacements. UNIFIED-FILL only pads remaining gaps.
@@ -12762,6 +12924,11 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
                 _venue_norm = _museum_venue_name.lower()
                 _suspect_venues = []
                 for p in poi_list:
+                    # [LOCAL-667] A building / collection-area fallback stop is a
+                    # legitimate interior stop of THIS venue (grounded in its own
+                    # corpus), not another venue — never count it as a suspect.
+                    if p.get('_stop_kind') in ('building', 'collection_area'):
+                        continue
                     _pname = p['name'].lower()
                     # Check if POI name contains a venue-type word AND is not the target venue
                     for indicator in _VENUE_INDICATORS:
