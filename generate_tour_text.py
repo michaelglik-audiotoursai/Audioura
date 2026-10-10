@@ -24396,6 +24396,23 @@ RULES:
                 else:
                     _transition = f"Continue to {next_poi['name']}."
             
+            # [LOCAL-660 defect 4] A directions line may announce the end of the
+            # walk ONLY on the leg into the LAST stop, and must never echo the
+            # tour theme. Tour 557 Stop 1→2 said "…marking the end of your walk
+            # exploring Massachusetts politics and current affairs" on stop 2 of
+            # 5. Sanitize every leg by position (covers LLM and POI directions).
+            try:
+                from directions_generator import sanitize_directions_leg as _san_dir
+                _is_last_leg = (i == len(poi_list) - 2)
+                _san = _san_dir(_transition, is_last_leg=_is_last_leg,
+                                next_name=next_poi.get('name', ''))
+                if _san != _transition:
+                    print(f"  [LOCAL-660] directions leg {i+1}→{i+2} sanitized "
+                          f"(is_last_leg={_is_last_leg}): dropped end/theme-echo language")
+                    _transition = _san
+            except Exception as _san_err:
+                print(f"  [LOCAL-660] directions sanitize error (non-fatal): {_san_err}")
+
             poi_content += f"\nDirections: {_transition}\n\n"
             _ss_transition = _transition  # [LOCAL-643] carry into the Stop record
             print(f"  [T4] Transition to Stop {stop_num+1}: {_transition[:60]}...")
@@ -25052,6 +25069,21 @@ RULES:
     except Exception as _dp_err:
         print(f"  [LOCAL-660] Dangling-pronoun gate error (non-fatal): {_dp_err}")
     _l654ck("LOCAL-660 dangling_pronoun")
+
+    # -------- [LOCAL-660 defect 4] Directions must not pre-announce the end ----
+    # Every-path text guard: only the Directions line of the leg INTO THE LAST
+    # stop may say the walk is ending, and no Directions line may echo the tour
+    # theme. Tour 557 v7 Stop 1→2 said "…marking the end of your walk exploring
+    # Massachusetts politics and current affairs" on stop 2 of 5.
+    try:
+        from directions_generator import sanitize_directions_in_text as _san_dirs
+        complete_tour, _n_dir = _san_dirs(complete_tour)
+        if _n_dir:
+            print(f"  [LOCAL-660] sanitized {_n_dir} directions line(s): only the "
+                  f"leg into the last stop may say final/end; theme echo dropped")
+    except Exception as _sdt_err:
+        print(f"  [LOCAL-660] Directions text sanitize error (non-fatal): {_sdt_err}")
+    _l654ck("LOCAL-660 directions_final_theme")
 
     # -------- [LOCAL-36] Practical facts QA gate --------
     # Verify provenance of every practical claim before delivery.
