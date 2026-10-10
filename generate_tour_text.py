@@ -13262,7 +13262,24 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
         try:
             from stop_existence_gate import get_gate_mode, run_existence_gate, verify_stop_existence
 
-            _seg_mode = get_gate_mode()
+            # [LOCAL-662] WALKING tours force ENFORCE. A walking/outdoor tour has no
+            # venue page to ground a stop against, so an invented stop ("The State
+            # House Park", tour 557 v9 Stop 4) has only the model's word behind it.
+            # get_gate_mode_for_category raises the shared-stack log_only to enforce
+            # for a walking tour (museum/dining keep the global mode), unless the
+            # gate is explicitly off. An unverified walking stop is then dropped and
+            # replaced via GEO-CHECK / LOCAL-290 replenishment, else the tour ships
+            # N−1 with the honest shortfall — never an unverified stop.
+            try:
+                from stop_existence_gate import get_gate_mode_for_category as _eg_cat_mode
+                _seg_mode = _eg_cat_mode(tour_category)
+            except Exception:
+                _seg_mode = get_gate_mode()
+            if _seg_mode == 'enforce' and get_gate_mode() != 'enforce':
+                print(f"  [LOCAL-662] EXISTENCE-GATE: forcing ENFORCE for "
+                      f"{tour_category!r} tour (global mode "
+                      f"{get_gate_mode().upper()}); unverified stops will be "
+                      f"dropped/replaced, else N−1 with honest shortfall")
             if _seg_mode != 'off' and not _seg_checklist_exempt:
                 # Get DB connection (same pattern as LOCAL-212)
                 _seg_conn = None

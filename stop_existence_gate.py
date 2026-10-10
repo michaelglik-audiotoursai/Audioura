@@ -805,7 +805,20 @@ def _extract_geographic_proper_nouns(stop_title: str) -> List[str]:
                 break
 
     return candidates
-    """Fetch P625 (coordinate location) for a Wikidata entity."""
+
+
+def _fetch_wikidata_coords(qid: str, headers: dict) -> Optional[Tuple[float, float]]:
+    """Fetch P625 (coordinate location) for a Wikidata entity.
+
+    [LOCAL-662] This function lost its ``def`` line in a prior edit — its
+    docstring and body were left orphaned directly after ``_extract_geographic_
+    proper_nouns``'s ``return candidates``, so the body was dead code and the
+    name was undefined. It is CALLED at _check_geographic_existence_tier1 (the
+    Wikidata geographic-entity coordinate check used by WALKING tours), where it
+    would have raised ``NameError`` the moment a Wikidata geographic hit with a
+    QID needed a proximity check. Restoring the ``def`` makes the geographic
+    existence path whole again — exactly the path a walking-tour stop-existence
+    gate relies on."""
     import requests as _http
     try:
         url = "https://www.wikidata.org/w/api.php"
@@ -1529,6 +1542,47 @@ def _log_gate_startup():
     mode = get_gate_mode()
     print(f"  [EXISTENCE-GATE] Mode at startup: {mode.upper()}")
     return mode
+
+
+# [LOCAL-662] Walking-tour categories whose stops MUST resolve to a real named
+# place. A walking tour has no venue page to ground against (unlike a museum,
+# whose own exhibition page is the stronger evidence, LOCAL-437/D532), so an
+# invented stop like "The State House Park" has nothing but the model's say-so
+# behind it. For these categories the gate is forced to ENFORCE regardless of the
+# shared-stack default (log_only) — a stop that does not resolve to a Wikidata
+# item or an OSM/geographic feature is dropped (and replaced via GEO-CHECK /
+# LOCAL-290 replenishment, else the tour ships N−1 with the honest shortfall).
+# Museum and dining tours keep the global mode: museum tours ground on the venue
+# page, dining tours already enforce their own external-existence check.
+_WALKING_ENFORCE_CATEGORIES = frozenset({'walking', 'specialized'})
+
+
+def get_gate_mode_for_category(tour_category: Optional[str]) -> str:
+    """Resolve the EFFECTIVE gate mode for a specific tour category (LOCAL-662).
+
+    Starts from the global mode (``get_gate_mode``). For a WALKING-class tour
+    (walking / specialized outdoor) the mode is raised to ``enforce`` UNLESS the
+    operator has explicitly turned the gate ``off`` — an explicit ``off`` is a
+    deliberate kill-switch and is always honoured. ``log_only`` on the shared
+    stack becomes ``enforce`` for a walking tour, so an unverified outdoor stop
+    is actually dropped rather than merely logged.
+
+    Museum / dining / any other category returns the global mode unchanged, so
+    the museum canary stays byte-for-byte identical.
+
+    A caller can disable the walking override alone with
+    ``WALKING_EXISTENCE_GATE_ENFORCE=0`` (the global mode then applies to walking
+    tours too) without touching museum behaviour.
+    """
+    base = get_gate_mode()
+    if base == 'off':
+        return 'off'  # explicit kill-switch wins
+    cat = (tour_category or '').strip().lower()
+    if cat not in _WALKING_ENFORCE_CATEGORIES:
+        return base
+    if os.environ.get('WALKING_EXISTENCE_GATE_ENFORCE', '1').strip() == '0':
+        return base
+    return 'enforce'
 
 
 def run_existence_gate(
