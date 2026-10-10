@@ -6010,6 +6010,24 @@ def _verify_works_v2(poi_list, venue_name, exhibition_scope=None):
                              'new york', 'pompidou', 'louvre', 'hermitage',
                              'uffizi', 'tate', 'prado', 'moma', 'guggenheim']
 
+    # [LOCAL-667] Collapse split-title candidates. When the Phase-3A model has
+    # atomised ONE list-like canonical title into several fragment "works"
+    # (HCMC: "North Central South Spring Garden" → North / Central / South /
+    # Spring Garden / Garden), fold the fragments back into the single canonical
+    # title BEFORE verification, so the one real work verifies once and the wasted
+    # slots are freed for genuine replenishment. Only collapses into a title
+    # already in the known SPARQL/canonical set; never invents or merges distinct
+    # works. Pure, deterministic, no network.
+    try:
+        from candidate_collapse_guard import collapse_split_title_candidates
+        _collapse_targets = set(canonical_titles) | set(sparql_titles or ())
+        poi_list, _collapses = collapse_split_title_candidates(poi_list, _collapse_targets)
+        for _c in _collapses:
+            print(f"  [LOCAL-667] Collapsed split-title fragments {_c['fragments']} "
+                  f"→ one candidate: '{_c['title']}'")
+    except Exception as _collapse_err:
+        print(f"  [LOCAL-667] candidate-collapse skipped ({_collapse_err})")
+
     for poi in poi_list:
         work_name = poi.get('name', '')
         
@@ -10130,9 +10148,20 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
                             # Prefer local label (what the museum displays)
                             _deduped_hints.append(w.get('label_local', '') or w.get('label_en', ''))
                         _hint_sample = sorted(_deduped_hints)[:12]
+                        # [LOCAL-667] Quote multi-word titles so a list-like title
+                        # ("North Central South Spring Garden") reads to the model
+                        # as ONE unit, not an enumeration to atomise into North /
+                        # Central / South / Garden. Each quoted title is one work.
+                        try:
+                            from candidate_collapse_guard import quote_multiword_hint_titles
+                            _hint_display = quote_multiword_hint_titles(_hint_sample)
+                        except Exception:
+                            _hint_display = _hint_sample
                         _museum_venue_constraint += (
                             f"\n\nKNOWN WORKS AT THIS VENUE (use these as guidance — include some from this list):\n"
-                            f"  {'; '.join(_hint_sample)}\n"
+                            f"  {'; '.join(_hint_display)}\n"
+                            f"Each quoted title is ONE single work — treat the whole quoted string as one name, "
+                            f"never split it into separate works on its commas, 'and', or internal words.\n"
                             f"Each work should appear ONLY ONCE in your list — do NOT list the same work under multiple names.\n"
                         )
                         print(f"  [Phase3A] Injected {len(_hint_sample)} canonical title hints from Wikidata (QID-deduped)")
