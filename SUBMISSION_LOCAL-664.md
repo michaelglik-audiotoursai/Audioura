@@ -2,7 +2,7 @@
 
 **Agent:** Mac Mini Kiro
 **Branch:** `LOCAL-664-cheap-arm-by-category`
-**Base:** `subscribed` @ `4cc74f4d` (verified: `git merge-base --is-ancestor 4cc74f4d HEAD` → exit 0)
+**Base:** `subscribed` @ `07f6509d` (verified: `git merge-base --is-ancestor 07f6509d HEAD` → exit 0)
 
 ## Why (D645 follow-up)
 `~/Audioura/COST_TIME_RESULTS_2026-10-09.md` (AB5–AB7) and `DECISIONS.md` D645:
@@ -81,11 +81,18 @@ to all tours`.)
 * log-line shape; category parsing edge cases (whitespace, dupes, empty/commas).
 
 ### Regression — full default suite (`python3 run_tests.py`)
-* Clean base (`4cc74f4d`): **489 passed, 69 failed, 4 infra-skipped** (562 total).
-* This branch: **490 passed, 69 failed, 4 infra-skipped** (563 total).
-* Identical 69 pre-existing failures (live `run_local*` generation scripts needing
-  services / API keys); my change adds exactly one passing test and zero new
-  failures.
+Measured against the actual `subscribed` base `07f6509d` (both runs in matching
+worktrees):
+* Clean base (`07f6509d`): **492 passed, 67 failed, 4 infra-skipped** (563 total).
+* This branch: **494 passed, 66 failed, 4 infra-skipped** (564 total).
+* My change adds exactly one new passing suite
+  (`test_local664_cheap_arm_by_category.py`, +1 total). Diffing the two failure
+  sets shows **no failure attributable to this change**: the handful of tests that
+  differ run-to-run (`test_d539_closure_regression.py`,
+  `test_local313_dining_nominatim.py`, `test_local483_gate_fold_and_boundary.py`,
+  `run_local189_style_ab_museum.py`) are live network tests (Gemini-with-sources,
+  Nominatim, live generation) that flip on their own — none touch narration
+  routing or research-backend selection. The net is one more pass, one fewer fail.
 
 Related existing suites run green with the change:
 * `tests/test_local648_serper_research.py` + `test_local631_concurrency_isolation.py` → 13 passed.
