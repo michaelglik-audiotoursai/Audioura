@@ -30,6 +30,23 @@ except Exception:  # pragma: no cover - defensive import
             return fn
         return _wrap
 
+# [LOCAL-656B] The single fast-pipeline module (LOCAL-651 run_parallel +
+# LOCAL-656 per-tour memo) is imported for the FAST_PIPELINE-guarded speed path
+# that collapses repeated identical resolve_venue / fetch_venue_works calls to
+# one within a tour. Import-safe: when fast_pipeline is absent OR the flag is OFF
+# the LOCAL-661 always-on 429-safety memo below is the only behaviour, unchanged.
+try:
+    import fast_pipeline as _fp
+except Exception:  # pragma: no cover - fast_pipeline is always present in-repo
+    _fp = None
+# [LOCAL-656] phase_timer handle for the fetch_venue_works [TIMING-SUB] step
+# (resolve_venue uses the @_sub_timed decorator above; the works wrapper times a
+# block inline). Import-safe no-op when phase_timer is unavailable.
+try:
+    import phase_timer as _pt
+except Exception:  # pragma: no cover
+    _pt = None
+
 # ─── LOCAL-230: Per-run failure counter ──────────────────────────────────────
 # Incremented when a network/API call fails (as opposed to returning a legitimate
 # empty result). Reported in the generation log so tours built during outages
@@ -656,7 +673,22 @@ def resolve_venue(venue_string: str, city: str = "") -> Optional[VenueEntity]:
     clean "no candidates" result (no network failures observed) is returned as
     None unchanged, so genuine no-Wikidata-entity museums keep their site-first
     path. On success the resolution is memoised for the rest of the tour.
+
+    [LOCAL-656B] SPEED path (FAST_PIPELINE=1 only). The LOCAL-651 profile saw this
+    resolve run 4× for the SAME (venue, city) in one poi_selection (10.3 s). The
+    repeated calls are collapsed to ONE impl call by returning the entity already
+    memoised in THIS tour — reading the SAME LOCAL-661 resolution memo, not a
+    second cache. This is unconditional ON (not only under a network failure),
+    because the 2nd..Nth identical call is a pure duplicate; a hit short-circuits
+    before _resolve_venue_impl runs. When the flag is OFF this block is skipped
+    and every call runs exactly as LOCAL-661 shipped (byte-identical, calls=4 in
+    [TIMING-SUB]).
     """
+    if _fp is not None and _fp.is_enabled():
+        _fast_hit = _resolve_memo_recall(venue_string, city)
+        if _fast_hit is not None:
+            return _fast_hit
+
     _failures_before = _network_failure_count
     entity = _resolve_venue_impl(venue_string, city)
     if entity is not None and getattr(entity, 'qid', ''):
@@ -931,7 +963,7 @@ def _resolve_venue_impl(venue_string: str, city: str = "") -> Optional[VenueEnti
     return entity
 
 
-# ─── [LOCAL-627 defect 4] Reject reproductions / casts / copies / replicas ────
+# ─── module-level reproduction constants (unchanged) ─────────────────────────
 # A museum catalogue (P195/P276) sometimes lists a REPRODUCTION of a work — a
 # plaster cast, a copy, a replica, a facsimile — alongside originals. Tour 487
 # opened on "Wrestlers (sculpture, 2021)", a 2021 plaster cast, as if it were an
@@ -1027,8 +1059,7 @@ def venue_is_modern_art(venue_name: str) -> bool:
     return bool(_MODERN_ART_MUSEUM_RE.search(venue_name or ""))
 
 
-@_sub_timed('fetch_venue_works')
-def fetch_venue_works(venue_qid: str, language: str = "en",
+def _fetch_venue_works_impl(venue_qid: str, language: str = "en",
                       is_modern_art_museum=None, venue_name: str = "") -> List[Dict]:
     """Fetch canonical works for a venue via SPARQL (P195/P276).
 
@@ -1206,6 +1237,31 @@ def fetch_venue_works(venue_qid: str, language: str = "en",
     except Exception as e:
         logger.warning(f"SPARQL query failed: {e}")
         return []
+
+
+# ─── [LOCAL-656] Public fetch_venue_works — per-tour memo + [TIMING-SUB] ──────
+# fetch_venue_works ran 3× for the same QID in one tour (profile: fetch_venue_works
+# ×3). The repeated SPARQL is the SAME (venue_qid, language, is_modern_art_museum,
+# venue_name), so memoizing at the SOURCE per tour collapses the duplicates to one.
+# Same scoping/guarantees as resolve_venue: contextvars per-tour scope (a second
+# tour re-fetches), FAST_PIPELINE-guarded (OFF ⇒ every call runs, byte-identical),
+# every call timed so [TIMING-SUB] shows the 3→1 drop when ON.
+def _fetch_venue_works_timed(venue_qid: str, language: str = "en",
+                             is_modern_art_museum=None, venue_name: str = "") -> List[Dict]:
+    if _pt is not None:
+        with _pt.get_sub_timer().step("fetch_venue_works"):
+            return _fetch_venue_works_impl(venue_qid, language,
+                                           is_modern_art_museum, venue_name)
+    return _fetch_venue_works_impl(venue_qid, language,
+                                   is_modern_art_museum, venue_name)
+
+
+if _fp is not None:
+    fetch_venue_works = _fp.memoize_per_tour("fetch_venue_works")(_fetch_venue_works_timed)
+else:  # pragma: no cover - fast_pipeline is always present in-repo
+    fetch_venue_works = _fetch_venue_works_timed
+fetch_venue_works.__name__ = "fetch_venue_works"
+fetch_venue_works.__doc__ = _fetch_venue_works_impl.__doc__
 
 
 # ─── [LOCAL-639 defect 3] Related collection holders (part-of / ownership) ────
