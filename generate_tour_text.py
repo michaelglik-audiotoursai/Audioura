@@ -12595,6 +12595,79 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
             else:
                 print(f"  [R4] Target reached: {len(poi_list)}/{total_stops} stops")
 
+            # -------- [LOCAL-667] THIN-WIKIDATA verification (before giving up) --------
+            # A real museum with a thin Wikidata catalogue (HCMC: 1 SPARQL work) has
+            # R4 propose genuine works (The Fisherman, Lotus Pond, …) that the
+            # thin canonical set cannot verify, so they are dropped and the tour
+            # ships "1 of 5". Before any unverified padding or shortfall, try to
+            # VERIFY those dropped works against sources Wikidata is not: the
+            # museum's own site (local + EN) and Wikipedia (local + EN) — already
+            # fetched, so free — plus a grounded search (the active research
+            # backend) to reach the bar. HONESTY RULE: a work is admitted only when
+            # TWO INDEPENDENT sources name it at this museum; one mention or zero is
+            # never a stop. Never invents a work.
+            if (tour_category == 'museum' and _verification_tier == 'thin'
+                    and len(poi_list) < total_stops and _story_corpus_result):
+                try:
+                    from thin_wikidata_fallback import verify_thin_candidates
+                    _thin_pages = _story_corpus_result.get('pages', []) or []
+                    # Pool: R4-dropped works + the pre-D1v2 candidates D1v2 dropped
+                    # (deduped by name inside verify_thin_candidates). These are
+                    # model-proposed, never invented here.
+                    _thin_pool = list(_r4_all_dropped_pois)
+                    _already = set(_normalize_name(p['name']) for p in poi_list)
+                    for _p in _pre_d1v2_candidates:
+                        if _normalize_name(_p.get('name', '')) not in _already:
+                            _thin_pool.append(_p)
+                    # Grounded search only when a backend is configured; corpus-only
+                    # otherwise. Cost-bounded by max_grounded.
+                    _thin_research_fn = None
+                    try:
+                        import story_leads as _sl
+                        if os.environ.get('GEMINI_API_KEY') or os.environ.get('GOOGLE_API_KEY') \
+                                or os.environ.get('SERPER_API_KEY'):
+                            _thin_research_fn = lambda _q: _sl.research_with_sources(_q, grounded=True)
+                    except Exception:
+                        _thin_research_fn = None
+                    _thin_city = ''
+                    if ',' in location:
+                        _thin_city = location.split(',', 1)[1].strip()
+                    _thin_needed = total_stops - len(poi_list)
+                    _thin_verified, _thin_verdicts = verify_thin_candidates(
+                        _thin_pool, _thin_pages, _museum_venue_name or location,
+                        venue_language=_museum_site_language,
+                        research_fn=_thin_research_fn, city=_thin_city,
+                        max_grounded=min(_thin_needed + 2, 8))
+                    print(f"  [LOCAL-667 THIN-VERIFY] {len(_thin_verified)} of "
+                          f"{len(_thin_verdicts)} thin candidate(s) reached the "
+                          f"two-independent-source bar")
+                    _thin_added = 0
+                    for _tv in _thin_verified:
+                        if _thin_added >= _thin_needed:
+                            break
+                        _tn = _normalize_name(_tv['name'])
+                        if _tn in _already:
+                            continue
+                        _already.add(_tn)
+                        _tv['verified'] = True
+                        _d1_evidence_log[_tv['name']] = {
+                            "status": "VERIFIED",
+                            "canonical_title": _tv['name'],
+                            "snippet": "",
+                            "method": "thin_wikidata_fallback",
+                            "sources": _tv.get('thin_sources', []),
+                        }
+                        poi_list.append(_tv)
+                        _thin_added += 1
+                        _srcs = ', '.join(s['origin'] for s in _tv.get('thin_sources', []))
+                        print(f"    [LOCAL-667 THIN-VERIFY] VERIFIED '{_tv['name']}' "
+                              f"({_srcs})")
+                    if _thin_added:
+                        print(f"  [LOCAL-667 THIN-VERIFY] added {_thin_added} source-verified "
+                              f"work(s), total now {len(poi_list)}/{total_stops}")
+                except Exception as _thin_err:
+                    print(f"  [LOCAL-667 THIN-VERIFY] skipped ({_thin_err})")
+
             # -------- [UNIFIED-FILL] Runs AFTER R4 (unverified last-resort padding) --------
             # [LOCAL-19] Moved here from before R4. Now R4 has already had its chance
             # to find verified replacements. UNIFIED-FILL only pads remaining gaps.
