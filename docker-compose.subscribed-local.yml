@@ -18,6 +18,8 @@ services:
       - STORY_RETRY_KEEP_BEST=1
       - STORY_RETRY_EARLY_STOP=1
       - TOUR_STORY_MODEL=gpt-4.1
+      # D646 (LEAD 2026-10-10): overlap independent waits (LOCAL-651/656; same calls, same stops). Rollback = delete this line.
+      - FAST_PIPELINE=1
     volumes:
       - /Users/micha/audioura-subscribed-local/_meter:/opt/meter:ro
       - /Users/micha/Audioura/meterlogs:/meterlogs
