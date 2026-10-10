@@ -80,7 +80,23 @@ def strip_uncontextualised_deaths(text):
     flagged = find_uncontextualised_deaths(text)
     if not flagged:
         return text, []
-    keep = [s for s in _split(text or '') if s not in flagged]
+
+    # [LOCAL-663] Faneuil Hall Stop 4 (1837 Lovejoy meeting) shipped
+    #   "In late 1837, the hall hosted another turning point. The outcry in the
+    #    hall was immediate."
+    # with the EVENT itself (the abolitionist meeting after Elijah Lovejoy's
+    # murder) gone — this gate removed the death sentence and left both the
+    # cataphoric LEAD-IN that announced it ("hosted another turning point") and
+    # the backward CONSEQUENCE ("The outcry ... was immediate"). The existing
+    # cut only looked backward with a tiny hardcoded phrase list ("once again",
+    # "in response"), so neither orphan was caught. Capture the removed
+    # sentences' POSITIONS first so a lead-in before, and a consequence after,
+    # can both be swept.
+    _orig_sents = _split(text or '')
+    _flagged_set = set(flagged)
+    _removed_idx = [i for i, s in enumerate(_orig_sents) if s in _flagged_set]
+
+    keep = [s for s in _orig_sents if s not in _flagged_set]
     clean = ' '.join(keep).strip()
     try:
         from unglossed_reference_gate import cut_orphaned_dependants
@@ -88,17 +104,63 @@ def strip_uncontextualised_deaths(text):
         flagged = list(flagged) + list(orphans or [])
     except Exception:
         pass
-    # LOCAL-479 cuts dependants of a removed PERSON ("Walter", "Reid"). What is
-    # left here depends on a removed EVENT: "The narthex ONCE AGAIN became a focal
-    # point, hosting a 'Mass of Peace'" — the "once again" now refers to nothing and
-    # the Mass is unexplained. Narrow sweep for that, adjacent sentences only.
+
+    # ── 1. Cataphoric LEAD-IN sweep (sentence BEFORE a removed death) ─────────
+    # A lead-in sentence forward-references the event the next sentence was going
+    # to tell — "the hall hosted another turning point", "this was a pivotal
+    # moment", "a defining chapter followed". Once the event is gone the lead-in
+    # promises something that never arrives. It is a lead-in (not real content)
+    # when it carries a cataphoric placeholder noun AND names no person/number of
+    # its own that would make it stand alone.
+    _CATAPHORIC_LEAD = re.compile(
+        r'\b(?:another|a|the|its|this)\s+'
+        r'(?:(?:great|defining|pivotal|dramatic|significant|major|notable|'
+        r'fateful|turning|new|next|further|final|lasting)\s+)*'
+        r'(?:turning\s+point|point|moment|chapter|episode|scene|'
+        r'confrontation|reckoning|crisis|controversy|debate|gathering|'
+        r'meeting|assembly|flashpoint|milestone)\b',
+        re.I)
+
+    def _is_bare_lead_in(sent):
+        if _NAMED.search(sent):
+            return False          # names a person → it is real content, keep it
+        return bool(_CATAPHORIC_LEAD.search(sent))
+
+    lead_ins = set()
+    for idx in _removed_idx:
+        j = idx - 1
+        if 0 <= j < len(_orig_sents):
+            prev = _orig_sents[j]
+            if prev not in _flagged_set and _is_bare_lead_in(prev):
+                lead_ins.add(prev)
+
+    # ── 2. CONSEQUENCE sweep (anaphor pointing back at the removed event) ────
+    # Backward anaphors: the explicit phrase list we already had, PLUS a generic
+    # definite-NP subject whose head noun is a reaction/aftermath word
+    # ("The outcry", "The response", "The reaction") — the event it reacts to is
+    # gone, so the reaction refers to nothing. Only applied to a sentence that
+    # names no one of its own.
     _ANAPHORIC = re.compile(r'\b(once again|in response|this (?:gathering|somber|'
-                            r'tragedy|loss|event)|the (?:gathering|memorial|vigil))\b',
-                            re.I)
+                            r'tragedy|loss|event|meeting|protest)|'
+                            r'the (?:gathering|memorial|vigil))\b', re.I)
+    _CONSEQUENCE_SUBJECT = re.compile(
+        r'^\s*(?:And\s+|But\s+|Then\s+)?The\s+'
+        r'(?:immediate\s+|public\s+|ensuing\s+|resulting\s+|widespread\s+)*'
+        r'(?:outcry|outrage|response|reaction|backlash|uproar|protest|protests|'
+        r'fallout|aftermath|controversy|furore|furor|indignation|repercussions?)'
+        r'\b',
+        re.I)
+
     remaining = _split(clean)
     survivors, cut_extra = [], []
     for sent in remaining:
-        if _ANAPHORIC.search(sent) and not _NAMED.search(sent):
+        if sent in lead_ins:
+            cut_extra.append(sent)
+            continue
+        if _NAMED.search(sent):
+            survivors.append(sent)
+            continue
+        if _ANAPHORIC.search(sent) or _CONSEQUENCE_SUBJECT.match(sent):
             cut_extra.append(sent)
         else:
             survivors.append(sent)

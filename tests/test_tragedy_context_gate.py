@@ -193,3 +193,79 @@ class TestVictimNameBackfillIsPeopleOnly(unittest.TestCase):
         out, recovered, removed = res(text, "Old State House", "Boston MA", grounded)
         self.assertNotIn("The victims were", out)
         self.assertNotIn("were Boston Massacre", out)
+
+
+class TestEventRemovalTakesItsOrphans(unittest.TestCase):
+    """[LOCAL-663 bug 2] Faneuil Hall Stop 4 (1837 Lovejoy meeting) shipped
+
+        "In late 1837, the hall hosted another turning point. The outcry in the
+         hall was immediate."
+
+    — the event itself (the abolitionist meeting after Elijah Lovejoy's murder)
+    was gone. The gate removed the uncontextualised death sentence but left the
+    cataphoric LEAD-IN that announced it ("hosted another turning point") and the
+    backward CONSEQUENCE ("The outcry ... was immediate"). Both now point at
+    nothing. The removal must take its orphans with it.
+    """
+
+    FANEUIL = (
+        "Faneuil Hall has drawn orators for generations. "
+        "In late 1837, the hall hosted another turning point. "
+        "The abolitionist editor Elijah Lovejoy had been killed, and citizens "
+        "gathered here. "
+        "The outcry in the hall was immediate. "
+        "Wendell Phillips rose to speak."
+    )
+
+    def test_the_event_sentence_is_flagged_and_removed(self):
+        clean, removed = strip_uncontextualised_deaths(self.FANEUIL)
+        self.assertTrue(any("Lovejoy" in r for r in removed))
+        self.assertNotIn("Lovejoy", clean)
+
+    def test_the_leadin_falls_with_the_event(self):
+        clean, _ = strip_uncontextualised_deaths(self.FANEUIL)
+        self.assertNotIn("another turning point", clean,
+                         "a lead-in promising an event that was deleted must go too")
+
+    def test_the_consequence_falls_with_the_event(self):
+        clean, _ = strip_uncontextualised_deaths(self.FANEUIL)
+        self.assertNotIn("The outcry", clean,
+                         "a reaction to a deleted event refers to nothing")
+
+    def test_standalone_and_unrelated_sentences_survive(self):
+        clean, _ = strip_uncontextualised_deaths(self.FANEUIL)
+        self.assertIn("drawn orators", clean)
+        self.assertIn("Wendell Phillips rose to speak", clean,
+                      "a sentence that names its own subject stands alone")
+
+    def test_leadin_sweep_is_adjacency_scoped(self):
+        """A 'turning point' phrase NOT immediately before the removed death —
+        and which introduces its own following content — must survive."""
+        t = ("In 1742 the hall opened as a market, a turning point for the town. "
+             "Merchants filled its stalls daily. "
+             "Decades later, John Smith was killed, and locals mourned.")
+        clean, removed = strip_uncontextualised_deaths(t)
+        self.assertTrue(any("John Smith" in r for r in removed))
+        self.assertIn("turning point", clean)
+        self.assertIn("Merchants filled", clean)
+
+    def test_no_death_means_no_sweep(self):
+        """With no uncontextualised death, a 'turning point' lead-in and a
+        'The response' sentence are ordinary prose and must be untouched."""
+        t = ("The nave was completed in 1881. This was a turning point for the "
+             "parish. The response from the community was generous.")
+        clean, removed = strip_uncontextualised_deaths(t)
+        self.assertEqual(removed, [])
+        self.assertEqual(clean, t)
+
+    def test_contextualised_death_and_its_leadin_both_survive(self):
+        """When the death carries its circumstances it is NOT removed, so its
+        lead-in is never swept."""
+        t = ("In late 1837 the hall hosted another turning point. "
+             "Elijah Lovejoy was murdered during a pro-slavery riot, and "
+             "citizens gathered here in response. "
+             "Wendell Phillips rose to speak.")
+        clean, removed = strip_uncontextualised_deaths(t)
+        self.assertEqual(removed, [], removed)
+        self.assertIn("turning point", clean)
+        self.assertIn("Lovejoy", clean)
