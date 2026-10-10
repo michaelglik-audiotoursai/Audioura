@@ -2367,11 +2367,17 @@ def _degrade_sentence_is_wellformed(sentence: str, entity: str = "") -> bool:
         return False
     if _ends_in_transitive_verb_without_object(sentence):   # [LOCAL-624]
         return False
-    # [LOCAL-660 defect 2] A copula welded onto a bare named entity.
-    if entity and _degrade_copula_equates_entity(sentence, entity):   # FIX A
-        return False
-    if _DEGRADE_GUARD_COPULA_BARE_ENTITY.search(sentence):   # FIX B
-        return False
+    # [LOCAL-660 defect 2] A copula welded onto a bare named entity — ONLY in the
+    # degrade path (when ``entity`` is given). FIX A matches the exact degraded
+    # name; FIX B is the broader shape, gated behind ``entity`` so it can only
+    # fire on a sentence the gate itself just degraded and never on a well-formed
+    # predicate nominative in the general safety-net ("Your first stop is
+    # Massachusetts State House.", "The capital is Boston.").
+    if entity:
+        if _degrade_copula_equates_entity(sentence, entity):        # FIX A
+            return False
+        if _DEGRADE_GUARD_COPULA_BARE_ENTITY.search(sentence):       # FIX B
+            return False
     return True
 
 
