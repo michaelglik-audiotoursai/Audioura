@@ -20,6 +20,10 @@ services:
       - TOUR_STORY_MODEL=gpt-4.1
       # D646 (LEAD 2026-10-10): overlap independent waits (LOCAL-651/656; same calls, same stops). Rollback = delete this line.
       - FAST_PIPELINE=1
+      # D645 re-enabled for MUSEUM tours only (LOCAL-664, 2026-10-10). Walking stays on Gemini research (Serper costs ~2 Kiro points there).
+      - CHEAP_ARM_CATEGORIES=museum
+      - NARRATION_MODEL=gpt-4.1-mini
+      - RESEARCH_BACKEND=serper
     volumes:
       - /Users/micha/audioura-subscribed-local/_meter:/opt/meter:ro
       - /Users/micha/Audioura/meterlogs:/meterlogs
