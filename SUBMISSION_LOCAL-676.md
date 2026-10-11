@@ -204,3 +204,50 @@ python3 -m pytest -q tests -m network
   `tests/test_local320_inconclusive.py`,
   `tests/test_local320_nominatim_ratelimit.py`,
   `tests/test_local320_nondining_regression.py` — `@pytest.mark.network`.
+
+
+## 9. Independent re-verification (Mac Mini Kiro, 2026-10-11)
+
+Re-ran the deliverable end-to-end on this branch to confirm the numbers above
+are reproducible. Environment: macOS, Docker postgres `development-postgres-2-1`
+on host `5433`, pytest 8.4.2.
+
+**Named-family cross-module leak scenario** (the exact reproduction from §2) —
+`172 + 672 + 604 + 596_api + 595_api + 597_by_reference` collected together:
+
+| Tree                       | Result                     | Exit |
+|----------------------------|----------------------------|------|
+| baseline `aaf54b6d`        | **37 failed, 40 passed**   | 1    |
+| this branch (HEAD)         | **77 passed**              | 0    |
+
+→ The leak genuinely broke the families at baseline; the branch fixes them all.
+
+**Network marking:** default run of the three network modules → `3 passed,
+32 skipped` (mocked unit tests still run, live calls skipped), exit 0.
+`-m network` collects `33/4716` tests across the suite. No paid/live calls.
+
+**Full suite** `python3 -m pytest -q tests`:
+
+| Metric    | This re-run (HEAD) | §4 reported | 
+|-----------|--------------------|-------------|
+| failed    | 99                 | 98          |
+| passed    | 4534               | 4535        |
+| skipped   | 58                 | 58          |
+| errors    | 43                 | 43          |
+| exit code | **1**              | 1           |
+| wall      | 559 s              | 663 s       |
+| "write to production" blocks | **4**   | 4           |
+
+The ±1 failed/passed vs §4 is a single service-/timing-dependent test that
+flips between runs (part of the documented ~90 pre-existing service/connectivity
+failures). Deliverable invariants all hold: **0 named-family failures** in the
+full run (`local672/604/596_api/595_api/597/329/331/349` all absent from
+`FAILED`), production-write blocks down from 56 → **4** (all in the out-of-scope
+legacy `test_local88` write-tests), 43 errors unchanged, exit 1.
+
+**Out-of-scope confirmed pre-existing:** on baseline `aaf54b6d`,
+`test_local328 + test_local88 + test_wallet_ledger` → `8 failed, 29 passed`,
+exit 1 — same failures as on this branch, so they are not regressions.
+
+**No paid calls. No `DELETE` on production tables.** Baseline comparison used a
+throwaway `git worktree` at `aaf54b6d`, removed after measurement.
