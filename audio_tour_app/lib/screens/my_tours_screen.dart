@@ -11,6 +11,7 @@ import '../services/tour_translation_helper.dart';
 import '../config/endpoints.dart';
 import '../utils/tour_path_healer.dart';
 import '../widgets/share_tour_sheet.dart';
+import '../widgets/rate_tour_dialog.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import 'tour_player_screen.dart';
@@ -886,6 +887,32 @@ class _MyToursScreenState extends State<MyToursScreen> {
     }
   }
 
+  /// [LOCAL-670] Rate a downloaded tour 1–10 from its ⋮ menu. The rating keys on
+  /// the numeric tour_id; a tour with no numeric id (local-only) can't be rated,
+  /// so we tell the user rather than silently failing.
+  Future<void> _showRateDialog(Map<String, dynamic> tour) async {
+    final tourId = tour['tour_id'];
+    if (tourId == null || int.tryParse(tourId.toString()) == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('This tour cannot be rated yet (no numeric tour ID).'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+    final result = await showRateTourDialog(
+      context,
+      tourId: tourId.toString(),
+      tourTitle: tour['title']?.toString() ?? 'this tour',
+    );
+    if (result != null && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Thanks! Tour rating now ${result.badgeText}.')),
+      );
+    }
+  }
+
   Future<void> _showTranslateDialog(Map<String, dynamic> tour) async {
     final tourId = tour['tour_id'];
     if (tourId == null || tourId.toString().isEmpty) {
@@ -1480,6 +1507,7 @@ class _MyToursScreenState extends State<MyToursScreen> {
                           constraints: const BoxConstraints(minWidth: 36),
                           onSelected: (value) {
                             switch (value) {
+                              case 'rate': _showRateDialog(tour); break;
                               case 'share': _shareTour(tour); break;
                               case 'translate': _showTranslateDialog(tour); break;
                               case 'edit': _editTour(tour); break;
@@ -1489,6 +1517,7 @@ class _MyToursScreenState extends State<MyToursScreen> {
                             }
                           },
                           itemBuilder: (context) => [
+                            const PopupMenuItem(value: 'rate', child: ListTile(leading: Icon(Icons.star_outline, color: Color(0xFFE2A400)), title: Text('Rate this tour'), dense: true)),
                             const PopupMenuItem(value: 'share', child: ListTile(leading: Icon(Icons.ios_share, color: Color(0xFF3498db)), title: Text('Share'), dense: true)),
                             if (!TourTranslationHelper.isTranslation(tour))
                               const PopupMenuItem(value: 'translate', child: ListTile(leading: Icon(Icons.translate, color: Color(0xFF8e44ad)), title: Text('Translate'), dense: true)),

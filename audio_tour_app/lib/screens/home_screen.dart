@@ -28,6 +28,7 @@ import '../utils/search_dispatch.dart';
 // import '../services/subscription_article_storage.dart';  // TEMPORARILY DISABLED - CAUSING BUILD ERRORS
 import '../widgets/subscription_credential_dialog.dart';
 import '../widgets/language_selector.dart';
+import '../widgets/rate_tour_dialog.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -50,6 +51,10 @@ class _HomeScreenState extends State<HomeScreen> {
   List<Map<String, dynamic>> _newsletters = [];
   String _selectedTypeFilter = 'All';
   List<String> _selectedLanguages = ['en'];
+  // [LOCAL-670] Home-page rating filter: 0 = Any, else the minimum shown score
+  // (7, 8, or 9). Remembered per device under SharedPreferences 'home_min_rating'
+  // and passed to /tours-near as ?min_rating=<n> so the server filters.
+  double _minRating = 0.0;
   final List<String> _articleTypes = [
     'All',
     'News and Politics',
@@ -80,6 +85,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _loadAppMode() async {
     final prefs = await SharedPreferences.getInstance();
     final mode = prefs.getString('app_mode') ?? 'Tours';
+    _minRating = prefs.getDouble('home_min_rating') ?? 0.0;
     await _loadLocationHistory();
     await _loadCustomLocation();
     
@@ -316,7 +322,12 @@ class _HomeScreenState extends State<HomeScreen> {
 
     try {
       final prefs = await SharedPreferences.getInstance();
-      final uri = await Endpoints.url(Service.mapDelivery, '/tours-near/${searchLocation.latitude}/${searchLocation.longitude}?radius=50');
+      // [LOCAL-670] Pass the chosen minimum rating to the server so it filters
+      // (Any = omit the param entirely). The server computes the shown score and
+      // drops tours below the bar.
+      final minRatingParam =
+          _minRating > 0 ? '&min_rating=${_minRating.toStringAsFixed(0)}' : '';
+      final uri = await Endpoints.url(Service.mapDelivery, '/tours-near/${searchLocation.latitude}/${searchLocation.longitude}?radius=50$minRatingParam');
       final url = uri.toString();
       
       await DebugLogHelper.addDebugLog('HOME: Requesting tours from: $url');
@@ -419,6 +430,50 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
   
+  /// [LOCAL-670] Choose the minimum tour rating to show (Any / 7+ / 8+ / 9+).
+  /// Persisted per device under 'home_min_rating' and applied by reloading the
+  /// nearby tours with the server-side min_rating filter.
+  void _showRatingFilterDialog() {
+    const options = <String, double>{
+      'Any': 0.0,
+      '7+': 7.0,
+      '8+': 8.0,
+      '9+': 9.0,
+    };
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Minimum rating'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            for (final entry in options.entries)
+              RadioListTile<double>(
+                title: Text(entry.key == 'Any' ? 'Any rating' : '${entry.key} stars'),
+                value: entry.value,
+                groupValue: _minRating,
+                onChanged: (value) async {
+                  if (value == null) return;
+                  Navigator.pop(context);
+                  final prefs = await SharedPreferences.getInstance();
+                  await prefs.setDouble('home_min_rating', value);
+                  if (!mounted) return;
+                  setState(() => _minRating = value);
+                  await _loadNearbyTours();
+                },
+              ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Close'),
+          ),
+        ],
+      ),
+    );
+  }
+
   /// [LOCAL-665] The one Home search dialog. Same visuals as the old shared
   /// dialogs (a title, a single text field, Cancel + Search), but a single box
   /// whose hint — "Share code, tour name, or place" — says it takes all three.
@@ -695,6 +750,9 @@ class _HomeScreenState extends State<HomeScreen> {
               children: [
                 Text('Distance: ${item['distance_km']} km'),
                 Text('Downloads: ${item['popularity']}'),
+                SizedBox(height: 6),
+                // [LOCAL-670] Rating badge "★ 8.3 · 2 ratings" / "★ 7.5 · New".
+                TourRatingBadge.fromTour(item),
                 if (_tourVersionLabel(item) != null)
                   Text(
                     _tourVersionLabel(item)!,
@@ -724,6 +782,24 @@ class _HomeScreenState extends State<HomeScreen> {
               TextButton(
                 onPressed: () => Navigator.pop(context),
                 child: Text('Close'),
+              ),
+              // [LOCAL-670] Rate this tour 1–10. On success, refresh the badge
+              // in this dialog with the recomputed score.
+              TextButton(
+                onPressed: () async {
+                  final result = await showRateTourDialog(
+                    context,
+                    tourId: '${item['id']}',
+                    tourTitle: item['name']?.toString() ?? 'this tour',
+                  );
+                  if (result != null) {
+                    item['rating_score'] = result.score;
+                    item['rating_count'] = result.count;
+                    item['rating_label'] = result.label;
+                    setDialogState(() {});
+                  }
+                },
+                child: Text('Rate'),
               ),
               ElevatedButton(
                 onPressed: () {
@@ -2906,6 +2982,15 @@ class _HomeScreenState extends State<HomeScreen> {
         backgroundColor: Color(0xFF2c3e50),
         foregroundColor: Colors.white,
         actions: [
+          // [LOCAL-670] Rating filter: Any / 7+ / 8+ / 9+. The chosen bar is
+          // remembered per device and passed to /tours-near as min_rating.
+          IconButton(
+            icon: Icon(_minRating > 0 ? Icons.star : Icons.star_border),
+            onPressed: _showRatingFilterDialog,
+            tooltip: _minRating > 0
+                ? 'Rating filter: ${_minRating.toStringAsFixed(0)}+'
+                : 'Rating filter: Any',
+          ),
           // [LOCAL-665] One search button for everything. Michael: the two old
           // buttons (flag = tours, arrow-glass = location) were easy to confuse.
           // Now a single box tells a share code, a tour name and a place apart by

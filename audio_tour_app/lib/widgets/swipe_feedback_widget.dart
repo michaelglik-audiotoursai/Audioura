@@ -33,6 +33,12 @@ class SwipeFeedbackWidget extends StatefulWidget {
   /// Path to the tour directory (for loading stop_metrics.json).
   final String tourPath;
 
+  /// [LOCAL-670] Human-readable name of the current stop, shown in the "This
+  /// stop:" label and the confirmation toast so the thumbs read clearly as a
+  /// PER-STOP judgement (distinct from the per-TOUR 1–10 rating). Null/empty
+  /// falls back to a generic phrasing; behaviour is otherwise unchanged.
+  final String? stopName;
+
   /// Called when a swipe is registered (for parent notification, e.g. haptics).
   final void Function(int swipe)? onSwipe;
 
@@ -42,6 +48,7 @@ class SwipeFeedbackWidget extends StatefulWidget {
     required this.tourId,
     this.jobId,
     required this.tourPath,
+    this.stopName,
     this.onSwipe,
   });
 
@@ -197,31 +204,53 @@ class SwipeFeedbackWidgetState extends State<SwipeFeedbackWidget>
     return Container(
       key: const ValueKey('swipe_buttons'),
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          // Dislike button
-          _FeedbackButton(
-            icon: Icons.thumb_down_outlined,
-            activeIcon: Icons.thumb_down,
-            color: const Color(0xFFE74C3C),
-            label: 'Not for me',
-            isActive: alreadySwiped && _swipedStops[widget.currentStopIndex] == -1,
-            isDisabled: alreadySwiped,
-            onTap: () => _handleSwipe(-1),
-            semanticLabel: 'Dislike this stop',
+          // [LOCAL-670] Make clear these thumbs rate THIS STOP, not the whole
+          // tour (the tour has its own 1–10 rating). Show the stop name when we
+          // have it so there is no ambiguity about what is being rated.
+          Padding(
+            padding: const EdgeInsets.only(bottom: 4),
+            child: Text(
+              (widget.stopName != null && widget.stopName!.trim().isNotEmpty)
+                  ? 'This stop: ${widget.stopName}'
+                  : 'This stop:',
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: Color(0xFF7F8C8D),
+              ),
+            ),
           ),
-          const SizedBox(width: 48),
-          // Like button
-          _FeedbackButton(
-            icon: Icons.thumb_up_outlined,
-            activeIcon: Icons.thumb_up,
-            color: const Color(0xFF27AE60),
-            label: 'More like this',
-            isActive: alreadySwiped && _swipedStops[widget.currentStopIndex] == 1,
-            isDisabled: alreadySwiped,
-            onTap: () => _handleSwipe(1),
-            semanticLabel: 'Like this stop',
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              // Dislike button
+              _FeedbackButton(
+                icon: Icons.thumb_down_outlined,
+                activeIcon: Icons.thumb_down,
+                color: const Color(0xFFE74C3C),
+                label: 'Not for me',
+                isActive: alreadySwiped && _swipedStops[widget.currentStopIndex] == -1,
+                isDisabled: alreadySwiped,
+                onTap: () => _handleSwipe(-1),
+                semanticLabel: 'Dislike this stop',
+              ),
+              const SizedBox(width: 48),
+              // Like button
+              _FeedbackButton(
+                icon: Icons.thumb_up_outlined,
+                activeIcon: Icons.thumb_up,
+                color: const Color(0xFF27AE60),
+                label: 'More like this',
+                isActive: alreadySwiped && _swipedStops[widget.currentStopIndex] == 1,
+                isDisabled: alreadySwiped,
+                onTap: () => _handleSwipe(1),
+                semanticLabel: 'Like this stop',
+              ),
+            ],
           ),
         ],
       ),
@@ -230,6 +259,13 @@ class SwipeFeedbackWidgetState extends State<SwipeFeedbackWidget>
 
   Widget _buildConfirmation() {
     final isLike = _lastSwipe == 1;
+    // [LOCAL-670] Name the stop in the confirmation so the listener sees the
+    // judgement was recorded against THIS stop, not the whole tour.
+    final hasName = widget.stopName != null && widget.stopName!.trim().isNotEmpty;
+    final suffix = hasName ? ' for "${widget.stopName}"' : ' for this stop';
+    final message = isLike
+        ? 'Noted — more like this$suffix'
+        : 'Noted — less like this$suffix';
     return Container(
       key: const ValueKey('confirmation'),
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -242,12 +278,14 @@ class SwipeFeedbackWidgetState extends State<SwipeFeedbackWidget>
             size: 20,
           ),
           const SizedBox(width: 8),
-          Text(
-            isLike ? 'Noted — more like this' : 'Noted — less like this',
-            style: TextStyle(
-              color: isLike ? const Color(0xFF27AE60) : const Color(0xFFE74C3C),
-              fontWeight: FontWeight.w500,
-              fontSize: 14,
+          Flexible(
+            child: Text(
+              message,
+              style: TextStyle(
+                color: isLike ? const Color(0xFF27AE60) : const Color(0xFFE74C3C),
+                fontWeight: FontWeight.w500,
+                fontSize: 14,
+              ),
             ),
           ),
           const SizedBox(width: 16),

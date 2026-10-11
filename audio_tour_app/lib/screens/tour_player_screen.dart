@@ -11,6 +11,7 @@ import '../widgets/swipe_feedback_widget.dart';
 import '../config/endpoints.dart';
 import '../services/webview_console_logger.dart';
 import '../widgets/share_tour_sheet.dart';
+import '../widgets/rate_tour_dialog.dart';
 
 class TourPlayerScreen extends StatefulWidget {
   final String tourPath;
@@ -41,6 +42,11 @@ class TourPlayerScreen extends StatefulWidget {
 class _TourPlayerScreenState extends State<TourPlayerScreen> with VoiceMethods {
   InAppWebViewController? _controller;
   int _currentStopIndex = 0;
+  // [LOCAL-670] Current stop's display name (for the per-stop thumbs label),
+  // reported from the WebView. _ratePrompted guards the end-of-tour "Rate this
+  // tour" prompt so it fires at most once.
+  String? _currentStopName;
+  bool _ratePrompted = false;
 
   // LOCAL-483: forward the tour player WebView's JS console into the debug log.
   final WebViewConsoleLogger _consoleLogger =
@@ -165,10 +171,26 @@ class _TourPlayerScreenState extends State<TourPlayerScreen> with VoiceMethods {
                       controller.addJavaScriptHandler(
                         handlerName: 'onStopChanged',
                         callback: (args) {
+                          // args: [index, stopName?, totalStops?]
                           final idx = args.isNotEmpty ? (args[0] is int ? args[0] : int.tryParse('${args[0]}') ?? 0) : 0;
-                          if (mounted) {
-                            setState(() => _currentStopIndex = idx);
+                          String? name;
+                          if (args.length > 1 && args[1] != null && '${args[1]}'.trim().isNotEmpty) {
+                            name = '${args[1]}'.trim();
                           }
+                          if (mounted) {
+                            setState(() {
+                              _currentStopIndex = idx;
+                              if (name != null) _currentStopName = name;
+                            });
+                          }
+                        },
+                      );
+                      // [LOCAL-670] Fired by the WebView when the final stop's
+                      // audio ends — offer the per-TOUR 1–10 rating once.
+                      controller.addJavaScriptHandler(
+                        handlerName: 'onTourEnded',
+                        callback: (args) {
+                          _maybePromptEndOfTourRating();
                         },
                       );
                     },
@@ -186,10 +208,29 @@ class _TourPlayerScreenState extends State<TourPlayerScreen> with VoiceMethods {
                             var origPreviousStop = window.previousStop;
                             var origGoToStop = window.goToStop;
                             var currentIdx = 0;
+                            var audios = document.querySelectorAll('audio');
+                            var totalStops = audios.length;
+                            // [LOCAL-670] Best-effort stop name for the index: prefer an
+                            // element with id stopTitle<n>/stop-title-<n>, else the nth
+                            // heading, else null. Never throws — a missing name just
+                            // yields the generic "This stop:" label.
+                            function stopNameFor(idx) {
+                              try {
+                                var byId = document.getElementById('stopTitle' + (idx + 1))
+                                        || document.getElementById('stop-title-' + (idx + 1))
+                                        || document.getElementById('stop' + (idx + 1) + 'Title');
+                                if (byId && byId.textContent) return byId.textContent.trim();
+                                var headings = document.querySelectorAll('h1,h2,h3,.stop-title,.stop-name');
+                                if (headings && headings.length > idx && headings[idx].textContent) {
+                                  return headings[idx].textContent.trim();
+                                }
+                              } catch (e) {}
+                              return null;
+                            }
                             function reportStop(idx) {
                               currentIdx = idx;
                               if (window.flutter_inappwebview) {
-                                window.flutter_inappwebview.callHandler('onStopChanged', idx);
+                                window.flutter_inappwebview.callHandler('onStopChanged', idx, stopNameFor(idx), totalStops);
                               }
                             }
                             if (typeof origNextStop === 'function') {
@@ -213,8 +254,7 @@ class _TourPlayerScreenState extends State<TourPlayerScreen> with VoiceMethods {
                                 reportStop(currentIdx);
                               };
                             }
-                            // Also hook audio 'ended' events to detect auto-advance
-                            var audios = document.querySelectorAll('audio');
+                            // Also hook audio 'ended'/'play' events.
                             audios.forEach(function(audio, idx) {
                               audio.addEventListener('play', function() {
                                 if (idx !== currentIdx) {
@@ -222,6 +262,15 @@ class _TourPlayerScreenState extends State<TourPlayerScreen> with VoiceMethods {
                                   reportStop(currentIdx);
                                 }
                               });
+                              // [LOCAL-670] When the LAST stop's audio ends, the tour
+                              // is over — tell Flutter to offer the rating prompt.
+                              if (idx === totalStops - 1) {
+                                audio.addEventListener('ended', function() {
+                                  if (window.flutter_inappwebview) {
+                                    window.flutter_inappwebview.callHandler('onTourEnded', idx);
+                                  }
+                                });
+                              }
                             });
                             // Report initial state
                             reportStop(0);
@@ -275,6 +324,7 @@ class _TourPlayerScreenState extends State<TourPlayerScreen> with VoiceMethods {
                   tourId: widget.tourId ?? _deriveTourId(),
                   jobId: widget.jobId,
                   tourPath: widget.tourPath,
+                  stopName: _currentStopName,
                   onSwipe: (swipe) {
                     // Light haptic feedback on swipe
                     HapticFeedback.lightImpact();
@@ -301,6 +351,30 @@ class _TourPlayerScreenState extends State<TourPlayerScreen> with VoiceMethods {
   String _deriveTourId() {
     final segments = widget.tourPath.split('/');
     return segments.isNotEmpty ? segments.last : 'unknown';
+  }
+
+  /// [LOCAL-670] Offer the per-TOUR 1–10 rating after the last stop finishes.
+  /// Fires at most once per player session. Only shown for a tour we can
+  /// identify by numeric id (what the rating endpoint keys on); tours opened
+  /// by local path only are skipped silently.
+  Future<void> _maybePromptEndOfTourRating() async {
+    if (_ratePrompted || !mounted) return;
+    _ratePrompted = true;
+
+    final tourId = widget.tourId;
+    if (tourId == null || int.tryParse(tourId) == null) {
+      await DebugLogHelper.addDebugLog(
+        'RATING: end-of-tour reached but no numeric tourId — skipping prompt',
+      );
+      return;
+    }
+
+    await DebugLogHelper.addDebugLog('RATING: end-of-tour — offering 1–10 rating');
+    await showRateTourDialog(
+      context,
+      tourId: tourId,
+      tourTitle: widget.tourTitle,
+    );
   }
 
   /// [LOCAL-579] Share the tour currently open in the player. Uses the tour's
