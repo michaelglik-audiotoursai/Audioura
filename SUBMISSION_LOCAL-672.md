@@ -113,3 +113,95 @@ Map-delivery (:5005) `tours-near` / `search-tours` / `tour-info` / `tour-by-code
 
 ## Constraints honoured
 - No paid API calls. DB changes additive and declared. Own containers only — no `audioura-*` container replaced, no GCloud. `DECISIONS.md`, `CLAUDE.md`, `BACKLOG.md`, `WORK_QUEUE.md`, `.continuous_dev/STATUS.md` untouched. Branch created from `subscribed @ 70a0bf83` (verified `git merge-base --is-ancestor 70a0bf83 HEAD` → 0).
+
+
+---
+
+# 672B — Rebase onto current `subscribed`
+
+LOCAL-672 was first cut on `subscribed @ 70a0bf83`. `subscribed` has since
+advanced to **`0ac9c4b9`**, picking up **LOCAL-671** (map-delivery carries
+`original_language` on every tour element) and **LOCAL-670C** (offline-first
+listening record / ratings / thumbs sync). This pass rebases the five LOCAL-672
+commits onto that new base and reconciles the one real collision — both 671 and
+672 edit the same SELECT column lists and row-unpacking in `map_delivery/app.py`.
+
+## What conflicted and how it was reconciled
+`git rebase origin/subscribed` replayed all five commits; only the map-delivery
+commit (`map-delivery ranking, verified counting, distribution, Top rated sort`)
+conflicted — **10 hunks across the four endpoints** (`/tour-by-code`,
+`/tours-near`, `/tour-info`, `/search-tours`). 670C did not touch this file.
+
+Each endpoint now carries **one query with ALL fields**, in a single fixed
+column order so every unpack matches the SELECT regardless of schema age:
+
+```
+… version/updated_at columns …,
+{_ratings_select(cur)}            -- rating_count, rating_values,
+                                  --   verified_values, created_values  (670 + 672)
+{_is_paid_select(cur)} AS is_paid -- (672)
+{_ORIGINAL_LANGUAGE_SELECT}       -- own_content_language,
+                                  --   source_content_language          (671)
+```
+
+- **JOINs:** `{_ratings_join(cur)}` then `{_ORIGINAL_LANGUAGE_JOIN}` — 672 did
+  not change the join; both are kept, 4× each.
+- **Row unpack** (all four endpoints): `… rating_count, rating_values,
+  verified_values, created_values, is_paid, own_content_language,
+  source_content_language`.
+- **Response body:** keeps BOTH 671's `original_language` key (computed via
+  `_resolved_original_language`) AND 672's `**_rating_payload(rating_values,
+  verified_values, created_values, is_paid)` block — 671's old
+  `rating = compute_rating(...)` + three individual rating keys is dropped in
+  favour of the richer 672 payload (which still carries `rating_score` /
+  `rating_count` / `rating_label` plus `verified_count`, `rank_score`,
+  `rating_distribution`). The `Top rated` sort (672) and `min_rating` filter are
+  preserved.
+- Both helper sets are retained in full: 672's `_is_paid_select`, `rank_score`,
+  `compute_distribution`, `_rating_payload`, `_has_verified_column`,
+  `_has_is_paid_column`, `_wants_top_rated`,
+  `_RATINGS_AGG_SUBQUERY_NO_VERIFIED`; and 671's `_resolved_original_language`,
+  `_ORIGINAL_LANGUAGE_SELECT` / `_ORIGINAL_LANGUAGE_JOIN`.
+
+## Sibling fixtures
+The reconciled SELECT adds three columns (`verified_values`, `created_values`,
+`is_paid`) ahead of 671's two language columns, so the sibling fake-cursor
+fixtures that return positional rows grew from **17 → 20 columns**: every mock
+row in `test_local657_version_label.py`, `test_local666_translation_source_version.py`
+and `test_local671_original_language.py` now inserts `None, None, False`
+(verified_values, created_values, is_paid) between `rating_values` and
+`own_content_language`. No test intent changed — only the tuple shape, matching
+the real SELECT. The DB-backed 670/670B/670C suites read JSON (not positional
+tuples) and needed no change.
+
+## Re-verification (this pass)
+- **All map-delivery suites together** — `pytest tests/test_local657_version_label.py
+  tests/test_local666_translation_source_version.py tests/test_local670_tour_ratings.py
+  tests/test_local670b_listened_gate.py tests/test_local670c_sync.py
+  tests/test_local671_original_language.py tests/test_local672_verified_reviews.py -q`
+  → **95 passed, exit 0**.
+- **672 alone** → **26 passed, exit 0** (hermetic helpers + DB-backed verified /
+  moderation / reviews / helpful-vote tests on `audiotours_test`, and the
+  map-delivery ↔ reviews-service `rank_score` lock-step test).
+- **No new failures from the rebase.** In an isolated whole-`tests/` run the
+  DB-backed suites (670/672 and unrelated billing suites such as `local595`)
+  show state-collision failures that are purely an artefact of thousands of
+  DB-sharing tests in one process; run in their normal focused groups they are
+  green (`local595_api` + 670 + 672 together → **51 passed, exit 0**), and the
+  seven map-delivery suites stay **95 passed, exit 0** before and after that run.
+- **flutter analyze** → **1354 issues, exactly 77 of them `error`-severity, all
+  pre-existing** (62 in `lib/services/audio_handler.dart`, 15 in legacy
+  `map_page.dart` / `tour_service.dart` / `subscription_management_screen.dart`
+  — all present on `0ac9c4b9`, none in files this branch touches). The new
+  review UI files (`tour_reviews_service.dart`, `reviews_section.dart`) and the
+  `home_screen.dart` edits contribute **zero errors**. No NEW errors.
+- **flutter build ios --no-codesign** → **✓ Built `Runner.app` (37.5 MB)**, exit 0.
+- **pubspec:** build bumped **2.4.8+37 → 2.4.8+38** (next after the current build).
+- **Base ancestry:** `git merge-base --is-ancestor 0ac9c4b9 HEAD` → **exit 0**.
+
+## Constraints honoured (672B)
+No paid API calls. Own containers only — no `audioura-*` container replaced, no
+GCloud, no DELETE beyond the suites' own `TEST-672-%` rows by exact id.
+`DECISIONS.md`, `CLAUDE.md`, `BACKLOG.md`, `WORK_QUEUE.md` and
+`.continuous_dev/STATUS.md` untouched. Everything LOCAL-672 delivered (D649 +
+addendum + D650) is preserved.
