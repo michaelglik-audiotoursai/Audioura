@@ -76,7 +76,8 @@ def get_tour_by_code(code):
                    v.max_version_no, v.last_replaced_at, t.created_at,
                    {_source_version_select(cur)} AS source_version,
                    sv.max_version_no AS source_max_version_no,
-                   {_ratings_select(cur)}
+                   {_ratings_select(cur)},
+                   {_ORIGINAL_LANGUAGE_SELECT}
             FROM audio_tours t
             LEFT JOIN (
                 SELECT tour_id,
@@ -92,6 +93,7 @@ def get_tour_by_code(code):
                 GROUP BY tour_id
             ) sv ON sv.tour_id = t.original_tour_id
             {_ratings_join(cur)}
+            {_ORIGINAL_LANGUAGE_JOIN}
             WHERE t.id = %s
         """, (row[0], row[0]))
         t = cur.fetchone()
@@ -102,7 +104,8 @@ def get_tour_by_code(code):
 
         (tour_id, tour_name, request_string, tour_lat, tour_lng, requests,
          language, original_id, max_vn, last_replaced, created_at,
-         source_version, source_max_vn, rating_count, rating_values) = t
+         source_version, source_max_vn, rating_count, rating_values,
+         own_content_language, source_content_language) = t
         # [LOCAL-666] A share code can point at a translation row (original_tour_id
         # set, e.g. Russian 615 of 557) as well as an original. For a translation we
         # report the SOURCE tour's version (its pinned source_version, else the
@@ -113,6 +116,8 @@ def get_tour_by_code(code):
         version, updated_at = _resolved_version_fields(
             original_id, source_version, source_max_vn, max_vn, last_replaced, created_at)
         rating = compute_rating(rating_values)
+        original_language = _resolved_original_language(
+            own_content_language, original_id, source_content_language)
         # Same keys as a /tours-near element. distance_km is None, not 0: the listener
         # is not near it, and 0 would sort it to the top under false pretences.
         return jsonify({
@@ -127,6 +132,7 @@ def get_tour_by_code(code):
                 'type': 'walking_tour',
                 'language': language or 'en',
                 'original_tour_id': original_id,
+                'original_language': original_language,
                 'via_share_code': code,
                 'version': version,
                 'updated_at': updated_at,
@@ -235,6 +241,27 @@ def _resolved_version_fields(original_tour_id, source_version,
     return version, _iso_date(created_at)
 
 
+# [LOCAL-671] The SOURCE language every tour element carries. "Original: English"
+# in the tour dialogs is NOT the tour's own language (a Russian translation's own
+# content_language is 'ru'); it is the language the tour was originally written in.
+#   * An ORIGINAL row (original_tour_id NULL) was written in its own
+#     content_language — so original_language == its own content_language.
+#   * A TRANSLATION row (original_tour_id set) was translated FROM its original,
+#     so original_language == that original's content_language, carried here by a
+#     LEFT JOIN on the source id (orig.content_language). The translation's own
+#     content_language ('ru', 'fr', …) is NOT the original language and is ignored.
+# Defaults to 'en' when unknown (NULL on either side), matching the rest of the
+# service, so the dialog never shows a blank "Original:".
+def _resolved_original_language(own_content_language, original_tour_id,
+                                source_content_language):
+    """original_language for a row that may be an ORIGINAL or a TRANSLATION."""
+    if original_tour_id is None:
+        return own_content_language or 'en'
+    # Translation: the original's language. Fall back to 'en' if the source row's
+    # content_language is NULL (legacy originals predate the column's default).
+    return source_content_language or 'en'
+
+
 # [LOCAL-666] Cache the one-time schema probe for the optional source_version column
 # so each request does not re-query information_schema. None until first checked.
 _HAS_SOURCE_VERSION = None
@@ -261,6 +288,27 @@ def _has_source_version_column(cur):
 def _source_version_select(cur):
     """SQL fragment selecting source_version (or a NULL literal on an older schema)."""
     return "t.source_version" if _has_source_version_column(cur) else "NULL::integer"
+
+
+# [LOCAL-671] original_language is appended as the LAST two SELECTed columns on every
+# endpoint, in this fixed order:
+#     ..., t.content_language AS own_content_language,
+#          orig.content_language AS source_content_language
+# own_content_language is the row's own language (used verbatim for an ORIGINAL);
+# source_content_language is the ORIGINAL tour's language, reached by a LEFT JOIN of
+# audio_tours onto itself on t.original_tour_id (NULL for an original row, since the
+# join finds nothing). _resolved_original_language collapses the two into the single
+# original_language value the app shows. Appending (not inserting) keeps the existing
+# column positions — and therefore every sibling test fixture — stable except for two
+# new trailing values, mirroring how LOCAL-670 appended its rating columns.
+_ORIGINAL_LANGUAGE_SELECT = ("t.content_language AS own_content_language, "
+                             "orig.content_language AS source_content_language")
+
+# LEFT JOIN the source (original) tour so a translation can read its ORIGINAL's
+# content_language. Inert for an original row (original_tour_id NULL → no match).
+_ORIGINAL_LANGUAGE_JOIN = """
+    LEFT JOIN audio_tours orig ON orig.id = t.original_tour_id
+"""
 
 
 # ─── Tour rating (LOCAL-670) ──────────────────────────────────────────────────
@@ -424,7 +472,8 @@ def get_tours_near_location(lat, lng):
                    v.max_version_no, v.last_replaced_at, t.created_at,
                    {_source_version_select(cur)} AS source_version,
                    sv.max_version_no AS source_max_version_no,
-                   {_ratings_select(cur)}
+                   {_ratings_select(cur)},
+                   {_ORIGINAL_LANGUAGE_SELECT}
             FROM audio_tours t
             LEFT JOIN (
                 SELECT tour_id,
@@ -439,6 +488,7 @@ def get_tours_near_location(lat, lng):
                 GROUP BY tour_id
             ) sv ON sv.tour_id = t.original_tour_id
             {_ratings_join(cur)}
+            {_ORIGINAL_LANGUAGE_JOIN}
             WHERE t.lat IS NOT NULL AND t.lng IS NOT NULL
             AND (t.content_language = 'en' OR t.content_language IS NULL)
             AND t.original_tour_id IS NULL
@@ -451,7 +501,8 @@ def get_tours_near_location(lat, lng):
         for tour in tours:
             (tour_id, tour_name, request_string, tour_lat, tour_lng, requests,
              language, original_id, max_vn, last_replaced, created_at,
-             source_version, source_max_vn, rating_count, rating_values) = tour
+             source_version, source_max_vn, rating_count, rating_values,
+             own_content_language, source_content_language) = tour
             
             if tour_lat and tour_lng:
                 distance = calculate_distance(lat, lng, tour_lat, tour_lng)
@@ -464,6 +515,8 @@ def get_tours_near_location(lat, lng):
                     # Server-side min_rating filter: skip tours below the bar.
                     if min_rating is not None and rating['score'] < min_rating:
                         continue
+                    original_language = _resolved_original_language(
+                        own_content_language, original_id, source_content_language)
                     tour_data = {
                         'id': tour_id,
                         'name': tour_name,
@@ -475,6 +528,7 @@ def get_tours_near_location(lat, lng):
                         'type': 'walking_tour',
                         'language': language or 'en',
                         'original_tour_id': original_id,
+                        'original_language': original_language,
                         'version': version,
                         'updated_at': updated_at,
                         'rating_score': rating['score'],
@@ -598,7 +652,8 @@ def get_tour_info(tour_id):
                    v.max_version_no, v.last_replaced_at, t.created_at,
                    {_source_version_select(cur)} AS source_version,
                    sv.max_version_no AS source_max_version_no,
-                   {_ratings_select(cur)}
+                   {_ratings_select(cur)},
+                   {_ORIGINAL_LANGUAGE_SELECT}
             FROM audio_tours t
             LEFT JOIN (
                 SELECT tour_id, MAX(version_no) AS max_version_no, MAX(replaced_at) AS last_replaced_at
@@ -609,6 +664,7 @@ def get_tour_info(tour_id):
                 FROM audio_tour_versions GROUP BY tour_id
             ) sv ON sv.tour_id = t.original_tour_id
             {_ratings_join(cur)}
+            {_ORIGINAL_LANGUAGE_JOIN}
             WHERE t.id = %s
         """, (tour_id,))
         
@@ -621,7 +677,8 @@ def get_tour_info(tour_id):
         
         (tour_id, tour_name, request_string, lat, lng, requests, language, original_id,
          max_vn, last_replaced, created_at, source_version, source_max_vn,
-         rating_count, rating_values) = result
+         rating_count, rating_values,
+         own_content_language, source_content_language) = result
         cur.close()
         conn.close()
         
@@ -629,6 +686,8 @@ def get_tour_info(tour_id):
         version, updated_at = _resolved_version_fields(
             original_id, source_version, source_max_vn, max_vn, last_replaced, created_at)
         rating = compute_rating(rating_values)
+        original_language = _resolved_original_language(
+            own_content_language, original_id, source_content_language)
         
         return jsonify({
             'id': tour_id,
@@ -641,6 +700,7 @@ def get_tour_info(tour_id):
             'language': language or 'en',
             'is_translation': is_translation,
             'parent_tour_id': original_id,
+            'original_language': original_language,
             'version': version,
             'updated_at': updated_at,
             'rating_score': rating['score'],
@@ -686,7 +746,8 @@ def search_tours():
                    v.max_version_no, v.last_replaced_at, t.created_at,
                    {_source_version_select(cur)} AS source_version,
                    sv.max_version_no AS source_max_version_no,
-                   {_ratings_select(cur)}
+                   {_ratings_select(cur)},
+                   {_ORIGINAL_LANGUAGE_SELECT}
             FROM audio_tours t
             LEFT JOIN (
                 SELECT tour_id, MAX(version_no) AS max_version_no, MAX(replaced_at) AS last_replaced_at
@@ -697,6 +758,7 @@ def search_tours():
                 FROM audio_tour_versions GROUP BY tour_id
             ) sv ON sv.tour_id = t.original_tour_id
             {_ratings_join(cur)}
+            {_ORIGINAL_LANGUAGE_JOIN}
             WHERE (t.tour_name ILIKE %s OR t.request_string ILIKE %s)
             AND t.lat IS NOT NULL AND t.lng IS NOT NULL
             AND (t.is_test IS NOT TRUE)
@@ -710,7 +772,8 @@ def search_tours():
         for tour in tours:
             (tour_id, tour_name, request_string, tour_lat, tour_lng, requests, language, original_id,
              max_vn, last_replaced, created_at, source_version, source_max_vn,
-             rating_count, rating_values) = tour
+             rating_count, rating_values,
+             own_content_language, source_content_language) = tour
             version, updated_at = _resolved_version_fields(
                 original_id, source_version, source_max_vn, max_vn, last_replaced, created_at)
             rating = compute_rating(rating_values)
@@ -721,6 +784,8 @@ def search_tours():
             if tour_lat and tour_lng:
                 distance = calculate_distance(lat, lng, tour_lat, tour_lng)
                 is_translation = original_id is not None and (language and language != 'en')
+                original_language = _resolved_original_language(
+                    own_content_language, original_id, source_content_language)
                 
                 search_results.append({
                     'id': tour_id,
@@ -734,6 +799,7 @@ def search_tours():
                     'language': language or 'en',
                     'is_translation': is_translation,
                     'parent_tour_id': original_id,
+                    'original_language': original_language,
                     'version': version,
                     'updated_at': updated_at,
                     'rating_score': rating['score'],

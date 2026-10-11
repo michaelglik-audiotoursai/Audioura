@@ -96,10 +96,11 @@ _COL_ABSENT = ("information_schema", [])
 
 class MapDeliveryTranslationVersionTest(unittest.TestCase):
     """map-delivery reports a translation's SOURCE version on /tour-by-code and
-    /tour-info. Row/column order (15 cols after LOCAL-670 appended the rating cols):
-    id, name, request_string, lat, lng, number_requested, language,
-    original_tour_id, max_version_no, last_replaced_at, created_at,
-    source_version, source_max_version_no, rating_count, rating_values.
+    /tour-info. Row/column order (17 cols after LOCAL-671 appended the two
+    content_language cols): id, name, request_string, lat, lng, number_requested,
+    language, original_tour_id, max_version_no, last_replaced_at, created_at,
+    source_version, source_max_version_no, rating_count, rating_values,
+    own_content_language, source_content_language.
     """
 
     def setUp(self):
@@ -121,9 +122,10 @@ class MapDeliveryTranslationVersionTest(unittest.TestCase):
             ("from shared_tours", [(615,)]),
             ("from audio_tours t", [
                 # id=615 is the RU translation of 557; its own archive is empty
-                # (never replaced in place) but source_version=10 is pinned.
+                # (never replaced in place) but source_version=10 is pinned. Trailing
+                # cols: own language 'ru', SOURCE (557) language 'en'.
                 (615, "Прогулка [ru]", "boston politics walk", 42.36, -71.06, 7,
-                 "ru", 557, None, None, created, 10, 9, None, None),
+                 "ru", 557, None, None, created, 10, 9, None, None, "ru", "en"),
             ]),
         ])
         resp = self.client.get("/tour-by-code/ru615code")
@@ -134,6 +136,7 @@ class MapDeliveryTranslationVersionTest(unittest.TestCase):
         self.assertEqual(tour["language"], "ru")
         self.assertEqual(tour["version"], 10)          # SOURCE version, not v1
         self.assertEqual(tour["updated_at"], "2026-10-10")  # translation's own date
+        self.assertEqual(tour["original_language"], "en")  # [LOCAL-671] source lang
 
     def test_tour_info_translation_inherits_source_v10(self):
         """Same rule on /tour-info (which previously returned no version at all)."""
@@ -142,7 +145,7 @@ class MapDeliveryTranslationVersionTest(unittest.TestCase):
             _COL_PRESENT,
             ("from audio_tours t", [
                 (615, "Прогулка [ru]", "boston politics walk", 42.36, -71.06, 7,
-                 "ru", 557, None, None, created, 10, 9, None, None),
+                 "ru", 557, None, None, created, 10, 9, None, None, "ru", "en"),
             ]),
         ])
         resp = self.client.get("/tour-info/615")
@@ -152,6 +155,7 @@ class MapDeliveryTranslationVersionTest(unittest.TestCase):
         self.assertEqual(body["updated_at"], "2026-10-10")
         self.assertTrue(body["is_translation"])
         self.assertEqual(body["parent_tour_id"], 557)
+        self.assertEqual(body["original_language"], "en")  # [LOCAL-671] source lang
 
     # ── (b) translation of an unreplaced source = v1 (no label) ──────────────
     def test_translation_of_unreplaced_source_is_v1(self):
@@ -164,7 +168,7 @@ class MapDeliveryTranslationVersionTest(unittest.TestCase):
             ("from shared_tours", [(620,)]),
             ("from audio_tours t", [
                 (620, "Promenade [fr]", "boston walk", 42.36, -71.06, 2,
-                 "fr", 557, None, None, created, 1, None, None, None),
+                 "fr", 557, None, None, created, 1, None, None, None, "fr", "en"),
             ]),
         ])
         resp = self.client.get("/tour-by-code/fr620code")
@@ -183,7 +187,7 @@ class MapDeliveryTranslationVersionTest(unittest.TestCase):
             ("from shared_tours", [(621,)]),
             ("from audio_tours t", [
                 (621, "Tour [de]", "boston walk", 42.36, -71.06, 1,
-                 "de", 557, None, None, created, None, None, None, None),
+                 "de", 557, None, None, created, None, None, None, None, "de", "en"),
             ]),
         ])
         resp = self.client.get("/tour-by-code/de621code")
@@ -204,7 +208,7 @@ class MapDeliveryTranslationVersionTest(unittest.TestCase):
                 # source_version comes back NULL (SELECTed as NULL::integer); the
                 # source 557 has 9 archived versions so its live version is 10.
                 (615, "Прогулка [ru]", "boston politics walk", 42.36, -71.06, 7,
-                 "ru", 557, None, None, created, None, 9, None, None),
+                 "ru", 557, None, None, created, None, 9, None, None, "ru", "en"),
             ]),
         ])
         resp = self.client.get("/tour-by-code/ru615code")
@@ -224,7 +228,8 @@ class MapDeliveryTranslationVersionTest(unittest.TestCase):
             ("from shared_tours", [(557,)]),
             ("from audio_tours t", [
                 (557, "Boston", "boston walk", 42.36, -71.06, 40,
-                 "en", None, 9, last_replaced, created, None, None, None, None),
+                 "en", None, 9, last_replaced, created, None, None, None, None,
+                 "en", None),
             ]),
         ])
         resp = self.client.get("/tour-by-code/boston")
@@ -232,6 +237,7 @@ class MapDeliveryTranslationVersionTest(unittest.TestCase):
         tour = resp.get_json()["tours"][0]
         self.assertEqual(tour["version"], 10)          # 9 archived + 1
         self.assertEqual(tour["updated_at"], "2026-10-09")  # replaced_at, not created
+        self.assertEqual(tour["original_language"], "en")  # [LOCAL-671] own lang
 
 
 class MapDeliveryHelperTest(unittest.TestCase):
