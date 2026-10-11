@@ -36,6 +36,31 @@ def _sub_step(_name):
         yield
 
 
+# ── [LOCAL-668] Dominant address among already-placed stops. The verified works
+# of a contained museum tour all carry the museum's own street address; the
+# building/collection-area fallback stops (which are INSIDE the museum) must
+# inherit that same address so the BLOCKER4b address-scatter guard sees one
+# contained location, not an empty "second address". Returns "" when no stop
+# carries a usable (>10 char) address yet. Pure/deterministic.
+def _dominant_poi_address(poi_list) -> str:
+    from collections import Counter
+    _c = Counter()
+    _first = {}
+    for _p in (poi_list or []):
+        try:
+            _a = (_p.get('address') or '').strip()
+        except Exception:
+            _a = ''
+        if _a and len(_a) > 10:
+            _key = _a.lower()[:40]
+            _c[_key] += 1
+            _first.setdefault(_key, _a)
+    if not _c:
+        return ''
+    _best = _c.most_common(1)[0][0]
+    return _first.get(_best, '')
+
+
 # ──── [LOCAL-437] MODULE-SCOPE PREDICATE: checklist exemption from existence gate ────
 # This predicate is the SINGLE source of truth for whether exhibition-sourced
 # stops bypass the existence gate. Tests IMPORT this — do not re-type it.
@@ -12960,6 +12985,59 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
                         "tier": _verification_tier if '_verification_tier' in dir() else 'unknown',
                     })
                     return None, None, (None, None)
+            # [LOCAL-668] Contained-address binding (runs BEFORE BLOCKER4b).
+            # A single-venue museum tour is contained: every stop — the verified
+            # works, the historic building, and the named collection areas — is
+            # INSIDE one building and belongs at ONE street address (the venue's).
+            # Thin-tier works promoted from the R4/model pool can carry a stray
+            # address the model guessed, and the LOCAL-667 building/collection-area
+            # fallback stops carry an EMPTY address; either reads to the
+            # address-scatter guard below as a second, distinct location and
+            # wrongly rejects an honest contained tour (LOCAL-668 evidence:
+            # hcmc_off_rejected.log). Bind each contained stop to the venue's own
+            # address with venue_bound_address() (D611 provenance rule: a stop
+            # keeps an address its OWN page literally states — a real satellite
+            # gallery — otherwise it takes the venue address). The venue address is
+            # the dominant address already on the stops; if none, the sourced
+            # venue address.
+            if tour_category == 'museum':
+                _c668_venue_addr = _dominant_poi_address(poi_list)
+                if not _c668_venue_addr:
+                    try:
+                        from stop_pool_orchestrator import _resolve_venue_address
+                        _c668_venue_addr = _resolve_venue_address(location) or ''
+                    except Exception:
+                        _c668_venue_addr = ''
+                if _c668_venue_addr and len(_c668_venue_addr) > 10:
+                    try:
+                        from about_museum_stop import venue_bound_address as _vba668
+                    except Exception:
+                        _vba668 = None
+                    _c668_bound = 0
+                    for _cp in poi_list:
+                        _cp_kind = _cp.get('_stop_kind', '')
+                        _cp_contained = (
+                            _cp_kind in ('building', 'collection_area')
+                            or _cp.get('_fallback_source')
+                            or 'thin_sources' in _cp
+                            or not (_cp.get('address') or '').strip()
+                        )
+                        if not _cp_contained:
+                            continue
+                        _cp_page = _cp.get('_source_page_text', '') or ''
+                        _cp_old = (_cp.get('address') or '').strip()
+                        if _vba668 is not None:
+                            _cp_new = _vba668(_cp.get('address', ''),
+                                              _c668_venue_addr, _cp_page)
+                        else:
+                            _cp_new = _cp_old or _c668_venue_addr
+                        if _cp_new and _cp_new != _cp_old:
+                            _cp['address'] = _cp_new
+                            _cp['_address_inherited_from_venue'] = True
+                            _c668_bound += 1
+                    if _c668_bound:
+                        print(f"  [LOCAL-668] Bound {_c668_bound} contained stop(s) to the "
+                              f"venue address (contained museum tour, 1 location).")
             # [BLOCKER4b] Address-scatter check: a contained museum tour should have
             # at most 2-3 distinct addresses (all inside one building).
             _unique_addresses = set()
