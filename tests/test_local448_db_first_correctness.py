@@ -22,8 +22,12 @@ os.environ['L447_RETRIEVAL_CHAIN'] = 'true'
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'tests'))
 
-# Set test database target
-os.environ.setdefault('AUDIOURA_DB_TARGET', 'production')  # read-only, safe
+# [LOCAL-675 item 4] Test-isolation fix (same root cause as test_local447).
+# A module-scope os.environ.setdefault('AUDIOURA_DB_TARGET', 'production') here
+# routed EVERY test imported after this module at the production 'audiotours'
+# database (AUDIOURA_DB_TARGET outranks pytest auto-detection), tripping the
+# conftest production-write guard in test_local670*.py. The production target is
+# now set and restored per-test in the live-integration class's setUp/tearDown.
 
 
 class TestDefect1WrongCorpusRejection(unittest.TestCase):
@@ -284,14 +288,22 @@ class TestDBFirstIntegration(unittest.TestCase):
         """Set host-side DB env vars for _get_db_connection() to find the DB."""
         # On the host, the DB is at localhost:5433 (docker-compose-master.yml maps it).
         # Inside containers, DATABASE_URL is set. This setUp ensures host tests work.
+        # [LOCAL-675 item 4] Save/restore every env var we touch (incl.
+        # AUDIOURA_DB_TARGET, DATABASE_URL, PGOPTIONS) so the production read is
+        # self-contained and nothing leaks to later tests; clear any leaked
+        # DATABASE_URL/PGOPTIONS that would hide production's stop_corpus.
         self._orig_env = {}
-        for key in ('DB_HOST', 'DB_PORT', 'DB_NAME', 'DB_USER', 'DB_PASSWORD'):
+        for key in ('DB_HOST', 'DB_PORT', 'DB_NAME', 'DB_USER', 'DB_PASSWORD',
+                    'AUDIOURA_DB_TARGET', 'DATABASE_URL', 'PGOPTIONS'):
             self._orig_env[key] = os.environ.get(key)
         os.environ['DB_HOST'] = 'localhost'
         os.environ['DB_PORT'] = '5433'
         os.environ['DB_NAME'] = 'audiotours'
         os.environ['DB_USER'] = 'admin'
         os.environ['DB_PASSWORD'] = 'password123'
+        os.environ['AUDIOURA_DB_TARGET'] = 'production'  # read-only lookup
+        os.environ.pop('DATABASE_URL', None)
+        os.environ.pop('PGOPTIONS', None)
 
     def tearDown(self):
         """Restore original env vars."""

@@ -283,6 +283,36 @@ _YEAR_SPAN_RE = re.compile(
 # alone (rounding/"nearly" slack). Beyond it, the number is corrected.
 _YEAR_SPAN_TOLERANCE = 2
 
+# [LOCAL-675 item 2] Relative-time phrases that assert an arithmetic span without
+# a digit. Boston 557 v12 Stop said "Three years later, … In 1770" after a prior
+# sentence dated 1742 — the real gap is 28 years, so "Three years" is wrong and
+# must be recomputed (or the phrase dropped). We handle three forms:
+#   * "<word-number> years later/after"   ("Three years later")
+#   * "a/one decade later/after"           (= 10 years)
+#   * "the following year" / "the next year" / "the year after" (= 1 year)
+# All are measured relative to the PREVIOUS dated sentence in the same stop.
+_WORD_NUMBERS = {
+    "a": 1, "an": 1, "one": 1, "two": 2, "three": 3, "four": 4, "five": 5,
+    "six": 6, "seven": 7, "eight": 8, "nine": 9, "ten": 10, "eleven": 11,
+    "twelve": 12, "thirteen": 13, "fourteen": 14, "fifteen": 15, "sixteen": 16,
+    "seventeen": 17, "eighteen": 18, "nineteen": 19, "twenty": 20,
+}
+_WORD_NUM_ALT = "|".join(sorted(_WORD_NUMBERS, key=len, reverse=True))
+
+# "<word> years later/after" — e.g. "three years later", "a year after".
+_WORD_YEARS_RE = re.compile(
+    r"(?i)\b((?:nearly|almost|about|around|roughly|some|just)\s+)?"
+    r"(" + _WORD_NUM_ALT + r")\s+years?\s+(after|later)\b")
+
+# "a decade later/after" / "one decade later" → 10 years.
+_DECADE_RE = re.compile(
+    r"(?i)\b((?:nearly|almost|about|around|roughly|some|just)\s+)?"
+    r"(?:a|one)\s+decade\s+(after|later)\b")
+
+# "the following year" / "the next year" / "the year after" → 1 year.
+_FOLLOWING_YEAR_RE = re.compile(
+    r"(?i)\bthe\s+(?:following|next)\s+year\b|\bthe\s+year\s+after\b")
+
 
 def _years_in(text: str) -> "List[int]":
     """All distinct 4-digit years (1000–2099) in ``text``, in order of appearance."""
@@ -291,6 +321,104 @@ def _years_in(text: str) -> "List[int]":
         y = int(m.group(1))
         if y not in out:
             out.append(y)
+    return out
+
+
+# Sentence splitter kept deliberately simple: split on ., ! or ? followed by
+# whitespace. Good enough for anchor-year bookkeeping; never mutates the text.
+_SENTENCE_SPLIT_RE = re.compile(r"(?<=[.!?])\s+")
+
+
+def _recompute_relative_spans(text: str, ctx_years: "List[int]",
+                              report: Dict) -> str:
+    """[LOCAL-675 item 2] Recompute the non-digit relative-time phrases
+    ("<word> years later", "a decade later", "the following year") against the
+    PREVIOUS dated sentence in the same body. Correct the phrase to "<N> years
+    later/after" when the arithmetic is off, or drop it when the two anchor dates
+    cannot be found. Operates sentence by sentence so each phrase is measured
+    from the date that actually precedes it, not the whole-body min/max."""
+    if not text:
+        return text
+    if not (_WORD_YEARS_RE.search(text) or _DECADE_RE.search(text)
+            or _FOLLOWING_YEAR_RE.search(text)):
+        return text
+
+    sentences = _SENTENCE_SPLIT_RE.split(text)
+    prev_year: Optional[int] = None  # latest year seen in a PRIOR sentence
+    rebuilt: "List[str]" = []
+
+    for sent in sentences:
+        this_years = _years_in(sent)
+        # The "to" anchor is the LAST year in THIS sentence (the date the phrase
+        # resolves to — "Three years later, in 1770" → 1770). The "from" anchor is
+        # the most recent year from a PREVIOUS dated sentence (Boston 557: 1742).
+        # If there is no previous dated sentence but this sentence names two or
+        # more years, anchor from the earliest in-sentence year instead, so a
+        # self-contained "…in 1770, three years after 1742…" still verifies.
+        to_year = this_years[-1] if this_years else None
+        from_year = prev_year
+        if from_year is None and len(this_years) >= 2:
+            from_year = min(this_years)
+            to_year = max(this_years)
+
+        def _span_or_none() -> Optional[int]:
+            if from_year is not None and to_year is not None:
+                return abs(to_year - from_year)
+            return None
+
+        def _correct_or_drop(match: "re.Match", stated: int,
+                             direction: str) -> str:
+            true_span = _span_or_none()
+            if true_span is None:
+                report["dropped"] += 1
+                report["changed"] = True
+                report["details"].append(
+                    {"phrase": match.group(0), "action": "dropped",
+                     "reason": "fewer than two anchor years"})
+                return ""
+            if abs(true_span - stated) <= _YEAR_SPAN_TOLERANCE:
+                return match.group(0)
+            report["corrected"] += 1
+            report["changed"] = True
+            report["details"].append(
+                {"phrase": match.group(0), "action": "corrected",
+                 "from": stated, "to": true_span})
+            return f"{true_span} years {direction}"
+
+        def _word_repl(m: "re.Match") -> str:
+            stated = _WORD_NUMBERS.get((m.group(2) or "").lower(), 0)
+            direction = m.group(3)
+            return _correct_or_drop(m, stated, direction)
+
+        def _decade_repl(m: "re.Match") -> str:
+            # group(1) is the optional qualifier; the LAST group is "after"/"later".
+            direction = m.group(m.lastindex)
+            return _correct_or_drop(m, 10, direction)
+
+        def _following_repl(m: "re.Match") -> str:
+            # "the following/next year" / "the year after" always means +1 year.
+            return _correct_or_drop(m, 1, "later")
+
+        new_sent = _WORD_YEARS_RE.sub(_word_repl, sent)
+        new_sent = _DECADE_RE.sub(_decade_repl, new_sent)
+        new_sent = _FOLLOWING_YEAR_RE.sub(_following_repl, new_sent)
+        # A dropped sentence-initial phrase can leave ", it was…" or a lowercase
+        # start. Strip the orphaned leading comma/space and re-capitalise.
+        if new_sent != sent:
+            _stripped = re.sub(r"^[\s,;:]+", "", new_sent)
+            if _stripped and _stripped[0].islower():
+                _stripped = _stripped[0].upper() + _stripped[1:]
+            new_sent = _stripped
+        rebuilt.append(new_sent)
+
+        # Update the running "previous dated sentence" anchor AFTER processing.
+        if this_years:
+            prev_year = this_years[-1]
+
+    out = " ".join(rebuilt)
+    out = re.sub(r"\s{2,}", " ", out)
+    out = re.sub(r"\s+([.,;!?])", r"\1", out)
+    out = re.sub(r",\s*,", ",", out)
     return out
 
 
@@ -314,9 +442,18 @@ def recompute_year_spans(text: str, context: str = "") -> "Tuple[str, Dict]":
       * If fewer than two anchor years exist anywhere: DROP the span clause
         ("N years after/later" and any leading qualifier), since the arithmetic
         cannot be verified and an unverifiable computed number is worse than none.
+
+    [LOCAL-675 item 2] In addition to the digit form, the non-digit relative-time
+    phrases "<word> years later/after", "a decade later" and "the following year"
+    are recomputed against the PREVIOUS dated sentence in the same body (Boston
+    557 v12: "Three years later, … In 1770" after 1742 is a 28-year gap).
     """
     report = {"corrected": 0, "dropped": 0, "changed": False, "details": []}
-    if not text or not _YEAR_SPAN_RE.search(text):
+    has_digit = bool(text and _YEAR_SPAN_RE.search(text))
+    has_relative = bool(text and (
+        _WORD_YEARS_RE.search(text) or _DECADE_RE.search(text)
+        or _FOLLOWING_YEAR_RE.search(text)))
+    if not text or not (has_digit or has_relative):
         return text or "", report
 
     ctx_years = _years_in(context) if context else []
@@ -346,7 +483,11 @@ def recompute_year_spans(text: str, context: str = "") -> "Tuple[str, Dict]":
         # Preserve the qualifier (e.g. "about ") and the direction word.
         return f"{qualifier}{true_span} years {direction}"
 
-    out = _YEAR_SPAN_RE.sub(_repl, text)
+    out = _YEAR_SPAN_RE.sub(_repl, text) if has_digit else text
+    # [LOCAL-675 item 2] Non-digit relative-time phrases, anchored to the previous
+    # dated sentence.
+    if has_relative:
+        out = _recompute_relative_spans(out, ctx_years, report)
     # Tidy spacing / doubled punctuation left by a dropped clause.
     out = re.sub(r"\s{2,}", " ", out)
     out = re.sub(r"\s+([.,;!?])", r"\1", out)

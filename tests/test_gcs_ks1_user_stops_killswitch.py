@@ -22,6 +22,38 @@ import user_stops_flag as usf
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 NAMED = ["Bell Tower", "Rose Window", "Crypt"]
 
+# [LOCAL-675 item 4] Holds the real (conftest-guarded) psycopg2.connect captured
+# the first time _load_orchestrator stubs it, so tearDownModule can restore it and
+# the stub never leaks into later test modules.
+_REAL_PSYCOPG2_CONNECT = None
+# [LOCAL-675 item 4] Same for entitlements.check_operation — we stub it to an
+# allow so the switch logic can run without a DB, then restore it so later
+# modules see the real levels gate.
+_REAL_CHECK_OPERATION = None
+
+
+def tearDownModule():
+    """Restore psycopg2.connect and entitlements.check_operation if this module
+    stubbed them, so DB-backed tests that run afterwards in the full suite (e.g.
+    test_local670*) are not broken by the 'no DB in test' stub or a stubbed gate."""
+    global _REAL_PSYCOPG2_CONNECT, _REAL_CHECK_OPERATION
+    if _REAL_PSYCOPG2_CONNECT is not None:
+        try:
+            import psycopg2
+            psycopg2.connect = _REAL_PSYCOPG2_CONNECT
+        except Exception:
+            pass
+        finally:
+            _REAL_PSYCOPG2_CONNECT = None
+    if _REAL_CHECK_OPERATION is not None:
+        try:
+            import entitlements
+            entitlements.check_operation = _REAL_CHECK_OPERATION
+        except Exception:
+            pass
+        finally:
+            _REAL_CHECK_OPERATION = None
+
 
 class _FlagEnv:
     """Context manager: set/clear USER_STOPS_ENABLED and restore afterwards."""
@@ -101,10 +133,38 @@ def _load_orchestrator(flag_value):
         "allowed": True, "clamped_stops": stops, "used": 0, "remaining": 100}
     import entitlements
     entitlements.check_tour_quota = orch.check_tour_quota
+    # [LOCAL-675 item 4] The authoritative generate gate is now the LOCAL-595
+    # levels model: the orchestrator does `from entitlements import check_operation`
+    # INSIDE the handler, and check_operation (subscription_levels) opens the DB.
+    # With psycopg2.connect stubbed to raise below, that call fails CLOSED and the
+    # endpoint returns 429 "could not verify your plan" — so the switch logic under
+    # test never runs. (LOCAL-672's merge routes the orchestrator through this gate,
+    # which is why these three tests started erroring in the full suite.) Stub the
+    # levels gate to an allow — exactly as the module docstring intends ("stub the
+    # generation thread and quota/DB so only the switch logic runs") — mirroring
+    # subscription_levels._allow()'s shape so the handler reads clamped_stops/mode.
+    def _allow_operation(user_id, op, requested_stops=0, new_stops=0, now=None):
+        return {"allowed": True, "error_code": None, "level": "L1",
+                "clamped_stops": requested_stops or 10, "mode": None}
+    global _REAL_CHECK_OPERATION
+    if _REAL_CHECK_OPERATION is None:
+        _REAL_CHECK_OPERATION = getattr(entitlements, "check_operation", None)
+    entitlements.check_operation = _allow_operation
+    if hasattr(orch, "check_operation"):
+        orch.check_operation = _allow_operation
     orch.track_user_tour = lambda *a, **k: None
     orch.log_job_update = lambda *a, **k: None
     try:
         import psycopg2
+        # [LOCAL-675 item 4] Remember the real connect ONCE so tearDownModule can
+        # restore it. Previously this module overwrote psycopg2.connect with a
+        # RuntimeError-throwing stub and never put it back, so EVERY DB-backed
+        # test that ran later in the full `pytest tests` session failed at setup
+        # with "RuntimeError: no DB in test" — notably test_local670_tour_ratings
+        # and test_local670b_listened_gate (green alone, ERROR in the full run).
+        global _REAL_PSYCOPG2_CONNECT
+        if _REAL_PSYCOPG2_CONNECT is None:
+            _REAL_PSYCOPG2_CONNECT = psycopg2.connect
         psycopg2.connect = lambda *a, **k: (_ for _ in ()).throw(RuntimeError("no DB in test"))
     except Exception:
         pass
@@ -120,7 +180,12 @@ class TestOrchestratorEntryPoint(unittest.TestCase):
 
         def _thread(job_id, location, tour_type, total_stops, user_id=None,
                     request_string=None, language='en', persona=None,
-                    is_test=None, stops=None):
+                    is_test=None, stops=None, mode=None):
+            # [LOCAL-675 item 4] The real orchestrate_tour_async gained an 11th
+            # positional arg (`mode`/generation_mode) with the LOCAL-597/672 levels
+            # work, and the orchestrator calls it positionally via threading.Thread
+            # args=(...11...). The old 10-arg stub raised "takes 4 to 10 positional
+            # arguments but 11 were given", so the captured stops stayed uncalled.
             captured["stops"] = stops
         orch.orchestrate_tour_async = _thread
 

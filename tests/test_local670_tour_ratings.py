@@ -85,8 +85,31 @@ def test_half_up_rounding():
 
 # ─── DB-backed fixtures ────────────────────────────────────────────────────────
 
+@pytest.fixture(scope="module", autouse=True)
+def _force_test_db_target():
+    """[LOCAL-675 item 4] Belt-and-braces isolation: force this module's DB-backed
+    tests at the TEST database regardless of what an earlier module left in the
+    environment. test_local447/448 (and others) set AUDIOURA_DB_TARGET=production
+    or DB_NAME=audiotours; AUDIOURA_DB_TARGET outranks pytest auto-detection in
+    db_connection, so a leaked value routed these tests at production and the
+    conftest write-guard raised ProductionWriteGuardError at setup. We pin the
+    test target here and restore the prior environment afterwards, so the module
+    is green both alone and in the full `pytest tests` run."""
+    _saved = {k: os.environ.get(k) for k in
+              ("AUDIOURA_DB_TARGET", "DB_NAME", "DATABASE_URL")}
+    os.environ["AUDIOURA_DB_TARGET"] = "test"
+    os.environ.pop("DB_NAME", None)       # don't let a leaked explicit name win
+    os.environ.pop("DATABASE_URL", None)  # nor a leaked full URL
+    yield
+    for k, v in _saved.items():
+        if v is None:
+            os.environ.pop(k, None)
+        else:
+            os.environ[k] = v
+
+
 @pytest.fixture(scope="module")
-def db():
+def db(_force_test_db_target):
     if not check_db_available():
         pytest.skip("database unavailable")
     conn = get_connection()
