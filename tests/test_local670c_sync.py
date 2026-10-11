@@ -61,8 +61,31 @@ def test_listens_ordered_before_ratings():
 
 # ─── DB-backed fixtures ───────────────────────────────────────────────────────
 
+@pytest.fixture(scope="module", autouse=True)
+def _force_test_db_target():
+    """[LOCAL-675 item 4] Belt-and-braces isolation (matches test_local670 /
+    test_local670b): force this module's DB-backed tests at the TEST database
+    regardless of what an earlier module left in the environment. test_local447/448
+    set AUDIOURA_DB_TARGET=production, which outranks pytest auto-detection in
+    db_connection and tripped the conftest production-write guard here (green
+    alone, ERROR in the full `pytest tests` run — the same family of leak the
+    Addendum flags for this file after the LOCAL-672 merge). Restored afterwards
+    so nothing leaks onward."""
+    _saved = {k: os.environ.get(k) for k in
+              ("AUDIOURA_DB_TARGET", "DB_NAME", "DATABASE_URL")}
+    os.environ["AUDIOURA_DB_TARGET"] = "test"
+    os.environ.pop("DB_NAME", None)       # don't let a leaked explicit name win
+    os.environ.pop("DATABASE_URL", None)  # nor a leaked full URL
+    yield
+    for k, v in _saved.items():
+        if v is None:
+            os.environ.pop(k, None)
+        else:
+            os.environ[k] = v
+
+
 @pytest.fixture(scope="module")
-def db():
+def db(_force_test_db_target):
     if not check_db_available():
         pytest.skip("database unavailable")
     conn = get_connection()

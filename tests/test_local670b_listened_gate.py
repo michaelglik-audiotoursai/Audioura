@@ -43,8 +43,28 @@ def test_required_is_two_for_a_normal_tour():
 
 # ─── DB-backed fixtures ───────────────────────────────────────────────────────
 
+@pytest.fixture(scope="module", autouse=True)
+def _force_test_db_target():
+    """[LOCAL-675 item 4] Belt-and-braces isolation: force this module's DB-backed
+    tests at the TEST database regardless of a leaked production target from an
+    earlier module (test_local447/448 set AUDIOURA_DB_TARGET=production, which
+    outranks pytest auto-detection and tripped the conftest write-guard here).
+    Restored afterwards so nothing leaks onward."""
+    _saved = {k: os.environ.get(k) for k in
+              ("AUDIOURA_DB_TARGET", "DB_NAME", "DATABASE_URL")}
+    os.environ["AUDIOURA_DB_TARGET"] = "test"
+    os.environ.pop("DB_NAME", None)
+    os.environ.pop("DATABASE_URL", None)
+    yield
+    for k, v in _saved.items():
+        if v is None:
+            os.environ.pop(k, None)
+        else:
+            os.environ[k] = v
+
+
 @pytest.fixture(scope="module")
-def db():
+def db(_force_test_db_target):
     if not check_db_available():
         pytest.skip("database unavailable")
     conn = get_connection()

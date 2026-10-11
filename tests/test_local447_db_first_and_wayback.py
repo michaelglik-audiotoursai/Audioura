@@ -29,8 +29,16 @@ from unittest.mock import patch, MagicMock
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'tests'))
 
-# Set test database target
-os.environ.setdefault('AUDIOURA_DB_TARGET', 'production')  # read-only, safe
+# [LOCAL-675 item 4] Test-isolation fix. This module USED to set
+#     os.environ.setdefault('AUDIOURA_DB_TARGET', 'production')
+# at import time. AUDIOURA_DB_TARGET outranks pytest auto-detection in
+# db_connection._default_dbname(), so that one line routed EVERY test imported
+# after this module (notably test_local670_tour_ratings.py and
+# test_local670b_listened_gate.py) at the PRODUCTION 'audiotours' database for
+# the rest of the session. Their writes then tripped the conftest.py
+# production-write guard (ProductionWriteGuardError) at setup — green alone, but
+# ERROR in the full `pytest tests` run. The target is now set and restored
+# per-test in setUp/tearDown (see TestLiveDBFallback), so nothing leaks.
 
 
 class TestDBFallbackPath(unittest.TestCase):
@@ -248,18 +256,35 @@ class TestDBFirstIntegration(unittest.TestCase):
     """
 
     def setUp(self):
-        """Set host-side DB env vars for _get_db_connection() to find the DB."""
+        """Point this one live-integration test at the production DB for a
+        READ-ONLY stop_corpus lookup, fully scoped so nothing leaks.
+
+        [LOCAL-675 item 4] We save and later restore every env var we touch —
+        including AUDIOURA_DB_TARGET, DATABASE_URL and PGOPTIONS — because an
+        earlier module in the full suite may have left DATABASE_URL pointing at
+        the test DB or PGOPTIONS routing at a throwaway schema (test_local597),
+        either of which would hide production's Wikipedia-sourced stop_corpus
+        rows and make this test spuriously fail. Clearing them here (and
+        restoring in tearDown) keeps the test self-contained and keeps THIS
+        module from leaking a production target into later tests (the bug that
+        made test_local670*.py ERROR in the full run)."""
         self._orig_env = {}
-        for key in ('DB_HOST', 'DB_PORT', 'DB_NAME', 'DB_USER', 'DB_PASSWORD'):
+        for key in ('DB_HOST', 'DB_PORT', 'DB_NAME', 'DB_USER', 'DB_PASSWORD',
+                    'AUDIOURA_DB_TARGET', 'DATABASE_URL', 'PGOPTIONS'):
             self._orig_env[key] = os.environ.get(key)
         os.environ['DB_HOST'] = 'localhost'
         os.environ['DB_PORT'] = '5433'
         os.environ['DB_NAME'] = 'audiotours'
         os.environ['DB_USER'] = 'admin'
         os.environ['DB_PASSWORD'] = 'password123'
+        os.environ['AUDIOURA_DB_TARGET'] = 'production'  # read-only lookup
+        # Drop any leaked overrides that would redirect the read away from
+        # production's public schema.
+        os.environ.pop('DATABASE_URL', None)
+        os.environ.pop('PGOPTIONS', None)
 
     def tearDown(self):
-        """Restore original env vars."""
+        """Restore original env vars (nothing leaks to later tests)."""
         for key, val in self._orig_env.items():
             if val is None:
                 os.environ.pop(key, None)
