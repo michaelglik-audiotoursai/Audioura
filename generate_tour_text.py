@@ -16855,6 +16855,32 @@ Exempt: navigation directions ("Turn left", "Continue past").
                             'domain': _sr.get('domain', ''),
                         })
 
+                # [LOCAL-668 #3] Venue-anchored evidence filter: drop any snippet
+                # whose SUBJECT is ANOTHER museum. Generic collection-area stops
+                # ("Woodblock prints collection") pull SERP results about the same
+                # medium at OTHER museums; on the HCMC cheap-arm run that put
+                # Honolulu/Saint-Louis holdings (Guston, Holbein, Pippin) into the
+                # evidence and bled "Saint Louis" into the narration. Prevention at
+                # the evidence stage beats cure at the prose stage (LOCAL-652). A
+                # snippet that names THIS venue is kept; one that names a foreign
+                # institution and NOT this venue is dropped; generic
+                # medium/technique evidence is kept. Museum tours only.
+                if tour_category == 'museum' and _s_snippets:
+                    try:
+                        from venue_anchored_research import drop_foreign_museum_snippets
+                        _vn668 = _museum_venue_name or location.split(',')[0].strip()
+                        _city668 = location.split(',', 1)[1].strip() if ',' in location else ''
+                        _s_snippets, _ff668 = drop_foreign_museum_snippets(
+                            _s_snippets, _vn668, _city668)
+                        if _ff668.get('dropped'):
+                            print(f"      [LOCAL-668] foreign-museum snippets dropped "
+                                  f"for '{_s_name[:40]}': {_ff668['dropped']} "
+                                  f"(kept {_ff668['output']})")
+                            for _dl in _ff668.get('dropped_log', [])[:5]:
+                                print(f"        ✗ names '{_dl['foreign']}' — {_dl['title'][:60]}")
+                    except Exception as _ff_err:
+                        print(f"      [LOCAL-668] foreign-museum filter skipped ({_ff_err})")
+
                 # [LOCAL-410] Inject credit_line as a leading snippet (source of Fridman etc.)
                 _s_credit = _s_poi.get('credit_line', '')
                 if not _s_credit and _exhibition_checklist_result and hasattr(_exhibition_checklist_result, 'works'):
@@ -18390,6 +18416,35 @@ MANDATORY INCLUSION — work this surprising detail into the description natural
                                   f"(never empty a stop)")
                     except Exception as _wf_err:
                         print(f"  [LOCAL-620] evidence balance skipped: {_wf_err}")
+
+                # [LOCAL-668 #3] Final venue-anchored drop at the generation
+                # chokepoint — catches foreign-museum snippets from EVERY source
+                # (initial research, STORY_REPLENISH, direct injection) just before
+                # they enter the prompt. A snippet whose subject is a DIFFERENT
+                # museum (the Saint-Louis / Honolulu leak on the HCMC area stops)
+                # is dropped; one naming THIS venue, or no competing institution,
+                # is kept. Never empties a stop's evidence.
+                if tour_category == 'museum' and _stop_snippets:
+                    try:
+                        from venue_anchored_research import drop_foreign_museum_snippets
+                        try:
+                            _vn668f = _museum_venue_name or location or ''
+                        except NameError:
+                            _vn668f = location or ''
+                        _city668f = location.split(',', 1)[1].strip() if ',' in (location or '') else ''
+                        _kept668, _rep668 = drop_foreign_museum_snippets(
+                            _stop_snippets, _vn668f, _city668f)
+                        if _kept668 and _rep668.get('dropped'):
+                            _stop_snippets = _kept668
+                            print(f"  [LOCAL-668] Stop {stop_num} foreign-museum evidence "
+                                  f"dropped: {_rep668['dropped']} (kept {_rep668['output']})")
+                            for _dl668 in _rep668.get('dropped_log', [])[:5]:
+                                print(f"    ✗ names '{_dl668['foreign']}' — {_dl668['title'][:60]}")
+                        elif _rep668.get('dropped') and not _kept668:
+                            print(f"  [LOCAL-668] Stop {stop_num}: all evidence named a "
+                                  f"foreign museum — kept as-is (never empty a stop)")
+                    except Exception as _ff668_err:
+                        print(f"  [LOCAL-668] foreign-museum filter skipped: {_ff668_err}")
 
                 # These are concrete, checkable facts — numbers, named materials,
                 # named techniques, named literary forms — that the prose MUST prefer
