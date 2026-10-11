@@ -159,6 +159,23 @@ def _first_segment(line: str) -> str:
     return _clean_title(head)
 
 
+def _title_head(line: str) -> str:
+    """The title portion of an item line INCLUDING any parenthetical/quoted
+    English gloss — text up to the first ' by '/dash/':' field separator but NOT
+    splitting on '(', so the gloss survives for the bilingual splitter."""
+    s = line.strip()
+    m = _LABEL_TITLE.search(s)
+    if m:
+        return m.group(1).strip()
+    head = _split_fields(s)[0] if _split_fields(s) else s
+    for sep in (r"\bby\b", r":"):
+        parts = re.split(sep, head, maxsplit=1)
+        if len(parts) == 2 and parts[0].strip():
+            head = parts[0]
+            break
+    return head.strip()
+
+
 def _clean_title(t: str) -> str:
     t = (t or "").strip().strip("*_\"'“”‘’ ")
     # Drop a leading enumerator the split may have left (defensive).
@@ -166,6 +183,57 @@ def _clean_title(t: str) -> str:
     # A parenthetical English gloss stays as-is in the stored title; callers that
     # want the bare title use title_in_text which is gloss-tolerant.
     return t.strip()
+
+
+# A quoted-or-parenthetical English gloss on a title line. The prompt asks for
+# "title (local language and English if different)", so the model returns forms
+# like  'Vườn xuân Trung Nam Bắc (North Central South Spring Garden)'  or
+# 'Vườn xuân Trung Nam Bắc — "North Central South Spring Garden"'. LOCAL-669B
+# needs BOTH titles so the identity-dedup pass can match a candidate on EITHER
+# its local OR its English title (the cross-language bridge). This splitter is
+# conservative: it only treats a parenthetical/quoted tail as the English gloss
+# when it looks like a title (mostly ASCII letters), never a year or a note.
+_GLOSS_PAREN = re.compile(r"^(?P<main>.+?)\s*[\(\[]\s*(?P<gloss>[^)\]]+?)\s*[\)\]]\s*$")
+_GLOSS_QUOTE = re.compile(r"^(?P<main>.+?)\s*[—–]\s*[\"“]\s*(?P<gloss>[^\"”]+?)\s*[\"”]\s*$")
+
+
+def _looks_like_english_title(s: str) -> bool:
+    """A parenthetical is an English GLOSS (not a year/medium/note) when it has
+    alphabetic content, is mostly ASCII letters, and is not a bare year."""
+    s = (s or "").strip()
+    if not s or _YEAR.fullmatch(s.strip()):
+        return False
+    letters = [c for c in s if c.isalpha()]
+    if len(letters) < 3:
+        return False
+    ascii_letters = [c for c in letters if ord(c) < 128]
+    return (len(ascii_letters) / len(letters)) >= 0.8
+
+
+def _split_bilingual_title(title_segment: str) -> Tuple[str, str]:
+    """Given the title segment of an item line, return (local_title, english_title).
+
+    If the segment carries a parenthetical/quoted English gloss, the part OUTSIDE
+    the parens is the local title and the part inside is the English title. If
+    there is no gloss, (title, "") is returned — the single title serves as both,
+    which the dedup pass handles. The ``name`` kept for display is unchanged
+    (handled by the caller); this only extracts the pair for identity matching.
+    """
+    s = (title_segment or "").strip().strip("*_\"'“”‘’ ")
+    for rx in (_GLOSS_PAREN, _GLOSS_QUOTE):
+        m = rx.match(s)
+        if m:
+            main = _clean_title(m.group("main"))
+            gloss = _clean_title(m.group("gloss"))
+            if main and gloss and _looks_like_english_title(gloss):
+                # The gloss is English; the main part is the local title.
+                return main, gloss
+            # A main part that is itself English with a local gloss (rarer): if the
+            # main looks English and the gloss does not, swap.
+            if main and gloss and _looks_like_english_title(main) \
+                    and not _looks_like_english_title(gloss):
+                return gloss, main
+    return s, ""
 
 
 def _extract_artist(line: str) -> str:
@@ -280,8 +348,16 @@ def parse_highlights(grounded_result: Dict, max_items: int = DEFAULT_HIGHLIGHTS
         if nkey in seen:
             continue
         seen.add(nkey)
+        # [LOCAL-669B] Capture BOTH the local and English title when the model
+        # gave a bilingual form ("Vườn xuân Trung Nam Bắc (North Central South
+        # Spring Garden)"), so the identity-dedup pass can match a candidate on
+        # EITHER title across languages. ``name`` stays the full first-segment
+        # (unchanged display behaviour); title_local/title_en are the split pair.
+        _local, _english = _split_bilingual_title(_title_head(line))
         out.append({
             "name": title,
+            "title_local": _local,
+            "title_en": _english,
             "artist": _extract_artist(line),
             "year": _extract_year(line),
             "medium": _extract_medium(line),

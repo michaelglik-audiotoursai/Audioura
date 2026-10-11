@@ -12490,7 +12490,189 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
             _R4_MAX_ROUNDS = 3
             _R4_MAX_CANDIDATES = 30
             _r4_all_dropped_pois = []  # Accumulate R4-generated candidates that failed verification
-            
+
+            # [LOCAL-669B] Highlights-first bookkeeping (ticket points 3 & 4):
+            # what the ONE grounded highlights call supplied, so R4 and the
+            # LOCAL-667 per-title thin-verify below can SKIP redundant grounded
+            # work. Default 0 / empty when the highlights block does not run.
+            _hl_fill_count = 0
+            _hl_titles_verified = set()
+
+            # -------- [LOCAL-669] GROUNDED HIGHLIGHTS (one call, cited) --------
+            # Michael, 2026-10-10: asking a grounded model ONE question — "describe
+            # 5 paintings from the Ho Chi Minh City Museum of Fine Arts" — already
+            # returns what a listener wants (named works, artist, year, medium, a
+            # fact), at the price of ONE grounded request. For a thin-Wikidata
+            # museum that is still short, make that the candidate source: ONE
+            # grounded "8 most notable works" call, then VERIFY each candidate from
+            # the call's OWN citations — ≥1 cited source on the museum's own domain,
+            # OR ≥2 independent cited sources — topping up with at most ONE Serper
+            # query per still-unverified candidate for a 2nd source. UNCITED
+            # candidates are never accepted (items 3–5 of Michael's list must be
+            # proven). This REPLACES LOCAL-667's per-title thin-verify as the first
+            # mover; LOCAL-667 below runs only for whatever is still short. Works
+            # first — area stops (LOCAL-668) only fill what is left. Cached per
+            # venue 30 days: a second tour of the same museum spends ZERO.
+            if (tour_category == 'museum' and _verification_tier == 'thin'
+                    and len(poi_list) < total_stops and _story_corpus_result):
+                try:
+                    import grounded_highlights as _gh
+                    _hl_city = ''
+                    if ',' in location:
+                        _hl_city = location.split(',', 1)[1].strip()
+                    _hl_vname = _museum_venue_name or location
+                    _hl_already = set(_normalize_name(p['name']) for p in poi_list)
+
+                    # Own-domain(s): the resolved official site plus any corpus page
+                    # classified as the venue's own site (so verification credits
+                    # the museum's own collection pages).
+                    _hl_own_domains = []
+                    if _museum_site_url:
+                        _hl_own_domains.append(_gh._domain(_museum_site_url))
+                    try:
+                        from thin_wikidata_fallback import _classify_page_origin as _cpo
+                        for _pg in (_story_corpus_result.get('pages', []) or []):
+                            if not isinstance(_pg, dict):
+                                continue
+                            if _cpo(_pg.get('url', ''), _pg.get('title', ''),
+                                    _museum_site_language) == 'site':
+                                _d = _gh._domain(_pg.get('url', ''))
+                                if _d and _d not in _hl_own_domains:
+                                    _hl_own_domains.append(_d)
+                    except Exception:
+                        pass
+
+                    # 30-day venue cache (shared with LOCAL-668 thin-verify): a
+                    # venue verified in the last 30 days serves from cache at ZERO
+                    # grounded cost. Cached works carry highlight_sources, so they
+                    # survive the round-trip.
+                    _hl_verified = None
+                    _hl_from_cache = False
+                    _tvc_hl = None
+                    try:
+                        import thin_verify_cache as _tvc_hl
+                        _hl_cached = _tvc_hl.cache_get(_hl_vname, _hl_city)
+                        if _hl_cached:
+                            _hl_verified = [w for w in _hl_cached
+                                            if _normalize_name(w.get('name', '')) not in _hl_already]
+                            _hl_from_cache = True
+                            print(f"  [LOCAL-669] highlights VENUE CACHE hit for "
+                                  f"'{_hl_vname}' — {len(_hl_verified)} verified "
+                                  f"work(s), 0 grounded requests (30-day cache)")
+                    except Exception:
+                        _tvc_hl = None
+
+                    if _hl_verified is None:
+                        # The ONE grounded call uses the active research backend
+                        # (Gemini grounded, or Serper + gpt-4.1-mini under
+                        # RESEARCH_BACKEND=serper). Only when a backend key exists.
+                        _hl_research_fn = None
+                        try:
+                            import story_leads as _sl_hl
+                            if (os.environ.get('GEMINI_API_KEY')
+                                    or os.environ.get('GOOGLE_API_KEY')
+                                    or os.environ.get('SERPER_API_KEY')):
+                                _hl_research_fn = lambda _q: _sl_hl.research_with_sources(_q, grounded=True)
+                        except Exception:
+                            _hl_research_fn = None
+
+                        # Metered Serper 2nd-source callable (returns [{url,...}]).
+                        _hl_serper_fn = None
+                        if os.environ.get('SERP_API_KEY') or os.environ.get('SERPER_API_KEY'):
+                            def _hl_serper_fn(_q):
+                                try:
+                                    from work_story_searcher import _serp_search
+                                    _res, _lat = _serp_search(_q)
+                                    return _res or []
+                                except Exception:
+                                    return []
+
+                        _hl_needed = total_stops - len(poi_list)
+                        _hl_result = _gh.grounded_highlights(
+                            _hl_vname, _hl_city,
+                            research_fn=_hl_research_fn,
+                            serper_fn=_hl_serper_fn,
+                            own_domains=_hl_own_domains,
+                            n=_gh.DEFAULT_HIGHLIGHTS)
+                        print("  " + _hl_result.log_line)
+                        _hl_verified = [w for w in _hl_result.verified_works
+                                        if _normalize_name(w.get('name', '')) not in _hl_already]
+                        # Cache the POSITIVE result for 30 days.
+                        if _tvc_hl and _hl_result.verified_works:
+                            try:
+                                _tvc_hl.cache_put(_hl_vname, _hl_city,
+                                                  _hl_result.verified_works)
+                            except Exception:
+                                pass
+
+                    # Works first: add verified highlights up to what is needed.
+                    # [LOCAL-669B] Drop any highlight that is the SAME WORK as one
+                    # already in the tour — by IDENTITY, not tokens. The English
+                    # Spring Garden (D1v2 SPARQL work) is already present; the
+                    # highlights call returns its Vietnamese name "Vườn xuân Trung
+                    # Nam Bắc" (plus its English gloss). A token guard cannot bridge
+                    # VN↔EN, so use identity_dedup: match on QID or an order-ignored
+                    # bilingual-normalised title set (each candidate carries BOTH
+                    # titles). This prevents the duplicate from CONSUMING a slot, so
+                    # R4 below still fills the gap with a DISTINCT work.
+                    try:
+                        import identity_dedup as _hl_idd
+                        _hl_bimap = {}
+                        try:
+                            import story_miner as _sm_hlbi
+                            _hl_bimap = dict(getattr(_sm_hlbi, '_BILINGUAL_MAP', {}) or {})
+                        except Exception:
+                            _hl_bimap = {}
+                        # Stamp evidence-log QIDs onto existing pois for the match.
+                        _hl_existing = []
+                        for _ep in poi_list:
+                            _epc = dict(_ep)
+                            if not _hl_idd.candidate_qid(_epc):
+                                _eev = _d1_evidence_log.get(_ep.get('name', ''), {})
+                                if isinstance(_eev, dict) and _eev.get('qid'):
+                                    _epc['qid'] = _eev['qid']
+                            _hl_existing.append(_hl_idd.identity_of(_epc, _hl_bimap))
+                        def _hl_is_dup(_w):
+                            _wid = _hl_idd.identity_of(_w, _hl_bimap)
+                            return any(_wid.shares_with(_e) for _e in _hl_existing)
+                        _hl_verified = [_w for _w in (_hl_verified or [])
+                                        if not _hl_is_dup(_w)]
+                    except Exception as _hlidd_err:
+                        print(f"  [LOCAL-669B] highlight identity-filter skipped ({_hlidd_err})")
+                    _hl_added = 0
+                    _hl_needed = total_stops - len(poi_list)
+                    _hl_verified_available = len(_hl_verified or [])  # [LOCAL-669B] N for point 3/4
+                    for _hw in (_hl_verified or []):
+                        if _hl_added >= _hl_needed:
+                            break
+                        _hn = _normalize_name(_hw.get('name', ''))
+                        if not _hn or _hn in _hl_already:
+                            continue
+                        _hl_already.add(_hn)
+                        _hw['verified'] = True
+                        _d1_evidence_log[_hw['name']] = {
+                            "status": "VERIFIED",
+                            "canonical_title": _hw['name'],
+                            "snippet": _hw.get('fact', '') or "",
+                            "method": "grounded_highlights",
+                            "sources": _hw.get('highlight_sources', []),
+                        }
+                        poi_list.append(_hw)
+                        _hl_added += 1
+                        _hsrcs = ', '.join(s['origin'] for s in _hw.get('highlight_sources', []))
+                        print(f"    [LOCAL-669] VERIFIED '{_hw['name']}' ({_hsrcs})")
+                    # [LOCAL-669B] Record what highlights supplied, so R4 and the
+                    # LOCAL-667 thin-verify below can SKIP redundant grounded work
+                    # when highlights already filled the tour (ticket point 4).
+                    _hl_fill_count = _hl_added
+                    _hl_titles_verified = set(_hl_already)
+                    if _hl_added:
+                        print(f"  [LOCAL-669] added {_hl_added} grounded-highlights "
+                              f"work(s){' (cache)' if _hl_from_cache else ''}, "
+                              f"total now {len(poi_list)}/{total_stops}")
+                except Exception as _hl_err:
+                    print(f"  [LOCAL-669] grounded highlights skipped ({_hl_err})")
+
             while not _r4_suppressed_by_scope and len(poi_list) < total_stops and _r4_round < _R4_MAX_ROUNDS and len(_r4_all_tried_names) < _R4_MAX_CANDIDATES:
                 _r4_round += 1
                 _r4_needed = total_stops - len(poi_list)
@@ -12620,162 +12802,6 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
             else:
                 print(f"  [R4] Target reached: {len(poi_list)}/{total_stops} stops")
 
-            # -------- [LOCAL-669] GROUNDED HIGHLIGHTS (one call, cited) --------
-            # Michael, 2026-10-10: asking a grounded model ONE question — "describe
-            # 5 paintings from the Ho Chi Minh City Museum of Fine Arts" — already
-            # returns what a listener wants (named works, artist, year, medium, a
-            # fact), at the price of ONE grounded request. For a thin-Wikidata
-            # museum that is still short, make that the candidate source: ONE
-            # grounded "8 most notable works" call, then VERIFY each candidate from
-            # the call's OWN citations — ≥1 cited source on the museum's own domain,
-            # OR ≥2 independent cited sources — topping up with at most ONE Serper
-            # query per still-unverified candidate for a 2nd source. UNCITED
-            # candidates are never accepted (items 3–5 of Michael's list must be
-            # proven). This REPLACES LOCAL-667's per-title thin-verify as the first
-            # mover; LOCAL-667 below runs only for whatever is still short. Works
-            # first — area stops (LOCAL-668) only fill what is left. Cached per
-            # venue 30 days: a second tour of the same museum spends ZERO.
-            if (tour_category == 'museum' and _verification_tier == 'thin'
-                    and len(poi_list) < total_stops and _story_corpus_result):
-                try:
-                    import grounded_highlights as _gh
-                    _hl_city = ''
-                    if ',' in location:
-                        _hl_city = location.split(',', 1)[1].strip()
-                    _hl_vname = _museum_venue_name or location
-                    _hl_already = set(_normalize_name(p['name']) for p in poi_list)
-
-                    # Own-domain(s): the resolved official site plus any corpus page
-                    # classified as the venue's own site (so verification credits
-                    # the museum's own collection pages).
-                    _hl_own_domains = []
-                    if _museum_site_url:
-                        _hl_own_domains.append(_gh._domain(_museum_site_url))
-                    try:
-                        from thin_wikidata_fallback import _classify_page_origin as _cpo
-                        for _pg in (_story_corpus_result.get('pages', []) or []):
-                            if not isinstance(_pg, dict):
-                                continue
-                            if _cpo(_pg.get('url', ''), _pg.get('title', ''),
-                                    _museum_site_language) == 'site':
-                                _d = _gh._domain(_pg.get('url', ''))
-                                if _d and _d not in _hl_own_domains:
-                                    _hl_own_domains.append(_d)
-                    except Exception:
-                        pass
-
-                    # 30-day venue cache (shared with LOCAL-668 thin-verify): a
-                    # venue verified in the last 30 days serves from cache at ZERO
-                    # grounded cost. Cached works carry highlight_sources, so they
-                    # survive the round-trip.
-                    _hl_verified = None
-                    _hl_from_cache = False
-                    _tvc_hl = None
-                    try:
-                        import thin_verify_cache as _tvc_hl
-                        _hl_cached = _tvc_hl.cache_get(_hl_vname, _hl_city)
-                        if _hl_cached:
-                            _hl_verified = [w for w in _hl_cached
-                                            if _normalize_name(w.get('name', '')) not in _hl_already]
-                            _hl_from_cache = True
-                            print(f"  [LOCAL-669] highlights VENUE CACHE hit for "
-                                  f"'{_hl_vname}' — {len(_hl_verified)} verified "
-                                  f"work(s), 0 grounded requests (30-day cache)")
-                    except Exception:
-                        _tvc_hl = None
-
-                    if _hl_verified is None:
-                        # The ONE grounded call uses the active research backend
-                        # (Gemini grounded, or Serper + gpt-4.1-mini under
-                        # RESEARCH_BACKEND=serper). Only when a backend key exists.
-                        _hl_research_fn = None
-                        try:
-                            import story_leads as _sl_hl
-                            if (os.environ.get('GEMINI_API_KEY')
-                                    or os.environ.get('GOOGLE_API_KEY')
-                                    or os.environ.get('SERPER_API_KEY')):
-                                _hl_research_fn = lambda _q: _sl_hl.research_with_sources(_q, grounded=True)
-                        except Exception:
-                            _hl_research_fn = None
-
-                        # Metered Serper 2nd-source callable (returns [{url,...}]).
-                        _hl_serper_fn = None
-                        if os.environ.get('SERP_API_KEY') or os.environ.get('SERPER_API_KEY'):
-                            def _hl_serper_fn(_q):
-                                try:
-                                    from work_story_searcher import _serp_search
-                                    _res, _lat = _serp_search(_q)
-                                    return _res or []
-                                except Exception:
-                                    return []
-
-                        _hl_needed = total_stops - len(poi_list)
-                        _hl_result = _gh.grounded_highlights(
-                            _hl_vname, _hl_city,
-                            research_fn=_hl_research_fn,
-                            serper_fn=_hl_serper_fn,
-                            own_domains=_hl_own_domains,
-                            n=_gh.DEFAULT_HIGHLIGHTS)
-                        print("  " + _hl_result.log_line)
-                        _hl_verified = [w for w in _hl_result.verified_works
-                                        if _normalize_name(w.get('name', '')) not in _hl_already]
-                        # Cache the POSITIVE result for 30 days.
-                        if _tvc_hl and _hl_result.verified_works:
-                            try:
-                                _tvc_hl.cache_put(_hl_vname, _hl_city,
-                                                  _hl_result.verified_works)
-                            except Exception:
-                                pass
-
-                    # Works first: add verified highlights up to what is needed.
-                    # [LOCAL-669] Drop any highlight that is a FRAGMENT/alias of a
-                    # work already in the tour (e.g. the local-language name "Vườn
-                    # xuân Trung Nam Bắc" of the English "North Central South Spring
-                    # Garden" already present). Admitting it would only be a
-                    # duplicate stop of the same object — the LOCAL-667 pool uses
-                    # the same guard; apply it here against poi_list.
-                    try:
-                        from candidate_collapse_guard import (
-                            _is_fragment_of as _hl_frag_of,
-                            _norm_tokens as _hl_frag_toks,
-                            _content_tokens as _hl_frag_content)
-                        _hl_targets = [(_hl_frag_toks(p.get('name', '')),
-                                        _hl_frag_content(p.get('name', '')))
-                                       for p in poi_list
-                                       if len(_hl_frag_content(p.get('name', ''))) >= 2]
-                        _hl_verified = [
-                            _w for _w in (_hl_verified or [])
-                            if not any(_hl_frag_of(_w.get('name', ''), _tt, _tc)
-                                       for _tt, _tc in _hl_targets)]
-                    except Exception:
-                        pass
-                    _hl_added = 0
-                    _hl_needed = total_stops - len(poi_list)
-                    for _hw in (_hl_verified or []):
-                        if _hl_added >= _hl_needed:
-                            break
-                        _hn = _normalize_name(_hw.get('name', ''))
-                        if not _hn or _hn in _hl_already:
-                            continue
-                        _hl_already.add(_hn)
-                        _hw['verified'] = True
-                        _d1_evidence_log[_hw['name']] = {
-                            "status": "VERIFIED",
-                            "canonical_title": _hw['name'],
-                            "snippet": _hw.get('fact', '') or "",
-                            "method": "grounded_highlights",
-                            "sources": _hw.get('highlight_sources', []),
-                        }
-                        poi_list.append(_hw)
-                        _hl_added += 1
-                        _hsrcs = ', '.join(s['origin'] for s in _hw.get('highlight_sources', []))
-                        print(f"    [LOCAL-669] VERIFIED '{_hw['name']}' ({_hsrcs})")
-                    if _hl_added:
-                        print(f"  [LOCAL-669] added {_hl_added} grounded-highlights "
-                              f"work(s){' (cache)' if _hl_from_cache else ''}, "
-                              f"total now {len(poi_list)}/{total_stops}")
-                except Exception as _hl_err:
-                    print(f"  [LOCAL-669] grounded highlights skipped ({_hl_err})")
 
             # -------- [LOCAL-667] THIN-WIKIDATA verification (before giving up) --------
             # A real museum with a thin Wikidata catalogue (HCMC: 1 SPARQL work) has
@@ -12801,6 +12827,14 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
                     # model-proposed, never invented here.
                     _thin_pool = list(_r4_all_dropped_pois)
                     _already = set(_normalize_name(p['name']) for p in poi_list)
+                    # [LOCAL-669B point 4] SKIP the per-title thin-verify for any
+                    # title the ONE grounded highlights call ALREADY verified: those
+                    # works are in poi_list (so in _already) and must never be
+                    # re-verified with a second grounded/Serper query. _already
+                    # therefore excludes them from the pool below for free; we also
+                    # union the highlights titles explicitly in case a work was
+                    # dropped on slot-count but still proven.
+                    _already |= set(_hl_titles_verified or set())
                     for _p in _pre_d1v2_candidates:
                         if _normalize_name(_p.get('name', '')) not in _already:
                             _thin_pool.append(_p)
@@ -13109,6 +13143,53 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
                 else:
                     print(f"  [LOCAL-577 REFILL] No title-mismatch drops available to refill "
                           f"({len(poi_list)}/{total_stops} stops — pool truly exhausted)")
+
+            # -------- [LOCAL-669B] IDENTITY DEDUP across the WHOLE candidate pool --------
+            # LOCAL-669's live HCMC run shipped ONE National Treasure as THREE stops:
+            # "North Central South Spring Garden" + "Central South and North Spring
+            # Garden" (R4, English label + reordered altLabel) + "Vườn xuân Trung
+            # Nam Bắc" (highlights, the Vietnamese). The token-based collapse guard
+            # folds English word-order permutations but CANNOT bridge the Vietnamese
+            # to the English. Collapse by IDENTITY instead:
+            #   (a) Wikidata QID when either side has one (stamped from the D1v2
+            #       evidence log), and
+            #   (b) a bilingual, ORDER-IGNORED title match — each candidate carries
+            #       its local AND English title (highlights parse + SPARQL labels),
+            #       normalised to a sorted content-token set and expanded through
+            #       the D1v2 bilingual word map — so the three Spring Gardens become
+            #       ONE stop while "Thanh niên Thành đồng" (its own identity) stays.
+            # Applied to the WHOLE pool (R4 + D1v2 + highlights + area), keeping the
+            # best-sourced title. A QID CONFLICT (two different QIDs) is never merged.
+            if tour_category == 'museum' and len(poi_list) > 1:
+                try:
+                    import identity_dedup as _idd
+                    # Bilingual word map built by D1v2 from this venue's SPARQL
+                    # label pairs (story_miner._BILINGUAL_MAP). Empty is fine —
+                    # the carried local/English pair on each candidate still
+                    # bridges languages without it.
+                    _bimap = {}
+                    try:
+                        import story_miner as _sm_bi
+                        _bimap = dict(getattr(_sm_bi, '_BILINGUAL_MAP', {}) or {})
+                    except Exception:
+                        _bimap = {}
+                    # Stamp QIDs from the D1v2 evidence log onto the pois so the
+                    # QID signal (a) is available to the dedup. Never invents a QID.
+                    for _p in poi_list:
+                        if not _idd.candidate_qid(_p):
+                            _ev = _d1_evidence_log.get(_p.get('name', ''), {})
+                            if isinstance(_ev, dict) and _ev.get('qid'):
+                                _p['qid'] = _ev['qid']
+                    _pre_dedup = len(poi_list)
+                    poi_list, _id_collapses = _idd.dedup_by_identity(poi_list, _bimap)
+                    for _c in _id_collapses:
+                        print(f"  [LOCAL-669B] IDENTITY DEDUP ({_c.reason}): kept "
+                              f"'{_c.kept_title}', dropped {_c.dropped_titles}")
+                    if _pre_dedup != len(poi_list):
+                        print(f"  [LOCAL-669B] identity dedup: {_pre_dedup} → "
+                              f"{len(poi_list)} stop(s) (one identity → one stop)")
+                except Exception as _id_err:
+                    print(f"  [LOCAL-669B] identity dedup skipped ({_id_err})")
 
             # -------- [LOCAL-16 GATE] D1v2-verified-only filter for museum tours --------
             # No unverified stop may reach Phase 5 for museum tours. This is the
