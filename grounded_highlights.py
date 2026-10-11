@@ -161,18 +161,26 @@ def _first_segment(line: str) -> str:
 
 def _title_head(line: str) -> str:
     """The title portion of an item line INCLUDING any parenthetical/quoted
-    English gloss — text up to the first ' by '/dash/':' field separator but NOT
-    splitting on '(', so the gloss survives for the bilingual splitter."""
+    English gloss. Stops at a ' by '/':' label, but keeps '(' and a trailing
+    quoted gloss ('— "English"') so the bilingual splitter can see them. A spaced
+    dash only ends the head when what follows is NOT a quoted gloss (i.e. it is an
+    artist/medium field)."""
     s = line.strip()
     m = _LABEL_TITLE.search(s)
     if m:
         return m.group(1).strip()
-    head = _split_fields(s)[0] if _split_fields(s) else s
+    # Trim at ' by ' / ':' first (these never introduce a title gloss).
     for sep in (r"\bby\b", r":"):
-        parts = re.split(sep, head, maxsplit=1)
+        parts = re.split(sep, s, maxsplit=1)
         if len(parts) == 2 and parts[0].strip():
-            head = parts[0]
+            s = parts[0]
             break
+    # If a trailing quoted gloss is present ('… — "English Title"'), keep the
+    # whole thing so _GLOSS_QUOTE can split it.
+    if _GLOSS_QUOTE.match(s.strip()):
+        return s.strip()
+    # Otherwise the first spaced-dash field is the title (artist/medium follow).
+    head = _split_fields(s)[0] if _split_fields(s) else s
     return head.strip()
 
 
@@ -219,21 +227,31 @@ def _split_bilingual_title(title_segment: str) -> Tuple[str, str]:
     which the dedup pass handles. The ``name`` kept for display is unchanged
     (handled by the caller); this only extracts the pair for identity matching.
     """
-    s = (title_segment or "").strip().strip("*_\"'“”‘’ ")
+    # Strip only markdown emphasis and surrounding whitespace — NOT quote
+    # characters, since a trailing quoted gloss ('… — "English"') needs its
+    # closing quote intact for _GLOSS_QUOTE to match.
+    s = (title_segment or "").strip().strip("*_ ")
     for rx in (_GLOSS_PAREN, _GLOSS_QUOTE):
         m = rx.match(s)
         if m:
             main = _clean_title(m.group("main"))
             gloss = _clean_title(m.group("gloss"))
+            # The gloss must have real alphabetic content to be a title at all —
+            # a bare year "(1943)" or number is NOT an English gloss.
+            _gloss_has_letters = sum(c.isalpha() for c in gloss) >= 3
             if main and gloss and _looks_like_english_title(gloss):
                 # The gloss is English; the main part is the local title.
                 return main, gloss
-            # A main part that is itself English with a local gloss (rarer): if the
-            # main looks English and the gloss does not, swap.
-            if main and gloss and _looks_like_english_title(main) \
-                    and not _looks_like_english_title(gloss):
+            # A main part that is itself English with a NON-English (local) gloss
+            # that still looks like a title (letters, not a year): swap.
+            if (main and gloss and _gloss_has_letters
+                    and _looks_like_english_title(main)
+                    and not _looks_like_english_title(gloss)):
                 return gloss, main
-    return s, ""
+            # A parenthetical that is a year/medium/note: keep only the main part.
+            if main and not _gloss_has_letters:
+                return main, ""
+    return _clean_title(s), ""
 
 
 def _extract_artist(line: str) -> str:
