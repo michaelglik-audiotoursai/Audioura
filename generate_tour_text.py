@@ -13059,6 +13059,16 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
                         _c668_venue_addr = _resolve_venue_address(location) or ''
                     except Exception:
                         _c668_venue_addr = ''
+                # A single NAMED museum means the whole tour is contained inside
+                # one building: EVERY stop (the Phase-3A works, the thin-verified
+                # works promoted from the R4/model pool with their own guessed
+                # addresses, and the building / collection-area fallback stops)
+                # belongs at the one venue address. venue_bound_address keeps a
+                # page-literal satellite address (a real annex) and otherwise
+                # takes the venue address. When the venue is NOT a single named
+                # museum (a city-scope museums request), bind only the
+                # grounded-contained fallback stops, never the works.
+                _c668_single_venue = bool(_museum_venue_name)
                 if _c668_venue_addr and len(_c668_venue_addr) > 10:
                     try:
                         from about_museum_stop import venue_bound_address as _vba668
@@ -13068,7 +13078,8 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
                     for _cp in poi_list:
                         _cp_kind = _cp.get('_stop_kind', '')
                         _cp_contained = (
-                            _cp_kind in ('building', 'collection_area')
+                            _c668_single_venue
+                            or _cp_kind in ('building', 'collection_area')
                             or _cp.get('_fallback_source')
                             or 'thin_sources' in _cp
                             or not (_cp.get('address') or '').strip()

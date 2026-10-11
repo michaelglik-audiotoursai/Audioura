@@ -53,14 +53,15 @@ def _blocker4b_fires(poi_list):
     return len(uniq) >= len(poi_list) // 2 and len(poi_list) >= 5
 
 
-def _bind_contained(poi_list):
+def _bind_contained(poi_list, single_venue=True):
     """The LOCAL-668 binding pass, mirroring generate_tour_text.py."""
     venue_addr = G._dominant_poi_address(poi_list)
     if not (venue_addr and len(venue_addr) > 10):
         return poi_list
     for cp in poi_list:
         contained = (
-            cp.get('_stop_kind') in ('building', 'collection_area')
+            single_venue
+            or cp.get('_stop_kind') in ('building', 'collection_area')
             or cp.get('_fallback_source')
             or 'thin_sources' in cp
             or not (cp.get('address') or '').strip()
@@ -119,6 +120,29 @@ class Blocker4bContained(unittest.TestCase):
                          "BLOCKER4b must NOT fire on a contained, single-address tour")
         for p in poi:
             self.assertEqual((p["address"] or "").strip(), _ADDR)
+
+    def test_two_verified_works_with_different_addresses_collapse(self):
+        """Live NORMAL-arm case: two thin-verified works carried DIFFERENT
+        model-guessed addresses; binding every stop of a single named venue
+        collapses them to ONE so BLOCKER4b does not fire."""
+        poi = [
+            {"name": "Lotus Pond", "address": _ADDR, "verified": True,
+             "thin_sources": [{"origin": "vnfam.vn"}]},
+            {"name": "Mother and Child", "address": _STRAY, "verified": True,
+             "thin_sources": [{"origin": "baotangmythuattphcm.com.vn"}]},
+            {"name": "The Ho Chi Minh City Museum of Fine Arts building",
+             "address": "", "_stop_kind": "building"},
+            {"name": "Lacquer painting collection", "address": "",
+             "_stop_kind": "collection_area"},
+            {"name": "Silk painting collection", "address": "",
+             "_stop_kind": "collection_area"},
+        ]
+        self.assertEqual(len(_blocker4b_unique_addresses(poi)), 2)
+        _bind_contained(poi, single_venue=True)
+        uniq = _blocker4b_unique_addresses(poi)
+        self.assertEqual(len(uniq), 1,
+                         f"single named venue must collapse to ONE address, got {uniq}")
+        self.assertFalse(_blocker4b_fires(poi))
 
     def test_binding_keeps_a_page_sourced_satellite_address(self):
         """A stop whose OWN page states a satellite address keeps it (D611)."""
