@@ -13,9 +13,35 @@ import sys
 import os
 import math
 
+import pytest
+
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from db_connection import get_connection
 from test_tour_helper import TestTourHelper
+
+
+# [LOCAL-676] This LOCAL-88 pollution suite asserts against the REAL production
+# corpus — Michael's 9 live Nice tours and the production audio_tours row count
+# (46). Those invariants only exist in the production DB, so the read-only
+# assertions must target it; before this change the module reached production
+# only via a leaked DATABASE_URL from a sibling module, and once that leak was
+# removed test_row_count_preserved started reading the empty audiotours_test.
+# Pin production for this module (read-only intent) so its behaviour matches the
+# pre-isolation baseline. The write-side tests here were designed to insert test
+# rows into production audio_tours; under the LOCAL-675 guard those writes are
+# blocked (as they already were in the baseline), which is correct — this suite
+# predates the guard and is tracked out of scope for LOCAL-676.
+@pytest.fixture(autouse=True, scope="module")
+def _force_production_db_local88():
+    prev = os.environ.get("AUDIOURA_DB_TARGET")
+    os.environ["AUDIOURA_DB_TARGET"] = "production"
+    try:
+        yield
+    finally:
+        if prev is None:
+            os.environ.pop("AUDIOURA_DB_TARGET", None)
+        else:
+            os.environ["AUDIOURA_DB_TARGET"] = prev
 
 
 def haversine(lat1, lng1, lat2, lng2):
