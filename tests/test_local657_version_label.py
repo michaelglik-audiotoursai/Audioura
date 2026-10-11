@@ -101,11 +101,11 @@ class VersionLabelTest(unittest.TestCase):
         map_app._HAS_SOURCE_VERSION = None
 
     # ── /tours-near ────────────────────────────────────────────────────────
-    # tours-near column order (15 cols after LOCAL-670 added the two rating cols):
-    # id, tour_name, request_string, lat, lng, number_requested,
-    # content_language, original_tour_id, max_version_no, last_replaced_at,
-    # created_at, source_version, source_max_version_no,
-    # rating_count, rating_values
+    # tours-near column order (17 cols after LOCAL-671 appended own/source
+    # content_language): id, tour_name, request_string, lat, lng,
+    # number_requested, content_language, original_tour_id, max_version_no,
+    # last_replaced_at, created_at, source_version, source_max_version_no,
+    # rating_count, rating_values, own_content_language, source_content_language
     def test_tours_near_v1_when_no_archive_rows(self):
         """A never-replaced tour → version 1, updated_at = created_at date."""
         created = datetime.datetime(2026, 10, 1, 8, 30, 0)
@@ -113,7 +113,8 @@ class VersionLabelTest(unittest.TestCase):
             ("information_schema", [("source_version",)]),
             ("from audio_tours t", [
                 (557, "Old Town", "old town walk", 43.70, 7.26, 12,
-                 "en", None, None, None, created, None, None, None, None),
+                 "en", None, None, None, created, None, None, None, None,
+                 "en", None),
             ]),
         ])
         resp = self.client.get("/tours-near/43.70/7.26?radius=50")
@@ -132,7 +133,8 @@ class VersionLabelTest(unittest.TestCase):
             ("information_schema", [("source_version",)]),
             ("from audio_tours t", [
                 (557, "Old Town", "old town walk", 43.70, 7.26, 30,
-                 "en", None, 2, last_replaced, created, None, None, None, None),
+                 "en", None, 2, last_replaced, created, None, None, None, None,
+                 "en", None),
             ]),
         ])
         resp = self.client.get("/tours-near/43.70/7.26?radius=50")
@@ -143,9 +145,10 @@ class VersionLabelTest(unittest.TestCase):
 
     # ── /tour-by-code ───────────────────────────────────────────────────────
     # tour-by-code first resolves the share code, then selects the row.
-    # row order: id, tour_name, request_string, lat, lng, number_requested,
-    # language, original_tour_id, max_version_no, last_replaced_at, created_at,
-    # source_version, source_max_version_no, rating_count, rating_values
+    # row order (17 cols after LOCAL-671): id, tour_name, request_string, lat,
+    # lng, number_requested, language, original_tour_id, max_version_no,
+    # last_replaced_at, created_at, source_version, source_max_version_no,
+    # rating_count, rating_values, own_content_language, source_content_language
     def test_tour_by_code_returns_version_ge_2_for_replaced_tour(self):
         """The live check's shape: q9oSUebU → tour 557, replaced once → v2."""
         created = datetime.datetime(2026, 1, 1, 0, 0, 0)
@@ -157,7 +160,8 @@ class VersionLabelTest(unittest.TestCase):
             # the row select (joined with the versions aggregate)
             ("from audio_tours t", [
                 (557, "Old Town", "old town walk", 43.70, 7.26, 25,
-                 "en", None, 1, last_replaced, created, None, None, None, None),
+                 "en", None, 1, last_replaced, created, None, None, None, None,
+                 "en", None),
             ]),
         ])
         resp = self.client.get("/tour-by-code/q9oSUebU")
@@ -179,7 +183,8 @@ class VersionLabelTest(unittest.TestCase):
             ("from shared_tours", [(900,)]),
             ("from audio_tours t", [
                 (900, "Fresh Tour", "fresh", 48.85, 2.35, 3,
-                 "en", None, None, None, created, None, None, None, None),
+                 "en", None, None, None, created, None, None, None, None,
+                 "en", None),
             ]),
         ])
         resp = self.client.get("/tour-by-code/freshcode")
@@ -200,9 +205,11 @@ class VersionLabelTest(unittest.TestCase):
             ("from shared_tours", [(1201,)]),
             ("from audio_tours t", [
                 # id=1201 is an ES translation of original 557; its own archive is
-                # empty (max_version_no NULL) but source_version=5 is pinned.
+                # empty (max_version_no NULL) but source_version=5 is pinned. The two
+                # trailing cols are its own language ('es') and the SOURCE's ('en').
                 (1201, "Old Town [es]", "old town walk", 43.70, 7.26, 4,
-                 "es", 557, None, None, created, 5, 4, None, None),
+                 "es", 557, None, None, created, 5, 4, None, None,
+                 "es", "en"),
             ]),
         ])
         resp = self.client.get("/tour-by-code/estrans")
@@ -213,6 +220,7 @@ class VersionLabelTest(unittest.TestCase):
         self.assertEqual(tour["language"], "es")
         self.assertEqual(tour["version"], 5)           # the SOURCE version it pins
         self.assertEqual(tour["updated_at"], "2026-10-08")  # its OWN created_at
+        self.assertEqual(tour["original_language"], "en")   # [LOCAL-671] source lang
 
     # ── the _version_fields helper directly ─────────────────────────────────
     def test_version_fields_helper(self):
