@@ -12620,6 +12620,142 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
             else:
                 print(f"  [R4] Target reached: {len(poi_list)}/{total_stops} stops")
 
+            # -------- [LOCAL-669] GROUNDED HIGHLIGHTS (one call, cited) --------
+            # Michael, 2026-10-10: asking a grounded model ONE question — "describe
+            # 5 paintings from the Ho Chi Minh City Museum of Fine Arts" — already
+            # returns what a listener wants (named works, artist, year, medium, a
+            # fact), at the price of ONE grounded request. For a thin-Wikidata
+            # museum that is still short, make that the candidate source: ONE
+            # grounded "8 most notable works" call, then VERIFY each candidate from
+            # the call's OWN citations — ≥1 cited source on the museum's own domain,
+            # OR ≥2 independent cited sources — topping up with at most ONE Serper
+            # query per still-unverified candidate for a 2nd source. UNCITED
+            # candidates are never accepted (items 3–5 of Michael's list must be
+            # proven). This REPLACES LOCAL-667's per-title thin-verify as the first
+            # mover; LOCAL-667 below runs only for whatever is still short. Works
+            # first — area stops (LOCAL-668) only fill what is left. Cached per
+            # venue 30 days: a second tour of the same museum spends ZERO.
+            if (tour_category == 'museum' and _verification_tier == 'thin'
+                    and len(poi_list) < total_stops and _story_corpus_result):
+                try:
+                    import grounded_highlights as _gh
+                    _hl_city = ''
+                    if ',' in location:
+                        _hl_city = location.split(',', 1)[1].strip()
+                    _hl_vname = _museum_venue_name or location
+                    _hl_already = set(_normalize_name(p['name']) for p in poi_list)
+
+                    # Own-domain(s): the resolved official site plus any corpus page
+                    # classified as the venue's own site (so verification credits
+                    # the museum's own collection pages).
+                    _hl_own_domains = []
+                    if _museum_site_url:
+                        _hl_own_domains.append(_gh._domain(_museum_site_url))
+                    try:
+                        from thin_wikidata_fallback import _classify_page_origin as _cpo
+                        for _pg in (_story_corpus_result.get('pages', []) or []):
+                            if not isinstance(_pg, dict):
+                                continue
+                            if _cpo(_pg.get('url', ''), _pg.get('title', ''),
+                                    _museum_site_language) == 'site':
+                                _d = _gh._domain(_pg.get('url', ''))
+                                if _d and _d not in _hl_own_domains:
+                                    _hl_own_domains.append(_d)
+                    except Exception:
+                        pass
+
+                    # 30-day venue cache (shared with LOCAL-668 thin-verify): a
+                    # venue verified in the last 30 days serves from cache at ZERO
+                    # grounded cost. Cached works carry highlight_sources, so they
+                    # survive the round-trip.
+                    _hl_verified = None
+                    _hl_from_cache = False
+                    _tvc_hl = None
+                    try:
+                        import thin_verify_cache as _tvc_hl
+                        _hl_cached = _tvc_hl.cache_get(_hl_vname, _hl_city)
+                        if _hl_cached:
+                            _hl_verified = [w for w in _hl_cached
+                                            if _normalize_name(w.get('name', '')) not in _hl_already]
+                            _hl_from_cache = True
+                            print(f"  [LOCAL-669] highlights VENUE CACHE hit for "
+                                  f"'{_hl_vname}' — {len(_hl_verified)} verified "
+                                  f"work(s), 0 grounded requests (30-day cache)")
+                    except Exception:
+                        _tvc_hl = None
+
+                    if _hl_verified is None:
+                        # The ONE grounded call uses the active research backend
+                        # (Gemini grounded, or Serper + gpt-4.1-mini under
+                        # RESEARCH_BACKEND=serper). Only when a backend key exists.
+                        _hl_research_fn = None
+                        try:
+                            import story_leads as _sl_hl
+                            if (os.environ.get('GEMINI_API_KEY')
+                                    or os.environ.get('GOOGLE_API_KEY')
+                                    or os.environ.get('SERPER_API_KEY')):
+                                _hl_research_fn = lambda _q: _sl_hl.research_with_sources(_q, grounded=True)
+                        except Exception:
+                            _hl_research_fn = None
+
+                        # Metered Serper 2nd-source callable (returns [{url,...}]).
+                        _hl_serper_fn = None
+                        if os.environ.get('SERP_API_KEY') or os.environ.get('SERPER_API_KEY'):
+                            def _hl_serper_fn(_q):
+                                try:
+                                    from work_story_searcher import _serp_search
+                                    _res, _lat = _serp_search(_q)
+                                    return _res or []
+                                except Exception:
+                                    return []
+
+                        _hl_needed = total_stops - len(poi_list)
+                        _hl_result = _gh.grounded_highlights(
+                            _hl_vname, _hl_city,
+                            research_fn=_hl_research_fn,
+                            serper_fn=_hl_serper_fn,
+                            own_domains=_hl_own_domains,
+                            n=_gh.DEFAULT_HIGHLIGHTS)
+                        print("  " + _hl_result.log_line)
+                        _hl_verified = [w for w in _hl_result.verified_works
+                                        if _normalize_name(w.get('name', '')) not in _hl_already]
+                        # Cache the POSITIVE result for 30 days.
+                        if _tvc_hl and _hl_result.verified_works:
+                            try:
+                                _tvc_hl.cache_put(_hl_vname, _hl_city,
+                                                  _hl_result.verified_works)
+                            except Exception:
+                                pass
+
+                    # Works first: add verified highlights up to what is needed.
+                    _hl_added = 0
+                    _hl_needed = total_stops - len(poi_list)
+                    for _hw in (_hl_verified or []):
+                        if _hl_added >= _hl_needed:
+                            break
+                        _hn = _normalize_name(_hw.get('name', ''))
+                        if not _hn or _hn in _hl_already:
+                            continue
+                        _hl_already.add(_hn)
+                        _hw['verified'] = True
+                        _d1_evidence_log[_hw['name']] = {
+                            "status": "VERIFIED",
+                            "canonical_title": _hw['name'],
+                            "snippet": _hw.get('fact', '') or "",
+                            "method": "grounded_highlights",
+                            "sources": _hw.get('highlight_sources', []),
+                        }
+                        poi_list.append(_hw)
+                        _hl_added += 1
+                        _hsrcs = ', '.join(s['origin'] for s in _hw.get('highlight_sources', []))
+                        print(f"    [LOCAL-669] VERIFIED '{_hw['name']}' ({_hsrcs})")
+                    if _hl_added:
+                        print(f"  [LOCAL-669] added {_hl_added} grounded-highlights "
+                              f"work(s){' (cache)' if _hl_from_cache else ''}, "
+                              f"total now {len(poi_list)}/{total_stops}")
+                except Exception as _hl_err:
+                    print(f"  [LOCAL-669] grounded highlights skipped ({_hl_err})")
+
             # -------- [LOCAL-667] THIN-WIKIDATA verification (before giving up) --------
             # A real museum with a thin Wikidata catalogue (HCMC: 1 SPARQL work) has
             # R4 propose genuine works (The Fisherman, Lotus Pond, …) that the
@@ -12631,6 +12767,9 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
             # backend) to reach the bar. HONESTY RULE: a work is admitted only when
             # TWO INDEPENDENT sources name it at this museum; one mention or zero is
             # never a stop. Never invents a work.
+            # [LOCAL-669] Runs AFTER grounded highlights, so it now only verifies
+            # what the one grounded call could not fill — the per-title searches it
+            # used to do up front are replaced by that single cited call.
             if (tour_category == 'museum' and _verification_tier == 'thin'
                     and len(poi_list) < total_stops and _story_corpus_result):
                 try:
