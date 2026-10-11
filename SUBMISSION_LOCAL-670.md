@@ -119,7 +119,7 @@ Six commits on `LOCAL-670-tour-ratings`, one per step (migration → service →
 
 ---
 
-# 670B — Rebase onto current `subscribed` (9684e563) + rating requires ≥ 2 listened stops
+# 670B — Rebase onto current `subscribed` (7ccd7a21) + rating requires ≥ 2 listened stops
 
 ## Why this follow-up
 
@@ -127,10 +127,15 @@ Six commits on `LOCAL-670-tour-ratings`, one per step (migration → service →
    `source_version` and the translation-version columns to the same map-delivery
    SELECTs that LOCAL-670 extended with the rating fields. LEAD's merge of
    LOCAL-670 into `subscribed` therefore left `get_tour_info`/`get_tours_near_location`
-   raising `not enough values to unpack (expected 15, got 13)`. This branch is
-   rebased onto `subscribed` @ **9684e563** (`git merge-base --is-ancestor 9684e563 HEAD`
-   exits 0) and the four map-delivery endpoints are reconciled into **ONE grouped
-   query each** carrying version + source_version + the rating fields.
+   raising `not enough values to unpack (expected 15, got 13)`. This branch was
+   first reconciled onto `subscribed` @ `9684e563`; `subscribed` has since advanced
+   to **7ccd7a21** (`Cache/pool v39`, LOCAL-669), so the branch is **rebased again
+   onto 7ccd7a21** — the current subscribed tip in this worktree. LOCAL-669 touches
+   a disjoint set of files (`generate_tour_text.py`, `grounded_highlights.py`,
+   `identity_dedup.py`, …) so the rebase was clean, no conflicts. The base gate
+   `git merge-base --is-ancestor 7ccd7a21 HEAD` exits 0, and the four map-delivery
+   endpoints are reconciled into **ONE grouped query each** carrying
+   version + source_version + the rating fields.
 
 2. **Michael (2026-10-10):** don't allow a tour rating until the listener has
    heard enough — "similar to Audible … politely say that the user did not hear
@@ -208,20 +213,33 @@ vice-versa); read-only status; negative `stop_index` → `ValueError`; missing
 
 ## Verification
 
-- `flutter analyze` on the owned new/edited files (`tour_listen_service.dart`,
-  `rate_tour_dialog.dart`) → **No issues found!** Remaining analyzer output in the
-  large screen files is pre-existing.
+- `flutter analyze` on the owned new/edited files → **0 errors, 0 warnings**. The
+  three new files (`tour_listen_service.dart`, `tour_rating_service.dart`,
+  `rate_tour_dialog.dart`) report **no issues at all**. The remaining analyzer
+  output in the large screen files is pre-existing `info`-level style lints
+  (`prefer_const_constructors`) and 25 pre-existing `warning`s (unused imports/
+  fields in `home_screen.dart`/`my_tours_screen.dart`/`tour_player_screen.dart`)
+  that are present at base `7ccd7a21` and are untouched by this change.
 - `flutter build ios --no-codesign` → `✓ Built build/ios/iphoneos/Runner.app (37.3MB)`.
-- **No NEW test failures vs `origin/subscribed` (9684e563).** The full
-  `python3 -m pytest -q tests` was run on this branch and on a clean 9684e563
-  worktree and the FAILED/ERROR node sets were diffed. Every pre-existing failure
-  (integration suites needing live services, e.g. `test_wallet_api`,
-  `test_newsletter_*`, `test_local67_entitlement_gate`'s missing `test_users`
-  fixture, `test_local431` story-gate) fails identically on the baseline. The
-  657/666/670/670b suites pass (46) in isolation and when ordered after other
-  DB-backed suites; their occasional ERROR attribution in the 27-minute full run
-  is a pre-existing full-run flakiness unrelated to this change (the same nodes do
-  not error on the baseline and pass every targeted run).
+- The 657/666/670/670b suites pass **46/46 together** and 670+670b pass **25/25**
+  in isolation (the DB-backed gate tests run against the live local Postgres — none
+  skipped).
+- **No NEW test failures vs `origin/subscribed`.** The full `python3 -m pytest -q tests`
+  was run on this branch and on a clean `origin/subscribed` (4a87061a) worktree, and
+  the FAILED/ERROR node sets were diffed. The suite is nondeterministic (183 vs 192
+  failed across two of this branch's own runs), driven by live-service/live-LLM
+  tests and shared-DB contention. After excluding this branch's own new 670/670b
+  test files (which ERROR only under full-run DB contention yet pass every targeted
+  run) and captured log-line noise (429 rate limits, `news-generator-1` DNS, "no DB
+  in test"), the only pre-existing tests that differed were flaky live-model gate
+  tests (`test_local431_story_gate_enforcement`, `test_local442` `TestLiveAPIMFACalibration`,
+  `test_local473` `TestLiveModel`, `test_spine_quality_gate` `with_real_generation`).
+  Re-running them in isolation, the three that still failed on this branch
+  (`test_palais_with_stories_passes_gate`, `test_good_stop_passes_at_3`,
+  `test_palais_tour_file_counts`) **fail identically on the clean `origin/subscribed`
+  worktree with none of this change's code present** — they are pre-existing
+  flakiness, not a regression. No failure is attributable to the map-delivery
+  reconciliation, the rating service, or the listened-stops gate.
 
 ## Safety / constraints honoured (670B)
 
@@ -237,7 +255,9 @@ vice-versa); read-only status; negative `stop_index` → `ValueError`; missing
 
 ## Commits (670B)
 
-Rebased `LOCAL-670-tour-ratings` onto 9684e563, then one commit per step:
-map-delivery fixture reconciliation → server listened gate (migration + service +
-tests) → app listened gate → this SUBMISSION update. Pushed with
-`--force-with-lease`.
+`LOCAL-670-tour-ratings` was reconciled onto `9684e563` with one commit per step
+(map-delivery fixture reconciliation → server listened gate [migration + service +
+tests] → app listened gate → SUBMISSION update), then the whole branch was
+**rebased onto the current subscribed tip `7ccd7a21`** (LOCAL-669) — a clean,
+conflict-free rebase since 669's files are disjoint — and this SUBMISSION section
+refreshed. Pushed with `--force-with-lease`.
