@@ -175,6 +175,24 @@ except ImportError as _pref_err:
     )
     print(f"[ORCHESTRATOR] ERROR: preference routes unavailable: {_pref_err}")
 
+# --- Tour Rating Routes (LOCAL-670) ---
+# The Dart client posts to /tour/<id>/rating and reads GET /tour/<id>/rating on
+# this service (port 5002). Per-TOUR 1..10 rating, alongside the per-STOP thumbs
+# already handled by swipe_preference_service. Without this registration the
+# rating badge shows nothing and "Rate this tour" 404s.
+#
+# Failure is logged at ERROR, not printed (D31, LOCAL-146).
+try:
+    from tour_rating_service import register_rating_routes
+    register_rating_routes(app)
+    print("[ORCHESTRATOR] Tour rating routes registered (LOCAL-670)")
+except ImportError as _rating_err:
+    import logging as _rating_logging
+    _rating_logging.getLogger("tour_orchestrator_service").error(
+        f"[LOCAL-670] Tour rating routes NOT registered — rating will 404: {_rating_err}"
+    )
+    print(f"[ORCHESTRATOR] ERROR: tour rating routes unavailable: {_rating_err}")
+
 # CORS headers for web platform support
 def add_cors_headers(response):
     response.headers['Access-Control-Allow-Origin'] = '*'
