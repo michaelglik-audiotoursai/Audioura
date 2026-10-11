@@ -74,7 +74,7 @@ class TestNormSet(unittest.TestCase):
                 "south": "nam", "north": "bac"}
         # With the map, the VN title's expanded set contains the English words.
         vn = set(idd.norm_set(_SPRING_VN, bmap).split())
-        self.assertTrue({"garden", "spring", "central", "south", "north"} <= vn)
+        self.assertTrue({"garden", "spring", "center", "south", "north"} <= vn)  # LEAD 2026-10-11: central→center canon
 
 
 class TestThreeSpringGardensCollapse(unittest.TestCase):

@@ -172,9 +172,9 @@ class TestTriggerQidStampBridgesGloss(unittest.TestCase):
             _poi(_SPRING_VN, verified=True,
                  title_local=_SPRING_VN, title_en=_SPRING_GLOSS),
         ]
-        # Prove the gloss token sets really differ (Center vs Central).
-        self.assertNotEqual(idd.norm_set(_SPRING_GLOSS), idd.norm_set(_SPRING_EN),
-                            "fixture must exercise the Center/Central mismatch")
+        # LEAD 2026-10-11: Center/Central now canonicalise to the same token, so the
+        # gloss and the SPARQL label match by title as well as by QID.
+        self.assertEqual(idd.norm_set(_SPRING_GLOSS), idd.norm_set(_SPRING_EN))
         res = idd.final_identity_gate(poi, needed_stops=2,
                                       evidence_log=_evidence_log_670())
         self.assertEqual(len(res.poi_list), 1,

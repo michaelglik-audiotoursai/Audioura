@@ -74,9 +74,27 @@ def _tokens(text: str) -> List[str]:
     return s.split()
 
 
+# [LEAD 2026-10-11] Spelling variants that name the same thing in translated titles:
+# HCMC's highlights gloss said "Spring Garden of the Center, South, and North" while
+# SPARQL said "North Central South Spring Garden" (tour 674 shipped both).
+_CANON = {
+    "central": "center", "centre": "center", "centered": "center",
+    "northern": "north", "southern": "south", "eastern": "east", "western": "west",
+    "colour": "color", "colours": "color", "grey": "gray",
+}
+
+
+def _canon(t: str) -> str:
+    t = _CANON.get(t, t)
+    # plural 's' only for longer words, so short names keep their spelling
+    if len(t) > 4 and t.endswith("s") and not t.endswith("ss"):
+        t = _CANON.get(t[:-1], t[:-1])
+    return t
+
+
 def _content_tokens(text: str) -> List[str]:
-    """Tokens with glue words and 1-char tokens dropped."""
-    return [t for t in _tokens(text) if t not in _GLUE and len(t) >= 2]
+    """Tokens with glue words and 1-char tokens dropped, spelling variants canonicalised."""
+    return [_canon(t) for t in _tokens(text) if t not in _GLUE and len(t) >= 2]
 
 
 def _expand_bilingual(tokens: Iterable[str],
@@ -87,8 +105,10 @@ def _expand_bilingual(tokens: Iterable[str],
     out: Set[str] = set(tokens)
     if not bilingual_map:
         return out
+    # keys canonicalised the same way as the tokens (e.g. "central" -> "center")
+    _ckeys = {_canon(_strip_accents_lower(k)): v for k, v in bilingual_map.items()}
     for t in list(out):
-        equiv = bilingual_map.get(t)
+        equiv = bilingual_map.get(t) or _ckeys.get(t)
         if equiv:
             for w in _content_tokens(equiv):
                 out.add(w)
