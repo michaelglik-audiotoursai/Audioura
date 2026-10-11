@@ -26,6 +26,8 @@ services:
       - ALERTS_MD=/meterlogs/ALERTS_DAILY_LIMIT.md
       # D645 re-enabled for MUSEUM tours only (LOCAL-664, 2026-10-10). Walking stays on Gemini research (Serper costs ~2 Kiro points there).
       - CHEAP_ARM_CATEGORIES=museum
+      # D651 (LEAD 2026-10-11): walking research via serper_plus (LOCAL-674: evidence 7.87 vs Gemini 5.67; live Kiro 6.5 = 6.5; $0.31 vs $0.65). Rollback: delete this line.
+      - WALKING_RESEARCH=serper_plus
       - NARRATION_MODEL=gpt-4.1-mini
       - RESEARCH_BACKEND=serper
     volumes:
