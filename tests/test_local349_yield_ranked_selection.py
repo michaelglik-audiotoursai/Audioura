@@ -337,13 +337,27 @@ class TestBulkQualityScoresDB:
 
     @pytest.fixture
     def db_conn(self):
-        """Get a production DB connection, skip if unavailable."""
+        """Get a PRODUCTION DB connection (read-only), skip if unavailable.
+
+        [LOCAL-676] Acchiardo / La Rossettisserie corpus rows live in the
+        production 'audiotours' DB, not in audiotours_test. This test asserts a
+        ranking over that real corpus, so it must read production explicitly. It
+        used to rely on DATABASE_URL being UNSET (falling back to the production
+        literal), but in a full pytest session a sibling suite sets
+        DATABASE_URL=…/audiotours_test, which pointed this read at the empty test
+        DB and the ranking assertion failed. Resolve the production host/port/
+        creds via db_connection but force dbname='audiotours' so the target is
+        unambiguous regardless of ambient env. This is a READ — no writes — so it
+        is safe and the LOCAL-232 guard never fires.
+        """
         try:
             import psycopg2
+            from db_connection import get_db_config
+            cfg = dict(get_db_config())
+            cfg['dbname'] = 'audiotours'  # explicit production read
             conn = psycopg2.connect(
-                os.environ.get('DATABASE_URL',
-                               'postgresql://admin:password123@localhost:5433/audiotours'),
-                connect_timeout=5
+                host=cfg['host'], port=cfg['port'], dbname=cfg['dbname'],
+                user=cfg['user'], password=cfg['password'], connect_timeout=5,
             )
             yield conn
             conn.close()

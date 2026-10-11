@@ -28,15 +28,26 @@ from decimal import Decimal
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'tests'))
 
-from db_connection import get_connection, check_db_available
+from db_connection import get_connection, check_db_available, get_db_config
 
 # ─── Environment for outside-Docker execution ─────────────────────────────────
-os.environ['DATABASE_URL'] = 'postgresql://admin:password123@localhost:5433/audiotours'
-os.environ['DB_HOST'] = 'localhost'
-os.environ['DB_PORT'] = '5433'
-os.environ['DB_NAME'] = 'audiotours'
-os.environ['DB_USER'] = 'admin'
-os.environ['DB_PASSWORD'] = 'password123'
+# [LOCAL-676] Do NOT hard-pin the production database at import time. pytest
+# imports every test module during collection, so an unconditional
+# os.environ['DATABASE_URL']='…/audiotours' here leaked a production target into
+# the shared process env and redirected OTHER suites (597, 672, …) to production,
+# tripping the LOCAL-232 write guard. Resolve the target the normal way instead:
+# under pytest db_connection routes to audiotours_test; run as a standalone
+# script it still resolves to the production DB as before.
+os.environ.setdefault('DB_HOST', 'localhost')
+os.environ.setdefault('DB_PORT', '5433')
+os.environ.setdefault('DB_USER', 'admin')
+os.environ.setdefault('DB_PASSWORD', 'password123')
+_cfg172 = get_db_config()
+os.environ['DB_NAME'] = _cfg172['dbname']
+os.environ['DATABASE_URL'] = (
+    f"postgresql://{_cfg172['user']}:{_cfg172['password']}"
+    f"@{_cfg172['host']}:{_cfg172['port']}/{_cfg172['dbname']}"
+)
 
 # ─── Test configuration ───────────────────────────────────────────────────────
 PPU_USER = f"test_local172_ppu_{uuid.uuid4().hex[:8]}"

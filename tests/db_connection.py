@@ -271,10 +271,25 @@ def get_database_url():
 
 
 def get_db_config():
+    # [D214 / LOCAL-676] An explicit AUDIOURA_DB_TARGET outranks an ambient
+    # DB_NAME, exactly as get_database_url() already does. Previously this
+    # function consulted DB_NAME first, so a test module that set
+    # DB_NAME=audiotours at import time (pytest imports every module during
+    # collection) silently redirected OTHER modules' get_connection() calls to
+    # production — defeating the LOCAL-296 switch and tripping the LOCAL-232
+    # production-write guard. The two resolvers must agree on precedence:
+    #   1. AUDIOURA_DB_TARGET (explicit switch; 'production' is a deliberate opt-in)
+    #   2. DB_NAME (explicit per-connection override)
+    #   3. _default_dbname() (pytest detection → audiotours_test, else production)
+    _explicit_target = _resolve_db_target()
+    if _explicit_target is not None:
+        dbname = _explicit_target
+    else:
+        dbname = os.environ.get("DB_NAME", _default_dbname())
     return {
         "host": os.environ.get("DB_HOST", DEFAULT_HOST),
         "port": os.environ.get("DB_PORT", DEFAULT_PORT),
-        "dbname": os.environ.get("DB_NAME", _default_dbname()),
+        "dbname": dbname,
         "user": os.environ.get("DB_USER", DEFAULT_USER),
         "password": os.environ.get("DB_PASSWORD", DEFAULT_PASSWORD),
     }

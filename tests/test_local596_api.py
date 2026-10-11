@@ -31,6 +31,38 @@ from flask import Flask
 import entitlements_api as ea
 import l2_seats
 
+# ─── LOCAL-676: throwaway-schema isolation ────────────────────────────────────
+# This suite writes to the shared seat/queue/offer/entitlement tables. Run in a
+# full session, leftover rows from (and left for) other l2 suites perturbed
+# seats_in_use()/offer_free_seats(), so offers landed for the wrong device and
+# these tests failed only in the full run. Route every connection in this
+# process (the Flask app's, _conn()'s, and the migration's) at a private
+# throwaway schema via PGOPTIONS, so the seat accounting sees ONLY this suite's
+# rows and public is never touched. The migrations re-create + re-seed the
+# cloned tables inside the schema (CREATE TABLE IF NOT EXISTS / INSERT ON
+# CONFLICT), so plans.seat_cap and l2_settings start from their migration
+# defaults every run. Dropped (CASCADE) in teardown with a public row-count proof.
+from _isolated_db import IsolatedSchema
+
+_ISO = IsolatedSchema(
+    prefix="t596api",
+    clone_tables=[
+        "plans", "l2_settings", "l2_queue", "l2_offers", "device_entitlement",
+    ],
+    proof_tables=["l2_queue", "l2_offers", "device_entitlement"],
+    db_url=_DB_URL,
+    banner="LOCAL-596-api",
+)
+
+
+def setUpModule():
+    _ISO.setup()
+
+
+def tearDownModule():
+    _ISO.teardown()
+
+
 API_KEY = "test-key-596"
 H = {"X-API-Key": API_KEY}
 
@@ -55,6 +87,14 @@ def _apply_migration(path):
 class ApiBase(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
+        # [LOCAL-676] entitlements_api.API_KEY is frozen from GATEWAY_API_KEY at
+        # its (single) import. Sibling l2 suites set DIFFERENT keys at their own
+        # import, so in a full session whichever imported entitlements_api first
+        # fixed the key and every other suite's X-API-Key header 401'd. Re-assert
+        # OUR key on the live module here, at execution time, so auth is correct
+        # regardless of collection order.
+        os.environ["GATEWAY_API_KEY"] = API_KEY
+        ea.API_KEY = API_KEY
         _apply_migration('012_subscription_levels.sql')
         _apply_migration('015_l2_seats_queue.sql')
         app = Flask(__name__)
