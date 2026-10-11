@@ -383,6 +383,274 @@ def check_listened_enough(user_id, tour_id):
     return info["enough"], info
 
 
+# ─── Batch sync (LOCAL-670C) ──────────────────────────────────────────────────
+#
+# Michael (2026-10-10): tours play fully offline, so the app records "listened",
+# ratings, reviews and per-stop thumbs LOCALLY and ships them in one batch when a
+# connection returns:  POST /sync { user_id, items:[…] }.
+#
+# Each item carries a client-generated UUID; the batch is IDEMPOTENT on it — a
+# retried item (dropped connection after the server committed) is a no-op that
+# reports "duplicate". The 670B listened-stops gate counts listens in the SAME
+# batch, so an offline listen-then-rate pair is accepted together: we apply all
+# `listened` items first, then evaluate each `rating` against the now-updated DB.
+#
+# Rejections (per-item, returned inside a 2xx so the client can drop exactly the
+# bad item): a timestamp more than SYNC_MAX_FUTURE_SKEW in the future, or a
+# `listened` event for a stop the tour does not have. A translation id maps to
+# its SOURCE (670B rule). D650: a `thumb` is an INTERNAL signal — it updates
+# personalization / stop quality only and is NEVER mixed into the tour score.
+
+from datetime import datetime, timedelta, timezone  # noqa: E402
+
+# A client clock up to this far ahead of the server is tolerated (clock drift);
+# beyond it the timestamp is rejected as implausible/future.
+SYNC_MAX_FUTURE_SKEW = timedelta(minutes=10)
+
+
+# Self-healing idempotency ledger: one row per processed client UUID. Lets a
+# retried batch skip already-applied items uniformly across all item types
+# (thumbs have no natural unique key, so this is what makes them idempotent).
+_SYNC_ITEMS_DDL = """
+    CREATE TABLE IF NOT EXISTS sync_items (
+        client_uuid  VARCHAR(64) PRIMARY KEY,
+        user_id      VARCHAR(255) NOT NULL,
+        item_type    VARCHAR(32) NOT NULL,
+        processed_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )
+"""
+
+# Self-healing store for text reviews (LOCAL-672 lands the UI later; the outbox
+# can already carry a review today, and "nothing is lost" is the rule). One
+# review per (tour, user); a later review replaces the earlier one.
+_TOUR_REVIEWS_DDL = """
+    CREATE TABLE IF NOT EXISTS tour_reviews (
+        id         SERIAL PRIMARY KEY,
+        tour_id    INTEGER NOT NULL,
+        user_id    VARCHAR(255) NOT NULL,
+        review     TEXT NOT NULL,
+        created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        CONSTRAINT uq_tour_reviews_tour_user UNIQUE (tour_id, user_id)
+    )
+"""
+
+
+def _ensure_sync_tables(cur):
+    """Create the sync ledger + reviews table if absent. Idempotent."""
+    cur.execute(_SYNC_ITEMS_DDL)
+    cur.execute(_TOUR_REVIEWS_DDL)
+
+
+def _parse_created_at(value):
+    """Parse an ISO-8601 timestamp to an aware UTC datetime, or None if absent/
+    unparseable. A trailing 'Z' (what the app sends) is accepted."""
+    if not value:
+        return None
+    try:
+        s = str(value).strip()
+        if s.endswith("Z"):
+            s = s[:-1] + "+00:00"
+        dt = datetime.fromisoformat(s)
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        return dt.astimezone(timezone.utc)
+    except (ValueError, TypeError):
+        return None
+
+
+def _is_future_skew(created_at, now=None):
+    """True if [created_at] is more than SYNC_MAX_FUTURE_SKEW ahead of now."""
+    if created_at is None:
+        return False  # a missing timestamp is not "in the future"
+    now = now or datetime.now(timezone.utc)
+    return created_at - now > SYNC_MAX_FUTURE_SKEW
+
+
+def _already_processed(cur, client_uuid):
+    cur.execute("SELECT 1 FROM sync_items WHERE client_uuid = %s", (client_uuid,))
+    return cur.fetchone() is not None
+
+
+def _mark_processed(cur, client_uuid, user_id, item_type):
+    cur.execute(
+        """
+        INSERT INTO sync_items (client_uuid, user_id, item_type)
+        VALUES (%s, %s, %s)
+        ON CONFLICT (client_uuid) DO NOTHING
+        """,
+        (client_uuid, user_id, item_type),
+    )
+
+
+def _sync_order_rank(item_type):
+    """Apply listens before the ratings that depend on them (gate counts them
+    in-batch); thumbs/reviews in between."""
+    if item_type == "listened":
+        return 0
+    if item_type == "rating":
+        return 2
+    return 1
+
+
+def _apply_sync_item(cur, item, batch_user_id):
+    """Apply one validated, not-yet-processed item on an OPEN cursor.
+
+    Returns the status string: 'accepted' or 'invalid'. The caller commits and
+    records the client_uuid. Validation (future skew, nonexistent stop) is done
+    here so the whole batch shares one connection/transaction and a rating sees
+    this batch's listens.
+    """
+    item_type = item.get("type")
+    user_id = item.get("user_id") or batch_user_id
+    tour_id = item.get("tour_id")
+    created_at = _parse_created_at(item.get("created_at"))
+
+    # Reject implausible future timestamps (clock skew guard) for every type.
+    if _is_future_skew(created_at):
+        return "invalid"
+
+    original_id = resolve_original_id(cur, tour_id) if tour_id is not None else None
+
+    if item_type == "listened":
+        stop_index = item.get("stop_index")
+        try:
+            stop_int = int(stop_index)
+        except (TypeError, ValueError):
+            return "invalid"
+        if stop_int < 0:
+            return "invalid"
+        # Reject a listen for a stop the tour does not have. stops_count may be
+        # unknown (None) — then we cannot disprove it, so we accept (same
+        # permissive stance the gate takes on unknown length).
+        stops = tour_stops_count(cur, original_id)
+        if stops is not None and stop_int >= stops:
+            return "invalid"
+        cur.execute(
+            """
+            INSERT INTO tour_listens (tour_id, user_id, stop_index)
+            VALUES (%s, %s, %s)
+            ON CONFLICT (tour_id, user_id, stop_index) DO NOTHING
+            """,
+            (original_id, user_id, stop_int),
+        )
+        return "accepted"
+
+    if item_type == "rating":
+        try:
+            rating_int = _validate_rating(item.get("rating"))
+        except ValueError:
+            return "invalid"
+        # 670B gate, now counting THIS batch's already-applied listens.
+        listened = count_listened_stops(cur, user_id, original_id)
+        required = required_listened_stops(cur, original_id)
+        if listened < required:
+            # Not enough listened even with this batch — reject so the client
+            # drops it (it cannot become valid later from the same payload).
+            return "invalid"
+        cur.execute(
+            """
+            INSERT INTO tour_ratings (tour_id, user_id, rating)
+            VALUES (%s, %s, %s)
+            ON CONFLICT (tour_id, user_id)
+            DO UPDATE SET rating = EXCLUDED.rating,
+                          updated_at = CURRENT_TIMESTAMP
+            """,
+            (original_id, user_id, rating_int),
+        )
+        return "accepted"
+
+    if item_type == "thumb":
+        # D650: internal signal only — personalization / stop quality, NEVER the
+        # tour score. Recorded into user_stop_feedback via swipe_preference.
+        swipe = item.get("swipe")
+        if swipe not in (-1, 1):
+            return "invalid"
+        stop_index = item.get("stop_index")
+        try:
+            stop_int = int(stop_index)
+        except (TypeError, ValueError):
+            return "invalid"
+        if stop_int < 0:
+            return "invalid"
+        try:
+            from swipe_preference_service import record_feedback
+            record_feedback(
+                user_id=user_id,
+                tour_id=original_id,
+                job_id=item.get("job_id"),
+                stop_index=stop_int,
+                swipe=swipe,
+                class_details=float(item.get("class_details", 0.333)),
+                class_historic=float(item.get("class_historic", 0.333)),
+                class_social=float(item.get("class_social", 0.333)),
+                i_con=float(item.get("i_con", 3.0)),
+            )
+        except Exception:  # noqa: BLE001 — a thumb must never fail the batch
+            return "invalid"
+        return "accepted"
+
+    if item_type == "review":
+        review = item.get("review")
+        if not isinstance(review, str) or not review.strip():
+            return "invalid"
+        cur.execute(
+            """
+            INSERT INTO tour_reviews (tour_id, user_id, review)
+            VALUES (%s, %s, %s)
+            ON CONFLICT (tour_id, user_id)
+            DO UPDATE SET review = EXCLUDED.review,
+                          updated_at = CURRENT_TIMESTAMP
+            """,
+            (original_id, user_id, review),
+        )
+        return "accepted"
+
+    # Unknown type — reject so the client drops it rather than retrying forever.
+    return "invalid"
+
+
+def process_sync_batch(user_id, items):
+    """Process a batch of outbox items idempotently in ONE transaction.
+
+    Applies listens before ratings so an offline listen-then-rate pair is
+    accepted together. Returns {"results": [{client_uuid, status}, …]} where
+    status ∈ accepted | duplicate | invalid. Items missing a client_uuid get a
+    synthetic one in the response so the client can still correlate.
+    """
+    results = []
+    conn = get_connection()
+    try:
+        cur = conn.cursor()
+        _ensure_tour_listens_table(cur)
+        _ensure_sync_tables(cur)
+
+        ordered = sorted(
+            list(items or []),
+            key=lambda it: _sync_order_rank(it.get("type")),
+        )
+
+        for item in ordered:
+            client_uuid = item.get("client_uuid")
+            if not client_uuid:
+                results.append({"client_uuid": None, "status": "invalid"})
+                continue
+
+            if _already_processed(cur, client_uuid):
+                results.append({"client_uuid": client_uuid, "status": "duplicate"})
+                continue
+
+            status = _apply_sync_item(cur, item, user_id)
+            if status == "accepted":
+                _mark_processed(cur, client_uuid, user_id, item.get("type", "?"))
+            results.append({"client_uuid": client_uuid, "status": status})
+
+        conn.commit()
+        return {"results": results}
+    finally:
+        conn.close()
+
+
 # ─── Flask API routes ─────────────────────────────────────────────────────────
 
 def register_rating_routes(app):
@@ -393,6 +661,7 @@ def register_rating_routes(app):
         GET  /tour/<tour_id>/rating                            → {score, count, label}
         POST /tour/<tour_id>/listened   {user_id, stop_index}  → record (idempotent)
         GET  /tour/<tour_id>/listened?user_id=...              → {listened_count, required, enough}
+        POST /sync                      {user_id, items:[…]}   → {results:[{client_uuid,status}]}
     """
     from flask import request, jsonify
 
@@ -497,5 +766,31 @@ def register_rating_routes(app):
         try:
             result = listened_status(user_id, tour_id)
         except Exception as e:  # noqa: BLE001
+            return jsonify({"error": str(e)}), 500
+        return jsonify(result), 200
+
+    @app.route('/sync', methods=['POST'])
+    def api_sync():
+        """[LOCAL-670C] Accept a batch of offline-recorded items.
+
+        Body: { user_id, items: [ {client_uuid, type, created_at, …}, … ] }.
+        Returns 200 with per-item verdicts:
+            { "results": [ {client_uuid, status}, … ] }
+        status ∈ accepted | duplicate | invalid. The client removes accepted +
+        duplicate + invalid items and keeps anything not reported (e.g. after a
+        5xx or network error) for a later retry. Idempotent on client_uuid.
+        """
+        data = request.get_json(silent=True)
+        if not data:
+            return jsonify({"error": "JSON body required"}), 400
+        user_id = data.get("user_id")
+        if not user_id:
+            return jsonify({"error": "user_id is required"}), 400
+        items = data.get("items")
+        if not isinstance(items, list):
+            return jsonify({"error": "items must be a list"}), 400
+        try:
+            result = process_sync_batch(user_id, items)
+        except Exception as e:  # noqa: BLE001 — a batch error must not lose items
             return jsonify({"error": str(e)}), 500
         return jsonify(result), 200
