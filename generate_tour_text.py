@@ -12679,14 +12679,64 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
                     if ',' in location:
                         _thin_city = location.split(',', 1)[1].strip()
                     _thin_needed = total_stops - len(poi_list)
-                    _thin_verified, _thin_verdicts = verify_thin_candidates(
-                        _thin_pool, _thin_pages, _museum_venue_name or location,
-                        venue_language=_museum_site_language,
-                        research_fn=_thin_research_fn, city=_thin_city,
-                        max_grounded=min(_thin_needed + 2, 8))
+                    # [LOCAL-668 #5] COST CAP for thin-verify.
+                    #   (1) 30-day VENUE CACHE: a venue verified in the last 30 days
+                    #       is served from cache at ZERO grounded cost (a thin
+                    #       catalogue does not change week to week).
+                    #   (2) per-tour BUDGET: at most THIN_VERIFY_MAX_QUERIES (10)
+                    #       grounded/Serper verification queries, wrapping the
+                    #       research callable so the cap holds no matter what; the
+                    #       used count is logged.
+                    _thin_vname = _museum_venue_name or location
+                    _thin_verified = None
+                    _thin_verdicts = []
+                    _thin_from_cache = False
+                    _thin_budget = None
+                    try:
+                        import thin_verify_cache as _tvc
+                        _cached_works = _tvc.cache_get(_thin_vname, _thin_city)
+                        if _cached_works:
+                            # Keep only cached works not already in the tour.
+                            _thin_verified = [
+                                w for w in _cached_works
+                                if _normalize_name(w.get('name', '')) not in _already]
+                            _thin_from_cache = True
+                            print(f"  [LOCAL-668] thin-verify VENUE CACHE hit for "
+                                  f"'{_thin_vname}' — {len(_thin_verified)} verified "
+                                  f"work(s), 0 verification queries (30-day cache)")
+                    except Exception as _tvc_err:
+                        print(f"  [LOCAL-668] thin-verify cache unavailable ({_tvc_err})")
+                        _tvc = None
+
+                    if _thin_verified is None:
+                        # Live verification. Cap grounded calls at min(existing
+                        # local cap, the per-tour budget remaining).
+                        try:
+                            _thin_budget = _tvc.VerificationBudget() if _tvc else None
+                        except Exception:
+                            _thin_budget = None
+                        _wrapped_research = (_thin_budget.wrap(_thin_research_fn)
+                                             if _thin_budget else _thin_research_fn)
+                        _local_cap = min(_thin_needed + 2, 8)
+                        _eff_cap = (min(_local_cap, _thin_budget.remaining)
+                                    if _thin_budget else _local_cap)
+                        _thin_verified, _thin_verdicts = verify_thin_candidates(
+                            _thin_pool, _thin_pages, _thin_vname,
+                            venue_language=_museum_site_language,
+                            research_fn=_wrapped_research, city=_thin_city,
+                            max_grounded=_eff_cap)
+                        if _thin_budget:
+                            print("  " + _thin_budget.summary())
+                        # Cache the POSITIVE verification result for 30 days.
+                        if _tvc and _thin_verified:
+                            try:
+                                _tvc.cache_put(_thin_vname, _thin_city, _thin_verified)
+                            except Exception:
+                                pass
                     print(f"  [LOCAL-667 THIN-VERIFY] {len(_thin_verified)} of "
-                          f"{len(_thin_verdicts)} thin candidate(s) reached the "
-                          f"two-independent-source bar")
+                          f"{len(_thin_verdicts) or len(_thin_verified)} thin candidate(s) "
+                          f"reached the two-independent-source bar"
+                          f"{' (cache)' if _thin_from_cache else ''}")
                     _thin_added = 0
                     for _tv in _thin_verified:
                         if _thin_added >= _thin_needed:
