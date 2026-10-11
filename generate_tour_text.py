@@ -36,6 +36,31 @@ def _sub_step(_name):
         yield
 
 
+# ── [LOCAL-668] Dominant address among already-placed stops. The verified works
+# of a contained museum tour all carry the museum's own street address; the
+# building/collection-area fallback stops (which are INSIDE the museum) must
+# inherit that same address so the BLOCKER4b address-scatter guard sees one
+# contained location, not an empty "second address". Returns "" when no stop
+# carries a usable (>10 char) address yet. Pure/deterministic.
+def _dominant_poi_address(poi_list) -> str:
+    from collections import Counter
+    _c = Counter()
+    _first = {}
+    for _p in (poi_list or []):
+        try:
+            _a = (_p.get('address') or '').strip()
+        except Exception:
+            _a = ''
+        if _a and len(_a) > 10:
+            _key = _a.lower()[:40]
+            _c[_key] += 1
+            _first.setdefault(_key, _a)
+    if not _c:
+        return ''
+    _best = _c.most_common(1)[0][0]
+    return _first.get(_best, '')
+
+
 # ──── [LOCAL-437] MODULE-SCOPE PREDICATE: checklist exemption from existence gate ────
 # This predicate is the SINGLE source of truth for whether exhibition-sourced
 # stops bypass the existence gate. Tests IMPORT this — do not re-type it.
@@ -12654,14 +12679,64 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
                     if ',' in location:
                         _thin_city = location.split(',', 1)[1].strip()
                     _thin_needed = total_stops - len(poi_list)
-                    _thin_verified, _thin_verdicts = verify_thin_candidates(
-                        _thin_pool, _thin_pages, _museum_venue_name or location,
-                        venue_language=_museum_site_language,
-                        research_fn=_thin_research_fn, city=_thin_city,
-                        max_grounded=min(_thin_needed + 2, 8))
+                    # [LOCAL-668 #5] COST CAP for thin-verify.
+                    #   (1) 30-day VENUE CACHE: a venue verified in the last 30 days
+                    #       is served from cache at ZERO grounded cost (a thin
+                    #       catalogue does not change week to week).
+                    #   (2) per-tour BUDGET: at most THIN_VERIFY_MAX_QUERIES (10)
+                    #       grounded/Serper verification queries, wrapping the
+                    #       research callable so the cap holds no matter what; the
+                    #       used count is logged.
+                    _thin_vname = _museum_venue_name or location
+                    _thin_verified = None
+                    _thin_verdicts = []
+                    _thin_from_cache = False
+                    _thin_budget = None
+                    try:
+                        import thin_verify_cache as _tvc
+                        _cached_works = _tvc.cache_get(_thin_vname, _thin_city)
+                        if _cached_works:
+                            # Keep only cached works not already in the tour.
+                            _thin_verified = [
+                                w for w in _cached_works
+                                if _normalize_name(w.get('name', '')) not in _already]
+                            _thin_from_cache = True
+                            print(f"  [LOCAL-668] thin-verify VENUE CACHE hit for "
+                                  f"'{_thin_vname}' — {len(_thin_verified)} verified "
+                                  f"work(s), 0 verification queries (30-day cache)")
+                    except Exception as _tvc_err:
+                        print(f"  [LOCAL-668] thin-verify cache unavailable ({_tvc_err})")
+                        _tvc = None
+
+                    if _thin_verified is None:
+                        # Live verification. Cap grounded calls at min(existing
+                        # local cap, the per-tour budget remaining).
+                        try:
+                            _thin_budget = _tvc.VerificationBudget() if _tvc else None
+                        except Exception:
+                            _thin_budget = None
+                        _wrapped_research = (_thin_budget.wrap(_thin_research_fn)
+                                             if _thin_budget else _thin_research_fn)
+                        _local_cap = min(_thin_needed + 2, 8)
+                        _eff_cap = (min(_local_cap, _thin_budget.remaining)
+                                    if _thin_budget else _local_cap)
+                        _thin_verified, _thin_verdicts = verify_thin_candidates(
+                            _thin_pool, _thin_pages, _thin_vname,
+                            venue_language=_museum_site_language,
+                            research_fn=_wrapped_research, city=_thin_city,
+                            max_grounded=_eff_cap)
+                        if _thin_budget:
+                            print("  " + _thin_budget.summary())
+                        # Cache the POSITIVE verification result for 30 days.
+                        if _tvc and _thin_verified:
+                            try:
+                                _tvc.cache_put(_thin_vname, _thin_city, _thin_verified)
+                            except Exception:
+                                pass
                     print(f"  [LOCAL-667 THIN-VERIFY] {len(_thin_verified)} of "
-                          f"{len(_thin_verdicts)} thin candidate(s) reached the "
-                          f"two-independent-source bar")
+                          f"{len(_thin_verdicts) or len(_thin_verified)} thin candidate(s) "
+                          f"reached the two-independent-source bar"
+                          f"{' (cache)' if _thin_from_cache else ''}")
                     _thin_added = 0
                     for _tv in _thin_verified:
                         if _thin_added >= _thin_needed:
@@ -12710,7 +12785,8 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
                     _fb_needed = total_stops - len(poi_list)
                     _fb_stops = build_fallback_stops(
                         _museum_venue_name or location, _fb_pages, _fb_combined,
-                        needed=_fb_needed, exclude_names=_fb_exclude)
+                        needed=_fb_needed, exclude_names=_fb_exclude,
+                        verified_works=[p for p in poi_list if p.get('verified', True)])
                     for _fb in _fb_stops:
                         _d1_evidence_log[_fb['name']] = {
                             "status": "VERIFIED",
@@ -12960,6 +13036,70 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
                         "tier": _verification_tier if '_verification_tier' in dir() else 'unknown',
                     })
                     return None, None, (None, None)
+            # [LOCAL-668] Contained-address binding (runs BEFORE BLOCKER4b).
+            # A single-venue museum tour is contained: every stop — the verified
+            # works, the historic building, and the named collection areas — is
+            # INSIDE one building and belongs at ONE street address (the venue's).
+            # Thin-tier works promoted from the R4/model pool can carry a stray
+            # address the model guessed, and the LOCAL-667 building/collection-area
+            # fallback stops carry an EMPTY address; either reads to the
+            # address-scatter guard below as a second, distinct location and
+            # wrongly rejects an honest contained tour (LOCAL-668 evidence:
+            # hcmc_off_rejected.log). Bind each contained stop to the venue's own
+            # address with venue_bound_address() (D611 provenance rule: a stop
+            # keeps an address its OWN page literally states — a real satellite
+            # gallery — otherwise it takes the venue address). The venue address is
+            # the dominant address already on the stops; if none, the sourced
+            # venue address.
+            if tour_category == 'museum':
+                _c668_venue_addr = _dominant_poi_address(poi_list)
+                if not _c668_venue_addr:
+                    try:
+                        from stop_pool_orchestrator import _resolve_venue_address
+                        _c668_venue_addr = _resolve_venue_address(location) or ''
+                    except Exception:
+                        _c668_venue_addr = ''
+                # A single NAMED museum means the whole tour is contained inside
+                # one building: EVERY stop (the Phase-3A works, the thin-verified
+                # works promoted from the R4/model pool with their own guessed
+                # addresses, and the building / collection-area fallback stops)
+                # belongs at the one venue address. venue_bound_address keeps a
+                # page-literal satellite address (a real annex) and otherwise
+                # takes the venue address. When the venue is NOT a single named
+                # museum (a city-scope museums request), bind only the
+                # grounded-contained fallback stops, never the works.
+                _c668_single_venue = bool(_museum_venue_name)
+                if _c668_venue_addr and len(_c668_venue_addr) > 10:
+                    try:
+                        from about_museum_stop import venue_bound_address as _vba668
+                    except Exception:
+                        _vba668 = None
+                    _c668_bound = 0
+                    for _cp in poi_list:
+                        _cp_kind = _cp.get('_stop_kind', '')
+                        _cp_contained = (
+                            _c668_single_venue
+                            or _cp_kind in ('building', 'collection_area')
+                            or _cp.get('_fallback_source')
+                            or 'thin_sources' in _cp
+                            or not (_cp.get('address') or '').strip()
+                        )
+                        if not _cp_contained:
+                            continue
+                        _cp_page = _cp.get('_source_page_text', '') or ''
+                        _cp_old = (_cp.get('address') or '').strip()
+                        if _vba668 is not None:
+                            _cp_new = _vba668(_cp.get('address', ''),
+                                              _c668_venue_addr, _cp_page)
+                        else:
+                            _cp_new = _cp_old or _c668_venue_addr
+                        if _cp_new and _cp_new != _cp_old:
+                            _cp['address'] = _cp_new
+                            _cp['_address_inherited_from_venue'] = True
+                            _c668_bound += 1
+                    if _c668_bound:
+                        print(f"  [LOCAL-668] Bound {_c668_bound} contained stop(s) to the "
+                              f"venue address (contained museum tour, 1 location).")
             # [BLOCKER4b] Address-scatter check: a contained museum tour should have
             # at most 2-3 distinct addresses (all inside one building).
             _unique_addresses = set()
@@ -16777,6 +16917,32 @@ Exempt: navigation directions ("Turn left", "Continue past").
                             'domain': _sr.get('domain', ''),
                         })
 
+                # [LOCAL-668 #3] Venue-anchored evidence filter: drop any snippet
+                # whose SUBJECT is ANOTHER museum. Generic collection-area stops
+                # ("Woodblock prints collection") pull SERP results about the same
+                # medium at OTHER museums; on the HCMC cheap-arm run that put
+                # Honolulu/Saint-Louis holdings (Guston, Holbein, Pippin) into the
+                # evidence and bled "Saint Louis" into the narration. Prevention at
+                # the evidence stage beats cure at the prose stage (LOCAL-652). A
+                # snippet that names THIS venue is kept; one that names a foreign
+                # institution and NOT this venue is dropped; generic
+                # medium/technique evidence is kept. Museum tours only.
+                if tour_category == 'museum' and _s_snippets:
+                    try:
+                        from venue_anchored_research import drop_foreign_museum_snippets
+                        _vn668 = _museum_venue_name or location.split(',')[0].strip()
+                        _city668 = location.split(',', 1)[1].strip() if ',' in location else ''
+                        _s_snippets, _ff668 = drop_foreign_museum_snippets(
+                            _s_snippets, _vn668, _city668)
+                        if _ff668.get('dropped'):
+                            print(f"      [LOCAL-668] foreign-museum snippets dropped "
+                                  f"for '{_s_name[:40]}': {_ff668['dropped']} "
+                                  f"(kept {_ff668['output']})")
+                            for _dl in _ff668.get('dropped_log', [])[:5]:
+                                print(f"        ✗ names '{_dl['foreign']}' — {_dl['title'][:60]}")
+                    except Exception as _ff_err:
+                        print(f"      [LOCAL-668] foreign-museum filter skipped ({_ff_err})")
+
                 # [LOCAL-410] Inject credit_line as a leading snippet (source of Fridman etc.)
                 _s_credit = _s_poi.get('credit_line', '')
                 if not _s_credit and _exhibition_checklist_result and hasattr(_exhibition_checklist_result, 'works'):
@@ -18313,6 +18479,35 @@ MANDATORY INCLUSION — work this surprising detail into the description natural
                     except Exception as _wf_err:
                         print(f"  [LOCAL-620] evidence balance skipped: {_wf_err}")
 
+                # [LOCAL-668 #3] Final venue-anchored drop at the generation
+                # chokepoint — catches foreign-museum snippets from EVERY source
+                # (initial research, STORY_REPLENISH, direct injection) just before
+                # they enter the prompt. A snippet whose subject is a DIFFERENT
+                # museum (the Saint-Louis / Honolulu leak on the HCMC area stops)
+                # is dropped; one naming THIS venue, or no competing institution,
+                # is kept. Never empties a stop's evidence.
+                if tour_category == 'museum' and _stop_snippets:
+                    try:
+                        from venue_anchored_research import drop_foreign_museum_snippets
+                        try:
+                            _vn668f = _museum_venue_name or location or ''
+                        except NameError:
+                            _vn668f = location or ''
+                        _city668f = location.split(',', 1)[1].strip() if ',' in (location or '') else ''
+                        _kept668, _rep668 = drop_foreign_museum_snippets(
+                            _stop_snippets, _vn668f, _city668f)
+                        if _kept668 and _rep668.get('dropped'):
+                            _stop_snippets = _kept668
+                            print(f"  [LOCAL-668] Stop {stop_num} foreign-museum evidence "
+                                  f"dropped: {_rep668['dropped']} (kept {_rep668['output']})")
+                            for _dl668 in _rep668.get('dropped_log', [])[:5]:
+                                print(f"    ✗ names '{_dl668['foreign']}' — {_dl668['title'][:60]}")
+                        elif _rep668.get('dropped') and not _kept668:
+                            print(f"  [LOCAL-668] Stop {stop_num}: all evidence named a "
+                                  f"foreign museum — kept as-is (never empty a stop)")
+                    except Exception as _ff668_err:
+                        print(f"  [LOCAL-668] foreign-museum filter skipped: {_ff668_err}")
+
                 # These are concrete, checkable facts — numbers, named materials,
                 # named techniques, named literary forms — that the prose MUST prefer
                 # over general claims like "revolutionized" or "had no precedent".
@@ -18429,6 +18624,30 @@ MANDATORY INCLUSION — work this surprising detail into the description natural
                               f"(reception_evidence={_has_reception})")
                     except Exception as _wfc_err:
                         print(f"  [LOCAL-617] narration contract skipped: {_wfc_err}")
+
+                    # [LOCAL-668 #2] AREA / BUILDING stops must LEAD with a verified
+                    # work (or artist) of THIS museum, so the stop opens on a real
+                    # object a visitor can see here rather than a generic lecture on
+                    # the medium. The verified lead work was attached when the
+                    # fallback stop was built (museum_fallback_stops.assign_lead_works).
+                    try:
+                        _lead = poi.get('_lead_work') if isinstance(poi, dict) else None
+                        if _lead and (_lead.get('name') or '').strip():
+                            _lead_name = _lead['name'].strip()
+                            _lead_artist = (_lead.get('artist') or '').strip()
+                            _by = f" by {_lead_artist}" if _lead_artist else ""
+                            description_prompt += (
+                                f"\nLEAD WITH A REAL WORK (LOCAL-668): open this stop by "
+                                f"naming the verified work \"{_lead_name}\"{_by} — a work "
+                                f"confirmed in THIS museum's collection — and describe it "
+                                f"first, as the concrete example of this area. Only after "
+                                f"that may you speak about the collection area in general. "
+                                f"Name ONLY works and artists of THIS museum; never a work "
+                                f"or artist from any other museum or collection.\n")
+                            print(f"  [LOCAL-668] Stop {stop_num} ({poi.get('_stop_kind','area')}) "
+                                  f"leads with verified work '{_lead_name}'{_by}")
+                    except Exception as _lw_err:
+                        print(f"  [LOCAL-668] lead-work instruction skipped: {_lw_err}")
 
         # [B6] Scored story elements → generation wiring (per-status phrasing)
         # Reads ranked elements from work_stories cache and injects them with

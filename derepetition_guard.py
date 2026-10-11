@@ -700,6 +700,80 @@ def _stop_blocks(tour_text: str):
     return blocks
 
 
+# ---------------------------------------------------------------------------
+# [LOCAL-668 #4] TECHNIQUE / EXPLANATION near-duplicate — the SAME how-it-is-made
+# explanation told at more than one stop. A thin-museum tour fills its slots with
+# collection-area stops (Lacquer painting, Silk painting, Woodblock prints); the
+# writer, having explained how lacquer is layered at the lacquer stop, repeats
+# that same technique explanation at the silk and woodblock stops. The lacquer-
+# layering story must be told ONCE.
+#
+# fact_signatures needs a YEAR; keyphrase_signatures needs a rare ADJACENT
+# bigram — a technique explanation often has neither ("lacquer is applied in many
+# thin layers, each sanded and polished before the next"). The signal here is a
+# high overlap of DISTINCTIVE content words between two sentences, measured by
+# Jaccard, independent of year or proper noun. Threshold is deliberately high
+# (>= 0.6 of the smaller set, >= 4 distinctive words) so ordinary prose that
+# merely shares a few art words never trips it; only a genuinely re-told
+# explanation collapses.
+# ---------------------------------------------------------------------------
+
+# Common words that never make a sentence distinctive (reuse the keyphrase set +
+# a few function words). A distinctive word is len>=5, lower-cased, outside this.
+def _technique_content_words(sentence: str):
+    import unicodedata
+    s = _QUOTED_SPAN_RE.sub(' ', sentence or '')
+    out = set()
+    for w in re.findall(r"[A-Za-zà-þÀ-Þ'\-]{5,}", s):
+        if w[:1].isupper():
+            continue  # proper noun — not a technique word
+        f = unicodedata.normalize('NFKD', w.lower())
+        f = ''.join(c for c in f if not unicodedata.combining(c))
+        if not f or f in _KEYPHRASE_COMMON or f in _FACT_NAME_STOPWORDS:
+            continue
+        out.add(f)
+    return out
+
+
+def _technique_near_duplicates(blocks, min_overlap: float = 0.6,
+                               min_distinctive: int = 4):
+    """Return repeats where a later stop's sentence re-tells an earlier stop's
+    explanation (high distinctive-word Jaccard). One entry per repeated sentence.
+    """
+    seen = []  # list of (stop_number, sentence, wordset)
+    out = []
+    for num, block in blocks:
+        _lines = block.split('\n')[1:]
+        if num == 1:
+            _lines = [ln for ln in _lines
+                      if not ln.strip().lower().startswith('orientation:')]
+        narration = '\n'.join(ln for ln in _lines if not _FACT_SKIP_LINE.match(ln))
+        for sent in _split_into_sentences(narration):
+            ws = _technique_content_words(sent)
+            if len(ws) < min_distinctive:
+                continue
+            matched = None
+            for (pnum, psent, pws) in seen:
+                if pnum == num:
+                    continue
+                inter = len(ws & pws)
+                denom = min(len(ws), len(pws)) or 1
+                if inter / denom >= min_overlap and inter >= min_distinctive:
+                    matched = (pnum, psent)
+                    break
+            if matched:
+                out.append({
+                    'signature': 'technique/near-duplicate',
+                    'first_stop': matched[0],
+                    'repeat_stop': num,
+                    'sentence': sent,
+                    'first_sentence': matched[1],
+                })
+            else:
+                seen.append((num, sent, ws))
+    return out
+
+
 def check_cross_stop_fact_repetition(tour_text: str, min_stops: int = 2,
                                      include_within_stop: bool = True):
     """Facts asserted more than once — across stops, and (LOCAL-660) within a stop.
@@ -771,6 +845,14 @@ def check_cross_stop_fact_repetition(tour_text: str, min_stops: int = 2,
                     })
                 elif sig not in seen:
                     seen[sig] = (num, sent)
+    # [LOCAL-668 #4] Add technique/explanation near-duplicates across stops (the
+    # lacquer-layering story retold at the silk/woodblock stops) — caught by
+    # distinctive-word overlap, which needs neither a year nor a rare bigram.
+    if len(blocks) >= min_stops:
+        _already = {(r['repeat_stop'], r['sentence']) for r in repeats}
+        for _nd in _technique_near_duplicates(blocks):
+            if (_nd['repeat_stop'], _nd['sentence']) not in _already:
+                repeats.append(_nd)
     return repeats
 
 
