@@ -174,11 +174,15 @@ def moderate_text(text):
     if words & _PROFANITY:
         return "pending", "profanity"
 
-    if _URL_RE.search(t):
-        return "pending", "url"
-
+    # Contact info is checked BEFORE the URL rule: an email contains a domain
+    # (a@b.com) that the URL regex would otherwise claim first, mislabelling a
+    # contact as a url. A phone number has no domain, so order does not matter
+    # for it, but keeping both here is clearer.
     if _EMAIL_RE.search(t) or _PHONE_RE.search(t):
         return "pending", "contact"
+
+    if _URL_RE.search(t):
+        return "pending", "url"
 
     return "approved", ""
 
