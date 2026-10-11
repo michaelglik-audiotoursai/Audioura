@@ -545,15 +545,97 @@ def research_backend() -> str:
     return 'serper' if v == 'serper' else 'gemini'
 
 
+# ── [LOCAL-674] WALKING_RESEARCH — the per-category research choice for WALKING ─
+# D645/LOCAL-664 measured that the LOCAL-648 Serper object backend loses ~2 Kiro
+# points on WALKING tours (Boston: Gemini 7.5 vs Serper 5.0), because a walking
+# stop is a PLACE with thin object-context and the top Serper results are
+# SEO/listing pages. So walking stays on Gemini — the 81%-of-the-bill cost we
+# want to cut. This flag selects, FOR WALKING TOURS ONLY, which research backend
+# answers the per-stop grounded narrate:
+#
+#   gemini           (default) — unchanged grounded Gemini, one request per stop.
+#   serper_plus      — Wikipedia-first (free full article + local-language) +
+#                      better Serper pages (skip SEO/listing, prefer official) +
+#                      a news pass where current affairs apply + one extractor
+#                      (serper_plus_research, LOCAL-674).
+#   gemini_per_venue — keep Gemini but issue ONE grounded request per VENUE/tour
+#                      instead of per stop (LOCAL-645); the per-stop narrate then
+#                      runs ungrounded on that material. The venue pass itself is
+#                      turned on by GEMINI_PER_VENUE=1 (set by the generator when
+#                      this value is selected); the router here keeps the per-stop
+#                      *fallback* on Gemini.
+#
+# CATEGORY-AWARE and DEFAULT-SAFE. The flag only takes effect for a tour whose
+# category is 'walking'; any other category is untouched (it keeps the normal
+# RESEARCH_BACKEND / cheap-arm routing). Unset or 'gemini' → byte-for-byte the
+# old behaviour. LEAD decides whether to switch it on.
+WALKING_RESEARCH_ENV = 'WALKING_RESEARCH'
+_WALKING_RESEARCH_VALUES = ('serper_plus', 'gemini_per_venue', 'gemini')
+
+
+def walking_research_backend() -> str:
+    """The WALKING_RESEARCH selection for the CURRENT tour, or '' when it does not
+    apply (not a walking tour, flag unset, or an unrecognised value). Reads the
+    tour category from the cheap_arm contextvar so it is per-tour and
+    concurrency-safe; when the category is unknown it still honours the flag only
+    if the flag is set AND no category gate contradicts it, matching how a walking
+    live run / harness sets WALKING_RESEARCH explicitly."""
+    v = (os.environ.get(WALKING_RESEARCH_ENV, '') or '').strip().lower()
+    if v not in _WALKING_RESEARCH_VALUES or v == 'gemini':
+        return ''
+    # Only apply to walking tours. When the category is unknown (''), honour the
+    # flag — the harness and the walking live run set it deliberately, and a
+    # non-walking production tour never sets WALKING_RESEARCH.
+    try:
+        import cheap_arm as _cheap_arm
+        cat = _cheap_arm.tour_category()
+    except Exception:
+        cat = ''
+    if cat and cat != 'walking':
+        return ''
+    return v
+
+
+def walking_gemini_per_venue_selected() -> bool:
+    """True when WALKING_RESEARCH=gemini_per_venue applies to this tour, so the
+    generator should turn the LOCAL-645 per-venue grounded pass ON for it (even if
+    GEMINI_PER_VENUE is not independently set)."""
+    return walking_research_backend() == 'gemini_per_venue'
+
+
 def research_with_sources(prompt: str, model: str = None, resolve: bool = True,
                           timeout: int = 90, grounded: bool = True) -> Dict:
     """Answer a research question, returning {text, sources, supports, queries,
     error}. Dispatches to the Serper backend when RESEARCH_BACKEND=serper AND
     grounded=True, otherwise to gemini_with_sources with the identical arguments.
 
+    [LOCAL-674] WALKING_RESEARCH takes precedence for a WALKING tour:
+      * serper_plus      → serper_plus_research (Wikipedia-first walking backend).
+      * gemini_per_venue → stay on Gemini for the per-stop fallback (the per-venue
+        grounded pass is handled upstream in story_production_loop); nothing to do
+        here beyond NOT routing to Serper.
+    For any non-walking tour, or when WALKING_RESEARCH is unset/gemini, this is
+    exactly the previous behaviour.
+
     This is call-compatible with gemini_with_sources, so a call site swaps one for
-    the other with no argument changes. With the default backend (gemini) this is
-    exactly gemini_with_sources — nothing changes."""
+    the other with no argument changes."""
+    if grounded:
+        _wr = walking_research_backend()
+        if _wr == 'serper_plus':
+            try:
+                import serper_plus_research
+            except Exception:
+                # Fail SAFE to Gemini rather than breaking generation.
+                return gemini_with_sources(prompt, model=None, resolve=resolve,
+                                           timeout=timeout, grounded=grounded)
+            return serper_plus_research.serper_plus_research(
+                prompt, model=model, resolve=resolve, timeout=timeout,
+                grounded=grounded)
+        if _wr == 'gemini_per_venue':
+            # Keep the per-stop fallback on Gemini; the one-per-venue grounded pass
+            # is run by the loop. Do NOT drop into the Serper object backend.
+            return gemini_with_sources(prompt, model=model, resolve=resolve,
+                                       timeout=timeout, grounded=grounded)
     if grounded and research_backend() == 'serper':
         try:
             import serper_research

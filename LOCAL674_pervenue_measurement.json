@@ -1,0 +1,604 @@
+{
+  "summary": {
+    "rate_tag": "2026-10-10-r5",
+    "n_requests": 3,
+    "n_stops": 15,
+    "arm": "gemini_per_venue",
+    "mean_evidence_score": 6.07,
+    "mean_dated_named_facts": 4.6,
+    "stops_with_consequence": 11,
+    "stops_filler": 0,
+    "stops_no_material": 0,
+    "grounded_requests": 3,
+    "total_usd": 0.17216,
+    "usd_per_stop_amortised": 0.01148,
+    "total_run_usd": 0.17758
+  },
+  "results": [
+    {
+      "request": "Walking tour of historic political Boston",
+      "city": "Boston, Massachusetts, United States",
+      "area": "historic political Boston",
+      "tour_usd": 0.05708,
+      "tour_seconds": 21.5,
+      "sources": [
+        {
+          "domain": "nps.gov",
+          "url": "https://www.nps.gov/places/old-state-house.htm"
+        },
+        {
+          "domain": "bostonteapartyship.com",
+          "url": "https://www.bostonteapartyship.com/boston-attractions/old-state-house-museum"
+        },
+        {
+          "domain": "faneuilhallmarketplace.com",
+          "url": "https://faneuilhallmarketplace.com/about/history-of-faneuil-hall"
+        },
+        {
+          "domain": "boston.gov",
+          "url": "https://www.boston.gov/news/boston-city-hall-study-report"
+        },
+        {
+          "domain": "npshistory.com",
+          "url": "https://npshistory.com/publications/bost/brochures/faneuil-hall-1.pdf"
+        },
+        {
+          "domain": "wikipedia.org",
+          "url": "https://en.wikipedia.org/wiki/Old_State_House_(Boston)"
+        },
+        {
+          "domain": "archpres.com",
+          "url": "https://archpres.com/ma-state-house-historic-restoration/"
+        },
+        {
+          "domain": "tclf.org",
+          "url": "https://www.tclf.org/old-state-house-boston-massacre-site"
+        },
+        {
+          "domain": "thehistorylist.com",
+          "url": "https://events.thehistorylist.com/venues/the-bostonian-society-old-state-house-boston-massachusetts"
+        },
+        {
+          "domain": "wikipedia.org",
+          "url": "https://en.wikipedia.org/wiki/Faneuil_Hall"
+        },
+        {
+          "domain": "nps.gov",
+          "url": "https://www.nps.gov/articles/000/fh-overview.htm"
+        },
+        {
+          "domain": "tclf.org",
+          "url": "https://www.tclf.org/faneuil-hall"
+        },
+        {
+          "domain": "sah-archipedia.org",
+          "url": "https://sah-archipedia.org/buildings/MA-01-GC4"
+        },
+        {
+          "domain": "wikipedia.org",
+          "url": "https://en.wikipedia.org/wiki/Boston_City_Hall"
+        },
+        {
+          "domain": "wikipedia.org",
+          "url": "https://en.wikipedia.org/wiki/Massachusetts_State_House"
+        },
+        {
+          "domain": "aoc.gov",
+          "url": "https://www.aoc.gov/about-us/history/architects-of-the-capitol/charles-bulfinch"
+        },
+        {
+          "domain": "bcausa.com",
+          "url": "https://www.bcausa.com/massachusetts-state-house"
+        },
+        {
+          "domain": "bostonathenaeum.org",
+          "url": "https://bostonathenaeum.org/about/"
+        },
+        {
+          "domain": "wikipedia.org",
+          "url": "https://en.wikipedia.org/wiki/Boston_Athen%C3%A6um"
+        },
+        {
+          "domain": "bostonpreservation.org",
+          "url": "https://www.bostonpreservation.org/advocacy-project/boston-athenaeum-0"
+        },
+        {
+          "domain": "bostonathenaeum.org",
+          "url": "https://bostonathenaeum.org/news/metamorphosis-2/"
+        },
+        {
+          "domain": "goppion.com",
+          "url": "https://www.goppion.com/projects/the-boston-athenaeum"
+        },
+        {
+          "domain": "annumarchitects.com",
+          "url": "https://www.annumarchitects.com/projects/the-boston-athenaeum/"
+        }
+      ],
+      "stops": {
+        "Old State House": {
+          "material": "**Old State House**  \nCompleted in 1713, this Georgian brick building was erected as the Massachusetts Bay Colony's Town House to hold government offices and a merchants' exchange. In 1761, patriot James Otis argued eloquently against British Writs of Assistance inside its chambers, and in 1770, the Boston Massacre occurred directly outside in front of the building. The Declaration of Independence was proclaimed to Bostonians for the first time from its eastern balcony on July 18, 1776. In 1881, the Bostonian Society was formed to preserve the site and prevent its demolition, converting it into a public history museum that remains an active National Historic Landmark.",
+          "has_material": true,
+          "score": {
+            "dated_named_facts": 5,
+            "dated_named_examples": [
+              "Completed in 1713, this Georgian brick building was erected as the Massachusetts Bay Colony's Town House",
+              "In 1761, patriot James Otis argued eloquently against British Writs of Assistance inside its chambers",
+              "in 1770, the Boston Massacre occurred directly outside in front of the building",
+              "The Declaration of Independence was proclaimed to Bostonians for the first time from its eastern balcony on July 18, 1776",
+              "In 1881, the Bostonian Society was formed to preserve the site and prevent its demolition"
+            ],
+            "has_consequence": true,
+            "filler": false,
+            "evidence_score": 7
+          }
+        },
+        "Faneuil Hall": {
+          "material": "**Faneuil Hall**  \nDesigned by painter and architect John Smibert, Faneuil Hall opened in 1742 after being funded and presented to the town of Boston as a gift from merchant Peter Faneuil. Known historically as the \"Cradle of Liberty,\" it served as the setting for pivotal town meetings led by figures such as Samuel Adams and James Otis in protest of British imperial taxation during the 1760s. The building was reconstructed following a fire in 1761 and subsequently expanded and redesigned in 1805–1806 by prominent architect Charles Bulfinch.",
+          "has_material": true,
+          "score": {
+            "dated_named_facts": 5,
+            "dated_named_examples": [
+              "Faneuil Hall opened in 1742 after being funded and presented to the town of Boston as a gift from merchant Peter Faneuil",
+              "it served as the setting for pivotal town meetings led by figures such as Samuel Adams and James Otis in protest of British imperial taxation during the 1760s",
+              "The building was reconstructed following a fire in 1761",
+              "expanded and redesigned in 1805–1806 by prominent architect Charles Bulfinch"
+            ],
+            "has_consequence": true,
+            "filler": false,
+            "evidence_score": 7
+          }
+        },
+        "Boston City Hall": {
+          "material": "**Boston City Hall**  \nConstructed in the Brutalist style, Boston City Hall was designed by architects Gerhard Kallmann, Michael McKinnell, and Edward F. Knowles after their firm won a national, two-stage architectural design competition in 1962. Groundbreaking occurred on September 18, 1963, and the nine-story concrete and brick municipal headquarters was officially dedicated on February 11, 1969. Created as the cornerstone of the Boston Redevelopment Authority's 1960s urban renewal program for Government Center, the building was honored with the American Institute of Architects Honor Award and the Boston Society of Architects Parker Medal in 1969.",
+          "has_material": true,
+          "score": {
+            "dated_named_facts": 4,
+            "dated_named_examples": [
+              "their firm won a national, two-stage architectural design competition in 1962",
+              "Groundbreaking occurred on September 18, 1963",
+              "the nine-story concrete and brick municipal headquarters was officially dedicated on February 11, 1969",
+              "the building was honored with the American Institute of Architects Honor Award and the Boston Society of Architects Parker Medal in 1969"
+            ],
+            "has_consequence": true,
+            "filler": false,
+            "evidence_score": 6
+          }
+        },
+        "Massachusetts State House": {
+          "material": "**Massachusetts State House**  \nDesigned by Boston-born architect Charles Bulfinch and completed in January 1798 on Beacon Hill, the Massachusetts State House serves as the state capitol and home to the General Court and Governor's offices. Its prominent Federal-style design was designated a National Historic Landmark on December 19, 1960. In 1895, a major yellow-brick and marble Annex designed by Charles Brigham was added to the rear, followed by the addition of marble-clad East and West wings between 1914 and 1917.",
+          "has_material": true,
+          "score": {
+            "dated_named_facts": 4,
+            "dated_named_examples": [
+              "completed in January 1798 on Beacon Hill",
+              "designated a National Historic Landmark on December 19, 1960",
+              "In 1895, a major yellow-brick and marble Annex designed by Charles Brigham was added",
+              "addition of marble-clad East and West wings between 1914 and 1917"
+            ],
+            "has_consequence": true,
+            "filler": false,
+            "evidence_score": 6
+          }
+        },
+        "Boston Athenaeum": {
+          "material": "**Boston Athenaeum**  \nThe Boston Athenaeum was established in 1807 by members of the Anthology Society as a membership library and cultural repository. Its permanent Italian Renaissance Revival landmark clubhouse at 10½ Beacon Street was designed by architect Edward Clarke Cabot and opened in 1849. In 1822, it became one of the earliest institutions of its kind to permit a woman to own a proprietorship share in her own name. The building was declared a National Historic Landmark in December 1965 and underwent a major $17 million renovation and expansion by Annum Architects completed in 2022.",
+          "has_material": true,
+          "score": {
+            "dated_named_facts": 4,
+            "dated_named_examples": [
+              "The Boston Athenaeum was established in 1807 by members of the Anthology Society",
+              "Its permanent Italian Renaissance Revival landmark clubhouse at 10½ Beacon Street was designed by architect Edward Clarke Cabot and opened in 1849",
+              "In 1822, it became one of the earliest institutions of its kind to permit a woman to own a proprietorship share in her own name",
+              "The building was declared a National Historic Landmark in December 1965"
+            ],
+            "has_consequence": false,
+            "filler": false,
+            "evidence_score": 4
+          }
+        }
+      }
+    },
+    {
+      "request": "Walking tour of the Freedom Trail, Boston",
+      "city": "Boston, Massachusetts, United States",
+      "area": "the Freedom Trail, Boston",
+      "tour_usd": 0.05728,
+      "tour_seconds": 20.1,
+      "sources": [
+        {
+          "domain": "seesight-tours.com",
+          "url": "https://www.seesight-tours.com/blog/16-stops-on-freedom-trail"
+        },
+        {
+          "domain": "boshist.org",
+          "url": "https://www.boshist.org/the-freedom-trail-a-journey-through-bostons-heritage/"
+        },
+        {
+          "domain": "wikipedia.org",
+          "url": "https://en.wikipedia.org/wiki/Freedom_Trail"
+        },
+        {
+          "domain": "thefreedomtrail.org",
+          "url": "https://www.thefreedomtrail.org/"
+        },
+        {
+          "domain": "wikipedia.org",
+          "url": "https://en.wikipedia.org/wiki/Massachusetts_State_House"
+        },
+        {
+          "domain": "otis.house",
+          "url": "https://otis.house/deepzoom/massachusetts-state-house/"
+        },
+        {
+          "domain": "sec.state.ma.us",
+          "url": "https://www.sec.state.ma.us/divisions/cis/historical/state-house-today.htm"
+        },
+        {
+          "domain": "wikipedia.org",
+          "url": "https://en.wikipedia.org/wiki/Park_Street_Church"
+        },
+        {
+          "domain": "thefreedomtrail.org",
+          "url": "https://www.thefreedomtrail.org/trail-sites/park-street-church"
+        },
+        {
+          "domain": "bostonteapartyship.com",
+          "url": "https://www.bostonteapartyship.com/boston-attractions/park-street-church"
+        },
+        {
+          "domain": "pluralism.org",
+          "url": "https://pluralism.org/park-street-church"
+        },
+        {
+          "domain": "hmdb.org",
+          "url": "https://www.hmdb.org/m.asp?m=18081"
+        },
+        {
+          "domain": "theclio.com",
+          "url": "https://theclio.com/entry/22751"
+        },
+        {
+          "domain": "wikipedia.org",
+          "url": "https://en.wikipedia.org/wiki/Granary_Burying_Ground"
+        },
+        {
+          "domain": "salemwitchmuseum.com",
+          "url": "https://salemwitchmuseum.com/locations/granary-burying-ground/"
+        },
+        {
+          "domain": "thedeadhistory.com",
+          "url": "https://thedeadhistory.com/granary-burying-ground/"
+        },
+        {
+          "domain": "ghostsandgravestones.com",
+          "url": "https://www.ghostsandgravestones.com/boston/granary-burying-ground"
+        },
+        {
+          "domain": "thefreedomtrail.org",
+          "url": "https://www.thefreedomtrail.org/trail-sites/kings-chapel-kings-chapel-burying-ground"
+        },
+        {
+          "domain": "frommers.com",
+          "url": "https://www.frommers.com/destinations/boston/attractions/kings-chapel-and-burying-ground/"
+        },
+        {
+          "domain": "sah-archipedia.org",
+          "url": "https://sah-archipedia.org/buildings/MA-01-BD7"
+        },
+        {
+          "domain": "agoboston2014.org",
+          "url": "http://www.agoboston2014.org/2013/09/kings-chapel/"
+        },
+        {
+          "domain": "facebook.com",
+          "url": "https://www.facebook.com/groups/898086475022523/posts/1671261294371700/"
+        },
+        {
+          "domain": "wikipedia.org",
+          "url": "https://en.wikipedia.org/wiki/Old_South_Meeting_House"
+        },
+        {
+          "domain": "nps.gov",
+          "url": "https://www.nps.gov/bost/learn/historyculture/osmh.htm?ms=webnav"
+        },
+        {
+          "domain": "revolutionaryspaces.org",
+          "url": "https://revolutionaryspaces.org/discover/old-south-meeting-house/"
+        },
+        {
+          "domain": "trolleytours.com",
+          "url": "https://www.trolleytours.com/boston/old-south-meeting-house"
+        },
+        {
+          "domain": "thefreedomtrail.org",
+          "url": "https://www.thefreedomtrail.org/trail-sites/old-south-meeting-house"
+        }
+      ],
+      "stops": {
+        "Massachusetts State House": {
+          "material": "### Massachusetts State House\nThe Massachusetts State House was designed by American architect Charles Bulfinch and completed in January 1798 atop Beacon Hill on land formerly owned by John Hancock. Governor Samuel Adams and Paul Revere laid its cornerstone on July 4, 1795. In 1802, Paul Revere’s company overlaid the original wooden dome with protective copper sheeting, which was later gilded in 23-karat gold leaf in 1861. It was designated a National Historic Landmark in 1960 and remains one of the oldest continuously operating state capitols in the United States.",
+          "has_material": true,
+          "score": {
+            "dated_named_facts": 5,
+            "dated_named_examples": [
+              "completed in January 1798 atop Beacon Hill",
+              "Governor Samuel Adams and Paul Revere laid its cornerstone on July 4, 1795",
+              "In 1802, Paul Revere’s company overlaid the original wooden dome with protective copper sheeting",
+              "which was later gilded in 23-karat gold leaf in 1861",
+              "It was designated a National Historic Landmark in 1960"
+            ],
+            "has_consequence": false,
+            "filler": false,
+            "evidence_score": 5
+          }
+        },
+        "Park Street Church": {
+          "material": "### Park Street Church\nPark Street Church was designed by English architect Peter Banner, with woodcarving by Solomon Willard, and was constructed in 1809 on the former site of Boston's town granary. The church's 217-foot steeple made it the tallest building in Boston for decades following its opening. On July 4, 1829, William Lloyd Garrison delivered his first major public address against slavery from the church's pulpit. Two years later, on July 4, 1831, the hymn \"America\" (\"My Country, 'Tis of Thee\") received its first public performance inside the church, sung by a children's choir.",
+          "has_material": true,
+          "score": {
+            "dated_named_facts": 3,
+            "dated_named_examples": [
+              "constructed in 1809 on the former site of Boston's town granary",
+              "On July 4, 1829, William Lloyd Garrison delivered his first major public address against slavery from the church's pulpit",
+              "Two years later, on July 4, 1831, the hymn \"America\" (\"My Country, 'Tis of Thee\") received its first public performance inside the church"
+            ],
+            "has_consequence": false,
+            "filler": false,
+            "evidence_score": 3
+          }
+        },
+        "Granary Burying Ground": {
+          "material": "### Granary Burying Ground\nThe Granary Burying Ground was established by the town of Boston in 1660 as the city's third municipal cemetery, on land that originally formed part of Boston Common. In 1737, the grounds were renamed for the public grain store that stood on the adjacent site. It contains an estimated 5,000 burials and 2,345 surviving grave markers, serving as the final resting place of American Revolution figures including Samuel Adams, John Hancock, Paul Revere, and the victims of the 1770 Boston Massacre. In 1840, architect Isaiah Rogers designed the distinctive Egyptian Revival entryway gate and iron perimeter fence that enclose the cemetery today.",
+          "has_material": true,
+          "score": {
+            "dated_named_facts": 5,
+            "dated_named_examples": [
+              "The Granary Burying Ground was established by the town of Boston in 1660",
+              "In 1737, the grounds were renamed for the public grain store",
+              "It contains ... the victims of the 1770 Boston Massacre",
+              "Samuel Adams ... buried here",
+              "In 1840, architect Isaiah Rogers designed the distinctive Egyptian Revival entryway gate"
+            ],
+            "has_consequence": false,
+            "filler": false,
+            "evidence_score": 5
+          }
+        },
+        "King's Chapel": {
+          "material": "### King's Chapel\nKing's Chapel was designed by Rhode Island architect Peter Harrison in 1749 and completed in 1754 out of Quincy granite, erected directly around an existing 1686 wooden church so services would not be interrupted during construction. While founded as New England’s first Anglican congregation, the church evolved in 1785 into America’s first Unitarian congregation under the leadership of lay reader James Freeman. The church's bell—originally cast in England in 1772—cracked in 1814 and was recast by Paul Revere in 1816, remaining in use to this day.",
+          "has_material": true,
+          "score": {
+            "dated_named_facts": 5,
+            "dated_named_examples": [
+              "King's Chapel was designed by Rhode Island architect Peter Harrison in 1749",
+              "completed in 1754 out of Quincy granite",
+              "erected directly around an existing 1686 wooden church",
+              "the church evolved in 1785 into America’s first Unitarian congregation under the leadership of lay reader James Freeman",
+              "the church's bell—originally cast in England in 1772—cracked in 1814 and was recast by Paul Revere in 1816"
+            ],
+            "has_consequence": true,
+            "filler": false,
+            "evidence_score": 7
+          }
+        },
+        "Old South Meeting House": {
+          "material": "### Old South Meeting House\nOld South Meeting House was designed by master builder Robert Twelves and completed in 1729 as a Puritan meeting house for the Third Church of Boston. On December 16, 1773, an estimated 5,000 colonists gathered inside its hall to protest the Tea Act, the decisive meeting that led immediately to the Boston Tea Party. During the British occupation of Boston in 1775–1776, British troops gutted the building's interior, covered the floor with dirt, and operated it as a military riding school. After being threatened with demolition in 1876, the structure was saved by a coalition of Boston citizens and officially opened to the public as a museum in 1877.",
+          "has_material": true,
+          "score": {
+            "dated_named_facts": 5,
+            "dated_named_examples": [
+              "Old South Meeting House was designed by master builder Robert Twelves and completed in 1729",
+              "On December 16, 1773, an estimated 5,000 colonists gathered inside its hall to protest the Tea Act",
+              "the decisive meeting that led immediately to the Boston Tea Party",
+              "During the British occupation of Boston in 1775–1776, British troops gutted the building's interior",
+              "After being threatened with demolition in 1876, the structure was saved by a coalition of Boston citizens and officially opened to the public as a museum in 1877"
+            ],
+            "has_consequence": true,
+            "filler": false,
+            "evidence_score": 7
+          }
+        }
+      }
+    },
+    {
+      "request": "Walking tour of Old Nice, France",
+      "city": "Nice, France",
+      "area": "Old Nice, France",
+      "tour_usd": 0.0578,
+      "tour_seconds": 26.8,
+      "sources": [
+        {
+          "domain": "vianissa.com",
+          "url": "https://www.vianissa.com/vieux-nice/"
+        },
+        {
+          "domain": "substack.com",
+          "url": "https://gayfrenchriviera.substack.com/p/vieux-nice-the-layered-history-of"
+        },
+        {
+          "domain": "blogspot.com",
+          "url": "http://aworldelsewhere-finn.blogspot.com/2011/07/cours-saleya-nice.html"
+        },
+        {
+          "domain": "accor.com",
+          "url": "https://mercure.accor.com/en/mercure-local-guide/cultural-treasures/old-nice.html"
+        },
+        {
+          "domain": "rivierabarcrawltours.com",
+          "url": "https://rivierabarcrawltours.com/what-does-cours-saleya-mean-nice-france/"
+        },
+        {
+          "domain": "thegoodlifefrance.com",
+          "url": "https://thegoodlifefrance.com/cours-saleya-market-in-nice-france/"
+        },
+        {
+          "domain": "explorenicecotedazur.com",
+          "url": "https://www.explorenicecotedazur.com/en/culture/cours-saleya/"
+        },
+        {
+          "domain": "wikipedia.org",
+          "url": "https://en.wikipedia.org/wiki/Nice_Cathedral"
+        },
+        {
+          "domain": "visitacity.com",
+          "url": "https://www.visitacity.com/en/nice/attractions/nice-cathedral"
+        },
+        {
+          "domain": "city-life.fr",
+          "url": "https://nice.city-life.fr/Visiter/Nice/Eglises-chapelles/868/Cathedrale-Sainte-Reparate?lang=en"
+        },
+        {
+          "domain": "wordpress.com",
+          "url": "https://vinoconvistablog.wordpress.com/2021/02/12/saint-reparate-is-the-patron-saint-of-the-town-and-diocese-of-nice-france/"
+        },
+        {
+          "domain": "france-voyage.com",
+          "url": "https://www.france-voyage.com/cities-towns/nice-23179/cathedral-sainte-reparate-14600.htm"
+        },
+        {
+          "domain": "agence-winter.com",
+          "url": "https://www.agence-winter.com/en/news/tourism-nice-2/most-beautiful-squares-in-nice-22"
+        },
+        {
+          "domain": "yannlefebvre.com",
+          "url": "https://yannlefebvre.com/tourism/old-nice-tourist-visit-1/"
+        },
+        {
+          "domain": "seenice.com",
+          "url": "https://www.seenice.com/sights/plazas/place-rossetti-673995"
+        },
+        {
+          "domain": "seenice.com",
+          "url": "https://www.seenice.com/sights/museums/palais-lascaris"
+        },
+        {
+          "domain": "grandsudinsolite.fr",
+          "url": "https://www.grandsudinsolite.fr/552--.html"
+        },
+        {
+          "domain": "wikipedia.org",
+          "url": "https://en.wikipedia.org/wiki/Palais_Lascaris"
+        },
+        {
+          "domain": "artsupp.com",
+          "url": "https://artsupp.com/en/nice/museums/palais-lascaris"
+        },
+        {
+          "domain": "francetravelplanner.com",
+          "url": "https://francetravelplanner.com/go/cote_azur/nice/see/palais-lascaris.html"
+        },
+        {
+          "domain": "wikipedia.org",
+          "url": "https://en.wikipedia.org/wiki/Castle_of_Nice"
+        },
+        {
+          "domain": "frenchrivieratraveller.com",
+          "url": "https://www.frenchrivieratraveller.com/Nice/Sights/colline-du-chateau.html"
+        },
+        {
+          "domain": "explorenicecotedazur.com",
+          "url": "https://www.explorenicecotedazur.com/en/culture/parc-de-la-colline-du-chateau/"
+        },
+        {
+          "domain": "bestofniceblog.com",
+          "url": "https://www.bestofniceblog.com/history-nice-france/the-nice-chateau-castle-hill/"
+        },
+        {
+          "domain": "seenice.com",
+          "url": "https://www.seenice.com/castles/colline-du-chateau-nice-area-673977"
+        },
+        {
+          "domain": "yondli.com",
+          "url": "https://yondli.com/france/nice/colline-du-chateau-nice"
+        }
+      ],
+      "stops": {
+        "Cours Saleya": {
+          "material": "- **Cours Saleya**  \n  Originally known as *La Marina* and later developed from the former ducal palace gardens, this open pedestrian esplanade was established under the name *Lou Cour* during the 18th century before taking its modern name. In 1839, Benoit Visconti opened a renowned literary salon here that hosted visiting international aristocracy and intellectuals for over five decades. In 1861, the municipality moved the local fruit and vegetable market to the square, expanding it in 1897 into what became the world’s first wholesale cut flower market. Through the late 19th century, the thoroughfare also served as the primary parade route for the Nice Carnival before the festivities were moved toward the Promenade des Anglais.",
+          "has_material": true,
+          "score": {
+            "dated_named_facts": 4,
+            "dated_named_examples": [
+              "established under the name Lou Cour during the 18th century",
+              "In 1839, Benoit Visconti opened a renowned literary salon here",
+              "In 1861, the municipality moved the local fruit and vegetable market to the square",
+              "expanded it in 1897 into what became the world’s first wholesale cut flower market"
+            ],
+            "has_consequence": true,
+            "filler": false,
+            "evidence_score": 6
+          }
+        },
+        "Nice Cathedral": {
+          "material": "- **Nice Cathedral**  \n  Also known as the *Cathédrale Sainte-Réparate*, the current Latin cross Baroque structure was primarily designed by Nice-born architect Jean-André Guibert and constructed between 1650 and 1685, with formal consecration taking place in 1699. The cathedral houses the relics of Sainte Reparata, a 3rd-century Christian martyr whose remains first arrived in Nice in 1060 and were enshrined under the cathedral’s main altar in 1690. Its standalone campanile was constructed later between 1731 and 1757, while the current Baroque Revival façade was completed around 1825–1830. On August 9, 1906, the cathedral was officially classified as a French National Monument, and it was elevated to the status of a minor basilica in 1949.",
+          "has_material": true,
+          "score": {
+            "dated_named_facts": 7,
+            "dated_named_examples": [
+              "constructed between 1650 and 1685 by Nice-born architect Jean-André Guibert",
+              "formal consecration taking place in 1699",
+              "relics of Sainte Reparata first arrived in Nice in 1060",
+              "relics enshrined under the cathedral’s main altar in 1690",
+              "campanile constructed between 1731 and 1757",
+              "Baroque Revival façade completed around 1825–1830",
+              "officially classified as a French National Monument on August 9, 1906"
+            ],
+            "has_consequence": true,
+            "filler": false,
+            "evidence_score": 9
+          }
+        },
+        "Place Rossetti": {
+          "material": "- **Place Rossetti**  \n  Place Rossetti was created as an open public square in 1825 following a land bequest from local dignitary Charles Rossetti de Châteauneuf, which enabled the demolition of buildings directly facing the cathedral to open up the space. Centered around an ornate fountain with a central obelisk, the square long served as the focal gathering point in the heart of Old Nice directly opposite the facade of Cathédrale Sainte-Réparate. In 1966, the iconic master ice cream parlor Fenocchio opened on the square, becoming an enduring commercial fixture of the plaza.",
+          "has_material": true,
+          "score": {
+            "dated_named_facts": 2,
+            "dated_named_examples": [
+              "Place Rossetti was created as an open public square in 1825 following a land bequest from local dignitary Charles Rossetti de Châteauneuf",
+              "In 1966, the iconic master ice cream parlor Fenocchio opened on the square"
+            ],
+            "has_consequence": true,
+            "filler": false,
+            "evidence_score": 4
+          }
+        },
+        "Palais Lascaris": {
+          "material": "- **Palais Lascaris**  \n  Commissioned around 1648 for the noble Lascaris-Vintimille family, this aristocratic palace is one of the premier examples of Genoese civil Baroque architecture in Nice. The property remained with the Lascaris-Vintimille family until the disruptions of the French Revolution forced its sale to private owners in 1802. The City of Nice purchased the deteriorated palace in 1942 to establish a public museum, securing its status as a classified Historic Monument in 1946. Following extensive restoration that wrapped up in 1970, the municipality transformed it into a musical instrument museum in 2001, permanently unveiling a collection of over 500 historic instruments built around the bequest of 19th-century collector Antoine Gautier in 2011.",
+          "has_material": true,
+          "score": {
+            "dated_named_facts": 6,
+            "dated_named_examples": [
+              "Commissioned around 1648 for the noble Lascaris-Vintimille family",
+              "The property remained with the Lascaris-Vintimille family until the disruptions of the French Revolution forced its sale to private owners in 1802",
+              "The City of Nice purchased the deteriorated palace in 1942 to establish a public museum",
+              "securing its status as a classified Historic Monument in 1946",
+              "Following extensive restoration that wrapped up in 1970",
+              "the municipality transformed it into a musical instrument museum in 2001"
+            ],
+            "has_consequence": true,
+            "filler": false,
+            "evidence_score": 8
+          }
+        },
+        "Colline du Château": {
+          "material": "- **Colline du Château**  \n  Occupied since antiquity as the site of the ancient Greek settlement of Nikaia founded in the 3rd century BC, this 93-meter limestone outcrop served as the heavily fortified medieval citadel and original cathedral site of Nice. The military fortifications successfully withstood major historical assaults, including the siege of 1543 by Franco-Ottoman forces, but were captured by French troops in 1705. In 1706, King Louis XIV of France commanded the total demolition of the castle and its defensive works. In 1829, work began to landscape the cleared ruins into a public park, which the municipality acquired for public strolls and expanded with an artificial cascading waterfall in 1885.",
+          "has_material": true,
+          "score": {
+            "dated_named_facts": 5,
+            "dated_named_examples": [
+              "founded in the 3rd century BC",
+              "siege of 1543 by Franco-Ottoman forces",
+              "captured by French troops in 1705",
+              "In 1706, King Louis XIV of France commanded the total demolition of the castle",
+              "In 1829, work began to landscape the cleared ruins into a public park"
+            ],
+            "has_consequence": true,
+            "filler": false,
+            "evidence_score": 7
+          }
+        }
+      }
+    }
+  ]
+}

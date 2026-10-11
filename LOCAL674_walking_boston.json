@@ -1,0 +1,766 @@
+{
+  "summary": {
+    "rate_tag": "2026-10-10-r5",
+    "arms": {
+      "gemini": {
+        "mean_evidence_score": 5.0,
+        "mean_dated_named_facts": 3.0,
+        "stops_with_consequence": 5,
+        "stops_filler": 0,
+        "mean_sources": 6.0,
+        "total_usd": 0.2695,
+        "usd_per_stop": 0.0539,
+        "mean_seconds": 7.4
+      },
+      "serper": {
+        "mean_evidence_score": 6.0,
+        "mean_dated_named_facts": 4.4,
+        "stops_with_consequence": 4,
+        "stops_filler": 1,
+        "mean_sources": 5.0,
+        "total_usd": 0.02272,
+        "usd_per_stop": 0.00454,
+        "mean_seconds": 7.8
+      },
+      "serper_plus": {
+        "mean_evidence_score": 8.2,
+        "mean_dated_named_facts": 6.2,
+        "stops_with_consequence": 5,
+        "stops_filler": 0,
+        "mean_sources": 4.0,
+        "total_usd": 0.01888,
+        "usd_per_stop": 0.00378,
+        "mean_seconds": 5.8
+      }
+    },
+    "n_stops": 5,
+    "total_run_usd": 0.31729
+  },
+  "results": [
+    {
+      "request": "Walking tour of historic political Boston",
+      "city": "Boston, Massachusetts, United States",
+      "place": "Old State House",
+      "prompt": "What story can be told to visitors of Boston, Massachusetts, United States about Old State House?\n\nContext — the work this concerns:\n  canonical_title: Old State House\n  venue_name: Old State House\nExhibition: Boston, Massachusetts, United States\n\nSearch, then answer with FACTS ONLY — each one sentence, with its source in brackets. Prefer what a visitor standing in front of it cannot see: why it was made, who decided, what went wrong, what it cost someone. If you find nothing reliable, say exactly \"NO RELIABLE INFORMATION\". Do not praise the work. Do not describe how it looks. Maximum 6 sentences.",
+      "arms": {
+        "gemini": {
+          "text": "The building was commissioned to replace Boston's wooden Town House after it was destroyed in the Great Fire of 1711. \n\nThe colonial government and the town jointly authorized its construction in 1712–1713 to serve as a shared civic hub, court, and merchant exchange. \n\nA disastrous fire gutted the entire interior in 1747, destroying irreplaceable colonial records and forcing builders to reconstruct everything within the surviving exterior brick walls. \n\nOn July 18, 1776, jubilant citizens celebrated the local reading of the Declaration of Independence by tearing down the building's original royal lion and unicorn sculptures and burning them in a bonfire. \n\nBy 1881, the city government considered tearing the deteriorating landmark down, prompting the city of Chicago to attempt to purchase and relocate it brick by brick. \n\nTo prevent its destruction and loss, alarmed citizens organized the Bostonian Society in 1881, funding an extensive restoration to preserve the building as a museum.",
+          "error": "",
+          "n_sources": 7,
+          "sources": [
+            {
+              "domain": "nps.gov",
+              "url": "https://npgallery.nps.gov/GetAsset/8c74542c-90d0-4069-bb60-b68266ee98e3"
+            },
+            {
+              "domain": "kellscraft.com",
+              "url": "https://www.kellscraft.com/RamblesBoston/ramblesboston02.html"
+            },
+            {
+              "domain": "trolleytours.com",
+              "url": "https://www.trolleytours.com/boston/old-state-house"
+            },
+            {
+              "domain": "journeywithmurphy.com",
+              "url": "https://journeywithmurphy.com/2021/01/old-state-house-boston-ma/"
+            },
+            {
+              "domain": "battlefields.org",
+              "url": "https://www.battlefields.org/learn/articles/old-state-house-boston"
+            },
+            {
+              "domain": "ournationalparks.us",
+              "url": "http://www.ournationalparks.us/northeast/boston-freedom-trail/old_state_house_means_everything_to_bostonians/"
+            },
+            {
+              "domain": "wikipedia.org",
+              "url": "https://en.wikipedia.org/wiki/Old_State_House_(Boston)"
+            }
+          ],
+          "queries": [
+            "\"Old State House\" Boston built 1713 cost fire 1747",
+            "Old State House Boston demolished saved 1881"
+          ],
+          "seconds": 10.3,
+          "usd": 0.05414,
+          "score": {
+            "dated_named_facts": 6,
+            "dated_named_examples": [
+              "The building was commissioned to replace Boston's wooden Town House after it was destroyed in the Great Fire of 1711.",
+              "The colonial government and the town jointly authorized its construction in 1712–1713 to serve as a shared civic hub, court, and merchant exchange.",
+              "A disastrous fire gutted the entire interior in 1747, destroying irreplaceable colonial records and forcing builders to reconstruct everything within the surviving exterior brick walls.",
+              "On July 18, 1776, jubilant citizens celebrated the local reading of the Declaration of Independence by tearing down the building's original royal lion and unicorn sculptures and burning them in a bonfire.",
+              "By 1881, the city government considered tearing the deteriorating landmark down, prompting the city of Chicago to attempt to purchase and relocate it brick by brick.",
+              "To prevent its destruction and loss, alarmed citizens organized the Bostonian Society in 1881, funding an extensive restoration to preserve the building as a museum."
+            ],
+            "has_consequence": true,
+            "filler": false,
+            "evidence_score": 8
+          }
+        },
+        "serper": {
+          "text": "The Old State House in Boston was built in 1713 and served as the seat of colonial and later state government throughout the 1700s. It was the site where the Boston Massacre occurred on March 5, 1770, when British soldiers fired into a crowd, killing five people. The royal governor, appointed by the King of Great Britain, held office in the building until 1775 and addressed the public from its balcony, symbolizing the King's authority. On July 18, 1776, the Declaration of Independence was read for the first time in Boston from the balcony of the Old State House. The building also hosted large gatherings, including the protest against the Tea Act on December 16, 1773, which led to the Boston Tea Party. Today, it is managed by Revolutionary Spaces and serves as a museum where visitors can explore period rooms and learn about Boston’s revolutionary history.",
+          "error": "",
+          "n_sources": 5,
+          "sources": [
+            {
+              "domain": "nps.gov",
+              "url": "https://www.nps.gov/bost/learn/historyculture/osh.htm"
+            },
+            {
+              "domain": "thefreedomtrail.org",
+              "url": "https://www.thefreedomtrail.org/trail-sites/old-state-house"
+            },
+            {
+              "domain": "revolutionaryspaces.org",
+              "url": "https://revolutionaryspaces.org/"
+            },
+            {
+              "domain": "en.wikipedia.org",
+              "url": "https://en.wikipedia.org/wiki/Old_State_House_(Boston)"
+            },
+            {
+              "domain": "arkansasheritage.com",
+              "url": "https://www.arkansasheritage.com/old-state-house-museum/oshm-home"
+            }
+          ],
+          "queries": [
+            "\"Old State House\"",
+            "\"Old State House\" Old State House",
+            "Boston Massachusetts United States State House"
+          ],
+          "seconds": 7.6,
+          "usd": 0.00453,
+          "score": {
+            "dated_named_facts": 5,
+            "dated_named_examples": [
+              "The Old State House in Boston was built in 1713",
+              "It was the site where the Boston Massacre occurred on March 5, 1770",
+              "The royal governor, appointed by the King of Great Britain, held office in the building until 1775",
+              "On July 18, 1776, the Declaration of Independence was read for the first time in Boston from the balcony of the Old State House",
+              "The building also hosted large gatherings, including the protest against the Tea Act on December 16, 1773"
+            ],
+            "has_consequence": true,
+            "filler": false,
+            "evidence_score": 7
+          }
+        },
+        "serper_plus": {
+          "text": "The Old State House was completed in 1713 on the site of the First Town-House, which had burned down in 1711, and it served as the seat of colonial and later state government throughout the 18th century. On March 5, 1770, British soldiers fired into a crowd in front of the building, killing five people in what became known as the Boston Massacre. The building’s balcony was the site where the Declaration of Independence was first read aloud to Bostonians on July 18, 1776. After the Massachusetts General Court moved to the New State House in 1798, the Old State House was used as Boston’s city hall following a refurbishment by Isaiah Rogers in 1830. Threatened with demolition in the late 19th century, it was renovated by George A. Clough in 1881–1882 and has since functioned as a history museum. The building also housed the royal governor’s office until 1775, symbolizing British authority in the colony.",
+          "error": "",
+          "n_sources": 4,
+          "sources": [
+            {
+              "domain": "en.wikipedia.org",
+              "url": "https://en.wikipedia.org/wiki/Old_State_House_(Boston)"
+            },
+            {
+              "domain": "nps.gov",
+              "url": "https://www.nps.gov/bost/learn/historyculture/osh.htm"
+            },
+            {
+              "domain": "revolutionaryspaces.org",
+              "url": "https://revolutionaryspaces.org/"
+            },
+            {
+              "domain": "thefreedomtrail.org",
+              "url": "https://www.thefreedomtrail.org/trail-sites/old-state-house"
+            }
+          ],
+          "queries": [
+            "\"Old State House\" Boston, Massachusetts, United States history",
+            "\"Old State House\" Boston, Massachusetts, United States official site"
+          ],
+          "seconds": 4.8,
+          "usd": 0.00376,
+          "score": {
+            "dated_named_facts": 7,
+            "dated_named_examples": [
+              "The Old State House was completed in 1713 on the site of the First Town-House",
+              "The First Town-House had burned down in 1711",
+              "On March 5, 1770, British soldiers fired into a crowd in front of the building, killing five people in what became known as the Boston Massacre",
+              "The Declaration of Independence was first read aloud to Bostonians on July 18, 1776",
+              "After the Massachusetts General Court moved to the New State House in 1798, the Old State House was used as Boston’s city hall",
+              "The Old State House was refurbished by Isaiah Rogers in 1830",
+              "It was renovated by George A. Clough in 1881–1882"
+            ],
+            "has_consequence": true,
+            "filler": false,
+            "evidence_score": 9
+          }
+        }
+      }
+    },
+    {
+      "request": "Walking tour of historic political Boston",
+      "city": "Boston, Massachusetts, United States",
+      "place": "Faneuil Hall",
+      "prompt": "What story can be told to visitors of Boston, Massachusetts, United States about Faneuil Hall?\n\nContext — the work this concerns:\n  canonical_title: Faneuil Hall\n  venue_name: Faneuil Hall\nExhibition: Boston, Massachusetts, United States\n\nSearch, then answer with FACTS ONLY — each one sentence, with its source in brackets. Prefer what a visitor standing in front of it cannot see: why it was made, who decided, what went wrong, what it cost someone. If you find nothing reliable, say exactly \"NO RELIABLE INFORMATION\". Do not praise the work. Do not describe how it looks. Maximum 6 sentences.",
+      "arms": {
+        "gemini": {
+          "text": "Merchant Peter Faneuil offered to fund the building in 1740 to establish a centralized public market for the town of Boston. \n\nMany residents initially opposed centralizing commerce, accepting his gift by a narrow vote of only 367 to 360. \n\nFaneuil financed the construction using his personal fortune, which was heavily derived from trafficking enslaved people and trading goods produced through slave labor. \n\nFaneuil died in 1743, just months after the hall opened, having possessed enslaved individuals whose labor enriched his estate. \n\nThe original hall was gutted by a devastating fire in 1761, leaving only the exterior brick walls standing before it was rebuilt.",
+          "error": "",
+          "n_sources": 6,
+          "sources": [
+            {
+              "domain": "wikipedia.org",
+              "url": "https://en.wikipedia.org/wiki/Faneuil_Hall"
+            },
+            {
+              "domain": "citydays.com",
+              "url": "https://citydays.com/places/faneuil-hall-market/"
+            },
+            {
+              "domain": "battlefields.org",
+              "url": "https://www.battlefields.org/learn/articles/faneuil-hall"
+            },
+            {
+              "domain": "nps.gov",
+              "url": "https://www.nps.gov/articles/000/peter-faneuil-legacy.htm"
+            },
+            {
+              "domain": "berkeleybeacon.com",
+              "url": "https://berkeleybeacon.com/the-dirty-money-that-built-fanueil-hall/"
+            },
+            {
+              "domain": "facebook.com",
+              "url": "https://www.facebook.com/BostonNHP/posts/onthisday-in-1761-faneuil-hall-was-gutted-by-a-devastating-fire-fortunately-the-/1684199634974596/"
+            }
+          ],
+          "queries": [
+            "Faneuil Hall Peter Faneuil controversy vote fire",
+            "Faneuil Hall history slave trade cost why built"
+          ],
+          "seconds": 7.0,
+          "usd": 0.05387,
+          "score": {
+            "dated_named_facts": 4,
+            "dated_named_examples": [
+              "Merchant Peter Faneuil offered to fund the building in 1740 to establish a centralized public market for the town of Boston.",
+              "Faneuil died in 1743, just months after the hall opened, having possessed enslaved individuals whose labor enriched his estate.",
+              "The original hall was gutted by a devastating fire in 1761, leaving only the exterior brick walls standing before it was rebuilt.",
+              "Many residents initially opposed centralizing commerce, accepting his gift by a narrow vote of only 367 to 360."
+            ],
+            "has_consequence": true,
+            "filler": false,
+            "evidence_score": 6
+          }
+        },
+        "serper": {
+          "text": "Faneuil Hall was built in 1742 as a marketplace and meeting hall, funded by wealthy merchant Peter Faneuil. It became known as the \"Cradle of Liberty\" because it hosted many important speeches and protests against British policies, including the first American protest against the Sugar Act and the Stamp Act in 1764. The original building burned down in 1761 and was rebuilt over the next decade. In 1806, Charles Bulfinch remodeled and expanded Faneuil Hall, and it was renovated again in 1827 after Quincy Market opened nearby. The golden grasshopper weathervane atop Faneuil Hall was created by craftsman Shem Drowne in 1742 and was reportedly used during the War of 1812 to spot spies. Faneuil Hall has served as a forum for debates and protests by abolitionists, women's suffragists, and labor unionists, continuing its legacy as a site for discussions on American liberty.",
+          "error": "",
+          "n_sources": 5,
+          "sources": [
+            {
+              "domain": "faneuilhallmarketplace.com",
+              "url": "https://faneuilhallmarketplace.com/"
+            },
+            {
+              "domain": "en.wikipedia.org",
+              "url": "https://en.wikipedia.org/wiki/Faneuil_Hall"
+            },
+            {
+              "domain": "nps.gov",
+              "url": "https://www.nps.gov/bost/learn/historyculture/fh.htm"
+            },
+            {
+              "domain": "thefreedomtrail.org",
+              "url": "https://www.thefreedomtrail.org/trail-sites/faneuil-hall"
+            },
+            {
+              "domain": "trolleytours.com",
+              "url": "https://www.trolleytours.com/boston/faneuil-hall"
+            }
+          ],
+          "queries": [
+            "\"Faneuil Hall\"",
+            "\"Faneuil Hall\" Faneuil Hall",
+            "Boston Massachusetts United States Faneuil canonical"
+          ],
+          "seconds": 7.9,
+          "usd": 0.00462,
+          "score": {
+            "dated_named_facts": 6,
+            "dated_named_examples": [
+              "Faneuil Hall was built in 1742 as a marketplace and meeting hall, funded by wealthy merchant Peter Faneuil",
+              "The original building burned down in 1761 and was rebuilt over the next decade",
+              "It hosted the first American protest against the Sugar Act and the Stamp Act in 1764",
+              "In 1806, Charles Bulfinch remodeled and expanded Faneuil Hall",
+              "It was renovated again in 1827 after Quincy Market opened nearby",
+              "The golden grasshopper weathervane atop Faneuil Hall was created by craftsman Shem Drowne in 1742"
+            ],
+            "has_consequence": true,
+            "filler": false,
+            "evidence_score": 8
+          }
+        },
+        "serper_plus": {
+          "text": "1. Faneuil Hall was built in 1742 as a marketplace and meeting hall, funded in part by profits from slave trading, after colonial merchant Peter Faneuil offered to donate the building to Boston on the condition it be used as a regulated market. 2. The original building burned down in 1761 and was rebuilt over the next decade, later remodeled and expanded by Charles Bulfinch in 1806 and renovated again in 1827 after Quincy Market opened nearby. 3. Faneuil Hall was the site of early American protests against the Sugar Act and Stamp Act in 1764, marking the beginning of the \"no taxation without representation\" doctrine. 4. In 1976, Faneuil Hall Marketplace underwent a major urban renewal project led by Jim Rouse, architect Benjamin Thompson, and Mayor Kevin White, transforming the area into a festival marketplace and preventing its demolition. 5. The marketplace adjacent to Faneuil Hall was expanded in 1826 with the construction of Quincy Market, organized by Mayor Josiah Quincy without tax or debt. 6. The golden grasshopper weathervane atop Faneuil Hall, created by craftsman Shem Drowne, was reportedly used during the War of 1812 to spot spies.",
+          "error": "",
+          "n_sources": 4,
+          "sources": [
+            {
+              "domain": "en.wikipedia.org",
+              "url": "https://en.wikipedia.org/wiki/Faneuil_Hall"
+            },
+            {
+              "domain": "faneuilhallmarketplace.com",
+              "url": "https://faneuilhallmarketplace.com/about/history-of-faneuil-hall"
+            },
+            {
+              "domain": "thefreedomtrail.org",
+              "url": "https://www.thefreedomtrail.org/trail-sites/faneuil-hall"
+            },
+            {
+              "domain": "faneuilhallmarketplace.com",
+              "url": "https://faneuilhallmarketplace.com/"
+            }
+          ],
+          "queries": [
+            "\"Faneuil Hall\" Boston, Massachusetts, United States history",
+            "\"Faneuil Hall\" Boston, Massachusetts, United States official site"
+          ],
+          "seconds": 5.2,
+          "usd": 0.00384,
+          "score": {
+            "dated_named_facts": 6,
+            "dated_named_examples": [
+              "Faneuil Hall was built in 1742 as a marketplace and meeting hall, funded in part by profits from slave trading, after colonial merchant Peter Faneuil offered to donate the building to Boston",
+              "The original building burned down in 1761 and was rebuilt over the next decade, later remodeled and expanded by Charles Bulfinch in 1806 and renovated again in 1827 after Quincy Market opened nearby",
+              "Faneuil Hall was the site of early American protests against the Sugar Act and Stamp Act in 1764, marking the beginning of the \"no taxation without representation\" doctrine",
+              "In 1976, Faneuil Hall Marketplace underwent a major urban renewal project led by Jim Rouse, architect Benjamin Thompson, and Mayor Kevin White, transforming the area into a festival marketplace and preventing its demolition",
+              "The marketplace adjacent to Faneuil Hall was expanded in 1826 with the construction of Quincy Market, organized by Mayor Josiah Quincy without tax or debt",
+              "The golden grasshopper weathervane atop Faneuil Hall, created by craftsman Shem Drowne, was reportedly used during the War of 1812 to spot spies"
+            ],
+            "has_consequence": true,
+            "filler": false,
+            "evidence_score": 8
+          }
+        }
+      }
+    },
+    {
+      "request": "Walking tour of historic political Boston",
+      "city": "Boston, Massachusetts, United States",
+      "place": "Boston City Hall",
+      "prompt": "What story can be told to visitors of Boston, Massachusetts, United States about Boston City Hall?\n\nContext — the work this concerns:\n  canonical_title: Boston City Hall\n  venue_name: Boston City Hall\nExhibition: Boston, Massachusetts, United States\n\nSearch, then answer with FACTS ONLY — each one sentence, with its source in brackets. Prefer what a visitor standing in front of it cannot see: why it was made, who decided, what went wrong, what it cost someone. If you find nothing reliable, say exactly \"NO RELIABLE INFORMATION\". Do not praise the work. Do not describe how it looks. Maximum 6 sentences.",
+      "arms": {
+        "gemini": {
+          "text": "Boston City Hall was commissioned as part of a massive urban renewal initiative aimed at revitalizing Boston’s stagnant economy and symbolizing a modern, uncorrupted civic era. \n\nIts creation came at the cost of demolishing historic Scollay Square, clearing over 1,000 buildings and displacing thousands of residents and business owners. \n\nIn 1962, a city jury chose the winning design by Gerhard Kallmann and Michael McKinnell from an open, nationwide architectural competition with 256 entries. \n\nThe construction ultimately cost the city approximately $26.5 million by its completion in 1969. \n\nOver the decades, persistent public hostility and maintenance neglect caused successive mayors, including Thomas Menino and Marty Walsh, to seriously propose abandoning or demolishing the structure.",
+          "error": "",
+          "n_sources": 6,
+          "sources": [
+            {
+              "domain": "re-thinkingthefuture.com",
+              "url": "https://www.re-thinkingthefuture.com/city-and-architecture/a14894-the-polarizing-legacy-of-boston-city-hall/"
+            },
+            {
+              "domain": "wgbh.org",
+              "url": "https://www.wgbh.org/news/local/2018-11-14/boston-city-hall-at-50-from-worlds-ugliest-building-to-brutalist-masterpiece"
+            },
+            {
+              "domain": "supremecourt.gov",
+              "url": "https://www.supremecourt.gov/opinions/urls_cited/ot2021/20-1800/20-1800-2.pdf"
+            },
+            {
+              "domain": "bostonpreservation.org",
+              "url": "https://www.bostonpreservation.org/advocacy-project/boston-city-hall-and-plaza"
+            },
+            {
+              "domain": "wikipedia.org",
+              "url": "https://en.wikipedia.org/wiki/Boston_City_Hall"
+            },
+            {
+              "domain": "atomic-ranch.com",
+              "url": "https://www.atomic-ranch.com/architecture-design/preservation-corner/boston-city-hall/"
+            }
+          ],
+          "queries": [
+            "Boston City Hall construction history cost demolition controversy facts"
+          ],
+          "seconds": 7.1,
+          "usd": 0.05389,
+          "score": {
+            "dated_named_facts": 1,
+            "dated_named_examples": [
+              "In 1962, a city jury chose the winning design by Gerhard Kallmann and Michael McKinnell from an open, nationwide architectural competition with 256 entries."
+            ],
+            "has_consequence": true,
+            "filler": false,
+            "evidence_score": 3
+          }
+        },
+        "serper": {
+          "text": "Boston City Hall was designed by the architectural firm Kallmann, McKinnell & Knowles as part of a nationwide competition and opened to the public in February 1969. It is internationally recognized as a masterwork of 1960s modernism and civic design. The building has been the seat of municipal government in Boston since its opening. A Conservation Management Plan (CMP) was completed by Building Conservation Associates to address preservation and maintenance, funded by the Getty Foundation’s Keeping it Modern grant. The CMP included developing cleaning methods for the interior concrete that preserve the building’s patina while removing surface soiling. In 2023, the conservation project received a Preservation Achievement Award from the Boston Preservation Alliance.",
+          "error": "",
+          "n_sources": 5,
+          "sources": [
+            {
+              "domain": "boston.gov",
+              "url": "https://www.boston.gov/homepage-bostongov"
+            },
+            {
+              "domain": "en.wikipedia.org",
+              "url": "https://en.wikipedia.org/wiki/Boston_City_Hall"
+            },
+            {
+              "domain": "bostonbyfoot.org",
+              "url": "https://bostonbyfoot.org/tours/boston-city-hall-950/"
+            },
+            {
+              "domain": "archdaily.com",
+              "url": "https://www.archdaily.com/117442/ad-classics-boston-city-hall-kallmann-mckinnell-knowles"
+            },
+            {
+              "domain": "bcausa.com",
+              "url": "https://www.bcausa.com/boston-city-hall"
+            }
+          ],
+          "queries": [
+            "\"Boston City Hall\"",
+            "\"Boston City Hall\" Boston City Hall",
+            "Boston Massachusetts United States Boston canonical"
+          ],
+          "seconds": 8.7,
+          "usd": 0.00449,
+          "score": {
+            "dated_named_facts": 2,
+            "dated_named_examples": [
+              "opened to the public in February 1969",
+              "In 2023, the conservation project received a Preservation Achievement Award from the Boston Preservation Alliance"
+            ],
+            "has_consequence": true,
+            "filler": false,
+            "evidence_score": 4
+          }
+        },
+        "serper_plus": {
+          "text": "Boston City Hall was proposed in 1956 as part of the Government Center redevelopment project to replace the outdated Old City Hall, with groundbreaking on September 18, 1963, and first occupancy in late 1967. The building was designed by Kallmann McKinnell & Knowles and Campbell, Aldrich & Nulty, winning a two-phase architectural competition in 1962. The site was formerly Adams Square, part of the larger Scollay Square area, which was cleared during urban renewal in the 1950s. Mayor Thomas Menino proposed replacing Boston City Hall twice in the 1990s and 2000s due to deferred maintenance issues. The building received the American Institute of Architects' 1969 Honor Award but has been widely criticized by the public and listed among the world's ugliest buildings. The City Hall Plaza surrounding the building covers 8 acres and includes entrances to the Government Center MBTA subway station.",
+          "error": "",
+          "n_sources": 4,
+          "sources": [
+            {
+              "domain": "en.wikipedia.org",
+              "url": "https://en.wikipedia.org/wiki/Boston_City_Hall"
+            },
+            {
+              "domain": "nps.gov",
+              "url": "https://www.nps.gov/places/boston-city-hall.htm"
+            },
+            {
+              "domain": "boston.gov",
+              "url": "https://www.boston.gov/homepage-bostongov"
+            },
+            {
+              "domain": "boston.gov",
+              "url": "https://www.boston.gov/departments/mayors-office/contact-boston-city-hall"
+            }
+          ],
+          "queries": [
+            "\"Boston City Hall\" Boston, Massachusetts, United States history",
+            "\"Boston City Hall\" Boston, Massachusetts, United States official site"
+          ],
+          "seconds": 5.7,
+          "usd": 0.00358,
+          "score": {
+            "dated_named_facts": 6,
+            "dated_named_examples": [
+              "Boston City Hall was proposed in 1956 as part of the Government Center redevelopment project",
+              "groundbreaking on September 18, 1963",
+              "first occupancy in late 1967",
+              "designed by Kallmann McKinnell & Knowles and Campbell, Aldrich & Nulty, winning a two-phase architectural competition in 1962",
+              "site was formerly Adams Square, part of the larger Scollay Square area, which was cleared during urban renewal in the 1950s",
+              "Mayor Thomas Menino proposed replacing Boston City Hall twice in the 1990s and 2000s due to deferred maintenance issues"
+            ],
+            "has_consequence": true,
+            "filler": false,
+            "evidence_score": 8
+          }
+        }
+      }
+    },
+    {
+      "request": "Walking tour of historic political Boston",
+      "city": "Boston, Massachusetts, United States",
+      "place": "Massachusetts State House",
+      "prompt": "What story can be told to visitors of Boston, Massachusetts, United States about Massachusetts State House?\n\nContext — the work this concerns:\n  canonical_title: Massachusetts State House\n  venue_name: Massachusetts State House\nExhibition: Boston, Massachusetts, United States\n\nSearch, then answer with FACTS ONLY — each one sentence, with its source in brackets. Prefer what a visitor standing in front of it cannot see: why it was made, who decided, what went wrong, what it cost someone. If you find nothing reliable, say exactly \"NO RELIABLE INFORMATION\". Do not praise the work. Do not describe how it looks. Maximum 6 sentences.",
+      "arms": {
+        "gemini": {
+          "text": "The Massachusetts State House was built to replace the Old State House as the seat of government for the Commonwealth of Massachusetts.\n\nThe building was constructed on land that had previously served as John Hancock's cow pasture.\n\nArchitect Charles Bulfinch designed the structure.\n\nGovernor Samuel Adams and Paul Revere laid the cornerstone together on July 4, 1795.\n\nConstruction concluded in January 1798 at a total cost of $133,333, exceeding its original budget by more than five times.",
+          "error": "",
+          "n_sources": 5,
+          "sources": [
+            {
+              "domain": "sec.state.ma.us",
+              "url": "https://www.sec.state.ma.us/divisions/cis/historical/state-house-today.htm"
+            },
+            {
+              "domain": "trolleytours.com",
+              "url": "https://www.trolleytours.com/boston/massachusetts-state-house"
+            },
+            {
+              "domain": "bu.edu",
+              "url": "https://www.bu.edu/federal/2018/07/16/take-a-tour-of-the-massachusetts-state-house/"
+            },
+            {
+              "domain": "wikipedia.org",
+              "url": "https://en.wikipedia.org/wiki/Massachusetts_State_House"
+            },
+            {
+              "domain": "nps.gov",
+              "url": "https://www.nps.gov/places/massachusetts-state-house.htm"
+            }
+          ],
+          "queries": [
+            "Massachusetts State House history facts cost construction"
+          ],
+          "seconds": 5.5,
+          "usd": 0.05368,
+          "score": {
+            "dated_named_facts": 1,
+            "dated_named_examples": [
+              "Governor Samuel Adams and Paul Revere laid the cornerstone together on July 4, 1795."
+            ],
+            "has_consequence": true,
+            "filler": false,
+            "evidence_score": 3
+          }
+        },
+        "serper": {
+          "text": "The Massachusetts State House, designed by Charles Bulfinch, was completed in January 1798 at a cost of $133,333, which was more than five times the original budget. The Masonic cornerstone ceremony was held on July 4, 1795, with Paul Revere presiding as Grand Master of the Grand Lodge of Massachusetts. The building’s dome was originally covered with wood shingles but was soon sheathed in copper by Paul Revere’s company to prevent leaks, and later gilded with gold leaf in 1874. During World War II, the dome’s gold finish was painted gray to reduce visibility during blackouts, and it was re-gilded in 1969 and again restored in 1997 with 23.75 karat gold leaf. The State House has been expanded multiple times, including major additions in 1895 and 1917 designed by Charles Brigham and other architects. Inside, the building has been a site of important social and political debates, including petitions by abolitionists and African Americans for civil rights and education equality in the 19th century.",
+          "error": "",
+          "n_sources": 5,
+          "sources": [
+            {
+              "domain": "en.wikipedia.org",
+              "url": "https://en.wikipedia.org/wiki/Massachusetts_State_House"
+            },
+            {
+              "domain": "thefreedomtrail.org",
+              "url": "https://www.thefreedomtrail.org/trail-sites/massachusetts-state-house"
+            },
+            {
+              "domain": "bostonteapartyship.com",
+              "url": "https://www.bostonteapartyship.com/boston-attractions/the-state-house"
+            },
+            {
+              "domain": "evergreene.com",
+              "url": "https://evergreene.com/projects/massachusetts-state-house/"
+            },
+            {
+              "domain": "nps.gov",
+              "url": "https://www.nps.gov/places/massachusetts-state-house.htm"
+            }
+          ],
+          "queries": [
+            "\"Massachusetts State House\"",
+            "\"Massachusetts State House\" Massachusetts State House",
+            "Boston Massachusetts United States Massachusetts State"
+          ],
+          "seconds": 7.6,
+          "usd": 0.00457,
+          "score": {
+            "dated_named_facts": 7,
+            "dated_named_examples": [
+              "The Massachusetts State House was completed in January 1798",
+              "The Masonic cornerstone ceremony was held on July 4, 1795, with Paul Revere presiding",
+              "The dome was gilded with gold leaf in 1874",
+              "During World War II, the dome’s gold finish was painted gray",
+              "The dome was re-gilded in 1969",
+              "The dome was restored in 1997 with 23.75 karat gold leaf",
+              "Major additions were made in 1895 and 1917 designed by Charles Brigham and other architects"
+            ],
+            "has_consequence": true,
+            "filler": false,
+            "evidence_score": 9
+          }
+        },
+        "serper_plus": {
+          "text": "The Massachusetts State House was designed by architect Charles Bulfinch and completed in January 1798 at a cost of $133,333, which was more than five times the original budget. The Masonic cornerstone ceremony was held on July 4, 1795, with Paul Revere presiding as Grand Master of the Grand Lodge of Massachusetts. The original wooden dome, which leaked, was covered with copper by Paul Revere's Revere Copper Company in 1802. The dome was gilded with gold leaf in 1874, painted gray during World War II to prevent reflection during blackouts, and re-gilded in 1969 and again in 1997 at a cost of around $300,000. Major expansions were completed in 1895 by Charles Brigham and in 1917 with east and west wings designed by Sturgis, Bryant, Chapman & Andrews. In July 2016, Governor Charlie Baker proposed selling a permanent easement on State House lawn land once owned by John Hancock, but the legislature protects the surrounding land as \"open space\".",
+          "error": "",
+          "n_sources": 4,
+          "sources": [
+            {
+              "domain": "en.wikipedia.org",
+              "url": "https://en.wikipedia.org/wiki/Massachusetts_State_House"
+            },
+            {
+              "domain": "nps.gov",
+              "url": "https://www.nps.gov/places/massachusetts-state-house.htm"
+            },
+            {
+              "domain": "thefreedomtrail.org",
+              "url": "https://www.thefreedomtrail.org/trail-sites/massachusetts-state-house"
+            },
+            {
+              "domain": "sgh.com",
+              "url": "https://www.sgh.com/project/massachusetts-state-house-2/"
+            }
+          ],
+          "queries": [
+            "\"Massachusetts State House\" Boston, Massachusetts, United States history",
+            "\"Massachusetts State House\" Boston, Massachusetts, United States official site"
+          ],
+          "seconds": 5.2,
+          "usd": 0.0038,
+          "score": {
+            "dated_named_facts": 8,
+            "dated_named_examples": [
+              "completed in January 1798 by architect Charles Bulfinch",
+              "Masonic cornerstone ceremony was held on July 4, 1795, with Paul Revere presiding as Grand Master of the Grand Lodge of Massachusetts",
+              "original wooden dome was covered with copper by Paul Revere's Revere Copper Company in 1802",
+              "dome was gilded with gold leaf in 1874",
+              "dome painted gray during World War II",
+              "major expansions completed in 1895 by Charles Brigham",
+              "major expansions completed in 1917 with east and west wings designed by Sturgis, Bryant, Chapman & Andrews",
+              "In July 2016, Governor Charlie Baker proposed selling a permanent easement on State House lawn land once owned by John Hancock"
+            ],
+            "has_consequence": true,
+            "filler": false,
+            "evidence_score": 10
+          }
+        }
+      }
+    },
+    {
+      "request": "Walking tour of historic political Boston",
+      "city": "Boston, Massachusetts, United States",
+      "place": "Boston Athenaeum",
+      "prompt": "What story can be told to visitors of Boston, Massachusetts, United States about Boston Athenaeum?\n\nContext — the work this concerns:\n  canonical_title: Boston Athenaeum\n  venue_name: Boston Athenaeum\nExhibition: Boston, Massachusetts, United States\n\nSearch, then answer with FACTS ONLY — each one sentence, with its source in brackets. Prefer what a visitor standing in front of it cannot see: why it was made, who decided, what went wrong, what it cost someone. If you find nothing reliable, say exactly \"NO RELIABLE INFORMATION\". Do not praise the work. Do not describe how it looks. Maximum 6 sentences.",
+      "arms": {
+        "gemini": {
+          "text": "Members of Boston's literary Anthology Club established the Boston Athenaeum in 1807 to combine the functions of a private library and a repository of scholarly resources. \n\nThe institution was financed through proprietary shares purchased by affluent Boston families to fund collections and access. \n\nIn 1847, the trustees commissioned architect Edward Clarke Cabot to design its permanent home on Beacon Street, choosing an Italianate sandstone design. \n\nThe institution faced severe space shortages as its art and book collections expanded, which eventually led its members to help establish the Museum of Fine Arts and transfer significant artworks there. \n\nThe Athenaeum also purchased a substantial portion of George Washington's personal library in the mid-19th century through member subscriptions.",
+          "error": "",
+          "n_sources": 6,
+          "sources": [
+            {
+              "domain": "bostonathenaeum.org",
+              "url": "https://bostonathenaeum.org/about/"
+            },
+            {
+              "domain": "wikipedia.org",
+              "url": "https://en.wikipedia.org/wiki/Boston_Athen%C3%A6um"
+            },
+            {
+              "domain": "traditionalbuilding.com",
+              "url": "https://www.traditionalbuilding.com/features/metamorphosis"
+            },
+            {
+              "domain": "tuftsdaily.com",
+              "url": "https://www.tuftsdaily.com/article/2017/02/boston-athenaeum-provides-a-gateway-into-a-newly-founded-united-states"
+            },
+            {
+              "domain": "kiddle.co",
+              "url": "https://kids.kiddle.co/Boston_Athen%C3%A6um"
+            },
+            {
+              "domain": "youtube.com",
+              "url": "https://www.youtube.com/watch?v=uz-GxiIHnvY"
+            }
+          ],
+          "queries": [
+            "Boston Athenaeum history facts origins cost founding"
+          ],
+          "seconds": 7.3,
+          "usd": 0.05392,
+          "score": {
+            "dated_named_facts": 3,
+            "dated_named_examples": [
+              "Members of Boston's literary Anthology Club established the Boston Athenaeum in 1807",
+              "In 1847, the trustees commissioned architect Edward Clarke Cabot to design its permanent home on Beacon Street",
+              "The Athenaeum also purchased a substantial portion of George Washington's personal library in the mid-19th century"
+            ],
+            "has_consequence": true,
+            "filler": false,
+            "evidence_score": 5
+          }
+        },
+        "serper": {
+          "text": "The Boston Athenaeum was founded in 1807 by the Anthology Club of Boston, Massachusetts, making it one of the oldest independent libraries in the United States. It operates as a membership library where patrons pay a yearly subscription fee to access its services. The Athenaeum holds a rare books collection of over 100,000 volumes and an art collection of 100,000 works including paintings, sculptures, prints, and photographs. Among its special treasures are the largest portion of President George Washington's library from Mount Vernon and busts of Washington, Franklin, and Lafayette once owned by Thomas Jefferson. The institution has been associated with many prominent members such as Ralph Waldo Emerson, Nathaniel Hawthorne, Louisa May Alcott, and John F. Kennedy. Its landmark 1849 neoclassical building on Beacon Hill underwent a $17 million restoration and expansion completed in fall 2022.",
+          "error": "",
+          "n_sources": 5,
+          "sources": [
+            {
+              "domain": "bostonathenaeum.org",
+              "url": "https://bostonathenaeum.org/"
+            },
+            {
+              "domain": "en.wikipedia.org",
+              "url": "https://en.wikipedia.org/wiki/Boston_Athen%C3%A6um"
+            },
+            {
+              "domain": "linkedin.com",
+              "url": "https://www.linkedin.com/company/boston-athenaeum"
+            },
+            {
+              "domain": "thecateredaffair.com",
+              "url": "https://www.thecateredaffair.com/our-venues/boston-athenaeum/"
+            },
+            {
+              "domain": "cntraveler.com",
+              "url": "https://www.cntraveler.com/activities/boston/boston-athenaeum"
+            }
+          ],
+          "queries": [
+            "\"Boston Athenaeum\"",
+            "\"Boston Athenaeum\" Boston Athenaeum",
+            "Boston Massachusetts United States Boston Athenaeum"
+          ],
+          "seconds": 7.4,
+          "usd": 0.00451,
+          "score": {
+            "dated_named_facts": 2,
+            "dated_named_examples": [
+              "The Boston Athenaeum was founded in 1807 by the Anthology Club of Boston, Massachusetts",
+              "Its landmark 1849 neoclassical building on Beacon Hill underwent a $17 million restoration and expansion completed in fall 2022"
+            ],
+            "has_consequence": false,
+            "filler": true,
+            "evidence_score": 2
+          }
+        },
+        "serper_plus": {
+          "text": "1. The Boston Athenæum was founded in 1807 by members of the Anthology Society, who originally planned a reading room but expanded their vision to include a library, art gallery, and collections of curiosities, with the first yearly subscriptions sold for ten dollars. 2. In 1827, the Boston Athenæum established its art gallery and began annual exhibitions, and that same year it transitioned to a circulating library, allowing members to check out up to four books at a time. 3. The current Boston Athenæum building at 10½ Beacon Street was constructed starting in 1847 and opened in 1849, designed by Edward Clarke Cabot to accommodate the library’s specific needs and built over graves in the Granary Burial Ground. 4. Charles Ammi Cutter became librarian in 1869 and created the Expansive Classification system to revise the library’s catalog, a system that later influenced the Library of Congress classification. 5. The Boston Athenæum has housed significant collections including George Washington’s personal library from Mount Vernon and busts once owned by Thomas Jefferson, reflecting its role as a repository of important American historical artifacts. 6. The institution began as a subscription library serving Boston’s elite and intellectuals, including members such as Ralph Waldo Emerson, Nathaniel Hawthorne, and John Quincy Adams, making it a center of cultural and scholarly activity since the early 19th century.",
+          "error": "",
+          "n_sources": 4,
+          "sources": [
+            {
+              "domain": "en.wikipedia.org",
+              "url": "https://en.wikipedia.org/wiki/Boston_Athenæum"
+            },
+            {
+              "domain": "bostonathenaeum.org",
+              "url": "https://bostonathenaeum.org/about/"
+            },
+            {
+              "domain": "daily.jstor.org",
+              "url": "https://daily.jstor.org/the-boston-athenaeum/"
+            },
+            {
+              "domain": "bostonathenaeum.org",
+              "url": "https://bostonathenaeum.org/visit/"
+            }
+          ],
+          "queries": [
+            "\"Boston Athenaeum\" Boston, Massachusetts, United States history",
+            "\"Boston Athenaeum\" Boston, Massachusetts, United States official site"
+          ],
+          "seconds": 7.9,
+          "usd": 0.0039,
+          "score": {
+            "dated_named_facts": 4,
+            "dated_named_examples": [
+              "The Boston Athenæum was founded in 1807 by members of the Anthology Society",
+              "In 1827, the Boston Athenæum established its art gallery and began annual exhibitions",
+              "The current Boston Athenæum building at 10½ Beacon Street was constructed starting in 1847 and opened in 1849, designed by Edward Clarke Cabot",
+              "Charles Ammi Cutter became librarian in 1869 and created the Expansive Classification system"
+            ],
+            "has_consequence": true,
+            "filler": false,
+            "evidence_score": 6
+          }
+        }
+      }
+    }
+  ]
+}
