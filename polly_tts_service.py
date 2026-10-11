@@ -10,6 +10,21 @@ import tempfile
 import logging
 from botocore.exceptions import ClientError, BotoCoreError
 
+# [LOCAL-673] Daily paid-API spend STOP. Polly runs through boto3 (its own HTTP
+# stack), which the network meter patch does NOT intercept, so we call
+# paid_api_meter.check_daily_limit() explicitly before synthesizing. Imported
+# softly with a no-op fallback so a missing meter can never break TTS (fail-open);
+# check_daily_limit() itself also fails open on any DB error and raises
+# DailyPaidLimitExceeded only once today's billed spend has reached
+# DAILY_PAID_LIMIT_USD.
+try:
+    from paid_api_meter import check_daily_limit as _check_daily_limit, DailyPaidLimitExceeded
+except Exception:  # pragma: no cover - meter ships via PYTHONPATH=/opt/meter (sitecustomize)
+    class DailyPaidLimitExceeded(Exception):
+        pass
+    def _check_daily_limit():
+        return None
+
 
 def _compat_send_file(path_or_file, **kwargs):
     """Version-tolerant send_file wrapper.
@@ -149,6 +164,11 @@ def synthesize_speech():
                 logging.warning(
                     f"[LOCAL-573] kokoro failed — falling back to Polly ({_k_err})"
                 )
+        # [LOCAL-673] About to bill Polly — enforce the daily paid-API limit first.
+        # Reached only when Kokoro did not handle this chunk, so the free local path
+        # is never blocked. Raises DailyPaidLimitExceeded (no call made) once today's
+        # billed spend has reached DAILY_PAID_LIMIT_USD; fails open on meter/DB error.
+        _check_daily_limit()
         response = polly_client.synthesize_speech(
             Text=chunk_text,
             OutputFormat=output_format,

@@ -38,6 +38,22 @@ try:
 except Exception:  # pragma: no cover - cost_meter ships in the image via the Dockerfile COPY
     _record_operation = None
 
+# [LOCAL-673] Daily paid-API spend STOP. The network meter patches requests/urllib
+# so OpenAI/Gemini/Serper are checked automatically, but AWS Translate and Polly
+# go through boto3 (their own HTTP stack) and are NOT caught by that patch. So we
+# call paid_api_meter.check_daily_limit() explicitly right before each boto3 paid
+# call. Imported softly with a no-op fallback: a missing meter must never break a
+# translation (fail-open). check_daily_limit() itself also fails open on any DB
+# error; it raises DailyPaidLimitExceeded only when today's billed spend has
+# reached DAILY_PAID_LIMIT_USD, which the caller surfaces as a clean API failure.
+try:
+    from paid_api_meter import check_daily_limit as _check_daily_limit, DailyPaidLimitExceeded
+except Exception:  # pragma: no cover - meter ships via PYTHONPATH=/opt/meter (sitecustomize)
+    class DailyPaidLimitExceeded(Exception):
+        pass
+    def _check_daily_limit():
+        return None
+
 app = Flask(__name__)
 logging.basicConfig(level=logging.INFO)
 
@@ -417,12 +433,22 @@ class TranslationService:
             if preserve_voice_commands:
                 translated_text = self._preserve_voice_commands(text, translated_text, target_language)
             return translated_text
+        except DailyPaidLimitExceeded:
+            # [LOCAL-673] The daily paid-API limit is a hard STOP, not a translation
+            # error — never swallow it into the original (untranslated) text, which
+            # would ship a half/wrong tour. Propagate so the caller fails cleanly.
+            raise
         except Exception as e:
             logging.error(f"Translation error: {e}")
             return text
 
     def _aws_translate_call(self, text, target_language):
         """Single AWS Translate API call (no [:5000] truncation)."""
+        # [LOCAL-673] boto3 bypasses the network meter patch — enforce the daily
+        # paid-API limit here. Raises DailyPaidLimitExceeded (no call made) once
+        # today's billed spend has reached DAILY_PAID_LIMIT_USD; fails open on any
+        # meter/DB error.
+        _check_daily_limit()
         response = self.translate_client.translate_text(
             Text=text,
             SourceLanguageCode='en',
@@ -501,6 +527,11 @@ class TranslationService:
                     if preserve_voice_commands:
                         translated = self._preserve_voice_commands(text, translated, target_language)
                     return translated
+            except DailyPaidLimitExceeded:
+                # [LOCAL-673] Hard STOP — do NOT treat as a translation error and do
+                # NOT fall back to AWS (which would also be refused). Propagate so the
+                # tour fails cleanly with an honest error.
+                raise
             except Exception as e:
                 reason = f'error {e}'
 
@@ -661,6 +692,12 @@ class TranslationService:
         to call gpt-4o and the prose pass to call gpt-4o-mini). `response_json` requests
         a JSON object response (used by the names glossary pass).
         """
+        # [LOCAL-673] Enforce the daily paid-API limit before the OpenAI call. The
+        # network meter patch also guards this (it goes through requests), but the
+        # explicit check makes the stop deterministic at the service layer and lets
+        # the LLM path's AWS fallback see a clean DailyPaidLimitExceeded. Fails open
+        # on any meter/DB error.
+        _check_daily_limit()
         payload = {
             'model': model or self._LLM_MODEL,
             'messages': [
@@ -772,6 +809,12 @@ class TranslationService:
         submitted_text = text[:3000] if text else ''
         char_count = len(submitted_text)
         engine = 'neural' if voice_id in self._POLLY_NEURAL_VOICES else 'standard'
+
+        # [LOCAL-673] boto3 Polly bypasses the network meter patch — enforce the
+        # daily paid-API limit here, BEFORE the try below, so DailyPaidLimitExceeded
+        # propagates as a clean, honest failure instead of being swallowed into a
+        # silent None (a half tour). Fails open on any meter/DB error.
+        _check_daily_limit()
 
         try:
             response = self.polly_client.synthesize_speech(
