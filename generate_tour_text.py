@@ -5150,6 +5150,11 @@ class VerificationResult:
     wiki_available: bool = False
     entity_resolved: bool = False
     qid: str = ''
+    # [LOCAL-669C] QID → {label_local, label_en, aliases} for every SPARQL work
+    # this venue carries. The final identity gate uses it to stamp a QID onto a
+    # cross-language duplicate by EXACT label (the strongest bridge), independent
+    # of whether a per-stop evidence entry happened to capture sparql_labels.
+    qid_to_labels: Dict[str, Any] = field(default_factory=dict)
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -6340,6 +6345,7 @@ def _verify_works_v2(poi_list, venue_name, exhibition_scope=None):
         wiki_available=_has_wiki,
         entity_resolved=bool(_venue_entity and _venue_entity.qid) if '_venue_entity' in dir() else False,
         qid=_venue_entity.qid if ('_venue_entity' in dir() and _venue_entity and _venue_entity.qid) else '',
+        qid_to_labels=dict(_qid_to_labels) if '_qid_to_labels' in dir() else {},
     )
 
 
@@ -12163,6 +12169,15 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
 
         # -------- [D1] In-collection verification for museum tours --------
         _d1_evidence_log = {}
+        # [LOCAL-669C] Verified candidates that did NOT make the cut (surplus
+        # highlights / thin-verify / R4 works). The final identity gate uses these
+        # to REFILL any slot a same-work collapse frees — works first, area stops
+        # last — so a collapsed duplicate is replaced by a DISTINCT verified work,
+        # never by repeating one. Empty on every non-museum path.
+        _final_gate_reserve = []
+        # [LOCAL-669C] venue QID→labels map captured from D1v2 (empty otherwise),
+        # the strongest bridge for the final gate's exact-label QID stamping.
+        _d1v2_qid_to_labels = {}
         _d1_venue_corpus = ""
         _story_corpus_result = None
         _d1v2_result = None  # [LOCAL-72] Initialize for non-museum paths (prevents NameError in three_class_retrieval)
@@ -12403,6 +12418,10 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
                     _d1_evidence_log = _d1v2_result.evidence_log
                     _d1_venue_corpus = _d1v2_result.combined_text
                     _story_corpus_result = _d1v2_result.corpus_result
+                    # [LOCAL-669C] Carry the venue's QID→labels map to the final
+                    # identity gate so it can stamp a cross-language duplicate by
+                    # exact label even when a per-stop evidence entry missed it.
+                    _d1v2_qid_to_labels = dict(getattr(_d1v2_result, 'qid_to_labels', {}) or {})
                     print(f"  [D1] Tier: {_verification_tier} ({len(poi_list)} verified works)")
                     
                     # [PALAIS-FIX] For thin tier with sparse Wikidata: restore GPT candidates
@@ -12531,8 +12550,30 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
             # mover; LOCAL-667 below runs only for whatever is still short. Works
             # first — area stops (LOCAL-668) only fill what is left. Cached per
             # venue 30 days: a second tour of the same museum spends ZERO.
-            if (tour_category == 'museum' and _verification_tier == 'thin'
-                    and len(poi_list) < total_stops and _story_corpus_result):
+            # [LOCAL-669C] TRIGGER (ticket point 2): the one grounded highlights
+            # call must run whenever the DOCUMENTED works number fewer than the
+            # requested stops — regardless of verification tier. LOCAL-669 gated
+            # this on tier=='thin'; a medium-tier museum with few catalogued works
+            # (so poi_list < total_stops) was therefore left short with no
+            # highlights top-up. The honest trigger is the COUNT, not the tier.
+            # The decision is logged either way.
+            _hl_short = (tour_category == 'museum'
+                         and len(poi_list) < total_stops
+                         and bool(_story_corpus_result))
+            if tour_category == 'museum':
+                if _hl_short:
+                    print(f"  [LOCAL-669C] highlights trigger: documented works "
+                          f"{len(poi_list)} < requested {total_stops} "
+                          f"(tier={_verification_tier}) — running grounded highlights")
+                elif len(poi_list) >= total_stops:
+                    print(f"  [LOCAL-669C] highlights trigger: skipped — "
+                          f"documented works {len(poi_list)} >= requested "
+                          f"{total_stops} (tier={_verification_tier})")
+                elif not _story_corpus_result:
+                    print(f"  [LOCAL-669C] highlights trigger: skipped — no story "
+                          f"corpus to supply own-domain verification "
+                          f"(tier={_verification_tier})")
+            if _hl_short:
                 try:
                     import grounded_highlights as _gh
                     _hl_city = ''
@@ -12669,7 +12710,13 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
                     _hl_verified_available = len(_hl_verified or [])  # [LOCAL-669B] N for point 3/4
                     for _hw in (_hl_verified or []):
                         if _hl_added >= _hl_needed:
-                            break
+                            # [LOCAL-669C] Tour is full, but this is a VERIFIED,
+                            # distinct work — keep it in the reserve so the final
+                            # identity gate can use it to refill a slot that a
+                            # same-work collapse frees (works first, never repeat).
+                            _hw.setdefault('verified', True)
+                            _final_gate_reserve.append(_hw)
+                            continue
                         _hn = _normalize_name(_hw.get('name', ''))
                         if not _hn or _hn in _hl_already:
                             continue
@@ -14383,6 +14430,47 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
             return None, None, (None, None)
         if len(poi_list) < total_stops:
             print(f"! Final count {len(poi_list)} < requested {total_stops}; orchestrator will surface stop_count_warning")
+
+        # -------- [LOCAL-669C] FINAL IDENTITY GATE (single choke point) --------
+        # The one place, on EVERY museum path (fresh, pool, cache, thin,
+        # highlights, exhibition/checklist, and after the LOCAL-667/668 area-stop
+        # steps), where the FINAL stop list is collapsed by work identity right
+        # before narration. LOCAL-669B had a dedup pass buried in the thin branch;
+        # the 2026-10-10 side-by-side proved it (a) never ran on the exhibition
+        # path and (b) collapsed NOTHING on 670 because the grounded-highlights
+        # stop carried no QID and its English gloss said "Center" where SPARQL
+        # said "Central". This gate stamps QIDs by EXACT label (so the highlights
+        # stop, literally named the work's SPARQL label_local, collapses by QID),
+        # dedups by identity (QID / order-ignored bilingual title set + D1v2 word
+        # map), and refills any freed slot from the verified reserve (works first,
+        # area stops last, never repeating). Logs its decision either way.
+        if tour_category == 'museum' and len(poi_list) >= 1:
+            try:
+                import identity_dedup as _fg_idd
+                _fg_bimap = {}
+                try:
+                    import story_miner as _fg_sm
+                    _fg_bimap = dict(getattr(_fg_sm, '_BILINGUAL_MAP', {}) or {})
+                except Exception:
+                    _fg_bimap = {}
+                _fg_res = _fg_idd.final_identity_gate(
+                    poi_list,
+                    needed_stops=total_stops,
+                    bilingual_map=_fg_bimap,
+                    qid_to_labels=_d1v2_qid_to_labels,
+                    evidence_log=_d1_evidence_log,
+                    reserve_pool=_final_gate_reserve,
+                    set_bilingual_titles=True,
+                )
+                for _fg_line in _fg_res.decision_log:
+                    print(f"  {_fg_line}")
+                poi_list = _fg_res.poi_list
+            except Exception as _fg_err:
+                print(f"  [LOCAL-669C] final identity gate skipped ({_fg_err})")
+
+        if len(poi_list) == 0:
+            print(f"X All POIs were filtered out after the final identity gate; cannot continue")
+            return None, None, (None, None)
 
         for i, p in enumerate(poi_list):
             p["stop_number"] = i + 1
@@ -25193,14 +25281,19 @@ RULES:
         description = poi.get("description", f"[Description for {poi_name} could not be generated.]")
         
         # Format the POI header
-        poi_header = f"Stop {stop_num}: {poi_name}"
+        # [LOCAL-669C] Prefer the bilingual display title set by the final identity
+        # gate ("<local> (<English>)" for an English tour), falling back to the
+        # bare name. This is the ONE listener-facing header for the work; the
+        # internal `name` (matching key) is unchanged.
+        _header_title = (poi.get("display_title") or "").strip() or poi_name
+        poi_header = f"Stop {stop_num}: {_header_title}"
         if artist and artist.lower() != "unknown artist":
             poi_header += f" by {artist}"
         if year:
             poi_header += f", {year}"
         
         # [F3] Header assertion: ensure GPT hasn't injected flowery text into the name field
-        _expected_header_start = f"Stop {stop_num}: {poi['name']}"
+        _expected_header_start = f"Stop {stop_num}: {_header_title}"
         if not poi_header.startswith(_expected_header_start):
             print(f"  [F3] ⚠️ HEADER MISMATCH at stop {stop_num}:")
             print(f"    Expected start: '{_expected_header_start}'")
