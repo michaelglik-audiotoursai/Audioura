@@ -792,10 +792,10 @@ class _HomeScreenState extends State<HomeScreen> {
                     tourId: '${item['id']}',
                     tourTitle: item['name']?.toString() ?? 'this tour',
                   );
-                  if (result != null) {
-                    item['rating_score'] = result.score;
-                    item['rating_count'] = result.count;
-                    item['rating_label'] = result.label;
+                  if (result != null && result.aggregate != null) {
+                    item['rating_score'] = result.aggregate!.score;
+                    item['rating_count'] = result.aggregate!.count;
+                    item['rating_label'] = result.aggregate!.label;
                     setDialogState(() {});
                   }
                 },

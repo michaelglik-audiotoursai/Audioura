@@ -109,23 +109,22 @@ class _RateTourDialogState extends State<RateTourDialog> {
     if (_selected == null || _submitting) return;
     setState(() => _submitting = true);
 
-    final result = await TourRatingService.submitRating(
+    // Offline-first: this ALWAYS saves locally and enqueues for sync, so it
+    // never fails. Online, [RatingSubmission.synced] is true and the aggregate
+    // is present; offline it is saved and shown as "pending sync".
+    final submission = await TourRatingService.submitRating(
       tourId: widget.tourId,
       rating: _selected!,
     );
 
     if (!mounted) return;
 
-    if (result != null) {
-      Navigator.of(context).pop(result);
-    } else {
-      setState(() => _submitting = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text("Couldn't save your rating — please try again."),
-        ),
-      );
-    }
+    // Show the listener their own rating at once ("Your rating: 8" or
+    // "...(pending sync)"), then return the submission to the caller.
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(submission.myRatingText)),
+    );
+    Navigator.of(context).pop(submission);
   }
 
   @override
@@ -182,16 +181,20 @@ class _RateTourDialogState extends State<RateTourDialog> {
   }
 }
 
-/// Show the rate-tour dialog. Returns the recomputed [TourRating] if the user
-/// submitted, or null if they dismissed it (or submission failed).
+/// Show the rate-tour dialog. Returns the [RatingSubmission] if the user
+/// submitted (always saved locally, synced when a connection returns), or null
+/// if they dismissed it.
 ///
-/// [LOCAL-670B] The per-TOUR rating is gated behind "heard at least 2 stops"
-/// (or all stops on a short tour). If the listener opens this before that
+/// [LOCAL-670B/670C] The per-TOUR rating is gated behind "heard at least 2
+/// stops" (or all stops on a short tour), evaluated from the LOCAL listen
+/// record so it works offline. If the listener opens this before that
 /// threshold, we DON'T show the 1–10 picker — we show the polite Audible-style
-/// message with the running count and return null. Callers should also hide the
-/// entry point until [TourListenService.hasListenedEnough], but gating here as
-/// well guarantees the message is consistent wherever rating is triggered.
-Future<TourRating?> showRateTourDialog(
+/// message with the running local count and return null. Callers should also
+/// hide the entry point until [TourListenService.hasListenedEnough], but gating
+/// here as well guarantees the message is consistent wherever rating is
+/// triggered. The picker opens pre-selected on the listener's own saved rating
+/// so a re-rate shows what they chose last.
+Future<RatingSubmission?> showRateTourDialog(
   BuildContext context, {
   required String tourId,
   required String tourTitle,
@@ -226,13 +229,16 @@ Future<TourRating?> showRateTourDialog(
     return null;
   }
 
+  // Pre-select the listener's own saved rating if they rated before.
+  final prefill = initialRating ?? await TourRatingService.myRating(tourId);
+
   if (!context.mounted) return null;
-  return showDialog<TourRating>(
+  return showDialog<RatingSubmission>(
     context: context,
     builder: (_) => RateTourDialog(
       tourId: tourId,
       tourTitle: tourTitle,
-      initialRating: initialRating,
+      initialRating: prefill,
     ),
   );
 }
