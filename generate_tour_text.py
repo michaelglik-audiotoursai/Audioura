@@ -5150,6 +5150,11 @@ class VerificationResult:
     wiki_available: bool = False
     entity_resolved: bool = False
     qid: str = ''
+    # [LOCAL-669C] QID → {label_local, label_en, aliases} for every SPARQL work
+    # this venue carries. The final identity gate uses it to stamp a QID onto a
+    # cross-language duplicate by EXACT label (the strongest bridge), independent
+    # of whether a per-stop evidence entry happened to capture sparql_labels.
+    qid_to_labels: Dict[str, Any] = field(default_factory=dict)
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -6340,6 +6345,7 @@ def _verify_works_v2(poi_list, venue_name, exhibition_scope=None):
         wiki_available=_has_wiki,
         entity_resolved=bool(_venue_entity and _venue_entity.qid) if '_venue_entity' in dir() else False,
         qid=_venue_entity.qid if ('_venue_entity' in dir() and _venue_entity and _venue_entity.qid) else '',
+        qid_to_labels=dict(_qid_to_labels) if '_qid_to_labels' in dir() else {},
     )
 
 
@@ -12169,6 +12175,9 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
         # last — so a collapsed duplicate is replaced by a DISTINCT verified work,
         # never by repeating one. Empty on every non-museum path.
         _final_gate_reserve = []
+        # [LOCAL-669C] venue QID→labels map captured from D1v2 (empty otherwise),
+        # the strongest bridge for the final gate's exact-label QID stamping.
+        _d1v2_qid_to_labels = {}
         _d1_venue_corpus = ""
         _story_corpus_result = None
         _d1v2_result = None  # [LOCAL-72] Initialize for non-museum paths (prevents NameError in three_class_retrieval)
@@ -12409,6 +12418,10 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
                     _d1_evidence_log = _d1v2_result.evidence_log
                     _d1_venue_corpus = _d1v2_result.combined_text
                     _story_corpus_result = _d1v2_result.corpus_result
+                    # [LOCAL-669C] Carry the venue's QID→labels map to the final
+                    # identity gate so it can stamp a cross-language duplicate by
+                    # exact label even when a per-stop evidence entry missed it.
+                    _d1v2_qid_to_labels = dict(getattr(_d1v2_result, 'qid_to_labels', {}) or {})
                     print(f"  [D1] Tier: {_verification_tier} ({len(poi_list)} verified works)")
                     
                     # [PALAIS-FIX] For thin tier with sparse Wikidata: restore GPT candidates
@@ -14444,6 +14457,7 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
                     poi_list,
                     needed_stops=total_stops,
                     bilingual_map=_fg_bimap,
+                    qid_to_labels=_d1v2_qid_to_labels,
                     evidence_log=_d1_evidence_log,
                     reserve_pool=_final_gate_reserve,
                     set_bilingual_titles=True,

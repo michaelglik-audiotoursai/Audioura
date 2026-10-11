@@ -190,6 +190,25 @@ class TestTriggerQidStampBridgesGloss(unittest.TestCase):
                                       qid_to_labels=qid_to_labels)
         self.assertEqual(len(res.poi_list), 1)
 
+    def test_qid_to_labels_bridges_with_empty_per_stop_evidence(self):
+        # The live-run failure mode: the per-stop evidence entries carry NO
+        # sparql_labels (and no QID), but the venue QID→labels map does. Both
+        # Spring Garden surface forms must still collapse — the gate stamps the
+        # QID onto EACH by exact label match against the venue map.
+        qid_to_labels = {_QID: {"label_local": _SPRING_VN, "label_en": _SPRING_EN,
+                                "aliases": [_SPRING_EN_ALT]}}
+        poi = [
+            _poi(_SPRING_EN, verified=True),
+            _poi(_SPRING_VN, verified=True, title_local=_SPRING_VN,
+                 title_en=_SPRING_GLOSS),  # gloss "Center" ≠ SPARQL "Central"
+            _poi("Thanh niên Thành đồng", verified=True),
+        ]
+        res = idd.final_identity_gate(
+            poi, needed_stops=3, qid_to_labels=qid_to_labels, evidence_log={})
+        self.assertEqual(res.stamped_qids, 2,
+                         "both Spring Garden forms stamped from the venue map")
+        self.assertEqual(len(res.poi_list), 2, "collapsed despite empty evidence")
+
 
 class TestBilingualHeader(unittest.TestCase):
     """Ticket point 3: an English tour shows '<local> (<English>)', local first,
