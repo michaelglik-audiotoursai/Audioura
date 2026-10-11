@@ -12735,7 +12735,8 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
                     _fb_needed = total_stops - len(poi_list)
                     _fb_stops = build_fallback_stops(
                         _museum_venue_name or location, _fb_pages, _fb_combined,
-                        needed=_fb_needed, exclude_names=_fb_exclude)
+                        needed=_fb_needed, exclude_names=_fb_exclude,
+                        verified_works=[p for p in poi_list if p.get('verified', True)])
                     for _fb in _fb_stops:
                         _d1_evidence_log[_fb['name']] = {
                             "status": "VERIFIED",
@@ -18562,6 +18563,30 @@ MANDATORY INCLUSION — work this surprising detail into the description natural
                               f"(reception_evidence={_has_reception})")
                     except Exception as _wfc_err:
                         print(f"  [LOCAL-617] narration contract skipped: {_wfc_err}")
+
+                    # [LOCAL-668 #2] AREA / BUILDING stops must LEAD with a verified
+                    # work (or artist) of THIS museum, so the stop opens on a real
+                    # object a visitor can see here rather than a generic lecture on
+                    # the medium. The verified lead work was attached when the
+                    # fallback stop was built (museum_fallback_stops.assign_lead_works).
+                    try:
+                        _lead = poi.get('_lead_work') if isinstance(poi, dict) else None
+                        if _lead and (_lead.get('name') or '').strip():
+                            _lead_name = _lead['name'].strip()
+                            _lead_artist = (_lead.get('artist') or '').strip()
+                            _by = f" by {_lead_artist}" if _lead_artist else ""
+                            description_prompt += (
+                                f"\nLEAD WITH A REAL WORK (LOCAL-668): open this stop by "
+                                f"naming the verified work \"{_lead_name}\"{_by} — a work "
+                                f"confirmed in THIS museum's collection — and describe it "
+                                f"first, as the concrete example of this area. Only after "
+                                f"that may you speak about the collection area in general. "
+                                f"Name ONLY works and artists of THIS museum; never a work "
+                                f"or artist from any other museum or collection.\n")
+                            print(f"  [LOCAL-668] Stop {stop_num} ({poi.get('_stop_kind','area')}) "
+                                  f"leads with verified work '{_lead_name}'{_by}")
+                    except Exception as _lw_err:
+                        print(f"  [LOCAL-668] lead-work instruction skipped: {_lw_err}")
 
         # [B6] Scored story elements → generation wiring (per-status phrasing)
         # Reads ranked elements from work_stories cache and injects them with

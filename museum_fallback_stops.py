@@ -176,10 +176,21 @@ def build_fallback_stops(
     building_qid: str = "",
     building_name_hint: str = "",
     exclude_names: Sequence[str] = (),
+    verified_works: Sequence[Dict] = (),
 ) -> List[Dict]:
     """Build up to `needed` fallback stops: the historic building first (one at
     most), then named collection areas, all grounded in the corpus and excluding
     anything already in the tour (`exclude_names`, matched case/accent-insensitively).
+
+    [LOCAL-668 #2] Prefer works over areas. Area stops only ever FILL the slots
+    the verified works could not. Each collection-area stop must NAME at least one
+    VERIFIED work (or its artist) of THIS museum and lead with it, so the area
+    stop opens on a real object the visitor can see here — not a generic lecture
+    on the medium. ``verified_works`` is the already-verified pool (dicts with
+    'name' and optional 'artist'); matching works (whose medium corresponds to the
+    area) are attached as the stop's ``_lead_work`` / ``_lead_works``, falling back
+    to any verified work when none matches by medium. When the pool is empty the
+    area stop still ships (grounded in the corpus) but without a lead work.
 
     Returns [] when `needed` <= 0 or the corpus grounds nothing — the caller then
     keeps the honest shortfall for what is truly left (LOCAL-632).
@@ -196,12 +207,67 @@ def build_fallback_stops(
         stops.append(bstop)
         _excl.add(_norm(bstop["name"]))
 
+    _area_stops = []
     for area in detect_collection_area_stops(pages, combined_text):
-        if len(stops) >= needed:
+        if len(stops) + len(_area_stops) >= needed:
             break
         if _norm(area["name"]) in _excl:
             continue
-        stops.append(area)
+        _area_stops.append(area)
         _excl.add(_norm(area["name"]))
 
+    assign_lead_works(_area_stops, verified_works)
+    stops.extend(_area_stops)
     return stops[:needed]
+
+
+def assign_lead_works(area_stops: List[Dict], verified_works: Sequence[Dict]) -> None:
+    """[LOCAL-668 #2] Attach a verified lead work/artist to each area stop, in place.
+
+    Each collection-area stop must open on a REAL, verified work of this museum.
+    A work is matched to an area when the area's label/keywords appear in the
+    work's name/medium (so "Lacquer painting collection" leads with a verified
+    lacquer work); otherwise area stops are assigned remaining verified works
+    round-robin so distinct areas lead with distinct works where the pool allows.
+    Pure/deterministic; a no-op when there are no area stops or no verified works.
+
+    Sets on each matched area stop:
+      _lead_work  = {"name": <title>, "artist": <artist>}
+      _lead_works = [that dict]   (list form for the narration contract)
+    """
+    pool = [w for w in (verified_works or []) if (w.get("name") or "").strip()]
+    if not area_stops or not pool:
+        return
+
+    label_of = {id(a): _norm(a.get("name", "").replace("collection", "")) for a in area_stops}
+    used: set = set()
+
+    def _as_lead(w: Dict) -> Dict:
+        return {"name": (w.get("name") or "").strip(),
+                "artist": (w.get("artist") or "").strip()}
+
+    # Pass 1: medium match — the area's words appear in the work's name/medium.
+    for area in area_stops:
+        words = [t for t in label_of[id(area)].split() if len(t) >= 4]
+        if not words:
+            continue
+        for w in pool:
+            if id(w) in used:
+                continue
+            hay = _norm(f"{w.get('name','')} {w.get('medium','')}")
+            if any(t in hay for t in words):
+                area["_lead_work"] = _as_lead(w)
+                area["_lead_works"] = [area["_lead_work"]]
+                used.add(id(w))
+                break
+
+    # Pass 2: round-robin remaining verified works to still-unled area stops.
+    _remaining = [w for w in pool if id(w) not in used] or pool
+    _ri = 0
+    for area in area_stops:
+        if area.get("_lead_work"):
+            continue
+        w = _remaining[_ri % len(_remaining)]
+        area["_lead_work"] = _as_lead(w)
+        area["_lead_works"] = [area["_lead_work"]]
+        _ri += 1
