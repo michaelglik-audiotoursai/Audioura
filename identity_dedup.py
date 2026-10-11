@@ -420,6 +420,98 @@ def _is_area_stop(cand: Dict) -> bool:
             or bool(cand.get("_area_stop")))
 
 
+# ── LOCAL-669C: bilingual stop titles (ticket point 3) ────────────────────────
+
+def _qid_labels_lookup(
+    qid_to_labels: Optional[Dict[str, Dict]] = None,
+    evidence_log: Optional[Dict[str, Dict]] = None,
+) -> Dict[str, Dict[str, str]]:
+    """QID → {'local': …, 'en': …} from the venue map and the evidence log, so a
+    stop that carries only ONE title can still be given its OTHER-language title
+    for the bilingual header."""
+    out: Dict[str, Dict[str, str]] = {}
+
+    def _put(qid: str, local: str, en: str) -> None:
+        q = _norm_qid(qid)
+        if not q:
+            return
+        slot = out.setdefault(q, {"local": "", "en": ""})
+        if local and not slot["local"]:
+            slot["local"] = local.strip()
+        if en and not slot["en"]:
+            slot["en"] = en.strip()
+
+    for qid, labels in (qid_to_labels or {}).items():
+        if isinstance(labels, dict):
+            _put(qid, labels.get("label_local", ""), labels.get("label_en", ""))
+    for ev in (evidence_log or {}).values():
+        if isinstance(ev, dict) and ev.get("qid"):
+            lbls = ev.get("sparql_labels") or {}
+            if isinstance(lbls, dict):
+                _put(ev["qid"], lbls.get("label_local", ""), lbls.get("label_en", ""))
+    return out
+
+
+def _is_mostly_ascii(s: str) -> bool:
+    letters = [c for c in (s or "") if c.isalpha()]
+    if not letters:
+        return False
+    return sum(1 for c in letters if ord(c) < 128) / len(letters) >= 0.8
+
+
+def bilingual_display_title(
+    cand: Dict,
+    qid_labels: Optional[Dict[str, Dict[str, str]]] = None,
+) -> str:
+    """The listener-facing header for one stop: the LOCAL title first, with the
+    ENGLISH title in parentheses — "Vườn xuân Trung Nam Bắc (North Central South
+    Spring Garden)". Sourced from the candidate's own local/English pair
+    (highlights parse) or, failing that, the work's SPARQL labels looked up by
+    QID. Never fabricates: when only one title is known, or the two are the same
+    work-word-set, the single title is returned unchanged — so a stop never gets
+    two different headers and a mono-lingual work is left alone.
+
+    The result is a DISPLAY string; the candidate's ``name`` (the matching key)
+    is left untouched by this function (the gate stores the result separately).
+    """
+    local = ""
+    en = ""
+    for f in _LABEL_LOCAL_FIELDS:
+        v = cand.get(f)
+        if isinstance(v, str) and v.strip():
+            local = v.strip()
+            break
+    for f in _LABEL_EN_FIELDS:
+        v = cand.get(f)
+        if isinstance(v, str) and v.strip():
+            en = v.strip()
+            break
+    # Fall back to the work's SPARQL labels (by QID) for the missing side.
+    q = candidate_qid(cand)
+    if q and qid_labels and q in qid_labels:
+        local = local or qid_labels[q].get("local", "")
+        en = en or qid_labels[q].get("en", "")
+    name = (cand.get("name") or "").strip()
+    # Decide which is the local (non-ASCII / native) title. If we only have a
+    # bare name, there is nothing bilingual to show.
+    if not local and not en:
+        return name
+    if local and not en:
+        # Only a local title — if the name adds an English gloss, keep the name.
+        return name or local
+    if en and not local:
+        return name or en
+    # Both present. If they normalise to the SAME work-word-set, they are the
+    # same string in two spellings — show just one (the local).
+    if norm_set(local) and norm_set(local) == norm_set(en):
+        return local
+    # Local first, English in parens. If 'local' is actually the ASCII one and
+    # 'en' the native one (mislabelled), swap so the native title leads.
+    if _is_mostly_ascii(local) and not _is_mostly_ascii(en):
+        local, en = en, local
+    return f"{local} ({en})"
+
+
 @dataclass
 class GateResult:
     poi_list: List[Dict]
@@ -437,6 +529,7 @@ def final_identity_gate(
     qid_to_labels: Optional[Dict[str, Dict]] = None,
     evidence_log: Optional[Dict[str, Dict]] = None,
     reserve_pool: Sequence[Dict] = (),
+    set_bilingual_titles: bool = False,
 ) -> GateResult:
     """The single final identity gate, run once right before narration on EVERY
     museum path.
@@ -512,6 +605,27 @@ def final_identity_gate(
             decision.append(
                 f"[LOCAL-669C] refilled freed slot with "
                 f"{'area stop' if _is_area_stop(cand) else 'work'} '{title}'")
+
+    # 4. [ticket point 3] Bilingual stop titles. Give each surviving stop a
+    # ``display_title`` = "<local> (<English>)" when both titles are known (the
+    # stop's own pair or the work's SPARQL labels by QID). Local leads, English
+    # in parens, word order from the source. ``name`` (the matching key) is left
+    # untouched. One header per work — never two.
+    if set_bilingual_titles:
+        _qlab = _qid_labels_lookup(qid_to_labels, evidence_log)
+        _retitled = 0
+        for cand in deduped:
+            disp = bilingual_display_title(cand, _qlab)
+            if disp and disp != (cand.get("name") or "").strip():
+                cand["display_title"] = disp
+                _retitled += 1
+            else:
+                # Keep an explicit display_title so renderers can rely on it.
+                cand.setdefault("display_title", (cand.get("name") or "").strip())
+        if _retitled:
+            decision.append(
+                f"[LOCAL-669C] bilingual titles: set {_retitled} '<local> "
+                f"(<English>)' header(s)")
 
     return GateResult(poi_list=deduped, collapses=collapses, refilled=refilled,
                       stamped_qids=stamped, decision_log=decision)
