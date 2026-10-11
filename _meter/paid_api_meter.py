@@ -23,8 +23,8 @@ GEMINI_IN, GEMINI_OUT, GROUNDING_PER_QUERY, SERPER_PER_QUERY = 0.75, 3.75, 0.014
 # RATE_TAG names the price card every record was costed with (Michael 2026-10-08: "keep the tag
 # on the price we are using"). Bump it whenever any rate below changes; the history of tags and the
 # bill reconciliation behind each lives in .continuous_dev/PRICE_CARD.md.
-RATE_TAG = "2026-10-08-r4"
-GROUNDED_REQUEST_USD = 0.035  # per search-enabled Gemini request = Google list price ($35/1000 grounded prompts); fitted 2026-10-08 on the 11:55-16:12 window ($3.10 billed)
+RATE_TAG = "2026-10-10-r5"  # r5: grounded request $0.053 (GCloud SKU report Oct 1-10; search billed per query at $0.014, ~3.8 billed queries per grounded request)
+GROUNDED_REQUEST_USD = 0.053  # r5 2026-10-10: GCloud SKU "Generate content search query gemini 3" = $0.014 per billed QUERY (8,324 queries = $116.54, Oct 1-10); Oct 8-9 billed search / grounded requests = $0.053
 
 def _host_kind(url):
     u = url or ""
