@@ -1,0 +1,1494 @@
+{
+  "summary": {
+    "rate_tag": "2026-10-10-r5",
+    "arms": {
+      "gemini": {
+        "mean_evidence_score": 6.0,
+        "mean_dated_named_facts": 4.0,
+        "stops_with_consequence": 10,
+        "stops_filler": 0,
+        "mean_sources": 5.8,
+        "total_usd": 0.53986,
+        "usd_per_stop": 0.05399,
+        "mean_seconds": 9.4
+      },
+      "serper": {
+        "mean_evidence_score": 6.3,
+        "mean_dated_named_facts": 4.5,
+        "stops_with_consequence": 9,
+        "stops_filler": 1,
+        "mean_sources": 5.0,
+        "total_usd": 0.04487,
+        "usd_per_stop": 0.00449,
+        "mean_seconds": 24.0
+      },
+      "serper_plus": {
+        "mean_evidence_score": 7.7,
+        "mean_dated_named_facts": 5.7,
+        "stops_with_consequence": 10,
+        "stops_filler": 1,
+        "mean_sources": 4.1,
+        "total_usd": 0.03749,
+        "usd_per_stop": 0.00375,
+        "mean_seconds": 6.0
+      }
+    },
+    "n_stops": 10,
+    "total_run_usd": 0.63418
+  },
+  "results": [
+    {
+      "request": "Walking tour of the Freedom Trail, Boston",
+      "city": "Boston, Massachusetts, United States",
+      "place": "Massachusetts State House",
+      "prompt": "What story can be told to visitors of Boston, Massachusetts, United States about Massachusetts State House?\n\nContext — the work this concerns:\n  canonical_title: Massachusetts State House\n  venue_name: Massachusetts State House\nExhibition: Boston, Massachusetts, United States\n\nSearch, then answer with FACTS ONLY — each one sentence, with its source in brackets. Prefer what a visitor standing in front of it cannot see: why it was made, who decided, what went wrong, what it cost someone. If you find nothing reliable, say exactly \"NO RELIABLE INFORMATION\". Do not praise the work. Do not describe how it looks. Maximum 6 sentences.",
+      "arms": {
+        "gemini": {
+          "text": "The state decided to replace the Old State House to accommodate the expanding branches of Massachusetts government on land previously used as John Hancock's cow pasture.\n\nArchitect Charles Bulfinch submitted his design in 1787, but officials took seven years to approve both the plans and the site.\n\nGovernor Samuel Adams and Paul Revere laid the building's cornerstone together on July 4, 1795.\n\nCompletion in 1798 cost the commonwealth $133,333, exceeding its original budget by more than five times.\n\nThe original wooden shingle dome quickly leaked from rain and snow, forcing the state to hire Paul Revere's company in 1802 to sheath it in protective copper.\n\nDuring World War II, officials painted the dome gray to protect Boston from targeted air raids during nighttime blackouts.",
+          "error": "",
+          "n_sources": 7,
+          "sources": [
+            {
+              "domain": "sec.state.ma.us",
+              "url": "https://www.sec.state.ma.us/divisions/cis/historical/state-house-today.htm"
+            },
+            {
+              "domain": "bu.edu",
+              "url": "https://www.bu.edu/federal/2018/07/16/take-a-tour-of-the-massachusetts-state-house/"
+            },
+            {
+              "domain": "otis.house",
+              "url": "https://otis.house/deepzoom/massachusetts-state-house/"
+            },
+            {
+              "domain": "wikipedia.org",
+              "url": "https://en.wikipedia.org/wiki/Massachusetts_State_House"
+            },
+            {
+              "domain": "sec.state.ma.us",
+              "url": "https://www.sec.state.ma.us/divisions/cis/ciskid/kidugd/dome.htm"
+            },
+            {
+              "domain": "evergreene.com",
+              "url": "https://evergreene.com/projects/massachusetts-state-house/"
+            },
+            {
+              "domain": "repdaverogers.com",
+              "url": "https://www.repdaverogers.com/resources/virtual-tour-of-the-state-house/"
+            }
+          ],
+          "queries": [
+            "Massachusetts State House Paul Revere copper dome",
+            "Massachusetts State House history facts cost architect"
+          ],
+          "seconds": 7.5,
+          "usd": 0.05395,
+          "score": {
+            "dated_named_facts": 5,
+            "dated_named_examples": [
+              "Architect Charles Bulfinch submitted his design in 1787",
+              "Governor Samuel Adams and Paul Revere laid the building's cornerstone together on July 4, 1795",
+              "Completion in 1798 cost the commonwealth $133,333",
+              "Paul Revere's company sheathed the dome in protective copper in 1802",
+              "During World War II, officials painted the dome gray to protect Boston from air raids"
+            ],
+            "has_consequence": true,
+            "filler": false,
+            "evidence_score": 7
+          }
+        },
+        "serper": {
+          "text": "The Massachusetts State House was designed by architect Charles Bulfinch and completed in January 1798 at a cost of $133,333, which was more than five times the original budget. The Masonic cornerstone ceremony was held on July 4, 1795, with Paul Revere presiding as Grand Master of the Grand Lodge of Massachusetts. The building’s dome was originally covered with wood shingles but was soon sheathed in copper by Paul Revere’s company to prevent leaks, and later gilded with gold leaf in 1874. During World War II, the dome’s gold finish was painted gray to avoid visibility during blackouts and was re-gilded in 1969, with a major restoration and re-gilding completed again in 1997. The State House has been expanded multiple times, including major additions in 1895 and 1917 designed by Charles Brigham and other architects. Inside, the building has been a site where abolitionists and civil rights petitioners advocated for justice, including efforts to end slavery and to ban segregated education in 1855.",
+          "error": "",
+          "n_sources": 5,
+          "sources": [
+            {
+              "domain": "en.wikipedia.org",
+              "url": "https://en.wikipedia.org/wiki/Massachusetts_State_House"
+            },
+            {
+              "domain": "thefreedomtrail.org",
+              "url": "https://www.thefreedomtrail.org/trail-sites/massachusetts-state-house"
+            },
+            {
+              "domain": "bostonteapartyship.com",
+              "url": "https://www.bostonteapartyship.com/boston-attractions/the-state-house"
+            },
+            {
+              "domain": "evergreene.com",
+              "url": "https://evergreene.com/projects/massachusetts-state-house/"
+            },
+            {
+              "domain": "nps.gov",
+              "url": "https://www.nps.gov/places/massachusetts-state-house.htm"
+            }
+          ],
+          "queries": [
+            "\"Massachusetts State House\"",
+            "\"Massachusetts State House\" Massachusetts State House",
+            "Boston Massachusetts United States Massachusetts State"
+          ],
+          "seconds": 7.0,
+          "usd": 0.00372,
+          "score": {
+            "dated_named_facts": 8,
+            "dated_named_examples": [
+              "completed in January 1798 at a cost of $133,333",
+              "Masonic cornerstone ceremony was held on July 4, 1795, with Paul Revere presiding as Grand Master of the Grand Lodge of Massachusetts",
+              "dome gilded with gold leaf in 1874",
+              "During World War II, the dome’s gold finish was painted gray to avoid visibility during blackouts",
+              "dome re-gilded in 1969",
+              "major restoration and re-gilding completed again in 1997",
+              "major additions in 1895 and 1917 designed by Charles Brigham and other architects",
+              "efforts to ban segregated education in 1855"
+            ],
+            "has_consequence": true,
+            "filler": false,
+            "evidence_score": 10
+          }
+        },
+        "serper_plus": {
+          "text": "The Massachusetts State House was designed by architect Charles Bulfinch and completed in January 1798 at a cost of $133,333, which was more than five times the original budget. The Masonic cornerstone ceremony was held on July 4, 1795, with Paul Revere presiding as Grand Master of the Grand Lodge of Massachusetts. The original wooden dome, which leaked, was covered with copper by Paul Revere's Revere Copper Company in 1802. The dome was gilded with gold leaf in 1874, painted gray during World War II to prevent reflection during blackouts, and re-gilded in 1969 and again in 1997 at an estimated cost of $300,000. Major expansions were completed in 1895 by Charles Brigham and in 1917 by architects Sturgis, Bryant, Chapman & Andrews, enlarging the original building. In July 2016, Governor Charlie Baker proposed selling a permanent easement on the State House lawn to a neighboring condominium development, but the surrounding land is legally considered \"open space\".",
+          "error": "",
+          "n_sources": 4,
+          "sources": [
+            {
+              "domain": "en.wikipedia.org",
+              "url": "https://en.wikipedia.org/wiki/Massachusetts_State_House"
+            },
+            {
+              "domain": "nps.gov",
+              "url": "https://www.nps.gov/places/massachusetts-state-house.htm"
+            },
+            {
+              "domain": "thefreedomtrail.org",
+              "url": "https://www.thefreedomtrail.org/trail-sites/massachusetts-state-house"
+            },
+            {
+              "domain": "sgh.com",
+              "url": "https://www.sgh.com/project/massachusetts-state-house-2/"
+            }
+          ],
+          "queries": [
+            "\"Massachusetts State House\" Boston, Massachusetts, United States history",
+            "\"Massachusetts State House\" Boston, Massachusetts, United States official site"
+          ],
+          "seconds": 6.2,
+          "usd": 0.00322,
+          "score": {
+            "dated_named_facts": 8,
+            "dated_named_examples": [
+              "completed in January 1798 at a cost of $133,333",
+              "Masonic cornerstone ceremony was held on July 4, 1795, with Paul Revere presiding as Grand Master of the Grand Lodge of Massachusetts",
+              "original wooden dome was covered with copper by Paul Revere's Revere Copper Company in 1802",
+              "dome was gilded with gold leaf in 1874",
+              "dome painted gray during World War II",
+              "major expansions were completed in 1895 by Charles Brigham",
+              "major expansions were completed in 1917 by architects Sturgis, Bryant, Chapman & Andrews",
+              "In July 2016, Governor Charlie Baker proposed selling a permanent easement on the State House lawn"
+            ],
+            "has_consequence": true,
+            "filler": false,
+            "evidence_score": 10
+          }
+        }
+      }
+    },
+    {
+      "request": "Walking tour of the Freedom Trail, Boston",
+      "city": "Boston, Massachusetts, United States",
+      "place": "Park Street Church",
+      "prompt": "What story can be told to visitors of Boston, Massachusetts, United States about Park Street Church?\n\nContext — the work this concerns:\n  canonical_title: Park Street Church\n  venue_name: Park Street Church\nExhibition: Boston, Massachusetts, United States\n\nSearch, then answer with FACTS ONLY — each one sentence, with its source in brackets. Prefer what a visitor standing in front of it cannot see: why it was made, who decided, what went wrong, what it cost someone. If you find nothing reliable, say exactly \"NO RELIABLE INFORMATION\". Do not praise the work. Do not describe how it looks. Maximum 6 sentences.",
+      "arms": {
+        "gemini": {
+          "text": "Twenty-six former members of the Old South Meeting House organized the congregation in 1809 to uphold orthodox Trinitarian Calvinism against the city’s rising Unitarian movement.\n\nThe building was constructed on the former site of Boston’s town granary at a cost exceeding $70,000.\n\nDuring the War of 1812, gunpowder was stored inside the church basement, earning its intersection the lasting moniker \"Brimstone Corner\".\n\nOn July 4, 1829, William Lloyd Garrison delivered his first major public address against slavery from its pulpit.\n\nOn July 4, 1831, the patriotic hymn \"America\" (\"My Country, 'Tis of Thee\") received its first public performance inside the church by a children's choir.",
+          "error": "",
+          "n_sources": 6,
+          "sources": [
+            {
+              "domain": "wikipedia.org",
+              "url": "https://en.wikipedia.org/wiki/Park_Street_Church"
+            },
+            {
+              "domain": "bostonteapartyship.com",
+              "url": "https://www.bostonteapartyship.com/boston-attractions/park-street-church"
+            },
+            {
+              "domain": "thefreedomtrail.org",
+              "url": "https://www.thefreedomtrail.org/trail-sites/park-street-church"
+            },
+            {
+              "domain": "kellscraft.com",
+              "url": "https://www.kellscraft.com/ParkStreet/parkstreetch21.html"
+            },
+            {
+              "domain": "trolleytours.com",
+              "url": "https://www.trolleytours.com/boston/park-street-church"
+            },
+            {
+              "domain": "pluralism.org",
+              "url": "https://pluralism.org/park-street-church"
+            }
+          ],
+          "queries": [
+            "Park Street Church Boston history facts why built brimstone corner cost"
+          ],
+          "seconds": 6.7,
+          "usd": 0.05395,
+          "score": {
+            "dated_named_facts": 3,
+            "dated_named_examples": [
+              "Twenty-six former members of the Old South Meeting House organized the congregation in 1809",
+              "During the War of 1812, gunpowder was stored inside the church basement",
+              "On July 4, 1829, William Lloyd Garrison delivered his first major public address against slavery from its pulpit"
+            ],
+            "has_consequence": true,
+            "filler": false,
+            "evidence_score": 5
+          }
+        },
+        "serper": {
+          "text": "Park Street Church was founded in 1809 by twenty-six local people, mostly former members of the Old South Meeting House, who wanted to preserve orthodox Trinitarian theology during a time of growing Unitarianism. Its cornerstone was laid on May 1, 1809, and construction was completed by the end of that year, with architect Peter Banner designing the church inspired by Christopher Wren’s London churches. The church’s 217-foot steeple was the tallest building in the United States from 1810 to 1828 and served as the first landmark travelers saw when approaching Boston. Park Street Church was built on the site of Boston’s town granary, which gave its name to the adjacent Granary Burying Ground. The congregation was among the first to engage in social justice causes such as prison reform, education, women’s suffrage, and anti-slavery, including hosting William Lloyd Garrison’s first major public anti-slavery speech in 1829. In 1816, the church established one of America’s first Sunday School programs for working children who had no other opportunity to learn to read.",
+          "error": "",
+          "n_sources": 5,
+          "sources": [
+            {
+              "domain": "en.wikipedia.org",
+              "url": "https://en.wikipedia.org/wiki/Park_Street_Church"
+            },
+            {
+              "domain": "bostonteapartyship.com",
+              "url": "https://www.bostonteapartyship.com/boston-attractions/park-street-church"
+            },
+            {
+              "domain": "parkstreet.churchcenter.com",
+              "url": "https://parkstreet.churchcenter.com/"
+            },
+            {
+              "domain": "thefreedomtrail.org",
+              "url": "https://www.thefreedomtrail.org/trail-sites/park-street-church"
+            },
+            {
+              "domain": "podcasts.apple.com",
+              "url": "https://podcasts.apple.com/us/podcast/park-street-church-sermons/id295660755"
+            }
+          ],
+          "queries": [
+            "\"Park Street Church\"",
+            "\"Park Street Church\" Park Street Church",
+            "Boston Massachusetts United States Street Church"
+          ],
+          "seconds": 8.4,
+          "usd": 0.00446,
+          "score": {
+            "dated_named_facts": 6,
+            "dated_named_examples": [
+              "Park Street Church was founded in 1809 by twenty-six local people",
+              "Its cornerstone was laid on May 1, 1809",
+              "The church’s 217-foot steeple was the tallest building in the United States from 1810 to 1828",
+              "Park Street Church was built on the site of Boston’s town granary",
+              "Park Street Church hosted William Lloyd Garrison’s first major public anti-slavery speech in 1829",
+              "In 1816, the church established one of America’s first Sunday School programs"
+            ],
+            "has_consequence": true,
+            "filler": false,
+            "evidence_score": 8
+          }
+        },
+        "serper_plus": {
+          "text": "Park Street Church was founded in 1809 by 26 local people, mostly former members of the Old South Meeting House, who wanted to preserve orthodox Trinitarian theology. Its cornerstone was laid on May 1, 1809, and the church was completed by the end of that year under architect Peter Banner, with a steeple rising 217 feet, which was the tallest building in the United States from 1810 to 1828. The church became known as \"Brimstone Corner\" partly because gunpowder was stored there during the War of 1812. In 1816, Park Street Church joined with Old South Church to form the City Mission Society, aimed at serving Boston’s urban poor. On July 4, 1829, abolitionist William Lloyd Garrison delivered his first major public anti-slavery speech at Park Street Church. The church hosted the debut of the patriotic song \"My Country, 'Tis of Thee\" on July 4, 1831.",
+          "error": "",
+          "n_sources": 4,
+          "sources": [
+            {
+              "domain": "en.wikipedia.org",
+              "url": "https://en.wikipedia.org/wiki/Park_Street_Church"
+            },
+            {
+              "domain": "bostonteapartyship.com",
+              "url": "https://www.bostonteapartyship.com/boston-attractions/park-street-church"
+            },
+            {
+              "domain": "thefreedomtrail.org",
+              "url": "https://www.thefreedomtrail.org/trail-sites/park-street-church"
+            },
+            {
+              "domain": "trolleytours.com",
+              "url": "https://www.trolleytours.com/boston/park-street-church"
+            }
+          ],
+          "queries": [
+            "\"Park Street Church\" Boston, Massachusetts, United States history",
+            "\"Park Street Church\" Boston, Massachusetts, United States official site"
+          ],
+          "seconds": 5.0,
+          "usd": 0.00385,
+          "score": {
+            "dated_named_facts": 6,
+            "dated_named_examples": [
+              "Park Street Church was founded in 1809 by 26 local people",
+              "Its cornerstone was laid on May 1, 1809",
+              "the church was completed by the end of that year under architect Peter Banner",
+              "The church was the tallest building in the United States from 1810 to 1828",
+              "In 1816, Park Street Church joined with Old South Church to form the City Mission Society",
+              "On July 4, 1829, abolitionist William Lloyd Garrison delivered his first major public anti-slavery speech at Park Street Church"
+            ],
+            "has_consequence": true,
+            "filler": false,
+            "evidence_score": 8
+          }
+        }
+      }
+    },
+    {
+      "request": "Walking tour of the Freedom Trail, Boston",
+      "city": "Boston, Massachusetts, United States",
+      "place": "Granary Burying Ground",
+      "prompt": "What story can be told to visitors of Boston, Massachusetts, United States about Granary Burying Ground?\n\nContext — the work this concerns:\n  canonical_title: Granary Burying Ground\n  venue_name: Granary Burying Ground\nExhibition: Boston, Massachusetts, United States\n\nSearch, then answer with FACTS ONLY — each one sentence, with its source in brackets. Prefer what a visitor standing in front of it cannot see: why it was made, who decided, what went wrong, what it cost someone. If you find nothing reliable, say exactly \"NO RELIABLE INFORMATION\". Do not praise the work. Do not describe how it looks. Maximum 6 sentences.",
+      "arms": {
+        "gemini": {
+          "text": "Town officials established the cemetery in 1660 on land taken from the Boston Common to relieve severe overcrowding at King's Chapel Burying Ground. \n\nBy 1740, space had grown so scarce that gravediggers submitted a formal petition complaining they were forced to bury corpses four bodies deep. \n\nAlthough roughly 2,345 headstones and monuments remain visible, historians estimate that over 5,000 people are actually buried across the site. \n\nDuring nineteenth-century municipal landscaping projects, workers uprooted hundreds of gravestones and rearranged them into orderly straight rows, leaving many markers detached from the actual bodies beneath them. \n\nIn the 1860s, construction workers demolished a row of adjacent brick tombs to bring light into neighboring basements, resulting in the permanent disappearance of Declaration of Independence signer John Hancock's remains. \n\nCity authorities permanently prohibited most new interments in 1856 due to the chronic lack of space and sanitary concerns.",
+          "error": "",
+          "n_sources": 5,
+          "sources": [
+            {
+              "domain": "citydays.com",
+              "url": "https://citydays.com/places/granary-burying-ground/"
+            },
+            {
+              "domain": "boston.gov",
+              "url": "https://www.boston.gov/cemeteries/granary-burying-ground"
+            },
+            {
+              "domain": "boston-discovery-guide.com",
+              "url": "https://www.boston-discovery-guide.com/granary-burying-ground.html"
+            },
+            {
+              "domain": "wikipedia.org",
+              "url": "https://en.wikipedia.org/wiki/Granary_Burying_Ground"
+            },
+            {
+              "domain": "celebrateboston.com",
+              "url": "https://www.celebrateboston.com/sites/granary-burying-ground-faqs.htm"
+            }
+          ],
+          "queries": [
+            "Granary Burying Ground established history cost moved headstones"
+          ],
+          "seconds": 7.4,
+          "usd": 0.05409,
+          "score": {
+            "dated_named_facts": 5,
+            "dated_named_examples": [
+              "Town officials established the cemetery in 1660 on land taken from the Boston Common",
+              "By 1740, space had grown so scarce that gravediggers submitted a formal petition",
+              "City authorities permanently prohibited most new interments in 1856 due to the chronic lack of space and sanitary concerns",
+              "During nineteenth-century municipal landscaping projects, workers uprooted hundreds of gravestones and rearranged them into orderly straight rows",
+              "In the 1860s, construction workers demolished a row of adjacent brick tombs resulting in the permanent disappearance of Declaration of Independence signer John Hancock's remains"
+            ],
+            "has_consequence": true,
+            "filler": false,
+            "evidence_score": 7
+          }
+        },
+        "serper": {
+          "text": "The Granary Burying Ground in Boston was established in 1660 as the city’s third burial site to relieve overcrowding at King’s Chapel Burying Ground. It was originally called the South or Common Burying Ground and was renamed in 1737 after a granary building that stood where Park Street Church is today. The cemetery contains about 2,345 gravestones but is estimated to hold over 5,000 burials, including many notable Revolutionary War figures such as John Hancock, Samuel Adams, Paul Revere, and victims of the Boston Massacre. The original layout of the gravestones was rearranged in the 19th century into neat rows to accommodate lawn mowing, a modern innovation at the time. Underground family crypts line the perimeter of the site, with older tombs located in the center. The burying ground was once part of Boston Common, and livestock grazing there helped maintain the landscaping before modern groundskeeping methods were introduced.",
+          "error": "",
+          "n_sources": 5,
+          "sources": [
+            {
+              "domain": "thefreedomtrail.org",
+              "url": "https://www.thefreedomtrail.org/trail-sites/granary-burying-ground"
+            },
+            {
+              "domain": "boston.gov",
+              "url": "https://www.boston.gov/cemeteries/granary-burying-ground"
+            },
+            {
+              "domain": "en.wikipedia.org",
+              "url": "https://en.wikipedia.org/wiki/Granary_Burying_Ground"
+            },
+            {
+              "domain": "salemwitchmuseum.com",
+              "url": "https://salemwitchmuseum.com/locations/granary-burying-ground/"
+            },
+            {
+              "domain": "nps.gov",
+              "url": "https://www.nps.gov/places/granary-burying-ground.htm"
+            }
+          ],
+          "queries": [
+            "\"Granary Burying Ground\"",
+            "\"Granary Burying Ground\" Granary Burying Ground",
+            "Boston Massachusetts United States Granary Burying"
+          ],
+          "seconds": 8.5,
+          "usd": 0.00464,
+          "score": {
+            "dated_named_facts": 3,
+            "dated_named_examples": [
+              "The Granary Burying Ground in Boston was established in 1660 as the city’s third burial site",
+              "It was originally called the South or Common Burying Ground and was renamed in 1737 after a granary building",
+              "The original layout of the gravestones was rearranged in the 19th century into neat rows to accommodate lawn mowing"
+            ],
+            "has_consequence": true,
+            "filler": false,
+            "evidence_score": 5
+          }
+        },
+        "serper_plus": {
+          "text": "The Granary Burying Ground was established in 1660 as Boston’s third cemetery to relieve overcrowding at King’s Chapel Burying Ground. In 1717, the town voted to enlarge the cemetery by taking part of the highway on the eastern side, which was carried out in 1720 with the creation of 15 new tombs. The cemetery was originally called the South Burying Ground but was renamed in 1737 after a granary building that stood on the site of today’s Park Street Church. In 1840, an iron fence and Egyptian revival gate designed by Isaiah Rogers were installed at a cost of $5,000, half funded by the city and half by public subscription. In January 2009, a previously unknown crypt was discovered when a tourist fell through a slate-covered stairway, possibly belonging to Jonathan Armitage, a Boston selectman from 1732-33. A $300,000 restoration project was announced in 2011 to repair and improve the site, funded partly by the Freedom Trail Foundation and the city.",
+          "error": "",
+          "n_sources": 4,
+          "sources": [
+            {
+              "domain": "en.wikipedia.org",
+              "url": "https://en.wikipedia.org/wiki/Granary_Burying_Ground"
+            },
+            {
+              "domain": "thefreedomtrail.org",
+              "url": "https://www.thefreedomtrail.org/trail-sites/granary-burying-ground"
+            },
+            {
+              "domain": "boston.gov",
+              "url": "https://www.boston.gov/cemeteries/granary-burying-ground"
+            },
+            {
+              "domain": "salemwitchmuseum.com",
+              "url": "https://salemwitchmuseum.com/locations/granary-burying-ground/"
+            }
+          ],
+          "queries": [
+            "\"Granary Burying Ground\" Boston, Massachusetts, United States history",
+            "\"Granary Burying Ground\" Boston, Massachusetts, United States official site"
+          ],
+          "seconds": 6.1,
+          "usd": 0.00385,
+          "score": {
+            "dated_named_facts": 6,
+            "dated_named_examples": [
+              "The Granary Burying Ground was established in 1660 as Boston’s third cemetery",
+              "In 1717, the town voted to enlarge the cemetery by taking part of the highway",
+              "which was carried out in 1720 with the creation of 15 new tombs",
+              "The cemetery was renamed in 1737 after a granary building that stood on the site of today’s Park Street Church",
+              "In 1840, an iron fence and Egyptian revival gate designed by Isaiah Rogers were installed",
+              "In January 2009, a previously unknown crypt was discovered possibly belonging to Jonathan Armitage"
+            ],
+            "has_consequence": true,
+            "filler": false,
+            "evidence_score": 8
+          }
+        }
+      }
+    },
+    {
+      "request": "Walking tour of the Freedom Trail, Boston",
+      "city": "Boston, Massachusetts, United States",
+      "place": "King's Chapel",
+      "prompt": "What story can be told to visitors of Boston, Massachusetts, United States about King's Chapel?\n\nContext — the work this concerns:\n  canonical_title: King's Chapel\n  venue_name: King's Chapel\nExhibition: Boston, Massachusetts, United States\n\nSearch, then answer with FACTS ONLY — each one sentence, with its source in brackets. Prefer what a visitor standing in front of it cannot see: why it was made, who decided, what went wrong, what it cost someone. If you find nothing reliable, say exactly \"NO RELIABLE INFORMATION\". Do not praise the work. Do not describe how it looks. Maximum 6 sentences.",
+      "arms": {
+        "gemini": {
+          "text": "Royal Governor Sir Edmund Andros decided to establish the congregation in the 1680s to impose the Church of England upon an intensely Puritan colony.\n\nBecause no local landowners would sell property for an Anglican church, the governor seized a corner of Boston's public burial ground to build it.\n\nLaborers had to dig up and relocate existing graves from the cemetery to make room for the church foundation.\n\nThe current stone structure was built directly around the original 1688 wooden meetinghouse so that services would never be interrupted during construction.\n\nOne of the largest individual donors toward funding the building was Charles Apthorp, a merchant who made his fortune through the transatlantic slave trade.\n\nThe church bell cracked after being rung for a fire in 1814 and had to be recast by Paul Revere in 1816.",
+          "error": "",
+          "n_sources": 6,
+          "sources": [
+            {
+              "domain": "bpl.org",
+              "url": "https://www.bpl.org/blogs/post/kings-chapel/"
+            },
+            {
+              "domain": "colonialsociety.org",
+              "url": "https://www.colonialsociety.org/publications/3640/historical-introduction-1686-1776-kings-chapel"
+            },
+            {
+              "domain": "boston.gov",
+              "url": "https://www.boston.gov/cemeteries/kings-chapel-burying-ground"
+            },
+            {
+              "domain": "bu.edu",
+              "url": "https://www.bu.edu/articles/2018/tour-kings-chapel/"
+            },
+            {
+              "domain": "thefreedomtrail.org",
+              "url": "https://www.thefreedomtrail.org/trail-sites/kings-chapel-kings-chapel-burying-ground"
+            },
+            {
+              "domain": "wgbh.org",
+              "url": "https://www.wgbh.org/news/local/2023-07-19/kings-chapel-burying-ground-ignores-the-history-of-enslavers-buried-there"
+            }
+          ],
+          "queries": [
+            "Kings Chapel Boston history construction cost",
+            "Kings Chapel Boston history facts why it was made who decided what went wrong"
+          ],
+          "seconds": 9.9,
+          "usd": 0.05397,
+          "score": {
+            "dated_named_facts": 4,
+            "dated_named_examples": [
+              "Royal Governor Sir Edmund Andros decided to establish the congregation in the 1680s",
+              "The current stone structure was built directly around the original 1688 wooden meetinghouse",
+              "The church bell cracked after being rung for a fire in 1814",
+              "The church bell had to be recast by Paul Revere in 1816"
+            ],
+            "has_consequence": true,
+            "filler": false,
+            "evidence_score": 6
+          }
+        },
+        "serper": {
+          "text": "King's Chapel in Boston was founded in 1686 by Royal Governor Sir Edmund Andros as the first Anglican church in colonial New England during the reign of King James II. The original wooden church was built in 1688 on land that no resident would sell for a non-Congregationalist church, so it was placed on a public burying ground now known as King's Chapel Burying Ground. Construction of the current stone building began in 1749 and was completed in 1754, designed by colonial architect Peter Harrison. The stone church was built around the original wooden church, which was then disassembled and removed through the new church’s windows; the wood was shipped to Nova Scotia to build St. John's Anglican Church in Lunenburg. The congregation has worshipped according to a Unitarian version of the Book of Common Prayer since 1785. The chapel is located at the corner of Tremont Street and School Street, Boston’s oldest English burying ground.",
+          "error": "",
+          "n_sources": 5,
+          "sources": [
+            {
+              "domain": "en.wikipedia.org",
+              "url": "https://en.wikipedia.org/wiki/King%27s_Chapel"
+            },
+            {
+              "domain": "thekingschapel.com",
+              "url": "https://www.thekingschapel.com/"
+            },
+            {
+              "domain": "thefreedomtrail.org",
+              "url": "https://www.thefreedomtrail.org/trail-sites/kings-chapel-kings-chapel-burying-ground"
+            },
+            {
+              "domain": "thekingschapel.org",
+              "url": "https://thekingschapel.org/"
+            },
+            {
+              "domain": "kingschapelfl.com",
+              "url": "https://www.kingschapelfl.com/"
+            }
+          ],
+          "queries": [
+            "\"King's Chapel\"",
+            "\"King's Chapel\" King's Chapel",
+            "Boston Massachusetts United States King's Chapel"
+          ],
+          "seconds": 9.1,
+          "usd": 0.00465,
+          "score": {
+            "dated_named_facts": 6,
+            "dated_named_examples": [
+              "King's Chapel in Boston was founded in 1686 by Royal Governor Sir Edmund Andros",
+              "The original wooden church was built in 1688 on land ... now known as King's Chapel Burying Ground",
+              "Construction of the current stone building began in 1749 and was completed in 1754, designed by colonial architect Peter Harrison",
+              "The wood was shipped to Nova Scotia to build St. John's Anglican Church in Lunenburg",
+              "The congregation has worshipped according to a Unitarian version of the Book of Common Prayer since 1785",
+              "King's Chapel Burying Ground is located at the corner of Tremont Street and School Street"
+            ],
+            "has_consequence": true,
+            "filler": false,
+            "evidence_score": 8
+          }
+        },
+        "serper_plus": {
+          "text": "1. King's Chapel was founded in 1686 by Royal Governor Sir Edmund Andros as the first Anglican church in colonial New England during King James II’s reign. 2. The current stone building, designed by Peter Harrison, was constructed from 1749 to 1754 around the original wooden chapel, which was then disassembled and shipped to Nova Scotia. 3. During the American Revolution, the chapel was vacant as Loyalist members fled to England and Nova Scotia, and it reopened in 1782, becoming Unitarian under James Freeman in 1785 after revising the Book of Common Prayer. 4. The original bell, cast in England in 1772, cracked in 1814 and was recast by Paul Revere and Sons in 1816; it is the largest bell cast by Revere’s foundry and still rings today. 5. The crypt beneath King's Chapel, used for private family tombs in the 1750s, was closed in the 1850s due to public health concerns and permanently sealed in the 1890s, making it one of the oldest crypt burial sites in the U.S.. 6. The adjacent King’s Chapel Burying Ground predates the chapel by over a century and was originally a public cemetery, renamed in the 1750s, but is not affiliated with the church.",
+          "error": "",
+          "n_sources": 4,
+          "sources": [
+            {
+              "domain": "en.wikipedia.org",
+              "url": "https://en.wikipedia.org/wiki/King's_Chapel"
+            },
+            {
+              "domain": "nps.gov",
+              "url": "https://www.nps.gov/places/king-s-chapel.htm"
+            },
+            {
+              "domain": "thefreedomtrail.org",
+              "url": "https://www.thefreedomtrail.org/trail-sites/kings-chapel-kings-chapel-burying-ground"
+            },
+            {
+              "domain": "bpl.org",
+              "url": "https://www.bpl.org/blogs/post/kings-chapel/"
+            }
+          ],
+          "queries": [
+            "\"King's Chapel\" Boston, Massachusetts, United States history",
+            "\"King's Chapel\" Boston, Massachusetts, United States official site"
+          ],
+          "seconds": 6.3,
+          "usd": 0.00397,
+          "score": {
+            "dated_named_facts": 7,
+            "dated_named_examples": [
+              "King's Chapel was founded in 1686 by Royal Governor Sir Edmund Andros",
+              "The current stone building, designed by Peter Harrison, was constructed from 1749 to 1754",
+              "The original wooden chapel was disassembled and shipped to Nova Scotia",
+              "During the American Revolution, the chapel was vacant as Loyalist members fled to England and Nova Scotia",
+              "The chapel reopened in 1782, becoming Unitarian under James Freeman in 1785",
+              "The original bell, cast in England in 1772, cracked in 1814 and was recast by Paul Revere and Sons in 1816",
+              "The crypt beneath King's Chapel, used for private family tombs in the 1750s, was closed in the 1850s and sealed in the 1890s"
+            ],
+            "has_consequence": true,
+            "filler": false,
+            "evidence_score": 9
+          }
+        }
+      }
+    },
+    {
+      "request": "Walking tour of the Freedom Trail, Boston",
+      "city": "Boston, Massachusetts, United States",
+      "place": "Old South Meeting House",
+      "prompt": "What story can be told to visitors of Boston, Massachusetts, United States about Old South Meeting House?\n\nContext — the work this concerns:\n  canonical_title: Old South Meeting House\n  venue_name: Old South Meeting House\nExhibition: Boston, Massachusetts, United States\n\nSearch, then answer with FACTS ONLY — each one sentence, with its source in brackets. Prefer what a visitor standing in front of it cannot see: why it was made, who decided, what went wrong, what it cost someone. If you find nothing reliable, say exactly \"NO RELIABLE INFORMATION\". Do not praise the work. Do not describe how it looks. Maximum 6 sentences.",
+      "arms": {
+        "gemini": {
+          "text": "The congregation of Boston's Third Church commissioned master builder Joshua Blanchard to construct the brick meeting house in 1729 to replace an outgrown 1669 wooden building. \n\nBecause it was the largest indoor space in colonial Boston, town leaders routinely chose it over Faneuil Hall to hold mass protest assemblies, including the five-thousand-person gathering on December 16, 1773, that directly launched the Boston Tea Party. \n\nDuring the British siege of Boston in 1775, occupying troops retaliated by ripping out its pews and pulpit, dumping dirt across the floor, and converting the sanctuary into a riding school for British cavalry. \n\nThe congregation had to spend eight years raising funds after the occupation simply to repair the interior and restore it to religious use. \n\nIn 1876, the congregation sold the building for demolition and materials after moving to Copley Square, prompting twenty Boston women to organize a public campaign that bought it back for $400,000 to halt its destruction.",
+          "error": "",
+          "n_sources": 5,
+          "sources": [
+            {
+              "domain": "virtualamericana.org",
+              "url": "https://virtualamericana.org/old-south-meeting-house/"
+            },
+            {
+              "domain": "boston.gov",
+              "url": "https://www.boston.gov/news/old-south-meeting-house-study-report"
+            },
+            {
+              "domain": "revolutionaryspaces.org",
+              "url": "https://revolutionaryspaces.org/discover/old-south-meeting-house/"
+            },
+            {
+              "domain": "trolleytours.com",
+              "url": "https://www.trolleytours.com/boston/old-south-meeting-house"
+            },
+            {
+              "domain": "thefreedomtrail.org",
+              "url": "https://www.thefreedomtrail.org/trail-sites/old-south-meeting-house"
+            }
+          ],
+          "queries": [
+            "Old South Meeting House history facts cost who decided",
+            "Old South Meeting House built 1729 background why it was made British occupation"
+          ],
+          "seconds": 6.8,
+          "usd": 0.05412,
+          "score": {
+            "dated_named_facts": 5,
+            "dated_named_examples": [
+              "The congregation of Boston's Third Church commissioned master builder Joshua Blanchard to construct the brick meeting house in 1729",
+              "to replace an outgrown 1669 wooden building",
+              "the five-thousand-person gathering on December 16, 1773, that directly launched the Boston Tea Party",
+              "During the British siege of Boston in 1775, occupying troops retaliated by ripping out its pews and pulpit",
+              "In 1876, the congregation sold the building for demolition and materials after moving to Copley Square"
+            ],
+            "has_consequence": true,
+            "filler": false,
+            "evidence_score": 7
+          }
+        },
+        "serper": {
+          "text": "Old South Meeting House was built in 1729 as a large Puritan meeting house and became the largest building in colonial Boston, hosting major public meetings. It was the site of the December 16, 1773 gathering where up to 5,000 colonists met to protest the Tea Act before the Boston Tea Party, which followed shortly after. The building was saved from demolition in 1876 by a group of twenty Boston women and has operated as a museum since 1877. The clock on its tower was made by Gawen Brown and installed in 1770. Notable members of its congregation included African-American poet Phillis Wheatley and patriots such as Samuel Adams and William Dawes. The Old South Meeting House is a National Historic Landmark and part of Boston’s Freedom Trail, stewarded today by Revolutionary Spaces.",
+          "error": "",
+          "n_sources": 5,
+          "sources": [
+            {
+              "domain": "thefreedomtrail.org",
+              "url": "https://www.thefreedomtrail.org/trail-sites/old-south-meeting-house"
+            },
+            {
+              "domain": "revolutionaryspaces.org",
+              "url": "https://revolutionaryspaces.org/"
+            },
+            {
+              "domain": "nps.gov",
+              "url": "https://www.nps.gov/bost/learn/historyculture/osmh.htm"
+            },
+            {
+              "domain": "en.wikipedia.org",
+              "url": "https://en.wikipedia.org/wiki/Old_South_Meeting_House"
+            },
+            {
+              "domain": "revolutionaryspaces.org",
+              "url": "https://revolutionaryspaces.org/discover/old-south-meeting-house/"
+            }
+          ],
+          "queries": [
+            "\"Old South Meeting House\"",
+            "\"Old South Meeting House\" Old South Meeting House",
+            "Boston Massachusetts United States South Meeting"
+          ],
+          "seconds": 6.9,
+          "usd": 0.0045,
+          "score": {
+            "dated_named_facts": 4,
+            "dated_named_examples": [
+              "Old South Meeting House was built in 1729 as a large Puritan meeting house",
+              "It was the site of the December 16, 1773 gathering where up to 5,000 colonists met to protest the Tea Act",
+              "The building was saved from demolition in 1876 by a group of twenty Boston women",
+              "The clock on its tower was made by Gawen Brown and installed in 1770"
+            ],
+            "has_consequence": true,
+            "filler": false,
+            "evidence_score": 6
+          }
+        },
+        "serper_plus": {
+          "text": "1. The Old South Meeting House was built in 1729 by a committee appointed after a 1727 vote to replace the deteriorated Cedar Meeting House, with construction starting on March 31, 1729, and opening in April 1730. 2. On December 16, 1773, over 5,000 colonists gathered at the Old South Meeting House to protest the Tea Act, and after failed negotiations, about 150 men disguised as Indigenous people left to destroy 342 chests of tea in the Boston Tea Party. 3. In 1775, British troops occupied and gutted the interior of the Old South Meeting House, converting it into a horse-riding facility, and the interior was rebuilt in 1783. 4. After the Great Boston Fire of 1872, the congregation moved out in 1875, and the building was nearly sold for scrap in 1876 before a group of citizens organized one of Boston’s first preservation efforts to save it as a museum. 5. The Old South Meeting House has been operated as a museum since 1877, with renovations including an overhaul from 1898 to 1914 and pew reproductions in 1947, and it is now managed by Revolutionary Spaces since 2020.",
+          "error": "",
+          "n_sources": 4,
+          "sources": [
+            {
+              "domain": "en.wikipedia.org",
+              "url": "https://en.wikipedia.org/wiki/Old_South_Meeting_House"
+            },
+            {
+              "domain": "thefreedomtrail.org",
+              "url": "https://www.thefreedomtrail.org/trail-sites/old-south-meeting-house"
+            },
+            {
+              "domain": "revolutionaryspaces.org",
+              "url": "https://revolutionaryspaces.org/"
+            },
+            {
+              "domain": "nps.gov",
+              "url": "https://www.nps.gov/bost/learn/historyculture/osmh.htm"
+            }
+          ],
+          "queries": [
+            "\"Old South Meeting House\" Boston, Massachusetts, United States history",
+            "\"Old South Meeting House\" Boston, Massachusetts, United States official site"
+          ],
+          "seconds": 5.3,
+          "usd": 0.00384,
+          "score": {
+            "dated_named_facts": 5,
+            "dated_named_examples": [
+              "The Old South Meeting House was built in 1729 by a committee appointed after a 1727 vote",
+              "On December 16, 1773, over 5,000 colonists gathered at the Old South Meeting House to protest the Tea Act",
+              "In 1775, British troops occupied and gutted the interior of the Old South Meeting House",
+              "After the Great Boston Fire of 1872, the congregation moved out in 1875",
+              "The Old South Meeting House has been operated as a museum since 1877"
+            ],
+            "has_consequence": true,
+            "filler": false,
+            "evidence_score": 7
+          }
+        }
+      }
+    },
+    {
+      "request": "Walking tour of Old Nice, France",
+      "city": "Nice, France",
+      "place": "Cours Saleya",
+      "prompt": "What story can be told to visitors of Nice, France about Cours Saleya?\n\nContext — the work this concerns:\n  canonical_title: Cours Saleya\n  venue_name: Cours Saleya\nExhibition: Nice, France\n\nSearch, then answer with FACTS ONLY — each one sentence, with its source in brackets. Prefer what a visitor standing in front of it cannot see: why it was made, who decided, what went wrong, what it cost someone. If you find nothing reliable, say exactly \"NO RELIABLE INFORMATION\". Do not praise the work. Do not describe how it looks. Maximum 6 sentences.",
+      "arms": {
+        "gemini": {
+          "text": "Cours Saleya was created in the 18th century over space made available after the demolition of Nice's medieval sea-facing defensive ramparts and gardens belonging to the Ducal Palace. \n\nThe municipal authorities established a dedicated fruit and vegetable market on the promenade in 1861. \n\nIn 1897, the city launched the world’s first wholesale cut flower market here, enabling local growers to ship fresh flowers by rail across Europe. \n\nDuring the late 19th century, the promenade served as the parade ground for the official floats of the Nice Carnival before growing crowds forced the festivities to relocate to the Promenade des Anglais. \n\nThe painter Henri Matisse lived and worked in an apartment overlooking the square from 1921 until 1938.",
+          "error": "",
+          "n_sources": 8,
+          "sources": [
+            {
+              "domain": "ryo.co",
+              "url": "https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQEp-CG9NK9TJJPsEn4YFiI6qEQ8dxdgSHmEfl76LhXVwr3zaau3QKNtQZdKOxx59TRIAaoRTSbkJCaZTXoN3M_sC3fDiKMhHzQ1GHJA7LMgBo4fr3ugUSUGEnZFcIQnKfdfzT_hfdoGqummx7Yom7bMfQ=="
+            },
+            {
+              "domain": "hotels.com",
+              "url": "https://ca.hotels.com/go/france/cours-saleya-nice"
+            },
+            {
+              "domain": "rivierabarcrawltours.com",
+              "url": "https://rivierabarcrawltours.com/what-does-cours-saleya-mean-nice-france/"
+            },
+            {
+              "domain": "blogspot.com",
+              "url": "http://aworldelsewhere-finn.blogspot.com/2011/07/cours-saleya-nice.html"
+            },
+            {
+              "domain": "provencelovers.fr",
+              "url": "https://provencelovers.fr/en/visit-cours-saleya-nice/"
+            },
+            {
+              "domain": "thegoodlifefrance.com",
+              "url": "https://thegoodlifefrance.com/cours-saleya-market-in-nice-france/"
+            },
+            {
+              "domain": "questoapp.com",
+              "url": "https://questoapp.com/nice/places-to-visit/marche-aux-fleurs-nice"
+            },
+            {
+              "domain": "explorenicecotedazur.com",
+              "url": "https://www.explorenicecotedazur.com/en/culture/cours-saleya/"
+            }
+          ],
+          "queries": [
+            "Cours Saleya history why it was built who decided",
+            "Cours Saleya Nice history origin"
+          ],
+          "seconds": 9.8,
+          "usd": 0.05399,
+          "score": {
+            "dated_named_facts": 4,
+            "dated_named_examples": [
+              "Cours Saleya was created in the 18th century over space made available after the demolition of Nice's medieval sea-facing defensive ramparts and gardens belonging to the Ducal Palace.",
+              "The municipal authorities established a dedicated fruit and vegetable market on the promenade in 1861.",
+              "In 1897, the city launched the world’s first wholesale cut flower market here, enabling local growers to ship fresh flowers by rail across Europe.",
+              "The painter Henri Matisse lived and worked in an apartment overlooking the square from 1921 until 1938."
+            ],
+            "has_consequence": true,
+            "filler": false,
+            "evidence_score": 6
+          }
+        },
+        "serper": {
+          "text": "Cours Saleya is located in the old town of Nice and is known for its daily flower market, which runs from Tuesday to Sunday mornings year-round. The name \"Cours Saleya\" likely derives from either \"Sale\" meaning salt or \"Sole\" meaning sun, reflecting the area's historical connection to salt storage and its sunny climate. In 1897, Nice opened the first wholesale cut flower market in the world at Cours Saleya, where growers from nearby hills brought flowers daily for bulk purchase before the market opened to individuals. The flower market was historically significant enough that flowers were shipped by rail from Nice to cities across France and Europe for nearly 100 years. On Mondays, the market transforms into an antique market, while in summer evenings, an artisan market selling souvenirs and crafts takes place. The market also sells local specialties such as socca, a chickpea flour pancake, which is baked nearby and brought to the market daily.",
+          "error": "",
+          "n_sources": 5,
+          "sources": [
+            {
+              "domain": "thegoodlifefrance.com",
+              "url": "https://thegoodlifefrance.com/cours-saleya-market-in-nice-france/"
+            },
+            {
+              "domain": "bestfrenchriviera.tours",
+              "url": "https://bestfrenchriviera.tours/the-market-on-cours-saleya/"
+            },
+            {
+              "domain": "niceandbeyond.com",
+              "url": "https://niceandbeyond.com/cours-saleya-markets-nice/"
+            },
+            {
+              "domain": "doeatbetterexperience.com",
+              "url": "https://doeatbetterexperience.com/blog/cours-saleya-market-nice-food-guide/"
+            },
+            {
+              "domain": "thesimiedit.com",
+              "url": "http://thesimiedit.com/blog/2015/12/26/le-cours-saleya-nice-france"
+            }
+          ],
+          "queries": [
+            "\"Cours Saleya\"",
+            "\"Cours Saleya\" Cours Saleya",
+            "France Cours Saleya canonical title Cours"
+          ],
+          "seconds": 15.3,
+          "usd": 0.00465,
+          "score": {
+            "dated_named_facts": 1,
+            "dated_named_examples": [
+              "In 1897, Nice opened the first wholesale cut flower market in the world at Cours Saleya"
+            ],
+            "has_consequence": true,
+            "filler": false,
+            "evidence_score": 3
+          }
+        },
+        "serper_plus": {
+          "text": "1. The space now known as Cours Saleya was originally called the Marina and from 1714 was known as the Palco, a place \"where one must be seen,\" evolving into its current name in the early 20th century. 2. In 1861, the municipality approved the creation of Nice’s first flower, fruit, and vegetable market on Cours Saleya, marking the start of its long association with fresh produce markets. 3. In 1897, Nice opened the world’s first wholesale cut flower market here, with flowers shipped daily by rail across France and Europe for nearly a century. 4. The Nice Carnival parades were held on Cours Saleya until 1892, after which the festivities moved to other parts of the city, causing the Cours to lose some of its festive character. 5. Since 1892, luxury shops moved away from Cours Saleya to other areas like the Quai and Place Masséna, changing the market’s social and commercial atmosphere. 6. Today, Cours Saleya hosts a daily flower market (except Mondays), a fruit and vegetable market, and on Mondays, an antiques and flea market, continuing its historic role as a vibrant commercial hub.",
+          "error": "",
+          "n_sources": 4,
+          "sources": [
+            {
+              "domain": "fr.wikipedia.org",
+              "url": "https://fr.wikipedia.org/wiki/Cours_Saleya"
+            },
+            {
+              "domain": "thegoodlifefrance.com",
+              "url": "https://thegoodlifefrance.com/cours-saleya-market-in-nice-france/"
+            },
+            {
+              "domain": "explorenicecotedazur.com",
+              "url": "https://www.explorenicecotedazur.com/en/culture/cours-saleya/"
+            },
+            {
+              "domain": "bestfrenchriviera.tours",
+              "url": "https://bestfrenchriviera.tours/the-market-on-cours-saleya/"
+            }
+          ],
+          "queries": [
+            "\"Cours Saleya\" Nice, France history",
+            "\"Cours Saleya\" Nice, France official site"
+          ],
+          "seconds": 6.3,
+          "usd": 0.00375,
+          "score": {
+            "dated_named_facts": 5,
+            "dated_named_examples": [
+              "from 1714 was known as the Palco",
+              "In 1861, the municipality approved the creation of Nice’s first flower, fruit, and vegetable market on Cours Saleya",
+              "In 1897, Nice opened the world’s first wholesale cut flower market here",
+              "The Nice Carnival parades were held on Cours Saleya until 1892, after which the festivities moved to other parts of the city",
+              "Since 1892, luxury shops moved away from Cours Saleya to other areas like the Quai and Place Masséna"
+            ],
+            "has_consequence": true,
+            "filler": false,
+            "evidence_score": 7
+          }
+        }
+      }
+    },
+    {
+      "request": "Walking tour of Old Nice, France",
+      "city": "Nice, France",
+      "place": "Nice Cathedral",
+      "prompt": "What story can be told to visitors of Nice, France about Nice Cathedral?\n\nContext — the work this concerns:\n  canonical_title: Nice Cathedral\n  venue_name: Nice Cathedral\nExhibition: Nice, France\n\nSearch, then answer with FACTS ONLY — each one sentence, with its source in brackets. Prefer what a visitor standing in front of it cannot see: why it was made, who decided, what went wrong, what it cost someone. If you find nothing reliable, say exactly \"NO RELIABLE INFORMATION\". Do not praise the work. Do not describe how it looks. Maximum 6 sentences.",
+      "arms": {
+        "gemini": {
+          "text": "Bishop Didier Palletis commissioned the construction of the cathedral in the mid-17th century after the earlier medieval parish church on the site was judged too small for the growing town. \n\nArchitect Jean-André Guibert modeled the structure on the church of Santa Susanna in Rome. \n\nThe cathedral was dedicated to Saint Reparata to house relics that had arrived in Nice in 1060, following the local legend that angels guided a boat carrying the martyred teenager across the sea to the city's bay. \n\nConstruction faced significant delays, spanning from 1650 to its consecration in 1699, with the bell tower left unbuilt until the mid-18th century and its current facade postponed until around 1830. \n\nIndividual local trade corporations and aristocratic families had to fund and maintain the ten interior chapels themselves.",
+          "error": "",
+          "n_sources": 6,
+          "sources": [
+            {
+              "domain": "seenice.com",
+              "url": "https://www.seenice.com/sights/religious/cathedrale-sainte-reparate"
+            },
+            {
+              "domain": "indiatimes.com",
+              "url": "https://timesofindia.indiatimes.com/travel/nice/cathdrale-sainte-rparate/ps44712554.cms"
+            },
+            {
+              "domain": "wikipedia.org",
+              "url": "https://en.wikipedia.org/wiki/Nice_Cathedral"
+            },
+            {
+              "domain": "visitthefrenchriviera.com",
+              "url": "https://visitthefrenchriviera.com/st_activity/cathedrale-sainte-reparate/"
+            },
+            {
+              "domain": "wordpress.com",
+              "url": "https://vinoconvistablog.wordpress.com/2021/02/12/saint-reparate-is-the-patron-saint-of-the-town-and-diocese-of-nice-france/"
+            },
+            {
+              "domain": "city-life.fr",
+              "url": "https://nice.city-life.fr/Visiter/Nice/Eglises-chapelles/868/Cathedrale-Sainte-Reparate?lang=en"
+            }
+          ],
+          "queries": [
+            "Nice Cathedral history construction facts Sainte Reparate",
+            "Cathédrale Sainte Réparate de Nice history facts"
+          ],
+          "seconds": 10.9,
+          "usd": 0.05401,
+          "score": {
+            "dated_named_facts": 4,
+            "dated_named_examples": [
+              "The cathedral was dedicated to Saint Reparata to house relics that had arrived in Nice in 1060",
+              "Construction faced significant delays, spanning from 1650 to its consecration in 1699",
+              "The bell tower left unbuilt until the mid-18th century",
+              "Its current facade postponed until around 1830"
+            ],
+            "has_consequence": true,
+            "filler": false,
+            "evidence_score": 6
+          }
+        },
+        "serper": {
+          "text": "Nice Cathedral is the seat of the Diocese of Nice and is dedicated to the Assumption of the Virgin Mary and Saint Reparata. The original cathedral on the site, called St Mary of the Castle, was consecrated in 1049, and relics of Saint Reparata arrived in Nice in 1060. By 1590, the church of St Reparata was officially recognized as a cathedral after the seat of the bishops of Nice was transferred from Cimiez Cathedral. Bishop Didier Palletis commissioned the architect Jean-André Guibert in 1649 to build a larger cathedral, leading to the construction of the current main building between 1650 and 1685. The cathedral was consecrated in 1699, but construction and decorative additions continued until 1949. The bell tower was built between 1731 and 1757, and new side chapels were added in 1900.",
+          "error": "",
+          "n_sources": 5,
+          "sources": [
+            {
+              "domain": "en.wikipedia.org",
+              "url": "https://en.wikipedia.org/wiki/Nice_Cathedral"
+            },
+            {
+              "domain": "en.wikipedia.org",
+              "url": "https://en.wikipedia.org/wiki/Russian_Orthodox_Cathedral,_Nice"
+            },
+            {
+              "domain": "newadvent.org",
+              "url": "https://www.newadvent.org/cathen/03438a.htm"
+            },
+            {
+              "domain": "title-smart.com",
+              "url": "https://title-smart.com/notre-dame-cathedral/"
+            },
+            {
+              "domain": "en.wikipedia.org",
+              "url": "https://en.wikipedia.org/wiki/Cathedral"
+            }
+          ],
+          "queries": [
+            "\"Nice Cathedral\"",
+            "\"Nice Cathedral\" Nice Cathedral",
+            "France Cathedral canonical title Cathedral Cathedral"
+          ],
+          "seconds": 105.9,
+          "usd": 0.00457,
+          "score": {
+            "dated_named_facts": 7,
+            "dated_named_examples": [
+              "The original cathedral on the site, called St Mary of the Castle, was consecrated in 1049",
+              "relics of Saint Reparata arrived in Nice in 1060",
+              "By 1590, the church of St Reparata was officially recognized as a cathedral after the seat of the bishops of Nice was transferred from Cimiez Cathedral",
+              "Bishop Didier Palletis commissioned the architect Jean-André Guibert in 1649 to build a larger cathedral",
+              "construction of the current main building between 1650 and 1685",
+              "The cathedral was consecrated in 1699",
+              "The bell tower was built between 1731 and 1757"
+            ],
+            "has_consequence": true,
+            "filler": false,
+            "evidence_score": 9
+          }
+        },
+        "serper_plus": {
+          "text": "1. The original cathedral on the site, called St Mary of the Castle, was consecrated in 1049, and relics of Saint Reparata arrived in Nice in 1060, leading to the construction of a chapel dedicated to her by 1075. 2. In 1590, the seat of the bishops of Nice was officially transferred from Cimiez Cathedral to the church of St Reparata after a ceremony presided over by Bishop Luigi Pallavicini and attended by Charles Emmanuel I, Duke of Savoy. 3. Bishop Didier Palletis commissioned architect Jean-André Guibert in 1649 to build a larger cathedral, resulting in the construction of the current main building between 1650 and 1685, which was consecrated in 1699. 4. The prominent bell tower was constructed between 1731 and 1757, partially obscuring the cathedral’s cupola. 5. In 1900, new side chapels were added to replace the former heavy Baroque ornamentation, and the cathedral was declared a minor basilica on 27 May 1949. 6. The cathedral has been classified as a national monument since 9 August 1906.",
+          "error": "",
+          "n_sources": 3,
+          "sources": [
+            {
+              "domain": "en.wikipedia.org",
+              "url": "https://en.wikipedia.org/wiki/Nice_Cathedral"
+            },
+            {
+              "domain": "fr.wikipedia.org",
+              "url": "https://fr.wikipedia.org/wiki/Cathédrale_Sainte-Réparate_de_Nice"
+            },
+            {
+              "domain": "theroyaltourblog.com",
+              "url": "https://theroyaltourblog.com/2026/04/08/old-nice-nice-under-italian-rule/"
+            }
+          ],
+          "queries": [
+            "\"Nice Cathedral\" Nice, France history",
+            "\"Nice Cathedral\" Nice, France official site"
+          ],
+          "seconds": 7.3,
+          "usd": 0.00359,
+          "score": {
+            "dated_named_facts": 7,
+            "dated_named_examples": [
+              "The original cathedral on the site, called St Mary of the Castle, was consecrated in 1049",
+              "relics of Saint Reparata arrived in Nice in 1060, leading to the construction of a chapel dedicated to her by 1075",
+              "In 1590, the seat of the bishops of Nice was officially transferred from Cimiez Cathedral to the church of St Reparata after a ceremony presided over by Bishop Luigi Pallavicini and attended by Charles Emmanuel I, Duke of Savoy",
+              "Bishop Didier Palletis commissioned architect Jean-André Guibert in 1649 to build a larger cathedral",
+              "the current main building [was constructed] between 1650 and 1685, which was consecrated in 1699",
+              "The prominent bell tower was constructed between 1731 and 1757",
+              "The cathedral has been classified as a national monument since 9 August 1906"
+            ],
+            "has_consequence": true,
+            "filler": false,
+            "evidence_score": 9
+          }
+        }
+      }
+    },
+    {
+      "request": "Walking tour of Old Nice, France",
+      "city": "Nice, France",
+      "place": "Place Rossetti",
+      "prompt": "What story can be told to visitors of Nice, France about Place Rossetti?\n\nContext — the work this concerns:\n  canonical_title: Place Rossetti\n  venue_name: Place Rossetti\nExhibition: Nice, France\n\nSearch, then answer with FACTS ONLY — each one sentence, with its source in brackets. Prefer what a visitor standing in front of it cannot see: why it was made, who decided, what went wrong, what it cost someone. If you find nothing reliable, say exactly \"NO RELIABLE INFORMATION\". Do not praise the work. Do not describe how it looks. Maximum 6 sentences.",
+      "arms": {
+        "gemini": {
+          "text": "The square did not exist in its modern form during the Middle Ages, as the area directly in front of Sainte-Réparate Cathedral was formerly choked by dense residential buildings and narrow alleyways. \n\nLocal dignitary Charles Rossetti de Châteauneuf bequeathed his properties and land opposite the cathedral to the city of Nice so the church could have an open forecourt. \n\nHis bequest enabled the municipality to demolish the obstructing apartment buildings in 1825 to clear and widen the open public space. \n\nThe city named the newly created square in honor of the Rossetti family to recognize their civic philanthropy.",
+          "error": "",
+          "n_sources": 4,
+          "sources": [
+            {
+              "domain": "enfrance.biz",
+              "url": "https://nice.enfrance.biz/place-rossetti-nice-lvieux-nice/"
+            },
+            {
+              "domain": "agence-winter.com",
+              "url": "https://www.agence-winter.com/en/news/tourism-nice-2/most-beautiful-squares-in-nice-22"
+            },
+            {
+              "domain": "guidesulysse.com",
+              "url": "https://www.guidesulysse.com/fr/fiche-contenu.aspx?id=100068"
+            },
+            {
+              "domain": "facebook.com",
+              "url": "https://www.facebook.com/groups/363672322952/posts/10161278062907953/"
+            }
+          ],
+          "queries": [
+            "\"place Rossetti\" \"legs\" \"1825\" Nice",
+            "\"place Rossetti\" \"Charles Rossetti\" Nice"
+          ],
+          "seconds": 11.4,
+          "usd": 0.05374,
+          "score": {
+            "dated_named_facts": 1,
+            "dated_named_examples": [
+              "His bequest enabled the municipality to demolish the obstructing apartment buildings in 1825 to clear and widen the open public space."
+            ],
+            "has_consequence": true,
+            "filler": false,
+            "evidence_score": 3
+          }
+        },
+        "serper": {
+          "text": "Place Rossetti is located in the heart of Nice's Old Town and is one of the city's liveliest and most popular squares. The square is dominated by the Cathédrale Sainte-Réparate, a fine example of Nice's Baroque heritage, known for its elegant façade and colorful tiled dome. Place Rossetti has been a social hub for generations, with the Fenocchio ice cream parlour offering over 90 flavors of ice cream and sorbet, contributing to the square's identity. At night, the square becomes a popular spot for street musicians and nightlife, including two well-known gay bars, Bar Bitch and Bar Butch, which add to its cosmopolitan atmosphere. The square is lined with ochre and pastel-colored façades and surrounded by cafés and restaurants, making it a place where heritage, local flavors, and social life come together. NO information was found about why the square was made, who decided on its design, or any costs or controversies related to it.",
+          "error": "",
+          "n_sources": 5,
+          "sources": [
+            {
+              "domain": "explorenicecotedazur.com",
+              "url": "https://www.explorenicecotedazur.com/en/culture/la-place-rossetti/"
+            },
+            {
+              "domain": "seenice.com",
+              "url": "https://www.seenice.com/sights/plazas/place-rossetti-673995"
+            },
+            {
+              "domain": "alamy.com",
+              "url": "https://www.alamy.com/the-lively-place-rossetti-square-late-at-night-as-tourists-and-french-enjoy-an-italian-sidewalk-cafe-alongside-the-nice-cathedral-image344910959.html"
+            },
+            {
+              "domain": "cotedazurfrance.com",
+              "url": "https://cotedazurfrance.com/offers/la-place-rossetti-nice-en-3032142/"
+            },
+            {
+              "domain": "jstor.org",
+              "url": "https://www.jstor.org/stable/43592703"
+            }
+          ],
+          "queries": [
+            "\"Place Rossetti\"",
+            "\"Place Rossetti\" Place Rossetti",
+            "France Place Rossetti canonical title Place"
+          ],
+          "seconds": 41.2,
+          "usd": 0.00446,
+          "score": {
+            "dated_named_facts": 0,
+            "dated_named_examples": [],
+            "has_consequence": false,
+            "filler": true,
+            "evidence_score": 0
+          }
+        },
+        "serper_plus": {
+          "text": "Place Rossetti is named after the Rossetti family, notably Charles Rossetti de Châteauneuf, who in 1825 bequeathed land to the city that allowed the demolition of a building opposite the Sainte-Réparate Cathedral, thereby enlarging the square and creating a proper forecourt for the cathedral. The square is dominated by the Cathédrale Sainte-Réparate, built between the 17th and 18th centuries, dedicated to the patron saint of Nice, and is a key example of Baroque architecture in the city. Place Rossetti has long been a lively meeting place in Nice’s Old Town, surrounded by colorful facades, cafes, restaurants, and the famous Fenocchio ice cream parlor, which has been part of the square’s identity for generations. The square’s central fountain is surrounded by traditional Niçoise restaurants, contributing to its enduring local character despite its popularity with tourists. In recent years, Place Rossetti has become more cosmopolitan, hosting popular nightlife venues including two well-known gay bars, Bar Bitch and Bar Butch, adding to its vibrant atmosphere.",
+          "error": "",
+          "n_sources": 4,
+          "sources": [
+            {
+              "domain": "fr.wikipedia.org",
+              "url": "https://fr.wikipedia.org/wiki/Place_Rossetti"
+            },
+            {
+              "domain": "lesoleiahotel.com",
+              "url": "https://www.lesoleiahotel.com/en/news/articles/explore-old-nice-secrets-history-and-mediterranean-charm-65380"
+            },
+            {
+              "domain": "explorenicecotedazur.com",
+              "url": "https://www.explorenicecotedazur.com/en/culture/la-place-rossetti/"
+            },
+            {
+              "domain": "seenice.com",
+              "url": "https://www.seenice.com/sights/plazas/place-rossetti-673995"
+            }
+          ],
+          "queries": [
+            "\"Place Rossetti\" Nice, France history",
+            "\"Place Rossetti\" Nice, France official site"
+          ],
+          "seconds": 6.6,
+          "usd": 0.00341,
+          "score": {
+            "dated_named_facts": 1,
+            "dated_named_examples": [
+              "in 1825 bequeathed land to the city that allowed the demolition of a building opposite the Sainte-Réparate Cathedral"
+            ],
+            "has_consequence": true,
+            "filler": true,
+            "evidence_score": 3
+          }
+        }
+      }
+    },
+    {
+      "request": "Walking tour of Old Nice, France",
+      "city": "Nice, France",
+      "place": "Palais Lascaris",
+      "prompt": "What story can be told to visitors of Nice, France about Palais Lascaris?\n\nContext — the work this concerns:\n  canonical_title: Palais Lascaris\n  venue_name: Palais Lascaris\nExhibition: Nice, France\n\nSearch, then answer with FACTS ONLY — each one sentence, with its source in brackets. Prefer what a visitor standing in front of it cannot see: why it was made, who decided, what went wrong, what it cost someone. If you find nothing reliable, say exactly \"NO RELIABLE INFORMATION\". Do not praise the work. Do not describe how it looks. Maximum 6 sentences.",
+      "arms": {
+        "gemini": {
+          "text": "The palace was commissioned in the mid-17th century by the aristocratic Lascaris-Vintimille family, nephews of Jean-Paul de Lascaris-Castellar, the 57th Grand Master of the Knights of Malta. \n\nThe family lost ownership of the residence during the turmoil following the French Revolution and sold it in 1802. \n\nOver the subsequent decades, the former noble mansion deteriorated significantly as the surrounding neighborhood decayed into an impoverished quarter divided into tenement housing. \n\nTo prevent further degradation and demolition, the City of Nice purchased the damaged structure in 1942. \n\nSquatters continued to occupy parts of the building until major municipal restoration work finally commenced in 1962. \n\nThe site reopened in 1970 and later became a municipal music museum following the 1901 bequest of over two hundred historical musical instruments by Nice resident Antoine Gautier.",
+          "error": "",
+          "n_sources": 4,
+          "sources": [
+            {
+              "domain": "grandsudinsolite.fr",
+              "url": "https://www.grandsudinsolite.fr/552--.html"
+            },
+            {
+              "domain": "bestofniceblog.com",
+              "url": "https://www.bestofniceblog.com/what-to-see-in-nice/history-and-science-museums/palais-lascaris-museum-in-old-nice/"
+            },
+            {
+              "domain": "wikipedia.org",
+              "url": "https://en.wikipedia.org/wiki/Palais_Lascaris"
+            },
+            {
+              "domain": "aec-collection.com",
+              "url": "https://www.aec-collection.com/en/travel-book/palais-lascaris-in-nice-baroque-palace-and-500-historic-instruments/"
+            }
+          ],
+          "queries": [
+            "Palais Lascaris history facts",
+            "Palais Lascaris Nice history commission cost why built"
+          ],
+          "seconds": 7.9,
+          "usd": 0.05409,
+          "score": {
+            "dated_named_facts": 6,
+            "dated_named_examples": [
+              "The palace was commissioned in the mid-17th century by the aristocratic Lascaris-Vintimille family",
+              "The family lost ownership of the residence during the turmoil following the French Revolution and sold it in 1802",
+              "the City of Nice purchased the damaged structure in 1942",
+              "major municipal restoration work finally commenced in 1962",
+              "The site reopened in 1970",
+              "became a municipal music museum following the 1901 bequest of over two hundred historical musical instruments by Nice resident Antoine Gautier"
+            ],
+            "has_consequence": true,
+            "filler": false,
+            "evidence_score": 8
+          }
+        },
+        "serper": {
+          "text": "The Palais Lascaris was built in the first half of the 17th century for the Lascaris-Vintimille family, one of Nice's principal noble families at the time. The city of Nice purchased the palace in 1942 with the intention of creating a museum. After restorations from 1962 to 1970, the building was opened to the public as a museum showcasing Baroque art and culture. The museum’s collection of over 500 historical musical instruments is largely based on the bequest of Antoine Gautier, a 19th-century Niçois amateur musician and collector. The Palais Lascaris is recognized as the most remarkable monument of Nice’s civil Baroque style and is listed as a historic monument since 1946. Guided tours are available by reservation, providing visitors with insights into the palace’s aristocratic history and its musical instrument collection.",
+          "error": "",
+          "n_sources": 5,
+          "sources": [
+            {
+              "domain": "explorenicecotedazur.com",
+              "url": "https://www.explorenicecotedazur.com/en/culture/palais-lascaris/"
+            },
+            {
+              "domain": "en.wikipedia.org",
+              "url": "https://en.wikipedia.org/wiki/Palais_Lascaris"
+            },
+            {
+              "domain": "rivieraloisirs.com",
+              "url": "https://www.rivieraloisirs.com/en/activities/palais-lascaris/"
+            },
+            {
+              "domain": "nice.fr",
+              "url": "https://www.nice.fr/lieux/palais-lascaris/"
+            },
+            {
+              "domain": "seenice.com",
+              "url": "https://www.seenice.com/sights/museums/palais-lascaris"
+            }
+          ],
+          "queries": [
+            "\"Palais Lascaris\"",
+            "\"Palais Lascaris\" Palais Lascaris",
+            "France Palais Lascaris canonical title Palais"
+          ],
+          "seconds": 26.1,
+          "usd": 0.00458,
+          "score": {
+            "dated_named_facts": 5,
+            "dated_named_examples": [
+              "The Palais Lascaris was built in the first half of the 17th century for the Lascaris-Vintimille family",
+              "The city of Nice purchased the palace in 1942 with the intention of creating a museum",
+              "After restorations from 1962 to 1970, the building was opened to the public as a museum",
+              "The Palais Lascaris is listed as a historic monument since 1946",
+              "The museum’s collection is largely based on the bequest of Antoine Gautier, a 19th-century Niçois amateur musician and collector"
+            ],
+            "has_consequence": true,
+            "filler": false,
+            "evidence_score": 7
+          }
+        },
+        "serper_plus": {
+          "text": "The Palais Lascaris was built in 1648 by the aristocratic Lascaris-Vintimille family and remained their property until 1802. In 1942, the city of Nice purchased the palace to convert it into a museum. Restoration work started in 1962 and was completed in 1970, when the museum opened to the public. In 2001, the city transferred its historical musical instrument collections from the Musée Masséna to the Palais Lascaris to create a dedicated music museum. The permanent exhibition of musical instruments was inaugurated in 2011. The museum’s collection is largely based on the bequest of Antoine Gautier, a Niçois jurist and amateur musician who died in 1904, leaving over 225 instruments and a rare musical library to the city.",
+          "error": "",
+          "n_sources": 5,
+          "sources": [
+            {
+              "domain": "en.wikipedia.org",
+              "url": "https://en.wikipedia.org/wiki/Palais_Lascaris"
+            },
+            {
+              "domain": "fr.wikipedia.org",
+              "url": "https://fr.wikipedia.org/wiki/Palais_Lascaris"
+            },
+            {
+              "domain": "explorenicecotedazur.com",
+              "url": "https://www.explorenicecotedazur.com/en/culture/palais-lascaris/"
+            },
+            {
+              "domain": "rivieraloisirs.com",
+              "url": "https://www.rivieraloisirs.com/en/activities/palais-lascaris/"
+            },
+            {
+              "domain": "viewfromtheback.com",
+              "url": "https://viewfromtheback.com/2025/03/19/trip-to-palais-lascaris/"
+            }
+          ],
+          "queries": [
+            "\"Palais Lascaris\" Nice, France history",
+            "\"Palais Lascaris\" Nice, France official site"
+          ],
+          "seconds": 5.7,
+          "usd": 0.00417,
+          "score": {
+            "dated_named_facts": 7,
+            "dated_named_examples": [
+              "The Palais Lascaris was built in 1648 by the aristocratic Lascaris-Vintimille family",
+              "remained their property until 1802",
+              "In 1942, the city of Nice purchased the palace to convert it into a museum",
+              "Restoration work started in 1962 and was completed in 1970, when the museum opened to the public",
+              "In 2001, the city transferred its historical musical instrument collections from the Musée Masséna to the Palais Lascaris"
+            ],
+            "has_consequence": true,
+            "filler": false,
+            "evidence_score": 9
+          }
+        }
+      }
+    },
+    {
+      "request": "Walking tour of Old Nice, France",
+      "city": "Nice, France",
+      "place": "Colline du Château",
+      "prompt": "What story can be told to visitors of Nice, France about Colline du Château?\n\nContext — the work this concerns:\n  canonical_title: Colline du Château\n  venue_name: Colline du Château\nExhibition: Nice, France\n\nSearch, then answer with FACTS ONLY — each one sentence, with its source in brackets. Prefer what a visitor standing in front of it cannot see: why it was made, who decided, what went wrong, what it cost someone. If you find nothing reliable, say exactly \"NO RELIABLE INFORMATION\". Do not praise the work. Do not describe how it looks. Maximum 6 sentences.",
+      "arms": {
+        "gemini": {
+          "text": "The fortified citadel atop the hill was built starting in the medieval period to protect the town and serve as a strategic military stronghold.\n\nDuring the 1705–1706 siege, French artillery fire breached the fortress when a bomb struck its munitions depot, causing a catastrophic explosion that cost hundreds of defenders their lives.\n\nFollowing the fortress's capture, King Louis XIV ordered the complete demolition of the citadel, ramparts, and cathedral so that no defensive bastion remained to resist French rule.\n\nKing Charles Felix of Sardinia decided in 1822 to grant the barren military lands to the city of Nice to develop public promenades and gardens for locals and winter visitors.\n\nThe elevator shaft carrying visitors up through the hill was originally excavated as a deep water well to supply the military garrison.",
+          "error": "",
+          "n_sources": 7,
+          "sources": [
+            {
+              "domain": "wikipedia.org",
+              "url": "https://en.wikipedia.org/wiki/Castle_of_Nice"
+            },
+            {
+              "domain": "nice-premium.com",
+              "url": "https://www.nice-premium.com/the-castle-hill-the-history-of-this-iconic-place-in-nice/"
+            },
+            {
+              "domain": "bestofniceblog.com",
+              "url": "https://www.bestofniceblog.com/history-nice-france/the-nice-chateau-castle-hill/"
+            },
+            {
+              "domain": "explorenicecotedazur.com",
+              "url": "https://www.explorenicecotedazur.com/en/culture/parc-de-la-colline-du-chateau/"
+            },
+            {
+              "domain": "rivieraloisirs.com",
+              "url": "https://www.rivieraloisirs.com/en/activities/la-colline-du-chateau-de-nice/"
+            },
+            {
+              "domain": "maregionsud.fr",
+              "url": "https://dossiersinventaire.maregionsud.fr/dossier/IA06003110"
+            },
+            {
+              "domain": "francetravelplanner.com",
+              "url": "https://francetravelplanner.com/go/cote_azur/nice/see/chateau_hill.html"
+            }
+          ],
+          "queries": [
+            "Colline du Chateau Nice history fortress destroyed Louis XIV",
+            "Colline du Chateau park creation 1828 Charles Felix"
+          ],
+          "seconds": 15.9,
+          "usd": 0.05395,
+          "score": {
+            "dated_named_facts": 3,
+            "dated_named_examples": [
+              "During the 1705–1706 siege, French artillery fire breached the fortress",
+              "Following the fortress's capture, King Louis XIV ordered the complete demolition of the citadel",
+              "King Charles Felix of Sardinia decided in 1822 to grant the barren military lands to the city of Nice"
+            ],
+            "has_consequence": true,
+            "filler": false,
+            "evidence_score": 5
+          }
+        },
+        "serper": {
+          "text": "The Colline du Château in Nice was originally a military citadel built from the 11th century and stood until the 18th century before being destroyed by order of Louis XIV in 1706. The castle was besieged multiple times, notably in 1543 and 1691, before French troops took it in 1705. The hill was a strategic trading post founded by Greek settlers from Massalia in the 3rd century BC to trade with local Ligurians. Louis XIV ordered the razing of the castle because he feared the resistance of the people of Nice. Since 1882, the city of Nice has managed the hill as a public park, transforming it into a green space with panoramic views over the Baie des Anges. Today, only ruins remain of the castle, but the park includes archaeological vestiges and a waterfall, making it a favored spot for both locals and tourists.",
+          "error": "",
+          "n_sources": 5,
+          "sources": [
+            {
+              "domain": "explorenicecotedazur.com",
+              "url": "https://www.explorenicecotedazur.com/en/culture/parc-de-la-colline-du-chateau/"
+            },
+            {
+              "domain": "tourazur.com",
+              "url": "https://www.tourazur.com/en/nices-chateau-hill-a-panoramic-walk-through-history/"
+            },
+            {
+              "domain": "en.wikipedia.org",
+              "url": "https://en.wikipedia.org/wiki/Castle_of_Nice"
+            },
+            {
+              "domain": "nice.fr",
+              "url": "https://www.nice.fr/lieux/parc-de-la-colline-du-chateau/"
+            },
+            {
+              "domain": "seenice.com",
+              "url": "https://www.seenice.com/activities/reserves/parc-de-la-colline-du-chateau-centre-676831"
+            }
+          ],
+          "queries": [
+            "\"Colline du Château\"",
+            "\"Colline du Château\" Colline du Château",
+            "France Colline Château canonical title Colline"
+          ],
+          "seconds": 11.4,
+          "usd": 0.00464,
+          "score": {
+            "dated_named_facts": 5,
+            "dated_named_examples": [
+              "built from the 11th century and stood until the 18th century before being destroyed by order of Louis XIV in 1706",
+              "The castle was besieged multiple times, notably in 1543 and 1691",
+              "French troops took it in 1705",
+              "The hill was a strategic trading post founded by Greek settlers from Massalia in the 3rd century BC",
+              "Since 1882, the city of Nice has managed the hill as a public park"
+            ],
+            "has_consequence": true,
+            "filler": false,
+            "evidence_score": 7
+          }
+        },
+        "serper_plus": {
+          "text": "1. The Castle of Nice, or Colline du Château, was a military citadel built from the 11th century and was besieged notably in 1543 and 1691 before being taken by French troops in 1705 and destroyed in 1706 by order of Louis XIV. 2. The site originally included a fortified settlement with a cathedral and various buildings by the 11th century, and it expanded with walls and towers after Nice became part of the House of Savoy in 1388. 3. The destruction of the castle in 1706 marked the end of its military role, and today the hill is a public park known for its panoramic views and historical ruins, including remnants of the cathedral and fortifications. 4. The castle’s elevator, now used by visitors, was originally a well for the castle and provides easy access to the hilltop, which also features a man-made waterfall and playgrounds. 5. The castle was considered one of the most powerful fortifications on the Mediterranean arc before its destruction, and its history is marked by repeated sieges linked to conflicts between France and the Duchy of Savoy allied with the Habsburgs.",
+          "error": "",
+          "n_sources": 5,
+          "sources": [
+            {
+              "domain": "en.wikipedia.org",
+              "url": "https://en.wikipedia.org/wiki/Castle_of_Nice"
+            },
+            {
+              "domain": "fr.wikipedia.org",
+              "url": "https://fr.wikipedia.org/wiki/Château_de_Nice"
+            },
+            {
+              "domain": "tourazur.com",
+              "url": "https://www.tourazur.com/en/nices-chateau-hill-a-panoramic-walk-through-history/"
+            },
+            {
+              "domain": "frenchrivieratraveller.com",
+              "url": "https://www.frenchrivieratraveller.com/Nice/Sights/colline-du-chateau.html"
+            },
+            {
+              "domain": "francetravelplanner.com",
+              "url": "https://francetravelplanner.com/go/cote_azur/nice/see/chateau_hill.html"
+            }
+          ],
+          "queries": [
+            "\"Colline du Château\" Nice, France history",
+            "\"Colline du Château\" Nice, France official site"
+          ],
+          "seconds": 5.7,
+          "usd": 0.00384,
+          "score": {
+            "dated_named_facts": 5,
+            "dated_named_examples": [
+              "was besieged notably in 1543 and 1691",
+              "before being taken by French troops in 1705",
+              "destroyed in 1706 by order of Louis XIV",
+              "expanded with walls and towers after Nice became part of the House of Savoy in 1388",
+              "The destruction of the castle in 1706 marked the end of its military role"
+            ],
+            "has_consequence": true,
+            "filler": false,
+            "evidence_score": 7
+          }
+        }
+      }
+    }
+  ]
+}
