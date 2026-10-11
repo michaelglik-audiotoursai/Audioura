@@ -211,13 +211,40 @@ def _clean_field(v: str) -> str:
     return (v or "").strip().strip("*_\"'“”‘’.,; ").strip()
 
 
+# A parsed "title" that is really a trailing citation / note / boilerplate line
+# rather than a work. The live HCMC run surfaced 'Source:** [Ho Chi Minh City
+# Government Portal]' being parsed as a work and then "verified" by its own
+# citation — a markdown source line, not an artwork. Reject these up front.
+_JUNK_TITLE_PREFIX = re.compile(
+    r"(?i)^\s*(sources?|notes?|references?|citations?|disclaimer|"
+    r"unverified|note that|here (?:are|is)|the following|in summary|"
+    r"these (?:are|works)|please note)\b")
+_MD_CITATION = re.compile(r"\*\*|\[[^\]]*\]\s*$|^\[|\bhttps?://")
+
+
+def _is_junk_title(title: str) -> bool:
+    """True when a parsed title is a citation/note/boilerplate line, markdown
+    source artifact, or has no alphabetic content — never a real work."""
+    t = (title or "").strip()
+    if not t:
+        return True
+    if not re.search(r"[A-Za-zÀ-ÿ\u00c0-\uffff]", t):
+        return True
+    if _JUNK_TITLE_PREFIX.search(t):
+        return True
+    if _MD_CITATION.search(t):
+        return True
+    return False
+
+
 def parse_highlights(grounded_result: Dict, max_items: int = DEFAULT_HIGHLIGHTS
                      ) -> List[Dict]:
     """Parse the grounded answer text into candidate works.
 
     Returns up to ``max_items`` dicts {name, artist, year, medium, fact,
     _raw_line}. Deterministic; no network. An answer with no parseable item lines
-    yields []. Never fabricates — a field absent from the text is "".
+    yields []. Never fabricates — a field absent from the text is "". Citation /
+    note / boilerplate lines are rejected (not works).
     """
     if not grounded_result or grounded_result.get("error"):
         return []
@@ -239,8 +266,15 @@ def parse_highlights(grounded_result: Dict, max_items: int = DEFAULT_HIGHLIGHTS
         line = " ".join(raw.strip().splitlines()).strip()
         if not line:
             continue
+        # Reject the whole line early when it is a source/note/boilerplate line or
+        # a bare URL — but NOT merely for markdown bold/brackets, which legitimately
+        # wrap a real title ("**The Fisherman** — Nguyen [1]").
+        if _JUNK_TITLE_PREFIX.search(line) or re.match(r"(?i)^\s*https?://", line):
+            continue
         title = _first_segment(line)
         if not title or len(_norm(title)) < 2:
+            continue
+        if _is_junk_title(title):
             continue
         nkey = _norm(title)
         if nkey in seen:

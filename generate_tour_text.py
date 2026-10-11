@@ -12728,6 +12728,27 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
                                 pass
 
                     # Works first: add verified highlights up to what is needed.
+                    # [LOCAL-669] Drop any highlight that is a FRAGMENT/alias of a
+                    # work already in the tour (e.g. the local-language name "Vườn
+                    # xuân Trung Nam Bắc" of the English "North Central South Spring
+                    # Garden" already present). Admitting it would only be a
+                    # duplicate stop of the same object — the LOCAL-667 pool uses
+                    # the same guard; apply it here against poi_list.
+                    try:
+                        from candidate_collapse_guard import (
+                            _is_fragment_of as _hl_frag_of,
+                            _norm_tokens as _hl_frag_toks,
+                            _content_tokens as _hl_frag_content)
+                        _hl_targets = [(_hl_frag_toks(p.get('name', '')),
+                                        _hl_frag_content(p.get('name', '')))
+                                       for p in poi_list
+                                       if len(_hl_frag_content(p.get('name', ''))) >= 2]
+                        _hl_verified = [
+                            _w for _w in (_hl_verified or [])
+                            if not any(_hl_frag_of(_w.get('name', ''), _tt, _tc)
+                                       for _tt, _tc in _hl_targets)]
+                    except Exception:
+                        pass
                     _hl_added = 0
                     _hl_needed = total_stops - len(poi_list)
                     for _hw in (_hl_verified or []):

@@ -302,6 +302,24 @@ class TestParsing(unittest.TestCase):
                 "sources": [], "supports": [], "queries": [], "error": ""}
         self.assertEqual(len(parse_highlights(gres)), 1)
 
+    def test_source_citation_line_rejected(self):
+        """A markdown 'Source:' / citation line is not a work (live HCMC bug:
+        'Source:** [Ho Chi Minh City Government Portal]' had been parsed as one)."""
+        gres = {"text": ("1. The Fisherman — Nguyen — oil, 1943.\n"
+                         "2. Source:** [Ho Chi Minh City Government Portal]\n"
+                         "3. References: Wikipedia, museum site\n"
+                         "4. https://example.org/collection\n"),
+                "sources": [], "supports": [], "queries": [], "error": ""}
+        names = [c["name"] for c in parse_highlights(gres)]
+        self.assertEqual(names, ["The Fisherman"])
+
+    def test_boilerplate_lead_line_rejected(self):
+        gres = {"text": ("1. Here are the notable works:\n"
+                         "2. Lotus Pond — Le Pho — silk, 1938.\n"),
+                "sources": [], "supports": [], "queries": [], "error": ""}
+        names = [c["name"] for c in parse_highlights(gres)]
+        self.assertEqual(names, ["Lotus Pond"])
+
 
 class TestOrchestration(unittest.TestCase):
     def test_no_backend_is_safe_noop(self):
