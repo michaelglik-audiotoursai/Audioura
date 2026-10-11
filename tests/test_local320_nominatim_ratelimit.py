@@ -40,6 +40,7 @@ def db_conn():
 class TestNominatimThrottle:
     """Scope 1: Rate limit compliance."""
 
+    @pytest.mark.network
     def test_requests_are_throttled(self):
         """Two consecutive Nominatim requests must be ≥1s apart."""
         import stop_existence_gate
@@ -99,6 +100,7 @@ class TestThrottleFailureClassification:
                     context="test_timeout"
                 )
 
+    @pytest.mark.network
     def test_search_failed_not_unverified(self, db_conn):
         """When Nominatim fails, the verdict must be search_failed, not unverified."""
         # Mock Nominatim to return 429 (all Wikipedia/Wikidata checks will return False
@@ -119,6 +121,7 @@ class TestThrottleFailureClassification:
             else:
                 print(f"  ✓ (Restaurant verified via Wikipedia/Wikidata before Nominatim)")
 
+    @pytest.mark.network
     def test_gate_retries_failed_searches(self, db_conn):
         """run_existence_gate must retry stops that had search failures."""
         call_count = [0]
@@ -154,6 +157,7 @@ class TestThrottleFailureClassification:
         print(f"  ✓ Gate retries search_failed stops (not dropped)")
 
 
+@pytest.mark.network
 class TestProximityBinding:
     """Scope 3: Results outside requested area are rejected."""
 
@@ -224,6 +228,7 @@ class TestProximityBinding:
             pytest.fail(f"Le Safari should verify but didn't: {result}")
 
 
+@pytest.mark.network
 class TestConsistentDelivery:
     """Scope 4+5: Consistent verification across multiple runs."""
 
@@ -280,6 +285,7 @@ class TestConsistentDelivery:
         assert elapsed < 120, f"Took too long: {elapsed:.1f}s"
 
 
+@pytest.mark.network
 class TestSafetyTests:
     """Run LOCAL-313 safety tests to confirm no regression."""
 

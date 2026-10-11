@@ -18,6 +18,7 @@ import os
 import re
 import psycopg2
 import psycopg2.extensions
+import pytest
 
 # ─── Guard ──────────────────────────────────────────────────────────────────
 
@@ -159,6 +160,42 @@ def pytest_configure(config):
         "markers",
         "integration: marks tests as integration tests (require services/DB)",
     )
+    config.addinivalue_line(
+        "markers",
+        "network: LOCAL-676 — test makes a real outbound call to a third-party "
+        "service (Nominatim/OSM, Wikidata, Wikipedia). Rate-limited and flaky in "
+        "CI, so skipped by default. Run with: --run-network (or -m network).",
+    )
+
+
+def pytest_addoption(parser):
+    """LOCAL-676: opt-in flag to run the network-only tests."""
+    parser.addoption(
+        "--run-network",
+        action="store_true",
+        default=False,
+        help="Run tests marked @pytest.mark.network (real Nominatim/Wikidata/"
+             "Wikipedia calls). Skipped by default.",
+    )
+
+
+def pytest_collection_modifyitems(config, items):
+    """LOCAL-676: skip @pytest.mark.network tests unless opted in.
+
+    Opt in with --run-network, or by selecting them explicitly with -m network
+    (so `-m network` still runs them for a targeted network check).
+    """
+    if config.getoption("--run-network"):
+        return
+    markexpr = config.getoption("-m", default="")
+    if "network" in markexpr:
+        return  # user explicitly selected the network tests
+    skip_network = pytest.mark.skip(
+        reason="network test skipped by default (use --run-network or -m network)"
+    )
+    for item in items:
+        if "network" in item.keywords:
+            item.add_marker(skip_network)
 
 
 def pytest_sessionstart(session):
