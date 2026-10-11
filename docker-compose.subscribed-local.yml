@@ -20,6 +20,9 @@ services:
       - TOUR_STORY_MODEL=gpt-4.1
       # D646 (LEAD 2026-10-10): overlap independent waits (LOCAL-651/656; same calls, same stops). Rollback = delete this line.
       - FAST_PIPELINE=1
+      # LOCAL-673 (Michael: a stop, not an email): refuse paid calls once today's spend passes $8; the alert lands in ~/Audioura/meterlogs.
+      - DAILY_PAID_LIMIT_USD=8
+      - ALERTS_MD=/meterlogs/ALERTS_DAILY_LIMIT.md
       # D645 re-enabled for MUSEUM tours only (LOCAL-664, 2026-10-10). Walking stays on Gemini research (Serper costs ~2 Kiro points there).
       - CHEAP_ARM_CATEGORIES=museum
       - NARRATION_MODEL=gpt-4.1-mini
@@ -66,6 +69,8 @@ services:
       - PYTHONPATH=/opt/meter
       - PAID_API_LOG=/meterlogs/paid_api_calls.jsonl
       - TRANSLATION_ENGINE=llm
+      - DAILY_PAID_LIMIT_USD=8
+      - ALERTS_MD=/meterlogs/ALERTS_DAILY_LIMIT.md
     volumes:
       - /Users/micha/audioura-subscribed-local/_meter:/opt/meter:ro
       - /Users/micha/Audioura/meterlogs:/meterlogs
