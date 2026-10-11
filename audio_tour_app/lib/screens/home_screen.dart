@@ -762,6 +762,18 @@ class _HomeScreenState extends State<HomeScreen> {
                       fontWeight: FontWeight.w600,
                     ),
                   ),
+                // [LOCAL-671] The original language, beside the version/rating
+                // badges. Not a translation list — the selector below still lets
+                // the listener translate into any language.
+                if (_originalLanguageLabel(item) != null)
+                  Text(
+                    _originalLanguageLabel(item)!,
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.grey.shade700,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
                 SizedBox(height: 10),
                 Text(item['request_string']),
                 SizedBox(height: 16),
@@ -935,6 +947,21 @@ class _HomeScreenState extends State<HomeScreen> {
       default: return language?.toUpperCase() ?? 'EN';
     }
   }
+
+  // [LOCAL-671] "Original: <Language name>" — the language the tour was WRITTEN
+  // in, surfaced by map-delivery as `original_language` on every tour element
+  // (an original's own content_language; a translation's SOURCE language, D648).
+  // This is NOT a list of available translations — the listener still chooses any
+  // target language with the LanguageSelector below. Returns null when the field
+  // is missing (an older map-delivery that does not send it) or blank, so the
+  // label simply does not appear rather than reading "Original: ".
+  String? _originalLanguageLabel(Map<String, dynamic> tour) {
+    final raw = tour['original_language'];
+    if (raw is! String || raw.trim().isEmpty) {
+      return null;
+    }
+    return 'Original: ${_getLanguageName(raw.trim())}';
+  }
   
   String _getTourOriginLabel(Map<String, dynamic> tour) {
     final originalTourId = tour['original_tour_id'];
@@ -1074,6 +1101,19 @@ class _HomeScreenState extends State<HomeScreen> {
                                   fontSize: 12,
                                   color: Colors.blue.shade700,
                                   fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
+                            // [LOCAL-671] "Original: <Language>" per tour, beside
+                            // the version/rating badges. No translation list.
+                            if (_originalLanguageLabel(tour) != null) ...[
+                              const SizedBox(height: 2),
+                              Text(
+                                _originalLanguageLabel(tour)!,
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.grey.shade700,
+                                  fontWeight: FontWeight.w500,
                                 ),
                               ),
                             ],
