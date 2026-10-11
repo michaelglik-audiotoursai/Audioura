@@ -150,8 +150,16 @@ class TestMuseumTourRegression:
         )
         print(f"  ✓ Museum classifies as: {venue_kind} ({evidence})")
 
+    @pytest.mark.network
     def test_8stop_museum_gate(self, db_conn):
-        """8-stop museum tour: 8/8 stops verified via venue_corpus."""
+        """8-stop museum tour: 8/8 stops verified via venue_corpus.
+
+        [LOCAL-676] Marked network: the enforce path triggers interpretive
+        enrichment, which issues live web queries (~16 per run) and takes 30-60s,
+        well past the 15s DB-only budget this test asserts. The confinement claim
+        (no Nominatim for museums) is proven by the fast TestCodePathConfinement
+        tests; this timing assertion only holds offline/with a warm cache.
+        """
         os.environ['STOP_EXISTENCE_GATE_MODE'] = 'enforce'
         stops = [
             'Kannon, le bodhisattva de la compassion',

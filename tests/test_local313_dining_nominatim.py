@@ -29,6 +29,12 @@ from stop_existence_gate import (
     run_existence_gate,
 )
 
+# [LOCAL-676] Every test here calls verify_stop_existence against the LIVE
+# Nominatim/OSM + Wikipedia/Wikidata services for real Nice restaurants. These
+# are rate-limited third-party calls — slow and flaky in a full suite — so the
+# module is network-only and skipped by default. Run with --run-network.
+pytestmark = pytest.mark.network
+
 
 @pytest.fixture(scope="module")
 def db_conn():

@@ -31,6 +31,32 @@ import psycopg2
 from flask import Flask
 import entitlements_api as ea
 
+# ─── LOCAL-676: throwaway-schema isolation ────────────────────────────────────
+# Like the other l2 suites, this one writes device_entitlement / purchases /
+# plans and reads shared config. Sibling suites left rows that perturbed its
+# /purchases/verify and /entitlements/me results when they ran first. Route
+# every connection in the process at a private throwaway schema via PGOPTIONS so
+# the suite starts from the migration defaults each run; public is proven
+# unchanged and the schema dropped in teardown.
+from _isolated_db import IsolatedSchema
+
+_ISO = IsolatedSchema(
+    prefix="t595api",
+    clone_tables=["plans", "device_entitlement", "purchases"],
+    proof_tables=["device_entitlement", "purchases"],
+    db_url=_DB_URL,
+    banner="LOCAL-595-api",
+)
+
+
+def setUpModule():
+    _ISO.setup()
+
+
+def tearDownModule():
+    _ISO.teardown()
+
+
 API_KEY = "test-key-595"
 H = {"X-API-Key": API_KEY}
 
@@ -55,6 +81,18 @@ def _ensure_schema():
 class ApiTestBase(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
+        # [LOCAL-676] Re-assert our gateway key on the shared entitlements_api
+        # module — sibling l2 suites freeze a different key at import, so without
+        # this the X-API-Key header 401s depending on collection order.
+        os.environ["GATEWAY_API_KEY"] = API_KEY
+        ea.API_KEY = API_KEY
+        # [LOCAL-676] entitlements_api.IAP_VERIFY_MODE is also frozen from the env
+        # at its single import. A sibling l2 suite imports entitlements_api first
+        # (without IAP_VERIFY_MODE=stub), freezing it to 'apple', so our
+        # /purchases/verify calls hit the real Apple path and 402'd. Re-assert the
+        # stub mode on the live module here.
+        os.environ["IAP_VERIFY_MODE"] = "stub"
+        ea.IAP_VERIFY_MODE = "stub"
         _ensure_schema()
         app = Flask(__name__)
         app.register_blueprint(ea.entitlements_bp)

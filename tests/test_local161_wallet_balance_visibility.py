@@ -27,10 +27,12 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__))))
 
 os.environ.setdefault('DB_HOST', 'localhost')
 os.environ.setdefault('DB_PORT', '5433')
-os.environ.setdefault('DB_NAME', 'audiotours')
+# [LOCAL-676] DB_NAME / DATABASE_URL intentionally not pinned here — see the
+# note in test_local159: pinning leaked a production target across the pytest
+# session. db_connection resolves audiotours_test under pytest, production as a
+# standalone script.
 os.environ.setdefault('DB_USER', 'admin')
 os.environ.setdefault('DB_PASSWORD', 'password123')
-os.environ.setdefault('DATABASE_URL', 'postgresql://admin:password123@localhost:5433/audiotours')
 
 from db_connection import get_connection, check_db_available
 

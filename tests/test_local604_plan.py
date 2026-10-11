@@ -45,6 +45,36 @@ import level_codes
 API_KEY = "test-key-604"
 H = {"X-API-Key": API_KEY}
 
+# ─── LOCAL-676: throwaway-schema isolation ────────────────────────────────────
+# Same rationale as test_local596_api: this suite mutates the shared seat/queue/
+# offer/entitlement/level-code/referral tables, and in a full session leftover
+# rows from sibling l2 suites broke seat accounting so offers never landed for
+# the test device. Route every connection in the process at a private throwaway
+# schema via PGOPTIONS. Migrations re-create + re-seed the cloned tables inside
+# the schema, so plans.seat_cap and l2_settings.offer_ttl_minutes start from
+# their defaults. public is proven unchanged and the schema is dropped in
+# teardown.
+from _isolated_db import IsolatedSchema
+
+_ISO = IsolatedSchema(
+    prefix="t604plan",
+    clone_tables=[
+        "plans", "l2_settings", "l2_queue", "l2_offers", "device_entitlement",
+        "level_codes", "purchases",
+    ],
+    proof_tables=["l2_queue", "l2_offers", "device_entitlement", "level_codes"],
+    db_url=_DB_URL,
+    banner="LOCAL-604-plan",
+)
+
+
+def setUpModule():
+    _ISO.setup()
+
+
+def tearDownModule():
+    _ISO.teardown()
+
 
 def _conn():
     return psycopg2.connect(_DB_URL)
@@ -86,6 +116,11 @@ def _ensure_referral_tables(conn):
 class Base(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
+        # [LOCAL-676] Re-assert our API key on the live entitlements_api module
+        # at execution time — sibling l2 suites freeze a different key at import
+        # (see test_local596_api for the full explanation).
+        os.environ["GATEWAY_API_KEY"] = API_KEY
+        ea.API_KEY = API_KEY
         _apply_migration('012_subscription_levels.sql')
         _apply_migration('014_admin_level.sql')
         _apply_migration('015_l2_seats_queue.sql')

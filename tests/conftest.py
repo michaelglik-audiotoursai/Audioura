@@ -18,6 +18,7 @@ import os
 import re
 import psycopg2
 import psycopg2.extensions
+import pytest
 
 # ─── Guard ──────────────────────────────────────────────────────────────────
 
@@ -115,6 +116,31 @@ def _guarded_connect(*args, **kwargs):
 # execute at module-import time.
 os.environ["_AUDIOURA_PYTEST_SESSION"] = "1"
 
+# ─── LOCAL-676: Pin the whole session to the TEST database by default ─────────
+#
+# Root cause of the round-2 failures: several test modules set
+# os.environ['DB_NAME']='audiotours' and/or os.environ['DATABASE_URL']=
+# '…/audiotours' UNCONDITIONALLY at module-import time. pytest imports EVERY
+# test module during collection, so the last such assignment leaked a
+# production DB target into the shared process environment. Other modules that
+# resolve their connection lazily (get_connection → get_db_config) or capture a
+# URL at import (get_db_config → DATABASE_URL) then connected to production
+# 'audiotours', and the LOCAL-232 write guard tripped on their isolated writes.
+#
+# AUDIOURA_DB_TARGET is the explicit switch db_connection consults FIRST — ahead
+# of both DB_NAME and DATABASE_URL (D214, and LOCAL-676 extends the same
+# precedence to get_db_config). Setting it here, once, before any test module is
+# imported, makes the pytest session resolve to audiotours_test regardless of
+# what any module scribbles into DB_NAME/DATABASE_URL during collection.
+#
+# A module that deliberately needs a read-only production connection still opts
+# in with its own `AUDIOURA_DB_TARGET=production` (e.g. via a monkeypatch
+# fixture, as test_local320_nondining_regression does) — that per-module value
+# overrides this default for its duration and reverts afterward. We only set the
+# default when the variable is not already present, so an outer harness that
+# chose a target keeps control.
+os.environ.setdefault("AUDIOURA_DB_TARGET", "test")
+
 psycopg2.connect = _guarded_connect
 
 
@@ -134,6 +160,42 @@ def pytest_configure(config):
         "markers",
         "integration: marks tests as integration tests (require services/DB)",
     )
+    config.addinivalue_line(
+        "markers",
+        "network: LOCAL-676 — test makes a real outbound call to a third-party "
+        "service (Nominatim/OSM, Wikidata, Wikipedia). Rate-limited and flaky in "
+        "CI, so skipped by default. Run with: --run-network (or -m network).",
+    )
+
+
+def pytest_addoption(parser):
+    """LOCAL-676: opt-in flag to run the network-only tests."""
+    parser.addoption(
+        "--run-network",
+        action="store_true",
+        default=False,
+        help="Run tests marked @pytest.mark.network (real Nominatim/Wikidata/"
+             "Wikipedia calls). Skipped by default.",
+    )
+
+
+def pytest_collection_modifyitems(config, items):
+    """LOCAL-676: skip @pytest.mark.network tests unless opted in.
+
+    Opt in with --run-network, or by selecting them explicitly with -m network
+    (so `-m network` still runs them for a targeted network check).
+    """
+    if config.getoption("--run-network"):
+        return
+    markexpr = config.getoption("-m", default="")
+    if "network" in markexpr:
+        return  # user explicitly selected the network tests
+    skip_network = pytest.mark.skip(
+        reason="network test skipped by default (use --run-network or -m network)"
+    )
+    for item in items:
+        if "network" in item.keywords:
+            item.add_marker(skip_network)
 
 
 def pytest_sessionstart(session):

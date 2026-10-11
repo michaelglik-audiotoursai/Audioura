@@ -25,10 +25,34 @@ import sys
 import os
 import re
 
+import pytest
+
 sys.path.insert(0, os.path.dirname(__file__))
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'translation-service'))
 
 from db_connection import get_connection, check_db_available
+
+
+# [LOCAL-676] This suite reads real tour content from the live production DB
+# (specific tour ids, docstring: "All data sourced from the live database
+# (read-only). Zero API calls."). It previously reached production only because
+# a sibling module leaked DATABASE_URL=…/audiotours into the session; with that
+# leak removed it would resolve to the empty audiotours_test. Opt into the
+# production target explicitly for this module's READS — no writes happen here,
+# so the LOCAL-232 guard never fires. The fixture reverts after the module so no
+# other suite is affected.
+@pytest.fixture(autouse=True, scope="module")
+def _force_production_db_local142():
+    import db_connection
+    prev = os.environ.get("AUDIOURA_DB_TARGET")
+    os.environ["AUDIOURA_DB_TARGET"] = "production"
+    try:
+        yield
+    finally:
+        if prev is None:
+            os.environ.pop("AUDIOURA_DB_TARGET", None)
+        else:
+            os.environ["AUDIOURA_DB_TARGET"] = prev
 
 # ─── NAV field prefixes (same as in translation_service.py) ──────────────────
 NAV_FIELD_PREFIXES = [

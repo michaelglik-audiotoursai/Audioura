@@ -32,6 +32,12 @@ from stop_existence_gate import (
     verify_stop_existence,
 )
 
+# [LOCAL-676] Although _nominatim_request is mocked here, verify_stop_existence
+# still queries the LIVE Wikipedia/Wikidata services before it reaches Nominatim,
+# so these tests make real third-party calls (a full run took ~48s). Network-only
+# → skipped by default; run with --run-network.
+pytestmark = pytest.mark.network
+
 
 @pytest.fixture(scope="module")
 def db_conn():

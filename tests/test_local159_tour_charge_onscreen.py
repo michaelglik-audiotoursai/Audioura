@@ -36,10 +36,13 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__))))
 # Set DB env vars for wallet_ledger and friends to connect
 os.environ.setdefault('DB_HOST', 'localhost')
 os.environ.setdefault('DB_PORT', '5433')
-os.environ.setdefault('DB_NAME', 'audiotours')
+# [LOCAL-676] DB_NAME / DATABASE_URL are intentionally NOT pinned to production
+# here. Pinning them at import time leaked a production target into the shared
+# pytest process env (every module is imported during collection) and redirected
+# sibling suites to the real DB. db_connection resolves the target itself: under
+# pytest → audiotours_test; run as a standalone script → production, as before.
 os.environ.setdefault('DB_USER', 'admin')
 os.environ.setdefault('DB_PASSWORD', 'password123')
-os.environ.setdefault('DATABASE_URL', 'postgresql://admin:password123@localhost:5433/audiotours')
 
 from db_connection import get_connection, check_db_available
 
