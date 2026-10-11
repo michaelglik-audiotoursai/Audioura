@@ -58,8 +58,10 @@ class TestMetersIncrement(unittest.TestCase):
         self.assertAlmostEqual(pb["gemini_tokens"]["usd"],
                                cost_rates.gemini_tokens_cost(1000, 500), places=9)
         self.assertEqual(pb["gemini_grounding"]["queries"], 3)
+        # r5 (2026-10-10): one grounded request is billed at least GROUNDED_REQUEST_COST,
+        # because the response under-reports the billed search queries (GCloud SKU report).
         self.assertAlmostEqual(pb["gemini_grounding"]["usd"],
-                               cost_rates.grounding_query_cost(3), places=9)
+                               max(cost_rates.GROUNDED_REQUEST_COST, cost_rates.grounding_query_cost(3)), places=9)
         # preflight untouched
         self.assertEqual(pb["preflight"]["calls"], 0)
 
