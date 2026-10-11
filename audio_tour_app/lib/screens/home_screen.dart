@@ -29,6 +29,7 @@ import '../utils/search_dispatch.dart';
 import '../widgets/subscription_credential_dialog.dart';
 import '../widgets/language_selector.dart';
 import '../widgets/rate_tour_dialog.dart';
+import '../widgets/reviews_section.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -55,6 +56,11 @@ class _HomeScreenState extends State<HomeScreen> {
   // (7, 8, or 9). Remembered per device under SharedPreferences 'home_min_rating'
   // and passed to /tours-near as ?min_rating=<n> so the server filters.
   double _minRating = 0.0;
+  // [LOCAL-672] Home-page "Top rated" sort: when true, /tours-near is asked for
+  // ?sort=top_rated and the server orders by the Bayesian rank_score (verified
+  // ratings weighted higher, old/pre-version ratings decayed). Remembered per
+  // device under SharedPreferences 'home_top_rated'. Default off (nearest-first).
+  bool _topRated = false;
   final List<String> _articleTypes = [
     'All',
     'News and Politics',
@@ -86,6 +92,7 @@ class _HomeScreenState extends State<HomeScreen> {
     final prefs = await SharedPreferences.getInstance();
     final mode = prefs.getString('app_mode') ?? 'Tours';
     _minRating = prefs.getDouble('home_min_rating') ?? 0.0;
+    _topRated = prefs.getBool('home_top_rated') ?? false;
     await _loadLocationHistory();
     await _loadCustomLocation();
     
@@ -327,7 +334,9 @@ class _HomeScreenState extends State<HomeScreen> {
       // drops tours below the bar.
       final minRatingParam =
           _minRating > 0 ? '&min_rating=${_minRating.toStringAsFixed(0)}' : '';
-      final uri = await Endpoints.url(Service.mapDelivery, '/tours-near/${searchLocation.latitude}/${searchLocation.longitude}?radius=50$minRatingParam');
+      // [LOCAL-672] "Top rated" sort: let the server order by rank_score.
+      final sortParam = _topRated ? '&sort=top_rated' : '';
+      final uri = await Endpoints.url(Service.mapDelivery, '/tours-near/${searchLocation.latitude}/${searchLocation.longitude}?radius=50$minRatingParam$sortParam');
       final url = uri.toString();
       
       await DebugLogHelper.addDebugLog('HOME: Requesting tours from: $url');
@@ -776,6 +785,14 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                 SizedBox(height: 10),
                 Text(item['request_string']),
+                SizedBox(height: 12),
+                // [LOCAL-672] Reviews (n): expandable list with the rating
+                // distribution bars, sort/filter, "Verified listener" badges,
+                // helpful votes and the curator reply.
+                ReviewsSection(
+                  tourId: '${item['id']}',
+                  initialCount: (item['rating_count'] as num?)?.toInt() ?? 0,
+                ),
                 SizedBox(height: 16),
                 Text('Select Languages:', style: TextStyle(fontWeight: FontWeight.bold)),
                 SizedBox(height: 8),
@@ -797,6 +814,7 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
               // [LOCAL-670] Rate this tour 1–10. On success, refresh the badge
               // in this dialog with the recomputed score.
+              // [LOCAL-672] Then offer an optional short text review.
               TextButton(
                 onPressed: () async {
                   final result = await showRateTourDialog(
@@ -809,6 +827,23 @@ class _HomeScreenState extends State<HomeScreen> {
                     item['rating_count'] = result.aggregate!.count;
                     item['rating_label'] = result.aggregate!.label;
                     setDialogState(() {});
+                    // [LOCAL-672] Offer "Add a short review" right after rating.
+                    if (context.mounted) {
+                      final status = await showAddReviewDialog(
+                        context,
+                        tourId: '${item['id']}',
+                        tourTitle: item['name']?.toString() ?? 'this tour',
+                      );
+                      if (status != null && context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(status == 'approved'
+                                ? 'Thanks! Your review is live.'
+                                : 'Thanks! Your review is being checked.'),
+                          ),
+                        );
+                      }
+                    }
                   }
                 },
                 child: Text('Rate'),
@@ -3030,6 +3065,21 @@ class _HomeScreenState extends State<HomeScreen> {
             tooltip: _minRating > 0
                 ? 'Rating filter: ${_minRating.toStringAsFixed(0)}+'
                 : 'Rating filter: Any',
+          ),
+          // [LOCAL-672] "Top rated" sort toggle. On → /tours-near is ordered by
+          // the Bayesian rank_score (verified ratings weighted higher). Off →
+          // nearest-first (the default). Remembered per device.
+          IconButton(
+            icon: Icon(_topRated ? Icons.trending_up : Icons.sort),
+            onPressed: () async {
+              final prefs = await SharedPreferences.getInstance();
+              final next = !_topRated;
+              await prefs.setBool('home_top_rated', next);
+              if (!mounted) return;
+              setState(() => _topRated = next);
+              _loadNearbyTours();
+            },
+            tooltip: _topRated ? 'Sorted: Top rated' : 'Sort: Top rated',
           ),
           // [LOCAL-665] One search button for everything. Michael: the two old
           // buttons (flag = tours, arrow-glass = location) were easy to confuse.
