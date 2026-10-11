@@ -204,11 +204,23 @@ def _query_today_total_usd(day_str):
             # ts is timestamptz; compare its NY calendar date to the NY day we are
             # metering. Doing the AT TIME ZONE conversion in SQL keeps the day
             # boundary correct regardless of the DB session timezone.
-            cur.execute(
-                "SELECT COALESCE(SUM(usd), 0) FROM paid_api_calls "
-                "WHERE status = 200 "
-                "AND (ts AT TIME ZONE 'America/New_York')::date = %s::date",
-                (day_str,))
+            # [LEAD 2026-10-10] DAILY_PAID_LIMIT_SERVICES (comma list of `service` values) scopes
+            # the limit to the listener-facing stack. Unscoped, a night of Kiro/bench test spend
+            # (their own containers) tripped the shared stack's $8 limit at 23:20.
+            svcs = [x.strip() for x in os.environ.get("DAILY_PAID_LIMIT_SERVICES", "").split(",") if x.strip()]
+            if svcs:
+                cur.execute(
+                    "SELECT COALESCE(SUM(usd), 0) FROM paid_api_calls "
+                    "WHERE status = 200 "
+                    "AND (ts AT TIME ZONE 'America/New_York')::date = %s::date "
+                    "AND service = ANY(%s)",
+                    (day_str, svcs))
+            else:
+                cur.execute(
+                    "SELECT COALESCE(SUM(usd), 0) FROM paid_api_calls "
+                    "WHERE status = 200 "
+                    "AND (ts AT TIME ZONE 'America/New_York')::date = %s::date",
+                    (day_str,))
             row = cur.fetchone()
         return float(row[0] or 0.0)
     finally:
