@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../services/tour_rating_service.dart';
+import '../services/tour_listen_service.dart';
 
 /// A small "★ 8.3 · 2 ratings" / "★ 7.5 · New" badge, shown on home-page tour
 /// list items and in tour dialogs (LOCAL-670).
@@ -183,12 +184,49 @@ class _RateTourDialogState extends State<RateTourDialog> {
 
 /// Show the rate-tour dialog. Returns the recomputed [TourRating] if the user
 /// submitted, or null if they dismissed it (or submission failed).
+///
+/// [LOCAL-670B] The per-TOUR rating is gated behind "heard at least 2 stops"
+/// (or all stops on a short tour). If the listener opens this before that
+/// threshold, we DON'T show the 1–10 picker — we show the polite Audible-style
+/// message with the running count and return null. Callers should also hide the
+/// entry point until [TourListenService.hasListenedEnough], but gating here as
+/// well guarantees the message is consistent wherever rating is triggered.
 Future<TourRating?> showRateTourDialog(
   BuildContext context, {
   required String tourId,
   required String tourTitle,
   int? initialRating,
-}) {
+  int? totalStops,
+}) async {
+  final enough = await TourListenService.hasListenedEnough(
+    tourId,
+    totalStops: totalStops,
+  );
+  if (!enough) {
+    if (!context.mounted) return null;
+    final heard = await TourListenService.listenedCount(tourId);
+    final required = TourListenService.requiredThreshold(totalStops);
+    if (!context.mounted) return null;
+    await showDialog<void>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Rate this tour'),
+        content: Text(
+          'Listen to at least $required stops to rate this tour. '
+          "You've heard $heard so far.",
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+    );
+    return null;
+  }
+
+  if (!context.mounted) return null;
   return showDialog<TourRating>(
     context: context,
     builder: (_) => RateTourDialog(

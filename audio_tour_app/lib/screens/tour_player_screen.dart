@@ -12,6 +12,7 @@ import '../config/endpoints.dart';
 import '../services/webview_console_logger.dart';
 import '../widgets/share_tour_sheet.dart';
 import '../widgets/rate_tour_dialog.dart';
+import '../services/tour_listen_service.dart';
 
 class TourPlayerScreen extends StatefulWidget {
   final String tourPath;
@@ -47,6 +48,9 @@ class _TourPlayerScreenState extends State<TourPlayerScreen> with VoiceMethods {
   // tour" prompt so it fires at most once.
   String? _currentStopName;
   bool _ratePrompted = false;
+  // [LOCAL-670B] Total stops in the tour, reported by the WebView, used to
+  // compute the listened-stops threshold (a short tour needs all its stops).
+  int? _totalStops;
 
   // LOCAL-483: forward the tour player WebView's JS console into the debug log.
   final WebViewConsoleLogger _consoleLogger =
@@ -177,10 +181,17 @@ class _TourPlayerScreenState extends State<TourPlayerScreen> with VoiceMethods {
                           if (args.length > 1 && args[1] != null && '${args[1]}'.trim().isNotEmpty) {
                             name = '${args[1]}'.trim();
                           }
+                          int? total;
+                          if (args.length > 2 && args[2] != null) {
+                            total = args[2] is int
+                                ? args[2]
+                                : int.tryParse('${args[2]}');
+                          }
                           if (mounted) {
                             setState(() {
                               _currentStopIndex = idx;
                               if (name != null) _currentStopName = name;
+                              if (total != null && total > 0) _totalStops = total;
                             });
                           }
                         },
@@ -191,6 +202,23 @@ class _TourPlayerScreenState extends State<TourPlayerScreen> with VoiceMethods {
                         handlerName: 'onTourEnded',
                         callback: (args) {
                           _maybePromptEndOfTourRating();
+                        },
+                      );
+                      // [LOCAL-670B] Fired when a stop's audio reaches >= 80% or
+                      // ends. We mark that stop LISTENED (locally + server POST)
+                      // so the per-TOUR rating unlocks once 2 distinct stops are
+                      // heard. args: [stopIndex].
+                      controller.addJavaScriptHandler(
+                        handlerName: 'onStopListened',
+                        callback: (args) {
+                          final idx = args.isNotEmpty
+                              ? (args[0] is int
+                                  ? args[0]
+                                  : int.tryParse('${args[0]}') ?? -1)
+                              : -1;
+                          if (idx >= 0) {
+                            unawaited(_recordStopListened(idx));
+                          }
                         },
                       );
                     },
@@ -261,6 +289,27 @@ class _TourPlayerScreenState extends State<TourPlayerScreen> with VoiceMethods {
                                   currentIdx = idx;
                                   reportStop(currentIdx);
                                 }
+                              });
+                              // [LOCAL-670B] Mark a stop LISTENED when its audio
+                              // crosses 80% of its duration or ends. Fire the
+                              // handler at most once per stop per load (guarded
+                              // by a data flag) so we don't spam the bridge.
+                              function markListened() {
+                                if (audio.getAttribute('data-listened') === '1') return;
+                                audio.setAttribute('data-listened', '1');
+                                if (window.flutter_inappwebview) {
+                                  window.flutter_inappwebview.callHandler('onStopListened', idx);
+                                }
+                              }
+                              audio.addEventListener('timeupdate', function() {
+                                var d = audio.duration;
+                                if (d && isFinite(d) && d > 0 &&
+                                    (audio.currentTime / d) >= 0.8) {
+                                  markListened();
+                                }
+                              });
+                              audio.addEventListener('ended', function() {
+                                markListened();
                               });
                               // [LOCAL-670] When the LAST stop's audio ends, the tour
                               // is over — tell Flutter to offer the rating prompt.
@@ -353,6 +402,26 @@ class _TourPlayerScreenState extends State<TourPlayerScreen> with VoiceMethods {
     return segments.isNotEmpty ? segments.last : 'unknown';
   }
 
+  /// [LOCAL-670B] Record that a stop was heard to >= 80% or the end. Stored
+  /// locally per (tour, stop) and POSTed to the server (idempotent), so the
+  /// per-TOUR rating unlocks once 2 distinct stops are heard. The listened key
+  /// is the numeric tour id when we have one (what the server gate keys on),
+  /// else the local path-derived id so the UI gate still works offline.
+  Future<void> _recordStopListened(int stopIndex) async {
+    final tourId = widget.tourId ?? _deriveTourId();
+    try {
+      await TourListenService.recordListened(
+        tourId: tourId,
+        stopIndex: stopIndex,
+      );
+      await DebugLogHelper.addDebugLog(
+        'LISTEN: stop $stopIndex of tour $tourId marked listened',
+      );
+    } catch (_) {
+      // never surface a tracking failure to the listener
+    }
+  }
+
   /// [LOCAL-670] Offer the per-TOUR 1–10 rating after the last stop finishes.
   /// Fires at most once per player session. Only shown for a tour we can
   /// identify by numeric id (what the rating endpoint keys on); tours opened
@@ -369,11 +438,29 @@ class _TourPlayerScreenState extends State<TourPlayerScreen> with VoiceMethods {
       return;
     }
 
+    // [LOCAL-670B] Only offer the rating once the listener has heard enough
+    // stops (>= 2, or all stops on a short tour). On a normal multi-stop tour
+    // reaching the END means they've heard several, so this virtually always
+    // passes; it correctly suppresses the prompt for someone who skipped
+    // straight to the final stop.
+    final enough = await TourListenService.hasListenedEnough(
+      tourId,
+      totalStops: _totalStops,
+    );
+    if (!enough) {
+      await DebugLogHelper.addDebugLog(
+        'RATING: end-of-tour reached but not enough stops listened — skipping prompt',
+      );
+      return;
+    }
+
     await DebugLogHelper.addDebugLog('RATING: end-of-tour — offering 1–10 rating');
+    if (!mounted) return;
     await showRateTourDialog(
       context,
       tourId: tourId,
       tourTitle: widget.tourTitle,
+      totalStops: _totalStops,
     );
   }
 
