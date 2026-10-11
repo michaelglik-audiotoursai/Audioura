@@ -5981,18 +5981,33 @@ def _verify_works_v2(poi_list, venue_name, exhibition_scope=None):
     
     # Build title→QID lookup from SPARQL works for deduplication
     _title_to_qid = {}
+    # [LOCAL-669B] QID → all SPARQL labels/aliases (local + English), so a
+    # D1v2-verified stop can be enriched with its OTHER-language label and the
+    # identity-dedup pass can bridge a cross-language duplicate (the Vietnamese
+    # "Vườn xuân Trung Nam Bắc" ↔ English "North Central South Spring Garden",
+    # Q109406846) by an EXACT label match rather than a fuzzy token overlap.
+    _qid_to_labels = {}
     for work in sparql_works:
         qid = work.get('qid', '')
         if not qid:
             continue
+        _labels = []
         for label_key in ('label_en', 'label_local'):
             lbl = work.get(label_key, '')
             if lbl:
                 from story_miner import _normalize as _norm_title
                 _title_to_qid[_norm_title(lbl)] = qid
+                _labels.append(lbl)
         for alias in work.get('aliases', []):
             if alias:
                 _title_to_qid[_norm_title(alias)] = qid
+                _labels.append(alias)
+        if _labels:
+            _qid_to_labels[qid] = {
+                'label_local': work.get('label_local', ''),
+                'label_en': work.get('label_en', ''),
+                'aliases': list(work.get('aliases', []) or []),
+            }
     
     # Inject dynamic aliases from SPARQL works (replaces hardcoded CANONICAL_ALIASES)
     if sparql_works:
@@ -6083,6 +6098,9 @@ def _verify_works_v2(poi_list, venue_name, exhibition_scope=None):
                     "snippet": snippet,
                     "method": "canonical_title_match",
                     "qid": _matched_qid,
+                    # [LOCAL-669B] the work's OTHER-language label(s), so the
+                    # identity-dedup pass can bridge a cross-language duplicate.
+                    "sparql_labels": _qid_to_labels.get(_matched_qid, {}),
                 }
             # Use the EXACT canonical title as the stop name (prevents GPT truncation)
             # If the matched canonical is a substring of a longer SPARQL title, prefer the SPARQL form
@@ -12623,14 +12641,21 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
                             _hl_bimap = dict(getattr(_sm_hlbi, '_BILINGUAL_MAP', {}) or {})
                         except Exception:
                             _hl_bimap = {}
-                        # Stamp evidence-log QIDs onto existing pois for the match.
+                        # Stamp evidence-log QID + the work's OTHER-language
+                        # SPARQL labels onto existing pois, so the identity match
+                        # bridges a cross-language duplicate by an EXACT label.
                         _hl_existing = []
                         for _ep in poi_list:
                             _epc = dict(_ep)
-                            if not _hl_idd.candidate_qid(_epc):
-                                _eev = _d1_evidence_log.get(_ep.get('name', ''), {})
-                                if isinstance(_eev, dict) and _eev.get('qid'):
+                            _eev = _d1_evidence_log.get(_ep.get('name', ''), {})
+                            if isinstance(_eev, dict):
+                                if _eev.get('qid') and not _hl_idd.candidate_qid(_epc):
                                     _epc['qid'] = _eev['qid']
+                                _lbls = _eev.get('sparql_labels') or {}
+                                if _lbls.get('label_local'):
+                                    _epc['label_local'] = _lbls['label_local']
+                                if _lbls.get('label_en'):
+                                    _epc['label_en'] = _lbls['label_en']
                             _hl_existing.append(_hl_idd.identity_of(_epc, _hl_bimap))
                         def _hl_is_dup(_w):
                             _wid = _hl_idd.identity_of(_w, _hl_bimap)
@@ -13173,13 +13198,20 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
                         _bimap = dict(getattr(_sm_bi, '_BILINGUAL_MAP', {}) or {})
                     except Exception:
                         _bimap = {}
-                    # Stamp QIDs from the D1v2 evidence log onto the pois so the
-                    # QID signal (a) is available to the dedup. Never invents a QID.
+                    # Stamp QID + the work's OTHER-language SPARQL labels from the
+                    # D1v2 evidence log onto the pois, so the dedup bridges a
+                    # cross-language duplicate by QID or an EXACT label. Never
+                    # invents a QID or a label.
                     for _p in poi_list:
-                        if not _idd.candidate_qid(_p):
-                            _ev = _d1_evidence_log.get(_p.get('name', ''), {})
-                            if isinstance(_ev, dict) and _ev.get('qid'):
+                        _ev = _d1_evidence_log.get(_p.get('name', ''), {})
+                        if isinstance(_ev, dict):
+                            if _ev.get('qid') and not _idd.candidate_qid(_p):
                                 _p['qid'] = _ev['qid']
+                            _lbls = _ev.get('sparql_labels') or {}
+                            if _lbls.get('label_local') and not _p.get('label_local'):
+                                _p['label_local'] = _lbls['label_local']
+                            if _lbls.get('label_en') and not _p.get('label_en'):
+                                _p['label_en'] = _lbls['label_en']
                     _pre_dedup = len(poi_list)
                     poi_list, _id_collapses = _idd.dedup_by_identity(poi_list, _bimap)
                     for _c in _id_collapses:

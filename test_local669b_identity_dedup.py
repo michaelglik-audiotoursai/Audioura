@@ -244,5 +244,71 @@ class TestBilingualTitleParse(unittest.TestCase):
         self.assertEqual(cands[0]["title_en"], "")
 
 
+class TestMarkdownSubBulletFormat(unittest.TestCase):
+    """The LIVE HCMC run (tour 667) exposed a parse failure: the grounded answer
+    used markdown bold titles with '(*gloss*)' and '- Artist:/- Year:' SUB-BULLET
+    fields. The old splitter promoted '- Artist:' and '- Year:' to their OWN
+    stops ("Artist", "Year"), and the '(*...*)' gloss was not split so the
+    cross-language identity match failed. These pin the block-based fix."""
+
+    _MD = (
+        "Here are the 8 most notable works:\n\n"
+        "1. **Vườn xuân Trung Nam Bắc** (*Spring Garden of the Center, South, "
+        "and North*)\n"
+        "   - Artist: Nguyễn Gia Trí\n"
+        "   - Year: 1969-1989\n"
+        "   - Medium: lacquer on wood\n"
+        "   - Fact: A designated National Treasure.\n\n"
+        "2. **Thanh niên Thành đồng** (*Youth of the Iron Fortress*)\n"
+        "   - Artist: Nguyễn Sáng\n"
+        "   - Year: 1978\n"
+        "   - Medium: lacquer\n\n"
+        "3. **Thiếu nữ trong vườn** (*Girl in the Garden*)\n"
+        "   - Artist: Nguyễn Gia Trí\n"
+        "   - Year: 1939\n"
+    )
+
+    def test_subbullets_not_promoted_to_stops(self):
+        cands = parse_highlights({"text": self._MD, "sources": [], "supports": []})
+        names = [c["name"] for c in cands]
+        # Exactly three works — NOT "Artist"/"Year"/"Medium"/"Fact".
+        self.assertEqual(len(cands), 3, names)
+        for junk in ("Artist", "Year", "Medium", "Fact"):
+            self.assertNotIn(junk, names)
+
+    def test_bilingual_split_from_markdown_gloss(self):
+        cands = parse_highlights({"text": self._MD, "sources": [], "supports": []})
+        c0 = cands[0]
+        self.assertEqual(c0["name"], "Vườn xuân Trung Nam Bắc")
+        self.assertEqual(c0["title_en"], "Spring Garden of the Center, South, and North")
+        self.assertEqual(c0["artist"], "Nguyễn Gia Trí")
+        self.assertEqual(c0["year"], "1969")
+
+    def test_fields_do_not_bleed_into_artist(self):
+        cands = parse_highlights({"text": self._MD, "sources": [], "supports": []})
+        # The artist must be ONLY the artist, not "… Year: … Medium: …".
+        self.assertNotIn("Year", cands[0]["artist"])
+        self.assertNotIn("Medium", cands[0]["artist"])
+
+    def test_spring_garden_collapses_against_english_sparql_stop(self):
+        # The real end-state: the D1v2 English SPARQL stop carries its Vietnamese
+        # label; the Vietnamese highlights candidate then collapses into it by an
+        # EXACT local-label match (no fuzzy token overlap needed for center/
+        # central).
+        cands = parse_highlights({"text": self._MD, "sources": [], "supports": []})
+        english_stop = _poi(_SPRING_EN, qid=_SPRING_QID, verified=True,
+                            label_local=_SPRING_VN, label_en=_SPRING_EN)
+        pool = [english_stop] + [dict(c, verified=True) for c in cands]
+        out, collapses = idd.dedup_by_identity(pool)
+        names = [o["name"] for o in out]
+        # The Vietnamese Spring Garden highlight folds into the English stop.
+        self.assertNotIn("Vườn xuân Trung Nam Bắc", names)
+        self.assertIn(_SPRING_EN, names)
+        # Iron Wall Youth and Girl in the Garden survive as distinct works.
+        self.assertIn("Thanh niên Thành đồng", names)
+        self.assertIn("Thiếu nữ trong vườn", names)
+        self.assertEqual(len(out), 3, names)
+
+
 if __name__ == "__main__":
     unittest.main()

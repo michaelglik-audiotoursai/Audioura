@@ -121,10 +121,15 @@ _YEAR = re.compile(r"\b(1[0-9]\d{2}|20[0-3]\d)\b")
 
 # Common "Title — Artist — medium, year" / "Title by Artist (year)" shapes, plus
 # explicit "Artist:" / "Year:" / "Medium:" labels when the model uses them.
-_LABEL_ARTIST = re.compile(r"(?i)\bartist\s*:\s*([^\n;|]+)")
-_LABEL_YEAR = re.compile(r"(?i)\byear\s*:\s*([^\n;|]+)")
-_LABEL_MEDIUM = re.compile(r"(?i)\bmedium\s*:\s*([^\n;|]+)")
-_LABEL_TITLE = re.compile(r"(?i)\btitle\s*:\s*([^\n;|]+)")
+# Labelled fields. Each value runs until the NEXT field label, a newline, or a
+# ';'/'|' separator — so folded "Artist: X Year: Y Medium: Z" does not bleed the
+# whole tail into the artist. The lookahead names the sibling labels.
+_FIELD_STOP = (r"(?=\s+(?:artist|year|date|medium|dimensions?|material|fact|"
+               r"title|description|note|size|location|collection)\s*:|[\n;|]|$)")
+_LABEL_ARTIST = re.compile(r"(?i)\bartist\s*:\s*(.+?)" + _FIELD_STOP)
+_LABEL_YEAR = re.compile(r"(?i)\byear\s*:\s*(.+?)" + _FIELD_STOP)
+_LABEL_MEDIUM = re.compile(r"(?i)\bmedium\s*:\s*(.+?)" + _FIELD_STOP)
+_LABEL_TITLE = re.compile(r"(?i)\btitle\s*:\s*(.+?)" + _FIELD_STOP)
 
 # Dash variants used as field separators.
 _DASHES = "—–‑-"
@@ -161,20 +166,25 @@ def _first_segment(line: str) -> str:
 
 def _title_head(line: str) -> str:
     """The title portion of an item line INCLUDING any parenthetical/quoted
-    English gloss. Stops at a ' by '/':' label, but keeps '(' and a trailing
-    quoted gloss ('— "English"') so the bilingual splitter can see them. A spaced
-    dash only ends the head when what follows is NOT a quoted gloss (i.e. it is an
-    artist/medium field)."""
+    English gloss. Cuts at the first FIELD LABEL ('Artist:', 'Year:', 'Medium:',
+    …) or ' by ', but keeps '(gloss)' and a trailing quoted gloss. A spaced dash
+    ends the head only when what follows is NOT a quoted gloss."""
     s = line.strip()
     m = _LABEL_TITLE.search(s)
     if m:
         return m.group(1).strip()
-    # Trim at ' by ' / ':' first (these never introduce a title gloss).
-    for sep in (r"\bby\b", r":"):
-        parts = re.split(sep, s, maxsplit=1)
-        if len(parts) == 2 and parts[0].strip():
-            s = parts[0]
-            break
+    # Cut at the FIRST field-label keyword (whole word + colon), so the label and
+    # its value never bleed into the title/gloss.
+    _labelcut = re.search(
+        r"(?i)\s+(?:artist|year|date|medium|dimensions?|material|fact|"
+        r"description|note|size|location|collection)\s*:",
+        s)
+    if _labelcut:
+        s = s[:_labelcut.start()].strip()
+    # Also cut at ' by ' (artist introducer) if present and earlier.
+    _bycut = re.split(r"(?i)\bby\b", s, maxsplit=1)
+    if len(_bycut) == 2 and _bycut[0].strip():
+        s = _bycut[0].strip()
     # If a trailing quoted gloss is present ('… — "English Title"'), keep the
     # whole thing so _GLOSS_QUOTE can split it.
     if _GLOSS_QUOTE.match(s.strip()):
@@ -310,8 +320,9 @@ _MD_CITATION = re.compile(r"\*\*|\[[^\]]*\]\s*$|^\[|\bhttps?://")
 
 def _is_junk_title(title: str) -> bool:
     """True when a parsed title is a citation/note/boilerplate line, markdown
-    source artifact, or has no alphabetic content — never a real work."""
-    t = (title or "").strip()
+    source artifact, a bare field LABEL ('Artist', 'Year', 'Medium', 'Title',
+    'Fact', 'Medium/Dimensions'), or has no alphabetic content — never a work."""
+    t = (title or "").strip().strip("*_ ")
     if not t:
         return True
     if not re.search(r"[A-Za-zÀ-ÿ\u00c0-\uffff]", t):
@@ -320,17 +331,78 @@ def _is_junk_title(title: str) -> bool:
         return True
     if _MD_CITATION.search(t):
         return True
+    # A bare field label the model emitted as a sub-bullet ("Artist", "Year",
+    # "Medium", "Dimensions", "Fact", "Title", "Description") is NOT a work. The
+    # live HCMC run promoted '- Artist:' and '- Year:' sub-bullets to stops.
+    if re.fullmatch(r"(?i)(artist|year|date|medium|dimensions?|material|fact|"
+                    r"title|name|description|note|size|location|collection)"
+                    r"(\s*/\s*\w+)?", t):
+        return True
     return False
+
+
+# A line that is a sub-bullet FIELD of the current work ("- Artist: …",
+# "* Year: …", "  - Medium: …") rather than a new work. These must be FOLDED into
+# the current work block, never split off as their own item.
+_FIELD_BULLET = re.compile(
+    r"(?i)^\s*[-*•]\s*(artist|year|date|medium|dimensions?|material|fact|"
+    r"title|name|description|note|size|location|collection)\b\s*:")
+
+# A new WORK begins at a numbered marker (1. / 1)) OR a top-level bold title
+# ("**Title**"). A bare '-'/'*' bullet is a new work ONLY when it is NOT a field
+# bullet (handled above).
+_NUM_MARKER = re.compile(r"^\s*\d+[.)]\s+")
+_BOLD_TITLE_LINE = re.compile(r"^\s*\*\*[^*]+\*\*")
+_PLAIN_BULLET = re.compile(r"^\s*[-*•]\s+")
+
+
+def _split_into_work_blocks(text: str) -> List[str]:
+    """Group the answer's lines into per-work blocks. A block starts at a numbered
+    marker or a bold-title line; a '- Label:' field line is folded into the
+    current block (not a new work). Lines before the first marker are preamble."""
+    blocks: List[str] = []
+    current: List[str] = []
+
+    def _flush():
+        if current:
+            blocks.append(" ".join(l.strip() for l in current if l.strip()))
+
+    started = False
+    for ln in text.splitlines():
+        if not ln.strip():
+            continue
+        is_field = bool(_FIELD_BULLET.match(ln))
+        is_new = (bool(_NUM_MARKER.match(ln))
+                  or (bool(_BOLD_TITLE_LINE.match(ln)) and not is_field)
+                  or (bool(_PLAIN_BULLET.match(ln)) and not is_field))
+        if is_new:
+            _flush()
+            current = [_NUM_MARKER.sub("", _PLAIN_BULLET.sub("", ln)).strip()]
+            started = True
+        elif started:
+            # Fold a sub-field or continuation line into the current block.
+            folded = _FIELD_BULLET.sub(lambda m: m.group(1) + ":", ln).strip()
+            folded = _PLAIN_BULLET.sub("", folded).strip()
+            current.append(folded)
+        # else: preamble before the first work — ignore.
+    _flush()
+    return blocks
 
 
 def parse_highlights(grounded_result: Dict, max_items: int = DEFAULT_HIGHLIGHTS
                      ) -> List[Dict]:
     """Parse the grounded answer text into candidate works.
 
-    Returns up to ``max_items`` dicts {name, artist, year, medium, fact,
-    _raw_line}. Deterministic; no network. An answer with no parseable item lines
-    yields []. Never fabricates — a field absent from the text is "". Citation /
-    note / boilerplate lines are rejected (not works).
+    Block-based: a work begins at a numbered marker or a bold-title line; a
+    '- Artist:/Year:/Medium:' sub-bullet is a FIELD of the current work, never its
+    own work (the live HCMC run promoted such sub-bullets to stops — fixed). The
+    first line of each block is the title (with its bilingual gloss); labelled
+    fields anywhere in the block supply artist/year/medium.
+
+    Returns up to ``max_items`` dicts {name, title_local, title_en, artist, year,
+    medium, fact, _raw_line}. Deterministic; no network. Never fabricates — a
+    field absent from the block is "". Citation / note / boilerplate / bare-label
+    lines are rejected (not works).
     """
     if not grounded_result or grounded_result.get("error"):
         return []
@@ -338,26 +410,27 @@ def parse_highlights(grounded_result: Dict, max_items: int = DEFAULT_HIGHLIGHTS
     if not text.strip():
         return []
 
-    # Split into per-item blocks on numbered/bulleted markers. The first chunk
-    # before the first marker is preamble and dropped.
-    chunks = _ITEM_SPLIT.split(text)
-    items = chunks[1:] if len(chunks) > 1 else []
-    if not items:
-        # No list markers — fall back to non-empty lines that look like entries.
-        items = [ln for ln in text.splitlines() if ln.strip()]
+    blocks = _split_into_work_blocks(text)
+    if not blocks:
+        # No list structure — fall back to non-empty lines that look like entries.
+        blocks = [ln.strip() for ln in text.splitlines() if ln.strip()]
 
     out: List[Dict] = []
     seen = set()
-    for raw in items:
-        line = " ".join(raw.strip().splitlines()).strip()
+    for line in blocks:
         if not line:
             continue
-        # Reject the whole line early when it is a source/note/boilerplate line or
-        # a bare URL — but NOT merely for markdown bold/brackets, which legitimately
-        # wrap a real title ("**The Fisherman** — Nguyen [1]").
+        # [LOCAL-669B] Strip markdown emphasis so '**Title**' / '*gloss*' do not
+        # trip the citation guard or pollute the identity token set. Keep the
+        # parenthesis structure for the bilingual splitter.
+        line = re.sub(r"\*{1,3}", "", line).strip()
+        # Reject a whole block that is a source/note/boilerplate line or a bare URL.
         if _JUNK_TITLE_PREFIX.search(line) or re.match(r"(?i)^\s*https?://", line):
             continue
-        title = _first_segment(line)
+        # The title segment is the head of the block (before ' by '/dash/':'),
+        # keeping any '(gloss)'. The folded 'Artist:/Year:' fields come after.
+        _head = _title_head(line)
+        title = _first_segment(_head) if _first_segment(_head) else _first_segment(line)
         if not title or len(_norm(title)) < 2:
             continue
         if _is_junk_title(title):
@@ -371,7 +444,7 @@ def parse_highlights(grounded_result: Dict, max_items: int = DEFAULT_HIGHLIGHTS
         # Spring Garden)"), so the identity-dedup pass can match a candidate on
         # EITHER title across languages. ``name`` stays the full first-segment
         # (unchanged display behaviour); title_local/title_en are the split pair.
-        _local, _english = _split_bilingual_title(_title_head(line))
+        _local, _english = _split_bilingual_title(_head)
         out.append({
             "name": title,
             "title_local": _local,
