@@ -231,7 +231,21 @@ def run_for_stop(matrix: Dict, stop_text: str, exhibition: str = '',
         # before.
         try:
             from story_leads import (venue_research as _pv_research,
-                                     gemini_per_venue_enabled as _pv_enabled)
+                                     gemini_per_venue_enabled as _pv_base_enabled)
+            # [LOCAL-674] The per-venue pass is on when GEMINI_PER_VENUE=1 (the
+            # LOCAL-645 flag) OR when WALKING_RESEARCH=gemini_per_venue selects it
+            # for this walking tour.
+            try:
+                from story_leads import walking_gemini_per_venue_selected as _pv_walk
+            except Exception:
+                def _pv_walk():
+                    return False
+
+            def _pv_enabled():
+                try:
+                    return bool(_pv_base_enabled()) or bool(_pv_walk())
+                except Exception:
+                    return False
         except Exception:
             _pv_research = None
             def _pv_enabled():
