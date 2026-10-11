@@ -170,6 +170,34 @@ def _validate_rating(rating):
     return rating_int
 
 
+def _compute_verified_and_creator(cur, user_id, original_id):
+    """[LOCAL-672] Best-effort (verified_flag, is_creator) for a rating write.
+
+    Delegates to tour_reviews_service for the verified rule (store-verified
+    purchase that unlocked this tour, with the D624 level-purchase fallback) and
+    the creator resolution. Imported LAZILY to avoid an import cycle (the reviews
+    service imports this module). If the reviews module or its tables are not
+    present (older deploy), verified degrades to False and is_creator to False —
+    never raising, so LOCAL-670 rating behaviour is unchanged.
+    """
+    try:
+        import tour_reviews_service as reviews_svc  # lazy: breaks the import cycle
+    except Exception:  # noqa: BLE001
+        return False, False
+    try:
+        creator = reviews_svc.resolve_tour_creator(cur, original_id)
+    except Exception:  # noqa: BLE001
+        creator = None
+    is_creator = creator is not None and str(creator) == str(user_id)
+    if is_creator:
+        return False, True
+    try:
+        verified = reviews_svc.compute_verified(cur, user_id, original_id)
+    except Exception:  # noqa: BLE001
+        verified = False
+    return bool(verified), False
+
+
 def record_rating(user_id, tour_id, rating):
     """Record (UPSERT) one user's rating of a tour.
 
@@ -177,30 +205,52 @@ def record_rating(user_id, tour_id, rating):
     constraint. Translations map to their original before writing. Returns the
     recomputed {score, count, label} plus authorisation info.
 
-    Raises ValueError if rating is not a whole number in 1..10.
+    [LOCAL-672] Also computes and stores the `verified` flag (store-verified
+    purchase that unlocked this tour; D624 level-purchase fallback) and enforces
+    the "a creator cannot rate their own tour" protection. The verified flag is
+    additive — a tour with no purchases just reads unverified, exactly as before.
+
+    Raises ValueError if rating is not a whole number in 1..10, or if the rater
+    is the tour's creator.
     """
     rating_int = _validate_rating(rating)
 
     conn = get_connection()
     try:
         cur = conn.cursor()
+        # Ensure the verified column exists before we write it (self-healing,
+        # idempotent — mirrors the reviews service and the 021 migration).
+        try:
+            cur.execute(
+                "ALTER TABLE tour_ratings "
+                "ADD COLUMN IF NOT EXISTS verified BOOLEAN NOT NULL DEFAULT FALSE"
+            )
+        except Exception:  # noqa: BLE001 — never block a rating on the DDL
+            conn.rollback()
         original_id = resolve_original_id(cur, tour_id)
         authorized = has_downloaded(cur, user_id, tour_id, original_id)
 
+        # [LOCAL-672] Protection: a creator cannot rate their own tour.
+        verified, is_creator = _compute_verified_and_creator(cur, user_id, original_id)
+        if is_creator:
+            raise ValueError("a tour's creator cannot rate their own tour")
+
         cur.execute(
             """
-            INSERT INTO tour_ratings (tour_id, user_id, rating)
-            VALUES (%s, %s, %s)
+            INSERT INTO tour_ratings (tour_id, user_id, rating, verified)
+            VALUES (%s, %s, %s, %s)
             ON CONFLICT (tour_id, user_id)
             DO UPDATE SET rating = EXCLUDED.rating,
+                          verified = EXCLUDED.verified,
                           updated_at = CURRENT_TIMESTAMP
             """,
-            (original_id, user_id, rating_int),
+            (original_id, user_id, rating_int, verified),
         )
         conn.commit()
 
         result = _get_rating_with_cursor(cur, original_id)
         result["authorized"] = authorized
+        result["verified"] = verified
         result["original_tour_id"] = original_id
         return result
     finally:
