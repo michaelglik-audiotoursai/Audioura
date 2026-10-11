@@ -420,18 +420,21 @@ _SYNC_ITEMS_DDL = """
     )
 """
 
-# Self-healing store for text reviews (LOCAL-672 lands the UI later; the outbox
-# can already carry a review today, and "nothing is lost" is the rule). One
-# review per (tour, user); a later review replaces the earlier one.
+# Self-healing store for text reviews arriving through the offline outbox
+# (LOCAL-672 lands the curated review UI later; the outbox can already carry a
+# review today, and "nothing is lost" is the rule). Deliberately a DISTINCT
+# table from any existing `tour_reviews` so we never collide with another
+# feature's schema. One review per (tour, user); a later review replaces the
+# earlier one.
 _TOUR_REVIEWS_DDL = """
-    CREATE TABLE IF NOT EXISTS tour_reviews (
+    CREATE TABLE IF NOT EXISTS tour_review_sync (
         id         SERIAL PRIMARY KEY,
         tour_id    INTEGER NOT NULL,
         user_id    VARCHAR(255) NOT NULL,
         review     TEXT NOT NULL,
         created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-        CONSTRAINT uq_tour_reviews_tour_user UNIQUE (tour_id, user_id)
+        CONSTRAINT uq_tour_review_sync_tour_user UNIQUE (tour_id, user_id)
     )
 """
 
@@ -596,7 +599,7 @@ def _apply_sync_item(cur, item, batch_user_id):
             return "invalid"
         cur.execute(
             """
-            INSERT INTO tour_reviews (tour_id, user_id, review)
+            INSERT INTO tour_review_sync (tour_id, user_id, review)
             VALUES (%s, %s, %s)
             ON CONFLICT (tour_id, user_id)
             DO UPDATE SET review = EXCLUDED.review,

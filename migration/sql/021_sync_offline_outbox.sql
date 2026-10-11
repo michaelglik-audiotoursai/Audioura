@@ -12,11 +12,14 @@
 --     no-op that reports "duplicate". This is what makes per-stop THUMBS
 --     idempotent too, since user_stop_feedback has no natural unique key.
 --
---   * tour_reviews — the text review store (LOCAL-672 lands the UI later; the
+--   * tour_review_sync — the raw text-review store for reviews arriving through
+--     the offline outbox (LOCAL-672 lands the curated review UI later; the
 --     outbox can already carry a review today and "nothing is lost" is the
---     rule). One review per (tour, user); a later review replaces the earlier
---     one, exactly like tour_ratings. tour_id is always an ORIGINAL
---     audio_tours.id (translations map to their source before writing).
+--     rule). DELIBERATELY a distinct table from any existing `tour_reviews` so
+--     this never collides with another feature's schema. One review per (tour,
+--     user); a later review replaces the earlier one, like tour_ratings.
+--     tour_id is always an ORIGINAL audio_tours.id (translations map to their
+--     source before writing).
 --
 -- Purely additive: no DROP, no DELETE, no change to any existing table. CREATE
 -- TABLE IF NOT EXISTS is idempotent, and tour_rating_service's own self-healing
@@ -32,14 +35,14 @@ CREATE TABLE IF NOT EXISTS sync_items (
     processed_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE TABLE IF NOT EXISTS tour_reviews (
+CREATE TABLE IF NOT EXISTS tour_review_sync (
     id         SERIAL PRIMARY KEY,
     tour_id    INTEGER NOT NULL,              -- references audio_tours.id (an ORIGINAL)
     user_id    VARCHAR(255) NOT NULL,         -- references users.secret_id
     review     TEXT NOT NULL,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT uq_tour_reviews_tour_user UNIQUE (tour_id, user_id)
+    CONSTRAINT uq_tour_review_sync_tour_user UNIQUE (tour_id, user_id)
 );
 
 COMMIT;

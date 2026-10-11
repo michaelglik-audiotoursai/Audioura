@@ -451,6 +451,14 @@ class OutboxService {
     _retryTimer?.cancel();
     _retryTimer = null;
   }
+
+  /// Testing hook: the batch order (listens before the ratings that depend on
+  /// them). Mirrors exactly what [flush] sends.
+  List<OutboxItem> orderedForTest(List<OutboxItem> items) => _ordered(items);
+
+  /// Testing hook: drop items older than [maxItemAge], as [flush] does.
+  List<OutboxItem> dropExpiredForTest(List<OutboxItem> items) =>
+      _dropExpired(items);
 }
 
 enum _ItemVerdict { accepted, invalid, retry }
