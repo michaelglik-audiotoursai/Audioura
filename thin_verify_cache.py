@@ -44,8 +44,15 @@ def _fold(s: str) -> str:
     return "".join(c for c in nfkd if not unicodedata.combining(c)).strip()
 
 
+# [LEAD 2026-10-11] v2: entries written before LOCAL-669B lack the English title of each work,
+# so the LOCAL-669C final identity gate could not bridge "Vườn xuân Trung Nam Bắc" to
+# "North Central South Spring Garden" (HCMC tours 672/673 shipped it twice). Bumping the key
+# version retires those entries without deleting any row.
+_CACHE_SCHEMA = "v2"
+
+
 def cache_key(venue: str, city: str) -> str:
-    return f"{_fold(venue)}|{_fold(city)}"
+    return f"{_CACHE_SCHEMA}|{_fold(venue)}|{_fold(city)}"
 
 
 class VerificationBudget:
