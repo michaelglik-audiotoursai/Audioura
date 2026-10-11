@@ -75,7 +75,8 @@ def get_tour_by_code(code):
                    t.number_requested, t.language, t.original_tour_id,
                    v.max_version_no, v.last_replaced_at, t.created_at,
                    {_source_version_select(cur)} AS source_version,
-                   sv.max_version_no AS source_max_version_no
+                   sv.max_version_no AS source_max_version_no,
+                   {_ratings_select(cur)}
             FROM audio_tours t
             LEFT JOIN (
                 SELECT tour_id,
@@ -90,6 +91,7 @@ def get_tour_by_code(code):
                 FROM audio_tour_versions
                 GROUP BY tour_id
             ) sv ON sv.tour_id = t.original_tour_id
+            {_ratings_join(cur)}
             WHERE t.id = %s
         """, (row[0], row[0]))
         t = cur.fetchone()
@@ -100,7 +102,7 @@ def get_tour_by_code(code):
 
         (tour_id, tour_name, request_string, tour_lat, tour_lng, requests,
          language, original_id, max_vn, last_replaced, created_at,
-         source_version, source_max_vn) = t
+         source_version, source_max_vn, rating_count, rating_values) = t
         # [LOCAL-666] A share code can point at a translation row (original_tour_id
         # set, e.g. Russian 615 of 557) as well as an original. For a translation we
         # report the SOURCE tour's version (its pinned source_version, else the
@@ -110,6 +112,7 @@ def get_tour_by_code(code):
         # Originals are unchanged.
         version, updated_at = _resolved_version_fields(
             original_id, source_version, source_max_vn, max_vn, last_replaced, created_at)
+        rating = compute_rating(rating_values)
         # Same keys as a /tours-near element. distance_km is None, not 0: the listener
         # is not near it, and 0 would sort it to the top under false pretences.
         return jsonify({
@@ -127,6 +130,9 @@ def get_tour_by_code(code):
                 'via_share_code': code,
                 'version': version,
                 'updated_at': updated_at,
+                'rating_score': rating['score'],
+                'rating_count': rating['count'],
+                'rating_label': rating['label'],
             }],
             'count': 1,
         })
@@ -257,6 +263,111 @@ def _source_version_select(cur):
     return "t.source_version" if _has_source_version_column(cur) else "NULL::integer"
 
 
+# ─── Tour rating (LOCAL-670) ──────────────────────────────────────────────────
+# The per-TOUR 1..10 rating is OWNED by the orchestrator's tour_rating_service
+# (POST/GET /tour/<id>/rating). map-delivery only READS it so the home list and
+# tour dialogs can show the badge and the home filter can pass min_rating. The
+# score rule below is a deliberate, self-contained copy of that service's rule
+# (D647) — this directory deploys as its own image and cannot import the root
+# module. Keep the two in lock-step; they are both unit-tested against the brief.
+#
+#   0 ratings   → 7.5, label "New"
+#   1..3        → average of (7.5 + the real ratings), 1 dp (half-up)
+#   >= 4        → median of the real ratings only, 1 dp (half-up)
+RATING_DEFAULT_SCORE = 7.5
+RATING_MEDIAN_SWITCH_COUNT = 4
+
+
+def _rating_round_1dp(value):
+    """One decimal place, half-up (8.25 → 8.3), without importing Decimal cost
+    per row: do the half-up by hand on a scaled integer."""
+    return math.floor(value * 10 + 0.5) / 10.0
+
+
+def _rating_median(values):
+    s = sorted(values)
+    n = len(s)
+    mid = n // 2
+    if n % 2 == 1:
+        return float(s[mid])
+    return (float(s[mid - 1]) + float(s[mid])) / 2.0
+
+
+def compute_rating(ratings):
+    """{score, count, label} from a list of REAL ratings (may be empty).
+
+    Identical rule to tour_rating_service.compute_score (LOCAL-670 / D647)."""
+    ratings = [int(r) for r in (ratings or []) if r is not None]
+    count = len(ratings)
+    if count == 0:
+        return {"score": RATING_DEFAULT_SCORE, "count": 0, "label": "New"}
+    if count < RATING_MEDIAN_SWITCH_COUNT:
+        blended = [RATING_DEFAULT_SCORE] + [float(r) for r in ratings]
+        score = _rating_round_1dp(sum(blended) / len(blended))
+    else:
+        score = _rating_round_1dp(_rating_median(ratings))
+    label = f"{count} rating" if count == 1 else f"{count} ratings"
+    return {"score": score, "count": count, "label": label}
+
+
+# One grouped pass over tour_ratings — NOT one query per tour. Keyed on the
+# ORIGINAL tour id, so a translation (original_tour_id set) inherits its source
+# tour's ratings when the caller joins on COALESCE(t.original_tour_id, t.id).
+_RATINGS_AGG_SUBQUERY = """
+    LEFT JOIN (
+        SELECT tour_id,
+               COUNT(*)            AS rating_count,
+               ARRAY_AGG(rating)   AS rating_values
+        FROM tour_ratings
+        GROUP BY tour_id
+    ) r ON r.tour_id = COALESCE(t.original_tour_id, t.id)
+"""
+
+_HAS_TOUR_RATINGS = None
+
+
+def _has_tour_ratings_table(cur):
+    """True if the tour_ratings table exists. Probed once per process and cached.
+    When absent (schema predates LOCAL-670) every tour reads as 0 ratings → the
+    default 7.5 "New" — never a 500."""
+    global _HAS_TOUR_RATINGS
+    if _HAS_TOUR_RATINGS is None:
+        try:
+            cur.execute("""
+                SELECT 1 FROM information_schema.tables
+                WHERE table_name = 'tour_ratings'
+            """)
+            _HAS_TOUR_RATINGS = cur.fetchone() is not None
+        except Exception:
+            _HAS_TOUR_RATINGS = False
+    return _HAS_TOUR_RATINGS
+
+
+def _parse_min_rating(args):
+    """Parse the optional ?min_rating=<float> query param. Returns a float or
+    None (absent/blank/invalid → no filter)."""
+    raw = (args.get('min_rating') or '').strip()
+    if not raw:
+        return None
+    try:
+        return float(raw)
+    except (TypeError, ValueError):
+        return None
+
+
+def _ratings_select(cur):
+    """SQL fragment selecting (rating_count, rating_values) or NULL literals on
+    an older schema with no tour_ratings table."""
+    if _has_tour_ratings_table(cur):
+        return "r.rating_count, r.rating_values"
+    return "NULL::bigint AS rating_count, NULL::smallint[] AS rating_values"
+
+
+def _ratings_join(cur):
+    """The grouped LEFT JOIN over tour_ratings, or empty string on older schema."""
+    return _RATINGS_AGG_SUBQUERY if _has_tour_ratings_table(cur) else ""
+
+
 def calculate_distance(lat1, lng1, lat2, lng2):
     """Calculate distance between two points in kilometers"""
     R = 6371
@@ -304,12 +415,16 @@ def get_tours_near_location(lat, lng):
         # shared _resolved_version_fields helper works uniformly; this list is
         # originals-only (original_tour_id IS NULL) so they are inert here, but keep
         # the shape identical to the other endpoints that DO surface translations.
+        # [LOCAL-670] Optional server-side rating filter (home page: Any/7+/8+/9+).
+        min_rating = _parse_min_rating(request.args)
+
         cur.execute(f"""
             SELECT t.id, t.tour_name, t.request_string, t.lat, t.lng,
                    t.number_requested, t.content_language, t.original_tour_id,
                    v.max_version_no, v.last_replaced_at, t.created_at,
                    {_source_version_select(cur)} AS source_version,
-                   sv.max_version_no AS source_max_version_no
+                   sv.max_version_no AS source_max_version_no,
+                   {_ratings_select(cur)}
             FROM audio_tours t
             LEFT JOIN (
                 SELECT tour_id,
@@ -323,6 +438,7 @@ def get_tours_near_location(lat, lng):
                 FROM audio_tour_versions
                 GROUP BY tour_id
             ) sv ON sv.tour_id = t.original_tour_id
+            {_ratings_join(cur)}
             WHERE t.lat IS NOT NULL AND t.lng IS NOT NULL
             AND (t.content_language = 'en' OR t.content_language IS NULL)
             AND t.original_tour_id IS NULL
@@ -335,7 +451,7 @@ def get_tours_near_location(lat, lng):
         for tour in tours:
             (tour_id, tour_name, request_string, tour_lat, tour_lng, requests,
              language, original_id, max_vn, last_replaced, created_at,
-             source_version, source_max_vn) = tour
+             source_version, source_max_vn, rating_count, rating_values) = tour
             
             if tour_lat and tour_lng:
                 distance = calculate_distance(lat, lng, tour_lat, tour_lng)
@@ -344,6 +460,10 @@ def get_tours_near_location(lat, lng):
                     version, updated_at = _resolved_version_fields(
                         original_id, source_version, source_max_vn,
                         max_vn, last_replaced, created_at)
+                    rating = compute_rating(rating_values)
+                    # Server-side min_rating filter: skip tours below the bar.
+                    if min_rating is not None and rating['score'] < min_rating:
+                        continue
                     tour_data = {
                         'id': tour_id,
                         'name': tour_name,
@@ -356,7 +476,10 @@ def get_tours_near_location(lat, lng):
                         'language': language or 'en',
                         'original_tour_id': original_id,
                         'version': version,
-                        'updated_at': updated_at
+                        'updated_at': updated_at,
+                        'rating_score': rating['score'],
+                        'rating_count': rating['count'],
+                        'rating_label': rating['label'],
                     }
                     tours_list.append(tour_data)
         
@@ -474,7 +597,8 @@ def get_tour_info(tour_id):
                    t.number_requested, t.content_language, t.original_tour_id,
                    v.max_version_no, v.last_replaced_at, t.created_at,
                    {_source_version_select(cur)} AS source_version,
-                   sv.max_version_no AS source_max_version_no
+                   sv.max_version_no AS source_max_version_no,
+                   {_ratings_select(cur)}
             FROM audio_tours t
             LEFT JOIN (
                 SELECT tour_id, MAX(version_no) AS max_version_no, MAX(replaced_at) AS last_replaced_at
@@ -484,6 +608,7 @@ def get_tour_info(tour_id):
                 SELECT tour_id, MAX(version_no) AS max_version_no
                 FROM audio_tour_versions GROUP BY tour_id
             ) sv ON sv.tour_id = t.original_tour_id
+            {_ratings_join(cur)}
             WHERE t.id = %s
         """, (tour_id,))
         
@@ -495,13 +620,15 @@ def get_tour_info(tour_id):
             return jsonify({'error': 'Tour not found'}), 404
         
         (tour_id, tour_name, request_string, lat, lng, requests, language, original_id,
-         max_vn, last_replaced, created_at, source_version, source_max_vn) = result
+         max_vn, last_replaced, created_at, source_version, source_max_vn,
+         rating_count, rating_values) = result
         cur.close()
         conn.close()
         
         is_translation = original_id is not None and (language and language != 'en')
         version, updated_at = _resolved_version_fields(
             original_id, source_version, source_max_vn, max_vn, last_replaced, created_at)
+        rating = compute_rating(rating_values)
         
         return jsonify({
             'id': tour_id,
@@ -515,7 +642,10 @@ def get_tour_info(tour_id):
             'is_translation': is_translation,
             'parent_tour_id': original_id,
             'version': version,
-            'updated_at': updated_at
+            'updated_at': updated_at,
+            'rating_score': rating['score'],
+            'rating_count': rating['count'],
+            'rating_label': rating['label'],
         })
         
     except Exception as e:
@@ -540,18 +670,23 @@ def search_tours():
         # Use ILIKE for case-insensitive pattern matching
         # Convert regex pattern back to SQL LIKE pattern
         sql_pattern = pattern.replace('.*', '%')
+        # [LOCAL-670] Optional server-side rating filter.
+        min_rating = _parse_min_rating(request.args)
         
         # [LOCAL-657, LEAD] Search results open the same tour dialogs, so they carry
         # the version label fields too (one grouped LEFT JOIN, as in /tours-near).
         # [LOCAL-666] Search surfaces translations (no original_tour_id IS NULL filter),
         # so a translation must show its SOURCE version, not v1. Join the versions
         # aggregate on the source id as well and resolve via _resolved_version_fields.
+        # [LOCAL-670] Rating aggregate joined on COALESCE(original_tour_id, id) so a
+        # translation inherits its source tour's rating too.
         cur.execute(f"""
             SELECT t.id, t.tour_name, t.request_string, t.lat, t.lng, t.number_requested,
                    t.content_language, t.original_tour_id,
                    v.max_version_no, v.last_replaced_at, t.created_at,
                    {_source_version_select(cur)} AS source_version,
-                   sv.max_version_no AS source_max_version_no
+                   sv.max_version_no AS source_max_version_no,
+                   {_ratings_select(cur)}
             FROM audio_tours t
             LEFT JOIN (
                 SELECT tour_id, MAX(version_no) AS max_version_no, MAX(replaced_at) AS last_replaced_at
@@ -561,6 +696,7 @@ def search_tours():
                 SELECT tour_id, MAX(version_no) AS max_version_no
                 FROM audio_tour_versions GROUP BY tour_id
             ) sv ON sv.tour_id = t.original_tour_id
+            {_ratings_join(cur)}
             WHERE (t.tour_name ILIKE %s OR t.request_string ILIKE %s)
             AND t.lat IS NOT NULL AND t.lng IS NOT NULL
             AND (t.is_test IS NOT TRUE)
@@ -573,9 +709,14 @@ def search_tours():
         
         for tour in tours:
             (tour_id, tour_name, request_string, tour_lat, tour_lng, requests, language, original_id,
-             max_vn, last_replaced, created_at, source_version, source_max_vn) = tour
+             max_vn, last_replaced, created_at, source_version, source_max_vn,
+             rating_count, rating_values) = tour
             version, updated_at = _resolved_version_fields(
                 original_id, source_version, source_max_vn, max_vn, last_replaced, created_at)
+            rating = compute_rating(rating_values)
+            # Server-side min_rating filter.
+            if min_rating is not None and rating['score'] < min_rating:
+                continue
             
             if tour_lat and tour_lng:
                 distance = calculate_distance(lat, lng, tour_lat, tour_lng)
@@ -595,6 +736,9 @@ def search_tours():
                     'parent_tour_id': original_id,
                     'version': version,
                     'updated_at': updated_at,
+                    'rating_score': rating['score'],
+                    'rating_count': rating['count'],
+                    'rating_label': rating['label'],
                 })
         
         # Sort by popularity first, then by distance
