@@ -15448,6 +15448,24 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
                         _deliverable, _reserve_pois, total_stops, title_key='name')
                     _added = len(_reconciled) - len(_deliverable)
                     if _added > 0:
+                        # [LEAD 2026-10-11] The backfill runs AFTER the LOCAL-669C final
+                        # identity gate, so it must apply the same identity rule: HCMC
+                        # 675 re-added "Central South and North Spring Garden" (a word-order
+                        # twin of Stop 1) from the reserve.
+                        try:
+                            import identity_dedup as _rb_idd
+                            _rb_res = _rb_idd.final_identity_gate(
+                                _reconciled, needed_stops=total_stops,
+                                qid_to_labels=locals().get('_d1v2_qid_to_labels'),
+                                evidence_log=locals().get('_d1_evidence_log'),
+                                reserve_pool=_reserve_pois)
+                            for _rb_line in _rb_res.decision_log:
+                                print(f"  [LOCAL-632 backfill] {_rb_line}")
+                            _reconciled = _rb_res.poi_list
+                            _added = len(_reconciled) - len(_deliverable)
+                        except Exception as _rb_err:
+                            print(f"  [LOCAL-632 backfill] identity check skipped ({_rb_err})")
+                    if _added > 0:
                         # Renumber the backfilled POIs so stop_number stays 1..k.
                         poi_list = _reconciled
                         for _ri, _rp in enumerate(poi_list):
