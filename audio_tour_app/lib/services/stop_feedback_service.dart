@@ -1,29 +1,28 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
-import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
-import '../config/endpoints.dart';
+import 'outbox_service.dart';
 import '../screens/debug_log_viewer_screen.dart';
 
-/// Offline-first stop feedback (swipe) service.
+/// Offline-first per-STOP thumbs (swipe) service.
 ///
-/// Queues swipes locally and flushes them to the backend when connectivity
-/// allows. Never blocks playback. Supports undo of the most recent swipe.
+/// LOCAL-670C: these per-stop thumbs used to live in their own queue and POST
+/// to `/user/<id>/stop-feedback`, which failed offline (Michael: "today's
+/// stop-feedback already fails offline. Move it into the outbox too."). They
+/// now go through the single [OutboxService] as `thumb` items, so they share
+/// the one durable queue, the connectivity/lifecycle sync triggers, the
+/// exponential backoff and the 90-day expiry — and reach the server batched via
+/// `POST /sync` when a connection returns.
 ///
-/// Backend endpoint (LOCAL-101):
-///   POST /user/<user_id>/stop-feedback
-///   Body: { stop_index, swipe, class_details, class_historic, class_social, i_con, tour_id?, job_id? }
+/// D650 (Michael): a per-stop thumb is an INTERNAL signal — personalization and
+/// stop-quality only, NEVER part of the tour's 1–10 score. The server keeps it
+/// out of the tour score; this client only records the signal.
 ///
-/// The class distributions come from stop_metrics.json in the tour directory
-/// (if available) or default to neutral values (0.33, 0.33, 0.33, i_con=3.0).
+/// The public surface (recordSwipe/undoLastSwipe/queueLength/getPendingQueue/
+/// flush/loadStopMetrics) is unchanged so [SwipeFeedbackWidget] and existing
+/// callers keep working; only the storage/transport moved under the hood.
 class StopFeedbackService {
-  static const _queueKey = 'swipe_feedback_queue';
-  static const _retryDelaySeconds = 30;
-  static const _maxRetries = 10;
-
-  Timer? _flushTimer;
-  bool _flushing = false;
   bool _testMode = false;
 
   /// Singleton instance
@@ -31,18 +30,16 @@ class StopFeedbackService {
   factory StopFeedbackService() => _instance;
   StopFeedbackService._();
 
-  /// Enable test mode (disables automatic network flush and retry timers).
-  /// Call this in test setUp() to prevent timer leaks.
+  /// Enable test mode (disables automatic network flush on the shared outbox).
   static void enableTestMode() {
     _instance._testMode = true;
-    _instance._flushTimer?.cancel();
-    _instance._flushTimer = null;
+    OutboxService.instance.enableTestMode();
   }
 
   /// Record a swipe (like=+1, dislike=-1) for a stop.
   ///
-  /// Writes to the local queue immediately (optimistic). Triggers an async
-  /// flush attempt. Never throws — failures are retried later.
+  /// Enqueues a `thumb` item in the shared outbox immediately (optimistic,
+  /// durable). The outbox owns the flush. Never throws.
   Future<void> recordSwipe({
     required int stopIndex,
     required int swipe,
@@ -55,98 +52,78 @@ class StopFeedbackService {
     final prefs = await SharedPreferences.getInstance();
     final userId = prefs.getString('user_id') ?? 'unknown';
 
-    // Resolve class distributions from stopMetrics or use neutral defaults
+    // Resolve class distributions from stopMetrics or use neutral defaults.
     final classDetails = stopMetrics?['class_details'] ?? 0.333;
     final classHistoric = stopMetrics?['class_historic'] ?? 0.333;
     final classSocial = stopMetrics?['class_social'] ?? 0.333;
     final iCon = stopMetrics?['i_con'] ?? 3.0;
 
-    final entry = {
-      'user_id': userId,
-      'tour_id': tourId,
-      'job_id': jobId,
-      'stop_index': stopIndex,
-      'swipe': swipe,
-      'class_details': classDetails,
-      'class_historic': classHistoric,
-      'class_social': classSocial,
-      'i_con': iCon,
-      'created_at': DateTime.now().toIso8601String(),
-      'retries': 0,
-    };
-
-    await _enqueue(entry);
-    await DebugLogHelper.addDebugLog(
-      'SWIPE: Queued ${swipe == 1 ? "LIKE" : "DISLIKE"} for stop $stopIndex '
-      '(tour=$tourId, d=${classDetails.toStringAsFixed(2)}, '
-      'h=${classHistoric.toStringAsFixed(2)}, s=${classSocial.toStringAsFixed(2)}, '
-      'i_con=${iCon.toStringAsFixed(1)})',
+    await OutboxService.instance.enqueueThumb(
+      userId: userId,
+      tourId: tourId,
+      stopIndex: stopIndex,
+      swipe: swipe,
+      extra: {
+        if (jobId != null) 'job_id': jobId,
+        'class_details': classDetails,
+        'class_historic': classHistoric,
+        'class_social': classSocial,
+        'i_con': iCon,
+      },
     );
 
-    // Attempt immediate flush (fire-and-forget) — skip in test mode
-    if (!_testMode) {
-      unawaited(_tryFlush());
-    }
+    await DebugLogHelper.addDebugLog(
+      'SWIPE: Queued ${swipe == 1 ? "LIKE" : "DISLIKE"} for stop $stopIndex '
+      '(tour=$tourId) → outbox',
+    );
   }
 
-  /// Undo the most recent swipe for a given tour+stop.
+  /// Undo the most recent still-unsent swipe for a given tour+stop.
   ///
-  /// Removes the entry from the local queue if it hasn't been sent yet.
-  /// If already sent, records an opposite swipe to neutralize it.
-  /// Returns true if an undo was performed.
+  /// Removes the matching `thumb` item from the outbox if it hasn't been sent
+  /// yet. Returns true if an undo was performed.
   Future<bool> undoLastSwipe({
     required int stopIndex,
     required String tourId,
   }) async {
-    final queue = await _getQueue();
-
-    // Find the most recent entry for this tour+stop (search from end)
-    int? matchIndex;
-    for (int i = queue.length - 1; i >= 0; i--) {
-      final entry = queue[i];
-      if (entry['tour_id'] == tourId && entry['stop_index'] == stopIndex) {
-        matchIndex = i;
-        break;
-      }
-    }
-
-    if (matchIndex == null) {
-      // Already sent — record opposite swipe to neutralize
-      await DebugLogHelper.addDebugLog(
-        'SWIPE: Undo for stop $stopIndex — already flushed, queueing reversal',
-      );
-      return false;
-    }
-
-    // Remove from queue (hasn't been sent yet)
-    queue.removeAt(matchIndex);
-    await _saveQueue(queue);
+    final removed = await _removeMatchingThumb(stopIndex: stopIndex, tourId: tourId);
     await DebugLogHelper.addDebugLog(
-      'SWIPE: Undo for stop $stopIndex — removed from queue (not yet sent)',
+      removed
+          ? 'SWIPE: Undo for stop $stopIndex — removed from outbox (not yet sent)'
+          : 'SWIPE: Undo for stop $stopIndex — already flushed, nothing to remove',
     );
-    return true;
+    return removed;
   }
 
-  /// Get the current queue length (for diagnostics / testing).
+  /// Current count of pending thumbs in the outbox (diagnostics / testing).
   Future<int> get queueLength async {
-    final queue = await _getQueue();
-    return queue.length;
+    final items = await OutboxService.instance.pendingItems();
+    return items.where((i) => i.type == 'thumb').length;
   }
 
-  /// Get the pending queue entries (for testing / diagnostics).
+  /// Pending thumbs as flat maps shaped like the legacy queue entries
+  /// (stop_index/swipe/tour_id/…), for diagnostics / testing.
   Future<List<Map<String, dynamic>>> getPendingQueue() async {
-    return await _getQueue();
+    final items = await OutboxService.instance.pendingItems();
+    return items
+        .where((i) => i.type == 'thumb')
+        .map((i) => {
+              'client_uuid': i.clientUuid,
+              'created_at': i.createdAt,
+              ...i.payload,
+            })
+        .toList();
   }
 
-  /// Force a flush attempt. Useful for testing or when connectivity is restored.
+  /// Force a flush of the shared outbox.
   Future<void> flush() async {
-    await _tryFlush();
+    if (_testMode) return;
+    await OutboxService.instance.flush();
   }
 
   /// Load stop metrics from the tour's local directory.
   ///
   /// Looks for `stop_metrics.json` in the tour path. Returns null if not found.
-  /// Format: { "stops": [ { "stop_index": 0, "class_details": 0.3, ... }, ... ] }
   static Future<Map<int, Map<String, double>>?> loadStopMetrics(String tourPath) async {
     try {
       final metricsFile = File('$tourPath/stop_metrics.json');
@@ -174,125 +151,38 @@ class StopFeedbackService {
     }
   }
 
+  /// No-op kept for API compatibility (the shared outbox owns its own timers).
+  void dispose() {}
+
   // ─── Private ───────────────────────────────────────────────────────────────
 
-  Future<void> _enqueue(Map<String, dynamic> entry) async {
-    final queue = await _getQueue();
-    queue.add(entry);
-    await _saveQueue(queue);
-  }
-
-  Future<List<Map<String, dynamic>>> _getQueue() async {
+  /// Remove the most-recent still-pending thumb for (tour, stop) from the
+  /// outbox storage directly. Returns true if one was removed.
+  Future<bool> _removeMatchingThumb({
+    required int stopIndex,
+    required String tourId,
+  }) async {
     final prefs = await SharedPreferences.getInstance();
-    final raw = prefs.getString(_queueKey);
-    if (raw == null || raw.isEmpty) return [];
+    final raw = prefs.getString('outbox_v1');
+    if (raw == null || raw.isEmpty) return false;
+    List<dynamic> list;
     try {
-      final list = jsonDecode(raw) as List<dynamic>;
-      return list.cast<Map<String, dynamic>>();
+      list = jsonDecode(raw) as List<dynamic>;
     } catch (_) {
-      return [];
+      return false;
     }
-  }
-
-  Future<void> _saveQueue(List<Map<String, dynamic>> queue) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_queueKey, jsonEncode(queue));
-  }
-
-  Future<void> _tryFlush() async {
-    if (_flushing) return; // Re-entry guard
-    _flushing = true;
-
-    try {
-      final queue = await _getQueue();
-      if (queue.isEmpty) return;
-
-      final remaining = <Map<String, dynamic>>[];
-
-      for (final entry in queue) {
-        final success = await _sendToServer(entry);
-        if (!success) {
-          final retries = (entry['retries'] as int? ?? 0) + 1;
-          if (retries < _maxRetries) {
-            entry['retries'] = retries;
-            remaining.add(entry);
-          } else {
-            await DebugLogHelper.addDebugLog(
-              'SWIPE: Dropping entry after $_maxRetries retries: '
-              'stop=${entry['stop_index']} tour=${entry['tour_id']}',
-            );
-          }
-        }
-      }
-
-      await _saveQueue(remaining);
-
-      // Schedule retry if there are remaining entries
-      if (remaining.isNotEmpty) {
-        _scheduleRetry();
-      }
-    } finally {
-      _flushing = false;
-    }
-  }
-
-  Future<bool> _sendToServer(Map<String, dynamic> entry) async {
-    try {
-      final userId = entry['user_id'] as String;
-      final body = {
-        'stop_index': entry['stop_index'],
-        'swipe': entry['swipe'],
-        'class_details': entry['class_details'],
-        'class_historic': entry['class_historic'],
-        'class_social': entry['class_social'],
-        'i_con': entry['i_con'],
-      };
-      if (entry['tour_id'] != null) body['tour_id'] = entry['tour_id'];
-      if (entry['job_id'] != null) body['job_id'] = entry['job_id'];
-
-      final response = await Endpoints.post(
-        Service.orchestrator,
-        '/user/$userId/stop-feedback',
-        body: body,
-        timeout: const Duration(seconds: 10),
-      );
-
-      if (response.statusCode == 200) {
-        await DebugLogHelper.addDebugLog(
-          'SWIPE: Sent ${entry['swipe'] == 1 ? "LIKE" : "DISLIKE"} '
-          'for stop ${entry['stop_index']} → server OK',
-        );
+    for (int i = list.length - 1; i >= 0; i--) {
+      final item = list[i];
+      if (item is Map &&
+          item['type'] == 'thumb' &&
+          item['payload'] is Map &&
+          item['payload']['tour_id'] == tourId &&
+          item['payload']['stop_index'] == stopIndex) {
+        list.removeAt(i);
+        await prefs.setString('outbox_v1', jsonEncode(list));
         return true;
-      } else {
-        await DebugLogHelper.addDebugLog(
-          'SWIPE: Server returned ${response.statusCode} for stop ${entry['stop_index']}',
-        );
-        return false;
       }
-    } on SocketException catch (_) {
-      // Network unreachable — expected underground/abroad
-      return false;
-    } on TimeoutException catch (_) {
-      return false;
-    } on http.ClientException catch (_) {
-      return false;
-    } catch (e) {
-      await DebugLogHelper.addDebugLog('SWIPE: Unexpected error sending feedback: $e');
-      return false;
     }
-  }
-
-  void _scheduleRetry() {
-    _flushTimer?.cancel();
-    _flushTimer = Timer(
-      const Duration(seconds: _retryDelaySeconds),
-      () => unawaited(_tryFlush()),
-    );
-  }
-
-  /// Dispose timers. Call when the app is shutting down.
-  void dispose() {
-    _flushTimer?.cancel();
-    _flushTimer = null;
+    return false;
   }
 }

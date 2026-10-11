@@ -11,6 +11,7 @@ import '../services/webview_console_logger.dart';
 import '../widgets/share_tour_sheet.dart';
 import '../widgets/rate_tour_dialog.dart';
 import '../services/tour_listen_service.dart';
+import '../services/playback_accumulator.dart';
 
 class TourPlayerScreen extends StatefulWidget {
   final String tourPath;
@@ -49,6 +50,13 @@ class _TourPlayerScreenState extends State<TourPlayerScreen> with VoiceMethods {
   // [LOCAL-670B] Total stops in the tour, reported by the WebView, used to
   // compute the listened-stops threshold (a short tour needs all its stops).
   int? _totalStops;
+
+  // [LOCAL-670C] One playback-time accumulator per stop index. Fed raw
+  // play/pause/seek/rate/tick/ended events from the WebView; verifies "listened"
+  // from genuinely played time so a scrub never fakes it. A stop that has
+  // already been recorded listened is dropped from the map so we stop counting.
+  final Map<int, PlaybackAccumulator> _accumulators = {};
+  final Set<int> _listenedRecorded = {};
 
   // LOCAL-483: forward the tour player WebView's JS console into the debug log.
   final WebViewConsoleLogger _consoleLogger =
@@ -202,21 +210,15 @@ class _TourPlayerScreenState extends State<TourPlayerScreen> with VoiceMethods {
                           _maybePromptEndOfTourRating();
                         },
                       );
-                      // [LOCAL-670B] Fired when a stop's audio reaches >= 80% or
-                      // ends. We mark that stop LISTENED (locally + server POST)
-                      // so the per-TOUR rating unlocks once 2 distinct stops are
-                      // heard. args: [stopIndex].
+                      // [LOCAL-670C] Raw playback events from the WebView, fed
+                      // into a per-stop PlaybackAccumulator so "listened" is
+                      // verified from ACTUAL played time (a scrub to 85% does
+                      // NOT count). args: [stopIndex, kind, currentTime,
+                      // duration, rate]. kind ∈ play|pause|seek|rate|tick|ended.
                       controller.addJavaScriptHandler(
-                        handlerName: 'onStopListened',
+                        handlerName: 'onPlaybackEvent',
                         callback: (args) {
-                          final idx = args.isNotEmpty
-                              ? (args[0] is int
-                                  ? args[0]
-                                  : int.tryParse('${args[0]}') ?? -1)
-                              : -1;
-                          if (idx >= 0) {
-                            unawaited(_recordStopListened(idx));
-                          }
+                          _onPlaybackEvent(args);
                         },
                       );
                     },
@@ -292,23 +294,26 @@ class _TourPlayerScreenState extends State<TourPlayerScreen> with VoiceMethods {
                               // crosses 80% of its duration or ends. Fire the
                               // handler at most once per stop per load (guarded
                               // by a data flag) so we don't spam the bridge.
-                              function markListened() {
-                                if (audio.getAttribute('data-listened') === '1') return;
-                                audio.setAttribute('data-listened', '1');
-                                if (window.flutter_inappwebview) {
-                                  window.flutter_inappwebview.callHandler('onStopListened', idx);
-                                }
-                              }
-                              audio.addEventListener('timeupdate', function() {
+                              // [LOCAL-670C] Emit RAW playback events; the Dart
+                              // PlaybackAccumulator decides "listened" from the
+                              // real played time, so a scrub to 85% adds nothing.
+                              function emit(kind) {
+                                if (!window.flutter_inappwebview) return;
                                 var d = audio.duration;
-                                if (d && isFinite(d) && d > 0 &&
-                                    (audio.currentTime / d) >= 0.8) {
-                                  markListened();
-                                }
-                              });
-                              audio.addEventListener('ended', function() {
-                                markListened();
-                              });
+                                window.flutter_inappwebview.callHandler(
+                                  'onPlaybackEvent', idx, kind,
+                                  audio.currentTime || 0,
+                                  (d && isFinite(d)) ? d : 0,
+                                  audio.playbackRate || 1.0
+                                );
+                              }
+                              audio.addEventListener('play', function() { emit('play'); });
+                              audio.addEventListener('pause', function() { emit('pause'); });
+                              audio.addEventListener('seeking', function() { emit('seek'); });
+                              audio.addEventListener('seeked', function() { emit('seek'); });
+                              audio.addEventListener('ratechange', function() { emit('rate'); });
+                              audio.addEventListener('timeupdate', function() { emit('tick'); });
+                              audio.addEventListener('ended', function() { emit('ended'); });
                               // [LOCAL-670] When the LAST stop's audio ends, the tour
                               // is over — tell Flutter to offer the rating prompt.
                               if (idx === totalStops - 1) {
@@ -400,11 +405,61 @@ class _TourPlayerScreenState extends State<TourPlayerScreen> with VoiceMethods {
     return segments.isNotEmpty ? segments.last : 'unknown';
   }
 
-  /// [LOCAL-670B] Record that a stop was heard to >= 80% or the end. Stored
-  /// locally per (tour, stop) and POSTed to the server (idempotent), so the
-  /// per-TOUR rating unlocks once 2 distinct stops are heard. The listened key
-  /// is the numeric tour id when we have one (what the server gate keys on),
-  /// else the local path-derived id so the UI gate still works offline.
+  /// [LOCAL-670C] Handle one raw playback event from the WebView and update the
+  /// stop's [PlaybackAccumulator]. When the accumulator confirms the stop was
+  /// genuinely listened (≥ 80% actually played, or the end reached after ≥ 80%),
+  /// record it locally + enqueue it for sync — exactly once per stop.
+  ///
+  /// args: [stopIndex, kind, currentTime, duration, rate].
+  void _onPlaybackEvent(List<dynamic> args) {
+    if (args.length < 5) return;
+    final idx = args[0] is int ? args[0] as int : int.tryParse('${args[0]}') ?? -1;
+    if (idx < 0) return;
+    final kind = '${args[1]}';
+    final pos = (args[2] is num) ? (args[2] as num).toDouble() : double.tryParse('${args[2]}') ?? 0.0;
+    final dur = (args[3] is num) ? (args[3] as num).toDouble() : double.tryParse('${args[3]}') ?? 0.0;
+    final rate = (args[4] is num) ? (args[4] as num).toDouble() : double.tryParse('${args[4]}') ?? 1.0;
+
+    if (dur <= 0) return; // duration not known yet; can't verify against it
+    if (_listenedRecorded.contains(idx)) return; // already counted
+
+    final acc = _accumulators.putIfAbsent(
+      idx,
+      () => PlaybackAccumulator(durationSeconds: dur),
+    );
+    final now = DateTime.now();
+    switch (kind) {
+      case 'play':
+        acc.onPlay(pos, atWallClock: now);
+        break;
+      case 'pause':
+        acc.onPause(pos, atWallClock: now);
+        break;
+      case 'seek':
+        acc.onSeek(pos, atWallClock: now);
+        break;
+      case 'rate':
+        acc.onRateChange(rate, positionSeconds: pos, atWallClock: now);
+        break;
+      case 'tick':
+        acc.onTick(pos, atWallClock: now);
+        break;
+      case 'ended':
+        acc.onEnded(pos, atWallClock: now);
+        break;
+    }
+
+    if (acc.isListened && !_listenedRecorded.contains(idx)) {
+      _listenedRecorded.add(idx);
+      unawaited(_recordStopListened(idx));
+    }
+  }
+
+  /// [LOCAL-670C] Persist that a stop was genuinely listened (local record with
+  /// timestamp) and enqueue a `listened` item in the outbox for idempotent
+  /// server sync when a connection returns. The listened key is the numeric
+  /// tour id when we have one (what the server gate keys on), else the local
+  /// path-derived id so the UI gate still works offline.
   Future<void> _recordStopListened(int stopIndex) async {
     final tourId = widget.tourId ?? _deriveTourId();
     try {
@@ -413,7 +468,7 @@ class _TourPlayerScreenState extends State<TourPlayerScreen> with VoiceMethods {
         stopIndex: stopIndex,
       );
       await DebugLogHelper.addDebugLog(
-        'LISTEN: stop $stopIndex of tour $tourId marked listened',
+        'LISTEN: stop $stopIndex of tour $tourId verified listened (played-time)',
       );
     } catch (_) {
       // never surface a tracking failure to the listener

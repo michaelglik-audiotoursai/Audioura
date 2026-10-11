@@ -42,6 +42,11 @@ dependencies:
   # LOCAL-598 (Android buy buttons hidden behind a flag).
   in_app_purchase: ^3.2.0
   in_app_purchase_storekit: ^0.3.19
+  # LOCAL-670C: detect connectivity changes to flush the offline outbox
+  # (listened events, ratings, reviews, per-stop thumbs) when a connection
+  # returns. 6.x supports Dart >=3.3 / Flutter >=3.19, within this project's
+  # 3.5 SDK floor.
+  connectivity_plus: ^6.0.5
 
 dev_dependencies:
   flutter_test:

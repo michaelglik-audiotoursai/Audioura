@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:async';
 
 import 'screens/main_screen.dart';
 import 'screens/onboarding_screen.dart';
+import 'services/app_sync_coordinator.dart';
 
 class MainScreenWithTreatsTab extends StatelessWidget {
   const MainScreenWithTreatsTab({super.key});
@@ -41,7 +43,12 @@ void main() async {
   }
   
   // Initialize InAppWebView (debugging enabled by default in debug mode)
-  
+
+  // [LOCAL-670C] Start the offline-outbox sync coordinator: flush now (app
+  // start) and whenever connectivity returns or the app resumes. Never blocks
+  // startup — failures are retried by the outbox's own backoff.
+  unawaited(AppSyncCoordinator.instance.start());
+
   runApp(const AudioTourApp());
 }
 

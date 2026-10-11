@@ -907,8 +907,12 @@ class _MyToursScreenState extends State<MyToursScreen> {
       tourTitle: tour['title']?.toString() ?? 'this tour',
     );
     if (result != null && mounted) {
+      final agg = result.aggregate;
+      final msg = agg != null
+          ? 'Thanks! Tour rating now ${agg.badgeText}.'
+          : 'Thanks! ${result.myRatingText}.';
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Thanks! Tour rating now ${result.badgeText}.')),
+        SnackBar(content: Text(msg)),
       );
     }
   }
