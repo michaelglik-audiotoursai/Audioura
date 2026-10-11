@@ -46,7 +46,7 @@ class Budget(unittest.TestCase):
 class Cache(unittest.TestCase):
     def test_cache_key_folds_accents_and_case(self):
         k = T.cache_key("Ho Chi Minh City Museum of Fine Arts", "Vietnam")
-        self.assertEqual(k, "ho chi minh city museum of fine arts|vietnam")
+        self.assertEqual(k, "v2|ho chi minh city museum of fine arts|vietnam")
 
     def test_no_db_is_safe_miss(self):
         self.assertIsNone(T.cache_get("V", "C", db_url=""))
