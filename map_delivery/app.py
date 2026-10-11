@@ -77,6 +77,7 @@ def get_tour_by_code(code):
                    {_source_version_select(cur)} AS source_version,
                    sv.max_version_no AS source_max_version_no,
                    {_ratings_select(cur)},
+                   {_is_paid_select(cur)} AS is_paid,
                    {_ORIGINAL_LANGUAGE_SELECT}
             FROM audio_tours t
             LEFT JOIN (
@@ -105,6 +106,7 @@ def get_tour_by_code(code):
         (tour_id, tour_name, request_string, tour_lat, tour_lng, requests,
          language, original_id, max_vn, last_replaced, created_at,
          source_version, source_max_vn, rating_count, rating_values,
+         verified_values, created_values, is_paid,
          own_content_language, source_content_language) = t
         # [LOCAL-666] A share code can point at a translation row (original_tour_id
         # set, e.g. Russian 615 of 557) as well as an original. For a translation we
@@ -115,7 +117,6 @@ def get_tour_by_code(code):
         # Originals are unchanged.
         version, updated_at = _resolved_version_fields(
             original_id, source_version, source_max_vn, max_vn, last_replaced, created_at)
-        rating = compute_rating(rating_values)
         original_language = _resolved_original_language(
             own_content_language, original_id, source_content_language)
         # Same keys as a /tours-near element. distance_km is None, not 0: the listener
@@ -136,9 +137,7 @@ def get_tour_by_code(code):
                 'via_share_code': code,
                 'version': version,
                 'updated_at': updated_at,
-                'rating_score': rating['score'],
-                'rating_count': rating['count'],
-                'rating_label': rating['label'],
+                **_rating_payload(rating_values, verified_values, created_values, is_paid),
             }],
             'count': 1,
         })
@@ -341,11 +340,22 @@ def _rating_median(values):
     return (float(s[mid - 1]) + float(s[mid])) / 2.0
 
 
-def compute_rating(ratings):
+def compute_rating(ratings, verified=None, paid=False):
     """{score, count, label} from a list of REAL ratings (may be empty).
 
-    Identical rule to tour_rating_service.compute_score (LOCAL-670 / D647)."""
-    ratings = [int(r) for r in (ratings or []) if r is not None]
+    Identical rule to tour_rating_service.compute_score (LOCAL-670 / D647).
+
+    [LOCAL-672] On a PAID tour only VERIFIED ratings count toward the shown
+    score; on a FREE tour all download-gated ratings count (unchanged LOCAL-670).
+    Pass the parallel `verified` list (same order as `ratings`) and paid=True to
+    restrict to verified ratings. The SHOWN score rule itself (prior/median) is
+    unchanged — only the input set differs on a paid tour.
+    """
+    pairs = [(int(r), bool(verified[i]) if verified and i < len(verified) and verified[i] is not None else False)
+             for i, r in enumerate(ratings or []) if r is not None]
+    if paid:
+        pairs = [p for p in pairs if p[1]]
+    ratings = [r for r, _ in pairs]
     count = len(ratings)
     if count == 0:
         return {"score": RATING_DEFAULT_SCORE, "count": 0, "label": "New"}
@@ -358,20 +368,160 @@ def compute_rating(ratings):
     return {"score": score, "count": count, "label": label}
 
 
-# One grouped pass over tour_ratings — NOT one query per tour. Keyed on the
-# ORIGINAL tour id, so a translation (original_tour_id set) inherits its source
-# tour's ratings when the caller joins on COALESCE(t.original_tour_id, t.id).
+# ─── [LOCAL-672] Verified counting, Bayesian ranking, distribution ────────────
+#
+# This directory deploys as its own image and cannot import tour_reviews_service,
+# so the rank rule and the five distribution bands are a self-contained copy of
+# that module's logic (items 4, 8, 11). Keep them in lock-step; both are unit-
+# tested against the brief. All of this is LIST-ORDER / display only — the SHOWN
+# score stays D647.
+
+RANK_PRIOR_COUNT = 3
+RANK_PRIOR_SCORE = 7.5
+WEIGHT_VERIFIED = 1.0
+WEIGHT_UNVERIFIED = 0.5
+WEIGHT_STALE = 0.5
+STALE_AFTER_DAYS = 365
+
+# Five bands (item 8): 9-10, 7-8, 5-6, 3-4, 1-2.
+_BANDS = [(9, 10), (7, 8), (5, 6), (3, 4), (1, 2)]
+
+
+def _band_of(rating):
+    for lo, hi in _BANDS:
+        if lo <= rating <= hi:
+            return f"{lo}-{hi}"
+    return None
+
+
+def _is_stale(created_at, now, current_version_date):
+    if created_at is None:
+        return False
+    try:
+        age_days = (now - created_at).days
+    except Exception:
+        return False
+    if age_days > STALE_AFTER_DAYS:
+        return True
+    if current_version_date is not None:
+        try:
+            if created_at < current_version_date:
+                return True
+        except Exception:
+            return False
+    return False
+
+
+def rank_score(ratings, verified=None, created=None, now=None, current_version_date=None):
+    """Bayesian list-ORDER key (items 4 & 11). NOT the shown score.
+
+    score = (C*7.5 + sum(w_i*rating_i)) / (C + sum(w_i)), C=3.
+    w_i = (1.0 verified | 0.5 unverified) * (0.5 if stale else 1.0),
+    stale = older than 12 months OR before the tour's current version date.
+    Parallel lists `verified` and `created` align with `ratings` (missing → False
+    / None). No ratings → the 7.5 prior (a new tour sorts mid-list)."""
+    from datetime import datetime as _dt
+    if now is None:
+        now = _dt.now()
+    num = RANK_PRIOR_COUNT * RANK_PRIOR_SCORE
+    den = float(RANK_PRIOR_COUNT)
+    for i, r in enumerate(ratings or []):
+        if r is None:
+            continue
+        v = bool(verified[i]) if verified and i < len(verified) and verified[i] is not None else False
+        c = created[i] if created and i < len(created) else None
+        w = WEIGHT_VERIFIED if v else WEIGHT_UNVERIFIED
+        if _is_stale(c, now, current_version_date):
+            w *= WEIGHT_STALE
+        num += w * int(r)
+        den += w
+    return num / den if den > 0 else RANK_PRIOR_SCORE
+
+
+def compute_distribution(ratings, verified=None, paid=False):
+    """The five-band distribution (item 8) with counts + percentages.
+
+    Verified ratings on a PAID tour; all counted ratings on a FREE tour."""
+    pairs = [(int(r), bool(verified[i]) if verified and i < len(verified) and verified[i] is not None else False)
+             for i, r in enumerate(ratings or []) if r is not None]
+    if paid:
+        pairs = [p for p in pairs if p[1]]
+    vals = [r for r, _ in pairs]
+    total = len(vals)
+    bands = []
+    for lo, hi in _BANDS:
+        c = sum(1 for r in vals if lo <= r <= hi)
+        bands.append({"band": f"{lo}-{hi}", "count": c,
+                      "percent": round((c / total) * 100) if total else 0})
+    return {"total": total, "bands": bands}
+
+
+def _rating_payload(rating_values, verified_values, created_values, paid):
+    """Build the full per-tour rating block for a response (LOCAL-670 + 672).
+
+    Returns a dict with:
+      rating_score / rating_count / rating_label  — the SHOWN score (D647);
+          on a PAID tour computed from VERIFIED ratings only, on a FREE tour
+          from all counted ratings (LOCAL-670).
+      verified_count          — how many of the ratings are verified.
+      is_paid                 — whether this tour is treated as paid.
+      rank_score              — the Bayesian list-ORDER key (items 4/11).
+      rating_distribution     — the five-band distribution (item 8), from the
+          same source set as the shown score (verified on paid, all on free).
+    The caller supplies the already-fetched arrays and the paid flag, so this is
+    a pure function (unit-testable, no DB)."""
+    rating = compute_rating(rating_values, verified=verified_values, paid=paid)
+    vals = [r for r in (rating_values or []) if r is not None]
+    verified_count = sum(1 for v in (verified_values or []) if v)
+    return {
+        'rating_score': rating['score'],
+        'rating_count': rating['count'],
+        'rating_label': rating['label'],
+        'verified_count': verified_count,
+        'is_paid': bool(paid),
+        'rank_score': round(rank_score(rating_values, verified=verified_values,
+                                        created=created_values), 4),
+        'rating_distribution': compute_distribution(
+            rating_values, verified=verified_values, paid=paid),
+    }
+
+
+
+# [LOCAL-672] Also aggregates the verified flag and created_at (same ARRAY_AGG
+# order as rating_values) so paid-tour counting, the distribution and the
+# Bayesian rank key have what they need in the same single pass. The verified /
+# created_at columns are included only when the schema has them (see
+# _ratings_select), so an older DB still works.
 _RATINGS_AGG_SUBQUERY = """
     LEFT JOIN (
         SELECT tour_id,
-               COUNT(*)            AS rating_count,
-               ARRAY_AGG(rating)   AS rating_values
+               COUNT(*)                 AS rating_count,
+               ARRAY_AGG(rating)        AS rating_values,
+               ARRAY_AGG(verified)      AS verified_values,
+               ARRAY_AGG(created_at)    AS created_values
+        FROM tour_ratings
+        GROUP BY tour_id
+    ) r ON r.tour_id = COALESCE(t.original_tour_id, t.id)
+"""
+
+# Fallback aggregate for a schema that has tour_ratings but NOT the LOCAL-672
+# verified column: emit NULL literals for the two new arrays so the tuple shape
+# is identical and no endpoint needs a second code path.
+_RATINGS_AGG_SUBQUERY_NO_VERIFIED = """
+    LEFT JOIN (
+        SELECT tour_id,
+               COUNT(*)              AS rating_count,
+               ARRAY_AGG(rating)     AS rating_values,
+               NULL::boolean[]       AS verified_values,
+               ARRAY_AGG(created_at) AS created_values
         FROM tour_ratings
         GROUP BY tour_id
     ) r ON r.tour_id = COALESCE(t.original_tour_id, t.id)
 """
 
 _HAS_TOUR_RATINGS = None
+_HAS_VERIFIED_COLUMN = None
+_HAS_IS_PAID_COLUMN = None
 
 
 def _has_tour_ratings_table(cur):
@@ -391,6 +541,38 @@ def _has_tour_ratings_table(cur):
     return _HAS_TOUR_RATINGS
 
 
+def _has_verified_column(cur):
+    """True if tour_ratings.verified exists (LOCAL-672). Probed once + cached.
+    When absent, verified counting degrades to the LOCAL-670 all-ratings rule."""
+    global _HAS_VERIFIED_COLUMN
+    if _HAS_VERIFIED_COLUMN is None:
+        try:
+            cur.execute("""
+                SELECT 1 FROM information_schema.columns
+                WHERE table_name = 'tour_ratings' AND column_name = 'verified'
+            """)
+            _HAS_VERIFIED_COLUMN = cur.fetchone() is not None
+        except Exception:
+            _HAS_VERIFIED_COLUMN = False
+    return _HAS_VERIFIED_COLUMN
+
+
+def _has_is_paid_column(cur):
+    """True if audio_tours.is_paid exists. Probed once + cached. Absent → every
+    tour is treated as FREE (no per-tour price mapping yet, D624 pending)."""
+    global _HAS_IS_PAID_COLUMN
+    if _HAS_IS_PAID_COLUMN is None:
+        try:
+            cur.execute("""
+                SELECT 1 FROM information_schema.columns
+                WHERE table_name = 'audio_tours' AND column_name = 'is_paid'
+            """)
+            _HAS_IS_PAID_COLUMN = cur.fetchone() is not None
+        except Exception:
+            _HAS_IS_PAID_COLUMN = False
+    return _HAS_IS_PAID_COLUMN
+
+
 def _parse_min_rating(args):
     """Parse the optional ?min_rating=<float> query param. Returns a float or
     None (absent/blank/invalid → no filter)."""
@@ -403,17 +585,44 @@ def _parse_min_rating(args):
         return None
 
 
+def _wants_top_rated(args):
+    """True when the caller asked for the 'Top rated' order (item 4/11). Accepts
+    ?sort=top_rated (and the convenience alias ?sort=rating)."""
+    s = (args.get('sort') or '').strip().lower()
+    return s in ('top_rated', 'top-rated', 'rating', 'top')
+
+
 def _ratings_select(cur):
-    """SQL fragment selecting (rating_count, rating_values) or NULL literals on
-    an older schema with no tour_ratings table."""
+    """SQL fragment selecting the rating aggregates, or NULL literals on an older
+    schema. Always four columns in a fixed order:
+        rating_count, rating_values, verified_values, created_values
+    so every endpoint unpacks the same shape regardless of schema age. The
+    verified array is real only when the LOCAL-672 column exists; otherwise it is
+    NULL (→ treated as all-unverified, i.e. the LOCAL-670 counting rule)."""
     if _has_tour_ratings_table(cur):
-        return "r.rating_count, r.rating_values"
-    return "NULL::bigint AS rating_count, NULL::smallint[] AS rating_values"
+        return "r.rating_count, r.rating_values, r.verified_values, r.created_values"
+    return ("NULL::bigint AS rating_count, NULL::smallint[] AS rating_values, "
+            "NULL::boolean[] AS verified_values, NULL::timestamp[] AS created_values")
 
 
 def _ratings_join(cur):
-    """The grouped LEFT JOIN over tour_ratings, or empty string on older schema."""
-    return _RATINGS_AGG_SUBQUERY if _has_tour_ratings_table(cur) else ""
+    """The grouped LEFT JOIN over tour_ratings, or empty string on older schema.
+    Picks the verified-aware aggregate when the column exists (LOCAL-672), else
+    the fallback that NULLs the verified array so the SELECT shape is identical."""
+    if not _has_tour_ratings_table(cur):
+        return ""
+    if _has_verified_column(cur):
+        return _RATINGS_AGG_SUBQUERY
+    return _RATINGS_AGG_SUBQUERY_NO_VERIFIED
+
+
+def _is_paid_select(cur):
+    """SQL fragment selecting the tour's paid flag. Uses audio_tours.is_paid when
+    that column exists (future per-tour price mapping, D624), else a FALSE literal
+    — every tour reads as FREE today, which is exactly LOCAL-670's counting."""
+    if _has_is_paid_column(cur):
+        return "COALESCE(t.is_paid, FALSE)"
+    return "FALSE"
 
 
 def calculate_distance(lat1, lng1, lat2, lng2):
@@ -473,6 +682,7 @@ def get_tours_near_location(lat, lng):
                    {_source_version_select(cur)} AS source_version,
                    sv.max_version_no AS source_max_version_no,
                    {_ratings_select(cur)},
+                   {_is_paid_select(cur)} AS is_paid,
                    {_ORIGINAL_LANGUAGE_SELECT}
             FROM audio_tours t
             LEFT JOIN (
@@ -502,6 +712,7 @@ def get_tours_near_location(lat, lng):
             (tour_id, tour_name, request_string, tour_lat, tour_lng, requests,
              language, original_id, max_vn, last_replaced, created_at,
              source_version, source_max_vn, rating_count, rating_values,
+             verified_values, created_values, is_paid,
              own_content_language, source_content_language) = tour
             
             if tour_lat and tour_lng:
@@ -511,9 +722,10 @@ def get_tours_near_location(lat, lng):
                     version, updated_at = _resolved_version_fields(
                         original_id, source_version, source_max_vn,
                         max_vn, last_replaced, created_at)
-                    rating = compute_rating(rating_values)
+                    rating_block = _rating_payload(
+                        rating_values, verified_values, created_values, is_paid)
                     # Server-side min_rating filter: skip tours below the bar.
-                    if min_rating is not None and rating['score'] < min_rating:
+                    if min_rating is not None and rating_block['rating_score'] < min_rating:
                         continue
                     original_language = _resolved_original_language(
                         own_content_language, original_id, source_content_language)
@@ -531,14 +743,19 @@ def get_tours_near_location(lat, lng):
                         'original_language': original_language,
                         'version': version,
                         'updated_at': updated_at,
-                        'rating_score': rating['score'],
-                        'rating_count': rating['count'],
-                        'rating_label': rating['label'],
+                        **rating_block,
                     }
                     tours_list.append(tour_data)
         
-        # Sort tours by distance
-        tours_list.sort(key=lambda x: x['distance_km'])
+        # [LOCAL-672] "Top rated" sort (?sort=top_rated): order by the Bayesian
+        # rank_score (verified 1.0 / unverified 0.5, 12-month & pre-version decay,
+        # C=3 prior) descending, breaking ties by distance so near tours win among
+        # equally-ranked ones. Default remains nearest-first (the original behaviour).
+        if _wants_top_rated(request.args):
+            tours_list.sort(key=lambda x: (-x.get('rank_score', RANK_PRIOR_SCORE),
+                                           x['distance_km']))
+        else:
+            tours_list.sort(key=lambda x: x['distance_km'])
         
         cur.close()
         conn.close()
@@ -653,6 +870,7 @@ def get_tour_info(tour_id):
                    {_source_version_select(cur)} AS source_version,
                    sv.max_version_no AS source_max_version_no,
                    {_ratings_select(cur)},
+                   {_is_paid_select(cur)} AS is_paid,
                    {_ORIGINAL_LANGUAGE_SELECT}
             FROM audio_tours t
             LEFT JOIN (
@@ -677,7 +895,7 @@ def get_tour_info(tour_id):
         
         (tour_id, tour_name, request_string, lat, lng, requests, language, original_id,
          max_vn, last_replaced, created_at, source_version, source_max_vn,
-         rating_count, rating_values,
+         rating_count, rating_values, verified_values, created_values, is_paid,
          own_content_language, source_content_language) = result
         cur.close()
         conn.close()
@@ -685,7 +903,6 @@ def get_tour_info(tour_id):
         is_translation = original_id is not None and (language and language != 'en')
         version, updated_at = _resolved_version_fields(
             original_id, source_version, source_max_vn, max_vn, last_replaced, created_at)
-        rating = compute_rating(rating_values)
         original_language = _resolved_original_language(
             own_content_language, original_id, source_content_language)
         
@@ -703,9 +920,7 @@ def get_tour_info(tour_id):
             'original_language': original_language,
             'version': version,
             'updated_at': updated_at,
-            'rating_score': rating['score'],
-            'rating_count': rating['count'],
-            'rating_label': rating['label'],
+            **_rating_payload(rating_values, verified_values, created_values, is_paid),
         })
         
     except Exception as e:
@@ -747,6 +962,7 @@ def search_tours():
                    {_source_version_select(cur)} AS source_version,
                    sv.max_version_no AS source_max_version_no,
                    {_ratings_select(cur)},
+                   {_is_paid_select(cur)} AS is_paid,
                    {_ORIGINAL_LANGUAGE_SELECT}
             FROM audio_tours t
             LEFT JOIN (
@@ -772,13 +988,14 @@ def search_tours():
         for tour in tours:
             (tour_id, tour_name, request_string, tour_lat, tour_lng, requests, language, original_id,
              max_vn, last_replaced, created_at, source_version, source_max_vn,
-             rating_count, rating_values,
+             rating_count, rating_values, verified_values, created_values, is_paid,
              own_content_language, source_content_language) = tour
             version, updated_at = _resolved_version_fields(
                 original_id, source_version, source_max_vn, max_vn, last_replaced, created_at)
-            rating = compute_rating(rating_values)
+            rating_block = _rating_payload(
+                rating_values, verified_values, created_values, is_paid)
             # Server-side min_rating filter.
-            if min_rating is not None and rating['score'] < min_rating:
+            if min_rating is not None and rating_block['rating_score'] < min_rating:
                 continue
             
             if tour_lat and tour_lng:
@@ -802,13 +1019,17 @@ def search_tours():
                     'original_language': original_language,
                     'version': version,
                     'updated_at': updated_at,
-                    'rating_score': rating['score'],
-                    'rating_count': rating['count'],
-                    'rating_label': rating['label'],
+                    **rating_block,
                 })
         
-        # Sort by popularity first, then by distance
-        search_results.sort(key=lambda x: (-x['popularity'], x['distance_km']))
+        # [LOCAL-672] "Top rated" sort (?sort=top_rated): the Bayesian rank_score
+        # descending, tie-broken by popularity then distance. Default stays
+        # popularity-then-distance (the original search order).
+        if _wants_top_rated(request.args):
+            search_results.sort(key=lambda x: (-x.get('rank_score', RANK_PRIOR_SCORE),
+                                               -x['popularity'], x['distance_km']))
+        else:
+            search_results.sort(key=lambda x: (-x['popularity'], x['distance_km']))
         
         cur.close()
         conn.close()
