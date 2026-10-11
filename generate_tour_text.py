@@ -14608,6 +14608,16 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
                     # it drives hedged narration and stop_metrics persistence downstream
                     if orig and 'verified' in orig:
                         merged['verified'] = orig['verified']
+                    # [LOCAL-675 item 1] The bilingual "<local> (<English>)" header
+                    # set by the LOCAL-669C final identity gate lives on `display_title`.
+                    # _new_poi() does NOT create that field, so the Phase 3B rebuild
+                    # (a fresh _new_poi per stop) silently dropped it — the delivered
+                    # header fell back to the bare `name` and the English gloss vanished
+                    # (HCMC tours 678/679: "Stop 3: Bác Hồ với thiếu nhi" with no English,
+                    # even though the gate logged "set 4 header(s)"). Carry it through,
+                    # exactly like `verified`.
+                    if orig and (orig.get('display_title') or '').strip():
+                        merged['display_title'] = orig['display_title']
                     new_list.append(merged)
                 print(f"OK PHASE 3B: ordered {len(new_list)} stop(s) with structured details and directions")
                 return new_list
@@ -25871,12 +25881,25 @@ RULES:
     # Only the REAL headers (one per stop, produced at PHASE 6 assembly) may start with "Stop N:".
     _real_header_set = set()
     for i, poi in enumerate(poi_list):
-        _h = f"Stop {i + 1}: {poi['name']}"
-        if poi['artist'] and poi['artist'].lower() != "unknown artist":
-            _h += f" by {poi['artist']}"
-        if poi['year']:
-            _h += f", {poi['year']}"
-        _real_header_set.add(_h)
+        # [LOCAL-675 item 1] The delivered header uses `display_title` when the
+        # LOCAL-669C gate set the bilingual "<local> (<English>)" string (see the
+        # PHASE 6 header build), so the sanitizer's "real header" set must include
+        # that variant — otherwise the parenthetical English looks like injected
+        # text and gets stripped. Register BOTH the bilingual title and the bare
+        # name so either rendering is recognised as real.
+        _title_variants = {(poi.get('name') or '').strip()}
+        _disp = (poi.get('display_title') or '').strip()
+        if _disp:
+            _title_variants.add(_disp)
+        for _tv in _title_variants:
+            if not _tv:
+                continue
+            _h = f"Stop {i + 1}: {_tv}"
+            if poi['artist'] and poi['artist'].lower() != "unknown artist":
+                _h += f" by {poi['artist']}"
+            if poi['year']:
+                _h += f", {poi['year']}"
+            _real_header_set.add(_h)
     
     # [LEAD 2026-10-08] Match headers NORMALISED (whitespace, curly/straight quotes, case,
     # trailing " by Artist, Year"). An exact-string match stripped the REAL Stop 3 header
@@ -25888,7 +25911,13 @@ RULES:
         _x = re.sub(r'\s+by\s+.+$', '', _x)
         _x = re.sub(r',\s*\d{3,4}.*$', '', _x)
         return re.sub(r'\s+', ' ', _x).strip().lower()
-    _real_by_num = {i + 1: _hdr_norm(poi.get('name') or '') for i, poi in enumerate(poi_list)}
+    # [LOCAL-675 item 1] Normalise from the delivered title — the bilingual
+    # display_title when the gate set one, else the bare name — so the normalised
+    # fallback compares like-for-like with the rendered "<local> (<English>)" line.
+    _real_by_num = {
+        i + 1: _hdr_norm((poi.get('display_title') or '').strip() or (poi.get('name') or ''))
+        for i, poi in enumerate(poi_list)
+    }
     def _is_real_header(_line):
         if _line.strip() in _real_header_set:
             return True
