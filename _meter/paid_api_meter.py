@@ -128,11 +128,169 @@ def _db_write(rec):
     except Exception:
         pass
 
+# --------------------------------------------------------------------------- #
+# Daily paid-API spend limit (LOCAL-673)
+#
+# Michael (2026-10-10): "Alerts would not do much if I am not at the desk." A
+# STOP is needed, not an email. Before a paid request (OpenAI, Gemini, Serper,
+# and the metered boto3 paths — AWS Translate, Polly) the caller/meter checks
+# today's America/New_York total of billed (status 200) usd in paid_api_calls.
+# If it is >= DAILY_PAID_LIMIT_USD the request is refused by raising
+# DailyPaidLimitExceeded WITHOUT sending. The total is read through a 60-second
+# cache so the check adds one short DB query per minute, not one per call.
+#
+# FAIL-OPEN: any error reading the limit or the DB -> allow and log. A meter bug
+# must never block a tour. The limit is OFF when DAILY_PAID_LIMIT_USD is unset
+# or non-positive.
+# --------------------------------------------------------------------------- #
+LIMIT_ENV = "DAILY_PAID_LIMIT_USD"
+_LIMIT_CACHE_TTL = 60.0  # seconds
+ALERTS_PATH = os.environ.get(
+    "ALERTS_MD",
+    os.path.join(os.path.expanduser("~"), "Audioura", ".continuous_dev", "ALERTS.md"))
+
+# Cache: (expiry_epoch, total_usd, ny_day_str). Guarded by _limit_lock.
+_limit_lock = threading.Lock()
+_limit_cache = {"expiry": 0.0, "total": 0.0, "day": None}
+# Day (YYYY-MM-DD, NY) on which we have already written an alert line.
+_alerted_day = None
+
+
+class DailyPaidLimitExceeded(Exception):
+    """Raised instead of sending a paid request once today's billed spend has
+    reached DAILY_PAID_LIMIT_USD. Callers already handle API failures, so the
+    tour fails cleanly with an honest error rather than producing a half tour."""
+
+
+def _limit_usd():
+    """Configured limit as a float, or None when the limit is off (unset / <= 0 /
+    unparseable). Never raises."""
+    try:
+        raw = os.environ.get(LIMIT_ENV)
+        if raw is None or str(raw).strip() == "":
+            return None
+        val = float(raw)
+        return val if val > 0 else None
+    except Exception:
+        return None
+
+
+def _ny_now():
+    """Current datetime in America/New_York. Falls back to a fixed EST/EDT guess
+    only if zoneinfo is unavailable (it ships with Python 3.9+)."""
+    from datetime import datetime
+    try:
+        from zoneinfo import ZoneInfo
+        return datetime.now(ZoneInfo("America/New_York"))
+    except Exception:
+        # Last-resort fallback: approximate NY as UTC-4 (EDT). Correctness here
+        # only affects the exact day-boundary minute; fail-open philosophy means
+        # we would rather err than crash.
+        from datetime import timezone, timedelta
+        return datetime.now(timezone.utc).astimezone(timezone(timedelta(hours=-4)))
+
+
+def _query_today_total_usd(day_str):
+    """Sum of billed (status 200) usd in paid_api_calls for the given NY calendar
+    day. Raises on any DB problem so the caller can fail open."""
+    import psycopg2
+    url = os.environ.get("DATABASE_URL")
+    conn = psycopg2.connect(url, connect_timeout=3) if url else psycopg2.connect(
+        host=os.environ.get("DB_HOST", "postgres-2"), dbname=os.environ.get("DB_NAME", "audiotours"),
+        user=os.environ.get("DB_USER", "admin"), password=os.environ.get("DB_PASSWORD", "password123"),
+        port=os.environ.get("DB_PORT", "5432"), connect_timeout=3)
+    try:
+        with conn, conn.cursor() as cur:
+            # ts is timestamptz; compare its NY calendar date to the NY day we are
+            # metering. Doing the AT TIME ZONE conversion in SQL keeps the day
+            # boundary correct regardless of the DB session timezone.
+            cur.execute(
+                "SELECT COALESCE(SUM(usd), 0) FROM paid_api_calls "
+                "WHERE status = 200 "
+                "AND (ts AT TIME ZONE 'America/New_York')::date = %s::date",
+                (day_str,))
+            row = cur.fetchone()
+        return float(row[0] or 0.0)
+    finally:
+        try: conn.close()
+        except Exception: pass
+
+
+def _today_total_usd(now=None):
+    """Cached today's (NY) billed total. The cache is keyed on the NY day so the
+    first call after midnight re-queries even if the 60 s TTL has not expired."""
+    now_ts = time.time()
+    ny = now or _ny_now()
+    day_str = ny.strftime("%Y-%m-%d")
+    with _limit_lock:
+        if (_limit_cache["day"] == day_str and now_ts < _limit_cache["expiry"]):
+            return _limit_cache["total"], day_str
+    total = _query_today_total_usd(day_str)  # may raise -> caller fails open
+    with _limit_lock:
+        _limit_cache["day"] = day_str
+        _limit_cache["total"] = total
+        _limit_cache["expiry"] = now_ts + _LIMIT_CACHE_TTL
+    return total, day_str
+
+
+def _write_alert_once(limit, day_str, ny):
+    """Write '*** DAILY PAID LIMIT $X reached at HH:MM ***' to ALERTS.md at most
+    once per NY day. LEAD's loop turns a non-empty ALERTS.md into a push. Never
+    raises."""
+    global _alerted_day
+    with _limit_lock:
+        if _alerted_day == day_str:
+            return
+        _alerted_day = day_str
+    try:
+        limit_txt = ("%g" % limit)
+        line = "*** DAILY PAID LIMIT $%s reached at %s ***\n" % (limit_txt, ny.strftime("%H:%M"))
+        os.makedirs(os.path.dirname(ALERTS_PATH), exist_ok=True)
+        with _lock, open(ALERTS_PATH, "a") as f:
+            f.write(line)
+    except Exception:
+        # Alert failure must not undo the stop; the stop itself is the hard guard.
+        pass
+
+
+def check_daily_limit():
+    """Enforce DAILY_PAID_LIMIT_USD before a paid request. Raises
+    DailyPaidLimitExceeded when today's (NY) billed total is >= the limit;
+    returns None (allow) otherwise. Fails OPEN on any meter/DB error.
+
+    Call this immediately before sending any paid request (it is also invoked by
+    the requests/urllib patches for OpenAI/Gemini/Serper)."""
+    limit = _limit_usd()
+    if limit is None:
+        return  # limit off
+    try:
+        ny = _ny_now()
+        total, day_str = _today_total_usd(ny)
+    except Exception as e:
+        # Fail-open: DB down / query error -> allow and log, never block.
+        try:
+            sys.stderr.write("[paid_api_meter] daily-limit check failed open: %s\n" % (str(e)[:200],))
+        except Exception:
+            pass
+        return
+    if total >= limit:
+        _write_alert_once(limit, day_str, ny)
+        raise DailyPaidLimitExceeded(
+            "DAILY_PAID_LIMIT_USD reached: today's billed paid-API spend "
+            "$%.4f >= limit $%g (America/New_York %s). Refusing paid request."
+            % (total, limit, day_str))
+
+
 def install():
     try:
         import requests
         _orig = requests.Session.send
         def send(self, request, **kw):
+            # Enforce the daily limit BEFORE sending any paid request. The check
+            # raises DailyPaidLimitExceeded (caught by callers as an API failure)
+            # or fails open; non-paid hosts are never checked.
+            if _host_kind(request.url):
+                check_daily_limit()
             resp = _orig(self, request, **kw)
             try:
                 if _host_kind(request.url):
@@ -154,6 +312,8 @@ def install():
             url = req.full_url if hasattr(req, "full_url") else str(req)
             if not _host_kind(url):
                 return _orig_open(req, *a, **kw)
+            # Enforce the daily limit BEFORE sending the paid request.
+            check_daily_limit()
             try:
                 resp = _orig_open(req, *a, **kw)
             except Exception as e:
