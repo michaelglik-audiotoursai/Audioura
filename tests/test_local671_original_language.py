@@ -19,7 +19,9 @@ two SELECTed columns:
   id, name, request_string, lat, lng, number_requested,
   (content_)language, original_tour_id, max_version_no, last_replaced_at,
   created_at, source_version, source_max_version_no, rating_count,
-  rating_values, own_content_language, source_content_language
+  rating_values, verified_values, created_values, is_paid,
+  own_content_language, source_content_language
+  (20 cols after LOCAL-672B inserted the three verified-review columns)
 
 All four endpoints are exercised: /tours-near, /tour-by-code, /tour-info,
 /search-tours — the first is originals-only, the other three surface
@@ -108,6 +110,7 @@ class OriginalLanguageTest(unittest.TestCase):
             ("from audio_tours t", [
                 (557, "Old Town", "old town walk", 43.70, 7.26, 12,
                  "en", None, None, None, created, None, None, None, None,
+                 None, None, False,
                  "en", None),
             ]),
         ])
@@ -127,6 +130,7 @@ class OriginalLanguageTest(unittest.TestCase):
             ("from audio_tours t", [
                 (700, "Vieux Nice", "vieux nice", 43.70, 7.26, 5,
                  "fr", None, None, None, created, None, None, None, None,
+                 None, None, False,
                  "fr", None),
             ]),
         ])
@@ -145,7 +149,7 @@ class OriginalLanguageTest(unittest.TestCase):
             ("from shared_tours", [(615,)]),
             ("from audio_tours t", [
                 (615, "Прогулка [ru]", "boston politics walk", 42.36, -71.06, 7,
-                 "ru", 557, None, None, created, 10, 9, None, None, "ru", "en"),
+                 "ru", 557, None, None, created, 10, 9, None, None, None, None, False, "ru", "en"),
             ]),
         ])
         resp = self.client.get("/tour-by-code/ru615code")
@@ -163,6 +167,7 @@ class OriginalLanguageTest(unittest.TestCase):
             ("from audio_tours t", [
                 (900, "Fresh Tour", "fresh", 48.85, 2.35, 3,
                  "en", None, None, None, created, None, None, None, None,
+                 None, None, False,
                  "en", None),
             ]),
         ])
@@ -178,7 +183,7 @@ class OriginalLanguageTest(unittest.TestCase):
             _COL_PRESENT,
             ("from audio_tours t", [
                 (615, "Прогулка [ru]", "boston politics walk", 42.36, -71.06, 7,
-                 "ru", 557, None, None, created, 10, 9, None, None, "ru", "en"),
+                 "ru", 557, None, None, created, 10, 9, None, None, None, None, False, "ru", "en"),
             ]),
         ])
         resp = self.client.get("/tour-info/615")
@@ -194,6 +199,7 @@ class OriginalLanguageTest(unittest.TestCase):
             ("from audio_tours t", [
                 (557, "Boston", "boston walk", 42.36, -71.06, 40,
                  "en", None, None, None, created, None, None, None, None,
+                 None, None, False,
                  "en", None),
             ]),
         ])
@@ -214,10 +220,11 @@ class OriginalLanguageTest(unittest.TestCase):
             ("from audio_tours t", [
                 # German translation of 557 (English original).
                 (621, "Boston [de]", "boston walk", 42.36, -71.06, 4,
-                 "de", 557, None, None, created, 1, None, None, None, "de", "en"),
+                 "de", 557, None, None, created, 1, None, None, None, None, None, False, "de", "en"),
                 # The English original itself.
                 (557, "Boston", "boston walk", 42.36, -71.06, 40,
                  "en", None, None, None, created, None, None, None, None,
+                 None, None, False,
                  "en", None),
             ]),
         ])
@@ -239,7 +246,7 @@ class OriginalLanguageTest(unittest.TestCase):
             ("from shared_tours", [(615,)]),
             ("from audio_tours t", [
                 (615, "Прогулка [ru]", "boston politics walk", 42.36, -71.06, 7,
-                 "ru", 557, None, None, created, 10, 9, None, None, "ru", None),
+                 "ru", 557, None, None, created, 10, 9, None, None, None, None, False, "ru", None),
             ]),
         ])
         resp = self.client.get("/tour-by-code/ru615code")

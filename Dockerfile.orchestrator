@@ -27,6 +27,7 @@ COPY build_manifest.py /app/
 COPY quality_guardrails.py /app/
 COPY swipe_preference_service.py /app/
 COPY tour_rating_service.py /app/
+COPY tour_reviews_service.py /app/
 COPY tour_scoring_service.py /app/
 # [LOCAL-602] tour_scoring_service imports tour_evaluator, which imports
 # tour_rubric_scorer; both were missing, so the orchestrator logged

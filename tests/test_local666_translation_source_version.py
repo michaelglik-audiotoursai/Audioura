@@ -96,10 +96,11 @@ _COL_ABSENT = ("information_schema", [])
 
 class MapDeliveryTranslationVersionTest(unittest.TestCase):
     """map-delivery reports a translation's SOURCE version on /tour-by-code and
-    /tour-info. Row/column order (17 cols after LOCAL-671 appended the two
-    content_language cols): id, name, request_string, lat, lng, number_requested,
+    /tour-info. Row/column order (20 cols after LOCAL-672B inserted the three
+    verified-review cols): id, name, request_string, lat, lng, number_requested,
     language, original_tour_id, max_version_no, last_replaced_at, created_at,
     source_version, source_max_version_no, rating_count, rating_values,
+    verified_values, created_values, is_paid,
     own_content_language, source_content_language.
     """
 
@@ -125,7 +126,7 @@ class MapDeliveryTranslationVersionTest(unittest.TestCase):
                 # (never replaced in place) but source_version=10 is pinned. Trailing
                 # cols: own language 'ru', SOURCE (557) language 'en'.
                 (615, "Прогулка [ru]", "boston politics walk", 42.36, -71.06, 7,
-                 "ru", 557, None, None, created, 10, 9, None, None, "ru", "en"),
+                 "ru", 557, None, None, created, 10, 9, None, None, None, None, False, "ru", "en"),
             ]),
         ])
         resp = self.client.get("/tour-by-code/ru615code")
@@ -145,7 +146,7 @@ class MapDeliveryTranslationVersionTest(unittest.TestCase):
             _COL_PRESENT,
             ("from audio_tours t", [
                 (615, "Прогулка [ru]", "boston politics walk", 42.36, -71.06, 7,
-                 "ru", 557, None, None, created, 10, 9, None, None, "ru", "en"),
+                 "ru", 557, None, None, created, 10, 9, None, None, None, None, False, "ru", "en"),
             ]),
         ])
         resp = self.client.get("/tour-info/615")
@@ -168,7 +169,7 @@ class MapDeliveryTranslationVersionTest(unittest.TestCase):
             ("from shared_tours", [(620,)]),
             ("from audio_tours t", [
                 (620, "Promenade [fr]", "boston walk", 42.36, -71.06, 2,
-                 "fr", 557, None, None, created, 1, None, None, None, "fr", "en"),
+                 "fr", 557, None, None, created, 1, None, None, None, None, None, False, "fr", "en"),
             ]),
         ])
         resp = self.client.get("/tour-by-code/fr620code")
@@ -187,7 +188,7 @@ class MapDeliveryTranslationVersionTest(unittest.TestCase):
             ("from shared_tours", [(621,)]),
             ("from audio_tours t", [
                 (621, "Tour [de]", "boston walk", 42.36, -71.06, 1,
-                 "de", 557, None, None, created, None, None, None, None, "de", "en"),
+                 "de", 557, None, None, created, None, None, None, None, None, None, False, "de", "en"),
             ]),
         ])
         resp = self.client.get("/tour-by-code/de621code")
@@ -208,7 +209,7 @@ class MapDeliveryTranslationVersionTest(unittest.TestCase):
                 # source_version comes back NULL (SELECTed as NULL::integer); the
                 # source 557 has 9 archived versions so its live version is 10.
                 (615, "Прогулка [ru]", "boston politics walk", 42.36, -71.06, 7,
-                 "ru", 557, None, None, created, None, 9, None, None, "ru", "en"),
+                 "ru", 557, None, None, created, None, 9, None, None, None, None, False, "ru", "en"),
             ]),
         ])
         resp = self.client.get("/tour-by-code/ru615code")
@@ -229,6 +230,7 @@ class MapDeliveryTranslationVersionTest(unittest.TestCase):
             ("from audio_tours t", [
                 (557, "Boston", "boston walk", 42.36, -71.06, 40,
                  "en", None, 9, last_replaced, created, None, None, None, None,
+                 None, None, False,
                  "en", None),
             ]),
         ])

@@ -193,6 +193,23 @@ except ImportError as _rating_err:
     )
     print(f"[ORCHESTRATOR] ERROR: tour rating routes unavailable: {_rating_err}")
 
+# [LOCAL-672] Verified reviews: text reviews with a moderation queue, one curator
+# reply, "helpful" votes, the rating distribution, and the moderation queue
+# visible to LEAD. All endpoints live on the orchestrator alongside the ratings
+# so the app talks to one service for every per-tour judgement. Registered
+# defensively so a missing module logs at ERROR and 404s the review endpoints
+# only — it never takes the orchestrator down or affects ratings.
+try:
+    from tour_reviews_service import register_review_routes
+    register_review_routes(app)
+    print("[ORCHESTRATOR] Tour review routes registered (LOCAL-672)")
+except ImportError as _review_err:
+    import logging as _review_logging
+    _review_logging.getLogger("tour_orchestrator_service").error(
+        f"[LOCAL-672] Tour review routes NOT registered — reviews will 404: {_review_err}"
+    )
+    print(f"[ORCHESTRATOR] ERROR: tour review routes unavailable: {_review_err}")
+
 # CORS headers for web platform support
 def add_cors_headers(response):
     response.headers['Access-Control-Allow-Origin'] = '*'
