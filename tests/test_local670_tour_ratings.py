@@ -95,13 +95,27 @@ def db():
 
 
 def _cleanup(conn):
-    """Delete only our TEST-670- rating rows, by exact id after a prefix check."""
+    """Delete only our TEST-670- rows, by exact id after a prefix check.
+
+    Covers tour_ratings and, since LOCAL-670B gated the rating POST behind
+    listened stops, tour_listens too (the endpoint test records a couple).
+    tour_listens may not exist on an older schema — guarded so cleanup never
+    fails the suite.
+    """
     cur = conn.cursor()
     cur.execute("SELECT id, user_id FROM tour_ratings WHERE user_id LIKE %s",
                 (TEST_PREFIX + "%",))
     ids = [row[0] for row in cur.fetchall() if row[1].startswith(TEST_PREFIX)]
     for i in ids:
         cur.execute("DELETE FROM tour_ratings WHERE id = %s", (i,))
+    try:
+        cur.execute("SELECT id, user_id FROM tour_listens WHERE user_id LIKE %s",
+                    (TEST_PREFIX + "%",))
+        lids = [row[0] for row in cur.fetchall() if row[1].startswith(TEST_PREFIX)]
+        for i in lids:
+            cur.execute("DELETE FROM tour_listens WHERE id = %s", (i,))
+    except Exception:
+        conn.rollback()
     conn.commit()
     cur.close()
 
@@ -211,6 +225,12 @@ def test_endpoint_post_then_get(db, orchestrator_client):
     _cleanup(db)
     try:
         tid = _seed_tour(db, "TEST-670 endpoint tour")
+
+        # [LOCAL-670B] The rating POST is now gated behind >= 2 listened stops.
+        # Record two so this endpoint test exercises the record/read path it is
+        # about, not the gate (which has its own suite).
+        svc.record_listen(f"{TEST_PREFIX}ep", tid, 0)
+        svc.record_listen(f"{TEST_PREFIX}ep", tid, 1)
 
         resp = orchestrator_client.post(
             f"/tour/{tid}/rating",

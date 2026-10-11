@@ -153,14 +153,11 @@ def has_downloaded(cur, user_id, tour_id, original_id):
 
 # ─── Writes & reads ───────────────────────────────────────────────────────────
 
-def record_rating(user_id, tour_id, rating):
-    """Record (UPSERT) one user's rating of a tour.
+def _validate_rating(rating):
+    """Validate a tour rating and return it as an int in 1..10.
 
-    A re-rate replaces the earlier value via the UNIQUE(tour_id, user_id)
-    constraint. Translations map to their original before writing. Returns the
-    recomputed {score, count, label} plus authorisation info.
-
-    Raises ValueError if rating is not a whole number in 1..10.
+    Raises ValueError if rating is not a whole number in 1..10. Shared by the
+    route (pre-gate 400) and record_rating (defence in depth).
     """
     try:
         rating_int = int(rating)
@@ -170,6 +167,19 @@ def record_rating(user_id, tour_id, rating):
         raise ValueError(f"rating must be a whole number 1..10, got {rating!r}")
     if not (1 <= rating_int <= 10):
         raise ValueError(f"rating must be in 1..10, got {rating_int}")
+    return rating_int
+
+
+def record_rating(user_id, tour_id, rating):
+    """Record (UPSERT) one user's rating of a tour.
+
+    A re-rate replaces the earlier value via the UNIQUE(tour_id, user_id)
+    constraint. Translations map to their original before writing. Returns the
+    recomputed {score, count, label} plus authorisation info.
+
+    Raises ValueError if rating is not a whole number in 1..10.
+    """
+    rating_int = _validate_rating(rating)
 
     conn = get_connection()
     try:
@@ -218,14 +228,171 @@ def get_rating(tour_id):
         conn.close()
 
 
+# ─── Listened-stops gate (LOCAL-670B) ─────────────────────────────────────────
+#
+# Michael: "Can we not allow rating if people did not listen to at least 2
+# stops ... similar to Audible." A tour rating is accepted only once the user
+# has finished (heard to >= 80% or the end — the app decides that; the server
+# only records the fact) at least REQUIRED_LISTENED_STOPS DISTINCT stops. A tour
+# with fewer stops than that threshold requires ALL of its stops instead, so a
+# 1-stop tour is rateable after that single stop.
+
+REQUIRED_LISTENED_STOPS = 2
+
+
+# Self-healing DDL, identical to migration/sql/020_tour_listens.sql, so the
+# service works whether or not the migration was run (mirrors tour_ratings).
+_TOUR_LISTENS_DDL = """
+    CREATE TABLE IF NOT EXISTS tour_listens (
+        id          SERIAL PRIMARY KEY,
+        tour_id     INTEGER NOT NULL,
+        user_id     VARCHAR(255) NOT NULL,
+        stop_index  INTEGER NOT NULL CHECK (stop_index >= 0),
+        created_at  TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        CONSTRAINT uq_tour_listens_tour_user_stop UNIQUE (tour_id, user_id, stop_index)
+    )
+"""
+
+
+def _ensure_tour_listens_table(cur):
+    """Create tour_listens if absent. Idempotent; safe to call on every write."""
+    cur.execute(_TOUR_LISTENS_DDL)
+
+
+def tour_stops_count(cur, original_id):
+    """The number of stops in a tour, or None if unknown.
+
+    Reads audio_tours.stops_count for the ORIGINAL id. None (column NULL or no
+    row) means "unknown"; the gate then falls back to the full threshold rather
+    than lowering the bar for a tour whose length we cannot confirm.
+    """
+    try:
+        cur.execute(
+            "SELECT stops_count FROM audio_tours WHERE id = %s",
+            (int(original_id),),
+        )
+        row = cur.fetchone()
+    except Exception:  # noqa: BLE001
+        return None
+    if row and row[0] is not None:
+        try:
+            return int(row[0])
+        except (TypeError, ValueError):
+            return None
+    return None
+
+
+def required_listened_stops(cur, original_id):
+    """How many distinct listened stops this tour needs before it can be rated.
+
+    REQUIRED_LISTENED_STOPS (2) normally; but a tour with fewer stops than that
+    requires ALL of its stops — so a 1-stop tour needs 1, a 0/unknown tour keeps
+    the full 2. Never returns less than 1.
+    """
+    stops = tour_stops_count(cur, original_id)
+    if stops is None or stops >= REQUIRED_LISTENED_STOPS:
+        return REQUIRED_LISTENED_STOPS
+    return max(1, stops)
+
+
+def count_listened_stops(cur, user_id, original_id):
+    """Distinct stops this user has finished on this (original) tour."""
+    try:
+        cur.execute(
+            "SELECT COUNT(DISTINCT stop_index) FROM tour_listens "
+            "WHERE tour_id = %s AND user_id = %s",
+            (int(original_id), user_id),
+        )
+        row = cur.fetchone()
+    except Exception:  # noqa: BLE001
+        return 0
+    return int(row[0]) if row and row[0] is not None else 0
+
+
+def record_listen(user_id, tour_id, stop_index):
+    """Record (idempotently) that a user finished one stop of a tour.
+
+    Translations map to their original before writing, so listens key on the
+    ORIGINAL id exactly like ratings. Re-finishing a stop UPSERTs onto the
+    UNIQUE(tour_id, user_id, stop_index) constraint and never adds a duplicate.
+    Returns {original_tour_id, stop_index, listened_count, required, enough}.
+
+    Raises ValueError if stop_index is not a non-negative integer.
+    """
+    try:
+        stop_int = int(stop_index)
+    except (TypeError, ValueError):
+        raise ValueError(f"stop_index must be a non-negative integer, got {stop_index!r}")
+    if stop_int != float(stop_index) or stop_int < 0:
+        raise ValueError(f"stop_index must be a non-negative integer, got {stop_index!r}")
+
+    conn = get_connection()
+    try:
+        cur = conn.cursor()
+        _ensure_tour_listens_table(cur)
+        original_id = resolve_original_id(cur, tour_id)
+        cur.execute(
+            """
+            INSERT INTO tour_listens (tour_id, user_id, stop_index)
+            VALUES (%s, %s, %s)
+            ON CONFLICT (tour_id, user_id, stop_index) DO NOTHING
+            """,
+            (original_id, user_id, stop_int),
+        )
+        conn.commit()
+
+        listened = count_listened_stops(cur, user_id, original_id)
+        required = required_listened_stops(cur, original_id)
+        return {
+            "original_tour_id": original_id,
+            "stop_index": stop_int,
+            "listened_count": listened,
+            "required": required,
+            "enough": listened >= required,
+        }
+    finally:
+        conn.close()
+
+
+def listened_status(user_id, tour_id):
+    """Read-only {listened_count, required, enough} for a (user, tour)."""
+    conn = get_connection()
+    try:
+        cur = conn.cursor()
+        _ensure_tour_listens_table(cur)
+        original_id = resolve_original_id(cur, tour_id)
+        listened = count_listened_stops(cur, user_id, original_id)
+        required = required_listened_stops(cur, original_id)
+        return {
+            "original_tour_id": original_id,
+            "listened_count": listened,
+            "required": required,
+            "enough": listened >= required,
+        }
+    finally:
+        conn.close()
+
+
+def check_listened_enough(user_id, tour_id):
+    """Gate helper for the rating POST: (enough, info) in one connection.
+
+    info is {listened_count, required, enough, original_tour_id}. Opened on its
+    own connection so record_rating keeps its own transaction boundary.
+    """
+    info = listened_status(user_id, tour_id)
+    return info["enough"], info
+
+
 # ─── Flask API routes ─────────────────────────────────────────────────────────
 
 def register_rating_routes(app):
     """Register tour-rating endpoints on a Flask app (the orchestrator).
 
     Endpoints:
-        POST /tour/<tour_id>/rating   {user_id, rating}  → record/replace
-        GET  /tour/<tour_id>/rating                      → {score, count, label}
+        POST /tour/<tour_id>/rating     {user_id, rating}      → record/replace
+        GET  /tour/<tour_id>/rating                            → {score, count, label}
+        POST /tour/<tour_id>/listened   {user_id, stop_index}  → record (idempotent)
+        GET  /tour/<tour_id>/listened?user_id=...              → {listened_count, required, enough}
     """
     from flask import request, jsonify
 
@@ -240,6 +407,33 @@ def register_rating_routes(app):
             return jsonify({"error": "user_id is required"}), 400
         if "rating" not in data:
             return jsonify({"error": "rating is required"}), 400
+
+        # Validate the rating VALUE before the listened gate, so malformed input
+        # is a clean 400 regardless of listen history (a 403 "listen more" on a
+        # rating of 99 would be misleading).
+        try:
+            _validate_rating(data["rating"])
+        except ValueError as ve:
+            return jsonify({"error": str(ve)}), 400
+
+        # [LOCAL-670B] Listened-stops gate. A tour rating is refused with 403
+        # until the user has finished >= 2 distinct stops (or all stops when the
+        # tour has fewer than 2). The per-STOP thumbs are a different endpoint and
+        # are unaffected — you can always rate a stop you heard.
+        try:
+            enough, listen_info = check_listened_enough(user_id, tour_id)
+        except Exception as e:  # noqa: BLE001 — gate read must never 500 the request
+            return jsonify({"error": str(e)}), 500
+        if not enough:
+            return jsonify({
+                "error": "not_enough_listened",
+                "message": (
+                    f"Listen to at least {listen_info['required']} stops to rate "
+                    f"this tour. You've heard {listen_info['listened_count']} so far."
+                ),
+                "listened_count": listen_info["listened_count"],
+                "required": listen_info["required"],
+            }), 403
 
         try:
             result = record_rating(
@@ -266,6 +460,42 @@ def register_rating_routes(app):
     def api_get_rating(tour_id):
         try:
             result = get_rating(tour_id)
+        except Exception as e:  # noqa: BLE001
+            return jsonify({"error": str(e)}), 500
+        return jsonify(result), 200
+
+    @app.route('/tour/<tour_id>/listened', methods=['POST'])
+    def api_record_listen(tour_id):
+        data = request.get_json(silent=True)
+        if not data:
+            return jsonify({"error": "JSON body required"}), 400
+
+        user_id = data.get("user_id")
+        if not user_id:
+            return jsonify({"error": "user_id is required"}), 400
+        if "stop_index" not in data:
+            return jsonify({"error": "stop_index is required"}), 400
+
+        try:
+            result = record_listen(
+                user_id=user_id,
+                tour_id=tour_id,
+                stop_index=data["stop_index"],
+            )
+        except ValueError as ve:
+            return jsonify({"error": str(ve)}), 400
+        except Exception as e:  # noqa: BLE001
+            return jsonify({"error": str(e)}), 500
+
+        return jsonify({"status": "ok", **result}), 200
+
+    @app.route('/tour/<tour_id>/listened', methods=['GET'])
+    def api_listened_status(tour_id):
+        user_id = request.args.get("user_id")
+        if not user_id:
+            return jsonify({"error": "user_id is required"}), 400
+        try:
+            result = listened_status(user_id, tour_id)
         except Exception as e:  # noqa: BLE001
             return jsonify({"error": str(e)}), 500
         return jsonify(result), 200
