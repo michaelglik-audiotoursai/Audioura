@@ -210,6 +210,25 @@ except ImportError as _review_err:
     )
     print(f"[ORCHESTRATOR] ERROR: tour review routes unavailable: {_review_err}")
 
+# --- Tour Pricing / Unlock Routes (LOCAL-677) ---
+# Curator paid tours: a Curator (plans.can_sell) sets/clears a price tier on
+# their own tour (POST /tour/<id>/price), buyers read the price and their
+# unlock/preview state, and the curator reads a Sales (unlock) count. The buy
+# flow itself verifies through the existing /purchases/verify path (user-api),
+# which writes tour_unlocks; these endpoints are the pricing + gating surface.
+# Registered defensively — a missing module 404s only the pricing endpoints and
+# never takes the orchestrator (or ratings/reviews) down.
+try:
+    from tour_pricing_service import register_pricing_routes
+    register_pricing_routes(app)
+    print("[ORCHESTRATOR] Tour pricing routes registered (LOCAL-677)")
+except ImportError as _pricing_err:
+    import logging as _pricing_logging
+    _pricing_logging.getLogger("tour_orchestrator_service").error(
+        f"[LOCAL-677] Tour pricing routes NOT registered — pricing will 404: {_pricing_err}"
+    )
+    print(f"[ORCHESTRATOR] ERROR: tour pricing routes unavailable: {_pricing_err}")
+
 # CORS headers for web platform support
 def add_cors_headers(response):
     response.headers['Access-Control-Allow-Origin'] = '*'
