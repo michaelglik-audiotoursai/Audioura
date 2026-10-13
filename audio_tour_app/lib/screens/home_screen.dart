@@ -20,6 +20,8 @@ import '../services/device_service.dart';
 import '../services/translation_service.dart';
 import '../services/tour_translation_helper.dart';
 import '../services/error_handler_service.dart';
+import '../services/tour_pricing_service.dart';
+import '../services/downloaded_tour_meta.dart';
 import '../config.dart';
 import '../config/endpoints.dart';
 import '../utils/share_code.dart';
@@ -1989,7 +1991,26 @@ class _HomeScreenState extends State<HomeScreen> {
         if (version != null) tourData['version'] = version;
         if (updatedAt != null) tourData['updated_at'] = updatedAt;
       }
-      
+
+      // [LOCAL-677B] Stamp the paid-tour snapshot onto the LOCAL record so the
+      // player knows the SERVER tour id (to ask /unlock-state with the right id)
+      // and can gate correctly OFFLINE from the stored price + unlock state.
+      //
+      //   * server_tour_id — the NUMERIC server id the pricing endpoints key on
+      //     (the download id = the numeric server tour id; `tour_id` above is the
+      //     editable id, which is often non-numeric and is why the player never
+      //     asked before — the Bounce root cause).
+      //   * is_paid / price_tier / price_label — a snapshot AT DOWNLOAD TIME.
+      //     This is the grandfathering key: a tour downloaded while FREE is
+      //     stamped is_paid:false and stays playable even after the curator later
+      //     prices it; a re-download after pricing stamps it paid and then locks.
+      //   * unlocked — whether THIS device already owns the tour (asked once at
+      //     download when online; false offline, which fails closed for a paid
+      //     tour exactly as intended). A later purchase writes unlocked:true
+      //     locally at once (DownloadedTourStore.markUnlockedForPath).
+      //   * original_language — for the Listen/player header "Original: <Lang>".
+      await _stampPaidSnapshot(tourData, tourId, sourceItem);
+
       await DebugLogHelper.addDebugLog('HOME: SAVE - Adding to saved tours list');
       savedTours.add(json.encode(tourData));
       
@@ -2002,6 +2023,89 @@ class _HomeScreenState extends State<HomeScreen> {
     } catch (e) {
       await DebugLogHelper.addDebugLog('HOME: Error saving tour to My Tours: $e');
       rethrow;
+    }
+  }
+
+  /// [LOCAL-677B] Fill the paid-tour snapshot on a downloaded tour's record.
+  ///
+  /// [tourData]   — the saved_tours map being built (mutated in place).
+  /// [downloadId] — the NUMERIC server/download tour id (the pricing endpoints'
+  ///                key); stored as `server_tour_id`.
+  /// [sourceItem] — the found-tour entry (from /tours-near, /search-tours,
+  ///                /tour-by-code), which already carries is_paid / price_tier /
+  ///                price_label / original_language inline on the payload.
+  ///
+  /// is_paid is taken from the server state AT DOWNLOAD TIME (grandfathering: a
+  /// tour downloaded while free is stamped free and stays playable). The device's
+  /// current unlock state is asked once (best effort, online only) so re-opening
+  /// a tour this device already bought is not wrongly locked; offline it defaults
+  /// to not-unlocked, which fails closed for a paid tour exactly as intended.
+  Future<void> _stampPaidSnapshot(
+    Map<String, dynamic> tourData,
+    int downloadId,
+    Map<String, dynamic>? sourceItem,
+  ) async {
+    try {
+      final serverId = downloadId.toString();
+
+      // Grandfather snapshot from the found-tour payload (defensive reads).
+      bool isPaid = false;
+      int? priceTier;
+      String priceLabel = 'Free';
+      String? originalLanguage;
+      if (sourceItem != null) {
+        isPaid = sourceItem['is_paid'] == true;
+        final rawTier = sourceItem['price_tier'];
+        if (rawTier is int) {
+          priceTier = rawTier;
+        } else if (rawTier is num) {
+          priceTier = rawTier.toInt();
+        } else if (rawTier is String) {
+          priceTier = int.tryParse(rawTier);
+        }
+        final rawLabel = sourceItem['price_label'];
+        if (rawLabel is String && rawLabel.trim().isNotEmpty) {
+          priceLabel = rawLabel.trim();
+        }
+        final rawLang = sourceItem['original_language'];
+        if (rawLang is String && rawLang.trim().isNotEmpty) {
+          originalLanguage = rawLang.trim();
+        }
+      }
+
+      // Device unlock state at download (only meaningful for a paid tour, and
+      // only when online). Keeps a re-download of an already-owned tour unlocked.
+      bool unlocked = !isPaid; // free ⇒ unlocked; paid ⇒ assume locked until known
+      if (isPaid) {
+        try {
+          final state = await TourPricingService.unlockState(serverId);
+          // A paid tour the server reports unlocked ⇒ this device owns it.
+          // (unlockState falls back to free/unlocked on any error, so only
+          // trust an explicit paid+unlocked answer here.)
+          if (state.isPaid && state.unlocked) unlocked = true;
+          if (!state.isPaid) {
+            // Server now reports free — but we grandfather on the found-tour
+            // snapshot, so keep is_paid as stamped.
+          }
+        } catch (_) {
+          // Offline / error ⇒ leave unlocked:false (fail closed for paid).
+        }
+      }
+
+      final meta = DownloadedTourMeta(
+        serverTourId: serverId,
+        priceTier: priceTier,
+        isPaid: isPaid,
+        unlocked: unlocked,
+        priceLabel: priceLabel,
+        originalLanguage: originalLanguage,
+        tourVersion: null, // version is stored separately above as `version`
+      );
+      tourData.addAll(meta.toRecordFields());
+    } catch (e) {
+      // Never fail a download because the snapshot could not be built; the
+      // player then falls back to the online check with the server id if present.
+      await DebugLogHelper.addDebugLog('HOME: paid snapshot stamp skipped: $e');
     }
   }
 
