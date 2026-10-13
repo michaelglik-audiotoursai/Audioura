@@ -124,16 +124,11 @@ class _TourPlayerScreenState extends State<TourPlayerScreen> with VoiceMethods {
     final meta = await DownloadedTourStore.metaForPath(widget.tourPath);
 
     // 2. Resolve the numeric server id from the best available source.
-    String? serverId = widget.serverTourId;
-    if (serverId == null || int.tryParse(serverId) == null) {
-      final wid = widget.tourId;
-      if (wid != null && int.tryParse(wid) != null) {
-        serverId = wid;
-      } else if (meta.serverTourId != null &&
-          int.tryParse(meta.serverTourId!) != null) {
-        serverId = meta.serverTourId;
-      }
-    }
+    final serverId = DownloadedTourMeta.resolveServerTourId(
+      serverTourId: widget.serverTourId,
+      widgetTourId: widget.tourId,
+      metaServerTourId: meta.serverTourId,
+    );
 
     TourUnlockState resolved;
     if (serverId != null && int.tryParse(serverId) != null) {

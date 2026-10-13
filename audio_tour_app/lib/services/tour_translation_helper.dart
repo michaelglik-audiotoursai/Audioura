@@ -31,6 +31,18 @@ class TourTranslationHelper {
     return val == true || val == 'true';
   }
 
+  /// [LOCAL-677B / D653] Should the ENGLISH tour be pulled to the phone?
+  /// English is downloaded only when it is a selected language. A null
+  /// selection means the default (English only). The server may still use
+  /// English as an internal translation template regardless; this governs only
+  /// what the LISTENER receives.
+  static bool shouldDownloadEnglish(List<String>? languages) =>
+      languages == null || languages.contains('en');
+
+  /// [LOCAL-677B / D653] The non-English languages to download as translations.
+  static List<String> translationLanguages(List<String>? languages) =>
+      (languages ?? const <String>[]).where((l) => l != 'en').toList();
+
   /// Translates a tour and downloads each translated version as a new entry.
   /// Returns a list of language codes that failed.
   /// The English tour must already be saved before calling this.

@@ -22,6 +22,7 @@ import '../services/tour_translation_helper.dart';
 import '../services/error_handler_service.dart';
 import '../services/tour_pricing_service.dart';
 import '../services/downloaded_tour_meta.dart';
+import '../utils/tour_display.dart';
 import '../config.dart';
 import '../config/endpoints.dart';
 import '../utils/share_code.dart';
@@ -813,7 +814,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 // the share-code (/tour-by-code) and search-results entries carry
                 // no distance, and "Distance: null km" is nonsense. Only shown
                 // when the server sent a real distance.
-                if (item['distance_km'] != null)
+                if (shouldShowDistance(item))
                   Text('Distance: ${item['distance_km']} km'),
                 Text('Downloads: ${item['popularity']}'),
                 SizedBox(height: 6),
@@ -1536,7 +1537,7 @@ class _HomeScreenState extends State<HomeScreen> {
     final prefs = await SharedPreferences.getInstance();
 
     // [LOCAL-677B / D653] Only pull English when it is a selected language.
-    final bool wantEnglish = languages == null || languages.contains('en');
+    final bool wantEnglish = TourTranslationHelper.shouldDownloadEnglish(languages);
     if (wantEnglish) {
       final uri = await Endpoints.url(Service.mapDelivery, '/download-tour/$tourId');
       final response = await http.get(uri, headers: await Endpoints.apiHeaders(Service.mapDelivery)).timeout(Duration(seconds: 120));
@@ -1581,7 +1582,7 @@ class _HomeScreenState extends State<HomeScreen> {
       // deselected, do NOT pull the English tour to the phone — the server may
       // still use English as the internal translation template, but the listener
       // does not receive it. A null `languages` means the default (English only).
-      final bool wantEnglish = languages == null || languages.contains('en');
+    final bool wantEnglish = TourTranslationHelper.shouldDownloadEnglish(languages);
       if (wantEnglish) {
         final dlUri = await Endpoints.url(Service.mapDelivery, '/download-tour/$tourId');
         final response = await http.get(dlUri, headers: await Endpoints.apiHeaders(Service.mapDelivery)).timeout(Duration(seconds: 120));

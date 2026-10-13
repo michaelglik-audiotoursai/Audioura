@@ -75,11 +75,16 @@ class DownloadedTourMeta {
     }
 
     final sid = r['server_tour_id'];
+    final isPaid = asBool(r['is_paid']);
+    // `unlocked` defaults to !isPaid when absent: a record with no unlock key is
+    // a free tour (unlocked) or a pre-677B record (treated free). Only an
+    // explicitly-stored false locks a paid tour.
+    final unlocked = r.containsKey('unlocked') ? asBool(r['unlocked']) : !isPaid;
     return DownloadedTourMeta(
       serverTourId: (sid == null) ? null : '$sid',
       priceTier: asInt(r['price_tier']),
-      isPaid: asBool(r['is_paid']),
-      unlocked: asBool(r['unlocked']),
+      isPaid: isPaid,
+      unlocked: unlocked,
       priceLabel: (r['price_label'] as String?) ?? 'Free',
       originalLanguage: (r['original_language'] as String?)?.trim().isEmpty ?? true
           ? null
@@ -113,6 +118,29 @@ class DownloadedTourMeta {
   /// Whether this is a paid tour the player should treat as a candidate for the
   /// online unlock-state check (worth asking the server with the server id).
   bool get isPaidAtDownload => isPaid;
+
+  /// [LOCAL-677B] Resolve the NUMERIC server tour id the pricing/unlock
+  /// endpoints key on, from the sources the player has, in priority order:
+  ///   1. an explicit [serverTourId] param (passed from My Tours / the dialog),
+  ///   2. a numeric [widgetTourId] (the generic tour id, when it happens to be
+  ///      numeric),
+  ///   3. the [metaServerTourId] stamped on the local record at download.
+  /// Returns null when none is a parseable integer — the player then has no id
+  /// to ask with and gates purely from the local offline snapshot.
+  ///
+  /// This is the fix for the Bounce: before, the player used only a non-numeric
+  /// generic id and so never asked. Pure + static so it is unit-testable.
+  static String? resolveServerTourId({
+    String? serverTourId,
+    String? widgetTourId,
+    String? metaServerTourId,
+  }) {
+    bool numeric(String? s) => s != null && int.tryParse(s) != null;
+    if (numeric(serverTourId)) return serverTourId;
+    if (numeric(widgetTourId)) return widgetTourId;
+    if (numeric(metaServerTourId)) return metaServerTourId;
+    return null;
+  }
 }
 
 /// Stamp / read the paid-tour snapshot on the saved_tours list.
