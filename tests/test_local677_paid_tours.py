@@ -265,9 +265,12 @@ def test_curator_owner_sets_and_clears_price(db):
         _cleanup(db)
 
 
-# ─── 4. Translation inheritance ───────────────────────────────────────────────
+# ─── 4. Translation: price inherited, unlock PER LANGUAGE (D653) ──────────────
 
-def test_translation_inherits_price_and_unlock(db):
+def test_translation_inherits_price_but_unlocks_separately(db):
+    """[LOCAL-677B / D653] A translation INHERITS its source's PRICE, but NOT its
+    unlock. Buying one language unlocks that language only; the other still
+    needs its own purchase. tour_unlocks keys on the language row's OWN id."""
     _cleanup(db)
     try:
         orig = _seed_tour(db, f"{TEST_PREFIX}tr orig")
@@ -276,23 +279,88 @@ def test_translation_inherits_price_and_unlock(db):
         _seed_creator(db, orig, owner)
         _make_curator(db, owner)
 
-        # Price the original; the translation inherits it.
+        # Price the original; the translation INHERITS the price.
         pricing_svc.set_price(owner, orig, 2)
         assert pricing_svc.get_price(trans)["price_tier"] == 2
         assert pricing_svc.get_price(trans)["price_label"] == "$2.99"
 
-        # Pricing via the TRANSLATION id resolves to the original.
+        # Pricing via the TRANSLATION id still resolves to the original for price.
         pricing_svc.set_price(owner, trans, 4)
         assert pricing_svc.get_price(orig)["price_tier"] == 4
 
-        # An unlock recorded on the translation keys on the original and is
-        # therefore shared by both.
+        # An unlock recorded on the TRANSLATION keys on the translation's OWN id
+        # and does NOT unlock the original (English still needs its own buy).
         buyer = f"{TEST_PREFIX}tr-buyer"
         _seed_user(db, buyer)
         pricing_svc.record_unlock(buyer, trans, transaction_id=f"{TEST_PREFIX}tr-txn",
                                   store="stub", price_usd=7.99)
-        assert pricing_svc.is_unlocked(buyer, orig) is True
         assert pricing_svc.is_unlocked(buyer, trans) is True
+        assert pricing_svc.is_unlocked(buyer, orig) is False
+
+        # The preview gate agrees: the translation is unlocked, the original is
+        # still locked for the same buyer.
+        assert pricing_svc.preview_state(buyer, trans)["locked"] is False
+        assert pricing_svc.preview_state(buyer, orig)["locked"] is True
+    finally:
+        _cleanup(db)
+
+
+def test_each_language_unlocks_independently_and_sales_pool(db):
+    """[LOCAL-677B / D653] Buying Russian then English on the same tour are two
+    separate unlocks; the curator's Sales count POOLS across the family."""
+    _cleanup(db)
+    try:
+        orig = _seed_tour(db, f"{TEST_PREFIX}2x orig", price_tier=3)
+        trans = _seed_tour(db, f"{TEST_PREFIX}2x ru", original_tour_id=orig, language="ru")
+        buyer = f"{TEST_PREFIX}2x-buyer"
+        _seed_user(db, buyer)
+
+        # Both languages start locked for the buyer.
+        assert pricing_svc.preview_state(buyer, orig)["locked"] is True
+        assert pricing_svc.preview_state(buyer, trans)["locked"] is True
+
+        # Buy Russian: Russian unlocks, English stays locked.
+        pricing_svc.record_unlock(buyer, trans, transaction_id=f"{TEST_PREFIX}2x-ru-txn",
+                                  store="stub", price_usd=4.99)
+        assert pricing_svc.preview_state(buyer, trans)["locked"] is False
+        assert pricing_svc.preview_state(buyer, orig)["locked"] is True
+        # One sale so far (pooled view).
+        assert pricing_svc.sales_count(orig) == 1
+
+        # Buy English too: now both unlocked, two sales (2 × $4.99 = $9.98).
+        pricing_svc.record_unlock(buyer, orig, transaction_id=f"{TEST_PREFIX}2x-en-txn",
+                                  store="stub", price_usd=4.99)
+        assert pricing_svc.preview_state(buyer, orig)["locked"] is False
+        assert pricing_svc.sales_count(orig) == 2
+        assert pricing_svc.sales_count(trans) == 2  # same pooled count via either id
+    finally:
+        _cleanup(db)
+
+
+def test_verified_pools_across_languages(db):
+    """[LOCAL-677B / D653] The Verified-listener mark comes from an unlock of ANY
+    language: a buyer who unlocked the Russian copy is Verified on the English
+    copy too (reviews/ratings pool across languages, D647)."""
+    _cleanup(db)
+    try:
+        orig = _seed_tour(db, f"{TEST_PREFIX}vp orig", price_tier=3)
+        trans = _seed_tour(db, f"{TEST_PREFIX}vp ru", original_tour_id=orig, language="ru")
+        buyer = f"{TEST_PREFIX}vp-buyer"
+        _seed_user(db, buyer)
+
+        cur = db.cursor()
+        assert reviews_svc.compute_verified(cur, buyer, orig) is False
+        cur.close()
+
+        # Unlock ONLY the Russian translation.
+        pricing_svc.record_unlock(buyer, trans, transaction_id=f"{TEST_PREFIX}vp-txn",
+                                  store="stub", price_usd=4.99)
+
+        # Verified on BOTH the original and the translation (pooled).
+        cur = db.cursor()
+        assert reviews_svc.compute_verified(cur, buyer, orig) is True
+        assert reviews_svc.compute_verified(cur, buyer, trans) is True
+        cur.close()
     finally:
         _cleanup(db)
 
@@ -413,6 +481,43 @@ def test_stub_tour_purchase_unlocks_idempotently(db, ent_client):
         # Either no entitlement row at all, or still l1 — never promoted to l3/l4.
         assert row is None or row[0] in ("l1", "l2")
         cur.close()
+    finally:
+        _cleanup(db)
+
+
+def test_stub_tour_purchase_translation_unlocks_own_language(db, ent_client):
+    """[LOCAL-677B / D653] Buying a TRANSLATION through /purchases/verify writes
+    the unlock on the TRANSLATION's own id, not the original — so the original
+    stays locked and English needs its own purchase."""
+    _cleanup(db)
+    try:
+        orig = _seed_tour(db, f"{TEST_PREFIX}vt orig", price_tier=3)
+        trans = _seed_tour(db, f"{TEST_PREFIX}vt ru", original_tour_id=orig, language="ru")
+        buyer = f"{TEST_PREFIX}vt-buyer"
+        _seed_user(db, buyer)
+        r = ent_client.post("/purchases/verify", json={
+            "store": "stub",
+            "transaction_id": f"{TEST_PREFIX}vt-txn",
+            "product": "audioura.tour.tier3",
+            "user_id": buyer,
+            "tour_id": str(trans),
+        })
+        assert r.status_code == 200
+        j = r.get_json()
+        assert j["unlocked"] is True
+        # The unlock is on the translation's OWN id.
+        assert int(j["tour_id"]) == trans
+
+        cur = db.cursor()
+        cur.execute("SELECT tour_id FROM tour_unlocks WHERE user_id = %s", (buyer,))
+        unlocked_ids = {row[0] for row in cur.fetchall()}
+        cur.close()
+        assert trans in unlocked_ids
+        assert orig not in unlocked_ids
+
+        # Pricing agrees: Russian unlocked, English still locked.
+        assert pricing_svc.preview_state(buyer, trans)["locked"] is False
+        assert pricing_svc.preview_state(buyer, orig)["locked"] is True
     finally:
         _cleanup(db)
 

@@ -1726,6 +1726,15 @@ class _MyToursScreenState extends State<MyToursScreen> {
                             tourPath: tour['path'],
                             tourTitle: tour['title'],
                             tourId: tour['tour_id']?.toString(),
+                            // [LOCAL-677B] The NUMERIC server id the pricing/
+                            // unlock endpoints key on, stamped at download. This
+                            // is what the player needs to ask /unlock-state (the
+                            // editable tour_id above is non-numeric, which is why
+                            // the player never asked — the Bounce). Falls back to
+                            // the local snapshot inside the player when absent.
+                            serverTourId: tour['server_tour_id']?.toString(),
+                            originalLanguage:
+                                tour['original_language']?.toString(),
                             track: tour['track'] as String?,
                             buildNumber: tour['build_number'] is int
                                 ? tour['build_number'] as int

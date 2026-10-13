@@ -118,3 +118,99 @@ later task, D624 §4).
   mirrors fall back to the D652 constants on a DB that predates migration 022.
 - No paid API calls. No payouts/Stripe. No GCloud. Own containers only.
 - Build bumped after 2.4.8+38 → 2.4.8+39.
+
+
+---
+
+# 677B — Bounce: the lock never engaged on the phone
+
+**Agent:** Mac Mini Kiro
+**Branch:** `LOCAL-677-paid-tours` (continued; rebased on `subscribed` @ `d0caeacb`)
+**Build:** 2.4.8+39 → **2.4.8+40**
+
+## The report (Michael's iPhone, app 2.4.8+39, 2026-10-13 18:46–18:50)
+Tour `q9oSUebU` (server tour 557, `price_tier=3`, is_test) showed the right
+dialog — ★ 7.5 · New, **$4.99**, v12 · updated Oct 11, Original: English — but
+after **Download Tour** the player **played ALL 5 stops**: no free-preview
+banner, no Buy, no TEST PURCHASE. The orchestrator logged **no
+`GET /tour/557/unlock-state` at all**.
+
+## Root cause (two bugs)
+1. **The player never asked.** A downloaded tour was opened by its local path and
+   its stored `tour_id` was the **editable** id (non-numeric). `tour_player_screen`
+   did `if (int.tryParse(tourId) == null) return;` before asking, so
+   `unlockState` was never called and fell back to "free".
+2. **The lock was only a banner.** Even when a lock state was present, nothing
+   stopped playback — the WebView auto-played every stop. So the lock could not
+   engage regardless of (1).
+
+## What shipped (steps map to the ticket)
+
+1. **Carry the server id + price + unlock into the local record** (step 1).
+   `NEW services/downloaded_tour_meta.dart` — `DownloadedTourMeta` (snapshot
+   model) + `DownloadedTourStore` (read/merge/mark-unlocked on `saved_tours`).
+   `home_screen._stampPaidSnapshot` stamps `server_tour_id` (the NUMERIC id the
+   pricing endpoints key on), `price_tier`, `is_paid` (grandfather snapshot),
+   `unlocked`, `price_label`, `original_language` at download. My Tours passes
+   `serverTourId` + `originalLanguage` to the player; every other entry path
+   (share code, voice next/prev) recovers them from the local record **by path**,
+   so the player always resolves the id and asks `/tour/<id>/unlock-state`.
+
+2. **Offline-correct lock** (step 2, D647 add. 2). `_loadUnlockState` asks the
+   server when a numeric id resolves; offline / no answer it gates from the local
+   snapshot (`_offlineState`): a tour stored **paid & not-unlocked** stays
+   preview-only; a tour stored **free** stays free. **Fail closed only for a tour
+   stored paid.** A confirmed purchase writes `unlocked:true` to the local record
+   at once (`markUnlockedForPath`) so the lock lifts offline, and syncs as today.
+   **Also fixed bug 2:** `_applyLockToWebView` injects a JS guard that
+   pauses+rewinds any stop `>= free_preview_stops` while locked (installed on the
+   real audio elements in `onLoadStop`, re-applied after a purchase).
+
+3. **Grandfathering** (step 3). `is_paid` is a snapshot **at download time**, so a
+   tour downloaded while free stays playable after the curator later prices it; a
+   **re-download** after pricing stamps it paid and then locks (Michael's test).
+
+4. **Listen/player header** (step 4). `_buildOriginalHeader` shows
+   "Original: &lt;Language&gt; · vN" above the player, like the dialog.
+
+5. **Hide "Distance: null km"** (step 5). `utils/tour_display.shouldShowDistance`
+   — the found-tour dialog renders the Distance line only when `distance_km` is
+   non-null (share-code and search entries carry none).
+
+7. **Download only the selected languages** (D653). If English is deselected the
+   phone does **not** pull the English tour (`TourTranslationHelper
+   .shouldDownloadEnglish`); the server may still use English as an internal
+   template, the listener just does not receive it. The "English will be generated
+   as template" note and the `showEnglishNote` flag were removed from the shared
+   `LanguageSelector` (all call sites updated).
+
+8. **Every language copy carries the price, unlocks separately** (D653). Reverses
+   LOCAL-677's "translation inherits unlock". A translation still **inherits** its
+   source's **price** (`get_price` resolves to original), but `tour_unlocks` is now
+   keyed on the **language row's own `tour_id`**: buying Russian unlocks Russian
+   only; English needs its own purchase (2 × $4.99 = $9.98). `record_unlock` /
+   `is_unlocked` / `preview_state` key on the own id; `_verify_tour_purchase`
+   writes the unlock on the purchased language's own id; `sales_count` **pools**
+   across the family for the curator's view; `compute_verified` pools across the
+   family so the **Verified-listener** mark comes from an unlock of **any** language
+   (reviews/ratings pool, D647). Each saved translation record carries the inherited
+   price snapshot keyed by its own server id, `unlocked:false` for a paid copy.
+
+## Verification
+- **Flutter tests (new, 22, all green):**
+  `test/downloaded_tour_meta_test.dart` — server-id resolution incl. **per entry
+  path** (listen list / share code / voice nav all resolve the id so unlock-state
+  is requested); offline lock (fail-closed-for-paid, free-stays-free);
+  grandfathering (free stays free, re-download paid locks, pre-677B record free);
+  store read/merge/mark-unlocked lifts the lock at once; per-language price
+  snapshot. `test/paid_tour_download_test.dart` — null-distance hidden;
+  selected-languages-only (English deselected is not pulled).
+- **Server tests:** `tests/test_local677_paid_tours.py` — **16 passed** (was 13):
+  translation inherits price **but unlocks separately**; each language unlocks
+  independently + sales pool; verified pools across languages; `/purchases/verify`
+  of a translation unlocks only that language. Regression:
+  `test_local672_verified_reviews.py` (26) still green → **42 passed**.
+- **`flutter analyze`** (whole app): **77 errors, all pre-existing**, **zero** in
+  any file 677B touched (unchanged from 677).
+- **`flutter build ios --no-codesign`** succeeded (`Runner.app`, 37.6 MB).
+- No paid API calls. No install (LEAD does). Build bumped 2.4.8+39 → **2.4.8+40**.

@@ -567,8 +567,22 @@ def _verify_tour_purchase(store, transaction_id, product, user_id,
     try:
         cur = conn.cursor()
 
-        original_tour_id = _resolve_original_tour_id(cur, tour_id)
-        if original_tour_id is None:
+        # [LOCAL-677B / D653] The unlock keys on the OWN language id the buyer
+        # purchased (buying Russian unlocks Russian only), NOT the source. We
+        # still validate the tour EXISTS (via the resolver, which also proves the
+        # id is an integer and a known tour); the unlock row then uses the own id.
+        resolved = _resolve_original_tour_id(cur, tour_id)
+        if resolved is None:
+            cur.close()
+            return jsonify({
+                "error": "unknown_tour",
+                "message": f"Unknown tour '{tour_id}'.",
+            }), 400
+        own_tour_id = int(tour_id)
+        # The tour id must be a real row (the resolver returns the id itself for
+        # an unknown-but-integer id, so confirm existence explicitly).
+        cur.execute("SELECT 1 FROM audio_tours WHERE id = %s", (own_tour_id,))
+        if cur.fetchone() is None:
             cur.close()
             return jsonify({
                 "error": "unknown_tour",
@@ -587,7 +601,7 @@ def _verify_tour_purchase(store, transaction_id, product, user_id,
                 VALUES (%s, %s, %s, %s, %s)
                 ON CONFLICT (user_id, tour_id) DO NOTHING
                 """,
-                (user_id, original_tour_id, transaction_id, store,
+                (user_id, own_tour_id, transaction_id, store,
                  _tour_price_usd(cur, product)),
             )
             conn.commit()
@@ -597,7 +611,7 @@ def _verify_tour_purchase(store, transaction_id, product, user_id,
                 "message": "This transaction has already been processed.",
                 "transaction_id": transaction_id,
                 "unlocked": True,
-                "tour_id": original_tour_id,
+                "tour_id": own_tour_id,
             }), 409
 
         # Verify with the store. For apple mode, verify_purchase checks the
@@ -626,7 +640,7 @@ def _verify_tour_purchase(store, transaction_id, product, user_id,
                     VALUES (%s, %s, %s, %s, %s)
                     ON CONFLICT (user_id, tour_id) DO NOTHING
                     """,
-                    (user_id, original_tour_id, effective_txid, store,
+                    (user_id, own_tour_id, effective_txid, store,
                      _tour_price_usd(cur, product)),
                 )
                 conn.commit()
@@ -636,7 +650,7 @@ def _verify_tour_purchase(store, transaction_id, product, user_id,
                     "message": "This transaction has already been processed.",
                     "transaction_id": effective_txid,
                     "unlocked": True,
-                    "tour_id": original_tour_id,
+                    "tour_id": own_tour_id,
                 }), 409
 
         price_usd = _tour_price_usd(cur, product)
@@ -657,7 +671,7 @@ def _verify_tour_purchase(store, transaction_id, product, user_id,
                 VALUES (%s, %s, %s, %s, %s)
                 ON CONFLICT (user_id, tour_id) DO NOTHING
                 """,
-                (user_id, original_tour_id, effective_txid, store, price_usd),
+                (user_id, own_tour_id, effective_txid, store, price_usd),
             )
             conn.commit()
             cur2.close()
@@ -666,7 +680,7 @@ def _verify_tour_purchase(store, transaction_id, product, user_id,
                 "message": "This transaction has already been processed.",
                 "transaction_id": effective_txid,
                 "unlocked": True,
-                "tour_id": original_tour_id,
+                "tour_id": own_tour_id,
             }), 409
 
         # Write the unlock (idempotent on UNIQUE(user_id, tour_id)): a replayed
@@ -677,14 +691,14 @@ def _verify_tour_purchase(store, transaction_id, product, user_id,
             VALUES (%s, %s, %s, %s, %s)
             ON CONFLICT (user_id, tour_id) DO NOTHING
             """,
-            (user_id, original_tour_id, effective_txid, store, price_usd),
+            (user_id, own_tour_id, effective_txid, store, price_usd),
         )
         conn.commit()
         cur.close()
         return jsonify({
             "verified": True,
             "unlocked": True,
-            "tour_id": original_tour_id,
+            "tour_id": own_tour_id,
             "transaction_id": effective_txid,
             "product": product,
             "amount": price_usd,

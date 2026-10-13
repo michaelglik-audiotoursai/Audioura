@@ -311,19 +311,29 @@ def compute_verified(cur, user_id, original_id):
     a non-purchasing user verified.
     """
     # [LOCAL-677] AUTHORITATIVE per-tour unlock: a tour_unlocks row for this
-    # (user, original tour) means the buyer completed a store-verified purchase
-    # that unlocked THIS tour (written by the /purchases/verify tour-tier path).
-    # This is the real per-tour signal the D624 fallback below only approximated,
-    # so it is checked FIRST and short-circuits — a buyer who unlocked the tour
-    # is a Verified listener regardless of the (now historical) product-string
-    # heuristics. A refunded purchase removes the unlock (the verify path writes
-    # the row only on a successful, non-refunded grant), so this stays correct
-    # under refunds too. Absent table (pre-022 DB) → falls through unchanged.
+    # user that unlocked ANY LANGUAGE of this tour means the buyer completed a
+    # store-verified purchase. [LOCAL-677B / D653] Unlocks are per-language rows
+    # now (buying Russian unlocks Russian only), but the Verified-listener mark
+    # pools across the family: an unlock of the original OR any of its
+    # translations verifies the listener (reviews/ratings pool across languages,
+    # D647). So check tour_unlocks for the original id AND every translation id.
+    # This is checked FIRST and short-circuits. Absent table (pre-022) → falls
+    # through unchanged.
     if _has_table(cur, "tour_unlocks"):
         try:
+            family_ids = {int(original_id)}
+            try:
+                cur.execute(
+                    "SELECT id FROM audio_tours WHERE original_tour_id = %s",
+                    (int(original_id),),
+                )
+                for (tid,) in cur.fetchall():
+                    family_ids.add(int(tid))
+            except Exception:  # noqa: BLE001 — pool is best-effort
+                pass
             cur.execute(
-                "SELECT 1 FROM tour_unlocks WHERE user_id = %s AND tour_id = %s LIMIT 1",
-                (user_id, int(original_id)),
+                "SELECT 1 FROM tour_unlocks WHERE user_id = %s AND tour_id = ANY(%s) LIMIT 1",
+                (user_id, sorted(family_ids)),
             )
             if cur.fetchone() is not None:
                 return True

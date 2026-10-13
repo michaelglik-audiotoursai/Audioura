@@ -234,14 +234,19 @@ def record_unlock(user_id, tour_id, transaction_id=None, store=None,
     """Record (idempotently) that a buyer unlocked a tour.
 
     UNIQUE(user_id, tour_id) → a replayed/duplicate purchase is a no-op (ON
-    CONFLICT DO NOTHING). The unlock keys on the ORIGINAL tour id (a translation
-    shares its source tour's unlock). Returns {original_tour_id, unlocked:True,
-    created:bool} where `created` is True only when a new row was written.
+    CONFLICT DO NOTHING).
+
+    [LOCAL-677B / D653] Every language copy unlocks SEPARATELY: the unlock keys
+    on the GIVEN language row's OWN tour_id, NOT its source. Buying Russian
+    unlocks Russian only; English needs its own purchase. (A translation still
+    INHERITS its source's PRICE — see get_price — but not its unlock.) Returns
+    {tour_id, unlocked:True, created:bool} where `created` is True only when a
+    new row was written.
     """
     conn = get_connection()
     try:
         cur = conn.cursor()
-        original_id = rating_svc.resolve_original_id(cur, tour_id)
+        own_id = int(tour_id)
         cur.execute(
             """
             INSERT INTO tour_unlocks (user_id, tour_id, transaction_id, store, price_usd)
@@ -249,12 +254,15 @@ def record_unlock(user_id, tour_id, transaction_id=None, store=None,
             ON CONFLICT (user_id, tour_id) DO NOTHING
             RETURNING id
             """,
-            (user_id, int(original_id), transaction_id, store, price_usd),
+            (user_id, own_id, transaction_id, store, price_usd),
         )
         created = cur.fetchone() is not None
         conn.commit()
         return {
-            "original_tour_id": int(original_id),
+            "tour_id": own_id,
+            # Kept for backward compatibility with callers that read this key;
+            # it now equals the OWN id (unlock is per language row, D653).
+            "original_tour_id": own_id,
             "unlocked": True,
             "created": created,
         }
@@ -278,28 +286,55 @@ def is_unlocked_cur(cur, user_id, original_id):
 
 
 def is_unlocked(user_id, tour_id):
-    """True if this user has unlocked this tour (translation → original)."""
+    """True if this user has unlocked THIS language copy.
+
+    [LOCAL-677B / D653] Per-language: keyed on the GIVEN tour_id's OWN unlock,
+    not its source. Buying Russian does not unlock English.
+    """
     conn = get_connection()
     try:
         cur = conn.cursor()
-        original_id = rating_svc.resolve_original_id(cur, tour_id)
-        return is_unlocked_cur(cur, user_id, original_id)
+        return is_unlocked_cur(cur, user_id, int(tour_id))
     finally:
         conn.close()
 
 
+def _language_family_ids(cur, tour_id):
+    """All audio_tours ids in the same language FAMILY as tour_id: the original
+    plus every translation of it. Used where a figure should POOL across
+    languages (the curator's Sales count; the Verified-listener mark). Never
+    raises — returns at least the original id."""
+    try:
+        original_id = rating_svc.resolve_original_id(cur, tour_id)
+    except Exception:  # noqa: BLE001
+        return [int(tour_id)]
+    ids = {int(original_id)}
+    try:
+        cur.execute(
+            "SELECT id FROM audio_tours WHERE original_tour_id = %s", (int(original_id),)
+        )
+        for (tid,) in cur.fetchall():
+            ids.add(int(tid))
+    except Exception:  # noqa: BLE001
+        pass
+    return sorted(ids)
+
+
 def sales_count(tour_id):
-    """How many unlocks (sales) a tour has — the curator's Sales count. Keys on
-    the ORIGINAL id (a translation's sales are its source's). 0 if the table is
-    absent (pre-022)."""
+    """How many unlocks (sales) a tour has — the curator's Sales count.
+
+    [LOCAL-677B / D653] A translation unlocks separately, so the curator's Sales
+    POOL across the whole language family (the original + every translation):
+    one Russian sale and one English sale on the same tour read as 2 sales for
+    the curator. 0 if the table is absent (pre-022)."""
     conn = get_connection()
     try:
         cur = conn.cursor()
-        original_id = rating_svc.resolve_original_id(cur, tour_id)
         try:
+            ids = _language_family_ids(cur, tour_id)
             cur.execute(
-                "SELECT COUNT(*) FROM tour_unlocks WHERE tour_id = %s",
-                (int(original_id),),
+                "SELECT COUNT(*) FROM tour_unlocks WHERE tour_id = ANY(%s)",
+                (ids,),
             )
             row = cur.fetchone()
             return int(row[0]) if row and row[0] is not None else 0
@@ -325,15 +360,23 @@ def preview_state(user_id, tour_id):
     unlocked is not locked. A PAID tour the user has NOT unlocked is `locked`:
     the app plays Stop 1 (indices < free_preview_stops) as a preview and blocks
     the rest behind the Buy button.
+
+    [LOCAL-677B / D653] The PRICE is inherited from the source tour (resolve to
+    original), but the UNLOCK is per LANGUAGE: `unlocked`/`locked` are decided by
+    whether THIS tour_id (the language the listener opened) has its own unlock
+    row. Buying Russian leaves English `locked`.
     """
     conn = get_connection()
     try:
         cur = conn.cursor()
         original_id = rating_svc.resolve_original_id(cur, tour_id)
         price = _price_payload(cur, original_id)
-        unlocked = (not price["is_paid"]) or is_unlocked_cur(cur, user_id, original_id)
+        # Unlock keys on the OWN language id, not the source.
+        unlocked = (not price["is_paid"]) or is_unlocked_cur(cur, user_id, int(tour_id))
         return {
             **price,
+            # Report the id the listener actually opened (the language row).
+            "tour_id": int(tour_id),
             "unlocked": bool(unlocked),
             "free_preview_stops": FREE_PREVIEW_STOPS,
             "locked": bool(price["is_paid"] and not unlocked),

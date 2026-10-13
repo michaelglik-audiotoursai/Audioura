@@ -13,6 +13,7 @@ import '../widgets/rate_tour_dialog.dart';
 import '../services/tour_listen_service.dart';
 import '../services/playback_accumulator.dart';
 import '../services/tour_pricing_service.dart';
+import '../services/downloaded_tour_meta.dart';
 import '../widgets/tour_buy_sheet.dart';
 
 class TourPlayerScreen extends StatefulWidget {
@@ -27,6 +28,19 @@ class TourPlayerScreen extends StatefulWidget {
   /// field. Rendered as "(vNNN)" when present, omitted when absent.
   final int? buildNumber;
 
+  /// [LOCAL-677B] The NUMERIC server tour id the pricing/unlock endpoints key
+  /// on. Distinct from [tourId] (the editable id, often non-numeric). When
+  /// provided, the player asks `/tour/<serverTourId>/unlock-state` with the
+  /// RIGHT id — the fix for the Bounce (a downloaded tour opened by path used to
+  /// have only a non-numeric id, so the player never asked and every stop
+  /// played). When null, the player recovers it from the local saved_tours
+  /// record (by [tourPath]) so every entry path works.
+  final String? serverTourId;
+
+  /// [LOCAL-677B] The tour's original language code (e.g. 'en', 'ru'), shown in
+  /// the player header as "Original: <Language>" like the found-tour dialog.
+  final String? originalLanguage;
+
   const TourPlayerScreen({
     super.key,
     required this.tourPath,
@@ -35,6 +49,8 @@ class TourPlayerScreen extends StatefulWidget {
     this.jobId,
     this.track,
     this.buildNumber,
+    this.serverTourId,
+    this.originalLanguage,
   });
 
   @override
@@ -70,6 +86,19 @@ class _TourPlayerScreenState extends State<TourPlayerScreen> with VoiceMethods {
   // banner invites the listener to unlock the rest.
   TourUnlockState? _unlockState;
 
+  // [LOCAL-677B] The resolved NUMERIC server tour id (widget.serverTourId →
+  // numeric widget.tourId → the server id stored on the local record). Null when
+  // the tour has no numeric id at all (e.g. a brand-new local-only tour).
+  String? _serverTourId;
+
+  // [LOCAL-677B] The offline snapshot read from the local saved_tours record.
+  // Used to gate playback when the server cannot be reached (D647 add. 2:
+  // fail closed for a tour stored paid, free stays free), and to show the header.
+  DownloadedTourMeta? _localMeta;
+
+  // [LOCAL-677B] How many opening stops play free as a preview on a locked tour.
+  int _freePreviewStops = 1;
+
   @override
   void initState() {
     super.initState();
@@ -78,20 +107,120 @@ class _TourPlayerScreenState extends State<TourPlayerScreen> with VoiceMethods {
     _loadUnlockState();
   }
 
-  /// [LOCAL-677] Fetch the tour's unlock/preview state (free tours resolve to
-  /// unlocked). Re-fetched after a purchase so the banner disappears on unlock.
+  /// [LOCAL-677 / 677B] Resolve the tour's unlock/preview state.
+  ///
+  /// Order of truth:
+  ///   1. Read the LOCAL snapshot stamped at download time (server id, price,
+  ///      unlock, original language) from the saved_tours record for this path.
+  ///   2. Resolve the NUMERIC server id: widget.serverTourId → a numeric
+  ///      widget.tourId → the local record's server_tour_id. This is what fixes
+  ///      the Bounce — the player now has the id the pricing endpoints key on.
+  ///   3. ONLINE: ask /tour/<serverId>/unlock-state and use the server's answer.
+  ///   4. OFFLINE / no server answer: gate from the LOCAL snapshot (offline-
+  ///      correct lock) — a tour stored paid & not-unlocked stays preview-only;
+  ///      a tour stored free (incl. grandfathered-free) plays in full.
   Future<void> _loadUnlockState() async {
-    final tourId = widget.tourId ?? _deriveTourId();
-    if (tourId.isEmpty || int.tryParse(tourId) == null) return;
-    final state = await TourPricingService.unlockState(tourId);
-    if (mounted) setState(() => _unlockState = state);
+    // 1. Local snapshot (never throws; returns a free/unlocked default).
+    final meta = await DownloadedTourStore.metaForPath(widget.tourPath);
+
+    // 2. Resolve the numeric server id from the best available source.
+    final serverId = DownloadedTourMeta.resolveServerTourId(
+      serverTourId: widget.serverTourId,
+      widgetTourId: widget.tourId,
+      metaServerTourId: meta.serverTourId,
+    );
+
+    TourUnlockState resolved;
+    if (serverId != null && int.tryParse(serverId) != null) {
+      // 3. Online check with the RIGHT id. unlockState falls back to free on any
+      // error, so distinguish a real "free" answer from an offline fallback by
+      // consulting the local snapshot: if the record says the tour is PAID,
+      // trust the local offline lock rather than the free fallback.
+      final online = await TourPricingService.unlockState(serverId);
+      if (!online.isPaid && meta.isPaid) {
+        // The server call almost certainly failed (offline) — the local record
+        // knows this is a paid tour. Fail closed from the snapshot.
+        resolved = _offlineState(meta);
+      } else {
+        resolved = online;
+        // Keep the local snapshot's unlock in sync so a later OFFLINE open is
+        // correct without another round trip.
+        if (online.isPaid && online.unlocked && !meta.unlocked) {
+          await DownloadedTourStore.markUnlockedForPath(widget.tourPath);
+        }
+      }
+    } else {
+      // 4. No numeric id at all → gate purely from the local snapshot.
+      resolved = _offlineState(meta);
+    }
+
+    if (mounted) {
+      setState(() {
+        _localMeta = meta;
+        _serverTourId = serverId;
+        _unlockState = resolved;
+        _freePreviewStops = resolved.freePreviewStops;
+      });
+    }
+    // If the tour is locked, make sure the WebView actually blocks the paid
+    // stops (the banner alone never stopped playback — part of the Bounce).
+    await _applyLockToWebView();
+  }
+
+  /// [LOCAL-677B] Build an unlock state from the LOCAL snapshot only (offline).
+  TourUnlockState _offlineState(DownloadedTourMeta meta) {
+    if (!meta.isPaid) return TourUnlockState.free();
+    final locked = meta.lockedOffline;
+    return TourUnlockState(
+      isPaid: true,
+      unlocked: !locked,
+      locked: locked,
+      freePreviewStops: 1,
+      priceTier: meta.priceTier,
+      priceUsd: null,
+      priceLabel: meta.priceLabel,
+      productId: null,
+    );
+  }
+
+  /// [LOCAL-677B] Enforce the lock inside the WebView: when the tour is locked,
+  /// block the audio of every stop at/after the free-preview count (Stop 1 plays
+  /// as a preview; the rest are paused and rewound if play is attempted). When
+  /// unlocked, the block is lifted. Safe to call before the page loads (the
+  /// injected guard installs itself and also runs on the next load).
+  Future<void> _applyLockToWebView() async {
+    final controller = _controller;
+    if (controller == null) return;
+    final locked = _unlockState?.locked == true;
+    final freeStops = _freePreviewStops;
+    try {
+      await controller.evaluateJavascript(source: """
+        (function() {
+          window.__audiouraLocked = $locked;
+          window.__audiouraFreeStops = $freeStops;
+          if (window.__audiouraLockInstalled) { return; }
+          window.__audiouraLockInstalled = true;
+          var audios = document.querySelectorAll('audio');
+          audios.forEach(function(audio, idx) {
+            audio.addEventListener('play', function() {
+              if (window.__audiouraLocked && idx >= window.__audiouraFreeStops) {
+                try { audio.pause(); audio.currentTime = 0; } catch (e) {}
+              }
+            });
+          });
+        })();
+      """);
+    } catch (_) {
+      // A gate that cannot inject must not crash the player; the banner still
+      // shows and the server-side gate remains authoritative.
+    }
   }
 
   /// [LOCAL-677] Offer the Buy / TEST PURCHASE sheet; on unlock, refresh state.
   Future<void> _offerBuy() async {
     final s = _unlockState;
     if (s == null || !s.locked || s.priceTier == null) return;
-    final tourId = widget.tourId ?? _deriveTourId();
+    final tourId = _serverTourId ?? widget.serverTourId ?? widget.tourId ?? _deriveTourId();
     final unlocked = await TourBuySheet.show(
       context,
       tourId: tourId,
@@ -100,6 +229,10 @@ class _TourPlayerScreenState extends State<TourPlayerScreen> with VoiceMethods {
       tourTitle: widget.tourTitle,
     );
     if (unlocked) {
+      // [LOCAL-677B] Write the unlock to the LOCAL record at once so the lock
+      // lifts OFFLINE immediately (it also synced to the server through the
+      // purchase path). Then refresh and lift the WebView block.
+      await DownloadedTourStore.markUnlockedForPath(widget.tourPath);
       await _loadUnlockState();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -142,6 +275,66 @@ class _TourPlayerScreenState extends State<TourPlayerScreen> with VoiceMethods {
         ),
       ),
     );
+  }
+
+  /// [LOCAL-677B] The player header line "Original: <Language> · v12", shown
+  /// above the WebView like the found-tour dialog. The original language comes
+  /// from widget.originalLanguage, else the local snapshot. The version comes
+  /// from widget.buildNumber (stored on the tour record). Returns an empty box
+  /// when there is nothing to show, so an old tour renders no header.
+  Widget _buildOriginalHeader() {
+    final lang = widget.originalLanguage ?? _localMeta?.originalLanguage;
+    final version = widget.buildNumber ?? _localMeta?.tourVersion;
+    final parts = <String>[];
+    if (lang != null && lang.trim().isNotEmpty) {
+      parts.add('Original: ${_languageName(lang.trim())}');
+    }
+    if (version != null && version > 1) {
+      parts.add('v$version');
+    }
+    if (parts.isEmpty) return const SizedBox.shrink();
+    return Material(
+      color: const Color(0xFFF2F4F6),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        child: Row(
+          children: [
+            Icon(Icons.language, size: 16, color: Colors.grey.shade700),
+            const SizedBox(width: 6),
+            Expanded(
+              child: Text(
+                parts.join(' · '),
+                style: TextStyle(
+                  fontSize: 12.5,
+                  color: Colors.grey.shade800,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Human language name for a code (shared with the found-tour dialog's set).
+  String _languageName(String code) {
+    switch (code.toLowerCase()) {
+      case 'en':
+        return 'English';
+      case 'es':
+        return 'Spanish';
+      case 'fr':
+        return 'French';
+      case 'de':
+        return 'German';
+      case 'ru':
+        return 'Russian';
+      case 'zh':
+        return 'Chinese';
+      default:
+        return code.toUpperCase();
+    }
   }
 
   @override
@@ -212,6 +405,11 @@ class _TourPlayerScreenState extends State<TourPlayerScreen> with VoiceMethods {
           if (snapshot.hasData) {
             return Column(
               children: [
+                // [LOCAL-677B] Listen/player header: "Original: <Language>" and
+                // the version, matching the found-tour dialog. Hidden when the
+                // tour carries neither (an old tour with no original_language and
+                // no version field shows no header).
+                _buildOriginalHeader(),
                 // [LOCAL-677] Paid-tour preview banner. Stop 1 plays free; the
                 // rest is locked until the listener buys. Shown only while the
                 // tour is paid and not yet unlocked.
@@ -410,6 +608,13 @@ class _TourPlayerScreenState extends State<TourPlayerScreen> with VoiceMethods {
                       } catch (e) {
                         await DebugLogHelper.addDebugLog('SWIPE: Failed to inject stop listener: $e');
                       }
+
+                      // [LOCAL-677B] Install the paid-tour lock gate on the real
+                      // audio elements now that the page has loaded. A locked tour
+                      // plays Stop 1 as a preview and blocks the paid stops; the
+                      // banner alone never stopped playback (the Bounce: all 5
+                      // stops played). Re-applied after a purchase lifts the lock.
+                      await _applyLockToWebView();
 
                       // Auto-start tour playback
                       await Future.delayed(Duration(milliseconds: 2000)); // Wait longer for page to fully load
