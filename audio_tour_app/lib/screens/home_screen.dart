@@ -809,7 +809,12 @@ class _HomeScreenState extends State<HomeScreen> {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Distance: ${item['distance_km']} km'),
+                // [LOCAL-677B] Hide the Distance line when distance_km is null:
+                // the share-code (/tour-by-code) and search-results entries carry
+                // no distance, and "Distance: null km" is nonsense. Only shown
+                // when the server sent a real distance.
+                if (item['distance_km'] != null)
+                  Text('Distance: ${item['distance_km']} km'),
                 Text('Downloads: ${item['popularity']}'),
                 SizedBox(height: 6),
                 // [LOCAL-670] Rating badge "★ 8.3 · 2 ratings" / "★ 7.5 · New".
