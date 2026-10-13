@@ -214,3 +214,168 @@ banner, no Buy, no TEST PURCHASE. The orchestrator logged **no
   any file 677B touched (unchanged from 677).
 - **`flutter build ios --no-codesign`** succeeded (`Runner.app`, 37.6 MB).
 - No paid API calls. No install (LEAD does). Build bumped 2.4.8+39 → **2.4.8+40**.
+
+
+---
+
+# 677C — Pay before download (D654)
+
+**Agent:** Mac Mini Kiro
+**Branch:** `LOCAL-677-paid-tours` (continued; merged `origin/subscribed` @ `b7b138dc`, which carries the 677B merge)
+**Build:** 2.4.8+40 → **2.4.8+41**
+
+## Why
+677B shipped D653 (selected languages only, per-language price and unlock) and
+an **in-player** lock (Stop 1 preview, the rest blocked behind a Buy banner).
+Michael's D654 replaces that: **the listener pays BEFORE the tour downloads.**
+None of D654 existed — no `purchase_required`, no preview endpoint, no
+Buy & Download button. 677C adds them and makes a downloaded tour play fully
+offline (there is nothing left to gate in the player once the download itself is
+gated).
+
+## What shipped (steps map to the ticket)
+
+### 1. Server enforcement — 402 before the zip (`map_delivery/app.py`)
+`GET /download-tour/<id>` now runs a `_download_gate` before streaming:
+- a **paid** language row (its `price_tier` inherited from the source, D653) the
+  caller has **not** unlocked → **HTTP 402** JSON
+  `{"error":"purchase_required","tour_id":..,"price_tier":..,"price":"4.99"}`
+  (price is the dollar amount, no `$`, the ticket's exact shape);
+- **free** rows, the tour's **creator** (the curator's own tour), an **unlocked**
+  row, and a **grandfathered** row download unchanged (200).
+
+map-delivery deploys as its own image and cannot import the repo-root pricing
+module, so the gate is **self-contained DB reads** against the same `postgres-2`
+DB (the pattern `_is_paid_select`/`_price_tier_select` already use):
+`_row_price_tier` (resolves a translation to its source for the price),
+`_user_has_unlock` (per-language `tour_unlocks`, D653), `_user_is_tour_creator`
+(earliest `tour_requests.secret_id`, mirroring the reviews service), and
+`_user_grandfathered`. Every read fails to the **free** path on error and only
+treats a row as locked once it is positively established paid — a lookup error
+never turns a free tour into a 402.
+
+**Grandfathering** (ticket: "use whatever 677B records; if nothing server-side
+exists, record download events and honour them"). 677B recorded this only on the
+phone, which the server cannot see, so 677C adds the server record:
+`migration/sql/023_tour_downloads.sql` — `tour_downloads(user_id, tour_id,
+was_free, UNIQUE(user_id,tour_id))`. Every successful download records a row with
+`was_free` = the row's tier was NULL at that moment; the gate honours a
+`was_free=TRUE` row, so a listener who pulled the tour while it was free keeps
+downloading it after the curator later prices it. Per language (keyed on the
+language row's own id), like the unlock. `UNIQUE` makes the first free download
+the one that counts (a later re-download never flips it to paid). The service
+**self-heals** the table (identical DDL) so the gate works whether or not the
+migration file has been run.
+
+### 2. Preview endpoint — Stop 1 only (`map_delivery/app.py`)
+`GET /tour/<id>/preview-audio` opens the stored tour zip and streams **exactly**
+`audio_1.mp3` (Stop 1) with `Content-Type: audio/mpeg`. No other stop, no text,
+no zip, no HTML. It works with **no unlock** (a paid, un-bought tour previews;
+a free tour previews too). A tour with no `audio_1` member → 404 (never falls
+through to any other stop).
+
+### 3. App — Buy & Download dialog (`screens/home_screen.dart`)
+The shared download / language dialog now decides its actions from a pure,
+testable `DownloadActionPlan.decide` (`widgets/download_action_plan.dart`):
+- a **free** or already-**unlocked** paid tour → the plain **"Download Tour"**,
+  unchanged;
+- an **unbought paid** tour → **"▶ Preview Stop 1"** (streams the preview
+  endpoint through `services/tour_preview_player.dart`, built on **flutter_sound**
+  — already a dependency, nothing saved, online only) **and**
+  **"Buy & Download — $X"**, and **NO plain Download** button.
+
+Tapping Buy runs the purchase through the existing `TourBuySheet` (the real store
+in cloud mode, or a clearly-labelled **TEST PURCHASE** in `IAP_VERIFY_MODE=stub`),
+**confirms the unlock** with the server, and only then downloads. Each selected
+paid language is bought separately (D653: 2 × $4.99 for two languages). The
+`/download-tour` URL now carries `user_id` (via `_downloadTourUri`; the
+translation download path too) so the server gate sees the right device — without
+it every paid download would 402. A **402 never crashes**: the download shows an
+orange "buy it to download" message and the Buy button stays.
+
+### 4. Player — downloaded tours play fully offline (`screens/tour_player_screen.dart`)
+Because pay now happens **before** download, a downloaded tour has already been
+paid for (or was free / grandfathered). The 677B in-player preview lock and Buy
+banner no longer gate a downloaded tour. `_loadUnlockState` now defaults a
+downloaded tour to **playable** and keeps **one quiet online re-check** for a
+**refund** (LOCAL-672): only an **explicit** server answer (the call actually
+returned 200 — `TourPricingService.unlockStateChecked` reports whether it did)
+that the tour is **paid AND not unlocked**, **and** the local snapshot says this
+device bought it (`is_paid`), locks it. **Offline is always playable**, and a
+grandfathered-free tour (stored `is_paid:false` by 677B) never locks. A refund
+persists to the local record (`DownloadedTourStore.markLockedForPath`) so the
+lock holds on a later offline open.
+
+### 5–7. 677B preserved; offline-first; build bump
+D653, the Original-language header, the version label, null-distance hiding and
+grandfathering are all untouched. Rating/reviews/sharing are unchanged
+(offline-first, LOCAL-670C outbox). Build bumped 2.4.8+40 → **2.4.8+41**.
+
+## Files
+- Server: `migration/sql/023_tour_downloads.sql` (new), `map_delivery/app.py`
+  (`_download_gate` + helpers, `/tour/<id>/preview-audio`).
+- App: `lib/widgets/download_action_plan.dart` (new),
+  `lib/services/tour_preview_player.dart` (new), `lib/screens/home_screen.dart`,
+  `lib/services/tour_translation_helper.dart`,
+  `lib/services/tour_pricing_service.dart` (`unlockStateChecked`),
+  `lib/screens/tour_player_screen.dart`,
+  `lib/services/downloaded_tour_meta.dart` (`markLockedForPath`),
+  `pubspec.yaml` (build bump).
+- Tests: `tests/test_local677_paid_tours.py` (+8), `audio_tour_app/test/pay_before_download_test.dart` (new).
+
+## Tests & verification
+- **Server `tests/test_local677_paid_tours.py` — 24 passed** (16 existing + 8 new
+  677C, against the in-process map-delivery client on the test DB): 402 for an
+  unbought paid row (exact body, `price` = `"4.99"`); 200 after a stub purchase of
+  THAT language, STILL 402 for the other language (D653); a free tour downloads
+  unchanged; grandfathering (downloaded-while-free keeps 200 after the tour is
+  priced, a new user is 402); the curator downloads their own paid tour; the
+  preview serves EXACTLY Stop 1's bytes and NONE of the other stops', free tours
+  preview, a missing tour is 404.
+- **Flutter `test/pay_before_download_test.dart` — 6 passed:**
+  `DownloadActionPlan.decide` (free/unlocked = plain Download; unbought paid =
+  Preview + Buy and NO plain Download; paid+unlocked = plain Download);
+  per-language `PaidLanguagePurchase`; `markLockedForPath`/`markUnlockedForPath`.
+- **Regression:** 677B Flutter suite (22) green; `test_local672_verified_reviews`
+  (26) green; the existing 677 server suite still passes within the 24.
+- **`flutter analyze`** on every new/changed file: **clean** (no errors, no
+  warnings) except `home_screen.dart`, whose warnings are **18 before and 18
+  after** — zero new.
+
+## Live test (own containers, dev DB, tour 557 only)
+Ran **my own** `local677c-map-delivery` (:5905) and `local677c-user-api` (:5903)
+on the `development_default` network against the dev DB (`postgres-2`,
+`localhost:5433`). **Michael's `audioura-*` containers were never touched**, and
+I tore my own down afterwards. Test tour **557** (`price_tier=3`, `is_paid`,
+`is_test`; 5 stops `audio_1..5.mp3`; a 3,400,269-byte zip).
+
+- Unbought paid 557 → **402** `{"error":"purchase_required","price":"4.99",
+  "price_tier":3,"tour_id":557}`.
+- `preview-audio/557` → **200** `audio/mpeg`, **1,009,965 bytes**, md5
+  byte-identical to `audio_1.mp3` extracted from the zip — Stop 1 only (the zip
+  has audio_1..5).
+- Stub purchase of 557 (via user-api) → `unlocked:true, amount 4.99`; then
+  download 557 → **200**, full zip (3,400,269 bytes).
+- Download 615 (a translation that inherits 557's price, NOT purchased) → **402**
+  (per-language, D653).
+- Self-healing: `tour_downloads` was auto-created on the first successful
+  download; the paid download recorded `was_free=False`.
+- Grandfathering: a fresh user was **402** before; after a `was_free=TRUE`
+  download row was recorded (simulating a free download before pricing), the same
+  user downloaded 557 → **200**.
+
+**Row counts.** Baseline: `tour_unlocks` total **0**; `tour_downloads` table did
+**not** exist. After the test: the buyer had `tour_unlocks[557]` **1** row
+(stub, $4.99) and `tour_downloads[557]` **1** row (`was_free=False`); the
+grandfather user had `tour_downloads[557]` **1** row (`was_free=TRUE`). Cleanup
+deleted **only** rows whose `user_id` starts with `TEST-677C-`, by exact id →
+both ledgers back to **0**. Tour 557 unchanged (`price_tier=3`, `is_paid`,
+`is_test`). `audio_tours` was never deleted from.
+
+## Notes / constraints honoured
+- Additive migration only (`CREATE TABLE IF NOT EXISTS`), plus identical
+  self-healing DDL so the gate works regardless of migration ordering.
+- No paid API calls (stub purchases only). No GCloud. Own containers only;
+  Michael's phone stack untouched. No install (LEAD does).
+- `IAP_VERIFY_MODE=stub` TEST PURCHASE path is the only buy path until the
+  Apple/Google tour products exist.

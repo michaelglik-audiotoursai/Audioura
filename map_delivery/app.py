@@ -8,6 +8,7 @@ import json
 import psycopg2
 import math
 import traceback
+import zipfile
 from io import BytesIO
 from datetime import datetime
 from flask import Flask, request, jsonify, send_file, make_response
@@ -153,6 +154,7 @@ def get_tour_by_code(code):
 @app.route('/tours-near/<lat>/<lng>', methods=['OPTIONS'])
 @app.route('/download-tour/<int:tour_id>', methods=['OPTIONS'])
 @app.route('/tour-info/<int:tour_id>', methods=['OPTIONS'])
+@app.route('/tour/<int:tour_id>/preview-audio', methods=['OPTIONS'])
 @app.route('/search-tours', methods=['OPTIONS'])
 def handle_options(*args, **kwargs):
     response = make_response()
@@ -743,6 +745,242 @@ def _passes_price_filter(price_filter, is_paid):
     return bool(is_paid)  # 'paid'
 
 
+# ─── [LOCAL-677C / D654] Pay-before-download enforcement ─────────────────────
+#
+# D654 moves the paywall BEFORE the download. /download-tour/<id> returns
+# HTTP 402 purchase_required for a PAID language row the caller has not unlocked,
+# with the two carve-outs the ticket requires unchanged:
+#   * FREE rows (price_tier NULL) download as before;
+#   * the CURATOR's OWN tour (its creator) downloads their own tour unpriced;
+#   * GRANDFATHERING: a user who downloaded this row while it was free keeps
+#     access (tour_downloads.was_free = TRUE for this user+row).
+#
+# map_delivery deploys as its own image and cannot import the repo-root pricing
+# module, so these are self-contained DB reads against the SAME postgres-2 DB —
+# the same pattern _is_paid_select / _price_tier_select already use. Every read
+# fails OPEN only for the FREE path and fails CLOSED (treats as not-unlocked)
+# only after we have positively established the row is paid: a lookup error on
+# the unlock/grandfather side never turns a free tour into a 402, and never
+# silently unlocks a paid one.
+
+_HAS_TOUR_UNLOCKS_TABLE = None
+_HAS_TOUR_DOWNLOADS_TABLE = None
+
+
+def _table_exists(cur, table_name):
+    """True if a table with this name exists in the current database."""
+    try:
+        cur.execute(
+            "SELECT 1 FROM information_schema.tables WHERE table_name = %s",
+            (table_name,),
+        )
+        return cur.fetchone() is not None
+    except Exception:  # noqa: BLE001
+        return False
+
+
+def _resolve_original_id(cur, tour_id):
+    """The ORIGINAL audio_tours.id for a (possibly translation) row.
+
+    A translation carries original_tour_id; an original has it NULL and is its
+    own original. Mirrors tour_rating_service.resolve_original_id so pricing,
+    reviews and this gate all agree on which row carries the price. Never raises
+    — returns the given id on any error."""
+    try:
+        cur.execute(
+            "SELECT original_tour_id FROM audio_tours WHERE id = %s", (int(tour_id),)
+        )
+        row = cur.fetchone()
+        if row and row[0] is not None:
+            return int(row[0])
+    except Exception:  # noqa: BLE001
+        pass
+    return int(tour_id)
+
+
+def _row_price_tier(cur, tour_id):
+    """The price_tier that governs this language row, resolving a translation to
+    its SOURCE (a translation inherits its original's price). None = free. None
+    on any error or on a schema that predates price_tier (fail to FREE)."""
+    if not _has_price_tier_column(cur):
+        return None
+    try:
+        original_id = _resolve_original_id(cur, tour_id)
+        cur.execute("SELECT price_tier FROM audio_tours WHERE id = %s", (original_id,))
+        row = cur.fetchone()
+        if row and row[0] is not None:
+            return int(row[0])
+    except Exception:  # noqa: BLE001
+        return None
+    return None
+
+
+def _user_has_unlock(cur, user_id, tour_id):
+    """True if this user has a tour_unlocks row for THIS language row's own id
+    (per-language unlock, 677B/D653). Absent table (pre-022) → not unlocked."""
+    global _HAS_TOUR_UNLOCKS_TABLE
+    if not user_id:
+        return False
+    if _HAS_TOUR_UNLOCKS_TABLE is None:
+        _HAS_TOUR_UNLOCKS_TABLE = _table_exists(cur, 'tour_unlocks')
+    if not _HAS_TOUR_UNLOCKS_TABLE:
+        return False
+    try:
+        cur.execute(
+            "SELECT 1 FROM tour_unlocks WHERE user_id = %s AND tour_id = %s LIMIT 1",
+            (user_id, int(tour_id)),
+        )
+        return cur.fetchone() is not None
+    except Exception:  # noqa: BLE001
+        return False
+
+
+def _user_is_tour_creator(cur, user_id, tour_id):
+    """True if user_id created this tour (its original). The curator downloads
+    their OWN tour unpriced. Resolution mirrors
+    tour_reviews_service.resolve_tour_creator: an optional explicit
+    audio_tours.creator_user_id, else the earliest tour_requests.secret_id for
+    the original id. Never raises → unresolved creator means NOT the creator (the
+    gate then relies on the unlock/grandfather paths, never falsely free)."""
+    if not user_id:
+        return False
+    try:
+        original_id = _resolve_original_id(cur, tour_id)
+        # Optional explicit creator column (forward compatible).
+        cur.execute(
+            "SELECT 1 FROM information_schema.columns "
+            "WHERE table_name = 'audio_tours' AND column_name = 'creator_user_id'"
+        )
+        if cur.fetchone() is not None:
+            cur.execute(
+                "SELECT creator_user_id FROM audio_tours WHERE id = %s", (original_id,)
+            )
+            row = cur.fetchone()
+            if row and row[0]:
+                return str(row[0]) == str(user_id)
+        # Earliest requester of the tour.
+        cur.execute(
+            """
+            SELECT secret_id FROM tour_requests
+            WHERE tour_id = %s AND secret_id IS NOT NULL
+            ORDER BY created_at ASC LIMIT 1
+            """,
+            (str(original_id),),
+        )
+        row = cur.fetchone()
+        if row and row[0]:
+            return str(row[0]) == str(user_id)
+    except Exception:  # noqa: BLE001
+        return False
+    return False
+
+
+def _user_grandfathered(cur, user_id, tour_id):
+    """True if this user downloaded THIS language row while it was free
+    (tour_downloads.was_free = TRUE for user+row). Absent table (pre-023) → not
+    grandfathered. Per language, like the unlock."""
+    global _HAS_TOUR_DOWNLOADS_TABLE
+    if not user_id:
+        return False
+    if _HAS_TOUR_DOWNLOADS_TABLE is None:
+        _HAS_TOUR_DOWNLOADS_TABLE = _table_exists(cur, 'tour_downloads')
+    if not _HAS_TOUR_DOWNLOADS_TABLE:
+        return False
+    try:
+        cur.execute(
+            "SELECT 1 FROM tour_downloads "
+            "WHERE user_id = %s AND tour_id = %s AND was_free = TRUE LIMIT 1",
+            (user_id, int(tour_id)),
+        )
+        return cur.fetchone() is not None
+    except Exception:  # noqa: BLE001
+        return False
+
+
+def _ensure_tour_downloads(cur):
+    """Self-healing DDL for the grandfathering ledger (mirrors migration 023),
+    so the 402 gate records and honours free downloads whether or not the
+    migration file has been run on this DB. Idempotent (CREATE TABLE IF NOT
+    EXISTS). Caches success so we create at most once per process. Does NOT
+    commit (the caller owns the transaction)."""
+    global _HAS_TOUR_DOWNLOADS_TABLE
+    if _HAS_TOUR_DOWNLOADS_TABLE:
+        return True
+    try:
+        cur.execute(
+            """
+            CREATE TABLE IF NOT EXISTS tour_downloads (
+                id          SERIAL PRIMARY KEY,
+                user_id     VARCHAR(255) NOT NULL,
+                tour_id     INTEGER      NOT NULL,
+                was_free    BOOLEAN      NOT NULL,
+                created_at  TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                CONSTRAINT uq_tour_downloads_user_tour UNIQUE (user_id, tour_id)
+            )
+            """
+        )
+        cur.execute(
+            "CREATE INDEX IF NOT EXISTS idx_tour_downloads_user_tour "
+            "ON tour_downloads(user_id, tour_id)"
+        )
+        _HAS_TOUR_DOWNLOADS_TABLE = True
+        return True
+    except Exception:  # noqa: BLE001 — must never fail a download
+        return False
+
+
+def _record_download_event(cur, user_id, tour_id, was_free):
+    """Record (idempotently) that user_id downloaded this language row, noting
+    whether it was free at that moment. UNIQUE(user_id, tour_id) → the FIRST
+    download is the one that counts; a later re-download never flips a free
+    grandfather row to paid and never adds a second row. Self-heals the table if
+    absent (pre-023). Does NOT commit (the caller owns the transaction)."""
+    if not user_id:
+        return
+    if not _ensure_tour_downloads(cur):
+        return
+    try:
+        cur.execute(
+            "INSERT INTO tour_downloads (user_id, tour_id, was_free) "
+            "VALUES (%s, %s, %s) ON CONFLICT (user_id, tour_id) DO NOTHING",
+            (user_id, int(tour_id), bool(was_free)),
+        )
+    except Exception:  # noqa: BLE001 — a ledger write must never fail the download
+        pass
+
+
+def _download_gate(cur, user_id, tour_id):
+    """The pay-before-download decision for ONE language row.
+
+    Returns (allowed: bool, info: dict). When allowed is False, `info` is the
+    402 body: {error: 'purchase_required', tour_id, price_tier, price}.
+
+    Order (the first that applies wins):
+      1. FREE row (price_tier NULL)            → allowed.
+      2. The tour's CREATOR (curator's own)    → allowed.
+      3. The user has an UNLOCK for this row   → allowed.
+      4. The user is GRANDFATHERED (free dl)   → allowed.
+      5. otherwise                             → 402 purchase_required.
+    """
+    tier = _row_price_tier(cur, tour_id)
+    if tier is None:
+        return True, None  # free row — unchanged behaviour
+    if _user_is_tour_creator(cur, user_id, tour_id):
+        return True, None  # the curator downloads their own tour
+    if _user_has_unlock(cur, user_id, tour_id):
+        return True, None  # bought this language
+    if _user_grandfathered(cur, user_id, tour_id):
+        return True, None  # downloaded while free — keeps access
+    price = _price_label_for(tier, cur)
+    # The 402 body: the app shows the Buy button again from this.
+    return False, {
+        "error": "purchase_required",
+        "tour_id": int(tour_id),
+        "price_tier": int(tier),
+        "price": (price[1:] if isinstance(price, str) and price.startswith("$") else price),
+    }
+
+
 def calculate_distance(lat1, lng1, lat2, lng2):
     """Calculate distance between two points in kilometers"""
     R = 6371
@@ -928,6 +1166,25 @@ def download_tour(tour_id):
         
         tour_name, audio_tour_data, request_string = result
         
+        # ─── [LOCAL-677C / D654] Pay before download ─────────────────────────
+        # A PAID language row the caller has not unlocked (and is not the curator
+        # of, and was not grandfathered on) is refused with HTTP 402 BEFORE the
+        # zip is streamed. Free rows, the curator's own tour, an unlocked row and
+        # a grandfathered (downloaded-while-free) row are unchanged.
+        allowed, deny = _download_gate(cur, user_id, tour_id)
+        if not allowed:
+            print(f"Tour {tour_id} is paid and not unlocked for {user_id}: 402")
+            sys.stdout.flush()
+            cur.close()
+            conn.close()
+            return jsonify(deny), 402
+
+        # Record the download event (idempotent) so a free download now
+        # grandfathers this user if the curator later prices the tour. was_free
+        # is read from the row's governing tier at THIS moment.
+        _record_download_event(cur, user_id, tour_id,
+                               was_free=(_row_price_tier(cur, tour_id) is None))
+
         cur.execute("""
             UPDATE audio_tours 
             SET number_requested = number_requested + 1 
@@ -971,6 +1228,94 @@ def download_tour(tour_id):
         
     except Exception as e:
         print(f"ERROR in download_tour: {e}")
+        sys.stdout.flush()
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/tour/<int:tour_id>/preview-audio', methods=['GET'])
+def preview_tour_audio(tour_id):
+    """[LOCAL-677C / D654] Stream ONLY Stop 1's audio of a tour, for a free
+    preview of a paid tour before purchase.
+
+    The listener taps "▶ Preview Stop 1" in the download dialog; the app streams
+    this endpoint and plays it (online only, nothing saved). It serves EXACTLY
+    `audio_1.mp3` (Stop 1) extracted from the tour zip — no other stop's audio,
+    no text, no zip, no HTML. It works with NO unlock (that is the whole point:
+    the preview is what you get before you buy). A free tour previews too.
+
+    The audio members in a tour zip are named audio_1.mp3 (Stop 1 / summary),
+    audio_2.mp3, … (tour_generation / translation_service). We open the stored
+    zip, read ONLY the audio_1 member, and stream its bytes. If the zip has no
+    audio_1 member the tour cannot be previewed → 404 (never fall through to any
+    other stop).
+    """
+    print(f"Preview Stop 1 audio for tour ID: {tour_id}")
+    sys.stdout.flush()
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor()
+        cur.execute(
+            "SELECT audio_tour FROM audio_tours WHERE id = %s AND audio_tour IS NOT NULL",
+            (tour_id,),
+        )
+        result = cur.fetchone()
+        cur.close()
+        conn.close()
+
+        if not result or not result[0]:
+            return jsonify({'error': 'Tour not found'}), 404
+
+        audio_tour_data = result[0]
+
+        # Open the zip and pull ONLY Stop 1's audio member. We accept the exact
+        # name `audio_1.mp3` (what the generator/translator write); as a tolerant
+        # fallback we take the lexicographically-first `audio_<n>.mp3` whose n is
+        # 1 — never any other stop. Nothing but that single mp3 is read or served.
+        stop1_bytes = None
+        try:
+            with zipfile.ZipFile(BytesIO(audio_tour_data)) as zf:
+                names = zf.namelist()
+                # Only ever consider the Stop-1 member. Match the basename so a
+                # zip that nests files in a folder still resolves (…/audio_1.mp3).
+                target = None
+                for n in names:
+                    base = n.rsplit('/', 1)[-1].lower()
+                    if base == 'audio_1.mp3':
+                        target = n
+                        break
+                if target is not None:
+                    stop1_bytes = zf.read(target)
+        except zipfile.BadZipFile:
+            return jsonify({'error': 'Tour archive unreadable'}), 404
+
+        if not stop1_bytes:
+            # No Stop-1 audio in this tour → cannot preview. Do NOT serve any
+            # other stop or any other member.
+            return jsonify({'error': 'Preview not available'}), 404
+
+        from flask import Response
+
+        def generate():
+            chunk_size = 8192
+            data = BytesIO(stop1_bytes)
+            while True:
+                chunk = data.read(chunk_size)
+                if not chunk:
+                    break
+                yield chunk
+
+        return Response(
+            generate(),
+            mimetype='audio/mpeg',
+            headers={
+                'Content-Type': 'audio/mpeg',
+                'Content-Length': str(len(stop1_bytes)),
+                'Content-Disposition': f'inline; filename="preview_stop1_{tour_id}.mp3"',
+                'Cache-Control': 'no-store',
+            },
+        )
+    except Exception as e:
+        print(f"ERROR in preview_tour_audio: {e}")
+        traceback.print_exc()
         sys.stdout.flush()
         return jsonify({'error': str(e)}), 500
 
