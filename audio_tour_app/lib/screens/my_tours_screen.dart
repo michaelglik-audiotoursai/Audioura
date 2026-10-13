@@ -18,6 +18,8 @@ import 'tour_player_screen.dart';
 import 'news_player_screen.dart';
 import 'edit_tour_screen.dart';
 import 'tour_map_screen.dart';
+import '../services/tour_pricing_service.dart';
+import '../services/entitlements_service.dart';
 
 /// LOCAL-484 — build the subtitle line shown under each tour on the Listen
 /// (My Tours) list.
@@ -116,6 +118,14 @@ class _MyToursScreenState extends State<MyToursScreen> {
   double _previousScrollPosition = 0.0;
   Map<int, bool> _tourHasMap = {};
 
+  // [LOCAL-677] Curator paid tours. _canSell is the device's Curator entitlement
+  // (plans.can_sell) — the Price control is shown only to a curator. _priceByTour
+  // caches the current price state, _salesByTour the unlock (sales) count, both
+  // keyed by the tour's numeric id string, loaded lazily per tour.
+  bool _canSell = false;
+  final Map<String, TourPrice> _priceByTour = {};
+  final Map<String, int> _salesByTour = {};
+
   final ScrollController _scrollController = ScrollController();
   
   Future<void> _manualRefresh() async {
@@ -130,6 +140,160 @@ class _MyToursScreenState extends State<MyToursScreen> {
     _loadAppMode();
     _setupVoiceCommands();
     _setupScrollListener();
+    _loadCuratorStatus();
+  }
+
+  /// [LOCAL-677] Learn whether this device is a Curator (plans.can_sell). Only a
+  /// curator sees the Price control. Fails safe to false (no control shown).
+  Future<void> _loadCuratorStatus() async {
+    try {
+      final ent = await EntitlementsService.me();
+      if (mounted) setState(() => _canSell = ent.canSell);
+    } catch (_) {/* not a curator / offline → no price control */}
+  }
+
+  /// [LOCAL-677] The numeric tour id of a saved tour, or null for a local-only
+  /// tour that was never persisted server-side (can't be priced/sold).
+  String? _numericTourId(Map<String, dynamic> tour) {
+    final raw = tour['tour_id']?.toString();
+    if (raw == null || int.tryParse(raw) == null) return null;
+    return raw;
+  }
+
+  /// [LOCAL-677] Lazily load a tour's price + sales count for the curator view.
+  Future<void> _loadPriceAndSales(String tourId) async {
+    final price = await TourPricingService.price(tourId);
+    final sales = await TourPricingService.salesCount(tourId);
+    if (!mounted) return;
+    setState(() {
+      _priceByTour[tourId] = price;
+      _salesByTour[tourId] = sales;
+    });
+  }
+
+  /// [LOCAL-677] The curator's price + Sales line for a sellable tour. Triggers
+  /// a lazy load the first time it is built. Shows nothing for a tour with no
+  /// numeric id. "Price: $4.99 · Sales: 3" or "Price: Free · Sales: 0".
+  Widget _buildCuratorPriceLine(Map<String, dynamic> tour) {
+    final tourId = _numericTourId(tour);
+    if (tourId == null) return const SizedBox.shrink();
+    if (!_priceByTour.containsKey(tourId)) {
+      // Kick off the lazy load once, after this frame (avoid setState in build).
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && !_priceByTour.containsKey(tourId)) {
+          _priceByTour[tourId] = const TourPrice(
+              isPaid: false,
+              priceTier: null,
+              priceUsd: null,
+              priceLabel: 'Free',
+              productId: null); // placeholder to avoid a reload loop
+          _loadPriceAndSales(tourId);
+        }
+      });
+      return const SizedBox.shrink();
+    }
+    final price = _priceByTour[tourId]!;
+    final sales = _salesByTour[tourId] ?? 0;
+    return Padding(
+      padding: const EdgeInsets.only(top: 2),
+      child: Text(
+        'Price: ${price.priceLabel} · Sales: $sales',
+        style: TextStyle(
+          fontSize: 12,
+          color: price.isPaid ? const Color(0xFF1B6B2E) : Colors.grey.shade700,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+    );
+  }
+
+  /// [LOCAL-677] Curator Price control: pick a tier (or Free) for THIS tour.
+  /// Uses the server's price_tiers config (no hard-coded prices) and
+  /// TourPricingService.setPrice, which enforces curator + ownership server-side
+  /// (a 403 is surfaced as a clear message). On success the row refreshes.
+  Future<void> _showPriceDialog(Map<String, dynamic> tour) async {
+    final tourId = _numericTourId(tour);
+    if (tourId == null) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('This tour has no numeric ID yet and cannot be priced.'),
+      ));
+      return;
+    }
+
+    final tiers = await TourPricingService.priceTiers();
+    final current = await TourPricingService.price(tourId);
+    if (!mounted) return;
+
+    int? chosen = current.priceTier; // null = Free
+
+    await showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialog) => AlertDialog(
+          title: const Text('Set a price'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Align(
+                alignment: Alignment.centerLeft,
+                child: Padding(
+                  padding: EdgeInsets.only(bottom: 8),
+                  child: Text(
+                    'Stop 1 is a free preview; the rest unlocks on purchase.',
+                    style: TextStyle(fontSize: 12, color: Colors.black54),
+                  ),
+                ),
+              ),
+              RadioListTile<int?>(
+                title: const Text('Free'),
+                value: null,
+                groupValue: chosen,
+                onChanged: (v) => setDialog(() => chosen = v),
+              ),
+              for (final t in tiers)
+                RadioListTile<int?>(
+                  title: Text(t.label),
+                  value: t.tier,
+                  groupValue: chosen,
+                  onChanged: (v) => setDialog(() => chosen = v),
+                ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                Navigator.pop(ctx);
+                final res = await TourPricingService.setPrice(tourId, chosen);
+                if (!mounted) return;
+                if (res.ok) {
+                  await _loadPriceAndSales(tourId);
+                  if (!mounted) return;
+                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                    content: Text(chosen == null
+                        ? 'Tour is now free.'
+                        : 'Price set.'),
+                  ));
+                } else {
+                  final msg = res.code == 'not_owner'
+                      ? 'You can only price a tour you created.'
+                      : res.code == 'not_curator'
+                          ? 'Only a Curator can set a price.'
+                          : (res.message ?? 'Could not set the price.');
+                  ScaffoldMessenger.of(context)
+                      .showSnackBar(SnackBar(content: Text(msg)));
+                }
+              },
+              child: const Text('Save'),
+            ),
+          ],
+        ),
+      ),
+    );
   }
   
   void _setupScrollListener() {
@@ -1482,6 +1646,12 @@ class _MyToursScreenState extends State<MyToursScreen> {
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                           ),
+                        // [LOCAL-677] Curator-only: the tour's price + a Sales
+                        // (unlocks) count. Only for a curator's sellable (numeric,
+                        // non-translation) tour. Loaded lazily the first time the
+                        // row builds; no money totals (that's a later task).
+                        if (_canSell && !TourTranslationHelper.isTranslation(tour))
+                          _buildCuratorPriceLine(tour),
                         // Track/release provenance is intentionally NOT shown as
                         // a chip here — a visible "Stable"/"Preview" label on the
                         // list confuses testers. It's available on demand via the
@@ -1518,6 +1688,7 @@ class _MyToursScreenState extends State<MyToursScreen> {
                               case 'delete': _deleteTour(index); break;
                               case 'report': _reportTour(tour); break;
                               case 'version': _showVersionDialog(tour); break;
+                              case 'price': _showPriceDialog(tour); break;
                             }
                           },
                           itemBuilder: (context) => [
@@ -1525,6 +1696,12 @@ class _MyToursScreenState extends State<MyToursScreen> {
                             const PopupMenuItem(value: 'share', child: ListTile(leading: Icon(Icons.ios_share, color: Color(0xFF3498db)), title: Text('Share'), dense: true)),
                             if (!TourTranslationHelper.isTranslation(tour))
                               const PopupMenuItem(value: 'translate', child: ListTile(leading: Icon(Icons.translate, color: Color(0xFF8e44ad)), title: Text('Translate'), dense: true)),
+                            // [LOCAL-677] Curator-only Price control (tier picker /
+                            // Free). Shown only to a device with can_sell, and only
+                            // for a tour with a numeric id (sellable). The server
+                            // still enforces ownership.
+                            if (_canSell && !TourTranslationHelper.isTranslation(tour) && _numericTourId(tour) != null)
+                              const PopupMenuItem(value: 'price', child: ListTile(leading: Icon(Icons.sell, color: Color(0xFF1B6B2E)), title: Text('Price'), dense: true)),
                             const PopupMenuItem(value: 'edit', child: ListTile(leading: Icon(Icons.edit, color: Colors.orange), title: Text('Edit'), dense: true)),
                             const PopupMenuItem(value: 'delete', child: ListTile(leading: Icon(Icons.delete, color: Colors.red), title: Text('Delete'), dense: true)),
                             const PopupMenuItem(value: 'report', child: ListTile(leading: Icon(Icons.flag_outlined, color: Colors.grey), title: Text('Report'), dense: true)),
