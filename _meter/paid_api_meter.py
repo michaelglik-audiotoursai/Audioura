@@ -10,6 +10,7 @@ import json, os, sys, time, threading, traceback
 LOG = os.environ.get("PAID_API_LOG", "/meterlogs/paid_api_calls.jsonl")
 SERVICE = os.environ.get("METER_SERVICE", os.path.basename(sys.argv[0]) if sys.argv else "?")
 _lock = threading.Lock()
+_INSTALLED = False  # guard so install() patches each HTTP client at most once
 
 # $ per 1M tokens. OpenAI: published list prices. Gemini Flash: derived from our own Google
 # invoice SKUs of 2026-10-05 (445,098 input tok = $0.33; 154,413 output tok = $0.58).
@@ -294,6 +295,13 @@ def check_daily_limit():
 
 
 def install():
+    # Idempotent: patching each HTTP client more than once would stack wrappers
+    # and record (and limit-check) every paid call N times. sitecustomize and
+    # meter_bootstrap can both import+install, so guard against a second pass.
+    global _INSTALLED
+    if _INSTALLED:
+        return
+    _INSTALLED = True
     try:
         import requests
         _orig = requests.Session.send
@@ -342,5 +350,111 @@ def install():
                 pass
             return resp
         ur.urlopen = urlopen
+    except Exception:
+        pass
+    # ----------------------------------------------------------------------- #
+    # httpx (sync + async)  [LOCAL-678]
+    #
+    # The OpenAI python SDK (openai>=1) and the Google GenAI SDK send every
+    # request through httpx, NOT requests/urllib. client.chat.completions.create
+    # -> httpx.Client.send -> api.openai.com. Those calls were invisible to the
+    # meter: on Oct 11 ~6.6k OpenAI requests (~$19) went unlogged this way.
+    #
+    # httpx.Client.send / httpx.AsyncClient.send are the single choke point every
+    # request passes through (streaming and non-streaming alike), so patching
+    # send() covers all higher-level helpers (.get/.post/.request and the SDKs).
+    # When stream=True the body is not read yet (reading .content would raise and
+    # would also consume the SDK's stream), so we record with an empty body in
+    # that case — exactly as the requests patch does.
+    # ----------------------------------------------------------------------- #
+    def _httpx_req_body(request):
+        try:
+            raw = request.content
+            return json.loads(raw) if raw else None
+        except Exception:
+            return None
+
+    def _httpx_resp_body(resp, stream):
+        if stream:
+            return b""
+        try:
+            # Non-streaming httpx responses are read eagerly before send() returns,
+            # so .content is available and re-readable without consuming anything.
+            if getattr(resp, "is_stream_consumed", True) or getattr(resp, "is_closed", True):
+                return resp.content
+        except Exception:
+            pass
+        return b""
+
+    try:
+        import httpx
+        _orig_httpx_send = httpx.Client.send
+
+        def _httpx_send(self, request, *, stream=False, **kw):
+            url = str(getattr(request, "url", ""))
+            if _host_kind(url):
+                check_daily_limit()
+            resp = _orig_httpx_send(self, request, stream=stream, **kw)
+            try:
+                if _host_kind(url):
+                    _record(url, resp.status_code,
+                            _httpx_resp_body(resp, stream), _httpx_req_body(request))
+            except Exception:
+                pass
+            return resp
+        httpx.Client.send = _httpx_send
+
+        _orig_httpx_asend = httpx.AsyncClient.send
+
+        async def _httpx_asend(self, request, *, stream=False, **kw):
+            url = str(getattr(request, "url", ""))
+            if _host_kind(url):
+                check_daily_limit()
+            resp = await _orig_httpx_asend(self, request, stream=stream, **kw)
+            try:
+                if _host_kind(url):
+                    _record(url, resp.status_code,
+                            _httpx_resp_body(resp, stream), _httpx_req_body(request))
+            except Exception:
+                pass
+            return resp
+        httpx.AsyncClient.send = _httpx_asend
+    except Exception:
+        pass
+    # ----------------------------------------------------------------------- #
+    # aiohttp  [LOCAL-678]
+    #
+    # aiohttp.ClientSession._request is the single internal choke point for
+    # .get/.post/.request. We read the response body with resp.read() (aiohttp
+    # caches it, so a later await resp.json()/read() in the caller still works)
+    # and pass the outgoing json=/data= kwarg as the request body for costing.
+    # ----------------------------------------------------------------------- #
+    try:
+        import aiohttp
+        _orig_aiohttp_request = aiohttp.ClientSession._request
+
+        async def _aiohttp_request(self, method, str_or_url, **kw):
+            url = str(str_or_url)
+            if _host_kind(url):
+                check_daily_limit()
+            resp = await _orig_aiohttp_request(self, method, str_or_url, **kw)
+            try:
+                if _host_kind(url):
+                    rb = kw.get("json")
+                    if rb is None:
+                        d = kw.get("data")
+                        if isinstance(d, (str, bytes)):
+                            try: rb = json.loads(d)
+                            except Exception: rb = None
+                    body = b""
+                    try:
+                        body = await resp.read()  # cached by aiohttp; caller can re-read
+                    except Exception:
+                        pass
+                    _record(url, resp.status, body, rb)
+            except Exception:
+                pass
+            return resp
+        aiohttp.ClientSession._request = _aiohttp_request
     except Exception:
         pass
