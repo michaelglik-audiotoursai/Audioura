@@ -619,3 +619,221 @@ def test_verified_after_unlock(db):
         assert out["verified"] is True
     finally:
         _cleanup(db)
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# LOCAL-677C (D654) — pay BEFORE download: the 402 gate + the Stop-1 preview.
+# ═══════════════════════════════════════════════════════════════════════════
+#
+# These exercise map-delivery's /download-tour/<id> gate and
+# /tour/<id>/preview-audio against the test DB (the same in-process md_client).
+# They seed a real little zip into audio_tours.audio_tour so the download and
+# preview paths have bytes to serve. All rows use TEST-677- ids and are cleaned.
+
+import io  # noqa: E402
+import zipfile  # noqa: E402
+
+
+def _make_tour_zip(num_stops=3):
+    """A minimal tour zip with audio_1.mp3 … audio_<n>.mp3, each carrying
+    DISTINCT bytes so a test can prove WHICH stop was served."""
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+        zf.writestr("index.html", "<html><body>tour</body></html>")
+        for i in range(1, num_stops + 1):
+            # Distinct, recognisable bytes per stop (not real mp3, but opaque to
+            # the endpoint which only reads the member bytes).
+            zf.writestr(f"audio_{i}.mp3", f"STOP-{i}-AUDIO-BYTES".encode())
+    return buf.getvalue()
+
+
+def _seed_tour_with_zip(conn, name, price_tier=None, original_tour_id=None,
+                        language="en", num_stops=3):
+    """Seed a tour row WITH an audio_tour zip blob so download/preview work."""
+    cur = conn.cursor()
+    cur.execute(
+        """
+        INSERT INTO audio_tours (tour_name, request_string, lat, lng,
+                                 content_language, language, original_tour_id,
+                                 price_tier, audio_tour, is_test)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, TRUE)
+        RETURNING id
+        """,
+        (name, name, 43.70, 7.26, language, language, original_tour_id,
+         price_tier, psycopg2.Binary(_make_tour_zip(num_stops))),
+    )
+    tid = cur.fetchone()[0]
+    conn.commit()
+    cur.close()
+    return tid
+
+
+import psycopg2  # noqa: E402
+
+
+def test_download_gate_402_for_unbought_paid(db, md_client):
+    """A PAID language row the caller has not unlocked is refused with HTTP 402
+    purchase_required BEFORE the zip is streamed."""
+    _cleanup(db)
+    try:
+        tid = _seed_tour_with_zip(db, f"{TEST_PREFIX}dl paid", price_tier=3)
+        stranger = f"{TEST_PREFIX}dl-stranger"
+        _seed_user(db, stranger)
+
+        r = md_client.get(f"/download-tour/{tid}?user_id={stranger}")
+        assert r.status_code == 402
+        j = r.get_json()
+        assert j["error"] == "purchase_required"
+        assert int(j["tour_id"]) == tid
+        assert int(j["price_tier"]) == 3
+        assert j["price"] == "4.99"  # the ticket's exact shape (no '$')
+    finally:
+        _cleanup(db)
+
+
+def test_download_gate_200_after_stub_purchase_that_language(db, md_client, ent_client):
+    """After a stub purchase of THAT language the download succeeds (200); the
+    OTHER language of the same tour is still 402 (per-language, D653)."""
+    _cleanup(db)
+    try:
+        orig = _seed_tour_with_zip(db, f"{TEST_PREFIX}dl2 en", price_tier=3)
+        ru = _seed_tour_with_zip(db, f"{TEST_PREFIX}dl2 ru",
+                                 original_tour_id=orig, language="ru")
+        buyer = f"{TEST_PREFIX}dl2-buyer"
+        _seed_user(db, buyer)
+
+        # Both languages locked for the buyer at first.
+        assert md_client.get(f"/download-tour/{orig}?user_id={buyer}").status_code == 402
+        assert md_client.get(f"/download-tour/{ru}?user_id={buyer}").status_code == 402
+
+        # Buy ENGLISH (the original id) through the stub purchase path.
+        pr = ent_client.post("/purchases/verify", json={
+            "store": "stub",
+            "transaction_id": f"{TEST_PREFIX}dl2-en-txn",
+            "product": "audioura.tour.tier3",
+            "user_id": buyer,
+            "tour_id": str(orig),
+        })
+        assert pr.status_code == 200
+
+        # English now downloads (200); Russian is STILL 402 (needs its own buy).
+        ok = md_client.get(f"/download-tour/{orig}?user_id={buyer}")
+        assert ok.status_code == 200
+        assert ok.headers["Content-Type"] == "application/zip"
+        assert md_client.get(f"/download-tour/{ru}?user_id={buyer}").status_code == 402
+
+        # Buy Russian too → Russian now downloads.
+        pr2 = ent_client.post("/purchases/verify", json={
+            "store": "stub",
+            "transaction_id": f"{TEST_PREFIX}dl2-ru-txn",
+            "product": "audioura.tour.tier3",
+            "user_id": buyer,
+            "tour_id": str(ru),
+        })
+        assert pr2.status_code == 200
+        assert md_client.get(f"/download-tour/{ru}?user_id={buyer}").status_code == 200
+    finally:
+        _cleanup(db)
+
+
+def test_download_gate_free_tour_unchanged(db, md_client):
+    """A FREE tour downloads for anyone — the gate never fires."""
+    _cleanup(db)
+    try:
+        tid = _seed_tour_with_zip(db, f"{TEST_PREFIX}dl free")  # price_tier None
+        stranger = f"{TEST_PREFIX}dl-free-stranger"
+        _seed_user(db, stranger)
+        r = md_client.get(f"/download-tour/{tid}?user_id={stranger}")
+        assert r.status_code == 200
+        assert r.headers["Content-Type"] == "application/zip"
+    finally:
+        _cleanup(db)
+
+
+def test_download_gate_grandfathered_free_download_allowed(db, md_client):
+    """A user who downloaded a row while it was FREE keeps access after the
+    curator later prices it (grandfathering, honoured from tour_downloads)."""
+    _cleanup(db)
+    try:
+        tid = _seed_tour_with_zip(db, f"{TEST_PREFIX}dl gf")  # free at first
+        user = f"{TEST_PREFIX}dl-gf-user"
+        _seed_user(db, user)
+
+        # Download while FREE → 200, and records a was_free grandfather row.
+        assert md_client.get(f"/download-tour/{tid}?user_id={user}").status_code == 200
+
+        # The curator now PRICES the tour.
+        cur = db.cursor()
+        cur.execute("UPDATE audio_tours SET price_tier = 3 WHERE id = %s", (tid,))
+        db.commit()
+        cur.close()
+
+        # A brand-new user is now gated (402)…
+        stranger = f"{TEST_PREFIX}dl-gf-stranger"
+        _seed_user(db, stranger)
+        assert md_client.get(f"/download-tour/{tid}?user_id={stranger}").status_code == 402
+
+        # …but the grandfathered user still downloads (200).
+        assert md_client.get(f"/download-tour/{tid}?user_id={user}").status_code == 200
+    finally:
+        _cleanup(db)
+
+
+def test_download_gate_curator_downloads_own_tour(db, md_client):
+    """The tour's CREATOR (curator) downloads their own paid tour unpriced."""
+    _cleanup(db)
+    try:
+        tid = _seed_tour_with_zip(db, f"{TEST_PREFIX}dl own", price_tier=3)
+        owner = f"{TEST_PREFIX}dl-owner"
+        _seed_creator(db, tid, owner)  # earliest tour_requests.secret_id = owner
+        r = md_client.get(f"/download-tour/{tid}?user_id={owner}")
+        assert r.status_code == 200
+    finally:
+        _cleanup(db)
+
+
+def test_preview_audio_serves_only_stop_1(db, md_client):
+    """GET /tour/<id>/preview-audio returns Stop 1's audio ONLY — the bytes are
+    audio_1.mp3's, and no other stop's bytes are ever served. Works with NO
+    unlock (a paid, un-bought tour previews)."""
+    _cleanup(db)
+    try:
+        tid = _seed_tour_with_zip(db, f"{TEST_PREFIX}prev paid", price_tier=3,
+                                  num_stops=4)
+        stranger = f"{TEST_PREFIX}prev-stranger"
+        _seed_user(db, stranger)
+
+        r = md_client.get(f"/tour/{tid}/preview-audio?user_id={stranger}")
+        assert r.status_code == 200
+        assert r.headers["Content-Type"] == "audio/mpeg"
+        body = r.data
+        # It is EXACTLY Stop 1's bytes…
+        assert body == b"STOP-1-AUDIO-BYTES"
+        # …and NONE of the other stops' bytes leaked into the response.
+        assert b"STOP-2-AUDIO-BYTES" not in body
+        assert b"STOP-3-AUDIO-BYTES" not in body
+        assert b"STOP-4-AUDIO-BYTES" not in body
+    finally:
+        _cleanup(db)
+
+
+def test_preview_audio_free_tour_also_previews(db, md_client):
+    """A free tour previews too (Stop 1 bytes), with no unlock needed."""
+    _cleanup(db)
+    try:
+        tid = _seed_tour_with_zip(db, f"{TEST_PREFIX}prev free")
+        r = md_client.get(f"/tour/{tid}/preview-audio")
+        assert r.status_code == 200
+        assert r.data == b"STOP-1-AUDIO-BYTES"
+    finally:
+        _cleanup(db)
+
+
+def test_preview_audio_missing_tour_404(db, md_client):
+    """A tour id with no audio → 404, never a 500 and never other bytes."""
+    _cleanup(db)
+    try:
+        r = md_client.get("/tour/999999999/preview-audio")
+        assert r.status_code == 404
+    finally:
+        _cleanup(db)
