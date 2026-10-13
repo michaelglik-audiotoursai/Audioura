@@ -10,6 +10,7 @@ import json, os, sys, time, threading, traceback
 LOG = os.environ.get("PAID_API_LOG", "/meterlogs/paid_api_calls.jsonl")
 SERVICE = os.environ.get("METER_SERVICE", os.path.basename(sys.argv[0]) if sys.argv else "?")
 _lock = threading.Lock()
+_INSTALLED = False  # guard so install() patches each HTTP client at most once
 
 # $ per 1M tokens. OpenAI: published list prices. Gemini Flash: derived from our own Google
 # invoice SKUs of 2026-10-05 (445,098 input tok = $0.33; 154,413 output tok = $0.58).
@@ -294,6 +295,13 @@ def check_daily_limit():
 
 
 def install():
+    # Idempotent: patching each HTTP client more than once would stack wrappers
+    # and record (and limit-check) every paid call N times. sitecustomize and
+    # meter_bootstrap can both import+install, so guard against a second pass.
+    global _INSTALLED
+    if _INSTALLED:
+        return
+    _INSTALLED = True
     try:
         import requests
         _orig = requests.Session.send
