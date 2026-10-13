@@ -12,6 +12,8 @@ import '../widgets/share_tour_sheet.dart';
 import '../widgets/rate_tour_dialog.dart';
 import '../services/tour_listen_service.dart';
 import '../services/playback_accumulator.dart';
+import '../services/tour_pricing_service.dart';
+import '../widgets/tour_buy_sheet.dart';
 
 class TourPlayerScreen extends StatefulWidget {
   final String tourPath;
@@ -62,11 +64,84 @@ class _TourPlayerScreenState extends State<TourPlayerScreen> with VoiceMethods {
   final WebViewConsoleLogger _consoleLogger =
       WebViewConsoleLogger(source: 'tour-player');
 
+  // [LOCAL-677] Paid-tour preview/lock state. Null until the first fetch; a
+  // free tour resolves to an unlocked state so the banner never shows. When the
+  // tour is paid and NOT unlocked, Stop 1 plays as a preview and a "Buy for $X"
+  // banner invites the listener to unlock the rest.
+  TourUnlockState? _unlockState;
+
   @override
   void initState() {
     super.initState();
     _initializeWebView();
     initializeVoiceControl();
+    _loadUnlockState();
+  }
+
+  /// [LOCAL-677] Fetch the tour's unlock/preview state (free tours resolve to
+  /// unlocked). Re-fetched after a purchase so the banner disappears on unlock.
+  Future<void> _loadUnlockState() async {
+    final tourId = widget.tourId ?? _deriveTourId();
+    if (tourId.isEmpty || int.tryParse(tourId) == null) return;
+    final state = await TourPricingService.unlockState(tourId);
+    if (mounted) setState(() => _unlockState = state);
+  }
+
+  /// [LOCAL-677] Offer the Buy / TEST PURCHASE sheet; on unlock, refresh state.
+  Future<void> _offerBuy() async {
+    final s = _unlockState;
+    if (s == null || !s.locked || s.priceTier == null) return;
+    final tourId = widget.tourId ?? _deriveTourId();
+    final unlocked = await TourBuySheet.show(
+      context,
+      tourId: tourId,
+      tier: s.priceTier!,
+      priceLabel: s.priceLabel,
+      tourTitle: widget.tourTitle,
+    );
+    if (unlocked) {
+      await _loadUnlockState();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Tour unlocked — enjoy the full tour!')),
+        );
+      }
+    }
+  }
+
+  /// [LOCAL-677] The preview/lock banner over the player: "Stop 1 is a free
+  /// preview" + a "Buy for $X" button that opens the buy/TEST PURCHASE sheet.
+  Widget _buildBuyBanner() {
+    final s = _unlockState!;
+    return Material(
+      color: Colors.orange.shade50,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        child: Row(
+          children: [
+            Icon(Icons.lock_outline, color: Colors.orange.shade800, size: 20),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                'Stop 1 is a free preview. Unlock the full tour.',
+                style: TextStyle(fontSize: 13, color: Colors.orange.shade900),
+              ),
+            ),
+            const SizedBox(width: 8),
+            ElevatedButton(
+              onPressed: _offerBuy,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF1B6B2E),
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                minimumSize: const Size(0, 36),
+              ),
+              child: Text('Buy for ${s.priceLabel}'),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   @override
@@ -137,6 +212,10 @@ class _TourPlayerScreenState extends State<TourPlayerScreen> with VoiceMethods {
           if (snapshot.hasData) {
             return Column(
               children: [
+                // [LOCAL-677] Paid-tour preview banner. Stop 1 plays free; the
+                // rest is locked until the listener buys. Shown only while the
+                // tour is paid and not yet unlocked.
+                if (_unlockState?.locked == true) _buildBuyBanner(),
                 Expanded(
                   child: InAppWebView(
                     initialUrlRequest: URLRequest(url: WebUri(snapshot.data!)),

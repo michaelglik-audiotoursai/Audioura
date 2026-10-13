@@ -30,6 +30,7 @@ import '../widgets/subscription_credential_dialog.dart';
 import '../widgets/language_selector.dart';
 import '../widgets/rate_tour_dialog.dart';
 import '../widgets/reviews_section.dart';
+import '../widgets/price_badge.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -61,6 +62,10 @@ class _HomeScreenState extends State<HomeScreen> {
   // ratings weighted higher, old/pre-version ratings decayed). Remembered per
   // device under SharedPreferences 'home_top_rated'. Default off (nearest-first).
   bool _topRated = false;
+  // [LOCAL-677] Home-page Free/Paid/Any filter: '' = Any, 'free', or 'paid'.
+  // Remembered per device under SharedPreferences 'home_price_filter' and passed
+  // to /tours-near as ?price=free|paid so the server filters.
+  String _priceFilter = '';
   final List<String> _articleTypes = [
     'All',
     'News and Politics',
@@ -93,6 +98,7 @@ class _HomeScreenState extends State<HomeScreen> {
     final mode = prefs.getString('app_mode') ?? 'Tours';
     _minRating = prefs.getDouble('home_min_rating') ?? 0.0;
     _topRated = prefs.getBool('home_top_rated') ?? false;
+    _priceFilter = prefs.getString('home_price_filter') ?? '';
     await _loadLocationHistory();
     await _loadCustomLocation();
     
@@ -336,7 +342,9 @@ class _HomeScreenState extends State<HomeScreen> {
           _minRating > 0 ? '&min_rating=${_minRating.toStringAsFixed(0)}' : '';
       // [LOCAL-672] "Top rated" sort: let the server order by rank_score.
       final sortParam = _topRated ? '&sort=top_rated' : '';
-      final uri = await Endpoints.url(Service.mapDelivery, '/tours-near/${searchLocation.latitude}/${searchLocation.longitude}?radius=50$minRatingParam$sortParam');
+      // [LOCAL-677] Free/Paid filter: pass ?price=free|paid (Any = omit).
+      final priceParam = _priceFilter.isNotEmpty ? '&price=$_priceFilter' : '';
+      final uri = await Endpoints.url(Service.mapDelivery, '/tours-near/${searchLocation.latitude}/${searchLocation.longitude}?radius=50$minRatingParam$sortParam$priceParam');
       final url = uri.toString();
       
       await DebugLogHelper.addDebugLog('HOME: Requesting tours from: $url');
@@ -483,7 +491,49 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  /// [LOCAL-665] The one Home search dialog. Same visuals as the old shared
+  /// [LOCAL-677] Choose Free / Paid / Any tours. Persisted per device under
+  /// 'home_price_filter' and applied by reloading the nearby tours with the
+  /// server-side ?price=free|paid filter.
+  void _showPriceFilterDialog() {
+    const options = <String, String>{
+      'Any': '',
+      'Free': 'free',
+      'Paid': 'paid',
+    };
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Free or paid'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            for (final entry in options.entries)
+              RadioListTile<String>(
+                title: Text(entry.key == 'Any' ? 'Any tour' : '${entry.key} tours'),
+                value: entry.value,
+                groupValue: _priceFilter,
+                onChanged: (value) async {
+                  if (value == null) return;
+                  Navigator.pop(context);
+                  final prefs = await SharedPreferences.getInstance();
+                  await prefs.setString('home_price_filter', value);
+                  if (!mounted) return;
+                  setState(() => _priceFilter = value);
+                  await _loadNearbyTours();
+                },
+              ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Close'),
+          ),
+        ],
+      ),
+    );
+  }
+
   /// dialogs (a title, a single text field, Cancel + Search), but a single box
   /// whose hint — "Share code, tour name, or place" — says it takes all three.
   /// On submit it hands the raw text to [classifySearchInput] and runs
@@ -761,7 +811,14 @@ class _HomeScreenState extends State<HomeScreen> {
                 Text('Downloads: ${item['popularity']}'),
                 SizedBox(height: 6),
                 // [LOCAL-670] Rating badge "★ 8.3 · 2 ratings" / "★ 7.5 · New".
-                TourRatingBadge.fromTour(item),
+                // [LOCAL-677] Price badge "$4.99" / "Free" beside the rating.
+                Row(
+                  children: [
+                    TourRatingBadge.fromTour(item),
+                    const SizedBox(width: 8),
+                    TourPriceBadge.fromTour(item),
+                  ],
+                ),
                 if (_tourVersionLabel(item) != null)
                   Text(
                     _tourVersionLabel(item)!,
@@ -1127,6 +1184,12 @@ class _HomeScreenState extends State<HomeScreen> {
                                   style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
                                 ),
                               ],
+                            ),
+                            // [LOCAL-677] Price badge in the list row ("$4.99"/"Free").
+                            const SizedBox(height: 4),
+                            Align(
+                              alignment: Alignment.centerLeft,
+                              child: TourPriceBadge.fromTour(tour, compact: true),
                             ),
                             if (_tourVersionLabel(tour) != null) ...[
                               SizedBox(height: 2),
@@ -3080,6 +3143,21 @@ class _HomeScreenState extends State<HomeScreen> {
               _loadNearbyTours();
             },
             tooltip: _topRated ? 'Sorted: Top rated' : 'Sort: Top rated',
+          ),
+          // [LOCAL-677] Free/Paid/Any filter. The chosen option is remembered
+          // per device and passed to /tours-near as ?price=free|paid.
+          IconButton(
+            icon: Icon(_priceFilter == 'free'
+                ? Icons.money_off
+                : _priceFilter == 'paid'
+                    ? Icons.sell
+                    : Icons.sell_outlined),
+            onPressed: _showPriceFilterDialog,
+            tooltip: _priceFilter == 'free'
+                ? 'Showing: Free tours'
+                : _priceFilter == 'paid'
+                    ? 'Showing: Paid tours'
+                    : 'Free/Paid: Any',
           ),
           // [LOCAL-665] One search button for everything. Michael: the two old
           // buttons (flag = tours, arrow-glass = location) were easy to confuse.

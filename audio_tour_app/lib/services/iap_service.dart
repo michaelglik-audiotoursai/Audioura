@@ -74,6 +74,22 @@ String? serverProductForStoreId(String storeId) {
   return null;
 }
 
+/// [LOCAL-677] Curator paid tours. A tour is sold as one of a FIXED set of
+/// CONSUMABLE price-tier products (per-tour products can't be created on the
+/// fly — D624). The store id the app sells for a tier, mirrored from the server
+/// price_tiers config / migration 022 (D652 defaults). Keep in lock-step with
+/// TOUR_TIER_PRODUCTS in entitlements_api.py and the price_tiers table.
+String tourProductForTier(int tier) => 'audioura.tour.tier$tier';
+
+/// All tour-tier store ids the app may sell (tier 1..5).
+const Set<String> kTourStoreIds = {
+  'audioura.tour.tier1',
+  'audioura.tour.tier2',
+  'audioura.tour.tier3',
+  'audioura.tour.tier4',
+  'audioura.tour.tier5',
+};
+
 enum IapResultStatus { granted, cancelled, pending, unavailable, failed }
 
 class IapResult {
@@ -93,6 +109,9 @@ class IapService {
   /// delivers the matching product's terminal state. One purchase at a time.
   Completer<IapResult>? _pending;
   String? _pendingStoreId;
+  // [LOCAL-677] When the in-flight purchase is a TOUR unlock, the tour id to
+  // send to /purchases/verify so the server writes tour_unlocks for this tour.
+  String? _pendingTourId;
 
   bool _initialised = false;
 
@@ -175,6 +194,128 @@ class IapService {
     return _pending!.future;
   }
 
+  // ─── [LOCAL-677] Curator paid tours ────────────────────────────────────────
+
+  /// Whether the device is in LOCAL server mode (the Mac Mini stack). The TEST
+  /// PURCHASE path is only offered there, where the server runs with
+  /// IAP_VERIFY_MODE=stub and no Apple/Google products exist yet.
+  Future<bool> isLocalStubMode() async {
+    final prefs = await SharedPreferences.getInstance();
+    return (prefs.getString('server_mode') ?? 'cloud') == 'local';
+  }
+
+  /// Buy (unlock) ONE tour at the given price [tier] through the store, then the
+  /// server verifies and writes tour_unlocks. iOS only (Android billing off).
+  /// Until the Apple/Google tour products exist this returns `unavailable` on a
+  /// real store; use [testPurchaseTour] in LOCAL stub mode. [tourId] is the tour
+  /// being unlocked (sent to /purchases/verify so the server unlocks that tour).
+  Future<IapResult> buyTour(int tier, String tourId) async {
+    if (Platform.isAndroid && !kAndroidBillingEnabled) {
+      return const IapResult(IapResultStatus.unavailable,
+          'In-app purchases are not available on Android yet.');
+    }
+    final storeId = tourProductForTier(tier);
+
+    final available = await _iap.isAvailable();
+    if (!available) {
+      return const IapResult(IapResultStatus.unavailable,
+          'The store is not available on this device.');
+    }
+    await _ensureListening();
+
+    final response = await _iap.queryProductDetails({storeId});
+    if (response.error != null ||
+        response.productDetails.isEmpty ||
+        response.notFoundIDs.contains(storeId)) {
+      await DebugLogHelper.addDebugLog(
+          'IAP: tour product not found: $storeId '
+          'notFound=${response.notFoundIDs}');
+      return const IapResult(IapResultStatus.unavailable,
+          'This tour is not available for purchase right now.');
+    }
+    final details = response.productDetails.first;
+
+    if (_pending != null && !_pending!.isCompleted) {
+      return const IapResult(
+          IapResultStatus.failed, 'Another purchase is already in progress.');
+    }
+    _pending = Completer<IapResult>();
+    _pendingStoreId = storeId;
+    _pendingTourId = tourId;
+
+    final param = PurchaseParam(productDetails: details);
+    try {
+      await _iap.buyConsumable(purchaseParam: param, autoConsume: false);
+    } catch (e) {
+      await DebugLogHelper.addDebugLog('IAP: tour buyConsumable threw: $e');
+      _pendingStoreId = null;
+      _pendingTourId = null;
+      final c = _pending;
+      _pending = null;
+      if (c != null && !c.isCompleted) {
+        return IapResult(IapResultStatus.failed, 'Could not start purchase: $e');
+      }
+    }
+    return _pending!.future;
+  }
+
+  /// TEST PURCHASE (LOCAL stub mode only). Completes a fake tour purchase by
+  /// posting straight to /purchases/verify with store='stub' and a generated
+  /// transaction id — no real store, no charge. The server (IAP_VERIFY_MODE=
+  /// stub) accepts any non-empty transaction id and writes tour_unlocks, so the
+  /// whole buy→unlock flow can be tested end to end on Michael's phone before
+  /// the Apple/Google products exist. Idempotent on the transaction id.
+  Future<IapResult> testPurchaseTour(int tier, String tourId) async {
+    final prefs = await SharedPreferences.getInstance();
+    final userId = prefs.getString('user_id') ?? '';
+    if (userId.isEmpty) {
+      return const IapResult(IapResultStatus.failed,
+          'No device id — cannot complete the test purchase.');
+    }
+    final storeId = tourProductForTier(tier);
+    final transactionId =
+        'TEST-677-${DateTime.now().millisecondsSinceEpoch}-$tourId';
+    final body = <String, dynamic>{
+      'store': 'stub',
+      'transaction_id': transactionId,
+      'product': storeId,
+      'user_id': userId,
+      'tour_id': tourId,
+    };
+    try {
+      final resp = await Endpoints.post(
+        Service.userDb,
+        '/purchases/verify',
+        body: body,
+        timeout: const Duration(seconds: 30),
+      );
+      if (resp.statusCode == 200) {
+        await DebugLogHelper.addDebugLog(
+            'IAP: TEST PURCHASE unlocked tour $tourId (tier $tier)');
+        return const IapResult(IapResultStatus.granted);
+      }
+      // 409 already_verified → the tour is already unlocked; treat as success.
+      if (resp.statusCode == 409) {
+        return const IapResult(IapResultStatus.granted);
+      }
+      String? msg;
+      try {
+        final decoded = jsonDecode(resp.body);
+        if (decoded is Map && decoded['message'] is String) {
+          msg = decoded['message'] as String;
+        }
+      } catch (_) {}
+      await DebugLogHelper.addDebugLog(
+          'IAP: TEST PURCHASE non-200 ${resp.statusCode}: ${resp.body}');
+      return IapResult(IapResultStatus.failed,
+          msg ?? 'The test purchase could not be completed.');
+    } catch (e) {
+      await DebugLogHelper.addDebugLog('IAP: TEST PURCHASE error: $e');
+      return IapResult(IapResultStatus.failed,
+          'Could not reach the server for the test purchase: $e');
+    }
+  }
+
   Future<void> _onPurchaseUpdates(List<PurchaseDetails> purchases) async {
     for (final p in purchases) {
       await _handleOne(p);
@@ -213,7 +354,14 @@ class IapService {
   /// Send the StoreKit 2 JWS signed transaction to /purchases/verify and grant
   /// only on the server's OK.
   Future<IapResult> _verifyAndGrant(PurchaseDetails p) async {
-    final serverProduct = serverProductForStoreId(p.productID);
+    // [LOCAL-677] A TOUR unlock: the product is a tour-tier id and a tour id was
+    // staged by buyTour(). Verify with tour_id so the server writes tour_unlocks
+    // for that tour (it does NOT change the buyer's level).
+    final bool isTourPurchase =
+        kTourStoreIds.contains(p.productID) && _pendingTourId != null;
+
+    final serverProduct =
+        isTourPurchase ? p.productID : serverProductForStoreId(p.productID);
     if (serverProduct == null) {
       return const IapResult(
           IapResultStatus.failed, 'Unknown product — not granted.');
@@ -237,6 +385,7 @@ class IapService {
       'product': p.productID, // store id; server maps to the product key
       'user_id': userId,
       'signed_transaction': jws,
+      if (isTourPurchase) 'tour_id': _pendingTourId,
     };
 
     try {
@@ -291,6 +440,7 @@ class IapService {
     final c = _pending;
     _pending = null;
     _pendingStoreId = null;
+    _pendingTourId = null;
     c!.complete(result);
   }
 
