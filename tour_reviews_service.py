@@ -310,6 +310,26 @@ def compute_verified(cur, user_id, original_id):
     BOTH a real purchase AND that the user actually has the tour. It never marks
     a non-purchasing user verified.
     """
+    # [LOCAL-677] AUTHORITATIVE per-tour unlock: a tour_unlocks row for this
+    # (user, original tour) means the buyer completed a store-verified purchase
+    # that unlocked THIS tour (written by the /purchases/verify tour-tier path).
+    # This is the real per-tour signal the D624 fallback below only approximated,
+    # so it is checked FIRST and short-circuits — a buyer who unlocked the tour
+    # is a Verified listener regardless of the (now historical) product-string
+    # heuristics. A refunded purchase removes the unlock (the verify path writes
+    # the row only on a successful, non-refunded grant), so this stays correct
+    # under refunds too. Absent table (pre-022 DB) → falls through unchanged.
+    if _has_table(cur, "tour_unlocks"):
+        try:
+            cur.execute(
+                "SELECT 1 FROM tour_unlocks WHERE user_id = %s AND tour_id = %s LIMIT 1",
+                (user_id, int(original_id)),
+            )
+            if cur.fetchone() is not None:
+                return True
+        except Exception:  # noqa: BLE001 — never 500 the verified check
+            pass
+
     if not _has_table(cur, "purchases"):
         return False
 

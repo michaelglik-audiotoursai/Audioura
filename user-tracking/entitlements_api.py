@@ -77,6 +77,72 @@ STORE_PRODUCT_IDS = {
 # Reverse: server key -> expected store productId (for the apple JWS check).
 SERVER_TO_STORE_PRODUCT = {v: k for k, v in STORE_PRODUCT_IDS.items()}
 
+# [LOCAL-677] Tour price-tier products. A paid CURATOR tour is sold as one of a
+# fixed set of CONSUMABLE store products (per-tour products can't be created on
+# the fly — D624). The server records which tour a verified transaction
+# unlocked, in tour_unlocks. Unlike a LEVEL purchase (which grants an allowance
+# on device_entitlement), a tour purchase unlocks ONE tour for the buyer and
+# does NOT change their level.
+#
+# This map is the self-contained mirror of the repo-root price_tiers table
+# (migration 022) / price_tiers.py — the user-api container's build context is
+# ./user-tracking and cannot import the repo-root module, exactly like
+# PRODUCT_LEVELS mirrors subscription_levels. The price_tiers TABLE is the
+# source of record; this is the fallback the stub path uses to stamp the amount.
+# Keep the five entries in lock-step with migration 022's seed rows (D652).
+TOUR_TIER_PRODUCTS = {
+    'audioura.tour.tier1': {'tier': 1, 'price_usd': 1.99},
+    'audioura.tour.tier2': {'tier': 2, 'price_usd': 2.99},
+    'audioura.tour.tier3': {'tier': 3, 'price_usd': 4.99},
+    'audioura.tour.tier4': {'tier': 4, 'price_usd': 7.99},
+    'audioura.tour.tier5': {'tier': 5, 'price_usd': 9.99},
+}
+
+
+def _is_tour_product(product):
+    """True if `product` is a tour price-tier store product id."""
+    return product in TOUR_TIER_PRODUCTS
+
+
+def _tour_price_usd(cur, product):
+    """The buyer price for a tour-tier product. Reads the price_tiers table when
+    present (DB is authoritative — Michael's SQL edits take effect), else the
+    code fallback above. Never raises."""
+    info = TOUR_TIER_PRODUCTS.get(product, {})
+    try:
+        cur.execute(
+            "SELECT 1 FROM information_schema.tables WHERE table_name = 'price_tiers'"
+        )
+        if cur.fetchone() is not None:
+            cur.execute(
+                "SELECT price_usd FROM price_tiers WHERE product_id = %s", (product,)
+            )
+            row = cur.fetchone()
+            if row and row[0] is not None:
+                return float(row[0])
+    except Exception:  # noqa: BLE001 — fall back to the code default on any error
+        pass
+    return info.get('price_usd')
+
+
+def _resolve_original_tour_id(cur, tour_id):
+    """Map a (possibly translation) tour id to the ORIGINAL audio_tours.id its
+    unlock keys on — the same rule the rating/review/pricing services use. A
+    translation row has original_tour_id set; an original (or unknown id) maps to
+    itself. Returns an int, or None if the id is not an integer."""
+    try:
+        tid = int(tour_id)
+    except (TypeError, ValueError):
+        return None
+    try:
+        cur.execute("SELECT original_tour_id FROM audio_tours WHERE id = %s", (tid,))
+        row = cur.fetchone()
+        if row and row[0]:
+            return int(row[0])
+    except Exception:  # noqa: BLE001
+        pass
+    return tid
+
 
 def _normalize_product(product):
     """Accept either a store product id (audioura.pack.l3) or a server product
@@ -481,6 +547,200 @@ def entitlements_lapse():
         conn.close()
 
 
+def _verify_tour_purchase(store, transaction_id, product, user_id,
+                          signed_transaction, tour_id):
+    """[LOCAL-677] Verify a TOUR price-tier purchase and unlock the tour.
+
+    A tour purchase unlocks ONE tour for the buyer (writes tour_unlocks) and
+    does NOT change their level. Flow mirrors the level path: idempotency on
+    transaction_id, verify via the store (stub accepts any non-empty id), record
+    the purchase, then write the unlock idempotently (UNIQUE(user_id,tour_id)).
+    Requires tour_id in the body. Returns a Flask (json, status) tuple.
+    """
+    if not tour_id:
+        return jsonify({
+            "error": "missing_fields",
+            "message": "tour_id is required to unlock a tour purchase.",
+        }), 400
+
+    conn = _get_db()
+    try:
+        cur = conn.cursor()
+
+        original_tour_id = _resolve_original_tour_id(cur, tour_id)
+        if original_tour_id is None:
+            cur.close()
+            return jsonify({
+                "error": "unknown_tour",
+                "message": f"Unknown tour '{tour_id}'.",
+            }), 400
+
+        # Idempotency on the client-supplied transaction id (apple re-checks the
+        # authoritative id below).
+        cur.execute("SELECT id FROM purchases WHERE transaction_id = %s", (transaction_id,))
+        if cur.fetchone():
+            # Already processed — ensure the unlock exists (idempotent) and
+            # report success so a redelivery is not an error.
+            cur.execute(
+                """
+                INSERT INTO tour_unlocks (user_id, tour_id, transaction_id, store, price_usd)
+                VALUES (%s, %s, %s, %s, %s)
+                ON CONFLICT (user_id, tour_id) DO NOTHING
+                """,
+                (user_id, original_tour_id, transaction_id, store,
+                 _tour_price_usd(cur, product)),
+            )
+            conn.commit()
+            cur.close()
+            return jsonify({
+                "error": "already_verified",
+                "message": "This transaction has already been processed.",
+                "transaction_id": transaction_id,
+                "unlocked": True,
+                "tour_id": original_tour_id,
+            }), 409
+
+        # Verify with the store. For apple mode, verify_purchase checks the
+        # signed transaction against the expected store product id; it already
+        # knows tour products are Consumable (SERVER_TO_STORE_PRODUCT is only for
+        # level products, so a tour product uses the store id directly below).
+        result = _verify_tour_signed(store, transaction_id, product,
+                                     signed_transaction)
+        if not result.ok:
+            cur.close()
+            return jsonify({
+                "error": "verification_failed",
+                "message": "The store could not verify this purchase.",
+                "raw_status": result.raw_status,
+            }), 402
+
+        # apple mode: the JWS yields the authoritative transaction id.
+        effective_txid = transaction_id
+        if isinstance(result.raw_status, str) and result.raw_status.startswith('apple_verified:'):
+            effective_txid = result.raw_status.split(':', 1)[1]
+            cur.execute("SELECT id FROM purchases WHERE transaction_id = %s", (effective_txid,))
+            if cur.fetchone():
+                cur.execute(
+                    """
+                    INSERT INTO tour_unlocks (user_id, tour_id, transaction_id, store, price_usd)
+                    VALUES (%s, %s, %s, %s, %s)
+                    ON CONFLICT (user_id, tour_id) DO NOTHING
+                    """,
+                    (user_id, original_tour_id, effective_txid, store,
+                     _tour_price_usd(cur, product)),
+                )
+                conn.commit()
+                cur.close()
+                return jsonify({
+                    "error": "already_verified",
+                    "message": "This transaction has already been processed.",
+                    "transaction_id": effective_txid,
+                    "unlocked": True,
+                    "tour_id": original_tour_id,
+                }), 409
+
+        price_usd = _tour_price_usd(cur, product)
+
+        # Record the purchase (product = the tour store product id). UNIQUE
+        # transaction_id enforces idempotency under a race.
+        try:
+            cur.execute("""
+                INSERT INTO purchases (transaction_id, store, product, user_id, amount, raw_status)
+                VALUES (%s, %s, %s, %s, %s, %s)
+            """, (effective_txid, store, product, user_id, price_usd, result.raw_status))
+        except psycopg2.errors.UniqueViolation:
+            conn.rollback()
+            cur2 = conn.cursor()
+            cur2.execute(
+                """
+                INSERT INTO tour_unlocks (user_id, tour_id, transaction_id, store, price_usd)
+                VALUES (%s, %s, %s, %s, %s)
+                ON CONFLICT (user_id, tour_id) DO NOTHING
+                """,
+                (user_id, original_tour_id, effective_txid, store, price_usd),
+            )
+            conn.commit()
+            cur2.close()
+            return jsonify({
+                "error": "already_verified",
+                "message": "This transaction has already been processed.",
+                "transaction_id": effective_txid,
+                "unlocked": True,
+                "tour_id": original_tour_id,
+            }), 409
+
+        # Write the unlock (idempotent on UNIQUE(user_id, tour_id)): a replayed
+        # purchase of the same tour by the same buyer never unlocks twice.
+        cur.execute(
+            """
+            INSERT INTO tour_unlocks (user_id, tour_id, transaction_id, store, price_usd)
+            VALUES (%s, %s, %s, %s, %s)
+            ON CONFLICT (user_id, tour_id) DO NOTHING
+            """,
+            (user_id, original_tour_id, effective_txid, store, price_usd),
+        )
+        conn.commit()
+        cur.close()
+        return jsonify({
+            "verified": True,
+            "unlocked": True,
+            "tour_id": original_tour_id,
+            "transaction_id": effective_txid,
+            "product": product,
+            "amount": price_usd,
+        }), 200
+    finally:
+        conn.close()
+
+
+def _verify_tour_signed(store, transaction_id, product, signed_transaction):
+    """Verify a TOUR purchase with the configured backend.
+
+    stub : any non-empty transaction id (sandbox) — the LOCAL path until Apple
+           and Google products exist. apple : the StoreKit 2 JWS checked offline
+           against the tour store product id (a Consumable). google : not yet.
+    """
+    if IAP_VERIFY_MODE == 'stub':
+        if not transaction_id:
+            return VerificationResult(False, 'stub_rejected_empty_transaction')
+        return VerificationResult(True, 'stub_verified',
+                                  TOUR_TIER_PRODUCTS.get(product, {}).get('price_usd'))
+
+    if IAP_VERIFY_MODE == 'apple':
+        if store != 'apple':
+            return VerificationResult(False, f'apple_mode_wrong_store:{store}')
+        if not signed_transaction:
+            return VerificationResult(False, 'apple_missing_signed_transaction')
+        try:
+            from apple_jws_verifier import (
+                verify_signed_transaction, JwsVerificationError,
+            )
+        except Exception as e:  # pragma: no cover
+            logger.error(f"[LOCAL-677] apple verifier import failed: {e}")
+            return VerificationResult(False, f'apple_verifier_unavailable:{e}')
+        try:
+            root_pem = _load_apple_root_ca()
+            verified = verify_signed_transaction(
+                signed_transaction,
+                root_ca_pem=root_pem,
+                expected_bundle_id=APPLE_BUNDLE_ID,
+                expected_product_id=product,  # the tour store product id itself
+                required_type='Consumable',
+                expected_environment=(APPLE_IAP_ENVIRONMENT or None),
+            )
+        except JwsVerificationError as e:
+            logger.warning(f"[LOCAL-677] apple verify failed: {e.code}")
+            return VerificationResult(False, f'apple_{e.code}')
+        except Exception as e:
+            logger.error(f"[LOCAL-677] apple verify error: {e}")
+            return VerificationResult(False, f'apple_error:{e}')
+        return VerificationResult(
+            True, f'apple_verified:{verified.transaction_id}',
+            TOUR_TIER_PRODUCTS.get(product, {}).get('price_usd'))
+
+    return VerificationResult(False, f'verify_mode_not_implemented:{IAP_VERIFY_MODE}')
+
+
 @entitlements_bp.route('/purchases/verify', methods=['POST'])
 def purchases_verify():
     err = _require_api_key()
@@ -499,6 +759,16 @@ def purchases_verify():
             "error": "missing_fields",
             "message": "store, transaction_id, product and user_id are all required.",
         }), 400
+
+    # [LOCAL-677] A TOUR price-tier purchase (audioura.tour.tierN) unlocks ONE
+    # tour for the buyer rather than granting a level. It takes a separate path:
+    # verify the transaction (stub accepts any non-empty id), record the purchase
+    # idempotently, and write a tour_unlocks row (idempotent on
+    # UNIQUE(user_id,tour_id)) so a replayed purchase never unlocks twice.
+    if _is_tour_product(product):
+        return _verify_tour_purchase(
+            store, transaction_id, product, user_id, signed_transaction,
+            tour_id=data.get('tour_id'))
 
     # Accept either the store product id (audioura.pack.l3) or the server key
     # (l3_pack_10). Normalize to the server key for the level mapping.

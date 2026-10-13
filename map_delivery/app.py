@@ -78,6 +78,7 @@ def get_tour_by_code(code):
                    sv.max_version_no AS source_max_version_no,
                    {_ratings_select(cur)},
                    {_is_paid_select(cur)} AS is_paid,
+                   {_price_tier_select(cur)} AS price_tier,
                    {_ORIGINAL_LANGUAGE_SELECT}
             FROM audio_tours t
             LEFT JOIN (
@@ -106,7 +107,7 @@ def get_tour_by_code(code):
         (tour_id, tour_name, request_string, tour_lat, tour_lng, requests,
          language, original_id, max_vn, last_replaced, created_at,
          source_version, source_max_vn, rating_count, rating_values,
-         verified_values, created_values, is_paid,
+         verified_values, created_values, is_paid, price_tier,
          own_content_language, source_content_language) = t
         # [LOCAL-666] A share code can point at a translation row (original_tour_id
         # set, e.g. Russian 615 of 557) as well as an original. For a translation we
@@ -138,6 +139,7 @@ def get_tour_by_code(code):
                 'version': version,
                 'updated_at': updated_at,
                 **_rating_payload(rating_values, verified_values, created_values, is_paid),
+                **_price_block(price_tier),
             }],
             'count': 1,
         })
@@ -618,11 +620,127 @@ def _ratings_join(cur):
 
 def _is_paid_select(cur):
     """SQL fragment selecting the tour's paid flag. Uses audio_tours.is_paid when
-    that column exists (future per-tour price mapping, D624), else a FALSE literal
-    — every tour reads as FREE today, which is exactly LOCAL-670's counting."""
+    that column exists (per-tour price mapping, D624/LOCAL-677), else a FALSE
+    literal — every tour reads as FREE on a schema that predates it.
+
+    [LOCAL-677] A translation inherits its SOURCE tour's paid flag: the endpoints
+    LEFT JOIN the original row as `orig`, so COALESCE(orig.is_paid, t.is_paid)
+    makes a translation of a paid tour read as paid (its own price_tier is always
+    NULL — only originals are priced). Falls back to the own flag for an original
+    (orig is NULL there)."""
     if _has_is_paid_column(cur):
-        return "COALESCE(t.is_paid, FALSE)"
+        return "COALESCE(orig.is_paid, t.is_paid, FALSE)"
     return "FALSE"
+
+
+# ─── [LOCAL-677] Price tier + Free/Paid filter ───────────────────────────────
+#
+# A paid tour carries a price_tier (1..5); the tier maps to a dollar label the
+# home list shows next to the ★ rating. map-delivery deploys as its own image
+# and cannot import the repo-root price_tiers module, so the tier→label map is a
+# self-contained copy of the D652 defaults (migration 022 seeds the same rows).
+# The price_tiers TABLE is authoritative when present (Michael's SQL edits take
+# effect); the constants are the fallback for a DB that predates it. Keep the
+# five entries in lock-step with migration 022.
+_DEFAULT_TIER_LABELS = {1: "$1.99", 2: "$2.99", 3: "$4.99", 4: "$7.99", 5: "$9.99"}
+_TIER_LABELS = None  # cached per process after the first DB read
+
+_HAS_PRICE_TIER_COLUMN = None
+_HAS_PRICE_TIERS_TABLE = None
+
+
+def _has_price_tier_column(cur):
+    """True if audio_tours.price_tier exists. Probed once + cached. Absent (pre-
+    022) → every tour reads as FREE (price_tier NULL), unchanged from before."""
+    global _HAS_PRICE_TIER_COLUMN
+    if _HAS_PRICE_TIER_COLUMN is None:
+        try:
+            cur.execute("""
+                SELECT 1 FROM information_schema.columns
+                WHERE table_name = 'audio_tours' AND column_name = 'price_tier'
+            """)
+            _HAS_PRICE_TIER_COLUMN = cur.fetchone() is not None
+        except Exception:
+            _HAS_PRICE_TIER_COLUMN = False
+    return _HAS_PRICE_TIER_COLUMN
+
+
+def _price_tier_select(cur):
+    """SQL fragment selecting the tour's price_tier, or NULL on an older schema.
+
+    A translation inherits its SOURCE tour's price: the endpoints already LEFT
+    JOIN the original row as `orig` (ON orig.id = t.original_tour_id) for the
+    original-language field, so COALESCE(orig.price_tier, t.price_tier) gives the
+    translation its source's tier and an original its own — no extra join."""
+    if _has_price_tier_column(cur):
+        return "COALESCE(orig.price_tier, t.price_tier)"
+    return "NULL::smallint"
+
+
+def _tier_labels(cur):
+    """{tier: label} from the price_tiers table when present, else the D652
+    defaults. Cached per process (prices change rarely; a restart re-reads). A
+    None cursor returns the cache if warmed, else the defaults — so a single-tour
+    endpoint that already closed its cursor still renders a correct label."""
+    global _TIER_LABELS
+    if _TIER_LABELS is not None:
+        return _TIER_LABELS
+    if cur is None:
+        return dict(_DEFAULT_TIER_LABELS)
+    labels = dict(_DEFAULT_TIER_LABELS)
+    try:
+        cur.execute("""
+            SELECT 1 FROM information_schema.tables WHERE table_name = 'price_tiers'
+        """)
+        if cur.fetchone() is not None:
+            cur.execute("SELECT tier, label FROM price_tiers WHERE COALESCE(active, TRUE) = TRUE")
+            rows = cur.fetchall()
+            if rows:
+                labels = {int(t): (lbl or _DEFAULT_TIER_LABELS.get(int(t), ""))
+                          for t, lbl in rows}
+    except Exception:
+        pass
+    _TIER_LABELS = labels
+    return _TIER_LABELS
+
+
+def _price_label_for(tier, cur):
+    """'$4.99' for a priced tier, 'Free' for a NULL/unknown tier."""
+    if tier is None:
+        return "Free"
+    try:
+        return _tier_labels(cur).get(int(tier), "Free")
+    except (TypeError, ValueError):
+        return "Free"
+
+
+def _price_block(price_tier, cur=None):
+    """The price fields appended to every tour payload: price_tier (int|None)
+    and price_label ('$4.99' | 'Free'). is_paid already comes from the rating
+    block; this adds the tier + its human label the home list shows. `cur` is
+    optional (a closed-cursor single-tour endpoint passes None → cached/default
+    labels)."""
+    tier = int(price_tier) if price_tier is not None else None
+    return {"price_tier": tier, "price_label": _price_label_for(tier, cur)}
+
+
+def _parse_price_filter(args):
+    """Parse the optional ?price=free|paid query param. Returns 'free', 'paid',
+    or None (absent/blank/invalid → no filter)."""
+    raw = (args.get('price') or '').strip().lower()
+    if raw in ('free', 'paid'):
+        return raw
+    return None
+
+
+def _passes_price_filter(price_filter, is_paid):
+    """True if a tour with the given is_paid flag passes the price filter.
+    None filter → everything passes (Any)."""
+    if price_filter is None:
+        return True
+    if price_filter == 'free':
+        return not is_paid
+    return bool(is_paid)  # 'paid'
 
 
 def calculate_distance(lat1, lng1, lat2, lng2):
@@ -674,6 +792,8 @@ def get_tours_near_location(lat, lng):
         # the shape identical to the other endpoints that DO surface translations.
         # [LOCAL-670] Optional server-side rating filter (home page: Any/7+/8+/9+).
         min_rating = _parse_min_rating(request.args)
+        # [LOCAL-677] Optional Free/Paid filter (home page: Free/Paid/Any).
+        price_filter = _parse_price_filter(request.args)
 
         cur.execute(f"""
             SELECT t.id, t.tour_name, t.request_string, t.lat, t.lng,
@@ -683,6 +803,7 @@ def get_tours_near_location(lat, lng):
                    sv.max_version_no AS source_max_version_no,
                    {_ratings_select(cur)},
                    {_is_paid_select(cur)} AS is_paid,
+                   {_price_tier_select(cur)} AS price_tier,
                    {_ORIGINAL_LANGUAGE_SELECT}
             FROM audio_tours t
             LEFT JOIN (
@@ -712,7 +833,7 @@ def get_tours_near_location(lat, lng):
             (tour_id, tour_name, request_string, tour_lat, tour_lng, requests,
              language, original_id, max_vn, last_replaced, created_at,
              source_version, source_max_vn, rating_count, rating_values,
-             verified_values, created_values, is_paid,
+             verified_values, created_values, is_paid, price_tier,
              own_content_language, source_content_language) = tour
             
             if tour_lat and tour_lng:
@@ -726,6 +847,9 @@ def get_tours_near_location(lat, lng):
                         rating_values, verified_values, created_values, is_paid)
                     # Server-side min_rating filter: skip tours below the bar.
                     if min_rating is not None and rating_block['rating_score'] < min_rating:
+                        continue
+                    # [LOCAL-677] Free/Paid filter: skip tours that don't match.
+                    if not _passes_price_filter(price_filter, rating_block['is_paid']):
                         continue
                     original_language = _resolved_original_language(
                         own_content_language, original_id, source_content_language)
@@ -744,6 +868,7 @@ def get_tours_near_location(lat, lng):
                         'version': version,
                         'updated_at': updated_at,
                         **rating_block,
+                        **_price_block(price_tier, cur),
                     }
                     tours_list.append(tour_data)
         
@@ -871,6 +996,7 @@ def get_tour_info(tour_id):
                    sv.max_version_no AS source_max_version_no,
                    {_ratings_select(cur)},
                    {_is_paid_select(cur)} AS is_paid,
+                   {_price_tier_select(cur)} AS price_tier,
                    {_ORIGINAL_LANGUAGE_SELECT}
             FROM audio_tours t
             LEFT JOIN (
@@ -895,7 +1021,7 @@ def get_tour_info(tour_id):
         
         (tour_id, tour_name, request_string, lat, lng, requests, language, original_id,
          max_vn, last_replaced, created_at, source_version, source_max_vn,
-         rating_count, rating_values, verified_values, created_values, is_paid,
+         rating_count, rating_values, verified_values, created_values, is_paid, price_tier,
          own_content_language, source_content_language) = result
         cur.close()
         conn.close()
@@ -921,6 +1047,7 @@ def get_tour_info(tour_id):
             'version': version,
             'updated_at': updated_at,
             **_rating_payload(rating_values, verified_values, created_values, is_paid),
+            **_price_block(price_tier),
         })
         
     except Exception as e:
@@ -947,6 +1074,8 @@ def search_tours():
         sql_pattern = pattern.replace('.*', '%')
         # [LOCAL-670] Optional server-side rating filter.
         min_rating = _parse_min_rating(request.args)
+        # [LOCAL-677] Optional Free/Paid filter.
+        price_filter = _parse_price_filter(request.args)
         
         # [LOCAL-657, LEAD] Search results open the same tour dialogs, so they carry
         # the version label fields too (one grouped LEFT JOIN, as in /tours-near).
@@ -963,6 +1092,7 @@ def search_tours():
                    sv.max_version_no AS source_max_version_no,
                    {_ratings_select(cur)},
                    {_is_paid_select(cur)} AS is_paid,
+                   {_price_tier_select(cur)} AS price_tier,
                    {_ORIGINAL_LANGUAGE_SELECT}
             FROM audio_tours t
             LEFT JOIN (
@@ -988,7 +1118,7 @@ def search_tours():
         for tour in tours:
             (tour_id, tour_name, request_string, tour_lat, tour_lng, requests, language, original_id,
              max_vn, last_replaced, created_at, source_version, source_max_vn,
-             rating_count, rating_values, verified_values, created_values, is_paid,
+             rating_count, rating_values, verified_values, created_values, is_paid, price_tier,
              own_content_language, source_content_language) = tour
             version, updated_at = _resolved_version_fields(
                 original_id, source_version, source_max_vn, max_vn, last_replaced, created_at)
@@ -996,6 +1126,9 @@ def search_tours():
                 rating_values, verified_values, created_values, is_paid)
             # Server-side min_rating filter.
             if min_rating is not None and rating_block['rating_score'] < min_rating:
+                continue
+            # [LOCAL-677] Free/Paid filter.
+            if not _passes_price_filter(price_filter, rating_block['is_paid']):
                 continue
             
             if tour_lat and tour_lng:
@@ -1020,6 +1153,7 @@ def search_tours():
                     'version': version,
                     'updated_at': updated_at,
                     **rating_block,
+                    **_price_block(price_tier, cur),
                 })
         
         # [LOCAL-672] "Top rated" sort (?sort=top_rated): the Bayesian rank_score
