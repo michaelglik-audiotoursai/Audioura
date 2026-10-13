@@ -107,18 +107,16 @@ class _TourPlayerScreenState extends State<TourPlayerScreen> with VoiceMethods {
     _loadUnlockState();
   }
 
-  /// [LOCAL-677 / 677B] Resolve the tour's unlock/preview state.
+  /// [LOCAL-677 / 677B / 677C] Resolve the tour's unlock/preview state.
   ///
-  /// Order of truth:
-  ///   1. Read the LOCAL snapshot stamped at download time (server id, price,
-  ///      unlock, original language) from the saved_tours record for this path.
-  ///   2. Resolve the NUMERIC server id: widget.serverTourId → a numeric
-  ///      widget.tourId → the local record's server_tour_id. This is what fixes
-  ///      the Bounce — the player now has the id the pricing endpoints key on.
-  ///   3. ONLINE: ask /tour/<serverId>/unlock-state and use the server's answer.
-  ///   4. OFFLINE / no server answer: gate from the LOCAL snapshot (offline-
-  ///      correct lock) — a tour stored paid & not-unlocked stays preview-only;
-  ///      a tour stored free (incl. grandfathered-free) plays in full.
+  /// [LOCAL-677C / D654] Pay BEFORE download: a downloaded tour has already been
+  /// paid for (the server 402-gated the download) or was free/grandfathered, so
+  /// it PLAYS FULLY — there is no in-player preview lock and no Buy banner for a
+  /// downloaded tour. The only remaining in-player check is one QUIET online
+  /// re-check for a REFUND (LOCAL-672): if, and ONLY if, the server is reached
+  /// and explicitly says this tour is paid AND not unlocked (and not
+  /// grandfathered), the tour locks on that check. Offline, or any inconclusive
+  /// answer, leaves the tour fully playable.
   Future<void> _loadUnlockState() async {
     // 1. Local snapshot (never throws; returns a free/unlocked default).
     final meta = await DownloadedTourStore.metaForPath(widget.tourPath);
@@ -130,28 +128,34 @@ class _TourPlayerScreenState extends State<TourPlayerScreen> with VoiceMethods {
       metaServerTourId: meta.serverTourId,
     );
 
-    TourUnlockState resolved;
-    if (serverId != null && int.tryParse(serverId) != null) {
-      // 3. Online check with the RIGHT id. unlockState falls back to free on any
-      // error, so distinguish a real "free" answer from an offline fallback by
-      // consulting the local snapshot: if the record says the tour is PAID,
-      // trust the local offline lock rather than the free fallback.
-      final online = await TourPricingService.unlockState(serverId);
-      if (!online.isPaid && meta.isPaid) {
-        // The server call almost certainly failed (offline) — the local record
-        // knows this is a paid tour. Fail closed from the snapshot.
-        resolved = _offlineState(meta);
-      } else {
-        resolved = online;
-        // Keep the local snapshot's unlock in sync so a later OFFLINE open is
-        // correct without another round trip.
-        if (online.isPaid && online.unlocked && !meta.unlocked) {
+    // 3. Default: a downloaded tour is PLAYABLE (D654). Offline = always
+    //    playable; we never gate a downloaded tour from the local snapshot.
+    TourUnlockState resolved = TourUnlockState.free();
+
+    // 4. One quiet online re-check for a refund. Only an EXPLICIT server answer
+    //    (answered == true) that the tour is paid AND locked flips it to locked;
+    //    an offline/failed check leaves it playable. Grandfathering is honoured
+    //    from the LOCAL snapshot: a tour downloaded while FREE was stamped
+    //    is_paid:false (677B), so we never lock it even if the row is now priced
+    //    — the refund lock applies only to a tour this device actually bought
+    //    (stored paid).
+    if (serverId != null &&
+        int.tryParse(serverId) != null &&
+        meta.isPaid) {
+      final check = await TourPricingService.unlockStateChecked(serverId);
+      if (check.answered && check.state.isPaid && check.state.locked) {
+        // The server says: paid and NOT unlocked for this device (a refund, or
+        // the unlock was revoked). Lock the tour on this online check.
+        resolved = check.state;
+        // Reflect the revocation in the local snapshot so a later offline open
+        // stays locked too (the purchase is gone).
+        await DownloadedTourStore.markLockedForPath(widget.tourPath);
+      } else if (check.answered && check.state.isPaid && check.state.unlocked) {
+        // Confirmed still owned — keep the local snapshot in sync.
+        if (!meta.unlocked) {
           await DownloadedTourStore.markUnlockedForPath(widget.tourPath);
         }
       }
-    } else {
-      // 4. No numeric id at all → gate purely from the local snapshot.
-      resolved = _offlineState(meta);
     }
 
     if (mounted) {
@@ -162,25 +166,9 @@ class _TourPlayerScreenState extends State<TourPlayerScreen> with VoiceMethods {
         _freePreviewStops = resolved.freePreviewStops;
       });
     }
-    // If the tour is locked, make sure the WebView actually blocks the paid
-    // stops (the banner alone never stopped playback — part of the Bounce).
+    // Enforce the lock inside the WebView ONLY in the refund case; a playable
+    // tour lifts any guard.
     await _applyLockToWebView();
-  }
-
-  /// [LOCAL-677B] Build an unlock state from the LOCAL snapshot only (offline).
-  TourUnlockState _offlineState(DownloadedTourMeta meta) {
-    if (!meta.isPaid) return TourUnlockState.free();
-    final locked = meta.lockedOffline;
-    return TourUnlockState(
-      isPaid: true,
-      unlocked: !locked,
-      locked: locked,
-      freePreviewStops: 1,
-      priceTier: meta.priceTier,
-      priceUsd: null,
-      priceLabel: meta.priceLabel,
-      productId: null,
-    );
   }
 
   /// [LOCAL-677B] Enforce the lock inside the WebView: when the tour is locked,

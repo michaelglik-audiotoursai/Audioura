@@ -139,6 +139,34 @@ class TourPricingService {
     return TourUnlockState.free();
   }
 
+  /// [LOCAL-677C / D654] An unlock-state check that reports whether the SERVER
+  /// actually answered. The player needs this to tell an explicit "not unlocked"
+  /// (a refund, LOCAL-672 — the tour should lock on the next online check) apart
+  /// from a network failure (offline → a downloaded tour must stay playable).
+  ///
+  /// Returns (answered, state): answered is true ONLY when the server returned
+  /// 200. On any error / non-200, answered is false and state is a free default
+  /// the caller should IGNORE in favour of the offline (always-playable) rule.
+  static Future<({bool answered, TourUnlockState state})> unlockStateChecked(
+      String tourId) async {
+    try {
+      final userId = await _userId();
+      final resp = await Endpoints.get(
+        Service.orchestrator,
+        '/tour/$tourId/unlock-state?user_id=${Uri.encodeComponent(userId)}',
+        timeout: const Duration(seconds: 10),
+      );
+      if (resp.statusCode == 200) {
+        return (
+          answered: true,
+          state: TourUnlockState.fromJson(
+              json.decode(resp.body) as Map<String, dynamic>)
+        );
+      }
+    } catch (_) {}
+    return (answered: false, state: TourUnlockState.free());
+  }
+
   /// The price of a tour (badge/label). Free on any error.
   static Future<TourPrice> price(String tourId) async {
     try {

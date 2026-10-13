@@ -78,7 +78,17 @@ class TourTranslationHelper {
             final version = (langEntry is Map) ? langEntry['version'] : null;
             final updatedAt = (langEntry is Map) ? langEntry['updated_at'] : null;
             try {
-              final translatedUri = await Endpoints.url(Service.mapDelivery, '/download-tour/$translatedId');
+              // [LOCAL-677C / D654] Carry user_id so the server gate decides
+              // the PER-LANGUAGE pay-before-download (D653): a paid translation
+              // the device has not unlocked is refused here with 402 and the
+              // language is reported as a failure (never a crash).
+              final tprefs = await SharedPreferences.getInstance();
+              final tUserId = tprefs.getString('user_id') ?? '';
+              final baseTranslatedUri = await Endpoints.url(Service.mapDelivery, '/download-tour/$translatedId');
+              final tParams = Map<String, String>.from(baseTranslatedUri.queryParameters);
+              if (tUserId.isNotEmpty) tParams['user_id'] = tUserId;
+              final translatedUri = baseTranslatedUri.replace(
+                  queryParameters: tParams.isEmpty ? null : tParams);
               final translatedResponse = await http.get(translatedUri, headers: await Endpoints.apiHeaders(Service.mapDelivery)).timeout(const Duration(seconds: 120));
               if (translatedResponse.statusCode == 200) {
                 final prefs = await SharedPreferences.getInstance();

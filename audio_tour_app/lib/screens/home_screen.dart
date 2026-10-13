@@ -34,7 +34,9 @@ import '../widgets/language_selector.dart';
 import '../widgets/rate_tour_dialog.dart';
 import '../widgets/reviews_section.dart';
 import '../widgets/price_badge.dart';
-
+import '../widgets/tour_buy_sheet.dart';
+import '../widgets/download_action_plan.dart';
+import '../services/tour_preview_player.dart';
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
 
@@ -800,11 +802,32 @@ class _HomeScreenState extends State<HomeScreen> {
     } else {
       // Show download dialog for tours with language selection
       List<String> selectedLanguages = ['en'];
-      
+      // [LOCAL-677C / D654] Pay before download. For an UNBOUGHT PAID tour the
+      // dialog shows "▶ Preview Stop 1" + "Buy & Download — $X" and NO plain
+      // Download. We ask the server once whether THIS tour (the row the listener
+      // tapped) is already unlocked for this device; the paid flag comes inline
+      // on the item (price_tier / price_label from map-delivery). A free or
+      // already-unlocked tour keeps the plain "Download Tour".
+      final bool itemIsPaid = item['is_paid'] == true ||
+          (item['price_tier'] is num && (item['price_tier'] as num) > 0);
+      bool unlockKnown = !itemIsPaid; // free: nothing to ask
+      bool unlockUnlocked = !itemIsPaid; // free counts as unlocked
+      bool buyBusy = false;
+
       showDialog(
         context: context,
         builder: (context) => StatefulBuilder(
-          builder: (context, setDialogState) => AlertDialog(
+          builder: (context, setDialogState) {
+            // Fetch the unlock state once for a paid tour (fire and forget; the
+            // dialog shows a brief spinner on the Buy row until it resolves).
+            if (itemIsPaid && !unlockKnown) {
+              TourPricingService.unlockState('${item['id']}').then((st) {
+                unlockKnown = true;
+                unlockUnlocked = st.unlocked;
+                if (context.mounted) setDialogState(() {});
+              });
+            }
+            return AlertDialog(
             title: Text(item['name']),
             content: Column(
               mainAxisSize: MainAxisSize.min,
@@ -912,18 +935,177 @@ class _HomeScreenState extends State<HomeScreen> {
                 },
                 child: Text('Rate'),
               ),
-              ElevatedButton(
-                onPressed: () {
-                  Navigator.pop(context);
-                  _downloadSingleTour(item['id'], selectedLanguages, item);
-                },
-                child: Text('Download Tour'),
+              // [LOCAL-677C / D654] Pay before download. A free (or already
+              // unlocked) tour keeps the plain "Download Tour". An unbought paid
+              // tour shows "▶ Preview Stop 1" + "Buy & Download — $X" and NO
+              // plain Download — the download starts only after the purchase
+              // confirms the unlock.
+              ..._buildDownloadActions(
+                context: context,
+                setDialogState: setDialogState,
+                item: item,
+                selectedLanguages: selectedLanguages,
+                plan: DownloadActionPlan.decide(
+                  isPaid: itemIsPaid,
+                  unlocked: unlockUnlocked,
+                  priceTier: (item['price_tier'] as num?)?.toInt(),
+                  priceLabel: item['price_label'] as String?,
+                ),
+                unlockKnown: unlockKnown,
+                buyBusy: buyBusy,
+                onBuyBusy: (b) => setDialogState(() => buyBusy = b),
+                onUnlocked: () => setDialogState(() {
+                  unlockUnlocked = true;
+                }),
               ),
             ],
-          ),
+          );
+          },
         ),
       );
     }
+  }
+
+  /// [LOCAL-677C / D654] The download-dialog action buttons for a tour, decided
+  /// by [plan]. Free / unlocked: a plain "Download Tour". Unbought paid: a
+  /// "▶ Preview Stop 1" button (streams Stop 1, nothing saved) and a
+  /// "Buy & Download — $X" button that buys EACH selected paid language, then
+  /// downloads only the languages whose unlock the server confirmed.
+  List<Widget> _buildDownloadActions({
+    required BuildContext context,
+    required StateSetter setDialogState,
+    required Map<String, dynamic> item,
+    required List<String> selectedLanguages,
+    required DownloadActionPlan plan,
+    required bool unlockKnown,
+    required bool buyBusy,
+    required void Function(bool) onBuyBusy,
+    required void Function() onUnlocked,
+  }) {
+    if (plan.showPlainDownload) {
+      return [
+        ElevatedButton(
+          onPressed: () {
+            Navigator.pop(context);
+            _downloadSingleTour(item['id'], selectedLanguages, item);
+          },
+          child: const Text('Download Tour'),
+        ),
+      ];
+    }
+
+    // Unbought paid tour: Preview + Buy & Download, no plain Download.
+    final String priceLabel = plan.priceLabel ?? '\$4.99';
+    final int tier = plan.priceTier ?? 3;
+    return [
+      TextButton.icon(
+        icon: const Icon(Icons.play_arrow),
+        label: const Text('Preview Stop 1'),
+        onPressed: buyBusy
+            ? null
+            : () async {
+                try {
+                  await TourPreviewPlayer.instance.play('${item['id']}');
+                } catch (_) {
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                          content: Text('Preview unavailable right now.')),
+                    );
+                  }
+                }
+              },
+      ),
+      ElevatedButton(
+        onPressed: (buyBusy || !unlockKnown)
+            ? null
+            : () async {
+                onBuyBusy(true);
+                final ok = await _buyAndDownloadPaid(
+                  context: context,
+                  item: item,
+                  tier: tier,
+                  priceLabel: priceLabel,
+                  selectedLanguages: selectedLanguages,
+                );
+                onBuyBusy(false);
+                if (ok) onUnlocked();
+              },
+        style: ElevatedButton.styleFrom(
+          backgroundColor: const Color(0xFF1B6B2E),
+          foregroundColor: Colors.white,
+        ),
+        child: buyBusy
+            ? const SizedBox(
+                height: 18,
+                width: 18,
+                child: CircularProgressIndicator(
+                    strokeWidth: 2, color: Colors.white),
+              )
+            : Text('Buy & Download — $priceLabel'),
+      ),
+    ];
+  }
+
+  /// [LOCAL-677C / D654] Buy EACH selected paid language (one purchase each,
+  /// D653: 2 × \$4.99 for two), then download only the languages the server
+  /// confirmed as unlocked. Stops the preview first. Returns true if at least
+  /// the tapped tour was unlocked and downloaded. A 402 on download never
+  /// crashes — it leaves the Buy button in place (the tour stays locked).
+  Future<bool> _buyAndDownloadPaid({
+    required BuildContext context,
+    required Map<String, dynamic> item,
+    required int tier,
+    required String priceLabel,
+    required List<String> selectedLanguages,
+  }) async {
+    await TourPreviewPlayer.instance.stop();
+    // Buy the tapped tour's language first (the row the listener is on). The
+    // Buy sheet drives the real store (cloud) or the TEST PURCHASE (stub).
+    final bought = await TourBuySheet.show(
+      context,
+      tourId: '${item['id']}',
+      tier: tier,
+      priceLabel: priceLabel,
+      tourTitle: item['name']?.toString(),
+    );
+    if (!bought) return false; // cancelled / failed — Buy button stays.
+    if (!context.mounted) return false;
+
+    // Confirm the unlock with the server before downloading. A 402 on the
+    // download would otherwise mean we never saved the zip.
+    final state = await TourPricingService.unlockState('${item['id']}');
+    if (!state.unlocked) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+              content: Text('Purchase not confirmed yet — please try again.')),
+        );
+      }
+      return false;
+    }
+
+    if (!context.mounted) return false;
+    Navigator.pop(context); // close the download dialog
+    // Now download; the server will serve the zip (200) because we are unlocked.
+    // Translations are purchased + downloaded by the translation path (D653);
+    // here we download the tapped language. The existing download handles the
+    // selected non-English translations too.
+    await _downloadSingleTour(item['id'], selectedLanguages, item);
+    return true;
+  }
+
+  /// [LOCAL-677C / D654] The /download-tour URL carrying the device user_id so
+  /// the server can decide the pay-before-download gate (unlock / grandfather /
+  /// curator). Without this the server would treat the request as anonymous and
+  /// 402 even a tour the device already owns.
+  Future<Uri> _downloadTourUri(int tourId) async {
+    final prefs = await SharedPreferences.getInstance();
+    final userId = prefs.getString('user_id') ?? '';
+    final uri = await Endpoints.url(Service.mapDelivery, '/download-tour/$tourId');
+    final params = Map<String, String>.from(uri.queryParameters);
+    if (userId.isNotEmpty) params['user_id'] = userId;
+    return uri.replace(queryParameters: params.isEmpty ? null : params);
   }
 
   List<Map<String, dynamic>> _clusterTours(List tours) {
@@ -1427,7 +1609,7 @@ class _HomeScreenState extends State<HomeScreen> {
     );
 
     try {
-      final downloadUri = await Endpoints.url(Service.mapDelivery, '/download-tour/$tourId');
+      final downloadUri = await _downloadTourUri(tourId);
       final url = downloadUri.toString();
       
       await DebugLogHelper.addDebugLog('HOME: Downloading from: $url');
@@ -1539,7 +1721,7 @@ class _HomeScreenState extends State<HomeScreen> {
     // [LOCAL-677B / D653] Only pull English when it is a selected language.
     final bool wantEnglish = TourTranslationHelper.shouldDownloadEnglish(languages);
     if (wantEnglish) {
-      final uri = await Endpoints.url(Service.mapDelivery, '/download-tour/$tourId');
+      final uri = await _downloadTourUri(tourId);
       final response = await http.get(uri, headers: await Endpoints.apiHeaders(Service.mapDelivery)).timeout(Duration(seconds: 120));
       if (response.statusCode == 200) {
         await _saveTourToMyTours(tourId, response.bodyBytes, sourceItem: sourceItem);
@@ -1584,10 +1766,25 @@ class _HomeScreenState extends State<HomeScreen> {
       // does not receive it. A null `languages` means the default (English only).
     final bool wantEnglish = TourTranslationHelper.shouldDownloadEnglish(languages);
       if (wantEnglish) {
-        final dlUri = await Endpoints.url(Service.mapDelivery, '/download-tour/$tourId');
+        final dlUri = await _downloadTourUri(tourId);
         final response = await http.get(dlUri, headers: await Endpoints.apiHeaders(Service.mapDelivery)).timeout(Duration(seconds: 120));
         if (response.statusCode == 200) {
           await _saveTourToMyTours(tourId, response.bodyBytes, sourceItem: sourceItem);
+        } else if (response.statusCode == 402) {
+          // [LOCAL-677C / D654] Pay before download: the server refused because
+          // this paid tour is not unlocked for this device. Never crash — close
+          // the progress dialog and tell the listener to buy. The download
+          // dialog's "Buy & Download" is the path that unlocks first.
+          if (mounted && Navigator.canPop(context)) Navigator.pop(context);
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('This tour is paid — buy it to download.'),
+                backgroundColor: Colors.orange,
+              ),
+            );
+          }
+          return;
         } else {
           throw Exception('Failed to download tour: ${response.statusCode}');
         }

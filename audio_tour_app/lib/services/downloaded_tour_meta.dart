@@ -210,4 +210,12 @@ class DownloadedTourStore {
   static Future<void> markUnlockedForPath(String path) async {
     await mergeFieldsForPath(path, {'unlocked': true});
   }
+
+  /// [LOCAL-677C / D654] Record locally that this device's unlock was REVOKED
+  /// (a refund, LOCAL-672) — called when the quiet online re-check explicitly
+  /// reports the tour as paid and not unlocked. Marks the record paid and NOT
+  /// unlocked so the lock stays engaged on a later offline open too.
+  static Future<void> markLockedForPath(String path) async {
+    await mergeFieldsForPath(path, {'is_paid': true, 'unlocked': false});
+  }
 }
