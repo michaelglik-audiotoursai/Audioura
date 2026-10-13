@@ -38,6 +38,7 @@ class TourTranslationHelper {
     required int tourId,
     required List<String> languages,
     required String parentEditTourId,
+    Map<String, dynamic>? sourceItem,
   }) async {
     final failures = <String>[];
     final nonEnglish = languages.where((l) => l != 'en').toList();
@@ -71,7 +72,7 @@ class TourTranslationHelper {
                 final prefs = await SharedPreferences.getInstance();
                 final appDir = await getApplicationDocumentsDirectory();
                 await _saveTranslatedTour(translatedId, translatedResponse.bodyBytes, appDir.path, prefs, parentEditTourId, lang,
-                    version: version, updatedAt: updatedAt);
+                    version: version, updatedAt: updatedAt, sourceItem: sourceItem);
                 await DebugLogHelper.addDebugLog('TRANSLATE: Saved translated tour ($lang) ID: $translatedId');
               } else {
                 failures.add(lang);
@@ -117,7 +118,7 @@ class TourTranslationHelper {
 
   /// Saves a translated tour ZIP to the local filesystem and SharedPreferences.
   static Future<void> _saveTranslatedTour(dynamic tourId, List<int> zipBytes, String appDirPath, SharedPreferences prefs, String parentEditTourId, String lang,
-      {dynamic version, dynamic updatedAt}) async {
+      {dynamic version, dynamic updatedAt, Map<String, dynamic>? sourceItem}) async {
     final archive = ZipDecoder().decodeBytes(zipBytes);
     String tourName = 'Translated Tour $tourId';
     // Try to extract tour name from ZIP manifest
@@ -159,6 +160,39 @@ class TourTranslationHelper {
     // Additive: omitted entirely when the server sent none (an older map-delivery).
     if (version != null) tourData['version'] = version;
     if (updatedAt != null) tourData['updated_at'] = updatedAt;
+
+    // [LOCAL-677B / D653] Every language copy carries the PRICE (a translation
+    // inherits its source's price), but unlocks SEPARATELY. Stamp the price
+    // snapshot onto THIS translation's local record keyed by the translation's
+    // OWN server id, so the player gates it independently of the English copy:
+    //   * server_tour_id = this translation's own id (its unlock is its own).
+    //   * is_paid/price_tier/price_label = inherited from the source payload.
+    //   * unlocked = false for a paid translation (needs its own purchase);
+    //     true for a free tour. A later purchase of THIS language writes
+    //     unlocked:true on this record only.
+    //   * original_language = the source tour's original language (for the header).
+    if (sourceItem != null) {
+      final bool isPaid = sourceItem['is_paid'] == true;
+      tourData['server_tour_id'] = tourId.toString();
+      tourData['is_paid'] = isPaid;
+      final rawTier = sourceItem['price_tier'];
+      if (rawTier is int) {
+        tourData['price_tier'] = rawTier;
+      } else if (rawTier is num) {
+        tourData['price_tier'] = rawTier.toInt();
+      } else if (rawTier is String) {
+        tourData['price_tier'] = int.tryParse(rawTier);
+      }
+      final rawLabel = sourceItem['price_label'];
+      tourData['price_label'] =
+          (rawLabel is String && rawLabel.trim().isNotEmpty) ? rawLabel.trim() : 'Free';
+      tourData['unlocked'] = !isPaid; // paid translation starts locked (own unlock)
+      final rawLang = sourceItem['original_language'];
+      if (rawLang is String && rawLang.trim().isNotEmpty) {
+        tourData['original_language'] = rawLang.trim();
+      }
+    }
+
     savedTours.add(json.encode(tourData));
     await prefs.setStringList('saved_tours', savedTours);
   }

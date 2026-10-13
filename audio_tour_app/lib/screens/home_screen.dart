@@ -867,7 +867,6 @@ class _HomeScreenState extends State<HomeScreen> {
                       selectedLanguages = languages;
                     });
                   },
-                  showEnglishNote: !selectedLanguages.contains('en'),
                 ),
               ],
             ),
@@ -1105,7 +1104,6 @@ class _HomeScreenState extends State<HomeScreen> {
                       selectedLanguages = languages;
                     });
                   },
-                  showEnglishNote: !selectedLanguages.contains('en'),
                 ),
                 SizedBox(height: 16),
                 Row(
@@ -1537,12 +1535,16 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<List<String>> _downloadSingleTourSilent(int tourId, [List<String>? languages, Map<String, dynamic>? sourceItem]) async {
     final prefs = await SharedPreferences.getInstance();
 
-    final uri = await Endpoints.url(Service.mapDelivery, '/download-tour/$tourId');
-    final response = await http.get(uri, headers: await Endpoints.apiHeaders(Service.mapDelivery)).timeout(Duration(seconds: 120));
-    if (response.statusCode == 200) {
-      await _saveTourToMyTours(tourId, response.bodyBytes, sourceItem: sourceItem);
-    } else {
-      throw Exception('Failed to download tour: ${response.statusCode}');
+    // [LOCAL-677B / D653] Only pull English when it is a selected language.
+    final bool wantEnglish = languages == null || languages.contains('en');
+    if (wantEnglish) {
+      final uri = await Endpoints.url(Service.mapDelivery, '/download-tour/$tourId');
+      final response = await http.get(uri, headers: await Endpoints.apiHeaders(Service.mapDelivery)).timeout(Duration(seconds: 120));
+      if (response.statusCode == 200) {
+        await _saveTourToMyTours(tourId, response.bodyBytes, sourceItem: sourceItem);
+      } else {
+        throw Exception('Failed to download tour: ${response.statusCode}');
+      }
     }
 
     if (languages == null) return [];
@@ -1550,7 +1552,11 @@ class _HomeScreenState extends State<HomeScreen> {
     if (nonEnglish.isEmpty) return [];
 
     final parentEditTourId = await _resolveParentEditTourId(tourId, prefs);
-    return await TourTranslationHelper.downloadTranslatedVersions(tourId: tourId, languages: nonEnglish, parentEditTourId: parentEditTourId);
+    return await TourTranslationHelper.downloadTranslatedVersions(
+        tourId: tourId,
+        languages: nonEnglish,
+        parentEditTourId: parentEditTourId,
+        sourceItem: sourceItem);
   }
 
   Future<void> _downloadSingleTour(int tourId, [List<String>? languages, Map<String, dynamic>? sourceItem]) async {
@@ -1571,13 +1577,19 @@ class _HomeScreenState extends State<HomeScreen> {
     );
     
     try {
-      // Always download English version first
-      final dlUri = await Endpoints.url(Service.mapDelivery, '/download-tour/$tourId');
-      final response = await http.get(dlUri, headers: await Endpoints.apiHeaders(Service.mapDelivery)).timeout(Duration(seconds: 120));
-      if (response.statusCode == 200) {
-        await _saveTourToMyTours(tourId, response.bodyBytes, sourceItem: sourceItem);
-      } else {
-        throw Exception('Failed to download tour: ${response.statusCode}');
+      // [LOCAL-677B / D653] Download ONLY the selected languages. If English is
+      // deselected, do NOT pull the English tour to the phone — the server may
+      // still use English as the internal translation template, but the listener
+      // does not receive it. A null `languages` means the default (English only).
+      final bool wantEnglish = languages == null || languages.contains('en');
+      if (wantEnglish) {
+        final dlUri = await Endpoints.url(Service.mapDelivery, '/download-tour/$tourId');
+        final response = await http.get(dlUri, headers: await Endpoints.apiHeaders(Service.mapDelivery)).timeout(Duration(seconds: 120));
+        if (response.statusCode == 200) {
+          await _saveTourToMyTours(tourId, response.bodyBytes, sourceItem: sourceItem);
+        } else {
+          throw Exception('Failed to download tour: ${response.statusCode}');
+        }
       }
 
       if (!mounted) return;
@@ -1603,7 +1615,11 @@ class _HomeScreenState extends State<HomeScreen> {
           );
 
           final parentEditTourId = await _resolveParentEditTourId(tourId, prefs);
-          final failures = await TourTranslationHelper.downloadTranslatedVersions(tourId: tourId, languages: nonEnglishLanguages, parentEditTourId: parentEditTourId);
+          final failures = await TourTranslationHelper.downloadTranslatedVersions(
+              tourId: tourId,
+              languages: nonEnglishLanguages,
+              parentEditTourId: parentEditTourId,
+              sourceItem: sourceItem);
           translationFailures.addAll(failures);
 
           if (!mounted) return;
@@ -1617,10 +1633,17 @@ class _HomeScreenState extends State<HomeScreen> {
 
       if (!mounted) return;
       if (translationFailures.isEmpty) {
-        final nonEnglish = (languages ?? []).where((l) => l != 'en').toList();
-        final msg = nonEnglish.isEmpty
-            ? 'Tour downloaded successfully!'
-            : 'Tour downloaded with ${nonEnglish.length} translation${nonEnglish.length == 1 ? '' : 's'} (${nonEnglish.join(", ")})';
+        final selected = languages ?? const ['en'];
+        final nonEnglish = selected.where((l) => l != 'en').toList();
+        final String msg;
+        if (!wantEnglish && nonEnglish.isNotEmpty) {
+          // English deselected: only translations were saved.
+          msg = 'Tour downloaded in ${nonEnglish.join(", ")}';
+        } else if (nonEnglish.isEmpty) {
+          msg = 'Tour downloaded successfully!';
+        } else {
+          msg = 'Tour downloaded with ${nonEnglish.length} translation${nonEnglish.length == 1 ? '' : 's'} (${nonEnglish.join(", ")})';
+        }
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(msg), backgroundColor: Colors.green),
         );
@@ -2887,7 +2910,6 @@ class _HomeScreenState extends State<HomeScreen> {
                               selectedLanguages = languages;
                             });
                           },
-                          showEnglishNote: !selectedLanguages.contains('en'),
                         ),
                         SizedBox(height: 16),
                         Row(

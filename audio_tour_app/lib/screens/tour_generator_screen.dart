@@ -1454,7 +1454,6 @@ class _TourGeneratorScreenState extends State<TourGeneratorScreen> {
                     _selectedLanguages = languages;
                   });
                 },
-                showEnglishNote: !_selectedLanguages.contains('en'),
               ),
               const SizedBox(height: 16),
             ],
@@ -1467,7 +1466,6 @@ class _TourGeneratorScreenState extends State<TourGeneratorScreen> {
                     _selectedLanguages = languages;
                   });
                 },
-                showEnglishNote: !_selectedLanguages.contains('en'),
               ),
               const SizedBox(height: 16),
             ],

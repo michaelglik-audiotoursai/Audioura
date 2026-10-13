@@ -3,13 +3,11 @@ import 'package:flutter/material.dart';
 class LanguageSelector extends StatefulWidget {
   final List<String> selectedLanguages;
   final Function(List<String>) onLanguagesChanged;
-  final bool showEnglishNote;
 
   const LanguageSelector({
     Key? key,
     required this.selectedLanguages,
     required this.onLanguagesChanged,
-    this.showEnglishNote = false,
   }) : super(key: key);
 
   @override
@@ -52,14 +50,10 @@ class _LanguageSelectorState extends State<LanguageSelector> {
             );
           }).toList(),
         ),
-        if (widget.showEnglishNote && !widget.selectedLanguages.contains('en'))
-          const Padding(
-            padding: EdgeInsets.only(top: 8),
-            child: Text(
-              'Note: English will be generated as template for translations',
-              style: TextStyle(fontSize: 12, color: Colors.grey),
-            ),
-          ),
+        // [LOCAL-677B / D653] The old "English will be generated as template for
+        // translations" note is removed: whether the server uses English as an
+        // internal translation template is an internal detail the listener does
+        // not need, and (with D653) a deselected English is simply not delivered.
       ],
     );
   }
