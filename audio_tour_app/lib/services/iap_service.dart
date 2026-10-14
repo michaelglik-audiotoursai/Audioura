@@ -111,6 +111,39 @@ String tourProductForTier(int tier) =>
 /// round-dollar ladder tiers = 41 products).
 final Set<String> kTourStoreIds = kTierProductIds.values.toSet();
 
+/// [LOCAL-690] True iff [storeId] is a COMMUNITY PASS product. The convention
+/// (migration 029 / communities_api.is_community_pass_product) is the prefix
+/// 'audioura.pass.'. ONE product per PRICE serves every community AND every
+/// length (LEAD review of LOCAL-690); the server records community + length +
+/// expiry (non-renewing).
+bool isCommunityPassProduct(String storeId) =>
+    storeId.startsWith('audioura.pass.');
+
+/// [LOCAL-690C] The 34 community-PASS store product ids — ONE product per PRICE,
+/// the same round-dollar ladder as the tour tiers (migration 029 / LOCAL-686):
+/// $2..$20 /$1, $25..$50 /$5, $60..$100 /$10, $125..$200 /$25. Apple's
+/// non-renewing subscription product carries no length, so one product serves
+/// every community and every length — the LENGTH is sent on /purchases/verify
+/// and lives on the community's option. These are the ids added to
+/// ios/Audioura.storekit as non-renewing subscriptions.
+const List<int> kPassLadderDollars = [
+  2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20,
+  25, 30, 35, 40, 45, 50, 60, 70, 80, 90, 100, 125, 150, 175, 200,
+];
+
+/// The store product id for a given whole-dollar pass PRICE, e.g. 5 ->
+/// 'audioura.pass.usd5'. The server is the source of truth and would reject an
+/// id it does not know.
+String passProductForDollars(int dollars) => 'audioura.pass.usd$dollars';
+
+/// All community-pass store ids the app may sell (the 34 ladder prices).
+final Set<String> kPassStoreIds =
+    kPassLadderDollars.map(passProductForDollars).toSet();
+
+/// The four pass lengths an owner may offer. The length is NOT part of the
+/// store product — it is chosen per community and sent to /purchases/verify.
+const List<String> kPassLengths = ['day', 'week', 'month', 'year'];
+
 enum IapResultStatus { granted, cancelled, pending, unavailable, failed }
 
 class IapResult {
@@ -133,6 +166,13 @@ class IapService {
   // [LOCAL-677] When the in-flight purchase is a TOUR unlock, the tour id to
   // send to /purchases/verify so the server writes tour_unlocks for this tour.
   String? _pendingTourId;
+  // [LOCAL-690] When the in-flight purchase is a COMMUNITY PASS, the community
+  // id to send to /purchases/verify so the server grants/extends membership.
+  String? _pendingCommunityId;
+  // [LOCAL-690C] The chosen pass LENGTH (day|week|month|year) for the in-flight
+  // pass purchase — one store product per price serves every length, so the
+  // length must travel to /purchases/verify alongside the community id.
+  String? _pendingPassLength;
 
   bool _initialised = false;
 
@@ -337,6 +377,111 @@ class IapService {
     }
   }
 
+  /// [LOCAL-690] Buy a COMMUNITY PASS (real store). [passProductId] is a store
+  /// pass id (audioura.pass.usd<N>) — ONE product per PRICE; [length]
+  /// (day|week|month|year) is the pass length the community offers and
+  /// [communityId] the community the pass is for. Both are sent to
+  /// /purchases/verify so the server grants/extends membership with the right
+  /// expiry. A pass is a non-renewing consumable: buying again extends.
+  Future<IapResult> buyCommunityPass(
+      String passProductId, int communityId, String length) async {
+    if (Platform.isAndroid && !kAndroidBillingEnabled) {
+      return const IapResult(IapResultStatus.unavailable,
+          'In-app purchases are not available on Android yet.');
+    }
+    final available = await _iap.isAvailable();
+    if (!available) {
+      return const IapResult(IapResultStatus.unavailable,
+          'The store is not available on this device.');
+    }
+    await _ensureListening();
+
+    final response = await _iap.queryProductDetails({passProductId});
+    if (response.error != null ||
+        response.productDetails.isEmpty ||
+        response.notFoundIDs.contains(passProductId)) {
+      await DebugLogHelper.addDebugLog(
+          'IAP: pass product not found: $passProductId');
+      return const IapResult(IapResultStatus.unavailable,
+          'This pass is not available for purchase right now.');
+    }
+    final details = response.productDetails.first;
+
+    if (_pending != null && !_pending!.isCompleted) {
+      return const IapResult(
+          IapResultStatus.failed, 'Another purchase is already in progress.');
+    }
+    _pending = Completer<IapResult>();
+    _pendingStoreId = passProductId;
+    _pendingCommunityId = communityId.toString();
+    _pendingPassLength = length;
+
+    final param = PurchaseParam(productDetails: details);
+    try {
+      await _iap.buyConsumable(purchaseParam: param, autoConsume: false);
+    } catch (e) {
+      await DebugLogHelper.addDebugLog('IAP: pass buyConsumable threw: $e');
+      _pendingStoreId = null;
+      _pendingCommunityId = null;
+      _pendingPassLength = null;
+      final c = _pending;
+      _pending = null;
+      if (c != null && !c.isCompleted) {
+        return IapResult(IapResultStatus.failed, 'Could not start purchase: $e');
+      }
+    }
+    return _pending!.future;
+  }
+
+  /// [LOCAL-690] TEST PURCHASE of a community pass (LOCAL stub mode only).
+  /// Posts straight to /purchases/verify with store='stub' so the whole
+  /// buy→membership flow can be tested before the Apple/Google pass products
+  /// exist. Idempotent on the transaction id.
+  Future<IapResult> testPurchaseCommunityPass(
+      String passProductId, int communityId, String length) async {
+    final prefs = await SharedPreferences.getInstance();
+    final userId = prefs.getString('user_id') ?? '';
+    if (userId.isEmpty) {
+      return const IapResult(IapResultStatus.failed,
+          'No device id — cannot complete the test purchase.');
+    }
+    final transactionId =
+        'TEST-690-${DateTime.now().millisecondsSinceEpoch}-$communityId';
+    final body = <String, dynamic>{
+      'store': 'stub',
+      'transaction_id': transactionId,
+      'product': passProductId,
+      'user_id': userId,
+      'community_id': communityId.toString(),
+      'length': length,
+    };
+    try {
+      final resp = await Endpoints.post(
+        Service.userDb,
+        '/purchases/verify',
+        body: body,
+        timeout: const Duration(seconds: 30),
+      );
+      if (resp.statusCode == 200 || resp.statusCode == 409) {
+        await DebugLogHelper.addDebugLog(
+            'IAP: TEST PASS membership in community $communityId');
+        return const IapResult(IapResultStatus.granted);
+      }
+      String? msg;
+      try {
+        final decoded = jsonDecode(resp.body);
+        if (decoded is Map && decoded['message'] is String) {
+          msg = decoded['message'] as String;
+        }
+      } catch (_) {}
+      return IapResult(IapResultStatus.failed,
+          msg ?? 'The test purchase could not be completed.');
+    } catch (e) {
+      return IapResult(IapResultStatus.failed,
+          'Could not reach the server for the test purchase: $e');
+    }
+  }
+
   Future<void> _onPurchaseUpdates(List<PurchaseDetails> purchases) async {
     for (final p in purchases) {
       await _handleOne(p);
@@ -381,8 +526,15 @@ class IapService {
     final bool isTourPurchase =
         kTourStoreIds.contains(p.productID) && _pendingTourId != null;
 
-    final serverProduct =
-        isTourPurchase ? p.productID : serverProductForStoreId(p.productID);
+    // [LOCAL-690] A COMMUNITY PASS: a pass product (audioura.pass.*) and a
+    // community id staged by buyCommunityPass(). Verify with community_id so the
+    // server grants/extends membership (non-renewing; expiry = now + duration).
+    final bool isPassPurchase =
+        isCommunityPassProduct(p.productID) && _pendingCommunityId != null;
+
+    final serverProduct = (isTourPurchase || isPassPurchase)
+        ? p.productID
+        : serverProductForStoreId(p.productID);
     if (serverProduct == null) {
       return const IapResult(
           IapResultStatus.failed, 'Unknown product — not granted.');
@@ -407,6 +559,9 @@ class IapService {
       'user_id': userId,
       'signed_transaction': jws,
       if (isTourPurchase) 'tour_id': _pendingTourId,
+      if (isPassPurchase) 'community_id': _pendingCommunityId,
+      if (isPassPurchase && _pendingPassLength != null)
+        'length': _pendingPassLength,
     };
 
     try {
@@ -462,6 +617,8 @@ class IapService {
     _pending = null;
     _pendingStoreId = null;
     _pendingTourId = null;
+    _pendingCommunityId = null;
+    _pendingPassLength = null;
     c!.complete(result);
   }
 

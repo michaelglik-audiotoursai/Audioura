@@ -18,6 +18,7 @@ import 'tour_player_screen.dart';
 import 'news_player_screen.dart';
 import 'edit_tour_screen.dart';
 import 'tour_map_screen.dart';
+import 'my_communities_screen.dart';
 import '../services/tour_pricing_service.dart';
 import '../services/entitlements_service.dart';
 import '../services/device_service.dart';
@@ -1729,6 +1730,18 @@ class _MyToursScreenState extends State<MyToursScreen> {
         backgroundColor: const Color(0xFF2c3e50),
         foregroundColor: Colors.white,
         actions: [
+          // [LOCAL-690] Joined communities live beside My tours in the Listen
+          // tab; each carries its origin (the community + organiser).
+          IconButton(
+            icon: const Icon(Icons.groups),
+            tooltip: 'My communities',
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const MyCommunitiesScreen()),
+              );
+            },
+          ),
           if (_tours.isNotEmpty)
             IconButton(
               icon: const Icon(Icons.delete_sweep),

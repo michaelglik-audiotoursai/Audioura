@@ -812,6 +812,21 @@ def purchases_verify():
             "message": "store, transaction_id, product and user_id are all required.",
         }), 400
 
+    # [LOCAL-690] A COMMUNITY PASS purchase (audioura.pass.*) grants/extends a
+    # community membership rather than a level or a tour unlock. It is a
+    # NON-RENEWING pass: the server stores community + expiry (now + duration),
+    # and buying again extends/replaces the expiry (nothing renews). Delegated
+    # to communities_api so one module owns all community rules.
+    try:
+        import communities_api
+        if communities_api.is_community_pass_product(product):
+            return communities_api.verify_community_pass(
+                store, transaction_id, product, user_id, signed_transaction,
+                community_id=data.get('community_id'),
+                length=data.get('length'))
+    except ImportError:  # pragma: no cover - communities module optional
+        pass
+
     # [LOCAL-677] A TOUR price-tier purchase (audioura.tour.tierN) unlocks ONE
     # tour for the buyer rather than granting a level. It takes a separate path:
     # verify the transaction (stub accepts any non-empty id), record the purchase
