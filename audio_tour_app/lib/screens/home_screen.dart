@@ -343,13 +343,7 @@ class _HomeScreenState extends State<HomeScreen> {
       // [LOCAL-670] Pass the chosen minimum rating to the server so it filters
       // (Any = omit the param entirely). The server computes the shown score and
       // drops tours below the bar.
-      final minRatingParam =
-          _minRating > 0 ? '&min_rating=${_minRating.toStringAsFixed(0)}' : '';
-      // [LOCAL-672] "Top rated" sort: let the server order by rank_score.
-      final sortParam = _topRated ? '&sort=top_rated' : '';
-      // [LOCAL-677] Free/Paid filter: pass ?price=free|paid (Any = omit).
-      final priceParam = _priceFilter.isNotEmpty ? '&price=$_priceFilter' : '';
-      final uri = await Endpoints.url(Service.mapDelivery, '/tours-near/${searchLocation.latitude}/${searchLocation.longitude}?radius=50$minRatingParam$sortParam$priceParam');
+      final uri = await Endpoints.url(Service.mapDelivery, '/tours-near/${searchLocation.latitude}/${searchLocation.longitude}?radius=50${_filterQueryParams()}');
       final url = uri.toString();
       
       await DebugLogHelper.addDebugLog('HOME: Requesting tours from: $url');
@@ -455,6 +449,80 @@ class _HomeScreenState extends State<HomeScreen> {
   /// [LOCAL-670] Choose the minimum tour rating to show (Any / 7+ / 8+ / 9+).
   /// Persisted per device under 'home_min_rating' and applied by reloading the
   /// nearby tours with the server-side min_rating filter.
+  /// [LOCAL-670/672/677] The three Home filters as query params, shared by
+  /// /tours-near and (LOCAL-680) /search-tours so a search honours them too.
+  /// Any/Nearest omit their param.
+  String _filterQueryParams() {
+    final minRatingParam =
+        _minRating > 0 ? '&min_rating=${_minRating.toStringAsFixed(0)}' : '';
+    final sortParam = _topRated ? '&sort=top_rated' : '';
+    final priceParam = _priceFilter.isNotEmpty ? '&price=$_priceFilter' : '';
+    return '$minRatingParam$sortParam$priceParam';
+  }
+
+  /// [LOCAL-680] One setter per filter, used by the AppBar dialogs and by the
+  /// filter row inside the Search dialog. Persist, update, reload the map list.
+  Future<void> _setMinRating(double value) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setDouble('home_min_rating', value);
+    if (!mounted) return;
+    setState(() => _minRating = value);
+    await _loadNearbyTours();
+  }
+
+  Future<void> _setTopRated(bool value) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('home_top_rated', value);
+    if (!mounted) return;
+    setState(() => _topRated = value);
+    await _loadNearbyTours();
+  }
+
+  Future<void> _setPriceFilter(String value) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('home_price_filter', value);
+    if (!mounted) return;
+    setState(() => _priceFilter = value);
+    await _loadNearbyTours();
+  }
+
+  /// [LOCAL-680] The sort button used to flip silently between a "sort" and a
+  /// "trending up" arrow; Michael could not tell what the arrow meant. It now
+  /// opens a dialog that names both orders.
+  void _showSortDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Sort tours'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            for (final topRated in [false, true])
+              RadioListTile<bool>(
+                title: Text(topRated ? 'Top rated first' : 'Nearest first'),
+                subtitle: Text(topRated
+                    ? 'Best listener ratings first; verified buyers count more'
+                    : 'Closest to the map location first'),
+                value: topRated,
+                groupValue: _topRated,
+                onChanged: (value) async {
+                  if (value == null) return;
+                  Navigator.pop(context);
+                  await _setTopRated(value);
+                },
+              ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Close'),
+          ),
+        ],
+      ),
+    );
+  }
+
   void _showRatingFilterDialog() {
     const options = <String, double>{
       'Any': 0.0,
@@ -477,11 +545,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 onChanged: (value) async {
                   if (value == null) return;
                   Navigator.pop(context);
-                  final prefs = await SharedPreferences.getInstance();
-                  await prefs.setDouble('home_min_rating', value);
-                  if (!mounted) return;
-                  setState(() => _minRating = value);
-                  await _loadNearbyTours();
+                  await _setMinRating(value);
                 },
               ),
           ],
@@ -520,11 +584,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 onChanged: (value) async {
                   if (value == null) return;
                   Navigator.pop(context);
-                  final prefs = await SharedPreferences.getInstance();
-                  await prefs.setString('home_price_filter', value);
-                  if (!mounted) return;
-                  setState(() => _priceFilter = value);
-                  await _loadNearbyTours();
+                  await _setPriceFilter(value);
                 },
               ),
           ],
@@ -549,7 +609,8 @@ class _HomeScreenState extends State<HomeScreen> {
 
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
         title: const Text('Search'),
         content: Column(
           mainAxisSize: MainAxisSize.min,
@@ -568,6 +629,10 @@ class _HomeScreenState extends State<HomeScreen> {
                 await _dispatchSearch(query);
               },
             ),
+            const SizedBox(height: 12),
+            // [LOCAL-680] The three Home filters, also here, so a search can be
+            // narrowed without leaving the dialog. Same state as the AppBar icons.
+            _buildSearchFilters(setDialogState),
             const SizedBox(height: 12),
             // [LOCAL-680] The one box takes three kinds of input (LOCAL-665), so show
             // one example of each, grouped. Michael, 2026-10-14: the examples were
@@ -624,6 +689,54 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ],
       ),
+      ),
+    );
+  }
+
+  /// [LOCAL-680] Rating / Sort / Price as three labelled dropdowns inside the
+  /// Search dialog. [setDialogState] repaints the dialog after a change.
+  Widget _buildSearchFilters(StateSetter setDialogState) {
+    Widget row<T>(String label, T value, Map<T, String> options,
+        Future<void> Function(T) onSet) {
+      return Row(
+        children: [
+          SizedBox(width: 64, child: Text(label, style: const TextStyle(fontSize: 13))),
+          Expanded(
+            child: DropdownButton<T>(
+              isExpanded: true,
+              isDense: true,
+              value: value,
+              items: [
+                for (final e in options.entries)
+                  DropdownMenuItem<T>(
+                    value: e.key,
+                    child: Text(e.value, style: const TextStyle(fontSize: 13)),
+                  ),
+              ],
+              onChanged: (v) async {
+                if (v == null) return;
+                await onSet(v);
+                setDialogState(() {});
+              },
+            ),
+          ),
+        ],
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // A stored bar outside the menu would crash DropdownButton; show Any.
+        row<double>('Rating', const [7.0, 8.0, 9.0].contains(_minRating) ? _minRating : 0.0,
+            <double, String>{0.0: 'Any rating', 7.0: '7+ stars', 8.0: '8+ stars', 9.0: '9+ stars'},
+            _setMinRating),
+        row<bool>('Sort', _topRated,
+            const {false: 'Nearest first', true: 'Top rated first'}, _setTopRated),
+        row<String>('Price', _priceFilter,
+            const {'': 'Free and paid', 'free': 'Free only', 'paid': 'Paid only'},
+            _setPriceFilter),
+      ],
     );
   }
 
@@ -1951,7 +2064,7 @@ class _HomeScreenState extends State<HomeScreen> {
         return [];
       }
       
-      final searchUri = await Endpoints.url(Service.mapDelivery, '/search-tours?pattern=${Uri.encodeComponent(regexPattern)}&lat=${searchLocation.latitude}&lng=${searchLocation.longitude}');
+      final searchUri = await Endpoints.url(Service.mapDelivery, '/search-tours?pattern=${Uri.encodeComponent(regexPattern)}&lat=${searchLocation.latitude}&lng=${searchLocation.longitude}${_filterQueryParams()}');
       final searchUrl = searchUri.toString();
       await DebugLogHelper.addDebugLog('HOME: Searching tours with URL: $searchUrl');
       
@@ -3468,17 +3581,13 @@ class _HomeScreenState extends State<HomeScreen> {
           // [LOCAL-672] "Top rated" sort toggle. On → /tours-near is ordered by
           // the Bayesian rank_score (verified ratings weighted higher). Off →
           // nearest-first (the default). Remembered per device.
+          // [LOCAL-680] Opens a dialog naming both orders instead of toggling
+          // silently; highlighted (amber) while "Top rated first" is on.
           IconButton(
-            icon: Icon(_topRated ? Icons.trending_up : Icons.sort),
-            onPressed: () async {
-              final prefs = await SharedPreferences.getInstance();
-              final next = !_topRated;
-              await prefs.setBool('home_top_rated', next);
-              if (!mounted) return;
-              setState(() => _topRated = next);
-              _loadNearbyTours();
-            },
-            tooltip: _topRated ? 'Sorted: Top rated' : 'Sort: Top rated',
+            icon: Icon(Icons.sort,
+                color: _topRated ? Colors.amber : null),
+            onPressed: _showSortDialog,
+            tooltip: _topRated ? 'Sorted: Top rated first' : 'Sorted: Nearest first',
           ),
           // [LOCAL-677] Free/Paid/Any filter. The chosen option is remembered
           // per device and passed to /tours-near as ?price=free|paid.
