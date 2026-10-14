@@ -46,8 +46,8 @@ MAX_CHARS = 24000  # ~6k tokens; long tours are judged on their first part
 PROMPT = """You are a content-rating moderator for an audio-tour app, rating a tour script like a film classification board rates a film. Judge ONLY the three categories below. Do NOT use a word list — judge meaning and intent, not isolated words ("class", "Assisi", "Scunthorpe" are not profanity; a history of a red-light district is not itself adult entertainment).
 
 Choose exactly one rating:
-- "general": suitable to list for everyone. The default. Ordinary history, culture, architecture, nature, food, art — even when it mentions war, death, religion or politics factually and without dwelling on the lurid.
-- "mature": fine for adults but not for a general audience — strong/frequent profanity, a focus on alcohol/bars/nightlife, casinos or gambling, or crime treated as entertainment. List ONLY to confirmed-18+ listeners.
+- "general": suitable to list for everyone. The default. Ordinary history, culture, architecture, nature, food, art — even when it mentions war, death, religion or politics factually and without dwelling on the lurid. Restaurants, cafés and markets are general even when they serve or describe wine, beer, cocktails or spirits, or have "bar"/"bourbon"/"brewery" in their name — a meal with drinks is not an alcohol-focused tour.
+- "mature": fine for adults but not for a general audience — strong/frequent profanity; a tour whose PURPOSE is drinking (bar crawl, pub crawl, wine or spirits tasting, brewery-hopping) or nightlife/clubs; casinos or gambling; crime treated as entertainment. List ONLY to confirmed-18+ listeners.
 - "not_allowed": must never be listed — sexual services or adult entertainment as a selling point, explicit sexual content, hate toward a protected group, or content that encourages illegal acts.
 
 When a tour sits between two ratings, pick the HIGHER (more restrictive) one — a human reviews everything that is not clearly general.
