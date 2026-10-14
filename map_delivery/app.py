@@ -1736,32 +1736,47 @@ def request_rescore(tour_id):
             cur.close()
             return jsonify({'error': 'not your tour'}), 403
 
-        # One re-score per content version.
+        # One re-score per content version. The rescore_requested_version
+        # column (migration 026) may not yet be applied on this DB; when it is
+        # absent we still honour the request (clear the score) but cannot track
+        # the per-version limit — fail OPEN, never 500.
         version = _tour_version_number(cur, original_id)
+        has_version_col = False
         try:
+            cur.execute(
+                "SELECT 1 FROM information_schema.columns WHERE table_name = "
+                "'audio_tours' AND column_name = 'rescore_requested_version'")
+            has_version_col = cur.fetchone() is not None
+        except Exception:  # noqa: BLE001
+            try:
+                conn.rollback()
+            except Exception:
+                pass
+            has_version_col = False
+
+        if has_version_col:
             cur.execute(
                 "SELECT rescore_requested_version FROM audio_tours WHERE id = %s",
                 (original_id,))
             prev = cur.fetchone()
             prev_version = prev[0] if prev else None
-        except Exception:  # noqa: BLE001 — column absent (pre-026) → treat as never requested
-            conn.rollback()
-            prev_version = None
-        if prev_version is not None and int(prev_version) == int(version):
-            cur.close()
-            return jsonify({
-                'error': 'already requested',
-                'message': ("You have already requested a re-score for this version "
-                            "of the tour. Edit the tour again to earn another free "
-                            "re-score."),
-                'version': version,
-            }), 409
-
-        # Clear the score (the tick re-scores it) and stamp the version.
-        cur.execute(
-            "UPDATE audio_tours SET editor_score = NULL, "
-            "rescore_requested_version = %s WHERE id = %s",
-            (version, original_id))
+            if prev_version is not None and int(prev_version) == int(version):
+                cur.close()
+                return jsonify({
+                    'error': 'already requested',
+                    'message': ("You have already requested a re-score for this "
+                                "version of the tour. Edit the tour again to earn "
+                                "another free re-score."),
+                    'version': version,
+                }), 409
+            cur.execute(
+                "UPDATE audio_tours SET editor_score = NULL, "
+                "rescore_requested_version = %s WHERE id = %s",
+                (version, original_id))
+        else:
+            cur.execute(
+                "UPDATE audio_tours SET editor_score = NULL WHERE id = %s",
+                (original_id,))
         conn.commit()
         cur.close()
         return jsonify({'status': 'queued', 'tour_id': int(original_id),
