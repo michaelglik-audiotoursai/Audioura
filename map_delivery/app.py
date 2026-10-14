@@ -13,6 +13,10 @@ from io import BytesIO
 from datetime import datetime
 from flask import Flask, request, jsonify, send_file, make_response
 
+# [LOCAL-689] Personal Match % — deterministic, no model call. The formula lives
+# in personal_match.py (copied into this image by the Dockerfile's COPY . .).
+import personal_match
+
 # Configure unbuffered logging
 sys.stdout.reconfigure(line_buffering=True)
 print(f"\n==== MAP DELIVERY SERVICE STARTING: {datetime.now().isoformat()} ====")
@@ -482,6 +486,158 @@ def _prior_for(editor_scores, tour_id, original_id):
     """A translation shows its ORIGINAL's evaluated score (ratings pool there too)."""
     key = original_id if original_id is not None else tour_id
     return editor_scores.get(int(key)) if key is not None else None
+
+
+# ─── [LOCAL-689] Personal Match % ────────────────────────────────────────────
+#
+# A listener's swipe-preference vector (user_class_prefs) + a tour's story
+# character (mean of stop_metrics.class_* over its stops) + the tour's evaluated
+# score (editor_score) → a 0–100 "Match %" and two short reasons. All arithmetic
+# is in personal_match.py; this file only READS the three inputs from the DB.
+# A translation uses its ORIGINAL tour's metrics AND score (the stops and the
+# evaluation both live on the original), exactly like _prior_for for the rating.
+#
+# Everything here is designed to be BATCHED: _user_prefs is one query, and
+# _tour_characters aggregates the stop_metrics of MANY tours in a single
+# GROUP BY — so /tours-near and /search-tours add Match % with two extra queries
+# total, never one-per-tour (no N+1).
+
+
+def _user_prefs(cur, user_id):
+    """(prefs_dict | None, swipe_count) for a listener.
+
+    prefs_dict is {details, historic, social} in [0,1]; None when the listener
+    has no user_class_prefs row at all (pure cold start). swipe_count is 0 then.
+    Never raises — returns (None, 0) on any error or missing table."""
+    if not user_id:
+        return None, 0
+    try:
+        cur.execute(
+            "SELECT pref_details, pref_historic, pref_social, swipe_count "
+            "FROM user_class_prefs WHERE user_id = %s", (str(user_id),))
+        row = cur.fetchone()
+    except Exception:  # noqa: BLE001 — schema predates the table → cold
+        try:
+            cur.connection.rollback()
+        except Exception:
+            pass
+        return None, 0
+    if not row:
+        return None, 0
+    prefs = {
+        'details': float(row[0]) if row[0] is not None else 0.5,
+        'historic': float(row[1]) if row[1] is not None else 0.5,
+        'social': float(row[2]) if row[2] is not None else 0.5,
+    }
+    swipe_count = int(row[3]) if row[3] is not None else 0
+    return prefs, swipe_count
+
+
+def _tour_characters(cur, original_ids):
+    """{original_tour_id: {details, historic, social}} for many tours in ONE
+    query (no N+1). Aggregates stop_metrics.class_* as a per-tour mean over the
+    tour's stops. Tours with no stop_metrics rows are simply absent from the
+    result; the caller treats a missing character as a neutral tour.
+
+    `original_ids` is the set of GOVERNING tour ids (translations already
+    resolved to their original) to aggregate. Empty / error → {}."""
+    ids = sorted({int(i) for i in original_ids if i is not None})
+    if not ids:
+        return {}
+    try:
+        cur.execute(
+            "SELECT tour_id, "
+            "       AVG(class_details)  AS d, "
+            "       AVG(class_historic) AS h, "
+            "       AVG(class_social)   AS s "
+            "FROM stop_metrics "
+            "WHERE tour_id = ANY(%s) "
+            "  AND class_details IS NOT NULL "
+            "GROUP BY tour_id", (ids,))
+        rows = cur.fetchall()
+    except Exception:  # noqa: BLE001 — schema predates stop_metrics → no chars
+        try:
+            cur.connection.rollback()
+        except Exception:
+            pass
+        return {}
+    out = {}
+    for tour_id, d, h, s in rows:
+        # Renormalise the mean so the three shares sum to 1 (personal_match also
+        # defends against this, but keep the stored value clean).
+        d, h, s = float(d or 0), float(h or 0), float(s or 0)
+        tot = d + h + s
+        if tot <= 0:
+            continue
+        out[int(tour_id)] = {'details': d / tot, 'historic': h / tot, 'social': s / tot}
+    return out
+
+
+def _match_block(prefs, swipe_count, character, editor_score):
+    """The public shape added to a tour item / returned by the endpoint:
+        {match_percent: int|None, match_reasons: [str,...], match_reason: str|None}
+    `match_reason` is the single cold-start sentence (null once a match exists);
+    `match_reasons` is the two phrases (empty on cold start)."""
+    result = personal_match.compute_match(prefs, swipe_count, character, editor_score)
+    if result['cold_start']:
+        return {
+            'match_percent': None,
+            'match_reasons': [],
+            'match_reason': personal_match.NO_MATCH_REASON,
+        }
+    return {
+        'match_percent': result['match_percent'],
+        'match_reasons': result['reasons'],
+        'match_reason': None,
+    }
+
+
+def _attach_match(cur, user_id, tours_list, editor_scores):
+    """[LOCAL-689] Add match_percent + reasons to EVERY item of a list endpoint,
+    in-place, with no N+1. Two queries total: _user_prefs (once) and
+    _tour_characters (once, batched over all governing tour ids).
+
+    Each tour item must carry 'id' and (for /tours-near originals) None or (for
+    /search-tours) 'parent_tour_id' / 'original_tour_id' so a translation maps
+    to its original's metrics+score. When user_id is absent or the listener has
+    < MIN_SWIPES swipes, every item gets the cold-start block (match_percent
+    null) — a uniform shape the app can rely on."""
+    prefs, swipe_count = _user_prefs(cur, user_id)
+
+    def _governing(item):
+        gid = item.get('original_tour_id', None)
+        if gid is None:
+            gid = item.get('parent_tour_id', None)
+        return int(gid) if gid is not None else int(item['id'])
+
+    governing_ids = {_governing(t) for t in tours_list}
+    characters = _tour_characters(cur, governing_ids) if (
+        prefs is not None and swipe_count >= personal_match.MIN_SWIPES) else {}
+
+    for t in tours_list:
+        gid = _governing(t)
+        character = characters.get(gid, {'details': 1 / 3, 'historic': 1 / 3, 'social': 1 / 3})
+        editor_score = editor_scores.get(gid)
+        t.update(_match_block(prefs, swipe_count, character, editor_score))
+
+
+def _single_tour_match(cur, user_id, tour_id):
+    """[LOCAL-689] The GET /tour/<id>/match payload for one tour. Resolves a
+    translation to its original for BOTH the metrics and the evaluated score."""
+    original_id = _resolve_original_id(cur, tour_id)
+    prefs, swipe_count = _user_prefs(cur, user_id)
+    editor = _editor_scores(cur)
+    editor_score = _prior_for(editor, tour_id, original_id)
+    if prefs is not None and swipe_count >= personal_match.MIN_SWIPES:
+        characters = _tour_characters(cur, [original_id])
+        character = characters.get(int(original_id),
+                                   {'details': 1 / 3, 'historic': 1 / 3, 'social': 1 / 3})
+    else:
+        character = {'details': 1 / 3, 'historic': 1 / 3, 'social': 1 / 3}
+    block = _match_block(prefs, swipe_count, character, editor_score)
+    block['tour_id'] = int(tour_id)
+    block['scored_tour_id'] = int(original_id)
+    return block
 
 
 def compute_rating(ratings, verified=None, paid=False, prior=None):
@@ -1297,11 +1453,24 @@ def get_tours_near_location(lat, lng):
                     }
                     tours_list.append(tour_data)
         
+        # [LOCAL-689] Add a personal match_percent + reasons to every item when
+        # ?user_id is passed (one prefs query + one batched stop_metrics
+        # aggregate — never one query per tour). editor is the {id: editor_score}
+        # map already fetched above, reused as the match's quality input.
+        _attach_match(cur, request.args.get('user_id'), tours_list, editor)
+
         # [LOCAL-672] "Top rated" sort (?sort=top_rated): order by the Bayesian
         # rank_score (verified 1.0 / unverified 0.5, 12-month & pre-version decay,
         # C=3 prior) descending, breaking ties by distance so near tours win among
         # equally-ranked ones. Default remains nearest-first (the original behaviour).
-        if _wants_top_rated(request.args):
+        # [LOCAL-689] ?sort=match: best personal match first. Tours with no match
+        # (cold start / null) sort to the end, then by distance.
+        sort_arg = (request.args.get('sort') or '').strip().lower()
+        if sort_arg == 'match':
+            tours_list.sort(key=lambda x: (
+                -(x.get('match_percent') if x.get('match_percent') is not None else -1),
+                x['distance_km']))
+        elif _wants_top_rated(request.args):
             tours_list.sort(key=lambda x: (-x.get('rank_score', RANK_PRIOR_SCORE),
                                            x['distance_km']))
         else:
@@ -1713,10 +1882,21 @@ def search_tours():
                     **_price_block(price_tier, cur),
                 })
         
+        # [LOCAL-689] Personal match_percent + reasons for every result when
+        # ?user_id is passed (batched; a translation maps to its original's
+        # metrics+score via its parent_tour_id). editor reused as the quality input.
+        _attach_match(cur, request.args.get('user_id'), search_results, editor)
+
         # [LOCAL-672] "Top rated" sort (?sort=top_rated): the Bayesian rank_score
         # descending, tie-broken by popularity then distance. Default stays
         # popularity-then-distance (the original search order).
-        if _wants_top_rated(request.args):
+        # [LOCAL-689] ?sort=match: best personal match first; no-match items last.
+        sort_arg = (request.args.get('sort') or '').strip().lower()
+        if sort_arg == 'match':
+            search_results.sort(key=lambda x: (
+                -(x.get('match_percent') if x.get('match_percent') is not None else -1),
+                -x['popularity'], x['distance_km']))
+        elif _wants_top_rated(request.args):
             search_results.sort(key=lambda x: (-x.get('rank_score', RANK_PRIOR_SCORE),
                                                -x['popularity'], x['distance_km']))
         else:
@@ -1853,6 +2033,60 @@ def get_score_explanation(tour_id):
         traceback.print_exc()
         sys.stdout.flush()
         return jsonify({'error': 'tour not scored'}), 404
+    finally:
+        if conn is not None:
+            conn.close()
+
+
+@app.route('/tour/<int:tour_id>/match', methods=['GET', 'OPTIONS'])
+def get_tour_match(tour_id):
+    """[LOCAL-689] Personal Match % for a listener — PUBLIC, free, deterministic.
+
+    GET /tour/<id>/match?user_id=<device user id>
+      → {match_percent: 0..100, reasons: [two short phrases], ...}
+      → {match_percent: null, reason: "Swipe a few stops to get matches"} when
+        the listener has fewer than personal_match.MIN_SWIPES swipes (or no
+        user_id is passed).
+
+    No model call: the number comes only from the listener's swipe-preference
+    vector, the tour's story character (mean of stop_metrics.class_*), and the
+    tour's evaluated score. A translation uses its ORIGINAL tour's metrics and
+    score. Never 500s on a listener with no history — that is a normal cold
+    start, returned as match_percent null."""
+    if request.method == 'OPTIONS':
+        return add_cors_headers(make_response())
+    user_id = request.args.get('user_id')
+    print(f"[LOCAL-689] match for tour {tour_id}, user {user_id}")
+    sys.stdout.flush()
+    conn = None
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor()
+        block = _single_tour_match(cur, user_id, tour_id)
+        cur.close()
+        # Public shape: match_percent + reasons; cold start carries a single
+        # `reason` sentence and match_percent null.
+        payload = {
+            'tour_id': block['tour_id'],
+            'scored_tour_id': block['scored_tour_id'],
+            'match_percent': block['match_percent'],
+            'reasons': block['match_reasons'],
+        }
+        if block['match_percent'] is None:
+            payload['reason'] = block['match_reason']
+        return jsonify(payload)
+    except Exception as e:  # noqa: BLE001
+        print(f"[LOCAL-689] match failed for {tour_id}: {e}")
+        traceback.print_exc()
+        sys.stdout.flush()
+        # Fail SOFT to a cold-start shape — a listener should never see a 500
+        # where a match belongs.
+        return jsonify({
+            'tour_id': int(tour_id),
+            'match_percent': None,
+            'reasons': [],
+            'reason': personal_match.NO_MATCH_REASON,
+        })
     finally:
         if conn is not None:
             conn.close()
