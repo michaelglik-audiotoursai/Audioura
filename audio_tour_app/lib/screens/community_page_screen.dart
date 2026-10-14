@@ -84,8 +84,9 @@ class _CommunityPageScreenState extends State<CommunityPageScreen> {
     final isStub = await IapService.instance.isLocalStubMode();
     final result = isStub
         ? await IapService.instance
-            .testPurchaseCommunityPass(pass.productId, c.id)
-        : await IapService.instance.buyCommunityPass(pass.productId, c.id);
+            .testPurchaseCommunityPass(pass.productId, c.id, pass.length)
+        : await IapService.instance
+            .buyCommunityPass(pass.productId, c.id, pass.length);
     if (!mounted) return;
     if (result.status == IapResultStatus.granted) {
       await _load(); // refresh my_status + episodes

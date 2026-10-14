@@ -13,6 +13,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../services/communities_service.dart';
+import '../services/iap_service.dart';
 import 'community_page_screen.dart';
 
 class CommunitiesAboutScreen extends StatelessWidget {
@@ -91,15 +92,57 @@ class _CreateCommunityScreenState extends State<CreateCommunityScreen> {
   bool _listed = false;
   bool _submitting = false;
 
-  // A compact pass catalogue the owner picks from (mirrors the seed catalogue;
-  // the server validates every id against community_pass_products).
-  final Map<String, bool> _passSelection = {
-    'audioura.pass.usd3.month': false,
-    'audioura.pass.usd5.month': false,
-    'audioura.pass.usd10.month': false,
-    'audioura.pass.usd5.year': false,
-    'audioura.pass.usd20.year': false,
+  // [LOCAL-690C] The pass catalogue is ONE product per PRICE (the 34 ladder
+  // prices, kPassLadderDollars); the LENGTH is chosen per community. The owner
+  // picks one or more PRICES (quick-pick chips off the ladder + a Custom field
+  // that snaps to the nearest ladder dollar) and one or more LENGTHS; the
+  // offered options are every selected price × selected length.
+  //
+  // Quick-pick prices: the same handful the tour control leads with, all real
+  // ladder steps. Custom snaps to the nearest of kPassLadderDollars.
+  static const List<int> _quickPickDollars = [2, 3, 5, 10, 20, 50];
+  final Set<int> _selectedDollars = <int>{};
+  final _customPrice = TextEditingController();
+  // The four pass lengths (day|week|month|year), default a single 'month'.
+  final Map<String, bool> _lengthSelection = {
+    'day': false,
+    'week': false,
+    'month': true,
+    'year': false,
   };
+
+  /// Snap a typed whole-dollar [amount] to the NEAREST ladder price
+  /// (kPassLadderDollars), mirroring TourPricingService.snapToLadder: ties round
+  /// DOWN, below the floor → the lowest step, above the ceiling → the highest.
+  static int snapDollarsToLadder(double amount) {
+    const ladder = kPassLadderDollars;
+    if (amount <= ladder.first) return ladder.first;
+    if (amount >= ladder.last) return ladder.last;
+    int best = ladder.first;
+    double bestDist = (amount - best).abs();
+    for (final d in ladder.skip(1)) {
+      final dist = (amount - d).abs();
+      if (dist < bestDist) {
+        best = d;
+        bestDist = dist;
+      }
+    }
+    return best;
+  }
+
+  /// The offered options as [{product_id, length}] — every selected price ×
+  /// every selected length. Empty when nothing is selected.
+  List<Map<String, String>> _passOptions() {
+    final lengths =
+        _lengthSelection.entries.where((e) => e.value).map((e) => e.key);
+    final options = <Map<String, String>>[];
+    for (final d in _selectedDollars) {
+      for (final len in lengths) {
+        options.add({'product_id': passProductForDollars(d), 'length': len});
+      }
+    }
+    return options;
+  }
 
   bool get _hasWaiver => _waiver.text.trim().isNotEmpty;
 
@@ -141,15 +184,89 @@ class _CreateCommunityScreenState extends State<CreateCommunityScreen> {
           ),
           if (_isPaid) ...[
             const Padding(
-              padding: EdgeInsets.only(left: 16, bottom: 4),
-              child: Text('Offer these passes:'),
+              padding: EdgeInsets.only(left: 16, top: 4),
+              child: Text('Pass price',
+                  style: TextStyle(fontWeight: FontWeight.bold)),
             ),
-            ..._passSelection.keys.map((id) => CheckboxListTile(
+            const Padding(
+              padding: EdgeInsets.only(left: 16, bottom: 4),
+              child: Text('Pick one or more prices. The length is set below.',
+                  style: TextStyle(fontSize: 12, color: Colors.grey)),
+            ),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Wrap(
+                spacing: 8,
+                children: _quickPickDollars
+                    .map((d) => FilterChip(
+                          label: Text('\$$d'),
+                          selected: _selectedDollars.contains(d),
+                          onSelected: (v) => setState(() {
+                            if (v) {
+                              _selectedDollars.add(d);
+                            } else {
+                              _selectedDollars.remove(d);
+                            }
+                          }),
+                        ))
+                    .toList(),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: _customPrice,
+                      keyboardType: TextInputType.number,
+                      decoration: const InputDecoration(
+                        labelText: 'Custom price (\$)',
+                        helperText: 'Snaps to the nearest step',
+                        border: OutlineInputBorder(),
+                        isDense: true,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  OutlinedButton(
+                    onPressed: () {
+                      final typed = double.tryParse(_customPrice.text.trim());
+                      if (typed == null) {
+                        _snack('Enter a dollar amount to snap.');
+                        return;
+                      }
+                      final snapped = snapDollarsToLadder(typed);
+                      setState(() {
+                        _selectedDollars.add(snapped);
+                        _customPrice.clear();
+                      });
+                      _snack('Added \$$snapped pass price.');
+                    },
+                    child: const Text('Add'),
+                  ),
+                ],
+              ),
+            ),
+            if (_selectedDollars.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+                child: Text(
+                  'Prices: ${(_selectedDollars.toList()..sort()).map((d) => '\$$d').join(', ')}',
+                  style: const TextStyle(fontSize: 12, color: Colors.grey),
+                ),
+              ),
+            const Padding(
+              padding: EdgeInsets.only(left: 16, top: 12),
+              child: Text('Pass length',
+                  style: TextStyle(fontWeight: FontWeight.bold)),
+            ),
+            ..._lengthSelection.keys.map((len) => CheckboxListTile(
                   dense: true,
-                  title: Text(_passLabel(id)),
-                  value: _passSelection[id],
+                  title: Text('Per $len'),
+                  value: _lengthSelection[len],
                   onChanged: (v) =>
-                      setState(() => _passSelection[id] = v ?? false),
+                      setState(() => _lengthSelection[len] = v ?? false),
                 )),
           ],
           SwitchListTile(
@@ -179,16 +296,6 @@ class _CreateCommunityScreenState extends State<CreateCommunityScreen> {
     );
   }
 
-  String _passLabel(String id) {
-    // Derive a readable label from the product id (the server also returns one).
-    final parts = id.split('.'); // audioura pass usdN length
-    if (parts.length >= 4) {
-      final price = parts[2].replaceFirst('usd', '\$');
-      return '$price / ${parts[3]}';
-    }
-    return id;
-  }
-
   Future<void> _submit() async {
     final name = _name.text.trim();
     if (name.isEmpty) {
@@ -200,12 +307,9 @@ class _CreateCommunityScreenState extends State<CreateCommunityScreen> {
       _snack('A listed community needs a latitude and longitude.');
       return;
     }
-    final passes = _passSelection.entries
-        .where((e) => e.value)
-        .map((e) => e.key)
-        .toList();
+    final passes = _passOptions();
     if (_isPaid && passes.isEmpty) {
-      _snack('A paid community needs at least one pass.');
+      _snack('A paid community needs at least one price and one length.');
       return;
     }
 
