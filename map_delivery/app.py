@@ -692,10 +692,18 @@ def _is_paid_select(cur):
 # and cannot import the repo-root price_tiers module, so the tier→label map is a
 # self-contained copy of the D652 defaults (migration 022 seeds the same rows).
 # The price_tiers TABLE is authoritative when present (Michael's SQL edits take
-# effect); the constants are the fallback for a DB that predates it. Keep the
-# five entries in lock-step with migration 022.
+# effect); the constants are the fallback for a DB that predates it. Keep these
+# entries in lock-step with migrations 022/024/026 (7 legacy .99 tiers + the 34
+# round-dollar ladder tiers 8..41, LOCAL-686).
 _DEFAULT_TIER_LABELS = {1: "$1.99", 2: "$2.99", 3: "$4.99", 4: "$7.99", 5: "$9.99",
-                        6: "$19.99", 7: "$49.99"}  # [LOCAL-684] tiers 6-7, migration 024
+                        6: "$19.99", 7: "$49.99",  # [LOCAL-684] legacy .99 tiers 1-7, migrations 022/024
+                        # [LOCAL-686] the round-dollar ladder, tiers 8..41 (migration 026)
+                        8: "$2", 9: "$3", 10: "$4", 11: "$5", 12: "$6", 13: "$7",
+                        14: "$8", 15: "$9", 16: "$10", 17: "$11", 18: "$12", 19: "$13",
+                        20: "$14", 21: "$15", 22: "$16", 23: "$17", 24: "$18", 25: "$19",
+                        26: "$20", 27: "$25", 28: "$30", 29: "$35", 30: "$40", 31: "$45",
+                        32: "$50", 33: "$60", 34: "$70", 35: "$80", 36: "$90", 37: "$100",
+                        38: "$125", 39: "$150", 40: "$175", 41: "$200"}
 _TIER_LABELS = None  # cached per process after the first DB read
 
 _HAS_PRICE_TIER_COLUMN = None
