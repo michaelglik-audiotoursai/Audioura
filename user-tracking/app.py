@@ -17,6 +17,16 @@ try:
 except Exception as _ent_err:  # pragma: no cover - import-time safety
     print(f"[LOCAL-595] WARNING: could not register entitlements blueprint: {_ent_err}")
 
+# [LOCAL-690] Communities HTTP surface: /communities/* (create, page, join by
+# code, episodes, feed import, map, mine, reminders). Pass purchases route
+# through /purchases/verify (entitlements) which delegates to communities_api.
+try:
+    from communities_api import communities_bp
+    app.register_blueprint(communities_bp)
+    print("[LOCAL-690] communities blueprint registered")
+except Exception as _com_err:  # pragma: no cover - import-time safety
+    print(f"[LOCAL-690] WARNING: could not register communities blueprint: {_com_err}")
+
 def get_db():
     return psycopg2.connect(os.getenv('DATABASE_URL'))
 
