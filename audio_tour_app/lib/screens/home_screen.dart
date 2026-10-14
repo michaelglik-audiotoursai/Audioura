@@ -83,6 +83,12 @@ class _HomeScreenState extends State<HomeScreen> {
   // Remembered per device under SharedPreferences 'home_price_filter' and passed
   // to /tours-near as ?price=free|paid so the server filters.
   String _priceFilter = '';
+  // [LOCAL-687] "Show 18+ tours (I am 18 or older)". Remembered per device under
+  // SharedPreferences 'home_show_adult'. When on, every list/search/code call
+  // carries ?adult=1 so mature tours are returned; off (the default) hides them.
+  // not_allowed tours are never returned regardless; pending/rejected are hidden
+  // until a human approves (server-side, map-delivery LOCAL-687).
+  bool _showAdult = false;
   final List<String> _articleTypes = [
     'All',
     'News and Politics',
@@ -116,6 +122,7 @@ class _HomeScreenState extends State<HomeScreen> {
     _minRating = prefs.getDouble('home_min_rating') ?? 0.0;
     _topRated = prefs.getBool('home_top_rated') ?? false;
     _priceFilter = prefs.getString('home_price_filter') ?? '';
+    _showAdult = prefs.getBool('home_show_adult') ?? false;  // [LOCAL-687]
     await _loadLocationHistory();
     await _loadCustomLocation();
     
@@ -459,6 +466,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                   children: [
                                     TourRatingBadge.fromTour(t),
                                     TourPriceBadge.fromTour(t),
+                                    if (_isMatureTour(t)) _adultChip(),
                                     if (km != null)
                                       Text('${(km / 1.609344).toStringAsFixed(1)} mi',
                                           style: const TextStyle(fontSize: 12)),
@@ -628,12 +636,32 @@ class _HomeScreenState extends State<HomeScreen> {
   /// [LOCAL-670/672/677] The three Home filters as query params, shared by
   /// /tours-near and (LOCAL-680) /search-tours so a search honours them too.
   /// Any/Nearest omit their param.
+  // [LOCAL-687] True when a tour element carries content_rating 'mature' (the
+  // only rating the app ever shows — not_allowed/pending are never delivered).
+  bool _isMatureTour(Map<String, dynamic> t) =>
+      (t['content_rating']?.toString().toLowerCase() ?? 'general') == 'mature';
+
+  // [LOCAL-687] The small "18+" chip shown beside mature tours in the List view
+  // and the tour dialog.
+  Widget _adultChip() => Container(
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+        decoration: BoxDecoration(
+          color: Colors.deepOrange,
+          borderRadius: BorderRadius.circular(4),
+        ),
+        child: const Text('18+',
+            style: TextStyle(
+                fontSize: 11, color: Colors.white, fontWeight: FontWeight.bold)),
+      );
+
   String _filterQueryParams() {
     final minRatingParam =
         _minRating > 0 ? '&min_rating=${_minRating.toStringAsFixed(0)}' : '';
     final sortParam = _topRated ? '&sort=top_rated' : '';
     final priceParam = _priceFilter.isNotEmpty ? '&price=$_priceFilter' : '';
-    return '$minRatingParam$sortParam$priceParam';
+    // [LOCAL-687] 18+ confirmed → ask the server to include mature tours.
+    final adultParam = _showAdult ? '&adult=1' : '';
+    return '$minRatingParam$sortParam$priceParam$adultParam';
   }
 
   /// [LOCAL-680] One setter per filter, used by the AppBar dialogs and by the
@@ -659,6 +687,16 @@ class _HomeScreenState extends State<HomeScreen> {
     await prefs.setString('home_price_filter', value);
     if (!mounted) return;
     setState(() => _priceFilter = value);
+    await _loadNearbyTours();
+  }
+
+  /// [LOCAL-687] The "Show 18+ tours (I am 18 or older)" toggle. Persist per
+  /// device and reload so the list immediately gains/loses mature tours.
+  Future<void> _setShowAdult(bool value) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('home_show_adult', value);
+    if (!mounted) return;
+    setState(() => _showAdult = value);
     await _loadNearbyTours();
   }
 
@@ -774,6 +812,51 @@ class _HomeScreenState extends State<HomeScreen> {
             child: const Text('Cancel'),
           ),
         ],
+      ),
+    );
+  }
+
+  /// [LOCAL-687] The "Show 18+ tours (I am 18 or older)" setting. A single
+  /// switch, remembered per device. On → mature tours (strong language,
+  /// alcohol/nightlife, gambling) are listed; off (the default) they are hidden.
+  /// Nothing rated not_allowed is ever listed, and tours awaiting review stay
+  /// hidden until a human approves — this toggle only governs mature tours.
+  void _showAdultFilterDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: const Text('18+ tours'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              SwitchListTile(
+                title: const Text('Show 18+ tours'),
+                subtitle: const Text('I am 18 or older'),
+                value: _showAdult,
+                onChanged: (value) async {
+                  setDialogState(() {});
+                  Navigator.pop(context);
+                  await _setShowAdult(value);
+                },
+              ),
+              const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 16),
+                child: Text(
+                  'Mature tours (strong language, alcohol or nightlife focus, '
+                  'gambling) are shown only when this is on.',
+                  style: TextStyle(fontSize: 12, color: Colors.black54),
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel'),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -1167,6 +1250,10 @@ class _HomeScreenState extends State<HomeScreen> {
                     TourRatingBadge.fromTour(item),
                     const SizedBox(width: 8),
                     TourPriceBadge.fromTour(item),
+                    if (_isMatureTour(item)) ...[
+                      const SizedBox(width: 8),
+                      _adultChip(),
+                    ],
                   ],
                 ),
                 if (_tourVersionLabel(item) != null)
@@ -2283,8 +2370,13 @@ class _HomeScreenState extends State<HomeScreen> {
   /// location search.
   Future<List<Map<String, dynamic>>> _resolveShareCode(String code) async {
     try {
+      // [LOCAL-687] Carry the 18+ flag so a mature shared tour resolves for a
+      // confirmed-adult listener; without it the server answers 403
+      // age_restricted (handled below) and the listener is told how to enable it.
+      final adultParam = _showAdult ? '?adult=1' : '';
       final uri = await Endpoints.url(
-          Service.mapDelivery, '/tour-by-code/${Uri.encodeComponent(code.trim())}');
+          Service.mapDelivery,
+          '/tour-by-code/${Uri.encodeComponent(code.trim())}$adultParam');
       await DebugLogHelper.addDebugLog('HOME: trying share code: $uri');
       final response = await http.get(
         uri,
@@ -2295,6 +2387,20 @@ class _HomeScreenState extends State<HomeScreen> {
         final tours = List<Map<String, dynamic>>.from(data['tours'] ?? []);
         await DebugLogHelper.addDebugLog('HOME: share code resolved ${tours.length} tour(s)');
         return tours;
+      }
+      // [LOCAL-687] 403 age_restricted: the code points at a mature tour and 18+
+      // is off. Tell the listener exactly how to open it, and do NOT fall back to
+      // a location search (the code WAS valid — it is gated, not unknown).
+      if (response.statusCode == 403) {
+        await DebugLogHelper.addDebugLog('HOME: share code is age_restricted (403)');
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+            content: Text('This tour is for adults (18+). Turn on 18+ tours in '
+                'Settings to open it.'),
+            duration: Duration(seconds: 5),
+          ));
+        }
+        return [];
       }
       // 404 is the normal "that was not a code" answer, not an error worth surfacing.
       await DebugLogHelper.addDebugLog('HOME: share code not found (${response.statusCode})');
@@ -3868,6 +3974,15 @@ class _HomeScreenState extends State<HomeScreen> {
                 : _priceFilter == 'paid'
                     ? 'Showing: Paid tours'
                     : 'Free/Paid: Any',
+          ),
+          // [LOCAL-687] "Show 18+ tours" toggle. On → every list/search/code call
+          // carries ?adult=1 so mature tours appear; off (default) hides them.
+          // Highlighted (amber) while on. Remembered per device.
+          IconButton(
+            icon: Icon(_showAdult ? Icons.no_adult_content : Icons.shield_outlined,
+                color: _showAdult ? Colors.amber : null),
+            onPressed: _showAdultFilterDialog,
+            tooltip: _showAdult ? '18+ tours: shown' : '18+ tours: hidden',
           ),
           // [LOCAL-665] One search button for everything. Michael: the two old
           // buttons (flag = tours, arrow-glass = location) were easy to confuse.
