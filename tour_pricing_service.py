@@ -460,7 +460,10 @@ def register_pricing_routes(app):
             return jsonify({"error": str(e)}), 500
         finally:
             conn.close()
-        # Shape as an ordered list the app can render directly.
+        # Shape as an ordered list the app can render directly. Each row carries
+        # tier, product_id, price_usd, label and [LOCAL-686] in_picker (TRUE for
+        # the 34 ladder steps the guide's picker offers; FALSE for the legacy .99
+        # tiers kept only for already-priced tours).
         out = [
             {"tier": t, **info}
             for t, info in sorted(tiers.items())

@@ -136,6 +136,516 @@
       "productID": "audioura.tour.tier7",
       "referenceName": "Tour tier 7 ($49.99)",
       "type": "Consumable"
+    },
+    {
+      "displayPrice": "2.00",
+      "familyShareable": false,
+      "internalID": "D002D002-0008-4000-8000-000000000686",
+      "localizations": [
+        {
+          "description": "Unlocks one tour in one language, yours to keep.",
+          "displayName": "Tour ($2)",
+          "locale": "en_US"
+        }
+      ],
+      "productID": "audioura.tour.usd2",
+      "referenceName": "Tour $2 (ladder)",
+      "type": "Consumable"
+    },
+    {
+      "displayPrice": "3.00",
+      "familyShareable": false,
+      "internalID": "D003D003-0009-4000-8000-000000000686",
+      "localizations": [
+        {
+          "description": "Unlocks one tour in one language, yours to keep.",
+          "displayName": "Tour ($3)",
+          "locale": "en_US"
+        }
+      ],
+      "productID": "audioura.tour.usd3",
+      "referenceName": "Tour $3 (ladder)",
+      "type": "Consumable"
+    },
+    {
+      "displayPrice": "4.00",
+      "familyShareable": false,
+      "internalID": "D004D004-0010-4000-8000-000000000686",
+      "localizations": [
+        {
+          "description": "Unlocks one tour in one language, yours to keep.",
+          "displayName": "Tour ($4)",
+          "locale": "en_US"
+        }
+      ],
+      "productID": "audioura.tour.usd4",
+      "referenceName": "Tour $4 (ladder)",
+      "type": "Consumable"
+    },
+    {
+      "displayPrice": "5.00",
+      "familyShareable": false,
+      "internalID": "D005D005-0011-4000-8000-000000000686",
+      "localizations": [
+        {
+          "description": "Unlocks one tour in one language, yours to keep.",
+          "displayName": "Tour ($5)",
+          "locale": "en_US"
+        }
+      ],
+      "productID": "audioura.tour.usd5",
+      "referenceName": "Tour $5 (ladder)",
+      "type": "Consumable"
+    },
+    {
+      "displayPrice": "6.00",
+      "familyShareable": false,
+      "internalID": "D006D006-0012-4000-8000-000000000686",
+      "localizations": [
+        {
+          "description": "Unlocks one tour in one language, yours to keep.",
+          "displayName": "Tour ($6)",
+          "locale": "en_US"
+        }
+      ],
+      "productID": "audioura.tour.usd6",
+      "referenceName": "Tour $6 (ladder)",
+      "type": "Consumable"
+    },
+    {
+      "displayPrice": "7.00",
+      "familyShareable": false,
+      "internalID": "D007D007-0013-4000-8000-000000000686",
+      "localizations": [
+        {
+          "description": "Unlocks one tour in one language, yours to keep.",
+          "displayName": "Tour ($7)",
+          "locale": "en_US"
+        }
+      ],
+      "productID": "audioura.tour.usd7",
+      "referenceName": "Tour $7 (ladder)",
+      "type": "Consumable"
+    },
+    {
+      "displayPrice": "8.00",
+      "familyShareable": false,
+      "internalID": "D008D008-0014-4000-8000-000000000686",
+      "localizations": [
+        {
+          "description": "Unlocks one tour in one language, yours to keep.",
+          "displayName": "Tour ($8)",
+          "locale": "en_US"
+        }
+      ],
+      "productID": "audioura.tour.usd8",
+      "referenceName": "Tour $8 (ladder)",
+      "type": "Consumable"
+    },
+    {
+      "displayPrice": "9.00",
+      "familyShareable": false,
+      "internalID": "D009D009-0015-4000-8000-000000000686",
+      "localizations": [
+        {
+          "description": "Unlocks one tour in one language, yours to keep.",
+          "displayName": "Tour ($9)",
+          "locale": "en_US"
+        }
+      ],
+      "productID": "audioura.tour.usd9",
+      "referenceName": "Tour $9 (ladder)",
+      "type": "Consumable"
+    },
+    {
+      "displayPrice": "10.00",
+      "familyShareable": false,
+      "internalID": "D00AD00A-0016-4000-8000-000000000686",
+      "localizations": [
+        {
+          "description": "Unlocks one tour in one language, yours to keep.",
+          "displayName": "Tour ($10)",
+          "locale": "en_US"
+        }
+      ],
+      "productID": "audioura.tour.usd10",
+      "referenceName": "Tour $10 (ladder)",
+      "type": "Consumable"
+    },
+    {
+      "displayPrice": "11.00",
+      "familyShareable": false,
+      "internalID": "D00BD00B-0017-4000-8000-000000000686",
+      "localizations": [
+        {
+          "description": "Unlocks one tour in one language, yours to keep.",
+          "displayName": "Tour ($11)",
+          "locale": "en_US"
+        }
+      ],
+      "productID": "audioura.tour.usd11",
+      "referenceName": "Tour $11 (ladder)",
+      "type": "Consumable"
+    },
+    {
+      "displayPrice": "12.00",
+      "familyShareable": false,
+      "internalID": "D00CD00C-0018-4000-8000-000000000686",
+      "localizations": [
+        {
+          "description": "Unlocks one tour in one language, yours to keep.",
+          "displayName": "Tour ($12)",
+          "locale": "en_US"
+        }
+      ],
+      "productID": "audioura.tour.usd12",
+      "referenceName": "Tour $12 (ladder)",
+      "type": "Consumable"
+    },
+    {
+      "displayPrice": "13.00",
+      "familyShareable": false,
+      "internalID": "D00DD00D-0019-4000-8000-000000000686",
+      "localizations": [
+        {
+          "description": "Unlocks one tour in one language, yours to keep.",
+          "displayName": "Tour ($13)",
+          "locale": "en_US"
+        }
+      ],
+      "productID": "audioura.tour.usd13",
+      "referenceName": "Tour $13 (ladder)",
+      "type": "Consumable"
+    },
+    {
+      "displayPrice": "14.00",
+      "familyShareable": false,
+      "internalID": "D00ED00E-0020-4000-8000-000000000686",
+      "localizations": [
+        {
+          "description": "Unlocks one tour in one language, yours to keep.",
+          "displayName": "Tour ($14)",
+          "locale": "en_US"
+        }
+      ],
+      "productID": "audioura.tour.usd14",
+      "referenceName": "Tour $14 (ladder)",
+      "type": "Consumable"
+    },
+    {
+      "displayPrice": "15.00",
+      "familyShareable": false,
+      "internalID": "D00FD00F-0021-4000-8000-000000000686",
+      "localizations": [
+        {
+          "description": "Unlocks one tour in one language, yours to keep.",
+          "displayName": "Tour ($15)",
+          "locale": "en_US"
+        }
+      ],
+      "productID": "audioura.tour.usd15",
+      "referenceName": "Tour $15 (ladder)",
+      "type": "Consumable"
+    },
+    {
+      "displayPrice": "16.00",
+      "familyShareable": false,
+      "internalID": "D010D010-0022-4000-8000-000000000686",
+      "localizations": [
+        {
+          "description": "Unlocks one tour in one language, yours to keep.",
+          "displayName": "Tour ($16)",
+          "locale": "en_US"
+        }
+      ],
+      "productID": "audioura.tour.usd16",
+      "referenceName": "Tour $16 (ladder)",
+      "type": "Consumable"
+    },
+    {
+      "displayPrice": "17.00",
+      "familyShareable": false,
+      "internalID": "D011D011-0023-4000-8000-000000000686",
+      "localizations": [
+        {
+          "description": "Unlocks one tour in one language, yours to keep.",
+          "displayName": "Tour ($17)",
+          "locale": "en_US"
+        }
+      ],
+      "productID": "audioura.tour.usd17",
+      "referenceName": "Tour $17 (ladder)",
+      "type": "Consumable"
+    },
+    {
+      "displayPrice": "18.00",
+      "familyShareable": false,
+      "internalID": "D012D012-0024-4000-8000-000000000686",
+      "localizations": [
+        {
+          "description": "Unlocks one tour in one language, yours to keep.",
+          "displayName": "Tour ($18)",
+          "locale": "en_US"
+        }
+      ],
+      "productID": "audioura.tour.usd18",
+      "referenceName": "Tour $18 (ladder)",
+      "type": "Consumable"
+    },
+    {
+      "displayPrice": "19.00",
+      "familyShareable": false,
+      "internalID": "D013D013-0025-4000-8000-000000000686",
+      "localizations": [
+        {
+          "description": "Unlocks one tour in one language, yours to keep.",
+          "displayName": "Tour ($19)",
+          "locale": "en_US"
+        }
+      ],
+      "productID": "audioura.tour.usd19",
+      "referenceName": "Tour $19 (ladder)",
+      "type": "Consumable"
+    },
+    {
+      "displayPrice": "20.00",
+      "familyShareable": false,
+      "internalID": "D014D014-0026-4000-8000-000000000686",
+      "localizations": [
+        {
+          "description": "Unlocks one tour in one language, yours to keep.",
+          "displayName": "Tour ($20)",
+          "locale": "en_US"
+        }
+      ],
+      "productID": "audioura.tour.usd20",
+      "referenceName": "Tour $20 (ladder)",
+      "type": "Consumable"
+    },
+    {
+      "displayPrice": "25.00",
+      "familyShareable": false,
+      "internalID": "D019D019-0027-4000-8000-000000000686",
+      "localizations": [
+        {
+          "description": "Unlocks one tour in one language, yours to keep.",
+          "displayName": "Tour ($25)",
+          "locale": "en_US"
+        }
+      ],
+      "productID": "audioura.tour.usd25",
+      "referenceName": "Tour $25 (ladder)",
+      "type": "Consumable"
+    },
+    {
+      "displayPrice": "30.00",
+      "familyShareable": false,
+      "internalID": "D01ED01E-0028-4000-8000-000000000686",
+      "localizations": [
+        {
+          "description": "Unlocks one tour in one language, yours to keep.",
+          "displayName": "Tour ($30)",
+          "locale": "en_US"
+        }
+      ],
+      "productID": "audioura.tour.usd30",
+      "referenceName": "Tour $30 (ladder)",
+      "type": "Consumable"
+    },
+    {
+      "displayPrice": "35.00",
+      "familyShareable": false,
+      "internalID": "D023D023-0029-4000-8000-000000000686",
+      "localizations": [
+        {
+          "description": "Unlocks one tour in one language, yours to keep.",
+          "displayName": "Tour ($35)",
+          "locale": "en_US"
+        }
+      ],
+      "productID": "audioura.tour.usd35",
+      "referenceName": "Tour $35 (ladder)",
+      "type": "Consumable"
+    },
+    {
+      "displayPrice": "40.00",
+      "familyShareable": false,
+      "internalID": "D028D028-0030-4000-8000-000000000686",
+      "localizations": [
+        {
+          "description": "Unlocks one tour in one language, yours to keep.",
+          "displayName": "Tour ($40)",
+          "locale": "en_US"
+        }
+      ],
+      "productID": "audioura.tour.usd40",
+      "referenceName": "Tour $40 (ladder)",
+      "type": "Consumable"
+    },
+    {
+      "displayPrice": "45.00",
+      "familyShareable": false,
+      "internalID": "D02DD02D-0031-4000-8000-000000000686",
+      "localizations": [
+        {
+          "description": "Unlocks one tour in one language, yours to keep.",
+          "displayName": "Tour ($45)",
+          "locale": "en_US"
+        }
+      ],
+      "productID": "audioura.tour.usd45",
+      "referenceName": "Tour $45 (ladder)",
+      "type": "Consumable"
+    },
+    {
+      "displayPrice": "50.00",
+      "familyShareable": false,
+      "internalID": "D032D032-0032-4000-8000-000000000686",
+      "localizations": [
+        {
+          "description": "Unlocks one tour in one language, yours to keep.",
+          "displayName": "Tour ($50)",
+          "locale": "en_US"
+        }
+      ],
+      "productID": "audioura.tour.usd50",
+      "referenceName": "Tour $50 (ladder)",
+      "type": "Consumable"
+    },
+    {
+      "displayPrice": "60.00",
+      "familyShareable": false,
+      "internalID": "D03CD03C-0033-4000-8000-000000000686",
+      "localizations": [
+        {
+          "description": "Unlocks one tour in one language, yours to keep.",
+          "displayName": "Tour ($60)",
+          "locale": "en_US"
+        }
+      ],
+      "productID": "audioura.tour.usd60",
+      "referenceName": "Tour $60 (ladder)",
+      "type": "Consumable"
+    },
+    {
+      "displayPrice": "70.00",
+      "familyShareable": false,
+      "internalID": "D046D046-0034-4000-8000-000000000686",
+      "localizations": [
+        {
+          "description": "Unlocks one tour in one language, yours to keep.",
+          "displayName": "Tour ($70)",
+          "locale": "en_US"
+        }
+      ],
+      "productID": "audioura.tour.usd70",
+      "referenceName": "Tour $70 (ladder)",
+      "type": "Consumable"
+    },
+    {
+      "displayPrice": "80.00",
+      "familyShareable": false,
+      "internalID": "D050D050-0035-4000-8000-000000000686",
+      "localizations": [
+        {
+          "description": "Unlocks one tour in one language, yours to keep.",
+          "displayName": "Tour ($80)",
+          "locale": "en_US"
+        }
+      ],
+      "productID": "audioura.tour.usd80",
+      "referenceName": "Tour $80 (ladder)",
+      "type": "Consumable"
+    },
+    {
+      "displayPrice": "90.00",
+      "familyShareable": false,
+      "internalID": "D05AD05A-0036-4000-8000-000000000686",
+      "localizations": [
+        {
+          "description": "Unlocks one tour in one language, yours to keep.",
+          "displayName": "Tour ($90)",
+          "locale": "en_US"
+        }
+      ],
+      "productID": "audioura.tour.usd90",
+      "referenceName": "Tour $90 (ladder)",
+      "type": "Consumable"
+    },
+    {
+      "displayPrice": "100.00",
+      "familyShareable": false,
+      "internalID": "D064D064-0037-4000-8000-000000000686",
+      "localizations": [
+        {
+          "description": "Unlocks one tour in one language, yours to keep.",
+          "displayName": "Tour ($100)",
+          "locale": "en_US"
+        }
+      ],
+      "productID": "audioura.tour.usd100",
+      "referenceName": "Tour $100 (ladder)",
+      "type": "Consumable"
+    },
+    {
+      "displayPrice": "125.00",
+      "familyShareable": false,
+      "internalID": "D07DD07D-0038-4000-8000-000000000686",
+      "localizations": [
+        {
+          "description": "Unlocks one tour in one language, yours to keep.",
+          "displayName": "Tour ($125)",
+          "locale": "en_US"
+        }
+      ],
+      "productID": "audioura.tour.usd125",
+      "referenceName": "Tour $125 (ladder)",
+      "type": "Consumable"
+    },
+    {
+      "displayPrice": "150.00",
+      "familyShareable": false,
+      "internalID": "D096D096-0039-4000-8000-000000000686",
+      "localizations": [
+        {
+          "description": "Unlocks one tour in one language, yours to keep.",
+          "displayName": "Tour ($150)",
+          "locale": "en_US"
+        }
+      ],
+      "productID": "audioura.tour.usd150",
+      "referenceName": "Tour $150 (ladder)",
+      "type": "Consumable"
+    },
+    {
+      "displayPrice": "175.00",
+      "familyShareable": false,
+      "internalID": "D0AFD0AF-0040-4000-8000-000000000686",
+      "localizations": [
+        {
+          "description": "Unlocks one tour in one language, yours to keep.",
+          "displayName": "Tour ($175)",
+          "locale": "en_US"
+        }
+      ],
+      "productID": "audioura.tour.usd175",
+      "referenceName": "Tour $175 (ladder)",
+      "type": "Consumable"
+    },
+    {
+      "displayPrice": "200.00",
+      "familyShareable": false,
+      "internalID": "D0C8D0C8-0041-4000-8000-000000000686",
+      "localizations": [
+        {
+          "description": "Unlocks one tour in one language, yours to keep.",
+          "displayName": "Tour ($200)",
+          "locale": "en_US"
+        }
+      ],
+      "productID": "audioura.tour.usd200",
+      "referenceName": "Tour $200 (ladder)",
+      "type": "Consumable"
     }
   ],
   "settings": {

@@ -89,7 +89,8 @@ SERVER_TO_STORE_PRODUCT = {v: k for k, v in STORE_PRODUCT_IDS.items()}
 # ./user-tracking and cannot import the repo-root module, exactly like
 # PRODUCT_LEVELS mirrors subscription_levels. The price_tiers TABLE is the
 # source of record; this is the fallback the stub path uses to stamp the amount.
-# Keep the five entries in lock-step with migration 022's seed rows (D652).
+# Keep these entries in lock-step with migrations 022/024/026's seed rows: the 7
+# legacy .99 tiers (D652) plus the 34 round-dollar ladder tiers 8..41 (LOCAL-686).
 TOUR_TIER_PRODUCTS = {
     'audioura.tour.tier1': {'tier': 1, 'price_usd': 1.99},
     'audioura.tour.tier2': {'tier': 2, 'price_usd': 2.99},
@@ -98,6 +99,41 @@ TOUR_TIER_PRODUCTS = {
     'audioura.tour.tier5': {'tier': 5, 'price_usd': 9.99},
     'audioura.tour.tier6': {'tier': 6, 'price_usd': 19.99},  # [LOCAL-684] migration 024
     'audioura.tour.tier7': {'tier': 7, 'price_usd': 49.99},
+    # [LOCAL-686] the round-dollar ladder (migration 026), tiers 8..41.
+    'audioura.tour.usd2': {'tier': 8, 'price_usd': 2.0},
+    'audioura.tour.usd3': {'tier': 9, 'price_usd': 3.0},
+    'audioura.tour.usd4': {'tier': 10, 'price_usd': 4.0},
+    'audioura.tour.usd5': {'tier': 11, 'price_usd': 5.0},
+    'audioura.tour.usd6': {'tier': 12, 'price_usd': 6.0},
+    'audioura.tour.usd7': {'tier': 13, 'price_usd': 7.0},
+    'audioura.tour.usd8': {'tier': 14, 'price_usd': 8.0},
+    'audioura.tour.usd9': {'tier': 15, 'price_usd': 9.0},
+    'audioura.tour.usd10': {'tier': 16, 'price_usd': 10.0},
+    'audioura.tour.usd11': {'tier': 17, 'price_usd': 11.0},
+    'audioura.tour.usd12': {'tier': 18, 'price_usd': 12.0},
+    'audioura.tour.usd13': {'tier': 19, 'price_usd': 13.0},
+    'audioura.tour.usd14': {'tier': 20, 'price_usd': 14.0},
+    'audioura.tour.usd15': {'tier': 21, 'price_usd': 15.0},
+    'audioura.tour.usd16': {'tier': 22, 'price_usd': 16.0},
+    'audioura.tour.usd17': {'tier': 23, 'price_usd': 17.0},
+    'audioura.tour.usd18': {'tier': 24, 'price_usd': 18.0},
+    'audioura.tour.usd19': {'tier': 25, 'price_usd': 19.0},
+    'audioura.tour.usd20': {'tier': 26, 'price_usd': 20.0},
+    'audioura.tour.usd25': {'tier': 27, 'price_usd': 25.0},
+    'audioura.tour.usd30': {'tier': 28, 'price_usd': 30.0},
+    'audioura.tour.usd35': {'tier': 29, 'price_usd': 35.0},
+    'audioura.tour.usd40': {'tier': 30, 'price_usd': 40.0},
+    'audioura.tour.usd45': {'tier': 31, 'price_usd': 45.0},
+    'audioura.tour.usd50': {'tier': 32, 'price_usd': 50.0},
+    'audioura.tour.usd60': {'tier': 33, 'price_usd': 60.0},
+    'audioura.tour.usd70': {'tier': 34, 'price_usd': 70.0},
+    'audioura.tour.usd80': {'tier': 35, 'price_usd': 80.0},
+    'audioura.tour.usd90': {'tier': 36, 'price_usd': 90.0},
+    'audioura.tour.usd100': {'tier': 37, 'price_usd': 100.0},
+    'audioura.tour.usd125': {'tier': 38, 'price_usd': 125.0},
+    'audioura.tour.usd150': {'tier': 39, 'price_usd': 150.0},
+    'audioura.tour.usd175': {'tier': 40, 'price_usd': 175.0},
+    'audioura.tour.usd200': {'tier': 41, 'price_usd': 200.0},
 }
 
 

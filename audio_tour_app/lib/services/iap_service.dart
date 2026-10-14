@@ -77,20 +77,39 @@ String? serverProductForStoreId(String storeId) {
 /// [LOCAL-677] Curator paid tours. A tour is sold as one of a FIXED set of
 /// CONSUMABLE price-tier products (per-tour products can't be created on the
 /// fly — D624). The store id the app sells for a tier, mirrored from the server
-/// price_tiers config / migration 022 (D652 defaults). Keep in lock-step with
+/// price_tiers config / migrations 022/024/026. Keep in lock-step with
 /// TOUR_TIER_PRODUCTS in entitlements_api.py and the price_tiers table.
-String tourProductForTier(int tier) => 'audioura.tour.tier$tier';
-
-/// All tour-tier store ids the app may sell (tier 1..7).
-const Set<String> kTourStoreIds = {
-  'audioura.tour.tier1',
-  'audioura.tour.tier2',
-  'audioura.tour.tier3',
-  'audioura.tour.tier4',
-  'audioura.tour.tier5',
-  'audioura.tour.tier6', // [LOCAL-684] $19.99
-  'audioura.tour.tier7', // [LOCAL-684] $49.99
+///
+/// [LOCAL-686] The product id is NOT a simple 'tier$tier': the seven legacy .99
+/// tiers (1..7) use 'audioura.tour.tier<N>', while the 34 round-dollar ladder
+/// tiers (8..41) use 'audioura.tour.usd<dollars>'. This map is the single Dart
+/// source of truth; tourProductForTier and kTourStoreIds derive from it.
+const Map<int, String> kTierProductIds = {
+  // Legacy .99 tiers 1..7 (migrations 022/024).
+  1: 'audioura.tour.tier1', 2: 'audioura.tour.tier2', 3: 'audioura.tour.tier3',
+  4: 'audioura.tour.tier4', 5: 'audioura.tour.tier5', 6: 'audioura.tour.tier6',
+  7: 'audioura.tour.tier7',
+  // The round-dollar ladder, tiers 8..41 (migration 026, LOCAL-686).
+  8: 'audioura.tour.usd2', 9: 'audioura.tour.usd3', 10: 'audioura.tour.usd4', 11: 'audioura.tour.usd5',
+  12: 'audioura.tour.usd6', 13: 'audioura.tour.usd7', 14: 'audioura.tour.usd8', 15: 'audioura.tour.usd9',
+  16: 'audioura.tour.usd10', 17: 'audioura.tour.usd11', 18: 'audioura.tour.usd12', 19: 'audioura.tour.usd13',
+  20: 'audioura.tour.usd14', 21: 'audioura.tour.usd15', 22: 'audioura.tour.usd16', 23: 'audioura.tour.usd17',
+  24: 'audioura.tour.usd18', 25: 'audioura.tour.usd19', 26: 'audioura.tour.usd20', 27: 'audioura.tour.usd25',
+  28: 'audioura.tour.usd30', 29: 'audioura.tour.usd35', 30: 'audioura.tour.usd40', 31: 'audioura.tour.usd45',
+  32: 'audioura.tour.usd50', 33: 'audioura.tour.usd60', 34: 'audioura.tour.usd70', 35: 'audioura.tour.usd80',
+  36: 'audioura.tour.usd90', 37: 'audioura.tour.usd100', 38: 'audioura.tour.usd125', 39: 'audioura.tour.usd150',
+  40: 'audioura.tour.usd175', 41: 'audioura.tour.usd200',
 };
+
+/// The store product id the app sells for a given price [tier]. Falls back to
+/// the legacy 'audioura.tour.tier<N>' shape for an unknown tier (defensive; the
+/// server is the source of truth and would reject an id it does not know).
+String tourProductForTier(int tier) =>
+    kTierProductIds[tier] ?? 'audioura.tour.tier$tier';
+
+/// All tour-tier store ids the app may sell (the 7 legacy .99 tiers + the 34
+/// round-dollar ladder tiers = 41 products).
+final Set<String> kTourStoreIds = kTierProductIds.values.toSet();
 
 enum IapResultStatus { granted, cancelled, pending, unavailable, failed }
 
