@@ -1,50 +1,151 @@
 {
-  "identifier" : "A0A0A0A0-0000-4000-8000-000000000598",
-  "nonRenewingSubscriptions" : [
-
-  ],
-  "products" : [
+  "identifier": "A0A0A0A0-0000-4000-8000-000000000598",
+  "nonRenewingSubscriptions": [],
+  "products": [
     {
-      "displayPrice" : "10.00",
-      "familyShareable" : false,
-      "internalID" : "B1B1B1B1-0001-4000-8000-000000000598",
-      "localizations" : [
+      "displayPrice": "10.00",
+      "familyShareable": false,
+      "internalID": "B1B1B1B1-0001-4000-8000-000000000598",
+      "localizations": [
         {
-          "description" : "5 fresh tours, up to 10 stops each, plus 5 stop-adding edits. One-time purchase; nothing renews automatically.",
-          "displayName" : "$10 pack",
-          "locale" : "en_US"
+          "description": "5 fresh tours, up to 10 stops each, plus 5 stop-adding edits. One-time purchase; nothing renews automatically.",
+          "displayName": "$10 pack",
+          "locale": "en_US"
         }
       ],
-      "productID" : "audioura.pack.l3",
-      "referenceName" : "L3 Pack ($10)",
-      "type" : "Consumable"
+      "productID": "audioura.pack.l3",
+      "referenceName": "L3 Pack ($10)",
+      "type": "Consumable"
     },
     {
-      "displayPrice" : "25.00",
-      "familyShareable" : false,
-      "internalID" : "B2B2B2B2-0002-4000-8000-000000000598",
-      "localizations" : [
+      "displayPrice": "25.00",
+      "familyShareable": false,
+      "internalID": "B2B2B2B2-0002-4000-8000-000000000598",
+      "localizations": [
         {
-          "description" : "25 operations (new tours or edits, any mix), up to 25 stops each. One-time purchase; nothing renews automatically.",
-          "displayName" : "$25 round",
-          "locale" : "en_US"
+          "description": "25 operations (new tours or edits, any mix), up to 25 stops each. One-time purchase; nothing renews automatically.",
+          "displayName": "$25 round",
+          "locale": "en_US"
         }
       ],
-      "productID" : "audioura.round.l4",
-      "referenceName" : "L4 Round ($25)",
-      "type" : "Consumable"
+      "productID": "audioura.round.l4",
+      "referenceName": "L4 Round ($25)",
+      "type": "Consumable"
+    },
+    {
+      "displayPrice": "1.99",
+      "familyShareable": false,
+      "internalID": "C1C1C1C1-0001-4000-8000-000000000684",
+      "localizations": [
+        {
+          "description": "Unlocks one tour in one language, yours to keep.",
+          "displayName": "Tour ($1.99)",
+          "locale": "en_US"
+        }
+      ],
+      "productID": "audioura.tour.tier1",
+      "referenceName": "Tour tier 1 ($1.99)",
+      "type": "Consumable"
+    },
+    {
+      "displayPrice": "2.99",
+      "familyShareable": false,
+      "internalID": "C2C2C2C2-0002-4000-8000-000000000684",
+      "localizations": [
+        {
+          "description": "Unlocks one tour in one language, yours to keep.",
+          "displayName": "Tour ($2.99)",
+          "locale": "en_US"
+        }
+      ],
+      "productID": "audioura.tour.tier2",
+      "referenceName": "Tour tier 2 ($2.99)",
+      "type": "Consumable"
+    },
+    {
+      "displayPrice": "4.99",
+      "familyShareable": false,
+      "internalID": "C3C3C3C3-0003-4000-8000-000000000684",
+      "localizations": [
+        {
+          "description": "Unlocks one tour in one language, yours to keep.",
+          "displayName": "Tour ($4.99)",
+          "locale": "en_US"
+        }
+      ],
+      "productID": "audioura.tour.tier3",
+      "referenceName": "Tour tier 3 ($4.99)",
+      "type": "Consumable"
+    },
+    {
+      "displayPrice": "7.99",
+      "familyShareable": false,
+      "internalID": "C4C4C4C4-0004-4000-8000-000000000684",
+      "localizations": [
+        {
+          "description": "Unlocks one tour in one language, yours to keep.",
+          "displayName": "Tour ($7.99)",
+          "locale": "en_US"
+        }
+      ],
+      "productID": "audioura.tour.tier4",
+      "referenceName": "Tour tier 4 ($7.99)",
+      "type": "Consumable"
+    },
+    {
+      "displayPrice": "9.99",
+      "familyShareable": false,
+      "internalID": "C5C5C5C5-0005-4000-8000-000000000684",
+      "localizations": [
+        {
+          "description": "Unlocks one tour in one language, yours to keep.",
+          "displayName": "Tour ($9.99)",
+          "locale": "en_US"
+        }
+      ],
+      "productID": "audioura.tour.tier5",
+      "referenceName": "Tour tier 5 ($9.99)",
+      "type": "Consumable"
+    },
+    {
+      "displayPrice": "19.99",
+      "familyShareable": false,
+      "internalID": "C6C6C6C6-0006-4000-8000-000000000684",
+      "localizations": [
+        {
+          "description": "Unlocks one tour in one language, yours to keep.",
+          "displayName": "Tour ($19.99)",
+          "locale": "en_US"
+        }
+      ],
+      "productID": "audioura.tour.tier6",
+      "referenceName": "Tour tier 6 ($19.99)",
+      "type": "Consumable"
+    },
+    {
+      "displayPrice": "49.99",
+      "familyShareable": false,
+      "internalID": "C7C7C7C7-0007-4000-8000-000000000684",
+      "localizations": [
+        {
+          "description": "Unlocks one tour in one language, yours to keep.",
+          "displayName": "Tour ($49.99)",
+          "locale": "en_US"
+        }
+      ],
+      "productID": "audioura.tour.tier7",
+      "referenceName": "Tour tier 7 ($49.99)",
+      "type": "Consumable"
     }
   ],
-  "settings" : {
-    "_applicationInternalID" : "000000000",
-    "_developerTeamID" : "0000000000",
-    "_lastSynchronizedDate" : 0
+  "settings": {
+    "_applicationInternalID": "000000000",
+    "_developerTeamID": "0000000000",
+    "_lastSynchronizedDate": 0
   },
-  "subscriptionGroups" : [
-
-  ],
-  "version" : {
-    "major" : 4,
-    "minor" : 0
+  "subscriptionGroups": [],
+  "version": {
+    "major": 4,
+    "minor": 0
   }
 }

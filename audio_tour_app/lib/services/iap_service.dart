@@ -81,13 +81,15 @@ String? serverProductForStoreId(String storeId) {
 /// TOUR_TIER_PRODUCTS in entitlements_api.py and the price_tiers table.
 String tourProductForTier(int tier) => 'audioura.tour.tier$tier';
 
-/// All tour-tier store ids the app may sell (tier 1..5).
+/// All tour-tier store ids the app may sell (tier 1..7).
 const Set<String> kTourStoreIds = {
   'audioura.tour.tier1',
   'audioura.tour.tier2',
   'audioura.tour.tier3',
   'audioura.tour.tier4',
   'audioura.tour.tier5',
+  'audioura.tour.tier6', // [LOCAL-684] $19.99
+  'audioura.tour.tier7', // [LOCAL-684] $49.99
 };
 
 enum IapResultStatus { granted, cancelled, pending, unavailable, failed }

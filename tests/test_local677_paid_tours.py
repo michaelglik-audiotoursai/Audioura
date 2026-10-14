@@ -53,15 +53,17 @@ TEST_PREFIX = "TEST-677-"
 
 def test_price_tiers_fallback_constants():
     tiers = price_tiers_cfg.load_price_tiers()  # no cursor → code defaults
-    assert set(tiers.keys()) == {1, 2, 3, 4, 5}
+    assert set(tiers.keys()) == {1, 2, 3, 4, 5, 6, 7}  # [LOCAL-684] 6-7 added
     assert tiers[3]["label"] == "$4.99"
+    assert tiers[6]["label"] == "$19.99" and tiers[7]["label"] == "$49.99"
     assert tiers[3]["product_id"] == "audioura.tour.tier3"
 
 
 def test_price_tiers_validation_and_labels():
     assert price_tiers_cfg.is_valid_tier(1) is True
     assert price_tiers_cfg.is_valid_tier(5) is True
-    assert price_tiers_cfg.is_valid_tier(6) is False
+    assert price_tiers_cfg.is_valid_tier(7) is True   # [LOCAL-684]
+    assert price_tiers_cfg.is_valid_tier(8) is False
     assert price_tiers_cfg.is_valid_tier(None) is False
     assert price_tiers_cfg.is_valid_tier(2.5) is False
     assert price_tiers_cfg.label_for_tier(None) == "Free"

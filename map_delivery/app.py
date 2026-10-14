@@ -665,7 +665,8 @@ def _is_paid_select(cur):
 # The price_tiers TABLE is authoritative when present (Michael's SQL edits take
 # effect); the constants are the fallback for a DB that predates it. Keep the
 # five entries in lock-step with migration 022.
-_DEFAULT_TIER_LABELS = {1: "$1.99", 2: "$2.99", 3: "$4.99", 4: "$7.99", 5: "$9.99"}
+_DEFAULT_TIER_LABELS = {1: "$1.99", 2: "$2.99", 3: "$4.99", 4: "$7.99", 5: "$9.99",
+                        6: "$19.99", 7: "$49.99"}  # [LOCAL-684] tiers 6-7, migration 024
 _TIER_LABELS = None  # cached per process after the first DB read
 
 _HAS_PRICE_TIER_COLUMN = None

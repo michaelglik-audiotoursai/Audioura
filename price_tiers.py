@@ -6,7 +6,7 @@ Curator paid tours sell at one of a FIXED set of tiers. Per-tour products cannot
 be created on the fly, so the app ships a fixed set of consumable store products
 (audioura.tour.tier1 … tier5) and the server records which tour a given verified
 transaction unlocked (tour_unlocks). This module is the single place the tier
-NUMBER (1..5) maps to a store product id, a dollar price and a display label.
+NUMBER (1..7) maps to a store product id, a dollar price and a display label.
 
 D652 (LEAD defaults, Michael owns the numbers): $1.99 / $2.99 / $4.99 / $7.99 /
 $9.99. These live as ROWS in the price_tiers table (migration 022) so Michael
@@ -28,6 +28,9 @@ DEFAULT_PRICE_TIERS = {
     3: {"product_id": "audioura.tour.tier3", "price_usd": 4.99, "label": "$4.99"},
     4: {"product_id": "audioura.tour.tier4", "price_usd": 7.99, "label": "$7.99"},
     5: {"product_id": "audioura.tour.tier5", "price_usd": 9.99, "label": "$9.99"},
+    # [LOCAL-684] migration 024 (Michael, 2026-10-14: "add $20 and $50").
+    6: {"product_id": "audioura.tour.tier6", "price_usd": 19.99, "label": "$19.99"},
+    7: {"product_id": "audioura.tour.tier7", "price_usd": 49.99, "label": "$49.99"},
 }
 
 # The valid tier numbers, in order.

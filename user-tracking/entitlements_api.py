@@ -96,6 +96,8 @@ TOUR_TIER_PRODUCTS = {
     'audioura.tour.tier3': {'tier': 3, 'price_usd': 4.99},
     'audioura.tour.tier4': {'tier': 4, 'price_usd': 7.99},
     'audioura.tour.tier5': {'tier': 5, 'price_usd': 9.99},
+    'audioura.tour.tier6': {'tier': 6, 'price_usd': 19.99},  # [LOCAL-684] migration 024
+    'audioura.tour.tier7': {'tier': 7, 'price_usd': 49.99},
 }
 
 

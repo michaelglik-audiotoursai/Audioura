@@ -11,7 +11,7 @@ preview and the other stops are locked until the tour is unlocked.
 This module owns the SERVER side of pricing and unlocking:
 
   1. set_price(user_id, tour_id, tier)  — curator-only, own-tour-only. tier is a
-     number 1..5 (a row in price_tiers) or None to clear (make the tour free).
+     number 1..7 (a row in price_tiers) or None to clear (make the tour free).
      A non-curator, or a curator who does not own the tour, is refused.
   2. get_price(tour_id)                 — {is_paid, price_tier, price_usd,
      price_label, product_id} for a tour. A translation inherits its SOURCE
@@ -169,7 +169,7 @@ class PricingError(Exception):
 def set_price(user_id, tour_id, tier):
     """Set or clear the price tier on a curator's OWN tour.
 
-    tier: an int 1..5 (a valid, active row in price_tiers) to price the tour, or
+    tier: an int 1..7 (a valid, active row in price_tiers) to price the tour, or
           None to CLEAR the price (make it free again).
 
     Rules:
@@ -408,7 +408,7 @@ def register_pricing_routes(app):
         if not user_id:
             return jsonify({"error": "user_id is required"}), 400
         if "tier" not in data:
-            return jsonify({"error": "tier is required (number 1..5, or null to clear)"}), 400
+            return jsonify({"error": "tier is required (number 1..7, or null to clear)"}), 400
 
         tier = data.get("tier")
         try:
