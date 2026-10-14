@@ -1739,6 +1739,306 @@ def search_tours():
         sys.stdout.flush()
         return jsonify({'error': str(e)}), 500
 
+# ─── [LOCAL-688] Why this score + public page + one free re-score ─────────────
+#
+# These are the "why" behind the number LOCAL-685 publishes. All three are
+# PUBLIC and FREE (Michael, 2026-10-14: it must look objective and cost nothing).
+# The explanation and the page read what tour_editor_score.py already wrote into
+# audio_tours.editor_score_detail — no model call here. The re-score request is
+# the one write: it clears a guide's own tour's score so the 5-minute tick
+# re-scores it, once per content version.
+
+# Human labels + fixed display order for the five rubric criteria. The detail
+# JSON keys are the lowercase names tour_editor_score.CRITERIA writes.
+_SCORE_CRITERIA = [
+    ('story', 'Story'),
+    ('specificity', 'Specificity'),
+    ('place', 'Sense of place'),
+    ('flow', 'Flow'),
+    ('accuracy', 'Accuracy'),
+]
+
+
+def _tour_version_number(cur, tour_id):
+    """The tour's live content version: COALESCE(MAX(version_no),0)+1 over its
+    OWN id in audio_tour_versions (LOCAL-657). An unedited tour is version 1.
+    Never raises — returns 1 on any error / missing table."""
+    try:
+        cur.execute(
+            "SELECT COALESCE(MAX(version_no), 0) FROM audio_tour_versions WHERE tour_id = %s",
+            (int(tour_id),))
+        row = cur.fetchone()
+        return int(row[0] or 0) + 1
+    except Exception:  # noqa: BLE001
+        try:
+            cur.connection.rollback()
+        except Exception:
+            pass
+        return 1
+
+
+def _score_explanation_payload(cur, tour_id):
+    """Build the Why-this-score block for a tour, or None when the governing
+    (original) tour has no evaluated score yet.
+
+    A translation shows its ORIGINAL's explanation (the score lives on the
+    original, exactly like the shown rating prior — _prior_for). Reads only what
+    tour_editor_score.py wrote: editor_score / editor_score_detail /
+    editor_scored_at. No model call."""
+    original_id = _resolve_original_id(cur, tour_id)
+    try:
+        cur.execute(
+            "SELECT editor_score, editor_score_detail, editor_scored_at "
+            "FROM audio_tours WHERE id = %s", (int(original_id),))
+    except Exception:  # noqa: BLE001 — schema predates the columns → unscored
+        try:
+            cur.connection.rollback()
+        except Exception:
+            pass
+        return None
+    row = cur.fetchone()
+    if not row or row[0] is None:
+        return None
+    score, detail, scored_at = row
+    detail = detail or {}
+    if isinstance(detail, str):
+        try:
+            detail = json.loads(detail)
+        except Exception:  # noqa: BLE001
+            detail = {}
+    evidence = detail.get('evidence') or {}
+    criteria = []
+    for key, label in _SCORE_CRITERIA:
+        grade = detail.get(key)
+        criteria.append({
+            'name': key,
+            'label': label,
+            'grade': float(grade) if grade is not None else None,
+            'evidence': evidence.get(key, ''),
+        })
+    return {
+        'tour_id': int(tour_id),
+        'scored_tour_id': int(original_id),
+        'score': float(score),
+        'label': 'Audioura score',
+        'criteria': criteria,
+        'summary': detail.get('summary', ''),
+        'scored_at': _iso_date(scored_at),
+        'rubric_version': detail.get('rubric_version'),
+    }
+
+
+@app.route('/tour/<int:tour_id>/score-explanation', methods=['GET', 'OPTIONS'])
+def get_score_explanation(tour_id):
+    """[LOCAL-688] Why this score — PUBLIC, no auth, free.
+
+    {score, label, criteria:[{name,label,grade,evidence}], summary, scored_at,
+    rubric_version}. A translation returns its original's explanation. 404 when
+    the governing tour has no evaluated score yet."""
+    if request.method == 'OPTIONS':
+        return add_cors_headers(make_response())
+    print(f"[LOCAL-688] score-explanation for tour {tour_id}")
+    sys.stdout.flush()
+    conn = None
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor()
+        payload = _score_explanation_payload(cur, tour_id)
+        cur.close()
+        if payload is None:
+            return jsonify({'error': 'tour not scored'}), 404
+        return jsonify(payload)
+    except Exception as e:  # noqa: BLE001
+        print(f"[LOCAL-688] score-explanation failed for {tour_id}: {e}")
+        traceback.print_exc()
+        sys.stdout.flush()
+        return jsonify({'error': 'tour not scored'}), 404
+    finally:
+        if conn is not None:
+            conn.close()
+
+
+@app.route('/tour/<int:tour_id>/rescore-request', methods=['POST', 'OPTIONS'])
+def request_rescore(tour_id):
+    """[LOCAL-688] A guide requests ONE free re-score of their OWN tour after an
+    edit. Clears the original's editor_score so the 5-minute tick re-scores it,
+    and records the content version it was requested for.
+
+    Ownership is the SAME check the curator Price control uses
+    (_user_is_tour_creator → earliest tour_requests.secret_id of the original,
+    or an explicit creator_user_id). user_id comes from the JSON body / query /
+    header, matching the rest of the service.
+
+    403 non-owner; 409 a second request for the SAME content version (one per
+    version); 200 {status:'queued', version} on success. The score is cleared on
+    the ORIGINAL (translations share it)."""
+    if request.method == 'OPTIONS':
+        return add_cors_headers(make_response())
+    print(f"[LOCAL-688] rescore-request for tour {tour_id}")
+    sys.stdout.flush()
+    body = request.get_json(silent=True) or {}
+    user_id = (body.get('user_id') or request.args.get('user_id')
+               or request.headers.get('X-User-Id'))
+    if not user_id:
+        return jsonify({'error': 'user_id required'}), 403
+    conn = None
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor()
+
+        # Ownership — on the ORIGINAL (a guide owns the tour, not a translation row).
+        original_id = _resolve_original_id(cur, tour_id)
+        if not _user_is_tour_creator(cur, user_id, original_id):
+            cur.close()
+            return jsonify({'error': 'not your tour'}), 403
+
+        # One re-score per content version. The rescore_requested_version
+        # column (migration 028) may not yet be applied on this DB; when it is
+        # absent we still honour the request (clear the score) but cannot track
+        # the per-version limit — fail OPEN, never 500.
+        version = _tour_version_number(cur, original_id)
+        has_version_col = False
+        try:
+            cur.execute(
+                "SELECT 1 FROM information_schema.columns WHERE table_name = "
+                "'audio_tours' AND column_name = 'rescore_requested_version'")
+            has_version_col = cur.fetchone() is not None
+        except Exception:  # noqa: BLE001
+            try:
+                conn.rollback()
+            except Exception:
+                pass
+            has_version_col = False
+
+        if has_version_col:
+            cur.execute(
+                "SELECT rescore_requested_version FROM audio_tours WHERE id = %s",
+                (original_id,))
+            prev = cur.fetchone()
+            prev_version = prev[0] if prev else None
+            if prev_version is not None and int(prev_version) == int(version):
+                cur.close()
+                return jsonify({
+                    'error': 'already requested',
+                    'message': ("You have already requested a re-score for this "
+                                "version of the tour. Edit the tour again to earn "
+                                "another free re-score."),
+                    'version': version,
+                }), 409
+            cur.execute(
+                "UPDATE audio_tours SET editor_score = NULL, "
+                "rescore_requested_version = %s WHERE id = %s",
+                (version, original_id))
+        else:
+            cur.execute(
+                "UPDATE audio_tours SET editor_score = NULL WHERE id = %s",
+                (original_id,))
+        conn.commit()
+        cur.close()
+        return jsonify({'status': 'queued', 'tour_id': int(original_id),
+                        'version': version})
+    except Exception as e:  # noqa: BLE001
+        print(f"[LOCAL-688] rescore-request failed for {tour_id}: {e}")
+        traceback.print_exc()
+        sys.stdout.flush()
+        if conn is not None:
+            try:
+                conn.rollback()
+            except Exception:
+                pass
+        return jsonify({'error': 'rescore request failed'}), 500
+    finally:
+        if conn is not None:
+            conn.close()
+
+
+# The public "How Audioura scores tours" page. Plain, self-contained HTML (no
+# external CSS/JS) so it renders on any phone browser the app links out to.
+# Static text — the actual grades live per-tour in the explanation endpoint.
+_HOW_WE_SCORE_HTML = """<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>How Audioura scores tours</title>
+<style>
+  :root { color-scheme: light dark; }
+  body { font-family: -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+         line-height: 1.5; margin: 0; padding: 1.25rem; max-width: 44rem;
+         margin-inline: auto; }
+  h1 { font-size: 1.5rem; margin-top: 0; }
+  h2 { font-size: 1.15rem; margin-top: 1.75rem; }
+  .crit { margin: 0.75rem 0; }
+  .crit b { display: block; }
+  table { border-collapse: collapse; width: 100%; margin-top: 0.5rem; font-size: 0.95rem; }
+  th, td { text-align: left; padding: 0.4rem 0.5rem; border-bottom: 1px solid #8884; vertical-align: top; }
+  .note { opacity: 0.8; font-size: 0.95rem; }
+  footer { margin-top: 2rem; font-size: 0.85rem; opacity: 0.7; }
+</style>
+</head>
+<body>
+<h1>How Audioura scores tours</h1>
+
+<p>Every tour on Audioura starts with a score between <b>5.0 and 8.0</b> &mdash; the
+<b>Audioura score</b>. It is our editor's read of the tour's script, so a brand-new
+tour nobody has rated yet still tells you something honest about its quality.
+The explanation is <b>free for everyone</b>, and the same rules apply to every
+tour, whoever made it.</p>
+
+<h2>The five things we grade</h2>
+<p>A demanding editor grades the script on five criteria, each from 1 to 10. We
+grade the <em>same</em> script three times and average the results, so the number
+is steady and not a lucky or unlucky single read.</p>
+
+<div class="crit"><b>Story</b>Narrative pull &mdash; named people, events, stakes and
+surprise, rather than a list of facts or brochure praise.</div>
+<div class="crit"><b>Specificity</b>Concrete names, dates, numbers and details a
+real local guide would know &mdash; not "rich history" and "vibrant atmosphere".</div>
+<div class="crit"><b>Sense of place</b>Tied to what you actually see or do at each
+stop, with usable directions between stops.</div>
+<div class="crit"><b>Flow</b>The stops connect into one tour; no repetition,
+padding or the same opening line at every stop.</div>
+<div class="crit"><b>Accuracy</b>Internally consistent and plausible; no
+contradictions, vague hedging or claims that look invented.</div>
+
+<h2>What the grades mean</h2>
+<table>
+  <tr><th>Grade</th><th>Reading</th></tr>
+  <tr><td>3</td><td>Weak</td></tr>
+  <tr><td>5</td><td>Mediocre / generic</td></tr>
+  <tr><td>6.5</td><td>Competent</td></tr>
+  <tr><td>8</td><td>Genuinely good</td></tr>
+  <tr><td>9.5</td><td>Exceptional (rare)</td></tr>
+</table>
+
+<h2>Why the range is 5 to 8</h2>
+<p class="note">Below 5 would bury a tour nobody has had the chance to hear yet;
+above 8 would claim more than an unrated tour has earned. <b>9 and 10 are
+reserved for listeners</b> &mdash; only real ratings reach the top of the scale.</p>
+
+<h2>Listeners take over</h2>
+<p>The Audioura score is only the starting point. Once a tour has a few ratings
+they blend in, and <b>from the fourth rating onward the listeners' score decides</b>
+&mdash; the Audioura score steps aside.</p>
+
+<h2>Guides: one free re-score</h2>
+<p>Edited your tour and think it reads better now? A guide may request <b>one free
+re-score</b> after an edit, from the tour's menu. We grade the new version and
+publish the fresh number. Edit again, and another free re-score is available.</p>
+
+<footer>Audioura &mdash; the same rules for every tour, free to see.</footer>
+</body>
+</html>"""
+
+
+@app.route('/how-we-score', methods=['GET'])
+def how_we_score():
+    """[LOCAL-688] Public 'How Audioura scores tours' page. Static HTML, no auth."""
+    resp = make_response(_HOW_WE_SCORE_HTML)
+    resp.headers['Content-Type'] = 'text/html; charset=utf-8'
+    return resp
+
+
 if __name__ == '__main__':
     print("Starting Map Delivery Service...")
     print("Endpoints:")
@@ -1747,6 +2047,9 @@ if __name__ == '__main__':
     print("  GET /download-tour/<tour_id> - Download tour zip file")
     print("  GET /tour-info/<tour_id> - Get tour information")
     print("  GET /search-tours?pattern=<pattern>&lat=<lat>&lng=<lng> - Search tours by pattern")
+    print("  GET /tour/<tour_id>/score-explanation - Why this score (public)")
+    print("  POST /tour/<tour_id>/rescore-request - Guide's one free re-score after an edit")
+    print("  GET /how-we-score - Public 'How Audioura scores tours' page")
     sys.stdout.flush()
     
     app.run(host='0.0.0.0', port=5005, debug=True)

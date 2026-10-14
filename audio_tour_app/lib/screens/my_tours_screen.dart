@@ -20,6 +20,8 @@ import 'edit_tour_screen.dart';
 import 'tour_map_screen.dart';
 import '../services/tour_pricing_service.dart';
 import '../services/entitlements_service.dart';
+import '../services/device_service.dart';
+import '../services/score_explanation_service.dart';
 
 /// LOCAL-484 — build the subtitle line shown under each tour on the Listen
 /// (My Tours) list.
@@ -210,6 +212,51 @@ class _MyToursScreenState extends State<MyToursScreen> {
           fontWeight: FontWeight.w600,
         ),
       ),
+    );
+  }
+
+  /// [LOCAL-688] Request the ONE free re-score of this tour after an edit.
+  /// Confirms first (it is one per content version), then POSTs to map-delivery
+  /// with the device user_id; the server enforces ownership (403) and the
+  /// one-per-version limit (409). The outcome is surfaced as a clear message.
+  Future<void> _requestRescore(Map<String, dynamic> tour) async {
+    final tourId = _numericTourId(tour);
+    if (tourId == null) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('This tour has no numeric ID yet and cannot be re-scored.'),
+      ));
+      return;
+    }
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Request a re-score'),
+        content: const Text(
+          'We\'ll grade this version of your tour again and publish the fresh '
+          'Audioura score. You get one free re-score per edit — edit the tour '
+          'again for another.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Request'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+
+    final userId = await DeviceService.getUserId();
+    final result = await ScoreExplanationService.requestRescore(tourId, userId);
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(result.message)),
     );
   }
 
@@ -1775,6 +1822,7 @@ class _MyToursScreenState extends State<MyToursScreen> {
                               case 'report': _reportTour(tour); break;
                               case 'version': _showVersionDialog(tour); break;
                               case 'price': _showPriceDialog(tour); break;
+                              case 'rescore': _requestRescore(tour); break;
                             }
                           },
                           itemBuilder: (context) => [
@@ -1789,6 +1837,11 @@ class _MyToursScreenState extends State<MyToursScreen> {
                             if (_canSell && !TourTranslationHelper.isTranslation(tour) && _numericTourId(tour) != null)
                               const PopupMenuItem(value: 'price', child: ListTile(leading: Icon(Icons.sell, color: Color(0xFF1B6B2E)), title: Text('Price'), dense: true)),
                             const PopupMenuItem(value: 'edit', child: ListTile(leading: Icon(Icons.edit, color: Colors.orange), title: Text('Edit'), dense: true)),
+                            // [LOCAL-688] One free re-score after an edit, on the
+                            // guide's OWN original tour (numeric id). The server
+                            // enforces ownership and the one-per-version limit.
+                            if (!TourTranslationHelper.isTranslation(tour) && _numericTourId(tour) != null)
+                              const PopupMenuItem(value: 'rescore', child: ListTile(leading: Icon(Icons.refresh, color: Color(0xFFE2A400)), title: Text('Request re-score'), dense: true)),
                             const PopupMenuItem(value: 'delete', child: ListTile(leading: Icon(Icons.delete, color: Colors.red), title: Text('Delete'), dense: true)),
                             const PopupMenuItem(value: 'report', child: ListTile(leading: Icon(Icons.flag_outlined, color: Colors.grey), title: Text('Report'), dense: true)),
                             const PopupMenuItem(value: 'version', child: ListTile(leading: Icon(Icons.info_outline, color: Colors.blueGrey), title: Text('Version'), dense: true)),
