@@ -96,11 +96,18 @@ class PriceTier {
   final String label;
   final String productId;
 
+  /// [LOCAL-686] Whether the guide's picker offers this tier. The 34 round-dollar
+  /// ladder tiers are true; the seven legacy .99 tiers (1..7) are false — still
+  /// valid for already-priced tours, but hidden from the picker. Defaults true
+  /// for an older server that does not send the field.
+  final bool inPicker;
+
   const PriceTier({
     required this.tier,
     required this.priceUsd,
     required this.label,
     required this.productId,
+    this.inPicker = true,
   });
 
   factory PriceTier.fromJson(Map<String, dynamic> j) => PriceTier(
@@ -108,6 +115,7 @@ class PriceTier {
         priceUsd: (j['price_usd'] as num?)?.toDouble() ?? 0.0,
         label: (j['label'] as String?) ?? '',
         productId: (j['product_id'] as String?) ?? '',
+        inPicker: j['in_picker'] == null ? true : j['in_picker'] == true,
       );
 }
 
@@ -252,5 +260,39 @@ class TourPricingService {
       }
     } catch (_) {}
     return const [];
+  }
+
+  /// [LOCAL-686] Only the tiers the guide's PICKER offers (in_picker true) — the
+  /// 34 round-dollar ladder steps, sorted by price ascending. The seven legacy
+  /// .99 tiers are filtered out (still valid for already-priced tours).
+  static Future<List<PriceTier>> pickerLadder() async {
+    final all = await priceTiers();
+    final ladder = all.where((t) => t.inPicker).toList()
+      ..sort((a, b) => a.priceUsd.compareTo(b.priceUsd));
+    return ladder;
+  }
+
+  /// [LOCAL-686] Snap a typed dollar [amount] to the NEAREST step of [ladder]
+  /// (which must be sorted ascending by price). Returns the chosen PriceTier, or
+  /// null when the ladder is empty. Mirrors price_tiers.snap_to_ladder on the
+  /// server: ties round DOWN, below the floor → the lowest step, above the
+  /// ceiling → the highest step. Pure/sync so the custom field can call it on
+  /// every keystroke with no await.
+  static PriceTier? snapToLadder(double amount, List<PriceTier> ladder) {
+    if (ladder.isEmpty) return null;
+    if (amount <= ladder.first.priceUsd) return ladder.first;
+    if (amount >= ladder.last.priceUsd) return ladder.last;
+    PriceTier best = ladder.first;
+    double bestDist = (amount - best.priceUsd).abs();
+    for (final t in ladder.skip(1)) {
+      final d = (amount - t.priceUsd).abs();
+      // Strictly closer wins; an equal distance keeps the lower price already
+      // held (ladder is ascending → first-seen is the lower step → round down).
+      if (d < bestDist) {
+        best = t;
+        bestDist = d;
+      }
+    }
+    return best;
   }
 }
