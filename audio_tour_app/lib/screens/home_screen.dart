@@ -63,6 +63,11 @@ class _HomeScreenState extends State<HomeScreen> {
   // (7, 8, or 9). Remembered per device under SharedPreferences 'home_min_rating'
   // and passed to /tours-near as ?min_rating=<n> so the server filters.
   double _minRating = 0.0;
+  // [LOCAL-681] How far from the map location tours are listed, in MILES, for
+  // both sort orders. Michael, 2026-10-14: "Top rated first" must mean top rated
+  // nearby, not anywhere. Default 10 mi (was a hidden fixed 50 km ≈ 31 mi).
+  static const List<int> _radiusChoicesMi = [1, 5, 10, 25, 50];
+  int _radiusMi = 10;
   // [LOCAL-672] Home-page "Top rated" sort: when true, /tours-near is asked for
   // ?sort=top_rated and the server orders by the Bayesian rank_score (verified
   // ratings weighted higher, old/pre-version ratings decayed). Remembered per
@@ -104,6 +109,10 @@ class _HomeScreenState extends State<HomeScreen> {
     final mode = prefs.getString('app_mode') ?? 'Tours';
     _minRating = prefs.getDouble('home_min_rating') ?? 0.0;
     _topRated = prefs.getBool('home_top_rated') ?? false;
+    final storedRadius = prefs.getInt('home_radius_mi');
+    if (storedRadius != null && _radiusChoicesMi.contains(storedRadius)) {
+      _radiusMi = storedRadius;
+    }
     _priceFilter = prefs.getString('home_price_filter') ?? '';
     await _loadLocationHistory();
     await _loadCustomLocation();
@@ -344,7 +353,7 @@ class _HomeScreenState extends State<HomeScreen> {
       // [LOCAL-670] Pass the chosen minimum rating to the server so it filters
       // (Any = omit the param entirely). The server computes the shown score and
       // drops tours below the bar.
-      final uri = await Endpoints.url(Service.mapDelivery, '/tours-near/${searchLocation.latitude}/${searchLocation.longitude}?radius=50${_filterQueryParams()}');
+      final uri = await Endpoints.url(Service.mapDelivery, '/tours-near/${searchLocation.latitude}/${searchLocation.longitude}?radius=${(_radiusMi * 1.609344).toStringAsFixed(1)}${_filterQueryParams()}');
       final url = uri.toString();
       
       await DebugLogHelper.addDebugLog('HOME: Requesting tours from: $url');
@@ -479,6 +488,14 @@ class _HomeScreenState extends State<HomeScreen> {
     await _loadNearbyTours();
   }
 
+  Future<void> _setRadiusMi(int value) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt('home_radius_mi', value);
+    if (!mounted) return;
+    setState(() => _radiusMi = value);
+    await _loadNearbyTours();
+  }
+
   Future<void> _setPriceFilter(String value) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('home_price_filter', value);
@@ -500,7 +517,9 @@ class _HomeScreenState extends State<HomeScreen> {
           children: [
             for (final topRated in [false, true])
               RadioListTile<bool>(
-                title: Text(topRated ? 'Top rated first' : 'Nearest first'),
+                title: Text(topRated
+                    ? 'Top rated first (within $_radiusMi mi)'
+                    : 'Nearest first (within $_radiusMi mi)'),
                 subtitle: Text(topRated
                     ? 'Best listener ratings first; verified buyers count more'
                     : 'Closest to the map location first'),
@@ -512,6 +531,24 @@ class _HomeScreenState extends State<HomeScreen> {
                   await _setTopRated(value);
                 },
               ),
+            const Divider(),
+            Row(
+              children: [
+                const Text('Within: '),
+                DropdownButton<int>(
+                  value: _radiusMi,
+                  items: [
+                    for (final mi in _radiusChoicesMi)
+                      DropdownMenuItem(value: mi, child: Text('$mi mi')),
+                  ],
+                  onChanged: (v) async {
+                    if (v == null) return;
+                    Navigator.pop(context);
+                    await _setRadiusMi(v);
+                  },
+                ),
+              ],
+            ),
           ],
         ),
         actions: [
@@ -736,6 +773,8 @@ class _HomeScreenState extends State<HomeScreen> {
             _setMinRating),
         row<bool>('Sort', _topRated,
             const {false: 'Nearest first', true: 'Top rated first'}, _setTopRated),
+        row<int>('Within', _radiusMi,
+            {for (final mi in _radiusChoicesMi) mi: '$mi mi of the map'}, _setRadiusMi),
         row<String>('Price', _priceFilter,
             const {'': 'Free and paid', 'free': 'Free only', 'paid': 'Paid only'},
             _setPriceFilter),
@@ -3674,7 +3713,9 @@ class _HomeScreenState extends State<HomeScreen> {
             icon: Icon(Icons.sort,
                 color: _topRated ? Colors.amber : null),
             onPressed: _showSortDialog,
-            tooltip: _topRated ? 'Sorted: Top rated first' : 'Sorted: Nearest first',
+            tooltip: _topRated
+                ? 'Sorted: Top rated first (within $_radiusMi mi)'
+                : 'Sorted: Nearest first (within $_radiusMi mi)',
           ),
           // [LOCAL-677] Free/Paid/Any filter. The chosen option is remembered
           // per device and passed to /tours-near as ?price=free|paid.
