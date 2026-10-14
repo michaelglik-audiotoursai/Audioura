@@ -100,6 +100,7 @@ def get_tour_by_code(code):
             WHERE t.id = %s
         """, (row[0], row[0]))
         t = cur.fetchone()
+        editor = _editor_scores(cur)  # [LOCAL-685]
         cur.close()
         conn.close()
         if not t:
@@ -139,7 +140,8 @@ def get_tour_by_code(code):
                 'via_share_code': code,
                 'version': version,
                 'updated_at': updated_at,
-                **_rating_payload(rating_values, verified_values, created_values, is_paid),
+                **_rating_payload(rating_values, verified_values, created_values, is_paid,
+                                  prior=_prior_for(editor, tour_id, original_id)),
                 **_price_block(price_tier),
             }],
             'count': 1,
@@ -344,7 +346,28 @@ def _rating_median(values):
     return (float(s[mid - 1]) + float(s[mid])) / 2.0
 
 
-def compute_rating(ratings, verified=None, paid=False):
+def _editor_scores(cur):
+    """[LOCAL-685] {tour_id: editor_score} for every scored tour (5.0–8.0, written
+    by tour_editor_score.py). Empty on a schema without the column or on error,
+    which falls back to the flat 7.5 — never a 500. One small query per request."""
+    try:
+        cur.execute("SELECT id, editor_score FROM audio_tours WHERE editor_score IS NOT NULL")
+        return {int(i): float(v) for i, v in cur.fetchall()}
+    except Exception:
+        try:
+            cur.connection.rollback()
+        except Exception:
+            pass
+        return {}
+
+
+def _prior_for(editor_scores, tour_id, original_id):
+    """A translation shows its ORIGINAL's evaluated score (ratings pool there too)."""
+    key = original_id if original_id is not None else tour_id
+    return editor_scores.get(int(key)) if key is not None else None
+
+
+def compute_rating(ratings, verified=None, paid=False, prior=None):
     """{score, count, label} from a list of REAL ratings (may be empty).
 
     Identical rule to tour_rating_service.compute_score (LOCAL-670 / D647).
@@ -361,10 +384,13 @@ def compute_rating(ratings, verified=None, paid=False):
         pairs = [p for p in pairs if p[1]]
     ratings = [r for r, _ in pairs]
     count = len(ratings)
+    # [LOCAL-685] The tour's evaluated score replaces the flat 7.5 when it has one.
+    base = float(prior) if prior is not None else RATING_DEFAULT_SCORE
     if count == 0:
-        return {"score": RATING_DEFAULT_SCORE, "count": 0, "label": "New"}
+        return {"score": base, "count": 0,
+                "label": "Audioura score" if prior is not None else "New"}
     if count < RATING_MEDIAN_SWITCH_COUNT:
-        blended = [RATING_DEFAULT_SCORE] + [float(r) for r in ratings]
+        blended = [base] + [float(r) for r in ratings]
         score = _rating_round_1dp(sum(blended) / len(blended))
     else:
         score = _rating_round_1dp(_rating_median(ratings))
@@ -416,7 +442,8 @@ def _is_stale(created_at, now, current_version_date):
     return False
 
 
-def rank_score(ratings, verified=None, created=None, now=None, current_version_date=None):
+def rank_score(ratings, verified=None, created=None, now=None, current_version_date=None,
+               prior=None):
     """Bayesian list-ORDER key (items 4 & 11). NOT the shown score.
 
     score = (C*7.5 + sum(w_i*rating_i)) / (C + sum(w_i)), C=3.
@@ -427,7 +454,9 @@ def rank_score(ratings, verified=None, created=None, now=None, current_version_d
     from datetime import datetime as _dt
     if now is None:
         now = _dt.now()
-    num = RANK_PRIOR_COUNT * RANK_PRIOR_SCORE
+    # [LOCAL-685] Per-tour evaluated prior when present, else the flat 7.5.
+    prior_score = float(prior) if prior is not None else RANK_PRIOR_SCORE
+    num = RANK_PRIOR_COUNT * prior_score
     den = float(RANK_PRIOR_COUNT)
     for i, r in enumerate(ratings or []):
         if r is None:
@@ -439,7 +468,7 @@ def rank_score(ratings, verified=None, created=None, now=None, current_version_d
             w *= WEIGHT_STALE
         num += w * int(r)
         den += w
-    return num / den if den > 0 else RANK_PRIOR_SCORE
+    return num / den if den > 0 else prior_score
 
 
 def compute_distribution(ratings, verified=None, paid=False):
@@ -460,7 +489,7 @@ def compute_distribution(ratings, verified=None, paid=False):
     return {"total": total, "bands": bands}
 
 
-def _rating_payload(rating_values, verified_values, created_values, paid):
+def _rating_payload(rating_values, verified_values, created_values, paid, prior=None):
     """Build the full per-tour rating block for a response (LOCAL-670 + 672).
 
     Returns a dict with:
@@ -474,7 +503,7 @@ def _rating_payload(rating_values, verified_values, created_values, paid):
           same source set as the shown score (verified on paid, all on free).
     The caller supplies the already-fetched arrays and the paid flag, so this is
     a pure function (unit-testable, no DB)."""
-    rating = compute_rating(rating_values, verified=verified_values, paid=paid)
+    rating = compute_rating(rating_values, verified=verified_values, paid=paid, prior=prior)
     vals = [r for r in (rating_values or []) if r is not None]
     verified_count = sum(1 for v in (verified_values or []) if v)
     return {
@@ -484,7 +513,7 @@ def _rating_payload(rating_values, verified_values, created_values, paid):
         'verified_count': verified_count,
         'is_paid': bool(paid),
         'rank_score': round(rank_score(rating_values, verified=verified_values,
-                                        created=created_values), 4),
+                                        created=created_values, prior=prior), 4),
         'rating_distribution': compute_distribution(
             rating_values, verified=verified_values, paid=paid),
     }
@@ -1087,6 +1116,7 @@ def get_tours_near_location(lat, lng):
         """)
         
         tours = cur.fetchall()
+        editor = _editor_scores(cur)  # [LOCAL-685]
         tours_list = []
         
         for tour in tours:
@@ -1104,7 +1134,8 @@ def get_tours_near_location(lat, lng):
                         original_id, source_version, source_max_vn,
                         max_vn, last_replaced, created_at)
                     rating_block = _rating_payload(
-                        rating_values, verified_values, created_values, is_paid)
+                        rating_values, verified_values, created_values, is_paid,
+                        prior=_prior_for(editor, tour_id, original_id))
                     # Server-side min_rating filter: skip tours below the bar.
                     if min_rating is not None and rating_block['rating_score'] < min_rating:
                         continue
@@ -1390,6 +1421,7 @@ def get_tour_info(tour_id):
          max_vn, last_replaced, created_at, source_version, source_max_vn,
          rating_count, rating_values, verified_values, created_values, is_paid, price_tier,
          own_content_language, source_content_language) = result
+        editor = _editor_scores(cur)  # [LOCAL-685]
         cur.close()
         conn.close()
         
@@ -1413,7 +1445,8 @@ def get_tour_info(tour_id):
             'original_language': original_language,
             'version': version,
             'updated_at': updated_at,
-            **_rating_payload(rating_values, verified_values, created_values, is_paid),
+            **_rating_payload(rating_values, verified_values, created_values, is_paid,
+                              prior=_prior_for(editor, tour_id, original_id)),
             **_price_block(price_tier),
         })
         
@@ -1479,6 +1512,7 @@ def search_tours():
         """, (sql_pattern, sql_pattern))
         
         tours = cur.fetchall()
+        editor = _editor_scores(cur)  # [LOCAL-685]
         search_results = []
         
         for tour in tours:
@@ -1489,7 +1523,8 @@ def search_tours():
             version, updated_at = _resolved_version_fields(
                 original_id, source_version, source_max_vn, max_vn, last_replaced, created_at)
             rating_block = _rating_payload(
-                rating_values, verified_values, created_values, is_paid)
+                rating_values, verified_values, created_values, is_paid,
+                prior=_prior_for(editor, tour_id, original_id))
             # Server-side min_rating filter.
             if min_rating is not None and rating_block['rating_score'] < min_rating:
                 continue

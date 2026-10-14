@@ -74,7 +74,7 @@ def _median(values):
     return (float(s[mid - 1]) + float(s[mid])) / 2.0
 
 
-def compute_score(ratings):
+def compute_score(ratings, prior=None):
     """Compute the shown {score, count, label} from a list of REAL ratings.
 
     Parameters:
@@ -89,12 +89,16 @@ def compute_score(ratings):
         >= 4     → median of ratings only, rounded to 1 dp
     """
     count = len(ratings)
+    # [LOCAL-685] The tour's evaluated score (editor_score, 5.0–8.0) replaces the
+    # flat 7.5 when it has one. Same rule as map-delivery's compute_rating.
+    base = float(prior) if prior is not None else DEFAULT_SCORE
 
     if count == 0:
-        return {"score": DEFAULT_SCORE, "count": 0, "label": "New"}
+        return {"score": base, "count": 0,
+                "label": "Audioura score" if prior is not None else "New"}
 
     if count < MEDIAN_SWITCH_COUNT:  # 1, 2, or 3 real ratings
-        blended = [DEFAULT_SCORE] + [float(r) for r in ratings]
+        blended = [base] + [float(r) for r in ratings]
         score = _round_half_up_1dp(sum(blended) / len(blended))
     else:  # 4+ real ratings — median of the real ratings only
         score = _round_half_up_1dp(_median(ratings))
@@ -264,7 +268,19 @@ def _get_rating_with_cursor(cur, original_id):
         (int(original_id),),
     )
     ratings = [int(r[0]) for r in cur.fetchall()]
-    return compute_score(ratings)
+    # [LOCAL-685] The original's evaluated score, when scored.
+    prior = None
+    try:
+        cur.execute("SELECT editor_score FROM audio_tours WHERE id = %s", (int(original_id),))
+        row = cur.fetchone()
+        if row and row[0] is not None:
+            prior = float(row[0])
+    except Exception:
+        try:
+            cur.connection.rollback()
+        except Exception:
+            pass
+    return compute_score(ratings, prior=prior)
 
 
 def get_rating(tour_id):

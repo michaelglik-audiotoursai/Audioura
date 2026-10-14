@@ -955,6 +955,17 @@ def store_audio_tour(tour_name, request_string, zip_path, lat, lng, tour_content
                      stops_count, lat, lng, existing_id)
                 )
 
+                # [LOCAL-685] New content → the evaluated score is stale; clear it so
+                # the background scorer (tour_editor_score.py --backfill) re-scores.
+                # SAVEPOINT: a schema without the column must not abort the replace.
+                cur.execute("SAVEPOINT clear_editor_score")
+                try:
+                    cur.execute("UPDATE audio_tours SET editor_score = NULL WHERE id = %s",
+                                (existing_id,))
+                    cur.execute("RELEASE SAVEPOINT clear_editor_score")
+                except Exception:
+                    cur.execute("ROLLBACK TO SAVEPOINT clear_editor_score")
+
                 # Flag translations (original_tour_id = this id) stale so the next
                 # translation request regenerates them. Never deleted.
                 cur.execute(
