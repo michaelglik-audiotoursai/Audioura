@@ -1,11 +1,11 @@
 # Mobile App — Kiro Context Reminder (POST-COMPACTION RECOVERY)
 
-_Last updated: 2026-08-31 by Mobile Kiro_
+_Last updated: 2026-09-03 by Mobile Kiro_
 
 ## 🚨 POST-COMPACTION RECOVERY PROTOCOL
 When chat history is compacted, the user will ask you to read `remind_ai.md` and `remind_mobile_ai.md`.
 **Your response:**
-"📱🔧 MOBILE KIRO — I've read both files. Current branch is `storied`, version `2.2.1+2`. Ubuntu VM toolchain upgraded to Flutter 3.41.6 / Android SDK 36 / NDK 28.2.13676358. Release APK + signed AAB build successfully via `build_flutter_clean.sh`. Ready to continue."
+"📱🔧 MOBILE KIRO — I've read both files. Branch `storied` at `c0049a8`, version `2.3.2+20`, published to Play Closed testing. Done this cycle: Stable/Preview selector + Version menu (wdvrdaxxmb), API-36 compliance build (wdvrdaxxma), credential-log security fix (wdvrday4pk, verified). Next up: Subscribed variant then Production before Nov 1 (wdvrday53b). Ubuntu-only builds; adb/Chrome for sideload (Files-by-Google broken by Play Protect). Ready to continue."
 
 ## Who you are
 1. **Kiro (Android Mobile Agent)** — Audioura Android code changes, commits, and build coordination. Replaced Mobile Amazon-Q as of 2026-06-07.
@@ -57,27 +57,50 @@ Proven 2026-09-02 on Pixel 4 / Android 13: **tapping an APK in Files by Google f
 - **Ask Michael before any Play Console upload** — outward-facing, not undoable.
 - Do NOT edit `DECISIONS.md`, `CLAUDE.md`, `BACKLOG.md`, `.continuous_dev/STATUS.md` (LEAD-owned).
 
-## 🎯 ACTIVE TASKS (as of 2026-08-31)
+## 🎯 STATE AS OF 2026-09-03 (latest session)
+
+**Current branch tip:** `origin/storied` = commit `c0049a8`, version **`2.3.2+20`**.
+**Published to Play Closed testing (Alpha):** release 20 (2.3.2), status Published 2026-09-03. NOT in Production yet.
+**Phone (Pixel 4, Android 13):** running adb-installed 2.3.2+20.
 
 ### wdvrdaxy8q — Ubuntu toolchain upgrade — ✅ DONE
-Flutter 3.41.6 + SDK 36 + NDK 28 + licenses + swap + gradle.properties fixes. Debug AND release builds pass on `storied`. Commits: `edfeaac` (NDK/Jetifier/props), `ce82c73` (heap 2g + workers 2). Results logged on the task.
+Flutter 3.41.6 + SDK 36 + NDK 28 + licenses + swap + gradle.properties. Commits `edfeaac`, `ce82c73`.
 
-### wdvrdaxxma — URGENT: Android release AAB + Play upload — 🔄 IN PROGRESS
-- AAB builds successfully (`audioura-release.aab`, ~46M, `2.2.1+2`). Signing key IS on the Windows laptop (build succeeds with release signing).
-- **Remaining before close:** (1) Michael tests audio/map/downloads/permissions on device; (2) confirm `versionCode` not a duplicate in Play (bumped to `2.2.1+2` for this); (3) Michael approves + uploads to Closed testing; (4) confirm target-API warning clears; (5) document keystore home (Google Cloud Secret Manager recommended, NOT ClickUp) + second copy.
-- Play App Signing is ENABLED (losing upload key is recoverable). Package `com.audioura.audiotours`.
-- DO NOT generate a new keystore. DO NOT upload without Michael's OK.
+### wdvrdaxxmb — Stable/Preview (Beta/Storied) selector — ✅ DONE & SHIPPED to Closed testing
+- Selector in About→Cloud section. **UI labels are Stable (=beta) / Preview (=storied)** per Michael 2026-09-01 — but pref/DB/API values stay `beta`/`storied`. Default Stable.
+- Only the base URL changes: Beta=`https://api.audioura.com`, Storied=`https://storied-api.audioura.com` (NOTE order: storied-api, NOT api-storied; goes through Cloudflare like Beta — do not revert to the bare Cloud Run URL). `endpoints.dart` `cloudTrack()`/`setCloudTrack()`/`base()` + `trackLabel()`/`isPreviewTrack()` helpers.
+- Per-tour `track` + optional `build_number` stored on the saved tour record (read from `/status` response, never recomputed; missing track⇒beta, missing build_number⇒no suffix).
+- **Provenance NOT shown as a list/player chip** (confused testers). Instead: tour ⋮ menu → **Version** dialog shows generation date, release (track+build), services version. (my_tours_screen `_showVersionDialog`.)
+- Services contract confirmed: same paths/auth; `audio_tours.track` 'beta'|'storied'. `build_number`/`code_sha` not yet populated by services (tracked wdvrdaxyud) → label shows bare Stable/Preview until then.
 
-### wdvrdaxxmb — Beta vs Storied selector in Cloud option — ⏳ BLOCKED on Services
-- Build: in the Cloud option add a **Beta / Storied** selector. **Beta is and stays the default** (older installed apps send no track field → must behave unchanged; missing/unknown track = Beta).
-- The choice changes ONLY the base URL the app posts to. Nothing else in the request changes (Michael's requirement: like-for-like comparison of the same venue on both tracks).
-- Persist to a `cloud_track` pref. Show a small track label on the tour list AND the player. Store `track` on the saved tour record — READ `audio_tours.track` from server responses, do not recompute.
-- **Blocked:** needs the Storied base URL + path/auth/response-field confirmation from Services Kiro (deployment task `wdvrdaxxm9`). Contract request already posted as a comment on `wdvrdaxxm9`.
-- **Version when built:** `2.3.1+1` (Michael's call — bump minor to 2.3, no zeros).
-- Deliberately NOT coupled to wdvrdaxxma (compliance AAB ships first without the selector).
+### wdvrdaxxma — Android release AAB + Play upload — ✅ substantially done
+Compliance (API 36) + selector shipped together as 2.3.2+20 to Closed testing. Live Play versionCode WAS 18; must always exceed it. Play App Signing ENABLED (Play re-signs; sideload uses local key — different signature, can't cross-install). DO NOT generate a new keystore.
 
-### wdvrdaxxm9 — Services: Deploy Storied to GCloud ALONGSIDE Beta — (Services Kiro's task, my dependency)
-- Two Cloud Run services, one Postgres, `audio_tours.track` discriminator (`'beta'|'storied'`, NOT NULL DEFAULT 'beta'). Beta stays byte-for-byte unchanged. I need the Storied URL from this.
+### wdvrday4pk — 🔴 SECURITY: credential/AES-key leak in debug log — ✅ DONE & VERIFIED
+Plaintext passwords + AES key were written to persisted, in-app-viewable `debug_logs` + console. Fixed (in c0049a8):
+- Removed secrets at source in `subscription_service.dart`, `subscription_encryption_service.dart`, and `subscription_credential_dialog.dart` (3rd file not in ticket) → log field names/lengths/existence only.
+- Added `lib/services/log_redactor.dart` (`LogRedactor.redact`) + routed ALL `DebugLogHelper.addDebugLog` through it (guard against recurrence; NOT a kDebugMode gate).
+- `main()` one-time purge of legacy `debug_logs` (keyed `debug_logs_security_purged_v2`).
+- iOS `UIBackgroundModes [audio]` added to Info.plist (single key — a merge dup was removed).
+- `test/log_redactor_test.dart` asserts secrets absent (can go red). Verified on device: submitted probe creds, full logcat had NO password/username/key; purge fired.
+
+### wdvrday52p — Services bug (my report) — handed to Services Kiro
+`/submit_credentials` returned 400 "Decryption failed: No module named 'cryptography'" — missing Python dep in newsletter service image. Services deployed a fix 2026-09-03.
+
+### wdvrday53b — 🗓️ Production release plan (Michael's list) — TRACKING, due ~Oct 15
+- API-36 compliance needs a **Production** release before **Nov 1, 2026** (Google extension). Reminder set Oct 15.
+- Business decision: ship the **Subscribed** build variant (revenue path — a variant of the shared app like Beta/Storied) BEFORE Production, so public compute spend has a revenue offset. Subscribed variant not yet scoped as its own task.
+- Fallback if Subscribed slips past mid-Oct: ship 2.3.2+20 (already in Closed testing) to Production anyway to keep update ability.
+
+### wdvrday4x3 — HOW-TO (Michael's list, complete): sideload via Chrome/adb (Files-by-Google broken)
+
+## 📲 SIDELOAD / INSTALL FACTS (proven 2026-09-02)
+- **Files by Google tap-install FAILS** ("App wasn't installed") intermittently→consistently: Play Protect runs a Just-in-Time scan + `upload_requested`/`PlayProtectDialogsActivity` that outlives the PackageInstaller session (`Session ID is no longer active`). NOT a build/signing/versionCode/data issue. Ruled out v1/v2/v3/v4+.idsig (T2==T3 both failed), key, versionCode, residual pkg, storage, transfer.
+- **Working install paths:** `adb install -r <apk>` (preserves data) OR Chrome download → tap in Chrome. adb at `C:\Users\micha\AppData\Local\Android\Sdk\platform-tools\adb.exe`.
+- Chrome-serve method: `adb reverse tcp:8765 tcp:8765`; serve dir with `python -m http.server 8765`; phone Chrome → `localhost:8765/audioura.apk`.
+- Signing is **v2+v3** (release config dropped the ineffective forced-v1/v4). Do NOT reintroduce v4 as a "fix" — it isn't one.
+- Play tester opt-in link format: `https://play.google.com/apps/testing/com.audioura.audiotours` (confirm exact link on Closed testing → Alpha → Testers tab).
+- Alpha testers list "Audioura Beta Testers": yury.makedonov@gmail.com, ilinkov@yahoo.com, michael.glik@gmail.com, elie.glik, glepsky, jacobnglik.
 
 ## 🚫 OWNERSHIP BOUNDARIES
 - ✅ **MY files:** `remind_mobile_ai.md`, `code_review_v*.md`, files in `amazon-q-communications/audiotours/`
@@ -103,15 +126,19 @@ Write iOS build requests to `c:\Users\micha\eclipse-workspace\amazon-q-communica
 - **Onboarding personalization** (`onboarding_screen.dart`): first-launch "What brings you here?" → 4 emoji → saves `narrative_tone` pref → sent in tour generation request body for Services routing.
 
 ## RECENT VERSION HISTORY (latest first)
-- **v2.2.1+2** — build-number bump for Play upload (avoid duplicate versionCode). Commit `da870f8`.
-- **v2.2.1+1** — corrected version label (was mislabeled 2.2.0). Build-env fixes for Flutter 3.41.6: Kotlin→2.2.0, NDK→28, Jetifier off, heap sizing.
-- **v2.2.0+1** — Storied release line: onboarding personalization + Play Integrity attestation (Android MethodChannel + iOS Dart side). Branch `storied`.
-- **v2.1.1+18** — Beta baseline (on `main`): signed AAB support, `applicationId=com.audioura.audiotours`, translation-failure modal dialog, AAB copy-back in build script.
-- **v2.1.1+9 and earlier** — cloud auth (`user_id` in tour body), news/newsletter URL migration to `Endpoints`, account deletion UI, existing-tour translation, poll hardening. (Full history in git log.)
+- **v2.3.2+20** — SECURITY: credential/AES-key log leak fixed + redaction guard + legacy-log purge; iOS UIBackgroundModes audio. Shipped to Play Closed testing. Commit `c0049a8`.
+- **v2.3.1+19/+5..+1** — Stable/Preview selector + Version menu; v2+v3 signing; versionCode walked up past live Play 18. (Superseded by +20.)
+- **v2.2.1+2 / +1** — Play versionCode bump; Flutter 3.41.6 build-env fixes (Kotlin 2.2.0, NDK 28, Jetifier off, heap sizing).
+- **v2.2.0+1** — Storied line: onboarding personalization + Play Integrity attestation.
+- **v2.1.1+18** — Beta baseline (on `main`): signed AAB, `applicationId=com.audioura.audiotours`.
 
 ## ⚠️ CRITICAL REMINDERS
-- ❌ NEVER build Flutter in Windows — Ubuntu VM only.
+- ❌ NEVER build Flutter in Windows — Ubuntu VM only. (flutter not installed on Windows; `flutter test` also Ubuntu-only.)
 - 🌿 All mobile commits go to `storied` (current release line), never `main`.
 - 🔐 Never commit keystores/keys: `.gitignore` must exclude `key.properties`, `*.jks`, `*.keystore`, `*.apk`, `build_secrets.env`.
 - 📱 `flutter doctor` license ✗ on the VM is a known false negative — builds work.
-- 🧠 If the shared folder blocks a `git pull` with "local changes would be overwritten", use `git reset --hard origin/storied` (safe — build-only folder).
+- ⚠️ **GIT SAFETY (hard lesson 2026-09-02):** `git reset --hard origin/storied` on the Ubuntu shared tree DESTROYED Mac Mini Claude's unpushed commit once. ALWAYS run `git log --oneline origin/storied..HEAD` FIRST — if it is non-empty, STOP and preserve those commits (push them) before resetting. Only reset when that check is empty. The shared `/media/sf_audiotours` tree is build-only; never author code there.
+- 🤝 **Shared branch with Mac Mini Claude:** he also commits to `origin/storied` (iOS + Python/services work). On push rejection, `git fetch` + rebase onto origin/storied — NEVER force-push. Resolve dup edits (e.g. both added UIBackgroundModes once).
+- 🔒 **NEVER log secrets:** passwords, usernames, keys, tokens. All `DebugLogHelper` goes through `LogRedactor`. Don't add raw `print()` of credentials/keys. See wdvrday4pk.
+- 🏷️ Tester-facing track names are **Stable/Preview**, never Beta/Storied (internal only). DB/API/pref values stay beta/storied.
+- 🧠 Secret-verification + any device test must run on Ubuntu/device, not Windows.
