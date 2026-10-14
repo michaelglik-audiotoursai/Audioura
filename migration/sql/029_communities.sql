@@ -17,17 +17,19 @@
 --                                  the per-community `disabled` off-switch, and
 --                                  one optional feed_url).
 --   2. community_pass_products   — the FIXED catalogue of non-renewing pass
---                                  store products: one product per {price ×
---                                  length ∈ day|week|month|year}. One product
---                                  serves every community at that price+length
---                                  (D657: a non-renewing product can be bought
---                                  again and again; Apple's product carries no
---                                  duration, so the LENGTH lives here and the
---                                  server computes expiry).
+--                                  store products: one product per PRICE (the
+--                                  34-step ladder, LOCAL-686). D658/LEAD review
+--                                  of LOCAL-690: Apple's non-renewing product
+--                                  carries NO duration, so ONE product per price
+--                                  serves every community AND every length — the
+--                                  LENGTH belongs to the community's pass option
+--                                  (table 3), not the catalogue. No length here.
 --   3. community_passes          — the pass OPTIONS an owner offers on their
---                                  community: (community, product) → shown on
---                                  the community page. A free community has
---                                  none.
+--                                  community: (community, product, length) →
+--                                  shown as "$5 / month" on the community page.
+--                                  The LENGTH + duration_days live HERE; the
+--                                  server computes expiry = now + duration_days.
+--                                  A free community has none.
 --   4. community_memberships     — one row per (user, community) membership with
 --                                  an expires_at the server enforces, the
 --                                  verifying transaction, and the reminder
@@ -109,74 +111,97 @@ COMMENT ON TABLE communities IS
 
 
 -- ─── 2. community_pass_products — the fixed non-renewing pass catalogue ──────
--- One row per (price × length). D658 addendum §1: lengths are EXACTLY four —
--- day, week, month, year. Apple's non-renewing product has no duration, so the
--- length lives HERE and the server computes expiry = now + duration_days. One
--- product serves EVERY community at that price+length (D657). Michael owns the
--- prices (a row, changeable by SQL, like price_tiers).
+-- One row per PRICE — the 34-step round-dollar LADDER (LOCAL-686, price_tiers
+-- tiers 8..41). LEAD review of LOCAL-690 (2026-10-14): Apple's non-renewing
+-- product carries NO duration, so ONE product per price serves EVERY community
+-- and EVERY length. Price × length would be 136 App Store products for Michael
+-- to create; one-per-price is 34. The LENGTH is NOT here — it belongs to the
+-- community's pass option (table 3). Product ids are 'audioura.pass.usd<N>',
+-- the SAME 34 steps as the tour ladder's 'audioura.tour.usd<N>'. Michael owns
+-- the prices (a row, changeable by SQL, like price_tiers).
 CREATE TABLE IF NOT EXISTS community_pass_products (
-    product_id      VARCHAR(64) PRIMARY KEY,       -- store product id, e.g. 'audioura.pass.usd5.month'
-    length          VARCHAR(8) NOT NULL
-                    CHECK (length IN ('day', 'week', 'month', 'year')),
-    duration_days   INTEGER NOT NULL CHECK (duration_days > 0),  -- how long the pass lasts
+    product_id      VARCHAR(64) PRIMARY KEY,       -- store product id, e.g. 'audioura.pass.usd5'
     price_usd       NUMERIC(10,2) NOT NULL,
-    label           VARCHAR(48) NOT NULL,          -- e.g. '$5 / month'
+    label           VARCHAR(48) NOT NULL,          -- the price only, e.g. '$5'
     active          BOOLEAN NOT NULL DEFAULT TRUE,
     created_at      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
--- A small LEAD-default catalogue: the five quick-pick prices ($3/$5/$10/$20/$50,
--- matching the tour quick picks, LOCAL-686) × the four lengths. Owners pick from
--- these on the community page; a new price or length is one more row with no
--- redeploy. Durations: day=1, week=7, month=30, year=365 (calendar-free, the
--- same simple arithmetic the server uses so a test can assert it).
-INSERT INTO community_pass_products (product_id, length, duration_days, price_usd, label) VALUES
-    ('audioura.pass.usd3.day',    'day',     1,  3.0,  '$3 / day'),
-    ('audioura.pass.usd3.week',   'week',    7,  3.0,  '$3 / week'),
-    ('audioura.pass.usd3.month',  'month',  30,  3.0,  '$3 / month'),
-    ('audioura.pass.usd3.year',   'year',  365,  3.0,  '$3 / year'),
-    ('audioura.pass.usd5.day',    'day',     1,  5.0,  '$5 / day'),
-    ('audioura.pass.usd5.week',   'week',    7,  5.0,  '$5 / week'),
-    ('audioura.pass.usd5.month',  'month',  30,  5.0,  '$5 / month'),
-    ('audioura.pass.usd5.year',   'year',  365,  5.0,  '$5 / year'),
-    ('audioura.pass.usd10.day',   'day',     1, 10.0, '$10 / day'),
-    ('audioura.pass.usd10.week',  'week',    7, 10.0, '$10 / week'),
-    ('audioura.pass.usd10.month', 'month',  30, 10.0, '$10 / month'),
-    ('audioura.pass.usd10.year',  'year',  365, 10.0, '$10 / year'),
-    ('audioura.pass.usd20.day',   'day',     1, 20.0, '$20 / day'),
-    ('audioura.pass.usd20.week',  'week',    7, 20.0, '$20 / week'),
-    ('audioura.pass.usd20.month', 'month',  30, 20.0, '$20 / month'),
-    ('audioura.pass.usd20.year',  'year',  365, 20.0, '$20 / year'),
-    ('audioura.pass.usd50.day',   'day',     1, 50.0, '$50 / day'),
-    ('audioura.pass.usd50.week',  'week',    7, 50.0, '$50 / week'),
-    ('audioura.pass.usd50.month', 'month',  30, 50.0, '$50 / month'),
-    ('audioura.pass.usd50.year',  'year',  365, 50.0, '$50 / year')
+-- The 34 ladder prices (LOCAL-686): $2..$20 /$1, $25..$50 /$5, $60..$100 /$10,
+-- $125..$200 /$25. One Apple non-renewing subscription product per price; the
+-- community's option (table 3) picks the length. A new price is one more row
+-- with no redeploy. ON CONFLICT re-asserts the canonical price/label so a
+-- re-run restores them (idempotent).
+INSERT INTO community_pass_products (product_id, price_usd, label) VALUES
+    ('audioura.pass.usd2',   2.00,   '$2'),
+    ('audioura.pass.usd3',   3.00,   '$3'),
+    ('audioura.pass.usd4',   4.00,   '$4'),
+    ('audioura.pass.usd5',   5.00,   '$5'),
+    ('audioura.pass.usd6',   6.00,   '$6'),
+    ('audioura.pass.usd7',   7.00,   '$7'),
+    ('audioura.pass.usd8',   8.00,   '$8'),
+    ('audioura.pass.usd9',   9.00,   '$9'),
+    ('audioura.pass.usd10',  10.00,  '$10'),
+    ('audioura.pass.usd11',  11.00,  '$11'),
+    ('audioura.pass.usd12',  12.00,  '$12'),
+    ('audioura.pass.usd13',  13.00,  '$13'),
+    ('audioura.pass.usd14',  14.00,  '$14'),
+    ('audioura.pass.usd15',  15.00,  '$15'),
+    ('audioura.pass.usd16',  16.00,  '$16'),
+    ('audioura.pass.usd17',  17.00,  '$17'),
+    ('audioura.pass.usd18',  18.00,  '$18'),
+    ('audioura.pass.usd19',  19.00,  '$19'),
+    ('audioura.pass.usd20',  20.00,  '$20'),
+    ('audioura.pass.usd25',  25.00,  '$25'),
+    ('audioura.pass.usd30',  30.00,  '$30'),
+    ('audioura.pass.usd35',  35.00,  '$35'),
+    ('audioura.pass.usd40',  40.00,  '$40'),
+    ('audioura.pass.usd45',  45.00,  '$45'),
+    ('audioura.pass.usd50',  50.00,  '$50'),
+    ('audioura.pass.usd60',  60.00,  '$60'),
+    ('audioura.pass.usd70',  70.00,  '$70'),
+    ('audioura.pass.usd80',  80.00,  '$80'),
+    ('audioura.pass.usd90',  90.00,  '$90'),
+    ('audioura.pass.usd100', 100.00, '$100'),
+    ('audioura.pass.usd125', 125.00, '$125'),
+    ('audioura.pass.usd150', 150.00, '$150'),
+    ('audioura.pass.usd175', 175.00, '$175'),
+    ('audioura.pass.usd200', 200.00, '$200')
 ON CONFLICT (product_id) DO UPDATE SET
-    length        = EXCLUDED.length,
-    duration_days = EXCLUDED.duration_days,
-    price_usd     = EXCLUDED.price_usd,
-    label         = EXCLUDED.label,
-    active        = TRUE;
+    price_usd = EXCLUDED.price_usd,
+    label     = EXCLUDED.label,
+    active    = TRUE;
 
 COMMENT ON TABLE community_pass_products IS
-    'LOCAL-690/D657-D658: the fixed catalogue of NON-RENEWING pass store products '
-    '(price × length ∈ day|week|month|year). One product serves every community. '
-    'duration_days -> server-computed expiry. Nothing renews automatically.';
+    'LOCAL-690/D658 (LEAD review): the fixed catalogue of NON-RENEWING pass store '
+    'products — ONE product per PRICE (the 34 ladder prices, LOCAL-686). Apple''s '
+    'non-renewing product carries no length, so one product serves every community '
+    'and every length; the LENGTH lives on the community''s option (community_passes).';
 
 
--- ─── 3. community_passes — the pass OPTIONS an owner offers ──────────────────
+-- ─── 3. community_passes — the pass OPTIONS an owner offers (price × length) ─
+-- The LENGTH lives HERE (not the catalogue): the owner offers "$5 / month" by
+-- attaching product audioura.pass.usd5 with length='month'. One product + four
+-- lengths = four possible options, all from the SAME store product. unique
+-- (community, product, length). Lengths are EXACTLY four — day, week, month,
+-- year; durations day=1, week=7, month=30, year=365 (calendar-free arithmetic
+-- the server uses so a test can assert expiry = now + duration_days).
 CREATE TABLE IF NOT EXISTS community_passes (
     id            SERIAL PRIMARY KEY,
     community_id  INTEGER NOT NULL REFERENCES communities(id) ON DELETE CASCADE,
     product_id    VARCHAR(64) NOT NULL REFERENCES community_pass_products(product_id),
+    length        VARCHAR(8) NOT NULL
+                  CHECK (length IN ('day', 'week', 'month', 'year')),
+    duration_days INTEGER NOT NULL CHECK (duration_days > 0),
     created_at    TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT uq_community_passes UNIQUE (community_id, product_id)
+    CONSTRAINT uq_community_passes UNIQUE (community_id, product_id, length)
 );
 CREATE INDEX IF NOT EXISTS idx_community_passes_community ON community_passes(community_id);
 
 COMMENT ON TABLE community_passes IS
-    'LOCAL-690: which pass products a community offers (shown on its page). A '
-    'free community has none.';
+    'LOCAL-690/D658 (LEAD review): which pass OPTIONS a community offers — a '
+    '(price product, length) pair with its duration_days. The LENGTH lives here, '
+    'not the catalogue. unique (community, product, length). Free community: none.';
 
 
 -- ─── 4. community_memberships — the member''s access + expiry ─────────────────

@@ -120,24 +120,61 @@ def _unique_join_code(cur):
 # ───────────────────────────────────────────────────────────────────────────
 def is_community_pass_product(product):
     """True iff `product` is a community pass store product id. The convention
-    (migration 029) is 'audioura.pass.*'. A cheap prefix check so the
-    /purchases/verify dispatcher can route without a DB round-trip."""
+    (migration 029) is 'audioura.pass.*'. One product per PRICE serves every
+    community and every length (LEAD review of LOCAL-690); the LENGTH is carried
+    separately on the request and the community's option. A cheap prefix check
+    so the /purchases/verify dispatcher can route without a DB round-trip."""
     return isinstance(product, str) and product.startswith('audioura.pass.')
 
 
-def _pass_product(cur, product_id):
-    """The (length, duration_days, price_usd, label) for a pass product, read
-    from community_pass_products (the source of record). None if unknown."""
+# The four lengths and their day durations (calendar-free arithmetic). The
+# LENGTH lives on the community's pass OPTION (community_passes), not the Apple
+# product — one product per PRICE serves every length (LEAD review of LOCAL-690).
+PASS_LENGTH_DAYS = {'day': 1, 'week': 7, 'month': 30, 'year': 365}
+
+
+def duration_days_for_length(length):
+    """The day-count for a pass length, or None for an unknown length."""
+    return PASS_LENGTH_DAYS.get(length)
+
+
+def pass_label_for(price_label, length):
+    """The option label shown on the page, e.g. '$5 / month' from price '$5'."""
+    return f'{price_label} / {length}'
+
+
+def _pass_catalogue_product(cur, product_id):
+    """The (price_usd, label) for a pass store product, read from
+    community_pass_products (the catalogue — PRICE only, no length). None if
+    unknown/inactive."""
     cur.execute(
-        "SELECT length, duration_days, price_usd, label "
-        "FROM community_pass_products WHERE product_id = %s AND active = TRUE",
+        "SELECT price_usd, label FROM community_pass_products "
+        "WHERE product_id = %s AND active = TRUE",
         (product_id,),
     )
     row = cur.fetchone()
     if not row:
         return None
-    return {'length': row[0], 'duration_days': int(row[1]),
-            'price_usd': float(row[2]), 'label': row[3]}
+    return {'price_usd': float(row[0]), 'price_label': row[1]}
+
+
+def _offered_option(cur, community_id, product_id, length):
+    """The community's offered option for (product, length): its duration_days
+    and the catalogue price/label. None when the community does NOT offer that
+    (product, length) pair, so the verify path can refuse an un-offered pass."""
+    cur.execute(
+        """SELECT p.duration_days, pp.price_usd, pp.label
+           FROM community_passes p
+           JOIN community_pass_products pp ON pp.product_id = p.product_id
+           WHERE p.community_id = %s AND p.product_id = %s AND p.length = %s
+             AND pp.active = TRUE""",
+        (int(community_id), product_id, length),
+    )
+    row = cur.fetchone()
+    if not row:
+        return None
+    return {'duration_days': int(row[0]), 'price_usd': float(row[1]),
+            'price_label': row[2]}
 
 
 def compute_expiry(now, duration_days):
@@ -193,16 +230,24 @@ def _community_row(cur, community_id):
 
 
 def _passes_for(cur, community_id):
+    """The community's offered pass OPTIONS for the page. The LENGTH +
+    duration_days come from community_passes; the PRICE from the catalogue. The
+    label is composed ('$5' + 'month' -> '$5 / month') since the catalogue label
+    is the price only (one product per price serves every length)."""
     cur.execute(
-        """SELECT p.product_id, pp.length, pp.duration_days, pp.price_usd, pp.label
+        """SELECT p.product_id, p.length, p.duration_days, pp.price_usd, pp.label
            FROM community_passes p
            JOIN community_pass_products pp ON pp.product_id = p.product_id
            WHERE p.community_id = %s AND pp.active = TRUE
-           ORDER BY pp.price_usd, pp.duration_days""",
+           ORDER BY pp.price_usd, p.duration_days""",
         (community_id,),
     )
-    return [{'product_id': r[0], 'length': r[1], 'duration_days': int(r[2]),
-             'price_usd': float(r[3]), 'label': r[4]} for r in cur.fetchall()]
+    out = []
+    for r in cur.fetchall():
+        out.append({'product_id': r[0], 'length': r[1], 'duration_days': int(r[2]),
+                    'price_usd': float(r[3]),
+                    'label': pass_label_for(r[4], r[1])})
+    return out
 
 
 def _episodes_for(cur, community_id):
@@ -322,19 +367,33 @@ def _verify_pass_signed(store, transaction_id, product, signed_transaction):
 
 
 def verify_community_pass(store, transaction_id, product, user_id,
-                          signed_transaction, community_id):
+                          signed_transaction, community_id, length):
     """Verify a community PASS purchase and grant/extend the membership.
 
-    Mirrors the tour-unlock path: idempotency on purchases.transaction_id,
-    verify via the store (stub accepts any non-empty id), record the purchase,
-    then UPSERT the membership with expires_at = now + duration_days. A membership
-    is ONE row per (user, community): buying again EXTENDS/REPLACES the expiry —
-    nothing renews automatically (D657). Returns a Flask (json, status) tuple.
+    One product per PRICE serves every community and every length (LEAD review
+    of LOCAL-690): the request carries community_id AND length, and the server
+    checks that (community, product, length) is one of THIS community's offered
+    options and sets expiry = now + the option's duration_days. Mirrors the
+    tour-unlock path: idempotency on purchases.transaction_id, verify via the
+    store (stub accepts any non-empty id), record the purchase, then UPSERT the
+    membership. A membership is ONE row per (user, community): buying again
+    EXTENDS/REPLACES the expiry — nothing renews automatically (D657). Returns a
+    Flask (json, status) tuple.
     """
     if not community_id:
         return jsonify({
             "error": "missing_fields",
             "message": "community_id is required to buy a community pass.",
+        }), 400
+    if not length:
+        return jsonify({
+            "error": "missing_fields",
+            "message": "length is required to buy a community pass.",
+        }), 400
+    if length not in PASS_LENGTH_DAYS:
+        return jsonify({
+            "error": "bad_length",
+            "message": "length must be one of day, week, month, year.",
         }), 400
 
     conn = _get_db()
@@ -351,18 +410,18 @@ def verify_community_pass(store, transaction_id, product, user_id,
             return jsonify({"error": "community_disabled",
                             "message": "This community is unavailable."}), 403
 
-        info = _pass_product(cur, product)
-        if not info:
+        # The store product must be a known PRICE in the catalogue.
+        cat = _pass_catalogue_product(cur, product)
+        if not cat:
             cur.close()
             return jsonify({"error": "unknown_product",
                             "message": f"Unknown pass product '{product}'."}), 400
 
-        # The community must actually OFFER this pass.
-        cur.execute(
-            "SELECT 1 FROM community_passes WHERE community_id = %s AND product_id = %s",
-            (int(community_id), product),
-        )
-        if cur.fetchone() is None:
+        # The community must actually OFFER this (product, length) option. The
+        # LENGTH lives on the option, so an option the community does not offer
+        # (even if the product is a real price) is refused.
+        option = _offered_option(cur, int(community_id), product, length)
+        if option is None:
             cur.close()
             return jsonify({"error": "pass_not_offered",
                             "message": "This community does not offer that pass."}), 400
@@ -384,13 +443,14 @@ def verify_community_pass(store, transaction_id, product, user_id,
             effective_txid = raw_status.split(':', 1)[1]
 
         now = datetime.utcnow()
-        new_expiry = compute_expiry(now, info['duration_days'])
+        new_expiry = compute_expiry(now, option['duration_days'])
+        price_usd = option['price_usd']
 
         if already:
             # The transaction was already processed — ensure the membership
             # reflects it and report success idempotently (no double extension).
             _upsert_membership(cur, user_id, int(community_id), new_expiry,
-                               effective_txid, store, product, info['price_usd'],
+                               effective_txid, store, product, price_usd,
                                extend_only=False)
             conn.commit()
             cur.close()
@@ -407,13 +467,13 @@ def verify_community_pass(store, transaction_id, product, user_id,
             cur.execute(
                 "INSERT INTO purchases (transaction_id, store, product, user_id, amount, raw_status) "
                 "VALUES (%s, %s, %s, %s, %s, %s)",
-                (effective_txid, store, product, user_id, info['price_usd'], raw_status),
+                (effective_txid, store, product, user_id, price_usd, raw_status),
             )
         except psycopg2.errors.UniqueViolation:
             conn.rollback()
             cur2 = conn.cursor()
             _upsert_membership(cur2, user_id, int(community_id), new_expiry,
-                               effective_txid, store, product, info['price_usd'],
+                               effective_txid, store, product, price_usd,
                                extend_only=False)
             conn.commit()
             cur2.close()
@@ -424,7 +484,7 @@ def verify_community_pass(store, transaction_id, product, user_id,
             }), 409
 
         _upsert_membership(cur, user_id, int(community_id), new_expiry,
-                           effective_txid, store, product, info['price_usd'],
+                           effective_txid, store, product, price_usd,
                            extend_only=False)
         conn.commit()
         cur.close()
@@ -433,12 +493,12 @@ def verify_community_pass(store, transaction_id, product, user_id,
             "membership": {
                 "community_id": int(community_id),
                 "expires_at": new_expiry.isoformat(),
-                "length": info['length'],
-                "duration_days": info['duration_days'],
+                "length": length,
+                "duration_days": option['duration_days'],
             },
             "transaction_id": effective_txid,
             "product": product,
-            "amount": info['price_usd'],
+            "amount": price_usd,
         }), 200
     finally:
         conn.close()
@@ -554,6 +614,21 @@ def create_community():
         return jsonify({"error": "paid_needs_passes",
                         "message": "A paid community must offer at least one pass."}), 400
 
+    # Normalise each pass option to {product_id, length}. Back-compat: a bare
+    # string product id (older client) is treated as a 'month' option. The
+    # LENGTH lives on the option now (LEAD review of LOCAL-690): one store
+    # product per PRICE, the owner picks the length here.
+    norm_options = []
+    for p in pass_products:
+        if isinstance(p, str):
+            norm_options.append({'product_id': p, 'length': 'month'})
+        elif isinstance(p, dict) and p.get('product_id'):
+            norm_options.append({'product_id': p['product_id'],
+                                 'length': (p.get('length') or 'month')})
+        else:
+            return jsonify({"error": "bad_pass_option",
+                            "message": "Each pass option needs a product_id and a length."}), 400
+
     conn = _get_db()
     try:
         cur = conn.cursor()
@@ -574,8 +649,18 @@ def create_community():
         )
         community_id = cur.fetchone()[0]
 
-        # Attach offered passes (validated against the catalogue).
-        for product_id in pass_products:
+        # Attach offered pass OPTIONS (each validated against the catalogue and
+        # the four allowed lengths). The LENGTH + duration_days live on the
+        # option; one store product per PRICE serves every length.
+        for opt in norm_options:
+            product_id = opt['product_id']
+            length = opt['length']
+            dur = duration_days_for_length(length)
+            if dur is None:
+                conn.rollback()
+                cur.close()
+                return jsonify({"error": "bad_length",
+                                "message": f"Unknown pass length '{length}'."}), 400
             cur.execute(
                 "SELECT 1 FROM community_pass_products WHERE product_id = %s AND active = TRUE",
                 (product_id,),
@@ -586,9 +671,9 @@ def create_community():
                 return jsonify({"error": "unknown_pass_product",
                                 "message": f"Unknown pass product '{product_id}'."}), 400
             cur.execute(
-                "INSERT INTO community_passes (community_id, product_id) "
-                "VALUES (%s, %s) ON CONFLICT DO NOTHING",
-                (community_id, product_id),
+                "INSERT INTO community_passes (community_id, product_id, length, duration_days) "
+                "VALUES (%s, %s, %s, %s) ON CONFLICT DO NOTHING",
+                (community_id, product_id, length, dur),
             )
         conn.commit()
 

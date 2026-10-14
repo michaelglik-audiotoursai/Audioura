@@ -822,7 +822,8 @@ def purchases_verify():
         if communities_api.is_community_pass_product(product):
             return communities_api.verify_community_pass(
                 store, transaction_id, product, user_id, signed_transaction,
-                community_id=data.get('community_id'))
+                community_id=data.get('community_id'),
+                length=data.get('length'))
     except ImportError:  # pragma: no cover - communities module optional
         pass
 
