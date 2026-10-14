@@ -227,77 +227,157 @@ class _MyToursScreenState extends State<MyToursScreen> {
       return;
     }
 
-    final tiers = await TourPricingService.priceTiers();
+    // [LOCAL-686] The picker offers ONLY the round-dollar ladder (in_picker).
+    final ladder = await TourPricingService.pickerLadder();
     final current = await TourPricingService.price(tourId);
     if (!mounted) return;
 
+    if (ladder.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('Prices are unavailable right now. Please try again.'),
+      ));
+      return;
+    }
+
+    // The LEAD quick-pick recommendation (D-pending): $3, $5, $10, $20, $50.
+    // Map each to its ladder tier (the ladder is round dollars, so these exist).
+    const quickPickUsd = [3.0, 5.0, 10.0, 20.0, 50.0];
+    final quickPicks = <PriceTier>[
+      for (final usd in quickPickUsd)
+        ...ladder.where((t) => t.priceUsd == usd).take(1),
+    ];
+
     int? chosen = current.priceTier; // null = Free
+    final customController = TextEditingController();
+    // If the tour already has a non-quick-pick price, seed the custom field with
+    // it so the guide sees their current price and can tweak it.
+    if (current.priceTier != null &&
+        !quickPicks.any((t) => t.tier == current.priceTier)) {
+      final cur = ladder.where((t) => t.tier == current.priceTier);
+      if (cur.isNotEmpty) {
+        customController.text = cur.first.priceUsd.toStringAsFixed(0);
+      }
+    }
 
     await showDialog(
       context: context,
       builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setDialog) => AlertDialog(
-          title: const Text('Set a price'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Align(
-                alignment: Alignment.centerLeft,
-                child: Padding(
-                  padding: EdgeInsets.only(bottom: 8),
-                  child: Text(
-                    'Stop 1 is a free preview; the rest unlocks on purchase.',
-                    style: TextStyle(fontSize: 12, color: Colors.black54),
+        builder: (ctx, setDialog) {
+          // The label under the custom field: 'Your price: $X' = nearest step.
+          String customSnapLabel = '';
+          final typed = double.tryParse(customController.text.trim());
+          if (typed != null) {
+            final snapped = TourPricingService.snapToLadder(typed, ladder);
+            if (snapped != null) customSnapLabel = 'Your price: ${snapped.label}';
+          }
+
+          Widget priceChip(String label, int? tier) {
+            final selected = chosen == tier;
+            return ChoiceChip(
+              label: Text(label),
+              selected: selected,
+              onSelected: (_) => setDialog(() {
+                chosen = tier;
+                // Picking a chip clears any custom entry (one source of truth).
+                customController.clear();
+              }),
+            );
+          }
+
+          return AlertDialog(
+            title: const Text('Set a price'),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Padding(
+                    padding: EdgeInsets.only(bottom: 8),
+                    child: Text(
+                      'Stop 1 is a free preview; the rest unlocks on purchase.',
+                      style: TextStyle(fontSize: 12, color: Colors.black54),
+                    ),
                   ),
-                ),
+                  // Quick picks + Free as chips at the top of the control.
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 4,
+                    children: [
+                      priceChip('Free', null),
+                      for (final t in quickPicks) priceChip(t.label, t.tier),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  const Text('Or set your own price',
+                      style: TextStyle(fontWeight: FontWeight.w600)),
+                  const SizedBox(height: 4),
+                  TextField(
+                    controller: customController,
+                    keyboardType: const TextInputType.numberWithOptions(
+                        decimal: true),
+                    decoration: const InputDecoration(
+                      labelText: r'Your price ($2–$200)',
+                      prefixText: r'$',
+                      isDense: true,
+                    ),
+                    onChanged: (val) => setDialog(() {
+                      // Typing a custom price snaps to the nearest ladder step
+                      // and selects that tier; the chip selection clears.
+                      final amt = double.tryParse(val.trim());
+                      if (amt != null) {
+                        final snapped =
+                            TourPricingService.snapToLadder(amt, ladder);
+                        chosen = snapped?.tier;
+                      }
+                    }),
+                  ),
+                  if (customSnapLabel.isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 6),
+                      child: Text(
+                        customSnapLabel,
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF1B6B2E),
+                        ),
+                      ),
+                    ),
+                ],
               ),
-              RadioListTile<int?>(
-                title: const Text('Free'),
-                value: null,
-                groupValue: chosen,
-                onChanged: (v) => setDialog(() => chosen = v),
-              ),
-              for (final t in tiers)
-                RadioListTile<int?>(
-                  title: Text(t.label),
-                  value: t.tier,
-                  groupValue: chosen,
-                  onChanged: (v) => setDialog(() => chosen = v),
-                ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: const Text('Cancel'),
             ),
-            ElevatedButton(
-              onPressed: () async {
-                Navigator.pop(ctx);
-                final res = await TourPricingService.setPrice(tourId, chosen);
-                if (!mounted) return;
-                if (res.ok) {
-                  await _loadPriceAndSales(tourId);
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('Cancel'),
+              ),
+              ElevatedButton(
+                onPressed: () async {
+                  Navigator.pop(ctx);
+                  final res = await TourPricingService.setPrice(tourId, chosen);
                   if (!mounted) return;
-                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                    content: Text(chosen == null
-                        ? 'Tour is now free.'
-                        : 'Price set.'),
-                  ));
-                } else {
-                  final msg = res.code == 'not_owner'
-                      ? 'You can only price a tour you created.'
-                      : res.code == 'not_curator'
-                          ? 'Only a Curator can set a price.'
-                          : (res.message ?? 'Could not set the price.');
-                  ScaffoldMessenger.of(context)
-                      .showSnackBar(SnackBar(content: Text(msg)));
-                }
-              },
-              child: const Text('Save'),
-            ),
-          ],
-        ),
+                  if (res.ok) {
+                    await _loadPriceAndSales(tourId);
+                    if (!mounted) return;
+                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                      content: Text(chosen == null
+                          ? 'Tour is now free.'
+                          : 'Price set.'),
+                    ));
+                  } else {
+                    final msg = res.code == 'not_owner'
+                        ? 'You can only price a tour you created.'
+                        : res.code == 'not_curator'
+                            ? 'Only a Curator can set a price.'
+                            : (res.message ?? 'Could not set the price.');
+                    ScaffoldMessenger.of(context)
+                        .showSnackBar(SnackBar(content: Text(msg)));
+                  }
+                },
+                child: const Text('Save'),
+              ),
+            ],
+          );
+        },
       ),
     );
   }
