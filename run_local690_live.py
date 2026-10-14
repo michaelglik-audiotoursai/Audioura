@@ -5,9 +5,10 @@ audiotours_local690 (own container development-postgres-2-1, host port 5433) and
 reports row counts per table. Never touches the shared `audiotours` DB.
 
 Flow: create a paid Listed community with passes + a free community → import a
-feed (mock HTTP) → owner adds a link → a member buys a pass (stub) → a member
-joins the free community → report → map list → reminders tick. Prints row
-counts for every community table at the end.
+feed (mock HTTP) → owner adds a link → a member buys a pass (stub) → the SAME
+$5 product buys a 1-day pass in a second community (LOCAL-690C: one product per
+PRICE, length per community) → a member joins the free community → report → map
+list → reminders tick. Prints row counts for every community table at the end.
 """
 import os
 import sys
@@ -58,12 +59,16 @@ r = c.post("/communities", json={
     "rules_text": "Be kind.", "is_paid": True, "visibility": "listed",
     "latitude": 42.36, "longitude": -71.06,
     "feed_url": "https://h/feed.xml",
-    "pass_products": ["audioura.pass.usd5.month", "audioura.pass.usd5.day"]})
+    "pass_products": [
+        {"product_id": "audioura.pass.usd5", "length": "month"},
+        {"product_id": "audioura.pass.usd5", "length": "day"},
+    ]})
 print("create paid:", r.status_code)
 paid = r.get_json()
 cid = paid["id"]
 print("  join_code:", paid["join_code"])
 print("  invite_message:", paid["invite_message"])
+print("  passes offered:", [(p["product_id"], p["length"], p["label"]) for p in paid["passes"]])
 
 # 2. Free community (book club).
 rf = c.post("/communities", json={"owner_user_id": owner, "name": "LIVE Book Club"})
@@ -81,12 +86,29 @@ ra = c.post(f"/communities/{cid}/episodes", json={
     "owner_user_id": owner, "episodes": [{"title": "Live Stop", "audio_url": "https://h/live.mp3"}]})
 print("add episode:", ra.status_code, ra.get_json())
 
-# 5. Member buys a pass (stub).
+# 5. Member buys a pass (stub) — ONE store product per PRICE; the length rides
+#    on the request. Here the SAME audioura.pass.usd5 buys a MONTH in this
+#    community.
 member = "LIVE-690-member"
 rp = c.post("/purchases/verify", json={
     "store": "stub", "transaction_id": "LIVE-690-txn-1",
-    "product": "audioura.pass.usd5.month", "user_id": member, "community_id": cid})
-print("buy pass:", rp.status_code, rp.get_json().get("membership"))
+    "product": "audioura.pass.usd5", "length": "month",
+    "user_id": member, "community_id": cid})
+print("buy pass ($5/month):", rp.status_code, rp.get_json().get("membership"))
+
+# 5b. [LOCAL-690C] The SAME store product audioura.pass.usd5 buys a 1-DAY pass in
+#     a SECOND community — one product per price serves every community AND every
+#     length (D658 LEAD review). Two memberships, different durations.
+r2 = c.post("/communities", json={
+    "owner_user_id": owner, "name": "LIVE Day-pass Club", "is_paid": True,
+    "pass_products": [{"product_id": "audioura.pass.usd5", "length": "day"}]})
+cid2 = r2.get_json()["id"]
+rp2 = c.post("/purchases/verify", json={
+    "store": "stub", "transaction_id": "LIVE-690-txn-2",
+    "product": "audioura.pass.usd5", "length": "day",
+    "user_id": member, "community_id": cid2})
+print("buy pass ($5/day, 2nd community, SAME product):", rp2.status_code,
+      rp2.get_json().get("membership"))
 
 # 6. Member lists episodes (active).
 rl = c.get(f"/communities/{cid}/episodes?user_id={member}")

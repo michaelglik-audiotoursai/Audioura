@@ -134,3 +134,108 @@ Migration idempotency verified: re-applying `029_communities.sql` produced no er
   purchases use); the `apple` JWS branch reuses the existing verified verifier. The Flutter
   UI was verified by `flutter analyze` + unit tests, not by an on-device run.
 - **Out of scope (by ticket):** owner payouts, tax forms, statements.
+
+
+---
+
+# 690C — pass catalogue = ONE product per PRICE (bounce of LOCAL-690)
+
+LEAD review of LOCAL-690 (2026-10-14): the one deviation from D658 was that migration 029 built
+the pass catalogue per **price × length** (20 products, 5 prices). D658 says Apple's non-renewing
+product carries no length, so **one product per PRICE serves every community and every length** —
+the LENGTH belongs to the community's pass option. Price × length would be 4× the App Store products
+for Michael to create (136 for the full ladder). And prices must come from the full ladder (LOCAL-686).
+690C rewrites 029 in place and threads the length through the stack.
+
+## What changed (690B → 690C)
+
+| Area | Before (690/690B) | After (690C) |
+|------|-------------------|--------------|
+| `community_pass_products` | 20 rows, `(product_id, length, duration_days, price_usd, label)`; ids `audioura.pass.usd5.month` | **34 rows** = the LOCAL-686 ladder prices, `(product_id, price_usd, label)`; ids `audioura.pass.usd<N>`; **no length column** |
+| `community_passes` (owner's options) | `(community, product)`, unique `(community, product)` | adds **`length` + `duration_days`**, unique **`(community, product, length)`** |
+| `/purchases/verify` (pass) | body `{community_id}`; expiry from the product's duration | body `{community_id, length}`; server checks `(community, product, length)` is offered, expiry = now + the **option's** `duration_days` |
+| App pass product ids | 20 `audioura.pass.usdN.length` | the **34** `audioura.pass.usd<N>` (`kPassStoreIds`); `buy/testPurchaseCommunityPass(..., length)` |
+| `Audioura.storekit` | `nonRenewingSubscriptions: []` | **34** non-renewing subscription products `audioura.pass.usd<N>` |
+| Create form | 5 hard-coded `price.length` checkboxes | price **quick-picks ($2/$3/$5/$10/$20/$50) + Custom (snaps to the nearest ladder dollar) + four length checkboxes**; `pass_products` body is `[{product_id, length}]` |
+
+The page still shows **"$5 / month"**: the catalogue label is the price only (`$5`), and the server
+composes `price_label / length` from the option (`pass_label_for`). Durations are the same
+calendar-free arithmetic (day=1, week=7, month=30, year=365).
+
+## Rulings → where they live (690C delta)
+- *One product per PRICE, length per community* → migration 029 §2 (34 price-only products) + §3
+  (`community_passes.length/duration_days`, unique `(community, product, length)`);
+  `communities_api._offered_option()` and `verify_community_pass(..., length)`.
+- *Prices come from the full ladder (LOCAL-686)* → the 34 `audioura.pass.usd<N>` match
+  `price_tiers` tiers 8..41; the create form snaps a custom price with `snapDollarsToLadder`
+  (mirrors `TourPricingService.snapToLadder` / `price_tiers.snap_to_ladder`).
+- *Request carries community_id + length; buying again extends* → `/purchases/verify` passes
+  `length` through; `_upsert_membership` is one row per `(user, community)` with a fresh expiry.
+
+## Reminders — the daily tick for LEAD (unchanged endpoint)
+`POST /communities/reminders/run` still runs the 3-days-before + at-expiry buckets (idempotent per
+period). To fire it once a day, add a tick that calls it — e.g. a cron/launchd entry hitting the
+user-api, or a one-liner on the host:
+
+```
+# once a day (example: 09:00). Point at the user-api base URL + API key in prod.
+0 9 * * *  curl -fsS -X POST "$USER_API_BASE/communities/reminders/run" -H "X-API-Key: $GATEWAY_API_KEY"
+```
+
+(Not wired into `.continuous_dev/*` — that is LEAD's call, per the ticket.) The app shows due
+reminders from `/communities/mine` as the in-app "expires in N days — Renew" banner.
+
+## Tests (690C)
+- **Server: 27 pass** (was 24) on `audiotours_test`. New/updated:
+  - `test_one_price_product_two_communities_two_lengths` — the SAME `audioura.pass.usd5` buys a
+    **1-day** pass in community A and a **1-month** pass in community B: two memberships, expiries
+    ≈ now+1d and now+30d.
+  - `test_catalogue_has_34_price_products_no_length` — catalogue is the 34 ladder prices with
+    **no** `length`/`duration_days` column; those live on `community_passes`.
+  - `test_pass_not_offered_refused` — a different product **and** the right product with a length
+    the community did not offer both → 400 `pass_not_offered`.
+  - `test_duration_days_for_length_and_label`, updated `test_is_community_pass_product`
+    (`audioura.pass.usd5` is a pass), and every pass purchase now carries `length`.
+- **Dart: 14 pass** (was 11). New `community pass product ids` group: `kPassStoreIds`/`kPassLadderDollars`
+  are 34 ids with no length suffix; `passProductForDollars(5) == 'audioura.pass.usd5'`; four lengths.
+  `Community.fromJson` pass payload updated to the new product shape.
+
+## Live row counts — isolated DB `audiotours_local690` (own container `development-postgres-2-1`, host 5433)
+`run_local690_live.py` (updated to the new shape) ran the full flow. The $5 product bought a
+**month** in the paid community and a **day** in a second community (one product, two lengths):
+
+| table | rows |
+|-------|------|
+| communities | 3 |
+| community_pass_products | **34** |
+| community_passes | 3 |
+| community_memberships | 3 |
+| community_episodes | 3 |
+| community_reports | 1 |
+| purchases | 2 |
+
+Live output confirmed `passes offered: [('audioura.pass.usd5','day','$5 / day'),
+('audioura.pass.usd5','month','$5 / month')]`, `buy pass ($5/month) duration_days 30`, and
+`buy pass ($5/day, 2nd community, SAME product) duration_days 1`.
+
+Migration 029 was dropped+re-applied on both `audiotours_test` and `audiotours_local690` (isolated
+DBs I own); `INSERT 0 34` on apply; the shared `audiotours` DB was never touched; no `-p audioura`,
+no `audioura-*` container renamed.
+
+## Commits (690C, per step)
+- `b3fa2ed0` — migration 029 rewritten + server (one product per price; length on the option;
+  `verify_community_pass(..., length)`; `_offered_option`; create attaches `{product_id, length}`).
+- `5a9efa38` — app (34 `audioura.pass.usd<N>` ids; buy/testPurchase take length; 34 storekit
+  non-renewing subscriptions; create form price-ladder + length picker; build 49→50).
+- `73c1161e` — tests (server to new shape + 3 new 690C tests = 27 pass; Dart pass payload + iap
+  pass-id group = 14 pass).
+
+## Honest status (690C)
+- **Proven:** 27 server tests + 14 Dart tests pass; the full live flow on the isolated DB with the
+  34-price catalogue and the one-product-two-lengths-two-communities case; migration applies with
+  `INSERT 0 34`; `flutter analyze` clean on the changed files.
+- **Not exercised live:** the real Apple/Google pass products still do not exist, so the pass
+  purchase was proven through the `stub` path; the `apple` JWS branch reuses the existing verifier
+  (now also sending `length`). The storekit entries and the create-form UI were verified by analyze
+  + unit tests, not an on-device run.
+- **Out of scope (by ticket):** owner payouts, tax forms, statements.
