@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""tour_editor_score.py — LOCAL-685: an evaluated starting score for every tour.
+"""tour_editor_score.py — LOCAL-685/688: an evaluated starting score for every tour.
 
 Michael, 2026-10-14: every unrated tour showed the same "7.5 · New", which
 "looks very artificial — that it is". This routine reads a tour's text, has a
@@ -7,6 +7,13 @@ small model grade it on a fixed rubric, and maps the result to 5.0–8.0. The
 number becomes the tour's PRIOR: shown while the tour has no ratings, blended
 with the first 1–3 ratings, and used as the Bayesian rank prior. Real listener
 ratings take over exactly as before (D647: median from 4 ratings on).
+
+[LOCAL-688] A single rubric run wobbles ±0.4 at temperature 0 (the model is not
+deterministic). The score is therefore the mean of THREE runs: each criterion is
+graded three times and averaged before mapping. Every run's grades are kept in
+editor_score_detail['runs'] so the published number is auditable, and the
+detail now carries a rubric_version (2) that the "Why this score" explanation
+surfaces to guides and listeners.
 
 Why 5.0–8.0: below 5 would bury a tour nobody has heard yet; above 8 would
 claim more than an unrated tour has earned. 9–10 stay reserved for listeners.
@@ -36,6 +43,14 @@ from datetime import datetime, timezone
 import psycopg2
 
 MODEL = os.getenv('EDITOR_SCORE_MODEL', 'gpt-4.1')
+# [LOCAL-688] A single run of the rubric wobbles ±0.4 even at temperature 0
+# (the model is not deterministic). Grade the SAME script three times and
+# average each criterion before mapping, so the published score is stable.
+# Overridable for cost control in tests/backfills; must be >= 1.
+RUBRIC_RUNS = max(1, int(os.getenv('EDITOR_SCORE_RUNS', '3')))
+# Bumped from 1 (LOCAL-685) to 2 (LOCAL-688): the published number is now the
+# mean of three runs, not one. Shown to guides/listeners in the explanation.
+RUBRIC_VERSION = 2
 SCORE_MIN, SCORE_MAX = 5.0, 8.0
 # The rubric average that maps to the ends of 5.0–8.0. A small model's grades
 # bunch between 5 and 9, so map that band (not 1–10) or every tour would land
@@ -76,7 +91,11 @@ def map_to_range(avg):
 
 
 def judge(title, text, stops):
-    """Ask the model for the five grades. Returns (detail dict, usage)."""
+    """Ask the model for the five grades ONCE. Returns (detail dict, usage).
+
+    The returned detail has each criterion clamped to 1–10 in 0.5 steps, plus
+    the model's per-criterion `evidence` and one-line `summary`.
+    """
     from openai import OpenAI
     client = OpenAI()
     resp = client.chat.completions.create(
@@ -92,12 +111,53 @@ def judge(title, text, stops):
     return detail, resp.usage
 
 
-def score_text(title, text, stops):
-    detail, usage = judge(title, text, stops)
-    avg = sum(detail[c] for c in CRITERIA) / len(CRITERIA)
-    detail.update({'rubric_avg': round(avg, 2), 'model': MODEL,
-                   'tokens_in': usage.prompt_tokens, 'tokens_out': usage.completion_tokens})
-    return map_to_range(avg), detail
+def _mean(values):
+    return sum(values) / len(values)
+
+
+def score_text(title, text, stops, runs=None):
+    """Grade the script `runs` times (default RUBRIC_RUNS = 3), average each of
+    the five criteria across the runs, then map that average to 5.0–8.0.
+
+    [LOCAL-688] Averaging three runs removes the ±0.4 single-run wobble. Every
+    run's five grades are kept in detail['runs'] so the number is auditable; the
+    published per-criterion grades (detail['story'], …) and evidence/summary come
+    from the averaged / first run respectively, so downstream shape is unchanged.
+    """
+    n = runs if runs is not None else RUBRIC_RUNS
+    results = []
+    tin = tout = 0
+    for _ in range(n):
+        d, usage = judge(title, text, stops)
+        results.append(d)
+        tin += usage.prompt_tokens
+        tout += usage.completion_tokens
+
+    # Average each criterion across runs, re-rounded to the same 0.5 grid so the
+    # published grade reads like a single rubric grade.
+    averaged = {}
+    for c in CRITERIA:
+        avg_c = _mean([r[c] for r in results])
+        averaged[c] = max(1.0, min(10.0, round(avg_c * 2) / 2))
+
+    rubric_avg = _mean([averaged[c] for c in CRITERIA])
+
+    # Evidence and summary are qualitative; take them from the FIRST run (all
+    # runs grade the same text, the sentences are interchangeable).
+    first = results[0]
+    detail = {c: averaged[c] for c in CRITERIA}
+    detail['evidence'] = first.get('evidence', {})
+    detail['summary'] = first.get('summary', '')
+    detail['rubric_avg'] = round(rubric_avg, 2)
+    detail['rubric_version'] = RUBRIC_VERSION
+    detail['model'] = MODEL
+    detail['runs'] = [
+        {c: r[c] for c in CRITERIA} for r in results
+    ]
+    detail['run_count'] = len(results)
+    detail['tokens_in'] = tin
+    detail['tokens_out'] = tout
+    return map_to_range(rubric_avg), detail
 
 
 def _conn():
