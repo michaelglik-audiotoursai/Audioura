@@ -63,11 +63,15 @@ class _HomeScreenState extends State<HomeScreen> {
   // (7, 8, or 9). Remembered per device under SharedPreferences 'home_min_rating'
   // and passed to /tours-near as ?min_rating=<n> so the server filters.
   double _minRating = 0.0;
-  // [LOCAL-681] How far from the map location tours are listed, in MILES, for
-  // both sort orders. Michael, 2026-10-14: "Top rated first" must mean top rated
-  // nearby, not anywhere. Default 10 mi (was a hidden fixed 50 km ≈ 31 mi).
-  static const List<int> _radiusChoicesMi = [1, 5, 10, 25, 50];
-  int _radiusMi = 10;
+  // [LOCAL-681] The map lists the tours in the area the listener is LOOKING AT:
+  // zoom out for more, zoom in for fewer. Michael, 2026-10-14, replacing a
+  // "Within N mi" setting: "maybe it should not be in the radius, but in the
+  // visible Home page, so user can zoom in and out." Both sort orders apply to
+  // this same area. Reloaded (debounced) whenever the map stops moving.
+  LatLngBounds? _viewBounds;
+  Timer? _viewReloadTimer;
+  // A world-wide view would ask for every tour; cap the circle at 500 km.
+  static const double _maxViewRadiusKm = 500;
   // [LOCAL-672] Home-page "Top rated" sort: when true, /tours-near is asked for
   // ?sort=top_rated and the server orders by the Bayesian rank_score (verified
   // ratings weighted higher, old/pre-version ratings decayed). Remembered per
@@ -109,10 +113,6 @@ class _HomeScreenState extends State<HomeScreen> {
     final mode = prefs.getString('app_mode') ?? 'Tours';
     _minRating = prefs.getDouble('home_min_rating') ?? 0.0;
     _topRated = prefs.getBool('home_top_rated') ?? false;
-    final storedRadius = prefs.getInt('home_radius_mi');
-    if (storedRadius != null && _radiusChoicesMi.contains(storedRadius)) {
-      _radiusMi = storedRadius;
-    }
     _priceFilter = prefs.getString('home_price_filter') ?? '';
     await _loadLocationHistory();
     await _loadCustomLocation();
@@ -308,6 +308,8 @@ class _HomeScreenState extends State<HomeScreen> {
                         size: 20,
                       ),
                     ),
+                    // [LOCAL-682] Gold $ badge: this pin holds a paid tour.
+                    if (_clusterHasPaid(cluster['tours'] as List)) const _PaidPinBadge(),
                     if (isMultiple)
                       Positioned(
                         right: -2,
@@ -341,8 +343,38 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  /// [LOCAL-682] True when any tour on this pin is paid (Michael, 2026-10-14:
+  /// paid and free pins looked identical).
+  static bool _clusterHasPaid(List toursList) => toursList.any((t) =>
+      t is Map &&
+      (t['is_paid'] == true ||
+          (t['price_tier'] is num && (t['price_tier'] as num) > 0)));
+
+  /// [LOCAL-681] The map moved: remember the visible area and reload once the
+  /// listener stops panning/zooming (programmatic moves count too, so a search
+  /// that moves the map lists that area).
+  void _onMapMoved(MapPosition position, bool hasGesture) {
+    final bounds = position.bounds;
+    if (bounds == null) return;
+    _viewBounds = bounds;
+    _viewReloadTimer?.cancel();
+    _viewReloadTimer = Timer(const Duration(milliseconds: 600), () {
+      if (mounted) _loadNearbyTours();
+    });
+  }
+
   Future<void> _loadNearbyTours() async {
-    final searchLocation = _displayLocation ?? _userLocation;
+    // [LOCAL-681] Prefer the visible map area: its centre, and a circle reaching
+    // its corners (so nothing on screen is missed). Before the map has reported
+    // its area, fall back to the listener's location and ~10 mi.
+    final view = _viewBounds;
+    final searchLocation = view?.center ?? _displayLocation ?? _userLocation;
+    final double radiusKm = view == null
+        ? 16.0
+        : min(
+            _calculateDistance(view.center.latitude, view.center.longitude,
+                view.northEast.latitude, view.northEast.longitude),
+            _maxViewRadiusKm);
     if (searchLocation == null) {
       await DebugLogHelper.addDebugLog('HOME: Cannot load tours - no location available');
       return;
@@ -353,7 +385,7 @@ class _HomeScreenState extends State<HomeScreen> {
       // [LOCAL-670] Pass the chosen minimum rating to the server so it filters
       // (Any = omit the param entirely). The server computes the shown score and
       // drops tours below the bar.
-      final uri = await Endpoints.url(Service.mapDelivery, '/tours-near/${searchLocation.latitude}/${searchLocation.longitude}?radius=${(_radiusMi * 1.609344).toStringAsFixed(1)}${_filterQueryParams()}');
+      final uri = await Endpoints.url(Service.mapDelivery, '/tours-near/${searchLocation.latitude}/${searchLocation.longitude}?radius=${radiusKm.toStringAsFixed(1)}${_filterQueryParams()}');
       final url = uri.toString();
       
       await DebugLogHelper.addDebugLog('HOME: Requesting tours from: $url');
@@ -412,6 +444,8 @@ class _HomeScreenState extends State<HomeScreen> {
                             size: 20,
                           ),
                         ),
+                        // [LOCAL-682] Gold $ badge: this pin holds a paid tour.
+                        if (_clusterHasPaid(toursList)) const _PaidPinBadge(),
                         if (isMultiple)
                           Positioned(
                             right: -2,
@@ -488,14 +522,6 @@ class _HomeScreenState extends State<HomeScreen> {
     await _loadNearbyTours();
   }
 
-  Future<void> _setRadiusMi(int value) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setInt('home_radius_mi', value);
-    if (!mounted) return;
-    setState(() => _radiusMi = value);
-    await _loadNearbyTours();
-  }
-
   Future<void> _setPriceFilter(String value) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('home_price_filter', value);
@@ -517,9 +543,7 @@ class _HomeScreenState extends State<HomeScreen> {
           children: [
             for (final topRated in [false, true])
               RadioListTile<bool>(
-                title: Text(topRated
-                    ? 'Top rated first (within $_radiusMi mi)'
-                    : 'Nearest first (within $_radiusMi mi)'),
+                title: Text(topRated ? 'Top rated first' : 'Nearest first'),
                 subtitle: Text(topRated
                     ? 'Best listener ratings first; verified buyers count more'
                     : 'Closest to the map location first'),
@@ -532,23 +556,8 @@ class _HomeScreenState extends State<HomeScreen> {
                 },
               ),
             const Divider(),
-            Row(
-              children: [
-                const Text('Within: '),
-                DropdownButton<int>(
-                  value: _radiusMi,
-                  items: [
-                    for (final mi in _radiusChoicesMi)
-                      DropdownMenuItem(value: mi, child: Text('$mi mi')),
-                  ],
-                  onChanged: (v) async {
-                    if (v == null) return;
-                    Navigator.pop(context);
-                    await _setRadiusMi(v);
-                  },
-                ),
-              ],
-            ),
+            Text('Applies to the tours in the visible map area — zoom out to see more.',
+                style: TextStyle(fontSize: 12, color: Colors.grey.shade700)),
           ],
         ),
         actions: [
@@ -773,8 +782,6 @@ class _HomeScreenState extends State<HomeScreen> {
             _setMinRating),
         row<bool>('Sort', _topRated,
             const {false: 'Nearest first', true: 'Top rated first'}, _setTopRated),
-        row<int>('Within', _radiusMi,
-            {for (final mi in _radiusChoicesMi) mi: '$mi mi of the map'}, _setRadiusMi),
         row<String>('Price', _priceFilter,
             const {'': 'Free and paid', 'free': 'Free only', 'paid': 'Paid only'},
             _setPriceFilter),
@@ -3713,9 +3720,7 @@ class _HomeScreenState extends State<HomeScreen> {
             icon: Icon(Icons.sort,
                 color: _topRated ? Colors.amber : null),
             onPressed: _showSortDialog,
-            tooltip: _topRated
-                ? 'Sorted: Top rated first (within $_radiusMi mi)'
-                : 'Sorted: Nearest first (within $_radiusMi mi)',
+            tooltip: _topRated ? 'Sorted: Top rated first' : 'Sorted: Nearest first',
           ),
           // [LOCAL-677] Free/Paid/Any filter. The chosen option is remembered
           // per device and passed to /tours-near as ?price=free|paid.
@@ -3802,6 +3807,12 @@ class _HomeScreenState extends State<HomeScreen> {
               options: MapOptions(
                 initialCenter: _displayLocation ?? _userLocation ?? LatLng(42.3601, -71.0589),
                 initialZoom: 13.0,
+                // [LOCAL-681] The visible area decides which tours are listed.
+                onPositionChanged: _onMapMoved,
+                onMapReady: () {
+                  _viewBounds = _mapController.camera.visibleBounds;
+                  _loadNearbyTours();
+                },
               ),
               children: [
                 TileLayer(
@@ -4620,6 +4631,40 @@ class _PreviewControls extends StatelessWidget {
           ],
         );
       },
+    );
+  }
+}
+
+
+/// [LOCAL-682] Small gold "$" in the pin's bottom-right corner (the top-right is
+/// the multi-tour badge).
+class _PaidPinBadge extends StatelessWidget {
+  const _PaidPinBadge();
+
+  @override
+  Widget build(BuildContext context) {
+    return Positioned(
+      right: -2,
+      bottom: -2,
+      child: Container(
+        width: 18,
+        height: 18,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: const Color(0xFFFFC107),
+          shape: BoxShape.circle,
+          border: Border.all(color: Colors.white, width: 1.5),
+        ),
+        child: const Text(
+          '\$',
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w900,
+            color: Color(0xFF5D4037),
+            height: 1.0,
+          ),
+        ),
+      ),
     );
   }
 }
