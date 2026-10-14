@@ -244,7 +244,7 @@ def test_free_join_and_paid_refuses_free_join(client):
     assert r.get_json()["my_status"]["active"] is True
 
     paid = _create(client, name=TEST_PREFIX + "PaidC", is_paid=True,
-                   pass_products=["audioura.pass.usd5.month"]).get_json()
+                   pass_products=[{"product_id": "audioura.pass.usd5", "length": "month"}]).get_json()
     r2 = client.post(f"/communities/{paid['id']}/join", json={"user_id": member})
     assert r2.status_code == 402
 
@@ -253,16 +253,17 @@ def test_free_join_and_paid_refuses_free_join(client):
 
 def test_pass_purchase_grants_membership_with_expiry(client, db, modules):
     paid = _create(client, name=TEST_PREFIX + "PaidPass", is_paid=True,
-                   pass_products=["audioura.pass.usd5.month"]).get_json()
+                   pass_products=[{"product_id": "audioura.pass.usd5", "length": "month"}]).get_json()
     buyer = TEST_PREFIX + "buyer1"
     body = {"store": "stub", "transaction_id": TEST_PREFIX + "txn1",
-            "product": "audioura.pass.usd5.month", "user_id": buyer,
+            "product": "audioura.pass.usd5", "length": "month", "user_id": buyer,
             "community_id": paid["id"]}
     r = client.post("/purchases/verify", json=body)
     assert r.status_code == 200
     j = r.get_json()
     assert j["verified"] is True
     assert j["membership"]["duration_days"] == 30
+    assert j["membership"]["length"] == "month"
     # expiry ≈ now + 30 days
     exp = datetime.fromisoformat(j["membership"]["expires_at"])
     assert timedelta(days=29) < (exp - datetime.utcnow()) < timedelta(days=31)
@@ -270,9 +271,9 @@ def test_pass_purchase_grants_membership_with_expiry(client, db, modules):
 
 def test_pass_purchase_idempotent(client):
     paid = _create(client, name=TEST_PREFIX + "Idem", is_paid=True,
-                   pass_products=["audioura.pass.usd5.day"]).get_json()
+                   pass_products=[{"product_id": "audioura.pass.usd5", "length": "day"}]).get_json()
     body = {"store": "stub", "transaction_id": TEST_PREFIX + "txn-idem",
-            "product": "audioura.pass.usd5.day", "user_id": TEST_PREFIX + "b2",
+            "product": "audioura.pass.usd5", "length": "day", "user_id": TEST_PREFIX + "b2",
             "community_id": paid["id"]}
     r1 = client.post("/purchases/verify", json=body)
     assert r1.status_code == 200
@@ -282,21 +283,23 @@ def test_pass_purchase_idempotent(client):
 
 def test_buying_again_extends_expiry(client, db):
     paid = _create(client, name=TEST_PREFIX + "Renew", is_paid=True,
-                   pass_products=["audioura.pass.usd5.day", "audioura.pass.usd5.year"]).get_json()
+                   pass_products=[{"product_id": "audioura.pass.usd5", "length": "day"},
+                                  {"product_id": "audioura.pass.usd5", "length": "year"}]).get_json()
     buyer = TEST_PREFIX + "renewer"
-    # First a 1-day pass.
+    # First a 1-day pass (same store product, length=day).
     client.post("/purchases/verify", json={
         "store": "stub", "transaction_id": TEST_PREFIX + "r-day",
-        "product": "audioura.pass.usd5.day", "user_id": buyer,
+        "product": "audioura.pass.usd5", "length": "day", "user_id": buyer,
         "community_id": paid["id"]})
     cur = db.cursor()
     cur.execute("SELECT expires_at FROM community_memberships WHERE user_id=%s AND community_id=%s",
                 (buyer, paid["id"]))
     exp1 = cur.fetchone()[0]
-    # Buy again — a 1-year pass. ONE row, a FRESH (later) expiry.
+    # Buy again — a 1-year pass (SAME product, length=year). ONE row, a FRESH
+    # (later) expiry.
     client.post("/purchases/verify", json={
         "store": "stub", "transaction_id": TEST_PREFIX + "r-year",
-        "product": "audioura.pass.usd5.year", "user_id": buyer,
+        "product": "audioura.pass.usd5", "length": "year", "user_id": buyer,
         "community_id": paid["id"]})
     cur.execute("SELECT COUNT(*), MAX(expires_at) FROM community_memberships WHERE user_id=%s AND community_id=%s",
                 (buyer, paid["id"]))
@@ -307,21 +310,93 @@ def test_buying_again_extends_expiry(client, db):
 
 
 def test_pass_not_offered_refused(client):
+    # The community offers only usd5/month. A different PRICE and a different
+    # LENGTH of the same price are both "not offered" (the option is the
+    # (product, length) pair, LEAD review of LOCAL-690).
     paid = _create(client, name=TEST_PREFIX + "Offer", is_paid=True,
-                   pass_products=["audioura.pass.usd5.month"]).get_json()
+                   pass_products=[{"product_id": "audioura.pass.usd5", "length": "month"}]).get_json()
+    # A different product entirely → not offered.
     r = client.post("/purchases/verify", json={
         "store": "stub", "transaction_id": TEST_PREFIX + "no-offer",
-        "product": "audioura.pass.usd50.year",  # not offered by this community
+        "product": "audioura.pass.usd50", "length": "year",
         "user_id": TEST_PREFIX + "b3", "community_id": paid["id"]})
     assert r.status_code == 400
     assert r.get_json()["error"] == "pass_not_offered"
+    # The RIGHT product but a LENGTH the community did not offer → not offered.
+    r2 = client.post("/purchases/verify", json={
+        "store": "stub", "transaction_id": TEST_PREFIX + "wrong-len",
+        "product": "audioura.pass.usd5", "length": "year",
+        "user_id": TEST_PREFIX + "b3", "community_id": paid["id"]})
+    assert r2.status_code == 400
+    assert r2.get_json()["error"] == "pass_not_offered"
+
+
+def test_one_price_product_two_communities_two_lengths(client, db):
+    """[LOCAL-690C] The heart of the LEAD review: ONE store product per PRICE
+    serves every community AND every length. The SAME audioura.pass.usd5 buys a
+    1-DAY pass in community A and a 1-MONTH pass in community B — two
+    memberships, each with the length's own expiry."""
+    a = _create(client, name=TEST_PREFIX + "A-day", is_paid=True,
+                pass_products=[{"product_id": "audioura.pass.usd5", "length": "day"}]).get_json()
+    b = _create(client, name=TEST_PREFIX + "B-month", is_paid=True,
+                pass_products=[{"product_id": "audioura.pass.usd5", "length": "month"}]).get_json()
+    buyer = TEST_PREFIX + "multi-buyer"
+
+    ra = client.post("/purchases/verify", json={
+        "store": "stub", "transaction_id": TEST_PREFIX + "m-a",
+        "product": "audioura.pass.usd5", "length": "day",
+        "user_id": buyer, "community_id": a["id"]})
+    rb = client.post("/purchases/verify", json={
+        "store": "stub", "transaction_id": TEST_PREFIX + "m-b",
+        "product": "audioura.pass.usd5", "length": "month",
+        "user_id": buyer, "community_id": b["id"]})
+    assert ra.status_code == 200 and rb.status_code == 200
+    # Same store product, different lengths → different durations.
+    assert ra.get_json()["membership"]["duration_days"] == 1
+    assert rb.get_json()["membership"]["duration_days"] == 30
+
+    # Two separate memberships, each with the right expiry window.
+    cur = db.cursor()
+    cur.execute("SELECT community_id, expires_at FROM community_memberships "
+                "WHERE user_id=%s ORDER BY expires_at", (buyer,))
+    rows = cur.fetchall()
+    cur.close()
+    assert len(rows) == 2
+    now = datetime.utcnow()
+    by_comm = {cid: exp for cid, exp in rows}
+    # A ≈ now + 1 day, B ≈ now + 30 days.
+    assert timedelta(hours=20) < (by_comm[a["id"]] - now) < timedelta(days=2)
+    assert timedelta(days=29) < (by_comm[b["id"]] - now) < timedelta(days=31)
+
+
+def test_catalogue_has_34_price_products_no_length(client, db):
+    """[LOCAL-690C] The pass catalogue is the 34 ladder PRICES with NO length —
+    one Apple product per price (D658 LEAD review). The length lives on the
+    community option, not the catalogue."""
+    cur = db.cursor()
+    cur.execute("SELECT COUNT(*) FROM community_pass_products "
+                "WHERE product_id LIKE 'audioura.pass.usd%' AND active = TRUE")
+    assert cur.fetchone()[0] >= 34  # the 34 ladder prices (seed is exactly 34)
+    # The catalogue carries NO length column (one product per price).
+    cur.execute("SELECT column_name FROM information_schema.columns "
+                "WHERE table_name = 'community_pass_products'")
+    cols = {r[0] for r in cur.fetchall()}
+    assert "length" not in cols
+    assert "duration_days" not in cols
+    # The LENGTH + duration_days live on the OPTION table instead.
+    cur.execute("SELECT column_name FROM information_schema.columns "
+                "WHERE table_name = 'community_passes'")
+    opt_cols = {r[0] for r in cur.fetchall()}
+    assert "length" in opt_cols
+    assert "duration_days" in opt_cols
+    cur.close()
 
 
 # ─── expiry blocks NEW content ──────────────────────────────────────────────────
 
 def test_expired_member_cannot_list_episodes_owner_and_active_can(client, db, modules):
     paid = _create(client, name=TEST_PREFIX + "Episodes", is_paid=True,
-                   pass_products=["audioura.pass.usd5.month"]).get_json()
+                   pass_products=[{"product_id": "audioura.pass.usd5", "length": "month"}]).get_json()
     cid = paid["id"]
     owner = TEST_PREFIX + "owner"
     # Owner adds an episode (no content check).
@@ -338,7 +413,7 @@ def test_expired_member_cannot_list_episodes_owner_and_active_can(client, db, mo
     member = TEST_PREFIX + "activemember"
     client.post("/purchases/verify", json={
         "store": "stub", "transaction_id": TEST_PREFIX + "act",
-        "product": "audioura.pass.usd5.month", "user_id": member,
+        "product": "audioura.pass.usd5", "length": "month", "user_id": member,
         "community_id": cid})
     ra = client.get(f"/communities/{cid}/episodes?user_id={member}")
     assert ra.status_code == 200
@@ -400,7 +475,7 @@ def test_import_feed_owner_only(client, modules):
 
 def test_reminders_before_and_at_expiry_each_once(client, db, modules):
     paid = _create(client, name=TEST_PREFIX + "Remind", is_paid=True,
-                   pass_products=["audioura.pass.usd5.month"]).get_json()
+                   pass_products=[{"product_id": "audioura.pass.usd5", "length": "month"}]).get_json()
     cid = paid["id"]
     # Member A: expiring in 2 days → before-reminder bucket.
     a = TEST_PREFIX + "rem-a"
@@ -409,7 +484,7 @@ def test_reminders_before_and_at_expiry_each_once(client, db, modules):
     for u in (a, b):
         client.post("/purchases/verify", json={
             "store": "stub", "transaction_id": TEST_PREFIX + "rm-" + u[-5:],
-            "product": "audioura.pass.usd5.month", "user_id": u,
+            "product": "audioura.pass.usd5", "length": "month", "user_id": u,
             "community_id": cid})
     cur = db.cursor()
     cur.execute("UPDATE community_memberships SET expires_at=%s WHERE user_id=%s AND community_id=%s",
@@ -486,7 +561,20 @@ def test_compute_expiry_and_active(modules):
 
 def test_is_community_pass_product(modules):
     ca = modules["ca"]
-    assert ca.is_community_pass_product("audioura.pass.usd5.month") is True
+    # One product per PRICE now (no length suffix) — still recognised by prefix.
+    assert ca.is_community_pass_product("audioura.pass.usd5") is True
+    assert ca.is_community_pass_product("audioura.pass.usd200") is True
     assert ca.is_community_pass_product("audioura.tour.tier3") is False
     assert ca.is_community_pass_product("l3_pack_10") is False
     assert ca.is_community_pass_product(None) is False
+
+
+def test_duration_days_for_length_and_label(modules):
+    ca = modules["ca"]
+    assert ca.duration_days_for_length("day") == 1
+    assert ca.duration_days_for_length("week") == 7
+    assert ca.duration_days_for_length("month") == 30
+    assert ca.duration_days_for_length("year") == 365
+    assert ca.duration_days_for_length("decade") is None
+    # The page label composes the catalogue PRICE label with the option length.
+    assert ca.pass_label_for("$5", "month") == "$5 / month"

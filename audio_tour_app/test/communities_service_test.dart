@@ -11,6 +11,7 @@
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:audio_tour_app_dev/services/communities_models.dart';
+import 'package:audio_tour_app_dev/services/iap_service.dart';
 
 void main() {
   group('CommunityRules.originLabel', () {
@@ -76,7 +77,7 @@ void main() {
         'longitude': -71.0,
         'passes': [
           {
-            'product_id': 'audioura.pass.usd5.month',
+            'product_id': 'audioura.pass.usd5',
             'length': 'month',
             'duration_days': 30,
             'price_usd': 5.0,
@@ -102,6 +103,8 @@ void main() {
       expect(c.isPaid, isTrue);
       expect(c.visibility, 'listed');
       expect(c.passes.single.label, r'$5 / month');
+      expect(c.passes.single.productId, 'audioura.pass.usd5');
+      expect(c.passes.single.length, 'month');
       expect(c.passes.single.durationDays, 30);
       expect(c.episodes.single.position, 1);
       expect(c.episodes.single.source, 'feed');
@@ -138,6 +141,34 @@ void main() {
       });
       expect(j.active, isTrue);
       expect(j.organiserName, 'O');
+    });
+  });
+
+  // [LOCAL-690C] The pass catalogue is ONE store product per PRICE (the 34
+  // ladder prices); the LENGTH is sent separately. No length in the product id.
+  group('community pass product ids (one per price)', () {
+    test('34 ladder prices, ids audioura.pass.usd<N>, no length suffix', () {
+      expect(kPassLadderDollars.length, 34);
+      expect(kPassStoreIds.length, 34);
+      // The lowest and highest ladder steps.
+      expect(kPassStoreIds.contains('audioura.pass.usd2'), isTrue);
+      expect(kPassStoreIds.contains('audioura.pass.usd200'), isTrue);
+      // No id carries a length suffix (one product per price).
+      for (final id in kPassStoreIds) {
+        expect(id.startsWith('audioura.pass.usd'), isTrue);
+        expect(id.contains('.day') || id.contains('.week') ||
+            id.contains('.month') || id.contains('.year'), isFalse);
+      }
+    });
+
+    test('passProductForDollars + isCommunityPassProduct', () {
+      expect(passProductForDollars(5), 'audioura.pass.usd5');
+      expect(isCommunityPassProduct('audioura.pass.usd5'), isTrue);
+      expect(isCommunityPassProduct('audioura.tour.usd5'), isFalse);
+    });
+
+    test('the four lengths are day/week/month/year', () {
+      expect(kPassLengths, ['day', 'week', 'month', 'year']);
     });
   });
 }
