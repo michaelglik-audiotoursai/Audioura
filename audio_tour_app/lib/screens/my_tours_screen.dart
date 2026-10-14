@@ -154,10 +154,16 @@ class _MyToursScreenState extends State<MyToursScreen> {
 
   /// [LOCAL-677] The numeric tour id of a saved tour, or null for a local-only
   /// tour that was never persisted server-side (can't be priced/sold).
+  ///
+  /// [LOCAL-680] Prefers `server_tour_id`, stamped at download (LOCAL-677B):
+  /// `tour_id` holds the EDIT id, which is non-numeric for a downloaded tour, so
+  /// Rate said "no numeric tour ID" on a bought tour (Michael, 2026-10-14).
   String? _numericTourId(Map<String, dynamic> tour) {
-    final raw = tour['tour_id']?.toString();
-    if (raw == null || int.tryParse(raw) == null) return null;
-    return raw;
+    for (final key in const ['server_tour_id', 'tour_id']) {
+      final raw = tour[key]?.toString();
+      if (raw != null && int.tryParse(raw) != null) return raw;
+    }
+    return null;
   }
 
   /// [LOCAL-677] Lazily load a tour's price + sales count for the curator view.
@@ -1055,8 +1061,8 @@ class _MyToursScreenState extends State<MyToursScreen> {
   /// the numeric tour_id; a tour with no numeric id (local-only) can't be rated,
   /// so we tell the user rather than silently failing.
   Future<void> _showRateDialog(Map<String, dynamic> tour) async {
-    final tourId = tour['tour_id'];
-    if (tourId == null || int.tryParse(tourId.toString()) == null) {
+    final tourId = _numericTourId(tour);
+    if (tourId == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('This tour cannot be rated yet (no numeric tour ID).'),
@@ -1082,7 +1088,7 @@ class _MyToursScreenState extends State<MyToursScreen> {
   }
 
   Future<void> _showTranslateDialog(Map<String, dynamic> tour) async {
-    final tourId = tour['tour_id'];
+    final tourId = _numericTourId(tour) ?? tour['tour_id'];
     if (tourId == null || tourId.toString().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('This tour cannot be translated (no tour ID).'), backgroundColor: Colors.orange),
@@ -1260,7 +1266,7 @@ class _MyToursScreenState extends State<MyToursScreen> {
   /// non-numeric ids and surfaces server/offline errors as a SnackBar.
   void _shareTour(Map<String, dynamic> tour) {
     final title = (tour['title'] ?? 'this tour').toString();
-    shareTour(context, audioTourId: tour['tour_id'], tourName: title);
+    shareTour(context, audioTourId: _numericTourId(tour) ?? tour['tour_id'], tourName: title);
   }
 
   void _editTour(Map<String, dynamic> tour) {
@@ -1818,7 +1824,7 @@ class _MyToursScreenState extends State<MyToursScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Close'),
+            child: const Text('Cancel'),
           ),
         ],
       ),

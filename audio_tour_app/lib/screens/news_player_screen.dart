@@ -422,7 +422,7 @@ class _NewsPlayerScreenState extends State<NewsPlayerScreen> {
           builder: (context) => AlertDialog(
             title: Text('Voice Commands'),
             content: SingleChildScrollView(child: Text(helpText, style: TextStyle(fontSize: 14))),
-            actions: [TextButton(onPressed: () => Navigator.of(context).pop(), child: Text('Close'))],
+            actions: [TextButton(onPressed: () => Navigator.of(context).pop(), child: Text('Cancel'))],
           ),
         );
         return;
@@ -451,7 +451,7 @@ class _NewsPlayerScreenState extends State<NewsPlayerScreen> {
               ],
             ),
           ),
-          actions: [TextButton(onPressed: () => Navigator.of(context).pop(), child: Text('Close'))],
+          actions: [TextButton(onPressed: () => Navigator.of(context).pop(), child: Text('Cancel'))],
         ),
       );
     } catch (e) {
@@ -461,7 +461,7 @@ class _NewsPlayerScreenState extends State<NewsPlayerScreen> {
         builder: (context) => AlertDialog(
           title: Text('Voice Commands'),
           content: Text(fallback, style: TextStyle(fontSize: 14)),
-          actions: [TextButton(onPressed: () => Navigator.of(context).pop(), child: Text('Close'))],
+          actions: [TextButton(onPressed: () => Navigator.of(context).pop(), child: Text('Cancel'))],
         ),
       );
     }

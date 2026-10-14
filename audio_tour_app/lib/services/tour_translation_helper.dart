@@ -120,6 +120,23 @@ class TourTranslationHelper {
     return failures;
   }
 
+  /// [LOCAL-680] The server row id of [lang]'s translation of [tourId], creating
+  /// the translation if it does not exist yet. A paid translation is bought by
+  /// THIS id (D653: each language row unlocks separately). Null on failure.
+  static Future<int?> translatedRowId(int tourId, String lang) async {
+    try {
+      final result = await TranslationService.translateTour(tourId: tourId, languages: [lang]);
+      if (result['status'] != 'completed') return null;
+      final id = _extractTranslatedIds(result)?[lang];
+      if (id is int) return id;
+      if (id is num) return id.toInt();
+      return int.tryParse('$id');
+    } catch (e) {
+      await DebugLogHelper.addDebugLog('TRANSLATE: translatedRowId($tourId, $lang) failed: $e');
+      return null;
+    }
+  }
+
   /// Handles both response shapes from the translation service.
   /// Returns null for languages with status='failed' or id=null.
   static Map<String, dynamic>? _extractTranslatedIds(Map<String, dynamic> result) {

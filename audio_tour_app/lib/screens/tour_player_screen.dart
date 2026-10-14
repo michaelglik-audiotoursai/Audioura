@@ -855,7 +855,7 @@ class _TourPlayerScreenState extends State<TourPlayerScreen> with VoiceMethods {
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context).pop(),
-              child: Text('Close'),
+              child: Text('Cancel'),
             ),
           ],
         );

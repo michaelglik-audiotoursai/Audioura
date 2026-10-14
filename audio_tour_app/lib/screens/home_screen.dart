@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
@@ -516,7 +517,7 @@ class _HomeScreenState extends State<HomeScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Close'),
+            child: const Text('Cancel'),
           ),
         ],
       ),
@@ -553,7 +554,7 @@ class _HomeScreenState extends State<HomeScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Close'),
+            child: const Text('Cancel'),
           ),
         ],
       ),
@@ -592,7 +593,7 @@ class _HomeScreenState extends State<HomeScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Close'),
+            child: const Text('Cancel'),
           ),
         ],
       ),
@@ -611,6 +612,10 @@ class _HomeScreenState extends State<HomeScreen> {
       context: context,
       builder: (context) => StatefulBuilder(
         builder: (context, setDialogState) => AlertDialog(
+        // [LOCAL-680] scrollable: with the keyboard up the content no longer
+        // fits, and an unscrollable Column let the action buttons overlap the
+        // examples (Michael, 2026-10-14). Now the whole body scrolls instead.
+        scrollable: true,
         title: const Text('Search'),
         content: Column(
           mainAxisSize: MainAxisSize.min,
@@ -642,11 +647,10 @@ class _HomeScreenState extends State<HomeScreen> {
             if (_locationHistory.isNotEmpty) ...[
               const Text('Recent Locations:', style: TextStyle(fontWeight: FontWeight.bold)),
               const SizedBox(height: 8),
-              Flexible(
-                child: ListView.builder(
-                  shrinkWrap: true,
-                  itemCount: _locationHistory.length,
-                  itemBuilder: (context, index) {
+              // A plain Column: a scrollable dialog cannot host a Flexible list.
+              Column(
+                mainAxisSize: MainAxisSize.min,
+                children: List.generate(_locationHistory.length, (index) {
                     final location = _locationHistory[index];
                     return ListTile(
                       dense: true,
@@ -660,8 +664,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         );
                       },
                     );
-                  },
-                ),
+                }),
               ),
             ],
           ],
@@ -908,7 +911,12 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  void _onTourMarkerTapped(Map<String, dynamic> item) {
+  /// [LOCAL-680] [done] completes when the listener is finished with this tour:
+  /// the dialog closed without buying, or Buy & Download finished. The multi-tour
+  /// download awaits it to show paid tours one at a time. [cancelLabel] renames
+  /// Cancel (the sequence says "Don't download").
+  void _onTourMarkerTapped(Map<String, dynamic> item,
+      {Completer<void>? done, String cancelLabel = 'Cancel'}) {
     if (item['type'] == 'treat') {
       // Navigate directly to treat detail view
       Navigator.push(
@@ -933,6 +941,12 @@ class _HomeScreenState extends State<HomeScreen> {
       bool unlockKnown = !itemIsPaid; // free: nothing to ask
       bool unlockUnlocked = !itemIsPaid; // free counts as unlocked
       bool buyBusy = false;
+      // [LOCAL-680] Set while Buy & Download runs: its own Navigator.pop must
+      // not count as "closed without buying".
+      bool buyStarted = false;
+      void finish() {
+        if (done != null && !done.isCompleted) done.complete();
+      }
 
       showDialog(
         context: context,
@@ -947,7 +961,14 @@ class _HomeScreenState extends State<HomeScreen> {
                 if (context.mounted) setDialogState(() {});
               });
             }
+            // [LOCAL-680] A paid tour is bought ONE language at a time (D653:
+            // each language is its own $X purchase), so its selector is
+            // single-choice. Free / owned tours keep multi-select.
+            final bool singleLanguage = itemIsPaid && !unlockUnlocked;
             return AlertDialog(
+            // [LOCAL-680] Long titles + reviews pushed the language selector off
+            // screen; the body scrolls so every control is reachable.
+            scrollable: true,
             title: Text(item['name']),
             content: Column(
               mainAxisSize: MainAxisSize.min,
@@ -1002,13 +1023,26 @@ class _HomeScreenState extends State<HomeScreen> {
                   initialCount: (item['rating_count'] as num?)?.toInt() ?? 0,
                 ),
                 SizedBox(height: 16),
-                Text('Select Languages:', style: TextStyle(fontWeight: FontWeight.bold)),
+                Text(singleLanguage ? 'Choose a language:' : 'Select Languages:',
+                    style: TextStyle(fontWeight: FontWeight.bold)),
+                if (singleLanguage)
+                  Text('Each language is a separate purchase.',
+                      style: TextStyle(fontSize: 12, color: Colors.grey.shade700)),
                 SizedBox(height: 8),
                 LanguageSelector(
                   selectedLanguages: selectedLanguages,
                   onLanguagesChanged: (languages) {
                     setDialogState(() {
-                      selectedLanguages = languages;
+                      if (singleLanguage) {
+                        // Keep exactly one: the newly tapped chip wins; tapping
+                        // the selected chip again leaves it selected.
+                        final added = languages
+                            .where((l) => !selectedLanguages.contains(l))
+                            .toList();
+                        if (added.isNotEmpty) selectedLanguages = [added.last];
+                      } else {
+                        selectedLanguages = languages;
+                      }
                     });
                   },
                 ),
@@ -1017,7 +1051,7 @@ class _HomeScreenState extends State<HomeScreen> {
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(context),
-                child: Text('Close'),
+                child: Text(cancelLabel),
               ),
               // [LOCAL-670] Rate this tour 1–10. On success, refresh the badge
               // in this dialog with the recomputed score.
@@ -1074,15 +1108,27 @@ class _HomeScreenState extends State<HomeScreen> {
                 unlockKnown: unlockKnown,
                 buyBusy: buyBusy,
                 onBuyBusy: (b) => setDialogState(() => buyBusy = b),
-                onUnlocked: () => setDialogState(() {
-                  unlockUnlocked = true;
-                }),
+                onBuyStarted: (started) {
+                  buyStarted = started;
+                },
+                onUnlocked: () {
+                  if (context.mounted) {
+                    setDialogState(() {
+                      unlockUnlocked = true;
+                    });
+                  }
+                },
+                onFinished: finish,
               ),
             ],
           );
           },
         ),
-      );
+      ).then((_) {
+        // [LOCAL-680] Closing the dialog always stops the preview.
+        TourPreviewPlayer.instance.stop();
+        if (!buyStarted) finish();
+      });
     }
   }
 
@@ -1100,7 +1146,9 @@ class _HomeScreenState extends State<HomeScreen> {
     required bool unlockKnown,
     required bool buyBusy,
     required void Function(bool) onBuyBusy,
+    required void Function(bool) onBuyStarted,
     required void Function() onUnlocked,
+    required void Function() onFinished,
   }) {
     if (plan.showPlainDownload) {
       return [
@@ -1118,38 +1166,28 @@ class _HomeScreenState extends State<HomeScreen> {
     final String priceLabel = plan.priceLabel ?? '\$4.99';
     final int tier = plan.priceTier ?? 3;
     return [
-      TextButton.icon(
-        icon: const Icon(Icons.play_arrow),
-        label: const Text('Preview Stop 1'),
-        onPressed: buyBusy
-            ? null
-            : () async {
-                try {
-                  await TourPreviewPlayer.instance.play('${item['id']}');
-                } catch (_) {
-                  if (context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                          content: Text('Preview unavailable right now.')),
-                    );
-                  }
-                }
-              },
-      ),
+      // [LOCAL-680] Preview → Pause / Resume + Stop while it plays.
+      _PreviewControls(tourId: '${item['id']}', enabled: !buyBusy),
       ElevatedButton(
-        onPressed: (buyBusy || !unlockKnown)
+        onPressed: (buyBusy || !unlockKnown || selectedLanguages.isEmpty)
             ? null
             : () async {
                 onBuyBusy(true);
+                onBuyStarted(true);
                 final ok = await _buyAndDownloadPaid(
                   context: context,
                   item: item,
                   tier: tier,
                   priceLabel: priceLabel,
-                  selectedLanguages: selectedLanguages,
+                  language: selectedLanguages.first,
                 );
-                onBuyBusy(false);
-                if (ok) onUnlocked();
+                if (ok) {
+                  onUnlocked();
+                  onFinished();
+                } else {
+                  onBuyStarted(false);
+                  if (context.mounted) onBuyBusy(false);
+                }
               },
         style: ElevatedButton.styleFrom(
           backgroundColor: const Color(0xFF1B6B2E),
@@ -1177,24 +1215,48 @@ class _HomeScreenState extends State<HomeScreen> {
     required Map<String, dynamic> item,
     required int tier,
     required String priceLabel,
-    required List<String> selectedLanguages,
+    required String language,
   }) async {
     await TourPreviewPlayer.instance.stop();
-    // Buy the tapped tour's language first (the row the listener is on). The
-    // Buy sheet drives the real store (cloud) or the TEST PURCHASE (stub).
+    // [LOCAL-680] Buy exactly ONE language (D653). 'en' / the tour's own
+    // language is the tapped row itself; any other language is its translation
+    // row, which unlocks separately — so resolve that row and buy IT. Before
+    // this, every purchase was charged to the tapped (English) row and the
+    // chosen translation then 402'd.
+    final int tappedId = item['id'] is int ? item['id'] as int : int.parse('${item['id']}');
+    final String itemLang = (item['content_language'] ?? 'en').toString();
+    final bool ownRow = language == 'en' || language == itemLang;
+    int buyId = tappedId;
+    if (!ownRow) {
+      final translated = await TourTranslationHelper.translatedRowId(tappedId, language);
+      if (translated == null) {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+                content: Text(
+                    '${TourTranslationHelper.availableLanguages[language] ?? language} is not available for this tour right now.')),
+          );
+        }
+        return false;
+      }
+      buyId = translated;
+    }
+    if (!context.mounted) return false;
+    final langName = TourTranslationHelper.availableLanguages[language] ?? language;
+    // The Buy sheet drives the real store (cloud) or the TEST PURCHASE (stub).
     final bought = await TourBuySheet.show(
       context,
-      tourId: '${item['id']}',
+      tourId: '$buyId',
       tier: tier,
       priceLabel: priceLabel,
-      tourTitle: item['name']?.toString(),
+      tourTitle: '${item['name'] ?? 'Tour'} ($langName)',
     );
     if (!bought) return false; // cancelled / failed — Buy button stays.
     if (!context.mounted) return false;
 
     // Confirm the unlock with the server before downloading. A 402 on the
     // download would otherwise mean we never saved the zip.
-    final state = await TourPricingService.unlockState('${item['id']}');
+    final state = await TourPricingService.unlockState('$buyId');
     if (!state.unlocked) {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -1207,11 +1269,10 @@ class _HomeScreenState extends State<HomeScreen> {
 
     if (!context.mounted) return false;
     Navigator.pop(context); // close the download dialog
-    // Now download; the server will serve the zip (200) because we are unlocked.
-    // Translations are purchased + downloaded by the translation path (D653);
-    // here we download the tapped language. The existing download handles the
-    // selected non-English translations too.
-    await _downloadSingleTour(item['id'], selectedLanguages, item);
+    // Now download only the bought language. 'en' in the list means "the
+    // tapped row itself" (_downloadSingleTour's convention); a translation is
+    // fetched by the translation path, which now gets 200 because it is unlocked.
+    await _downloadSingleTour(tappedId, ownRow ? const ['en'] : [language], item);
     return true;
   }
 
@@ -1607,16 +1668,32 @@ class _HomeScreenState extends State<HomeScreen> {
           children: [
             CircularProgressIndicator(),
             SizedBox(width: 20),
-            Text('Downloading ${toursToDownload.length} new tours...'),
+            Text('Downloading ${toursToDownload.length} tour(s)...'),
           ],
         ),
       ),
     );
     
+    // [LOCAL-680] Unbought paid tours cannot be bulk-downloaded (the server
+    // answers 402, which used to end in "No new tours downloaded"). Download
+    // the rest now; afterwards show each paid tour on its own with Preview /
+    // Buy & Download / Don't download (Michael, 2026-10-14).
+    final paidToOffer = <Map<String, dynamic>>[];
+    final freeOrOwned = <Map<String, dynamic>>[];
+    for (final tour in toursToDownload) {
+      final isPaid = tour['is_paid'] == true ||
+          (tour['price_tier'] is num && (tour['price_tier'] as num) > 0);
+      if (isPaid && !(await TourPricingService.unlockState('${tour['id']}')).unlocked) {
+        paidToOffer.add(tour);
+      } else {
+        freeOrOwned.add(tour);
+      }
+    }
+
     int successCount = 0;
     int translationSuccessCount = 0;
     final Map<String, List<String>> failuresByTour = {};
-    for (final tour in toursToDownload) {
+    for (final tour in freeOrOwned) {
       try {
         final failures = await _downloadSingleTourSilent(tour['id'], languages, tour);
         successCount++;
@@ -1655,15 +1732,25 @@ class _HomeScreenState extends State<HomeScreen> {
     }
 
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        action: successCount > 0 ? SnackBarAction(
-          label: 'View',
-          onPressed: () => Navigator.pushNamed(context, '/my_tours'),
-        ) : null,
-      ),
-    );
+    if (freeOrOwned.isNotEmpty || paidToOffer.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(message),
+          action: successCount > 0 ? SnackBarAction(
+            label: 'View',
+            onPressed: () => Navigator.pushNamed(context, '/my_tours'),
+          ) : null,
+        ),
+      );
+    }
+
+    // [LOCAL-680] Now the paid tours, one at a time.
+    for (final tour in paidToOffer) {
+      if (!mounted) return;
+      final done = Completer<void>();
+      _onTourMarkerTapped(tour, done: done, cancelLabel: "Don't download");
+      await done.future;
+    }
   }
   
   Future<void> _downloadTour(int tourId) async {
@@ -4429,6 +4516,69 @@ class _SearchExamples extends StatelessWidget {
             ),
           ),
       ],
+    );
+  }
+}
+
+
+/// [LOCAL-680] Stop-1 preview controls for the paid-tour dialog:
+/// idle → "Preview Stop 1"; playing → "Pause" + "Stop"; paused → "Resume" + "Stop".
+class _PreviewControls extends StatelessWidget {
+  final String tourId;
+  final bool enabled;
+  const _PreviewControls({required this.tourId, required this.enabled});
+
+  @override
+  Widget build(BuildContext context) {
+    final player = TourPreviewPlayer.instance;
+    return ValueListenableBuilder<PreviewState>(
+      valueListenable: player.state,
+      builder: (context, st, _) {
+        final mine = player.currentTourId == tourId;
+        final state = mine ? st : PreviewState.idle;
+        if (state == PreviewState.idle) {
+          return TextButton.icon(
+            icon: const Icon(Icons.play_arrow),
+            label: const Text('Preview Stop 1'),
+            onPressed: !enabled
+                ? null
+                : () async {
+                    try {
+                      await player.play(tourId);
+                    } catch (_) {
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Preview unavailable right now.')),
+                        );
+                      }
+                    }
+                  },
+          );
+        }
+        if (state == PreviewState.loading) {
+          return const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 12),
+            child: SizedBox(
+                height: 18, width: 18, child: CircularProgressIndicator(strokeWidth: 2)),
+          );
+        }
+        final playing = state == PreviewState.playing;
+        return Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextButton.icon(
+              icon: Icon(playing ? Icons.pause : Icons.play_arrow),
+              label: Text(playing ? 'Pause' : 'Resume'),
+              onPressed: playing ? player.pause : player.resume,
+            ),
+            TextButton.icon(
+              icon: const Icon(Icons.stop),
+              label: const Text('Stop'),
+              onPressed: player.stop,
+            ),
+          ],
+        );
+      },
     );
   }
 }
