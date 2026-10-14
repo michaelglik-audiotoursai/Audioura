@@ -80,7 +80,8 @@ def get_tour_by_code(code):
                    {_ratings_select(cur)},
                    {_is_paid_select(cur)} AS is_paid,
                    {_price_tier_select(cur)} AS price_tier,
-                   {_ORIGINAL_LANGUAGE_SELECT}
+                   {_ORIGINAL_LANGUAGE_SELECT},
+                   {_content_rating_select(cur)}
             FROM audio_tours t
             LEFT JOIN (
                 SELECT tour_id,
@@ -110,7 +111,21 @@ def get_tour_by_code(code):
          language, original_id, max_vn, last_replaced, created_at,
          source_version, source_max_vn, rating_count, rating_values,
          verified_values, created_values, is_paid, price_tier,
-         own_content_language, source_content_language) = t
+         own_content_language, source_content_language,
+         content_rating, content_review_status) = _row_with_rating(t, 21)
+        # [LOCAL-687] Content gate for a shared code. A hidden tour (not_allowed,
+        # or pending/rejected review) is a clean 404 — the same as a code that
+        # resolves to nothing, so a held tour is indistinguishable from no tour.
+        # A MATURE tour the caller has not confirmed 18+ for (no adult=1) is a 403
+        # age_restricted — the app shows "turn on 18+ tours in Settings". A mature
+        # tour WITH adult=1, and any general tour, resolve normally.
+        adult = _adult_requested(request.args)
+        _rating = (content_rating or 'general').strip().lower()
+        _status = (content_review_status or '').strip().lower()
+        if _rating == 'not_allowed' or _status in ('pending', 'rejected'):
+            return jsonify({'error': 'tour not found'}), 404
+        if _rating == 'mature' and not adult:
+            return jsonify({'error': 'age_restricted'}), 403
         # [LOCAL-666] A share code can point at a translation row (original_tour_id
         # set, e.g. Russian 615 of 557) as well as an original. For a translation we
         # report the SOURCE tour's version (its pinned source_version, else the
@@ -140,6 +155,7 @@ def get_tour_by_code(code):
                 'via_share_code': code,
                 'version': version,
                 'updated_at': updated_at,
+                'content_rating': _content_rating_field(content_rating),
                 **_rating_payload(rating_values, verified_values, created_values, is_paid,
                                   prior=_prior_for(editor, tour_id, original_id)),
                 **_price_block(price_tier),
@@ -314,6 +330,107 @@ _ORIGINAL_LANGUAGE_SELECT = ("t.content_language AS own_content_language, "
 _ORIGINAL_LANGUAGE_JOIN = """
     LEFT JOIN audio_tours orig ON orig.id = t.original_tour_id
 """
+
+
+# ─── [LOCAL-687 / D656] Content rating + review gate ──────────────────────────
+#
+# Every tour carries a content_rating (general | mature | not_allowed; NULL =
+# NOT RATED YET, treated as general so old tours keep working) and a
+# review_status (pending | approved | rejected; NULL = no review needed). Both
+# are written by tour_content_rating.py (migration 027). The LISTING RULE, applied
+# on every endpoint:
+#   * not_allowed                         -> never listed (hidden).
+#   * review_status pending | rejected    -> hidden until a human approves.
+#   * mature                              -> listed ONLY when the request carries
+#                                            adult=1 (listener confirmed 18+).
+#   * general / NULL (and approved)       -> listed for everyone.
+# A translation INHERITS its ORIGINAL's rating and review_status, read through the
+# `orig` self-join the endpoints already have (COALESCE(orig.*, t.*)), exactly as
+# price_tier / is_paid do. Appended as the LAST two SELECTed columns on every
+# endpoint — content_rating, content_review_status — so existing column positions
+# (and sibling test fixtures) stay stable, mirroring LOCAL-671/670.
+_HAS_CONTENT_RATING_COLUMN = None
+
+
+def _has_content_rating_column(cur):
+    """True if audio_tours.content_rating exists (migration 027). Probed once +
+    cached. Absent (older schema) → every tour reads as NULL == general and lists
+    as before — content rating fails OPEN to the old behaviour, never a 500."""
+    global _HAS_CONTENT_RATING_COLUMN
+    if _HAS_CONTENT_RATING_COLUMN is None:
+        try:
+            cur.execute("""
+                SELECT 1 FROM information_schema.columns
+                WHERE table_name = 'audio_tours' AND column_name = 'content_rating'
+            """)
+            _HAS_CONTENT_RATING_COLUMN = cur.fetchone() is not None
+        except Exception:
+            _HAS_CONTENT_RATING_COLUMN = False
+    return _HAS_CONTENT_RATING_COLUMN
+
+
+def _content_rating_select(cur):
+    """SQL fragment selecting (content_rating, review_status), inheriting a
+    translation's values from its ORIGINAL via the `orig` self-join — so a
+    translation of a mature/not_allowed/pending original is hidden too. Two NULL
+    literals on an older schema (→ everything reads as general, lists as before).
+    Always two columns in a fixed order, appended LAST."""
+    if _has_content_rating_column(cur):
+        return ("COALESCE(orig.content_rating, t.content_rating) AS content_rating, "
+                "COALESCE(orig.review_status, t.review_status) AS content_review_status")
+    return ("NULL::varchar AS content_rating, "
+            "NULL::varchar AS content_review_status")
+
+
+def _adult_requested(args):
+    """True when the request confirmed the listener is 18+ (adult=1). Accepts
+    adult=1/true/yes. Anything else (absent, 0, blank) → False, so mature tours
+    stay hidden by default."""
+    raw = (args.get('adult') or '').strip().lower()
+    return raw in ('1', 'true', 'yes')
+
+
+def _content_visible(content_rating, review_status, adult):
+    """The listing decision for ONE tour. Returns True if it may be listed.
+
+    NULL content_rating == 'general' (old tours keep working until scored).
+      * not_allowed                      -> hidden (never listed).
+      * review_status pending | rejected -> hidden (awaiting / failed review).
+      * mature                           -> only when adult is True.
+      * general                          -> listed.
+    An 'approved' review_status lists per the tour's rating (mature still needs
+    adult=1); NULL review_status (general, no review needed) lists too.
+    """
+    rating = (content_rating or 'general').strip().lower()
+    status = (review_status or '').strip().lower()
+    if rating == 'not_allowed':
+        return False
+    if status in ('pending', 'rejected'):
+        return False
+    if rating == 'mature':
+        return bool(adult)
+    return True
+
+
+def _content_rating_field(content_rating):
+    """The content_rating value put on every tour payload. NULL → 'general' so the
+    app always sees one of the three known values (the app shows an 18+ chip when
+    it is 'mature')."""
+    return (content_rating or 'general').strip().lower()
+
+
+def _row_with_rating(row, head_len):
+    """Return (row_padded_to_head_len+2). The content_rating + review_status pair
+    was APPENDED as the last two SELECT columns (LOCAL-687). A production row
+    always carries them; a row from an older code path (or a sibling unit-test
+    fixture written before 687) carries only the first head_len values. Pad the
+    missing trailing pair with (None, None) — which reads as general/no-review, so
+    those rows list exactly as they did before 687. This keeps the unpack arity
+    fixed without forcing every pre-687 fixture to grow two columns."""
+    row = tuple(row)
+    if len(row) >= head_len + 2:
+        return row[:head_len + 2]
+    return row[:head_len] + (None, None)
 
 
 # ─── Tour rating (LOCAL-670) ──────────────────────────────────────────────────
@@ -1101,7 +1218,8 @@ def get_tours_near_location(lat, lng):
                    {_ratings_select(cur)},
                    {_is_paid_select(cur)} AS is_paid,
                    {_price_tier_select(cur)} AS price_tier,
-                   {_ORIGINAL_LANGUAGE_SELECT}
+                   {_ORIGINAL_LANGUAGE_SELECT},
+                   {_content_rating_select(cur)}
             FROM audio_tours t
             LEFT JOIN (
                 SELECT tour_id,
@@ -1126,13 +1244,20 @@ def get_tours_near_location(lat, lng):
         tours = cur.fetchall()
         editor = _editor_scores(cur)  # [LOCAL-685]
         tours_list = []
+        adult = _adult_requested(request.args)  # [LOCAL-687] 18+ confirmed?
         
         for tour in tours:
             (tour_id, tour_name, request_string, tour_lat, tour_lng, requests,
              language, original_id, max_vn, last_replaced, created_at,
              source_version, source_max_vn, rating_count, rating_values,
              verified_values, created_values, is_paid, price_tier,
-             own_content_language, source_content_language) = tour
+             own_content_language, source_content_language,
+             content_rating, content_review_status) = _row_with_rating(tour, 21)
+            
+            # [LOCAL-687] Content gate: hide not_allowed, hide pending/rejected,
+            # hide mature unless adult=1. NULL rating == general (old tours list).
+            if not _content_visible(content_rating, content_review_status, adult):
+                continue
             
             if tour_lat and tour_lng:
                 distance = calculate_distance(lat, lng, tour_lat, tour_lng)
@@ -1166,6 +1291,7 @@ def get_tours_near_location(lat, lng):
                         'original_language': original_language,
                         'version': version,
                         'updated_at': updated_at,
+                        'content_rating': _content_rating_field(content_rating),
                         **rating_block,
                         **_price_block(price_tier, cur),
                     }
@@ -1403,7 +1529,8 @@ def get_tour_info(tour_id):
                    {_ratings_select(cur)},
                    {_is_paid_select(cur)} AS is_paid,
                    {_price_tier_select(cur)} AS price_tier,
-                   {_ORIGINAL_LANGUAGE_SELECT}
+                   {_ORIGINAL_LANGUAGE_SELECT},
+                   {_content_rating_select(cur)}
             FROM audio_tours t
             LEFT JOIN (
                 SELECT tour_id, MAX(version_no) AS max_version_no, MAX(replaced_at) AS last_replaced_at
@@ -1428,10 +1555,22 @@ def get_tour_info(tour_id):
         (tour_id, tour_name, request_string, lat, lng, requests, language, original_id,
          max_vn, last_replaced, created_at, source_version, source_max_vn,
          rating_count, rating_values, verified_values, created_values, is_paid, price_tier,
-         own_content_language, source_content_language) = result
+         own_content_language, source_content_language,
+         content_rating, content_review_status) = _row_with_rating(result, 21)
         editor = _editor_scores(cur)  # [LOCAL-685]
         cur.close()
         conn.close()
+        
+        # [LOCAL-687] Apply the same listing gate to the detail view: a tour that
+        # would not be listed is a 404 here too (not_allowed, or pending/rejected
+        # review; mature without adult=1). NULL rating == general. This keeps a
+        # hidden tour un-reachable through its info endpoint, not just the list.
+        adult = _adult_requested(request.args)
+        if not _content_visible(content_rating, content_review_status, adult):
+            print(f"Tour {tour_id} hidden by content rating "
+                  f"({content_rating}/{content_review_status}, adult={adult})")
+            sys.stdout.flush()
+            return jsonify({'error': 'Tour not found'}), 404
         
         is_translation = original_id is not None and (language and language != 'en')
         version, updated_at = _resolved_version_fields(
@@ -1453,6 +1592,7 @@ def get_tour_info(tour_id):
             'original_language': original_language,
             'version': version,
             'updated_at': updated_at,
+            'content_rating': _content_rating_field(content_rating),
             **_rating_payload(rating_values, verified_values, created_values, is_paid,
                               prior=_prior_for(editor, tour_id, original_id)),
             **_price_block(price_tier),
@@ -1500,7 +1640,8 @@ def search_tours():
                    {_ratings_select(cur)},
                    {_is_paid_select(cur)} AS is_paid,
                    {_price_tier_select(cur)} AS price_tier,
-                   {_ORIGINAL_LANGUAGE_SELECT}
+                   {_ORIGINAL_LANGUAGE_SELECT},
+                   {_content_rating_select(cur)}
             FROM audio_tours t
             LEFT JOIN (
                 SELECT tour_id, MAX(version_no) AS max_version_no, MAX(replaced_at) AS last_replaced_at
@@ -1522,12 +1663,18 @@ def search_tours():
         tours = cur.fetchall()
         editor = _editor_scores(cur)  # [LOCAL-685]
         search_results = []
+        adult = _adult_requested(request.args)  # [LOCAL-687] 18+ confirmed?
         
         for tour in tours:
             (tour_id, tour_name, request_string, tour_lat, tour_lng, requests, language, original_id,
              max_vn, last_replaced, created_at, source_version, source_max_vn,
              rating_count, rating_values, verified_values, created_values, is_paid, price_tier,
-             own_content_language, source_content_language) = tour
+             own_content_language, source_content_language,
+             content_rating, content_review_status) = _row_with_rating(tour, 21)
+            # [LOCAL-687] Content gate: hide not_allowed, hide pending/rejected,
+            # hide mature unless adult=1. NULL rating == general.
+            if not _content_visible(content_rating, content_review_status, adult):
+                continue
             version, updated_at = _resolved_version_fields(
                 original_id, source_version, source_max_vn, max_vn, last_replaced, created_at)
             rating_block = _rating_payload(
@@ -1561,6 +1708,7 @@ def search_tours():
                     'original_language': original_language,
                     'version': version,
                     'updated_at': updated_at,
+                    'content_rating': _content_rating_field(content_rating),
                     **rating_block,
                     **_price_block(price_tier, cur),
                 })
