@@ -577,6 +577,27 @@ def _has_is_paid_column(cur):
     return _HAS_IS_PAID_COLUMN
 
 
+def _search_like_pattern(pattern):
+    """[LOCAL-680] Turn the listener's search text into an ILIKE pattern.
+
+    No '*'  → substring match, as before: "Boston" finds any name containing Boston.
+    With '*' → the stars are the ONLY wildcards and the text is anchored:
+        "Boston*"   starts with Boston
+        "*Boston"   ends with Boston
+        "*Boston*"  contains Boston
+    Michael, 2026-10-14: "Boston*" returned every tour mentioning Boston because
+    the old code always wrapped the text in %...%.
+
+    The app sends '*' as the regex '.*'; both spellings are accepted. Literal
+    '%', '_' and '\\' are escaped so they never act as SQL wildcards.
+    """
+    p = (pattern or '').strip().replace('.*', '*')
+    p = p.replace('\\', '\\\\').replace('%', '\\%').replace('_', '\\_')
+    if '*' not in p:
+        return f'%{p}%'
+    return p.replace('*', '%')
+
+
 def _parse_min_rating(args):
     """Parse the optional ?min_rating=<float> query param. Returns a float or
     None (absent/blank/invalid → no filter)."""
@@ -1414,9 +1435,8 @@ def search_tours():
         conn = get_db_connection()
         cur = conn.cursor()
         
-        # Use ILIKE for case-insensitive pattern matching
-        # Convert regex pattern back to SQL LIKE pattern
-        sql_pattern = pattern.replace('.*', '%')
+        # [LOCAL-680] '*' anchors the match (Boston* = starts with); no '*' = contains.
+        sql_pattern = _search_like_pattern(pattern)
         # [LOCAL-670] Optional server-side rating filter.
         min_rating = _parse_min_rating(request.args)
         # [LOCAL-677] Optional Free/Paid filter.
@@ -1455,7 +1475,7 @@ def search_tours():
             AND (t.is_test IS NOT TRUE)
             ORDER BY t.number_requested DESC
             LIMIT 50
-        """, (f'%{sql_pattern}%', f'%{sql_pattern}%'))
+        """, (sql_pattern, sql_pattern))
         
         tours = cur.fetchall()
         search_results = []

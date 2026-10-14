@@ -568,6 +568,11 @@ class _HomeScreenState extends State<HomeScreen> {
                 await _dispatchSearch(query);
               },
             ),
+            const SizedBox(height: 12),
+            // [LOCAL-680] The one box takes three kinds of input (LOCAL-665), so show
+            // one example of each, grouped. Michael, 2026-10-14: the examples were
+            // lost when the three dialogs were merged, and they matter more now.
+            const _SearchExamples(),
             const SizedBox(height: 16),
             if (_locationHistory.isNotEmpty) ...[
               const Text('Recent Locations:', style: TextStyle(fontWeight: FontWeight.bold)),
@@ -668,9 +673,11 @@ class _HomeScreenState extends State<HomeScreen> {
   /// the place geocoder CONCURRENTLY, then present the single combined outcome
   /// (resolveTextSearch): tours+place, tours only, place only, or nothing.
   Future<void> _dispatchTextSearch(String query) async {
+    // [LOCAL-680] A '*' marks a tour-name pattern ("Boston*"), never a place.
+    final isNamePattern = query.contains('*');
     final results = await Future.wait([
       _searchTours(query),
-      _geocodeLocation(query),
+      isNamePattern ? Future<LatLng?>.value(null) : _geocodeLocation(query),
     ]);
     if (!mounted) return;
 
@@ -4277,6 +4284,42 @@ class _TreatDetailView extends StatelessWidget {
             ),
         ],
       ),
+    );
+  }
+}
+
+/// [LOCAL-680] Examples under the Search box, one group per kind of input.
+/// '*' semantics match the server (_search_like_pattern): no star = contains;
+/// stars anchor the match.
+class _SearchExamples extends StatelessWidget {
+  const _SearchExamples();
+
+  static const List<List<String>> _groups = [
+    ['Place', 'Boston  ·  Nice, France  ·  42.36, -71.06'],
+    ['Tour name', 'Boston* starts with  ·  *Boston ends with  ·  *Boston* contains'],
+    ['Share code', 'Ab12Cd34  (8 letters and digits, or paste the whole share message)'],
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    final small = Theme.of(context).textTheme.bodySmall;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('Examples', style: small?.copyWith(fontWeight: FontWeight.bold)),
+        const SizedBox(height: 4),
+        for (final g in _groups)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 2),
+            child: Text.rich(
+              TextSpan(children: [
+                TextSpan(text: '${g[0]}: ', style: const TextStyle(fontWeight: FontWeight.w600)),
+                TextSpan(text: g[1]),
+              ]),
+              style: small,
+            ),
+          ),
+      ],
     );
   }
 }
