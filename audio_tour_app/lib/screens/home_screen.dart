@@ -83,7 +83,19 @@ class _HomeScreenState extends State<HomeScreen> {
   // ?sort=top_rated and the server orders by the Bayesian rank_score (verified
   // ratings weighted higher, old/pre-version ratings decayed). Remembered per
   // device under SharedPreferences 'home_top_rated'. Default off (nearest-first).
-  bool _topRated = false;
+  //
+  // [LOCAL-689] Sort is now tri-state: 'nearest' | 'top_rated' | 'match'. The
+  // List view exposes all three (Nearest / Top rated / Best match first); the
+  // AppBar sort icon and the Search filter-row keep their original two-way
+  // Nearest/Top-rated control via the `_topRated` getter/`_setTopRated` setter
+  // below, which read and write this one field. Persisted under 'home_sort_mode'
+  // (the legacy 'home_top_rated' bool is still honoured on first load).
+  String _sortMode = 'nearest';
+  bool get _topRated => _sortMode == 'top_rated';
+  // [LOCAL-689] The device's listener id (DeviceService.getUserId), cached so
+  // the sync _filterQueryParams can attach ?user_id= for the Match % the server
+  // computes. Loaded once in _loadAppMode; empty until then (match simply off).
+  String _deviceUserId = '';
   // [LOCAL-677] Home-page Free/Paid/Any filter: '' = Any, 'free', or 'paid'.
   // Remembered per device under SharedPreferences 'home_price_filter' and passed
   // to /tours-near as ?price=free|paid so the server filters.
@@ -173,9 +185,17 @@ class _HomeScreenState extends State<HomeScreen> {
     final prefs = await SharedPreferences.getInstance();
     final mode = prefs.getString('app_mode') ?? 'Tours';
     _minRating = prefs.getDouble('home_min_rating') ?? 0.0;
-    _topRated = prefs.getBool('home_top_rated') ?? false;
+    // [LOCAL-689] Tri-state sort. New key wins; else migrate the legacy bool.
+    _sortMode = prefs.getString('home_sort_mode') ??
+        ((prefs.getBool('home_top_rated') ?? false) ? 'top_rated' : 'nearest');
     _priceFilter = prefs.getString('home_price_filter') ?? '';
     _showAdult = prefs.getBool('home_show_adult') ?? false;  // [LOCAL-687]
+    // [LOCAL-689] Cache the listener id for the Match % query param.
+    try {
+      _deviceUserId = await DeviceService.getUserId();
+    } catch (_) {
+      _deviceUserId = '';
+    }
     await _loadLocationHistory();
     await _loadCustomLocation();
     
@@ -416,6 +436,8 @@ class _HomeScreenState extends State<HomeScreen> {
   /// circle reaches the corners, so it returns a few just outside), in the
   /// chosen order. Nearest = nearest to the listener when the map shows their
   /// own location, else to the map centre. Top rated = the server's rank order.
+  /// [LOCAL-689] Best match = by the server's personal match_percent descending,
+  /// tours with no match (null) sinking to the end.
   List<Map<String, dynamic>> _visibleTours() {
     final view = _viewBounds;
     final list = _loadedTours.where((t) {
@@ -425,18 +447,38 @@ class _HomeScreenState extends State<HomeScreen> {
       if (lat == null || lng == null) return false;
       return view == null || view.contains(LatLng(lat, lng));
     }).toList();
-    if (!_topRated) {
-      final from = (!_isUsingCustomLocation && _userLocation != null)
-          ? _userLocation!
-          : (view?.center ?? _userLocation);
-      if (from != null) {
-        for (final t in list) {
-          t['_list_km'] = _calculateDistance(from.latitude, from.longitude,
-              (t['lat'] as num).toDouble(), (t['lng'] as num).toDouble());
-        }
-        list.sort((a, b) =>
-            (a['_list_km'] as double).compareTo(b['_list_km'] as double));
+
+    // Distance is shown as "mi" in every mode, so always compute _list_km.
+    final from = (!_isUsingCustomLocation && _userLocation != null)
+        ? _userLocation!
+        : (view?.center ?? _userLocation);
+    if (from != null) {
+      for (final t in list) {
+        t['_list_km'] = _calculateDistance(from.latitude, from.longitude,
+            (t['lat'] as num).toDouble(), (t['lng'] as num).toDouble());
       }
+    }
+
+    if (_sortMode == 'match') {
+      // Best match first; a null match_percent (cold start / no history) sorts
+      // to the end, then nearest within equal match.
+      int pct(Map<String, dynamic> t) {
+        final v = t['match_percent'];
+        return v is num ? v.toInt() : -1;
+      }
+      list.sort((a, b) {
+        final cmp = pct(b).compareTo(pct(a));
+        if (cmp != 0) return cmp;
+        final ak = (a['_list_km'] as num?)?.toDouble() ?? double.infinity;
+        final bk = (b['_list_km'] as num?)?.toDouble() ?? double.infinity;
+        return ak.compareTo(bk);
+      });
+    } else if (_sortMode == 'top_rated') {
+      // Keep the server's rank order (already sorted by /tours-near).
+    } else if (from != null) {
+      // Nearest first (the default).
+      list.sort((a, b) =>
+          (a['_list_km'] as double).compareTo(b['_list_km'] as double));
     }
     return list;
   }
@@ -479,12 +521,17 @@ class _HomeScreenState extends State<HomeScreen> {
                   child: Wrap(
                     spacing: 8,
                     children: [
-                      for (final top in [false, true])
+                      // [LOCAL-689] Tri-state sort: Nearest / Top rated / Best match.
+                      for (final opt in const [
+                        ['nearest', 'Nearest first'],
+                        ['top_rated', 'Top rated first'],
+                        ['match', 'Best match first'],
+                      ])
                         ChoiceChip(
-                          label: Text(top ? 'Top rated first' : 'Nearest first'),
-                          selected: _topRated == top,
+                          label: Text(opt[1]),
+                          selected: _sortMode == opt[0],
                           onSelected: (_) async {
-                            await _setTopRated(top);
+                            await _setSortMode(opt[0]);
                             setSheetState(() {});
                           },
                         ),
@@ -513,20 +560,35 @@ class _HomeScreenState extends State<HomeScreen> {
                                   maxLines: 2, overflow: TextOverflow.ellipsis),
                               subtitle: Padding(
                                 padding: const EdgeInsets.only(top: 4),
-                                child: Wrap(
-                                  spacing: 8,
-                                  crossAxisAlignment: WrapCrossAlignment.center,
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  mainAxisSize: MainAxisSize.min,
                                   children: [
-                                    TourRatingBadge.fromTour(t,
-                                        onTap: () => showWhyThisScoreSheet(
-                                            context,
-                                            tourId: '${t['id']}',
-                                            tour: t)),
-                                    TourPriceBadge.fromTour(t),
-                                    if (_isMatureTour(t)) _adultChip(),
-                                    if (km != null)
-                                      Text('${(km / 1.609344).toStringAsFixed(1)} mi',
-                                          style: const TextStyle(fontSize: 12)),
+                                    Wrap(
+                                      spacing: 8,
+                                      runSpacing: 4,
+                                      crossAxisAlignment: WrapCrossAlignment.center,
+                                      children: [
+                                        // [LOCAL-689] "Match 82%" leads when present.
+                                        if (_matchChip(t) != null) _matchChip(t)!,
+                                        TourRatingBadge.fromTour(t,
+                                            onTap: () => showWhyThisScoreSheet(
+                                                context,
+                                                tourId: '${t['id']}',
+                                                tour: t)),
+                                        TourPriceBadge.fromTour(t),
+                                        if (_isMatureTour(t)) _adultChip(),
+                                        if (km != null)
+                                          Text('${(km / 1.609344).toStringAsFixed(1)} mi',
+                                              style: const TextStyle(fontSize: 12)),
+                                      ],
+                                    ),
+                                    // [LOCAL-689] The two reason phrases (or the
+                                    // "swipe a few stops" cold-start line).
+                                    if (_matchReasonsLine(t) != null) ...[
+                                      const SizedBox(height: 4),
+                                      _matchReasonsLine(t)!,
+                                    ],
                                   ],
                                 ),
                               ),
@@ -711,14 +773,75 @@ class _HomeScreenState extends State<HomeScreen> {
                 fontSize: 11, color: Colors.white, fontWeight: FontWeight.bold)),
       );
 
+  // ─── [LOCAL-689] Personal "Match %" chip + reasons ─────────────────────────
+  // The server attaches match_percent (int|null), match_reasons (two phrases),
+  // and match_reason (the single cold-start sentence) to every tour item of
+  // /tours-near and /search-tours. These helpers render them identically in the
+  // List view and the tour dialog.
+
+  int? _matchPercentOf(Map<String, dynamic> t) {
+    final v = t['match_percent'];
+    return v is num ? v.toInt() : null;
+  }
+
+  List<String> _matchReasonsOf(Map<String, dynamic> t) {
+    final r = t['match_reasons'];
+    if (r is List) return r.map((e) => e.toString()).toList();
+    return const [];
+  }
+
+  /// The "Match 82%" chip. Green, like a personal fit. Null → no chip (the
+  /// caller shows nothing, or the cold-start line via _matchReasonsLine).
+  Widget? _matchChip(Map<String, dynamic> t) {
+    final pct = _matchPercentOf(t);
+    if (pct == null) return null;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: Colors.green.shade600,
+        borderRadius: BorderRadius.circular(4),
+      ),
+      child: Text('Match $pct%',
+          style: const TextStyle(
+              fontSize: 11, color: Colors.white, fontWeight: FontWeight.bold)),
+    );
+  }
+
+  /// The two reason phrases joined ("strong on history, which you like; light on
+  /// people stories"), or the cold-start sentence when there is no match yet.
+  /// Returns null when there is nothing to say (no reasons and no cold line).
+  Widget? _matchReasonsLine(Map<String, dynamic> t) {
+    final reasons = _matchReasonsOf(t);
+    String? text;
+    if (reasons.isNotEmpty) {
+      text = reasons.join('; ');
+    } else if (_matchPercentOf(t) == null && t['match_reason'] is String) {
+      text = t['match_reason'] as String;
+    }
+    if (text == null || text.isEmpty) return null;
+    return Text(text,
+        style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
+        maxLines: 2,
+        overflow: TextOverflow.ellipsis);
+  }
+
   String _filterQueryParams() {
     final minRatingParam =
         _minRating > 0 ? '&min_rating=${_minRating.toStringAsFixed(0)}' : '';
-    final sortParam = _topRated ? '&sort=top_rated' : '';
+    // [LOCAL-689] Tri-state sort → ?sort=top_rated | match (nearest omits it).
+    // 'match' also needs ?user_id so the server knows whose preferences to use;
+    // we always attach user_id when we have one so every tour carries its
+    // Match % regardless of the current sort (the chip shows in all orders).
+    final sortParam = _sortMode == 'top_rated'
+        ? '&sort=top_rated'
+        : (_sortMode == 'match' ? '&sort=match' : '');
+    final userParam = _deviceUserId.isNotEmpty
+        ? '&user_id=${Uri.encodeComponent(_deviceUserId)}'
+        : '';
     final priceParam = _priceFilter.isNotEmpty ? '&price=$_priceFilter' : '';
     // [LOCAL-687] 18+ confirmed → ask the server to include mature tours.
     final adultParam = _showAdult ? '&adult=1' : '';
-    return '$minRatingParam$sortParam$priceParam$adultParam';
+    return '$minRatingParam$sortParam$userParam$priceParam$adultParam';
   }
 
   /// [LOCAL-680] One setter per filter, used by the AppBar dialogs and by the
@@ -731,11 +854,23 @@ class _HomeScreenState extends State<HomeScreen> {
     await _loadNearbyTours();
   }
 
+  /// [LOCAL-672] The two-way Nearest/Top-rated control (AppBar icon, Search
+  /// filter-row). Maps onto the tri-state _sortMode: true → 'top_rated',
+  /// false → 'nearest'. Does not touch 'match' (that is set from the List view).
   Future<void> _setTopRated(bool value) async {
+    await _setSortMode(value ? 'top_rated' : 'nearest');
+  }
+
+  /// [LOCAL-689] The tri-state sort used by the List view: 'nearest',
+  /// 'top_rated', or 'match' (Best match first). Persisted under
+  /// 'home_sort_mode'; the legacy 'home_top_rated' bool is kept in sync so an
+  /// older build reading it still gets a sensible Nearest/Top-rated.
+  Future<void> _setSortMode(String mode) async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool('home_top_rated', value);
+    await prefs.setString('home_sort_mode', mode);
+    await prefs.setBool('home_top_rated', mode == 'top_rated');
     if (!mounted) return;
-    setState(() => _topRated = value);
+    setState(() => _sortMode = mode);
     await _loadNearbyTours();
   }
 
@@ -1316,8 +1451,14 @@ class _HomeScreenState extends State<HomeScreen> {
                 SizedBox(height: 6),
                 // [LOCAL-670] Rating badge "★ 8.3 · 2 ratings" / "★ 7.5 · New".
                 // [LOCAL-677] Price badge "$4.99" / "Free" beside the rating.
+                // [LOCAL-689] Personal "Match 82%" chip leads the row when the
+                // server computed one for this listener.
                 Row(
                   children: [
+                    if (_matchChip(item) != null) ...[
+                      _matchChip(item)!,
+                      const SizedBox(width: 8),
+                    ],
                     TourRatingBadge.fromTour(item,
                         onTap: () => showWhyThisScoreSheet(context,
                             tourId: '${item['id']}', tour: item)),
@@ -1329,6 +1470,12 @@ class _HomeScreenState extends State<HomeScreen> {
                     ],
                   ],
                 ),
+                // [LOCAL-689] The two reason phrases ("strong on history, which
+                // you like; light on people stories") or the cold-start line.
+                if (_matchReasonsLine(item) != null) ...[
+                  const SizedBox(height: 4),
+                  _matchReasonsLine(item)!,
+                ],
                 if (_tourVersionLabel(item) != null)
                   Text(
                     _tourVersionLabel(item)!,
