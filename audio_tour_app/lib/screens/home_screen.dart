@@ -28,6 +28,8 @@ import '../config.dart';
 import '../config/endpoints.dart';
 import '../utils/share_code.dart';
 import '../utils/search_dispatch.dart';
+import '../services/communities_service.dart';
+import 'community_page_screen.dart';
 // import '../services/credential_storage_service.dart';  // TEMPORARILY DISABLED - CAUSING BUILD ERRORS
 // import '../services/subscription_article_storage.dart';  // TEMPORARILY DISABLED - CAUSING BUILD ERRORS
 import '../widgets/subscription_credential_dialog.dart';
@@ -51,6 +53,8 @@ class _HomeScreenState extends State<HomeScreen> {
   LatLng? _userLocation;
   LatLng? _displayLocation; // Location being displayed (may differ from user location)
   List<Marker> _tourMarkers = [];
+  // [LOCAL-690] Listed-community pins for the Home map (community badge).
+  List<Marker> _communityMarkers = [];
   bool _isLoading = true;
   bool _connectionError = false;
   String _appMode = 'Tours';
@@ -105,6 +109,54 @@ class _HomeScreenState extends State<HomeScreen> {
     super.initState();
     _initializeSecureEncryption();
     _loadAppMode();
+    _loadCommunityPins();
+  }
+
+  /// [LOCAL-690] Load Listed communities and render them as map pins with a
+  /// community badge. Failures are swallowed — the map still shows tours.
+  Future<void> _loadCommunityPins() async {
+    try {
+      final pins = await CommunitiesService.mapPins();
+      if (!mounted) return;
+      setState(() {
+        _communityMarkers = pins
+            .map((p) => Marker(
+                  point: LatLng(p.latitude, p.longitude),
+                  width: 44,
+                  height: 44,
+                  child: GestureDetector(
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                            builder: (_) =>
+                                CommunityPageScreen(communityId: p.id)),
+                      );
+                    },
+                    child: Stack(
+                      alignment: Alignment.center,
+                      children: [
+                        const Icon(Icons.location_on,
+                            color: Colors.deepPurple, size: 40),
+                        Positioned(
+                          bottom: 10,
+                          child: Container(
+                            padding: const EdgeInsets.all(2),
+                            decoration: const BoxDecoration(
+                              color: Colors.white, shape: BoxShape.circle),
+                            child: const Icon(Icons.groups,
+                                color: Colors.deepPurple, size: 14),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ))
+            .toList();
+      });
+    } catch (_) {
+      // Non-fatal: communities just won't appear on the map this session.
+    }
   }
   
   Future<void> _initializeSecureEncryption() async {
@@ -1041,9 +1093,23 @@ class _HomeScreenState extends State<HomeScreen> {
     if (tours.isNotEmpty) {
       _presentFoundTours(tours);
     } else {
+      // [LOCAL-690] Not a tour code — try it as a community INVITE code (the
+      // join flow, D658 addendum 2 §3). A member → the community page opens to
+      // its episodes; a non-member → the page shows "This tour belongs to
+      // <Community>. Join to listen" with the passes.
+      final community = await CommunitiesService.resolveByCode(code);
+      if (!mounted) return;
+      if (community != null) {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+              builder: (_) => CommunityPageScreen(communityId: community.id)),
+        );
+        return;
+      }
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('No tour with that code on this server (check Settings → server)'),
+          content: Text('No tour or community with that code on this server (check Settings → server)'),
           backgroundColor: Colors.orange,
           duration: Duration(seconds: 5),
         ),
@@ -4075,6 +4141,11 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
                 
                 MarkerLayer(markers: _tourMarkers),
+
+                // [LOCAL-690] Listed communities on the Home map, each with a
+                // community badge (D658 addendum 2 §4). Private/waiver
+                // communities are never returned by /communities/map.
+                MarkerLayer(markers: _communityMarkers),
                 
                 // User location marker (always show if available)
                 if (_userLocation != null && !_isUsingCustomLocation)

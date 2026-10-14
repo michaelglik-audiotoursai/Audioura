@@ -12,6 +12,7 @@ import 'dart:io' show Platform, Directory;
 
 import 'debug_log_viewer_screen.dart';
 import 'plan_screen.dart';
+import 'communities_about_screen.dart';
 import '../config/endpoints.dart';
 import '../services/error_handler_service.dart';
 
@@ -384,6 +385,64 @@ class _AboutScreenState extends State<AboutScreen> {
                       label: const Text('Open your plan'),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.indigo,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 20),
+            // [LOCAL-690] Communities button (D658 addendum §: About carries a
+            // Communities button).
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: Colors.deepPurple.shade50,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.deepPurple.shade200),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Row(
+                    children: [
+                      Icon(Icons.groups, size: 30, color: Colors.deepPurple),
+                      SizedBox(width: 10),
+                      Text(
+                        'Communities',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.deepPurple,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  const Text(
+                    'Organisers publish their own audio to members. Create one '
+                    'from the Generate tab, or join with an invite code in the '
+                    'Home search box.',
+                    style: TextStyle(fontSize: 13),
+                  ),
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton.icon(
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                              builder: (context) => const CommunitiesAboutScreen()),
+                        );
+                      },
+                      icon: const Icon(Icons.groups_outlined),
+                      label: const Text('About Communities'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.deepPurple,
                         foregroundColor: Colors.white,
                         padding: const EdgeInsets.symmetric(vertical: 14),
                       ),

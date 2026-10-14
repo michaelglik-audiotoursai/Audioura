@@ -27,6 +27,7 @@ import '../utils/user_stops.dart';
 import 'user_stops_screen.dart';
 import 'main_screen.dart';
 import 'plan_screen.dart';
+import 'communities_about_screen.dart';
 
 class TourGeneratorScreen extends StatefulWidget {
   const TourGeneratorScreen({super.key});
@@ -1302,6 +1303,29 @@ class _TourGeneratorScreenState extends State<TourGeneratorScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            // [LOCAL-690] Generate split: Tour | Community. "Tour" is the normal
+            // generator below; "Community" opens the create-a-community flow
+            // (organisers create communities here — D658 addendum §).
+            if (_appMode == 'Tours') ...[
+              Padding(
+                padding: const EdgeInsets.only(bottom: 16),
+                child: SegmentedButton<String>(
+                  segments: const [
+                    ButtonSegment(value: 'tour', label: Text('Tour'), icon: Icon(Icons.map)),
+                    ButtonSegment(value: 'community', label: Text('Community'), icon: Icon(Icons.groups)),
+                  ],
+                  selected: const {'tour'},
+                  onSelectionChanged: (sel) {
+                    if (sel.contains('community')) {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (_) => const CommunitiesAboutScreen()),
+                      );
+                    }
+                  },
+                ),
+              ),
+            ],
             Container(
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
