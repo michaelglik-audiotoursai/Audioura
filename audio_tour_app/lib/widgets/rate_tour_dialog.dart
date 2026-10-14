@@ -16,21 +16,27 @@ class TourRatingBadge extends StatelessWidget {
   /// Compact variant uses a smaller font / tighter padding for list rows.
   final bool compact;
 
+  /// [LOCAL-688] When set, tapping the badge opens the "Why this score" sheet.
+  final VoidCallback? onTap;
+
   const TourRatingBadge({
     super.key,
     this.score,
     this.count,
     this.label,
     this.compact = false,
+    this.onTap,
   });
 
   /// Build from a tour map returned by map-delivery (/tours-near etc.).
-  factory TourRatingBadge.fromTour(Map<String, dynamic> tour, {bool compact = false}) {
+  factory TourRatingBadge.fromTour(Map<String, dynamic> tour,
+      {bool compact = false, VoidCallback? onTap}) {
     return TourRatingBadge(
       score: (tour['rating_score'] as num?)?.toDouble(),
       count: (tour['rating_count'] as num?)?.toInt(),
       label: tour['rating_label'] as String?,
       compact: compact,
+      onTap: onTap,
     );
   }
 
@@ -42,7 +48,7 @@ class TourRatingBadge extends StatelessWidget {
     final text = '${s.toStringAsFixed(1)} · $l';
     final fontSize = compact ? 11.0 : 13.0;
 
-    return Container(
+    final badge = Container(
       padding: EdgeInsets.symmetric(
         horizontal: compact ? 6 : 8,
         vertical: compact ? 2 : 4,
@@ -64,8 +70,22 @@ class TourRatingBadge extends StatelessWidget {
               color: const Color(0xFF7A5C00),
             ),
           ),
+          // [LOCAL-688] A faint chevron hints the badge is tappable ("Why this
+          // score"), only when an onTap is wired.
+          if (onTap != null) ...[
+            const SizedBox(width: 2),
+            Icon(Icons.info_outline,
+                size: fontSize, color: const Color(0xFF7A5C00)),
+          ],
         ],
       ),
+    );
+
+    if (onTap == null) return badge;
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: badge,
     );
   }
 }

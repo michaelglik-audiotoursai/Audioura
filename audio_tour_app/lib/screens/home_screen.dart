@@ -33,6 +33,7 @@ import '../utils/search_dispatch.dart';
 import '../widgets/subscription_credential_dialog.dart';
 import '../widgets/language_selector.dart';
 import '../widgets/rate_tour_dialog.dart';
+import '../widgets/why_this_score_sheet.dart';
 import '../widgets/reviews_section.dart';
 import '../widgets/price_badge.dart';
 import '../widgets/tour_buy_sheet.dart';
@@ -457,7 +458,11 @@ class _HomeScreenState extends State<HomeScreen> {
                                   spacing: 8,
                                   crossAxisAlignment: WrapCrossAlignment.center,
                                   children: [
-                                    TourRatingBadge.fromTour(t),
+                                    TourRatingBadge.fromTour(t,
+                                        onTap: () => showWhyThisScoreSheet(
+                                            context,
+                                            tourId: '${t['id']}',
+                                            tour: t)),
                                     TourPriceBadge.fromTour(t),
                                     if (km != null)
                                       Text('${(km / 1.609344).toStringAsFixed(1)} mi',
@@ -1164,7 +1169,9 @@ class _HomeScreenState extends State<HomeScreen> {
                 // [LOCAL-677] Price badge "$4.99" / "Free" beside the rating.
                 Row(
                   children: [
-                    TourRatingBadge.fromTour(item),
+                    TourRatingBadge.fromTour(item,
+                        onTap: () => showWhyThisScoreSheet(context,
+                            tourId: '${item['id']}', tour: item)),
                     const SizedBox(width: 8),
                     TourPriceBadge.fromTour(item),
                   ],
