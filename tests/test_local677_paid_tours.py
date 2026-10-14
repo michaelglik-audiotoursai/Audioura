@@ -53,22 +53,30 @@ TEST_PREFIX = "TEST-677-"
 
 def test_price_tiers_fallback_constants():
     tiers = price_tiers_cfg.load_price_tiers()  # no cursor → code defaults
-    assert set(tiers.keys()) == {1, 2, 3, 4, 5, 6, 7}  # [LOCAL-684] 6-7 added
+    # [LOCAL-686] 7 legacy .99 tiers + 34 round-dollar ladder tiers = 41.
+    assert set(tiers.keys()) == set(range(1, 42))
     assert tiers[3]["label"] == "$4.99"
     assert tiers[6]["label"] == "$19.99" and tiers[7]["label"] == "$49.99"
     assert tiers[3]["product_id"] == "audioura.tour.tier3"
+    # The ladder: round-dollar labels and usd<N> product ids (e.g. $35 = tier 29).
+    assert tiers[29]["label"] == "$35"
+    assert tiers[29]["product_id"] == "audioura.tour.usd35"
+    assert tiers[41]["label"] == "$200"
 
 
 def test_price_tiers_validation_and_labels():
     assert price_tiers_cfg.is_valid_tier(1) is True
     assert price_tiers_cfg.is_valid_tier(5) is True
     assert price_tiers_cfg.is_valid_tier(7) is True   # [LOCAL-684]
-    assert price_tiers_cfg.is_valid_tier(8) is False
+    assert price_tiers_cfg.is_valid_tier(8) is True   # [LOCAL-686] ladder start
+    assert price_tiers_cfg.is_valid_tier(41) is True  # [LOCAL-686] ladder end
+    assert price_tiers_cfg.is_valid_tier(42) is False # [LOCAL-686] past the ladder
     assert price_tiers_cfg.is_valid_tier(None) is False
     assert price_tiers_cfg.is_valid_tier(2.5) is False
     assert price_tiers_cfg.label_for_tier(None) == "Free"
     assert price_tiers_cfg.label_for_tier(4) == "$7.99"
     assert price_tiers_cfg.tier_for_product("audioura.tour.tier2") == 2
+    assert price_tiers_cfg.tier_for_product("audioura.tour.usd35") == 29  # [LOCAL-686]
     assert price_tiers_cfg.tier_for_product("l3_pack_10") is None
 
 
