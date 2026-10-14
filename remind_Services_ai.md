@@ -8,6 +8,28 @@
 
 ---
 
+## 🗒️ SESSION LOG — 2026-10 (latest; read this FIRST — it supersedes the older headers below)
+
+> ⚠️ This file differs per git branch (separate copies on `main` and `storied`; this is the `main` copy, mirrored from `storied`). SQ4/B6 story-quality work is CLOSED, do not reopen.
+
+**Context now:** Work shifted from story-quality to **release + Subscribed monetization + ClickUp task cleanup**. ClickUp spaces: Beta `90137683357`, Storied `901310117577`, **Subscribed `901313855797`** (active), New Architecture. Subscribed lists: 🔵 Claude—Review `1000410000000749`, 🟦 Services—Kiro `1000410000000750`, 🟩 Mobile—Kiro `1000410000000751`, 👤 Michael `1000410000000752`.
+
+**GCP facts (verified via gcloud, authed michael.glik@gmail.com):** project `audiotours-migration`, region `us-central1`, artifact repo `us-central1-docker.pkg.dev/audiotours-migration/services`. Billing `01EE1F-6D9958-ABBB49` (paid/open since Aug 14; budget "Audioura Monthly Spend" $60, 50/90/100% alerts). Cloud SQL `audioura-db` POSTGRES_15 `db-f1-micro` 10GB (conn `audiotours-migration:us-central1:audioura-db`). Cloud Run incl. `tour-modernized`, `newsletter-processor` (shared Beta+Storied), + `-storied` variants `api-gateway-storied` + `tour-orchestrator-storied`. Deploy: `deploy_cloudrun_service.sh <service>`. Google Play acct = **Organization** (AUDIOURA LLC) → no 12-tester/14-day gate. API-36 SATISFIED (Policy status "No issues found"; build 2.3.2+20 in closed test).
+
+**Measured tour cost (COST_PER_TOUR.md on storied):** fresh 4-stop ≈ **$0.75** (OpenAI $0.26 + grounding $0.32 + neural Polly $0.17). Cache hit $0.00. Edit/added stop ≈ $0.04 (Polly only). Translation ≈ $0.19/language (AWS Translate + std Polly, no OpenAI/grounding). Grounding ($0.035/req) biggest lever. Rates `cost_rates.py`, meter `cost_meter.py`, ceiling `cost_ceiling_monitor.py` ($1.30 abort).
+
+**This session done (verified):** Fixed `wdvrday52p` (newsletter-processor missing `cryptography` → /submit_credentials 400). Deployed `audioura:v39` (rev `newsletter-processor-00012-gxg`); verified. One deploy fixed both tracks (shared service). ROOT CAUSE OPEN: `Dockerfile.cloudrun` uses a hand-maintained pip list, ignores `requirements.txt` (follow-up). Decision B (`wdvrdaxvvc`): all 5 Beta per-service Dockerfiles → `COPY *.py`, committed to `main` (`1fe0d20`).
+
+**Subscription model (spec task `wdvrdayu5a` → Mac Mini Claude):** L1 install (listen only) / L2 free (1/day,3/mo,≤5 stops,by-reference,queued,100 cap,7-day evict) / L3 $10 pack (5 fresh+5 edits,≤10 stops) / L4 $25 round (25 combined,≤25 stops,sell) / Tester (invite,10/day cap 50/mo). Consumable IAP (NOT auto-renew), anniversary=last-payment+1mo, device_id only (no identity/refunds). CRITICAL: L2 by-reference MUST skip grounding.
+
+**Open security (Michael executes, documented):** `wdvrdaxay9` AWS key rotation — key `AKIAWLW36SCEWGWIQ26O` exposed in git history + hardcoded in `docker-compose-newsletter.yml`; SAME key in local .env + GCP Secret Manager `aws-access-key-id`/`aws-secret-access-key` + prod → rotate all 3, deactivate-before-delete (full steps in task). Also `wdvrdaxay8` OpenAI, `wdvrdaxe5p` Boston Globe pw, `wdvrdaxbkv` Mac Mini GitHub token.
+
+**ClickUp cleanup closed:** `wdvrdaw6em`, `wdvrdaw6en`, `wdvrdawkgy`, `wdvrdaxbkh`, `wdvrdaxdnd`, `wdvrdaxe8m`, `wdvrdaxe8q`, `wdvrdayuf9`. Storied-on-GCloud deploy = `wdvrdaxxm9` (plan posted; blocker `wdvrdaxy4r` = merge LOCAL-470 reversed-coord fix into storied via Mac Mini Claude). Igor tester: `wdvrdaxy14`/`wdvrdaxy15`.
+
+**NEXT (resume here):** one-task-at-a-time cleanup of Michael's Subscribed 👤 list `1000410000000752` — key rotations, Subscribed billing setup cluster (`wdvrdayuf1` Apple Paid Apps Agreement, `wdvrdayx32` Google merchant profile, products `wdvrdayuf3`/`wdvrdayx33`), decisions `wdvrdayuf5`/`wdvrdayuf7`/`wdvrdayuf8`. Do ONE at a time (Michael asked not to batch).
+
+---
+
 ## 🗒️ SESSION LOG — 2026-08-31 (Services Kiro, Windows laptop)
 
 > ⚠️ **This reminder file differs per git branch.** This `main` copy and the `storied` copy are separate. This same session log was written to BOTH branch copies (Michael's directive, option 3). If facts here conflict with the older production header above, THIS log is newer.
