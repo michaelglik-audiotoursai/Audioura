@@ -24400,3 +24400,91 @@ non-English stays Polly per D603), translation (TRANSLATION_ENGINE=llm, D595), m
 
 Measured voice: 4-stop English tour 58 s total on Kokoro, $0 (Polly ≈ $0.12). Writer and total
 cost/time per tour: to be measured from Michael's real phone tours (cost_ledger).
+
+## D605 — Tour 388 field test: three defects, two follow-ups (2026-10-04, LEAD)
+
+Fix now: LOCAL-575 (Kokoro multi-chunk MP3 header: subscribed/local only), LOCAL-576 (named places
+are anchors exempt from locality/coverage/scope removal; route starts at the named start; scope check
+before writing plus replenishment; storied release fix → ClickUp deploy after review).
+Follow-ups, queued after: (a) **translation-service is unmetered**: no cost_ledger rows for
+translation LLM or its direct-boto3 Polly audio, so "real price" undercounts translations;
+(b) **Russian Polly mispronounces names and landmarks** (Michael: future concern; candidates are an
+SSML phoneme/lexicon layer fed from Wikidata IPA, so it stays Polly-cheap per D603).
+Per-stop writer cost on this biking tour was flat versus baseline (≈ $0.049/stop): no story retries to
+save on outdoor tours, and gpt-4.1's per-token saving was offset by a 25k-char prompt. The biking
+saving is the voice ($0.15 → $0).
+
+## D606 — Curator tour sharing ships on Subscribed as app 2.4.1+27 (2026-10-04)
+
+Michael's version rule: tour sharing on **Subscribed = 2.4.1+27** (on Storied it would be 2.3.3+27).
+It is on Subscribed (LOCAL-579, merged b6350ec; version commit 00805de). Installed on Michael's
+iPhone 16 by **in-place upgrade** (`xcrun devicectl device install app`) over 2.3.2 (26), same bundle
+`com.audioura.audiotours`, same team, so app data was kept. `install_to_iphone.sh` uses `flutter install`,
+which **uninstalls first** and wipes app data (downloaded tours, prefs, possibly the user id that
+GCloud's tester plan is keyed to); prefer devicectl for upgrades. Sharing access decision (LEAD,
+reversible): a code is public: anyone with it can open that tour, no account gate (fine for
+Kostya's team; revisit if tours become paid).
+
+## D607 — Museums with no verifiable works: a degradation ladder ending in an honest overview (2026-10-05, LEAD)
+
+Michael proposed that when nothing is known about a venue's works, we still give a summary from its own
+site (hours, exhibitions, entry price). Adopted as a ladder: (1) verified works or current exhibitions →
+full tour (LOCAL-580); (2) named but thin → short, hedged stops (D592); (3) venue resolved and site
+reachable but nothing verifiable on display → **museum overview**, one stop, from the venue's own pages
+only, with hours and price stated only with a dated source on the venue's domain (LOCAL-582, parked
+until LOCAL-580 merges); (4) no usable site → structured error + suggestion (LOCAL-580/581). Rule at
+every rung: only what the venue's pages say; never invent (the Griffin failure was GPT inventing 5 shows).
+
+## D608 — Local and Cloud Run generator images must install the same packages (2026-10-05, LEAD)
+
+Michael's Griffin retry on the Mac Mini failed although LOCAL-580 was deployed there: the local
+generator image (`Dockerfile.generator` → `requirements_generator.txt`) lacked **beautifulsoup4**, so
+`exhibition_site_first` silently fell back to a regex that cannot read the Griffin's card markup and
+found 0 exhibitions. Kiro's live run passed because it ran on the host, where bs4 is installed.
+Cloud Run (`Dockerfile.cloudrun`, its own hand-kept pip list) already had bs4, lxml and pydub; the
+local list had none of the three. Fixed (storied 040a361, forward-merged): the container now finds
+9 Griffin exhibitions. **Rule:** a live acceptance run must run inside the container it ships in,
+not on the host. When a task adds an import, check BOTH dependency lists (this is the third time:
+cryptography wdvrday52p, pycountry LOCAL-564, bs4 here). Follow-up: D1v2 matched "The Griffin Museum
+Collection" to the site junk title "Griffin Museum Board Of Directors 2". Canonical-title extraction for
+the non-exhibition path still admits page chrome.
+
+## D609 — Stop pool (LOCAL-590) per Michael's design; exact counts; tour 394 deleted at his request (2026-10-05)
+
+Michael asked to build the stop pool (LOCAL-495). His ordering rule: **single-building tours** add the
+new stops **before** the pooled ones, regenerate the orientation, leave the conclusion; **outdoor tours**
+re-sequence the route and rewrite the directions of the stops next to each insertion (often 4 rewritten
+for 2 added; still worth it). Subscribed only. Generate exactly N (no bucket rounding once the pool
+exists). Correction recorded: LEAD said a 7-stop request "builds 10 trimmed to 7"; wrong. The generator
+builds exactly N, and only the cache buckets. Tour 394 (Michael's broken Griffin 7-stop) deleted with his
+explicit authorisation: 5 stop_metrics + 1 audio_tours row, counts 205→204; full backup
+`/Volumes/AudiouraSSD/deleted_tours/`. The bad 4–6 bucket cache row was retired, not deleted (D-note
+2026-10-05).
+Also deleted at Michael's request (2026-10-05 20:2x): tours 391 (en) and 392 (ru), the junk Griffin pair
+with website menu items as stops; their 5 stop_metrics; and share code NCyh65N7 (pointed at 392). Counts
+204 → 202 (real 60 → 58). Backups: `/Volumes/AudiouraSSD/deleted_tours/` (audio_tours_391/392.json incl.
+ZIPs, stop_metrics_391_392.json, shared_tours_391_392.json).
+
+## D610 — Stop pool live on the local stack; cache never serves fewer stops than asked (2026-10-05, LEAD)
+
+LOCAL-590 merged (subscribed 1f093e0) and running locally (pool ON; `DISABLE_STOP_POOL=1` turns it off).
+Measured live, isolated: MFA 5→7 reused 4 / new 3, **$0.63 vs $1.13 full (−44%), 403 s vs 740 s (−46%)**;
+Boston Common 4→6 reused 4 / new 2 / 4 transitions rewritten (Michael's prediction), $0.09. Griffin
+reuse was NOT shown live (a flaky QID lookup split the pool across keys; fixed by reading both keys,
+unit-tested). The pool already holds 7 Griffin stops from Kiro's runs, so Michael's next Griffin ≤7 request
+is served from the pool.
+**Found reviewing it (storied 91999e9, forward-merged):** `get_cached_tour` returned a cached tour with
+FEWER stops than requested in the same bucket (a 4-stop tour answering a 6-stop request). Now a miss.
+Test red on old code. **Follow-up:** LOCAL-590's tests wrote ~30 `zz_isolated_*` venues into the shared
+DB's `stop_pool`. Harmless (unmatchable names) but tests must use a transaction/rollback or a test DB.
+
+Also deleted at Michael's request (2026-10-05 23:5x): tours 395 (en) / 396 (ru), the Athenaeum tour that became a city walk (LOCAL-591); 3 stop_metrics. Counts 204 -> 202 (real 60 -> 58). Backups in /Volumes/AudiouraSSD/deleted_tours/.
+
+## D611 — Exactly N stops; the opening section belongs to Stop 1 (Michael, 2026-10-06, binding)
+
+"If a user asks for x number of stops, we are supposed to generate exactly x number of stops." As with the
+walking tour's Overall section (the R2 prolog folded into Stop 1), every single-venue tour (museum, facility,
+building) opens Stop 1 with a section carrying the About content (history, architecture) **and the practical
+facts: opening hours, admission, closed days** ("very important… but it has to be the first section of Stop 1"),
+then Stop 1's own narration. LOCAL-585's extra "About" stop (5 asked → 6) was wrong; LEAD had chosen it and
+offered it as an option. Fix: LOCAL-592. Restaurant tours keep per-restaurant practicals in each stop (D538).

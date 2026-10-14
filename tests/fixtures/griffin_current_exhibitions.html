@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<!--
+  Fixture for LOCAL-580.
+
+  A trimmed-but-faithful copy of https://griffinmuseum.org/current-exhibitions/
+  as it appeared when Michael's "Griffin Museum of Photography, Winchester, MA"
+  request (job 7fe11ab9) failed on 2026-10-05.
+
+  The real current exhibitions are the page's <h2> section headings, each a link
+  to its own /show/<slug>/ detail page. The page ALSO embeds a FlipBook viewer
+  whose button labels ("Toggle Fullscreen", "Next Page", "Download PDF File",
+  "Zoom Out", ...) were mistakenly scraped as 22 "canonical titles" by the old
+  plaintext extractor. The structural extractor must return the exhibitions and
+  reject every FlipBook/viewer control, nav item and footer heading.
+
+  Structure (tags, classes, aria-labels) mirrors the live DOM. Prose trimmed.
+-->
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Current Exhibitions - Griffin Museum of Photography</title>
+</head>
+<body>
+
+<header id="site-header">
+  <nav class="main-navigation" aria-label="Main menu">
+    <ul>
+      <li><a href="/">Home</a></li>
+      <li><a href="/current-exhibitions/">Current Exhibitions</a></li>
+      <li><a href="/virtual-galleries/">Virtual Galleries</a></li>
+      <li><a href="/membership/">Membership</a></li>
+      <li><a href="/donate/">Donate</a></li>
+    </ul>
+  </nav>
+</header>
+
+<main id="content">
+
+  <h1>Current Exhibitions</h1>
+
+  <section class="exhibitions-grid">
+
+    <article class="exhibition">
+      <h2 class="exhibition-title">
+        <a href="https://griffinmuseum.org/show/lua-kobayashi-the-persistence-of-memories/">Lua Kobayashi | The Persistence of Memories</a>
+      </h2>
+      <p class="exhibition-dates">September 11 &ndash; November 2, 2026 &middot; Main Gallery</p>
+      <p class="exhibition-blurb">Lua Kobayashi's cyanotype and lumen prints meditate on remembrance.</p>
+    </article>
+
+    <article class="exhibition">
+      <h2 class="exhibition-title">
+        <a href="https://griffinmuseum.org/show/homage-robert-frank-the-americans/">Homage | Robert Frank: The Americans</a>
+      </h2>
+      <p class="exhibition-dates">September 11 &ndash; November 2, 2026 &middot; Griffin Gallery</p>
+      <p class="exhibition-blurb">A tribute to the photographs of Robert Frank's landmark book.</p>
+    </article>
+
+    <article class="exhibition">
+      <h2 class="exhibition-title">
+        <a href="/show/tabitha-soren-an-artist-life/">Tabitha Soren | An Artist Life</a>
+      </h2>
+      <p class="exhibition-dates">September 11 &ndash; November 2, 2026 &middot; Atelier Gallery</p>
+      <p class="exhibition-blurb">Tabitha Soren photographs the surfaces artists touch.</p>
+    </article>
+
+    <article class="exhibition">
+      <h2 class="exhibition-title">
+        <a href="/show/intertidal-field-notes/">Intertidal : Field Notes</a>
+      </h2>
+      <p class="exhibition-dates">September 11 &ndash; November 2, 2026 &middot; Griffin Gallery</p>
+    </article>
+
+    <article class="exhibition">
+      <h2 class="exhibition-title">
+        <a href="/show/bu-masters-show-2026-traces-pursuing-process/">BU Masters Show 2026 | Traces: Pursuing Process</a>
+      </h2>
+      <p class="exhibition-dates">September 11 &ndash; November 2, 2026 &middot; Education Gallery</p>
+    </article>
+
+    <article class="exhibition">
+      <h2 class="exhibition-title">
+        <a href="/show/earth-wind-fire/">Earth, Wind &amp; Fire</a>
+      </h2>
+      <p class="exhibition-dates">September 11 &ndash; November 2, 2026 &middot; Virtual Gallery</p>
+    </article>
+
+    <article class="exhibition">
+      <h2 class="exhibition-title">
+        <a href="/show/ultrasound/">ULTRASOUND</a>
+      </h2>
+      <p class="exhibition-dates">September 11 &ndash; November 2, 2026 &middot; Virtual Gallery</p>
+    </article>
+
+    <article class="exhibition">
+      <h2 class="exhibition-title">
+        <a href="/show/tlc/">TLC</a>
+      </h2>
+      <p class="exhibition-dates">September 11 &ndash; November 2, 2026 &middot; Virtual Gallery</p>
+    </article>
+
+  </section>
+
+  <!--
+    A FlipBook (3D PDF viewer) embedded on the page for the exhibition catalog.
+    Its controls are <button>s and elements with aria-label — all UI chrome,
+    NOT exhibitions. The old extractor turned these into "canonical titles".
+  -->
+  <section class="df-book-wrapper" id="flipbook-catalog">
+    <h2 class="df-book-caption">Exhibition Catalog</h2>
+    <div class="df-ui-controls" role="toolbar" aria-label="FlipBook controls">
+      <button type="button" class="df-ui-btn df-ui-fullscreen" aria-label="Toggle Fullscreen">Toggle Fullscreen</button>
+      <button type="button" class="df-ui-btn df-ui-next" aria-label="Next Page">Next Page</button>
+      <button type="button" class="df-ui-btn df-ui-prev" aria-label="Previous Page">Previous Page</button>
+      <button type="button" class="df-ui-btn df-ui-download" aria-label="Download PDF File">Download PDF File</button>
+      <button type="button" class="df-ui-btn df-ui-zoomin" aria-label="Zoom In">Zoom In</button>
+      <button type="button" class="df-ui-btn df-ui-zoomout" aria-label="Zoom Out">Zoom Out</button>
+      <button type="button" class="df-ui-btn df-ui-thumb" aria-label="Toggle Thumbnails">Toggle Thumbnails</button>
+      <button type="button" class="df-ui-btn df-ui-sound" aria-label="Toggle Sound">Toggle Sound</button>
+      <button type="button" class="df-ui-btn df-ui-share" aria-label="Share">Share</button>
+      <a href="#" class="df-ui-btn df-ui-first" role="button" aria-label="First Page">First Page</a>
+      <a href="#" class="df-ui-btn df-ui-last" role="button" aria-label="Last Page">Last Page</a>
+      <button type="button" class="df-ui-btn df-ui-print" aria-label="Print">Print</button>
+      <button type="button" class="df-ui-btn df-ui-start" aria-label="Start Presentation">Start Presentation</button>
+      <button type="button" class="df-ui-btn df-ui-sidemenu" aria-label="More options">More options</button>
+    </div>
+  </section>
+
+  <!-- Non-exhibition structural headings on the same page. -->
+  <section class="other-galleries">
+    <h2>Winchester Galleries</h2>
+    <p>Our home galleries in Winchester, Massachusetts.</p>
+    <h2>Virtual Galleries</h2>
+    <p>Browse past shows online.</p>
+  </section>
+
+</main>
+
+<footer id="site-footer">
+  <h2>Footer</h2>
+  <nav aria-label="Footer menu">
+    <ul>
+      <li><a href="/contact/">Contact</a></li>
+      <li><a href="/hours/">Hours &amp; Admission</a></li>
+      <li><a href="/privacy/">Privacy Policy</a></li>
+    </ul>
+  </nav>
+  <p>67 Shore Road, Winchester, MA 01890</p>
+</footer>
+
+</body>
+</html>

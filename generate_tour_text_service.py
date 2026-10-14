@@ -297,6 +297,24 @@ def generate_tour_async(job_id, location, tour_type, total_stops=10, user_id=Non
                 _svc_logger.error(f"[LOCAL-146] MISSING: generate_tour_text._LAST_CLEAN_FAIL_EVIDENCE — degradation evidence unavailable: {_cfe_err}")
             except AttributeError as _cfe_err:
                 _svc_logger.error(f"[LOCAL-146] generate_tour_text._LAST_CLEAN_FAIL_EVIDENCE not defined: {_cfe_err}")
+            # [LOCAL-580 D4] Attach an ACTIONABLE structured failure: a stable
+            # error_code, a plain-language message, and a machine-usable
+            # suggestion object derived from the venue's resolved locality (so
+            # the mobile app, LOCAL-581, can offer a one-tap alternative such as
+            # "Walking tour of Winchester, MA"). The old human string stays in
+            # `error` verbatim for pre-LOCAL-581 app builds.
+            try:
+                from actionable_failure import build_actionable_failure
+                _af = build_actionable_failure(
+                    _error_extra.get("evidence_summary"), location, _error_msg)
+                _error_extra["error_code"] = _af["error_code"]
+                _error_extra["message"] = _af["message"]
+                _error_extra["suggestion"] = _af["suggestion"]
+                _svc_logger.info(
+                    f"[LOCAL-580] clean-fail error_code={_af['error_code']} "
+                    f"suggestion={_af['suggestion']}")
+            except Exception as _af_err:
+                _svc_logger.error(f"[LOCAL-580] actionable-failure build failed (non-fatal): {_af_err}")
             ACTIVE_JOBS.update(job_id, status="error", error=_error_msg, **_error_extra)
             if os.path.exists(temp_path):
                 os.unlink(temp_path)
@@ -438,9 +456,38 @@ def generate_tour_async(job_id, location, tour_type, total_stops=10, user_id=Non
                     break
                 elif content_qa_runner.FACTUAL_FAIL_COUNT > 0:
                     # Factual failure — reject entirely (upstream pipeline bug, not fixable here)
+                    # [LOCAL-593 #5] The internal failure count stays in the LOG.
+                    # The listener gets the LOCAL-580 actionable contract: a stable
+                    # error_code ('factual_integrity'), a plain-language message that
+                    # never mentions an internal check, and a machine-usable
+                    # suggestion the LOCAL-581 "Edit request" button can pre-fill
+                    # (a smaller same-venue tour, which has a real chance of passing).
                     print(f"[BLOCKER4c] FACTUAL QA FAILED (round {_qa_round}): {content_qa_runner.FACTUAL_FAIL_COUNT} factual failure(s)")
+                    _fi_venue = (location or "this museum").split(',')[0].strip() or "this museum"
+                    _fi_message = (
+                        f'We couldn\u2019t verify enough facts about {_fi_venue} to '
+                        f'narrate it safely. Try the museum\u2019s full official name, '
+                        f'or fewer stops.'
+                    )
+                    _fi_extra = {}
+                    try:
+                        from actionable_failure import build_actionable_failure
+                        _fi_af = build_actionable_failure(
+                            {'error_type': 'factual_integrity', 'venue': _fi_venue},
+                            location, _fi_message)
+                        _fi_extra["error_code"] = _fi_af["error_code"]
+                        _fi_extra["message"] = _fi_af["message"]
+                        _fi_extra["suggestion"] = _fi_af["suggestion"]
+                        _svc_logger.info(
+                            f"[LOCAL-593 #5] factual-integrity fail: "
+                            f"{content_qa_runner.FACTUAL_FAIL_COUNT} internal failure(s); "
+                            f"error_code={_fi_af['error_code']} "
+                            f"suggestion={_fi_af['suggestion']}")
+                    except Exception as _fi_err:
+                        _svc_logger.error(
+                            f"[LOCAL-593 #5] actionable-failure build failed (non-fatal): {_fi_err}")
                     ACTIVE_JOBS.update(job_id, status="error",
-                                      error=f"Tour failed factual integrity check ({content_qa_runner.FACTUAL_FAIL_COUNT} factual failures). Please try again.")
+                                      error=_fi_message, **_fi_extra)
                     if os.path.exists(temp_path):
                         os.unlink(temp_path)
                     return
@@ -554,10 +601,42 @@ def generate_tour_async(job_id, location, tour_type, total_stops=10, user_id=Non
                 # Scoring failure MUST NOT block delivery (LOCAL-306 rule)
                 print(f"[LOCAL-311] Non-fatal scoring error (direct generate): {_scoring_err}")
 
+        # [LOCAL-582] Declare how the tour was delivered. 'overview' means the
+        # venue resolved and its own site was reachable, but no works could be
+        # verified, so the engine delivered ONE sourced orientation stop from the
+        # venue's own pages (rung 3 of the ladder) instead of clean-failing. The
+        # job carries tour_kind, the LOCAL-580 locality suggestion, and the
+        # requested-vs-delivered stop counts (D536) so the app can label it
+        # honestly and still offer the walking-tour alternative.
+        _l582_extra = {}
+        try:
+            import generate_tour_text as _gtt_kind
+            _tour_kind = getattr(_gtt_kind, "_LAST_TOUR_KIND", "full") or "full"
+            _l582_extra["tour_kind"] = _tour_kind
+            if _tour_kind == "overview":
+                _ov_suggestion = getattr(_gtt_kind, "_LAST_TOUR_SUGGESTION", {}) or {}
+                if _ov_suggestion:
+                    _l582_extra["suggestion"] = _ov_suggestion
+                _ov_sources = getattr(_gtt_kind, "_LAST_OVERVIEW_SOURCES", []) or []
+                if _ov_sources:
+                    _l582_extra["overview_sources"] = list(_ov_sources)
+                _notice = getattr(_gtt_kind, "_LAST_STOP_COUNT_NOTICE", {}) or {}
+                _l582_extra["requested_stops"] = _notice.get("requested", total_stops)
+                _l582_extra["delivered_stops"] = _notice.get("delivered", 1)
+                _svc_logger.info(
+                    f"[LOCAL-582] overview delivered: requested="
+                    f"{_l582_extra.get('requested_stops')} delivered="
+                    f"{_l582_extra.get('delivered_stops')} "
+                    f"suggestion={_l582_extra.get('suggestion')} "
+                    f"sources={len(_ov_sources)}")
+        except Exception as _kind_err:
+            _svc_logger.error(f"[LOCAL-582] tour_kind surfacing failed (non-fatal): {_kind_err}")
+
         ACTIVE_JOBS.update(job_id, status="completed",
                           progress="Tour text generation completed successfully!",
                           output_file=output_filename,
                           coordinates=coordinates,
+                          **_l582_extra,
                           **({"tour_content": tour_content_str} if tour_content_str else {}),
                           **({"i_con_avg": _icon_result["tour_avg"]} if _icon_result else {}))
         

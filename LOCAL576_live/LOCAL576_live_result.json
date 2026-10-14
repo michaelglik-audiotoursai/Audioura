@@ -1,0 +1,33 @@
+{
+  "ok": true,
+  "wall_s": 284.5,
+  "chars": 11594,
+  "delivered_stops": [
+    {
+      "n": 1,
+      "name": "Crystal Lake"
+    },
+    {
+      "n": 2,
+      "name": "Commonwealth Avenue Mall"
+    },
+    {
+      "n": 3,
+      "name": "Boston Common"
+    },
+    {
+      "n": 4,
+      "name": "Boston Public Garden"
+    },
+    {
+      "n": 5,
+      "name": "Paul Revere House"
+    }
+  ],
+  "delivered_count": 5,
+  "total_api_cost_usd": 0.309762,
+  "first_coordinates": [
+    42.3634,
+    -71.0534
+  ]
+}

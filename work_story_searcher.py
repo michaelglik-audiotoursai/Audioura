@@ -19,7 +19,14 @@ CORPUS_VERSION = 1
 # --- LOCAL-441: Concurrent lookup configuration ---
 EXTERNAL_LOOKUP_BATCH_BUDGET_SECONDS = 20.0  # Wall-budget for a batch of P856 lookups
 EXTERNAL_LOOKUP_POOL_SIZE = 10  # Thread pool size for concurrent lookups
-EXTERNAL_LOOKUP_PER_TIMEOUT = 8  # Per-lookup timeout (seconds), unchanged from original
+# [LOCAL-583 D3] Per-lookup P856 timeout dropped 8s -> 3s. A real Wikidata ASK
+# answers in well under a second; the only time the full timeout is spent is
+# when the host is slow/dead, and the dead-host breaker then short-circuits the
+# rest of the run. The old 8s meant a single slow lookup (or a batch submitted
+# before the first failure cold-marked the host) could burn tens of seconds in
+# external_lookups. This bounds the worst case without changing any verdict:
+# a timeout is still 'unverified' (D495/LOCAL-459), never a demotion to tier3.
+EXTERNAL_LOOKUP_PER_TIMEOUT = int(os.environ.get('EXTERNAL_LOOKUP_PER_TIMEOUT', '3'))
 
 # Module-level domain tier cache — process-lifetime only. Every tour generation is
 # a fresh process, so this starts empty every run. [D495] The comment that used to

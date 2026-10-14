@@ -1,0 +1,807 @@
+/Users/micha/Library/Python/3.9/lib/python/site-packages/urllib3/__init__.py:35: NotOpenSSLWarning: urllib3 v2 only supports OpenSSL 1.1.1+, currently the 'ssl' module is compiled with 'LibreSSL 2.8.3'. See: https://github.com/urllib3/urllib3/issues/3020
+  warnings.warn(
+========================================================================
+LOCAL-576 LIVE: 'biking tour in a loop from Crystal Lake to Paul Revere via Commonwealth Avenue Mall & Boston Common, MA'  (5 stops)
+========================================================================
+[LOCAL-197] llm_cost() called with total_tokens (deprecated) by /Users/micha/audioura-worktrees/LOCAL-576/generate_tour_text.py:8018. Caller should supply input_tokens and output_tokens separately.
+[LOCAL-197] llm_cost() called with total_tokens (deprecated) by /Users/micha/audioura-worktrees/LOCAL-576/generate_tour_text.py:8019. Caller should supply input_tokens and output_tokens separately.
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20261004_134253.txt'
+
+======================================================================
+CALL #001 | 13:42:53.011 | GENERATE_TOUR_TEXT_FUNCTION_ENTRY
+======================================================================
+  location: biking tour in a loop from Crystal Lake to Paul Revere via Commonwealth Avenue Mall & Boston Common, MA
+  tour_type: 
+  total_stops_parameter: 5
+  output_file: /Users/micha/audioura-worktrees/LOCAL-576/LOCAL576_live/tour388_rerun.txt
+
+  [LOCAL-245] Stop-existence gate mode: LOG_ONLY
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20261004_134253.txt'
+
+======================================================================
+CALL #002 | 13:42:53.011 | TOTAL_STOPS_FINALIZED
+======================================================================
+  location: biking tour in a loop from Crystal Lake to Paul Revere via Commonwealth Avenue Mall & Boston Common, MA
+  total_stops_final: 5
+  source: parameter
+
+
+PHASE 1: Analyzing tour intent with AI...
+  [BLOCKER1] Stripped 'tour' from location: 'biking tour in a loop from Crystal Lake to Paul Revere via Commonwealth Avenue Mall & Boston Common, MA' → 'biking  in a loop from Crystal Lake to Paul Revere via Commonwealth Avenue Mall & Boston Common, MA'
+  [LOCAL-46] Stripped transport words: 'biking  in a loop from Crystal Lake to Paul Revere via Commonwealth Avenue Mall & Boston Common, MA' → 'in a loop from Crystal Lake to Paul Revere via Commonwealth Avenue Mall & Boston Common, MA'
+  [Bug2Fix/D536] tour_type='' not prepended (pre_category='walking'); intent sees the ORIGINAL request, not the stripped one
+Intent analysis response: {
+    "poi_type": "biking tour",
+    "location": "Crystal Lake to Paul Revere via Commonwealth Avenue Mall & Boston Common, MA",
+    "theme_type": "STANDARD",
+    "theme_name": null,
+    "requirements": null,
+    "business_hours_relevant": false,
+    "accessibility_mentioned": false,
+    "needs_research": false,
+    "venue_name": null,
+    "geographic_scope": "Crystal Lake to Paul Revere via Commonwealth Avenue Mall & Boston Common, MA",
+    "named_places": [],
+    "scope_precision": "DISTRICT",
+    "transport_mode": "bike",
+    "country_scope": null
+}
+  [TRANSPORT] mode=bike, country_scope=None (keyword=bike, intent=bike)
+✅ Intent Analysis Results:
+   POI Type: biking tour
+   Location: Crystal Lake to Paul Revere via Commonwealth Avenue Mall & Boston Common, MA
+   Requirements: None
+   Business Hours Relevant: False
+   Accessibility Mentioned: False
+   Venue Name: None
+[TIMING] phase=intent elapsed=1.9s cumulative=1.9s
+[LOCAL-474] tour_type='' → category='walking' (source=inferred)
+
+Detected tour category: BIKE
+Using walking template for biking tour in a loop from Crystal Lake to Paul Revere via Commonwealth Avenue Mall & Boston Common, MA - 
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20261004_134253.txt'
+
+======================================================================
+CALL #003 | 13:42:54.931 | GENERATING_PROMPT
+======================================================================
+  location: biking tour in a loop from Crystal Lake to Paul Revere via Commonwealth Avenue Mall & Boston Common, MA
+  user_request: biking tour in a loop from Crystal Lake to Paul Revere via Commonwealth Avenue Mall & Boston Common, MA
+  total_stops: 5
+
+
+PHASE 3A: Fetching 5 candidate POI(s) for biking tour in a loop from Crystal Lake to Paul Revere via Commonwealth Avenue Mall & Boston Common, MA...
+  [S17] scope_constraint injected: precision=DISTRICT, scope='Crystal Lake to Paul Revere via Commonwealth Avenue Mall & Boston Common, MA'
+  [LOCAL-290] Asking for 8 candidates (N=5 + margin for gate filtering)
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20261004_134253.txt'
+
+======================================================================
+CALL #004 | 13:42:54.931 | PHASE_3A_REQUEST
+======================================================================
+  location: biking tour in a loop from Crystal Lake to Paul Revere via Commonwealth Avenue Mall & Boston Common, MA
+  total_stops: 5
+  poi_type_hint: biking tour
+
+PHASE 3A API call cost: $0.0005 (680 tokens)
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20261004_134253.txt'
+
+======================================================================
+CALL #005 | 13:42:57.605 | OPENAI_API_CALL
+======================================================================
+  total_stops_requested: 5
+  stop_count_in_prompt: True
+  http_status: 200
+  prompt_first_500_chars: You are a knowledgeable local guide for biking tour in a loop from Crystal Lake to Paul Revere via Commonwealth Avenue Mall & Boston Common, MA.
+List exactly 8 specific, real, well-known biking tour relevant to: biking tour in a loop from Crystal Lake to Paul Revere via Commonwealth Avenue Mall & Boston Common, MA.
+
+Requirements:
+- Use REAL, SPECIFIC names of actual establishments or landmarks.
+- NEVER use generic placeholders like 'Restaurant 1', 'Stop 1', 'Location A'.
+- Include a complete str
+  prompt_last_300_chars:  cycling routes.
+- Stops should be accessible by bicycle (not inside buildings or pedestrian-only zones).
+
+
+Return ONLY a JSON array, no other text, no markdown fences:
+[{"name": "...", "address": "...", "reason": "Brief reason why this landmark is notable — a specific date, person, or event"}, ...]
+  stops_found_in_response: 0
+  stop_markers_in_response:
+    []
+  response_first_500_chars: [{"name": "Crystal Lake", "address": "Newton, MA 02459", "reason": "Scenic lake with biking trails and picnic areas"},
+{"name": "Commonwealth Avenue Mall", "address": "Commonwealth Ave, Boston, MA 02116", "reason": "Historic tree-lined parkway with bike lanes"},
+{"name": "Boston Public Garden", "address": "4 Charles St, Boston, MA 02116", "reason": "Beautiful botanical garden for a leisurely bike ride"},
+{"name": "Boston Common", "address": "139 Tremont St, Boston, MA 02111", "reason": "Oldest c
+
+   ! [LOCAL-329] Hollow reason for 'Crystal Lake': 'Scenic lake with biking trails and picnic areas'
+   ! [LOCAL-329] Hollow reason for 'Long Wharf': 'Scenic waterfront area with bike-friendly paths'
+   ! [LOCAL-329] Hollow reason for 'Christopher Columbus Waterfront Park': 'Park with harbor views and bike access'
+  [LOCAL-329] Substance filter: 3 candidate(s) rejected for ranking-only reasons
+  [LOCAL-329] Captured 5 substantive selection reason(s)
+OK PHASE 3A parsed 5 candidate POI(s):
+   - Commonwealth Avenue Mall @ Commonwealth Ave, Boston, MA 02116
+   - Boston Public Garden @ 4 Charles St, Boston, MA 02116
+   - Boston Common @ 139 Tremont St, Boston, MA 02111
+   - Paul Revere House @ 19 N Square, Boston, MA 02113
+   - North End @ Boston, MA 02109
+  [LOCAL-576] named anchors: ['Crystal Lake', 'Commonwealth Avenue Mall', 'Boston Common', 'Paul Revere'] start='Crystal Lake' end='Paul Revere' is_loop=True
+  [LOCAL-576 anchor] Requested stop 'Paul Revere' is already a candidate — marked user_explicit/_anchor on 'Paul Revere House'
+  [LOCAL-576 anchor] Requested stop 'Boston Common' is already a candidate — marked user_explicit/_anchor on 'Boston Common'
+  [LOCAL-576 anchor] Requested stop 'Commonwealth Avenue Mall' is already a candidate — marked user_explicit/_anchor on 'Commonwealth Avenue Mall'
+  [LOCAL-576 anchor] Requested stop 'Crystal Lake' was NOT among the candidates — INSERTED as a user-explicit/_anchor stop
+  [LOCAL-547] 1 requested stop(s) were missing from every fill path and were inserted: ['Crystal Lake']
+  [area_resolver] Parsed: city='MA', neighborhood='a loop from Crystal Lake to Paul Revere via Commonwealth Avenue Mall & Boston Common'
+  [area_resolver] 'MA' resolved as country (Q1028), swapping: city='a loop from Crystal Lake to Paul Revere via Commonwealth Avenue Mall & Boston Common'
+  [area_resolver] Could not resolve swapped city: 'a loop from Crystal Lake to Paul Revere via Commonwealth Avenue Mall & Boston Common'
+[LOCAL-197] llm_cost() called with total_tokens (deprecated) by /Users/micha/audioura-worktrees/LOCAL-576/generate_tour_text.py:9852. Caller should supply input_tokens and output_tokens separately.
+[LOCAL-197] llm_cost() called with total_tokens (deprecated) by /Users/micha/audioura-worktrees/LOCAL-576/generate_tour_text.py:9853. Caller should supply input_tokens and output_tokens separately.
+[OSM-VENUE] Overpass HTTP 504 for 'Boston Common'
+[OSM-VENUE] Overpass HTTP 504 for 'Boston Public Garden'
+[LOCAL-197] llm_cost() called with total_tokens (deprecated) by /Users/micha/audioura-worktrees/LOCAL-576/fact_extractor.py:218. Caller should supply input_tokens and output_tokens separately.
+  [WALK-D1] Area resolution failed for 'in a loop from Crystal Lake to Paul Revere via Commonwealth Avenue Mall & Boston Common, MA' — proceeding unverified
+
+PHASE 4.5: Validating AI knowledge for biking tour in a loop from Crystal Lake to Paul Revere via Commonwealth Avenue Mall & Boston Common, MA...
+OK Knowledge validation passed: Knowledge validation passed
+
+PHASE 4: skipped (tour_category='walking', no type-verification required)
+   [D536] User-explicit stops from waypoint phrasing: {'commonwealth avenue mall', 'paul revere', 'boston common', 'crystal lake'}
+   PHASE 3C: skipped for walking tours (GEO-CHECK handles proximity)
+  [LOCAL-212] Coverage selection: 0 COVERED, fallback needed: 4×VENUE_ONLY, 1×EMPTY (not enough covered candidates to fill 5 stops)
+  [LOCAL-212] Selected: ['Paul Revere House=VENUE_ONLY', 'Commonwealth Avenue Mall=VENUE_ONLY', 'Boston Common=VENUE_ONLY', 'Crystal Lake=EMPTY', 'Boston Public Garden=VENUE_ONLY']
+  [LOCAL-212] Dropped:  ['North End=VENUE_ONLY']
+  [LOCAL-349] Yield scores (selected): ['Paul Revere House=9.0', 'Commonwealth Avenue Mall=1.5', 'Boston Common=1.5', 'Crystal Lake=0.0', 'Boston Public Garden=0.0']
+  [LOCAL-349] Yield scores (dropped):  ['North End=0.0']
+  [EXISTENCE-GATE] LOG_ONLY — 0/6 stops verified (0%), 6 would be dropped
+    [UNVERIFIED] 'Paul Revere House' — no evidence
+    [UNVERIFIED] 'Commonwealth Avenue Mall' — no evidence
+    [UNVERIFIED] 'Boston Common' — no evidence
+    [UNVERIFIED] 'Crystal Lake' — no evidence
+    [UNVERIFIED] 'Boston Public Garden' — no evidence
+    [UNVERIFIED] 'North End' — no evidence
+    [HARVEST] Summary: 0 harvested, 0 already had corpus, 0 verified_no_detail
+    [INTERPRETIVE] Summary: 0 stops enriched, +0 passages, 0 queries issued, 0 attributions dropped
+  [ROUTE-ORDER] Only 0 stops with coordinates — skipping algorithmic routing
+  [LOCAL-329] Persisted 1 selection reason(s) to stop_corpus
+
+PHASE 3B: Requesting structured details and walking directions for 5 stop(s)...
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20261004_134253.txt'
+
+======================================================================
+CALL #006 | 13:43:04.241 | PHASE_3B_REQUEST
+======================================================================
+  location: biking tour in a loop from Crystal Lake to Paul Revere via Commonwealth Avenue Mall & Boston Common, MA
+  stop_count: 5
+
+PHASE 3B API call cost: $0.0008 (1051 tokens)
+OK PHASE 3B: ordered 5 stop(s) with structured details and directions
+  [LOCAL-355] Querying OSM for venue facts (city: Crystal, hint: auto)
+  [LOCAL-355] Paul Revere House: no practical facts in OSM
+  [LOCAL-355] Commonwealth Avenue Mall: no practical facts in OSM
+  [LOCAL-355] Boston Common: no practical facts in OSM
+  [LOCAL-355] Crystal Lake: no practical facts in OSM
+  [LOCAL-355] Boston Public Garden: no practical facts in OSM
+   GEO-CHECK: all 5 stops within cycling distance (max leg 11.65 km, total 25.97 km, limit 120 km)
+Extracted first POI coordinates: (42.3634, -71.0534)
+
+=== Extracted POI Information ===
+1. Paul Revere House
+   Address: 19 N Square, Boston, MA 02113
+   Coordinates: 42.3634, -71.0534
+   Directions: Head southeast on Hanover St, then turn left onto N Square — Enjoy the vibrant a...
+2. Commonwealth Avenue Mall
+   Address: Commonwealth Ave, Boston, MA 02116
+   Coordinates: 42.3510, -71.0736
+   Directions: Continue straight on Hanover St, then turn right onto Cross St — Notice the tran...
+3. Boston Common
+   Address: 139 Tremont St, Boston, MA 02111
+   Coordinates: 42.3554, -71.0656
+   Directions: Ride straight on Commonwealth Ave, then turn left onto Charles St — Enjoy the gr...
+4. Crystal Lake
+   Address: Crystal Lake, Newton, MA 02459
+   Coordinates: 42.3255, -71.2015
+   Directions: Head southwest on Charles St, then continue straight onto Beacon St — Marvel at ...
+5. Boston Public Garden
+   Address: 4 Charles St, Boston, MA 02116
+   Coordinates: 42.3553, -71.0696
+   Directions: Continue on Beacon St, then turn right onto Arlington St — Admire the beauty of ...
+================================
+
+  [D556] +9 story fact(s) for 'Paul Revere House' via gemini (7 high)
+  [D556] +5 story fact(s) for 'Commonwealth Avenue Mall' via gemini (5 high)
+  [D556] +4 story fact(s) for 'Boston Common' via gemini (4 high)
+  [D556] +8 story fact(s) for 'Crystal Lake' via gemini (7 high)
+  [D556] +5 story fact(s) for 'Boston Public Garden' via gemini (5 high)
+[TIMING] phase=poi_selection elapsed=147.4s cumulative=149.3s
+
+[Storied] STORIED_MODE=true — generating spine + fact sheets...
+  [LOCAL-47] Paul Revere House: tier=rich, facts=8
+  [LOCAL-47] Commonwealth Avenue Mall: tier=empty, facts=0
+  [LOCAL-47] Boston Common: tier=rich, facts=8
+  [LOCAL-47] Crystal Lake: tier=empty, facts=0
+  [LOCAL-47] Boston Public Garden: tier=rich, facts=8
+  [LOCAL-37] Three-class retrieval: 5 stops processed, 0 with category
+  [LOCAL-47] Outdoor retrieval tiers: {'rich': 3, 'empty': 2}
+  [SQ-S6b] Insufficient data for thread discovery (elements=0, stops=5)
+  [SQ-S6b] Thread discovery: mode=mosaic, threads=0
+  [§3] No story elements available — spine will use invented arc (mode=invented)
+SPINE_COST: category=walking venue=biking tour in a loop from Cry model=gpt-4o tokens=1576 (in=889 out=687) cost=$0.0091 latency=7.1s
+[COST_METER] FRESH | spine_generate | $0.009092 | user=None | job=None
+  [LOCAL-278] Spine cost folded into total: $0.0091
+  [LOCAL-111] Spine quality: 4/4 | {'climax_position': True, 'unique_emotional_beats': True, 'valid_callbacks': True, 'closing_revelation_length': True}
+  [Storied] Spine generated: 5 arc entries (mode=invented)
+  [LOCAL-183] stop_corpus: 4/5 stops have per-stop passages (23 total passages)
+  [LOCAL-198] Corpus gate: ENABLED — checking stop coverage...
+  [CORPUS-GATE] stop='Paul Revere House' verdict=VENUE_ONLY action=SHORTENED
+  [CORPUS-GATE] stop='Commonwealth Avenue Mall' verdict=VENUE_ONLY action=SHORTENED
+  [CORPUS-GATE] stop='Boston Common' verdict=VENUE_ONLY action=SHORTENED
+  [CORPUS-GATE] stop='Crystal Lake' verdict=EMPTY action=PASSED_VIA_SNIPPETS (direct snippets override)
+  [CORPUS-GATE] stop='Boston Public Garden' verdict=VENUE_ONLY action=SHORTENED
+  [LOCAL-198] Corpus gate: 0 PASSED, 0 CREATOR_ONLY, 0 EMPTY, 4 SHORTENED
+  [Storied] Fact sheets: 5/5 generated
+  [S25] Story types assigned: ['culture', 'history', 'architecture', 'culture', 'history']
+  [LOCAL-188] Style constraints ACTIVE (declarative prose rules injected)
+  [LOCAL-576] Route order pinned to named anchors (start='Crystal Lake', end='Paul Revere', loop=True): ['Crystal Lake', 'Commonwealth Avenue Mall', 'Boston Common', 'Boston Public Garden', 'Paul Revere House']
+
+  [LOCAL-576] Pre-writing scope check against 'Crystal Lake to Paul Revere via Commonwealth Avenue Mall & Boston Common, MA' (5 stop(s), want 5)...
+   OK 'Commonwealth Avenue Mall' — inside 'Crystal Lake to Paul Revere via Commonwealth Avenue Mall & Boston Common, MA': Commonwealth Avenue Mall is within the bounds of the tour route from Crystal Lake to Paul Revere via Commonwealth Avenue Mall & Boston Common, MA. (conf=high)
+   OK 'Boston Common' — inside 'Crystal Lake to Paul Revere via Commonwealth Avenue Mall & Boston Common, MA': Boston Common is within the bounds of 'Crystal Lake to Paul Revere via Commonwealth Avenue Mall & Boston Common, MA'. (conf=high)
+   OK 'Boston Public Garden' — inside 'Crystal Lake to Paul Revere via Commonwealth Avenue Mall & Boston Common, MA': Boston Public Garden is located near Boston Common, which is within the bounds of the tour route from Crystal Lake to Paul Revere via Commonwealth Avenue Mall & Boston Common, MA. (conf=medium)
+   OK 'Paul Revere House' — inside 'Crystal Lake to Paul Revere via Commonwealth Avenue Mall & Boston Common, MA': The Paul Revere House is located within the bounds of the tour route from Crystal Lake to Paul Revere via Commonwealth Avenue Mall & Boston Common, MA. (conf=medium)
+  [LOCAL-576] Pre-writing scope check: all 5 stop(s) within 'Crystal Lake to Paul Revere via Commonwealth Avenue Mall & Boston Common, MA'.
+[LOCAL-197] llm_cost() called with total_tokens (deprecated) by /Users/micha/audioura-worktrees/LOCAL-576/generate_tour_text.py:14482. Caller should supply input_tokens and output_tokens separately.
+[LOCAL-197] llm_cost() called with total_tokens (deprecated) by /Users/micha/audioura-worktrees/LOCAL-576/generate_tour_text.py:15795. Caller should supply input_tokens and output_tokens separately.
+[TIMING] phase=fact_sheets elapsed=20.2s cumulative=169.5s
+
+PHASE 5: Generating detailed descriptions for each POI (parallel)...
+[TIMING] phase=narration elapsed=0.0s cumulative=169.5s
+[TIMING] phase=external_lookups elapsed=0.0s cumulative=169.5s
+
+Generating description for Stop 1: Crystal Lake by , ...
+
+Generating description for Stop 2: Commonwealth Avenue Mall by , ...
+
+Generating description for Stop 3: Boston Common by , ...
+
+Generating description for Stop 4: Boston Public Garden by , ...
+
+Generating description for Stop 5: Paul Revere House by , ...
+  [LOCAL-381] stop='Boston Public Garden' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-381] stop='Commonwealth Avenue Mall' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-381] stop='Crystal Lake' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-381] stop='Boston Common' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-381] stop='Paul Revere House' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-411] Stop 4 snippet ranking: input=5 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=5 output=5 usable=5 (t1t2=0, t3=0, market=0)
+    Top scores: [('Boston Public Garden', 12, ''), ('Boston Public Garden', 8, ''), ('Boston Public Garden', 8, '')]
+  [LOCAL-402] Stop 4: injected 5 snippets as reference material
+  [D533] Stop 4 corpus-gate restriction LIFTED — 5 source item(s) arrived after the gate ran
+  [LOCAL-411] Stop 4 prompt size: before_snippets=13559 after=22878 (+9319 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (22878)
+  [LOCAL-411] Stop 1 snippet ranking: input=8 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=5 output=5 usable=5 (t1t2=0, t3=0, market=0)
+    Top scores: [('Crystal Lake', 10, ''), ('Crystal Lake', 8, ''), ('Crystal Lake', 8, '')]
+  [LOCAL-402] Stop 1: injected 5 snippets as reference material
+  [LOCAL-411] Stop 1 prompt size: before_snippets=11954 after=18535 (+6581 from snippets+instructions, facts_first=no)
+  [LOCAL-411] Stop 2 snippet ranking: input=5 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=5 output=5 usable=5 (t1t2=0, t3=0, market=0)
+    Top scores: [('Commonwealth Avenue Mall', 16, ''), ('Commonwealth Avenue Mall', 8, ''), ('Commonwealth Avenue Mall', 8, '')]
+  [LOCAL-402] Stop 2: injected 5 snippets as reference material
+  [D533] Stop 2 corpus-gate restriction LIFTED — 5 source item(s) arrived after the gate ran
+  [LOCAL-411] Stop 2 prompt size: before_snippets=11576 after=21217 (+9641 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (21217)
+  [LOCAL-411] Stop 3 snippet ranking: input=4 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=5 output=4 usable=4 (t1t2=0, t3=0, market=0)
+    Top scores: [('Boston Common', 12, ''), ('Boston Common', 8, ''), ('Boston Common', 8, '')]
+  [LOCAL-402] Stop 3: injected 4 snippets as reference material
+  [D533] Stop 3 corpus-gate restriction LIFTED — 4 source item(s) arrived after the gate ran
+  [LOCAL-411] Stop 3 prompt size: before_snippets=13259 after=22522 (+9263 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (22522)
+  [LOCAL-411] Stop 5 snippet ranking: input=9 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=5 output=5 usable=5 (t1t2=0, t3=0, market=0)
+    Top scores: [('Paul Revere House', 12, ''), ('Paul Revere House', 12, ''), ('Paul Revere House', 8, '')]
+  [LOCAL-402] Stop 5: injected 5 snippets as reference material
+  [D533] Stop 5 corpus-gate restriction LIFTED — 9 source item(s) arrived after the gate ran
+  [LOCAL-411] Stop 5 prompt size: before_snippets=13551 after=26717 (+13166 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (26717)
+  [LOCAL-408] Prompt dump written to: /Users/micha/audioura-worktrees/LOCAL-576/prompt_dump_stop1.txt
+Stop 5 API call cost: $0.0319 (6725 tokens, model=gpt-4o)
+Stop 5 description word count: 254 words
+  [LOCAL-407] Stop 5: snippets injected but no candidate specifics extracted
+  [LOCAL-414] Stop 5: SCRUBBED banned phrases from output: ['a testament to']
+Stop 1 API call cost: $0.0222 (4681 tokens, model=gpt-4o)
+Stop 1 description word count: 238 words
+  [LOCAL-407] Stop 1: snippets injected but no candidate specifics extracted
+Stop 2 API call cost: $0.0253 (5318 tokens, model=gpt-4o)
+Stop 2 description word count: 289 words
+  [LOCAL-407] Stop 2: snippets injected but no candidate specifics extracted
+  [LOCAL-414] Stop 2: SCRUBBED banned phrases from output: ['invites us to', 'a testament to']
+Stop 4 API call cost: $0.0266 (5608 tokens, model=gpt-4o)
+Stop 4 description word count: 211 words
+  [LOCAL-407] Stop 4: snippets injected but no candidate specifics extracted
+  [LOCAL-414] Stop 4: SCRUBBED banned phrases from output: ['a testament to']
+Stop 3 API call cost: $0.0266 (5605 tokens, model=gpt-4o)
+Stop 3 description word count: 267 words
+  [LOCAL-407] Stop 3: snippets injected but no candidate specifics extracted
+
+  [LOCAL-439] STORY GATE: checking story-units per stop (D394)...
+    ✗ FAIL stop='Crystal Lake': story_units=0, entities_ok=True, thesis_ok=True
+      → story_units=0: no candidate story-unit of ≥3 sentences passes classification (need at least 1 with named person, real actions, arc)
+    ✓ PASS stop='Commonwealth Avenue Mall': story_units=1, entities_ok=True, thesis_ok=True
+      interest: emotional=3, new_info=2, deduction=1, total=4
+    ✓ PASS stop='Boston Common': story_units=1, entities_ok=True, thesis_ok=True
+      interest: emotional=3, new_info=2, deduction=1, total=4
+    ✓ PASS stop='Boston Public Garden': story_units=1, entities_ok=True, thesis_ok=True
+      interest: emotional=3, new_info=2, deduction=1, total=4
+    ✓ PASS stop='Paul Revere House': story_units=1, entities_ok=True, thesis_ok=True
+      interest: emotional=3, new_info=2, deduction=1, total=4
+  [LOCAL-439] Classification cost: $0.001475 (input=6108, output=932)
+  [LOCAL-439] STORY GATE: SOME STOPS FAILED (informational — does not block delivery)
+
+  [LOCAL-192] PHASE 5.1: Style validation + per-paragraph retry...
+  [LOCAL-192] Stop 1 para 1: retry FIXED (R10_UNFULFILLED_PROMISE)
+  [LOCAL-192] Stop 1 para 3: retry IMPROVED (3→2 errors)
+  [LOCAL-192] Stop 2 para 1: retry FIXED (R1_IMPERATIVE)
+  [LOCAL-192] Stop 2 para 3: retry FIXED (R10_UNFULFILLED_PROMISE)
+  [LOCAL-192] Stop 2 para 4: retry FAILED — keeping original (R10_UNFULFILLED_PROMISE, R1_IMPERATIVE)
+  [LOCAL-192] Stop 3 para 1: retry FIXED (R10_UNFULFILLED_PROMISE)
+  [LOCAL-192] Stop 3 para 2: retry FIXED (R1_IMPERATIVE)
+  [LOCAL-192] Stop 3 para 3: retry IMPROVED (2→1 errors)
+  [LOCAL-192] Stop 3 para 4: retry FIXED (R1_IMPERATIVE)
+  [LOCAL-192] Stop 4 para 1: retry FIXED (R10_UNFULFILLED_PROMISE)
+  [LOCAL-192] Stop 4 para 3: retry FAILED — keeping original (R10_UNFULFILLED_PROMISE)
+  [LOCAL-192] Stop 5 para 1: retry FIXED (R1_IMPERATIVE)
+  [LOCAL-192] Stop 5 para 3: retry FIXED (R3_SUGGESTIVE_EXPLORATION, R1_IMPERATIVE)
+  [LOCAL-192] Style retry summary: 13 paragraphs retried, 11 fixed/improved, 2 kept original
+  [LOCAL-192] Retry cost: $0.0049 (6134 tokens)
+
+  [LOCAL-255] PHASE 5.13: R1 imperative rewrite...
+  [LOCAL-255] Stop 1 'Crystal Lake': 0 rewritten, 1 deleted
+  [LOCAL-255] Stop 3 'Boston Common': 1 rewritten, 0 deleted
+  [LOCAL-255] R1 summary: 1 rewritten, 1 deleted, 2 stops affected, LLM tokens: 0 ($0.0000)
+  [LOCAL-255] WARNING: deletion rate 1/2 = 50.0% exceeds 10% — rewriter may be failing and quietly shortening tours
+
+  [LOCAL-251] PHASE 5.14: R7 hallucinated-sensory deletion...
+  [LOCAL-251] R7 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-261] PHASE 5.141: R2 question deletion...
+  [LOCAL-261] R2 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-261] PHASE 5.142: R3 suggestive-exploration deletion...
+  [LOCAL-261] Stop 3 'Boston Common': 1 sentence(s) deleted, 0 paragraph(s) emptied
+  [LOCAL-261] R3 summary: 1 sentences deleted, 0 paragraphs emptied, 1 stops affected
+
+  [LOCAL-261] PHASE 5.143: R4 prescribed-feeling deletion...
+  [LOCAL-261] R4 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-261] PHASE 5.144: R8 prompt-leakage deletion...
+  [LOCAL-261] R8 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-216] PHASE 5.15: R9 generic-sentence deletion...
+  [LOCAL-216] Stop 2 'Commonwealth Avenue Mall': 1 sentence(s) deleted, 0 paragraph(s) emptied
+  [LOCAL-216] R9 summary: 1 sentences deleted, 0 paragraphs emptied, 1 stops affected
+
+  [LOCAL-235] PHASE 5.155: R10 unfulfilled-promise deletion...
+  [LOCAL-235] Stop 1 'Crystal Lake': 2 sentence(s) deleted, 0 paragraph(s) emptied
+  [LOCAL-235] Stop 2 'Commonwealth Avenue Mall': 1 sentence(s) deleted, 1 paragraph(s) emptied
+  [LOCAL-235] Stop 4 'Boston Public Garden': 2 sentence(s) deleted, 1 paragraph(s) emptied
+  [LOCAL-235] R10 summary: 5 sentences deleted, 2 paragraphs emptied, 3 stops affected
+
+  [LOCAL-472] PHASE 5.152: Stop-specificity gate...
+  [LOCAL-472] Stop-specificity gate summary:
+    Stops checked: 5
+    Paragraphs checked: 15
+    Transferable (high, removed): 0
+    Transferable (low conf, kept): 0
+    Last-paragraph protected: 0
+    Ungrounded named entities: 13
+    Stops affected: 0
+    [LOCAL-472] UNGROUNDED entity stop='Crystal Lake' entity='Baptist Pond' reason='No specific person or work is mentioned with a concrete link to the stop.' in: "Crystal Lake, formerly known as Baptist Pond, underwent a name change in the mid-19th century as par"
+    [LOCAL-472] UNGROUNDED entity stop='Commonwealth Avenue Mall' entity='Eben Norton Horsford' reason='It does not specify where Horsford commissioned the statue.' in: "In 1887, a compelling narrative unfolded when Eben Norton Horsford, a chemistry professor with a pen"
+    [LOCAL-472] UNGROUNDED entity stop='Commonwealth Avenue Mall' entity='Leif Erikson' reason='It does not specify where the statue is located.' in: "In 1887, a compelling narrative unfolded when Eben Norton Horsford, a chemistry professor with a pen"
+    [LOCAL-472] UNGROUNDED entity stop='Commonwealth Avenue Mall' entity='Alexander Hamilton' reason='It does not specify Hamilton's direct connection to the location of the statue.' in: "Continue your journey along this shaded stretch, and you'll soon encounter another monumental story "
+    [LOCAL-472] UNGROUNDED entity stop='Commonwealth Avenue Mall' entity='Berkeley Streets' reason='It does not specify Hamilton's direct connection to Berkeley Streets.' in: "Continue your journey along this shaded stretch, and you'll soon encounter another monumental story "
+    [LOCAL-472] UNGROUNDED entity stop='Commonwealth Avenue Mall' entity='On June' reason='It does not specify a direct link between the event and the Commonwealth Avenue Mall.' in: "In more recent history, the Commonwealth Avenue Mall bore witness to tragedy. On June 17, 1972, the "
+    [LOCAL-472] UNGROUNDED entity stop='Boston Common' entity='North America' reason='No specific person or work is mentioned with a concrete link to Boston Common.' in: "In 1895, the construction of North America's first underground subway system unearthed over 900 skel"
+    [LOCAL-472] UNGROUNDED entity stop='Boston Common' entity='Emerald Necklace' reason='No specific person or work is mentioned with a concrete link to Boston Common.' in: "The Common is now a vibrant part of the Emerald Necklace, a chain of parks that stretch through Bost"
+    [LOCAL-472] UNGROUNDED entity stop='Boston Public Garden' entity='William Morton' reason='It does not specify a direct link between Morton and the Boston Public Garden.' in: "The Boston Public Garden, once a muddy expanse, transformed into America's first public botanical ga"
+    [LOCAL-472] UNGROUNDED entity stop='Boston Public Garden' entity='Mayor James Michael Curley' reason='It does not specify Curley's direct actions or presence at the Boston Public Garden.' in: "In the early 20th century, another battle unfolded here, not of science, but of civic spirit. Mayor "
+    [LOCAL-472] UNGROUNDED entity stop='Boston Public Garden' entity='Beacon Hill' reason='It does not specify how Mayor Curley relates to the Boston Public Garden.' in: "In the early 20th century, another battle unfolded here, not of science, but of civic spirit. Mayor "
+    [LOCAL-472] UNGROUNDED entity stop='Paul Revere House' entity='Boston Massacre' reason='No direct link between the Boston Massacre and the Paul Revere House is established.' in: "In March 1771, Paul Revere transformed his front windows into a politically charged tableau to mark "
+    [LOCAL-472] UNGROUNDED entity stop='Paul Revere House' entity='Henry Pelham' reason='It does not specify how Pelham is directly connected to the Paul Revere House.' in: "In March 1771, Paul Revere transformed his front windows into a politically charged tableau to mark "
+
+  [LOCAL-263] PHASE 5.156: Unsupported-claim gate...
+  [LOCAL-263] Unsupported-claim gate summary:
+    Sentences removed: 0
+    Sentences kept (substantiated): 0
+    By type: PROMISE=0, SENSORY=0, FEELING=0, QUALITY=0
+    Escalation calls: 0
+    Stops affected: 0
+    Deletion rate: 0.0% (0/44)
+
+  [LOCAL-269] PHASE 5.157: Unglossed-reference gate...
+  [LOCAL-479] stop='Boston Common' cut orphaned dependant of a removed introduction — subject 'sacrifice': "The sacrifice played a crucial role in the fight for religious freedom, ultimate"
+  [LOCAL-269] Unglossed-reference gate summary (LOCAL-287: compose, not splice):
+    References detected: 21
+    Glossed (composed): 5
+    Suppressed (already explained): 1
+    Degraded (name dropped): 11
+    Guard failures: 0
+    Known (skipped): 4
+    Triage: 2473 tokens, $0.0006, 7.7s
+    Gloss: 1589 tokens, $0.0003, 5.2s
+    Compose: 2168 tokens, $0.0004, 3.7s
+    Total added cost: $0.0013
+    Stops affected: 5
+    Glosses applied:
+      • Baptist Pond → DEGRADED (name dropped)
+      • Leif Erikson → DEGRADED (name dropped)
+      • Berkeley Streets → DEGRADED (name dropped)
+      • Hotel Vendome → "a historic hotel with Victorian architecture" [source: model]
+      • Dartmouth Street → DEGRADED (name dropped)
+      • Henry Phillips → DEGRADED (name dropped)
+      • Benjamin Woodbridge → DEGRADED (name dropped)
+      • On June → DEGRADED (name dropped)
+      • Mary Dyer → "a prominent Quaker executed for her beliefs" [source: model]
+      • King Charles II to stop future → DEGRADED (name dropped)
+      • Dyer → DEGRADED (name dropped)
+      • William Morton → "the dentist who demonstrated ether's use" [source: model]
+      • Charles Jackson → "the physician who claimed ether's discovery" [source: model]
+      • Mayor James Michael Curley → SUPPRESSED (already explained)
+      • Great Fire → DEGRADED (name dropped)
+      • In March → DEGRADED (name dropped)
+      • Henry Pelham → "an artist known for political cartoons" [source: model]
+
+  [LOCAL-402] Temporal coherence gate SKIPPED (non-museum tour)
+
+  [LOCAL-229] PHASE 5.16: CONTRADICTED claim block (D100 enforcement)...
+  [LOCAL-229] CONTRADICTED block summary: 0 group(s) blocked, 0 stop(s) affected
+
+PHASE 5.5a: Post-description knowledge validation (all tour types)...
+OK Post-description validation passed: Knowledge validation passed
+
+PHASE 5.6: skipped — the pre-writing scope check already ran (LOCAL-576; a second pass after writing can only remove a stop too late to replace).
+OK PHASE 5.7: Dangling-reference scrub complete (5 stops)
+
+  [LOCAL-318] PHASE 5.7b: Dangling-demonstrative scrub...
+  [LOCAL-318] Dangling-demonstrative scrub summary:
+    Detected: 3
+    Repaired (name substituted): 0
+    Deleted (unrepairable): 3
+    Stops affected: 2
+    [1] DELETED: 'These high-speed' in: These high-speed getaways were among the first of their kind, marking a new era 
+    [3] DELETED: 'This event' in: This event highlighted religious intolerance and led Quaker executions.
+    [3] DELETED: 'This eerie' in: This eerie discovery underscores how Boston Common has served as a backdrop to b
+OK PHASE 5.7b: Dangling-demonstrative scrub complete
+
+PHASE 5.9: Audio-native cleanup (LOCAL-41)...
+  [LOCAL-41] Stripped 0 trailing question(s), removed 0 'broader context' instance(s)
+
+  [D498] step 7c: most valuable stop is 5 'Paul Revere House' (index 63) — allowance 5 -> 7 sentences on regeneration, story currently 0 sentence(s) — no story pass result, cannot judge
+
+  [LOCAL-487] step 7a: 5 stop(s) have NO VALID STORY by Michael's bar (3+ consecutive sentences, one person, an action and something at stake)
+    stop 1 'Crystal Lake': longest qualifying run is 2 sentence(s); the bar is 3 consecutive sentences about one subject, carrying an act
+    stop 2 'Commonwealth Avenue Mall': longest qualifying run is 2 sentence(s); the bar is 3 consecutive sentences about one subject, carrying an act
+    stop 3 'Boston Common': longest qualifying run is 2 sentence(s); the bar is 3 consecutive sentences about one subject, carrying an act
+    stop 4 'Boston Public Garden': the longest run (3 sentences, The Boston Public Garden) has agency=1 stakes=0 — someone is described, but noth
+    stop 5 'Paul Revere House': the longest run (6 sentences, Paul Revere) has agency=0 stakes=3 — someone is described, but nothing is risked
+    [LOCAL-487] cap=1: retrying only the weakest — stop 1 'Crystal Lake' (index 22)
+  [D534] No cross-stop repetition in the drafts
+
+  [LOCAL-474] PHASE 5.17: retry 'Crystal Lake' — 238w → 111w after gates, 8 sentence(s) removed
+    removed: "Crystal Lake, once known as Baptist Pond, holds a fascinating story beneath its calm exterior."
+    removed: "In the mid-19th century, this body of water was rebranded as part of a clever marketing strategy."
+    removed: "The name change to Crystal Lake was an effort to promote the ice harvested here as pure and disease-"
+    removed: "This rebranding was successful, breathing new life into the local economy and leaving a legacy that "
+    removed: "These high-speed getaways were among the first of their kind, marking a new era in criminal activity"
+    removed: "As you pedal away from Crystal Lake, reflect on how these waters and roads have borne witness to sto"
+    removed: "The lake's serene surface belies its industrial past, while Commonwealth Avenue's stately trees now "
+    removed: "The lively heart of Boston, with its own rich tapestry of history, awaits just ahead, promising furt"
+    [LOCAL-491] step 7b: no unused fact left on the matrix — retrying without a rotation
+
+  [LOCAL-474] PHASE 5.17: retry 'Commonwealth Avenue Mall' — 261w → 169w after gates, 7 sentence(s) removed
+    removed: "In 1887, a compelling narrative unfolded right here when Eben Norton Horsford, a chemistry professor"
+    removed: "Horsford fervently believed that Norumbega, a legendary Viking settlement, was located along the Cha"
+    removed: "In 1865, a statue of Alexander Hamilton was unveiled between Arlington and Berkeley Streets."
+    removed: "On June 17, 1972, the Hotel Vendome, situated at the intersection of Dartmouth Street, became the si"
+    removed: "This loss reverberates through the generations, a poignant chapter that echoes in the quietude of th"
+    removed: "As you prepare to glide onwards, know that each stone and leaf here holds a fragment of Boston's com"
+    removed: "Pedal onwards, and you'll find a green oasis that holds stories older than the city itself, waiting "
+    [LOCAL-491] step 7b: no unused fact left on the matrix — retrying without a rotation
+
+  [LOCAL-474] PHASE 5.17: retry 'Boston Common' — 267w → 165w after gates, 11 sentence(s) removed
+    removed: "Boston Common has been a witness to centuries of human endeavor and struggle."
+    removed: "It is here, on July 3, 1728, that a fatal duel between Henry Phillips and Benjamin Woodbridge unfold"
+    removed: "Phillips and Woodbridge's disagreement resulted in Woodbridge's death, forcing Phillips to flee to F"
+    removed: "The duel, a remnant of European customs, marked a moment of personal tragedy and legal consequence, "
+    removed: "Another somber chapter in the Common's history unfolded on June 1, 1660, when Mary Dyer was publicly"
+    removed: "Her execution, a brutal testament to religious intolerance, prompted King Charles II to intervene an"
+    removed: "Dyer’s sacrifice was a pivotal moment in the struggle for religious freedom, a cause that eventually"
+    removed: "As you walk further, consider the intersection of Boylston and Tremont Streets."
+    removed: "This eerie discovery underscores how Boston Common has served as a backdrop to both innovation and t"
+    removed: "Today, the Common is a vibrant part of the Emerald Necklace, a chain of parks that stretch through B"
+    removed: "As you leave this historic ground, remember that Boston Common is more than a park; it’s a living te"
+    [LOCAL-491] step 7b: no unused fact left on the matrix — retrying without a rotation
+
+  [LOCAL-474] PHASE 5.17: retry 'Boston Public Garden' — 188w → 128w after gates, 6 sentence(s) removed
+    removed: "Once a muddy expanse, the Boston Public Garden rose from the mire to become America's first public b"
+    removed: "William Morton and Dr."
+    removed: "Charles Jackson, both of whom claimed the discovery of ether as an anesthetic."
+    removed: "This structure not only celebrates a medical breakthrough but also embodies the contentious spirit o"
+    removed: "As you cycle through this historical tapestry, the garden's path leads you onward, towards the echoe"
+    removed: "Each pedal forward is a journey deeper into the stories of Boston, where past and present intertwine"
+    [LOCAL-491] step 7b: no unused fact left on the matrix — retrying without a rotation
+
+  [LOCAL-474] PHASE 5.17: retry 'Paul Revere House' — 230w → 219w after gates, 5 sentence(s) removed
+    removed: "It occupies the former site of the Second Church of Boston's parsonage, which was destroyed in the G"
+    removed: "As you stand here, imagine the bustling activity of a household that was both a family home and the "
+    removed: "In March 1771, Paul Revere transformed his front windows into a politically charged tableau to mark "
+    removed: "Years later, on the night of April 18, 1775, Revere's legendary ride to warn of the British advance "
+    removed: "As you explore this space, reflect on the layers of history embedded in its walls, from its Puritan "
+    [LOCAL-491] step 7b: no unused fact left on the matrix — retrying without a rotation
+
+  [LOCAL-526] PHASE 5.17: regenerating 5 eligible stop(s) concurrently (max_workers=5)
+
+Generating description for Stop 1: Crystal Lake by , ...
+
+Generating description for Stop 2: Commonwealth Avenue Mall by , ...
+
+Generating description for Stop 3: Boston Common by , ...
+
+Generating description for Stop 4: Boston Public Garden by , ...
+
+Generating description for Stop 5: Paul Revere House by , ...
+  [LOCAL-381] stop='Commonwealth Avenue Mall' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-411] Stop 2 snippet ranking: input=5 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=5 output=5 usable=5 (t1t2=0, t3=0, market=0)
+    Top scores: [('Commonwealth Avenue Mall', 16, ''), ('Commonwealth Avenue Mall', 8, ''), ('Commonwealth Avenue Mall', 8, '')]
+  [LOCAL-402] Stop 2: injected 5 snippets as reference material
+  [D533] Stop 2 corpus-gate restriction LIFTED — 5 source item(s) arrived after the gate ran
+  [LOCAL-411] Stop 2 prompt size: before_snippets=11576 after=21217 (+9641 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (21217)
+  [LOCAL-381] stop='Paul Revere House' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-411] Stop 5 snippet ranking: input=9 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=5 output=5 usable=5 (t1t2=0, t3=0, market=0)
+    Top scores: [('Paul Revere House', 12, ''), ('Paul Revere House', 12, ''), ('Paul Revere House', 8, '')]
+  [LOCAL-402] Stop 5: injected 5 snippets as reference material
+  [D533] Stop 5 corpus-gate restriction LIFTED — 9 source item(s) arrived after the gate ran
+  [LOCAL-411] Stop 5 prompt size: before_snippets=13551 after=26717 (+13166 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (26717)
+  [LOCAL-381] stop='Crystal Lake' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-411] Stop 1 snippet ranking: input=8 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=5 output=5 usable=5 (t1t2=0, t3=0, market=0)
+    Top scores: [('Crystal Lake', 10, ''), ('Crystal Lake', 8, ''), ('Crystal Lake', 8, '')]
+  [LOCAL-402] Stop 1: injected 5 snippets as reference material
+  [LOCAL-411] Stop 1 prompt size: before_snippets=11954 after=18535 (+6581 from snippets+instructions, facts_first=no)
+  [LOCAL-381] stop='Boston Public Garden' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-411] Stop 4 snippet ranking: input=5 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=5 output=5 usable=5 (t1t2=0, t3=0, market=0)
+    Top scores: [('Boston Public Garden', 12, ''), ('Boston Public Garden', 8, ''), ('Boston Public Garden', 8, '')]
+  [LOCAL-402] Stop 4: injected 5 snippets as reference material
+  [D533] Stop 4 corpus-gate restriction LIFTED — 5 source item(s) arrived after the gate ran
+  [LOCAL-411] Stop 4 prompt size: before_snippets=13559 after=22878 (+9319 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (22878)
+  [LOCAL-381] stop='Boston Common' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-411] Stop 3 snippet ranking: input=4 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=5 output=4 usable=4 (t1t2=0, t3=0, market=0)
+    Top scores: [('Boston Common', 12, ''), ('Boston Common', 8, ''), ('Boston Common', 8, '')]
+  [LOCAL-402] Stop 3: injected 4 snippets as reference material
+  [D533] Stop 3 corpus-gate restriction LIFTED — 4 source item(s) arrived after the gate ran
+  [LOCAL-411] Stop 3 prompt size: before_snippets=13259 after=22522 (+9263 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (22522)
+  [LOCAL-408] Prompt dump written to: /Users/micha/audioura-worktrees/LOCAL-576/prompt_dump_stop1.txt
+Stop 1 API call cost: $0.0252 (5294 tokens, model=gpt-4o)
+Stop 1 description word count: 257 words
+  [LOCAL-407] Stop 1: snippets injected but no candidate specifics extracted
+Stop 3 API call cost: $0.0292 (6143 tokens, model=gpt-4o)
+Stop 3 description word count: 270 words
+  [LOCAL-407] Stop 3: snippets injected but no candidate specifics extracted
+  [LOCAL-414] Stop 3: SCRUBBED banned phrases from output: ['a testament to', 'stands as a testament']
+Stop 4 API call cost: $0.0284 (5984 tokens, model=gpt-4o)
+Stop 4 description word count: 223 words
+  [LOCAL-407] Stop 4: snippets injected but no candidate specifics extracted
+  [LOCAL-414] Stop 4: SCRUBBED banned phrases from output: ['a testament to']
+Stop 2 API call cost: $0.0269 (5667 tokens, model=gpt-4o)
+Stop 2 description word count: 216 words
+  [LOCAL-407] Stop 2: snippets injected but no candidate specifics extracted
+Stop 5 API call cost: $0.0338 (7115 tokens, model=gpt-4o)
+Stop 5 description word count: 231 words
+  [LOCAL-407] Stop 5: snippets injected but no candidate specifics extracted
+  [LOCAL-526] PHASE 5.17 regeneration wall: 7.1s for 5 stop(s) at max_workers=5
+    [LOCAL-474] regenerated and re-gated: 257w (was 111w)
+    [LOCAL-474] regenerated and re-gated: 215w (was 169w)
+    [LOCAL-474] regenerated and re-gated: 242w (was 165w)
+    [LOCAL-474] regenerated and re-gated: 182w (was 128w)
+    [LOCAL-474] regenerated and re-gated: 231w (was 219w)
+      [TRAGEDY-CONTEXT] stop='Paul Revere House' cut (circumstances not documented): In March 1770, he seized upon the Boston Massacre's outrage, copying Henry Pelha
+  [TRAGEDY-CONTEXT] recovered 0, removed 1 sentence(s)
+  [D534] no repeated sentences left after the retries
+
+  [LOCAL-474] retry summary: 5 eligible, 5 retried, 5 improved, 0 kept original
+  [LOCAL-487] triggers: 1 hollowed by gates, 1 storyless (step 7a — Michael's bar, independent of length), 0 top-value (step 7c — larger allowance), 0 repeating an earlier stop (D534), 5 thin enough for another story (D534, floor=300w). Triggers overlap and are counted separately; they do not sum to 'eligible'.
+  [LOCAL-474] each regenerated stop was re-gated before being accepted; a retry can only replace text it beats after gating.
+
+PHASE 5.10: Anti-preaching cleanup (LOCAL-44)...
+  [LOCAL-44] Stripped 0 preaching closer(s)
+
+  [LOCAL-444] Obligation audit DISABLED by L444_OBLIGATION_AUDIT=false
+  [LOCAL-427] HTTP 200 from https://www.komoot.com/smarttour/e1422485165/boston-loop-from-crystal-lake-to-paul-revere-park-via-commonwealth-avenue-mall-boston-common (attempt 1)
+  [LOCAL-459] R5: Fetched 3003 chars from https://www.komoot.com/smarttour/e1422485165/bosto
+  [LOCAL-427] HTTP 200 from https://www.instagram.com/p/DdkOI08D9sm/ (attempt 1)
+  [LOCAL-427] HTTP 200 from https://www.facebook.com/groups/bestpavedcycletrails/posts/4059510344362283/ (attempt 1)
+  [LOCAL-427] HTTP 200 from https://ciclismoclassico.com/grand-tour-of-boston/ (attempt 1)
+  [LOCAL-459] R5: Fetched 1955 chars from https://ciclismoclassico.com/grand-tour-of-boston/
+  [LOCAL-427] HTTP 200 from https://us.trip.com/things-to-do/detail/114343609/ (attempt 1)
+  [LOCAL-427] HTTP 200 from https://www.railstotrails.org/trailblog/the-minuteman-bikeway-a-revolution-on-two-wheels/ (attempt 1)
+  [LOCAL-459] R5: Fetched 2242 chars from https://www.railstotrails.org/trailblog/the-minute
+  [LOCAL-427] HTTP 200 from https://exploringbybike.com/2024/08/19/we-biked-35-miles-from-boston-to-lowell-mass-almost-exclusively-on-trails/ (attempt 1)
+  [LOCAL-459] R5: Fetched 1418 chars from https://exploringbybike.com/2024/08/19/we-biked-35
+  [D512] verb discovery: query='biking tour in a loop from Crystal Lake to Paul Revere via Commo' -> 3 new verb(s): beloved, billed, complicated
+  [D512] _AGENCY_VERB widened by 3 discovered verb(s)
+
+  [LOCAL-485] PHASE 5.21: Story valuation index (report only, never gates)...
+     #  stop                                      idx  hist  detl   soc
+     1  Crystal Lake                               24     0    15    30
+     2  Commonwealth Avenue Mall                   40    32     0    95
+     3  Boston Common                              46    59    13    57
+     4  Boston Public Garden                       53    34     0    65
+     5  Paul Revere House                          70    70     0    45
+    [LOCAL-485] index mean 46.6 over 5 stop(s), range 24-70
+    [LOCAL-485] weakest: 'Crystal Lake' at 24
+[TIMING] phase=story_first elapsed=103.9s cumulative=273.3s
+
+PHASE 6: Assembling the complete tour...
+  [R2] Prolog saved for Stop 1 (105 words)
+
+  [LOCAL-244] PHASE 5.9: Prolog gating (R9, R10, subject routine)...
+  [LOCAL-244] Prolog before gates: 105 words
+  [LOCAL-244] Prolog R9: 0 deletions
+  [LOCAL-286] Prolog R7: 0 deletions
+  [LOCAL-244] Prolog R10: 0 deletions
+  [LOCAL-244] Prolog subject: 0 expanded, 0 deleted, cost=$0.0000
+  [LOCAL-244] Prolog after gates: 105 words (delta: 0)
+
+  [LOCAL-246] PHASE 5.95: Orientation gating (R9, R10)...
+    Stop 2 orientation R7: 1 sentence(s) deleted
+    Stop 5 orientation R10: 1 sentence(s) deleted
+  [LOCAL-246] Orientation gating summary:
+    Words before: 242
+    Words after:  200
+    Delta: -42
+    Stops affected: 2/5
+    Deletions (2):
+      [Stop 2][R7_HALLUCINATED_SENSORY] "Here, the echoes of history resonate through the rustling leaves and the whispers of the past linger..."
+      [Stop 5][R10_UNFULFILLED_PROMISE] "Best viewed from the cobblestones of this historic square, the house's weathered façade and steep-pi..."
+
+  [LOCAL-270] PHASE 5.96: Composing Part 4 (forward connection) from delivered narrations...
+    Stops with delivered content: 5/5
+    [LOCAL-276] Intrigue ranking completed: 2.2s, $0.0102, 1505 tokens
+    [LOCAL-276] Ranked 5 stops:
+      [Crystal Lake] (cause): This renaming wasn't just about aesthetics; it was a strategic marketing move ai...
+      [Commonwealth Avenue Mall] (mystery): In June 1962, the tranquility of this promenade was shattered by the chilling pr...
+      [Boston Common] (cause): Her execution was not just a local event but echoed across the Atlantic, prompti...
+      [Boston Public Garden] (reversal): Following her husband's death, Julia fought to retain the Swan Boats concession ...
+[LOCAL-197] llm_cost() called with total_tokens (deprecated) by /Users/micha/audioura-worktrees/LOCAL-576/generate_tour_text.py:19605. Caller should supply input_tokens and output_tokens separately.
+      [Paul Revere House] (reversal): This bold act not only fueled anti-British sentiments but also lined his pockets...
+    [LOCAL-276] 5 intriguing / 0 excluded (celebrity_trivia)
+    [LOCAL-276] Using ranked facts for composition (5 stops)
+    Part 4 LLM cost: $0.0033 (570 tokens) [attempt 1]
+    ✗ Part 4 attempt 1 FAILED verification:
+      Candidate: "At Commonwealth Avenue Mall, you'll learn about the chilling presence of the 'Boston Strangler' in June 1962. Then, at Boston Public Garden, discover how Julia fought to keep the Swan Boats concession after her husband's death."
+      FAIL: date '1962' attributed to 'Boston Public Garden' but belongs to a different stop
+    Part 4 LLM cost: $0.0033 (570 tokens) [attempt 2]
+    ✗ Part 4 attempt 2 FAILED verification:
+      Candidate: "At Commonwealth Avenue Mall, you'll learn about the chilling presence of the 'Boston Strangler' in June 1962. Next, at Boston Public Garden, discover Julia's fight to retain the Swan Boats concession following her husband's death."
+      FAIL: date '1962' attributed to 'Boston Public Garden' but belongs to a different stop
+    ✗ Part 4 FAILED all 2 attempts — omitting
+      Last candidate: "At Commonwealth Avenue Mall, you'll learn about the chilling presence of the 'Boston Strangler' in June 1962. Next, at Boston Public Garden, discover Julia's fight to retain the Swan Boats concession following her husband's death."
+    Part 4 total cost: $0.0067
+
+  [LOCAL-286] PHASE 5.97: Prolog-body deduplication (≥8 word overlap)...
+  [LOCAL-286] Deduplication: 0 sentence(s) removed from stop bodies
+
+  [LOCAL-292] Empty stop removal gate: PASSED (all 5 stops have narration)
+  [LOCAL-394] Stop count invariant: OK (5 selected == 5 delivered)
+  [D536] Listener asked for 5 stop(s), delivering 5 — request met
+  DEBUG - POI 1 content includes:
+    Specific Examples: True
+    Operational Details: True
+    Walking Directions: True
+  [T4] Transition to Stop 2: Head southeast from Crystal Lake and bike along Beacon Stree...
+  DEBUG - POI 2 content includes:
+    Specific Examples: True
+    Operational Details: True
+    Walking Directions: True
+  [T4] Transition to Stop 3: Hop on your bike and pedal down Commonwealth Avenue Mall tow...
+  DEBUG - POI 3 content includes:
+    Specific Examples: True
+    Operational Details: True
+    Walking Directions: True
+  [T4] Transition to Stop 4: As you leave Boston Common, pedal along the scenic Commonwea...
+  DEBUG - POI 4 content includes:
+    Specific Examples: True
+    Operational Details: True
+    Walking Directions: True
+  [T4] Transition to Stop 5: Head out of Boston Public Garden and pedal along the charmin...
+  DEBUG - POI 5 content includes:
+    Specific Examples: True
+    Operational Details: True
+    Walking Directions: True
+  [LOCAL-280] Recap composition: 0.7s, $0.0024, 413 tokens
+  [LOCAL-280] Recap built: 31 words, 2 composed clauses (0 D177 rejected, 0 navigation rejected)
+    [Boston Public Garden] (reversal): "Following her husband's death, Julia fought to retain the Swan Boats concession ..."
+      → composed: "Boston Public Garden, Julia fought to keep Swan Boats post-husband's death"
+    [Paul Revere House] (reversal): "This bold act not only fueled anti-British sentiments but also lined his pockets..."
+      → composed: "Paul Revere House, bold act stoked anti-British feelings and boosted his wealth"
+    D177 verified: all 2 source facts present in delivered text
+  [LOCAL-280] Recap added: "That's 5 stops and 14 kilometres — Boston Public Garden, Julia fought to keep Swan Boats post-husband's death and Paul Revere House, bold act stoked anti-British feelings and boosted his wealth."
+  [LOCAL-273] Part 1: no verified nearby stop found — omitted
+  [LOCAL-275] Part 2 (restaurant): verified via audio_tours id=372 'chart house restaurant tour, Boston, MA -  Tour' (0.3 km from last stop)
+  [D519] Treat Page: no treat within 1.0 km of any of 5 stop(s) (0 treat(s) with coordinates) — mention OMITTED
+  [LOCAL-275/D519] Part 2: tour offer only — no treat near a stop
+  [LOCAL-275] Part 2 error: name '_venue_parts_used' is not defined
+  [LOCAL-275] Closing offer: 1 sentence(s)
+  [EPILOG] Journey epilog added to last stop
+  [S27] No cross-stop repetition detected
+  [D533] No cross-stop fact repetition detected
+  [D533] Person-year role guard: no mismatches (3094 chars of corpus checked)
+
+  [LOCAL-36] Practical Facts Gate:
+    Claims found: 5
+    Verified: 0
+    Dropped: 5
+    AUDIT: admission | Open during daylight hours, Free to visit | (no source) | DROPPED — no source content
+    AUDIT: admission | Open 24/7, Free to visit | (no source) | DROPPED — no source content
+    AUDIT: admission | Open 24/7, Free to visit | (no source) | DROPPED — no source content
+    AUDIT: admission | Open 24/7, Free to visit | (no source) | DROPPED — no source content
+    AUDIT: hours | Hours: 9:30 AM - 5:15 PM, Admission: $5-$10, No reservations required, Can be busy on weekends | (no source) | DROPPED — no source content
+  [LOCAL-36] PRACTICAL FACTS GATE: 5 claim(s) dropped
+  [D523] spoken-text hygiene: 0 template seam(s), 3 missing space(s), 0 spoken label(s), 0 dangling phrase(s) removed
+
+  [LOCAL-260] PROLOG STRUCTURE VALIDATION: 3 error(s), 0 warning(s)
+    [ERROR] Part 3: PART3_MISSING — Part 3 (Purpose / intrigue with sourced facts) is not present.
+    [ERROR] Part 4: PART4_MISSING — Part 4 (Forward connection to stops) is not present.
+    [ERROR] Part 0: DUPLICATE_TOUR_DESCRIPTION — Tour contains 3 tour-level descriptions (must be exactly 1). Passages found:
+  [1] "You are about to embark on a cycling journey through a loop from Crystal Lake to Paul Revere via Com..."
+  [2] "As you glide along the tree-lined paths of Commonwealth Avenue Mall, take a moment to pause near the..."
+  [3] "As you stand here amidst the verdant expanse of Boston Common, look around at the 50 acres of histor..."
+
+=== Word Count Statistics ===
+Stop 1: Crystal Lake - 238 words
+Stop 2: Commonwealth Avenue Mall - 289 words
+Stop 3: Boston Common - 267 words
+Stop 4: Boston Public Garden - 211 words
+Stop 5: Paul Revere House - 254 words
+===========================
+
+  [LOCAL-540] scorer ran on assembled tour (11594 chars, 5/5 stops)
+  [LOCAL-540] defects seen: ['unsourced_person_event']
+  [LOCAL-540]   unsourced_person_event [advisory]: 1 unsourced person-event(s); "Before Revere" placed here in 1676 with no source: "Before Revere's time, the site belonged to the Second Church of Boston's parso
+
+Total API cost: $0.3098 (44677 tokens)
+Grounding:      $0.2100 (6 requests)
+Tour total:     $0.5198
+Provenance:     5/46 factual sentences sourced, 41 unsourced (5 corpus, 0 grounded, 41 parametric)
+CACHE STORE: biking tour in a loop from Crystal Lake to Paul Revere via Commonwealth Avenue Mall & Boston Common, MA /  / 5
+
+Tour text generated successfully!
+  [LOCAL-230] Network failures: 0 (all API calls succeeded)
+Saved to: /Users/micha/audioura-worktrees/LOCAL-576/LOCAL576_live/tour388_rerun.txt
+  [C5-5] Evidence (provenance-only) persisted: /Users/micha/audioura-worktrees/LOCAL-576/LOCAL576_live/tour388_rerun_evidence.json
+
+Preview of the generated tour:
+
+Step-by-Step Audio Guided Tour: biking tour in a loop from Crystal Lake to Paul Revere via Commonwealth Avenue Mall & Boston Common, MA
+Tour-Category: biking
+
+Stop 1: Crystal Lake
+
+Address: Crystal Lake, Newton, MA 02459
+
+Coordinates: 42.3255, -71.2015
+
+Type/Specialty: Natural Lake
+
+Specific Examples: Scenic views, walking trails, wildlife
+
+Orientation: You are about to embark on a cycling journey through a loop from Crystal Lake to Paul Revere via Commonwealth Avenue Mall & Boston Common, MA. T...
+
+[TIMING] phase=packing elapsed=11.2s cumulative=284.5s
+[TIMING] phase=verification elapsed=0.0s cumulative=284.5s
+[TIMING] TOTAL wall=284.5s phases: poi_selection=147.4s, story_first=103.9s, fact_sheets=20.2s, packing=11.2s, intent=1.9s, narration=0.0s, external_lookups=0.0s, verification=0.0s
+
+========================================================================
+  delivered 5 stop(s), wall=284.5s, cost=$0.3098
+    Stop 1: Crystal Lake
+    Stop 2: Commonwealth Avenue Mall
+    Stop 3: Boston Common
+    Stop 4: Boston Public Garden
+    Stop 5: Paul Revere House
+========================================================================

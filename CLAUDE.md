@@ -225,8 +225,30 @@ A plain `docker-compose -f docker-compose-master.yml build/up` silently puts the
 and so does recreating a dependent service (that happened once on 2026-10-04). Update the code:
 `git -C ~/audioura-subscribed-local checkout --detach origin/subscribed`. English TTS needs the host
 Kokoro service (launchd `com.audioura.kokoro`, :5181; `curl localhost:5181/health` must say ffmpeg).
+**⛔ Tasks never replace the shared containers (2026-10-05).** The `audioura-*` containers on ports
+5000/5002/5005/5018/5030 are what Michael's phone uses. A task's live test must build and run its
+OWN container (`docker run --rm --name <task>-<svc> -p <spare port>` or a separate compose project,
+`-p <task>`), never `docker compose -p audioura … up` and never a rename of an `audioura-*` container.
+Cause: LOCAL-586 (2026-10-05), following LEAD's own instruction to "rebuild generator with the
+override… through port 5002", swapped `audioura-tour-generator:local586` (storied code) into the shared
+container and renamed the original orchestrator. The phone silently lost every Subscribed switch, and
+LEAD's Griffin timing measured the wrong code. **Every task file's live-test step must say this.**
+
 **Docker builds hang?** Check for stuck `docker-credential-desktop get`: `credsStore` was removed
 from `~/.docker/config.json` for exactly this.
+
+**External SSD (2026-10-04):** SanDisk 1 TB, APFS, `/Volumes/AudiouraSSD`. `~/audioura-worktrees` is a
+**symlink** into it: every task worktree lives on the SSD. **If the SSD is unplugged, the dispatcher
+and every worktree break**; check `ls /Volumes/AudiouraSSD` first when git or Kiro fail strangely.
+launchd jobs need **Full Disk Access for `/bin/zsh`** to touch the SSD (macOS blocks removable volumes:
+`Operation not permitted`). Michael granted it 2026-10-04, proven by a launchd probe that ran
+`git worktree add` through the symlink. Docker's disk image stays **internal**: on 2026-10-04 Michael chose `/Volumes/AudiouraSSD/DockerData`
+in Settings → Resources → Disk image location and clicked Apply & restart. Docker restarted, but saved
+no new location and kept using the internal `Docker.raw`, most likely because Docker Desktop has no
+removable-volume permission. Not worth more of Michael's time: the worktrees, the main growth, are
+on the SSD and the internal disk has 30 GB free. If it is ever needed, grant Docker Desktop Full Disk
+Access first. Pre-move DB backup:
+`/Volumes/AudiouraSSD/pre_migration_*.sql.gz`.
 
 # ASKING A SIDE QUESTION WITHOUT DERAILING THE SESSION
 

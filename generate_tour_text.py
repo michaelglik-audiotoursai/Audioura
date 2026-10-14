@@ -407,6 +407,44 @@ _NEIGHBORHOOD_TO_CITY = {
 # Prevents GPT-hallucinated venue_names on walking/restaurant requests from
 # silently flipping the category and injecting a single-venue museum constraint.
 # Word-boundary anchored to avoid false positives ("touring" vs "tour").
+#
+# [LOCAL-591] The set is split into TWO classes, because they are not the same
+# kind of signal:
+#
+#   ACTIVITY/mobility words (walking, restaurant, food, bike, …) name a DIFFERENT
+#   ACTIVITY — you walk a district, you eat your way down a street, you cycle a
+#   corridor. These are genuinely non-museum: they describe how the listener
+#   moves and what they do, not a theme applied to one building.
+#
+#   THEME words (architecture, architectural, art, history, historical, literary,
+#   book, novel, film, movie) name a SUBJECT, not a place or an activity. "An
+#   architecture tour IN the Boston Athenaeum" is still a tour OF the Athenaeum —
+#   the Athenaeum is a museum-library with notable architecture AND collections.
+#   A theme word is not a different place (Michael, 2026-10-06, tours 395/396:
+#   "architectural" flipped the Athenaeum to a city walking tour, then the
+#   building's own walls cut it to 3 stops).
+#
+# So a theme word must NOT block the museum flip when the request names a tour
+# INSIDE one named building; an activity word still may. _should_force_museum
+# below encodes exactly that.
+_ACTIVITY_NON_MUSEUM_TOUR_RE = re.compile(
+    r'\b(walking|restaurant|food|dining|culinary|self[- ]guided'
+    r'|pub\s+crawl|bike|cycling|biking|shopping)'
+    r'\s+tour\b',
+    re.IGNORECASE,
+)
+
+# THEME words that READ like a tour genre but name a subject, not a place/activity.
+_THEME_TOUR_RE = re.compile(
+    r'\b(architecture|architectural|art|arts|history|historical|heritage'
+    r'|movie|film|book|literary|novel)'
+    r'\s+tour\b',
+    re.IGNORECASE,
+)
+
+# Backward-compatible union: the full "explicit non-museum phrase" set. Kept so
+# existing call sites and tests that reference it by name keep working; the S15
+# decision itself now goes through _should_force_museum (LOCAL-591).
 _EXPLICIT_NON_MUSEUM_TOUR_RE = re.compile(
     r'\b(walking|restaurant|food|dining|culinary|self[- ]guided|architecture|architectural'
     r'|pub\s+crawl|bike|cycling|biking|shopping'
@@ -414,6 +452,148 @@ _EXPLICIT_NON_MUSEUM_TOUR_RE = re.compile(
     r'\s+tour\b',
     re.IGNORECASE,
 )
+
+# [LOCAL-591] Interior prepositions: "...tour IN/INSIDE/WITHIN/AT/OF <building>"
+# means a tour OF that building. "around/near/by/outside <X>" is the perimeter
+# case (D536's Hippodrome, the approved Cimiez walking tour) and is NOT interior.
+# Anchored on "tour <prep>" so a bare "at"/"in" elsewhere in the string does not
+# trigger it.
+_INTERIOR_PREP_RE = re.compile(
+    r'\btours?\s+(?:in|inside|within|at|of|through(?:out)?)\b',
+    re.IGNORECASE,
+)
+
+# Institutional tail nouns — a BUILDING-scope place whose name ends in one of
+# these is a contained venue a tour can be held INSIDE.
+_CONTAINED_VENUE_TAIL = (
+    'museum', 'museums', 'gallery', 'galleries', 'library', 'athenaeum',
+    'athenæum', 'house', 'mansion', 'estate', 'homestead', 'manse', 'villa',
+    'palace', 'palais', 'palazzo', 'castle', 'château', 'chateau', 'institute',
+    'institution', 'collection', 'archive', 'archives', 'hall', 'center',
+    'centre', 'conservatory', 'observatory',
+)
+
+
+def _is_contained_venue_request(location, intent):
+    """[LOCAL-591] True when the request names a tour held INSIDE one building.
+
+    The listener wrote "<theme> tour in/inside/at <named building>" and PHASE 1
+    resolved that building (a BUILDING-scope venue). The tour is OF that building
+    whatever the theme word — "art", "architecture", "history". This is the exact
+    shape that turned "Art and Architectual tour in Boston Athenaeum" into a city
+    walking tour and then cut it to 3 stops by the building's walls (tours
+    395/396).
+
+    It is deterministic — a fact about the phrasing and the resolved scope, not an
+    opinion. Two signals must both hold, so it never fires on a city tour:
+
+      1. An INTERIOR preposition binds the tour to the place: "tour in/inside/
+         within/at/of <X>". "around/near/by" (perimeter) does NOT count — that is
+         D536's Hippodrome and the approved Cimiez walking tour, both of which
+         stay non-museum.
+
+      2. The resolved scope is a single building: scope_precision == BUILDING with
+         a venue_name or a geographic_scope whose leading noun is an institution
+         (museum, library, athenaeum, house, gallery, …).
+    """
+    if not intent:
+        return False
+    loc = location or ''
+    if not _INTERIOR_PREP_RE.search(loc):
+        return False
+    if (intent.get('scope_precision') or '').upper() != 'BUILDING':
+        return False
+    # A single building: either PHASE 1 gave a venue_name, or the geographic_scope
+    # is itself an institution by its leading noun.
+    if intent.get('venue_name'):
+        return True
+    scope = (intent.get('geographic_scope') or '').split(',')[0].strip().lower().rstrip('.')
+    if not scope:
+        return False
+    # Guard against a city-sized scope mislabelled BUILDING.
+    city = (intent.get('location') or '').split(',')[0].strip().lower()
+    if scope and city and scope == city:
+        return False
+    scope_words = scope.split()
+    tail = scope_words[-3:] if len(scope_words) >= 3 else scope_words
+    return any(w in _CONTAINED_VENUE_TAIL for w in tail)
+
+
+def _should_force_museum(location, tour_type, intent, transport_mode='on_foot'):
+    """[LOCAL-591] The S15 decision: should a resolved venue_name force the
+    museum (contained-venue) category?
+
+    Rules, in order:
+      - No venue_name, or not on foot → no (S15 was never about those).
+      - A worship/civic place class (church, courthouse, …) is never a museum
+        (LOCAL-485) — its stops are places, not catalogued works.
+      - A multi-building institution keyword (libraries, churches, …) blocks the
+        single-venue flip (it implies several locations).
+      - A contained-venue request ("tour in/inside/at <named building>") FORCES
+        museum even if a THEME word (architecture/art/history) is present — a
+        theme word is not a different place (LOCAL-591).
+      - Otherwise, an explicit ACTIVITY/mobility phrase ("walking tour", "food
+        tour", "bike tour") blocks the flip; a bare theme word no longer does.
+    """
+    if not intent or not intent.get('venue_name') or transport_mode != 'on_foot':
+        return False
+    if _detect_worship_civic_class(location, tour_type):
+        return False
+    if _MULTI_BUILDING_INSTITUTION_RE.search(location or ''):
+        return False
+    if _is_contained_venue_request(location, intent):
+        # Interior-to-a-building: a theme word does not demote it. Only reject if
+        # the listener ALSO named a different activity (e.g. "walking tour inside
+        # X" — rare, but respect it: it is literally a walking tour).
+        return not _ACTIVITY_NON_MUSEUM_TOUR_RE.search(location or '')
+    # Not a contained-venue request: the full non-museum set (activity + theme)
+    # still blocks a venue_name-only flip, exactly as before LOCAL-591.
+    return not _EXPLICIT_NON_MUSEUM_TOUR_RE.search(location or '')
+
+
+# [LOCAL-591] A generic THEME phrase that PHASE 1 drops into `requirements`
+# ("Art and Architectural tour", "history", "art") is NOT a named exhibition or a
+# specific artist scope. Tours 395/396: the Athenaeum request produced
+# requirements="Art and Architectural tour"; LOCAL-362 read that as a scoped
+# exhibition, searched the venue for an exhibition called "Art and Architectual
+# tour in", found none, asked GPT for its works, got [] — and the whole
+# contained-venue tour clean-failed, even though SPARQL had already returned six
+# documented works for the building. A theme word is not a different place and
+# not a specific exhibition: a generic-theme requirement must NOT trigger the
+# exhibition-scope path, so the tour falls back to the venue's documented works.
+_GENERIC_THEME_WORDS = {
+    'art', 'arts', 'artistic', 'architecture', 'architectural', 'architectual',
+    'history', 'historic', 'historical', 'heritage', 'culture', 'cultural',
+    'general', 'overview', 'highlights', 'collection', 'collections',
+    'permanent', 'masterpiece', 'masterpieces', 'tour', 'tours', 'walking',
+    'self', 'guided', 'self-guided', 'and', 'or', 'the', 'of', 'in', 'a', 'an',
+}
+
+
+def _is_generic_theme_requirement(requirements):
+    """[LOCAL-591] True when a `requirements` string is only generic theme/genre
+    words — i.e. a THEME, not a named exhibition or a specific artist.
+
+    "Art and Architectural tour" → True (generic theme).
+    "Picasso, Miró, Dalí: Unbound" → False (named artists / exhibition).
+    "works by Chagall" → False (specific artist).
+    "" → False (nothing to scope on — the caller treats empty separately).
+
+    Deterministic: it is a fact about the words, not an opinion. If EVERY content
+    word is a generic theme/genre word, there is no specific exhibition to scope
+    to, so the venue's documented works should be used instead.
+    """
+    r = (requirements or '').strip().lower()
+    if not r:
+        return False
+    # A colon usually introduces a named exhibition title ("Artists: Title").
+    if ':' in r:
+        return False
+    words = re.findall(r"[a-zà-ÿ'\-]+", r)
+    if not words:
+        return False
+    return all(w in _GENERIC_THEME_WORDS for w in words)
+
 
 # Multi-building institution keywords — these should NOT be classified as single-venue museum
 # even if GPT returns a venue_name. They imply multiple distinct locations.
@@ -1101,6 +1281,193 @@ Example: For "Paul Revere House" and poi_type "restaurant":
         return {"matches": True, "reason": "verification failed", "confidence": "low"}
 
 
+def _norm_name_for_refill(name):
+    """Normalization used by the LOCAL-577 refill/gate helpers.
+
+    Prefer story_miner._normalize (the same accent-folding + punctuation-stripping
+    the D1v2 path uses, so a title the gate renamed matches its evidence key); fall
+    back to a local NFKD fold if story_miner cannot be imported."""
+    try:
+        from story_miner import _normalize as _sm_norm
+        return _sm_norm(name or "")
+    except Exception:
+        n = unicodedata.normalize('NFKD', (name or '').lower())
+        n = ''.join(c for c in n if not unicodedata.combining(c))
+        return re.sub(r'\s+', ' ', re.sub(r"[^\w\s]", ' ', n)).strip()
+
+
+# [LOCAL-577] A real stop dropped by D1v2 on a canonical-TITLE mismatch is still a
+# real stop. D592: a thin stop is acceptable, a MISSING one is not.
+#
+# Field defect (job b5982123, tour 431): Palais Lascaris, 4 stops → 3. Four works
+# passed the existence gate; D1v2 then dropped "The Adoration of the Magi" with
+# `reason: "no canonical match"` — not non-existence, not a wrong venue, just a
+# title our Wikidata/site corpus could not line up. R4 re-prompted but its fresh
+# candidates also failed the canonical match, so the count was never restored, and
+# the LOCAL-16 GATE stripped every verified=False pad for being unverified.
+#
+# The acceptable last-resort refill is NARROW on purpose: only the candidates D1v2
+# dropped for a title mismatch, never REJECTED (located at another venue), never a
+# theme/book word or cycle name (prolog material, not a stop), never non-existence.
+# Each returns verified=False and tagged _title_mismatch_refill so the narration
+# hedges exactly as unverified exhibits already do (D592), and so the gate can
+# exempt it the same way it exempts a stop the listener named (LOCAL-547).
+_TITLE_MISMATCH_REASONS = ("no canonical match",)
+
+
+def _is_title_mismatch_drop(evidence_entry):
+    """True only when D1v2 dropped a candidate for a canonical-TITLE mismatch.
+
+    A DROPPED status alone is not enough — theme-word, cycle-name and
+    normalized-duplicate drops are also DROPPED but are NOT real stops. Match on
+    the reason D1v2 writes for a pure title mismatch."""
+    if not isinstance(evidence_entry, dict):
+        return False
+    if evidence_entry.get('status') != 'DROPPED':
+        return False
+    _reason = (evidence_entry.get('reason') or '').strip().lower()
+    return _reason in _TITLE_MISMATCH_REASONS
+
+
+def _title_mismatch_refill_pool(evidence_log, pre_d1v2_candidates,
+                                current_poi_list, venue_name=None, exists_fn=None):
+    """[LOCAL-577] Return the candidates D1v2 dropped for a title mismatch ONLY,
+    as hedged refill POIs, in the order they appeared in pre_d1v2_candidates.
+
+    Each returned POI is a copy marked:
+      - verified=False            → narration hedges (D592)
+      - _title_mismatch_refill=True → exempt from the LOCAL-16 GATE strip
+
+    Excluded, never refilled:
+      - anything NOT dropped for "no canonical match" (REJECTED wrong-venue,
+        theme/book word, cycle name, non-existence, normalized duplicate)
+      - a candidate already present in current_poi_list (by normalized name)
+      - a candidate whose evidence entry is VERIFIED (already in the list)
+      - a work the LOCAL-24 corpus classifier excludes (programs/workshops)
+      - [LOCAL-580] a candidate whose existence is DEFINITIVELY disproven by
+        exists_fn (a GPT-invented title that does not exist anywhere).
+
+    [LOCAL-580 FABRICATION GUARD]
+    "no canonical match" means only "this title did not line up with THIS venue's
+    canonical corpus". That is true both for a real work the corpus simply never
+    named (Palais Lascaris's "The Adoration of the Magi" — LOCAL-577's whole
+    point) AND for a title GPT invented out of nothing (Griffin's "The American
+    Dream", "The Human Condition" — the LOCAL-580 field defect). LOCAL-577 as
+    shipped could re-admit the second kind: a fabrication, hedged, would ship as
+    a stop. That is the exact failure LOCAL-577 was meant to end, not cause.
+
+    The distinguishing signal is EXISTENCE. `exists_fn(name)` returns:
+        True   → the work exists (keep it eligible — the Adoration case)
+        False  → the work was checked and does NOT exist (DROP — a fabrication)
+        None   → inconclusive / not checked / search failed
+    D162 governs the None case: a search that did not really run is never
+    evidence of absence, so None does NOT disqualify — only an explicit False
+    does. When exists_fn is None (legacy callers), the guard is inert and
+    behaviour is exactly LOCAL-577's.
+    """
+    evidence_log = evidence_log or {}
+    _current_norm = {_norm_name_for_refill(p.get('name', '')) for p in (current_poi_list or [])}
+    _verified_norm = {
+        _norm_name_for_refill(k)
+        for k, v in evidence_log.items()
+        if isinstance(v, dict) and v.get('status') == 'VERIFIED'
+    }
+    try:
+        from story_miner import classify_corpus_entry as _classify
+    except Exception:
+        _classify = None
+
+    _pool = []
+    _seen = set()
+    for p in (pre_d1v2_candidates or []):
+        _name = p.get('name', '')
+        _norm = _norm_name_for_refill(_name)
+        if not _norm or _norm in _seen:
+            continue
+        # Only a pure title-mismatch drop qualifies.
+        if not _is_title_mismatch_drop(evidence_log.get(_name)):
+            continue
+        # Never duplicate a stop already in the list or already verified.
+        if _norm in _current_norm or _norm in _verified_norm:
+            continue
+        # LOCAL-24: do not re-admit a program/workshop/non-work the classifier excludes.
+        if _classify is not None:
+            try:
+                _cls = _classify(title=_name, venue_name=venue_name)
+                if isinstance(_cls, dict) and _cls.get('kind') == 'excluded':
+                    print(f"  [LOCAL-577 REFILL] LOCAL-24 blocked: '{_name}' ({_cls.get('rule')})")
+                    continue
+            except Exception:
+                pass  # classifier is advisory; never let it crash the refill
+        # [LOCAL-580] FABRICATION GUARD: a title-mismatch drop is only a real
+        # stop if it actually exists. An invented title whose existence check
+        # DEFINITIVELY fails is never re-admitted. Inconclusive (None) is not a
+        # failure (D162) — only an explicit False blocks.
+        if exists_fn is not None:
+            try:
+                _exists = exists_fn(_name)
+            except Exception:
+                _exists = None  # a crashing check is inconclusive, never absence
+            if _exists is False:
+                print(f"  [LOCAL-580 FABRICATION GUARD] NOT re-admitting '{_name}' — "
+                      f"title mismatch AND existence check failed (invented, does not exist)")
+                continue
+        _rp = dict(p)
+        _rp['verified'] = False
+        _rp['_title_mismatch_refill'] = True
+        _pool.append(_rp)
+        _seen.add(_norm)
+    return _pool
+
+
+def _local16_gate_survivors(poi_list, evidence_log):
+    """[LOCAL-16 + LOCAL-577] The museum verified-only choke-point, as a pure
+    function so it can be tested directly (D277).
+
+    Keeps, in order:
+      - a stop the listener NAMED (user_explicit)                     [LOCAL-547]
+      - a title-mismatch refill (_title_mismatch_refill)              [LOCAL-577]
+      - a D1v2-verified stop (verified is not False)
+    and deduplicates verified stops by canonical title (round-3 finding).
+
+    Strips any other verified=False stop. Returns (survivors, removed_names)."""
+    evidence_log = evidence_log or {}
+
+    def _find_canonical_for_poi(poi_name):
+        ev = evidence_log.get(poi_name, {})
+        if isinstance(ev, dict) and ev.get('canonical_title'):
+            return ev['canonical_title']
+        _poi_norm = _norm_name_for_refill(poi_name)
+        for _key, _val in evidence_log.items():
+            if isinstance(_val, dict) and _val.get('status') == 'VERIFIED':
+                _ct = _val.get('canonical_title', '')
+                if _ct and _norm_name_for_refill(_ct) == _poi_norm:
+                    return _ct
+        return None
+
+    _seen_canonical = set()
+    _survivors = []
+    _removed = []
+    for p in (poi_list or []):
+        # Exemptions: a named stop or a title-mismatch refill is announced, never
+        # dropped — it carries verified=False so the narration hedges (D592).
+        if p.get('user_explicit') or p.get('_title_mismatch_refill'):
+            _survivors.append(p)
+            continue
+        if not p.get('verified', True):
+            _removed.append(p['name'])
+            continue
+        _canon = _find_canonical_for_poi(p['name'])
+        if _canon:
+            _canon_norm = _norm_name_for_refill(_canon)
+            if _canon_norm in _seen_canonical:
+                _removed.append(f"{p['name']} (dup canonical: {_canon})")
+                continue
+            _seen_canonical.add(_canon_norm)
+        _survivors.append(p)
+    return _survivors, _removed
+
+
 # [D536] "with a stop at X" makes X a WAYPOINT, not the tour's boundary.
 #
 # The 2026-08-27 Riviera run: the request was "Biking tour in French Riviera with
@@ -1121,7 +1488,8 @@ _WAYPOINT_RE = re.compile(
     re.IGNORECASE)
 
 
-def _apply_named_waypoints(poi_list, location, _new_poi_fn, extra=None):
+def _apply_named_waypoints(poi_list, location, _new_poi_fn, extra=None,
+                           anchor_names=None):
     """[LOCAL-547] Mark or insert the stops the listener named, whatever built poi_list.
 
     D536 owned this and lived inside `if not _deterministic_fill_used and not
@@ -1138,8 +1506,18 @@ def _apply_named_waypoints(poi_list, location, _new_poi_fn, extra=None):
 
     Idempotent: a stop already flagged user_explicit is left alone, so calling it
     twice on the same list changes nothing.
+
+    [LOCAL-576] `anchor_names` are route anchors from "from X to Y via A & B"/"loop
+    from X". They get the SAME user_explicit protection as waypoints AND an
+    additional `_anchor=True` flag, so the scope check (PHASE 5.6) can exempt them:
+    a place the listener named as the START/END/VIA of the route cannot be "outside"
+    that route. Pass them pre-reversed by the caller — like `extra`, they are
+    inserted at index 0 one at a time, so reversing preserves the request's order.
     """
-    wps = named_waypoints(location) + [e for e in (extra or []) if e]
+    anchor_set = {_norm_place(a) for a in (anchor_names or []) if a}
+    wps = (named_waypoints(location)
+           + [e for e in (extra or []) if e]
+           + [a for a in (anchor_names or []) if a])
     if not wps:
         return poi_list, []
     inserted = []
@@ -1147,22 +1525,33 @@ def _apply_named_waypoints(poi_list, location, _new_poi_fn, extra=None):
         wpn = _norm_place(wp)
         if not wpn:
             continue
+        _is_anchor = wpn in anchor_set
+        _tag = 'LOCAL-576 anchor' if _is_anchor else 'LOCAL-547'
         already = [p for p in poi_list
                    if (lambda q: q and (wpn == q or wpn in q or q in wpn))(
                        _norm_place(p.get('name', '')))]
         if already:
             for p in already:
+                _changed = False
                 if not p.get('user_explicit'):
                     p['user_explicit'] = True
-                    print(f"  [LOCAL-547] Requested stop '{wp}' is already a candidate "
-                          f"— marked user_explicit on '{p.get('name')}'")
+                    _changed = True
+                if _is_anchor and not p.get('_anchor'):
+                    p['_anchor'] = True
+                    _changed = True
+                if _changed:
+                    print(f"  [{_tag}] Requested stop '{wp}' is already a candidate "
+                          f"— marked user_explicit{'/_anchor' if _is_anchor else ''} "
+                          f"on '{p.get('name')}'")
             continue
         poi = _new_poi_fn(wp)
         poi['user_explicit'] = True
+        if _is_anchor:
+            poi['_anchor'] = True
         poi_list.insert(0, poi)
         inserted.append(wp)
-        print(f"  [LOCAL-547] Requested stop '{wp}' was NOT among the candidates "
-              f"— INSERTED as a user-explicit stop")
+        print(f"  [{_tag}] Requested stop '{wp}' was NOT among the candidates "
+              f"— INSERTED as a user-explicit{'/_anchor' if _is_anchor else ''} stop")
     return poi_list, inserted
 
 
@@ -1312,10 +1701,188 @@ def named_waypoints(request_text):
     return out
 
 
+# [LOCAL-576] A listener who says "from X to Y via A & B" or "loop from X" has
+# NAMED the stops of the route, and named the point it starts from. Those are
+# anchors: the route is built around them, not filtered against them.
+#
+# Field test, tour 388 (2026-10-04): "biking tour in a loop from Crystal Lake to
+# Paul Revere via Commonwealth Avenue Mall & Boston Common, MA", 5 stops.
+# Delivered 4, starting at the Massachusetts State House. Crystal Lake (the start
+# the listener named) was deleted by PHASE 3C because its address geocodes to
+# Newton, MA and the request string said "MA" not "Newton"; Commonwealth Avenue
+# Mall was dropped by LOCAL-212 for having no corpus coverage; North End was
+# written in full and then removed by PHASE 5.6 with no replacement.
+#
+# named_waypoints() already owns "with a stop at X". This owns the ROUTE forms
+# "from X to Y", "X to Y", "via/through A & B", and "loop/round trip from X".
+# It is deterministic on purpose (D526/D528): the structure of the phrasing, not
+# a list of place names, is what tells us these are stops. The transport/tour-type
+# prefix ("biking tour in a loop") and the trailing region (", MA") are stripped
+# so they are never mistaken for a place.
+
+# Words that mark the START of a route ("from X ...", "starting at X ...").
+_ANCHOR_START_RE = re.compile(
+    r'\b(?:from|start(?:ing)?(?:\s+(?:at|from))?|begin(?:ning)?(?:\s+(?:at|from))?)\s+',
+    re.IGNORECASE)
+# "to Y" marks the route's END / turnaround.
+_ANCHOR_TO_RE = re.compile(r'\bto\s+', re.IGNORECASE)
+# "via A & B", "through A and B" — the ordered via-points.
+_ANCHOR_VIA_RE = re.compile(r'\b(?:via|through|through to|by\s+way\s+of)\s+', re.IGNORECASE)
+# A loop/round-trip returns to its start; its start is also effectively its end.
+_ANCHOR_LOOP_RE = re.compile(r'\b(?:loop|round[\s-]?trip|circular|circuit)\b', re.IGNORECASE)
+# Boundaries at which a captured anchor phrase ends.
+_ANCHOR_STOP_WORDS_RE = re.compile(
+    r'\s*(?:,|\.|;|$|\bvia\b|\bthrough\b|\bto\b|\bfrom\b|\bstarting\b|\bbeginning\b'
+    r'|\bending\b|\bthen\b|\band\s+back\b)',
+    re.IGNORECASE)
+
+
+def _anchor_split_via(segment):
+    """Split a via-segment into ordered places on '&', 'and', ',' — keeping order."""
+    parts = re.split(r'\s*(?:&|\band\b|,|\+)\s*', segment or '', flags=re.IGNORECASE)
+    return [p.strip(' ,.;') for p in parts if p and len(p.strip(' ,.;')) > 2]
+
+
+def _anchor_trim(raw):
+    """Trim a captured phrase at the first route keyword / clause boundary."""
+    if not raw:
+        return ''
+    m = _ANCHOR_STOP_WORDS_RE.search(raw)
+    phrase = raw[:m.start()] if m else raw
+    return phrase.strip(' ,.;')
+
+
+def named_anchors(request_text):
+    """[LOCAL-576] Extract the route the listener NAMED, structurally.
+
+    Returns a dict:
+        {'anchors': [ordered place strings], 'start': str|None, 'end': str|None,
+         'is_loop': bool}
+    `anchors` is in the order the listener gave: start first, then via-points in
+    order, then end. For a loop the start is repeated conceptually as the return;
+    callers close the ring, this does not duplicate the name in `anchors`.
+
+    Empty anchors list when the request has no "from X to Y"/"loop from X" shape.
+    No place-name list is used — only the grammar of the request decides.
+    """
+    text = (request_text or '').strip()
+    if not text:
+        return {'anchors': [], 'start': None, 'end': None, 'is_loop': False}
+
+    is_loop = bool(_ANCHOR_LOOP_RE.search(text))
+
+    start = end = None
+    vias = []
+
+    # 1) START: the first "from/starting at X" after any tour-type/transport prefix.
+    m_start = _ANCHOR_START_RE.search(text)
+    after_start = text[m_start.end():] if m_start else ''
+    if m_start:
+        start = _anchor_trim(after_start)
+
+    # 2) END: "to Y" that follows the start (a loop's "to Y" is the turnaround).
+    search_region = after_start if m_start else text
+    m_to = _ANCHOR_TO_RE.search(search_region)
+    if m_to:
+        end = _anchor_trim(search_region[m_to.end():])
+
+    # 3) VIA: "via/through A & B" — ordered via-points.
+    m_via = _ANCHOR_VIA_RE.search(text)
+    if m_via:
+        via_seg = _anchor_trim(text[m_via.end():])
+        vias = _anchor_split_via(via_seg)
+
+    def _clean(x):
+        return x.strip(' ,.;') if x and len(x.strip(' ,.;')) > 2 else None
+    start, end = _clean(start), _clean(end)
+    vias = [v for v in vias if _clean(v)]
+
+    anchors, seen = [], set()
+    for a in [start] + vias + [end]:
+        if not a:
+            continue
+        key = _norm_place(a)
+        if not key or key in seen:
+            continue
+        seen.add(key)
+        anchors.append(a)
+
+    return {'anchors': anchors, 'start': start, 'end': end, 'is_loop': is_loop}
+
+
 def _norm_place(s):
     n = unicodedata.normalize('NFKD', (s or '').lower())
     n = ''.join(c for c in n if not unicodedata.combining(c))
     return re.sub(r'\s+', ' ', re.sub(r"[^\w\s]", ' ', n)).strip()
+
+
+def _match_anchor_poi(poi_list, anchor_name):
+    """Find the poi that corresponds to a named anchor, by normalized name
+    containment either way. Returns the first match or None."""
+    an = _norm_place(anchor_name)
+    if not an:
+        return None
+    for p in poi_list:
+        pn = _norm_place(p.get('name', ''))
+        if pn and (pn == an or an in pn or pn in an):
+            return p
+    return None
+
+
+def _order_by_anchors(poi_list, anchor_info):
+    """[LOCAL-576] Pin the route to the order the listener named.
+
+      loop from X          -> stop 1 is X; the loop returns to it (X first closes
+                              the ring, so a loop "ends heading back to X").
+      from X to Y          -> stop 1 is X, last stop is Y.
+      ... via A & B ...    -> via-points keep the listener's order, between start
+                              and end.
+    Non-anchor stops (the ones WE chose to fill the route) keep their existing
+    relative order and occupy the slots between the via-points and the end.
+
+    Deterministic and position-only: it never adds or drops a stop, so it is safe
+    to run after selection and after _compute_route_order. Returns a new list.
+    """
+    if not poi_list or not anchor_info or not anchor_info.get('anchors'):
+        return poi_list
+
+    start = anchor_info.get('start')
+    end = anchor_info.get('end')
+    is_loop = anchor_info.get('is_loop')
+    anchors = anchor_info.get('anchors') or []
+    # Via-points are the anchors that are neither the start nor the end, in order.
+    vias = [a for a in anchors if a not in (start, end)]
+
+    start_poi = _match_anchor_poi(poi_list, start) if start else None
+    end_poi = _match_anchor_poi(poi_list, end) if end else None
+    via_pois, _seen = [], set()
+    for v in vias:
+        vp = _match_anchor_poi(poi_list, v)
+        if vp is not None and id(vp) not in _seen:
+            via_pois.append(vp)
+            _seen.add(id(vp))
+
+    pinned_ids = set()
+    for p in ([start_poi] + via_pois + [end_poi]):
+        if p is not None:
+            pinned_ids.add(id(p))
+    middle = [p for p in poi_list if id(p) not in pinned_ids]
+
+    # A loop whose turnaround (end) equals the start has no distinct end poi; the
+    # ring closes on the start, so the end slot is left to a filler/via.
+    ordered = []
+    if start_poi is not None:
+        ordered.append(start_poi)
+    ordered.extend(via_pois)
+    ordered.extend(middle)
+    if end_poi is not None and end_poi is not start_poi:
+        ordered.append(end_poi)
+
+    # Safety: never drop or duplicate a stop. If anything went sideways, fall back
+    # to the input untouched.
+    if len(ordered) != len(poi_list) or {id(p) for p in ordered} != {id(p) for p in poi_list}:
+        return poi_list
+    return ordered
 
 
 def scope_is_a_waypoint(scope_name, request_text):
@@ -1445,6 +2012,78 @@ def _resolve_scope_for_check(intent, location, tour_category, museum_venue_name,
                 print(f"  [D536] Falling back to the tour's stated area: '{_wider}' "
                       f"(too wide for a stop-by-stop containment check — skipping PHASE 5.6)")
         scope = ''
+    # [LOCAL-591] ONE SCOPE PER TOUR. Whatever scope we are about to hand the
+    # containment check MUST be the tour's own extent. This is the invariant the
+    # 395/396 defect broke: a city walking tour's stops were checked against one
+    # building. Assert it here, in the single place that decides the scope, so a
+    # mismatch can never reach _validate_stops_within_scope again.
+    scope = _assert_one_scope_per_tour(tour_category, scope, intent, quiet=quiet)
+    return scope
+
+
+def _assert_one_scope_per_tour(tour_category, scope, intent, quiet=False):
+    """[LOCAL-591] Invariant: a tour is only ever checked against ITS OWN extent.
+
+    Tours 395/396: because the Boston Athenaeum request was mis-classified as a
+    WALKING tour, the generator chose city-wide stops (MFA, Trinity, BPL,
+    Gardner, State House, Granary) and then PHASE 5.6 judged each of them against
+    the BUILDING scope 'Boston Athenaeum, Boston, Massachusetts'. Six were removed
+    for being "outside" a building that was never the tour's extent. The scope
+    checked did not belong to the tour.
+
+    The rule, by category:
+
+      museum / facility (contained-venue):
+        containment is the venue guard (PHASE 5.5b) — there is NO second,
+        stop-by-stop scope. Any non-empty `scope` for these categories is a
+        drift and is cleared to ''.
+
+      walking / biking / restaurant / book (area tours):
+        the scope MUST be the tour's own declared extent (its geographic_scope).
+        A scope tighter than — and different from — the tour's declared area
+        (e.g. a single building for a city/district tour) is the 395/396 mismatch
+        and is cleared to ''. A scope that IS the tour's declared area passes
+        through unchanged.
+
+    Returns the validated scope ('' means "no stop-by-stop check applies").
+    """
+    if not scope:
+        return ''
+
+    # A contained-venue tour has no stop-by-stop scope of its own: it is guarded
+    # by PHASE 5.5b against its venue. Anything else here is a cross-scope leak.
+    if tour_category in ('museum', 'facility'):
+        if not quiet:
+            print(f"  [LOCAL-591] ONE-SCOPE invariant: a {tour_category} tour is "
+                  f"guarded by its venue (PHASE 5.5b); dropping stop-by-stop scope "
+                  f"'{scope}'.")
+        return ''
+
+    # An area tour must be checked against ITS OWN declared extent. The scope the
+    # resolver chose is the intent's geographic_scope, so for a well-formed intent
+    # they already match; this makes the match explicit and catches the case where
+    # the chosen scope is tighter than the tour's actual extent.
+    declared = (intent.get('geographic_scope') or '').strip() if intent else ''
+    if declared and _norm_place(scope) != _norm_place(declared):
+        if not quiet:
+            print(f"  [LOCAL-591] ONE-SCOPE invariant VIOLATION: tour extent is "
+                  f"'{declared}' but the containment scope is '{scope}' — these are "
+                  f"different places. A tour is never checked against a scope that is "
+                  f"not its own extent; dropping it.")
+        return ''
+
+    # The tour's declared extent is a whole CITY: there is no tight boundary to
+    # check stops against, and judging city-wide stops against a single building
+    # is precisely the 395/396 bug. The resolver already restricts `scope` to
+    # BUILDING/DISTRICT/CORRIDOR precision, so a CITY-precision intent should not
+    # have produced a scope at all — belt-and-braces, clear it.
+    if intent and (intent.get('scope_precision') or '').upper() == 'CITY':
+        if not quiet:
+            print(f"  [LOCAL-591] ONE-SCOPE invariant: tour extent is a whole city "
+                  f"('{declared}') — too wide for a stop-by-stop containment check; "
+                  f"dropping scope '{scope}'.")
+        return ''
+
     return scope
 
 
@@ -1454,6 +2093,197 @@ def _resolve_scope_for_check(intent, location, tour_category, museum_venue_name,
 # how `_lore` was lost and then how `_venue_part` was lost after that. Same bug, same
 # fix: do not hang run-scoped truth on an object that gets replaced.
 _VENUE_PARTS_RUN = False
+
+
+# [LOCAL-591] The scope judge's own reasoning text that says a stop is OUTSIDE.
+# The judge is asked for {"inside_scope": bool, "confidence": ..., "reason": ...}.
+# On tours 395/396 it returned inside_scope=true with the reason "King's Chapel is
+# located outside the bounds of Boston Athenaeum, Boston, Massachusetts." — the
+# boolean and the reasoning contradicted each other, and the code trusted the
+# boolean, recording a stop as inside that its own reason said was outside.
+_VERDICT_OUTSIDE_RE = re.compile(
+    r'\b(?:located\s+)?outside\b'
+    r'|\bnot\s+(?:located\s+)?(?:inside|within|in)\b'
+    r'|\boutside\s+(?:the\s+)?bounds\b'
+    r'|\bis\s+not\s+(?:part|a\s+part)\s+of\b'
+    r'|\bdifferent\s+(?:building|venue|location)\b'
+    r'|\belsewhere\b',
+    re.IGNORECASE,
+)
+# A reason that says the stop IS inside — used only to detect the reverse
+# contradiction (boolean false, reason says inside). We do NOT flip a removal
+# verdict to "keep" on the strength of text alone (that would weaken the guard);
+# we only make a self-contradiction visible and resolve it toward NOT inside,
+# because the destructive action (removal) still requires high confidence anyway.
+_VERDICT_INSIDE_RE = re.compile(
+    r'\b(?:is\s+)?(?:located\s+)?(?:inside|within)\b'
+    r'|\bpart\s+of\b'
+    r'|\bhoused\s+(?:in|within)\b',
+    re.IGNORECASE,
+)
+
+
+def _reconcile_scope_verdict(inside, reason):
+    """[LOCAL-591] A verdict is its reasoning, not a boolean that can drift from it.
+
+    The containment judge returns a boolean (`inside_scope`) AND a free-text
+    reason. When they disagree, the reason is the ground truth about what the
+    model actually concluded — the boolean is a serialization the model
+    frequently gets backwards (tours 395/396: inside_scope=true alongside
+    "King's Chapel is located outside the bounds of Boston Athenaeum").
+
+    Rule: if the reason clearly says OUTSIDE, the verdict is NOT inside — a
+    reasoning text that says "outside" can never be recorded as inside. The
+    boolean is corrected to match the reason. (The destructive action, removal,
+    still requires high confidence downstream — this only stops a
+    self-contradicting verdict from being mis-recorded as inside.)
+
+    Returns the reconciled `inside` boolean. `reason` is inspected, never changed.
+    """
+    r = reason or ''
+    says_outside = bool(_VERDICT_OUTSIDE_RE.search(r))
+    if inside and says_outside:
+        # The boolean said inside; the model's own words say outside. Trust the words.
+        return False
+    return inside
+
+
+# [LOCAL-591] A parseable 'lat, lng' already present on a stop, in any of the
+# shapes the generator uses (the `coordinates` string, or numeric
+# latitude/longitude fields, or Wikidata lat/lng).
+_COORD_PAIR_RE = re.compile(r'-?\d+\.?\d*\s*,\s*-?\d+\.?\d*')
+
+
+def _poi_has_coordinates(poi):
+    """True when a stop already carries a usable coordinate.
+
+    Checks the `coordinates` string first, then the numeric latitude/longitude
+    (and wikidata_*) fields. A (0,0) pair or an empty string counts as missing.
+    """
+    cs = poi.get('coordinates', '') or ''
+    m = _COORD_PAIR_RE.search(cs)
+    if m:
+        try:
+            lat, lng = [float(x) for x in m.group(0).split(',')]
+            if not (lat == 0.0 and lng == 0.0):
+                return True
+        except ValueError:
+            pass
+    lat = poi.get('latitude') or poi.get('wikidata_lat')
+    lng = poi.get('longitude') or poi.get('wikidata_lng')
+    try:
+        if lat is not None and lng is not None and (float(lat) != 0.0 or float(lng) != 0.0):
+            return True
+    except (TypeError, ValueError):
+        pass
+    return False
+
+
+def _geocode_missing_coordinates(poi_list, location, headers,
+                                 coord_fetch=None, resolve_poi_fn=None,
+                                 tour_anchor=None):
+    """[LOCAL-591] Every delivered stop must have coordinates — a final sweep.
+
+    Tours 395/396: King's Chapel was added by the LOCAL-576 replenishment loop,
+    which runs AFTER the D559 geocoding phase. Nothing geocoded it afterward, so
+    it shipped with no coordinates and had no map marker. The same gap exists for
+    any stop added late — D556 additions, LOCAL-577/589 refills — because they
+    all land after geocoding.
+
+    This runs just before packing (PHASE 6) and geocodes every stop that still
+    lacks a parseable coordinate, whatever path added it. A stop that cannot be
+    placed is LOGGED and kept (never DELETE a stop); its name is returned in
+    `still_missing` so the caller can announce the gap.
+
+    `coord_fetch(poi) -> (poi, "lat, lng", tokens)` is injected so the sweep is
+    testable offline; the default calls the same LLM coordinate endpoint the
+    PHASE-3B fallback uses. When `resolve_poi_fn` is given, a freshly fetched
+    coordinate is corroborated through it (the D559 independent geocoder), exactly
+    as the centroid-collapse refill does.
+
+    Returns (n_fixed, still_missing_names, tokens_used). Mutates poi dicts in place.
+    """
+    if not poi_list:
+        return 0, [], 0
+
+    missing = [p for p in poi_list if not _poi_has_coordinates(p)]
+    if not missing:
+        return 0, [], 0
+
+    print(f"\n  [LOCAL-591] COORDINATE SWEEP: {len(missing)} delivered stop(s) have no "
+          f"coordinates (added after the geocoding phase) — geocoding before packing: "
+          f"{[p.get('name', '') for p in missing]}")
+
+    if coord_fetch is None:
+        def coord_fetch(poi):
+            prompt = (
+                f"Provide GPS coordinates for '{poi.get('name', '')}'"
+                + (f" at {poi['address']}" if poi.get('address') else f" in {location}")
+                + ".\nFormat: Latitude: [number]\nLongitude: [number]\n"
+                  "Only coordinates, nothing else."
+            )
+            data = {
+                "model": os.environ.get("TOUR_LLM_MODEL", "gpt-3.5-turbo"),
+                "messages": [
+                    {"role": "system", "content": "You provide accurate GPS coordinates. "
+                     "Respond only with Latitude and Longitude lines."},
+                    {"role": "user", "content": prompt},
+                ],
+                "temperature": 0.3,
+                "max_tokens": 60,
+            }
+            try:
+                resp = requests.post("https://api.openai.com/v1/chat/completions",
+                                     headers=headers, data=json.dumps(data))
+                if resp.status_code == 200:
+                    text = resp.json()["choices"][0]["message"]["content"]
+                    lat_m = re.search(r'Latitude:\s*(-?\d+\.\d+)', text, re.IGNORECASE)
+                    lng_m = re.search(r'Longitude:\s*(-?\d+\.\d+)', text, re.IGNORECASE)
+                    _tok = resp.json().get("usage", {}).get("total_tokens", 0)
+                    if lat_m and lng_m:
+                        return poi, f"{lat_m.group(1)}, {lng_m.group(1)}", _tok
+            except Exception as _e:
+                print(f"   [LOCAL-591] coord fetch error for '{poi.get('name', '')}': {_e}")
+            return poi, "", 0
+
+    n_fixed = 0
+    tokens_used = 0
+    still_missing = []
+
+    # Fetch in parallel — same executor the rest of the tour path uses.
+    results = []
+    if len(missing) == 1:
+        results = [coord_fetch(missing[0])]
+    else:
+        from concurrent.futures import as_completed as _as_completed
+        with tour_executor(max_workers=min(len(missing), 5)) as _ex:
+            _futs = {_ex.submit(coord_fetch, p): p for p in missing}
+            for _f in _as_completed(_futs):
+                results.append(_f.result())
+
+    for poi, coords, tokens in results:
+        tokens_used += tokens or 0
+        if coords and _COORD_PAIR_RE.search(coords):
+            poi['coordinates'] = coords
+            # Corroborate through the independent geocoder when available, exactly
+            # as the D559 phase and the centroid-collapse refill do.
+            if resolve_poi_fn is not None:
+                try:
+                    resolve_poi_fn(poi, location, tour_anchor)
+                except Exception as _re:
+                    print(f"   [LOCAL-591] resolve_poi after sweep failed for "
+                          f"'{poi.get('name', '')}' (keeping fetched coord): {_re}")
+            n_fixed += 1
+            print(f"   [LOCAL-591] coord sweep OK '{poi.get('name', '')}': "
+                  f"{poi.get('coordinates', '')}")
+        else:
+            still_missing.append(poi.get('name', ''))
+            print(f"   [LOCAL-591] coord sweep COULD NOT place '{poi.get('name', '')}' "
+                  f"— stop is kept (never dropped) but has no map marker; announced.")
+
+    print(f"  [LOCAL-591] COORDINATE SWEEP complete: {n_fixed} geocoded, "
+          f"{len(still_missing)} still without a marker.")
+    return n_fixed, still_missing, tokens_used
 
 
 def _validate_stops_within_scope(poi_list, scope_name, headers, max_check=12,
@@ -1583,8 +2413,17 @@ def _validate_stops_within_scope(poi_list, scope_name, headers, max_check=12,
             if resp.status_code != 200:
                 return poi, True, "low", f"API error {resp.status_code} - keeping"
             parsed = json.loads(resp.json()["choices"][0]["message"]["content"])
-            return (poi, parsed.get("inside_scope", True),
-                    parsed.get("confidence", "low"), parsed.get("reason", ""))
+            _inside = parsed.get("inside_scope", True)
+            _conf = parsed.get("confidence", "low")
+            _reason = parsed.get("reason", "")
+            # [LOCAL-591] The verdict IS its reasoning. If the model's own words say
+            # the stop is outside, it is not inside — whatever the boolean claimed.
+            _reconciled = _reconcile_scope_verdict(_inside, _reason)
+            if _reconciled != _inside:
+                print(f"   [LOCAL-591] verdict/reason contradiction for '{name}': "
+                      f"inside_scope={_inside} but reason says outside — recording as "
+                      f"NOT inside. reason: {_reason}")
+            return (poi, _reconciled, _conf, _reason)
         except Exception as e:
             return poi, True, "low", f"check error: {e}"
 
@@ -1625,6 +2464,18 @@ def _validate_stops_within_scope(poi_list, scope_name, headers, max_check=12,
                 survivors.append(poi)
                 print(f"   OK '{poi['name']}' — part of '{scope_name}' by construction "
                       f"(D578: scope check does not apply to building parts)")
+            elif poi.get('_anchor') or poi.get('user_explicit'):
+                # [LOCAL-576] A place the listener NAMED as the start, end, or a
+                # via-point of the route cannot be "outside" the route it defines.
+                # Tour 388: North End (a candidate WE chose) was correctly removed
+                # here, but Crystal Lake / Commonwealth Avenue Mall / Boston Common
+                # / Paul Revere Park were the listener's own anchors — removing any
+                # of them is the swap the listener never agreed to. The scope check
+                # judges stops WE picked, never the ones the listener did.
+                survivors.append(poi)
+                _why = 'anchor' if poi.get('_anchor') else 'user-named stop'
+                print(f"   OK '{poi['name']}' — {_why}; the scope check does not "
+                      f"remove a stop the listener named (LOCAL-576)")
             elif inside or conf in ("low", "medium"):
                 survivors.append(poi)
                 print(f"   OK '{poi['name']}' — inside '{scope_name}': {reason} (conf={conf})")
@@ -2860,6 +3711,174 @@ def _build_unclassifiable_evidence(location, tour_type):
 
 
 
+def _assemble_overview_tour_text(venue_name, location, tour_type, overview):
+    """[LOCAL-582] Render a museum OVERVIEW (rung 3) as a finished, single-stop tour.
+
+    The venue resolved and its own site was reachable, but no works/exhibitions
+    could be verified. Rather than clean-fail, we deliver ONE honest orientation
+    stop built entirely from the venue's own pages (museum_overview.build_museum_
+    overview). This function wraps that narration in the same tour envelope the
+    rest of the pipeline emits — a title header, a Tour-Category line, and a
+    `Stop 1:` block — so downstream delivery/TTS/DB handle it unchanged.
+
+    The practical facts (hours/admission) are ALREADY sourced-and-dated inside
+    overview.narration (D538 contract, enforced in museum_overview). We also mirror
+    the verified facts onto a `Museum Information:` line when present, so the
+    LOCAL-36 practical_facts_gate downstream recognises them as sourced claims
+    rather than flagging them as invented.
+
+    Returns the complete tour text (str).
+    """
+    _vn = (venue_name or location or 'this museum').strip()
+    _display_category = 'Museum'
+    tour_title = f"Step-by-Step Audio Guided Tour: {location} - {_display_category} Overview"
+    lines = [tour_title, "Tour-Category: Museum", ""]
+
+    # The single orientation stop. Keep the "Stop 1:" shape the whole pipeline
+    # (and the live runner's `^\s*Stop\s+\d+\s*[:\-]` regex) expects.
+    lines.append(f"Stop 1: {_vn} — Overview")
+    lines.append("")
+    lines.append(overview.narration.strip())
+    lines.append("")
+
+    # Mirror the sourced practical sentence onto a Museum Information line so the
+    # practical-facts gate sees it as a sourced claim (it already lives in the
+    # narration verbatim; this is the gate's expected location).
+    if overview.facts_line:
+        lines.append(f"Museum Information: {overview.facts_line}")
+        lines.append("")
+
+    # Sources — venue-own-domain only, so the overview is auditable.
+    if overview.sources:
+        lines.append("Sources (the museum's own pages):")
+        for _u in overview.sources:
+            lines.append(f"  - {_u}")
+        lines.append("")
+
+    return "\n".join(lines).rstrip() + "\n"
+
+
+def _try_deliver_museum_overview(venue_name, location, tour_type, site_url,
+                                 locality, site_language, requested_stops,
+                                 output_file, entity_resolved, site_reachable):
+    """[LOCAL-582] RUNG 3: build + deliver a museum overview, or return None.
+
+    Shared by the two points the museum pipeline would otherwise clean-fail with
+    nothing to show: (a) Phase 3A produced NO candidates for an exhibition/historic
+    venue, and (b) D1v2 verification returned tier 'unresolvable'. In both the
+    venue resolved and (we hope) its own site is reachable.
+
+    Rung 3 fires only when ``entity_resolved and site_reachable and site_url``.
+    On success it SETS the module globals (_LAST_TOUR_KIND='overview',
+    _LAST_TOUR_SUGGESTION, _LAST_OVERVIEW_SOURCES, _LAST_GENERATION_COST,
+    _LAST_STOP_COUNT_NOTICE), clears _LAST_CLEAN_FAIL_EVIDENCE, writes the tour to
+    ``output_file``, and returns the finished tour text. Otherwise returns None and
+    the caller proceeds to rung 4 (LOCAL-580 structured error + suggestion).
+
+    Hours/admission inside the overview are sourced-and-dated (D538), enforced in
+    museum_overview — nothing is invented here.
+    """
+    global _LAST_TOUR_KIND, _LAST_TOUR_SUGGESTION, _LAST_OVERVIEW_SOURCES
+    global _LAST_CLEAN_FAIL_EVIDENCE, _LAST_GENERATION_COST
+
+    if not (entity_resolved and site_reachable and site_url):
+        return None
+
+    try:
+        from museum_overview import build_museum_overview
+        print(f"  [LOCAL-582] RUNG 3 — building museum overview from "
+              f"'{site_url}' (0 verifiable works, site reachable)")
+        overview = build_museum_overview(
+            venue_name=venue_name or location,
+            base_site_url=site_url,
+            locality=locality,
+            venue_language=site_language or 'en',
+        )
+    except Exception as _ov_err:
+        print(f"  [LOCAL-582] overview build failed (falling to rung 4): {_ov_err}")
+        import traceback
+        traceback.print_exc()
+        return None
+
+    if overview is None or overview.is_empty():
+        return None
+
+    ov_text = _assemble_overview_tour_text(venue_name or location, location, tour_type, overview)
+    _LAST_TOUR_KIND = 'overview'
+    _LAST_OVERVIEW_SOURCES = list(overview.sources)
+    try:
+        from actionable_failure import _walking_suggestion, derive_locality
+        _ov_locality = locality or derive_locality(location)
+        _LAST_TOUR_SUGGESTION = _walking_suggestion(_ov_locality) or {}
+    except Exception:
+        _LAST_TOUR_SUGGESTION = {}
+    _set_stop_count_notice(
+        requested_stops, 1, 'overview',
+        "works could not be verified; delivered a sourced museum overview from the "
+        "venue's own site instead of failing")
+    print(f"  [LOCAL-582] OVERVIEW delivered (tour_kind='overview'): 1 stop, "
+          f"{len(overview.sources)} source(s), hours={overview.has_hours} "
+          f"admission={overview.has_admission}; requested {requested_stops} / delivered 1")
+    _LAST_CLEAN_FAIL_EVIDENCE = {}
+    _LAST_GENERATION_COST = {
+        "total_cost": 0.0, "total_tokens": 0, "cache_hit": False,
+        "breakdown": {"llm": 0.0, "tts": 0.0, "search": 0.0},
+    }
+    if output_file:
+        try:
+            with open(output_file, "w", encoding="utf-8") as _ovf:
+                _ovf.write(ov_text)
+        except Exception as _ovw_err:
+            print(f"  [LOCAL-582] could not write overview to {output_file}: {_ovw_err}")
+    return ov_text
+
+
+def _site_first_empty_action(reason, fetch_failed):
+    """[LOCAL-589 D2] Decide what to do when site-first returned NO candidates
+    for a resolved exhibition museum (0 catalogue/SPARQL works).
+
+    This is the no-invention contract, as a pure function so it is unit-testable:
+
+      * A FETCH FAILURE (``fetch_failed`` True, reason 'fetch_failed') — the
+        venue's own site could not be read (timeout/5xx/exception), even after
+        the one retry build_site_first_candidates already performed. We must NOT
+        fall through to Phase 3A, where GPT would INVENT shows. Return
+        ``'overview'`` so the caller takes the LOCAL-582 sourced-overview rung
+        (and, if that is impossible, clean-fails) — GPT may only ever CHOOSE
+        among real site exhibitions, never originate them.
+
+      * reason 'parsed_zero' / 'no_listing_found' — the site WAS reachable and
+        genuinely published no structural exhibitions. Falling through to the
+        existing paths is correct (D577: never turn a working tour into no tour);
+        downstream GPT candidates are still gated by D1v2 against the LOCAL-589
+        chrome-free canonical set. Return ``'fall_through'``.
+
+    Returns 'overview' or 'fall_through'.
+    """
+    if fetch_failed or reason == 'fetch_failed':
+        return 'overview'
+    return 'fall_through'
+
+
+def _site_fill_effective_cap(exhibition_stops_source, n_candidates, total_stops,
+                             headroom=1):
+    """[LOCAL-589 D4] How many candidates to carry through narration.
+
+    For the site_exhibition path, when MORE real current exhibitions exist than
+    were requested, carry a small narration HEADROOM (default one spare real
+    show) so that if one selected show's narration later comes back empty — and
+    the LOCAL-292 empty-stop gate removes it — the tour still delivers the
+    requested count from real exhibitions (the tour is trimmed back to the exact
+    request after that gate). The spare is only ever a REAL extra exhibition;
+    nothing is invented. All other paths keep the plain cap (no headroom).
+
+    Returns the effective cap (>= total_stops).
+    """
+    if exhibition_stops_source == 'site_exhibition' and n_candidates > total_stops:
+        return total_stops + min(headroom, n_candidates - total_stops)
+    return total_stops
+
+
 def _validate_museum_stop_descriptions(poi_list, venue_name, headers):
     """
     PHASE 5.5 — Post-description guard for single-venue museum tours.
@@ -2992,11 +4011,60 @@ from typing import Optional, List, Dict, Any
 # Module-level: populated on unresolvable clean-fail for structured error response
 _LAST_CLEAN_FAIL_EVIDENCE = {}
 
+# [LOCAL-582] Module-level: how the LAST generation was delivered.
+#   'full'     — a normal multi-stop tour (default; LOCAL-580 and before).
+#   'overview' — rung 3: the venue resolved and its own site was reachable, but
+#                no works/exhibitions could be verified, so we delivered a single
+#                sourced ORIENTATION stop from the venue's own pages instead of
+#                clean-failing. The service/DB label the row honestly from this.
+# Declared so the service layer can read tour_kind without changing the engine's
+# return signature — the same pattern as _LAST_GENERATION_COST / _LAST_CLEAN_FAIL_EVIDENCE.
+_LAST_TOUR_KIND = 'full'
+
+# [LOCAL-582] Module-level: the LOCAL-580 actionable suggestion carried on an
+# overview job (the locality walking-tour alternative). Empty dict when none.
+_LAST_TOUR_SUGGESTION = {}
+
+# [LOCAL-582] Module-level: the venue-own-domain source URLs the overview was
+# built from (for the job result / audit). Empty on a non-overview generation.
+_LAST_OVERVIEW_SOURCES = []
+
 # [B1b] Module-level: populated after successful generation with final poi_list (including verified flags)
 _LAST_POI_LIST = []
 
 # Module-level: populated after D1v2 verification with the computed tier
 _LAST_VERIFICATION_TIER = ""
+
+# [LOCAL-593 #4] How PROMINENT is a documented work?
+# The deterministic selector used to order works by source tier only, so within
+# a tier the order was insertion/alphabetical — which is exactly why the Harvard
+# tour's 7 stops were the first 7 works ALPHABETICALLY (A Courtier…, Autumn
+# Landscape…), the museum's obscure holdings rather than its highlights. We now
+# rank by prominence first and fall back to alphabetical only to break ties.
+#
+# Prominence signals, all grounded (no model guess):
+#   * Wikidata sitelinks — how many Wikipedia/Wikimedia editions the work's item
+#     has; a famous work has many, an obscure one has zero.
+#   * Wikipedia / corpus mentions — how often the title appears in the venue's
+#     narrative corpus (its own site + Wikipedia article). A highlight is talked
+#     about; a stored-but-undiscussed object is not.
+#   * On-site "highlight"/"notable works" membership — a catalogue work the
+#     museum itself foregrounds.
+def _work_prominence_score(entry, corpus_text_lower=""):
+    """Higher = more prominent. Deterministic given the inputs."""
+    score = 0
+    try:
+        score += int(entry.get('sitelinks', 0) or 0) * 100
+    except (TypeError, ValueError):
+        pass
+    if corpus_text_lower:
+        for _key in {entry.get('title', ''), entry.get('label_en', '')}:
+            _key = (_key or '').strip().lower()
+            if len(_key) >= 4:
+                score += corpus_text_lower.count(_key) * 5
+    if entry.get('highlight') or entry.get('notable'):
+        score += 50
+    return score
 
 # [LOCAL-60] Module-level: populated after generation with cost breakdown
 # Allows the service layer to read the cost without changing the function signature.
@@ -3957,7 +5025,32 @@ def _verify_works_v2(poi_list, venue_name, exhibition_scope=None):
     _gallery_titles = _filter_result['galleries']
     _excluded_titles = _filter_result['excluded']
     _cross_lang_aliases = _filter_result['aliases']
-    
+
+    # [LOCAL-589 D3] ONE CHROME FILTER, APPLIED TO THE CANONICAL SET EVERYONE
+    # VERIFIES AGAINST. LOCAL-583 ran reject_chrome_titles only on a LOCAL copy
+    # just before the cache write, so the in-memory canonical set that D1v2
+    # verification (match_candidate_to_canonical), R4 replenishment, UNIFIED-FILL,
+    # POST-R4-FILL and LOCAL-577's title-mismatch refill all check against still
+    # held site chrome. That is how the Griffin field run (tour 394) "VERIFIED"
+    # Function Rentals / Calls For Entry / Griffin Salon / Exhibitions Closed /
+    # Arthur Griffin Archive as exhibition stops. Filtering HERE — right after the
+    # LOCAL-24 work/non-work filter and BEFORE corpus_result['canonical_titles']
+    # is set — means the chrome-free set propagates to every one of those paths
+    # from a single point. SPARQL works are inside this union but are themselves
+    # Wikidata-verified show/collection labels and do not read as chrome, so they
+    # are untouched.
+    if canonical_titles:
+        from exhibition_discovery import reject_chrome_titles as _reject_chrome_canon
+        _canon_before = len(canonical_titles)
+        _canonical_kept = _reject_chrome_canon(canonical_titles, venue_name)
+        if len(_canonical_kept) != _canon_before:
+            _canonical_dropped = sorted(set(canonical_titles) - set(_canonical_kept))
+            print(f"  [D1v2] [LOCAL-589] chrome rejected from the canonical SET "
+                  f"(verified-against) : {_canon_before} → {len(_canonical_kept)} "
+                  f"— dropped {_canonical_dropped}")
+        # Preserve set type (downstream does set algebra on canonical_titles).
+        canonical_titles = set(_canonical_kept)
+
     # Store classification in corpus_result for downstream audit
     # CRITICAL: Also update corpus_result['canonical_titles'] so R4 replenishment
     # uses the FILTERED set (prevents excluded titles from being re-verified via R4)
@@ -4313,11 +5406,22 @@ def _verify_works_v2(poi_list, venue_name, exhibition_scope=None):
     if _venue_entity and _venue_entity.qid and not _cache_hit:
         try:
             from venue_resolver import cache_put
+            # [LOCAL-583 D2] Run the canonical-title union through structural
+            # chrome rejection BEFORE it is written to venue_corpus, so the cache
+            # never stores site furniture as a "work". (cache_put also filters as
+            # defense-in-depth.) SPARQL works are left untouched — Wikidata-
+            # verified, not site-scraped.
+            from exhibition_discovery import reject_chrome_titles as _reject_chrome
+            _canon_in = len(canonical_titles) if canonical_titles else 0
+            _canonical_clean = _reject_chrome(canonical_titles, venue_name)
+            if _canon_in != len(_canonical_clean):
+                print(f"  [D1v2] [LOCAL-583] chrome rejected from canonical union before cache write: "
+                      f"{_canon_in} → {len(_canonical_clean)}")
             cache_put(
                 qid=_venue_entity.qid,
                 venue_name=venue_name,
                 official_url=_base_site_url or '',
-                canonical_titles=canonical_titles,
+                canonical_titles=_canonical_clean,
                 story_elements=corpus_result.get('story_elements'),
                 sparql_works=sparql_works,
                 pages=corpus_result.get('pages'),
@@ -5857,7 +6961,34 @@ def _extract_city_from_resolved_entity(venue_entity) -> str:
     return ''
 
 
-def generate_tour_text(location, tour_type, output_file=None, total_stops=None, persona=None, user_id=None, job_id=None, forced_stops=None):
+# [LOCAL-586] Harness marker, built in ONE place so it can be unit-tested and so
+# the implicit-string-concat `* 70` repetition (tour 370: 70 stamped banners) can
+# never return. This marker is written to a tour's output ONLY when a genuine
+# verification-harness caller passes harness=True — never on the listener's own
+# chosen-stops product path (orchestrator → /generate), which leaves harness False.
+# THIS IS A VERIFICATION-HARNESS MARKER — NOT A PRODUCT FEATURE.
+def _build_harness_banner(forced_stops):
+    """Return the FORCED STOPS — VERIFICATION HARNESS banner exactly once.
+
+    Built from a list joined with "\\n" (not adjacent string literals) so no
+    literal is ever left adjacent to a `* N` repeat. Ends with one blank line
+    separating it from the tour body.
+    """
+    _bar = "=" * 70
+    return "\n".join([
+        _bar,
+        "⚠️  FORCED STOPS — VERIFICATION HARNESS (LOCAL-357)",
+        "    This tour was generated with a forced stop list.",
+        "    It is NOT a naturally-selected tour and must not be",
+        "    scored as evidence of selection quality.",
+        f"    Forced: {forced_stops}",
+        _bar,
+        "",
+        "",
+    ])
+
+
+def generate_tour_text(location, tour_type, output_file=None, total_stops=None, persona=None, user_id=None, job_id=None, forced_stops=None, harness=False):
     """
     Generate audio tour text using OpenAI API with geo coordinates.
     
@@ -5873,13 +7004,25 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
         user_id: Optional user_id for cost attribution (LOCAL-323).
                  Threaded to spine_generator for per-operation ledger rows.
         job_id: Optional job correlation ID for cost_meter recording.
-        forced_stops: Optional list of stop names (LOCAL-357 verification harness).
-                 When provided, bypasses Phase 3A candidate generation entirely
-                 and uses these exact stop names in the given order.
-                 Everything downstream (corpus, enrichment, gates) runs unchanged.
-                 The output is stamped with a FORCED STOPS banner so it cannot be
-                 mistaken for a naturally-generated tour.
-                 THIS IS A VERIFICATION HARNESS — NOT A PRODUCT FEATURE.
+        forced_stops: Optional list of stop names. Bypasses Phase 3A candidate
+                 generation entirely and uses these exact stop names in the given
+                 order. Everything downstream (corpus, enrichment, gates) runs
+                 unchanged. Used by BOTH callers:
+                   * the PRODUCT path — a listener's own chosen stops arriving
+                     through the orchestrator / tour-generator /generate endpoint
+                     (LOCAL-523/525/547). This is a real tour: harness is left
+                     False, so NO banner and nothing extra in the content.
+                   * the VERIFICATION HARNESS — run_* measurement scripts and
+                     tests that inject a known stop list to probe the pipeline.
+                     Those pass harness=True to stamp the banner.
+        harness: [LOCAL-586] When True (verification-harness callers ONLY), stamp
+                 a single FORCED STOPS — VERIFICATION HARNESS banner at the top of
+                 the output file so a measured tour cannot be mistaken for a
+                 naturally-generated one. The orchestrator / product user-stops
+                 path NEVER sets this, so a listener's chosen-stops tour carries no
+                 banner and no "not naturally selected" wording. Default False.
+                 THIS BANNER IS A VERIFICATION-HARNESS MARKER — NOT A PRODUCT
+                 FEATURE.
     
     Returns:
         tuple: (tour_text, output_file, coordinates)
@@ -6000,8 +7143,18 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
     # [LOCAL-60] Declare global for cost exposure
     global _LAST_GENERATION_COST
     global _LAST_CLEAN_FAIL_EVIDENCE  # [LOCAL-474] clean-fail evidence set from multiple points
+    global _LAST_TOUR_KIND  # [LOCAL-582] 'full' or 'overview' — declared default below
+    global _LAST_TOUR_SUGGESTION  # [LOCAL-582] actionable suggestion carried on an overview
+    global _LAST_OVERVIEW_SOURCES  # [LOCAL-582] venue-own-domain source URLs for an overview
     global _LAST_POI_LIST  # [LOCAL-326] needed for partial-tour early returns
     global _DIRECT_SNIPPETS_PER_STOP  # [LOCAL-410] Allow generation path to populate search results
+
+    # [LOCAL-582] Reset per-generation delivery kind. Defaults to 'full'; only the
+    # rung-3 overview path flips it to 'overview'. Reset here so a prior overview
+    # cannot leak into the next request's job result.
+    _LAST_TOUR_KIND = 'full'
+    _LAST_TOUR_SUGGESTION = {}
+    _LAST_OVERVIEW_SOURCES = []
 
     # [LOCAL-533] Zero the grounded-request counter for this generation. Grounding
     # (Gemini + Google Search) bills per request and was absent from the printed
@@ -6216,11 +7369,14 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
         # courthouse, town hall, …) is NOT a museum: its stops are places, not
         # catalogued works. Do not let S15 flip it to the artwork pipeline.
         if (intent.get('venue_name') and transport_mode == 'on_foot'
-                and not _EXPLICIT_NON_MUSEUM_TOUR_RE.search(location)
-                and not _MULTI_BUILDING_INSTITUTION_RE.search(location)
-                and not _detect_worship_civic_class(location, tour_type)):
+                and _should_force_museum(location, tour_type, intent, transport_mode)):
             tour_category = 'museum'
-            print(f"  [S15] Forced tour_category=museum from venue_name='{intent['venue_name']}'")
+            if _is_contained_venue_request(location, intent):
+                print(f"  [S15/LOCAL-591] Forced tour_category=museum from venue_name="
+                      f"'{intent['venue_name']}' — request is a tour INSIDE one building "
+                      f"(a theme word is not a different place)")
+            else:
+                print(f"  [S15] Forced tour_category=museum from venue_name='{intent['venue_name']}'")
         else:
             if intent.get('venue_name') and _detect_worship_civic_class(location, tour_type):
                 print(f"  [S15/LOCAL-485] venue_name='{intent['venue_name']}' NOT forced to museum "
@@ -6669,6 +7825,16 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
     # This is the ONLY path that guarantees reproducibility.
     # [LOCAL-362] SUPPRESSED when a scoped request (exhibition/artist filter) is detected.
     _deterministic_fill_used = False
+    # [LOCAL-580] Site-first exhibition capture. When the venue resolves but has
+    # 0 catalogued/SPARQL works (an exhibition museum), we read its CURRENT
+    # EXHIBITIONS from its own site and use those as the candidate stops instead
+    # of letting Phase 3A invent generic shows. Captured here (venue already
+    # resolved for the LOCAL-30 fill) and consumed just below, where
+    # _exhibition_stops_source exists.
+    _museum_site_first_eligible = False  # True only when 0 documented works
+    _museum_site_url = ''
+    _museum_site_language = 'en'
+    _museum_resolved_locality = ''       # for the D4 actionable-failure suggestion
     # Pre-compute scope detection for the early block (full detection runs below)
     _early_scope_detected = False
     if intent and intent.get('venue_name') and tour_category == 'museum':
@@ -6676,6 +7842,10 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
         _early_poi = (intent.get('poi_type') or '').strip().lower()
         # LOCAL-362: Same logic as main scope detection — exact match for poi_type
         _early_poi_is_exhibition = _early_poi in ('exhibit', 'exhibition', 'exhibits')
+        # [LOCAL-591] A generic theme requirement is not a scoped exhibition — do
+        # not suppress the deterministic venue-works bypass for it.
+        if _early_req and _is_generic_theme_requirement(_early_req):
+            _early_req = ''
         if _early_req or _early_poi_is_exhibition:
             _early_scope_detected = True
             print(f"  [LOCAL-362] Scoped request detected (requirements='{_early_req}') — "
@@ -6727,7 +7897,9 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                     _t = w.get('label_local', '') or w.get('label_en', '')
                     _tn = _det_norm(_t)
                     if _t and _tn not in _det_seen_titles_norm:
-                        _det_documented.append({'title': _t, 'source': 'sparql'})
+                        _det_documented.append({'title': _t, 'source': 'sparql',
+                                                'sitelinks': int(w.get('sitelinks', 0) or 0),
+                                                'label_en': w.get('label_en', '')})
                         _det_seen_titles_norm.add(_tn)
                 
                 # Source 3: Cached canonical titles that survived LOCAL-24 filter
@@ -6738,14 +7910,70 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                             _det_documented.append({'title': _ct, 'source': 'canonical'})
                             _det_seen_titles_norm.add(_tn)
                 
-                print(f"  [LOCAL-30] Deterministic selection: {len(_det_documented)} documented works "
-                      f"({len(_det_catalogue_works)} catalogue, {len(_det_sparql_seen_qids)} SPARQL)")
-                
-                # If documented works >= total_stops, fill deterministically
-                if len(_det_documented) >= total_stops:
+                # [LOCAL-583 D1] "Documented" means catalogue + SPARQL ONLY.
+                # Site/wiki-derived canonical titles (source == 'canonical') are
+                # NOT documented works: they came from the venue's own pages (or a
+                # cache row written from them) and, as the Griffin field defect
+                # showed, can be pure site chrome ("Our Team", "Calls For Entry").
+                # They must never (a) trigger the deterministic bypass nor (b)
+                # block the LOCAL-580 site-first path, which only runs when the
+                # museum has 0 catalogue/SPARQL works. Canonical titles remain in
+                # _det_documented only as *fill material* once a documented base
+                # has already earned the bypass.
+                _det_documented_count = sum(
+                    1 for d in _det_documented if d.get('source') in ('catalogue', 'sparql')
+                )
+                _det_canonical_count = len(_det_documented) - _det_documented_count
+                print(f"  [LOCAL-30] Deterministic selection: {_det_documented_count} documented works "
+                      f"({len(_det_catalogue_works)} catalogue, {len(_det_sparql_seen_qids)} SPARQL"
+                      f"; {_det_canonical_count} site/cache canonical title(s) are NOT documented)")
+
+                # [LOCAL-580] An EXHIBITION MUSEUM resolves but has 0 catalogued
+                # works. Capture its site URL + locality so the block below can
+                # read its CURRENT EXHIBITIONS from its own site (site-first
+                # candidates) instead of Phase 3A inventing generic shows, and so
+                # a clean fail can suggest a locality-based alternative (D4).
+                # [LOCAL-583 D1] Eligibility keys on documented (catalogue+SPARQL)
+                # count, NOT on canonical titles — a cache full of site chrome
+                # must not keep the site-first path from running.
+                if _det_documented_count == 0:
+                    _museum_site_first_eligible = True
+                    _museum_site_url = getattr(_det_entity, 'official_url', '') or ''
+                    _museum_site_language = getattr(_det_entity, 'language', 'en') or 'en'
+                    # [LOCAL-580 D4] Remember the locality (city hint from the
+                    # request tail) so a clean fail can suggest a locality-based
+                    # walking tour instead of a dead end.
+                    _museum_resolved_locality = _det_city_hint or ''
+                    print(f"  [LOCAL-580] 0 documented works for '{_museum_venue_name}' — "
+                          f"exhibition-museum site-first path ELIGIBLE "
+                          f"(site='{_museum_site_url}')")
+
+                # If DOCUMENTED works (catalogue+SPARQL) >= total_stops, fill
+                # deterministically. [LOCAL-583 D1] canonical titles do NOT count
+                # toward this threshold — they cannot trigger the bypass alone.
+                if _det_documented_count >= total_stops:
                     # Priority order: catalogue first (richest metadata), then SPARQL, then canonical
                     _priority = {'catalogue': 0, 'sparql': 1, 'canonical': 2}
-                    _det_documented.sort(key=lambda d: _priority.get(d['source'], 9))
+                    # [LOCAL-593 #4] HIGHLIGHT-FIRST ordering. Within each source
+                    # tier, rank by PROMINENCE (Wikidata sitelinks + corpus/Wikipedia
+                    # mention count + on-site highlight flag) and use alphabetical
+                    # order ONLY to break ties. This replaces the old source-only
+                    # sort whose within-tier order was alphabetical — the cause of
+                    # the Harvard tour opening on its 7 most obscure works.
+                    _det_corpus_text_lower = ""
+                    try:
+                        _dc_pages = (_det_cache or {}).get('pages') or []
+                        if isinstance(_dc_pages, list):
+                            _det_corpus_text_lower = '\n'.join(
+                                p.get('text', '') for p in _dc_pages
+                                if isinstance(p, dict) and p.get('text')).lower()
+                    except Exception:
+                        _det_corpus_text_lower = ""
+                    _det_documented.sort(key=lambda d: (
+                        _priority.get(d['source'], 9),
+                        -_work_prominence_score(d, _det_corpus_text_lower),
+                        d['title'].lower(),
+                    ))
                     
                     # Apply bare-noun filter (shouldn't be needed but defence-in-depth)
                     from story_miner import is_bare_generic_noun
@@ -6762,7 +7990,7 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                         print(f"     - {p['name']} [{_src}]")
                     _deterministic_fill_used = True
                 else:
-                    print(f"  [LOCAL-30] Documented works ({len(_det_documented)}) < total_stops ({total_stops}) "
+                    print(f"  [LOCAL-30] Documented works ({_det_documented_count}) < total_stops ({total_stops}) "
                           f"— will use documented as base, GPT fills remainder")
         except Exception as _det_err:
             print(f"  [LOCAL-30] Deterministic selection check failed (falling through to Phase 3A): {_det_err}")
@@ -6877,7 +8105,8 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                 # and none of his three works appeared among the candidates at all.
                 # Mark them here, on the list venue-parts just built.
                 poi_list, _vp_wp_inserted = _apply_named_waypoints(
-                    poi_list, location, _new_poi)
+                    poi_list, location, _new_poi,
+                    anchor_names=list(reversed(named_anchors(user_request)['anchors'])))
                 if _vp_wp_inserted:
                     print(f"  [LOCAL-547] {len(_vp_wp_inserted)} requested stop(s) "
                           f"added to the venue-parts list: {_vp_wp_inserted}")
@@ -7035,6 +8264,15 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
         # 1. requirements is non-empty (primary signal — Phase 1 identified criteria), OR
         # 2. poi_type is exactly "exhibit" or "exhibition" (not "museum exhibits" which is generic)
         _poi_is_exhibition = _scope_poi_type in ('exhibit', 'exhibition', 'exhibits')
+        # [LOCAL-591] A generic THEME requirement ("Art and Architectural tour")
+        # is not a named exhibition — it must not trigger the exhibition-scope
+        # path, or a contained-venue tour clean-fails looking for an exhibition
+        # that does not exist (tours 395/396). Fall back to the venue's works.
+        if _scope_requirements and _is_generic_theme_requirement(_scope_requirements):
+            print(f"  [LOCAL-591] requirements='{_scope_requirements}' is a generic "
+                  f"theme, not a named exhibition — NOT treating this as a scoped "
+                  f"exhibition request; using the venue's documented works.")
+            _scope_requirements = ''
         _is_scoped = bool(_scope_requirements) or _poi_is_exhibition
 
         if _is_scoped:
@@ -7132,6 +8370,104 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
         print(f"OK PHASE 3A parsed {len(poi_list)} candidate POI(s):")
         for p in poi_list:
             print(f"   - {p['name']} [FORCED]")
+    elif (_museum_site_first_eligible and _exhibition_scope is None
+          and not _deterministic_fill_used):
+        # ──── [LOCAL-580] SITE-FIRST EXHIBITION CANDIDATES ────────────────────
+        # The venue resolved but has 0 catalogued works (an exhibition museum).
+        # Read its CURRENT EXHIBITIONS from its own site and use those as the
+        # candidate stops — one stop per show, each sourced from its own detail
+        # page. GPT never invents here. Each POI is page_sourced=True so the
+        # exhibit-museum grounding path (not the permanent-collection D1v2 check)
+        # verifies it against the site text it came from.
+        _phase_timer.start('site_first_exhibitions')
+        try:
+            from exhibition_site_first import build_site_first_candidates, SiteFirstResult
+            _sf_diagnostics = {}
+            _sf_candidates = build_site_first_candidates(
+                base_site_url=_museum_site_url,
+                venue_language=_museum_site_language,
+                total_stops=total_stops,
+                diagnostics=_sf_diagnostics,
+            )
+            if _sf_candidates:
+                poi_list = [_new_poi(c['name'], page_sourced=True) for c in _sf_candidates]
+                for _poi, _c in zip(poi_list, _sf_candidates):
+                    _poi['detail_url'] = _c.get('detail_url', '')
+                    _poi['source'] = 'site_exhibition'
+                _exhibition_stops_source = 'site_exhibition'
+                _deterministic_fill_used = True   # Phase 3A GPT is bypassed
+                # Build a minimal result carrying the combined site text so the
+                # grounding path can confirm each title appears on the site.
+                _exhibition_checklist_result = SiteFirstResult(
+                    page_text='\n\n'.join(c.get('page_text', '') for c in _sf_candidates)
+                )
+                print(f"\nPHASE 3A: SKIPPED (LOCAL-580 site-first — "
+                      f"{len(poi_list)} current exhibition(s) from the venue site)")
+                for _poi in poi_list:
+                    print(f"   - {_poi['name']} [SITE EXHIBITION {_poi.get('detail_url','')}]")
+            else:
+                _sf_reason = _sf_diagnostics.get('reason', 'no_listing_found')
+                _sf_fetch_failed = bool(_sf_diagnostics.get('fetch_failed'))
+                print(f"  [LOCAL-580] Site-first found no current exhibitions "
+                      f"on '{_museum_site_url}' — reason={_sf_reason}")
+                # ──── [LOCAL-589 D2] NO INVENTION FOR EXHIBITION MUSEUMS ────────
+                # The Griffin field defect: a swallowed ReadTimeout made a
+                # transient FETCH FAILURE look like "the site has no shows", and
+                # the run fell through to Phase 3A where GPT INVENTED seven shows
+                # ("The Still Life Collection", "The Annual Juried Exhibition"…),
+                # six of which D1v2 rightly dropped. For a resolved exhibition
+                # museum (0 catalogue/SPARQL works), a fetch failure must NEVER
+                # become GPT invention. The listing fetch has ALREADY been retried
+                # once with a longer timeout inside build_site_first_candidates
+                # (LOCAL-589 D1); if it STILL failed, we take the LOCAL-582 museum
+                # overview rung — a sourced orientation from the venue's own site —
+                # instead of falling through to invention. GPT may only ever CHOOSE
+                # among real site exhibitions, never originate them.
+                _sf_action = _site_first_empty_action(_sf_reason, _sf_fetch_failed)
+                if _sf_action == 'overview':
+                    print(f"  [LOCAL-589] site-first fetch FAILED (reason={_sf_reason}) for "
+                          f"exhibition museum '{_museum_venue_name}' — NOT falling through to "
+                          f"Phase 3A GPT invention; taking the LOCAL-582 overview rung")
+                    _ov_text = _try_deliver_museum_overview(
+                        venue_name=_museum_venue_name, location=location,
+                        tour_type=tour_type, site_url=_museum_site_url,
+                        locality=_museum_resolved_locality,
+                        site_language=_museum_site_language,
+                        requested_stops=_requested_stop_count_original or total_stops,
+                        output_file=output_file,
+                        entity_resolved=True, site_reachable=True)
+                    if _ov_text is not None:
+                        return _ov_text, output_file, (None, None)
+                    # Overview could not be built either (site truly unreachable).
+                    # Clean-fail with structured evidence — still no invention.
+                    print(f"  [LOCAL-589] overview rung also failed — clean-fail "
+                          f"(no GPT-invented stops) for '{_museum_venue_name}'")
+                    _LAST_CLEAN_FAIL_EVIDENCE = {
+                        "error_type": "thin_evidence",
+                        "entity_resolved": True,
+                        "qid": "",
+                        "sparql_works": 0,
+                        "site_reachable": False,
+                        "wikipedia_available": False,
+                        "tier": "unresolvable",
+                        "venue": _museum_venue_name or location,
+                        "locality": _museum_resolved_locality,
+                        "reason": f"site-first {_sf_reason}; overview unavailable",
+                    }
+                    return None, None, (None, None)
+                # reason in {parsed_zero, no_listing_found}: the site WAS reachable
+                # and genuinely published no structural exhibitions. Falling through
+                # to the existing paths is correct here (D577 — never turn a working
+                # tour into no tour); GPT invention is still gated downstream by
+                # D1v2 + the LOCAL-589 chrome-free canonical set.
+                print(f"  [LOCAL-580] reason={_sf_reason} (site reachable, 0 shows) "
+                      f"— falling through to Phase 3A")
+        except Exception as _sf_err:
+            print(f"  [LOCAL-580] Site-first path failed (falling through): {_sf_err}")
+            import traceback
+            traceback.print_exc()
+        finally:
+            _phase_timer.end('site_first_exhibitions')
     elif _exhibition_scope is not None:
         # ──── [LOCAL-364] EXHIBITION CHECKLIST RETRIEVAL ──────────────────────
         _phase_timer.start('exhibition_checklist')
@@ -7586,7 +8922,9 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                     _t = w.get('label_local', '') or w.get('label_en', '')
                     _tn = _det_norm(_t)
                     if _t and _tn not in _det_seen_titles_norm:
-                        _det_documented.append({'title': _t, 'source': 'sparql'})
+                        _det_documented.append({'title': _t, 'source': 'sparql',
+                                                'sitelinks': int(w.get('sitelinks', 0) or 0),
+                                                'label_en': w.get('label_en', '')})
                         _det_seen_titles_norm.add(_tn)
                 
                 # Source 3: Cached canonical titles that survived LOCAL-24 filter
@@ -7597,11 +8935,19 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                             _det_documented.append({'title': _ct, 'source': 'canonical'})
                             _det_seen_titles_norm.add(_tn)
                 
-                print(f"  [LOCAL-30] Deterministic selection: {len(_det_documented)} documented works "
-                      f"({len(_det_catalogue_works)} catalogue, {len(_det_sparql_seen_qids)} SPARQL)")
+                # [LOCAL-583 D1] "Documented" = catalogue + SPARQL ONLY. Canonical
+                # (site/cache) titles are NOT documented works and must not trigger
+                # the deterministic bypass on their own (the Griffin chrome defect).
+                _det_documented_count = sum(
+                    1 for d in _det_documented if d.get('source') in ('catalogue', 'sparql')
+                )
+                _det_canonical_count = len(_det_documented) - _det_documented_count
+                print(f"  [LOCAL-30] Deterministic selection: {_det_documented_count} documented works "
+                      f"({len(_det_catalogue_works)} catalogue, {len(_det_sparql_seen_qids)} SPARQL"
+                      f"; {_det_canonical_count} site/cache canonical title(s) are NOT documented)")
                 
-                # If documented works >= total_stops, fill deterministically
-                if len(_det_documented) >= total_stops:
+                # If DOCUMENTED works (catalogue+SPARQL) >= total_stops, fill deterministically
+                if _det_documented_count >= total_stops:
                     # -------- [LOCAL-284] Corpus-depth tiebreak for museum selection --------
                     # D170 says stop selection stays free — no artificial constraints.
                     # But for a MUSEUM, the candidate set is a closed list of real objects,
@@ -7659,10 +9005,24 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                     # facts). Quality score = sum of non-sludge passages weighted by
                     # source type yield (museum_official 3.0, wikipedia 2.5, etc.).
                     _priority = {'catalogue': 0, 'sparql': 1, 'canonical': 2}
+                    # [LOCAL-593 #4] Add PROMINENCE (sitelinks + corpus mentions +
+                    # highlight flag) as a tie-break ahead of alphabetical, so that
+                    # when two works have equal corpus-quality the more prominent
+                    # one is chosen — never the alphabetically-first obscure work.
+                    _det_corpus_text_lower = ""
+                    try:
+                        _dc_pages = (_det_cache or {}).get('pages') or []
+                        if isinstance(_dc_pages, list):
+                            _det_corpus_text_lower = '\n'.join(
+                                p.get('text', '') for p in _dc_pages
+                                if isinstance(p, dict) and p.get('text')).lower()
+                    except Exception:
+                        _det_corpus_text_lower = ""
                     _det_documented.sort(key=lambda d: (
                         -_depth_map.get(_det_norm(d['title']), 0),
                         _priority.get(d['source'], 9),
-                        d['title'],
+                        -_work_prominence_score(d, _det_corpus_text_lower),
+                        d['title'].lower(),
                     ))
                     
                     # Apply bare-noun filter (shouldn't be needed but defence-in-depth)
@@ -7681,7 +9041,7 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                         print(f"     - {p['name']} [{_src}] (quality={_qscore:.1f})")
                     _deterministic_fill_used = True
                 else:
-                    print(f"  [LOCAL-30] Documented works ({len(_det_documented)}) < total_stops ({total_stops}) "
+                    print(f"  [LOCAL-30] Documented works ({_det_documented_count}) < total_stops ({total_stops}) "
                           f"— will use documented as base, GPT fills remainder")
         except Exception as _det_err:
             print(f"  [LOCAL-30] Deterministic selection check failed (falling through to Phase 3A): {_det_err}")
@@ -7889,6 +9249,38 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
 
             if len(poi_list) == 0:
                 print(f"X PHASE 3A: no usable POIs after parsing")
+                # [LOCAL-582] RUNG 3. An exhibition/historic museum that resolved on
+                # Wikidata (so it IS a real venue) but has 0 catalogued works, no
+                # site-first exhibitions, AND no Phase-3A candidates would otherwise
+                # clean-fail here with nothing to show. If the venue's own site is
+                # reachable, deliver ONE sourced orientation overview instead. We let
+                # build_museum_overview decide reachability (it returns None if no
+                # page could be fetched); _museum_site_first_eligible means the venue
+                # resolved with 0 documented works.
+                if tour_category == 'museum' and _museum_site_first_eligible and _museum_site_url:
+                    _ov_text = _try_deliver_museum_overview(
+                        venue_name=_museum_venue_name, location=location,
+                        tour_type=tour_type, site_url=_museum_site_url,
+                        locality=_museum_resolved_locality,
+                        site_language=_museum_site_language,
+                        requested_stops=_requested_stop_count_original or total_stops,
+                        output_file=output_file,
+                        entity_resolved=True, site_reachable=True)
+                    if _ov_text is not None:
+                        return _ov_text, output_file, (None, None)
+                    # No usable site -> rung 4: record structured evidence so the
+                    # service layer surfaces the LOCAL-580 error + locality suggestion.
+                    _LAST_CLEAN_FAIL_EVIDENCE = {
+                        "error_type": "thin_evidence",
+                        "entity_resolved": True,
+                        "qid": "",
+                        "sparql_works": 0,
+                        "site_reachable": False,
+                        "wikipedia_available": False,
+                        "tier": "unresolvable",
+                        "venue": _museum_venue_name or location,
+                        "locality": _museum_resolved_locality,
+                    }
                 return None, None, (None, None)
 
             print(f"OK PHASE 3A parsed {len(poi_list)} candidate POI(s):")
@@ -7964,9 +9356,22 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
         if _named_venues:
             print(f"  [LOCAL-557] Restaurant request names {_named_venues} "
                   f"— the listener's stops, not a theme")
+        # [LOCAL-576] Route anchors from "from X to Y via A & B" / "loop from X".
+        # Extracted from the ORIGINAL request (user_request), not the stripped
+        # location — the structure and the region (", MA") live in the sentence
+        # the listener typed. Marked user_explicit AND _anchor so PHASE 5.6 cannot
+        # remove them: a start/end/via the listener named is not "outside" the
+        # route it defines.
+        _lr576 = named_anchors(user_request)
+        _lr576_anchors = _lr576['anchors']
+        if _lr576_anchors:
+            print(f"  [LOCAL-576] named anchors: {_lr576_anchors} "
+                  f"start={_lr576['start']!r} end={_lr576['end']!r} "
+                  f"is_loop={_lr576['is_loop']}")
         # Inserted at index 0 one by one, so reverse to keep the request's order.
         poi_list, _wp_inserted = _apply_named_waypoints(
-            poi_list, location, _new_poi, extra=list(reversed(_named_venues)))
+            poi_list, location, _new_poi, extra=list(reversed(_named_venues)),
+            anchor_names=list(reversed(_lr576_anchors)))
         if _wp_inserted:
             print(f"  [LOCAL-547] {len(_wp_inserted)} requested stop(s) were missing "
                   f"from every fill path and were inserted: {_wp_inserted}")
@@ -7982,7 +9387,7 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
             # exhibition page. These works are already grounded by their source — 
             # verifying them against SPARQL/Wikidata would reject exhibition-specific
             # works that aren't individually catalogued in the museum's permanent collection.
-            if _exhibition_stops_source in ('checklist', 'partial', 'prose_llm'):
+            if _exhibition_stops_source in ('checklist', 'partial', 'prose_llm', 'site_exhibition'):
                 # [D532] The condition no longer includes `_deterministic_fill_used`.
                 # That flag describes the RUN, so one appended Phase 3A candidate used
                 # to drag the venue's own works into the permanent-collection check
@@ -8072,18 +9477,56 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                 _LAST_VERIFICATION_TIER = _verification_tier
             else:
                 # Try new story_miner-based verification (T0a/T1)
-                # Pass full location string so D1v2 can parse city for venue disambiguation
+                # Pass the clean venue name plus the city, so D1v2 can parse city
+                # for venue disambiguation.
                 _d1v2_venue_arg = _museum_venue_name
                 if ',' not in _d1v2_venue_arg and ',' in _location_normalized:
-                    # Append city/state from location if venue name alone lacks it
-                    _d1v2_venue_arg = _location_normalized
+                    # [LOCAL-591] Append ONLY the city/state tail from the location —
+                    # never the whole request string. Tours 395/396: _museum_venue_name
+                    # was the clean 'Boston Athenaeum' but this branch replaced it with
+                    # the full location 'Art and Architectual in Boston Athenaeum, boston,
+                    # ma', so D1v2 then resolved the theme-prefixed phrase
+                    # 'Art and Architectual in Boston Athenaeum', found no Wikidata
+                    # candidate, and clean-failed 'unresolvable' — even though the venue
+                    # had already resolved (Q478013) and SPARQL had returned 6 works.
+                    # The venue name is NOT in the request's leading words; the city is in
+                    # its trailing comma segments. Append those.
+                    _loc_segs = [s.strip() for s in _location_normalized.split(',') if s.strip()]
+                    _city_tail = ', '.join(_loc_segs[1:]) if len(_loc_segs) >= 2 else ''
+                    _d1v2_venue_arg = f"{_museum_venue_name}, {_city_tail}" if _city_tail else _museum_venue_name
                 _d1v2_result = _verify_works_v2(poi_list, _d1v2_venue_arg, exhibition_scope=_exhibition_scope)
                 if isinstance(_d1v2_result, VerificationResult):
                     _verification_tier = _d1v2_result.tier
                     _LAST_VERIFICATION_TIER = _verification_tier
                     if _d1v2_result.tier == 'unresolvable':
-                        # Clean fail with structured error
-                        print(f"  [D1] Tier: unresolvable — clean fail (entity={_d1v2_result.entity_resolved}, sparql={_d1v2_result.sparql_count})")
+                        # [LOCAL-582] RUNG 3 OF THE LADDER (D607). The venue resolved
+                        # and its own site is reachable, but no works/exhibitions
+                        # could be verified. This used to clean-fail. Michael,
+                        # 2026-10-05: "if there is no information at all we should
+                        # still generate a summary with the information available on
+                        # the museum link." Deliver ONE sourced orientation stop from
+                        # the venue's OWN pages (hours/admission only with a source,
+                        # dated — the D538 contract). If no usable site, fall through
+                        # to rung 4: the LOCAL-580 structured error + suggestion.
+                        print(f"  [D1] Tier: unresolvable (entity={_d1v2_result.entity_resolved}, "
+                              f"site_reachable={_d1v2_result.site_reachable}, "
+                              f"sparql={_d1v2_result.sparql_count})")
+                        _ov_text = _try_deliver_museum_overview(
+                            venue_name=_museum_venue_name, location=location,
+                            tour_type=tour_type,
+                            site_url=_museum_site_url or getattr(_d1v2_result, 'official_url', ''),
+                            locality=_museum_resolved_locality,
+                            site_language=_museum_site_language,
+                            requested_stops=_requested_stop_count_original or total_stops,
+                            output_file=output_file,
+                            entity_resolved=_d1v2_result.entity_resolved,
+                            site_reachable=_d1v2_result.site_reachable)
+                        if _ov_text is not None:
+                            return _ov_text, output_file, (None, None)
+
+                        # RUNG 4: no usable site (or overview empty) — clean fail with
+                        # the LOCAL-580 structured error + locality suggestion.
+                        print(f"  [D1] Tier: unresolvable — clean fail (rung 4; no usable site)")
                         _LAST_CLEAN_FAIL_EVIDENCE = {
                             "error_type": "thin_evidence",
                             "entity_resolved": _d1v2_result.entity_resolved,
@@ -8095,6 +9538,8 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                             # [LOCAL-485] Name the venue so the service layer can say
                             # WHICH venue lacked material, instead of a catch-all.
                             "venue": _museum_venue_name or location,
+                            # [LOCAL-580 D4] Locality for the actionable suggestion.
+                            "locality": _museum_resolved_locality,
                         }
                         return None, None, (None, None)
                     # Extract fields from VerificationResult
@@ -8211,6 +9656,8 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                         "tier": "unresolvable",
                         # [LOCAL-485] Name the venue so the service layer can say which.
                         "venue": _museum_venue_name or location,
+                        # [LOCAL-580 D4] Locality for the actionable suggestion.
+                        "locality": _museum_resolved_locality,
                     })
                     return None, None, (None, None)
 
@@ -8378,7 +9825,19 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                     break
             
             if len(poi_list) < total_stops:
-                print(f"  [R4] Replenishment exhausted: {len(poi_list)}/{total_stops} stops (stop_count_warning)")
+                # [LOCAL-577] R4 re-runs until the count is met or the pool is truly
+                # exhausted — say WHICH, so a shortfall is never silent.
+                if _r4_suppressed_by_scope:
+                    _r4_why = "suppressed by exhibition scope (D275 — no venue-wide backfill)"
+                elif _r4_round >= _R4_MAX_ROUNDS:
+                    _r4_why = f"hit the {_R4_MAX_ROUNDS}-round cap"
+                elif len(_r4_all_tried_names) >= _R4_MAX_CANDIDATES:
+                    _r4_why = f"tried the {_R4_MAX_CANDIDATES}-candidate ceiling"
+                else:
+                    _r4_why = "the model returned no further new, verifiable works"
+                print(f"  [R4] Replenishment exhausted: {len(poi_list)}/{total_stops} stops "
+                      f"(stop_count_warning) — stopped because {_r4_why}; "
+                      f"{len(_r4_all_dropped_pois)} R4 candidate(s) failed canonical match")
             else:
                 print(f"  [R4] Target reached: {len(poi_list)}/{total_stops} stops")
 
@@ -8477,63 +9936,68 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                               f"(tier={_verification_tier}, {_tier_label}, "
                               f"total now {len(poi_list)}/{total_stops})")
 
+            # -------- [LOCAL-577] Title-mismatch refill (hedged, last resort) --------
+            # After R4 and both fills, a museum tour can still be short because D1v2
+            # dropped a REAL stop on a canonical-TITLE mismatch ("no canonical match")
+            # — a work the existence gate accepted but our Wikidata/site corpus could
+            # not line a title up for — and every ordinary fill is verified=False, so
+            # the LOCAL-16 GATE below strips it. Re-admit ONLY those title-mismatch
+            # drops, hedged (verified=False) and tagged _title_mismatch_refill so the
+            # gate exempts them, exactly as a listener-named stop is exempt (LOCAL-547).
+            # Never REJECTED (wrong venue), never theme/cycle words, never non-existence.
+            if tour_category == 'museum' and len(poi_list) < total_stops:
+                _tm_needed = total_stops - len(poi_list)
+                # [LOCAL-580] FABRICATION GUARD: a title-mismatch drop is only a
+                # real stop if it actually exists. Build an existence check so an
+                # invented title (Griffin's "The American Dream") is never
+                # re-admitted, while a real work the corpus just didn't name
+                # (Palais's "The Adoration of the Magi") still is. Definitive
+                # absence (verified=False, not a search failure) blocks; anything
+                # inconclusive returns None and does NOT block (D162).
+                def _tm_exists_fn(_cand_name):
+                    try:
+                        from stop_existence_gate import (get_gate_mode as _eg_mode,
+                                                         verify_stop_existence as _eg_verify)
+                        if _eg_mode() == 'off':
+                            return None  # gate disabled → inconclusive, never absence
+                        try:
+                            from venue_resolver import _get_db_connection as _eg_conn_fn
+                            _eg_conn = _eg_conn_fn()
+                        except Exception:
+                            return None  # no DB → inconclusive
+                        _v = _eg_verify(_cand_name, _museum_venue_name or location,
+                                        _eg_conn, tour_type=tour_type)
+                        if _v.get('search_failed'):
+                            return None  # D162: a search that did not run is not absence
+                        return bool(_v.get('verified'))
+                    except Exception:
+                        return None  # any failure → inconclusive, never block a real stop
+                _tm_pool = _title_mismatch_refill_pool(
+                    _d1_evidence_log, _pre_d1v2_candidates, poi_list,
+                    venue_name=_museum_venue_name, exists_fn=_tm_exists_fn)
+                _tm_added = _tm_pool[:_tm_needed]
+                if _tm_added:
+                    poi_list = list(poi_list) + _tm_added
+                    print(f"  [LOCAL-577 REFILL] Re-admitted {len(_tm_added)} stop(s) D1v2 dropped "
+                          f"on a canonical-title mismatch (hedged, verified=False, "
+                          f"total now {len(poi_list)}/{total_stops}):")
+                    for _tp in _tm_added:
+                        print(f"      ↩ {_tp['name']} — real stop, title not in canonical corpus (D592 hedge)")
+                else:
+                    print(f"  [LOCAL-577 REFILL] No title-mismatch drops available to refill "
+                          f"({len(poi_list)}/{total_stops} stops — pool truly exhausted)")
+
             # -------- [LOCAL-16 GATE] D1v2-verified-only filter for museum tours --------
             # No unverified stop may reach Phase 5 for museum tours. This is the
             # centralized choke-point: after ALL candidate-gathering (R4, UNIFIED-FILL,
-            # POST-R4-FILL), strip anything not D1v2-verified. Accept honest shortfall.
-            # Also deduplicates by canonical title (round 3 finding).
+            # POST-R4-FILL, LOCAL-577 title-mismatch refill), strip anything not
+            # D1v2-verified EXCEPT the listener-named (user_explicit) and the hedged
+            # title-mismatch refill (_title_mismatch_refill). Also dedups by canonical
+            # title. Implemented as the module-level _local16_gate_survivors() so the
+            # exact survivor logic is unit-tested directly (D277).
             if tour_category == 'museum':
                 _pre_gate_count = len(poi_list)
-                _seen_canonical = set()
-                _gate_survivors = []
-                _gate_removed = []
-
-                # Build a reverse lookup: normalized poi name → canonical_title
-                # D1v2 renames poi['name'] to the canonical form, so the evidence_log
-                # key (original GPT name) differs from poi['name']. We need to find
-                # the canonical_title for each poi by checking:
-                #   1. Direct key lookup (works for R4 stops)
-                #   2. Canonical_title match (works for D1v2 renamed stops)
-                def _find_canonical_for_poi(poi_name):
-                    """Find the canonical title for a poi by any method."""
-                    # Direct lookup (R4 uses poi name as key)
-                    ev = _d1_evidence_log.get(poi_name, {})
-                    if isinstance(ev, dict) and ev.get('canonical_title'):
-                        return ev['canonical_title']
-                    # Reverse lookup: poi was renamed TO canonical, so check if
-                    # any evidence entry has canonical_title matching poi_name
-                    _poi_norm = _normalize_name(poi_name)
-                    for _key, _val in _d1_evidence_log.items():
-                        if isinstance(_val, dict) and _val.get('status') == 'VERIFIED':
-                            _ct = _val.get('canonical_title', '')
-                            if _ct and _normalize_name(_ct) == _poi_norm:
-                                return _ct
-                    return None
-
-                for p in poi_list:
-                    # [LOCAL-547] A stop the listener NAMED is exempt from the
-                    # verified-only gate. LOCAL-546's restore puts it back with
-                    # verified=False precisely so the narration hedges; this gate
-                    # would then delete it again one screen later, and Igor would
-                    # once more be told what he wanted to see. Michael, 2026-09-21:
-                    # state the precondition, never drop the stop.
-                    if p.get('user_explicit'):
-                        _gate_survivors.append(p)
-                        continue
-                    # Check verification status
-                    if not p.get('verified', True):
-                        _gate_removed.append(p['name'])
-                        continue
-                    # Canonical-title dedup: if two stops map to the same canonical,
-                    # keep only the first one encountered
-                    _canon = _find_canonical_for_poi(p['name'])
-                    if _canon:
-                        _canon_norm = _normalize_name(_canon)
-                        if _canon_norm in _seen_canonical:
-                            _gate_removed.append(f"{p['name']} (dup canonical: {_canon})")
-                            continue
-                        _seen_canonical.add(_canon_norm)
-                    _gate_survivors.append(p)
+                _gate_survivors, _gate_removed = _local16_gate_survivors(poi_list, _d1_evidence_log)
 
                 if _gate_removed:
                     print(f"  [LOCAL-16 GATE] D1v2-verified-only filter for museum tour")
@@ -8541,7 +10005,8 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                     for _rm in _gate_removed:
                         print(f"      ✗ {_rm}")
                     poi_list = _gate_survivors
-                    print(f"    After: {len(poi_list)} verified stop(s)")
+                    print(f"    After: {len(poi_list)} stop(s) survive "
+                          f"(verified + hedged refill + named)")
                     if len(poi_list) < total_stops:
                         print(f"    [LOCAL-16 GATE] Accepting honest shortfall: {len(poi_list)}/{total_stops} stops")
                         # Cap total_stops to prevent Part C and other downstream loops
@@ -8556,7 +10021,8 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                         })
                         return None, None, (None, None)
                 else:
-                    print(f"  [LOCAL-16 GATE] All {len(poi_list)} stops are D1v2-verified ✓")
+                    poi_list = _gate_survivors
+                    print(f"  [LOCAL-16 GATE] All {len(poi_list)} stops cleared the gate ✓")
 
         # -------- [BLOCKER 1] Single-venue validation --------
         # For a named single museum, check if POIs look like other museums/venues
@@ -8717,6 +10183,13 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
         # he named by hand had no protection from either gate.
         for _wp in named_waypoints(location):
             _explicit_stop_names.add(_normalize_name(_wp))
+        # [LOCAL-576] Route anchors ("from X to Y via A & B" / "loop from X") are
+        # user-explicit too. Crystal Lake was deleted here on tour 388 because its
+        # address geocodes to "Newton, MA" and the request string said "MA": a place
+        # the listener NAMED as the start of the route was removed by a locality
+        # string test. Anchors are extracted from the original request.
+        for _a in named_anchors(user_request)['anchors']:
+            _explicit_stop_names.add(_normalize_name(_a))
         if _explicit_stop_names:
             print(f"   [D536] User-explicit stops from waypoint phrasing: {_explicit_stop_names}")
         _explicit_match = re.search(r'(?:with\s+)?stops\s+(?:at|:)\s*(.+?)(?:,\s*(?:[A-Z]{2})\s*$|$)', location, re.IGNORECASE)
@@ -8745,8 +10218,14 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
             for p in poi_list:
                 p_norm = _normalize_name(p['name'])
                 # Skip address check for user-explicit stops
-                if p_norm in _explicit_stop_names:
-                    print(f"   PHASE 3C: KEPT '{p['name']}' (user-explicit stop, address check bypassed)")
+                # [LOCAL-576] Honour the flag on the POI as well as the name set:
+                # an inserted anchor carries user_explicit/_anchor directly, and a
+                # candidate whose name differs slightly from the request wording
+                # (e.g. "Crystal Lake Park" vs the request's "Crystal Lake") is
+                # protected by the flag even if the normalized name does not match.
+                if p.get('user_explicit') or p.get('_anchor') or p_norm in _explicit_stop_names:
+                    _why = 'anchor' if p.get('_anchor') else 'user-explicit'
+                    print(f"   PHASE 3C: KEPT '{p['name']}' ({_why} stop, address check bypassed)")
                     continue
                 if not _address_matches_location(p.get('address', ''), location):
                     location_rejects.append(p)
@@ -9524,8 +11003,24 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
         # ──── END LOCAL-320 INCONCLUSIVE REPLACEMENT ──────────────────────────
 
         # Hard cap and final sanity
-        if len(poi_list) > total_stops:
-            poi_list = poi_list[:total_stops]
+        # [LOCAL-589 D4] FILL THE COUNT FROM REAL EXHIBITIONS. The Griffin field
+        # case: 9 real current shows exist, 7 are requested, but if ONE selected
+        # show's narration later comes back empty, the LOCAL-292 empty-stop gate
+        # removes it and the tour ships 6. When the stops are REAL site
+        # exhibitions (site_exhibition) and MORE of them exist than requested, we
+        # carry a small narration headroom (one spare real show) past this cap so
+        # a single empty-narration removal still leaves the requested count; the
+        # tour is trimmed back to exactly the requested number AFTER the LOCAL-292
+        # gate. Headroom is only taken when extra REAL exhibitions are available —
+        # never invented, and other tour paths are untouched.
+        _effective_cap = _site_fill_effective_cap(
+            _exhibition_stops_source, len(poi_list), total_stops)
+        if _effective_cap > total_stops:
+            print(f"  [LOCAL-589] site-first fill headroom: carrying {_effective_cap} real "
+                  f"exhibition(s) through narration for a {total_stops}-stop request "
+                  f"(spare {_effective_cap - total_stops} covers an empty-narration drop)")
+        if len(poi_list) > _effective_cap:
+            poi_list = poi_list[:_effective_cap]
         if len(poi_list) == 0:
             print(f"X All POIs were filtered out; cannot continue")
             return None, None, (None, None)
@@ -9770,8 +11265,11 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
             if _official_url_for_info:
                 try:
                     from visitor_facts_extractor import fetch_visitor_info_with_provenance
+                    # [LOCAL-584 r2] Pass the venue name so hours/closed-days bind to
+                    # the venue's own section, not a satellite gallery's block.
                     _provenance_result = fetch_visitor_info_with_provenance(
-                        _official_url_for_info, language="en")
+                        _official_url_for_info, language="en",
+                        venue_name=_museum_venue_name)
                     _sourced_visitor_info = _provenance_result.formatted_info
                     _visitor_info_source_url = _provenance_result.source_url
                     _visitor_info_source_text = _provenance_result.source_text
@@ -9807,7 +11305,8 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                         _en_sig = sum(1 for w in ['closed', 'hours', 'admission', 'open', 'free', 'tuesday']
                                       if w in _cp_lower)
                         _cp_lang = "en" if _en_sig > _fr_sig else "fr"
-                        _cp_facts = extract_visitor_facts_from_text(_cp_text, _cp_lang)
+                        _cp_facts = extract_visitor_facts_from_text(
+                            _cp_text, _cp_lang, venue_name=_museum_venue_name)
                         # Score: admission with price is critical
                         _cp_score = 0
                         _cp_score += min(len(_cp_facts.hours), 2) * 2
@@ -9826,11 +11325,36 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                     if _best_corpus_facts and not _best_corpus_facts.is_empty():
                         _formatted = _best_corpus_facts.format_en()
                         if _formatted and len(_formatted) >= 10:
-                            _sourced_visitor_info = _formatted
-                            _visitor_info_source_url = _best_corpus_page_url
-                            _visitor_info_source_text = _best_corpus_page_text[:10000]
-                            print(f"  [LOCAL-91] Corpus fallback: visitor info extracted from {_best_corpus_page_url}")
-                            print(f"  [LOCAL-91] Corpus fallback Museum Information: {_formatted}")
+                            # [LOCAL-584] ONE gate for every path. The corpus fallback
+                            # used to write format_en() straight onto Museum Information
+                            # with NO verification — that is how tour 391 (Griffin Museum,
+                            # Winchester MA) shipped "08:00–20:00. €12", neither on its
+                            # $-priced, AM/PM page. Route the formatted facts through the
+                            # shared literal gate (verify_claim_against_source +
+                            # claim_tokens_in_source); unsupported segments are DROPPED and
+                            # LOGGED. Only what the page literally supports survives.
+                            _gated = _formatted
+                            try:
+                                from practical_facts_gate import gate_formatted_facts
+                                _gated, _dropped = gate_formatted_facts(
+                                    _formatted,
+                                    _best_corpus_page_text[:10000],
+                                    source_url=_best_corpus_page_url,
+                                    log=lambda m: print(f"  {m}"),
+                                )
+                            except Exception as _gate_err:
+                                print(f"  [LOCAL-584] gate unavailable, dropping corpus facts "
+                                      f"to stay safe (non-fatal): {_gate_err}")
+                                _gated = ''
+                            if _gated and len(_gated) >= 10:
+                                _sourced_visitor_info = _gated
+                                _visitor_info_source_url = _best_corpus_page_url
+                                _visitor_info_source_text = _best_corpus_page_text[:10000]
+                                print(f"  [LOCAL-91] Corpus fallback: visitor info extracted from {_best_corpus_page_url}")
+                                print(f"  [LOCAL-91] Corpus fallback Museum Information: {_gated}")
+                            else:
+                                print(f"  [LOCAL-584] Corpus fallback facts did not survive the "
+                                      f"literal gate — Museum Information OMITTED (was: {_formatted!r})")
                 except ImportError:
                     print(f"  [LOCAL-91] visitor_facts_extractor not available for corpus fallback")
                 except Exception as _cf_err:
@@ -9953,20 +11477,49 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                 _osm_city = _extract_city(location)
                 if _osm_city:
                     _venue_hint = 'museum' if tour_category == 'museum' else ''
-                    print(f"  [LOCAL-355] Querying OSM for venue facts (city: {_osm_city}, hint: {_venue_hint or 'auto'})")
+                    # [LOCAL-583 D3] Exhibit-museum stops are EXHIBITIONS, not
+                    # mappable OSM objects. OpenStreetMap has no node for a
+                    # temporary show ("Intertidal : Field Notes") any more than it
+                    # has one for a pulpit (the D569 church-tour defect: N Overpass
+                    # calls, every one a 504/timeout, ~200s wasted). The practical
+                    # facts a listener needs here — admission, hours — belong to
+                    # the MUSEUM BUILDING, so we query OSM ONCE for the venue and
+                    # share its facts across the exhibition stops, instead of
+                    # firing one doomed Overpass query per show name.
+                    _stops_are_exhibitions = (
+                        _exhibition_stops_source in ('site_exhibition', 'checklist', 'partial')
+                        or any(p.get('source') == 'site_exhibition' for p in poi_list)
+                    )
                     _osm_source_texts_355 = []
                     _osm_source_urls_355 = []
-                    for poi in poi_list:
-                        _osm_facts = fetch_osm_venue_facts(poi['name'], _osm_city, venue_hint=_venue_hint)
-                        if not _osm_facts.is_empty():
-                            # Only replace if no visitor info was already sourced (LOCAL-34/39)
-                            if not poi.get('operational_details'):
-                                poi['operational_details'] = _osm_facts.format_practical_sentence()
-                            _osm_source_texts_355.append(_osm_facts.source_text)
-                            _osm_source_urls_355.append(_osm_facts.source_url)
-                            print(f"  [LOCAL-355] {poi['name']}: sourced → {_osm_facts.format_practical_sentence()}")
+                    if _stops_are_exhibitions:
+                        _venue_query_name = _museum_venue_name or venue_name
+                        print(f"  [LOCAL-355] [LOCAL-583] Exhibit-museum: querying OSM ONCE for the "
+                              f"museum building '{_venue_query_name}' (not per-exhibition — a show has no OSM node)")
+                        _venue_osm = fetch_osm_venue_facts(_venue_query_name, _osm_city, venue_hint='museum')
+                        if not _venue_osm.is_empty():
+                            _venue_sentence = _venue_osm.format_practical_sentence()
+                            for poi in poi_list:
+                                if not poi.get('operational_details'):
+                                    poi['operational_details'] = _venue_sentence
+                            _osm_source_texts_355.append(_venue_osm.source_text)
+                            _osm_source_urls_355.append(_venue_osm.source_url)
+                            print(f"  [LOCAL-355] museum building: sourced → {_venue_sentence}")
                         else:
-                            print(f"  [LOCAL-355] {poi['name']}: no practical facts in OSM")
+                            print(f"  [LOCAL-355] museum building: no practical facts in OSM")
+                    else:
+                        print(f"  [LOCAL-355] Querying OSM for venue facts (city: {_osm_city}, hint: {_venue_hint or 'auto'})")
+                        for poi in poi_list:
+                            _osm_facts = fetch_osm_venue_facts(poi['name'], _osm_city, venue_hint=_venue_hint)
+                            if not _osm_facts.is_empty():
+                                # Only replace if no visitor info was already sourced (LOCAL-34/39)
+                                if not poi.get('operational_details'):
+                                    poi['operational_details'] = _osm_facts.format_practical_sentence()
+                                _osm_source_texts_355.append(_osm_facts.source_text)
+                                _osm_source_urls_355.append(_osm_facts.source_url)
+                                print(f"  [LOCAL-355] {poi['name']}: sourced → {_osm_facts.format_practical_sentence()}")
+                            else:
+                                print(f"  [LOCAL-355] {poi['name']}: no practical facts in OSM")
                     if _osm_source_texts_355:
                         # Append to existing source text (don't overwrite LOCAL-34 website sources)
                         _osm_355_combined = "\n\n".join(_osm_source_texts_355)
@@ -11465,6 +13018,84 @@ Exempt: navigation directions ("Turn left", "Continue past").
             with open(output_file, "w", encoding="utf-8") as _pf:
                 _pf.write(_partial_tour)
         return _partial_tour, output_file, first_poi_coordinates
+
+    # ============================================================
+    # [LOCAL-576] Pin the delivered order to the route the listener named FIRST,
+    # so the start anchor sits at index 0 before the scope check runs: PHASE 5.6
+    # keeps stop 0 unconditionally for graceful degradation, and that protected
+    # slot must be the stop the LISTENER named as the start, never a stop WE chose
+    # that happens to be first in the candidate list. loop/from-X starts at X,
+    # from-X-to-Y ends at Y, via-points keep the listener's order. Position-only —
+    # never adds or drops.
+    _lr576_order_info = named_anchors(user_request)
+    if _lr576_order_info.get('anchors'):
+        _lr576_pre = [p.get('name', '') for p in poi_list]
+        poi_list = _order_by_anchors(poi_list, _lr576_order_info)
+        _lr576_post = [p.get('name', '') for p in poi_list]
+        if _lr576_pre != _lr576_post:
+            print(f"  [LOCAL-576] Route order pinned to named anchors "
+                  f"(start={_lr576_order_info['start']!r}, end={_lr576_order_info['end']!r}, "
+                  f"loop={_lr576_order_info['is_loop']}): {_lr576_post}")
+
+    # ============================================================
+    # [LOCAL-576] SCOPE CHECK **BEFORE WRITING**, then REPLENISH.
+    # ============================================================
+    # Tour 388 delivered 4 of 5 because North End was SELECTED, written in full
+    # (gpt-4.1, $0.03), and only then removed by PHASE 5.6 — far too late to be
+    # replaced, so the tour just got shorter. The scope verdict was right; it ran
+    # after the money was spent. Michael, 2026-10-04: "the scope verdict is right;
+    # it runs too late."
+    #
+    # Run the SAME containment check (same resolver, same function) here, before a
+    # single description is written, so a stop we chose that is out of scope is
+    # dropped while it is still cheap, and the replenishment loop refills the count
+    # from the candidate pool. Anchors are exempt inside _validate_stops_within_scope
+    # (a place the listener named cannot be "outside" the route it defines), so this
+    # never touches Crystal Lake, Commonwealth Avenue Mall, Boston Common or Paul
+    # Revere Park — only the stops WE picked.
+    #
+    # Museums keep their own venue guard (PHASE 5.5b) and are excluded, exactly as
+    # _resolve_scope_for_check already decides.
+    _lr576_prewrite_ran = False
+    if tour_category not in ('museum', 'facility'):
+        _lr576_scope = _resolve_scope_for_check(intent, location, tour_category,
+                                                _museum_venue_name, quiet=True)
+        if _lr576_scope and poi_list:
+            _lr576_prewrite_ran = True
+            _lr576_want = _requested_stop_count_original or len(poi_list)
+            _lr576_before = len(poi_list)
+            print(f"\n  [LOCAL-576] Pre-writing scope check against '{_lr576_scope}' "
+                  f"({_lr576_before} stop(s), want {_lr576_want})...")
+            poi_list = _validate_stops_within_scope(poi_list, _lr576_scope, headers)
+            _lr576_removed = _lr576_before - len(poi_list)
+            if _lr576_removed > 0:
+                print(f"  [LOCAL-576] Pre-writing scope check removed {_lr576_removed} "
+                      f"out-of-scope stop(s) BEFORE any description was written — "
+                      f"replenishing to {_lr576_want}.")
+                try:
+                    from restaurant_practicals import propose_replacements as _lr576_propose_fn
+                    _lr576_seen = {(p.get('name') or '').lower() for p in poi_list}
+
+                    def _lr576_propose(_need, _seen):
+                        return _lr576_propose_fn(location, list(_seen), _need, api_key,
+                                                 kind='places to visit')
+
+                    _lr576_added, _lr576_rej, _lr576_rounds = replenish_to_count(
+                        poi_list, _lr576_want, _lr576_scope, headers,
+                        propose=_lr576_propose, make_poi=_new_poi, seen=_lr576_seen)
+                    print(f"  [LOCAL-576] Replenished {_lr576_added} stop(s) in "
+                          f"{_lr576_rounds} round(s); {_lr576_rej} rejected for scope. "
+                          f"Now {len(poi_list)}/{_lr576_want}.")
+                    # Replenished stops were appended to the end — re-pin the order so
+                    # the end anchor stays last and the start anchor stays first.
+                    if _lr576_added:
+                        poi_list = _order_by_anchors(poi_list, _lr576_order_info)
+                except Exception as _lr576_e:
+                    print(f"  [LOCAL-576] Replenishment unavailable ({_lr576_e}) — "
+                          f"delivering {len(poi_list)} verified stop(s).")
+            else:
+                print(f"  [LOCAL-576] Pre-writing scope check: all {_lr576_before} "
+                      f"stop(s) within '{_lr576_scope}'.")
 
     # PHASE 5: Generate detailed descriptions for each POI (parallelized)
     _phase_timer.start('narration')
@@ -16523,7 +18154,16 @@ REWRITE RULES (all mandatory):
         print(f"OK PHASE 5.5b: {len(poi_list)} stop(s) passed venue description validation")
 
     # PHASE 5.6: Geographic-scope containment — only when the museum guard did NOT run
-    if not (tour_category == 'museum' and _museum_venue_name):
+    # [LOCAL-576] If the PRE-WRITING scope check already ran (non-museum/facility),
+    # do NOT run it again here. Re-running the same containment check after the
+    # descriptions are written is exactly the too-late removal that cost tour 388
+    # its 5th stop: Fenway Park passed the pre-writing check, was written in full,
+    # and this post-writing pass then removed it with no replacement -> 4 of 5. The
+    # pre-writing check (with replenishment) is authoritative; a second pass here
+    # can only delete a stop after the money is spent and after the pool can no
+    # longer refill it. Anchors are exempt in both passes regardless.
+    if (not (tour_category == 'museum' and _museum_venue_name)
+            and not _lr576_prewrite_ran):
         # [D558] Same resolver the replenishment loop uses — "validated the same
         # way as the original" has to mean the same code, not a second copy.
         _scope_for_check = _resolve_scope_for_check(intent, location, tour_category,
@@ -16536,6 +18176,10 @@ REWRITE RULES (all mandatory):
             if len(poi_list) <= max(1, _before // 2):
                 print(f"  [PHASE 5.6] >50% of stops were outside '{_scope_for_check}' — "
                       f"scope is likely a small single venue; delivering {len(poi_list)} verified stop(s).")
+    elif _lr576_prewrite_ran:
+        print(f"\nPHASE 5.6: skipped — the pre-writing scope check already ran "
+              f"(LOCAL-576; a second pass after writing can only remove a stop too "
+              f"late to replace).")
 
     _sfp.sub_start('dangling_ref_5_7')
     # -------- PHASE 5.7: Dangling-reference scrub --------
@@ -17715,6 +19359,39 @@ REWRITE RULES (all mandatory):
 
     # [LOCAL-3498] Close the story_first sub-phase profile before the phase ends.
     _sfp.summary()
+
+    # [LOCAL-591] FINAL COORDINATE SWEEP — every delivered stop must have a map
+    # marker. Stops added AFTER the D559 geocoding phase (LOCAL-576 replenishment,
+    # D556 additions, LOCAL-577/589 refills) were never geocoded; King's Chapel
+    # shipped on tour 395 with no coordinates and no marker. Geocode any stop that
+    # still lacks a parseable coordinate, here, just before packing — the last
+    # point where the stop set is final. A stop that cannot be placed is announced
+    # (returned in still_missing) and KEPT, never dropped.
+    try:
+        _sweep_resolve = None
+        _sweep_anchor = None
+        try:
+            from geocode_stops import resolve_poi as _sweep_resolve, geocode as _sweep_geocode, \
+                location_hint as _sweep_hint
+            try:
+                _sweep_anchor = _sweep_geocode(_sweep_hint(location) or location)
+            except Exception:
+                _sweep_anchor = None
+        except ImportError as _sw_imp:
+            _import_logger.error(f"[LOCAL-591] geocode_stops unavailable for the "
+                                 f"coordinate sweep ({_sw_imp}); using the LLM fetch alone")
+            _sweep_resolve = None
+        _sweep_fixed, _sweep_missing, _sweep_tokens = _geocode_missing_coordinates(
+            poi_list, location, headers,
+            resolve_poi_fn=_sweep_resolve, tour_anchor=_sweep_anchor)
+        if _sweep_tokens:
+            total_tokens += _sweep_tokens
+            total_cost += _tour_llm_cost(_sweep_tokens)
+        if _sweep_missing:
+            print(f"  [LOCAL-591] {len(_sweep_missing)} stop(s) still without a map "
+                  f"marker after the sweep (kept, announced): {_sweep_missing}")
+    except Exception as _sweep_err:
+        print(f"  [LOCAL-591] coordinate sweep error (non-fatal): {_sweep_err}")
 
     # PHASE 6: Assemble the complete tour
     _phase_timer.start('packing')
@@ -19005,6 +20682,30 @@ RULES:
     else:
         print(f"\n  [LOCAL-292] Empty stop removal gate: PASSED (all {_l292_requested_stops} stops have narration)")
 
+    # [LOCAL-589 D4] Trim the site-first narration headroom back to the listener's
+    # ask. We carried one or two spare REAL exhibitions through narration so a
+    # single empty-narration removal (LOCAL-292) still leaves the requested count.
+    # Now that the empty stops are gone, drop any remaining spares so we deliver
+    # EXACTLY what was asked — and so LOCAL-394's selected==delivered invariant
+    # measures the request, not the headroom. Only the site_exhibition path ever
+    # has headroom, so other tours are untouched.
+    if (_exhibition_stops_source == 'site_exhibition'
+            and _requested_stop_count_original):
+        if len(poi_list) > _requested_stop_count_original:
+            _l589_before = len(poi_list)
+            poi_list = poi_list[:_requested_stop_count_original]
+            for _l589_i, _l589_p in enumerate(poi_list):
+                _l589_p['stop_number'] = _l589_i + 1
+            total_stops = len(poi_list)
+            print(f"  [LOCAL-589] site-first headroom trimmed: {_l589_before} → "
+                  f"{len(poi_list)} to match the {_requested_stop_count_original}-stop request")
+        # Re-base the gate's "requested" counter to the listener's ask so the
+        # LOCAL-394 invariant below reads selected==delivered: the spares were
+        # intentional headroom, not lost stops. Done whether or not a trim was
+        # needed (an empty-narration drop already consumed the spare).
+        if _l292_requested_stops > _requested_stop_count_original:
+            _l292_requested_stops = _requested_stop_count_original
+
     # [LOCAL-292] Rebuild tour title with correct stop count if stops were removed
     if _l292_failed_stops and poi_list:
         # The tour_title line is the first line of complete_tour; rebuild complete_tour header
@@ -20242,18 +21943,29 @@ RULES:
         output_file = f"{safe_location}_{safe_tour_type}_tour_{timestamp}.txt"
     
     with open(output_file, "w", encoding="utf-8") as f:
-        # [LOCAL-357] Stamp forced-stops banner at top of output file
-        if _forced_stops_active:
-            _forced_banner = (
-                "=" * 70 + "\n"
-                "⚠️  FORCED STOPS — VERIFICATION HARNESS (LOCAL-357)\n"
-                "    This tour was generated with a forced stop list.\n"
-                "    It is NOT a naturally-selected tour and must not be\n"
-                "    scored as evidence of selection quality.\n"
-                f"    Forced: {forced_stops}\n"
-                "=" * 70 + "\n\n"
-            )
-            f.write(_forced_banner)
+        # [LOCAL-357] Stamp forced-stops banner — VERIFICATION HARNESS ONLY.
+        # [LOCAL-586] Gated on the explicit `harness` flag, NOT on the mere
+        # presence of forced_stops. A listener's own chosen stops arrive through
+        # the orchestrator / product path with harness=False, so their real tour
+        # gets NO banner and nothing in tour_content beyond the normal format.
+        # Only genuine verification-harness callers (run_* scripts / tests that
+        # pass harness=True) stamp this marker.
+        #
+        # [LOCAL-586] The banner is now built with an explicit list + "\n".join so
+        # it is written EXACTLY ONCE. The previous version relied on implicit
+        # string-literal concatenation:
+        #     "=" * 70 + "\n"
+        #     "...body...\n"
+        #     f"    Forced: {forced_stops}\n"
+        #     "=" * 70 + "\n\n"
+        # Python concatenates adjacent string literals at compile time, so the
+        # f-string line and the following "=" literal merged into one literal
+        # ("    Forced: [...]\n=") which the trailing `* 70` then repeated 70
+        # times — the whole banner body was stamped 70× (tour 370: 70 HARNESS
+        # blocks, each closed by a lone "="). Joining a list removes any literal
+        # adjacent to the `* 70`, so the separator multiplies and the body does not.
+        if harness and _forced_stops_active:
+            f.write(_build_harness_banner(forced_stops))
         f.write(complete_tour)
     
     print(f"\nTour text generated successfully!")

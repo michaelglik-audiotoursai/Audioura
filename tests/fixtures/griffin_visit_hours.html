@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<!--
+  Fixture for LOCAL-582.
+
+  A trimmed-but-faithful copy of a museum "Hours & Admission" page, in the same
+  shape griffinmuseum.org publishes its visitor information. The museum_overview
+  path (rung 3) must read HOURS and ADMISSION from a page like this ONLY WITH A
+  SOURCE: a practical fact is stated only if a snippet here supports it, verified
+  through practical_facts_gate.verify_claim_against_source, and dated.
+
+  This "with hours" variant carries both opening hours and an admission price.
+  The companion test also drives a NO-HOURS variant (built inline) to prove the
+  overview OMITS hours it cannot source — it never invents them.
+-->
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Hours &amp; Admission - Griffin Museum of Photography</title>
+</head>
+<body>
+
+<header id="site-header">
+  <nav class="main-navigation" aria-label="Main menu">
+    <ul>
+      <li><a href="/">Home</a></li>
+      <li><a href="/current-exhibitions/">Current Exhibitions</a></li>
+      <li><a href="/visit/">Visit</a></li>
+    </ul>
+  </nav>
+</header>
+
+<main id="content">
+  <h1>Hours &amp; Admission</h1>
+
+  <section class="hours">
+    <h2>Hours</h2>
+    <p>The Griffin Museum of Photography is open Tuesday through Sunday, 10:00 to 17:00.</p>
+    <p>The museum is closed on Monday.</p>
+  </section>
+
+  <section class="admission">
+    <h2>Admission</h2>
+    <p>Admission: $10 per adult. Members and children under 12 are free.</p>
+  </section>
+</main>
+
+<footer id="site-footer">
+  <p>Copyright Griffin Museum of Photography. All rights reserved.</p>
+</footer>
+
+</body>
+</html>

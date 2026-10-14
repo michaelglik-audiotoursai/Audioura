@@ -8,3 +8,6 @@ itsdangerous==1.1.0
 jinja2==2.11.3
 psycopg2-binary==2.9.9
 pycountry==24.6.1
+beautifulsoup4==4.12.2
+lxml==4.9.3
+pydub==0.25.1
