@@ -1,0 +1,11 @@
+-- 026: one free re-score after an edit (LOCAL-688). Additive, idempotent.
+-- A guide may request ONE re-score of their own tour per content version. We
+-- record the version that a re-score was last requested for, so a second
+-- request for the SAME version is refused (409) while a request after the next
+-- edit (which bumps the version) is allowed again.
+--
+-- The "content version" is the tour's live version — COALESCE(MAX(version_no),0)+1
+-- over audio_tour_versions for the tour's own id (the same number the app shows
+-- next to Downloads, LOCAL-657). An unedited tour is version 1. NULL here means
+-- no re-score has ever been requested → the guide's one free re-score is available.
+ALTER TABLE audio_tours ADD COLUMN IF NOT EXISTS rescore_requested_version INTEGER;
