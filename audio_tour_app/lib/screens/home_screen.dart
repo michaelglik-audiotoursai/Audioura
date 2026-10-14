@@ -69,6 +69,8 @@ class _HomeScreenState extends State<HomeScreen> {
   // visible Home page, so user can zoom in and out." Both sort orders apply to
   // this same area. Reloaded (debounced) whenever the map stops moving.
   LatLngBounds? _viewBounds;
+  // [LOCAL-683] The tours of the last /tours-near load, for the List view.
+  List<Map<String, dynamic>> _loadedTours = [];
   Timer? _viewReloadTimer;
   // A world-wide view would ask for every tour; cap the circle at 500 km.
   static const double _maxViewRadiusKm = 500;
@@ -350,6 +352,135 @@ class _HomeScreenState extends State<HomeScreen> {
       (t['is_paid'] == true ||
           (t['price_tier'] is num && (t['price_tier'] as num) > 0)));
 
+  /// [LOCAL-683] The loaded tours that are actually ON SCREEN (the request
+  /// circle reaches the corners, so it returns a few just outside), in the
+  /// chosen order. Nearest = nearest to the listener when the map shows their
+  /// own location, else to the map centre. Top rated = the server's rank order.
+  List<Map<String, dynamic>> _visibleTours() {
+    final view = _viewBounds;
+    final list = _loadedTours.where((t) {
+      if (t['type'] == 'treat') return false;
+      final lat = (t['lat'] as num?)?.toDouble();
+      final lng = (t['lng'] as num?)?.toDouble();
+      if (lat == null || lng == null) return false;
+      return view == null || view.contains(LatLng(lat, lng));
+    }).toList();
+    if (!_topRated) {
+      final from = (!_isUsingCustomLocation && _userLocation != null)
+          ? _userLocation!
+          : (view?.center ?? _userLocation);
+      if (from != null) {
+        for (final t in list) {
+          t['_list_km'] = _calculateDistance(from.latitude, from.longitude,
+              (t['lat'] as num).toDouble(), (t['lng'] as num).toDouble());
+        }
+        list.sort((a, b) =>
+            (a['_list_km'] as double).compareTo(b['_list_km'] as double));
+      }
+    }
+    return list;
+  }
+
+  /// [LOCAL-683] "List" — the tours in the visible map area as a list, where
+  /// Nearest / Top rated is actually visible (Michael, 2026-10-14). Tapping a
+  /// tour opens the same dialog as its map pin.
+  void _showVisibleToursList() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (sheetContext) => StatefulBuilder(
+        builder: (sheetContext, setSheetState) {
+          final tours = _visibleTours();
+          return DraggableScrollableSheet(
+            expand: false,
+            initialChildSize: 0.6,
+            maxChildSize: 0.95,
+            builder: (context, scrollController) => Column(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          '${tours.length} tour${tours.length == 1 ? '' : 's'} in this map area',
+                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                        ),
+                      ),
+                      TextButton(
+                        onPressed: () => Navigator.pop(sheetContext),
+                        child: const Text('Cancel'),
+                      ),
+                    ],
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: Wrap(
+                    spacing: 8,
+                    children: [
+                      for (final top in [false, true])
+                        ChoiceChip(
+                          label: Text(top ? 'Top rated first' : 'Nearest first'),
+                          selected: _topRated == top,
+                          onSelected: (_) async {
+                            await _setTopRated(top);
+                            setSheetState(() {});
+                          },
+                        ),
+                    ],
+                  ),
+                ),
+                const Divider(),
+                Expanded(
+                  child: tours.isEmpty
+                      ? const Center(
+                          child: Padding(
+                            padding: EdgeInsets.all(24),
+                            child: Text('No tours here. Zoom out the map to see more.',
+                                textAlign: TextAlign.center),
+                          ),
+                        )
+                      : ListView.separated(
+                          controller: scrollController,
+                          itemCount: tours.length,
+                          separatorBuilder: (_, __) => const Divider(height: 1),
+                          itemBuilder: (context, i) {
+                            final t = tours[i];
+                            final km = (t['_list_km'] as num?) ?? (t['distance_km'] as num?);
+                            return ListTile(
+                              title: Text(t['name']?.toString() ?? 'Tour',
+                                  maxLines: 2, overflow: TextOverflow.ellipsis),
+                              subtitle: Padding(
+                                padding: const EdgeInsets.only(top: 4),
+                                child: Wrap(
+                                  spacing: 8,
+                                  crossAxisAlignment: WrapCrossAlignment.center,
+                                  children: [
+                                    TourRatingBadge.fromTour(t),
+                                    TourPriceBadge.fromTour(t),
+                                    if (km != null)
+                                      Text('${(km / 1.609344).toStringAsFixed(1)} mi',
+                                          style: const TextStyle(fontSize: 12)),
+                                  ],
+                                ),
+                              ),
+                              onTap: () {
+                                Navigator.pop(sheetContext);
+                                _onTourMarkerTapped(t);
+                              },
+                            );
+                          },
+                        ),
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+
   /// [LOCAL-681] The map moved: remember the visible area and reload once the
   /// listener stops panning/zooming (programmatic moves count too, so a search
   /// that moves the map lists that area).
@@ -400,6 +531,7 @@ class _HomeScreenState extends State<HomeScreen> {
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         final tours = data['tours'] as List;
+        _loadedTours = tours.whereType<Map>().map((t) => Map<String, dynamic>.from(t)).toList();
         await DebugLogHelper.addDebugLog('HOME: Received ${tours.length} tours from server');
 
         // Cache the tours
@@ -3874,7 +4006,20 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ],
       ),
-      floatingActionButton: FloatingActionButton(
+      // [LOCAL-683] "List" above the location button.
+      floatingActionButton: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          FloatingActionButton.extended(
+            heroTag: 'home_list',
+            onPressed: _showVisibleToursList,
+            icon: const Icon(Icons.list),
+            label: const Text('List'),
+          ),
+          const SizedBox(height: 12),
+          FloatingActionButton(
+        heroTag: 'home_location',
         onPressed: () async {
           if (_isUsingCustomLocation) {
             _resetToCurrentLocation();
@@ -3889,6 +4034,8 @@ class _HomeScreenState extends State<HomeScreen> {
         },
         backgroundColor: _isUsingCustomLocation ? Colors.orange : null,
         child: Icon(_isUsingCustomLocation ? Icons.home : Icons.my_location),
+      ),
+        ],
       ),
     );
   }
