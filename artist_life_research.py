@@ -255,7 +255,12 @@ def _artist_cache_put(artist: str, local_code: str, result: Dict,
                  (local_code or ''), _json.dumps(stored, ensure_ascii=False)))
         conn.commit()
         conn.close()
-    except Exception:
+    except Exception as _put_err:
+        try:
+            print(f"  [LOCAL-692B] artist cache put skipped ({type(_put_err).__name__}: "
+                  f"{_put_err})", flush=True)
+        except Exception:
+            pass
         return
 
 

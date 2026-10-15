@@ -37,6 +37,7 @@ Writes audio_tours.editor_score / editor_score_detail / editor_scored_at
 import argparse
 import json
 import os
+import re
 import sys
 from datetime import datetime, timezone
 
@@ -95,20 +96,49 @@ def judge(title, text, stops):
 
     The returned detail has each criterion clamped to 1–10 in 0.5 steps, plus
     the model's per-criterion `evidence` and one-line `summary`.
+
+    [LOCAL-692B] SDK-tolerant: the modern ``from openai import OpenAI`` client is
+    preferred, but the generator container ships a LEGACY ``openai`` SDK (no
+    ``OpenAI`` class), on which the import raised and the score came back None.
+    We fall back to the legacy ``openai.ChatCompletion.create`` so the production
+    editor (gpt-4.1, 3 runs) actually scores inside the container.
     """
-    from openai import OpenAI
-    client = OpenAI()
-    resp = client.chat.completions.create(
-        model=MODEL,
-        temperature=0,
-        response_format={'type': 'json_object'},
-        messages=[{'role': 'user', 'content': PROMPT.format(
-            title=title, stops=stops or '?', text=text[:MAX_CHARS])}],
-    )
-    detail = json.loads(resp.choices[0].message.content)
+    _messages = [{'role': 'user', 'content': PROMPT.format(
+        title=title, stops=stops or '?', text=text[:MAX_CHARS])}]
+    try:
+        from openai import OpenAI  # modern SDK (>=1.0)
+        client = OpenAI()
+        resp = client.chat.completions.create(
+            model=MODEL, temperature=0,
+            response_format={'type': 'json_object'}, messages=_messages)
+        content = resp.choices[0].message.content
+        usage = resp.usage
+    except (ImportError, AttributeError):
+        # Legacy SDK (0.x): openai.ChatCompletion. No response_format support,
+        # so the prompt itself instructs JSON-only output.
+        import openai as _legacy
+        _key = os.getenv('OPENAI_API_KEY')
+        if _key:
+            _legacy.api_key = _key
+        resp = _legacy.ChatCompletion.create(
+            model=MODEL, temperature=0, messages=_messages)
+        content = resp['choices'][0]['message']['content']
+        _u = resp.get('usage', {}) if isinstance(resp, dict) else {}
+
+        class _Usage:
+            prompt_tokens = int((_u or {}).get('prompt_tokens', 0) or 0)
+            completion_tokens = int((_u or {}).get('completion_tokens', 0) or 0)
+        usage = _Usage()
+    # Legacy output may wrap JSON in prose/fences — extract the JSON object.
+    content = (content or '').strip()
+    if not content.startswith('{'):
+        _m = re.search(r'\{.*\}', content, re.S)
+        if _m:
+            content = _m.group(0)
+    detail = json.loads(content)
     for c in CRITERIA:
         detail[c] = max(1.0, min(10.0, round(float(detail[c]) * 2) / 2))
-    return detail, resp.usage
+    return detail, usage
 
 
 def _mean(values):
