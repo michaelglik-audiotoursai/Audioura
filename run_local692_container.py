@@ -43,11 +43,26 @@ _os.environ['STORIED_MODE'] = 'true'
 _os.environ['DISABLE_TOUR_CACHE'] = '1'
 _os.environ['DISABLE_STOP_POOL'] = '1'
 _os.environ.setdefault('LOCAL603_PREFLIGHT', '1')
+# [LOCAL-692B / D659 LEAD review] The stop-existence gate (D127/D236) must RUN
+# so a non-existent work (the LOCAL-692 Vermeer hallucination) is caught — a
+# non-existent work in a museum tour is a bounce. D261/D262: without DATABASE_URL
+# the gate's DB connection silently fails and the gate does NOT run. So we build
+# DATABASE_URL from the DB_* parts when it is not already provided, and set the
+# gate to log_only (verdicts computed + logged; nothing dropped in this A/B).
+if not _os.environ.get('DATABASE_URL'):
+    _dbh = _os.environ.get('DB_HOST', 'development-postgres-2-1')
+    _dbp = _os.environ.get('DB_PORT', '5432')
+    _dbn = _os.environ.get('DB_NAME', 'audiotours')
+    _dbu = _os.environ.get('DB_USER', 'admin')
+    _dbpw = _os.environ.get('DB_PASSWORD', 'password123')
+    _os.environ['DATABASE_URL'] = f"postgresql://{_dbu}:{_dbpw}@{_dbh}:{_dbp}/{_dbn}"
+    print(f"[LOCAL-692B] DATABASE_URL set from DB_* so the stop-existence gate "
+          f"runs (D261/D262): host={_dbh}", flush=True)
 _os.environ.setdefault('STOP_EXISTENCE_GATE_MODE', 'log_only')
-# Editor scorer: use the cheaper model to stay well under budget (the rubric
-# still separates tours; see tour_editor_score PRICES).
-_os.environ.setdefault('EDITOR_SCORE_MODEL', 'gpt-4.1-mini')
-_os.environ.setdefault('EDITOR_SCORE_RUNS', '1')
+# [LOCAL-692B / D659 3d] Score with the PRODUCTION editor model gpt-4.1, 3 runs,
+# for the final table (LOCAL-692 used the cheap 1-run to save budget).
+_os.environ.setdefault('EDITOR_SCORE_MODEL', 'gpt-4.1')
+_os.environ.setdefault('EDITOR_SCORE_RUNS', '3')
 
 HARD_CAP_USD = float(_os.environ.get('COST_HARD_LIMIT_USD', '3.00'))
 RESERVE_USD = float(_os.environ.get('LOCAL692_RESERVE_USD', '0.45'))
@@ -56,6 +71,9 @@ HOST = socket.gethostname()
 VENUE = _os.environ.get('LOCAL692_VENUE', 'Ho Chi Minh City Museum of Fine Arts, Vietnam')
 STOPS = int(_os.environ.get('LOCAL692_STOPS', '5'))
 SLUG = _os.environ.get('LOCAL692_SLUG', 'HCMC')
+# [LOCAL-692B] Tour category: 'museum' (default) or 'walking' for the Boston
+# walk. Drives both the cheap-arm gate and the per-stop research backend choice.
+CATEGORY = _os.environ.get('LOCAL692_CATEGORY', 'museum').strip().lower()
 # Pin the EXACT works as forced stops (LOCAL-357 harness path) so BEFORE and
 # AFTER narrate the SAME works — a valid comparison and the ticket's named works.
 # Pipe-separated in LOCAL692_FORCED_STOPS; empty -> free selection.
@@ -64,9 +82,12 @@ FORCED_STOPS = [s.strip() for s in _forced_raw.split('|') if s.strip()] or None
 if FORCED_STOPS:
     STOPS = len(FORCED_STOPS)
 
-print(f"=== LOCAL-692 eval: {VENUE} ({STOPS} stops, museum) ===", flush=True)
+print(f"=== LOCAL-692 eval: {VENUE} ({STOPS} stops, {CATEGORY}) ===", flush=True)
 print(f"host: {HOST}  HARD CAP(task): ${HARD_CAP_USD}  reserve: ${RESERVE_USD}",
       flush=True)
+print(f"[LOCAL-692B] gate mode={_os.environ['STOP_EXISTENCE_GATE_MODE']} "
+      f"editor={_os.environ['EDITOR_SCORE_MODEL']} x{_os.environ['EDITOR_SCORE_RUNS']} "
+      f"forced_stops={'PINNED' if FORCED_STOPS else 'FREE'}", flush=True)
 
 from generate_tour_text import generate_tour_text  # noqa: E402
 import tour_conclusion as _tc  # noqa: E402
@@ -162,20 +183,42 @@ def _classify_source(line):
     return 'wikipedia' if wiki else 'other'
 
 
+# [LOCAL-692B] A charged-episode detector (mirrors artist_life_research's
+# _CHARGE_WORDS) used as a per-stop "#stories" proxy: how many distinct charged
+# moments (a decision, a loss, a conflict, a surprise) the stop narrates.
+_CHARGE_RE = re.compile(
+    r"(?i)\b(decided|refused|chose|vowed|defied|rejected|abandoned|secretly|"
+    r"died|death|lost|destroyed|burned|burnt|grief|exile|exiled|fled|"
+    r"imprisoned|arrested|war|wounded|poverty|starv|widow|orphan|banned|"
+    r"censored|accused|betrayed|rival|persecut|forbidden|surprise|unexpected|"
+    r"discovered|hidden|rediscovered|forgotten|turning point)\b")
+
+
+def _story_count(body):
+    """Number of SENTENCES in the stop that carry a charged episode (proxy for
+    'how many stories this stop tells'). Capped at a sane max."""
+    sents = re.split(r'(?<=[.!?])\s+', body)
+    return sum(1 for s in sents if _CHARGE_RE.search(s))
+
+
 def _report(slug, text):
     stops = _stops(text)
     print(f"  --- [{slug}] PER-STOP ---", flush=True)
     total_words = 0
+    total_stories = 0
     q_counts = {k: 0 for k in _Q}
     for title, body in stops:
         w = _words(body)
         total_words += w
+        nstories = _story_count(body)
+        total_stories += nstories
         answered = [k for k, rx in _Q.items() if rx.search(body)]
         for k in answered:
             q_counts[k] += 1
         generic = len(_GENERIC.findall(body))
         print(f"   STOP: {title[:60]}", flush=True)
-        print(f"     words={w}  Qs_answered({len(answered)})={answered}  "
+        print(f"     words={w}  stories(charged_sentences)={nstories}  "
+              f"Qs_answered({len(answered)})={answered}  "
               f"generic_theme_hits={generic}", flush=True)
     nstops = max(1, len(stops))
     print(f"  --- [{slug}] SOURCES ---", flush=True)
@@ -198,16 +241,22 @@ def _report(slug, text):
     print(f"  --- [{slug}] SUMMARY ---", flush=True)
     print(f"     words/stop={total_words/nstops:.0f} (total {total_words}, "
           f"{len(stops)} stops)", flush=True)
+    print(f"     stories/stop={total_stories/nstops:.1f} (total charged "
+          f"sentences {total_stories})", flush=True)
     print(f"     Qs answered across tour: "
           f"{ {k: v for k, v in q_counts.items() if v} }", flush=True)
     print(f"     distinct Michael-Qs answered >=1 stop: "
           f"{sum(1 for v in q_counts.values() if v)}/6", flush=True)
     print(f"     sources: wikipedia_lines={wiki_n} other_lines={other_n}",
           flush=True)
-    print(f"     name_faults={faults}", flush=True)
+    # [LOCAL-692B] has_say_aid MUST be 0 now (pronunciation moved to TTS SSML).
+    print(f"     name_faults={faults}  (has_say_aid should be 0 — TTS-layer SSML)",
+          flush=True)
     return {
         'words_per_stop': round(total_words / nstops, 1),
         'total_words': total_words, 'stops': len(stops),
+        'stories_per_stop': round(total_stories / nstops, 2),
+        'total_stories': total_stories,
         'q_counts': q_counts,
         'distinct_qs': sum(1 for v in q_counts.values() if v),
         'wiki_source_lines': wiki_n, 'other_source_lines': other_n,
@@ -266,7 +315,7 @@ def _run_arm(slug, env_overrides):
     t0 = time.time()
     try:
         text, _p, _c = generate_tour_text(
-            VENUE, 'museum', f"/app/tours/LOCAL692_{SLUG}_{slug}.txt", STOPS,
+            VENUE, CATEGORY, f"/app/tours/LOCAL692_{SLUG}_{slug}.txt", STOPS,
             user_id=None, forced_stops=FORCED_STOPS, harness=bool(FORCED_STOPS))
     except Exception as e:
         print(f"RUN ERROR for {slug}: {e}", flush=True)
@@ -310,19 +359,45 @@ print(f"[db] audio_tours BEFORE: {_row_count()} (is_test {_test_row_count()})",
       flush=True)
 print(f"[db] spend for host {HOST} BEFORE: ${_spend_so_far()}", flush=True)
 
-# The cheap arm applies to BOTH versions (museum category). BEFORE leaves
-# MUSEUM_RESEARCH unset (object backend); AFTER sets artist_life.
-_os.environ['CHEAP_ARM_CATEGORIES'] = 'museum'
-ARMS = [
-    ("BEFORE", {"NARRATION_MODEL": "gpt-4.1-mini", "RESEARCH_BACKEND": "serper",
-                "MUSEUM_RESEARCH": None}),
-    ("AFTER", {"NARRATION_MODEL": "gpt-4.1-mini", "RESEARCH_BACKEND": "serper",
-               "MUSEUM_RESEARCH": "artist_life"}),
-]
+# The cheap arm applies to BOTH versions. BEFORE is the object/plain backend;
+# AFTER engages the LOCAL-692B improvement for the category:
+#   museum  → MUSEUM_RESEARCH=artist_life (artist-life ladder + second story).
+#   walking → WALKING_RESEARCH=serper_plus (the LOCAL-674 walking backend; the
+#             "one more story" improvement is measured by #stories/words/score).
+_os.environ['CHEAP_ARM_CATEGORIES'] = CATEGORY
+if CATEGORY == 'walking':
+    ARMS = [
+        ("BEFORE", {"NARRATION_MODEL": "gpt-4.1-mini", "RESEARCH_BACKEND": "serper",
+                    "WALKING_RESEARCH": None, "MUSEUM_RESEARCH": None}),
+        ("AFTER", {"NARRATION_MODEL": "gpt-4.1-mini", "RESEARCH_BACKEND": "serper",
+                   "WALKING_RESEARCH": "serper_plus", "MUSEUM_RESEARCH": None}),
+    ]
+else:
+    ARMS = [
+        ("BEFORE", {"NARRATION_MODEL": "gpt-4.1-mini", "RESEARCH_BACKEND": "serper",
+                    "MUSEUM_RESEARCH": None}),
+        ("AFTER", {"NARRATION_MODEL": "gpt-4.1-mini", "RESEARCH_BACKEND": "serper",
+                   "MUSEUM_RESEARCH": "artist_life"}),
+    ]
+
+# [LOCAL-692B] per-artist cache row count before/after (persists across tours).
+try:
+    import artist_life_research as _alr
+    print(f"[LOCAL-692B] artist_life_research_cache rows BEFORE: "
+          f"{_alr.artist_cache_row_count()}", flush=True)
+except Exception as _ce:
+    print(f"[LOCAL-692B] artist cache count unavailable: {_ce}", flush=True)
 
 results = []
 for _slug, _env in ARMS:
     results.append(_run_arm(_slug, _env))
+
+try:
+    import artist_life_research as _alr
+    print(f"[LOCAL-692B] artist_life_research_cache rows AFTER: "
+          f"{_alr.artist_cache_row_count()}", flush=True)
+except Exception:
+    pass
 
 print(f"\n[db] audio_tours AFTER: {_row_count()} (is_test {_test_row_count()})",
       flush=True)
