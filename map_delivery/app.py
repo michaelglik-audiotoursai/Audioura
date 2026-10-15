@@ -1517,6 +1517,154 @@ def _record_download_event(cur, user_id, tour_id, was_free):
         pass
 
 
+# ─── [LOCAL-701 / D663 §3] Community tours ────────────────────────────────────
+#
+# A tour generated FOR a community carries two columns on audio_tours (migration
+# 035): community_id and community_visibility ('members' | 'public'). map_delivery
+# deploys as its own image and cannot import community_tours_service, so these are
+# self-contained DB reads against the SAME postgres-2 DB — the same pattern the
+# paid-gate helpers use. The listing + download rules (D663 §3):
+#   * members-only community tour  → NEVER on /tours-near, /search, /tour-by-code
+#                                    or /tour-info (community page only). Download
+#                                    only by an active member.
+#   * public community tour        → shown on the map/search WITH the community
+#                                    badge; download requires an active membership
+#                                    (non-member → 402 membership_required).
+#   * members download free of extra charge (the pass is the payment); D660
+#     per-download rules do NOT apply to community tours.
+_HAS_COMMUNITY_COLUMNS = None
+
+
+def _has_community_columns(cur):
+    """True if audio_tours.community_id + community_visibility exist (migration
+    035). Probed once + cached. Absent (older schema) → every tour is an
+    ordinary public tour and the community rules are inert (feature OFF, never a
+    500)."""
+    global _HAS_COMMUNITY_COLUMNS
+    if _HAS_COMMUNITY_COLUMNS is None:
+        try:
+            cur.execute(
+                "SELECT COUNT(*) FROM information_schema.columns "
+                "WHERE table_name = 'audio_tours' "
+                "AND column_name IN ('community_id', 'community_visibility')"
+            )
+            _HAS_COMMUNITY_COLUMNS = (cur.fetchone()[0] == 2)
+        except Exception:  # noqa: BLE001
+            _HAS_COMMUNITY_COLUMNS = False
+    return _HAS_COMMUNITY_COLUMNS
+
+
+def _community_tag(cur, tour_id):
+    """(community_id, visibility) for a tour, resolving a translation to its
+    original, or (None, None) for an ordinary tour / older schema. Never
+    raises."""
+    if not _has_community_columns(cur):
+        return None, None
+    try:
+        cur.execute(
+            "SELECT COALESCE(orig.community_id, t.community_id), "
+            "       COALESCE(orig.community_visibility, t.community_visibility) "
+            "FROM audio_tours t "
+            "LEFT JOIN audio_tours orig ON orig.id = t.original_tour_id "
+            "WHERE t.id = %s",
+            (int(tour_id),),
+        )
+        row = cur.fetchone()
+    except Exception:  # noqa: BLE001
+        return None, None
+    if row and row[0] is not None:
+        return int(row[0]), row[1]
+    return None, None
+
+
+def _community_tags_batch(cur, tour_ids):
+    """{tour_id: (community_id, visibility)} for many tour ids in ONE query (no
+    N+1), for the list endpoints. Only rows that ARE community tours appear;
+    everything else is simply absent (the caller treats absence as ordinary).
+    Empty on an older schema / error."""
+    ids = sorted({int(i) for i in tour_ids if i is not None})
+    if not ids or not _has_community_columns(cur):
+        return {}
+    try:
+        cur.execute(
+            "SELECT id, community_id, community_visibility FROM audio_tours "
+            "WHERE id = ANY(%s) AND community_id IS NOT NULL",
+            (ids,),
+        )
+        return {int(r[0]): (int(r[1]), r[2]) for r in cur.fetchall()}
+    except Exception:  # noqa: BLE001
+        try:
+            cur.connection.rollback()
+        except Exception:
+            pass
+        return {}
+
+
+def _community_name(cur, community_id):
+    """The community's name (for the badge label), or None. Never raises."""
+    if community_id is None:
+        return None
+    try:
+        cur.execute("SELECT name FROM communities WHERE id = %s", (int(community_id),))
+        row = cur.fetchone()
+        return row[0] if row else None
+    except Exception:  # noqa: BLE001
+        return None
+
+
+def _is_active_member(cur, user_id, community_id, now=None):
+    """True iff user_id is an ACTIVE member of the community, or its OWNER.
+
+    An active member has a membership row with NULL expiry (free community) or a
+    future expiry; the owner always qualifies (they made the tour). Mirrors
+    communities_api.is_membership_active. Never raises → False (fail closed: a
+    lookup problem must not hand out community content)."""
+    if not user_id or community_id is None:
+        return False
+    from datetime import datetime
+    now = now or datetime.utcnow()
+    try:
+        cur.execute("SELECT owner_user_id FROM communities WHERE id = %s",
+                    (int(community_id),))
+        row = cur.fetchone()
+        if row and row[0] is not None and str(row[0]) == str(user_id):
+            return True  # the owner
+        cur.execute(
+            "SELECT expires_at FROM community_memberships "
+            "WHERE user_id = %s AND community_id = %s",
+            (str(user_id), int(community_id)),
+        )
+        m = cur.fetchone()
+        if m is None:
+            return False
+        return m[0] is None or m[0] > now
+    except Exception:  # noqa: BLE001
+        return False
+
+
+def _community_download_decision(cur, user_id, tour_id):
+    """The community part of the download gate for ONE tour.
+
+    Returns (relevant, allowed, deny):
+      * relevant=False → not a community tour; the caller runs the ordinary
+        paid/free gate unchanged.
+      * relevant=True, allowed=True → an active member (or the owner) — allowed,
+        and D660 per-download rules do NOT apply (the pass is the payment).
+      * relevant=True, allowed=False → a non-member/expired member: `deny` is the
+        402 body {error:'membership_required', community_id, tour_id}; the app
+        opens the community page (join / buy pass)."""
+    community_id, _vis = _community_tag(cur, tour_id)
+    if community_id is None:
+        return False, True, None
+    if _is_active_member(cur, user_id, community_id):
+        return True, True, None
+    return True, False, {
+        "error": "membership_required",
+        "community_id": int(community_id),
+        "tour_id": int(tour_id),
+    }
+
+
 def _download_gate(cur, user_id, tour_id):
     """The pay-before-download decision for ONE language row.
 
@@ -1542,6 +1690,18 @@ def _download_gate(cur, user_id, tour_id):
                                                  already-consumed-and-not-rebought
                                                  case: buy again to download again).
     """
+    # [LOCAL-701 / D663 §3] A COMMUNITY tour is gated by MEMBERSHIP, not price.
+    # Decide this FIRST: a community tour never follows the paid/unlock path —
+    # an active member (or the owner) downloads it (members download free of
+    # extra charge; D660 per-download rules do NOT apply), and a non-member gets
+    # 402 membership_required so the app opens the community page.
+    _ct_relevant, _ct_allowed, _ct_deny = _community_download_decision(
+        cur, user_id, tour_id)
+    if _ct_relevant:
+        if _ct_allowed:
+            return True, None
+        return False, _ct_deny
+
     tier = _row_price_tier(cur, tour_id)
     if tier is None:
         return True, None  # free row — unchanged behaviour
@@ -1722,6 +1882,11 @@ def get_tours_near_location(lat, lng):
         
         tours = cur.fetchall()
         editor = _editor_scores(cur)  # [LOCAL-685]
+        # [LOCAL-701 / D663 §3] Batch the community tags for every fetched tour
+        # (one query, no N+1). A members-only community tour is HIDDEN from the
+        # map; a public one is shown WITH a community badge.
+        _ct_tags = _community_tags_batch(cur, [t[0] for t in tours])
+        _ct_names = {}
         tours_list = []
         adult = _adult_requested(request.args)  # [LOCAL-687] 18+ confirmed?
         
@@ -1736,6 +1901,13 @@ def get_tours_near_location(lat, lng):
             # [LOCAL-687] Content gate: hide not_allowed, hide pending/rejected,
             # hide mature unless adult=1. NULL rating == general (old tours list).
             if not _content_visible(content_rating, content_review_status, adult):
+                continue
+
+            # [LOCAL-701 / D663 §3] Community-tour visibility. A members-only
+            # community tour never appears on the map (community page only); a
+            # public one is shown and will carry a community badge below.
+            _ct_cid, _ct_vis = _ct_tags.get(tour_id, (None, None))
+            if _ct_cid is not None and _ct_vis != 'public':
                 continue
             
             if tour_lat and tour_lng:
@@ -1774,6 +1946,16 @@ def get_tours_near_location(lat, lng):
                         **rating_block,
                         **_price_block(price_tier, cur),
                     }
+                    # [LOCAL-701 / D663 §3] A PUBLIC community tour carries the
+                    # community badge (like the gold $ for paid). members-only
+                    # tours were already skipped above, so only public reach here.
+                    if _ct_cid is not None:
+                        if _ct_cid not in _ct_names:
+                            _ct_names[_ct_cid] = _community_name(cur, _ct_cid)
+                        tour_data['community_id'] = _ct_cid
+                        tour_data['community_name'] = _ct_names[_ct_cid]
+                        tour_data['community_visibility'] = _ct_vis
+                        tour_data['badge'] = 'community'
                     tours_list.append(tour_data)
         
         # [LOCAL-689] Add a personal match_percent + reasons to every item when
@@ -2283,6 +2465,10 @@ def search_tours():
         
         tours = cur.fetchall()
         editor = _editor_scores(cur)  # [LOCAL-685]
+        # [LOCAL-701 / D663 §3] Batch community tags: hide members-only tours
+        # from search; badge public ones.
+        _ct_tags = _community_tags_batch(cur, [t[0] for t in tours])
+        _ct_names = {}
         search_results = []
         adult = _adult_requested(request.args)  # [LOCAL-687] 18+ confirmed?
         
@@ -2295,6 +2481,11 @@ def search_tours():
             # [LOCAL-687] Content gate: hide not_allowed, hide pending/rejected,
             # hide mature unless adult=1. NULL rating == general.
             if not _content_visible(content_rating, content_review_status, adult):
+                continue
+            # [LOCAL-701 / D663 §3] A members-only community tour never appears in
+            # search (community page only); a public one is badged below.
+            _ct_cid, _ct_vis = _ct_tags.get(tour_id, (None, None))
+            if _ct_cid is not None and _ct_vis != 'public':
                 continue
             version, updated_at = _resolved_version_fields(
                 original_id, source_version, source_max_vn, max_vn, last_replaced, created_at)
@@ -2314,7 +2505,7 @@ def search_tours():
                 original_language = _resolved_original_language(
                     own_content_language, original_id, source_content_language)
                 
-                search_results.append({
+                search_result = {
                     'id': tour_id,
                     'name': tour_name,
                     'request_string': request_string,
@@ -2332,7 +2523,16 @@ def search_tours():
                     'content_rating': _content_rating_field(content_rating),
                     **rating_block,
                     **_price_block(price_tier, cur),
-                })
+                }
+                # [LOCAL-701 / D663 §3] Public community tour → community badge.
+                if _ct_cid is not None:
+                    if _ct_cid not in _ct_names:
+                        _ct_names[_ct_cid] = _community_name(cur, _ct_cid)
+                    search_result['community_id'] = _ct_cid
+                    search_result['community_name'] = _ct_names[_ct_cid]
+                    search_result['community_visibility'] = _ct_vis
+                    search_result['badge'] = 'community'
+                search_results.append(search_result)
         
         # [LOCAL-689] Personal match_percent + reasons for every result when
         # ?user_id is passed (batched; a translation maps to its original's

@@ -1287,6 +1287,35 @@ def my_communities():
         conn.close()
 
 
+@communities_bp.route('/communities/mine-owned', methods=['GET'])
+def my_owned_communities():
+    """[LOCAL-701 / D663 §3] The communities a user OWNS (is the organiser of),
+    for the Generate tab's "For: my community <name>" selector. Only an owner of
+    ≥ 1 community sees the selector, so the app calls this to populate it. Lists
+    non-disabled communities only (a disabled community cannot receive a tour).
+    Returns {communities: [{id, name}, ...]} (minimal shape — the selector needs
+    only id + name)."""
+    err = _require_api_key()
+    if err:
+        return err
+    user_id = request.args.get('user_id')
+    if not user_id:
+        return jsonify({"error": "user_id is required"}), 400
+    conn = _get_db()
+    try:
+        cur = conn.cursor()
+        cur.execute(
+            "SELECT id, name FROM communities "
+            "WHERE owner_user_id = %s AND disabled = FALSE ORDER BY name",
+            (user_id,),
+        )
+        out = [{'id': r[0], 'name': r[1]} for r in cur.fetchall()]
+        cur.close()
+        return jsonify({"communities": out}), 200
+    finally:
+        conn.close()
+
+
 @communities_bp.route('/communities/reminders/run', methods=['POST'])
 def reminders_run():
     """Run the reminder tick (3-days-before + at-expiry). Returns the membership
