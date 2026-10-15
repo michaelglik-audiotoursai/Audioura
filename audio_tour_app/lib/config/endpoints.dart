@@ -1,4 +1,6 @@
+import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../config.dart';
@@ -204,4 +206,196 @@ class Endpoints {
         s == Service.translation ||
         s == Service.generator;
   }
+
+  // ---------------------------------------------------------------------------
+  // LOCAL-694 — graceful degradation against a Storied backend.
+  //
+  // The Storied server (what GCloud runs today) does not host every endpoint
+  // the Subscribed app calls. Replaying all 66 calls against a local Storied
+  // stack (SUBMISSION_LOCAL-694.md) showed three shapes the app must survive
+  // WITHOUT crashing or showing a raw/blank error:
+  //   1. 404 / 405 / 501 — the route is missing on Storied. Flask answers with
+  //      an HTML body (NOT JSON), so any jsonDecode(body) on the error path
+  //      throws FormatException. 27 of the app's calls land here.
+  //   2. Connection refused — the whole service is absent on Storied (userDb,
+  //      voice, generator, custom-audio, tour-id-resolution: 23 calls). This
+  //      surfaces as SocketException / ClientException.
+  //   3. 5xx with a JSON body — a server-side error; still parseable.
+  //
+  // These helpers are the ONE central place that decides "is this a feature
+  // the server simply doesn't offer?" and turns it into either a friendly
+  // message or a null/empty the caller can render as an empty state. Prefer
+  // these over ad-hoc per-call catches.
+  // ---------------------------------------------------------------------------
+
+  /// The single user-facing line for a feature the Storied server lacks.
+  /// Michael's wording (D661): testers see "Preview", never branch names.
+  static const String featureUnavailableMessage =
+      'This feature is available in Preview only.';
+
+  /// True when a response means "this ROUTE is not offered by this backend"
+  /// (i.e. the feature is unavailable, Preview-only) as opposed to an ordinary
+  /// "not found" the server deliberately returned.
+  ///
+  /// LOCAL-694B (LEAD review 2026-10-14): a bare 404 is NOT enough. On the
+  /// Subscribed server an unknown community code, a deleted tour, or an unknown
+  /// job all return a 404 whose body is the SERVICE'S OWN JSON error
+  /// (e.g. `{"error":"not_found"}`, `{"error":"Job not found"}`). That is a
+  /// normal not-found and must keep its existing message — never "Preview only".
+  ///
+  /// A route is MISSING only when the 404 is NOT the service's own JSON error:
+  ///   (a) the GCloud API gateway's JSON `{"error":"endpoint not found",
+  ///       "service":"api-gateway"}` — what GCloud returns today for an unknown
+  ///       path (LEAD saw it at storied-api.audioura.com/tour-info/431), or
+  ///   (b) a non-JSON body — Flask's HTML 404 page when a service is called
+  ///       directly, or
+  ///   (c) 405 Method Not Allowed / 501 Not Implemented (the route/verb is not
+  ///       served at all; body shape is irrelevant).
+  ///
+  /// [body] is the raw response body; pass it so a JSON 404 can be told apart
+  /// from an HTML/gateway 404. When [body] is omitted a 404 is treated
+  /// conservatively as a normal not-found (NOT feature-unavailable), so callers
+  /// that cannot supply a body never over-report "Preview only".
+  static bool isRouteMissing(int statusCode, [String? body]) {
+    // 405/501: the route (or that verb on it) simply is not served. Missing.
+    if (statusCode == 405 || statusCode == 501) return true;
+    if (statusCode != 404) return false;
+
+    // 404: decide by body. A JSON object that is the service's own error is a
+    // NORMAL not-found; the gateway's "endpoint not found" is the one JSON 404
+    // that still means missing.
+    final map = tryDecodeMap(body);
+    if (map == null) {
+      // Non-JSON (HTML 404 page) or empty body => route missing (case b).
+      return true;
+    }
+    // Case (a): the GCloud gateway's own 404 envelope.
+    if (map['service'] == 'api-gateway' &&
+        map['error'] == 'endpoint not found') {
+      return true;
+    }
+    // Any other JSON 404 is the service's own not-found => NORMAL, keep message.
+    return false;
+  }
+
+  /// @Deprecated LOCAL-694B. Status-only classifier retained ONLY so a 405/501
+  /// (where the body never matters) can be checked without a body. For 404 this
+  /// returns false, because a 404 cannot be classified from the status alone —
+  /// use [isRouteMissing(statusCode, body)] instead. Do not use this for 404s.
+  static bool isFeatureUnavailableStatus(int statusCode) =>
+      statusCode == 405 || statusCode == 501;
+
+  /// Safely decode a response body as a JSON object. Returns null when the body
+  /// is empty, not valid JSON (e.g. a Flask HTML 404 page), or not a JSON
+  /// object. NEVER throws — this is the defensive replacement for a bare
+  /// `jsonDecode(response.body) as Map` on any path that can see a non-200.
+  static Map<String, dynamic>? tryDecodeMap(String? body) {
+    if (body == null || body.isEmpty) return null;
+    try {
+      final decoded = jsonDecode(body);
+      return decoded is Map<String, dynamic> ? decoded : null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Safely decode a response body as a JSON list. Returns null on empty,
+  /// non-JSON (HTML error page), or non-list bodies. Never throws.
+  static List<dynamic>? tryDecodeList(String? body) {
+    if (body == null || body.isEmpty) return null;
+    try {
+      final decoded = jsonDecode(body);
+      return decoded is List ? decoded : null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// True when [error] is a transport-level failure that, against Storied,
+  /// means the whole service is absent (connection refused) or unreachable:
+  /// SocketException, http.ClientException, TimeoutException. Callers that want
+  /// to treat "service not on this server" the same as "route missing" can use
+  /// this to map such errors to a [FeatureUnavailableException].
+  static bool isServiceAbsentError(Object error) =>
+      error is SocketException ||
+      error is http.ClientException ||
+      error is TimeoutException;
+
+  /// GET that throws [FeatureUnavailableException] when the ROUTE is missing on
+  /// the current server (gateway/HTML 404, or 405/501) or the service is absent
+  /// (connection refused / unreachable). A service's OWN JSON 404 (a normal
+  /// not-found, e.g. `{"error":"not_found"}`) is NOT feature-unavailable and is
+  /// returned to the caller as-is for normal handling, as is any other
+  /// response. See [isRouteMissing] (LOCAL-694B).
+  static Future<http.Response> getOrFeatureUnavailable(
+    Service s,
+    String path, {
+    Duration? timeout,
+  }) async {
+    final http.Response resp;
+    try {
+      resp = await get(s, path, timeout: timeout);
+    } catch (e) {
+      if (isServiceAbsentError(e)) {
+        throw FeatureUnavailableException(service: s, path: path, cause: e);
+      }
+      rethrow;
+    }
+    if (isRouteMissing(resp.statusCode, resp.body)) {
+      throw FeatureUnavailableException(
+          service: s, path: path, statusCode: resp.statusCode);
+    }
+    return resp;
+  }
+
+  /// POST counterpart of [getOrFeatureUnavailable]. See that doc.
+  static Future<http.Response> postOrFeatureUnavailable(
+    Service s,
+    String path, {
+    required Map<String, dynamic> body,
+    Duration? timeout,
+  }) async {
+    final http.Response resp;
+    try {
+      resp = await post(s, path, body: body, timeout: timeout);
+    } catch (e) {
+      if (isServiceAbsentError(e)) {
+        throw FeatureUnavailableException(service: s, path: path, cause: e);
+      }
+      rethrow;
+    }
+    if (isRouteMissing(resp.statusCode, resp.body)) {
+      throw FeatureUnavailableException(
+          service: s, path: path, statusCode: resp.statusCode);
+    }
+    return resp;
+  }
+}
+
+/// Thrown when a server endpoint the app expects is not offered by the current
+/// backend (missing route on Storied, or the whole service absent). Carries a
+/// user-safe [message] a screen can show directly; the service/path/status are
+/// for logs only. See LOCAL-694 / [Endpoints.featureUnavailableMessage].
+class FeatureUnavailableException implements Exception {
+  final Service service;
+  final String path;
+  final int? statusCode;
+  final Object? cause;
+
+  /// A user-facing override. Defaults to the standard "Preview only" line.
+  final String message;
+
+  FeatureUnavailableException({
+    required this.service,
+    required this.path,
+    this.statusCode,
+    this.cause,
+    String? message,
+  }) : message = message ?? Endpoints.featureUnavailableMessage;
+
+  @override
+  String toString() =>
+      'FeatureUnavailableException($service $path'
+      '${statusCode != null ? ' status=$statusCode' : ''}'
+      '${cause != null ? ' cause=$cause' : ''})';
 }

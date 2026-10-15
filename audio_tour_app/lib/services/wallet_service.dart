@@ -1,4 +1,3 @@
-import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../config/endpoints.dart';
 
@@ -154,68 +153,73 @@ class WalletService {
     return prefs.getString('user_id') ?? 'unknown';
   }
 
-  /// Get wallet data for the current user
+  /// Get wallet data for the current user.
+  /// Throws [FeatureUnavailableException] when the wallet feature is not on the
+  /// current server (Storied: /wallet is 404) so the screen shows the friendly
+  /// "Preview only" state instead of a raw error. (LOCAL-694)
   static Future<WalletData> getWallet() async {
     if (await _useMock()) return _MockWalletBackend.getWallet();
 
     final userId = await _getUserId();
-    final response = await Endpoints.get(
+    final response = await Endpoints.getOrFeatureUnavailable(
       Service.orchestrator,
       '/wallet/$userId',
       timeout: const Duration(seconds: 10),
     );
-    if (response.statusCode == 200) {
-      return WalletData.fromJson(jsonDecode(response.body));
+    final map = Endpoints.tryDecodeMap(response.body);
+    if (response.statusCode == 200 && map != null) {
+      return WalletData.fromJson(map);
     }
     throw Exception('Failed to fetch wallet: ${response.statusCode}');
   }
 
-  /// Get transaction history
+  /// Get transaction history. See [getWallet] for the Storied behaviour.
   static Future<List<WalletTransaction>> getTransactions({int limit = 50}) async {
     if (await _useMock()) return _MockWalletBackend.getTransactions(limit: limit);
 
     final userId = await _getUserId();
-    final response = await Endpoints.get(
+    final response = await Endpoints.getOrFeatureUnavailable(
       Service.orchestrator,
       '/wallet/$userId/transactions?limit=$limit',
       timeout: const Duration(seconds: 10),
     );
-    if (response.statusCode == 200) {
-      final List<dynamic> data = jsonDecode(response.body);
+    final data = Endpoints.tryDecodeList(response.body);
+    if (response.statusCode == 200 && data != null) {
       return data.map((e) => WalletTransaction.fromJson(e)).toList();
     }
     throw Exception('Failed to fetch transactions: ${response.statusCode}');
   }
 
-  /// Get available plans
+  /// Get available plans. See [getWallet] for the Storied behaviour.
   static Future<List<AvailablePlan>> getAvailablePlans() async {
     if (await _useMock()) return _MockWalletBackend.getAvailablePlans();
 
-    final response = await Endpoints.get(
+    final response = await Endpoints.getOrFeatureUnavailable(
       Service.orchestrator,
       '/plans/available',
       timeout: const Duration(seconds: 10),
     );
-    if (response.statusCode == 200) {
-      final List<dynamic> data = jsonDecode(response.body);
+    final data = Endpoints.tryDecodeList(response.body);
+    if (response.statusCode == 200 && data != null) {
       return data.map((e) => AvailablePlan.fromJson(e)).toList();
     }
     throw Exception('Failed to fetch plans: ${response.statusCode}');
   }
 
-  /// Top up balance (Pay-Per-Use)
+  /// Top up balance (Pay-Per-Use). See [getWallet] for the Storied behaviour.
   static Future<TopUpResult> topUp(String productId) async {
     if (await _useMock()) return _MockWalletBackend.topUp(productId);
 
     final userId = await _getUserId();
-    final response = await Endpoints.post(
+    final response = await Endpoints.postOrFeatureUnavailable(
       Service.orchestrator,
       '/wallet/$userId/topup',
       body: {'product_id': productId},
       timeout: const Duration(seconds: 15),
     );
-    if (response.statusCode == 200) {
-      return TopUpResult.fromJson(jsonDecode(response.body));
+    final map = Endpoints.tryDecodeMap(response.body);
+    if (response.statusCode == 200 && map != null) {
+      return TopUpResult.fromJson(map);
     }
     throw Exception('Top-up failed: ${response.statusCode}');
   }
