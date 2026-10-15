@@ -1526,11 +1526,19 @@ def _download_gate(cur, user_id, tour_id):
     Order (the first that applies wins):
       1. FREE row (price_tier NULL)            → allowed.
       2. The tour's CREATOR (curator's own)    → allowed.
-      3. The user has an UNCONSUMED UNLOCK     → allowed (D660: one download per
+      3. [LOCAL-695] The device was MOVED AWAY  → 402 profile_moved for a paid
+         by a recovery-code restore            row it is not grandfathered on.
+                                                 The profile (and its restore
+                                                 grants) now live on another
+                                                 phone; this phone is no longer
+                                                 offered re-downloads. Tours
+                                                 already on it keep playing
+                                                 (local/offline, D654).
+      4. The user has an UNCONSUMED UNLOCK     → allowed (D660: one download per
                                                  purchase; a consumed unlock no
                                                  longer authorises a download).
-      4. The user is GRANDFATHERED (free dl)   → allowed (LOCAL-677C, unchanged).
-      5. otherwise                             → 402 purchase_required (also the
+      5. The user is GRANDFATHERED (free dl)   → allowed (LOCAL-677C, unchanged).
+      6. otherwise                             → 402 purchase_required (also the
                                                  already-consumed-and-not-rebought
                                                  case: buy again to download again).
     """
@@ -1539,6 +1547,17 @@ def _download_gate(cur, user_id, tour_id):
         return True, None  # free row — unchanged behaviour
     if _user_is_tour_creator(cur, user_id, tour_id):
         return True, None  # the curator downloads their own tour
+    # [LOCAL-695] Abuse guard: a device unlinked by a later restore (the profile
+    # moved to a new phone) is not offered re-downloads of paid rows. A
+    # grandfathered (downloaded-while-free) row still downloads — that is the
+    # phone's own history, not the moved profile's grant.
+    if _device_moved_away(cur, user_id) and not _user_grandfathered(cur, user_id, tour_id):
+        return False, {
+            "error": "profile_moved",
+            "message": "This profile was restored on another device. Tours already "
+                       "on this phone keep playing.",
+            "tour_id": int(tour_id),
+        }
     if _user_has_unlock(cur, user_id, tour_id):
         return True, None  # bought this language
     if _user_grandfathered(cur, user_id, tour_id):
@@ -1551,6 +1570,70 @@ def _download_gate(cur, user_id, tour_id):
         "price_tier": int(tier),
         "price": (price[1:] if isinstance(price, str) and price.startswith("$") else price),
     }
+
+
+# [LOCAL-695] Cache for presence of the device_consolidation_history table +
+# unlinked_at column (migration 033). Resolved once per process.
+_HAS_CONSOLIDATION_HISTORY = None
+
+
+def _device_moved_away(cur, user_id):
+    """[LOCAL-695] True if this device was UNLINKED from its profile by a later
+    recovery-code restore (the profile moved to another phone). Self-contained
+    DB read (map_delivery is its own image and cannot import the repo-root
+    recovery module), mirroring recovery_code_service.profile_was_moved:
+
+      * the device is NOT a current primary_device_id of any profile, AND
+      * its MOST-RECENT device_consolidation_history row has unlinked_at set.
+
+    Absent table/column (pre-033) → False (feature off; never refuses a normal
+    download). Never raises — any error fails OPEN to 'not moved' so a lookup
+    problem can never wrongly refuse a paid download the gate would otherwise
+    allow via the unlock/grandfather paths below."""
+    global _HAS_CONSOLIDATION_HISTORY
+    if not user_id:
+        return False
+    if _HAS_CONSOLIDATION_HISTORY is None:
+        try:
+            _HAS_CONSOLIDATION_HISTORY = (
+                _table_exists(cur, 'device_consolidation_history')
+                and _column_exists(cur, 'device_consolidation_history', 'unlinked_at')
+            )
+        except Exception:  # noqa: BLE001
+            _HAS_CONSOLIDATION_HISTORY = False
+    if not _HAS_CONSOLIDATION_HISTORY:
+        return False
+    try:
+        cur.execute(
+            "SELECT 1 FROM user_consolidation_map WHERE primary_device_id = %s LIMIT 1",
+            (user_id,),
+        )
+        if cur.fetchone() is not None:
+            return False  # still a primary device somewhere → not moved
+        cur.execute(
+            "SELECT unlinked_at FROM device_consolidation_history "
+            "WHERE merged_device_id = %s ORDER BY merged_at DESC, id DESC LIMIT 1",
+            (user_id,),
+        )
+        row = cur.fetchone()
+        if row is None:
+            return False
+        return row[0] is not None
+    except Exception:  # noqa: BLE001
+        return False
+
+
+def _column_exists(cur, table_name, column_name):
+    """True if a column exists on a table in the current database."""
+    try:
+        cur.execute(
+            "SELECT 1 FROM information_schema.columns "
+            "WHERE table_name = %s AND column_name = %s",
+            (table_name, column_name),
+        )
+        return cur.fetchone() is not None
+    except Exception:  # noqa: BLE001
+        return False
 
 
 def calculate_distance(lat1, lng1, lat2, lng2):
