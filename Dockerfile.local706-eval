@@ -1,0 +1,29 @@
+# [LOCAL-706] Disposable polly-tts image for the HCMC 697 evaluation ONLY.
+# Identical to Dockerfile.polly-tts but also COPYs the name-aid module and the
+# generic lexicon so the real service applies the Kokoro pronunciation markup.
+# (The production Dockerfile.polly-tts should add the same two COPY lines when
+# LEAD deploys — see SUBMISSION_LOCAL-706.md.) Built as its OWN image/container;
+# never touches any audioura-* container.
+FROM python:3.9-slim
+
+COPY _meter/ /opt/meter/
+ENV PYTHONPATH=/opt/meter
+WORKDIR /app
+
+RUN pip install flask boto3 requests psycopg2-binary
+
+COPY polly_tts_service.py .
+COPY kokoro_engine.py .
+COPY cost_meter.py .
+COPY cost_rates.py .
+COPY build_manifest.py .
+# [LOCAL-706] the pronunciation aid + generic lexicon
+COPY vietnamese_name_aid.py .
+COPY pronunciation_lexicon.json .
+
+ARG GIT_SHA=unknown
+RUN echo "${GIT_SHA}" > /app/.git_sha
+RUN python build_manifest.py /app /app/.build_manifest.json
+
+EXPOSE 5018
+CMD ["python", "polly_tts_service.py"]

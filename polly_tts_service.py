@@ -33,8 +33,9 @@ except Exception:  # pragma: no cover - meter ships via PYTHONPATH=/opt/meter (s
 # known name in an SSML <sub alias="respelling"> (or <phoneme>) so the English
 # Polly voice (Joanna) says it correctly, while the visible/printed text stays
 # the correct diacritic name. Imported SOFTLY: if the module is unavailable the
-# chunk is synthesised as plain text exactly as before (fail-open). Only the
-# Polly path uses this; Kokoro (English voices) does not take SSML.
+# chunk is synthesised as plain text exactly as before (fail-open). The Polly
+# path uses SSML; the Kokoro path uses misaki inline markup [name](/IPA/)
+# (LOCAL-706, see _maybe_kokoro_markup) — same lexicon, each voice's own form.
 try:
     import vietnamese_name_aid as _vn_aid
 except Exception:  # pragma: no cover - fail open to plain text
@@ -59,6 +60,30 @@ def _maybe_ssml_for_polly(chunk_text):
     except Exception as _ssml_err:  # pragma: no cover
         logging.warning(f"[LOCAL-692B] SSML build failed, plain text: {_ssml_err}")
         return chunk_text, 'text'
+
+
+def _maybe_kokoro_markup(full_text):
+    """[LOCAL-706 / D667] Return the text to send to the Kokoro host service.
+
+    Kokoro's misaki G2P cannot pronounce raw Vietnamese diacritic names (bare
+    "Nguyễn Gia Trí" tokenises to the unknown-phoneme marker). misaki DOES accept
+    inline markup ``[name](/IPA/)``; vietnamese_name_aid.to_kokoro wraps the first
+    mention of each known name with the verified misaki IPA (or substitutes the
+    English respelling when no IPA is present). ONLY the audio request string
+    changes — the stored/visible tour text is untouched. Deterministic and
+    non-fatal: with the aid unavailable, or on any error, the ORIGINAL text is
+    returned so the Kokoro render is exactly as before (fail-open)."""
+    if _vn_aid is None or not full_text:
+        return full_text
+    try:
+        if not any(a.full in full_text for a in _vn_aid.LEXICON.values()):
+            return full_text
+        marked, _notes = _vn_aid.to_kokoro(full_text)
+        return marked or full_text
+    except Exception as _kok_err:  # pragma: no cover
+        logging.warning(
+            f"[LOCAL-706] Kokoro markup build failed, plain text: {_kok_err}")
+        return full_text
 
 
 def _compat_send_file(path_or_file, **kwargs):
@@ -193,7 +218,9 @@ def synthesize_speech():
             # MP3; the chunked branch recombines these at the PCM level so the
             # final file has one correct header (never byte-concatenated).
             try:
-                audio = kokoro_engine.synthesize_to_mp3(chunk_text, voice_id)
+                # [LOCAL-706] Same misaki pronunciation markup as the host path.
+                audio = kokoro_engine.synthesize_to_mp3(
+                    _maybe_kokoro_markup(chunk_text), voice_id)
                 return audio, 'kokoro'
             except Exception as _k_err:  # noqa: BLE001 - fall back on anything
                 logging.warning(
@@ -229,11 +256,16 @@ def synthesize_speech():
                 "[LOCAL-573] kokoro host unavailable — Polly (requests not installed)"
             )
             return None
+        # [LOCAL-706] Pronounce known Vietnamese names for Kokoro via misaki
+        # inline markup [name](/IPA/) (or respelling substitution). The visible
+        # tour text is unchanged; only this host request string is annotated.
+        # Fail-open: _maybe_kokoro_markup returns the original text on any issue.
+        host_text = _maybe_kokoro_markup(full_text)
         try:
             resp = _requests.post(
                 KOKORO_URL,
-                json={'text': full_text, 'voice': voice_id},
-                timeout=_render_text_timeout(len(full_text)),
+                json={'text': host_text, 'voice': voice_id},
+                timeout=_render_text_timeout(len(host_text)),
             )
             if resp.status_code == 200 and resp.content:
                 return resp.content
