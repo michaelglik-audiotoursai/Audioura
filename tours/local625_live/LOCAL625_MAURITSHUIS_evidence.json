@@ -1,0 +1,194 @@
+{
+  "landmarks": {
+    "Portret van Anna Wake (1605-voor 1669)": {
+      "status": "VERIFIED",
+      "canonical_title": "Portret van Anna Wake (1605-voor 1669)",
+      "snippet": "ezette dieren en schilderijen met Braziliaanse onderwerpen (slaven, planten, dorpen). Deze werden in de vestibule en het trappenhuis gehangen.\nFamilieportretten kwamen in de grote zaal aan de achterkant van het huis. In de hal op de eerste verdieping hing hij portretten van leden van koningshuizen. Zijn sl",
+      "method": "canonical_title_match",
+      "qid": "Q17275899"
+    },
+    "Het loflied van Simeon": {
+      "status": "VERIFIED",
+      "canonical_title": "Het loflied van Simeon",
+      "snippet": "",
+      "method": "canonical_title_match",
+      "qid": "Q17275824"
+    },
+    "De bewening van Christus": {
+      "status": "VERIFIED",
+      "canonical_title": "De bewening van Christus",
+      "snippet": "",
+      "method": "canonical_title_match",
+      "qid": "Q17275914"
+    },
+    "Soo voer gesongen, soo na gepepen": {
+      "status": "VERIFIED",
+      "canonical_title": "Soo voer gesongen, soo na gepepen",
+      "snippet": "nst uit vooral de zeventiende eeuw. Tot de vaste collectie behoren onder meer Meisje met de parel en Gezicht op Delft van Johannes Vermeer, \"Soo voer gesongen, soo na gepepen\" van Jan Steen, De stier van Paulus Potter en De anatomische les van Dr. Nicolaes Tulp van Rembrandt van Rijn.\nHet Mauritshuis is oor",
+      "method": "canonical_title_match",
+      "qid": ""
+    }
+  },
+  "claim_provenance": {
+    "counts": {
+      "sourced": 3,
+      "unsourced": 16,
+      "total": 19,
+      "corpus": 3,
+      "grounded": 0,
+      "parametric": 16
+    },
+    "per_stop": {
+      "": {
+        "sourced": 0,
+        "unsourced": 1,
+        "total": 1
+      },
+      "Portret van Anna Wake (1605-voor 1669)": {
+        "sourced": 2,
+        "unsourced": 7,
+        "total": 9
+      },
+      "Het loflied van Simeon": {
+        "sourced": 1,
+        "unsourced": 8,
+        "total": 9
+      }
+    },
+    "claims": [
+      {
+        "stop": "",
+        "text": "Step-by-step audio guided tour of the Mauritshuis in The Hague, Netherlands, is a museum tour.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Portret van Anna Wake (1605-voor 1669)",
+        "text": "You are about to explore the Mauritshuis in The Hague.",
+        "class": "corpus",
+        "source": "https://nl.wikisource.org/wiki/Bestand:Anthony_van_Dyck_089_black_and_white_01.jpg",
+        "evidence": "Antoon van Dyck: Portret van Anna Wake (1605-voor 1669) ... Mauritshuis. 's-Gravenhage [mus.cat.], The Hague ... Mauritshuis. 's-Gravenhage'' [mus.cat ..."
+      },
+      {
+        "stop": "Portret van Anna Wake (1605-voor 1669)",
+        "text": "Your first stop is Portret van Anna Wake (1605-voor 1669).",
+        "class": "corpus",
+        "source": "https://commons.wikimedia.org/wiki/File:Anthony_van_Dyck_-_Portrait_of_Anna_Wake_(1605-before_1669)_-_240_-_Mauritshuis.jpg",
+        "evidence": "File:Anthony van Dyck - Portrait of Anna Wake (1605-before 1669) - 240 - Mauritshuis. ... label QS:Lnl,\"Portret van Anna Wake (1605-voor 1669)\"."
+      },
+      {
+        "stop": "Portret van Anna Wake (1605-voor 1669)",
+        "text": "To truly experience \"Portret van Anna Wake (1605-voor 1669),\" step back to appreciate the full effect of Van Dyck's masterful composition, which fills the canvas with light and rich detail that might otherwise elude a closer view.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Portret van Anna Wake (1605-voor 1669)",
+        "text": "This work captures Anna Wake in an elegant pose, her figure almost life-sized on the 112.5 x 99.5 cm canvas, against a subtly rendered background.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Portret van Anna Wake (1605-voor 1669)",
+        "text": "Anthony van Dyck's use of oil on canvas here showcases his signature ability to convey both the dignity and the subtle emotional depth of his subjects.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Portret van Anna Wake (1605-voor 1669)",
+        "text": "At the time of this painting, Van Dyck was at the height of his career, having recently returned to Antwerp from England, where his reputation as a leading portraitist was secured.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Portret van Anna Wake (1605-voor 1669)",
+        "text": "Van Dyck's style, marked by fluid lines and a delicate interplay of light and shadow, set him apart as a true innovator of portraiture.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Portret van Anna Wake (1605-voor 1669)",
+        "text": "Standing before this work, one can sense the quiet strength and poise of Anna Wake.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Portret van Anna Wake (1605-voor 1669)",
+        "text": "Van Dyck's rendering offers an intimate glimpse into Anna's personal world beneath her formal exterior.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Het loflied van Simeon",
+        "text": "In 1631, an artist signed his work with the monogram 'RHL 1631', marking the completion of a panel depicting the biblical subject of Simeon's Song of Praise, an oil painting by rembrandt.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Het loflied van Simeon",
+        "text": "This work, unlike Rembrandt's later unfinished depiction in 1669, placed the figures in a Gothic-style temple interior, drawing inspiration from the architecture of churches in Leiden.",
+        "class": "corpus",
+        "source": "knowledge_fallback:gemini",
+        "evidence": "Unlike Rembrandt's final, unfinished 1669 depiction of the same biblical subject in Stockholm, this 1631 work situates the figures within an intricately detailed, cavernous Gothic-style temple interio"
+      },
+      {
+        "stop": "Het loflied van Simeon",
+        "text": "This work, an oil on canvas measuring 94.5 by 107.5 cm, envelops the viewer in a dark, expansive space, reminiscent of the sackbut you stopped at a moment ago, where the interplay of light and shadow projects a sense of divine revelation.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Het loflied van Simeon",
+        "text": "De Gelder's choice to depict Simeon in such a majestic setting reflects not only the biblical narrative but also an exploration of spiritual and personal understanding.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Het loflied van Simeon",
+        "text": "Arent de Gelder, a student of Rembrandt, was deeply influenced by his master's techniques.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Het loflied van Simeon",
+        "text": "By the time he painted Het loflied van Simeon, de Gelder was at a mature stage in his career, seeking to capture the emotional depth and complexity that characterized his mentor's work.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Het loflied van Simeon",
+        "text": "The painting’s composition, with its focus on the interplay between light and dark, evokes a feeling of introspection and divine grace, drawing viewers into the intimate exchange between Simeon and the child.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Het loflied van Simeon",
+        "text": "That's 2 stops in all.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Het loflied van Simeon",
+        "text": "Sources: This tour draws on information from www.mauritshuis.nl and the Wikipedia article on the museum.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      }
+    ]
+  }
+}

@@ -1,0 +1,1708 @@
+=== LOCAL-625 isolated live run (two FRESH museums, 2 stops each) ===
+model : gpt-4o   combined cap: $1.00
+[db] audio_tours row count BEFORE: 490
+
+=== generating: Mauritshuis, The Hague, Netherlands (2 stops) ===
+  [LOCAL-603] preflight venue='Mauritshuis' status=open hours=y admission=y highlights=5
+
+======================================================================
+CALL #001 | 18:46:46.009 | GENERATE_TOUR_TEXT_FUNCTION_ENTRY
+======================================================================
+  location: Mauritshuis, The Hague, Netherlands
+  tour_type: museum
+  total_stops_parameter: 2
+  output_file: /app/tours/LOCAL625_MAURITSHUIS.txt
+
+  [LOCAL-245] Stop-existence gate mode: LOG_ONLY
+
+======================================================================
+CALL #002 | 18:46:46.017 | TOTAL_STOPS_FINALIZED
+======================================================================
+  location: Mauritshuis, The Hague, Netherlands
+  total_stops_final: 2
+  source: parameter
+
+
+PHASE 1: Analyzing tour intent with AI...
+  [Bug2Fix/D536] tour_type='museum' not prepended (pre_category='walking'); intent sees the ORIGINAL request, not the stripped one
+Intent analysis response: ```json
+{
+    "poi_type": "museums",
+    "location": "The Hague, Netherlands",
+    "theme_type": "STANDARD",
+    "theme_name": null,
+    "requirements": null,
+    "business_hours_relevant": false,
+    "accessibility_mentioned": false,
+    "needs_research": false,
+    "venue_name": "Mauritshuis",
+    "geographic_scope": "The Hague, Netherlands",
+    "named_places": [],
+    "scope_precision": "CITY",
+    "transport_mode": "on_foot",
+    "country_scope": "Netherlands"
+}
+```
+  [INTENT] Stripped LLM fences from response
+  [TRANSPORT] mode=on_foot, country_scope=Netherlands (keyword=on_foot, intent=on_foot)
+✅ Intent Analysis Results:
+   POI Type: museums
+   Location: The Hague, Netherlands
+   Requirements: None
+   Business Hours Relevant: False
+   Accessibility Mentioned: False
+   Venue Name: Mauritshuis
+  [venue_name sanity] 'Mauritshuis' OK
+  [S15] Forced tour_category=museum from venue_name='Mauritshuis'
+[TIMING] phase=intent elapsed=2.1s cumulative=2.1s
+[LOCAL-474] tour_type='museum' → category='museum' (source=explicit)
+
+Detected tour category: MUSEUM
+Using museum template for Mauritshuis, The Hague, Netherlands - museum
+
+======================================================================
+CALL #003 | 18:46:48.125 | GENERATING_PROMPT
+======================================================================
+  location: Mauritshuis, The Hague, Netherlands
+  user_request: Mauritshuis, The Hague, Netherlands
+  total_stops: 2
+
+
+PHASE 3A: Fetching 2 candidate POI(s) for Mauritshuis, The Hague, Netherlands...
+  [Museum constraint] Venue from intent='Mauritshuis'
+  [venue_resolver] Name variants: ['Mauritshuis']
+  [venue_resolver] Candidates for variant 'Mauritshuis': ['Q17324051', 'Q221092', 'Q1942873', 'Q19340088', 'Q73263055', 'Q114359096', 'Q114361267', 'Q34032879']
+    [venue_resolver] Artist link: P138 → Q321492 (John Maurice, Prince of Nassau-Siegen)
+  [venue_resolver] Resolved: 'Mauritshuis' → Q221092 (Mauritshuis)
+    URL: https://www.mauritshuis.nl
+    Coords: 52.08038888888889, 4.314305555555555
+    Language: nl
+    Artist: John Maurice, Prince of Nassau-Siegen (Q321492)
+  [venue_resolver] SPARQL: 123 works found for Q221092
+  [Phase3A] Injected 12 canonical title hints from Wikidata (QID-deduped)
+  [S17] no scope_constraint (precision='CITY', scope='The Hague, Netherlands')
+  [venue_resolver] Name variants: ['Mauritshuis']
+  [venue_resolver] Candidates for variant 'Mauritshuis': ['Q17324051', 'Q221092', 'Q1942873', 'Q19340088', 'Q73263055', 'Q114359096', 'Q114361267', 'Q34032879']
+    [venue_resolver] Artist link: P138 → Q321492 (John Maurice, Prince of Nassau-Siegen)
+  [venue_resolver] Resolved: 'Mauritshuis' → Q221092 (Mauritshuis)
+    URL: https://www.mauritshuis.nl
+    Coords: 52.08038888888889, 4.314305555555555
+    Language: nl
+    Artist: John Maurice, Prince of Nassau-Siegen (Q321492)
+  [venue_cache] HIT for Q221092 (tier=rich, expires=2026-11-07 09:47:23.363948)
+  [venue_resolver] SPARQL: 123 works found for Q221092
+  [LOCAL-30] Deterministic selection: 115 documented works (0 catalogue, 123 SPARQL; 104 site/cache canonical title(s) are NOT documented)
+  [LOCAL-30] DETERMINISTIC BYPASS: 4 documented works → Phase 3A SKIPPED
+   Stops proposed (deterministic, no GPT):
+     - Soo voer gesongen, soo na gepepen [sparql]
+     - De briefschrijfster [sparql]
+  [venue_resolver] Name variants: ['Mauritshuis']
+  [venue_resolver] Candidates for variant 'Mauritshuis': ['Q17324051', 'Q221092', 'Q1942873', 'Q19340088', 'Q73263055', 'Q114359096', 'Q114361267', 'Q34032879']
+    [venue_resolver] Artist link: P138 → Q321492 (John Maurice, Prince of Nassau-Siegen)
+  [venue_resolver] Resolved: 'Mauritshuis' → Q221092 (Mauritshuis)
+    URL: https://www.mauritshuis.nl
+    Coords: 52.08038888888889, 4.314305555555555
+    Language: nl
+    Artist: John Maurice, Prince of Nassau-Siegen (Q321492)
+  [venue_cache] HIT for Q221092 (tier=rich, expires=2026-11-07 09:47:23.363948)
+  [venue_resolver] SPARQL: 123 works found for Q221092
+  [LOCAL-30] Deterministic selection: 115 documented works (0 catalogue, 123 SPARQL; 104 site/cache canonical title(s) are NOT documented)
+  [LOCAL-328] Quality score map: 3 objects scored (source-weighted, sludge excluded)
+  [LOCAL-30] DETERMINISTIC BYPASS: 4 documented works → Phase 3A SKIPPED
+   Stops proposed (deterministic, quality-score ranked):
+     - Portret van Anna Wake (1605-voor 1669) [canonical] (quality=12.0)
+     - Het loflied van Simeon [sparql] (quality=9.0)
+  [R4] Museum tour: asking for 4 candidates (2x for D1v2 filtering)
+
+PHASE 3A: SKIPPED (deterministic fill from 4 documented works)
+OK PHASE 3A parsed 4 candidate POI(s):
+   - Portret van Anna Wake (1605-voor 1669)
+   - Het loflied van Simeon
+   - De bewening van Christus
+   - Soo voer gesongen, soo na gepepen
+  [venue_resolver] Name variants: ['Mauritshuis']
+  [venue_resolver] Candidates for variant 'Mauritshuis': ['Q17324051', 'Q221092', 'Q1942873', 'Q19340088', 'Q73263055', 'Q114359096', 'Q114361267', 'Q34032879']
+    [venue_resolver] Artist link: P138 → Q321492 (John Maurice, Prince of Nassau-Siegen)
+  [venue_resolver] Resolved: 'Mauritshuis' → Q221092 (Mauritshuis)
+    URL: https://www.mauritshuis.nl
+    Coords: 52.08038888888889, 4.314305555555555
+    Language: nl
+    Artist: John Maurice, Prince of Nassau-Siegen (Q321492)
+  [D1v2] Venue resolved: Q221092 → URL=https://www.mauritshuis.nl, lang=nl
+  [venue_cache] HIT for Q221092 (tier=rich, expires=2026-11-07 09:47:23.363948)
+  [D1v2] Cache HIT: 126 canonical titles (tier=rich), 0 catalogue works, combined_text=120958 chars
+  [LOCAL-24] Classification: 126 works, 0 galleries, 0 excluded
+  [D1v2-LOCAL24] After filter: 126 works, 0 galleries, 0 excluded
+  [venue_resolver] Built 195 dynamic aliases from 96 works
+  [D1v2] Injected 195 dynamic aliases
+  [D1v2] Built bilingual map: 430 word pairs
+  [D1v2] Artist-check: valid creator 'John Maurice, Prince of Nassau-Siegen' (Q321492)
+  [D1v2] VERIFIED 'Portret van Anna Wake (1605-voor 1669)' → canonical: 'Portret van Anna Wake (1605-voor 1669)'
+  [D1v2] VERIFIED 'Het loflied van Simeon' → canonical: 'Het loflied van Simeon'
+  [D1v2] VERIFIED 'De bewening van Christus' → canonical: 'De bewening van Christus'
+  [D1v2] VERIFIED 'Soo voer gesongen, soo na gepepen' → canonical: 'Soo voer gesongen, soo na gepepen'
+  [D1v2] 4/4 works verified — tier: rich
+  [D1] Tier: rich (4 verified works)
+  [R4] Target reached: 4/2 stops
+  [LOCAL-16 GATE] All 4 stops cleared the gate ✓
+
+PHASE 4.5: Validating AI knowledge for Mauritshuis, The Hague, Netherlands...
+OK Knowledge validation passed: Knowledge validation passed
+
+PHASE 4: skipped (tour_category='museum', no type-verification required)
+  [LOCAL-212] Coverage selection: 0 COVERED, fallback needed: 2×VENUE_ONLY (not enough covered candidates to fill 2 stops)
+  [LOCAL-212] Selected: ['Portret van Anna Wake (1605-voor 1669)=VENUE_ONLY', 'Het loflied van Simeon=VENUE_ONLY']
+  [LOCAL-212] Dropped:  ['De bewening van Christus=VENUE_ONLY', 'Soo voer gesongen, soo na gepepen=EMPTY']
+  [LOCAL-349] Yield scores (selected): ['Portret van Anna Wake (1605-voor 1669)=12.0', 'Het loflied van Simeon=9.0']
+[LOCAL-197] llm_cost() called with total_tokens (deprecated) by /app/generate_tour_text.py:12379. Caller should supply input_tokens and output_tokens separately.
+[LOCAL-197] llm_cost() called with total_tokens (deprecated) by /app/generate_tour_text.py:12380. Caller should supply input_tokens and output_tokens separately.
+[OSM-VENUE] Overpass ReadTimeout for 'Portret van Anna Wake (1605-voor 1669)' (attempt 1/2)
+[OSM-VENUE] Overpass ReadTimeout for 'Portret van Anna Wake (1605-voor 1669)' (attempt 2/2)
+[OSM-VENUE] Overpass ReadTimeout for 'Het loflied van Simeon' (attempt 1/2)
+[OSM-VENUE] Overpass HTTP 502 for 'Het loflied van Simeon'
+[LOCAL-197] llm_cost() called with total_tokens (deprecated) by /app/generate_tour_text.py:12930. Caller should supply input_tokens and output_tokens separately.
+[LOCAL-197] llm_cost() called with total_tokens (deprecated) by /app/fact_extractor.py:220. Caller should supply input_tokens and output_tokens separately.
+  [LOCAL-349] Yield scores (dropped):  ['De bewening van Christus=1.0', 'Soo voer gesongen, soo na gepepen=0.0']
+  [EXISTENCE-GATE] LOG_ONLY — 4/4 stops verified (100%), 0 would be dropped
+    [VERIFIED] 'Portret van Anna Wake (1605-voor 1669)' — venue_corpus canonical_title: 'Portret van Anna Wake (1605-voor 1669)' at 'Mauri
+    [VERIFIED] 'Het loflied van Simeon' — venue_corpus canonical_title: 'Het loflied van Simeon' at 'Mauritshuis, The Hagu
+    [VERIFIED] 'De bewening van Christus' — venue_corpus canonical_title: 'De bewening van Christus' at 'Mauritshuis, The Ha
+    [VERIFIED] 'Soo voer gesongen, soo na gepepen' — venue_corpus canonical_title: 'Soo voer gesongen, soo na gepepen' at 'Mauritshui
+    [HARVEST] 'Soo voer gesongen, soo na gepepen': verified_no_detail (name match only, no facts in source)
+    [HARVEST] Summary: 0 harvested, 3 already had corpus, 1 verified_no_detail
+    [INTERPRETIVE] 'Portret van Anna Wake (1605-voor 1669)': +2 passages (2 queries)
+    [INTERPRETIVE] 'Het loflied van Simeon': +2 passages (2 queries)
+    [INTERPRETIVE] 'Soo voer gesongen, soo na gepepen': +1 passages (3 queries)
+    [INTERPRETIVE] DROPPED attributed quote for 'Soo voer gesongen, soo na gepepen': 'Jan Steen' — no_primary_source_found_for:Jan Steen
+    [INTERPRETIVE] Summary: 3 stops enriched, +5 passages, 9 queries issued, 1 attributions dropped
+
+PHASE 3B: Requesting structured details and walking directions for 2 stop(s)...
+
+======================================================================
+CALL #004 | 18:47:42.359 | PHASE_3B_REQUEST
+======================================================================
+  location: Mauritshuis, The Hague, Netherlands
+  stop_count: 2
+
+PHASE 3B API call cost: $0.0026 (551 tokens)
+OK PHASE 3B: ordered 2 stop(s) with structured details and directions
+  [LOCAL-27] Corpus-sourced metadata applied to 2 stops
+  [LOCAL-35] Visitor info page found (en): https://www.mauritshuis.nl/en/visit
+  [LOCAL-35] Extracted from https://www.mauritshuis.nl/en/visit: closed=[], hours=1, admission='€21'
+  [LOCAL-35] Final Museum Information: Monday, 13:00–18:00. €21
+  [LOCAL-39] Museum Information sourced from official site for stop 1
+  [LOCAL-355] Querying OSM for venue facts (city: Hague, hint: museum)
+  [LOCAL-355] Portret van Anna Wake (1605-voor 1669): no practical facts in OSM
+  [LOCAL-355] Het loflied van Simeon: no practical facts in OSM
+  [LOCAL-622] OSM lookup budget: spent=35.5s / limit=120s, skipped=0
+   Coords cluster detected: 2 stops share '52.0806, 4.3124', refetching...
+   Cluster refetch OK 'Het loflied van Simeon': 52.0804, 4.3134
+   Cluster refetch OK 'Portret van Anna Wake (1605-voor 1669)': 52.0805, 4.3130
+Extracted first POI coordinates: (52.0805, 4.313)
+  [D4] Museum single-coordinate: all stops set to (52.0805, 4.313) (source: model (fallback))
+
+=== Extracted POI Information ===
+1. Portret van Anna Wake (1605-voor 1669)
+   Address: Plein 29, 2511 CS Den Haag, Netherlands
+   Coordinates: 52.0805, 4.313
+   Directions: From Den Haag Centraal Station, head southwest on Bezuidenhoutseweg toward Anna ...
+2. Het loflied van Simeon
+   Address: Plein 29, 2511 CS Den Haag, Netherlands
+   Coordinates: 52.0805, 4.313
+   Directions: Exit the room and turn left, heading toward the main hallway. Continue straight ...
+================================
+
+[TIMING] phase=poi_selection elapsed=100.9s cumulative=103.0s
+
+[Storied] STORIED_MODE=true — generating spine + fact sheets...
+  [§3-adapter] Extracting story elements from 5/6 corpus pages for 'Mauritshuis'
+    page[0] score=13440 url=https://nl.wikipedia.org/wiki/Mauritshuis
+    page[1] score=13440 url=https://nl.wikipedia.org/wiki/Mauritshuis
+    page[2] score=10055 url=https://en.wikipedia.org/wiki/Mauritshuis
+  [§3-adapter] No elements extracted from 5 pages
+  [LOCAL-37] Three-class retrieval: 2 stops processed, 0 with category
+  [SQ-S6b] Insufficient data for thread discovery (elements=0, stops=2)
+  [SQ-S6b] Thread discovery: mode=mosaic, threads=0
+  [§3] No story elements available — spine will use invented arc (mode=invented)
+SPINE_COST: category=museum venue=Mauritshuis model=gpt-4o tokens=1068 (in=648 out=420) cost=$0.0058 latency=5.3s
+[COST_METER] FRESH | spine_generate | $0.005820 | user=None | job=None
+  [LOCAL-278] Spine cost folded into total: $0.0058
+  [LOCAL-111] Spine quality: 3/4 | {'climax_position': False, 'unique_emotional_beats': True, 'valid_callbacks': True, 'closing_revelation_length': True}
+  [Storied] Spine generated: 2 arc entries (mode=invented)
+  [LOCAL-183] stop_corpus: 2/2 stops have per-stop passages (16 total passages)
+  [LOCAL-198] Corpus gate: ENABLED — checking stop coverage...
+  [CORPUS-GATE] stop='Portret van Anna Wake (1605-voor 1669)' verdict=VENUE_ONLY action=SHORTENED
+  [CORPUS-GATE] stop='Het loflied van Simeon' verdict=VENUE_ONLY action=SHORTENED
+  [LOCAL-198] Corpus gate: 0 PASSED, 0 CREATOR_ONLY, 0 EMPTY, 2 SHORTENED
+  [Storied] Fact sheets: 2/2 generated
+  [S25] Story types assigned: ['art', 'history']
+  [work_stories] MISS for portret van anna wake 1605voor 1669
+  [work_stories] MISS for het loflied van simeon
+  [LOCAL-37] Tour diversity: no swaps needed (naturally balanced)
+  [LOCAL-188] Style constraints ACTIVE (declarative prose rules injected)
+[TIMING] phase=fact_sheets elapsed=11.9s cumulative=114.9s
+
+PHASE 5: Generating detailed descriptions for each POI (parallel)...
+
+  [LOCAL-382] framing=none source='-'
+[TIMING] phase=narration elapsed=0.0s cumulative=114.9s
+  [D495] venue domain seeded tier1: mauritshuis.nl
+
+  [LOCAL-410] SERP search wiring — searching for stories on 2 stops...
+  [work_stories] MISS for het loflied van simeon
+  [work_stories] MISS for portret van anna wake 1605voor 1669
+  [LOCAL-441] Batch P856 check: 8 domains, budget=20.0s, pool=10
+  [LOCAL-441] Batch P856 check: 8 domains, budget=20.0s, pool=10
+  [DEAD-HOST] Marked cold: wikimedia (timeout/network error for balat.kikirpa.be: The read operation timed out)
+  [SQ-S2] Wikidata P856 check failed for balat.kikirpa.be: The read operation timed out
+  [SQ-S2] Wikidata P856 check failed for the-low-countries.com: The read operation timed out
+  [SQ-S2] Wikidata P856 check failed for fr.wikipedia.org: The read operation timed out
+  [SQ-S2] Wikidata P856 check failed for commons.wikimedia.org: The read operation timed out
+  [SQ-S2] Wikidata P856 check failed for wikidata.org: The read operation timed out
+  [SQ-S2] Wikidata P856 check failed for nl.wikipedia.org: The read operation timed out
+  [SQ-S2] Wikidata P856 check failed for nl.wikisource.org: The read operation timed out
+  [SQ-S2] Wikidata P856 check failed for codart.nl: The read operation timed out
+  [LOCAL-441] Batch complete: 3.1s, 0 tier1, 8 unverified, 0 budget-expired
+  [SQ-S2] Wikidata P856 check failed for the-low-countries.com: The read operation timed out
+  [SQ-S2] Wikidata P856 check failed for wikidata.org: The read operation timed out
+  [SQ-S2] Wikidata P856 check failed for codart.nl: The read operation timed out
+  [SQ-S2] Wikidata P856 check failed for nl.wikipedia.org: The read operation timed out
+  [SQ-S2] Wikidata P856 check failed for artway.eu: The read operation timed out
+  [SQ-S2] Wikidata P856 check failed for artsandculture.google.com: The read operation timed out
+  [SQ-S2] Wikidata P856 check failed for statenvertaling.net: The read operation timed out
+  [LOCAL-441] Batch complete: 3.1s, 1 tier1, 7 unverified, 0 budget-expired
+    [D500] Stop 1: placeholder cleared from ['publisher', 'credit_line', 'medium', 'artist'] — unknown, not 'Not specified'
+    [LOCAL-486] Stop 1 worthiness: score=1/4 mine=True — has specific_title
+    [D489] material kind: stop='Portret van Anna Wake (1605-voor 1669)' kind=active volume=COVERED sentences=50 active=2 staked=0 eventful=0 passive=1  <-- DISAGREE: enough material, wrong kind
+         best: "In 1936, Sir Henri Deterding (1866-1939) donated five important paintings to the museum, including Girl Eating Oysters by Jan Steen and Gera"
+    [LOCAL-489] Stop 1 needs more material (eventless): 23 passages, 3796 chars, verdict=COVERED
+[LOCAL-197] llm_cost() called with total_tokens (deprecated) by /app/generate_tour_text.py:17398. Caller should supply input_tokens and output_tokens separately.
+      [LOCAL-489] +5 from: "Portret van Anna Wake (1605-voor 1669)" "Mauritshuis" provenance
+      [LOCAL-498] after replenishment: kind active -> active, 3796 -> 4491 chars, eventful=0 (NO CHANGE — the round bought more of the same)
+         best now: "In 1936, Sir Henri Deterding (1866-1939) donated five important paintings to the museum, including Girl Eating"
+    [LOCAL-488] step 4: 2 providers, 12 leads, 0 with cross-model agreement, 1 SERP-confirmed
+      → injected 1 confirmed lead(s) ahead of the SERP snippets
+    Stop 1 'Portret van Anna Wake (1605-voor 1669)': queries=3 serp_results=23 snippets=29
+      → 1816 The painting was acquired by the Mauritshuis
+      → ... Anthony van Dyck Portret ...
+    [D500] Stop 2: placeholder cleared from ['publisher', 'credit_line', 'medium', 'artist'] — unknown, not 'Not specified'
+    [LOCAL-486] Stop 2 worthiness: score=1/4 mine=True — has specific_title
+    [D489] material kind: stop='Het loflied van Simeon' kind=active volume=COVERED sentences=40 active=3 staked=0 eventful=0 passive=1  <-- DISAGREE: enough material, wrong kind
+         best: "Die leerde hem schilderen met een brede toets, donkere ..."
+    [LOCAL-489] Stop 2 needs more material (eventless): 21 passages, 3634 chars, verdict=COVERED
+      [LOCAL-489] +8 from: "Het loflied van Simeon" "Mauritshuis" provenance
+      [LOCAL-498] after replenishment: kind active -> active, 3634 -> 4825 chars, eventful=0 (NO CHANGE — the round bought more of the same)
+         best now: "Die leerde hem schilderen met een brede toets, donkere ..."
+    [LOCAL-488] step 4: 2 providers, 10 leads, 2 with cross-model agreement, 2 SERP-confirmed
+      → injected 2 confirmed lead(s) ahead of the SERP snippets
+    Stop 2 'Het loflied van Simeon': queries=3 serp_results=21 snippets=31
+      → 1822 The Mauritshuis museum was established in The Hague
+      → 1631 Rembrandt painted "Het loflied van Simeon"
+
+  [LOCAL-410] SERP search complete: 8 queries, 57 results, 60 total snippets
+  [LOCAL-411] Snippet ranking+capping enabled: cap=5/stop, 60 raw → max 10 injected
+
+  [LOCAL-410] CHAIN INSTRUMENTATION:
+    Portret van Anna Wake (1605-voor 1669): serp_results=23 elements_extracted=- beats_injected=- (measured post-generation)
+    Het loflied van Simeon: serp_results=21 elements_extracted=- beats_injected=- (measured post-generation)
+  [D534] Stop 1 has 29 snippet(s) but they are VENUE-level only — fetching object-level facts
+  [D533] Stop 1 'Portret van Anna Wake (1605-voor 1669)' has 29 snippet(s) — asking the knowledge fallback
+  [D533] +8 fact(s) via gemini (8 high-confidence) — stop will be labelled aloud
+      [high] The portrait was painted in 1628 by Flemish artist Anthony van Dyck (born Antwerp 1599, died London 1641).
+      [high] It is an oil on canvas painting measuring 112.5 cm in height by 99.3 cm in width, held in the Mauritshuis unde
+      [high] The canvas is signed and dated to the left of center with the inscription 'AET. SUA 22. AN 1628 / Ant.° van di
+      [high] The painting depicts Anna Wake holding an ostrich feather fan and wearing a black gown trimmed with Flemish bo
+      [high] The work was commissioned as a marriage pendant to Van Dyck's 1627 portrait of her husband, the Antwerp cloth 
+      [high] Because Stevens had already been painted in 1627 looking toward his left, Van Dyck was obliged to reverse trad
+  [D534] Stop 2 has 31 snippet(s) but they are VENUE-level only — fetching object-level facts
+  [D533] Stop 2 'Het loflied van Simeon' has 31 snippet(s) — asking the knowledge fallback
+  [D533] +7 fact(s) via gemini (7 high-confidence) — stop will be labelled aloud
+      [high] The painting was created in 1631 in Leiden by Dutch artist Rembrandt van Rijn (1606–1669) during the final mon
+      [high] It is executed in oil on an oak panel measuring 60.9 cm in height by 47.9 cm in width.
+      [high] The panel is signed and dated by the artist with the monogram 'RHL 1631'.
+      [high] It bears inventory number 145 in the Mauritshuis collection in The Hague.
+      [high] The painting entered the stadholder collection early in its history, recorded in the possession of Prince Fred
+      [high] During the Napoleonic Wars, French troops took the painting from the stadholder collection to Paris in 1795 fo
+  [D533] Knowledge fallback filled 2 starved stop(s)
+[TIMING] phase=external_lookups elapsed=54.7s cumulative=169.6s
+
+Generating description for Stop 1: Portret van Anna Wake (1605-voor 1669) by , ...
+
+Generating description for Stop 2: Het loflied van Simeon by , ...
+  [LOCAL-381] stop='Portret van Anna Wake (1605-voor 1669)' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-381] stop='Het loflied van Simeon' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-411] Stop 1 snippet ranking: input=37 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=5 output=5 usable=5 (t1t2=1, t3=0, market=0)
+    Top scores: [('Portret van Anna Wake (1605-voor 1669)', 23, ''), ('Portret van Anna Wake (1605-voor 1669)', 15, ''), ('Portret van Anna Wake (1605-voor 1669)', 13, '')]
+  [LOCAL-411] Stop 2 snippet ranking: input=38 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=5 output=5 usable=5 (t1t2=1, t3=0, market=0)
+    Top scores: [('Het loflied van Simeon', 16, ''), ('Het loflied van Simeon', 14, ''), ('Het loflied van Simeon', 12, 'tier1')]
+  [LOCAL-620] Stop 1 evidence balance: input=5 kept_rich=3 kept_story=0 dropped_boilerplate=0 output=3
+  [LOCAL-402] Stop 1: injected 3 snippets as reference material
+  [LOCAL-620] Stop 2 evidence balance: input=5 kept_rich=2 kept_story=0 dropped_boilerplate=0 output=2
+  [LOCAL-402] Stop 2: injected 2 snippets as reference material
+  [LOCAL-620] prefs: default/balanced (no user_id)
+  [LOCAL-617] Stop 1: narration contract injected (reception_evidence=False)
+  [D533] Stop 1 corpus-gate restriction LIFTED — 37 source item(s) arrived after the gate ran
+  [LOCAL-411] Stop 1 prompt size: before_snippets=10634 after=27882 (+17248 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (27882)
+  [LOCAL-620] prefs: default/balanced (no user_id)
+  [LOCAL-617] Stop 2: narration contract injected (reception_evidence=False)
+  [D533] Stop 2 corpus-gate restriction LIFTED — 38 source item(s) arrived after the gate ran
+  [LOCAL-411] Stop 2 prompt size: before_snippets=10939 after=27471 (+16532 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (27471)
+  [D498] Stop 1 matrix: 3/9 slots filled — empty: ['artist', 'publisher', 'printed_by', 'medium', 'credit_line', 'focus_fact']
+  [D498] Stop 2 matrix: 3/9 slots filled — empty: ['artist', 'publisher', 'printed_by', 'medium', 'credit_line', 'focus_fact']
+  [D500] agents 0/3: hero=—, sponsor=—, builder=—
+  [D500] agents 0/3: hero=—, sponsor=—, builder=—
+  [LOCAL-490] Stop 1 story pass: ok=True (3 sentences), $0.0044
+    story: "The portrait of Anna Wake was originally commissioned by Peeter Stevens as a marriage pendant to accompany Van Dyck's 1627 portrait of himself. After "
+  [LOCAL-408] Prompt dump written to: /app/prompt_dump_stop1.txt
+  [LOCAL-490] Stop 2 story pass: ok=True (3 sentences), $0.0044
+    story: "In 1631, an artist signed his work with the monogram 'RHL 1631', marking the completion of a panel depicting the biblical subject of Simeon's Song of "
+Stop 1 API call cost: $0.0351 (7390 tokens, model=gpt-4o)
+  [LOCAL-569] Stop 1 attempt 1/5 story_count=2 words=268
+  [LOCAL-432] Stop 1: STORY RETRY — story_count=2 < 3, need 1 more, retrying (attempt 2/5)
+Stop 2 API call cost: $0.0343 (7214 tokens, model=gpt-4o)
+  [LOCAL-569] Stop 2 attempt 1/5 story_count=2 words=268
+  [LOCAL-432] Stop 2: STORY RETRY — story_count=2 < 3, need 1 more, retrying (attempt 2/5)
+Stop 1 API call cost: $0.0371 (7808 tokens, model=gpt-4o)
+  [LOCAL-569] Stop 1 attempt 2/5 story_count=3 words=295
+Stop 1 description word count: 295 words
+  [LOCAL-407] Stop 1: snippets injected but no candidate specifics extracted
+Stop 2 API call cost: $0.0364 (7661 tokens, model=gpt-4o)
+  [LOCAL-569] Stop 2 attempt 2/5 story_count=3 words=315
+[LOCAL-197] llm_cost() called with total_tokens (deprecated) by /app/generate_tour_text.py:18796. Caller should supply input_tokens and output_tokens separately.
+Stop 2 description word count: 315 words
+  [LOCAL-407] Stop 2: snippets injected but no candidate specifics extracted
+  [LOCAL-414] Stop 2: SCRUBBED banned phrases from output: ['a testament to', 'stands as a testament']
+
+  [LOCAL-439] STORY GATE: checking story-units per stop (D394)...
+    ✗ FAIL stop='Portret van Anna Wake (1605-voor 1669)': story_units=0, entities_ok=True, thesis_ok=True
+      → story_units=0: no candidate story-unit of ≥3 sentences passes classification (need at least 1 with named person, real actions, arc)
+    ✗ FAIL stop='Het loflied van Simeon': story_units=0, entities_ok=True, thesis_ok=True
+      → story_units=0: no candidate story-unit of ≥3 sentences passes classification (need at least 1 with named person, real actions, arc)
+  [LOCAL-439] Classification cost: $0.001919 (input=8016, output=1195)
+  [LOCAL-439] STORY GATE: SOME STOPS FAILED (informational — does not block delivery)
+
+  [LOCAL-423] STORY VERIFICATION: checking claims against sources...
+    ✓ PASS stop='Portret van Anna Wake (1605-voor 1669)': claims=3, sourced=3, unsourced=0, contradicted=0
+      evidence (3 sourced claims):
+        claim='commissioned by Peeter Stevens' ← 
+        claim='in 1668' ← https://www.mauritshuis.nl/ontdek-collectie/kunstwerken/239-
+        claim='in 1768' ← 
+    ✗ FAIL stop='Het loflied van Simeon': claims=4, sourced=3, unsourced=1, contradicted=0
+      → UNSOURCED: 'Gelder created another' (attribution) — no snippet contains this assertion
+      evidence (3 sourced claims):
+        claim='1631' ← 
+        claim='in 1669' ← https://commons.wikimedia.org/wiki/File:Het_loflied_van_Sime
+        claim='in 1733' ← https://www.mauritshuis.nl/ontdek-collectie/kunstwerken/145-
+  [LOCAL-423] STORY VERIFICATION: SOME STOPS HAVE UNSOURCED CLAIMS
+  [LOCAL-423] Unsourced claims will be stripped from delivered text
+    [LOCAL-423] Stripped 1 sentence(s) from 'Het loflied van Simeon':
+      ✗ "Fast forward to the early 18th century, between 1700 and 1710, when Arent de Gelder created another "
+
+  [LOCAL-192] PHASE 5.1: Style validation + per-paragraph retry...
+  [LOCAL-192] Stop 1 para 3: retry FIXED (R2_QUESTION)
+  [LOCAL-192] Style retry summary: 1 paragraphs retried, 1 fixed/improved, 0 kept original
+  [LOCAL-192] Retry cost: $0.0023 (478 tokens)
+
+  [LOCAL-255] PHASE 5.13: R1 imperative rewrite...
+  [LOCAL-255] R1 summary: 0 rewritten, 0 deleted, 0 stops affected, LLM tokens: 0 ($0.0000)
+
+  [LOCAL-251] PHASE 5.14: R7 hallucinated-sensory deletion...
+  [LOCAL-251] R7 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-261] PHASE 5.141: R2 question deletion...
+  [LOCAL-261] R2 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-261] PHASE 5.142: R3 suggestive-exploration deletion...
+  [LOCAL-261] R3 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-261] PHASE 5.143: R4 prescribed-feeling deletion...
+  [LOCAL-261] R4 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-261] PHASE 5.144: R8 prompt-leakage deletion...
+  [LOCAL-261] R8 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-216] PHASE 5.15: R9 generic-sentence deletion...
+  [LOCAL-216] R9 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-235] PHASE 5.155: R10 unfulfilled-promise deletion...
+  [LOCAL-235] R10 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-472] PHASE 5.152: Stop-specificity gate...
+  [LOCAL-472] Stop-specificity gate summary:
+    Stops checked: 2
+    Paragraphs checked: 4
+    Transferable (high, removed): 0
+    Transferable (low conf, kept): 0
+    Last-paragraph protected: 0
+    Ungrounded named entities: 3
+    Stops affected: 0
+    [LOCAL-472] UNGROUNDED entity stop='Portret van Anna Wake (1605-voor 1669)' entity='Anthony van Dyck' reason='It does not specify that Van Dyck painted this portrait at this stop.' in: "Anthony van Dyck's use of oil on canvas here showcases his signature ability to convey both the dign"
+    [LOCAL-472] UNGROUNDED entity stop='Portret van Anna Wake (1605-voor 1669)' entity='Van Dyck' reason='It does not specify that Van Dyck painted this portrait at this stop.' in: "Anthony van Dyck's use of oil on canvas here showcases his signature ability to convey both the dign"
+    [LOCAL-472] UNGROUNDED entity stop='Portret van Anna Wake (1605-voor 1669)' entity='Van Dyck' reason='It does not specify that Van Dyck painted this portrait.' in: "Standing before this work, one can sense the quiet strength and poise of Anna Wake. As the eldest da"
+
+  [LOCAL-263] PHASE 5.156: Unsupported-claim gate...
+  [LOCAL-263] Unsupported-claim gate summary:
+    Sentences removed: 0
+    Sentences kept (substantiated): 0
+    By type: PROMISE=0, SENSORY=0, FEELING=0, QUALITY=0
+    Escalation calls: 0
+    Stops affected: 0
+    Deletion rate: 0.0% (0/20)
+
+  [LOCAL-269] PHASE 5.157: Unglossed-reference gate...
+  [LOCAL-269] Unglossed-reference gate summary (LOCAL-287: compose, not splice):
+    References detected: 3
+    Glossed (composed): 3
+    Suppressed (already explained): 0
+    Degraded (name dropped): 0
+    Guard failures: 0
+    Known (skipped): 0
+    Triage: 725 tokens, $0.0001, 1.7s
+    Gloss: 214 tokens, $0.0000, 1.1s
+    Compose: 1091 tokens, $0.0002, 3.8s
+    Total added cost: $0.0004
+    Stops affected: 2
+    Glosses applied:
+      • Van Dyck → "the most important portraitist of his day" [source: corpus]
+      • Stadtholder Prince Willem → "the last stadtholder of the Dutch Republic" [source: model]
+      • Praise → "an oil painting by rembrandt" [source: corpus]
+
+  [LOCAL-458] entity gate SKIPPED: no exhibition scope (unscoped museum tour)
+
+  [LOCAL-458] entity gate SKIPPED: no exhibition scope (unscoped museum tour)
+
+  [LOCAL-385] Form-claim gate SKIPPED (no exhibition scope — unscoped museum tours are not gated)
+
+  [LOCAL-389] Numeric-claim gate SKIPPED (no exhibition scope — unscoped museum tours are not gated)
+
+  [LOCAL-402] PHASE 5.161: Temporal coherence gate (impossible relations)...
+  [LOCAL-402] Temporal coherence gate summary:
+    Relations checked: 23
+    Relations rejected: 0
+    Sentences removed: 0
+    Stops affected: 0
+
+  [LOCAL-229] PHASE 5.16: CONTRADICTED claim block (D100 enforcement)...
+  [LOCAL-229] BLOCKED Stop 1 'Portret van Anna Wake (1605-vo': claim='1627 (in context: "arriage pendant to accompany Van Dyck's 1' contradicted_by='Hague. Anna Wake (1605-before 1669) was the wife of Peeter Stevens (c. 1590-1668' → DROPPED
+  [LOCAL-229] CONTRADICTED block summary: 1 group(s) blocked, 1 stop(s) affected
+  [LOCAL-229] Block log (1 entries):
+    stop=1 claim='1627 (in context: "arriage pendant to accompany Va' evidence='Hague. Anna Wake (1605-before 1669) was the wife o' action=DROPPED
+
+PHASE 5.5a: Post-description knowledge validation (all tour types)...
+OK Post-description validation passed: Knowledge validation passed
+
+PHASE 5.5b: Validating descriptions are inside 'Mauritshuis'...
+   Authority: 1 D1v2-verified (kept unconditionally), 0 unverified (will check)
+   Pre-filter: 0 clean, 0 suspect (will call OpenAI for suspect only)
+OK PHASE 5.5b: 2 stop(s) passed venue description validation
+OK PHASE 5.7: Dangling-reference scrub complete (2 stops)
+
+  [LOCAL-318] PHASE 5.7b: Dangling-demonstrative scrub...
+  [LOCAL-318] Dangling-demonstrative scrub summary:
+    Detected: 0
+    Repaired (name substituted): 0
+    Deleted (unrepairable): 0
+    Stops affected: 0
+OK PHASE 5.7b: Dangling-demonstrative scrub complete
+
+PHASE 5.8: Type/prose contradiction check (LOCAL-27)...
+  [LOCAL-27] No type/prose contradictions detected
+
+PHASE 5.9: Audio-native cleanup (LOCAL-41)...
+  [LOCAL-41] Stripped 0 trailing question(s), removed 0 'broader context' instance(s)
+
+  [D498] step 7c: most valuable stop is 2 'Het loflied van Simeon' (index 70) — allowance 5 -> 7 sentences on regeneration, story currently 3 sentence(s)
+
+  [LOCAL-487] step 7a: 2 stop(s) have NO VALID STORY by Michael's bar (3+ consecutive sentences, one person, an action and something at stake)
+    stop 1 'Portret van Anna Wake (1605-voor 1669)': the longest run (3 sentences, Anthony van Dyck) has agency=1 stakes=0 — someone is described, but nothing is r
+    stop 2 'Het loflied van Simeon': the longest run (4 sentences, De Gelder) has agency=0 stakes=1 — someone is described, but nothing is risked, 
+    [LOCAL-487] cap=1: retrying only the weakest — stop 1 'Portret van Anna Wake (1605-voor 1' (index 59)
+  [D534] No cross-stop repetition in the drafts
+
+  [LOCAL-474] PHASE 5.17: retry 'Portret van Anna Wake (1605-voor 1669)' — 295w → 190w after gates, 8 sentence(s) removed
+    removed: "The portrait of Anna Wake was originally commissioned by Peeter Stevens as a marriage pendant to acc"
+    removed: "After Stevens's death in 1668, his collection, including this portrait, remained intact until it was"
+    removed: "A century later, in 1768, Slingelandt's estate sold the painting to Stadtholder Prince Willem V, mar"
+    removed: "Standing before this work, one might feel drawn into the quiet strength and poise of Anna Wake."
+    removed: "As the eldest daughter of a prominent family, and the wife of a successful cloth merchant, her portr"
+    removed: "Yet, there is an intimacy in Van Dyck's rendering, a glimpse into Anna's personal world, layered ben"
+    removed: "This painting not only captures her likeness but also reflects the broader cultural and social milie"
+    removed: "What deeper truths might be hidden in a painting not just about the sitter, but also about the artis"
+    [LOCAL-491] step 7b: rotating to the venue fact — institutional context; weakest, but it scopes the search
+      focus: "Portret van Anna Wake (1605-voor 1669) is held at Mauritshuis."
+
+  [LOCAL-474] PHASE 5.17: retry 'Het loflied van Simeon' — 257w → 262w after gates, 1 sentence(s) removed
+    removed: "In 1631, an artist signed his work with the monogram 'RHL 1631', marking the completion of a panel d"
+    [LOCAL-491] step 7b: rotating to the venue fact — institutional context; weakest, but it scopes the search
+      focus: "Het loflied van Simeon is held at Mauritshuis."
+
+  [LOCAL-526] PHASE 5.17: regenerating 2 eligible stop(s) concurrently (max_workers=2)
+
+Generating description for Stop 1: Portret van Anna Wake (1605-voor 1669) by , ...
+  [LOCAL-381] stop='Portret van Anna Wake (1605-voor 1669)' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-411] Stop 1 snippet ranking: input=37 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=5 output=5 usable=5 (t1t2=1, t3=0, market=0)
+    Top scores: [('Portret van Anna Wake (1605-voor 1669)', 23, ''), ('Portret van Anna Wake (1605-voor 1669)', 15, ''), ('Portret van Anna Wake (1605-voor 1669)', 13, '')]
+  [LOCAL-620] Stop 1 evidence balance: input=5 kept_rich=3 kept_story=0 dropped_boilerplate=0 output=3
+  [LOCAL-402] Stop 1: injected 3 snippets as reference material
+  [LOCAL-620] prefs: default/balanced (no user_id)
+  [LOCAL-617] Stop 1: narration contract injected (reception_evidence=False)
+  [D533] Stop 1 corpus-gate restriction LIFTED — 37 source item(s) arrived after the gate ran
+  [LOCAL-411] Stop 1 prompt size: before_snippets=10634 after=27882 (+17248 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (27882)
+  [D498] Stop 1 matrix: 4/9 slots filled — empty: ['artist', 'publisher', 'printed_by', 'medium', 'credit_line']
+  [D500] agents 0/3: hero=—, sponsor=—, builder=—
+
+Generating description for Stop 2: Het loflied van Simeon by , ...
+  [LOCAL-381] stop='Het loflied van Simeon' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-411] Stop 2 snippet ranking: input=38 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=5 output=5 usable=5 (t1t2=1, t3=0, market=0)
+    Top scores: [('Het loflied van Simeon', 16, ''), ('Het loflied van Simeon', 14, ''), ('Het loflied van Simeon', 12, 'tier1')]
+  [LOCAL-620] Stop 2 evidence balance: input=5 kept_rich=2 kept_story=0 dropped_boilerplate=0 output=2
+  [LOCAL-402] Stop 2: injected 2 snippets as reference material
+  [LOCAL-620] prefs: default/balanced (no user_id)
+  [LOCAL-617] Stop 2: narration contract injected (reception_evidence=False)
+  [D533] Stop 2 corpus-gate restriction LIFTED — 38 source item(s) arrived after the gate ran
+  [LOCAL-411] Stop 2 prompt size: before_snippets=10939 after=27471 (+16532 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (27471)
+  [D498] Stop 2 matrix: 4/9 slots filled — empty: ['artist', 'publisher', 'printed_by', 'medium', 'credit_line']
+  [D500] agents 0/3: hero=—, sponsor=—, builder=—
+  [LOCAL-490] Stop 1 story pass: ok=True (4 sentences), $0.0062
+    story: "Portret van Anna Wake (1605-voor 1669) was part of Peeter Stevens's collection until his death in 1668. After Stevens passed away, the painting change"
+  [LOCAL-408] Prompt dump written to: /app/prompt_dump_stop1.txt
+  [LOCAL-490] Stop 2 story pass: ok=True (5 sentences), $0.0054
+    story: "In 1631, the artist signed the panel of "Het loflied van Simeon" with the monogram 'RHL 1631', marking its completion. Unlike Rembrandt's later depict"
+Stop 2 API call cost: $0.0358 (7526 tokens, model=gpt-4o)
+  [LOCAL-569] Stop 2 attempt 1/5 story_count=2 words=283
+  [LOCAL-432] Stop 2: STORY RETRY — story_count=2 < 3, need 1 more, retrying (attempt 2/5)
+Stop 1 API call cost: $0.0383 (8058 tokens, model=gpt-4o)
+  [LOCAL-569] Stop 1 attempt 1/5 story_count=2 words=300
+  [LOCAL-432] Stop 1: STORY RETRY — story_count=2 < 3, need 1 more, retrying (attempt 2/5)
+Stop 1 API call cost: $0.0396 (8342 tokens, model=gpt-4o)
+  [LOCAL-569] Stop 1 attempt 2/5 story_count=3 words=236
+Stop 1 description word count: 236 words
+  [LOCAL-407] Stop 1: snippets injected but no candidate specifics extracted
+Stop 2 API call cost: $0.0376 (7906 tokens, model=gpt-4o)
+  [LOCAL-569] Stop 2 attempt 2/5 story_count=2 words=249
+  [LOCAL-432] Stop 2: STORY RETRY — story_count=2 < 3, need 1 more, retrying (attempt 3/5)
+Stop 2 API call cost: $0.0393 (8279 tokens, model=gpt-4o)
+  [LOCAL-569] Stop 2 attempt 3/5 story_count=2 words=250
+  [LOCAL-432] Stop 2: STORY RETRY — story_count=2 < 3, need 1 more, retrying (attempt 4/5)
+Stop 2 API call cost: $0.0414 (8719 tokens, model=gpt-4o)
+  [LOCAL-569] Stop 2 attempt 4/5 story_count=4 words=266
+Stop 2 description word count: 266 words
+  [LOCAL-407] Stop 2: snippets injected but no candidate specifics extracted
+  [LOCAL-526] PHASE 5.17 regeneration wall: 16.8s for 2 stop(s) at max_workers=2
+    [LOCAL-487] retry judged on the story bar, not on length: cleared=False
+    [LOCAL-474] retry not better after re-gating — keeping the original gated text
+    [D498] step 7c judged on the index, not on length: 70 -> 66, accepted=False
+    [LOCAL-474] retry not better after re-gating — keeping the original gated text
+  [D534] no repeated sentences left after the retries
+
+  [LOCAL-474] retry summary: 2 eligible, 2 retried, 0 improved, 2 kept original
+  [LOCAL-487] triggers: 0 hollowed by gates, 1 storyless (step 7a — Michael's bar, independent of length), 1 top-value (step 7c — larger allowance), 0 repeating an earlier stop (D534), 2 thin enough for another story (D534, floor=300w). Triggers overlap and are counted separately; they do not sum to 'eligible'.
+  [LOCAL-474] each regenerated stop was re-gated before being accepted; a retry can only replace text it beats after gating.
+
+PHASE 5.10: Anti-preaching cleanup (LOCAL-44)...
+  [LOCAL-44] Stripped 0 preaching closer(s)
+
+  [LOCAL-444] Obligation audit DISABLED by L444_OBLIGATION_AUDIT=false
+  [LOCAL-427] HTTP 429 from https://www.metmuseum.org/perspectives/series/materials-and-techniques — retrying in 2.6s (attempt 1, 30s budget remaining)
+  [LOCAL-427] HTTP 429 from https://www.metmuseum.org/perspectives/series/materials-and-techniques — retrying in 3.1s (attempt 2, 27s budget remaining)
+  [LOCAL-427] HTTP 429 from https://www.metmuseum.org/perspectives/series/materials-and-techniques — retrying in 10.2s (attempt 3, 24s budget remaining)
+  [LOCAL-427] HTTP 429 from https://www.metmuseum.org/perspectives/series/materials-and-techniques — budget exhausted after 4 attempt(s), 30s elapsed
+  [LOCAL-427] HTTP 200 from https://paceprints.com/techniques (attempt 1)
+  [LOCAL-459] R5: Fetched 2341 chars from https://paceprints.com/techniques
+  [LOCAL-427] HTTP 200 from https://www.facebook.com/groups/548291505332293/posts/783417401819701/ (attempt 1)
+  [LOCAL-427] HTTP 200 from https://www.visualartsbrampton.com/resources/articles-tutorials/printmaking-process (attempt 1)
+  [LOCAL-459] R5: Fetched 1827 chars from https://www.visualartsbrampton.com/resources/artic
+  [LOCAL-427] HTTP 200 from https://blog.dma.org/tag/printmaking/ (attempt 1)
+  [LOCAL-459] R5: Fetched 1736 chars from https://blog.dma.org/tag/printmaking/
+  [LOCAL-427] HTTP 200 from https://www.youtube.com/watch?v=mUzwDarPdvI (attempt 1)
+  [LOCAL-427] HTTP 200 from https://news.masterworksfineart.com/2021/01/20/printmaking-techniques-defined-and-explained-in-plain-english (attempt 1)
+  [LOCAL-459] R5: Fetched 3003 chars from https://news.masterworksfineart.com/2021/01/20/pri
+  [LOCAL-427] HTTP 200 from https://www.clarkart.edu/microsites/impressionist-line/about/printmaking-techniques (attempt 1)
+  [LOCAL-459] R5: Fetched 1756 chars from https://www.clarkart.edu/microsites/impressionist-
+  [D512] verb discovery: query='Mauritshuis printmaking process how it is made technique step by' -> 12 new verb(s): inked, raised, covered, coated, produced, handmade, placed, pressed, applied, experienced, emerged, defined
+  [D512] _AGENCY_VERB widened by 12 discovered verb(s)
+
+  [D511] PHASE 5.20: credit_line loop — object record, seeds, challenge, adjudicate, gate
+    [D501] no object record for 'Portret van Anna Wake (1605-voor 1669)' — matrix unchanged
+    [D511] 4 credit_line(s) to try (0 from the matrix, 4 from the text)
+    [D501] no object record for 'Het loflied van Simeon' — matrix unchanged
+    [D511] 4 credit_line(s) to try (0 from the matrix, 4 from the text)
+    [D511] 2.1                    kind=none     idx=5   C0 X5 fail:index_d515  [old gate: eventful,index,confirmed]
+    [D511] 1.1                    kind=none     idx=5   C0 X5 fail:index_d515  [old gate: eventful,index,confirmed]
+  [LOCAL-427] HTTP 200 from https://www.mauritshuis.nl/en/our-collection/artworks/240-portrait-of-anna-wake-1605-before-1669 (attempt 1)
+  [LOCAL-459] R5: Fetched 2695 chars from https://www.mauritshuis.nl/en/our-collection/artwo
+  [LOCAL-427] HTTP 200 from https://www.facebook.com/mauritshuis/posts/some-lovely-husband-and-wife-portraits-but-somethings-off-traditionally-the-husb/1208530114636734/ (attempt 1)
+  [LOCAL-427] HTTP 200 from https://commons.wikimedia.org/wiki/File:Anthony_van_Dyck_-_Portrait_of_Anna_Wake_(1605-before_1669)_-_240_-_Mauritshuis.jpg (attempt 1)
+  [LOCAL-459] R5: Fetched 3003 chars from https://commons.wikimedia.org/wiki/File:Anthony_va
+    [D511] 2.1                    kind=none     idx=5   C0 X2 fail:index_d515  [old gate: eventful,index,confirmed]
+  [LOCAL-427] HTTP 200 from https://fr.wikipedia.org/wiki/Fichier:Anthony_van_Dyck_089.jpg (attempt 1)
+  [LOCAL-459] R5: Fetched 2352 chars from https://fr.wikipedia.org/wiki/Fichier:Anthony_van_
+    [D511] 2.2                    kind=none     idx=5   C0 X1 fail:index_d515  [old gate: eventful,index,confirmed]
+  [LOCAL-427] HTTP 200 from https://www.mauritshuis.nl/en/our-collection/artworks/145-simeon-s-song-of-praise (attempt 1)
+  [LOCAL-459] R5: Fetched 2261 chars from https://www.mauritshuis.nl/en/our-collection/artwo
+    [D511] 3.1                    kind=active   idx=46  C5 X12 fail:index_d515  [old gate: eventful,index]
+  [LOCAL-427] HTTP 200 from https://www.facebook.com/historyofart2016/posts/rembrandt-van-rijnsimeons-song-of-praise1631/1503112834719714/ (attempt 1)
+  [LOCAL-427] HTTP 200 from https://commons.wikimedia.org/wiki/File:Het_loflied_van_Simeon,_Rembrandt_van_Rijn,_1631,_Mauritshuis,_The_Hague.jpg (attempt 1)
+  [LOCAL-459] R5: Fetched 3003 chars from https://commons.wikimedia.org/wiki/File:Het_loflie
+  [LOCAL-427] HTTP 200 from https://www.facebook.com/groups/508378955026280/posts/935853522278819/ (attempt 1)
+  [LOCAL-427] HTTP 200 from https://www.wikidata.org/wiki/Q17275824 (attempt 1)
+  [LOCAL-459] R5: Fetched 2559 chars from https://www.wikidata.org/wiki/Q17275824
+    [D511] 7.1                    kind=none     idx=5   C0 X4 fail:index_d515  [old gate: eventful,index,confirmed]
+    [D511] 3.1                    kind=inert    idx=34  C1 X6 fail:index_d515  [old gate: eventful,index,confirmed]
+    [LOCAL-468] pairwise overlap: mean=0.297, max=1.000 (CONVERGED — seeds not working)
+      marking the completi × Rembrandt's later un = 0.385
+      marking the completi × drawing inspiration  = 0.385
+      marking the completi × setting it apart fro = 0.009
+      Rembrandt's later un × drawing inspiration  = 1.000
+      Rembrandt's later un × setting it apart fro = 0.003
+      drawing inspiration  × setting it apart fro = 0.003
+    [D511] examined 4 credit_line(s) (indices 5, 5, 5, 34), no story passed, ~$0.049, 53s
+  [LOCAL-427] Cache HIT: https://www.mauritshuis.nl/en/our-collection/artworks/240-portrait-of-anna-wake-1605-before-1669 (6781 chars)
+  [LOCAL-459] R5: Fetched 2335 chars from https://www.mauritshuis.nl/en/our-collection/artwo
+    [D511] 7.2                    kind=active   idx=40  C2 X7 fail:no_invented_person,index_d515  [old gate: eventful,index,confirmed]  UNGROUNDED:Anthony
+    [LOCAL-468] pairwise overlap: mean=0.105, max=0.383 (DIVERSE)
+      Dyck's use of oil    × having recently retu = 0.003
+      Dyck's use of oil    × Dyck's rendering off = 0.383
+      Dyck's use of oil    × Anna's personal worl = 0.008
+      having recently retu × Dyck's rendering off = 0.030
+      having recently retu × Anna's personal worl = 0.173
+      Dyck's rendering off × Anna's personal worl = 0.035
+    [D511] examined 4 credit_line(s) (indices 5, 46, 5, 40), no story passed, ~$0.054, 62s
+
+  [D511] stop 1: Portret van Anna Wake (1605-voor 1669)
+    [D511] no story passed the gate — stop keeps its descriptive text and publishes no story
+
+  [D511] stop 2: Het loflied van Simeon
+    [D511] no story passed the gate — stop keeps its descriptive text and publishes no story
+
+  [D511] PHASE 5.20 summary: 0/2 stops got a gated story (0 with multiple stories), ~$0.103, [D518] 0 duplicated prose sentence(s) replaced
+
+  [LOCAL-485] PHASE 5.21: Story valuation index (report only, never gates)...
+     #  stop                                      idx  hist  detl   soc
+     1  Portret van Anna Wake (1605-voor 1669)     59    21    38    23
+     2  Het loflied van Simeon                     70    53    50    27
+    [LOCAL-485] index mean 64.5 over 2 stop(s), range 59-70
+    [LOCAL-485] weakest: 'Portret van Anna Wake (1605-voor 1669)' at 59
+[TIMING] phase=story_first elapsed=162.2s cumulative=331.8s
+
+PHASE 6: Assembling the complete tour...
+  [LOCAL-11] Venue-identity mining: 1 facts found {'architecture': 1}
+  [R2] Prolog saved for Stop 1 (91 words)
+
+  [LOCAL-244] PHASE 5.9: Prolog gating (R9, R10, subject routine)...
+  [LOCAL-244] Prolog before gates: 91 words
+  [LOCAL-244] Prolog R9: 0 deletions
+  [LOCAL-286] Prolog R7: 0 deletions
+  [LOCAL-244] Prolog R10: 0 deletions
+  [LOCAL-244] Prolog subject: 0 expanded, 0 deleted, cost=$0.0000
+  [LOCAL-244] Prolog after gates: 91 words (delta: 0)
+
+  [LOCAL-246] PHASE 5.95: Orientation gating (R9, R10)...
+    Stop 2 orientation R10: 1 sentence(s) deleted
+  [LOCAL-246] Orientation gating summary:
+    Words before: 73
+    Words after:  62
+    Delta: -11
+    Stops affected: 1/2
+    Deletions (1):
+      [Stop 2][R10_UNFULFILLED_PROMISE] "Stand before Het loflied van Simeon to appreciate its full grandeur."
+
+  [LOCAL-270] PHASE 5.96: Composing Part 4 (forward connection) from delivered narrations...
+    Stops with delivered content: 2/2
+    [LOCAL-276] Intrigue ranking completed: 2.0s, $0.0064, 985 tokens
+    [LOCAL-276] Ranked 2 stops:
+      [Portret van Anna Wake (1605-voor 1669)] (dated_event): At the time of this painting, Van Dyck was at the height of his career, having r...
+[LOCAL-197] llm_cost() called with total_tokens (deprecated) by /app/generate_tour_text.py:23919. Caller should supply input_tokens and output_tokens separately.
+      [Het loflied van Simeon] (dated_event): In 1631, an artist signed his work with the monogram 'RHL 1631', marking the com...
+    [LOCAL-276] 2 intriguing / 0 excluded (celebrity_trivia)
+    [LOCAL-276] Using ranked facts for composition (2 stops)
+    Part 4 LLM cost: $0.0033 (527 tokens) [attempt 1]
+    ✗ Part 4 attempt 1 FAILED verification:
+      Candidate: "You will soon discover Van Dyck's successful return to Antwerp in 1605-voor 1669's "Portret van Anna Wake" and the completion of "Het loflied van Simeon" in 1631 by an artist using the monogram 'RHL 1631'."
+      FAIL: date '1605' not found in any stop description
+    Part 4 LLM cost: $0.0031 (519 tokens) [attempt 2]
+    ✗ Part 4 attempt 2 FAILED verification:
+      Candidate: "Discover Van Dyck's portrait of Anna Wake at Stop 1, showcasing his career peak. Then, witness the completion of Rembrandt's 'Het loflied van Simeon' in 1631 at Stop 2, a masterpiece of biblical art."
+      FAIL: 'Discover Van Dyck' not found in any stop description
+      FAIL: only 1 stop(s) referenced by name, need ≥2
+    ✗ Part 4 FAILED all 2 attempts — omitting
+      Last candidate: "Discover Van Dyck's portrait of Anna Wake at Stop 1, showcasing his career peak. Then, witness the completion of Rembrandt's 'Het loflied van Simeon' in 1631 at Stop 2, a masterpiece of biblical art."
+    Part 4 total cost: $0.0064
+  [LOCAL-618 #1] Orientation pre-tell guard: dropped 2 sentence(s) carrying later-stop facts
+
+  [LOCAL-286] PHASE 5.97: Prolog-body deduplication (≥8 word overlap)...
+  [LOCAL-286] Deduplication: 0 sentence(s) removed from stop bodies
+
+  [LOCAL-292] Empty stop removal gate: PASSED (all 2 stops have narration)
+  [LOCAL-394] Stop count invariant: OK (2 selected == 2 delivered)
+  [D536] Listener asked for 2 stop(s), delivering 2 — request met
+  DEBUG - POI 1 content includes:
+    Specific Examples: False
+    Operational Details: True
+    Walking Directions: True
+  [T4] Transition to Stop 2: Continue through Mauritshuis — next is Het loflied van Simeo...
+  DEBUG - POI 2 content includes:
+    Specific Examples: False
+    Operational Details: False
+    Walking Directions: True
+  [LOCAL-280] Recap composition: 0.9s, $0.0028, 478 tokens
+  [LOCAL-280] Recap built: 29 words, 2 composed clauses (0 D177 rejected, 0 navigation rejected)
+    [Portret van Anna Wake (1605-voor 1669)] (dated_event): "At the time of this painting, Van Dyck was at the height of his career, having r..."
+      → composed: "Portret van Anna Wake, painted when Van Dyck was renowned in Antwerp"
+    [Het loflied van Simeon] (dated_event): "In 1631, an artist signed his work with the monogram 'RHL 1631', marking the com..."
+      → composed: "Het loflied van Simeon, a 1631 panel signed 'RHL', painted by Rembrandt"
+    D177 verified: all 2 source facts present in delivered text
+  [LOCAL-280] Recap added: "That's 2 stops — Portret van Anna Wake, painted when Van Dyck was renowned in Antwerp and Het loflied van Simeon, a 1631 panel signed 'RHL', painted by Rembrandt."
+  [LOCAL-275] Part 2: museum tour category, no restaurant found nearby
+  [D519] Treat Page: no treat within 1.0 km of any of 2 stop(s) (0 treat(s) with coordinates) — mention OMITTED
+  [LOCAL-275/D519] Part 2: nothing verified — no tour offer, no Treat Page
+  [LOCAL-275] Part 2 error: name '_venue_parts_used' is not defined
+  [LOCAL-275] Closing offer fallback (no verification passed)
+  [EPILOG] Journey epilog added to last stop
+  [S27] No cross-stop repetition detected
+  [D533] No cross-stop fact repetition detected
+  [D533] Person-year role guard: no mismatches (123332 chars of corpus checked)
+  [LOCAL-615] No duplicated paragraphs
+  [LOCAL-620] Story-balance stop-body policy: dropped 0 boilerplate + 1 bare-transfer sentence(s), kept 0 collector story sentence(s) across 2 stops
+  [LOCAL-623] Same-title bleed filter: no change (2 stops scanned)
+  [LOCAL-623] Museum-motif filter: no change (2 stops scanned)
+  [LOCAL-617] Conclusion de-dup: removed redundant 'This tour covered …' line (recap kept)
+
+  [LOCAL-36] Practical Facts Gate:
+    Claims found: 2
+    Verified: 2
+    Dropped: 0
+    AUDIT: hours | Monday, 13:00–18:00 | https://www.mauritshuis.nl/en/visit | VERIFIED
+    AUDIT: admission | €21 | https://www.mauritshuis.nl/en/visit | VERIFIED
+  [LOCAL-36] PRACTICAL FACTS GATE: PASSED (2 verified)
+  [LOCAL-618 #2] grammar/splice lint: 2 flagged, 0 dropped, 1 rewritten ({'repeated_pair': 1, 'verbless': 1})
+  [LOCAL-618 #2] grammar/splice lint: 2 flagged, 0 dropped, 1 rewritten by_code={'repeated_pair': 1, 'verbless': 1}
+
+  [LOCAL-260] PROLOG STRUCTURE VALIDATION: 4 error(s), 0 warning(s)
+    [ERROR] Part 1: PART1_MISSING — Part 1 (Tour name and transportation mode) is not present.
+    [ERROR] Part 3: PART3_MISSING — Part 3 (Purpose / intrigue with sourced facts) is not present.
+    [ERROR] Part 4: PART4_MISSING — Part 4 (Forward connection to stops) is not present.
+    [ERROR] Part 2: PART2_INSUFFICIENT_SUBSTANCE — Part 2 has only 1 route indicator(s) (endpoints); need at least 2 of: endpoints, distance, terrain, duration.
+
+=== Word Count Statistics ===
+Stop 1: Portret van Anna Wake (1605-voor 1669) - 295 words
+Stop 2: Het loflied van Simeon - 315 words
+===========================
+
+  [LOCAL-540] scorer ran on assembled tour (3868 chars, 2/2 stops)
+  [LOCAL-540] defects seen: ['dangling_reference']
+  [LOCAL-540]   dangling_reference [REQUIRED_CLEAN]: 1 dangling pronoun reference(s), e.g. 'His compositions, marked by fluid lines and a delicate inter'
+  [LOCAL-540] REQUIRED_CLEAN defect present (['dangling_reference']) — issuing ONE retry over 1 section(s)
+  [LOCAL-540] retry: regenerating stop (stop 1) for ['dangling_reference']
+  [LOCAL-540] retry rewrite: 1119 tokens, $0.005318 (gpt-4o)
+  [LOCAL-540] rescored after retry: defects ['dangling_reference'] -> ['thin']
+  [LOCAL-540] retry removed: ['dangling_reference']
+  [LOCAL-540] retry cleared all REQUIRED_CLEAN defects
+  [LOCAL-619B] thematic conclusion built from final text: 2 delivered stop(s), venue='Mauritshuis'
+
+Total API cost: $0.2074 (21981 tokens)
+Grounding:      $0.0700 (5 queries, 4 requests)
+Tour total:     $0.2774
+Provenance:     3/19 factual sentences sourced, 16 unsourced (3 corpus, 0 grounded, 16 parametric)
+
+Tour text generated successfully!
+  [LOCAL-230] Network failures: 0 (all API calls succeeded)
+Saved to: /app/tours/LOCAL625_MAURITSHUIS.txt
+  [C5-5] Evidence persisted: /app/tours/LOCAL625_MAURITSHUIS_evidence.json
+
+Preview of the generated tour:
+
+Step-by-step audio guided tour of the Mauritshuis in The Hague, Netherlands, is a museum tour.
+
+Stop 1: Portret van Anna Wake (1605-voor 1669)
+
+Address: Plein 29, 2511 CS Den Haag, Netherlands
+
+Coordinates: 52.0805, 4.313
+
+Museum Information: Monday, 13:00–18:00. €21
+
+Orientation: You are about to explore the Mauritshuis in The Hague. Your first stop is Portret van Anna Wake (1605-voor 1669). To truly experience "Portret van Anna Wake (1605-voor 1669)," step back to appreciate the full effect of...
+
+
+========================================================================
+  [LOCAL-410] CHAIN INSTRUMENTATION (post-generation)
+========================================================================
+    Portret van Anna Wake (1605-voor 1669): serp_results=23 snippets_injected=29 beats_in_delivered_text=0
+    Het loflied van Simeon: serp_results=21 snippets_injected=31 beats_in_delivered_text=0
+========================================================================
+[TIMING] phase=packing elapsed=16.4s cumulative=348.2s
+[TIMING] phase=verification elapsed=0.0s cumulative=348.2s
+[TIMING] TOTAL wall=348.2s phases: story_first=162.2s, poi_selection=100.9s, external_lookups=54.7s, packing=16.4s, fact_sheets=11.9s, intent=2.1s, narration=0.0s, verification=0.0s
+  [LOCAL-619B] thematic conclusion already present and count OK (2 stop(s)); preserved (every-path guard)
+OUTCOME: DELIVERED — 4050 chars, 2 stops, wall 361.1s
+[LOCAL-625 facts on spoken text] — Mauritshuis, The Hague, Netherlands
+  HOURS/Museum Information: Monday, 13:00–18:00. €21
+  ADDRESS: 'Plein 29, 2511 CS Den Haag, Netherlands'
+  ADDRESS: 'Plein 29, 2511 CS Den Haag, Netherlands'
+  STOP TITLE: Portret van Anna Wake (1605-voor 1669)
+  STOP TITLE: Het loflied van Simeon
+  garbage-hours probe: CLEAN
+[cost] tour_total=$0.4120
+STORED audio_tours id = 702  (is_test=true)
+LOCAL625_TOUR_ID=702
+
+=== generating: Alte Pinakothek, Munich, Germany (2 stops) ===
+  [LOCAL-603] preflight venue='Alte Pinakothek' status=open hours=y admission=y highlights=6
+
+======================================================================
+CALL #005 | 18:53:00.266 | GENERATE_TOUR_TEXT_FUNCTION_ENTRY
+======================================================================
+  location: Alte Pinakothek, Munich, Germany
+  tour_type: museum
+  total_stops_parameter: 2
+  output_file: /app/tours/LOCAL625_ALTE_PINAKOTHEK.txt
+
+  [LOCAL-245] Stop-existence gate mode: LOG_ONLY
+
+======================================================================
+CALL #006 | 18:53:00.266 | TOTAL_STOPS_FINALIZED
+======================================================================
+  location: Alte Pinakothek, Munich, Germany
+  total_stops_final: 2
+  source: parameter
+
+
+PHASE 1: Analyzing tour intent with AI...
+  [Bug2Fix/D536] tour_type='museum' not prepended (pre_category='walking'); intent sees the ORIGINAL request, not the stripped one
+Intent analysis response: ```json
+{
+    "poi_type": "museums",
+    "location": "Munich, Germany",
+    "theme_type": "STANDARD",
+    "theme_name": null,
+    "requirements": null,
+    "business_hours_relevant": true,
+    "accessibility_mentioned": false,
+    "needs_research": false,
+    "venue_name": "Alte Pinakothek",
+    "geographic_scope": "Alte Pinakothek, Munich, Germany",
+    "named_places": [],
+    "scope_precision": "BUILDING",
+    "transport_mode": "on_foot",
+    "country_scope": "Germany"
+}
+```
+  [INTENT] Stripped LLM fences from response
+  [TRANSPORT] mode=on_foot, country_scope=Germany (keyword=on_foot, intent=on_foot)
+✅ Intent Analysis Results:
+   POI Type: museums
+   Location: Munich, Germany
+   Requirements: None
+   Business Hours Relevant: True
+   Accessibility Mentioned: False
+   Venue Name: Alte Pinakothek
+  [venue_name sanity] 'Alte Pinakothek' OK
+  [S15] Forced tour_category=museum from venue_name='Alte Pinakothek'
+[TIMING] phase=intent elapsed=6.8s cumulative=6.8s
+[LOCAL-474] tour_type='museum' → category='museum' (source=explicit)
+
+Detected tour category: MUSEUM
+Using museum template for Alte Pinakothek, Munich, Germany - museum
+
+======================================================================
+CALL #007 | 18:53:07.034 | GENERATING_PROMPT
+======================================================================
+  location: Alte Pinakothek, Munich, Germany
+  user_request: Alte Pinakothek, Munich, Germany
+  total_stops: 2
+
+
+PHASE 3A: Fetching 2 candidate POI(s) for Alte Pinakothek, Munich, Germany...
+  [Museum constraint] Venue from intent='Alte Pinakothek'
+  [venue_resolver] Name variants: ['Alte Pinakothek']
+  [venue_resolver] Candidates for variant 'Alte Pinakothek': ['Q154568', 'Q117190850', 'Q29865859', 'Q29865837', 'Q29865718', 'Q29865834', 'Q29865825', 'Q29865827']
+    [venue_resolver] Artist inferred from name: 'Alte Pinakothek'
+  [venue_resolver] Resolved: 'Alte Pinakothek' → Q154568 (Alte Pinakothek)
+    URL: https://www.pinakothek.de/besuch/alte-pinakothek
+    Coords: 48.148291, 11.569985
+    Language: de
+    Artist: Alte Pinakothek ()
+  [venue_resolver] SPARQL: 162 works found for Q154568
+  [Phase3A] Injected 12 canonical title hints from Wikidata (QID-deduped)
+  [S17] no scope_constraint (precision='BUILDING', scope='Alte Pinakothek, Munich, Germany')
+  [venue_resolver] Name variants: ['Alte Pinakothek']
+  [venue_resolver] Candidates for variant 'Alte Pinakothek': ['Q154568', 'Q117190850', 'Q29865859', 'Q29865837', 'Q29865718', 'Q29865834', 'Q29865825', 'Q29865827']
+    [venue_resolver] Artist inferred from name: 'Alte Pinakothek'
+  [venue_resolver] Resolved: 'Alte Pinakothek' → Q154568 (Alte Pinakothek)
+    URL: https://www.pinakothek.de/besuch/alte-pinakothek
+    Coords: 48.148291, 11.569985
+    Language: de
+    Artist: Alte Pinakothek ()
+  [venue_cache] HIT for Q154568 (tier=rich, expires=2026-11-07 09:07:43.510909)
+  [venue_resolver] SPARQL: 162 works found for Q154568
+  [LOCAL-30] Deterministic selection: 152 documented works (0 catalogue, 162 SPARQL; 213 site/cache canonical title(s) are NOT documented)
+  [LOCAL-30] DETERMINISTIC BYPASS: 4 documented works → Phase 3A SKIPPED
+   Stops proposed (deterministic, no GPT):
+     - Das Schlaraffenland [sparql]
+     - Vulkan überrascht Venus und Mars [sparql]
+  [venue_resolver] Name variants: ['Alte Pinakothek']
+  [venue_resolver] Candidates for variant 'Alte Pinakothek': ['Q154568', 'Q117190850', 'Q29865859', 'Q29865837', 'Q29865718', 'Q29865834', 'Q29865825', 'Q29865827']
+    [venue_resolver] Artist inferred from name: 'Alte Pinakothek'
+  [venue_resolver] Resolved: 'Alte Pinakothek' → Q154568 (Alte Pinakothek)
+    URL: https://www.pinakothek.de/besuch/alte-pinakothek
+    Coords: 48.148291, 11.569985
+    Language: de
+    Artist: Alte Pinakothek ()
+  [venue_cache] HIT for Q154568 (tier=rich, expires=2026-11-07 09:07:43.510909)
+  [venue_resolver] SPARQL: 162 works found for Q154568
+  [LOCAL-30] Deterministic selection: 152 documented works (0 catalogue, 162 SPARQL; 213 site/cache canonical title(s) are NOT documented)
+  [LOCAL-328] Quality score map: 4 objects scored (source-weighted, sludge excluded)
+  [LOCAL-30] DETERMINISTIC BYPASS: 4 documented works → Phase 3A SKIPPED
+   Stops proposed (deterministic, quality-score ranked):
+     - The Holy Family [canonical] (quality=11.0)
+     - Alte Pinakothek, Obergeschoss, Kabinett 16 [canonical] (quality=9.0)
+  [R4] Museum tour: asking for 4 candidates (2x for D1v2 filtering)
+
+PHASE 3A: SKIPPED (deterministic fill from 4 documented works)
+OK PHASE 3A parsed 4 candidate POI(s):
+   - The Holy Family
+   - Alte Pinakothek, Obergeschoss, Kabinett 16
+   - Alte Pinakothek, Obergeschoss, Kabinett 1-2
+   - Alte Pinakothek, Obergeschoss, Saal IIa
+  [venue_resolver] Name variants: ['Alte Pinakothek']
+  [venue_resolver] Candidates for variant 'Alte Pinakothek': ['Q154568', 'Q117190850', 'Q29865859', 'Q29865837', 'Q29865718', 'Q29865834', 'Q29865825', 'Q29865827']
+    [venue_resolver] Artist inferred from name: 'Alte Pinakothek'
+  [venue_resolver] Resolved: 'Alte Pinakothek' → Q154568 (Alte Pinakothek)
+    URL: https://www.pinakothek.de/besuch/alte-pinakothek
+    Coords: 48.148291, 11.569985
+    Language: de
+    Artist: Alte Pinakothek ()
+  [D1v2] Venue resolved: Q154568 → URL=https://www.pinakothek.de/besuch/alte-pinakothek, lang=de
+  [venue_cache] HIT for Q154568 (tier=rich, expires=2026-11-07 09:07:43.510909)
+  [D1v2] Cache HIT: 221 canonical titles (tier=rich), 0 catalogue works, combined_text=86971 chars
+  [LOCAL-34] Will enrich bare title at stop-naming: 'Danae' → 'Danae (1522)'
+  [LOCAL-24] Classification: 221 works, 0 galleries, 0 excluded
+[LOCAL-197] llm_cost() called with total_tokens (deprecated) by /app/generate_tour_text.py:10996. Caller should supply input_tokens and output_tokens separately.
+[OSM-VENUE] Overpass HTTP 502 for 'The Holy Family'
+[OSM-VENUE] Overpass ReadTimeout for 'Allegorische Frauengestalt mit Spiegel' (attempt 1/2)
+[OSM-VENUE] Overpass ReadTimeout for 'Allegorische Frauengestalt mit Spiegel' (attempt 2/2)
+  [LOCAL-625] rejected room/space titles from canonical SET: 221 → 165 — dropped ['AP OG -> Kabinett 4', 'AP OG -> Saal IX', 'AP OG Kabinett 5', 'AP OG Saal VIII', 'Alte Pinakothek, Obergeschoss, Kabinett 1-2', 'Alte Pinakothek, Obergeschoss, Kabinett 10', 'Alte Pinakothek, Obergeschoss, Kabinett 11', 'Alte Pinakothek, Obergeschoss, Kabinett 12', 'Alte Pinakothek, Obergeschoss, Kabinett 13', 'Alte Pinakothek, Obergeschoss, Kabinett 14', 'Alte Pinakothek, Obergeschoss, Kabinett 15', 'Alte Pinakothek, Obergeschoss, Kabinett 16', 'Alte Pinakothek, Obergeschoss, Kabinett 17', 'Alte Pinakothek, Obergeschoss, Kabinett 18', 'Alte Pinakothek, Obergeschoss, Kabinett 19', 'Alte Pinakothek, Obergeschoss, Kabinett 20', 'Alte Pinakothek, Obergeschoss, Kabinett 21', 'Alte Pinakothek, Obergeschoss, Kabinett 22', 'Alte Pinakothek, Obergeschoss, Kabinett 23', 'Alte Pinakothek, Obergeschoss, Kabinett 3', 'Alte Pinakothek, Obergeschoss, Kabinett 4', 'Alte Pinakothek, Obergeschoss, Kabinett 5', 'Alte Pinakothek, Obergeschoss, Kabinett 6', 'Alte Pinakothek, Obergeschoss, Kabinett 7', 'Alte Pinakothek, Obergeschoss, Kabinett 8', 'Alte Pinakothek, Obergeschoss, Kabinett 9', 'Alte Pinakothek, Obergeschoss, Saal III', 'Alte Pinakothek, Obergeschoss, Saal IIa', 'Alte Pinakothek, Obergeschoss, Saal IIb', 'Alte Pinakothek, Obergeschoss, Saal IV', 'Alte Pinakothek, Obergeschoss, Saal IX', 'Alte Pinakothek, Obergeschoss, Saal VIII', 'Alte Pinakothek, Obergeschoss, Saal XIII', 'Alte Pinakothek, Obergeschoss, Saal XIIa', 'Alte Pinakothek, Obergeschoss, Saal XIIb', 'cabinet 10', 'cabinet 11', 'cabinet 12', 'cabinet 13', 'cabinet 14', 'cabinet 15', 'cabinet 16', 'cabinet 17', 'cabinet 18', 'cabinet 19', 'cabinet 20', 'cabinet 21', 'cabinet 22', 'cabinet 23', 'cabinet 3', 'cabinet 5', 'cabinet 6', 'cabinet 7', 'cabinet 8', 'cabinet 9', 'rechter Flügel: Die hl. Elisabeth; Rückseite: Maria der Verkündigung']
+  [D1v2-LOCAL24] After filter: 165 works, 0 galleries, 0 excluded
+  [venue_resolver] Built 320 dynamic aliases from 196 works
+  [D1v2] Injected 320 dynamic aliases
+  [D1v2] Built bilingual map: 379 word pairs
+  [D1v2] artist-check skipped (no valid creator) — no artist_qid on entity
+  [D1v2] VERIFIED 'The Holy Family' → canonical: 'The Holy Family'
+  [D1v2] DROPPED 'Alte Pinakothek, Obergeschoss, Kabinett 16' — theme/book word 'obergeschoss,', not a work title
+  [D1v2] DROPPED 'Alte Pinakothek, Obergeschoss, Kabinett 1-2' — theme/book word 'obergeschoss,', not a work title
+  [D1v2] DROPPED 'Alte Pinakothek, Obergeschoss, Saal IIa' — theme/book word 'obergeschoss,', not a work title
+  [D1v2] 1/4 works verified — tier: rich
+  [D1] Tier: rich (1 verified works)
+
+  [R4] Replenishment round 1/3: need 1 more, asking for 6
+    [LOCAL-22] Rejected corrupted name from R4: 'Bildnis Martin Schongauer(?)'
+    [R4] VERIFIED 'Allegorische Frauengestalt mit Spiegel' → 'Allegorische Frauengestalt mit Spiegel'
+    [R4] VERIFIED 'Altes Benrather Schloss am Spiegelweiher' → 'Altes Benrather Schloss am Spiegelweiher'
+    [R4] VERIFIED 'Amor schnitzt den Bogen' → 'Amor schnitzt den Bogen'
+    [R4] VERIFIED 'An amourous embrace of a shepherd and a shepherdess' → 'An amourous embrace of a shepherd and a shepherdess'
+    [R4] VERIFIED 'Anbetung der Könige' → 'Anbetung der Könige'
+    [R4] Round 1: +1 verified, total now 2
+  [R4] Target reached: 2/2 stops
+  [LOCAL-16 GATE] All 2 stops cleared the gate ✓
+
+PHASE 4.5: Validating AI knowledge for Alte Pinakothek, Munich, Germany...
+OK Knowledge validation passed: Knowledge validation passed
+
+PHASE 4: skipped (tour_category='museum', no type-verification required)
+  [EXISTENCE-GATE] LOG_ONLY — 2/2 stops verified (100%), 0 would be dropped
+    [VERIFIED] 'The Holy Family' — venue_corpus canonical_title: 'The Holy Family' at 'Alte Pinakothek, Munich, Ger
+    [VERIFIED] 'Allegorische Frauengestalt mit Spiegel' — venue_corpus canonical_title: 'Allegorische Frauengestalt mit Spiegel' at 'Alte 
+    [HARVEST] 'Allegorische Frauengestalt mit Spiegel': verified_no_detail (name match only, no facts in source)
+    [HARVEST] Summary: 0 harvested, 1 already had corpus, 1 verified_no_detail
+    [INTERPRETIVE] 'The Holy Family': +1 passages (2 queries)
+    [INTERPRETIVE] 'Allegorische Frauengestalt mit Spiegel': +1 passages (2 queries)
+    [INTERPRETIVE] Summary: 2 stops enriched, +2 passages, 4 queries issued, 0 attributions dropped
+
+PHASE 3B: Requesting structured details and walking directions for 2 stop(s)...
+
+======================================================================
+CALL #008 | 18:53:46.271 | PHASE_3B_REQUEST
+======================================================================
+  location: Alte Pinakothek, Munich, Germany
+  stop_count: 2
+
+PHASE 3B API call cost: $0.0028 (581 tokens)
+OK PHASE 3B: ordered 2 stop(s) with structured details and directions
+  [LOCAL-27] Corpus-sourced metadata applied to 2 stops
+  [LOCAL-35] Visitor info scoped to venue section (deep path: https://www.pinakothek.de/besuch/alte-pinakothek)
+  [LOCAL-35] Visitor info page found (fr): https://www.pinakothek.de/besuch/alte-pinakothek
+  [LOCAL-35] Extracted from https://www.pinakothek.de/besuch/alte-pinakothek: closed=[], hours=1, admission=''
+  [LOCAL-35] Final Museum Information: 10.00–18.00
+  [LOCAL-39] Museum Information sourced from official site for stop 1
+  [LOCAL-355] Querying OSM for venue facts (city: Munich, hint: museum)
+  [LOCAL-355] The Holy Family: no practical facts in OSM
+  [LOCAL-355] Allegorische Frauengestalt mit Spiegel: no practical facts in OSM
+  [LOCAL-622] OSM lookup budget: spent=27.5s / limit=120s, skipped=0
+   Coords cluster detected: 2 stops share '48.1508, 11.5772', refetching...
+   Cluster refetch OK 'Allegorische Frauengestalt mit Spiegel': 48.1505, 11.5662
+   Cluster refetch OK 'The Holy Family': 48.1494, 11.5705
+Extracted first POI coordinates: (48.1494, 11.5705)
+  [D4] Museum single-coordinate: all stops set to (48.1494, 11.5705) (source: model (fallback))
+
+=== Extracted POI Information ===
+1. The Holy Family
+   Address: Alte Pinakothek, Barer Str. 27, 80333 München, Germany
+   Coordinates: 48.1494, 11.5705
+   Directions: From the Sendlinger Tor U-Bahn station, take the U2 line towards Messestadt Nort...
+2. Allegorische Frauengestalt mit Spiegel
+   Address: Alte Pinakothek, Barer Str. 27, 80333 München, Germany
+   Coordinates: 48.1494, 11.5705
+   Directions: Exit the exhibition room where The Holy Family is displayed and turn right. Walk...
+================================
+
+[TIMING] phase=poi_selection elapsed=81.1s cumulative=87.8s
+
+[Storied] STORIED_MODE=true — generating spine + fact sheets...
+  [§3-adapter] Extracting story elements from 4/4 corpus pages for 'Alte Pinakothek'
+    page[0] score=14210 url=https://de.wikipedia.org/wiki/Alte_Pinakothek
+    page[1] score=14210 url=https://de.wikipedia.org/wiki/Alte_Pinakothek
+    page[2] score=10055 url=https://en.wikipedia.org/wiki/Alte_Pinakothek
+  [§3-adapter] No elements extracted from 4 pages
+  [LOCAL-37] Three-class retrieval: 2 stops processed, 0 with category
+  [SQ-S6b] Insufficient data for thread discovery (elements=0, stops=2)
+  [SQ-S6b] Thread discovery: mode=mosaic, threads=0
+  [§3] No story elements available — spine will use invented arc (mode=invented)
+SPINE_COST: category=museum venue=Alte Pinakothek model=gpt-4o tokens=1013 (in=636 out=377) cost=$0.0054 latency=3.5s
+[COST_METER] FRESH | spine_generate | $0.005360 | user=None | job=None
+  [LOCAL-278] Spine cost folded into total: $0.0054
+  [LOCAL-111] Spine quality: 3/4 | {'climax_position': False, 'unique_emotional_beats': True, 'valid_callbacks': True, 'closing_revelation_length': True}
+  [Storied] Spine generated: 2 arc entries (mode=invented)
+  [LOCAL-183] stop_corpus: 2/2 stops have per-stop passages (11 total passages)
+  [LOCAL-198] Corpus gate: ENABLED — checking stop coverage...
+  [CORPUS-GATE] stop='The Holy Family' verdict=VENUE_ONLY action=SHORTENED
+  [CORPUS-GATE] stop='Allegorische Frauengestalt mit Spiegel' verdict=VENUE_ONLY action=SHORTENED
+  [LOCAL-198] Corpus gate: 0 PASSED, 0 CREATOR_ONLY, 0 EMPTY, 2 SHORTENED
+  [Storied] Fact sheets: 2/2 generated
+  [S25] Story types assigned: ['art', 'history']
+  [work_stories] MISS for the holy family
+  [work_stories] MISS for allegorische frauengestalt mit spiegel
+  [LOCAL-37] Tour diversity: no swaps needed (naturally balanced)
+  [LOCAL-188] Style constraints ACTIVE (declarative prose rules injected)
+[TIMING] phase=fact_sheets elapsed=13.1s cumulative=100.9s
+
+PHASE 5: Generating detailed descriptions for each POI (parallel)...
+
+  [LOCAL-382] framing=none source='-'
+[TIMING] phase=narration elapsed=0.0s cumulative=101.0s
+  [D495] venue domain seeded tier1: pinakothek.de
+
+  [LOCAL-410] SERP search wiring — searching for stories on 2 stops...
+  [work_stories] MISS for the holy family
+  [work_stories] MISS for allegorische frauengestalt mit spiegel
+  [LOCAL-441] Batch P856 check: 6 domains, budget=20.0s, pool=10
+  [LOCAL-441] Batch P856 check: 7 domains, budget=20.0s, pool=10
+  [DEAD-HOST] Marked cold: wikimedia (timeout/network error for lootedart.com: The read operation timed out)
+  [SQ-S2] Wikidata P856 check failed for lootedart.com: The read operation timed out
+  [SQ-S2] Wikidata P856 check failed for artdaily.cc: The read operation timed out
+  [SQ-S2] Wikidata P856 check failed for kikirpa.be: The read operation timed out
+  [SQ-S2] Wikidata P856 check failed for mus3ums.com: The read operation timed out
+  [SQ-S2] Wikidata P856 check failed for timesofisrael.com: The read operation timed out
+  [SQ-S2] Wikidata P856 check failed for mediastorehouse.com: The read operation timed out
+  [LOCAL-441] Batch complete: 3.1s, 0 tier1, 6 unverified, 0 budget-expired
+  [SQ-S2] Wikidata P856 check failed for timesofisrael.com: The read operation timed out
+  [SQ-S2] Wikidata P856 check failed for de.wikipedia.org: The read operation timed out
+  [SQ-S2] Wikidata P856 check failed for niceartgallery.com: The read operation timed out
+  [SQ-S2] Wikidata P856 check failed for lootedart.com: The read operation timed out
+  [SQ-S2] Wikidata P856 check failed for jenikirbyhistory.getarchive.net: The read operation timed out
+  [SQ-S2] Wikidata P856 check failed for digitalcurator.art: The read operation timed out
+  [SQ-S2] Wikidata P856 check failed for app.fta.art: The read operation timed out
+  [LOCAL-441] Batch complete: 3.1s, 0 tier1, 7 unverified, 0 budget-expired
+    [D500] Stop 1: placeholder cleared from ['publisher', 'credit_line', 'medium', 'artist'] — unknown, not 'Not specified'
+    [LOCAL-486] Stop 1 worthiness: score=1/4 mine=True — has specific_title
+    [D489] material kind: stop='The Holy Family' kind=active volume=COVERED sentences=41 active=2 staked=0 eventful=0 passive=1  <-- DISAGREE: enough material, wrong kind
+         best: "For example, the Pinakotheks-Verein, originally founded in 1953 to support the rebuilding of the Alte Pinakothek, today includes patronage o"
+    [LOCAL-489] Stop 1 needs more material (eventless): 21 passages, 3266 chars, verdict=COVERED
+      [LOCAL-489] +8 from: "The Holy Family" "Alte Pinakothek" provenance
+      [LOCAL-498] after replenishment: kind active -> active, 3266 -> 4486 chars, eventful=0 (NO CHANGE — the round bought more of the same)
+         best now: "For example, the Pinakotheks-Verein, originally founded in 1953 to support the rebuilding of the Alte Pinakoth"
+    [LOCAL-488] step 4: 2 providers, 12 leads, 0 with cross-model agreement, 2 SERP-confirmed
+      → injected 2 confirmed lead(s) ahead of the SERP snippets
+    Stop 1 'The Holy Family': queries=3 serp_results=21 snippets=31
+      → 1836 The Alte Pinakothek opened to the public.
+      → 1826 The Alte Pinakothek was founded in Munich.
+    [D500] Stop 2: placeholder cleared from ['publisher', 'credit_line', 'medium', 'artist'] — unknown, not 'Not specified'
+    [LOCAL-486] Stop 2 worthiness: score=1/4 mine=True — has specific_title
+    [D489] material kind: stop='Allegorische Frauengestalt mit Spiegel' kind=active volume=COVERED sentences=38 active=2 staked=0 eventful=0 passive=0  <-- DISAGREE: enough material, wrong kind
+         best: "For example, the Pinakotheks-Verein, originally founded in 1953 to support the rebuilding of the Alte Pinakothek, today includes patronage o"
+    [LOCAL-489] Stop 2 needs more material (eventless): 22 passages, 4059 chars, verdict=COVERED
+      [LOCAL-489] +8 from: "Allegorische Frauengestalt mit Spiegel" "Alte Pinakothek" provenance
+      [LOCAL-498] after replenishment: kind active -> active, 4059 -> 5255 chars, eventful=0 (NO CHANGE — the round bought more of the same)
+         best now: "For example, the Pinakotheks-Verein, originally founded in 1953 to support the rebuilding of the Alte Pinakoth"
+    [LOCAL-488] step 4: 2 providers, 12 leads, 0 with cross-model agreement, 0 SERP-confirmed
+    Stop 2 'Allegorische Frauengestalt mit Spiegel': queries=3 serp_results=22 snippets=30
+      → Allegorische Frauengestalt mit Spiegel, Schlange, Hirsch und Hindin, ; Material / Technik / Bildträger. Lindenholz (Tili
+      → File:Baldung - Allegorische Frauengestalt mit Mirror und Schlange - im Rahmen.jpg · File:HANS-BALDUNG-GEN-GRIEN ALLEGORI
+
+  [LOCAL-410] SERP search complete: 8 queries, 59 results, 61 total snippets
+  [LOCAL-411] Snippet ranking+capping enabled: cap=5/stop, 61 raw → max 10 injected
+
+  [LOCAL-410] CHAIN INSTRUMENTATION:
+    The Holy Family: serp_results=21 elements_extracted=- beats_injected=- (measured post-generation)
+    Allegorische Frauengestalt mit Spiegel: serp_results=22 elements_extracted=- beats_injected=- (measured post-generation)
+  [D534] Stop 1 has 31 snippet(s) but they are VENUE-level only — fetching object-level facts
+  [D533] Stop 1 'The Holy Family' has 31 snippet(s) — asking the knowledge fallback
+  [D533] +10 fact(s) via gemini (10 high-confidence) — stop will be labelled aloud
+      [high] The painting was created by the Italian High Renaissance artist Raphael (Raffaello Sanzio), who worked in Urbi
+      [high] It is executed in oil on a wood panel measuring 131 cm by 107 cm.
+      [high] Raphael signed the work along the neckline of the Virgin Mary's tunic with the gold inscription 'RAPHAEL . VRB
+      [high] The work was originally commissioned by the Florentine merchant Domenico Canigiani, likely around the time of 
+      [high] By 1589, the panel had entered the Medici grand-ducal collection in Florence, where it hung in the Tribuna of 
+      [high] Grand Duke Cosimo III de' Medici presented the painting in 1697 as a diplomatic gift to his son-in-law, Electo
+  [D534] Stop 2 has 30 snippet(s) but they are VENUE-level only — fetching object-level facts
+  [D533] Stop 2 'Allegorische Frauengestalt mit Spiegel' has 30 snippet(s) — asking the knowledge fallback
+  [D533] +6 fact(s) via gemini (6 high-confidence) — stop will be labelled aloud
+      [high] The painting was created in 1529 by German Renaissance artist Hans Baldung (known as Hans Baldung Grien), who 
+      [high] The work is executed in oil on conifer wood panel and measures approximately 83 cm in height by 36 cm in width
+      [high] Held under inventory number 5376 in the Alte Pinakothek in Munich, the full German collection title is 'Allego
+      [high] The panel entered the museum's collection through the Bavarian Electoral Gallery (Kurfürstliche Galerie Münche
+      [high] The painting was conceived as a pendant pair with Baldung's matching panel depicting an allegorical woman with
+      [high] The central nude figure is traditionally interpreted as an allegory of Prudence (Prudentia) or Vanity (Vanitas
+  [D533] Knowledge fallback filled 2 starved stop(s)
+[TIMING] phase=external_lookups elapsed=56.0s cumulative=157.0s
+
+Generating description for Stop 1: The Holy Family by , ...
+
+Generating description for Stop 2: Allegorische Frauengestalt mit Spiegel by , ...
+  [LOCAL-381] stop='Allegorische Frauengestalt mit Spiegel' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-381] stop='The Holy Family' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-411] Stop 2 snippet ranking: input=36 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=5 output=5 usable=5 (t1t2=0, t3=0, market=0)
+    Top scores: [('Allegorische Frauengestalt mit Spiegel', 20, ''), ('Allegory of Music by Hans Baldung Grien (1529)', 8, ''), ('Datei:Allegorical figure of a woman with mirror, s', 8, 'unverified')]
+  [LOCAL-620] Stop 2 evidence balance: input=5 kept_rich=3 kept_story=0 dropped_boilerplate=0 output=3
+  [LOCAL-402] Stop 2: injected 3 snippets as reference material
+  [LOCAL-620] prefs: default/balanced (no user_id)
+  [LOCAL-617] Stop 2: narration contract injected (reception_evidence=False)
+  [D533] Stop 2 corpus-gate restriction LIFTED — 36 source item(s) arrived after the gate ran
+  [LOCAL-411] Stop 2 prompt size: before_snippets=11416 after=26643 (+15227 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (26643)
+  [D498] Stop 2 matrix: 3/9 slots filled — empty: ['artist', 'publisher', 'printed_by', 'medium', 'credit_line', 'focus_fact']
+  [D500] agents 0/3: hero=—, sponsor=—, builder=—
+  [LOCAL-411] Stop 1 snippet ranking: input=41 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=5 output=5 usable=5 (t1t2=1, t3=0, market=0)
+    Top scores: [('The Holy Family', 16, ''), ('The Holy Family', 16, ''), ('The Holy Family with Saint John the Baptist ...', 15, '')]
+  [LOCAL-620] Stop 1 evidence balance: input=5 kept_rich=2 kept_story=0 dropped_boilerplate=0 output=2
+  [LOCAL-402] Stop 1: injected 2 snippets as reference material
+  [LOCAL-620] prefs: default/balanced (no user_id)
+  [LOCAL-617] Stop 1: narration contract injected (reception_evidence=False)
+  [D533] Stop 1 corpus-gate restriction LIFTED — 41 source item(s) arrived after the gate ran
+  [LOCAL-411] Stop 1 prompt size: before_snippets=10459 after=27688 (+17229 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (27688)
+  [D498] Stop 1 matrix: 3/9 slots filled — empty: ['artist', 'publisher', 'printed_by', 'medium', 'credit_line', 'focus_fact']
+  [D500] agents 0/3: hero=—, sponsor=—, builder=—
+  [LOCAL-490] Stop 2 story pass: ok=False (model returned NO_STORY — material did not support one), $0.0037
+  [LOCAL-490] Stop 1 story pass: ok=True (3 sentences), $0.0042
+    story: "In the early 1500s, Florentine merchant Domenico Canigiani sought to commemorate his marriage with a significant work of art. He commissioned the reno"
+  [LOCAL-408] Prompt dump written to: /app/prompt_dump_stop1.txt
+Stop 1 API call cost: $0.0343 (7217 tokens, model=gpt-4o)
+  [LOCAL-569] Stop 1 attempt 1/5 story_count=2 words=293
+  [LOCAL-432] Stop 1: STORY RETRY — story_count=2 < 3, need 1 more, retrying (attempt 2/5)
+Stop 2 API call cost: $0.0333 (7019 tokens, model=gpt-4o)
+  [LOCAL-569] Stop 2 attempt 1/5 story_count=0 words=260
+  [LOCAL-417] Stop 2: POSITIVE GATE FAILED — ["subject not named (expected 'Allegorische Frauengestalt mit Spiegel' or significant word)"]
+  [LOCAL-417]   verbatim: 'Created in 1529 by Hans Baldung Grien, a German Renaissance artist renowned for his allegorical and often enigmatic compositions, this painting embodies a rich tapestry of symbolism and introspection. At the heart of the work is a woman holding a mirror, a motif that has long been used to symbolize '
+  [LOCAL-417] Stop 2: retrying (attempt 1, temp=0.90)...
+Stop 1 API call cost: $0.0359 (7565 tokens, model=gpt-4o)
+  [LOCAL-569] Stop 1 attempt 2/5 story_count=2 words=271
+  [LOCAL-432] Stop 1: STORY RETRY — story_count=2 < 3, need 1 more, retrying (attempt 3/5)
+Stop 2 API call cost: $0.0338 (7113 tokens, model=gpt-4o)
+  [LOCAL-569] Stop 2 attempt 2/5 story_count=1 words=304
+  [LOCAL-432] Stop 2: STORY RETRY — story_count=1 < 3, need 2 more, retrying (attempt 3/5)
+Stop 1 API call cost: $0.0378 (7951 tokens, model=gpt-4o)
+  [LOCAL-569] Stop 1 attempt 3/5 story_count=2 words=252
+  [LOCAL-417] Stop 1: POSITIVE GATE FAILED — ["subject not named (expected 'The Holy Family' or significant word)"]
+  [LOCAL-417]   verbatim: "In the early 1500s, Florentine merchant Domenico Canigiani commissioned the renowned Italian artist Raphael to create a painting marking his marriage. Crafted between 1505 and 1506, this work of art was intended for a private domestic altar, and it has since become a celebrated example of Raphael's "
+  [LOCAL-417] Stop 1: retrying (attempt 3, temp=1.00)...
+Stop 2 API call cost: $0.0354 (7447 tokens, model=gpt-4o)
+  [LOCAL-569] Stop 2 attempt 3/5 story_count=2 words=264
+  [LOCAL-432] Stop 2: STORY RETRY — story_count=2 < 3, need 1 more, retrying (attempt 4/5)
+Stop 1 API call cost: $0.0378 (7947 tokens, model=gpt-4o)
+  [LOCAL-569] Stop 1 attempt 4/5 story_count=1 words=240
+  [LOCAL-432] Stop 1: STORY RETRY — story_count=1 < 3, need 2 more, retrying (attempt 5/5)
+Stop 2 API call cost: $0.0373 (7854 tokens, model=gpt-4o)
+  [LOCAL-569] Stop 2 attempt 4/5 story_count=1 words=291
+  [LOCAL-432] Stop 2: STORY RETRY — story_count=1 < 3, need 2 more, retrying (attempt 5/5)
+Stop 1 API call cost: $0.0395 (8319 tokens, model=gpt-4o)
+  [LOCAL-569] Stop 1 attempt 5/5 story_count=2 words=241
+Stop 1 description word count: 241 words
+  [LOCAL-407] Stop 1: snippets injected but no candidate specifics extracted
+  [LOCAL-414] Stop 1: SCRUBBED banned phrases from output: ['a testament to']
+Stop 2 API call cost: $0.0389 (8188 tokens, model=gpt-4o)
+  [LOCAL-569] Stop 2 attempt 5/5 story_count=2 words=224
+Stop 2 description word count: 224 words
+  [LOCAL-407] Stop 2: snippets injected but no candidate specifics extracted
+
+  [LOCAL-439] STORY GATE: checking story-units per stop (D394)...
+    ✗ FAIL stop='The Holy Family': story_units=0, entities_ok=True, thesis_ok=True
+      → story_units=0: no candidate story-unit of ≥3 sentences passes classification (need at least 1 with named person, real actions, arc)
+    ✗ FAIL stop='Allegorische Frauengestalt mit Spiegel': story_units=0, entities_ok=True, thesis_ok=True
+      → story_units=0: no candidate story-unit of ≥3 sentences passes classification (need at least 1 with named person, real actions, arc)
+  [LOCAL-439] Classification cost: $0.001580 (input=6491, output=1010)
+  [LOCAL-439] STORY GATE: SOME STOPS FAILED (informational — does not block delivery)
+
+  [LOCAL-423] STORY VERIFICATION: checking claims against sources...
+    ✗ FAIL stop='The Holy Family': claims=2, sourced=1, unsourced=1, contradicted=0
+      → UNSOURCED: '1983' (year) — no snippet contains this assertion
+      evidence (1 sourced claims):
+        claim='Domenico Canigiani commissioned Raphael' ← 
+    ✓ PASS stop='Allegorische Frauengestalt mit Spiegel': claims=2, sourced=2, unsourced=0, contradicted=0
+      evidence (2 sourced claims):
+        claim='1529' ← https://de.wikipedia.org/wiki/Datei:Allegorical_figure_of_a_
+        claim='Hans Baldung Grien created this' ← 
+  [LOCAL-423] STORY VERIFICATION: SOME STOPS HAVE UNSOURCED CLAIMS
+  [LOCAL-423] Unsourced claims will be stripped from delivered text
+    [LOCAL-423] Stripped 1 sentence(s) from 'The Holy Family':
+      ✗ "In 1983, a significant restoration was undertaken to mark the 500th anniversary of Raphael’s birth, "
+
+  [LOCAL-192] PHASE 5.1: Style validation + per-paragraph retry...
+  [LOCAL-192] Stop 1 para 1: retry FIXED (R2_QUESTION)
+  [LOCAL-192] Stop 2 para 1: retry FAILED — keeping original (R1_IMPERATIVE)
+  [LOCAL-192] Stop 2 para 2: retry FIXED (R10_UNFULFILLED_PROMISE)
+  [LOCAL-192] Stop 2 para 3: retry FIXED (R2_QUESTION)
+  [LOCAL-192] Style retry summary: 4 paragraphs retried, 3 fixed/improved, 1 kept original
+  [LOCAL-192] Retry cost: $0.0095 (2000 tokens)
+
+  [LOCAL-255] PHASE 5.13: R1 imperative rewrite...
+  [LOCAL-255] R1 summary: 0 rewritten, 0 deleted, 0 stops affected, LLM tokens: 0 ($0.0000)
+
+  [LOCAL-251] PHASE 5.14: R7 hallucinated-sensory deletion...
+  [LOCAL-251] R7 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-261] PHASE 5.141: R2 question deletion...
+  [LOCAL-261] R2 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-261] PHASE 5.142: R3 suggestive-exploration deletion...
+  [LOCAL-261] R3 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-261] PHASE 5.143: R4 prescribed-feeling deletion...
+  [LOCAL-261] R4 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-261] PHASE 5.144: R8 prompt-leakage deletion...
+  [LOCAL-261] R8 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-216] PHASE 5.15: R9 generic-sentence deletion...
+  [LOCAL-216] R9 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-235] PHASE 5.155: R10 unfulfilled-promise deletion...
+  [LOCAL-235] R10 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-472] PHASE 5.152: Stop-specificity gate...
+  [LOCAL-472] Stop-specificity gate summary:
+    Stops checked: 2
+    Paragraphs checked: 4
+    Transferable (high, removed): 0
+    Transferable (low conf, kept): 0
+    Last-paragraph protected: 0
+    Ungrounded named entities: 2
+    Stops affected: 0
+    [LOCAL-472] UNGROUNDED entity stop='Allegorische Frauengestalt mit Spiegel' entity='Bavarian State Painting Collections' reason='It does not specify how the painting relates to the Bavarian State Painting Collections.' in: "The painting’s acquisition by the Bavarian State Painting Collections reflects its enduring importan"
+    [LOCAL-472] UNGROUNDED entity stop='Allegorische Frauengestalt mit Spiegel' entity='Alte Pinakothek' reason='It does not specify how the painting relates to the Alte Pinakothek.' in: "The painting’s acquisition by the Bavarian State Painting Collections reflects its enduring importan"
+
+  [LOCAL-263] PHASE 5.156: Unsupported-claim gate...
+  [LOCAL-263] Unsupported-claim gate summary:
+    Sentences removed: 0
+    Sentences kept (substantiated): 0
+    By type: PROMISE=0, SENSORY=0, FEELING=0, QUALITY=0
+    Escalation calls: 0
+    Stops affected: 0
+    Deletion rate: 0.0% (0/16)
+
+  [LOCAL-269] PHASE 5.157: Unglossed-reference gate...
+  [LOCAL-269] Unglossed-reference gate summary (LOCAL-287: compose, not splice):
+    References detected: 4
+    Glossed (composed): 3
+    Suppressed (already explained): 0
+    Degraded (name dropped): 1
+    Guard failures: 0
+    Known (skipped): 0
+    Triage: 795 tokens, $0.0002, 2.8s
+    Gloss: 542 tokens, $0.0001, 2.2s
+    Compose: 1093 tokens, $0.0002, 1.9s
+    Total added cost: $0.0005
+    Stops affected: 2
+    Glosses applied:
+      • Virgin Mary → "the mother of Jesus Christ" [source: model]
+      • Saint Joseph → "the husband of the Virgin Mary" [source: model]
+      • Hans Baldung Grien → "a german painter of the northern renaissance" [source: model]
+      • Bavarian State Painting Collections → DEGRADED (name dropped)
+
+  [LOCAL-458] entity gate SKIPPED: no exhibition scope (unscoped museum tour)
+
+  [LOCAL-458] entity gate SKIPPED: no exhibition scope (unscoped museum tour)
+
+  [LOCAL-385] Form-claim gate SKIPPED (no exhibition scope — unscoped museum tours are not gated)
+
+  [LOCAL-389] Numeric-claim gate SKIPPED (no exhibition scope — unscoped museum tours are not gated)
+
+  [LOCAL-402] PHASE 5.161: Temporal coherence gate (impossible relations)...
+  [LOCAL-402] Temporal coherence gate summary:
+    Relations checked: 19
+    Relations rejected: 0
+    Sentences removed: 0
+    Stops affected: 0
+
+  [LOCAL-229] PHASE 5.16: CONTRADICTED claim block (D100 enforcement)...
+  [LOCAL-229] CONTRADICTED block summary: 0 group(s) blocked, 0 stop(s) affected
+
+PHASE 5.5a: Post-description knowledge validation (all tour types)...
+OK Post-description validation passed: Knowledge validation passed
+
+PHASE 5.5b: Validating descriptions are inside 'Alte Pinakothek'...
+   Authority: 1 D1v2-verified (kept unconditionally), 0 unverified (will check)
+   Pre-filter: 0 clean, 0 suspect (will call OpenAI for suspect only)
+OK PHASE 5.5b: 2 stop(s) passed venue description validation
+OK PHASE 5.7: Dangling-reference scrub complete (2 stops)
+
+  [LOCAL-318] PHASE 5.7b: Dangling-demonstrative scrub...
+  [LOCAL-318] Dangling-demonstrative scrub summary:
+    Detected: 1
+    Repaired (name substituted): 0
+    Deleted (unrepairable): 1
+    Stops affected: 1
+    [2] DELETED: 'These animals' in: These animals, charged with metaphorical significance, evoke the complex interpl
+OK PHASE 5.7b: Dangling-demonstrative scrub complete
+
+PHASE 5.8: Type/prose contradiction check (LOCAL-27)...
+  [LOCAL-27] No type/prose contradictions detected
+
+PHASE 5.9: Audio-native cleanup (LOCAL-41)...
+  [LOCAL-41] Stripped 0 trailing question(s), removed 0 'broader context' instance(s)
+
+  [D498] step 7c: most valuable stop is 1 'The Holy Family' (index 44) — allowance 5 -> 7 sentences on regeneration, story currently 3 sentence(s)
+
+  [LOCAL-487] step 7a: 2 stop(s) have NO VALID STORY by Michael's bar (3+ consecutive sentences, one person, an action and something at stake)
+    stop 1 'The Holy Family': the longest run (3 sentences, Raphael) has agency=0 stakes=0 — someone is described, but nothing is risked, re
+    stop 2 'Allegorische Frauengestalt mit Spiegel': the longest run (3 sentences, Strasbourg) has agency=0 stakes=0 — someone is described, but nothing is risked,
+    [LOCAL-487] cap=1: retrying only the weakest — stop 2 'Allegorische Frauengestalt mit Spi' (index 26)
+  [D534] No cross-stop repetition in the drafts
+
+  [LOCAL-474] PHASE 5.17: retry 'The Holy Family' — 188w → 151w after gates, 2 sentence(s) removed
+    removed: "The tranquil composition reveals the Virgin Mary, Saint Joseph, and the infant Jesus, mingling the d"
+    removed: "Today, with its focus on the frames rather than the paintings themselves, the Alte Pinakothek invite"
+    [LOCAL-491] step 7b: rotating to the venue fact — institutional context; weakest, but it scopes the search
+      focus: "The Holy Family is held at Alte Pinakothek."
+
+  [LOCAL-474] PHASE 5.17: retry 'Allegorische Frauengestalt mit Spiegel' — 224w → 159w after gates, 7 sentence(s) removed
+    removed: "In 1529, Hans Baldung Grien created this enigmatic piece, titled Allegorische Frauengestalt mit Spie"
+    removed: "These animals, charged with metaphorical significance, evoke the complex interplay between truth and"
+    removed: "Baldung, who worked primarily in Strasbourg and Freiburg, frequently integrated fantastical elements"
+    removed: "The decision to shift his focus allowed him to imbue his works with a level of introspection and nar"
+    removed: "As a luminary of the German Renaissance, his creative choices bridged the sacred and the secular, of"
+    removed: "The painting’s acquisition by the Bavarian State Painting Collections reflects its enduring importan"
+    removed: "What does the mirror reveal about our own reflections in art?"
+    [LOCAL-491] step 7b: rotating to the venue fact — institutional context; weakest, but it scopes the search
+      focus: "Allegorische Frauengestalt mit Spiegel is held at Alte Pinakothek."
+
+  [LOCAL-526] PHASE 5.17: regenerating 2 eligible stop(s) concurrently (max_workers=2)
+
+Generating description for Stop 1: The Holy Family by , ...
+
+Generating description for Stop 2: Allegorische Frauengestalt mit Spiegel by , ...
+  [LOCAL-381] stop='Allegorische Frauengestalt mit Spiegel' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-411] Stop 2 snippet ranking: input=36 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=5 output=5 usable=5 (t1t2=0, t3=0, market=0)
+    Top scores: [('Allegorische Frauengestalt mit Spiegel', 20, ''), ('Allegory of Music by Hans Baldung Grien (1529)', 8, ''), ('Datei:Allegorical figure of a woman with mirror, s', 8, 'unverified')]
+  [LOCAL-620] Stop 2 evidence balance: input=5 kept_rich=3 kept_story=0 dropped_boilerplate=0 output=3
+  [LOCAL-402] Stop 2: injected 3 snippets as reference material
+  [LOCAL-620] prefs: default/balanced (no user_id)
+  [LOCAL-617] Stop 2: narration contract injected (reception_evidence=False)
+  [D533] Stop 2 corpus-gate restriction LIFTED — 36 source item(s) arrived after the gate ran
+  [LOCAL-411] Stop 2 prompt size: before_snippets=11416 after=26643 (+15227 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (26643)
+  [D498] Stop 2 matrix: 4/9 slots filled — empty: ['artist', 'publisher', 'printed_by', 'medium', 'credit_line']
+  [D500] agents 0/3: hero=—, sponsor=—, builder=—
+  [LOCAL-381] stop='The Holy Family' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-411] Stop 1 snippet ranking: input=41 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=5 output=5 usable=5 (t1t2=1, t3=0, market=0)
+    Top scores: [('The Holy Family', 16, ''), ('The Holy Family', 16, ''), ('The Holy Family with Saint John the Baptist ...', 15, '')]
+  [LOCAL-620] Stop 1 evidence balance: input=5 kept_rich=2 kept_story=0 dropped_boilerplate=0 output=2
+  [LOCAL-402] Stop 1: injected 2 snippets as reference material
+  [LOCAL-620] prefs: default/balanced (no user_id)
+  [LOCAL-617] Stop 1: narration contract injected (reception_evidence=False)
+  [D533] Stop 1 corpus-gate restriction LIFTED — 41 source item(s) arrived after the gate ran
+  [LOCAL-411] Stop 1 prompt size: before_snippets=10459 after=27688 (+17229 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (27688)
+  [D498] Stop 1 matrix: 4/9 slots filled — empty: ['artist', 'publisher', 'printed_by', 'medium', 'credit_line']
+  [D500] agents 0/3: hero=—, sponsor=—, builder=—
+  [LOCAL-490] Stop 1 story pass: ok=True (5 sentences), $0.0055
+    story: "The Holy Family, a masterpiece by Raphael, was initially commissioned by the Florentine merchant Domenico Canigiani around 1505–1507. Canigiani, likel"
+  [LOCAL-408] Prompt dump written to: /app/prompt_dump_stop1.txt
+  [LOCAL-490] Stop 2 story pass: ok=True (4 sentences), $0.0064
+    story: "In 1529, Hans Baldung Grien completed the painting "Allegorische Frauengestalt mit Spiegel" while working primarily in Strasbourg and Freiburg. At the"
+Stop 1 API call cost: $0.0358 (7536 tokens, model=gpt-4o)
+  [LOCAL-569] Stop 1 attempt 1/5 story_count=2 words=279
+  [LOCAL-432] Stop 1: STORY RETRY — story_count=2 < 3, need 1 more, retrying (attempt 2/5)
+Stop 2 API call cost: $0.0359 (7560 tokens, model=gpt-4o)
+  [LOCAL-569] Stop 2 attempt 1/5 story_count=1 words=277
+  [LOCAL-432] Stop 2: STORY RETRY — story_count=1 < 3, need 2 more, retrying (attempt 2/5)
+Stop 1 API call cost: $0.0375 (7899 tokens, model=gpt-4o)
+  [LOCAL-569] Stop 1 attempt 2/5 story_count=1 words=263
+  [LOCAL-432] Stop 1: STORY RETRY — story_count=1 < 3, need 2 more, retrying (attempt 3/5)
+Stop 2 API call cost: $0.0374 (7869 tokens, model=gpt-4o)
+  [LOCAL-569] Stop 2 attempt 2/5 story_count=3 words=219
+Stop 2 description word count: 219 words
+  [LOCAL-407] Stop 2: snippets injected but no candidate specifics extracted
+  [LOCAL-414] Stop 2: SCRUBBED banned phrases from output: ['a testament to']
+Stop 1 API call cost: $0.0392 (8246 tokens, model=gpt-4o)
+  [LOCAL-569] Stop 1 attempt 3/5 story_count=3 words=237
+Stop 1 description word count: 237 words
+  [LOCAL-407] Stop 1: snippets injected but no candidate specifics extracted
+  [LOCAL-526] PHASE 5.17 regeneration wall: 14.0s for 2 stop(s) at max_workers=2
+    [D498] step 7c judged on the index, not on length: 44 -> 56, accepted=True
+    [LOCAL-474] regenerated and re-gated: 237w (was 151w)
+    [LOCAL-487] retry judged on the story bar, not on length: cleared=False
+    [LOCAL-474] retry not better after re-gating — keeping the original gated text
+  [D534] no repeated sentences left after the retries
+
+  [LOCAL-474] retry summary: 2 eligible, 2 retried, 1 improved, 1 kept original
+  [LOCAL-487] triggers: 0 hollowed by gates, 1 storyless (step 7a — Michael's bar, independent of length), 1 top-value (step 7c — larger allowance), 0 repeating an earlier stop (D534), 2 thin enough for another story (D534, floor=300w). Triggers overlap and are counted separately; they do not sum to 'eligible'.
+  [LOCAL-474] each regenerated stop was re-gated before being accepted; a retry can only replace text it beats after gating.
+
+PHASE 5.10: Anti-preaching cleanup (LOCAL-44)...
+  [LOCAL-44] Stripped 0 preaching closer(s)
+
+  [LOCAL-444] Obligation audit DISABLED by L444_OBLIGATION_AUDIT=false
+  [LOCAL-427] Cache HIT: https://paceprints.com/techniques (25990 chars)
+  [LOCAL-459] R5: Fetched 2341 chars from https://paceprints.com/techniques
+  [LOCAL-427] Cache HIT: https://www.clarkart.edu/microsites/impressionist-line/about/printmaking-techniques (14959 chars)
+  [LOCAL-459] R5: Fetched 1756 chars from https://www.clarkart.edu/microsites/impressionist-
+  [LOCAL-427] HTTP 200 from https://www.youtube.com/watch?v=lNoRrp17SJ4 (attempt 1)
+  [LOCAL-427] HTTP 200 from https://www.pinakothek.de/en/alte-pinakothek (attempt 1)
+  [LOCAL-459] R5: Fetched 1409 chars from https://www.pinakothek.de/en/alte-pinakothek
+  [LOCAL-427] HTTP 200 from https://www.highpointprintmaking.org/about-printmaking (attempt 1)
+  [LOCAL-459] R5: Fetched 1621 chars from https://www.highpointprintmaking.org/about-printma
+  [LOCAL-427] HTTP 200 from https://www.uprinting.com/a-historical-guide-to-prints-and-printmaking.html?srsltid=AU7gw4U6wiGe7qMpdB78-us36SEziLs2vJHKJ3DV0aVE8UiVT1NZUc-W (attempt 1)
+  [LOCAL-459] R5: Fetched 1668 chars from https://www.uprinting.com/a-historical-guide-to-pr
+  [LOCAL-427] Cache HIT: https://news.masterworksfineart.com/2021/01/20/printmaking-techniques-defined-and-explained-in-plain-english (40255 chars)
+  [LOCAL-459] R5: Fetched 3003 chars from https://news.masterworksfineart.com/2021/01/20/pri
+  [D512] verb discovery: query='Alte Pinakothek printmaking process how it is made technique ste' -> 3 new verb(s): removed, baked, poured
+  [D512] _AGENCY_VERB widened by 3 discovered verb(s)
+
+  [D511] PHASE 5.20: credit_line loop — object record, seeds, challenge, adjudicate, gate
+    [D501] no object record for 'Allegorische Frauengestalt mit Spiegel' — matrix unchanged
+    [D511] 4 credit_line(s) to try (0 from the matrix, 4 from the text)
+    [D501] no object record for 'The Holy Family' — matrix unchanged
+    [D511] 4 credit_line(s) to try (0 from the matrix, 4 from the text)
+  [LOCAL-427] HTTP 200 from https://www.uffizi.it/en/artworks/holy-family-known-as-the-doni-tondo (attempt 1)
+  [LOCAL-459] R5: Fetched 3003 chars from https://www.uffizi.it/en/artworks/holy-family-know
+  [LOCAL-427] HTTP 200 from https://www.facebook.com/61584959041089/posts/doni-tondo-the-holy-familymichelangelo-buonarroti-italian-14751564c-15051507oil-/122141944569165301/ (attempt 1)
+  [LOCAL-427] HTTP 200 from https://www.pinakothek.de/en/exhibition/raffael-1520-2020 (attempt 1)
+  [LOCAL-459] R5: Fetched 1905 chars from https://www.pinakothek.de/en/exhibition/raffael-15
+  [LOCAL-427] HTTP 200 from https://www.visit-florence-italy.com/museums/uffizi/michelangelo-the-holy-family-tondo-doni-uffizi-florence-01.html (attempt 1)
+  [LOCAL-459] R5: Fetched 957 chars from https://www.visit-florence-italy.com/museums/uffiz
+    [D511] 1.1                    kind=active   idx=46  C1 X2 fail:index_d515  [old gate: eventful,index]
+    [D511] 1.1                    kind=none     idx=5   C0 X4 fail:index_d515  [old gate: eventful,index,confirmed]
+    [D511] 1.2                    kind=none     idx=5   C0 X1 fail:index_d515  [old gate: eventful,index,confirmed]
+  [LOCAL-427] HTTP 200 from https://arsartisticadventureofmankind.wordpress.com/tag/raphaels-the-holy-family/ (attempt 1)
+  [LOCAL-459] R5: Fetched 2424 chars from https://arsartisticadventureofmankind.wordpress.co
+  [LOCAL-427] HTTP 200 from https://www.wikiart.org/en/raphael/the-holy-family-with-a-lamb-1507 (attempt 1)
+  [LOCAL-459] R5: Fetched 3003 chars from https://www.wikiart.org/en/raphael/the-holy-family
+  [LOCAL-427] HTTP 200 from https://www.facebook.com/groups/162243897516549/posts/438144626593140/ (attempt 1)
+  [LOCAL-427] HTTP 200 from https://en.wikipedia.org/wiki/Canigiani_Holy_Family (attempt 1)
+  [LOCAL-459] R5: Fetched 2095 chars from https://en.wikipedia.org/wiki/Canigiani_Holy_Famil
+    [D511] 3.1                    kind=active   idx=38  C2 X5 fail:index_d515  [old gate: eventful,index,confirmed]
+    [D511] 3.1                    kind=none     idx=5   C0 X4 fail:index_d515  [old gate: eventful,index,confirmed]
+    [D511] 4.1                    kind=none     idx=10  C0 X1 fail:index_d515  [old gate: eventful,index,confirmed]
+    [LOCAL-468] pairwise overlap: mean=0.583, max=1.000 (CONVERGED — seeds not working)
+      Hans Baldung Grien,  × during a pivotal mom = 0.635
+      Hans Baldung Grien,  × primarily worked in  = 1.000
+      Hans Baldung Grien,  × offering viewers a c = 0.382
+      during a pivotal mom × primarily worked in  = 0.635
+      during a pivotal mom × offering viewers a c = 0.464
+      primarily worked in  × offering viewers a c = 0.382
+    [D511] examined 4 credit_line(s) (indices 5, 5, 5, 10), no story passed, ~$0.048, 33s
+    [D511] 4.1                    kind=none     idx=10  C0 X1 fail:index_d515  [old gate: eventful,index,confirmed]
+    [D511] 4.2                    kind=none     idx=10  C0 X1 fail:index_d515  [old gate: eventful,index,confirmed]
+    [LOCAL-468] pairwise overlap: mean=0.064, max=0.188 (DIVERSE)
+      The Holy Family, a m × Florence's influenti = 0.122
+      The Holy Family, a m × Raphael's enduring l = 0.010
+      The Holy Family, a m × commemorating the 50 = 0.019
+      Florence's influenti × Raphael's enduring l = 0.022
+      Florence's influenti × commemorating the 50 = 0.021
+      Raphael's enduring l × commemorating the 50 = 0.188
+    [D511] examined 4 credit_line(s) (indices 46, 38, 10, 10), no story passed, ~$0.050, 38s
+
+  [D511] stop 1: The Holy Family
+    [D511] no story passed the gate — stop keeps its descriptive text and publishes no story
+
+  [D511] stop 2: Allegorische Frauengestalt mit Spiegel
+    [D511] no story passed the gate — stop keeps its descriptive text and publishes no story
+
+  [D511] PHASE 5.20 summary: 0/2 stops got a gated story (0 with multiple stories), ~$0.098, [D518] 0 duplicated prose sentence(s) replaced
+
+  [LOCAL-485] PHASE 5.21: Story valuation index (report only, never gates)...
+     #  stop                                      idx  hist  detl   soc
+     1  The Holy Family                            56    51    14    65
+     2  Allegorische Frauengestalt mit Spiegel     26    12     6    53
+    [LOCAL-485] index mean 41.0 over 2 stop(s), range 26-56
+    [LOCAL-485] weakest: 'Allegorische Frauengestalt mit Spiegel' at 26
+[TIMING] phase=story_first elapsed=132.7s cumulative=289.7s
+
+PHASE 6: Assembling the complete tour...
+  [LOCAL-11] Venue-identity mining: 2 facts found {'architecture': 1, 'founding': 1}
+  [R2] Prolog saved for Stop 1 (93 words)
+
+  [LOCAL-244] PHASE 5.9: Prolog gating (R9, R10, subject routine)...
+  [LOCAL-244] Prolog before gates: 93 words
+  [LOCAL-244] Prolog R9: 0 deletions
+  [LOCAL-286] Prolog R7: 0 deletions
+  [LOCAL-244] Prolog R10: 1 sentence(s) deleted
+  [LOCAL-244] Prolog subject: 0 expanded, 0 deleted, cost=$0.0000
+  [LOCAL-244] Prolog after gates: 79 words (delta: -14)
+  [LOCAL-244] Prolog deletions (1):
+    [R10_UNFULFILLED_PROMISE] "Join this journey of introspection and discovery through the masterpieces housed within these walls."
+
+  [LOCAL-246] PHASE 5.95: Orientation gating (R9, R10)...
+  [LOCAL-246] Orientation gating summary:
+    Words before: 93
+    Words after:  93
+    Delta: 0
+    Stops affected: 0/2
+
+  [LOCAL-270] PHASE 5.96: Composing Part 4 (forward connection) from delivered narrations...
+    Stops with delivered content: 2/2
+    [LOCAL-276] Intrigue ranking completed: 1.6s, $0.0057, 893 tokens
+    [LOCAL-276] Ranked 2 stops:
+      [The Holy Family] (cause): This commission marked a pivotal moment for Raphael, aligning him with Florence'...
+      [Allegorische Frauengestalt mit Spiegel] (mystery): Baldung, who primarily worked in Strasbourg and Freiburg, often incorporated fan...
+    [LOCAL-276] 2 intriguing / 0 excluded (celebrity_trivia)
+    [LOCAL-276] Using ranked facts for composition (2 stops)
+    Part 4 LLM cost: $0.0027 (456 tokens) [attempt 1]
+    ✓ Part 4 composed and verified (26 words):
+      "In the stops ahead, you will learn about Baldung's fantastical elements at Allegorische Frauengestalt mit Spiegel and Raphael's alignment with influential patrons at The Holy Family."
+      Stops referenced: 2
+    Part 4 total cost: $0.0027
+  [LOCAL-618 #1] Orientation pre-tell guard: dropped 2 sentence(s) carrying later-stop facts
+
+  [LOCAL-286] PHASE 5.97: Prolog-body deduplication (≥8 word overlap)...
+  [LOCAL-286] Deduplication: 0 sentence(s) removed from stop bodies
+
+  [LOCAL-292] Empty stop removal gate: PASSED (all 2 stops have narration)
+  [LOCAL-394] Stop count invariant: OK (2 selected == 2 delivered)
+  [D536] Listener asked for 2 stop(s), delivering 2 — request met
+  DEBUG - POI 1 content includes:
+    Specific Examples: False
+    Operational Details: True
+    Walking Directions: True
+  [T4] Transition to Stop 2: Continue through Alte Pinakothek — next is Allegorische Frau...
+  DEBUG - POI 2 content includes:
+    Specific Examples: False
+    Operational Details: False
+    Walking Directions: True
+  [LOCAL-280] Recap composition: 1.2s, $0.0025, 434 tokens
+  [LOCAL-280] Recap built: 28 words, 2 composed clauses (0 D177 rejected, 0 navigation rejected)
+    [Allegorische Frauengestalt mit Spiegel] (mystery): "Baldung, who primarily worked in Strasbourg and Freiburg, often incorporated fan..."
+      → composed: "Allegorical Female Figure with Mirror, showcasing Baldung's fantastical style in Strasbourg"
+    [The Holy Family] (cause): "This commission marked a pivotal moment for Raphael, aligning him with Florence'..."
+      → composed: "The Holy Family, a commission elevating Raphael's skill among Florence's elite patrons"
+    D177 verified: all 2 source facts present in delivered text
+  [LOCAL-280] Recap added: "That's 2 stops — Allegorical Female Figure with Mirror, showcasing Baldung's fantastical style in Strasbourg and the Holy Family, a commission elevating Raphael's skill among Florence's elite patrons."
+  [LOCAL-275] Part 2: museum tour category, no restaurant found nearby
+  [D519] Treat Page: no treat within 1.0 km of any of 2 stop(s) (0 treat(s) with coordinates) — mention OMITTED
+  [LOCAL-275/D519] Part 2: nothing verified — no tour offer, no Treat Page
+  [LOCAL-275] Part 2 error: name '_venue_parts_used' is not defined
+  [LOCAL-275] Closing offer fallback (no verification passed)
+  [EPILOG] Journey epilog added to last stop
+  [S27] No cross-stop repetition detected
+  [D533] No cross-stop fact repetition detected
+  [D533] Person-year role guard: no mismatches (88674 chars of corpus checked)
+  [LOCAL-615] No duplicated paragraphs
+  [LOCAL-620] Story-balance stop-body policy: no change (2 stops scanned)
+  [LOCAL-623] Same-title bleed filter: no change (2 stops scanned)
+  [LOCAL-623] Museum-motif filter: no change (2 stops scanned)
+  [LOCAL-617] Conclusion de-dup: removed redundant 'This tour covered …' line (recap kept)
+
+  [LOCAL-36] Practical Facts Gate:
+    Claims found: 0
+    Verified: 0
+    Dropped: 0
+    AUDIT: NO_CLAIMS | (none) | (none) | PASS — no practical claims to verify
+  [LOCAL-36] No practical claims found to verify (informational for tour_category='museum')
+  [LOCAL-618 #2] grammar/splice lint: 2 flagged, 0 dropped, 1 rewritten ({'repeated_pair': 1, 'verbless': 1})
+  [LOCAL-618 #2] grammar/splice lint: 2 flagged, 0 dropped, 1 rewritten by_code={'repeated_pair': 1, 'verbless': 1}
+
+  [LOCAL-260] PROLOG STRUCTURE VALIDATION: 3 error(s), 0 warning(s)
+    [ERROR] Part 1: PART1_MISSING — Part 1 (Tour name and transportation mode) is not present.
+    [ERROR] Part 4: PART4_MISSING — Part 4 (Forward connection to stops) is not present.
+    [ERROR] Part 2: PART2_INSUFFICIENT_SUBSTANCE — Part 2 has only 1 route indicator(s) (endpoints); need at least 2 of: endpoints, distance, terrain, duration.
+
+=== Word Count Statistics ===
+Stop 1: The Holy Family - 241 words
+Stop 2: Allegorische Frauengestalt mit Spiegel - 224 words
+===========================
+
+  [LOCAL-540] scorer ran on assembled tour (4538 chars, 2/2 stops)
+  [LOCAL-540] defects seen: ['offsite_entity']
+  [LOCAL-540]   offsite_entity [REQUIRED_CLEAN]: 1 place(s) framed as part of the tour but not a stop/venue, e.g. "Allegorical Female Figure" in: That's 2 stops — Allegorical Female Figure
+  [LOCAL-540] REQUIRED_CLEAN defect present (['offsite_entity']) — issuing ONE retry over 1 section(s)
+  [LOCAL-540] retry: regenerating epilog for ['offsite_entity']
+  [LOCAL-540] retry rewrite: 424 tokens, $0.002020 (gpt-4o)
+  [LOCAL-540] rescored after retry: defects ['offsite_entity'] -> []
+  [LOCAL-540] retry removed: ['offsite_entity']
+  [LOCAL-540] retry cleared all REQUIRED_CLEAN defects
+  [LOCAL-619B] thematic conclusion built from final text: 2 delivered stop(s), venue='Alte Pinakothek'
+
+Total API cost: $0.2480 (24060 tokens)
+Grounding:      $0.0700 (5 queries, 4 requests)
+Tour total:     $0.3180
+Provenance:     2/16 factual sentences sourced, 14 unsourced (2 corpus, 0 grounded, 14 parametric)
+
+Tour text generated successfully!
+  [LOCAL-230] Network failures: 0 (all API calls succeeded)
+Saved to: /app/tours/LOCAL625_ALTE_PINAKOTHEK.txt
+  [C5-5] Evidence persisted: /app/tours/LOCAL625_ALTE_PINAKOTHEK_evidence.json
+
+Preview of the generated tour:
+
+Step-by-step audio guided tour of the Alte Pinakothek in Munich, Germany, is a museum tour.
+
+Stop 1: The Holy Family
+
+Address: Alte Pinakothek, Barer Str. 27, 80333 München, Germany
+
+Coordinates: 48.1494, 11.5705
+
+Museum Information: 10.00–18.00
+
+Orientation: You are about to explore the Alte Pinakothek in Munich. The two works, spanning different periods and styles, come together to explore the themes of identity and self-reflection through religious and allegorical art. The Canigiani Holy Fami...
+
+
+========================================================================
+  [LOCAL-410] CHAIN INSTRUMENTATION (post-generation)
+========================================================================
+    The Holy Family: serp_results=21 snippets_injected=31 beats_in_delivered_text=0
+    Allegorische Frauengestalt mit Spiegel: serp_results=22 snippets_injected=30 beats_in_delivered_text=1
+========================================================================
+[TIMING] phase=packing elapsed=10.6s cumulative=300.3s
+[TIMING] phase=verification elapsed=0.0s cumulative=300.3s
+[TIMING] TOTAL wall=300.3s phases: story_first=132.7s, poi_selection=81.1s, external_lookups=56.0s, fact_sheets=13.1s, packing=10.6s, intent=6.8s, narration=0.0s, verification=0.0s
+  [LOCAL-619B] thematic conclusion already present and count OK (2 stop(s)); preserved (every-path guard)
+OUTCOME: DELIVERED — 4597 chars, 2 stops, wall 326.3s
+[LOCAL-625 facts on spoken text] — Alte Pinakothek, Munich, Germany
+  HOURS/Museum Information: 10.00–18.00
+  ADDRESS: 'Alte Pinakothek, Barer Str. 27, 80333 München, Germany'
+  ADDRESS: 'Alte Pinakothek, Barer Str. 27, 80333 München, Germany'
+  STOP TITLE: The Holy Family
+  STOP TITLE: Allegorische Frauengestalt mit Spiegel
+  garbage-hours probe: CLEAN
+[cost] tour_total=$0.5317
+STORED audio_tours id = 703  (is_test=true)
+LOCAL625_TOUR_ID=703
+
+[db] audio_tours row count AFTER: 492
+=== LOCAL-625 run complete ===
+LOCAL625_TOUR_IDS=702,703
+[COST_METER] FRESH | tour_generate | $0.472479 | user=TEST-LOCAL-625 | job=None
+[LIVE_RUN_METER] TEST-LOCAL-625  (cap $1.00, all providers combined)
+  openai            $0.3695
+  gemini_grounding  $0.0700  (requests=4, queries=5)
+  gemini_tokens     $0.0120
+  serper            $0.0210
+  preflight         $0.0592
+  TOTAL             $0.4725   description='test run'
+[LIVE_RUN_METER] cost_ledger row f0f25ee9-3681-4f3a-8a23-83c9f0e975ac (user_id=TEST-LOCAL-625, description='test run')

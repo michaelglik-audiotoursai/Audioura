@@ -1,0 +1,194 @@
+{
+  "landmarks": {
+    "The Holy Family": {
+      "status": "VERIFIED",
+      "canonical_title": "The Holy Family",
+      "snippet": "",
+      "method": "canonical_title_match",
+      "qid": "Q29480644"
+    },
+    "Alte Pinakothek, Obergeschoss, Kabinett 16": {
+      "status": "DROPPED",
+      "reason": "theme word: 'obergeschoss,'"
+    },
+    "Alte Pinakothek, Obergeschoss, Kabinett 1-2": {
+      "status": "DROPPED",
+      "reason": "theme word: 'obergeschoss,'"
+    },
+    "Alte Pinakothek, Obergeschoss, Saal IIa": {
+      "status": "DROPPED",
+      "reason": "theme word: 'obergeschoss,'"
+    },
+    "Allegorische Frauengestalt mit Spiegel": {
+      "status": "VERIFIED",
+      "canonical_title": "Allegorische Frauengestalt mit Spiegel",
+      "snippet": "t 219 Werken oberdeutscher und schwäbischer Malerei. Dazu kamen Ankäufe in Italien, z. B. Raffaels „Madonna mit dem Vorhang“. Die fürstliche Sammlung spiegelt somit den Geschmack der jeweiligen Sammlerpersönlichkeiten wider. So erklären sich die anderswo unerreichbaren Stärken ebenso wie die deutlichen Lüc",
+      "method": "R4_replenishment"
+    },
+    "Altes Benrather Schloss am Spiegelweiher": {
+      "status": "VERIFIED",
+      "canonical_title": "Altes Benrather Schloss am Spiegelweiher",
+      "snippet": "ek sowie Kunstdrucke, Postkarten und Geschenke erhalten Sie in unserem Shop.\n\nÖFFNUNGSZEITENTäglich außer MO 10.00 – 18.00DI und MI 10.00 – 20.00MO geschlossen+49 (0)89 28998820\n\nWenn Sie Bücher und Produkte bestellen möchten, wenden Sie sich bitte an Cedon.\n\nÖFFNUNGSZEITENTäglich außer MO 10.00 – 17.30DI",
+      "method": "R4_replenishment"
+    },
+    "Amor schnitzt den Bogen": {
+      "status": "VERIFIED",
+      "canonical_title": "Amor schnitzt den Bogen",
+      "snippet": "„Die Eitelkeit der Welt“, um 1515); („Die Dornenkrönung“, um 1570), Jacopo Tintoretto („Vulkan überrascht Venus und Mars“, um 1555), Paolo Veronese („Amor mit zwei Hunden“, 1575/1580), Federico Barocci („Christus und Magdalena“, 1590), Bartolomeo Manfredi („Dornenkrönung Christi“, um 1609), Orazio Genti",
+      "method": "R4_replenishment"
+    },
+    "An amourous embrace of a shepherd and a shepherdess": {
+      "status": "VERIFIED",
+      "canonical_title": "An amourous embrace of a shepherd and a shepherdess",
+      "snippet": "",
+      "method": "R4_replenishment"
+    },
+    "Anbetung der Könige": {
+      "status": "VERIFIED",
+      "canonical_title": "Anbetung der Könige",
+      "snippet": "bei Issus)  (1529)\n\nMadonna mit der Nelke (um 1475)\n\nDas Große Jüngste Gericht (um 1617)\n\nVulkan überrascht Venus und Mars (um 1555)\n\nColumba-Altar: Anbetung der Könige (um 1455)\n\nDie Heilige Familie aus dem Hause Canigiani (um 1505/1506)\n\nEinen Überblick über die verschiedenen Anreisemöglichkeiten bietet",
+      "method": "R4_replenishment"
+    }
+  },
+  "claim_provenance": {
+    "counts": {
+      "sourced": 2,
+      "unsourced": 14,
+      "total": 16,
+      "corpus": 2,
+      "grounded": 0,
+      "parametric": 14
+    },
+    "per_stop": {
+      "": {
+        "sourced": 0,
+        "unsourced": 1,
+        "total": 1
+      },
+      "The Holy Family": {
+        "sourced": 2,
+        "unsourced": 6,
+        "total": 8
+      },
+      "Allegorische Frauengestalt mit Spiegel": {
+        "sourced": 0,
+        "unsourced": 7,
+        "total": 7
+      }
+    },
+    "claims": [
+      {
+        "stop": "",
+        "text": "Step-by-step audio guided tour of the Alte Pinakothek in Munich, Germany, is a museum tour.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "The Holy Family",
+        "text": "You are about to explore the Alte Pinakothek in Munich.",
+        "class": "corpus",
+        "source": "https://en.wikipedia.org/wiki/Canigiani_Holy_Family",
+        "evidence": "Alte Pinakothek, Munich. It shows mainly (l.t.r.) Elisabeth with baby John ... The painting shows the Holy Family, consisting of Jesus Christ as a baby ..."
+      },
+      {
+        "stop": "The Holy Family",
+        "text": "The Canigiani Holy Family, restored in 1983, invites contemplation beyond the frames, while Andrea del Sarto's profound meditation in \"The Holy Family\" offers a deeper understanding of the subject matter.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "The Holy Family",
+        "text": "The Holy Family, a masterpiece by Raphael, was commissioned by Florentine merchant Domenico Canigiani around 1505–1507.",
+        "class": "corpus",
+        "source": "knowledge_fallback:gemini",
+        "evidence": "The work was originally commissioned by the Florentine merchant Domenico Canigiani, likely around the time of his marriage in 1505–1507, for a private domestic altar."
+      },
+      {
+        "stop": "The Holy Family",
+        "text": "This commission marked a pivotal moment for Raphael, aligning him with Florence's influential patrons and providing a platform to showcase his exquisite skill in a domestic religious setting.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "The Holy Family",
+        "text": "In 1983, The Holy Family was restored as a tribute to Raphael's enduring legacy, commemorating the 500th anniversary of his birth.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "The Holy Family",
+        "text": "Initially created for private devotion, the painting now captivates a broader audience at the Alte Pinakothek, a transformation that allows countless visitors to appreciate its impact within the context of art history.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "The Holy Family",
+        "text": "Raphael, active during the Italian High Renaissance, found himself in a flourishing artistic environment of Florence when he created this work.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "The Holy Family",
+        "text": "The interplay of the art and its frame in The Holy Family emphasizes the carefully curated harmony Raphael strived to achieve, leaving a lasting impression of peace and reverence.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Allegorische Frauengestalt mit Spiegel",
+        "text": "To fully appreciate Allegorische Frauengestalt mit Spiegel, stand directly in front of the painting to capture the luminosity of Hans Baldung Grien’s oil on panel work.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Allegorische Frauengestalt mit Spiegel",
+        "text": "In 1529, Hans Baldung Grien, a german painter of the northern renaissance, created this enigmatic piece, titled Allegorische Frauengestalt mit Spiegel, Schlange, Hirsch und Hündin, during a pivotal moment in his career.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Allegorische Frauengestalt mit Spiegel",
+        "text": "Known for his symbolic complexity, Baldung painted a woman holding a mirror, surrounded by a serpent, a stag, and a hind.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Allegorische Frauengestalt mit Spiegel",
+        "text": "Baldung, who primarily worked in Strasbourg and Freiburg, often incorporated fantastical elements into his art, as seen here.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Allegorische Frauengestalt mit Spiegel",
+        "text": "By including this work in its collection, the Alte Pinakothek, emphasizing older artworks, underscores its commitment to showcasing pivotal moments in art history.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Allegorische Frauengestalt mit Spiegel",
+        "text": "That's 2 stops in all.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Allegorische Frauengestalt mit Spiegel",
+        "text": "Sources: This tour draws on information from www.pinakothek.de and the Wikipedia article on the museum.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      }
+    ]
+  }
+}

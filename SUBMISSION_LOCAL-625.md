@@ -132,7 +132,7 @@ tests/test_local600_order_and_shortfall   exit=0   24 passed
 tests/test_local602_* (11 files)          exit=0   all passed
 tests/test_local603_meter_and_l2.py       exit=0    5 passed
 tests/test_local603_preflight.py          exit=0    9 passed
-tests/test_local604_plan.py               exit=0   21 passed
+tests/test_local604_plan.py               exit=0   21 passed (needs Postgres :5433; 21 DB setup-errors when the dev DB is down — environmental, not a regression; this branch does not touch plan code)
 tests/test_local606_replace_on_change.py  exit=0    5 passed
 tests/test_local609_cost_breakdown.py     exit=0   18 passed
 tests/test_local60_cost_metering.py       exit=0    8 passed
@@ -154,50 +154,67 @@ not in the required suite.)
 ## Live runs (item 7)
 
 Own disposable container `local625-gen` (`docker run --rm`, compose-free) on
-`development_default`, tour cache OFF, hard cap $1.00 combined, metered by
-`tests/live_run_meter.py`. Rows are **additive is_test only** (creator_type=Test);
-no DELETE. `audio_tours` row count: **277 before → 290 after** across the runs.
+`development_default`, tour cache OFF (`DISABLE_TOUR_CACHE=1`), hard cap
+`COST_HARD_LIMIT_USD=1.00` + `TEST_GEMINI_MAX_USD=1.00` combined, metered by
+`tests/live_run_meter.py`. Rows are **additive is_test only**; **no DELETE**.
 
-**Mauritshuis, The Hague** (ids 472, 476, 479, 482, 484) — all four fixes clean:
+**FRESH re-run (final, supersedes the earlier blocked note below).** Both venues
+regenerated fresh in one capped run after the external billing condition cleared.
+`audio_tours` row count: **490 before → 492 after** (total); is_test **420 → 422**.
+Combined live-run meter TOTAL **$0.4725** (openai $0.3695, gemini_grounding
+$0.0700, gemini_tokens $0.0120, serper $0.0210, preflight $0.0592) — under the
+$1.00 cap. New rows: **id 702 (Mauritshuis), id 703 (Alte Pinakothek)**, both
+`is_test=t`.
+
+**Mauritshuis, The Hague** (id 702) — all four fixes clean:
 ```
-Resolved: 'Mauritshuis' → Q221092 (Mauritshuis)          # item 4 (base clean-failed)
-Stop 1: Portret van Anna Wake (1605-voor 1669)           # item 3 — a painting
-Stop 2: Het loflied van Simeon                           # item 3 — a painting
-Address: Plein 29, 2514 HA Den Haag, Netherlands         # item 2 — both stops
-Museum Information: Monday, 13:00–18:00. €21             # item 1 — clean + admission
+[venue_resolver] Candidates: ['Q17324051','Q221092','Q1942873', ...]  # 0-work painting is FIRST
+[venue_resolver] Resolved: 'Mauritshuis' → Q221092 (Mauritshuis)      # item 4 — ranked past the painting
+[venue_resolver] SPARQL: 123 works found for Q221092                  # item 4 — real museum (base clean-failed)
+Stop 1: Portret van Anna Wake (1605-voor 1669)                        # item 3 — a painting
+Stop 2: Het loflied van Simeon                                        # item 3 — a painting
+Address: Plein 29, 2511 CS Den Haag, Netherlands                      # item 2 — identical on both stops
+Museum Information: Monday, 13:00–18:00. €21                           # item 1 — clean clock + admission
+garbage-hours probe: CLEAN                                            # item 1
 ```
 
-**Alte Pinakothek, Munich** (id 483) — items 1 & 2 clean:
+**Alte Pinakothek, Munich** (id 703) — all four fixes clean; **residual RESOLVED**:
 ```
-Museum Information: 10.00–18.00                           # item 1 — no "00–18"
-Stop 1: The Holy Family                                  # item 3 — a painting
-Address: Barer Str. 27, 80333 München, Germany           # item 2 — both stops
-[LOCAL-625] rejected room/space titles from canonical SET: 221 → 170  # item 3
+Museum Information: 10.00–18.00                                        # item 1 — no "00–18"
+garbage-hours probe: CLEAN                                            # item 1
+Stop 1: The Holy Family                                              # item 3 — a painting (Raphael)
+Stop 2: Allegorische Frauengestalt mit Spiegel                        # item 3 — a painting (Baldung); NO Kabinett
+Address: Alte Pinakothek, Barer Str. 27, 80333 München, Germany       # item 2 — identical on both stops
 ```
+The prior residual ("AP OG -> Kabinett 4" on the earlier id 483) is **gone** in
+this fresh build with the follow-up `_SPACE_UNIT_RE` fix in the image: both stops
+are paintings.
 
-**critique.sh** (listener review of the spoken text):
-- `critique_482.md` (Mauritshuis): **6/10** — was a clean-fail before the fix.
-- `critique_483.md` (Alte Pinakothek): **3.5/10** — was **2/10** on the original
-  evidence tour 471.
+**critique.sh** (listener review of the spoken text; files `critique_702.md`,
+`critique_703.md` under `.continuous_dev/calib/critique/`):
+- **Mauritshuis (702): 4/10.** None of the flagged defects are LOCAL-625 items —
+  they are out-of-scope: a Rembrandt↔de Gelder same-title attribution bleed on
+  Stop 2, a hallucinated "sackbut" cross-reference, and catalog-dimension filler.
+  Item 4 cleared the clean-fail (the tour now generates).
+- **Alte Pinakothek (703): 6/10.** None of the flagged defects are LOCAL-625 items
+  — out-of-scope: an "oil on canvas" vs panel medium error, a dangling template
+  bind ("acquisition by reflects …"), institutional filler. The original evidence
+  tour 471 scored 2/10 with the garbage hours + room-as-stop; those are gone.
 
-### Residual + blocker (honest)
-Alte Pinakothek id 483 still shows Stop 2 as **"AP OG -> Kabinett 4"** — a Wikidata
-alias surface form with a ` -> ` arrow. That tour was generated BEFORE my
-follow-up fix. The fix (`_SPACE_UNIT_RE` in `room_candidate_guard.py`) rejects
-exactly that string and is verified by unit test (0 false positives on 19 real
-works). I could **not** re-run Alte Pinakothek live to reconfirm it end-to-end
-because the shared **Gemini prepaid balance is exhausted** — every new generation
-now fails immediately with:
-```
-[LOCAL-603] preflight unavailable (HTTPError: 402 Client Error: Payment Required
-for url: https://generativelanguage.googleapis.com/.../gemini-flash-latest...)
-OUTCOME: NO TOUR TEXT after 0.5s     TOTAL $0.0000
-```
-This is an external billing condition (confirmed repeatedly; both venues fail at
-$0.0000), not a code regression. The code path is proven by the unit test and by
-the canonical-SET rejection log (which already drops every Kabinett/Saal entry);
-only the arrow-alias (an additional surface form) needed the follow-up, which is
-committed and tested. Live-run meter cumulative for `TEST-LOCAL-625` ≈ $1.68.
+In both critiques the four LOCAL-625 defects are **absent**: no garbage hours (both
+CLEAN), no wrong/inconsistent address (one museum address per stop), no room/
+gallery/building stop (all four stops are paintings), and Mauritshuis resolves and
+generates. The residual scores reflect pre-existing out-of-scope defects owned by
+other tickets.
+
+### Earlier blocked attempt (historical, now superseded)
+An earlier attempt generated Alte Pinakothek (id 483) BEFORE the `_SPACE_UNIT_RE`
+follow-up and shipped Stop 2 as "AP OG -> Kabinett 4"; a subsequent re-run was
+blocked by a transient Gemini 402 (prepaid balance). That condition has since
+cleared (verified by a 1-token probe returning HTTP 200), and the FRESH re-run
+above (id 703) reconfirms the fix end-to-end. The guard is also covered by unit
+test (`test_local625` + `is_room_or_space_title('AP OG -> Kabinett 4') == True`,
+0 false positives on 19 real works).
 
 ## Files changed
 ```
