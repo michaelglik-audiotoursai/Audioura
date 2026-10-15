@@ -15,7 +15,7 @@ This policy explains what Audioura collects, why, and your choices. It updates t
 - **Tour unlocks & community memberships:** we store which tours you own and which communities you have an active pass for, with the pass expiry.
 - **Ratings & reviews:** these are **public**. Your rating and review text are shown to other listeners.
 - **Swipe preferences / persona:** your taste signals and selected persona are used to compute a personal "Match %" and to tailor narration. Stored in our database, not shared.
-- **Editor score & content rating:** tour *text* is evaluated automatically (by AI providers — OpenAI, and Wikipedia for factual context) to produce a quality score and a content rating. This evaluates the tour, not you.
+- **Editor score & content rating:** tour *text* is evaluated automatically (by AI providers — see §4) to produce a quality score and a content rating. This evaluates the tour, not you.
 - **Age confirmation:** if you choose to see 18+ (Mature) tours, we store that you confirmed you are 18 or older.
 - **Community data:** if you organise or join a community, we store community and membership details (see "Communities" below).
 - **Retention & deletion:** clarified below.
@@ -53,7 +53,14 @@ Your swipe/taste signals and your chosen persona (for example art lover, history
 To keep quality up and to rate content, the **text of a tour** is evaluated automatically:
 - an **editor score** (a quality number) and a **content rating** (General / Mature / Not allowed) are produced by an AI model;
 - this processes the **tour text**, not your personal data.
-AI providers that process tour text: **OpenAI** (narration, fact sheets, scoring, and content rating; per its data-processing terms, your prompts are not used to train its models) and the **Wikipedia API** (public article text for factual grounding — no user data is sent).
+Services that process the **tour request and tour text** (the place or topic you asked for, never your name or contact details):
+- **OpenAI** — writing narration, fact sheets, scoring and content rating.
+- **Google (Gemini)** — researching facts about the places in a tour.
+- **Serper** (web search) — finding public web pages about the places in a tour.
+- **Wikipedia / Wikidata** — public reference text; no user data is sent.
+- **Amazon Web Services (Polly)** — turning tour text into speech.
+- **DeepL** — translating tours into other languages.
+Under these providers' API terms, the text we send is not used to train their models.
 
 ### Age confirmation for 18+ tours
 If you turn on "Show 18+ tours", we store that you confirmed you are 18 or older, so Mature tours can be shown to you. You can turn this off again.
@@ -68,7 +75,8 @@ As in the previous policy, we also handle: subscription credentials (encrypted a
 
 ## 4. Who we share data with
 - **Apple / Google:** process payments and refunds (we never see card data), and verify the app via attestation.
-- **AI/factual providers:** OpenAI and Wikipedia, for tour text only (above).
+- **AI, research, voice and translation providers:** OpenAI, Google (Gemini), Serper, Wikipedia, Amazon Web Services (Polly), DeepL — for tour requests and tour text only (above).
+- **Maps:** OpenStreetMap map tiles and Nominatim place search. When you view the map or search a place, your device requests map images and sends the place you typed; these services can see your device's IP address. The location you search from is also sent to our server to find nearby tours.
 - We do **not** sell your personal data, and we do not share it with advertisers.
 
 ## 5. Retention
