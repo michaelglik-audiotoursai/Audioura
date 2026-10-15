@@ -527,6 +527,29 @@ class _CreateCommunityScreenState extends State<CreateCommunityScreen> {
             ),
           ),
           const SizedBox(height: 12),
+          // [LOCAL-703 / D664] The launch-window rule, stated BEFORE the Create
+          // button so the organiser knows the one-week / two-members deal (and
+          // whether it's "paid members" or "members") before committing.
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.blue.shade50,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: Colors.blue.shade200),
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Icon(Icons.timer_outlined, size: 20, color: Colors.blue),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(CommunityCopy.createLaunchRule(paid: _isPaid),
+                      style: const TextStyle(fontSize: 13)),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
           // §1 / §4: the close warning, shown above the Create button.
           Container(
             padding: const EdgeInsets.all(12),
@@ -732,6 +755,31 @@ class _CreateCommunityScreenState extends State<CreateCommunityScreen> {
             const SizedBox(height: 8),
             SelectableText(c.inviteMessage ?? 'Code: $code',
                 style: const TextStyle(fontWeight: FontWeight.w600)),
+            const SizedBox(height: 12),
+            // [LOCAL-703 / D664] The launch countdown, shown right on the
+            // creation confirmation so the clock is visible from the first
+            // moment ("152 h left to get 2 paid members — 0 of 2 so far").
+            Row(
+              children: [
+                const Icon(Icons.timer_outlined, size: 18, color: Colors.blue),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    CommunityCopy.launchCountdown(
+                      launched: c.launch.launched,
+                      paid: c.isPaid,
+                      hoursLeft: c.launch.hoursLeft,
+                      membersSoFar: c.launch.membersSoFar,
+                      membersNeeded: c.launch.membersNeeded,
+                    ),
+                    style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.blue.shade900),
+                  ),
+                ),
+              ],
+            ),
           ],
         ),
         actions: [

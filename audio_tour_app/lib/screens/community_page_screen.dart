@@ -328,6 +328,12 @@ class _CommunityPageScreenState extends State<CommunityPageScreen> {
           // volunteer / accept actions.
           ..._handoverSection(c),
 
+          // [LOCAL-703 / D664] The organiser's live launch countdown. Shown to
+          // the OWNER while the community is active (hidden once archived — the
+          // hand-over/archived banners cover that). Turns green "Launched 🎉"
+          // once the bar is met.
+          ..._launchCountdownSection(c),
+
           // Organiser card.
           _section('Organiser', [
             if (c.organiser.name != null) Text(c.organiser.name!,
@@ -524,6 +530,51 @@ class _CommunityPageScreenState extends State<CommunityPageScreen> {
                   ),
               ],
             ],
+          ),
+        ),
+      ),
+    ];
+  }
+
+  /// [LOCAL-703 / D664] The organiser's live launch countdown. Shown to the
+  /// OWNER only, while the community is active (an archived community shows the
+  /// archived banner instead). Reads the server-computed launch block:
+  /// "152 h left to get 2 paid members — 1 of 2 so far", turning into a green
+  /// "Launched 🎉" once the bar is met.
+  List<Widget> _launchCountdownSection(Community c) {
+    if (!c.isOwner) return const [];
+    if (c.status == 'archived') return const [];
+    final l = c.launch;
+    final text = CommunityCopy.launchCountdown(
+      launched: l.launched,
+      paid: c.isPaid,
+      hoursLeft: l.hoursLeft,
+      membersSoFar: l.membersSoFar,
+      membersNeeded: l.membersNeeded,
+    );
+    final color = l.launched ? Colors.green.shade50 : Colors.blue.shade50;
+    final fg = l.launched ? Colors.green.shade800 : Colors.blue.shade900;
+    return [
+      Padding(
+        padding: const EdgeInsets.only(top: 12),
+        child: Card(
+          color: color,
+          child: Padding(
+            padding: const EdgeInsets.all(12),
+            child: Row(
+              children: [
+                Icon(l.launched ? Icons.celebration : Icons.timer_outlined,
+                    color: fg),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    text,
+                    key: const Key('launch_countdown_text'),
+                    style: TextStyle(fontWeight: FontWeight.w600, color: fg),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),

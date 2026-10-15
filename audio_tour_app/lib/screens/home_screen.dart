@@ -1232,13 +1232,26 @@ class _HomeScreenState extends State<HomeScreen> {
       // join flow, D658 addendum 2 §3). A member → the community page opens to
       // its episodes; a non-member → the page shows "This tour belongs to
       // <Community>. Join to listen" with the passes.
-      final community = await CommunitiesService.resolveByCode(code);
+      // [LOCAL-703 / D664] An archived community's code is dead: the server
+      // returns 410 community_closed and we tell the listener plainly.
+      final res = await CommunitiesService.resolveByCodeResult(code);
       if (!mounted) return;
-      if (community != null) {
+      if (res.found) {
         Navigator.push(
           context,
           MaterialPageRoute(
-              builder: (_) => CommunityPageScreen(communityId: community.id)),
+              builder: (_) =>
+                  CommunityPageScreen(communityId: res.community!.id)),
+        );
+        return;
+      }
+      if (res.closed) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(CommunityCopy.communityClosed),
+            backgroundColor: Colors.orange,
+            duration: Duration(seconds: 5),
+          ),
         );
         return;
       }

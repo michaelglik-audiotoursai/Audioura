@@ -155,6 +155,45 @@ class MyOffer {
   }
 }
 
+/// [LOCAL-703 / D664] The launch window: a new community must win its first two
+/// QUALIFYING members (excluding the owner) within the window, or it is
+/// archived and its invite code stops working. The organiser sees a live
+/// countdown that turns into "Launched 🎉" once met.
+class CommunityLaunch {
+  final String? deadline; // ISO8601, when the window closes
+  final int hoursLeft; // whole hours remaining, never negative
+  final int membersNeeded; // the bar (2)
+  final int membersSoFar; // qualifying members so far (owner excluded)
+  final bool launched; // true once the bar is met — countdown gone for good
+  final String? launchedAt;
+
+  const CommunityLaunch({
+    this.deadline,
+    required this.hoursLeft,
+    required this.membersNeeded,
+    required this.membersSoFar,
+    required this.launched,
+    this.launchedAt,
+  });
+
+  factory CommunityLaunch.fromJson(Map<String, dynamic>? j) {
+    if (j == null) {
+      return const CommunityLaunch(
+          hoursLeft: 0, membersNeeded: 2, membersSoFar: 0, launched: false);
+    }
+    return CommunityLaunch(
+      deadline: j['deadline'] as String?,
+      hoursLeft: (j['hours_left'] is num) ? (j['hours_left'] as num).toInt() : 0,
+      membersNeeded:
+          (j['members_needed'] is num) ? (j['members_needed'] as num).toInt() : 2,
+      membersSoFar:
+          (j['members_so_far'] is num) ? (j['members_so_far'] as num).toInt() : 0,
+      launched: j['launched'] == true,
+      launchedAt: j['launched_at'] as String?,
+    );
+  }
+}
+
 /// The full community page payload.
 class Community {
   final int id;
@@ -186,6 +225,8 @@ class Community {
   final String? archivedAt;
   final List<OrganiserOffer> organiserOffers; // owner view, during hand-over
   final MyOffer? myOffer; // the caller's own offer, during hand-over
+  // [LOCAL-703 / D664] The launch window / countdown.
+  final CommunityLaunch launch;
 
   const Community({
     required this.id,
@@ -216,6 +257,8 @@ class Community {
     this.archivedAt,
     this.organiserOffers = const [],
     this.myOffer,
+    this.launch = const CommunityLaunch(
+        hoursLeft: 0, membersNeeded: 2, membersSoFar: 0, launched: false),
   });
 
   factory Community.fromJson(Map<String, dynamic> j) {
@@ -260,8 +303,22 @@ class Community {
       myOffer: j['my_offer'] is Map<String, dynamic>
           ? MyOffer.fromJson(j['my_offer'] as Map<String, dynamic>)
           : null,
+      launch: CommunityLaunch.fromJson(j['launch'] as Map<String, dynamic>?),
     );
   }
+}
+
+/// [LOCAL-703 / D664] The outcome of resolving an invite code. Exactly one of
+/// three states: a resolved [community] (200), [closed] = true when the code
+/// belongs to an archived community (410 community_closed → "This community has
+/// closed."), or neither (not found / unreachable → the generic message).
+class CodeResolution {
+  final Community? community;
+  final bool closed;
+
+  const CodeResolution({this.community, this.closed = false});
+
+  bool get found => community != null;
 }
 
 /// A Listed community pin for the Home map (community badge).
@@ -549,4 +606,41 @@ class CommunityCopy {
     bool? nameAvailable,
   }) =>
       requiredFilled && termsAccepted && nameAvailable != false;
+
+  // ── [LOCAL-703 / D664] Launch-window countdown copy ─────────────────────────
+
+  /// The rule stated on the Create screen, ABOVE the Create button, so the
+  /// organiser knows the deal before committing. Paid vs free wording differs
+  /// only in "paid members" vs "members".
+  static String createLaunchRule({required bool paid}) {
+    final who = paid ? 'paid members' : 'members';
+    return 'Heads up: a new community has one week to get its first 2 $who '
+        '(you don\'t count). You\'ll see a live countdown. Miss it and the '
+        'community is archived and its invite code stops working — members keep '
+        'anything they\'ve downloaded.';
+  }
+
+  /// The live countdown line on the organiser's community page and the creation
+  /// confirmation. Before launch it reads, e.g.:
+  ///   "152 h left to get 2 paid members — 1 of 2 so far"   (paid)
+  ///   "152 h left to get 2 members — 1 of 2 so far"        (free)
+  /// Once launched it is the green success line "Launched 🎉". Pure so the exact
+  /// wording is unit-testable without a widget.
+  static String launchCountdown({
+    required bool launched,
+    required bool paid,
+    required int hoursLeft,
+    required int membersSoFar,
+    required int membersNeeded,
+  }) {
+    if (launched) return 'Launched 🎉';
+    final who = paid ? 'paid members' : 'members';
+    return '$hoursLeft h left to get $membersNeeded $who — '
+        '$membersSoFar of $membersNeeded so far';
+  }
+
+  /// The message a listener sees when an invite code resolves to a CLOSED
+  /// (archived) community — the server returns 410 community_closed. Exactly
+  /// the server wording (D664).
+  static const String communityClosed = 'This community has closed.';
 }
