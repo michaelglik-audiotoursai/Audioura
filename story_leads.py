@@ -603,6 +603,42 @@ def walking_gemini_per_venue_selected() -> bool:
     return walking_research_backend() == 'gemini_per_venue'
 
 
+# ── [LOCAL-692] MUSEUM_RESEARCH — artist-life research for MUSEUM stops ────────
+# D659: the LOCAL-648 Serper object backend made HCMC museum tours "practically
+# not even informative" — it researches the OBJECT (title/artist/year/credit)
+# and never the ARTIST'S LIFE (where they lived, where they learned, what changed
+# their life, why they dedicated themselves to art, the work's own story).
+# artist_life_research adds those targeted life + work-story queries in English
+# AND the venue's local language, keeps Wikipedia as a FACT-CHECK source only
+# (marked in the corpus), and tells the extractor to lead with the person.
+#
+# CATEGORY-AWARE and DEFAULT-SAFE. The flag only takes effect for a tour whose
+# category is 'museum'; any other category is untouched. Unset or 'serper'/
+# 'gemini' → byte-for-byte the old behaviour. Engaged ONLY when grounded=True.
+MUSEUM_RESEARCH_ENV = 'MUSEUM_RESEARCH'
+_MUSEUM_RESEARCH_VALUES = ('artist_life',)
+
+
+def museum_research_backend() -> str:
+    """The MUSEUM_RESEARCH selection for the CURRENT tour, or '' when it does not
+    apply (not a museum tour, flag unset, or an unrecognised value). Reads the
+    tour category from the cheap_arm contextvar so it is per-tour and
+    concurrency-safe; when the category is unknown it still honours the flag — a
+    museum live run / harness sets MUSEUM_RESEARCH deliberately, and a
+    non-museum production tour never sets it."""
+    v = (os.environ.get(MUSEUM_RESEARCH_ENV, '') or '').strip().lower()
+    if v not in _MUSEUM_RESEARCH_VALUES:
+        return ''
+    try:
+        import cheap_arm as _cheap_arm
+        cat = _cheap_arm.tour_category()
+    except Exception:
+        cat = ''
+    if cat and cat != 'museum':
+        return ''
+    return v
+
+
 def research_with_sources(prompt: str, model: str = None, resolve: bool = True,
                           timeout: int = 90, grounded: bool = True) -> Dict:
     """Answer a research question, returning {text, sources, supports, queries,
@@ -637,6 +673,19 @@ def research_with_sources(prompt: str, model: str = None, resolve: bool = True,
             return gemini_with_sources(prompt, model=model, resolve=resolve,
                                        timeout=timeout, grounded=grounded)
     if grounded and research_backend() == 'serper':
+        # [LOCAL-692] On the cheap (serper) arm, a MUSEUM tour with
+        # MUSEUM_RESEARCH=artist_life uses the artist-life backend instead of the
+        # object-only serper_research. It researches the ARTIST'S LIFE + the
+        # work's story (English + local language), keeps Wikipedia fact-check
+        # only, and is call- and shape-compatible. Fail SAFE to serper_research.
+        if museum_research_backend() == 'artist_life':
+            try:
+                import artist_life_research
+                return artist_life_research.artist_life_research(
+                    prompt, model=model, resolve=resolve, timeout=timeout,
+                    grounded=grounded)
+            except Exception:
+                pass  # fall through to the object backend below
         try:
             import serper_research
         except Exception as e:
