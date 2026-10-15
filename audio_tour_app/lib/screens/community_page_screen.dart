@@ -19,6 +19,7 @@ import '../services/iap_service.dart';
 import '../services/device_service.dart';
 import '../services/document_acceptance_service.dart';
 import '../widgets/tour_buy_sheet.dart' show TermsAgreeLine;
+import 'communities_about_screen.dart' show CommunityInviteTools;
 
 class CommunityPageScreen extends StatefulWidget {
   /// Open by community id (from a map pin or the Listen tab) …
@@ -174,6 +175,14 @@ class _CommunityPageScreenState extends State<CommunityPageScreen> {
 
           if (c.description != null && c.description!.isNotEmpty)
             _section('About', [Text(c.description!)]),
+
+          // [LOCAL-700 §4] The organiser's page ALWAYS carries the invite tools:
+          // the code with Copy, Share, Email and Regenerate (old code dies).
+          if (c.isOwner && (c.joinCode != null && c.joinCode!.isNotEmpty))
+            Padding(
+              padding: const EdgeInsets.only(top: 16),
+              child: CommunityInviteTools(community: c),
+            ),
 
           if (c.rulesText != null && c.rulesText!.isNotEmpty)
             _section('Rules', [Text(c.rulesText!)]),

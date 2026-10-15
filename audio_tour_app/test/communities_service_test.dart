@@ -171,4 +171,162 @@ void main() {
       expect(kPassLengths, ['day', 'week', 'month', 'year']);
     });
   });
+
+  // ── [LOCAL-700] round-1 copy + create-form logic (pure, Flutter-free) ───────
+  group('CommunityCopy — §1 description text', () {
+    test('about text names BOTH kinds of content', () {
+      const t = CommunityCopy.aboutContent;
+      // Owner's own audio (links / RSS feed, not stored, not checked).
+      expect(t.contains('Your own audio'), isTrue);
+      expect(t.toLowerCase().contains('rss feed'), isTrue);
+      expect(t.toLowerCase().contains('does not store'), isTrue);
+      // Tours made with Audioura, checked (content rating), members-only.
+      expect(t.contains('made with Audioura'), isTrue);
+      expect(t.toLowerCase().contains('content rating'), isTrue);
+    });
+
+    test('create intro also covers both kinds', () {
+      final t = CommunityCopy.createIntro.toLowerCase();
+      expect(t.contains('your own audio'), isTrue);
+      expect(t.contains('made with audioura'), isTrue);
+    });
+
+    test('close warning: cannot be closed, can step down', () {
+      final w = CommunityCopy.closeWarning.toLowerCase();
+      expect(w.contains('cannot be closed'), isTrue);
+      expect(w.contains('step down'), isTrue);
+    });
+  });
+
+  group('CommunityCopy — §4 prefill pools (≥ 8 variants each)', () {
+    test('every pool has at least 8 non-empty variants', () {
+      final pools = <String, List<String>>{
+        'namePrefixes': CommunityCopy.namePrefixes,
+        'descriptions': CommunityCopy.descriptions,
+        'organiserNames': CommunityCopy.organiserNames,
+        'bios': CommunityCopy.bios,
+        'rules': CommunityCopy.rules,
+      };
+      pools.forEach((name, pool) {
+        expect(pool.length, greaterThanOrEqualTo(8), reason: name);
+        for (final v in pool) {
+          expect(v.trim().isNotEmpty, isTrue, reason: '$name has an empty item');
+        }
+      });
+    });
+  });
+
+  group('CommunityCopy.uniqueName — §4 unique generated name', () {
+    test('attempt 0 is the plain "<stem> of <place>"', () {
+      expect(CommunityCopy.uniqueName('The Wandering Owls', 'Lisbon'),
+          'The Wandering Owls of Lisbon');
+    });
+    test('a later attempt appends a short suffix', () {
+      final a1 = CommunityCopy.uniqueName('The Owls', 'Porto', attempt: 1);
+      expect(a1.startsWith('The Owls of Porto'), isTrue);
+      expect(a1 == 'The Owls of Porto', isFalse); // a suffix was added
+    });
+    test('empty place drops the " of ..." tail', () {
+      expect(CommunityCopy.uniqueName('The Owls', ''), 'The Owls');
+    });
+  });
+
+  group('CommunityCopy.emailInviteBody — §4 email contains code + install', () {
+    test('ALWAYS contains the code and the install line', () {
+      final body = CommunityCopy.emailInviteBody(
+        communityName: 'Night Owls',
+        description: 'We walk at night.',
+        organiserName: 'Sam',
+        code: 'AB12CD34',
+      );
+      // The exact join instruction with the code.
+      expect(body.contains('AB12CD34'), isTrue);
+      expect(body.contains('Search'), isTrue);
+      // The install line (App Store / Google Play via audioura.com for now).
+      expect(body.contains(CommunityCopy.installUrl), isTrue);
+      // Carries the name, description and organiser.
+      expect(body.contains('Night Owls'), isTrue);
+      expect(body.contains('We walk at night.'), isTrue);
+      expect(body.contains('Sam'), isTrue);
+    });
+
+    test('code + install present even with no description / organiser', () {
+      final body = CommunityCopy.emailInviteBody(
+        communityName: 'Minimal',
+        code: 'ZZ99ZZ99',
+      );
+      expect(body.contains('ZZ99ZZ99'), isTrue);
+      expect(body.contains(CommunityCopy.installUrl), isTrue);
+    });
+  });
+
+  group('CommunityCopy — §4 required-field gating', () {
+    test('all required present (non-listed) -> filled', () {
+      expect(
+        CommunityCopy.requiredFieldsFilled(
+          name: 'C', description: 'D', organiserName: 'O', rules: 'R',
+          listed: false,
+        ),
+        isTrue,
+      );
+    });
+    test('any missing required field -> not filled', () {
+      expect(
+        CommunityCopy.requiredFieldsFilled(
+          name: '', description: 'D', organiserName: 'O', rules: 'R',
+          listed: false,
+        ),
+        isFalse,
+      );
+      expect(
+        CommunityCopy.requiredFieldsFilled(
+          name: 'C', description: 'D', organiserName: 'O', rules: '   ',
+          listed: false,
+        ),
+        isFalse,
+      );
+    });
+    test('listed requires a location; private does not', () {
+      expect(
+        CommunityCopy.requiredFieldsFilled(
+          name: 'C', description: 'D', organiserName: 'O', rules: 'R',
+          listed: true,
+        ),
+        isFalse,
+      );
+      expect(
+        CommunityCopy.requiredFieldsFilled(
+          name: 'C', description: 'D', organiserName: 'O', rules: 'R',
+          listed: true, latitude: '42.0', longitude: '-71.0',
+        ),
+        isTrue,
+      );
+    });
+
+    test('createEnabled needs filled + terms; known-taken name blocks', () {
+      // Not enabled until the terms are accepted.
+      expect(
+        CommunityCopy.createEnabled(requiredFilled: true, termsAccepted: false),
+        isFalse,
+      );
+      // Enabled when filled + terms, name unknown (null) does NOT block.
+      expect(
+        CommunityCopy.createEnabled(
+            requiredFilled: true, termsAccepted: true, nameAvailable: null),
+        isTrue,
+      );
+      // A known-taken name (false) blocks even when everything else is ready.
+      expect(
+        CommunityCopy.createEnabled(
+            requiredFilled: true, termsAccepted: true, nameAvailable: false),
+        isFalse,
+      );
+      // A confirmed-free name (true) is fine.
+      expect(
+        CommunityCopy.createEnabled(
+            requiredFilled: true, termsAccepted: true, nameAvailable: true),
+        isTrue,
+      );
+    });
+  });
 }
