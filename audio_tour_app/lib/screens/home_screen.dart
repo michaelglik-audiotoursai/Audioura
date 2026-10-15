@@ -1513,6 +1513,20 @@ class _HomeScreenState extends State<HomeScreen> {
                 if (singleLanguage)
                   Text('Each language is a separate purchase.',
                       style: TextStyle(fontSize: 12, color: Colors.grey.shade700)),
+                // [LOCAL-693 / D660] Every download of a paid tour is paid. Warn
+                // BEFORE the buy so it is never a surprise: one purchase = one
+                // download to this phone; the tour then plays unlimited offline,
+                // but deleting it or switching phones means buying again.
+                if (singleLanguage)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 4),
+                    child: Text(
+                      'Downloads to this phone. Deleting it or changing phones '
+                      'means buying again.',
+                      style: TextStyle(
+                          fontSize: 12, color: Colors.grey.shade700),
+                    ),
+                  ),
                 SizedBox(height: 8),
                 LanguageSelector(
                   selectedLanguages: selectedLanguages,
@@ -1772,6 +1786,38 @@ class _HomeScreenState extends State<HomeScreen> {
     final params = Map<String, String>.from(uri.queryParameters);
     if (userId.isNotEmpty) params['user_id'] = userId;
     return uri.replace(queryParameters: params.isEmpty ? null : params);
+  }
+
+  /// [LOCAL-693 / D660] Confirm a fully-downloaded PAID tour so the server
+  /// SPENDS the purchase (one download per purchase). Called ONLY after the zip
+  /// was received AND successfully saved+extracted — a failed or cut-off
+  /// download never reaches here, so the unlock stays unconsumed and the
+  /// listener retries for free. The server tells us whether this download
+  /// consumes an unlock via the X-Download-Id header on the /download-tour
+  /// response (empty for free / curator / grandfathered / already-owned-free
+  /// downloads — nothing to confirm). Fire-and-forget and fully defensive: a
+  /// failed confirm never breaks the (already successful) download; the server
+  /// re-checks unlock-state online later. [downloadId] is the X-Download-Id
+  /// value; when empty this is a no-op.
+  Future<void> _confirmDownloadComplete(int tourId, String? downloadId) async {
+    if (downloadId == null || downloadId.isEmpty) return;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final userId = prefs.getString('user_id') ?? '';
+      await Endpoints.post(
+        Service.mapDelivery,
+        '/tour/$tourId/download-complete',
+        body: {'user_id': userId, 'download_id': downloadId},
+        timeout: const Duration(seconds: 15),
+      );
+      await DebugLogHelper.addDebugLog(
+          'HOME: download-complete confirmed tour $tourId (id=$downloadId)');
+    } catch (e) {
+      // A failed confirm is safe: the unlock simply stays unconsumed and the
+      // next online unlock-state check reconciles. Never surface to the user.
+      await DebugLogHelper.addDebugLog(
+          'HOME: download-complete confirm failed for $tourId: $e');
+    }
   }
 
   List<Map<String, dynamic>> _clusterTours(List tours) {
@@ -2319,6 +2365,10 @@ class _HomeScreenState extends State<HomeScreen> {
         // Save tour to My Tours
         await _saveTourToMyTours(tourId, response.bodyBytes);
         await DebugLogHelper.addDebugLog('HOME: MAIN - Back from _saveTourToMyTours');
+        // [LOCAL-693 / D660] The zip was received AND saved: confirm the
+        // download so the server spends the purchase (one download per buy).
+        await _confirmDownloadComplete(
+            tourId, response.headers['x-download-id']);
         
         // Dismiss dialog AFTER save completes
         await DebugLogHelper.addDebugLog('HOME: MAIN - Checking if widget is mounted: $mounted');
@@ -2417,6 +2467,10 @@ class _HomeScreenState extends State<HomeScreen> {
       final response = await http.get(uri, headers: await Endpoints.apiHeaders(Service.mapDelivery)).timeout(Duration(seconds: 120));
       if (response.statusCode == 200) {
         await _saveTourToMyTours(tourId, response.bodyBytes, sourceItem: sourceItem);
+        // [LOCAL-693 / D660] Confirm the completed download so the server spends
+        // the purchase (one download per buy). No-op for free/owned downloads.
+        await _confirmDownloadComplete(
+            tourId, response.headers['x-download-id']);
       } else {
         throw Exception('Failed to download tour: ${response.statusCode}');
       }
@@ -2462,6 +2516,10 @@ class _HomeScreenState extends State<HomeScreen> {
         final response = await http.get(dlUri, headers: await Endpoints.apiHeaders(Service.mapDelivery)).timeout(Duration(seconds: 120));
         if (response.statusCode == 200) {
           await _saveTourToMyTours(tourId, response.bodyBytes, sourceItem: sourceItem);
+          // [LOCAL-693 / D660] Confirm the completed download so the server
+          // spends the purchase (one download per buy). No-op for free/owned.
+          await _confirmDownloadComplete(
+              tourId, response.headers['x-download-id']);
         } else if (response.statusCode == 402) {
           // [LOCAL-677C / D654] Pay before download: the server refused because
           // this paid tour is not unlocked for this device. Never crash — close

@@ -1173,11 +1173,24 @@ class _MyToursScreenState extends State<MyToursScreen> {
   
   Future<void> _deleteTour(int index) async {
     final tour = _tours[index];
+    // [LOCAL-693 / D660] A PAID tour on the phone is the listener's forever, but
+    // every download is a purchase: deleting it means buying again to get it
+    // back. Warn with the SAME sentence the Buy dialog used, so deletion is
+    // never an accidental loss. A free tour keeps the plain confirmation (it can
+    // simply be downloaded again at no cost). Detect "paid" from the saved
+    // metadata captured at download time (is_paid / price_tier).
+    final bool tourIsPaid = tour['is_paid'] == true ||
+        (tour['price_tier'] is num && (tour['price_tier'] as num) > 0);
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Delete Tour'),
-        content: Text('Delete "${tour['title']}"?'),
+        title: Text(tourIsPaid ? 'Delete and lose it?' : 'Delete Tour'),
+        content: Text(
+          tourIsPaid
+              ? 'Delete "${tour['title']}"?\n\nThis tour downloaded to this '
+                'phone. Deleting it or changing phones means buying again.'
+              : 'Delete "${tour['title']}"?',
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),

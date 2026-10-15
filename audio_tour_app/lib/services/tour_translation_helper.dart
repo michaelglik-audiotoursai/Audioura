@@ -96,6 +96,24 @@ class TourTranslationHelper {
                 await _saveTranslatedTour(translatedId, translatedResponse.bodyBytes, appDir.path, prefs, parentEditTourId, lang,
                     version: version, updatedAt: updatedAt, sourceItem: sourceItem);
                 await DebugLogHelper.addDebugLog('TRANSLATE: Saved translated tour ($lang) ID: $translatedId');
+                // [LOCAL-693 / D660] A paid translation is its own purchase
+                // (D653). Confirm the completed download so the server spends it
+                // (one download per buy). No-op for free/owned; the header is
+                // empty unless this download rode an unlock. Fully defensive.
+                final dlId = translatedResponse.headers['x-download-id'];
+                if (dlId != null && dlId.isNotEmpty) {
+                  try {
+                    await Endpoints.post(
+                      Service.mapDelivery,
+                      '/tour/$translatedId/download-complete',
+                      body: {'user_id': tUserId, 'download_id': dlId},
+                      timeout: const Duration(seconds: 15),
+                    );
+                  } catch (e) {
+                    await DebugLogHelper.addDebugLog(
+                        'TRANSLATE: download-complete confirm failed ($lang): $e');
+                  }
+                }
               } else {
                 failures.add(lang);
                 await DebugLogHelper.addDebugLog('TRANSLATE: Download failed ($lang): ${translatedResponse.statusCode}');
