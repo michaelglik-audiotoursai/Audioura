@@ -102,7 +102,7 @@ INSERT INTO plans (
     10, 'month', 10, TRUE,
     3, NULL, NULL, NULL,
     5, 0, TRUE,
-    0, NULL, 100, FALSE, 0.00, 7
+    0, NULL, 100, TRUE, 0.00, 7   -- [LOCAL-701/D663 §2] can_sell: everyone who can create may charge
 )
 ON CONFLICT (plan_id) DO UPDATE SET
     tours_per_day = EXCLUDED.tours_per_day,
@@ -133,7 +133,7 @@ INSERT INTO plans (
     999, 'month', 60, TRUE,
     NULL, 5, 5, NULL,
     10, 10, FALSE,
-    3, 'lifetime', NULL, FALSE, 10.00, NULL
+    3, 'lifetime', NULL, TRUE, 10.00, NULL   -- [LOCAL-701/D663 §2] can_sell
 )
 ON CONFLICT (plan_id) DO UPDATE SET
     tours_per_day = EXCLUDED.tours_per_day,
@@ -194,7 +194,7 @@ INSERT INTO plans (
     999, 'month', 60, TRUE,
     50, NULL, NULL, NULL,
     5, 5, FALSE,
-    3, 'month', NULL, FALSE, 0.00, NULL
+    3, 'month', NULL, TRUE, 0.00, NULL   -- [LOCAL-701/D663 §2] can_sell
 )
 ON CONFLICT (plan_id) DO UPDATE SET
     tours_per_day = EXCLUDED.tours_per_day,

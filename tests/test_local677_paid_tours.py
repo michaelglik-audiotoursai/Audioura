@@ -246,18 +246,38 @@ def _make_curator(conn, user_id):
     _set_level(conn, user_id, "l4")
 
 
-# ─── 3. Curator-only price ────────────────────────────────────────────────────
+# ─── 3. Only a can_sell plan may price ────────────────────────────────────────
 
 def test_non_curator_cannot_price(db):
+    # [LOCAL-701 / D663 §2] "Everyone who can create tours may charge" — l2/l3/
+    # l4/tester now have plans.can_sell = TRUE, overruling the Curator-only
+    # selling of D652/LOCAL-677. The ONLY level that cannot sell is l1
+    # (Introduction), which also cannot create tours. So the "cannot price"
+    # example is now l1, not l2.
     _cleanup(db)
     try:
         tid = _seed_tour(db, f"{TEST_PREFIX}np tour")
         owner = f"{TEST_PREFIX}np-owner"
         _seed_creator(db, tid, owner)
-        _set_level(db, owner, "l2")  # NOT a curator
+        _set_level(db, owner, "l1")  # Introduction — the only level that cannot sell
         with pytest.raises(pricing_svc.PricingError) as ei:
             pricing_svc.set_price(owner, tid, 3)
         assert ei.value.code == "not_curator"
+    finally:
+        _cleanup(db)
+
+
+def test_free_plan_l2_may_now_price(db):
+    # [LOCAL-701 / D663 §2] A Free (l2) creator may now price their own tour.
+    _cleanup(db)
+    try:
+        tid = _seed_tour(db, f"{TEST_PREFIX}l2 tour")
+        owner = f"{TEST_PREFIX}l2-owner"
+        _seed_creator(db, tid, owner)
+        _set_level(db, owner, "l2")  # Free — can_sell TRUE under D663
+        result = pricing_svc.set_price(owner, tid, 3)
+        assert result["is_paid"] is True
+        assert result["price_tier"] == 3
     finally:
         _cleanup(db)
 
