@@ -56,6 +56,13 @@ HOST = socket.gethostname()
 VENUE = _os.environ.get('LOCAL692_VENUE', 'Ho Chi Minh City Museum of Fine Arts, Vietnam')
 STOPS = int(_os.environ.get('LOCAL692_STOPS', '5'))
 SLUG = _os.environ.get('LOCAL692_SLUG', 'HCMC')
+# Pin the EXACT works as forced stops (LOCAL-357 harness path) so BEFORE and
+# AFTER narrate the SAME works — a valid comparison and the ticket's named works.
+# Pipe-separated in LOCAL692_FORCED_STOPS; empty -> free selection.
+_forced_raw = _os.environ.get('LOCAL692_FORCED_STOPS', '').strip()
+FORCED_STOPS = [s.strip() for s in _forced_raw.split('|') if s.strip()] or None
+if FORCED_STOPS:
+    STOPS = len(FORCED_STOPS)
 
 print(f"=== LOCAL-692 eval: {VENUE} ({STOPS} stops, museum) ===", flush=True)
 print(f"host: {HOST}  HARD CAP(task): ${HARD_CAP_USD}  reserve: ${RESERVE_USD}",
@@ -254,12 +261,13 @@ def _run_arm(slug, env_overrides):
         print(f"[reserve-gate] SKIP {slug}: would exceed cap", flush=True)
         return {'slug': slug, 'outcome': 'SKIPPED_CAP'}
     print(f"=== [{slug}] generating overrides="
-          f"{ {k: v for k, v in env_overrides.items()} } ===", flush=True)
+          f"{ {k: v for k, v in env_overrides.items()} } "
+          f"forced_stops={FORCED_STOPS} ===", flush=True)
     t0 = time.time()
     try:
         text, _p, _c = generate_tour_text(
             VENUE, 'museum', f"/app/tours/LOCAL692_{SLUG}_{slug}.txt", STOPS,
-            user_id=None)
+            user_id=None, forced_stops=FORCED_STOPS, harness=bool(FORCED_STOPS))
     except Exception as e:
         print(f"RUN ERROR for {slug}: {e}", flush=True)
         return {'slug': slug, 'outcome': f'ERROR:{e}'}
