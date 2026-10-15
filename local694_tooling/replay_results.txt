@@ -1,146 +1,166 @@
-[ 1] orchestrator     POST   400           4xx (handled refusal/validation) /generate-complete-tour
-[ 2] orchestrator     GET    404           MISSING ROUTE (404/405/501)      /status/nonexistent-job
-[ 3] orchestrator     GET    404           MISSING ROUTE (404/405/501)      /download/nonexistent-job
-[ 4] orchestrator     GET    200           OK                               /health
-[ 5] orchestrator     GET    405           MISSING ROUTE (404/405/501)      /delete-account/local694-probe-user
-[ 6] orchestrator     POST   400           4xx (handled refusal/validation) /tour-status
-[ 7] orchestrator     GET    404           MISSING ROUTE (404/405/501)      /tour/1/unlock-state?user_id=local694-probe-user
-[ 8] orchestrator     GET    404           MISSING ROUTE (404/405/501)      /tour/1/price
-[ 9] orchestrator     POST   404           MISSING ROUTE (404/405/501)      /tour/1/price
-[10] orchestrator     GET    404           MISSING ROUTE (404/405/501)      /tour/1/sales
-[11] orchestrator     GET    404           MISSING ROUTE (404/405/501)      /price-tiers
-[12] orchestrator     GET    404           MISSING ROUTE (404/405/501)      /tour/1/reviews?sort=top
-[13] orchestrator     GET    404           MISSING ROUTE (404/405/501)      /tour/1/distribution
-[14] orchestrator     POST   404           MISSING ROUTE (404/405/501)      /tour/1/review
-[15] orchestrator     POST   404           MISSING ROUTE (404/405/501)      /review/1/helpful
-[16] orchestrator     POST   404           MISSING ROUTE (404/405/501)      /review/1/reply
-[17] orchestrator     POST   404           MISSING ROUTE (404/405/501)      /tour/1/rating
-[18] orchestrator     GET    404           MISSING ROUTE (404/405/501)      /tour/1/rating
-[19] orchestrator     GET    404           MISSING ROUTE (404/405/501)      /wallet/local694-probe-user
-[20] orchestrator     GET    404           MISSING ROUTE (404/405/501)      /wallet/local694-probe-user/transactions?limit=50
-[21] orchestrator     GET    404           MISSING ROUTE (404/405/501)      /plans/available
-[22] orchestrator     POST   404           MISSING ROUTE (404/405/501)      /wallet/local694-probe-user/topup
-[23] orchestrator     POST   404           MISSING ROUTE (404/405/501)      /sync
-[24] mapDelivery      GET    200           OK                               /tours-near/48.8584/2.2945?radius=5.0
-[25] mapDelivery      GET    200           OK                               /download-tour/1
-[26] mapDelivery      GET    200           OK                               /search-tours?pattern=museum&lat=48.8584&lng=2.2945
-[27] mapDelivery      GET    404           MISSING ROUTE (404/405/501)      /tour-by-code/ABC123
-[28] mapDelivery      GET    404           MISSING ROUTE (404/405/501)      /tour/1/preview-audio
-[29] mapDelivery      GET    404           MISSING ROUTE (404/405/501)      /tour/1/score-explanation
-[30] mapDelivery      POST   404           MISSING ROUTE (404/405/501)      /tour/1/rescore-request
-[31] mapDelivery      GET    404           MISSING ROUTE (404/405/501)      /how-we-score
-[32] tourIdResolution GET    CONN_REFUSED  ABSENT (no service on Storied)   /tour/1/resolve
-[33] userDb           GET    CONN_REFUSED  ABSENT (no service on Storied)   /user
-[34] userDb           GET    CONN_REFUSED  ABSENT (no service on Storied)   /health
-[35] userDb           GET    CONN_REFUSED  ABSENT (no service on Storied)   /entitlements/me?user_id=local694-probe-user
-[36] userDb           POST   CONN_REFUSED  ABSENT (no service on Storied)   /entitlements/app-open
-[37] userDb           POST   CONN_REFUSED  ABSENT (no service on Storied)   /entitlements/lapse
-[38] userDb           POST   CONN_REFUSED  ABSENT (no service on Storied)   /l2/queue/join
-[39] userDb           POST   CONN_REFUSED  ABSENT (no service on Storied)   /l2/claim
-[40] userDb           POST   CONN_REFUSED  ABSENT (no service on Storied)   /purchases/verify
-[41] userDb           POST   CONN_REFUSED  ABSENT (no service on Storied)   /document-acceptance
-[42] userDb           GET    CONN_REFUSED  ABSENT (no service on Storied)   /document-acceptance?user_id=local694-probe-user
-[43] userDb           POST   CONN_REFUSED  ABSENT (no service on Storied)   /communities
-[44] userDb           GET    CONN_REFUSED  ABSENT (no service on Storied)   /communities/by-code/ABC123
-[45] userDb           GET    CONN_REFUSED  ABSENT (no service on Storied)   /communities/1
-[46] userDb           POST   CONN_REFUSED  ABSENT (no service on Storied)   /communities/1/join
-[47] userDb           GET    CONN_REFUSED  ABSENT (no service on Storied)   /communities/map
-[48] treats           GET    200           OK                               /treats-near/48.8584/2.2945
-[50] voice            POST   CONN_REFUSED  ABSENT (no service on Storied)   /parse_voice_search
-[51] voice            POST   CONN_REFUSED  ABSENT (no service on Storied)   /process-voice-command
-[52] translation      POST   200           OK                               /translate-with-audio
-[53] generator        POST   CONN_REFUSED  ABSENT (no service on Storied)   /tour/share
-[54] news             POST   400           4xx (handled refusal/validation) /generate-news
-[55] news             GET    404           MISSING ROUTE (404/405/501)      /news-status/nonexistent
-[56] news             GET    404           MISSING ROUTE (404/405/501)      /news-download/nonexistent?user_id=local694-probe-user
-[57] newsletter       GET    500           5xx (server error)               /newsletters_v2
-[58] newsletter       POST   500           5xx (server error)               /process_newsletter
-[59] newsletter       POST   503           5xx (server error)               /submit_credentials
-[60] newsletter       POST   503           5xx (server error)               /key_exchange
-[61] tourEditing      POST   400           4xx (handled refusal/validation) /tour/1/update-stop
-[62] tourEditing      POST   400           4xx (handled refusal/validation) /tour/1/update-multiple-stops
-[63] tourEditing      GET    200           OK                               /tour/1/job-status/nonexistent-job
-[64] customAudio      POST   CONN_REFUSED  ABSENT (no service on Storied)   /tour/1/stop/1/custom-audio
-[65] customAudio      DELETE CONN_REFUSED  ABSENT (no service on Storied)   /tour/1/stop/1/custom-audio
-[66] customAudio      GET    CONN_REFUSED  ABSENT (no service on Storied)   /tour/1/stop/1/audio-versions
-[67] customAudio      GET    CONN_REFUSED  ABSENT (no service on Storied)   /tour/1/audio-metadata
+### STORIED STACK PROVENANCE (built from origin/storied)
+
+- STORIED worktree: /Volumes/AudiouraSSD/audioura-worktrees/local694b-storied
+- git rev-parse HEAD: bbcff4872db2c6a6ff771153cbe1aa675450b2e3
+- per-container stamp (/app/.git_sha or RELEASE/GIT_SHA env):
+
+  - local694-map-delivery-1: bbcff4872db2c6a6ff771153cbe1aa675450b2e3
+  - local694-news-orchestrator-1: bbcff4872db2c6a6ff771153cbe1aa675450b2e3
+  - local694-newsletter-processor-1: (no stamp)
+  - local694-tour-editing-phase2-1: bbcff4872db2c6a6ff771153cbe1aa675450b2e3
+  - local694-tour-orchestrator-1: bbcff4872db2c6a6ff771153cbe1aa675450b2e3
+  - local694-translation-service-1: bbcff4872db2c6a6ff771153cbe1aa675450b2e3
+  - local694-treats-1: bbcff4872db2c6a6ff771153cbe1aa675450b2e3
+
+[ 1] orchestrator     POST   400           grep=yes         4xx (handled refusal/validation)                              /generate-complete-tour
+[ 2] orchestrator     GET    404           grep=yes         NORMAL not-found (json 404)        json-404 (NORMAL not-found) /status/nonexistent-job
+[ 3] orchestrator     GET    404           grep=yes         NORMAL not-found (json 404)        json-404 (NORMAL not-found) /download/nonexistent-job
+[ 4] orchestrator     GET    200           grep=yes         OK                                                            /health
+[ 5] orchestrator     GET    405           grep=yes         MISSING ROUTE (405/501)                                       /delete-account/local694-probe-user
+[ 6] orchestrator     POST   400           grep=yes         4xx (handled refusal/validation)                              /tour-status
+[ 7] orchestrator     GET    404           grep=no          MISSING ROUTE (html/gateway 404)   html-404 (MISSING)         /tour/686/unlock-state?user_id=local694-probe-user
+[ 8] orchestrator     GET    404           grep=no          MISSING ROUTE (html/gateway 404)   html-404 (MISSING)         /tour/686/price
+[ 9] orchestrator     POST   404           grep=no          MISSING ROUTE (html/gateway 404)   html-404 (MISSING)         /tour/686/price
+[10] orchestrator     GET    404           grep=no          MISSING ROUTE (html/gateway 404)   html-404 (MISSING)         /tour/686/sales
+[11] orchestrator     GET    404           grep=no          MISSING ROUTE (html/gateway 404)   html-404 (MISSING)         /price-tiers
+[12] orchestrator     GET    404           grep=no          MISSING ROUTE (html/gateway 404)   html-404 (MISSING)         /tour/686/reviews?sort=top
+[13] orchestrator     GET    404           grep=no          MISSING ROUTE (html/gateway 404)   html-404 (MISSING)         /tour/686/distribution
+[14] orchestrator     POST   404           grep=no          MISSING ROUTE (html/gateway 404)   html-404 (MISSING)         /tour/686/review
+[15] orchestrator     POST   404           grep=no          MISSING ROUTE (html/gateway 404)   html-404 (MISSING)         /review/1/helpful
+[16] orchestrator     POST   404           grep=no          MISSING ROUTE (html/gateway 404)   html-404 (MISSING)         /review/1/reply
+[17] orchestrator     POST   404           grep=no          MISSING ROUTE (html/gateway 404)   html-404 (MISSING)         /tour/686/rating
+[18] orchestrator     GET    404           grep=no          MISSING ROUTE (html/gateway 404)   html-404 (MISSING)         /tour/686/rating
+[19] orchestrator     GET    404           grep=no          MISSING ROUTE (html/gateway 404)   html-404 (MISSING)         /wallet/local694-probe-user
+[20] orchestrator     GET    404           grep=no          MISSING ROUTE (html/gateway 404)   html-404 (MISSING)         /wallet/local694-probe-user/transactions?limit=50
+[21] orchestrator     GET    404           grep=no          MISSING ROUTE (html/gateway 404)   html-404 (MISSING)         /plans/available
+[22] orchestrator     POST   404           grep=no          MISSING ROUTE (html/gateway 404)   html-404 (MISSING)         /wallet/local694-probe-user/topup
+[23] orchestrator     POST   404           grep=no          MISSING ROUTE (html/gateway 404)   html-404 (MISSING)         /sync
+[24] mapDelivery      GET    200           grep=yes         OK                                                            /tours-near/48.8584/2.2945?radius=5.0
+[25] mapDelivery      GET    404           grep=yes         NORMAL not-found (json 404)        json-404 (NORMAL not-found) /download-tour/686
+[26] mapDelivery      GET    200           grep=yes         OK                                                            /search-tours?pattern=museum&lat=48.8584&lng=2.2945
+[27] mapDelivery      GET    200           grep=yes         OK                                                            /tour-by-code/L687MATA
+[28] mapDelivery      GET    404           grep=no          MISSING ROUTE (html/gateway 404)   html-404 (MISSING)         /tour/686/preview-audio
+[29] mapDelivery      GET    404           grep=no          MISSING ROUTE (html/gateway 404)   html-404 (MISSING)         /tour/686/score-explanation
+[30] mapDelivery      POST   404           grep=no          MISSING ROUTE (html/gateway 404)   html-404 (MISSING)         /tour/686/rescore-request
+[31] mapDelivery      GET    404           grep=no          MISSING ROUTE (html/gateway 404)   html-404 (MISSING)         /how-we-score
+[32] tourIdResolution GET    CONN_REFUSED  grep=yes         ABSENT (no service on Storied)                                /tour/686/resolve
+[33] userDb           GET    CONN_REFUSED  grep=src-missing ABSENT (no service on Storied)                                /user
+[34] userDb           GET    CONN_REFUSED  grep=src-missing ABSENT (no service on Storied)                                /health
+[35] userDb           GET    CONN_REFUSED  grep=src-missing ABSENT (no service on Storied)                                /entitlements/me?user_id=local694-probe-user
+[36] userDb           POST   CONN_REFUSED  grep=src-missing ABSENT (no service on Storied)                                /entitlements/app-open
+[37] userDb           POST   CONN_REFUSED  grep=src-missing ABSENT (no service on Storied)                                /entitlements/lapse
+[38] userDb           POST   CONN_REFUSED  grep=src-missing ABSENT (no service on Storied)                                /l2/queue/join
+[39] userDb           POST   CONN_REFUSED  grep=src-missing ABSENT (no service on Storied)                                /l2/claim
+[40] userDb           POST   CONN_REFUSED  grep=src-missing ABSENT (no service on Storied)                                /purchases/verify
+[41] userDb           POST   CONN_REFUSED  grep=src-missing ABSENT (no service on Storied)                                /document-acceptance
+[42] userDb           GET    CONN_REFUSED  grep=src-missing ABSENT (no service on Storied)                                /document-acceptance?user_id=local694-probe-user
+[43] userDb           POST   CONN_REFUSED  grep=src-missing ABSENT (no service on Storied)                                /communities
+[44] userDb           GET    CONN_REFUSED  grep=src-missing ABSENT (no service on Storied)                                /communities/by-code/L687MATA
+[45] userDb           GET    CONN_REFUSED  grep=src-missing ABSENT (no service on Storied)                                /communities/1
+[46] userDb           POST   CONN_REFUSED  grep=src-missing ABSENT (no service on Storied)                                /communities/1/join
+[47] userDb           GET    CONN_REFUSED  grep=src-missing ABSENT (no service on Storied)                                /communities/map
+[48] treats           GET    200           grep=yes         OK                                                            /treats-near/48.8584/2.2945
+[50] voice            POST   CONN_REFUSED  grep=src-missing ABSENT (no service on Storied)                                /parse_voice_search
+[51] voice            POST   CONN_REFUSED  grep=src-missing ABSENT (no service on Storied)                                /process-voice-command
+[52] translation      POST   200           grep=yes         OK                                                            /translate-with-audio
+[53] generator        POST   CONN_REFUSED  grep=yes         ABSENT (no service on Storied)                                /tour/share
+[54] news             POST   400           grep=yes         4xx (handled refusal/validation)                              /generate-news
+[55] news             GET    500           grep=yes         5xx (server error)                                            /status/nonexistent
+[56] news             GET    500           grep=yes         5xx (server error)                                            /download/nonexistent?user_id=local694-probe-user
+[57] newsletter       GET    500           grep=yes         5xx (server error)                                            /newsletters_v2
+[58] newsletter       POST   500           grep=yes         5xx (server error)                                            /process_newsletter
+[59] newsletter       POST   503           grep=yes         5xx (server error)                                            /submit_credentials
+[60] newsletter       POST   503           grep=yes         5xx (server error)                                            /key_exchange
+[61] tourEditing      POST   400           grep=yes         4xx (handled refusal/validation)                              /tour/686/update-stop
+[62] tourEditing      POST   400           grep=yes         4xx (handled refusal/validation)                              /tour/686/update-multiple-stops
+[63] tourEditing      GET    200           grep=yes         OK                                                            /tour/686/job-status/nonexistent-job
+[64] customAudio      POST   CONN_REFUSED  grep=src-missing ABSENT (no service on Storied)                                /tour/686/stop/1/custom-audio
+[65] customAudio      DELETE CONN_REFUSED  grep=src-missing ABSENT (no service on Storied)                                /tour/686/stop/1/custom-audio
+[66] customAudio      GET    CONN_REFUSED  grep=src-missing ABSENT (no service on Storied)                                /tour/686/stop/1/audio-versions
+[67] customAudio      GET    CONN_REFUSED  grep=src-missing ABSENT (no service on Storied)                                /tour/686/audio-metadata
+
+### STACK-SANITY: grep=yes but html/gateway 404 on a hosted service
+
+  none — every grep-present route on a hosted service returns JSON/200, never an HTML 404.
 
 
 ### REPLAY TABLE (markdown)
 
-| # | Service | Method | Path | Status | Classification | Body shape | Note |
-|---|---|---|---|---|---|---|---|
-| 1 | orchestrator | POST | `/generate-complete-tour` | 400 | 4xx (handled refusal/validation) | json-object{error} | empty body -> validation refusal, no job |
-| 2 | orchestrator | GET | `/status/nonexistent-job` | 404 | MISSING ROUTE (404/405/501) | json-object{error} |  |
-| 3 | orchestrator | GET | `/download/nonexistent-job` | 404 | MISSING ROUTE (404/405/501) | json-object{error} |  |
-| 4 | orchestrator | GET | `/health` | 200 | OK | json-object{cost_ceiling,service,status} |  |
-| 5 | orchestrator | GET | `/delete-account/local694-probe-user` | 405 | MISSING ROUTE (404/405/501) | non-json: '<!doctype html> <html lang=en> <title>405 Method Not Allowed' | GET probe (no delete body) |
-| 6 | orchestrator | POST | `/tour-status` | 400 | 4xx (handled refusal/validation) | json-object{message,status} | empty body |
-| 7 | orchestrator | GET | `/tour/1/unlock-state?user_id=local694-probe-user` | 404 | MISSING ROUTE (404/405/501) | non-json: '<!doctype html> <html lang=en> <title>404 Not Found</title> ' |  |
-| 8 | orchestrator | GET | `/tour/1/price` | 404 | MISSING ROUTE (404/405/501) | non-json: '<!doctype html> <html lang=en> <title>404 Not Found</title> ' |  |
-| 9 | orchestrator | POST | `/tour/1/price` | 404 | MISSING ROUTE (404/405/501) | non-json: '<!doctype html> <html lang=en> <title>404 Not Found</title> ' | empty body |
-| 10 | orchestrator | GET | `/tour/1/sales` | 404 | MISSING ROUTE (404/405/501) | non-json: '<!doctype html> <html lang=en> <title>404 Not Found</title> ' |  |
-| 11 | orchestrator | GET | `/price-tiers` | 404 | MISSING ROUTE (404/405/501) | non-json: '<!doctype html> <html lang=en> <title>404 Not Found</title> ' |  |
-| 12 | orchestrator | GET | `/tour/1/reviews?sort=top` | 404 | MISSING ROUTE (404/405/501) | non-json: '<!doctype html> <html lang=en> <title>404 Not Found</title> ' |  |
-| 13 | orchestrator | GET | `/tour/1/distribution` | 404 | MISSING ROUTE (404/405/501) | non-json: '<!doctype html> <html lang=en> <title>404 Not Found</title> ' |  |
-| 14 | orchestrator | POST | `/tour/1/review` | 404 | MISSING ROUTE (404/405/501) | non-json: '<!doctype html> <html lang=en> <title>404 Not Found</title> ' | empty body |
-| 15 | orchestrator | POST | `/review/1/helpful` | 404 | MISSING ROUTE (404/405/501) | non-json: '<!doctype html> <html lang=en> <title>404 Not Found</title> ' | empty body |
-| 16 | orchestrator | POST | `/review/1/reply` | 404 | MISSING ROUTE (404/405/501) | non-json: '<!doctype html> <html lang=en> <title>404 Not Found</title> ' | empty body |
-| 17 | orchestrator | POST | `/tour/1/rating` | 404 | MISSING ROUTE (404/405/501) | non-json: '<!doctype html> <html lang=en> <title>404 Not Found</title> ' | empty body |
-| 18 | orchestrator | GET | `/tour/1/rating` | 404 | MISSING ROUTE (404/405/501) | non-json: '<!doctype html> <html lang=en> <title>404 Not Found</title> ' |  |
-| 19 | orchestrator | GET | `/wallet/local694-probe-user` | 404 | MISSING ROUTE (404/405/501) | non-json: '<!doctype html> <html lang=en> <title>404 Not Found</title> ' |  |
-| 20 | orchestrator | GET | `/wallet/local694-probe-user/transactions?limit=50` | 404 | MISSING ROUTE (404/405/501) | non-json: '<!doctype html> <html lang=en> <title>404 Not Found</title> ' |  |
-| 21 | orchestrator | GET | `/plans/available` | 404 | MISSING ROUTE (404/405/501) | non-json: '<!doctype html> <html lang=en> <title>404 Not Found</title> ' |  |
-| 22 | orchestrator | POST | `/wallet/local694-probe-user/topup` | 404 | MISSING ROUTE (404/405/501) | non-json: '<!doctype html> <html lang=en> <title>404 Not Found</title> ' | empty body (no purchase) |
-| 23 | orchestrator | POST | `/sync` | 404 | MISSING ROUTE (404/405/501) | non-json: '<!doctype html> <html lang=en> <title>404 Not Found</title> ' | empty body |
-| 24 | mapDelivery | GET | `/tours-near/48.8584/2.2945?radius=5.0` | 200 | OK | json-object{center_lat,center_lng,count,radius_km,tours} | Paris |
-| 25 | mapDelivery | GET | `/download-tour/1` | 200 | OK | non-json: 'PK\x03\x04\x14\x00\x00\x00\x08\x00�\x1a�\\�j��\x06\x00\x00\x1b\x1a\x00\x00 \x00\x00\x00index.html�Y�n�H\x10���\x18���j��Vܡ6�' |  |
-| 26 | mapDelivery | GET | `/search-tours?pattern=museum&lat=48.8584&lng=2.2945` | 200 | OK | json-object{count,pattern,tours} |  |
-| 27 | mapDelivery | GET | `/tour-by-code/ABC123` | 404 | MISSING ROUTE (404/405/501) | non-json: '<!doctype html> <html lang=en> <title>404 Not Found</title> ' |  |
-| 28 | mapDelivery | GET | `/tour/1/preview-audio` | 404 | MISSING ROUTE (404/405/501) | non-json: '<!doctype html> <html lang=en> <title>404 Not Found</title> ' |  |
-| 29 | mapDelivery | GET | `/tour/1/score-explanation` | 404 | MISSING ROUTE (404/405/501) | non-json: '<!doctype html> <html lang=en> <title>404 Not Found</title> ' |  |
-| 30 | mapDelivery | POST | `/tour/1/rescore-request` | 404 | MISSING ROUTE (404/405/501) | non-json: '<!doctype html> <html lang=en> <title>404 Not Found</title> ' | empty body |
-| 31 | mapDelivery | GET | `/how-we-score` | 404 | MISSING ROUTE (404/405/501) | non-json: '<!doctype html> <html lang=en> <title>404 Not Found</title> ' |  |
-| 32 | tourIdResolution | GET | `/tour/1/resolve` | CONN_REFUSED | ABSENT (no service on Storied) | service absent on Storied | ABSENT on Storied |
-| 33 | userDb | GET | `/user` | CONN_REFUSED | ABSENT (no service on Storied) | service absent on Storied | ABSENT on Storied |
-| 34 | userDb | GET | `/health` | CONN_REFUSED | ABSENT (no service on Storied) | service absent on Storied | ABSENT on Storied |
-| 35 | userDb | GET | `/entitlements/me?user_id=local694-probe-user` | CONN_REFUSED | ABSENT (no service on Storied) | service absent on Storied | ABSENT on Storied |
-| 36 | userDb | POST | `/entitlements/app-open` | CONN_REFUSED | ABSENT (no service on Storied) | service absent on Storied | ABSENT on Storied |
-| 37 | userDb | POST | `/entitlements/lapse` | CONN_REFUSED | ABSENT (no service on Storied) | service absent on Storied | ABSENT on Storied |
-| 38 | userDb | POST | `/l2/queue/join` | CONN_REFUSED | ABSENT (no service on Storied) | service absent on Storied | ABSENT on Storied |
-| 39 | userDb | POST | `/l2/claim` | CONN_REFUSED | ABSENT (no service on Storied) | service absent on Storied | ABSENT on Storied |
-| 40 | userDb | POST | `/purchases/verify` | CONN_REFUSED | ABSENT (no service on Storied) | service absent on Storied | ABSENT on Storied |
-| 41 | userDb | POST | `/document-acceptance` | CONN_REFUSED | ABSENT (no service on Storied) | service absent on Storied | ABSENT on Storied |
-| 42 | userDb | GET | `/document-acceptance?user_id=local694-probe-user` | CONN_REFUSED | ABSENT (no service on Storied) | service absent on Storied | ABSENT on Storied |
-| 43 | userDb | POST | `/communities` | CONN_REFUSED | ABSENT (no service on Storied) | service absent on Storied | ABSENT on Storied |
-| 44 | userDb | GET | `/communities/by-code/ABC123` | CONN_REFUSED | ABSENT (no service on Storied) | service absent on Storied | ABSENT on Storied |
-| 45 | userDb | GET | `/communities/1` | CONN_REFUSED | ABSENT (no service on Storied) | service absent on Storied | ABSENT on Storied |
-| 46 | userDb | POST | `/communities/1/join` | CONN_REFUSED | ABSENT (no service on Storied) | service absent on Storied | ABSENT on Storied |
-| 47 | userDb | GET | `/communities/map` | CONN_REFUSED | ABSENT (no service on Storied) | service absent on Storied | ABSENT on Storied |
-| 48 | treats | GET | `/treats-near/48.8584/2.2945` | 200 | OK | json-object{center_lat,center_lng,count,treats} |  |
-| 50 | voice | POST | `/parse_voice_search` | CONN_REFUSED | ABSENT (no service on Storied) | service absent on Storied | ABSENT on Storied |
-| 51 | voice | POST | `/process-voice-command` | CONN_REFUSED | ABSENT (no service on Storied) | service absent on Storied | ABSENT on Storied |
-| 52 | translation | POST | `/translate-with-audio` | 200 | OK | json-object{status,translations} | empty body -> refusal, no paid translate |
-| 53 | generator | POST | `/tour/share` | CONN_REFUSED | ABSENT (no service on Storied) | service absent on Storied | ABSENT on Storied |
-| 54 | news | POST | `/generate-news` | 400 | 4xx (handled refusal/validation) | json-object{error} | empty body |
-| 55 | news | GET | `/news-status/nonexistent` | 404 | MISSING ROUTE (404/405/501) | non-json: '<!doctype html> <html lang=en> <title>404 Not Found</title> ' |  |
-| 56 | news | GET | `/news-download/nonexistent?user_id=local694-probe-user` | 404 | MISSING ROUTE (404/405/501) | non-json: '<!doctype html> <html lang=en> <title>404 Not Found</title> ' |  |
-| 57 | newsletter | GET | `/newsletters_v2` | 500 | 5xx (server error) | json-object{error} |  |
-| 58 | newsletter | POST | `/process_newsletter` | 500 | 5xx (server error) | json-object{error_type,message,status} | empty body |
-| 59 | newsletter | POST | `/submit_credentials` | 503 | 5xx (server error) | json-object{message,status} | empty body |
-| 60 | newsletter | POST | `/key_exchange` | 503 | 5xx (server error) | json-object{message,status} | empty body |
-| 61 | tourEditing | POST | `/tour/1/update-stop` | 400 | 4xx (handled refusal/validation) | json-object{error_code,message,recoverable,status,suggested_action} | empty body |
-| 62 | tourEditing | POST | `/tour/1/update-multiple-stops` | 400 | 4xx (handled refusal/validation) | json-object{error_code,message,recoverable,status,suggested_action} | empty body |
-| 63 | tourEditing | GET | `/tour/1/job-status/nonexistent-job` | 200 | OK | json-object{job_id,message,status,tour_id} |  |
-| 64 | customAudio | POST | `/tour/1/stop/1/custom-audio` | CONN_REFUSED | ABSENT (no service on Storied) | service absent on Storied | ABSENT on Storied |
-| 65 | customAudio | DELETE | `/tour/1/stop/1/custom-audio` | CONN_REFUSED | ABSENT (no service on Storied) | service absent on Storied | ABSENT on Storied |
-| 66 | customAudio | GET | `/tour/1/stop/1/audio-versions` | CONN_REFUSED | ABSENT (no service on Storied) | service absent on Storied | ABSENT on Storied |
-| 67 | customAudio | GET | `/tour/1/audio-metadata` | CONN_REFUSED | ABSENT (no service on Storied) | service absent on Storied | ABSENT on Storied |
+| # | Service | Method | Path | Status | Classification | route exists on storied (grep) | 404 body kind | Body shape | Note |
+|---|---|---|---|---|---|---|---|---|---|
+| 1 | orchestrator | POST | `/generate-complete-tour` | 400 | 4xx (handled refusal/validation) | yes |  | json-object{error} | empty body -> validation refusal, no job |
+| 2 | orchestrator | GET | `/status/nonexistent-job` | 404 | NORMAL not-found (json 404) | yes | json-404 (NORMAL not-found) | json-object{error} | REAL route; job_status empty so unknown-job 404 (NORMAL) |
+| 3 | orchestrator | GET | `/download/nonexistent-job` | 404 | NORMAL not-found (json 404) | yes | json-404 (NORMAL not-found) | json-object{error} | REAL route; unknown-job 404 (NORMAL) |
+| 4 | orchestrator | GET | `/health` | 200 | OK | yes |  | json-object{cost_ceiling,service,status} |  |
+| 5 | orchestrator | GET | `/delete-account/local694-probe-user` | 405 | MISSING ROUTE (405/501) | yes |  | non-json(html): '<!doctype html> <html lang=en> <title>405 Method N' | GET probe (no delete body) |
+| 6 | orchestrator | POST | `/tour-status` | 400 | 4xx (handled refusal/validation) | yes |  | json-object{message,status} | empty body |
+| 7 | orchestrator | GET | `/tour/686/unlock-state?user_id=local694-probe-user` | 404 | MISSING ROUTE (html/gateway 404) | no | html-404 (MISSING) | non-json(html): '<!doctype html> <html lang=en> <title>404 Not Foun' |  |
+| 8 | orchestrator | GET | `/tour/686/price` | 404 | MISSING ROUTE (html/gateway 404) | no | html-404 (MISSING) | non-json(html): '<!doctype html> <html lang=en> <title>404 Not Foun' |  |
+| 9 | orchestrator | POST | `/tour/686/price` | 404 | MISSING ROUTE (html/gateway 404) | no | html-404 (MISSING) | non-json(html): '<!doctype html> <html lang=en> <title>404 Not Foun' | empty body |
+| 10 | orchestrator | GET | `/tour/686/sales` | 404 | MISSING ROUTE (html/gateway 404) | no | html-404 (MISSING) | non-json(html): '<!doctype html> <html lang=en> <title>404 Not Foun' |  |
+| 11 | orchestrator | GET | `/price-tiers` | 404 | MISSING ROUTE (html/gateway 404) | no | html-404 (MISSING) | non-json(html): '<!doctype html> <html lang=en> <title>404 Not Foun' |  |
+| 12 | orchestrator | GET | `/tour/686/reviews?sort=top` | 404 | MISSING ROUTE (html/gateway 404) | no | html-404 (MISSING) | non-json(html): '<!doctype html> <html lang=en> <title>404 Not Foun' |  |
+| 13 | orchestrator | GET | `/tour/686/distribution` | 404 | MISSING ROUTE (html/gateway 404) | no | html-404 (MISSING) | non-json(html): '<!doctype html> <html lang=en> <title>404 Not Foun' |  |
+| 14 | orchestrator | POST | `/tour/686/review` | 404 | MISSING ROUTE (html/gateway 404) | no | html-404 (MISSING) | non-json(html): '<!doctype html> <html lang=en> <title>404 Not Foun' | empty body |
+| 15 | orchestrator | POST | `/review/1/helpful` | 404 | MISSING ROUTE (html/gateway 404) | no | html-404 (MISSING) | non-json(html): '<!doctype html> <html lang=en> <title>404 Not Foun' | empty body |
+| 16 | orchestrator | POST | `/review/1/reply` | 404 | MISSING ROUTE (html/gateway 404) | no | html-404 (MISSING) | non-json(html): '<!doctype html> <html lang=en> <title>404 Not Foun' | empty body |
+| 17 | orchestrator | POST | `/tour/686/rating` | 404 | MISSING ROUTE (html/gateway 404) | no | html-404 (MISSING) | non-json(html): '<!doctype html> <html lang=en> <title>404 Not Foun' | empty body |
+| 18 | orchestrator | GET | `/tour/686/rating` | 404 | MISSING ROUTE (html/gateway 404) | no | html-404 (MISSING) | non-json(html): '<!doctype html> <html lang=en> <title>404 Not Foun' |  |
+| 19 | orchestrator | GET | `/wallet/local694-probe-user` | 404 | MISSING ROUTE (html/gateway 404) | no | html-404 (MISSING) | non-json(html): '<!doctype html> <html lang=en> <title>404 Not Foun' |  |
+| 20 | orchestrator | GET | `/wallet/local694-probe-user/transactions?limit=50` | 404 | MISSING ROUTE (html/gateway 404) | no | html-404 (MISSING) | non-json(html): '<!doctype html> <html lang=en> <title>404 Not Foun' |  |
+| 21 | orchestrator | GET | `/plans/available` | 404 | MISSING ROUTE (html/gateway 404) | no | html-404 (MISSING) | non-json(html): '<!doctype html> <html lang=en> <title>404 Not Foun' |  |
+| 22 | orchestrator | POST | `/wallet/local694-probe-user/topup` | 404 | MISSING ROUTE (html/gateway 404) | no | html-404 (MISSING) | non-json(html): '<!doctype html> <html lang=en> <title>404 Not Foun' | empty body (no purchase) |
+| 23 | orchestrator | POST | `/sync` | 404 | MISSING ROUTE (html/gateway 404) | no | html-404 (MISSING) | non-json(html): '<!doctype html> <html lang=en> <title>404 Not Foun' | empty body |
+| 24 | mapDelivery | GET | `/tours-near/48.8584/2.2945?radius=5.0` | 200 | OK | yes |  | json-object{center_lat,center_lng,radius_km,total_count,tours} | Paris |
+| 25 | mapDelivery | GET | `/download-tour/686` | 404 | NORMAL not-found (json 404) | yes | json-404 (NORMAL not-found) | json-object{error} | REAL tour id 686 |
+| 26 | mapDelivery | GET | `/search-tours?pattern=museum&lat=48.8584&lng=2.2945` | 200 | OK | yes |  | json-object{count,pattern,tours} |  |
+| 27 | mapDelivery | GET | `/tour-by-code/L687MATA` | 200 | OK | yes |  | json-object{count,tours} | REAL share code -> 200 |
+| 28 | mapDelivery | GET | `/tour/686/preview-audio` | 404 | MISSING ROUTE (html/gateway 404) | no | html-404 (MISSING) | non-json(html): '<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 3.2 Final/' |  |
+| 29 | mapDelivery | GET | `/tour/686/score-explanation` | 404 | MISSING ROUTE (html/gateway 404) | no | html-404 (MISSING) | non-json(html): '<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 3.2 Final/' |  |
+| 30 | mapDelivery | POST | `/tour/686/rescore-request` | 404 | MISSING ROUTE (html/gateway 404) | no | html-404 (MISSING) | non-json(html): '<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 3.2 Final/' | empty body |
+| 31 | mapDelivery | GET | `/how-we-score` | 404 | MISSING ROUTE (html/gateway 404) | no | html-404 (MISSING) | non-json(html): '<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 3.2 Final/' |  |
+| 32 | tourIdResolution | GET | `/tour/686/resolve` | CONN_REFUSED | ABSENT (no service on Storied) | yes |  | service absent on Storied | ABSENT on Storied (service not hosted) |
+| 33 | userDb | GET | `/user` | CONN_REFUSED | ABSENT (no service on Storied) | src-missing |  | service absent on Storied | ABSENT on Storied |
+| 34 | userDb | GET | `/health` | CONN_REFUSED | ABSENT (no service on Storied) | src-missing |  | service absent on Storied | ABSENT on Storied |
+| 35 | userDb | GET | `/entitlements/me?user_id=local694-probe-user` | CONN_REFUSED | ABSENT (no service on Storied) | src-missing |  | service absent on Storied | ABSENT on Storied |
+| 36 | userDb | POST | `/entitlements/app-open` | CONN_REFUSED | ABSENT (no service on Storied) | src-missing |  | service absent on Storied | ABSENT on Storied |
+| 37 | userDb | POST | `/entitlements/lapse` | CONN_REFUSED | ABSENT (no service on Storied) | src-missing |  | service absent on Storied | ABSENT on Storied |
+| 38 | userDb | POST | `/l2/queue/join` | CONN_REFUSED | ABSENT (no service on Storied) | src-missing |  | service absent on Storied | ABSENT on Storied |
+| 39 | userDb | POST | `/l2/claim` | CONN_REFUSED | ABSENT (no service on Storied) | src-missing |  | service absent on Storied | ABSENT on Storied |
+| 40 | userDb | POST | `/purchases/verify` | CONN_REFUSED | ABSENT (no service on Storied) | src-missing |  | service absent on Storied | ABSENT on Storied |
+| 41 | userDb | POST | `/document-acceptance` | CONN_REFUSED | ABSENT (no service on Storied) | src-missing |  | service absent on Storied | ABSENT on Storied |
+| 42 | userDb | GET | `/document-acceptance?user_id=local694-probe-user` | CONN_REFUSED | ABSENT (no service on Storied) | src-missing |  | service absent on Storied | ABSENT on Storied |
+| 43 | userDb | POST | `/communities` | CONN_REFUSED | ABSENT (no service on Storied) | src-missing |  | service absent on Storied | ABSENT on Storied |
+| 44 | userDb | GET | `/communities/by-code/L687MATA` | CONN_REFUSED | ABSENT (no service on Storied) | src-missing |  | service absent on Storied | ABSENT on Storied |
+| 45 | userDb | GET | `/communities/1` | CONN_REFUSED | ABSENT (no service on Storied) | src-missing |  | service absent on Storied | ABSENT on Storied |
+| 46 | userDb | POST | `/communities/1/join` | CONN_REFUSED | ABSENT (no service on Storied) | src-missing |  | service absent on Storied | ABSENT on Storied |
+| 47 | userDb | GET | `/communities/map` | CONN_REFUSED | ABSENT (no service on Storied) | src-missing |  | service absent on Storied | ABSENT on Storied |
+| 48 | treats | GET | `/treats-near/48.8584/2.2945` | 200 | OK | yes |  | json-object{center_lat,center_lng,count,treats} |  |
+| 50 | voice | POST | `/parse_voice_search` | CONN_REFUSED | ABSENT (no service on Storied) | src-missing |  | service absent on Storied | ABSENT on Storied |
+| 51 | voice | POST | `/process-voice-command` | CONN_REFUSED | ABSENT (no service on Storied) | src-missing |  | service absent on Storied | ABSENT on Storied |
+| 52 | translation | POST | `/translate-with-audio` | 200 | OK | yes |  | json-object{status,translations} | empty body -> refusal, no paid translate |
+| 53 | generator | POST | `/tour/share` | CONN_REFUSED | ABSENT (no service on Storied) | yes |  | service absent on Storied | ABSENT on Storied (generator not hosted) |
+| 54 | news | POST | `/generate-news` | 400 | 4xx (handled refusal/validation) | yes |  | json-object{error} | empty body |
+| 55 | news | GET | `/status/nonexistent` | 500 | 5xx (server error) | yes |  | json-object{error} | direct service path; gateway rewrites /news-status/* -> /status/* |
+| 56 | news | GET | `/download/nonexistent?user_id=local694-probe-user` | 500 | 5xx (server error) | yes |  | json-object{error} | direct service path; gateway rewrites /news-download/* -> /download/* |
+| 57 | newsletter | GET | `/newsletters_v2` | 500 | 5xx (server error) | yes |  | json-object{error} |  |
+| 58 | newsletter | POST | `/process_newsletter` | 500 | 5xx (server error) | yes |  | json-object{error_type,message,status} | empty body |
+| 59 | newsletter | POST | `/submit_credentials` | 503 | 5xx (server error) | yes |  | json-object{message,status} | empty body |
+| 60 | newsletter | POST | `/key_exchange` | 503 | 5xx (server error) | yes |  | json-object{message,status} | empty body |
+| 61 | tourEditing | POST | `/tour/686/update-stop` | 400 | 4xx (handled refusal/validation) | yes |  | json-object{error_code,message,recoverable,status,suggested_action} | empty body |
+| 62 | tourEditing | POST | `/tour/686/update-multiple-stops` | 400 | 4xx (handled refusal/validation) | yes |  | json-object{error_code,message,recoverable,status,suggested_action} | empty body |
+| 63 | tourEditing | GET | `/tour/686/job-status/nonexistent-job` | 200 | OK | yes |  | json-object{job_id,message,status,tour_id} |  |
+| 64 | customAudio | POST | `/tour/686/stop/1/custom-audio` | CONN_REFUSED | ABSENT (no service on Storied) | src-missing |  | service absent on Storied | ABSENT on Storied |
+| 65 | customAudio | DELETE | `/tour/686/stop/1/custom-audio` | CONN_REFUSED | ABSENT (no service on Storied) | src-missing |  | service absent on Storied | ABSENT on Storied |
+| 66 | customAudio | GET | `/tour/686/stop/1/audio-versions` | CONN_REFUSED | ABSENT (no service on Storied) | src-missing |  | service absent on Storied | ABSENT on Storied |
+| 67 | customAudio | GET | `/tour/686/audio-metadata` | CONN_REFUSED | ABSENT (no service on Storied) | src-missing |  | service absent on Storied | ABSENT on Storied |
 
 ### SUMMARY
 
 - 4xx (handled refusal/validation): 5
-- 5xx (server error): 4
+- 5xx (server error): 6
 - ABSENT (no service on Storied): 23
-- MISSING ROUTE (404/405/501): 27
+- MISSING ROUTE (405/501): 1
+- MISSING ROUTE (html/gateway 404): 21
+- NORMAL not-found (json 404): 3
 - OK: 7
