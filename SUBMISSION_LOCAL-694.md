@@ -159,3 +159,180 @@ Own containers only (`-p local694`); no `audioura-*` touched; no GCloud; no tour
 generated. No edits to DECISIONS.md / CLAUDE.md / BACKLOG.md / WORK_QUEUE.md /
 `.continuous_dev/*`. The `Track B` Beta/Storied base URLs in `endpoints.dart` were
 left byte-for-byte unchanged.
+
+
+---
+
+# 694B — bounce of LOCAL-694 (LEAD review 2026-10-14, two defects)
+
+**Agent:** Mac Mini Kiro · **Branch:** `LOCAL-694-storied-compat` (continued) · **Base:** subscribed (`10db345b`)
+
+LEAD did not merge LOCAL-694 and called out two defects. Both are fixed below;
+Dart (now 59) and the Python replay were re-run.
+
+## Defect 1 — every 404 was treated as "feature unavailable"
+
+`Endpoints.isFeatureUnavailableStatus(code)` returned true for **any** 404/405/501,
+so an ordinary not-found (unknown community code, deleted tour, unknown job) said
+*"This feature is available in Preview only."* even on the Subscribed server.
+
+**Fix** (`lib/config/endpoints.dart`): a new body-aware classifier
+`isRouteMissing(statusCode, [body])`. A route is MISSING **only** when the 404 is
+NOT the service's own JSON error:
+
+- **(a)** the GCloud API gateway's JSON `{"error":"endpoint not found","service":"api-gateway"}`
+  (confirmed at `api-gateway/main.py:297` — what GCloud returns for an unknown path), **or**
+- **(b)** a non-JSON body (Flask's HTML 404 page when a service is called directly), **or**
+- **(c)** 405 Method Not Allowed / 501 Not Implemented.
+
+A JSON 404 **from the service itself** (`{"error":"not_found"}`, `{"error":"Job not found"}`,
+`{"error":"tour not found"}`) is a **NORMAL not-found** and keeps its existing message.
+
+- `get/postOrFeatureUnavailable` now classify with `isRouteMissing(status, resp.body)`;
+  a service JSON 404 is returned to the caller for normal handling instead of raising.
+- `tour_share_service` uses `isRouteMissing` (so a real "tour not found" keeps the
+  server's message, while a missing share route still shows Preview).
+- `isFeatureUnavailableStatus` is reduced to **405/501-only** (deprecated) because a
+  404 cannot be classified from the status alone — no caller can over-report Preview.
+
+**Tests** — all four cases, per helper, plus end-to-end proofs
+(`test/storied_compat_test.dart`, `test/storied_compat_services_test.dart`):
+
+- `(a)` gateway JSON 404 → MISSING; `(b)` HTML/empty 404 → MISSING; `(c)` 405/501 → MISSING
+  regardless of body; `(d)` service JSON 404 (`not_found` / `Job not found` / `tour not found`)
+  → NORMAL (not missing). A service error that merely names the gateway stays NORMAL.
+- `isFeatureUnavailableStatus(404)` is now **false**; 405/501 true.
+- End-to-end via `http.runWithClient` + `MockClient`: a gateway/HTML 404 and a connection
+  refusal give the Preview message; a **service JSON 404** does **not** —
+  `WalletService.getWallet` throws its ordinary Exception (never `FeatureUnavailableException`),
+  `TourShareService` keeps "Tour not found", `CommunitiesService.get` returns null with
+  `isAvailable()` still true.
+- `flutter test test/storied_compat_test.dart test/storied_compat_services_test.dart` →
+  **59 pass** (was 37). Full suite: no new failures; the only reds are the 6 pre-existing
+  `local109_swipe_e2e_test.dart` cases that need a live server (identical `+6 -6` on the clean base).
+
+## Defect 2 — the replay did not run real Storied code
+
+The LOCAL-694 stack built every image from `build: .` — the **subscribed** worktree —
+so it measured subscribed code (D358), and it reported routes storied **has** as MISSING
+(`/tour-by-code`, `/status/<job>`, `/download/<job>`).
+
+**Fix** — the stack is now built **strictly from a detached `origin/storied` worktree**
+(`bbcff487`), via `local694_tooling/storied-stack.compose.yml`:
+
+- Every build `context` is the storied worktree (`$STORIED`, `$STORIED/map_delivery`,
+  `$STORIED/translation-service`); each build passes `GIT_SHA=$STORIED_SHA`.
+- Each container prints its build context + a `git rev-parse` stamp (`print_stack_stamps()`):
+  **all 7 containers stamp `bbcff487…`** (verified via `/app/.git_sha`).
+- **Decisive correction:** map-delivery is built from `map_delivery/` (its own Dockerfile →
+  `CMD ["python","app.py"]`). `map_delivery/app.py:35` defines `/tour-by-code/<code>`.
+  LOCAL-694 instead ran the **root** `map_delivery_service.py` (no such route) via
+  `Dockerfile.cloudrun`, which is why `/tour-by-code` showed an HTML 404.
+
+**Real data** (dev DB, read-only; creds from storied source): `shared_tours` holds real
+share codes — `L687MATA` → `audio_tour_id` 686. The replay uses **share code `L687MATA`**
+and **real tour id `686`**. `job_status` is empty in this dev DB, so no real job id exists;
+an unknown job id therefore draws the service's **own JSON 404** — which is exactly the
+NORMAL not-found the app must keep (and proves the route exists).
+
+**New columns** in the harness/table: **"route exists on storied (grep)"** (greps the
+storied worktree's real service source) and a **404 body kind** (`json-404 NORMAL` vs
+`html-404 MISSING` vs `gateway-404 MISSING`). A **STACK-SANITY** check fails the run if any
+`grep=yes` route on a *hosted* service returns an HTML 404 ("fix the stack, not the app").
+
+### STACK-SANITY — passes
+
+> none — every grep-present route on a hosted service returns JSON/200, never an HTML 404.
+
+The three routes LEAD flagged are now correct: **#2 `/status`**, **#3 `/download`**, and
+**#25 `/download-tour/686`** are `grep=yes` and return a **json-404 (NORMAL not-found)** — the
+routes exist; a made-up id simply isn't found. **#27 `/tour-by-code/L687MATA`** is a clean
+**200** on the real share code. The orchestrator genuinely has only 14 routes (no wallet /
+plans / pricing / sync / rating / review), so `grep=no` on #7–23 is truthful and their HTML
+404 (MISSING) is correct. #5 `/delete-account` is **405** (storied hosts it as DELETE-only;
+a GET is Method-Not-Allowed = MISSING for that verb). News #55/#56 probe the service's real
+`/status` and `/download` (the gateway rewrites `/news-*`); they return a parseable JSON 500
+(route exists, empty-data env), not a missing route.
+
+### Replay table (app → Storied built from origin/storied `bbcff487`)
+
+| # | Service | Method | Path | Status | Classification | route exists on storied (grep) | 404 body kind | Body shape | Note |
+|---|---|---|---|---|---|---|---|---|---|
+| 1 | orchestrator | POST | `/generate-complete-tour` | 400 | 4xx | yes |  | json{error} | empty body → validation refusal, no job |
+| 2 | orchestrator | GET | `/status/<job>` | 404 | **NORMAL not-found (json 404)** | **yes** | json-404 | json{error} | REAL route; unknown-job 404 (was mislabelled MISSING) |
+| 3 | orchestrator | GET | `/download/<job>` | 404 | **NORMAL not-found (json 404)** | **yes** | json-404 | json{error} | REAL route; unknown-job 404 (was mislabelled MISSING) |
+| 4 | orchestrator | GET | `/health` | 200 | OK | yes |  | json{cost_ceiling,service,status} |  |
+| 5 | orchestrator | GET | `/delete-account/<id>` | 405 | MISSING (405/501) | yes |  | html | storied hosts it DELETE-only; GET = 405 |
+| 6 | orchestrator | POST | `/tour-status` | 400 | 4xx | yes |  | json{message,status} | empty body |
+| 7 | orchestrator | GET | `/tour/686/unlock-state` | 404 | MISSING (html 404) | no | html-404 | html |  |
+| 8 | orchestrator | GET | `/tour/686/price` | 404 | MISSING (html 404) | no | html-404 | html |  |
+| 9 | orchestrator | POST | `/tour/686/price` | 404 | MISSING (html 404) | no | html-404 | html | empty body |
+| 10 | orchestrator | GET | `/tour/686/sales` | 404 | MISSING (html 404) | no | html-404 | html |  |
+| 11 | orchestrator | GET | `/price-tiers` | 404 | MISSING (html 404) | no | html-404 | html |  |
+| 12 | orchestrator | GET | `/tour/686/reviews` | 404 | MISSING (html 404) | no | html-404 | html |  |
+| 13 | orchestrator | GET | `/tour/686/distribution` | 404 | MISSING (html 404) | no | html-404 | html |  |
+| 14 | orchestrator | POST | `/tour/686/review` | 404 | MISSING (html 404) | no | html-404 | html | empty body |
+| 15 | orchestrator | POST | `/review/1/helpful` | 404 | MISSING (html 404) | no | html-404 | html | empty body |
+| 16 | orchestrator | POST | `/review/1/reply` | 404 | MISSING (html 404) | no | html-404 | html | empty body |
+| 17 | orchestrator | POST | `/tour/686/rating` | 404 | MISSING (html 404) | no | html-404 | html | empty body |
+| 18 | orchestrator | GET | `/tour/686/rating` | 404 | MISSING (html 404) | no | html-404 | html |  |
+| 19 | orchestrator | GET | `/wallet/<id>` | 404 | MISSING (html 404) | no | html-404 | html |  |
+| 20 | orchestrator | GET | `/wallet/<id>/transactions` | 404 | MISSING (html 404) | no | html-404 | html |  |
+| 21 | orchestrator | GET | `/plans/available` | 404 | MISSING (html 404) | no | html-404 | html |  |
+| 22 | orchestrator | POST | `/wallet/<id>/topup` | 404 | MISSING (html 404) | no | html-404 | html | empty body |
+| 23 | orchestrator | POST | `/sync` | 404 | MISSING (html 404) | no | html-404 | html | empty body |
+| 24 | mapDelivery | GET | `/tours-near/<lat>/<lng>` | 200 | OK | yes |  | json{center_lat,center_lng,radius_km,total_count,tours} | Paris |
+| 25 | mapDelivery | GET | `/download-tour/686` | 404 | **NORMAL not-found (json 404)** | **yes** | json-404 | json{error} | REAL tour id (was mislabelled MISSING) |
+| 26 | mapDelivery | GET | `/search-tours` | 200 | OK | yes |  | json{count,pattern,tours} |  |
+| 27 | mapDelivery | GET | `/tour-by-code/L687MATA` | **200** | **OK** | **yes** |  | json{count,tours} | REAL share code → 200 (was mislabelled MISSING) |
+| 28 | mapDelivery | GET | `/tour/686/preview-audio` | 404 | MISSING (html 404) | no | html-404 | html |  |
+| 29 | mapDelivery | GET | `/tour/686/score-explanation` | 404 | MISSING (html 404) | no | html-404 | html |  |
+| 30 | mapDelivery | POST | `/tour/686/rescore-request` | 404 | MISSING (html 404) | no | html-404 | html | empty body |
+| 31 | mapDelivery | GET | `/how-we-score` | 404 | MISSING (html 404) | no | html-404 | html |  |
+| 32 | tourIdResolution | GET | `/tour/686/resolve` | refused | ABSENT | yes |  | — | service not hosted |
+| 33–47 | userDb | — | user / entitlements / iap / legal / communities | refused | ABSENT (15) | src-missing |  | — | service not hosted on storied |
+| 48 | treats | GET | `/treats-near/<lat>/<lng>` | 200 | OK | yes |  | json{center_lat,center_lng,count,treats} |  |
+| 50–51 | voice | POST | voice search / command | refused | ABSENT (2) | src-missing |  | — | service not hosted |
+| 52 | translation | POST | `/translate-with-audio` | 200 | OK | yes |  | json{status,translations} | empty body → refusal |
+| 53 | generator | POST | `/tour/share` | refused | ABSENT | yes |  | — | generator not hosted on storied |
+| 54 | news | POST | `/generate-news` | 400 | 4xx | yes |  | json{error} | empty body |
+| 55 | news | GET | `/status/<id>` | 500 | 5xx | yes |  | json{error} | real route; gateway rewrites `/news-status/*` → `/status/*` |
+| 56 | news | GET | `/download/<id>` | 500 | 5xx | yes |  | json{error} | real route; gateway rewrites `/news-download/*` → `/download/*` |
+| 57 | newsletter | GET | `/newsletters_v2` | 500 | 5xx | yes |  | json{error} |  |
+| 58 | newsletter | POST | `/process_newsletter` | 500 | 5xx | yes |  | json{error_type,message,status} | empty body |
+| 59 | newsletter | POST | `/submit_credentials` | 503 | 5xx | yes |  | json{message,status} | empty body |
+| 60 | newsletter | POST | `/key_exchange` | 503 | 5xx | yes |  | json{message,status} | empty body |
+| 61 | tourEditing | POST | `/tour/686/update-stop` | 400 | 4xx | yes |  | json{error_code,…} | empty body |
+| 62 | tourEditing | POST | `/tour/686/update-multiple-stops` | 400 | 4xx | yes |  | json{error_code,…} | empty body |
+| 63 | tourEditing | GET | `/tour/686/job-status/<job>` | 200 | OK | yes |  | json{job_id,message,status,tour_id} |  |
+| 64–67 | customAudio | — | custom-audio / versions / metadata | refused | ABSENT (4) | src-missing |  | — | service not hosted |
+
+(Rows 33–47, 50–51, 64–67 collapsed for brevity; the full per-row table with every path is
+in `local694_tooling/replay_results.txt`.)
+
+**Totals (694B):** OK = 7 · NORMAL not-found (json 404) = 3 · MISSING ROUTE (html/gateway 404) = 21 ·
+MISSING ROUTE (405/501) = 1 · ABSENT (refused) = 23 · 4xx = 5 · 5xx = 6.
+
+Compared with 694 (OK=7 / 404=27 / absent=23 / 4xx=5 / 5xx=4): the three mislabelled routes
+(#2, #3, #25) moved from "MISSING" to "NORMAL not-found", #27 moved from "MISSING" to **OK**,
+and the two news rows now measure the real service path (JSON 5xx, route exists) instead of a
+gateway-prefixed HTML 404. No `grep=yes` route on a hosted service returns an HTML 404.
+
+## Reproduce (694B)
+```bash
+# origin/storied worktree (detached — never move the branch)
+git worktree add --detach <path>/local694b-storied origin/storied
+export STORIED=<path>/local694b-storied STORIED_SHA=$(git -C "$STORIED" rev-parse HEAD)
+# Stack built STRICTLY from origin/storied; map-delivery from map_delivery/app.py
+docker compose -p local694 -f local694_tooling/storied-stack.compose.yml up -d --build
+# Replay (prints per-container git stamp, grep column, STACK-SANITY check)
+python3 local694_tooling/replay_harness.py
+# App tests
+cd audio_tour_app && flutter test test/storied_compat_test.dart test/storied_compat_services_test.dart   # 59 pass
+```
+
+## Scope / process (694B)
+Own containers only (`-p local694`); no `audioura-*` touched; GCloud read-only (none here);
+no tours generated; no writes to the dev DB (reads + empty-body validation probes only). No
+edits to DECISIONS / CLAUDE / BACKLOG / WORK_QUEUE / `.continuous_dev`. The Track B Beta/Storied
+base URLs in `endpoints.dart` are byte-for-byte unchanged.
