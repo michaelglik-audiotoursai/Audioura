@@ -24,6 +24,10 @@ entitlements_api.py). It owns the HTTP surface for communities:
   DELETE /communities/<id>                 owner deletes a MEMBER-LESS community (D663 §1 d)
   POST /communities/archive/run            daily archive tick (handover 30d -> archived)
   POST /communities/reminders/run         reminder tick (3-days-before + at-expiry)
+  POST /communities/launch-window/run     launch-window tick (D664): archive a
+                                          community that missed its first-two-
+                                          members bar; remind the organiser at
+                                          48 h / 12 h left. Daily AND hourly.
 
 The PASS PURCHASE goes through the existing /purchases/verify path: that route
 calls `is_community_pass_product(product)` and, when true,
@@ -318,6 +322,23 @@ STATUS_ARCHIVED = 'archived'
 # tick flips handover→archived at this age. Overridable for tests.
 ARCHIVE_AFTER_DAYS = int(os.getenv('COMMUNITY_ARCHIVE_AFTER_DAYS', '30'))
 
+# [LOCAL-703 / D664] The launch window. A new community must win its first two
+# QUALIFYING members (excluding the owner) within this many hours of creation or
+# the launch-window job archives it. 168 h = 7 days, configurable.
+COMMUNITY_LAUNCH_HOURS = int(os.getenv('COMMUNITY_LAUNCH_HOURS', '168'))
+
+# [LOCAL-703 / D664] The bar: two members (the organiser does not count).
+COMMUNITY_LAUNCH_MEMBERS_NEEDED = int(os.getenv('COMMUNITY_LAUNCH_MEMBERS_NEEDED', '2'))
+
+# [LOCAL-703 / D664] Why a community was archived — distinguishes the launch
+# window miss from the LOCAL-702 30-day hand-over expiry.
+ARCHIVED_REASON_LAUNCH_MISSED = 'launch_window_missed'
+ARCHIVED_REASON_HANDOVER_EXPIRED = 'handover_expired'
+
+# [LOCAL-703 / D664] Organiser reminders at 48 h and 12 h left (once each). The
+# launch-window job stamps the matching column so a reminder never double-sends.
+LAUNCH_REMINDER_HOURS = (48, 12)
+
 # The terms a NEW organiser must accept when taking over (LOCAL-691
 # document_acceptance). Recorded server-side on accept so the hand-over leaves
 # the same audit trail as creating a community.
@@ -372,14 +393,209 @@ def archive_stale_handovers(cur, now=None, after_days=ARCHIVE_AFTER_DAYS):
     cutoff = now - timedelta(days=after_days)
     cur.execute(
         """UPDATE communities
-              SET status = %s, archived_at = %s, updated_at = NOW()
+              SET status = %s, archived_at = %s, archived_reason = %s,
+                  updated_at = NOW()
             WHERE status = %s
               AND stepped_down_at IS NOT NULL
               AND stepped_down_at <= %s
             RETURNING id""",
-        (STATUS_ARCHIVED, now, STATUS_HANDOVER, cutoff),
+        (STATUS_ARCHIVED, now, ARCHIVED_REASON_HANDOVER_EXPIRED,
+         STATUS_HANDOVER, cutoff),
     )
     return [r[0] for r in cur.fetchall()]
+
+
+# ───────────────────────────────────────────────────────────────────────────
+# Launch window (LOCAL-703, D664)
+# ───────────────────────────────────────────────────────────────────────────
+# A new community must win its first COMMUNITY_LAUNCH_MEMBERS_NEEDED (2)
+# QUALIFYING members, EXCLUDING the owner, within COMMUNITY_LAUNCH_HOURS (168 h)
+# of creation. Paid communities count members holding a verified paid pass
+# (community_memberships.transaction_id IS NOT NULL); free communities count
+# joined members. Launch is checked on every join / pass verification: once the
+# bar is met, launched_at is stamped ONCE and never reverted, and the countdown
+# is gone for good. Miss the bar → the launch-window job archives the community
+# (archived_reason = 'launch_window_missed'); its invite code then resolves to
+# 410 community_closed and nothing new is served or sold (members keep their
+# downloads, D658).
+
+
+def _qualifying_member_count(cur, community_id, is_paid):
+    """How many QUALIFYING members a community has toward launch, EXCLUDING the
+    owner (D664). For a PAID community a qualifying member holds a verified paid
+    pass — community_memberships.transaction_id IS NOT NULL (a free join of a
+    paid community, which cannot happen through the API, would not count). For a
+    FREE community every membership row counts (a free join IS the bar). The
+    owner is excluded by joining against the community's owner_user_id.
+
+    Note on scope: a paid community's bar is specifically PAID members, so
+    free-joined rows never count toward a paid community's launch — exactly the
+    LEAD reading recorded in D664 ("free-joined don't count for paid")."""
+    if is_paid:
+        cur.execute(
+            """SELECT COUNT(*)
+                 FROM community_memberships m
+                 JOIN communities c ON c.id = m.community_id
+                WHERE m.community_id = %s
+                  AND m.transaction_id IS NOT NULL
+                  AND m.user_id <> c.owner_user_id""",
+            (community_id,),
+        )
+    else:
+        cur.execute(
+            """SELECT COUNT(*)
+                 FROM community_memberships m
+                 JOIN communities c ON c.id = m.community_id
+                WHERE m.community_id = %s
+                  AND m.user_id <> c.owner_user_id""",
+            (community_id,),
+        )
+    return cur.fetchone()[0]
+
+
+def _check_and_maybe_launch(cur, community_id, now=None):
+    """Launch the community if it now meets the bar. Called on every join / pass
+    verification. Idempotent and one-way: if launched_at is already set it is a
+    no-op (never reverted); otherwise, when the qualifying-member count reaches
+    COMMUNITY_LAUNCH_MEMBERS_NEEDED, stamp launched_at = now. Returns True iff
+    the community is (now or already) launched.
+
+    Launching stamps ONLY launched_at — status stays whatever it is (an active
+    community simply stops being a launch-window candidate; the partial index
+    and the job both key off launched_at IS NULL)."""
+    now = now or datetime.utcnow()
+    c = _community_row(cur, community_id)
+    if not c:
+        return False
+    if c['launched_at'] is not None:
+        return True
+    count = _qualifying_member_count(cur, community_id, c['is_paid'])
+    if count >= COMMUNITY_LAUNCH_MEMBERS_NEEDED:
+        cur.execute(
+            "UPDATE communities SET launched_at = %s, updated_at = NOW() "
+            "WHERE id = %s AND launched_at IS NULL",
+            (now, community_id),
+        )
+        return True
+    return False
+
+
+def _launch_info(c, cur=None, now=None):
+    """The `launch` payload block for the community page (D664): the deadline,
+    hours left, the bar, how many qualifying members so far, and whether the
+    community has launched. `c` is a _community_row dict; `cur` is used to count
+    members (omit to report members_so_far=0, e.g. a cheap caller).
+
+    hours_left is max(0, ceil((deadline - now)/1h)) so the organiser's countdown
+    never goes negative and the LAST partial hour still reads as 1 (the hourly
+    cadence matters for the final hours — D664)."""
+    now = now or _utcnow_aware()
+    launched = c['launched_at'] is not None
+    deadline = c['launch_deadline']
+    members_so_far = 0
+    if cur is not None:
+        members_so_far = _qualifying_member_count(cur, c['id'], c['is_paid'])
+    hours_left = 0
+    if deadline is not None:
+        delta = deadline - _as_aware(now)
+        secs = delta.total_seconds()
+        if secs > 0:
+            # ceil to whole hours so a partial final hour still shows as 1.
+            hours_left = int((secs + 3599) // 3600)
+    return {
+        'deadline': deadline.isoformat() if deadline else None,
+        'hours_left': hours_left,
+        'members_needed': COMMUNITY_LAUNCH_MEMBERS_NEEDED,
+        'members_so_far': members_so_far,
+        'launched': launched,
+        'launched_at': c['launched_at'].isoformat() if c['launched_at'] else None,
+    }
+
+
+def _utcnow_aware():
+    """A timezone-aware UTC now. launch_deadline is TIMESTAMPTZ, so psycopg2
+    returns an aware datetime; comparisons must be aware too."""
+    from datetime import timezone
+    return datetime.now(timezone.utc)
+
+
+def _as_aware(dt):
+    """Coerce a datetime to timezone-aware UTC (naive is assumed UTC) so a
+    deadline (aware, from TIMESTAMPTZ) and a test-injected naive `now` compare
+    cleanly."""
+    from datetime import timezone
+    if dt.tzinfo is None:
+        return dt.replace(tzinfo=timezone.utc)
+    return dt
+
+
+def run_launch_window(cur, now=None):
+    """[LOCAL-703 / D664] The launch-window job (daily AND hourly — the hourly
+    cadence keeps the organiser's final-hours countdown accurate). Two jobs in
+    one pass, both idempotent:
+
+      1. ARCHIVE: every ACTIVE, un-launched community whose launch_deadline has
+         passed → status 'archived', archived_at, archived_reason
+         'launch_window_missed'. A LAUNCHED community (launched_at set) is never
+         touched; a community already archived/handover is not active and so is
+         skipped. Running twice archives nothing new.
+      2. REMIND: an ACTIVE, un-launched community with <= 48 h / <= 12 h left
+         (and not past the deadline) gets the organiser reminder once each; the
+         matching column is stamped so it never double-sends.
+
+    Returns {'archived': [ids], 'reminded_48h': [ids], 'reminded_12h': [ids]}.
+    The reminder buckets are the community ids to notify; the actual push is the
+    app/notification layer's job (same split as run_reminders)."""
+    now = now or _utcnow_aware()
+    now = _as_aware(now)
+
+    # ─── 1. Archive past-deadline, un-launched, still-active communities ──────
+    cur.execute(
+        """UPDATE communities
+              SET status = %s, archived_at = %s, archived_reason = %s,
+                  updated_at = NOW()
+            WHERE status = %s
+              AND launched_at IS NULL
+              AND launch_deadline IS NOT NULL
+              AND launch_deadline <= %s
+            RETURNING id""",
+        (STATUS_ARCHIVED, now, ARCHIVED_REASON_LAUNCH_MISSED,
+         STATUS_ACTIVE, now),
+    )
+    archived = [r[0] for r in cur.fetchall()]
+
+    # ─── 2. Organiser reminders at 48 h and 12 h left (once each) ─────────────
+    # A reminder fires for an active, un-launched community whose deadline is in
+    # (now, now + Xh] and whose matching column is still NULL. The 12 h bucket
+    # intentionally also catches a community already inside 12 h even if its 48 h
+    # reminder somehow never ran — each column guards its own bucket.
+    reminded = {}
+    for hours in LAUNCH_REMINDER_HOURS:
+        col = f'launch_reminded_{hours}h_at'
+        cutoff = now + timedelta(hours=hours)
+        cur.execute(
+            f"""SELECT id FROM communities
+                 WHERE status = %s
+                   AND launched_at IS NULL
+                   AND launch_deadline IS NOT NULL
+                   AND launch_deadline > %s
+                   AND launch_deadline <= %s
+                   AND {col} IS NULL""",
+            (STATUS_ACTIVE, now, cutoff),
+        )
+        ids = [r[0] for r in cur.fetchall()]
+        if ids:
+            cur.execute(
+                f"UPDATE communities SET {col} = %s WHERE id = ANY(%s)",
+                (now, ids),
+            )
+        reminded[hours] = ids
+
+    return {
+        'archived': archived,
+        'reminded_48h': reminded.get(48, []),
+        'reminded_12h': reminded.get(12, []),
+    }
 
 
 # ───────────────────────────────────────────────────────────────────────────
@@ -391,7 +607,8 @@ def _community_row(cur, community_id):
                   organiser_photo_url, organiser_bio, organiser_contact,
                   rules_text, waiver_text, has_waiver, is_paid, visibility,
                   latitude, longitude, join_code, feed_url, disabled,
-                  status, stepped_down_at, archived_at
+                  status, stepped_down_at, archived_at,
+                  launch_deadline, launched_at, archived_reason
            FROM communities WHERE id = %s""",
         (community_id,),
     )
@@ -402,7 +619,8 @@ def _community_row(cur, community_id):
             'organiser_photo_url', 'organiser_bio', 'organiser_contact',
             'rules_text', 'waiver_text', 'has_waiver', 'is_paid', 'visibility',
             'latitude', 'longitude', 'join_code', 'feed_url', 'disabled',
-            'status', 'stepped_down_at', 'archived_at']
+            'status', 'stepped_down_at', 'archived_at',
+            'launch_deadline', 'launched_at', 'archived_reason']
     return dict(zip(keys, row))
 
 
@@ -489,6 +707,12 @@ def _community_page(cur, community_id, user_id=None, now=None):
         # Episodes only for an active member or the owner (D658 addendum §2).
         'episodes': _episodes_for(cur, community_id) if active else [],
         'episode_count': _episode_count(cur, community_id),
+        # [LOCAL-703 / D664] The launch window: the deadline, hours left, the bar
+        # (2), how many qualifying members so far, and whether it has launched.
+        # The organiser's page and the creation confirmation render the live
+        # countdown from this ("152 h left to get 2 paid members — 1 of 2 so
+        # far"), turning green "Launched 🎉" once launched is true.
+        'launch': _launch_info(c, cur=cur, now=now),
     }
     # [LOCAL-702 / D663 §1] While in hand-over, a member can see whether THEY
     # have volunteered (and whether they are the one the owner picked), so the
@@ -788,6 +1012,10 @@ def verify_community_pass(store, transaction_id, product, user_id,
         _upsert_membership(cur, user_id, int(community_id), new_expiry,
                            effective_txid, store, product, price_usd,
                            extend_only=False)
+        # [LOCAL-703 / D664] A paid community launches on its 2nd paid member
+        # (owner excluded; free joins never count for a paid community). Check
+        # and stamp launched_at once; never reverts.
+        _check_and_maybe_launch(cur, int(community_id))
         conn.commit()
         cur.close()
         return jsonify({
@@ -967,14 +1195,16 @@ def create_community():
                    (owner_user_id, name, description, organiser_name,
                     organiser_photo_url, organiser_bio, organiser_contact,
                     rules_text, waiver_text, has_waiver, is_paid, visibility,
-                    latitude, longitude, join_code, feed_url)
-               VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+                    latitude, longitude, join_code, feed_url, launch_deadline)
+               VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,
+                       NOW() + make_interval(hours => %s))
                RETURNING id""",
             (owner_user_id, name, data.get('description'),
              data.get('organiser_name'), data.get('organiser_photo_url'),
              data.get('organiser_bio'), data.get('organiser_contact'),
              data.get('rules_text'), data.get('waiver_text'), has_waiver,
-             is_paid, visibility, lat, lng, join_code, data.get('feed_url')),
+             is_paid, visibility, lat, lng, join_code, data.get('feed_url'),
+             COMMUNITY_LAUNCH_HOURS),
         )
         community_id = cur.fetchone()[0]
 
@@ -1082,12 +1312,23 @@ def get_community_by_code(code):
     conn = _get_db()
     try:
         cur = conn.cursor()
-        cur.execute("SELECT id, disabled FROM communities WHERE join_code = %s", (code,))
+        cur.execute("SELECT id, disabled, status FROM communities WHERE join_code = %s", (code,))
         row = cur.fetchone()
         if not row or row[1]:
             cur.close()
             return jsonify({"error": "not_found",
                             "message": "No community with that code."}), 404
+        # [LOCAL-703 / D664] An ARCHIVED community's invite code stops working:
+        # the code resolves to 410 community_closed ("This community has
+        # closed"). This covers the launch-window miss (archived_reason
+        # 'launch_window_missed') AND the LOCAL-702 hand-over expiry — once a
+        # community is archived, its code is dead for new members. Existing
+        # members keep their downloads (D658); they reach the community through
+        # /communities/mine, not the code.
+        if row[2] == STATUS_ARCHIVED:
+            cur.close()
+            return jsonify({"error": "community_closed",
+                            "message": "This community has closed."}), 410
         payload = _community_page(cur, row[0], user_id=user_id)
         payload['join_message'] = f'This tour belongs to {payload["name"]}. Join to listen.'
         cur.close()
@@ -1176,6 +1417,9 @@ def join_free_community(community_id):
                 }), 409
         # Free membership: no expiry (NULL).
         _upsert_membership(cur, user_id, community_id, None, None, None, None, None)
+        # [LOCAL-703 / D664] A free community launches on its 2nd joined member
+        # (owner excluded). Check and stamp launched_at once; never reverts.
+        _check_and_maybe_launch(cur, community_id)
         conn.commit()
         payload = _community_page(cur, community_id, user_id=user_id)
         cur.close()
@@ -1845,6 +2089,34 @@ def reminders_run():
     try:
         cur = conn.cursor()
         result = run_reminders(cur)
+        conn.commit()
+        cur.close()
+        return jsonify(result), 200
+    finally:
+        conn.close()
+
+
+@communities_bp.route('/communities/launch-window/run', methods=['POST'])
+def launch_window_run():
+    """[LOCAL-703 / D664] The launch-window tick. Runs DAILY AND HOURLY (the
+    hourly cadence keeps the organiser's final-hours countdown accurate). In one
+    idempotent pass it:
+
+      * ARCHIVES every active, un-launched community past its launch_deadline
+        (status 'archived', archived_reason 'launch_window_missed'); its invite
+        code then resolves to 410 community_closed. A launched community is
+        never touched.
+      * stamps the organiser reminders at 48 h and 12 h left (once each).
+
+    Returns {archived, reminded_48h, reminded_12h} — the community ids affected
+    this run. LEAD wires the tick to call this (see SUBMISSION_LOCAL-703.md)."""
+    err = _require_api_key()
+    if err:
+        return err
+    conn = _get_db()
+    try:
+        cur = conn.cursor()
+        result = run_launch_window(cur)
         conn.commit()
         cur.close()
         return jsonify(result), 200

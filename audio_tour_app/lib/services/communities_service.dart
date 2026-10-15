@@ -71,16 +71,30 @@ class CommunitiesService {
   /// when there is no community with that code (so the Home search can fall
   /// through to its "no tour with that code" message).
   static Future<Community?> resolveByCode(String code, {String? userId}) async {
+    return (await resolveByCodeResult(code, userId: userId)).community;
+  }
+
+  /// [LOCAL-703 / D664] Resolve a code, distinguishing a CLOSED (archived)
+  /// community from a non-existent one. The server returns 410 community_closed
+  /// for an archived community (its invite code has stopped working); the Home
+  /// search then shows "This community has closed." instead of the generic
+  /// "no tour or community with that code". 200 → the community; 404/other →
+  /// notFound; transport error → notFound (degrade gracefully).
+  static Future<CodeResolution> resolveByCodeResult(String code,
+      {String? userId}) async {
     try {
       final q = userId != null ? '?user_id=$userId' : '';
       final r =
           await Endpoints.get(Service.userDb, '/communities/by-code/$code$q');
+      if (r.statusCode == 410) {
+        return const CodeResolution(closed: true);
+      }
       final map = Endpoints.tryDecodeMap(r.body);
       if (r.statusCode == 200 && map != null) {
-        return Community.fromJson(map);
+        return CodeResolution(community: Community.fromJson(map));
       }
     } catch (_) {}
-    return null;
+    return const CodeResolution();
   }
 
   static Future<Community?> get(int id, {String? userId}) async {
