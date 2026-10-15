@@ -22,11 +22,20 @@ class _MyCommunitiesScreenState extends State<MyCommunitiesScreen> {
   // LOCAL-694: false when the Communities backend (Service.userDb) is not on
   // the current server (Storied). Drives an explanatory empty state.
   bool _featureAvailable = true;
+  // [LOCAL-700 §2] Join from here with an invite code (same resolver as Home).
+  final TextEditingController _codeController = TextEditingController();
+  bool _joining = false;
 
   @override
   void initState() {
     super.initState();
     _load();
+  }
+
+  @override
+  void dispose() {
+    _codeController.dispose();
+    super.dispose();
   }
 
   Future<void> _load() async {
@@ -48,6 +57,68 @@ class _MyCommunitiesScreenState extends State<MyCommunitiesScreen> {
       _communities = list;
       _loading = false;
     });
+  }
+
+  Future<void> _join() async {
+    final code = _codeController.text.trim();
+    if (code.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Enter an invite code first.')));
+      return;
+    }
+    setState(() => _joining = true);
+    final prefs = await SharedPreferences.getInstance();
+    final userId = prefs.getString('user_id');
+    // [LOCAL-700 §2] Same resolver as Home search.
+    final community =
+        await CommunitiesService.resolveByCode(code, userId: userId);
+    if (!mounted) return;
+    setState(() => _joining = false);
+    if (community == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('No community with that code.')));
+      return;
+    }
+    _codeController.clear();
+    // Member or non-member: open the community page (join framing / content).
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+          builder: (_) => CommunityPageScreen(communityId: community.id)),
+    );
+    if (mounted) _load(); // refresh the list after a possible join
+  }
+
+  Widget _buildJoinBar() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 12, 12, 4),
+      child: Row(
+        children: [
+          Expanded(
+            child: TextField(
+              controller: _codeController,
+              decoration: const InputDecoration(
+                labelText: 'Have an invite code?',
+                border: OutlineInputBorder(),
+                isDense: true,
+              ),
+              textInputAction: TextInputAction.go,
+              onSubmitted: (_) => _join(),
+            ),
+          ),
+          const SizedBox(width: 8),
+          ElevatedButton(
+            onPressed: _joining ? null : _join,
+            child: _joining
+                ? const SizedBox(
+                    height: 18,
+                    width: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2))
+                : const Text('Join'),
+          ),
+        ],
+      ),
+    );
   }
 
   void _showOrigin(JoinedCommunity c) {
@@ -91,55 +162,73 @@ class _MyCommunitiesScreenState extends State<MyCommunitiesScreen> {
                     ),
                   ),
                 )
-              : _communities.isEmpty
-              ? const Center(
-                  child: Text(
-                    'You have not joined any communities yet.\n'
-                    'Paste an invite code into Search on the Home page.',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(color: Colors.grey),
-                  ),
-                )
-              : ListView.builder(
-                  itemCount: _communities.length,
-                  itemBuilder: (context, i) {
-                    final c = _communities[i];
-                    return Card(
-                      margin: const EdgeInsets.all(8),
-                      child: ListTile(
-                        leading: const Icon(Icons.groups, color: Colors.deepPurple),
-                        title: Text(c.name),
-                        subtitle: Text(c.active
-                            ? 'Active member'
-                            : 'Expired — renew to listen to new content'),
-                        trailing: PopupMenuButton<String>(
-                          onSelected: (v) {
-                            if (v == 'origin') _showOrigin(c);
-                            if (v == 'open') {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                    builder: (_) =>
-                                        CommunityPageScreen(communityId: c.id)),
-                              );
-                            }
-                          },
-                          itemBuilder: (_) => const [
-                            PopupMenuItem(value: 'origin', child: Text('Origin')),
-                            PopupMenuItem(value: 'open', child: Text('Open community')),
-                          ],
-                        ),
-                        onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                                builder: (_) =>
-                                    CommunityPageScreen(communityId: c.id)),
-                          );
-                        },
-                      ),
-                    );
-                  },
+              : Column(
+                  children: [
+                    // [LOCAL-700 §2] Join from here with an invite code.
+                    _buildJoinBar(),
+                    Expanded(
+                      child: _communities.isEmpty
+                          ? const Center(
+                              child: Padding(
+                                padding: EdgeInsets.all(24),
+                                child: Text(
+                                  'You have not joined any communities yet.\n'
+                                  'Enter an invite code above, or paste it into '
+                                  'Search on the Home page.',
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(color: Colors.grey),
+                                ),
+                              ),
+                            )
+                          : ListView.builder(
+                              itemCount: _communities.length,
+                              itemBuilder: (context, i) {
+                                final c = _communities[i];
+                                return Card(
+                                  margin: const EdgeInsets.all(8),
+                                  child: ListTile(
+                                    leading: const Icon(Icons.groups,
+                                        color: Colors.deepPurple),
+                                    title: Text(c.name),
+                                    subtitle: Text(c.active
+                                        ? 'Active member'
+                                        : 'Expired — renew to listen to new content'),
+                                    trailing: PopupMenuButton<String>(
+                                      onSelected: (v) {
+                                        if (v == 'origin') _showOrigin(c);
+                                        if (v == 'open') {
+                                          Navigator.push(
+                                            context,
+                                            MaterialPageRoute(
+                                                builder: (_) =>
+                                                    CommunityPageScreen(
+                                                        communityId: c.id)),
+                                          );
+                                        }
+                                      },
+                                      itemBuilder: (_) => const [
+                                        PopupMenuItem(
+                                            value: 'origin',
+                                            child: Text('Origin')),
+                                        PopupMenuItem(
+                                            value: 'open',
+                                            child: Text('Open community')),
+                                      ],
+                                    ),
+                                    onTap: () {
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                            builder: (_) => CommunityPageScreen(
+                                                communityId: c.id)),
+                                      );
+                                    },
+                                  ),
+                                );
+                              },
+                            ),
+                    ),
+                  ],
                 ),
     );
   }
