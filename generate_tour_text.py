@@ -26511,6 +26511,27 @@ RULES:
         print(f"  [D523] spoken-text hygiene skipped (non-fatal): {_d523_e}")
     _l654ck("D523 clean_spoken_text")
 
+    # [LOCAL-692] Fix Vietnamese artist names on the FINAL spoken text and add a
+    # TTS-friendly pronunciation aid on first mention. D659: HCMC author names
+    # were "hugely misinterpreted" — wrong attribution (Nguyen Van Tri for a
+    # Nguyễn Gia Trí work), stripped diacritics, and a last-syllable fragment used
+    # as a surname; the English Polly voice then mangled them. This deterministic
+    # pass corrects names to their verified full form (diacritics + family-first
+    # order) and appends "(say: …)" once per artist so the English voice can say
+    # them. Gated to the museum artist-life path (MUSEUM_RESEARCH=artist_life on a
+    # museum tour) so every other tour is byte-for-byte unchanged. Never fatal.
+    try:
+        import story_leads as _sl_vn
+        if _sl_vn.museum_research_backend() == 'artist_life':
+            import vietnamese_name_aid as _vn
+            complete_tour, _vn_notes = _vn.apply(complete_tour, with_aids=True)
+            if _vn_notes:
+                print(f"  [LOCAL-692] Vietnamese name aid applied: "
+                      f"{len(_vn_notes)} edit(s) — {_vn_notes}")
+    except Exception as _vn_e:
+        print(f"  [LOCAL-692] Vietnamese name aid skipped (non-fatal): {_vn_e}")
+    _l654ck("LOCAL-692 vietnamese_name_aid")
+
     # [LOCAL-618 #2] Deterministic grammar & splice lint on the FINAL spoken text.
     # Flags unbalanced quotes/parens, "…-" splices, verbless sentences and repeated
     # word pairs, then drops the flagged sentence — or hands exactly ONE flagged

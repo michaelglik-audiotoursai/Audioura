@@ -234,13 +234,42 @@ def compile_for_seed(seed: Dict, matrix: Dict, exhibition: str = '') -> str:
             '"NO RELIABLE INFORMATION". Do not discuss other people\'s '
             "contributions. Do not praise the work. Maximum 6 sentences.")
     else:
-        instruction = (
-            "Search, then answer with FACTS ONLY — each one sentence, with its "
-            "source in brackets. Prefer what a visitor standing in front of it "
-            "cannot see: why it was made, who decided, what went wrong, what it "
-            "cost someone. If you find nothing reliable, say exactly "
-            '"NO RELIABLE INFORMATION". Do not praise the work. Do not describe '
-            "how it looks. Maximum 6 sentences.")
+        # [LOCAL-692] On a MUSEUM tour with the artist-life backend, the prose
+        # seed asks the PERSON-first questions D659 named, not just the object's
+        # "why it was made" angle. Default-safe: the museum branch is used only
+        # when museum_research_backend()=='artist_life' applies to this tour; any
+        # other tour keeps the exact previous instruction.
+        _museum_artist_life = False
+        try:
+            import story_leads as _sl
+            _museum_artist_life = _sl.museum_research_backend() == 'artist_life'
+        except Exception:
+            _museum_artist_life = False
+        if _museum_artist_life:
+            instruction = (
+                "Search, then answer with FACTS ONLY — each one sentence, with "
+                "its source in brackets. LEAD with the ARTIST as a person and a "
+                "concrete moment (a place, a year, a decision). Answer at least "
+                "TWO of these with sourced facts: where the artist lived and "
+                "worked; where they learned or who trained them; what changed "
+                "their life; why they dedicated their life to art; and the "
+                "work's own story (why it was made, how the museum acquired it, "
+                "when it was first shown). Do NOT write generic themes "
+                "(resilience, endurance, women's roles, national identity, "
+                "cultural memory) unless you tie them to a concrete sourced "
+                "event in this artist's life. If you find nothing human about "
+                "the artist, say so in one sentence and give the work's "
+                "documented story instead — never pad. If you find nothing "
+                'reliable at all, say exactly "NO RELIABLE INFORMATION". Do not '
+                "describe how it looks. Maximum 9 sentences.")
+        else:
+            instruction = (
+                "Search, then answer with FACTS ONLY — each one sentence, with its "
+                "source in brackets. Prefer what a visitor standing in front of it "
+                "cannot see: why it was made, who decided, what went wrong, what it "
+                "cost someone. If you find nothing reliable, say exactly "
+                '"NO RELIABLE INFORMATION". Do not praise the work. Do not describe '
+                "how it looks. Maximum 6 sentences.")
 
     return (f"{seed_ask}\n\n"
             f"Context — the work this concerns:\n{mat}\n"
