@@ -24,8 +24,10 @@ If your community uses a **waiver** (for example for a physical activity), that 
 ## 5. Members keep what they downloaded
 Members join with your invite code and (for a paid community) buy a **pass** that lasts a **fixed length of time** and **does not renew automatically**. When a member's pass ends, they stop getting **new** audio, but any audio they already **downloaded** stays on their device. You can report problems and Audioura keeps a per-community **off switch**; a report about a community tour is routed to **you**, the owner.
 
-## 6. Payments and merchant of record
-Paid passes are sold through the **Apple App Store** or **Google Play**, with **Audioura as the merchant of record** for the transaction. **Apple/Google process the payment — neither you nor Audioura sees card details.** Passes are non-renewing; the member buys again if they want to continue.
+## 6. Payments
+Passes are sold through the **Apple App Store** or **Google Play**. **Apple or Google is the seller to the member**: they take the payment,
+handle card details, refunds and sales tax/VAT, and pay the proceeds to Audioura after their commission. Neither you nor Audioura sees card details.
+Passes do not renew automatically; a member buys again to continue. Your share of the proceeds is paid by Audioura under the payout terms (Section 7).
 
 ## 7. Payouts
 **Payouts to organisers are not built yet.** The payout terms — share, schedule, and method — will be **announced before the first payout.** Until then, creating a community and offering passes exercises the join, pass, and content flow; it does not create a payment obligation from Audioura to you for sales that occur before payout terms are published and accepted.
