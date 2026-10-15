@@ -25,7 +25,9 @@ U) are excluded so a human can copy it reliably.
 RESTORE
 -------
 On a new phone, entering the code:
-  1. validates the code against every stored hash (equality via the per-code salt);
+  1. computes an HMAC selector (code_lookup = HMAC-SHA256(RECOVERY_CODE_PEPPER,
+     normalized_code)) and fetches EXACTLY ONE row by it (O(1) — never a scan),
+     then verifies that one row's per-code-salted PBKDF2 hash (constant time);
   2. LINKS the new device id to the profile (user_consolidation_map /
      device_consolidation_history), and UNLINKS the previous device — one profile
      lives on one phone at a time;
@@ -81,6 +83,48 @@ logger = logging.getLogger("recovery_code_service")
 RESTORE_RATE_LIMIT_PER_HOUR = int(os.getenv("RESTORE_RATE_LIMIT_PER_HOUR", "5"))
 RESTORE_MAX_PER_30_DAYS = int(os.getenv("RESTORE_MAX_PER_30_DAYS", "2"))
 PBKDF2_ITERATIONS = int(os.getenv("RECOVERY_CODE_ITERATIONS", "200000"))
+
+# ─── LOCAL-695B: HMAC selector pepper (makes restore O(1)) ────────────────────
+# RECOVERY_CODE_PEPPER is a server-held secret (32+ random bytes) that is NEVER
+# stored in the database. The restore path computes a deterministic selector,
+#   code_lookup = HMAC-SHA256(PEPPER, normalized_code)  (hex),
+# fetches EXACTLY ONE row by that selector, then verifies with the per-code
+# salted PBKDF2 hash. Without the pepper an attacker holding the DB cannot
+# precompute selectors for guessed codes. If the pepper is absent the recovery
+# routes are DISABLED (we never fall back to the O(N) scan).
+_PEPPER_ENV = "RECOVERY_CODE_PEPPER"
+
+
+def get_pepper():
+    """Return the configured recovery-code pepper as bytes, or None if unset/
+    blank. Read at call time (not import time) so tests and the route registrar
+    see the current environment."""
+    raw = os.getenv(_PEPPER_ENV)
+    if raw is None:
+        return None
+    raw = raw.strip()
+    if not raw:
+        return None
+    return raw.encode("utf-8")
+
+
+class PepperMissingError(RuntimeError):
+    """Raised when a recovery operation needs the pepper but it is not set.
+    Surfacing this (rather than scanning) is the ticket's hard requirement:
+    missing pepper → routes refuse to serve, never a slow full-table scan."""
+
+
+def compute_lookup(code, pepper=None):
+    """The deterministic selector for a code: HMAC-SHA256(pepper, normalized_code)
+    as lowercase hex. Raises PepperMissingError if no pepper is configured."""
+    if pepper is None:
+        pepper = get_pepper()
+    if not pepper:
+        raise PepperMissingError(
+            f"{_PEPPER_ENV} is not set; recovery-code lookup is unavailable"
+        )
+    norm = normalize_code(code).encode("utf-8")
+    return hmac.new(pepper, norm, hashlib.sha256).hexdigest()
 
 # Crockford base32 without the ambiguous I, L, O, U — easy to read and copy.
 _ALPHABET = "0123456789ABCDEFGHJKMNPQRSTVWXYZ"
@@ -199,6 +243,15 @@ def ensure_recovery_schema(cur):
             rotated_at      TIMESTAMPTZ
         )
         """
+    )
+    # LOCAL-695B: fast O(1) selector column + partial UNIQUE index (mirrors
+    # migration 034). Additive so an existing recovery_codes table gains it.
+    cur.execute(
+        "ALTER TABLE recovery_codes ADD COLUMN IF NOT EXISTS code_lookup VARCHAR(64)"
+    )
+    cur.execute(
+        "CREATE UNIQUE INDEX IF NOT EXISTS uq_recovery_codes_lookup "
+        "ON recovery_codes (code_lookup) WHERE code_lookup IS NOT NULL"
     )
     cur.execute(
         """
@@ -431,12 +484,18 @@ def build_listen_page(cur, profile_id, device_ids):
 def generate_for_device(cur, device_id):
     """Generate (or ROTATE) the recovery code for the device's profile. Returns
     (code_plaintext, profile_id, rotated: bool). The plaintext is returned ONCE;
-    only its salted hash is stored. Caller commits."""
+    only its salted hash is stored. Caller commits.
+
+    LOCAL-695B: also writes the deterministic HMAC selector `code_lookup` so the
+    restore path is an O(1) single-row fetch. Requires RECOVERY_CODE_PEPPER —
+    raises PepperMissingError if it is unset (we never store a code that cannot
+    be looked up without a scan)."""
     ensure_recovery_schema(cur)
     profile_id = _get_or_create_profile_id(cur, device_id)
     code = generate_recovery_code()
     salt = secrets.token_bytes(16)
     digest = hash_code(code, salt, PBKDF2_ITERATIONS)
+    lookup = compute_lookup(code)  # raises PepperMissingError if no pepper
     cur.execute(
         "SELECT 1 FROM recovery_codes WHERE consolidated_user_id = %s", (profile_id,)
     )
@@ -444,29 +503,42 @@ def generate_for_device(cur, device_id):
     cur.execute(
         """
         INSERT INTO recovery_codes
-            (consolidated_user_id, code_hash, code_salt, hash_algo, hash_iterations, created_at, rotated_at)
-        VALUES (%s, %s, %s, 'pbkdf2_sha256', %s, NOW(), NULL)
+            (consolidated_user_id, code_hash, code_salt, hash_algo, hash_iterations, code_lookup, created_at, rotated_at)
+        VALUES (%s, %s, %s, 'pbkdf2_sha256', %s, %s, NOW(), NULL)
         ON CONFLICT (consolidated_user_id) DO UPDATE
           SET code_hash = EXCLUDED.code_hash,
               code_salt = EXCLUDED.code_salt,
               hash_iterations = EXCLUDED.hash_iterations,
+              code_lookup = EXCLUDED.code_lookup,
               rotated_at = NOW()
         """,
-        (profile_id, psycopg2.Binary(digest), psycopg2.Binary(salt), PBKDF2_ITERATIONS),
+        (profile_id, psycopg2.Binary(digest), psycopg2.Binary(salt),
+         PBKDF2_ITERATIONS, lookup),
     )
     return code, profile_id, rotated
 
 
 def _match_code(cur, code):
-    """Find the profile whose stored recovery hash matches `code`. Scans
-    recovery_codes (one row per profile) and verifies each with its own salt in
-    constant time. Returns (profile_id, iterations) or (None, None)."""
+    """Find the profile whose stored recovery code matches `code`, in O(1).
+
+    LOCAL-695B: compute the HMAC selector ONCE and fetch EXACTLY ONE row by the
+    UNIQUE code_lookup index, then verify that single row with its per-code
+    salted PBKDF2 hash in constant time. One PBKDF2 per restore, not N. Returns
+    (profile_id, iterations) or (None, None). Raises PepperMissingError if the
+    pepper is unset — the caller must have refused the route already, but we fail
+    loud rather than silently scanning."""
+    lookup = compute_lookup(code)  # raises PepperMissingError if no pepper
     cur.execute(
-        "SELECT consolidated_user_id, code_hash, code_salt, hash_iterations FROM recovery_codes"
+        "SELECT consolidated_user_id, code_hash, code_salt, hash_iterations "
+        "FROM recovery_codes WHERE code_lookup = %s",
+        (lookup,),
     )
-    for profile_id, code_hash, code_salt, iterations in cur.fetchall():
-        if verify_code(code, bytes(code_salt), bytes(code_hash), iterations):
-            return profile_id, iterations
+    row = cur.fetchone()
+    if not row:
+        return None, None
+    profile_id, code_hash, code_salt, iterations = row
+    if verify_code(code, bytes(code_salt), bytes(code_hash), iterations):
+        return profile_id, iterations
     return None, None
 
 
@@ -707,7 +779,32 @@ def linked_device_ids_for_deletion(cur, secret_id):
 
 def register_recovery_routes(app):
     """Register the recovery-code endpoints on the orchestrator Flask app.
-    Mirrors the defensive register_*_routes pattern used by pricing/ratings."""
+    Mirrors the defensive register_*_routes pattern used by pricing/ratings.
+
+    LOCAL-695B: the recovery feature now REQUIRES RECOVERY_CODE_PEPPER (the HMAC
+    selector key that makes restore O(1)). If it is absent we DO NOT register the
+    working routes and we DO NOT fall back to the old O(N) scan — instead we log
+    a clear line and register stubs that return 503 so a misconfigured server
+    fails safe and visibly rather than letting anyone tie up the orchestrator."""
+    if get_pepper() is None:
+        logger.error(
+            "RECOVERY_CODE_PEPPER is not set — recovery-code routes are DISABLED. "
+            "Set %s to 32+ random bytes (see SUBMISSION_LOCAL-695.md) and restart. "
+            "Refusing to serve rather than scanning every stored hash.",
+            _PEPPER_ENV,
+        )
+
+        @app.route("/recovery-code/<path:_sub>",
+                   methods=["GET", "POST", "OPTIONS"])
+        def recovery_code_disabled(_sub):  # noqa: ANN001
+            if request.method == "OPTIONS":
+                return ("", 204)
+            return jsonify({
+                "error": "recovery_disabled",
+                "message": "Recovery is temporarily unavailable.",
+            }), 503
+
+        return app
 
     @app.route("/recovery-code/generate", methods=["POST", "OPTIONS"])
     def recovery_code_generate():  # noqa: ANN001

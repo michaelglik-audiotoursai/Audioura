@@ -39,6 +39,7 @@ services:
       - PYTHONPATH=/opt/meter
       - PAID_API_LOG=/meterlogs/paid_api_calls.jsonl
       - L2_SEAT_JOB_ENABLED=true          # LOCAL-596 hourly L2 eviction/offer job
+      - RECOVERY_CODE_PEPPER=${RECOVERY_CODE_PEPPER}   # LOCAL-695B: HMAC selector key for O(1) recovery-code lookup; LEAD must set it in ~/Audioura/.env (32+ random bytes). If unset, recovery routes are disabled (never a scan).
     volumes:
       - /Users/micha/audioura-subscribed-local/_meter:/opt/meter:ro
       - /Users/micha/Audioura/meterlogs:/meterlogs

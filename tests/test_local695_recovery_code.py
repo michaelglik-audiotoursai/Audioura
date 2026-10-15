@@ -40,6 +40,11 @@ from db_connection import get_connection, check_db_available, get_db_config  # n
 
 TEST_PREFIX = "TEST-695-"
 
+# LOCAL-695B: deterministic pepper for the test DB (production reads it from env;
+# it is never stored in the database).
+RECOVERY_CODE_PEPPER_ENV = "RECOVERY_CODE_PEPPER"
+TEST_PEPPER = "test-pepper-695B-0123456789abcdef0123456789abcdef"
+
 
 # ─── module loaders ───────────────────────────────────────────────────────────
 
@@ -53,6 +58,11 @@ def _load_recovery():
     os.environ["DB_NAME"] = cfg["dbname"]
     os.environ["DB_USER"] = cfg["user"]
     os.environ["DB_PASSWORD"] = cfg["password"]
+    # LOCAL-695B: the HMAC selector pepper is REQUIRED for generate/restore. Set
+    # a deterministic test pepper so the suite is reproducible; production reads
+    # it from env (never the DB). Individual tests that exercise the
+    # missing-pepper path manage this var themselves.
+    os.environ[RECOVERY_CODE_PEPPER_ENV] = TEST_PEPPER
     import recovery_code_service as rc
     # Reset the module-level schema cache so ensure runs against this DB.
     rc._SCHEMA_READY = False
@@ -396,3 +406,201 @@ def test_deletion_removes_all_linked_rows(rc, conn):
     assert cur.fetchone()[0] == 0
     cur.execute("SELECT COUNT(*) FROM user_consolidation_map WHERE consolidated_user_id = ANY(%s)", (identity,))
     assert cur.fetchone()[0] == 0
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# LOCAL-695B — O(1) HMAC selector lookup (bounce of LOCAL-695)
+#
+# LEAD defect: _match_code SELECTed every recovery_codes row and ran PBKDF2 (200k
+# iters) against each, so a restore was O(N) PBKDF2 — ~100 s at 1,000 profiles,
+# and a DoS vector across devices. Fix: a deterministic HMAC selector
+# (code_lookup = HMAC-SHA256(RECOVERY_CODE_PEPPER, normalized_code), hex), UNIQUE-
+# indexed, written at generate/rotate; restore computes it once, fetches exactly
+# ONE row, then verifies that one row's PBKDF2 hash. Missing pepper → routes
+# disabled (never a scan).
+# ══════════════════════════════════════════════════════════════════════════════
+
+import time as _time
+import secrets as _secrets
+
+
+class _CountingCursor:
+    """Wrap a real psycopg2 cursor and count executes that touch recovery_codes,
+    so a test can PROVE a restore reads the table at most once (O(1), not a
+    scan). Delegates everything else to the wrapped cursor."""
+
+    def __init__(self, cur):
+        self._cur = cur
+        self.recovery_selects = 0
+
+    def execute(self, query, params=None):
+        q = query if isinstance(query, str) else str(query)
+        low = q.lower()
+        if "from recovery_codes" in low and low.strip().startswith("select"):
+            self.recovery_selects += 1
+        return self._cur.execute(query, params) if params is not None else self._cur.execute(query)
+
+    def __getattr__(self, name):
+        return getattr(self._cur, name)
+
+
+def test_lookup_is_hex_hmac_and_pepper_dependent(rc):
+    """compute_lookup is a 64-hex HMAC-SHA256 selector, deterministic for a
+    (pepper, code) pair, format/case-insensitive, and CHANGES with the pepper."""
+    code = rc.generate_recovery_code()
+    lk = rc.compute_lookup(code)
+    assert isinstance(lk, str) and len(lk) == 64
+    assert all(c in "0123456789abcdef" for c in lk)
+    # Deterministic + format/case-insensitive (same normalization as the hash).
+    assert rc.compute_lookup(code.lower().replace("-", " ")) == lk
+    # A different pepper yields a different selector (pepper actually keys it).
+    other = rc.compute_lookup(code, pepper=b"a-different-pepper-value-xxxxxxxx")
+    assert other != lk
+
+
+def test_generate_writes_lookup_and_rotation_updates_it(rc, conn):
+    """generate_for_device stores code_lookup matching the plaintext; rotating
+    REPLACES the lookup so the old code's selector no longer resolves."""
+    cur = conn.cursor()
+    device = TEST_PREFIX + "lk1"
+    code, profile_id, rotated = rc.generate_for_device(cur, device)
+    conn.commit()
+    assert not rotated
+    cur.execute("SELECT code_lookup FROM recovery_codes WHERE consolidated_user_id = %s",
+                (profile_id,))
+    stored = cur.fetchone()[0]
+    assert stored == rc.compute_lookup(code)
+
+    # Rotate: new code, new lookup; the OLD selector points at nothing now.
+    old_lookup = stored
+    code2, profile_id2, rotated2 = rc.generate_for_device(cur, device)
+    conn.commit()
+    assert profile_id2 == profile_id and rotated2 and code2 != code
+    cur.execute("SELECT code_lookup FROM recovery_codes WHERE consolidated_user_id = %s",
+                (profile_id,))
+    new_lookup = cur.fetchone()[0]
+    assert new_lookup == rc.compute_lookup(code2)
+    assert new_lookup != old_lookup
+    # The old selector resolves to no row (the old code is dead).
+    cur.execute("SELECT COUNT(*) FROM recovery_codes WHERE code_lookup = %s", (old_lookup,))
+    assert cur.fetchone()[0] == 0
+    # And _match_code accepts the new code, rejects the old one.
+    assert rc._match_code(cur, code2)[0] == profile_id
+    assert rc._match_code(cur, code)[0] is None
+
+
+def test_match_code_is_single_query(rc, conn):
+    """A restore reads recovery_codes AT MOST ONCE regardless of how many codes
+    are stored — the O(1) guarantee. Both a hit and a miss cost one SELECT."""
+    cur = conn.cursor()
+    # Seed a handful of other profiles so a scan WOULD read many rows.
+    for i in range(25):
+        rc.generate_for_device(cur, f"{TEST_PREFIX}sq{i}")
+    conn.commit()
+    target_code, _pid, _ = rc.generate_for_device(cur, TEST_PREFIX + "sq_target")
+    conn.commit()
+
+    counting = _CountingCursor(cur)
+    pid, _ = rc._match_code(counting, target_code)
+    assert pid is not None
+    assert counting.recovery_selects == 1, "hit must be a single SELECT (O(1))"
+
+    counting2 = _CountingCursor(cur)
+    miss, _ = rc._match_code(counting2, "ZZZZ-ZZZZ-ZZZZ-ZZZZ")
+    assert miss is None
+    assert counting2.recovery_selects == 1, "miss must be a single SELECT (O(1))"
+
+
+def test_restore_with_5000_codes_under_half_second(rc, conn):
+    """Ticket perf bar: with 5,000 synthetic codes stored, a restore completes in
+    < 0.5 s. The old scan ran PBKDF2 5,000× (minutes); the selector makes it one
+    indexed fetch + one PBKDF2 verify.
+
+    We seed 5,000 rows CHEAPLY (direct INSERTs with a shared dummy PBKDF2 hash
+    and the correct per-code lookup) rather than calling generate_for_device
+    5,000× (which would itself run 5,000 PBKDF2s). The target profile gets a
+    REAL hash so the final verify succeeds."""
+    cur = conn.cursor()
+    rc.ensure_recovery_schema(cur)
+
+    # One shared cheap salt/hash for the 4,999 decoys (their verify never runs —
+    # the selector points the restore at exactly one row, the target).
+    dummy_salt = _secrets.token_bytes(16)
+    dummy_hash = rc.hash_code("DECOY-DECOY-DECOY-0000", dummy_salt, 1)
+
+    # Target profile: real code, real salted hash, real lookup.
+    target_device = TEST_PREFIX + "perf_target"
+    target_profile = f"CONSOLIDATED-{target_device}-perf"
+    target_code = rc.generate_recovery_code()
+    target_salt = _secrets.token_bytes(16)
+    target_hash = rc.hash_code(target_code, target_salt, rc.PBKDF2_ITERATIONS)
+    target_lookup = rc.compute_lookup(target_code)
+    cur.execute(
+        "INSERT INTO user_consolidation_map (consolidated_user_id, primary_device_id) "
+        "VALUES (%s, %s) ON CONFLICT DO NOTHING",
+        (target_profile, target_device),
+    )
+
+    # Bulk-insert 4,999 decoys + the target with correct, UNIQUE lookups.
+    import psycopg2 as _pg
+    rows = []
+    for i in range(4999):
+        pid = f"CONSOLIDATED-{TEST_PREFIX}perf{i}"
+        lookup = rc.compute_lookup(f"DECOY-{i:05d}-FILL-0000")
+        rows.append((pid, _pg.Binary(dummy_hash), _pg.Binary(dummy_salt), 1, lookup))
+    rows.append((target_profile, _pg.Binary(target_hash), _pg.Binary(target_salt),
+                 rc.PBKDF2_ITERATIONS, target_lookup))
+    cur.executemany(
+        "INSERT INTO recovery_codes "
+        "(consolidated_user_id, code_hash, code_salt, hash_algo, hash_iterations, code_lookup) "
+        "VALUES (%s, %s, %s, 'pbkdf2_sha256', %s, %s) "
+        "ON CONFLICT (consolidated_user_id) DO NOTHING",
+        rows,
+    )
+    conn.commit()
+
+    cur.execute("SELECT COUNT(*) FROM recovery_codes WHERE consolidated_user_id LIKE %s",
+                ("CONSOLIDATED-" + TEST_PREFIX + "perf%",))
+    assert cur.fetchone()[0] >= 5000
+
+    new_device = TEST_PREFIX + "perf_new"
+    t0 = _time.perf_counter()
+    status, payload = rc.restore_for_device(cur, new_device, target_code)
+    elapsed = _time.perf_counter() - t0
+    conn.commit()
+
+    assert status == "restored", payload
+    assert payload["profile_id"] == target_profile
+    assert elapsed < 0.5, f"restore took {elapsed:.3f}s with 5000 codes (must be < 0.5s)"
+
+
+def test_missing_pepper_disables_routes_and_refuses_ops(rc, conn, monkeypatch):
+    """With no RECOVERY_CODE_PEPPER: (a) register_recovery_routes logs and mounts
+    a 503 stub instead of the working routes (never a scan); (b) generate/restore
+    raise PepperMissingError rather than silently scanning."""
+    from flask import Flask
+
+    monkeypatch.delenv(RECOVERY_CODE_PEPPER_ENV, raising=False)
+    assert rc.get_pepper() is None
+
+    # (a) Routes are DISABLED → 503 on every recovery-code path.
+    app = Flask("rc_nopepper_test")
+    rc.register_recovery_routes(app)
+    client = app.test_client()
+    r = client.post("/recovery-code/generate", json={"user_id": TEST_PREFIX + "np"})
+    assert r.status_code == 503 and r.get_json()["error"] == "recovery_disabled"
+    r2 = client.post("/recovery-code/restore",
+                     json={"user_id": TEST_PREFIX + "np", "code": "ANY"})
+    assert r2.status_code == 503
+
+    # (b) Direct ops refuse loudly rather than scanning.
+    cur = conn.cursor()
+    with pytest.raises(rc.PepperMissingError):
+        rc.compute_lookup("ABCD-EFGH-JKLM-NPQR")
+    with pytest.raises(rc.PepperMissingError):
+        rc.generate_for_device(cur, TEST_PREFIX + "np2")
+    conn.rollback()
+
+    # Restore to the test pepper for the rest of the module.
+    monkeypatch.setenv(RECOVERY_CODE_PEPPER_ENV, TEST_PEPPER)
+    assert rc.get_pepper() is not None
