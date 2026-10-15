@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../config/endpoints.dart';
 import '../services/wallet_service.dart';
 
 /// Format a USD amount with conventional sign placement.
@@ -24,6 +25,9 @@ class _WalletScreenState extends State<WalletScreen> {
   List<WalletTransaction> _transactions = [];
   bool _isLoading = true;
   String? _error;
+  // LOCAL-694: set when the wallet feature is not offered by the current
+  // backend (Storied). Shows a friendly "Preview only" state, not an error.
+  bool _featureUnavailable = false;
 
   @override
   void initState() {
@@ -35,6 +39,7 @@ class _WalletScreenState extends State<WalletScreen> {
     setState(() {
       _isLoading = true;
       _error = null;
+      _featureUnavailable = false;
     });
     try {
       final wallet = await WalletService.getWallet();
@@ -43,6 +48,14 @@ class _WalletScreenState extends State<WalletScreen> {
         setState(() {
           _wallet = wallet;
           _transactions = transactions;
+          _isLoading = false;
+        });
+      }
+    } on FeatureUnavailableException catch (e) {
+      if (mounted) {
+        setState(() {
+          _featureUnavailable = true;
+          _error = e.message;
           _isLoading = false;
         });
       }
@@ -124,7 +137,26 @@ class _WalletScreenState extends State<WalletScreen> {
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
-          : _error != null
+          : _featureUnavailable
+              ? Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(32),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.account_balance_wallet_outlined,
+                            size: 48, color: Colors.grey.shade400),
+                        const SizedBox(height: 16),
+                        Text(
+                          _error ?? Endpoints.featureUnavailableMessage,
+                          textAlign: TextAlign.center,
+                          style: TextStyle(color: Colors.grey.shade700),
+                        ),
+                      ],
+                    ),
+                  ),
+                )
+              : _error != null
               ? Center(
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
@@ -613,6 +645,7 @@ class _PaywallScreenState extends State<PaywallScreen> {
   List<AvailablePlan> _plans = [];
   bool _isLoading = true;
   String? _error;
+  bool _featureUnavailable = false; // LOCAL-694
 
   @override
   void initState() {
@@ -624,12 +657,21 @@ class _PaywallScreenState extends State<PaywallScreen> {
     setState(() {
       _isLoading = true;
       _error = null;
+      _featureUnavailable = false;
     });
     try {
       final plans = await WalletService.getAvailablePlans();
       if (mounted) {
         setState(() {
           _plans = plans;
+          _isLoading = false;
+        });
+      }
+    } on FeatureUnavailableException catch (e) {
+      if (mounted) {
+        setState(() {
+          _featureUnavailable = true;
+          _error = e.message;
           _isLoading = false;
         });
       }
@@ -653,7 +695,18 @@ class _PaywallScreenState extends State<PaywallScreen> {
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
-          : _error != null
+          : _featureUnavailable
+              ? Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(32),
+                    child: Text(
+                      _error ?? Endpoints.featureUnavailableMessage,
+                      textAlign: TextAlign.center,
+                      style: TextStyle(color: Colors.grey.shade700),
+                    ),
+                  ),
+                )
+              : _error != null
               ? Center(child: Text('Error: $_error'))
               : ListView(
                   padding: const EdgeInsets.all(16),

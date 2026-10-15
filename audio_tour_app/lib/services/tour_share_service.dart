@@ -71,10 +71,15 @@ class TourShareService {
       final serverMsg = _serverMessage(response.body);
       await DebugLogHelper.addDebugLog(
           'SHARE: tour $numericId failed ${response.statusCode}: ${response.body}');
+      // LOCAL-694/694B: a route-missing answer here (405/501, the GCloud
+      // gateway's "endpoint not found" JSON, or an HTML 404) means the share
+      // ROUTE is not offered by this backend (Storied hosts no tour-generator)
+      // — tell the tester it is a Preview feature. A service's own JSON 404
+      // (e.g. "tour not found") is a normal not-found and keeps its message.
+      if (Endpoints.isRouteMissing(response.statusCode, response.body)) {
+        return ShareResult.failure(Endpoints.featureUnavailableMessage);
+      }
       switch (response.statusCode) {
-        case 404:
-          return ShareResult.failure(
-              serverMsg ?? 'That tour was not found on the server.');
         case 401:
         case 503:
           return ShareResult.failure(
@@ -85,6 +90,12 @@ class TourShareService {
       }
     } catch (e) {
       await DebugLogHelper.addDebugLog('SHARE: request error: $e');
+      // LOCAL-694: the whole tour-generator service is absent on Storied, so
+      // the request fails at the socket. Treat an absent service as the same
+      // "Preview only" feature message rather than implying a flaky network.
+      if (Endpoints.isServiceAbsentError(e)) {
+        return ShareResult.failure(Endpoints.featureUnavailableMessage);
+      }
       return ShareResult.failure(
           'Could not reach the server. Check your connection and try again.');
     }

@@ -1,0 +1,143 @@
+# LOCAL-694B — Storied stack, isolated under `docker compose -p local694`.
+#
+# BOUNCE FIX (LEAD review 2026-10-14, D358): the LOCAL-694 run built every image
+# from `build: .` — i.e. from the LOCAL-694B worktree, which is the SUBSCRIBED
+# tree, NOT storied. That silently measured subscribed code and mislabelled
+# routes that storied actually has. This file now builds STRICTLY from a
+# detached `origin/storied` worktree, set via the STORIED env var, and uses each
+# service's REAL GCloud Dockerfile/entrypoint.
+#
+#   export STORIED=/Volumes/AudiouraSSD/audioura-worktrees/local694b-storied
+#   git -C "$STORIED" rev-parse HEAD   # must be origin/storied (bbcff487…)
+#
+# The decisive correction: map-delivery is built from `map_delivery/` (its own
+# Dockerfile, CMD ["python","app.py"]) — app.py:35 defines /tour-by-code/<code>,
+# the route LEAD saw mislabelled MISSING. The LOCAL-694 run instead ran the
+# ROOT map_delivery_service.py (no /tour-by-code) via Dockerfile.cloudrun.
+#
+# Host ports remapped to 53xx so NOTHING collides with the running `audioura`
+# dev stack (5000-5030). DB: join the EXISTING dev DB network
+# (`development_default`) where postgres is reachable as `postgres-2` (storied's
+# default DB_HOST) — read-mostly; the harness only reads + sends empty-body
+# validation probes, never writes real rows.
+#
+# Each build sets GIT_SHA=${STORIED_SHA} so the image carries the stamp; the
+# bring-up script prints `git rev-parse` + the resolved build context per
+# container. Services storied's GCloud does NOT host (userDb, voice, generator,
+# tour_id_resolution, custom_audio) are intentionally absent → connection
+# refused, the exact GCloud condition.
+
+services:
+  tour-orchestrator:
+    build:
+      context: ${STORIED}
+      dockerfile: Dockerfile.cloudrun
+      args: {GIT_SHA: "${STORIED_SHA:-unset}"}
+    ports: ["5302:5002"]
+    volumes: ["${STORIED}/tours:/app/tours"]
+    environment:
+      - USER_STOPS_ENABLED=true
+    networks:
+      default:
+        aliases: [development-tour-orchestrator-1]
+      devdb: {}
+    command: python tour_orchestrator_service.py
+
+  tour-processor:
+    build:
+      context: ${STORIED}
+      dockerfile: Dockerfile.cloudrun
+      args: {GIT_SHA: "${STORIED_SHA:-unset}"}
+    ports: ["5301:5001"]
+    volumes: ["${STORIED}/tours:/app/tours"]
+    networks:
+      default:
+        aliases: [development-tour-processor-1, development-tour-update-1]
+      devdb: {}
+    command: python tour_generation_service.py
+
+  # DECISIVE FIX: build from map_delivery/ (its own Dockerfile → app.py), the
+  # GCloud map-delivery image. app.py hosts /tour-by-code/<code> (line 35).
+  map-delivery:
+    build:
+      context: ${STORIED}/map_delivery
+      dockerfile: Dockerfile
+      args: {GIT_SHA: "${STORIED_SHA:-unset}"}
+    ports: ["5305:5005"]
+    volumes: ["${STORIED}/tours:/app/tours"]
+    networks:
+      default:
+        aliases: [development-map-delivery-1]
+      devdb: {}
+
+  treats:
+    build:
+      context: ${STORIED}
+      dockerfile: Dockerfile.cloudrun
+      args: {GIT_SHA: "${STORIED_SHA:-unset}"}
+    ports: ["5307:5006"]
+    networks:
+      default:
+        aliases: [development-treats-1]
+      devdb: {}
+    command: python treats_service.py
+
+  news-orchestrator:
+    build:
+      context: ${STORIED}
+      dockerfile: Dockerfile.news-orchestrator
+      args: {GIT_SHA: "${STORIED_SHA:-unset}"}
+    ports: ["5312:5012"]
+    networks:
+      default:
+        aliases: [news-orchestrator-1]
+      devdb: {}
+
+  newsletter-processor:
+    build:
+      context: ${STORIED}
+      dockerfile: Dockerfile.newsletter-processor
+      args: {GIT_SHA: "${STORIED_SHA:-unset}"}
+    ports: ["5317:5017"]
+    networks:
+      default:
+        aliases: [newsletter-processor-1]
+      devdb: {}
+
+  tour-editing-phase2:
+    build:
+      context: ${STORIED}
+      dockerfile: Dockerfile.cloudrun
+      args: {GIT_SHA: "${STORIED_SHA:-unset}"}
+    ports: ["5322:5022"]
+    volumes: ["${STORIED}/tours:/app/tours"]
+    environment:
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID:-test}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY:-test}
+      - AWS_DEFAULT_REGION=us-east-1
+    networks:
+      default:
+        aliases: [tour-editing-phase2-1]
+      devdb: {}
+    command: python tour_editing_phase2.py
+
+  translation-service:
+    build:
+      context: ${STORIED}/translation-service
+      dockerfile: Dockerfile
+      args: {GIT_SHA: "${STORIED_SHA:-unset}"}
+    ports: ["5330:5030"]
+    environment:
+      - AWS_ACCESS_KEY_ID=test
+      - AWS_SECRET_ACCESS_KEY=test
+      - AWS_DEFAULT_REGION=us-east-1
+    networks:
+      default:
+        aliases: [translation-service-1]
+      devdb: {}
+
+networks:
+  default:
+  devdb:
+    external: true
+    name: development_default
