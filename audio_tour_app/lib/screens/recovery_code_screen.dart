@@ -79,20 +79,26 @@ class _RecoveryCodeScreenState extends State<RecoveryCodeScreen> {
         _snack('No user id yet — open the app fully first.', Colors.red);
         return;
       }
-      final resp = await Endpoints.post(
+      // LOCAL-705 (D661): route through the storied-compat helper so a server
+      // that does not offer recovery codes (Storied/Stable — a route-missing
+      // 404 or the whole service absent) shows the "Preview only" line instead
+      // of a raw "(404)" / exception. A present route behaves exactly as before.
+      final resp = await Endpoints.postOrFeatureUnavailable(
         Service.orchestrator,
         '/recovery-code/generate',
         body: {'user_id': userId},
         timeout: const Duration(seconds: 15),
       );
       if (resp.statusCode == 201) {
-        final body = jsonDecode(resp.body) as Map<String, dynamic>;
+        final body = Endpoints.tryDecodeMap(resp.body) ?? const {};
         setState(() {
           _code = formatRecoveryCodeForDisplay(body['code']?.toString());
         });
       } else {
         _snack('Could not create a recovery code (${resp.statusCode}).', Colors.red);
       }
+    } on FeatureUnavailableException catch (e) {
+      _snack(e.message, Colors.red);
     } catch (e) {
       _snack('Could not create a recovery code: $e', Colors.red);
     } finally {
@@ -125,7 +131,10 @@ class _RecoveryCodeScreenState extends State<RecoveryCodeScreen> {
         _setRestoreMessage('No user id yet — open the app fully first.', Colors.red);
         return;
       }
-      final resp = await Endpoints.post(
+      // LOCAL-705 (D661): helper-routed — a Storied server without the restore
+      // route (route-missing 404 / absent service) shows "Preview only" rather
+      // than a raw status/exception. Present-route handling is unchanged.
+      final resp = await Endpoints.postOrFeatureUnavailable(
         Service.orchestrator,
         '/recovery-code/restore',
         body: {
@@ -164,6 +173,8 @@ class _RecoveryCodeScreenState extends State<RecoveryCodeScreen> {
       } else {
         _setRestoreMessage('Could not restore (${resp.statusCode}).', Colors.red);
       }
+    } on FeatureUnavailableException catch (e) {
+      _setRestoreMessage(e.message, Colors.red);
     } catch (e) {
       _setRestoreMessage('Could not restore: $e', Colors.red);
     } finally {

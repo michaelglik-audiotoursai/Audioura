@@ -1,0 +1,54 @@
+# LOCAL-705 (D661) — storied-compat allow-list.
+#
+# Every lib/ file that makes a RAW server call (http.get/post/put/delete or
+# Endpoints.get/post/put/delete, i.e. NOT the *OrFeatureUnavailable helpers)
+# must appear here with a one-line reason, OR the call must be routed through a
+# helper. storied_compat_guard_test.dart enforces this and also fails on a
+# STALE entry (a file that no longer has a raw call), so this list stays honest.
+#
+# A reason answers: "why does this raw call NOT crash the app on a Storied
+# (Stable) backend that may lack the route or the whole service?" The two
+# acceptable shapes are:
+#   • CORE  — the endpoint IS hosted by Storied (map/search/download/generate/
+#             status/rating/translate/share/sync); the call is still wrapped so
+#             a transient error degrades, but the feature is expected to work.
+#   • SAFE  — the method wraps the call in try/catch and returns a safe default
+#             (null / [] / false / an error-result object / an empty state) on
+#             ANY non-2xx or transport error, so a missing route or absent
+#             service shows an empty state, never a crash.
+# Format:  <path relative to lib/> | <reason>
+
+# ─── CORE flows (hosted by Storied; wrapped against transient failure) ────────
+screens/home_screen.dart | CORE map/tours-near/search/share-code/download/resolve + Nominatim geocode; every call in try/catch, decode only on 200.
+screens/tour_generator_screen.dart | CORE generate/status/download + news; non-200 handled as a structured refusal, decode guarded by try/catch.
+services/background_service.dart | CORE /status + /download polling for a backgrounded generate; wrapped in try/catch, acts only on 200.
+services/background_tour_monitor.dart | CORE /status + /download polling; try/catch, acts only on 200.
+services/tour_translation_helper.dart | CORE download of a translated tour + translate POST; try/catch, 200-gated.
+services/tour_rating_service.dart | CORE POST/GET /tour/<id>/rating; typed catches (Socket/Timeout/Client) -> null, outbox-queued offline.
+services/tour_status_service.dart | CORE PUT /user + POST /tour-status tracking; try/catch -> void/'' on any failure.
+services/translation_service.dart | CORE POST /translate-with-audio; try/catch -> {status:error,message} map, never throws to the UI.
+services/outbox_service.dart | CORE POST /sync of queued events; typed catches -> null (keep + backoff), 4xx/5xx kept not lost.
+services/tour_share_service.dart | SAFE explicit handler — Endpoints.post then isRouteMissing(status,body); route-missing/absent -> Preview message (tested storied_compat_services_test.dart).
+
+# ─── Feature services that degrade to a safe default on Storied ───────────────
+services/communities_service.dart | SAFE every method try/catch -> null/[]/false; tested communities_service_test.dart + storied_compat_services_test.dart (404/refused).
+services/community_tour_service.dart | SAFE try/catch -> []/null; the Generate selector hides and the community page shows its empty state (tested community_tour_test.dart).
+services/iap_service.dart | SAFE every /purchases/* call try/catch -> IapResult.failed/unavailable; a missing route never crashes the buy flow.
+services/entitlements_service.dart | SAFE try/catch -> Entitlements.unknown/null/false/ClaimResult(ok:false); userDb absent on Storied is handled.
+services/tour_pricing_service.dart | SAFE try/catch -> free/unlocked defaults (0 sales, [] tiers); a network/route failure never locks a tour.
+services/tour_reviews_service.dart | SAFE try/catch (typed + catch-all) -> []/empty-distribution/null; UI shows "no reviews yet".
+services/custom_audio_service.dart | SAFE try/catch -> {success:false,...}/[]/{}; a missing custom-audio service shows an error result, not a crash.
+services/document_acceptance_service.dart | SAFE try/catch -> false/[]; a missing route is treated as "not accepted / none".
+services/score_explanation_service.dart | SAFE try/catch -> null/RescoreResult; the screen shows "not available yet".
+services/tour_editing_service.dart | SAFE try/catch -> {success:false,...}; a missing tour-editing service surfaces as a handled error, not a crash.
+services/subscription_service.dart | SAFE try/catch -> error map/false; newsletter credential submit degrades without crashing.
+services/voice_control_service.dart | SAFE try/catch, acts only on 200; a missing voice service simply does nothing (logs only).
+services/navigation_service.dart | SAFE try/catch -> ServiceLookupResult(error); a missing nearby-services route shows "couldn't look up".
+services/api_tester.dart | SAFE diagnostics-only; each probe wrapped in its own try/catch and logs the error, never throws.
+screens/treats_screen.dart | SAFE try/catch, decode only on 200; a missing treats service leaves the list empty (isLoading cleared).
+screens/my_tours_screen.dart | SAFE voice-search POST in try/catch; a missing voice service falls back to plain text search.
+screens/about_screen.dart | SAFE diagnostics (health/user) + delete-account, each in try/catch; a missing route shows a status line, never a crash.
+
+# ─── Dead code (not reachable; cannot run, cannot crash) ──────────────────────
+services/tour_service.dart | DEAD unreferenced except by widgets/map_page.dart, which is never instantiated; references an undefined ApiConfig, so it is never compiled onto a live path.
+services/map_service.dart | DEAD no importers; hardcodes the Docker-internal host http://map_delivery:5005 and is not wired into the app.
