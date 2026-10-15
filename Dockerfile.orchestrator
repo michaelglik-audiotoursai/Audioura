@@ -30,6 +30,7 @@ COPY tour_rating_service.py /app/
 COPY tour_reviews_service.py /app/
 COPY tour_pricing_service.py /app/
 COPY recovery_code_service.py /app/
+COPY community_tours_service.py /app/
 COPY price_tiers.py /app/
 COPY tour_scoring_service.py /app/
 # [LOCAL-602] tour_scoring_service imports tour_evaluator, which imports
