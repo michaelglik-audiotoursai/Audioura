@@ -1174,11 +1174,12 @@ class _MyToursScreenState extends State<MyToursScreen> {
   
   Future<void> _deleteTour(int index) async {
     final tour = _tours[index];
-    // [LOCAL-693 / D660] A PAID tour on the phone is the listener's forever, but
-    // every download is a purchase: deleting it means buying again to get it
-    // back. The prompt uses the SAME warning sentence the Buy dialog showed for
-    // a paid tour, and the plain confirmation for a free one. Pure decision in
-    // DeleteTourPrompt (unit-tested); paid detected from saved metadata.
+    // [LOCAL-693 / D660 + LOCAL-693B / D660 addendum] A PAID tour on the phone is
+    // the listener's forever, but every download is a purchase: deleting it means
+    // buying again to get it back. No warning at purchase; the one calm
+    // confirmation lives HERE. A paid tour shows "Delete paid tour?" with the
+    // D660-addendum sentence; a free tour shows the plain confirmation. Pure
+    // decision in DeleteTourPrompt (unit-tested); paid from saved metadata.
     final prompt = DeleteTourPrompt.decide(
       tourTitle: (tour['title'] ?? 'this tour').toString(),
       isPaid: DeleteTourPrompt.isPaidTour(tour),
@@ -1189,13 +1190,15 @@ class _MyToursScreenState extends State<MyToursScreen> {
         title: Text(prompt.title),
         content: Text(prompt.body),
         actions: [
+          // Cancel is the default (listed first, no destructive styling).
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
+            child: Text(prompt.cancelLabel),
           ),
           TextButton(
             onPressed: () => Navigator.pop(context, true),
-            child: const Text('Delete', style: TextStyle(color: Colors.red)),
+            child: Text(prompt.confirmLabel,
+                style: const TextStyle(color: Colors.red)),
           ),
         ],
       ),

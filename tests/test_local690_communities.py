@@ -51,6 +51,28 @@ from db_connection import get_connection, get_database_url  # noqa: E402
 TEST_PREFIX = "TEST-690-"
 
 
+@pytest.fixture(scope="module", autouse=True)
+def _isolate_entitlements_env():
+    """[LOCAL-693B] Own this module's entitlements env and restore it afterwards.
+    Other modules (595/604/596) set GATEWAY_API_KEY / IAP_VERIFY_MODE at import
+    and never restore them; with those set, our fresh entitlements import would
+    require an X-API-Key and 401 our calls. Force the vars we need, then restore
+    exactly what was there so we poison no one else."""
+    keys = ("GATEWAY_API_KEY", "IAP_VERIFY_MODE", "ALLOW_UNAUTHENTICATED_ENTITLEMENTS")
+    saved = {k: os.environ.get(k) for k in keys}
+    os.environ["GATEWAY_API_KEY"] = ""
+    os.environ["IAP_VERIFY_MODE"] = "stub"
+    os.environ["ALLOW_UNAUTHENTICATED_ENTITLEMENTS"] = "true"
+    try:
+        yield
+    finally:
+        for k, v in saved.items():
+            if v is None:
+                os.environ.pop(k, None)
+            else:
+                os.environ[k] = v
+
+
 def _load_module(name, rel_path):
     path = os.path.join(os.path.dirname(os.path.dirname(__file__)), rel_path)
     spec = importlib.util.spec_from_file_location(name, path)
@@ -61,13 +83,17 @@ def _load_module(name, rel_path):
 
 
 @pytest.fixture(scope="module")
-def modules():
+def modules(_isolate_entitlements_env):
     os.environ["DATABASE_URL"] = get_database_url()
     ut_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "user-tracking")
     sys.path.insert(0, ut_dir)
     rss = _load_module("communities_rss", "user-tracking/communities_rss.py")
     ca = _load_module("communities_api", "user-tracking/communities_api.py")
     ea = _load_module("entitlements_api_690", "user-tracking/entitlements_api.py")
+    # [LOCAL-693B] Pin the import-time-cached auth/verify knobs to this module's
+    # intent so a stale import order cannot leave auth required or 'apple' mode.
+    ea.API_KEY = ""
+    ea.IAP_VERIFY_MODE = "stub"
     return {"rss": rss, "ca": ca, "ea": ea}
 
 

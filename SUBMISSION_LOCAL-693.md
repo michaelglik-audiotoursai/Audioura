@@ -107,3 +107,70 @@ New 693 coverage: buy → download OK → confirm → 2nd download 402 → rebuy
 ## Not done / out of scope
 - Full Docker-container live run was deliberately **not** performed: `map_delivery/app.py` hard-codes `host="postgres-2"` (the shared container network), and the ticket forbids touching the `audioura-*` project/containers. The in-process run exercises the identical service code and the real dev Postgres, which is the faithful, safe equivalent.
 - Real Apple/Google store verification stays in stub mode locally (unchanged, D652).
+
+---
+
+# 693B — D660 addendum: calm wording; server-side consumption; test isolation
+
+**Decision:** D660 addendum (Michael, 2026-10-14): *a bought tour is like a bought bag — no warning at purchase.* Plus a LEAD review of 693: *consumption must be decided by the SERVER, not the app.*
+
+## What changed and why
+
+### 1. No warning at purchase time
+Removed the Buy-dialog line *"Downloads to this phone. Deleting it or changing phones means buying again."* from `home_screen.dart`. There is no longer any purchase-time warning (grepped the app for the sentence and the only live use was this one; the rest was in `DeleteTourPrompt`, handled below).
+
+### 2. Delete confirmation moved to a calm voice (paid only)
+`DeleteTourPrompt` now returns the exact D660-addendum copy for a **paid** tour:
+- title **"Delete paid tour?"**
+- body **"Are you sure you want to delete this paid tour? Downloading it again will require another purchase."**
+- buttons **"Cancel"** (default, listed first) and **"Delete"**.
+
+The withdrawn LEAD wording ("Delete and lose it?", "changing phones") is gone. **Free** tours are unchanged: plain "Delete Tour", no warning. `my_tours_screen.dart` renders the dialog from the model's `cancelLabel`/`confirmLabel`.
+
+### 3. Legal drafts — calm, plus the recovery code
+Grepped the whole `legal/` folder for `re-?download` / alarm wording and fixed every hit:
+- **TERMS §2** rewritten to state the one-download rule plainly, once, without alarm, and adds: *"If you lose or replace your phone, you can restore your Listen page … with your recovery code, without paying again."* (recovery code = LOCAL-695.)
+- **REFUNDS** — adds the same recovery-code sentence to "What a purchase gives you".
+- **GUIDE_TERMS §1** — softened ("Downloading the tour again later is a new purchase." replaces "buys again if they delete it or move to a new phone").
+- **PRIVACY** — already factual; version bumped with the set.
+
+All four bumped to `2026-10-14-draft3 (LOCAL-693B / D660 addendum)`; `legal/html` regenerated via `legal/build_html.py` (recovery-code wording verified present in `terms.html` and `refunds.html`).
+
+### 4. Server-side consumption (LEAD review) — the core fix
+**Problem (693):** a purchase was consumed only when the app called `POST /tour/<id>/download-complete`. A modified app, or a direct API call (the gateway key ships inside the app), could simply never call it and download forever.
+
+**Fix (693B):**
+- **map-delivery decides consumption.** `download_tour`'s streaming generator stamps the oldest unconsumed unlock `consumed_at = NOW()` **only after yielding the LAST byte** of the zip (`_consume_unlock_after_stream`, own short-lived connection). A client disconnect raises `GeneratorExit` inside the generator *before* that point, which is caught and re-raised **without** consuming — a cut-off download never spends the purchase (D660), decided by the server, not the app.
+- **`POST /tour/<id>/download-complete` is replaced by `POST /tour/<id>/download-failed`.** The app no longer confirms success; it reports **failure** (bytes received, but save/validate failed). `_restore_unlock` restores the just-consumed purchase **exactly once** (`restored_at`), **only within 24h** of consumption:
+  - restore → **200** `{restored:true, remaining_unconsumed}`;
+  - second report for the same purchase (already restored) → **409** `already_restored`;
+  - report past 24h → **409** `window_expired`;
+  - nothing consumed → **409** `not_consumed`.
+- **Migration 032** (`032_tour_unlock_restore.sql`) adds `tour_unlocks.restored_at` (additive, idempotent); the service self-heals the column via `_ensure_unlock_consumption_columns`.
+- **App:** `_confirmDownloadComplete` → `_reportDownloadFailed(tourId, consumesHeader, reason)`, wired at all four download call sites (main, silent, single-English, translation) to fire **only** when the bytes arrived (HTTP 200) but the zip could not be saved/validated, keyed off the `X-Download-Consumes-Unlock` response header. Build bumped `2.4.17+52`.
+
+### 5. Test isolation
+**Problem:** `test_local693` passed alone but 5 tests 401'd under `pytest tests -k "677 or 686 or 690 or 691 or 693"`. Root cause: `test_local595_api` / `604` / `596` set `GATEWAY_API_KEY` (and `IAP_VERIFY_MODE`) **unconditionally at import time** and never restore them; the entitlements / document-acceptance modules cache `API_KEY = os.getenv('GATEWAY_API_KEY')` at import, so the `setdefault`-based 677/690/691/693 inherited a non-empty key → auth required → 401.
+
+**Fix:** each of 677 / 690 / 691 / 693 now **owns and restores its own env** via an autouse module-scoped fixture `_isolate_entitlements_env` (saves, forces `GATEWAY_API_KEY=''`, `IAP_VERIFY_MODE='stub'`, `ALLOW_UNAUTHENTICATED_ENTITLEMENTS='true'`, restores on teardown). Each module's loader also pins the cached `API_KEY=''` / `IAP_VERIFY_MODE='stub'` on the freshly-imported module. No change to the offending 595/604/596 modules (out of scope).
+
+## Tests (all green)
+- **Combined** `pytest tests -k "677 or 686 or 690 or 691 or 693"` → **80 passed, 0 failed, 18 skipped** (was 37 failed before isolation fix).
+- **`test_local693` alone** → **10 passed**, including the LEAD cases:
+  - full stream **consumes** (buy → download → second 402 → rebuy);
+  - **cut-off stream** (generator closed before last byte) → **does NOT consume**, retries free, then a full download consumes;
+  - **download-failed** restores once (200) → second report **409** → past-24h **409** → no-consumption **409**;
+  - two languages consumed independently; grandfathered + curator never consume; unlock-state counts; verified stays verified.
+  - `_make_tour_zip` uses `ZIP_STORED` with enlarged payloads so the zip spans multiple 8KB chunks and the cut-off genuinely exercises the `GeneratorExit` path.
+- **Dart** `flutter test test/delete_tour_prompt_test.dart` → **6 passed**: paid exact title/body/buttons, free skips the warning, `isPaidTour` detection.
+- `python3 -m py_compile map_delivery/app.py` OK; `flutter analyze` on the 4 changed Dart files → **0 errors** (only pre-existing lint info/warnings outside the changed lines).
+
+## Commits (693B, on `LOCAL-693-paid-per-download`)
+1. app — remove Buy-dialog warning; delete confirmation to exact D660-addendum copy; build bump
+2. legal — calm wording + recovery-code sentence (TERMS/REFUNDS/GUIDE_TERMS/PRIVACY → draft3); regenerate `legal/html`
+3. server — migration 032 `restored_at`; map-delivery consumes server-side at last byte; replace `download-complete` with `download-failed` (restore-once / 24h / 409); app reports failure
+4. tests — rewrite 693 for server-side consumption + cut-off + restore; env isolation across 677/690/691/693
+
+## Not done / out of scope
+- Same as 693: no full Docker-container live run (`map_delivery/app.py` hard-codes `host="postgres-2"`; the ticket forbids touching `audioura-*` containers). The in-process clients exercise the identical service code against the real dev Postgres.
+- The recovery-code restore flow itself (entering a code on a new phone) is **LOCAL-695**; 693B only adds the Terms/Refunds sentence that promises it.

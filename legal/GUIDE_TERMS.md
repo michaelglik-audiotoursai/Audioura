@@ -2,14 +2,14 @@
 
 **DRAFT for review. Not published. Audioura LLC must approve (and may have a lawyer review) before this goes live.**
 
-**Version:** 2026-10-14-draft2 (LOCAL-693 / D660)
+**Version:** 2026-10-14-draft3 (LOCAL-693B / D660 addendum)
 **Last updated:** 14 October 2026
 Audioura LLC · 44 Sharpe Rd, Newton Centre, MA 02459, USA · info@audioura.com
 
 These Guide Terms apply when you price and sell an audio tour on Audioura. They are in addition to the general [Terms of Service](/terms). By pricing a tour, you accept these Guide Terms.
 
 ## 1. Pricing
-You set a price for your tour from Audioura's **price ladder** (a fixed set of allowed prices). You pick a price point; you do not enter an arbitrary amount. Listeners buy your tour **per language** — each translation is sold separately. Each purchase pays for **one download** of your tour: a listener who buys can download it once to their device and then play it offline forever, and buys again if they delete it or move to a new phone.
+You set a price for your tour from Audioura's **price ladder** (a fixed set of allowed prices). You pick a price point; you do not enter an arbitrary amount. Listeners buy your tour **per language** — each translation is sold separately. Each purchase pays for **one download** of your tour: a listener who buys downloads it to their device and then plays it offline, as often as they like, forever. Downloading the tour again later is a new purchase.
 
 ## 2. Evaluation and content rating
 Every tour on Audioura is evaluated automatically before and while it is listed:

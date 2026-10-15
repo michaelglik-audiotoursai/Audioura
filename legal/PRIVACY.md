@@ -2,7 +2,7 @@
 
 **DRAFT for review. Not published. Audioura LLC must approve (and may have a lawyer review) before this goes live.**
 
-**Version:** 2026-10-14-draft2 (LOCAL-693 / D660)
+**Version:** 2026-10-14-draft3 (LOCAL-693B / D660 addendum)
 **Last updated:** 14 October 2026
 **Who we are:** Audioura LLC, 44 Sharpe Rd, Newton Centre, MA 02459, USA · info@audioura.com
 

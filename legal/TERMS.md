@@ -2,7 +2,7 @@
 
 **DRAFT for review. Not published. Audioura LLC must approve (and may have a lawyer review) before this goes live.**
 
-**Version:** 2026-10-14-draft2 (LOCAL-693 / D660)
+**Version:** 2026-10-14-draft3 (LOCAL-693B / D660 addendum)
 **Last updated:** 14 October 2026
 **Who we are:** Audioura LLC, 44 Sharpe Rd, Newton Centre, MA 02459, USA · info@audioura.com
 
@@ -17,8 +17,9 @@ You use Audioura from a device. We identify your device with a private, random I
 Audioura sells individual audio tours and community passes. When you buy a tour:
 
 - You buy **one tour in one language**. A translation of the same tour into another language is a separate purchase.
-- Each purchase lets you **download the tour once, to this device**. Once it is on your device it is **yours to keep** — you can play it offline as many times as you like, forever, at no further charge.
-- Because each purchase is one download, **deleting the tour, moving to a new phone, or reinstalling means buying it again** to download it again. An app update installs in place and does not lose a tour you already have.
+- Each purchase lets you **download the tour once, to your device**. Once it is on your device it is **yours to keep** — you can play it offline as many times as you like, forever, at no further charge.
+- Each purchase pays for one download, so downloading a tour again later is a new purchase. An app update installs in place and does not lose a tour you already have.
+- If you lose or replace your phone, you can restore your Listen page — the paid tours, free tours and news you had — on the new phone with your recovery code, without paying again.
 - A download that **fails or is interrupted does not use up your purchase** — you can try the download again at no extra charge until it completes.
 - Stop 1 is a free preview. Buying unlocks the download of the rest of the tour.
 - You **pay before you download** the full tour.
