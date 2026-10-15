@@ -70,8 +70,11 @@ class TestArtistLifeResearch(unittest.TestCase):
         captured = {}
 
         def _answer(prompt, model, max_tokens=900):
-            captured['prompt'] = prompt
-            captured['model'] = model
+            # The ladder issues the main extractor first, then (optionally) a
+            # second-story extractor. Capture the FIRST (main) prompt only.
+            if 'prompt' not in captured:
+                captured['prompt'] = prompt
+                captured['model'] = model
             return {'text': 'Nguyễn Gia Trí studied in Hanoi in 1936 [1]. '
                             'He devoted twenty years to the work [2].', 'error': ''}
 
@@ -173,6 +176,98 @@ class TestVietnameseNameAid(unittest.TestCase):
             self.assertTrue(vn.LEXICON[key].say)
         self.assertEqual(vn.canonical_name('Nguyen Gia Tri'), 'Nguy\u1ec5n Gia Tr\u00ed')
         self.assertEqual(vn.canonical_name('Bui Xuan Phai'), 'B\u00f9i Xu\u00e2n Ph\u00e1i')
+
+
+class TestStoryLadder(unittest.TestCase):
+    """[LOCAL-692B] The story-source ladder: keep searching down the rungs until
+    an emotionally-charged story is found; cap the extra search; log the rung;
+    add a distinct second story without lengthening the first."""
+
+    def _serp(self, record=None):
+        def _s(q):
+            if record is not None:
+                record.append(q)
+            return [{'title': 't',
+                     'url': f'https://example-art.com/{abs(hash(q)) % 99999}',
+                     'snippet': 's'}]
+        return _s
+
+    def test_charged_story_on_first_rung_spends_no_extra(self):
+        def _answer(prompt, model, max_tokens=700):
+            if 'ONE MORE short' in prompt:
+                return {'text': 'NO SECOND STORY', 'error': ''}
+            return {'text': 'Nguyễn Gia Trí refused the commission and fled '
+                            'into exile in 1954 [1].', 'error': ''}
+        out = al.artist_life_research(
+            MUSEUM_PROMPT, serp=self._serp(), fetch=lambda u: 'refused fled exile ' * 20,
+            answer=_answer, wiki=lambda n, c: [])
+        self.assertEqual(out['rung'], 'exhibit')
+        self.assertEqual(out['extra_queries'], 0)
+        self.assertIn('exile', out['text'])
+
+    def test_keeps_searching_and_caps_extra_queries(self):
+        # No charged story anywhere → the ladder descends all rungs but the
+        # EXTRA queries (museum + culture) never exceed the cap.
+        def _answer(prompt, model, max_tokens=700):
+            if 'ONE MORE short' in prompt:
+                return {'text': 'NO SECOND STORY', 'error': ''}
+            return {'text': 'He painted calmly for many years [1].', 'error': ''}
+        out = al.artist_life_research(
+            MUSEUM_PROMPT, serp=self._serp(), fetch=lambda u: 'calm studio years ' * 20,
+            answer=_answer, wiki=lambda n, c: [])
+        self.assertLessEqual(out['extra_queries'], al.MAX_EXTRA_QUERIES)
+        self.assertGreater(out['extra_queries'], 0)  # it did keep searching
+
+    def test_rung_logged_when_charge_appears_only_later(self):
+        state = {'n': 0}
+
+        def _answer(prompt, model, max_tokens=700):
+            if 'ONE MORE short' in prompt:
+                return {'text': 'NO SECOND STORY', 'error': ''}
+            state['n'] += 1
+            if state['n'] >= 3:
+                return {'text': 'The museum was looted during the war [1].',
+                        'error': ''}
+            return {'text': 'A calm overview of the work [1].', 'error': ''}
+        out = al.artist_life_research(
+            MUSEUM_PROMPT, serp=self._serp(), fetch=lambda u: 'content ' * 20,
+            answer=_answer, wiki=lambda n, c: [])
+        self.assertIn(out['rung'], ('museum', 'culture'))
+        self.assertGreater(out['extra_queries'], 0)
+
+    def test_distinct_second_story_added_not_padded(self):
+        def _answer(prompt, model, max_tokens=700):
+            if 'ONE MORE short' in prompt:
+                return {'text': 'His friend Nguyễn Sáng was imprisoned during '
+                                'the war [1].', 'error': ''}
+            return {'text': 'Nguyễn Gia Trí refused the commission and fled '
+                            'into exile in 1954 [1].', 'error': ''}
+        out = al.artist_life_research(
+            MUSEUM_PROMPT, serp=self._serp(), fetch=lambda u: 'refused fled exile war imprisoned ' * 10,
+            answer=_answer, wiki=lambda n, c: [])
+        self.assertTrue(out['second_story'])
+        self.assertIn('imprisoned', out['second_story'])
+        # The first story is NOT lengthened by the second — they are separate.
+        self.assertNotIn('imprisoned', out['text'])
+
+    def test_near_duplicate_second_story_rejected(self):
+        def _answer(prompt, model, max_tokens=700):
+            charged = ('Nguyễn Gia Trí refused the commission and fled into '
+                       'exile in 1954 [1].')
+            # The "second story" is the SAME sentence → must be rejected.
+            return {'text': charged, 'error': ''}
+        out = al.artist_life_research(
+            MUSEUM_PROMPT, serp=self._serp(), fetch=lambda u: 'refused fled exile ' * 20,
+            answer=_answer, wiki=lambda n, c: [])
+        self.assertEqual(out['second_story'], '')
+
+    def test_charge_detector(self):
+        self.assertTrue(al._is_emotionally_charged(
+            'He refused the commission and fled into exile.'))
+        self.assertTrue(al._is_emotionally_charged(
+            'The studio burned and the work was lost.'))
+        self.assertFalse(al._is_emotionally_charged(
+            'He painted landscapes in a calm style for many years.'))
 
 
 class TestRouterGating(unittest.TestCase):

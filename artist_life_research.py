@@ -97,6 +97,54 @@ WIKI_MARK = ('[WIKIPEDIA — FACT-CHECK ONLY: use ONLY to verify dates and the '
              'spelling of names; do NOT take the story or any narrative from '
              'this source]')
 
+# ── [LOCAL-692B / D659 addendum] THE STORY-SOURCE LADDER ──────────────────────
+# Michael corrected LOCAL-692: do not "say so briefly" when nothing human is
+# found. Instead KEEP SEARCHING down a ladder of story sources until an
+# emotionally-charged story — a decision, a loss, a conflict, a surprise — is
+# found, then write the stop. The rungs for a museum stop, highest-signal first:
+#
+#     1. exhibit  — the EXHIBIT'S OWN story (the work: commission, acquisition,
+#                   what was shown instead, controversy, theft, destruction).
+#     2. artist   — the ARTIST'S life (where they learned, a turning point, why).
+#     3. museum   — the MUSEUM'S own story (its founding, a famous episode).
+#     4. culture  — the CULTURE/COUNTRY story the work belongs to.
+#
+# We walk DOWN the rungs, adding queries (and other languages), until the
+# extractor returns a story the charge-detector judges emotionally charged, OR
+# the EXTRA-QUERY CAP (MAX_EXTRA_QUERIES beyond the first rung's base queries)
+# is reached. The rung the story came from is returned as out['rung'] and logged.
+MAX_EXTRA_QUERIES = int(os.environ.get('ARTIST_LIFE_MAX_EXTRA_QUERIES', '6'))
+
+# Words that signal an emotionally-charged story: a DECISION, a LOSS, a CONFLICT,
+# or a SURPRISE (Michael's four). Deterministic, multilingual-friendly (English
+# + a few Vietnamese tokens, since local-language pages are read). If the
+# extracted story contains one of these in a sourced sentence, the ladder stops.
+_CHARGE_WORDS = re.compile(
+    r"(?i)\b("
+    # decision / defiance
+    r"decided|refused|chose|vowed|insisted|defied|rejected|abandoned|"
+    r"gave up|turned down|resolved|secretly|"
+    # loss / death / hardship
+    r"died|death|lost|destroyed|burned|burnt|grief|mourning|exile|exiled|"
+    r"fled|imprisoned|arrested|war|wounded|poverty|starv|illness|widow|orphan|"
+    # conflict
+    r"banned|censored|accused|betrayed|rival|quarrel|dispute|conflict|"
+    r"persecut|forbidden|clash|"
+    # surprise / reversal
+    r"surprise|unexpected|discovered|hidden|turned out|only later|against all|"
+    r"miracle|rediscovered|forgotten|"
+    # Vietnamese tokens for the same (local-language pages)
+    r"quyết định|từ chối|chiến tranh|lưu vong|qua đời|mất|bị bắt"
+    r")\b")
+
+
+def _is_emotionally_charged(text: str) -> bool:
+    """True when the extracted story carries at least one marker of a decision,
+    a loss, a conflict, or a surprise (Michael's four). Pure/deterministic."""
+    if not text or len(text.strip()) < 40:
+        return False
+    return bool(_CHARGE_WORDS.search(text))
+
 
 def _blank() -> Dict:
     return {'text': '', 'sources': [], 'supports': [], 'queries': [], 'error': ''}
@@ -181,6 +229,58 @@ def _work_queries(prompt: str, max_q: int = MAX_WORK_QUERIES) -> List[str]:
         return _sr.derive_queries(prompt, max_queries=max_q)
     except Exception:
         return []
+
+
+# ── [LOCAL-692B] rung query builders: exhibit / museum / culture-country ──────
+
+def _exhibit_story_queries(title: str, artist: str, local_code: str,
+                           max_q: int = 2) -> List[str]:
+    """RUNG 1 — the EXHIBIT'S OWN story: the work's commission, controversy,
+    theft, destruction, what was shown instead, how it was acquired. Charged
+    angles first (these are the ones that carry a decision/loss/conflict)."""
+    if not title:
+        return []
+    t = title.split('(')[0].strip()
+    out = [
+        f'"{t}" controversy OR destroyed OR refused OR scandal OR stolen',
+        f'"{t}" {artist} why painted OR commission OR story'.strip(),
+    ]
+    if local_code == 'vi':
+        out.append(f'"{t}" câu chuyện OR tranh cãi')  # story / controversy
+    return out[:max_q]
+
+
+def _museum_story_queries(venue: str, max_q: int = 2) -> List[str]:
+    """RUNG 3 — the MUSEUM'S own story: founding, a famous episode, a dramatic
+    moment in its history (wartime, a theft, a bequest)."""
+    v = (venue or '').split(',')[0].strip()
+    if not v:
+        return []
+    out = [
+        f'"{v}" history founded story OR war OR theft OR bequest',
+        f'"{v}" famous episode OR dramatic OR saved',
+    ]
+    return out[:max_q]
+
+
+def _culture_country_queries(ctx: dict, local_code: str, max_q: int = 2) -> List[str]:
+    """RUNG 4 — the CULTURE/COUNTRY story the work belongs to: the tradition,
+    the moment in the country's art history, the human stakes behind the form
+    (e.g. Vietnamese lacquer during the war). Last resort on the ladder."""
+    venue = (ctx.get('venue_name') or '')
+    medium = (ctx.get('medium') or ctx.get('canonical_title') or '')
+    country = ''
+    for tok in ('Vietnam', 'France', 'Italy', 'Japan', 'China', 'Spain',
+                'Boston', 'USA'):
+        if tok.lower() in (venue + ' ' + medium).lower():
+            country = tok
+            break
+    base = (medium.split('(')[0].strip() or 'art')
+    out = [
+        f'{country} {base} tradition history war struggle story'.strip(),
+        f'{country} artists {base} hardship OR exile OR revolution'.strip(),
+    ]
+    return out[:max_q]
 
 
 # ── 3. gather pages: artist-life web + work web, skipping junk ────────────────
@@ -329,66 +429,39 @@ def artist_life_research(prompt: str, model: str = None, resolve: bool = True,
                          fetch: Optional[Callable] = None,
                          answer: Optional[Callable] = None,
                          wiki: Optional[Callable] = None) -> Dict:
-    """Answer a museum per-stop story-lead question with ARTIST-LIFE research.
+    """Answer a museum per-stop story-lead question with ARTIST-LIFE research,
+    walking the STORY-SOURCE LADDER (LOCAL-692B / D659 addendum).
 
     Call-compatible with story_leads.gemini_with_sources / serper_research (same
-    positional params), returns the same shape. `model` names the EXTRACTOR model
-    (default gpt-4.1-mini, or ARTIST_LIFE_EXTRACTOR). Injectables are for tests.
-    Never raises; failures land in out['error'].
+    positional params), returns the same shape PLUS three extra keys:
+      out['rung']          which ladder rung the story came from
+                           ('exhibit' | 'artist' | 'museum' | 'culture' | '')
+      out['extra_queries'] how many EXTRA queries (beyond the first two rungs)
+                           the ladder walk spent (<= MAX_EXTRA_QUERIES)
+      out['second_story']  an optional short SECOND story (LOCAL-692B), '' if none
+
+    The ladder walks DOWN the rungs — exhibit's own story > artist > museum >
+    culture/country — re-running the extractor as sources accumulate, and STOPS
+    as soon as the extracted story is emotionally charged (a decision, a loss, a
+    conflict, a surprise), or when the extra-query cap is reached. `model` names
+    the EXTRACTOR model (default gpt-4.1-mini). Injectables are for tests. Never
+    raises; failures land in out['error'].
 
     When the stop has no attributable artist (unknown/anonymous), it falls back
     to the plain object research (serper_research) so the stop is still grounded.
     """
     out = _blank()
+    out['rung'] = ''
+    out['extra_queries'] = 0
+    out['second_story'] = ''
     extractor = model or EXTRACTOR_MODEL
     answer = answer or _answer
 
-    try:
-        ctx = _sr._parse_context(prompt)
-        artist = _full_artist(ctx)
-        venue = (ctx.get('venue_name') or '').strip()
-        # Local language from the venue/city string (vietnam -> 'vi').
-        local_code = _spr._local_lang_from_city(venue) or \
-            _spr._local_lang_from_city(prompt)
-
-        if _is_placeholder_artist(artist):
-            # No real person to research — defer to the object backend so the stop
-            # is still grounded (it will not invent an artist).
-            return _sr.serper_research(
-                prompt, model=model, resolve=resolve, timeout=timeout,
-                grounded=grounded, serp=serp, fetch=fetch, answer=answer)
-
-        life_q = _life_queries(artist, local_code)
-        work_q = _work_queries(prompt)
-
-        pages: List[Dict] = []
-        # 1. artist-life web pages (the STORY source) — majority of the budget.
-        life_budget = max(1, MAX_WEB_PAGES - MAX_WORK_QUERIES)
-        life_pages, used_life = gather_web(
-            life_q, life_budget, serp=serp, fetch=fetch, origin='artist_life')
-        pages.extend(life_pages)
-        out['queries'].extend(used_life)
-        # 2. work-story web pages — remaining budget.
-        work_pages, used_work = gather_web(
-            work_q, MAX_WEB_PAGES - len(pages), serp=serp, fetch=fetch,
-            origin='work_story')
-        pages.extend(work_pages)
-        out['queries'].extend(used_work)
-        # 3. Wikipedia, fact-check only (free).
-        wiki_pages = gather_wikipedia_factcheck(artist, local_code, wiki=wiki)
-        pages.extend(wiki_pages)
-
-        # De-duplicated source list, order preserved.
-        seen = set()
-        for p in pages:
-            if p['url'] and p['url'] not in seen:
-                seen.add(p['url'])
-                out['sources'].append({'domain': p['domain'], 'url': p['url']})
-
+    def _extract(pages: List[Dict]) -> Dict:
+        """Run the extractor over the accumulated pages; return {text, supports,
+        error}. Keeps the fact-check / person-first prompt."""
         if not pages:
-            out['error'] = 'no pages gathered'
-            return out
-
+            return {'text': '', 'supports': [], 'error': 'no pages gathered'}
         sources_block = '\n\n'.join(
             f"[{i + 1}] {p.get('title', '')} ({p['domain']})\n{p['text']}"
             for i, p in enumerate(pages))
@@ -396,19 +469,179 @@ def artist_life_research(prompt: str, model: str = None, resolve: bool = True,
             prompt=prompt, sources=sources_block,
             wiki_mark_short='WIKIPEDIA — FACT-CHECK ONLY'), extractor)
         if ans.get('error'):
-            out['error'] = ans['error']
-            return out
+            return {'text': '', 'supports': [], 'error': ans['error']}
         text = (ans.get('text') or '').strip()
         if _sr._NO_MATERIAL.lower() in text.lower() \
                 and len(text) < len(_sr._NO_MATERIAL) + 10:
-            out['text'] = ''
-            return out
-        out['text'] = _sr._strip_cites(text)
-        out['supports'] = _attribute_with_wiki(text, pages)
+            return {'text': '', 'supports': [], 'error': ''}
+        return {'text': text, 'supports': _attribute_with_wiki(text, pages),
+                'error': ''}
+
+    try:
+        ctx = _sr._parse_context(prompt)
+        artist = _full_artist(ctx)
+        venue = (ctx.get('venue_name') or '').strip()
+        title = (ctx.get('canonical_title') or '').strip()
+        # Local language from the venue/city string (vietnam -> 'vi').
+        local_code = _spr._local_lang_from_city(venue) or \
+            _spr._local_lang_from_city(prompt)
+
+        if _is_placeholder_artist(artist):
+            # No real person to research — defer to the object backend so the stop
+            # is still grounded (it will not invent an artist). Only the exhibit
+            # rung is meaningful; mark it so the caller can log.
+            res = _sr.serper_research(
+                prompt, model=model, resolve=resolve, timeout=timeout,
+                grounded=grounded, serp=serp, fetch=fetch, answer=answer)
+            if isinstance(res, dict):
+                res.setdefault('rung', 'exhibit')
+                res.setdefault('extra_queries', 0)
+                res.setdefault('second_story', '')
+            return res
+
+        # Wikipedia (free, fact-check only) is gathered ONCE up front and kept in
+        # the corpus on every rung — it only verifies dates/names, never the story.
+        wiki_pages = gather_wikipedia_factcheck(artist, local_code, wiki=wiki)
+
+        # ── the ladder: (rung name, query list, is_base) ─────────────────────
+        # The first two rungs (exhibit + artist) are the BASE search — the normal
+        # LOCAL-692 research. Rungs 3-4 (museum, culture) are the EXTRA search
+        # Michael asked for: we only descend to them when nothing charged has
+        # been found yet, and every query they issue counts toward the cap.
+        rungs = [
+            ('exhibit', _exhibit_story_queries(title, artist, local_code)
+                        + _work_queries(prompt), True),
+            ('artist', _life_queries(artist, local_code), True),
+            ('museum', _museum_story_queries(venue), False),
+            ('culture', _culture_country_queries(ctx, local_code), False),
+        ]
+
+        pages: List[Dict] = []
+        best = {'text': '', 'supports': [], 'rung': ''}
+        extra_queries = 0
+        chosen_rung = ''
+
+        for rung_name, queries, is_base in rungs:
+            if not queries:
+                continue
+            # Enforce the extra-query cap on the NON-base rungs: trim the rung's
+            # queries so the running extra total never exceeds MAX_EXTRA_QUERIES.
+            if not is_base:
+                remaining = MAX_EXTRA_QUERIES - extra_queries
+                if remaining <= 0:
+                    break  # cap reached — stop descending
+                queries = queries[:remaining]
+
+            budget = max(1, MAX_WEB_PAGES - len(pages))
+            new_pages, used = gather_web(
+                queries, budget, serp=serp, fetch=fetch, origin=rung_name)
+            pages.extend(new_pages)
+            out['queries'].extend(used)
+            if not is_base:
+                extra_queries += len(used)
+
+            # Extract over everything gathered so far (+ Wikipedia fact-check).
+            res = _extract(pages + wiki_pages)
+            if res['error'] and not best['text']:
+                # Remember the error only if we have nothing better yet.
+                out['error'] = res['error']
+            if res['text']:
+                # Keep the most recent non-empty story; prefer a charged one.
+                if _is_emotionally_charged(res['text']):
+                    best = {'text': res['text'], 'supports': res['supports'],
+                            'rung': rung_name}
+                    chosen_rung = rung_name
+                    out['error'] = ''
+                    break  # found a charged story — stop walking the ladder
+                if not best['text']:
+                    best = {'text': res['text'], 'supports': res['supports'],
+                            'rung': rung_name}
+                    out['error'] = ''
+
+        # De-duplicated source list, order preserved (all rungs + Wikipedia).
+        seen = set()
+        for p in pages + wiki_pages:
+            if p['url'] and p['url'] not in seen:
+                seen.add(p['url'])
+                out['sources'].append({'domain': p['domain'], 'url': p['url']})
+
+        out['text'] = _sr._strip_cites(best['text']) if best['text'] else ''
+        out['supports'] = best['supports']
+        out['rung'] = chosen_rung or best['rung']
+        out['extra_queries'] = extra_queries
+
+        # ── [LOCAL-692B] SECOND STORY. When the sources also carry a DISTINCT
+        # charged story (a different person/episode than the one just written),
+        # extract it as a SHORT add-on — this is how a thin stop gets "one more
+        # story" WITHOUT lengthening the first. No extra queries are spent.
+        if out['text']:
+            out['second_story'] = _extract_second_story(
+                pages + wiki_pages, out['text'], answer, extractor)
         return out
     except Exception as e:
         out['error'] = f'{type(e).__name__}: {e}'
         return out
+
+
+# ── [LOCAL-692B] second short story (no lengthening of the first) ─────────────
+
+_SECOND_STORY_PROMPT = """\
+You are a museum-tour researcher. The tour already has this story for the stop:
+
+FIRST STORY (already written, do NOT repeat it):
+{first}
+
+Using ONLY the numbered SOURCES below, find ONE MORE short, emotionally charged \
+story — a decision, a loss, a conflict, or a surprise — that is DISTINCT from \
+the first story (a different person, episode, or moment). Write it in 1-3 short \
+sentences, each ending with its source number in brackets like [2]. A source \
+marked "WIKIPEDIA — FACT-CHECK ONLY" may be used only to confirm a date or a \
+name, never as the story. If there is no distinct second story in the sources, \
+reply with exactly: NO SECOND STORY
+
+SOURCES:
+{sources}
+"""
+
+
+def _extract_second_story(pages: List[Dict], first_story: str,
+                          answer: Callable, extractor: str) -> str:
+    """Ask for ONE distinct, charged second story from the SAME gathered pages
+    (no new queries). Returns '' when none is found or it is not charged. Pure
+    add-on: it never touches the first story."""
+    try:
+        if not pages or not first_story:
+            return ''
+        sources_block = '\n\n'.join(
+            f"[{i + 1}] {p.get('title', '')} ({p['domain']})\n{p['text']}"
+            for i, p in enumerate(pages))
+        ans = answer(_SECOND_STORY_PROMPT.format(
+            first=first_story[:800], sources=sources_block), extractor)
+        if not isinstance(ans, dict) or ans.get('error'):
+            return ''
+        text = (ans.get('text') or '').strip()
+        if not text or 'no second story' in text.lower():
+            return ''
+        # Only keep it if it is itself charged and not a near-duplicate of #1.
+        if not _is_emotionally_charged(text):
+            return ''
+        if _too_similar(text, first_story):
+            return ''
+        return _sr._strip_cites(text)
+    except Exception:
+        return ''
+
+
+def _too_similar(a: str, b: str) -> bool:
+    """True when `a` substantially overlaps `b` (so a 'second story' that merely
+    restates the first is rejected). Token-set Jaccard on content words >= 0.5."""
+    def _toks(s):
+        return {w for w in re.findall(r"[A-Za-zÀ-ỹ']{4,}", (s or '').lower())}
+    ta, tb = _toks(a), _toks(b)
+    if not ta:
+        return True
+    inter = len(ta & tb)
+    return inter / max(1, len(ta)) >= 0.5
 
 
 # ── CLI: answer one prompt and print the result (for spot checks) ─────────────
