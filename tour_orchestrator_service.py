@@ -229,6 +229,27 @@ except ImportError as _pricing_err:
     )
     print(f"[ORCHESTRATOR] ERROR: tour pricing routes unavailable: {_pricing_err}")
 
+# --- Recovery Code / Profile Portability Routes (LOCAL-695) ---
+# Anonymous recovery code: the listener saves a code after their first purchase
+# (POST /recovery-code/generate), and on a NEW phone restores their Listen page
+# with it (POST /recovery-code/restore) — the new device is linked to the
+# profile and the old one unlinked (consolidation tables), paid tours get a
+# restore grant so they re-download without paying again, attempts are rate-
+# limited and logged, and >2 restores in 30 days is refused. Hosted here because
+# the orchestrator already owns account deletion and can import the repo-root
+# consolidation module. Registered defensively — a missing module 404s only the
+# recovery endpoints and never takes the orchestrator down.
+try:
+    from recovery_code_service import register_recovery_routes
+    register_recovery_routes(app)
+    print("[ORCHESTRATOR] Recovery code routes registered (LOCAL-695)")
+except ImportError as _recovery_err:
+    import logging as _recovery_logging
+    _recovery_logging.getLogger("tour_orchestrator_service").error(
+        f"[LOCAL-695] Recovery code routes NOT registered — recovery/restore will 404: {_recovery_err}"
+    )
+    print(f"[ORCHESTRATOR] ERROR: recovery code routes unavailable: {_recovery_err}")
+
 # CORS headers for web platform support
 def add_cors_headers(response):
     response.headers['Access-Control-Allow-Origin'] = '*'
@@ -2721,7 +2742,14 @@ def list_jobs():
 def delete_account(secret_id):
     """Full erasure of all personal data for a user. Idempotent.
     Required by Apple App Store and Google Play Store policies.
-    Deletes from ALL tables keyed on secret_id/device_id, children before parents."""
+    Deletes from ALL tables keyed on secret_id/device_id, children before parents.
+
+    [LOCAL-695] Consolidation-aware: once profiles span multiple devices under one
+    consolidated_user_id (recovery-code portability), deletion must wipe EVERY
+    linked device, not just the one that made the request (June design note). We
+    resolve the full set of device ids (and the profile id) behind this secret_id
+    first, then delete device-keyed rows for ALL of them. A single-device user
+    resolves to a one-element set, so the previous behaviour is unchanged."""
     print(f"\n==== DELETE ACCOUNT REQUEST: {datetime.now().isoformat()} ====")
     print(f"secret_id: {secret_id}")
     
@@ -2739,63 +2767,94 @@ def delete_account(secret_id):
             port=os.getenv('DB_PORT', '5432')
         )
         cur = conn.cursor()
-        
+
+        # [LOCAL-695] Resolve the consolidated identity: every device id linked to
+        # this secret_id's profile (primary + every merged device, linked OR
+        # unlinked), plus the profile id itself and secret_id. Falls back to
+        # {secret_id} if the consolidation module/tables are absent, so deletion
+        # never fails to remove the current device.
+        try:
+            from recovery_code_service import linked_device_ids_for_deletion
+            identity_ids = sorted(linked_device_ids_for_deletion(cur, secret_id))
+        except Exception as _rc_err:  # noqa: BLE001
+            print(f"[DELETE-ACCOUNT] consolidation resolve fell back ({_rc_err}); single-device delete")
+            identity_ids = [secret_id]
+        # The profile id (if any) is included in identity_ids; the device ids are
+        # every entry. Both sets are used below.
+        print(f"[DELETE-ACCOUNT] consolidated identity spans {len(identity_ids)} id(s): {identity_ids}")
+
         # Everything in one transaction — fail-closed (all or nothing)
         tables_deleted = []
         
         # --- Children of article_requests (must go first due to FK) ---
-        cur.execute("DELETE FROM news_audios WHERE article_id IN (SELECT article_id FROM article_requests WHERE secret_id = %s)", (secret_id,))
+        cur.execute("DELETE FROM news_audios WHERE article_id IN (SELECT article_id FROM article_requests WHERE secret_id = ANY(%s))", (identity_ids,))
         tables_deleted.append(('news_audios', cur.rowcount))
         
         # --- Credential/encryption tables (keyed on device_id or consolidated_user_id) ---
-        # The app may use secret_id as device_id, or they may be linked via consolidation.
-        # Delete by both: device_id = secret_id OR consolidated_user_id = secret_id
-        cur.execute("DELETE FROM user_subscription_credentials WHERE device_id = %s OR consolidated_user_id = %s", (secret_id, secret_id))
+        # Delete by device_id in the identity set OR consolidated_user_id in the set.
+        cur.execute("DELETE FROM user_subscription_credentials WHERE device_id = ANY(%s) OR consolidated_user_id = ANY(%s)", (identity_ids, identity_ids))
         tables_deleted.append(('user_subscription_credentials', cur.rowcount))
         
-        cur.execute("DELETE FROM dh_aes_keys WHERE device_id = %s", (secret_id,))
+        cur.execute("DELETE FROM dh_aes_keys WHERE device_id = ANY(%s)", (identity_ids,))
         tables_deleted.append(('dh_aes_keys', cur.rowcount))
         
-        cur.execute("DELETE FROM dh_server_keys WHERE device_id = %s", (secret_id,))
+        cur.execute("DELETE FROM dh_server_keys WHERE device_id = ANY(%s)", (identity_ids,))
         tables_deleted.append(('dh_server_keys', cur.rowcount))
         
-        cur.execute("DELETE FROM device_encryption_keys WHERE device_id = %s", (secret_id,))
+        cur.execute("DELETE FROM device_encryption_keys WHERE device_id = ANY(%s)", (identity_ids,))
         tables_deleted.append(('device_encryption_keys', cur.rowcount))
-        
+
+        # --- Recovery-code + restore ledgers (LOCAL-695) ---
+        # Delete by consolidated_user_id in the identity set, and by requesting
+        # device for the per-device attempt ledger. Only runs when the tables
+        # exist (a DB that predates migration 033 skips them cleanly).
+        cur.execute("SELECT to_regclass('recovery_codes')")
+        if cur.fetchone()[0] is not None:
+            cur.execute("DELETE FROM recovery_codes WHERE consolidated_user_id = ANY(%s)", (identity_ids,))
+            tables_deleted.append(('recovery_codes', cur.rowcount))
+        cur.execute("SELECT to_regclass('profile_restores')")
+        if cur.fetchone()[0] is not None:
+            cur.execute("DELETE FROM profile_restores WHERE consolidated_user_id = ANY(%s) OR new_device_id = ANY(%s) OR unlinked_device_id = ANY(%s)", (identity_ids, identity_ids, identity_ids))
+            tables_deleted.append(('profile_restores', cur.rowcount))
+        cur.execute("SELECT to_regclass('restore_attempts')")
+        if cur.fetchone()[0] is not None:
+            cur.execute("DELETE FROM restore_attempts WHERE device_id = ANY(%s)", (identity_ids,))
+            tables_deleted.append(('restore_attempts', cur.rowcount))
+
         # --- Consolidation tables ---
-        cur.execute("DELETE FROM device_consolidation_history WHERE consolidated_user_id = %s", (secret_id,))
+        cur.execute("DELETE FROM device_consolidation_history WHERE consolidated_user_id = ANY(%s) OR merged_device_id = ANY(%s)", (identity_ids, identity_ids))
         tables_deleted.append(('device_consolidation_history', cur.rowcount))
         
-        cur.execute("DELETE FROM user_consolidation_map WHERE consolidated_user_id = %s", (secret_id,))
+        cur.execute("DELETE FROM user_consolidation_map WHERE consolidated_user_id = ANY(%s) OR primary_device_id = ANY(%s)", (identity_ids, identity_ids))
         tables_deleted.append(('user_consolidation_map', cur.rowcount))
         
         # --- Tables with FK to users (children, must go before users) ---
-        cur.execute("DELETE FROM coordinates WHERE secret_id = %s", (secret_id,))
+        cur.execute("DELETE FROM coordinates WHERE secret_id = ANY(%s)", (identity_ids,))
         tables_deleted.append(('coordinates', cur.rowcount))
         
-        cur.execute("DELETE FROM map_requests WHERE secret_id = %s", (secret_id,))
+        cur.execute("DELETE FROM map_requests WHERE secret_id = ANY(%s)", (identity_ids,))
         tables_deleted.append(('map_requests', cur.rowcount))
         
-        cur.execute("DELETE FROM tour_requests WHERE secret_id = %s", (secret_id,))
+        cur.execute("DELETE FROM tour_requests WHERE secret_id = ANY(%s)", (identity_ids,))
         tables_deleted.append(('tour_requests', cur.rowcount))
         
-        cur.execute("DELETE FROM article_requests WHERE secret_id = %s", (secret_id,))
+        cur.execute("DELETE FROM article_requests WHERE secret_id = ANY(%s)", (identity_ids,))
         tables_deleted.append(('article_requests', cur.rowcount))
         
         # --- Parent: users table (last — all FK children already removed) ---
-        cur.execute("DELETE FROM users WHERE secret_id = %s", (secret_id,))
+        cur.execute("DELETE FROM users WHERE secret_id = ANY(%s)", (identity_ids,))
         tables_deleted.append(('users', cur.rowcount))
         
         conn.commit()
         cur.close()
         
         total_rows = sum(count for _, count in tables_deleted)
-        print(f"[DELETE-ACCOUNT] Deleted {total_rows} total rows for {secret_id}")
+        print(f"[DELETE-ACCOUNT] Deleted {total_rows} total rows for {secret_id} ({len(identity_ids)} linked id(s))")
         for table, count in tables_deleted:
             if count > 0:
                 print(f"  {table}: {count} rows")
         
-        return jsonify({"deleted": True, "rows_removed": total_rows})
+        return jsonify({"deleted": True, "rows_removed": total_rows, "linked_ids": len(identity_ids)})
     
     except Exception as e:
         print(f"[DELETE-ACCOUNT] ERROR: {e}")

@@ -13,6 +13,7 @@ import 'dart:io' show Platform, Directory;
 import 'debug_log_viewer_screen.dart';
 import 'plan_screen.dart';
 import 'communities_about_screen.dart';
+import 'recovery_code_screen.dart';
 import '../config/endpoints.dart';
 import '../services/error_handler_service.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -550,6 +551,64 @@ class _AboutScreenState extends State<AboutScreen> {
                   ),
                 ),
               ],
+            ),
+            const SizedBox(height: 30),
+            // [LOCAL-695] Profile portability — recovery code + restore.
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: Colors.teal.shade50,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.teal.shade200),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Row(
+                    children: [
+                      Icon(Icons.vpn_key, size: 30, color: Colors.teal),
+                      SizedBox(width: 10),
+                      Text(
+                        'Recovery code',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.teal,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  const Text(
+                    'Save a recovery code so you can get your Listen page back '
+                    'on a new phone — your tours and news, with paid tours '
+                    'restored without paying again. Or restore here if you just '
+                    'switched phones.',
+                    style: TextStyle(fontSize: 13),
+                  ),
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton.icon(
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                              builder: (context) => const RecoveryCodeScreen()),
+                        );
+                      },
+                      icon: const Icon(Icons.vpn_key_outlined),
+                      label: const Text('Recovery code & Restore'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.teal,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
             const SizedBox(height: 30),
             // Account Deletion — App Store / Play Store requirement

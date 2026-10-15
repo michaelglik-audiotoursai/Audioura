@@ -2,7 +2,7 @@
 
 **DRAFT for review. Not published. Audioura LLC must approve (and may have a lawyer review) before this goes live.**
 
-**Version:** 2026-10-14-draft3 (LOCAL-693B / D660 addendum)
+**Version:** 2026-10-14-draft4 (LOCAL-695 / profile portability addendum)
 **Last updated:** 14 October 2026
 **Who we are:** Audioura LLC, 44 Sharpe Rd, Newton Centre, MA 02459, USA · info@audioura.com
 
@@ -18,6 +18,7 @@ This policy explains what Audioura collects, why, and your choices. It updates t
 - **Editor score & content rating:** tour *text* is evaluated automatically (by AI providers — see §4) to produce a quality score and a content rating. This evaluates the tour, not you.
 - **Age confirmation:** if you choose to see 18+ (Mature) tours, we store that you confirmed you are 18 or older.
 - **Community data:** if you organise or join a community, we store community and membership details (see "Communities" below).
+- **Recovery code (new):** you can save an anonymous recovery code to restore your Listen page on a new phone. We store only a scrambled (hashed) copy of the code, never the code itself.
 - **Retention & deletion:** clarified below.
 
 ---
@@ -70,6 +71,14 @@ If you turn on "Show 18+ tours", we store that you confirmed you are 18 or older
 - If you **join** a community, we store your membership and pass expiry.
 - A report you make about a community is sent to the community's **owner**; we keep a record and a per-community off switch.
 
+### Recovery code (restoring your Listen page on a new phone)
+Because your identity is anonymous (a device-generated `secret_id`, not an email or password), a new or replaced phone would otherwise start with an empty Listen page. To let you move your profile across phones, you can save a **recovery code** — a random, anonymous code shown to you once (offered after your first purchase, and always available in *About → Recovery code*).
+- We store **only a salted, hashed copy** of the code (PBKDF2-HMAC-SHA256), never the code itself. Holding our database does not reveal your code.
+- The code is **not** linked to your name, email, or any contact detail — it is anonymous by design.
+- On a new phone, entering the code links that phone to your profile and **signs it out of your old phone** (one profile lives on one phone at a time), and your paid tours re-download without paying again.
+- Entering a code is rate-limited and logged (the device, the time, and whether it succeeded) to prevent abuse; repeated restores in a short period are refused and you are asked to contact support.
+- If you lose the code, your profile cannot be recovered — this is the trade-off of a design that holds no identifying information about you.
+
 ### App functionality and anti-abuse (unchanged)
 As in the previous policy, we also handle: subscription credentials (encrypted at rest), referral codes and redemptions, share counts, and app-attestation tokens (sent to Apple/Google to confirm the app is genuine; **not stored** by us — only logged transiently). See the app-store privacy labels for the full list.
 
@@ -81,12 +90,13 @@ As in the previous policy, we also handle: subscription credentials (encrypted a
 
 ## 5. Retention
 - Purchase records, tour unlocks, and community memberships are kept while you use Audioura, so your purchases stay available.
+- Your recovery code's hashed copy and a log of restore events are kept while the profile exists, so restoring your Listen page keeps working; both are deleted when you delete your data.
 - Ratings/reviews are kept while published.
 - Attestation tokens are not stored (only transient logs, ~30 days).
 - You can delete your data (below), after which we remove your records except where we must keep a minimal record for legal, tax, or fraud-prevention reasons.
 
 ## 6. Deletion and your choices
-You can request deletion of your data from within the app or by emailing info@audioura.com. You can change your persona, turn 18+ tours on/off, and remove your reviews. Note that purchases are recorded by Apple/Google independently of us.
+You can request deletion of your data from within the app or by emailing info@audioura.com. If you have linked more than one phone to your profile with a recovery code, deletion removes the data for **all linked devices** under that profile, including your recovery code and restore history. You can change your persona, turn 18+ tours on/off, and remove your reviews. Note that purchases are recorded by Apple/Google independently of us.
 
 ## 7. Children
 Audioura is not directed to children. Some content is for adults only and is gated (18+). Do not use Audioura if you are below the age of digital consent where you live.
