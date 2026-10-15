@@ -211,14 +211,17 @@ class TestRouterGating(unittest.TestCase):
 
 
 class TestLengthTarget(unittest.TestCase):
-    def test_artist_life_extractor_budget_not_shorter(self):
-        # The after-version must not be shorter than the object backend: the
-        # artist-life extractor is allowed MORE sentences/tokens, not fewer.
-        self.assertGreaterEqual(al.ANSWER_MAX_TOKENS, sr.ANSWER_MAX_TOKENS)
+    def test_artist_life_extractor_budget_not_longer(self):
+        # [LOCAL-692B] Michael REVERTED the length increase: shorter stories
+        # "feel of the right size". The artist-life extractor budget must NOT
+        # exceed the object backend's — it is the same short budget, so a stop
+        # is not padded. (Equality is the intent; never larger.)
+        self.assertLessEqual(al.ANSWER_MAX_TOKENS, sr.ANSWER_MAX_TOKENS)
 
-    def test_museum_prose_instruction_allows_full_length(self):
-        # The museum artist-life prose instruction permits up to 9 sentences
-        # (object backend used 6), so stops are not truncated shorter.
+    def test_museum_prose_instruction_is_short_not_padded(self):
+        # [LOCAL-692B] The museum artist-life prose instruction keeps the SHORT
+        # budget (max 6 sentences, same as the object backend) — it must NOT
+        # allow 9 sentences any more. Person-first is still required.
         os.environ['MUSEUM_RESEARCH'] = 'artist_life'
         try:
             import cheap_arm
@@ -236,7 +239,8 @@ class TestLengthTarget(unittest.TestCase):
         except Exception:
             pass
         os.environ.pop('MUSEUM_RESEARCH', None)
-        self.assertIn('Maximum 9 sentences', prompt)
+        self.assertIn('maximum 6 sentences', prompt.lower())
+        self.assertNotIn('9 sentences', prompt)
         self.assertIn('LEAD with the ARTIST', prompt)
 
 

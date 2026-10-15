@@ -246,6 +246,14 @@ def compile_for_seed(seed: Dict, matrix: Dict, exhibition: str = '') -> str:
         except Exception:
             _museum_artist_life = False
         if _museum_artist_life:
+            # [LOCAL-692B / D659 addendum] Michael REVERTED the length increase:
+            # the shorter stories "feel of the right size". So the museum
+            # instruction keeps the SAME short budget as the object backend
+            # (max 6 sentences) — it is NOT padded to the normal arm's word
+            # count. What a short stop was missing is ONE MORE STORY, which the
+            # ladder/second-story path adds separately (a second short story, or
+            # one "on the way" for a walking tour) — never by lengthening this
+            # one. Person-first and the generic-theme ban are kept.
             instruction = (
                 "Search, then answer with FACTS ONLY — each one sentence, with "
                 "its source in brackets. LEAD with the ARTIST as a person and a "
@@ -261,7 +269,7 @@ def compile_for_seed(seed: Dict, matrix: Dict, exhibition: str = '') -> str:
                 "the artist, say so in one sentence and give the work's "
                 "documented story instead — never pad. If you find nothing "
                 'reliable at all, say exactly "NO RELIABLE INFORMATION". Do not '
-                "describe how it looks. Maximum 9 sentences.")
+                "describe how it looks. Keep it SHORT: maximum 6 sentences.")
         else:
             instruction = (
                 "Search, then answer with FACTS ONLY — each one sentence, with its "

@@ -84,7 +84,12 @@ MAX_WORK_QUERIES = int(os.environ.get('ARTIST_LIFE_MAX_WORK_QUERIES', '2'))
 MAX_WEB_PAGES = int(os.environ.get('ARTIST_LIFE_MAX_PAGES', '6'))
 PER_PAGE_CHARS = int(os.environ.get('ARTIST_LIFE_PER_PAGE_CHARS', '2800'))
 WIKI_CHARS = int(os.environ.get('ARTIST_LIFE_WIKI_CHARS', '3500'))
-ANSWER_MAX_TOKENS = int(os.environ.get('ARTIST_LIFE_MAX_TOKENS', '900'))
+# [LOCAL-692B / D659 addendum] Michael reverted the length increase: shorter
+# stories "feel of the right size", so the extractor budget is the SHORT one
+# (same as serper_research's object backend, 700), NOT the padded 900. The fix
+# for a thin stop is a SECOND short story (the ladder/second-story path), never
+# a longer first story.
+ANSWER_MAX_TOKENS = int(os.environ.get('ARTIST_LIFE_MAX_TOKENS', '700'))
 
 # A Wikipedia page is kept as a FACT-CHECK source only — never the story. This
 # marker is prepended to its text in the corpus so the extractor can tell.
@@ -263,9 +268,10 @@ into one stop about a work of art and the ARTIST who made it. Use ONLY the \
 numbered SOURCES below. Do NOT use any prior knowledge: if a fact is not in the \
 sources, do not state it.
 
-Your job is to tell the LISTENER who this artist is as a PERSON. In 5-9 short \
-sentences, LEAD with the person and a concrete moment — a place, a year, a \
-decision — then connect it to the work. Prefer facts that answer these \
+Your job is to tell the LISTENER who this artist is as a PERSON. In 4-6 short \
+sentences (keep it SHORT — a shorter story is the right size), LEAD with the \
+person and a concrete moment — a place, a year, a decision — then connect it to \
+the work. Prefer facts that answer these \
 questions, in roughly this priority:
   1. Where did the artist live and work?
   2. Where did they learn / who trained them (school, teacher, "studied at", \
