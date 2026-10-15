@@ -433,4 +433,37 @@ class CommunityCopy {
   /// §4: A short email SUBJECT for the invite.
   static String emailInviteSubject(String communityName) =>
       'Join "$communityName" on Audioura';
+
+  /// §4: Are all REQUIRED create fields present? Required: name, description,
+  /// organiser name, rules. Location (lat+lng) is required ONLY for a Listed
+  /// community. Pure so the gating is unit-testable without a widget.
+  static bool requiredFieldsFilled({
+    required String name,
+    required String description,
+    required String organiserName,
+    required String rules,
+    required bool listed,
+    String latitude = '',
+    String longitude = '',
+  }) {
+    final core = name.trim().isNotEmpty &&
+        description.trim().isNotEmpty &&
+        organiserName.trim().isNotEmpty &&
+        rules.trim().isNotEmpty;
+    if (!core) return false;
+    if (listed && (latitude.trim().isEmpty || longitude.trim().isEmpty)) {
+      return false;
+    }
+    return true;
+  }
+
+  /// §4: Is the Create button enabled? All required fields filled AND the
+  /// Organiser Terms accepted AND the name is not known-taken (nameAvailable
+  /// false). nameAvailable null (unknown / not yet checked) does NOT block.
+  static bool createEnabled({
+    required bool requiredFilled,
+    required bool termsAccepted,
+    bool? nameAvailable,
+  }) =>
+      requiredFilled && termsAccepted && nameAvailable != false;
 }

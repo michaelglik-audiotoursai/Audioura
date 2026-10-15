@@ -357,27 +357,26 @@ class _CreateCommunityScreenState extends State<CreateCommunityScreen> {
 
   /// [LOCAL-700 §4] All REQUIRED fields present. Required: name, description,
   /// organiser name, rules. Location is required ONLY for a Listed community.
-  bool get _requiredFilled {
-    final listed = _hasWaiver ? false : _listed;
-    final core = _name.text.trim().isNotEmpty &&
-        _description.text.trim().isNotEmpty &&
-        _organiserName.text.trim().isNotEmpty &&
-        _rules.text.trim().isNotEmpty;
-    if (!core) return false;
-    if (listed && (_lat.text.trim().isEmpty || _lng.text.trim().isEmpty)) {
-      return false;
-    }
-    return true;
-  }
+  bool get _requiredFilled => CommunityCopy.requiredFieldsFilled(
+        name: _name.text,
+        description: _description.text,
+        organiserName: _organiserName.text,
+        rules: _rules.text,
+        listed: _hasWaiver ? false : _listed,
+        latitude: _lat.text,
+        longitude: _lng.text,
+      );
 
   /// [LOCAL-700 §4] The Create button is enabled only when all required fields
   /// are filled AND the Organiser Terms are accepted (and we are not mid-submit,
   /// and the name is not known-taken).
   bool get _canSubmit =>
       !_submitting &&
-      _requiredFilled &&
-      _organiserTermsAccepted &&
-      _nameAvailable != false;
+      CommunityCopy.createEnabled(
+        requiredFilled: _requiredFilled,
+        termsAccepted: _organiserTermsAccepted,
+        nameAvailable: _nameAvailable,
+      );
 
   @override
   Widget build(BuildContext context) {
