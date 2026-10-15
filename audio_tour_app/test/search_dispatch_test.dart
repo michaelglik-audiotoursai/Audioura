@@ -132,22 +132,37 @@ void main() {
     });
   });
 
-  group('resolveTextSearch — concurrent outcome table (Deliver §2c)', () {
-    test('tours found AND place found → toursAndPlace', () {
+  // [LOCAL-697 / LEAD D662] A found PLACE always wins: the widget relocates the
+  // map to it immediately (normal Home view of that area), with NO tours dialog
+  // and NO "relocate?" confirmation. The tours dialog appears ONLY when no place
+  // is found but tour names match. The outcome enum encodes exactly that:
+  //   place + tours → toursAndPlace (relocate + 'N tours named "<q>" — Show')
+  //   place only    → placeOnly     (relocate)
+  //   tours only    → toursOnly      (tours dialog)
+  //   neither       → nothing        ('nothing found')
+  group('resolveTextSearch — concurrent outcome table (D662)', () {
+    test('place + tours → toursAndPlace (relocate, then offer tours)', () {
       expect(
         resolveTextSearch(tourCount: 3, placeFound: true),
         TextSearchOutcome.toursAndPlace,
       );
     });
 
-    test('only tours → toursOnly', () {
+    test('place + a single tour → still toursAndPlace (relocate wins)', () {
+      expect(
+        resolveTextSearch(tourCount: 1, placeFound: true),
+        TextSearchOutcome.toursAndPlace,
+      );
+    });
+
+    test('tours only → toursOnly (the tours dialog)', () {
       expect(
         resolveTextSearch(tourCount: 2, placeFound: false),
         TextSearchOutcome.toursOnly,
       );
     });
 
-    test('only a place → placeOnly', () {
+    test('place only → placeOnly (relocate)', () {
       expect(
         resolveTextSearch(tourCount: 0, placeFound: true),
         TextSearchOutcome.placeOnly,
