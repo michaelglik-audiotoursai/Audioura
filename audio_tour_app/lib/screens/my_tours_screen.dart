@@ -23,6 +23,7 @@ import '../services/tour_pricing_service.dart';
 import '../services/entitlements_service.dart';
 import '../services/device_service.dart';
 import '../services/score_explanation_service.dart';
+import '../services/document_acceptance_service.dart';
 
 /// LOCAL-484 — build the subtitle line shown under each tour on the Listen
 /// (My Tours) list.
@@ -297,6 +298,14 @@ class _MyToursScreenState extends State<MyToursScreen> {
 
     int? chosen = current.priceTier; // null = Free
     final customController = TextEditingController();
+    // [LOCAL-691] First time a guide prices a tour (any paid tier) they must
+    // accept the Guide Terms. We seed this true if they already accepted the
+    // current version, so returning guides are not re-prompted.
+    bool guideTermsAccepted = false;
+    final priceUserId = await DeviceService.getUserId();
+    guideTermsAccepted = await DocumentAcceptanceService.hasAccepted(
+        priceUserId, LegalDoc.guideTerms);
+    if (!mounted) return;
     // If the tour already has a non-quick-pick price, seed the custom field with
     // it so the guide sees their current price and can tweak it.
     if (current.priceTier != null &&
@@ -390,6 +399,40 @@ class _MyToursScreenState extends State<MyToursScreen> {
                         ),
                       ),
                     ),
+                  // [LOCAL-691] Required Guide Terms acceptance for a paid price.
+                  if (chosen != null) ...[
+                    const SizedBox(height: 8),
+                    CheckboxListTile(
+                      contentPadding: EdgeInsets.zero,
+                      dense: true,
+                      value: guideTermsAccepted,
+                      onChanged: (v) =>
+                          setDialog(() => guideTermsAccepted = v ?? false),
+                      title: Wrap(
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        children: [
+                          const Text('I accept the ',
+                              style: TextStyle(fontSize: 13)),
+                          InkWell(
+                            onTap: () async {
+                              final uri =
+                                  Uri.parse(legalDocUrl(LegalDoc.guideTerms));
+                              if (await canLaunchUrl(uri)) {
+                                await launchUrl(uri,
+                                    mode: LaunchMode.externalApplication);
+                              }
+                            },
+                            child: const Text('Guide Terms',
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  color: Color(0xFF3A3AC0),
+                                  decoration: TextDecoration.underline,
+                                )),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                 ],
               ),
             ),
@@ -399,7 +442,14 @@ class _MyToursScreenState extends State<MyToursScreen> {
                 child: const Text('Cancel'),
               ),
               ElevatedButton(
-                onPressed: () async {
+                onPressed: (chosen != null && !guideTermsAccepted)
+                    ? null
+                    : () async {
+                  // [LOCAL-691] Record Guide Terms acceptance before pricing.
+                  if (chosen != null) {
+                    await DocumentAcceptanceService.record(
+                        priceUserId, LegalDoc.guideTerms);
+                  }
                   Navigator.pop(ctx);
                   final res = await TourPricingService.setPrice(tourId, chosen);
                   if (!mounted) return;

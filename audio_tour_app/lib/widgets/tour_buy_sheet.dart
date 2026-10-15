@@ -8,8 +8,11 @@
 // products exist. Returns true when the tour was unlocked.
 
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../services/iap_service.dart';
+import '../services/device_service.dart';
+import '../services/document_acceptance_service.dart';
 
 class TourBuySheet {
   /// Present the buy sheet for [tourId] at [tier] / [priceLabel]. Returns true
@@ -72,6 +75,10 @@ class _BuySheetBodyState extends State<_BuySheetBody> {
         : await IapService.instance.buyTour(widget.tier, widget.tourId);
     if (!mounted) return;
     if (result.status == IapResultStatus.granted) {
+      // [LOCAL-691] Buying agrees to the Terms — record the acceptance.
+      final userId = await DeviceService.getUserId();
+      await DocumentAcceptanceService.record(userId, LegalDoc.terms);
+      if (!mounted) return;
       Navigator.of(context).pop(true);
       return;
     }
@@ -133,6 +140,8 @@ class _BuySheetBodyState extends State<_BuySheetBody> {
             'A bought tour stays yours.',
             style: TextStyle(fontSize: 13, color: Colors.black87),
           ),
+          const SizedBox(height: 12),
+          const TermsAgreeLine(),
           const SizedBox(height: 16),
           if (_error != null) ...[
             Text(_error!, style: TextStyle(color: Colors.red.shade700, fontSize: 13)),
@@ -173,6 +182,42 @@ class _BuySheetBodyState extends State<_BuySheetBody> {
           ),
         ],
       ),
+    );
+  }
+}
+
+/// [LOCAL-691] A small "By buying you agree to the Terms" line with a tappable
+/// Terms link. Shared by the tour Buy sheet and the community-pass sheet.
+class TermsAgreeLine extends StatelessWidget {
+  const TermsAgreeLine({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Wrap(
+      crossAxisAlignment: WrapCrossAlignment.center,
+      children: [
+        const Text(
+          'By buying you agree to the ',
+          style: TextStyle(fontSize: 12, color: Colors.black54),
+        ),
+        InkWell(
+          onTap: () async {
+            final uri = Uri.parse(legalDocUrl(LegalDoc.terms));
+            if (await canLaunchUrl(uri)) {
+              await launchUrl(uri, mode: LaunchMode.externalApplication);
+            }
+          },
+          child: const Text(
+            'Terms',
+            style: TextStyle(
+              fontSize: 12,
+              color: Color(0xFF3A3AC0),
+              decoration: TextDecoration.underline,
+            ),
+          ),
+        ),
+        const Text('.', style: TextStyle(fontSize: 12, color: Colors.black54)),
+      ],
     );
   }
 }

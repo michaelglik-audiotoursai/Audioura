@@ -16,6 +16,9 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../services/communities_service.dart';
 import '../services/iap_service.dart';
+import '../services/device_service.dart';
+import '../services/document_acceptance_service.dart';
+import '../widgets/tour_buy_sheet.dart' show TermsAgreeLine;
 
 class CommunityPageScreen extends StatefulWidget {
   /// Open by community id (from a map pin or the Listen tab) …
@@ -89,6 +92,9 @@ class _CommunityPageScreenState extends State<CommunityPageScreen> {
             .buyCommunityPass(pass.productId, c.id, pass.length);
     if (!mounted) return;
     if (result.status == IapResultStatus.granted) {
+      // [LOCAL-691] Buying a pass agrees to the Terms — record the acceptance.
+      final userId = _userId ?? await DeviceService.getUserId();
+      await DocumentAcceptanceService.record(userId, LegalDoc.terms);
       await _load(); // refresh my_status + episodes
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
@@ -198,6 +204,10 @@ class _CommunityPageScreenState extends State<CommunityPageScreen> {
           if (!canListen) ...[
             if (c.isPaid) ...[
               _sectionTitle('Membership passes'),
+              const Padding(
+                padding: EdgeInsets.only(bottom: 4),
+                child: TermsAgreeLine(),
+              ),
               ...c.passes.map((p) => Card(
                     child: ListTile(
                       title: Text(p.label),
