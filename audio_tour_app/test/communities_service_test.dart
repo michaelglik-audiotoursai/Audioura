@@ -329,4 +329,73 @@ void main() {
       );
     });
   });
+
+  group('LOCAL-702 hand-over state parsing (D663 §1)', () {
+    test('active community defaults — accepts new members, not looking', () {
+      final c = Community.fromJson({
+        'id': 1,
+        'name': 'Active One',
+        'status': 'active',
+      });
+      expect(c.status, 'active');
+      expect(c.lookingForOrganiser, isFalse);
+      expect(c.archived, isFalse);
+      expect(c.acceptsNewMembers, isTrue);
+      expect(c.myOffer, isNull);
+      expect(c.organiserOffers, isEmpty);
+    });
+
+    test('older payload with no status still parses as active', () {
+      final c = Community.fromJson({'id': 2, 'name': 'Legacy'});
+      expect(c.status, 'active');
+      expect(c.acceptsNewMembers, isTrue);
+      expect(c.lookingForOrganiser, isFalse);
+    });
+
+    test('handover community — looking, closed, offers parsed', () {
+      final c = Community.fromJson({
+        'id': 3,
+        'name': 'Handing Over',
+        'status': 'handover',
+        'looking_for_organiser': true,
+        'accepts_new_members': false,
+        'stepped_down_at': '2026-10-15T00:00:00',
+        'my_offer': {'status': 'picked', 'picked': true},
+        'organiser_offers': [
+          {'member_user_id': 'u-1', 'status': 'offered'},
+          {'member_user_id': 'u-2', 'status': 'picked', 'picked_at': 'x'},
+        ],
+      });
+      expect(c.lookingForOrganiser, isTrue);
+      expect(c.acceptsNewMembers, isFalse);
+      expect(c.steppedDownAt, isNotNull);
+      expect(c.myOffer, isNotNull);
+      expect(c.myOffer!.picked, isTrue);
+      expect(c.organiserOffers.length, 2);
+      expect(c.organiserOffers[1].isPicked, isTrue);
+    });
+
+    test('archived community — archived flags set, closed to new members', () {
+      final c = Community.fromJson({
+        'id': 4,
+        'name': 'Archived',
+        'status': 'archived',
+        'archived': true,
+        'accepts_new_members': false,
+        'archived_at': '2026-11-15T00:00:00',
+      });
+      expect(c.archived, isTrue);
+      expect(c.acceptsNewMembers, isFalse);
+      expect(c.lookingForOrganiser, isFalse);
+      expect(c.archivedAt, isNotNull);
+    });
+
+    test('MyOffer null-safe parsing', () {
+      expect(MyOffer.fromJson(null).status, 'none');
+      expect(MyOffer.fromJson(null).picked, isFalse);
+      final o = MyOffer.fromJson({'status': 'offered', 'picked': false});
+      expect(o.status, 'offered');
+      expect(o.picked, isFalse);
+    });
+  });
 }

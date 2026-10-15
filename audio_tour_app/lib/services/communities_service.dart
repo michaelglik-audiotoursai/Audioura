@@ -206,4 +206,68 @@ class CommunitiesService {
     } catch (_) {}
     return null;
   }
+
+  /// [LOCAL-702 / D663 §1] The OWNER steps down as organiser (after a
+  /// confirmation dialog). The community enters hand-over: closed to new
+  /// members, "Looking for a new organiser". Returns the refreshed community, or
+  /// null on failure.
+  static Future<Community?> stepDown(int id, String ownerUserId) =>
+      _postCommunity('/communities/$id/step-down',
+          {'owner_user_id': ownerUserId});
+
+  /// [LOCAL-702 / D663 §1] A member volunteers to take over a community in
+  /// hand-over. Returns the refreshed community, or null on failure.
+  static Future<Community?> offerOrganiser(int id, String userId) =>
+      _postCommunity('/communities/$id/offer-organiser', {'user_id': userId});
+
+  /// [LOCAL-702 / D663 §1] A volunteer withdraws their offer. Returns true on
+  /// success.
+  static Future<bool> withdrawOffer(int id, String userId) async {
+    try {
+      final r = await Endpoints.post(
+          Service.userDb, '/communities/$id/withdraw-offer',
+          body: {'user_id': userId});
+      return r.statusCode == 200;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// [LOCAL-702 / D663 §1] The stepping-down owner picks a volunteer. Returns
+  /// the refreshed community, or null on failure.
+  static Future<Community?> pickOrganiser(
+          int id, String ownerUserId, String memberUserId) =>
+      _postCommunity('/communities/$id/pick-organiser',
+          {'owner_user_id': ownerUserId, 'member_user_id': memberUserId});
+
+  /// [LOCAL-702 / D663 §1] The picked member accepts and becomes the owner; the
+  /// community reopens. Returns the refreshed community, or null on failure.
+  static Future<Community?> acceptOrganiser(int id, String userId) =>
+      _postCommunity('/communities/$id/accept-organiser', {'user_id': userId});
+
+  /// [LOCAL-702 / D663 §1 (d)] The owner deletes a MEMBER-LESS community.
+  /// Returns true on success; false when the community has members (409
+  /// has_members), the caller is not the owner (403), or on any error.
+  static Future<bool> deleteCommunity(int id, String ownerUserId) async {
+    try {
+      final r = await Endpoints.delete(Service.userDb, '/communities/$id',
+          body: {'owner_user_id': ownerUserId});
+      return r.statusCode == 200;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// Shared helper: POST a body and parse the returned community page. Returns
+  /// null on any non-200 or transport error (the screens then show their
+  /// unchanged state).
+  static Future<Community?> _postCommunity(
+      String path, Map<String, dynamic> body) async {
+    try {
+      final r = await Endpoints.post(Service.userDb, path, body: body);
+      final map = Endpoints.tryDecodeMap(r.body);
+      if (r.statusCode == 200 && map != null) return Community.fromJson(map);
+    } catch (_) {}
+    return null;
+  }
 }

@@ -157,6 +157,16 @@ class Endpoints {
     return timeout != null ? request.timeout(timeout) : request;
   }
 
+  /// Convenience DELETE with apiHeaders and an optional JSON body (used e.g. by
+  /// the owner-deletes-a-member-less-community call, LOCAL-702 / D663 §1 d).
+  static Future<http.Response> delete(Service s, String path, {Map<String, dynamic>? body, Duration? timeout}) async {
+    final uri = await url(s, path);
+    final headers = await apiHeaders(s, requestBody: body);
+    final request = http.delete(uri, headers: headers,
+        body: body != null ? jsonEncode(body) : null);
+    return timeout != null ? request.timeout(timeout) : request;
+  }
+
   /// Returns the correct news article download URI, handling the cloud path
   /// difference: local uses /download/<id>, cloud gateway uses /news-download/<id>.
   static Future<Uri> newsDownloadUrl(String articleId, String userId) async {

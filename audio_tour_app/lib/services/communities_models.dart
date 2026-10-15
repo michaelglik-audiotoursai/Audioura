@@ -100,6 +100,61 @@ class MyStatus {
   }
 }
 
+/// [LOCAL-702 / D663 §1] A hand-over volunteer the OWNER sees while picking a
+/// new organiser. One per member who volunteered.
+class OrganiserOffer {
+  final String memberUserId;
+  final String status; // offered | picked | accepted
+  final String? pickedAt;
+  final String? acceptedAt;
+  final String? offeredAt;
+
+  const OrganiserOffer({
+    required this.memberUserId,
+    required this.status,
+    this.pickedAt,
+    this.acceptedAt,
+    this.offeredAt,
+  });
+
+  bool get isPicked => status == 'picked';
+
+  factory OrganiserOffer.fromJson(Map<String, dynamic> j) => OrganiserOffer(
+        memberUserId: (j['member_user_id'] ?? '') as String,
+        status: (j['status'] ?? 'offered') as String,
+        pickedAt: j['picked_at'] as String?,
+        acceptedAt: j['accepted_at'] as String?,
+        offeredAt: j['offered_at'] as String?,
+      );
+}
+
+/// [LOCAL-702 / D663 §1] The CALLER's own hand-over offer, so the app can show
+/// "You volunteered" and, when picked, the "Accept" action. Null when the
+/// caller has not volunteered.
+class MyOffer {
+  final String status; // offered | picked | accepted | withdrawn
+  final bool picked;
+  final String? pickedAt;
+  final String? acceptedAt;
+
+  const MyOffer({
+    required this.status,
+    required this.picked,
+    this.pickedAt,
+    this.acceptedAt,
+  });
+
+  factory MyOffer.fromJson(Map<String, dynamic>? j) {
+    if (j == null) return const MyOffer(status: 'none', picked: false);
+    return MyOffer(
+      status: (j['status'] ?? 'none') as String,
+      picked: j['picked'] == true,
+      pickedAt: j['picked_at'] as String?,
+      acceptedAt: j['accepted_at'] as String?,
+    );
+  }
+}
+
 /// The full community page payload.
 class Community {
   final int id;
@@ -122,6 +177,15 @@ class Community {
   final String? joinCode; // present on create / to the owner
   final String? inviteMessage; // present on create
   final String? joinMessage; // present on resolve-by-code
+  // [LOCAL-702 / D663 §1] The organiser step-down state machine.
+  final String status; // active | handover | archived
+  final bool lookingForOrganiser; // true while in hand-over
+  final bool archived; // true once archived
+  final bool acceptsNewMembers; // false in handover/archived
+  final String? steppedDownAt;
+  final String? archivedAt;
+  final List<OrganiserOffer> organiserOffers; // owner view, during hand-over
+  final MyOffer? myOffer; // the caller's own offer, during hand-over
 
   const Community({
     required this.id,
@@ -144,6 +208,14 @@ class Community {
     this.joinCode,
     this.inviteMessage,
     this.joinMessage,
+    this.status = 'active',
+    this.lookingForOrganiser = false,
+    this.archived = false,
+    this.acceptsNewMembers = true,
+    this.steppedDownAt,
+    this.archivedAt,
+    this.organiserOffers = const [],
+    this.myOffer,
   });
 
   factory Community.fromJson(Map<String, dynamic> j) {
@@ -177,6 +249,17 @@ class Community {
       joinCode: j['join_code'] as String?,
       inviteMessage: j['invite_message'] as String?,
       joinMessage: j['join_message'] as String?,
+      status: (j['status'] ?? 'active') as String,
+      lookingForOrganiser: j['looking_for_organiser'] == true,
+      archived: j['archived'] == true,
+      // Default TRUE when the server omits the field (older shape = active).
+      acceptsNewMembers: j['accepts_new_members'] != false,
+      steppedDownAt: j['stepped_down_at'] as String?,
+      archivedAt: j['archived_at'] as String?,
+      organiserOffers: list(j['organiser_offers'], OrganiserOffer.fromJson),
+      myOffer: j['my_offer'] is Map<String, dynamic>
+          ? MyOffer.fromJson(j['my_offer'] as Map<String, dynamic>)
+          : null,
     );
   }
 }

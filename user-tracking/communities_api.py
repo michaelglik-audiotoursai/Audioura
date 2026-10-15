@@ -16,6 +16,13 @@ entitlements_api.py). It owns the HTTP surface for communities:
   POST /communities/<id>/report           report -> owner
   GET  /communities/map?...                Listed communities for the Home map
   GET  /communities/mine?user_id=...       the member's joined communities (Listen origin)
+  POST /communities/<id>/step-down         owner steps down -> handover (D663 §1)
+  POST /communities/<id>/offer-organiser   a member volunteers to take over
+  POST /communities/<id>/withdraw-offer    a volunteer withdraws
+  POST /communities/<id>/pick-organiser    owner picks a volunteer
+  POST /communities/<id>/accept-organiser  picked member accepts -> becomes owner, reopens
+  DELETE /communities/<id>                 owner deletes a MEMBER-LESS community (D663 §1 d)
+  POST /communities/archive/run            daily archive tick (handover 30d -> archived)
   POST /communities/reminders/run         reminder tick (3-days-before + at-expiry)
 
 The PASS PURCHASE goes through the existing /purchases/verify path: that route
@@ -292,6 +299,90 @@ def _membership(cur, user_id, community_id):
 
 
 # ───────────────────────────────────────────────────────────────────────────
+# Organiser step-down state machine (LOCAL-702, D663 §1)
+# ───────────────────────────────────────────────────────────────────────────
+# A community's `status` is the state machine:
+#   active   — normal; new members may join and buy passes.
+#   handover — the owner stepped down (D663 §1 (a)): stays readable/playable for
+#              existing members, REFUSES new joins/pass sales (409
+#              community_closed_to_new_members), shows "Looking for a new
+#              organiser". A member volunteers; the owner picks; the member
+#              accepts → becomes owner, the community reopens (→ active).
+#   archived — no new organiser within ARCHIVE_AFTER_DAYS of stepping down
+#              (D663 §1 (c)): members keep downloads, nothing new. Terminal.
+STATUS_ACTIVE = 'active'
+STATUS_HANDOVER = 'handover'
+STATUS_ARCHIVED = 'archived'
+
+# D663 §1 (c): no new organiser within 30 days → archived. The daily job on the
+# tick flips handover→archived at this age. Overridable for tests.
+ARCHIVE_AFTER_DAYS = int(os.getenv('COMMUNITY_ARCHIVE_AFTER_DAYS', '30'))
+
+# The terms a NEW organiser must accept when taking over (LOCAL-691
+# document_acceptance). Recorded server-side on accept so the hand-over leaves
+# the same audit trail as creating a community.
+ORGANISER_TERMS_DOCUMENT = 'organiser_terms'
+ORGANISER_TERMS_VERSION = os.getenv('ORGANISER_TERMS_VERSION', '2026-10-14-draft1')
+
+
+def _accepts_new_members(status):
+    """True iff a community in `status` accepts NEW members (free joins and pass
+    sales). Only an 'active' community does; a 'handover' or 'archived' community
+    is closed to new members (D663 §1 (a)/(c)). An unknown/NULL status is
+    treated as active (the pre-LOCAL-702 default)."""
+    return status in (None, '', STATUS_ACTIVE)
+
+
+def _record_organiser_terms_acceptance(cur, user_id):
+    """Record the incoming organiser's terms acceptance (LOCAL-691). Idempotent
+    (ON CONFLICT DO NOTHING). Best-effort: a missing document_acceptance table
+    must not break the hand-over, so any error is swallowed — the ownership
+    transfer is the binding act, the acceptance is its audit trail."""
+    try:
+        cur.execute(
+            """INSERT INTO document_acceptance (user_id, document, version)
+               VALUES (%s, %s, %s)
+               ON CONFLICT (user_id, document, version) DO NOTHING""",
+            (user_id, ORGANISER_TERMS_DOCUMENT, ORGANISER_TERMS_VERSION),
+        )
+    except Exception:  # noqa: BLE001 — acceptance is an audit trail, not a gate
+        logger.warning("[LOCAL-702] could not record organiser terms acceptance")
+
+
+def _community_member_count(cur, community_id):
+    """How many members a community has (D658: a community WITHOUT members can
+    still be deleted by its owner; once members exist, it cannot be closed)."""
+    cur.execute(
+        "SELECT COUNT(*) FROM community_memberships WHERE community_id = %s",
+        (community_id,),
+    )
+    return cur.fetchone()[0]
+
+
+def archive_stale_handovers(cur, now=None, after_days=ARCHIVE_AFTER_DAYS):
+    """The daily archive job (D663 §1 (c)). Flip every community that has been
+    in 'handover' for ≥ after_days (measured from stepped_down_at) to
+    'archived', stamping archived_at. Returns the list of community ids archived
+    this run. Idempotent: a community already archived is not touched (the WHERE
+    only matches status='handover'); running twice archives nothing new.
+
+    LEAD wires the daily tick to call this (see SUBMISSION) — the same pattern
+    as the reminder tick: a tiny endpoint the external scheduler hits daily."""
+    now = now or datetime.utcnow()
+    cutoff = now - timedelta(days=after_days)
+    cur.execute(
+        """UPDATE communities
+              SET status = %s, archived_at = %s, updated_at = NOW()
+            WHERE status = %s
+              AND stepped_down_at IS NOT NULL
+              AND stepped_down_at <= %s
+            RETURNING id""",
+        (STATUS_ARCHIVED, now, STATUS_HANDOVER, cutoff),
+    )
+    return [r[0] for r in cur.fetchall()]
+
+
+# ───────────────────────────────────────────────────────────────────────────
 # Community row -> page payload
 # ───────────────────────────────────────────────────────────────────────────
 def _community_row(cur, community_id):
@@ -299,7 +390,8 @@ def _community_row(cur, community_id):
         """SELECT id, owner_user_id, name, description, organiser_name,
                   organiser_photo_url, organiser_bio, organiser_contact,
                   rules_text, waiver_text, has_waiver, is_paid, visibility,
-                  latitude, longitude, join_code, feed_url, disabled
+                  latitude, longitude, join_code, feed_url, disabled,
+                  status, stepped_down_at, archived_at
            FROM communities WHERE id = %s""",
         (community_id,),
     )
@@ -309,7 +401,8 @@ def _community_row(cur, community_id):
     keys = ['id', 'owner_user_id', 'name', 'description', 'organiser_name',
             'organiser_photo_url', 'organiser_bio', 'organiser_contact',
             'rules_text', 'waiver_text', 'has_waiver', 'is_paid', 'visibility',
-            'latitude', 'longitude', 'join_code', 'feed_url', 'disabled']
+            'latitude', 'longitude', 'join_code', 'feed_url', 'disabled',
+            'status', 'stepped_down_at', 'archived_at']
     return dict(zip(keys, row))
 
 
@@ -375,6 +468,17 @@ def _community_page(cur, community_id, user_id=None, now=None):
         'disabled': c['disabled'],
         'latitude': c['latitude'],
         'longitude': c['longitude'],
+        # [LOCAL-702 / D663 §1] The hand-over state machine. `status` is active |
+        # handover | archived. `looking_for_organiser` is the banner flag the
+        # member sees while the community is in hand-over (closed to new members,
+        # waiting for a volunteer to take over). `archived` tells the app to show
+        # the read-only "archived — downloads only" state.
+        'status': c['status'] or STATUS_ACTIVE,
+        'looking_for_organiser': (c['status'] == STATUS_HANDOVER),
+        'archived': (c['status'] == STATUS_ARCHIVED),
+        'accepts_new_members': _accepts_new_members(c['status']),
+        'stepped_down_at': c['stepped_down_at'].isoformat() if c['stepped_down_at'] else None,
+        'archived_at': c['archived_at'].isoformat() if c['archived_at'] else None,
         'passes': _passes_for(cur, community_id),
         'is_owner': is_owner,
         'my_status': {
@@ -386,6 +490,16 @@ def _community_page(cur, community_id, user_id=None, now=None):
         'episodes': _episodes_for(cur, community_id) if active else [],
         'episode_count': _episode_count(cur, community_id),
     }
+    # [LOCAL-702 / D663 §1] While in hand-over, a member can see whether THEY
+    # have volunteered (and whether they are the one the owner picked), so the
+    # app can show "You volunteered" / "You were picked — Accept". NULL when the
+    # caller has no offer. The owner additionally gets the full volunteer list to
+    # pick from.
+    if c['status'] == STATUS_HANDOVER:
+        if user_id:
+            payload['my_offer'] = _my_offer(cur, community_id, user_id)
+        if is_owner:
+            payload['organiser_offers'] = _offers_for(cur, community_id)
     # [LOCAL-700 §4] The organiser's page ALWAYS carries the invite code (with
     # Copy/Share/Email/Regenerate in the app). The code is owner-only — a member
     # or non-member never sees another community's code here.
@@ -393,6 +507,42 @@ def _community_page(cur, community_id, user_id=None, now=None):
         payload['join_code'] = c['join_code']
         payload['invite_message'] = build_invite_message(c['name'], c['join_code'])
     return payload
+
+
+def _offers_for(cur, community_id):
+    """The hand-over volunteers for a community (owner view). Each: the member,
+    their offer status, and the pick/accept timestamps. Withdrawn/superseded
+    offers are omitted — the owner only picks from live volunteers."""
+    cur.execute(
+        """SELECT member_user_id, status, picked_at, accepted_at, created_at
+           FROM community_organiser_offers
+           WHERE community_id = %s AND status IN ('offered', 'picked', 'accepted')
+           ORDER BY created_at""",
+        (community_id,),
+    )
+    return [{'member_user_id': r[0], 'status': r[1],
+             'picked_at': r[2].isoformat() if r[2] else None,
+             'accepted_at': r[3].isoformat() if r[3] else None,
+             'offered_at': r[4].isoformat() if r[4] else None}
+            for r in cur.fetchall()]
+
+
+def _my_offer(cur, community_id, user_id):
+    """The caller's own hand-over offer for a community, or None. Lets the app
+    show "You volunteered" and, when picked, the "Accept" action."""
+    cur.execute(
+        """SELECT status, picked_at, accepted_at
+           FROM community_organiser_offers
+           WHERE community_id = %s AND member_user_id = %s""",
+        (community_id, user_id),
+    )
+    row = cur.fetchone()
+    if not row:
+        return None
+    return {'status': row[0],
+            'picked': row[0] == 'picked',
+            'picked_at': row[1].isoformat() if row[1] else None,
+            'accepted_at': row[2].isoformat() if row[2] else None}
 
 
 def _episode_count(cur, community_id):
@@ -541,6 +691,21 @@ def verify_community_pass(store, transaction_id, product, user_id,
             cur.close()
             return jsonify({"error": "community_disabled",
                             "message": "This community is unavailable."}), 403
+
+        # [LOCAL-702 / D663 §1] A community in hand-over or archived is CLOSED to
+        # new members: no pass sales. An EXISTING member buying again (renewing)
+        # is still allowed — the gate blocks a NEW membership, not a renewal of
+        # one that already exists (the member joined while it was active).
+        if not _accepts_new_members(c['status']):
+            existing_member = _membership(cur, user_id, int(community_id)) is not None
+            if not existing_member:
+                cur.close()
+                return jsonify({
+                    "error": "community_closed_to_new_members",
+                    "message": "This community has stopped taking new members "
+                               "while it looks for a new organiser.",
+                    "status": c['status'],
+                }), 409
 
         # The store product must be a known PRICE in the catalogue.
         cat = _pass_catalogue_product(cur, product)
@@ -996,6 +1161,19 @@ def join_free_community(community_id):
             cur.close()
             return jsonify({"error": "payment_required",
                             "message": "This community requires a pass."}), 402
+        # [LOCAL-702 / D663 §1] Closed to new members while in hand-over/archived.
+        # An existing member re-joining is a no-op the gate still allows; a NEW
+        # join is refused with 409 community_closed_to_new_members.
+        if not _accepts_new_members(c['status']):
+            existing_member = _membership(cur, user_id, community_id) is not None
+            if not existing_member:
+                cur.close()
+                return jsonify({
+                    "error": "community_closed_to_new_members",
+                    "message": "This community has stopped taking new members "
+                               "while it looks for a new organiser.",
+                    "status": c['status'],
+                }), 409
         # Free membership: no expiry (NULL).
         _upsert_membership(cur, user_id, community_id, None, None, None, None, None)
         conn.commit()
@@ -1312,6 +1490,346 @@ def my_owned_communities():
         out = [{'id': r[0], 'name': r[1]} for r in cur.fetchall()]
         cur.close()
         return jsonify({"communities": out}), 200
+    finally:
+        conn.close()
+
+
+# ───────────────────────────────────────────────────────────────────────────
+# Organiser step-down, hand-over and archive (LOCAL-702, D663 §1)
+# ───────────────────────────────────────────────────────────────────────────
+@communities_bp.route('/communities/<int:community_id>/step-down', methods=['POST'])
+def step_down(community_id):
+    """[D663 §1 (a)] The OWNER steps down as organiser (after a confirmation in
+    the app). active → handover. The community then: stays readable/playable for
+    existing members, REFUSES new joins/pass sales (409), and shows "Looking for
+    a new organiser" to members. Sets stepped_down_at, which starts the 30-day
+    archive clock.
+
+    Body: {owner_user_id | user_id}. 404 unknown; 403 not the owner; 409
+    already_archived (an archived community cannot step down again). Stepping
+    down an already-handover community is idempotent (200, no clock reset)."""
+    err = _require_api_key()
+    if err:
+        return err
+    data = request.get_json(silent=True) or {}
+    user_id = data.get('owner_user_id') or data.get('user_id')
+    if not user_id:
+        return jsonify({"error": "missing_fields",
+                        "message": "owner_user_id is required."}), 400
+    conn = _get_db()
+    try:
+        cur = conn.cursor()
+        c = _community_row(cur, community_id)
+        if not c or c['disabled']:
+            cur.close()
+            return jsonify({"error": "not_found"}), 404
+        if c['owner_user_id'] != user_id:
+            cur.close()
+            return jsonify({"error": "forbidden",
+                            "message": "Only the owner can step down."}), 403
+        if c['status'] == STATUS_ARCHIVED:
+            cur.close()
+            return jsonify({"error": "already_archived",
+                            "message": "This community is archived."}), 409
+        if c['status'] == STATUS_HANDOVER:
+            # Idempotent — already stepping down. Do not reset the archive clock.
+            payload = _community_page(cur, community_id, user_id=user_id)
+            cur.close()
+            return jsonify(payload), 200
+        now = datetime.utcnow()
+        cur.execute(
+            "UPDATE communities SET status = %s, stepped_down_at = %s, "
+            "updated_at = NOW() WHERE id = %s",
+            (STATUS_HANDOVER, now, community_id),
+        )
+        conn.commit()
+        payload = _community_page(cur, community_id, user_id=user_id)
+        cur.close()
+        return jsonify(payload), 200
+    finally:
+        conn.close()
+
+
+@communities_bp.route('/communities/<int:community_id>/offer-organiser', methods=['POST'])
+def offer_organiser(community_id):
+    """[D663 §1 (b)] A member VOLUNTEERS to take over a community in hand-over.
+    Before stepping down the OWNER may also volunteer a hand-over (so this is
+    open to the owner too); after stepping down, ANY member may volunteer. The
+    offer is recorded (offered); the owner then picks one.
+
+    Body: {user_id}. 404 unknown; 409 not_in_handover (only a hand-over
+    community takes offers). Re-volunteering reuses the row and resets it to
+    'offered' (so a withdrawn/superseded member can volunteer again)."""
+    err = _require_api_key()
+    if err:
+        return err
+    data = request.get_json(silent=True) or {}
+    user_id = data.get('user_id')
+    if not user_id:
+        return jsonify({"error": "user_id is required"}), 400
+    conn = _get_db()
+    try:
+        cur = conn.cursor()
+        c = _community_row(cur, community_id)
+        if not c or c['disabled']:
+            cur.close()
+            return jsonify({"error": "not_found"}), 404
+        if c['status'] != STATUS_HANDOVER:
+            cur.close()
+            return jsonify({"error": "not_in_handover",
+                            "message": "This community is not looking for a new "
+                                       "organiser."}), 409
+        cur.execute(
+            """INSERT INTO community_organiser_offers
+                   (community_id, member_user_id, status)
+               VALUES (%s, %s, 'offered')
+               ON CONFLICT (community_id, member_user_id) DO UPDATE SET
+                   status = 'offered', picked_at = NULL, accepted_at = NULL,
+                   updated_at = NOW()""",
+            (community_id, user_id),
+        )
+        conn.commit()
+        payload = _community_page(cur, community_id, user_id=user_id)
+        cur.close()
+        return jsonify(payload), 200
+    finally:
+        conn.close()
+
+
+@communities_bp.route('/communities/<int:community_id>/withdraw-offer', methods=['POST'])
+def withdraw_offer(community_id):
+    """[D663 §1 (b)] A volunteer withdraws their offer. Body: {user_id}. The
+    offer becomes 'withdrawn' (inert). 404 if there is no such open offer."""
+    err = _require_api_key()
+    if err:
+        return err
+    data = request.get_json(silent=True) or {}
+    user_id = data.get('user_id')
+    if not user_id:
+        return jsonify({"error": "user_id is required"}), 400
+    conn = _get_db()
+    try:
+        cur = conn.cursor()
+        cur.execute(
+            "UPDATE community_organiser_offers SET status = 'withdrawn', "
+            "picked_at = NULL, accepted_at = NULL, updated_at = NOW() "
+            "WHERE community_id = %s AND member_user_id = %s "
+            "AND status IN ('offered', 'picked') RETURNING id",
+            (community_id, user_id),
+        )
+        row = cur.fetchone()
+        conn.commit()
+        if not row:
+            cur.close()
+            return jsonify({"error": "not_found",
+                            "message": "No open offer to withdraw."}), 404
+        cur.close()
+        return jsonify({"withdrawn": True}), 200
+    finally:
+        conn.close()
+
+
+@communities_bp.route('/communities/<int:community_id>/pick-organiser', methods=['POST'])
+def pick_organiser(community_id):
+    """[D663 §1 (b)] The stepping-down OWNER picks a volunteer. Body:
+    {owner_user_id | user_id, member_user_id}. The picked offer becomes
+    'picked'; any previously picked offer for this community is superseded back
+    to 'offered' (the owner can change their mind). The picked member then
+    ACCEPTS to become the owner.
+
+    404 unknown community / no such offer; 403 not the owner; 409 not_in_handover."""
+    err = _require_api_key()
+    if err:
+        return err
+    data = request.get_json(silent=True) or {}
+    user_id = data.get('owner_user_id') or data.get('user_id')
+    member_user_id = data.get('member_user_id')
+    if not user_id or not member_user_id:
+        return jsonify({"error": "missing_fields",
+                        "message": "owner_user_id and member_user_id are required."}), 400
+    conn = _get_db()
+    try:
+        cur = conn.cursor()
+        c = _community_row(cur, community_id)
+        if not c or c['disabled']:
+            cur.close()
+            return jsonify({"error": "not_found"}), 404
+        if c['owner_user_id'] != user_id:
+            cur.close()
+            return jsonify({"error": "forbidden",
+                            "message": "Only the owner can pick a new organiser."}), 403
+        if c['status'] != STATUS_HANDOVER:
+            cur.close()
+            return jsonify({"error": "not_in_handover",
+                            "message": "This community is not in hand-over."}), 409
+        # The target must have an open offer.
+        cur.execute(
+            "SELECT id, status FROM community_organiser_offers "
+            "WHERE community_id = %s AND member_user_id = %s",
+            (community_id, member_user_id),
+        )
+        offer = cur.fetchone()
+        if not offer or offer[1] not in ('offered', 'picked'):
+            cur.close()
+            return jsonify({"error": "no_such_offer",
+                            "message": "That member has not volunteered."}), 404
+        # Supersede any OTHER picked offer back to 'offered' (one pick at a time),
+        # then pick this one. Done in this order so the partial unique index
+        # (one 'picked' per community) is never violated mid-statement.
+        cur.execute(
+            "UPDATE community_organiser_offers SET status = 'offered', "
+            "picked_at = NULL, updated_at = NOW() "
+            "WHERE community_id = %s AND status = 'picked' AND member_user_id <> %s",
+            (community_id, member_user_id),
+        )
+        cur.execute(
+            "UPDATE community_organiser_offers SET status = 'picked', "
+            "picked_at = %s, updated_at = NOW() "
+            "WHERE community_id = %s AND member_user_id = %s",
+            (datetime.utcnow(), community_id, member_user_id),
+        )
+        conn.commit()
+        payload = _community_page(cur, community_id, user_id=user_id)
+        cur.close()
+        return jsonify(payload), 200
+    finally:
+        conn.close()
+
+
+@communities_bp.route('/communities/<int:community_id>/accept-organiser', methods=['POST'])
+def accept_organiser(community_id):
+    """[D663 §1 (b)] The PICKED member accepts and becomes the owner. The
+    community REOPENS (handover → active), ownership transfers to the member,
+    the archive clock clears, and the incoming organiser's terms acceptance is
+    recorded (LOCAL-691 document_acceptance). All open offers are closed.
+
+    Body: {user_id}. 404 unknown; 409 not_in_handover; 403 not_picked (only the
+    member the owner picked may accept)."""
+    err = _require_api_key()
+    if err:
+        return err
+    data = request.get_json(silent=True) or {}
+    user_id = data.get('user_id')
+    if not user_id:
+        return jsonify({"error": "user_id is required"}), 400
+    conn = _get_db()
+    try:
+        cur = conn.cursor()
+        c = _community_row(cur, community_id)
+        if not c or c['disabled']:
+            cur.close()
+            return jsonify({"error": "not_found"}), 404
+        if c['status'] != STATUS_HANDOVER:
+            cur.close()
+            return jsonify({"error": "not_in_handover",
+                            "message": "This community is not in hand-over."}), 409
+        cur.execute(
+            "SELECT status FROM community_organiser_offers "
+            "WHERE community_id = %s AND member_user_id = %s",
+            (community_id, user_id),
+        )
+        offer = cur.fetchone()
+        if not offer or offer[0] != 'picked':
+            cur.close()
+            return jsonify({"error": "not_picked",
+                            "message": "Only the member the owner picked can "
+                                       "accept the hand-over."}), 403
+
+        now = datetime.utcnow()
+        # Transfer ownership + reopen. The organiser card is left as stored; the
+        # app lets the new owner edit it. stepped_down_at/archived_at clear so
+        # the community starts fresh.
+        cur.execute(
+            "UPDATE communities SET owner_user_id = %s, status = %s, "
+            "stepped_down_at = NULL, archived_at = NULL, updated_at = NOW() "
+            "WHERE id = %s",
+            (user_id, STATUS_ACTIVE, community_id),
+        )
+        # Mark this offer accepted; close every other offer for the community.
+        cur.execute(
+            "UPDATE community_organiser_offers SET status = 'accepted', "
+            "accepted_at = %s, updated_at = NOW() "
+            "WHERE community_id = %s AND member_user_id = %s",
+            (now, community_id, user_id),
+        )
+        cur.execute(
+            "UPDATE community_organiser_offers SET status = 'withdrawn', "
+            "picked_at = NULL, updated_at = NOW() "
+            "WHERE community_id = %s AND member_user_id <> %s "
+            "AND status IN ('offered', 'picked')",
+            (community_id, user_id),
+        )
+        # [LOCAL-691] Record the incoming organiser's terms acceptance.
+        _record_organiser_terms_acceptance(cur, user_id)
+        conn.commit()
+        payload = _community_page(cur, community_id, user_id=user_id)
+        cur.close()
+        return jsonify(payload), 200
+    finally:
+        conn.close()
+
+
+@communities_bp.route('/communities/<int:community_id>', methods=['DELETE'])
+def delete_community(community_id):
+    """[D663 §1 (d)] A community WITHOUT members can still be DELETED by its
+    owner. The D658 rule only forbids CLOSING a community once members exist —
+    so this refuses (409 has_members) when the community has ≥ 1 membership, and
+    deletes the empty community (and its children, via ON DELETE CASCADE)
+    otherwise.
+
+    Body: {owner_user_id | user_id}. 404 unknown; 403 not the owner; 409
+    has_members. 200 {deleted:true} on success."""
+    err = _require_api_key()
+    if err:
+        return err
+    data = request.get_json(silent=True) or {}
+    user_id = data.get('owner_user_id') or data.get('user_id')
+    if not user_id:
+        return jsonify({"error": "missing_fields",
+                        "message": "owner_user_id is required."}), 400
+    conn = _get_db()
+    try:
+        cur = conn.cursor()
+        c = _community_row(cur, community_id)
+        if not c:
+            cur.close()
+            return jsonify({"error": "not_found"}), 404
+        if c['owner_user_id'] != user_id:
+            cur.close()
+            return jsonify({"error": "forbidden",
+                            "message": "Only the owner can delete a community."}), 403
+        if _community_member_count(cur, community_id) > 0:
+            cur.close()
+            return jsonify({
+                "error": "has_members",
+                "message": "A community with members cannot be deleted. Step "
+                           "down to hand it over instead.",
+            }), 409
+        cur.execute("DELETE FROM communities WHERE id = %s", (community_id,))
+        conn.commit()
+        cur.close()
+        return jsonify({"deleted": True, "id": community_id}), 200
+    finally:
+        conn.close()
+
+
+@communities_bp.route('/communities/archive/run', methods=['POST'])
+def archive_run():
+    """[D663 §1 (c)] The DAILY archive job. Flip every community that has been in
+    hand-over for ≥ 30 days (from stepped_down_at) to 'archived'. Returns the
+    archived community ids. Idempotent (only matches status='handover').
+
+    LEAD wires the daily tick to call this — see SUBMISSION_LOCAL-702.md."""
+    err = _require_api_key()
+    if err:
+        return err
+    conn = _get_db()
+    try:
+        cur = conn.cursor()
+        archived = archive_stale_handovers(cur)
+        conn.commit()
+        cur.close()
+        return jsonify({"archived": archived, "count": len(archived)}), 200
     finally:
         conn.close()
 
