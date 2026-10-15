@@ -2548,7 +2548,33 @@ class _HomeScreenState extends State<HomeScreen> {
           // this paid tour is not unlocked for this device. Never crash — close
           // the progress dialog and tell the listener to buy. The download
           // dialog's "Buy & Download" is the path that unlocks first.
+          //
+          // [LOCAL-701 / D663 §3] A COMMUNITY tour refuses with
+          // {"error":"membership_required","community_id":…} instead. The pass
+          // is bought on the community page (join / buy pass), the same flow as
+          // a paid tour — so open that page rather than the Buy dialog.
           if (mounted && Navigator.canPop(context)) Navigator.pop(context);
+          int? _communityId;
+          try {
+            final body = json.decode(response.body);
+            if (body is Map && body['error'] == 'membership_required') {
+              final cid = body['community_id'];
+              if (cid is int) _communityId = cid;
+              else if (cid is num) _communityId = cid.toInt();
+            }
+          } catch (_) {}
+          if (_communityId != null) {
+            if (mounted) {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) =>
+                      CommunityPageScreen(communityId: _communityId),
+                ),
+              );
+            }
+            return;
+          }
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(

@@ -16,6 +16,7 @@ import '../services/background_tour_monitor.dart';
 import '../config/endpoints.dart';
 import '../services/translation_service.dart';
 import '../services/error_handler_service.dart';
+import '../services/community_tour_service.dart';
 
 import '../screens/debug_log_viewer_screen.dart';
 import '../screens/tour_player_screen.dart';
@@ -55,6 +56,15 @@ class _TourGeneratorScreenState extends State<TourGeneratorScreen> {
   // The user's own ordered stop list, once they have named and reviewed it.
   List<Map<String, dynamic>> _userStops = [];
 
+  // [LOCAL-701 / D663 §3] Generate FOR a community. The "For:" selector shows
+  // ONLY to an organiser (owner of ≥ 1 community); _ownedCommunities is loaded
+  // once in initState. _communityTarget is the chosen target (default: "Just me
+  // / public as usual"). When a community is chosen its id + visibility are
+  // merged into the generate body; the orchestrator tags the stored tour and
+  // charges this organiser's plan allowance as for any tour.
+  List<OwnedCommunity> _ownedCommunities = const [];
+  CommunityTourTarget _communityTarget = CommunityTourTarget.justMe;
+
   // [LOCAL-581] Snapshot of the last tour request submitted this session, so
   // "Try again" can re-submit the IDENTICAL request (location text, tour type,
   // stop count, user stops, language) instead of silently doing nothing
@@ -70,6 +80,7 @@ class _TourGeneratorScreenState extends State<TourGeneratorScreen> {
     super.initState();
     _loadBackgroundStatus();
     _loadAppMode();
+    _loadOwnedCommunities();  // [LOCAL-701] populate the "For:" selector (organisers only)
     
     // Check for stalled tours immediately
     BackgroundTourMonitor.checkStalledTours();
@@ -136,6 +147,102 @@ class _TourGeneratorScreenState extends State<TourGeneratorScreen> {
   Map<String, dynamic> _parseTourRequest(String request) {
     // [LOCAL-358] Delegates to top-level utility for testability.
     return parseTourRequest(request);
+  }
+
+  // [LOCAL-701 / D663 §3] Load the communities this user OWNS so the Generate
+  // tab can offer the "For: my community <name>" selector. Only an organiser
+  // (owner of ≥ 1 community) sees it; a listener with none sees nothing. Never
+  // throws — an empty list just hides the selector.
+  Future<void> _loadOwnedCommunities() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final userId = prefs.getString('user_id') ?? '';
+      if (userId.isEmpty) return;
+      final owned = await CommunityTourService.ownedCommunities(userId);
+      if (!mounted) return;
+      setState(() => _ownedCommunities = owned);
+    } catch (_) {
+      // Non-fatal: the selector simply stays hidden.
+    }
+  }
+
+  // [LOCAL-701 / D663 §3] The "For:" selector widget. Shown ONLY to an
+  // organiser. "Just me / public as usual" is the default; choosing a community
+  // reveals the members/public visibility choice with a one-line hint.
+  Widget _buildCommunitySelector() {
+    if (!CommunityTourRules.selectorVisible(_ownedCommunities)) {
+      return const SizedBox.shrink();
+    }
+    final selectedId = _communityTarget.community?.id;
+    return Card(
+      margin: const EdgeInsets.only(top: 8, bottom: 8),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('For', style: TextStyle(fontWeight: FontWeight.bold)),
+            DropdownButton<int?>(
+              isExpanded: true,
+              value: selectedId,
+              items: [
+                const DropdownMenuItem<int?>(
+                  value: null,
+                  child: Text(CommunityTourRules.justMeLabel),
+                ),
+                ..._ownedCommunities.map((c) => DropdownMenuItem<int?>(
+                      value: c.id,
+                      child: Text(CommunityTourRules.communityLabel(c.name),
+                          overflow: TextOverflow.ellipsis),
+                    )),
+              ],
+              onChanged: (id) {
+                setState(() {
+                  if (id == null) {
+                    _communityTarget = CommunityTourTarget.justMe;
+                  } else {
+                    final c =
+                        _ownedCommunities.firstWhere((e) => e.id == id);
+                    _communityTarget = CommunityTourTarget(
+                        community: c,
+                        visibility: CommunityTourRules.defaultVisibility);
+                  }
+                });
+              },
+            ),
+            if (_communityTarget.isCommunity) ...[
+              const SizedBox(height: 8),
+              Row(
+                children: CommunityTourRules.visibilityChoices.map((v) {
+                  return Expanded(
+                    child: RadioListTile<String>(
+                      contentPadding: EdgeInsets.zero,
+                      dense: true,
+                      value: v,
+                      groupValue: _communityTarget.visibility,
+                      title: Text(v == 'public' ? 'Public' : 'Members'),
+                      onChanged: (val) {
+                        if (val == null) return;
+                        setState(() => _communityTarget = CommunityTourTarget(
+                            community: _communityTarget.community,
+                            visibility: val));
+                      },
+                    ),
+                  );
+                }).toList(),
+              ),
+              Padding(
+                padding: const EdgeInsets.only(top: 4),
+                child: Text(
+                  CommunityTourRules.visibilityHint(_communityTarget.visibility),
+                  style: const TextStyle(fontSize: 12, color: Colors.grey),
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
   }
 
   String _sanitizeInput(String input) {
@@ -241,6 +348,10 @@ class _TourGeneratorScreenState extends State<TourGeneratorScreen> {
       final prefs = await SharedPreferences.getInstance();
       final userId = prefs.getString('user_id') ?? '';
       if (userId.isNotEmpty) tourData['user_id'] = userId;
+      // [LOCAL-701 / D663 §3] If the organiser chose "For: my community", merge
+      // community_id + community_visibility so the orchestrator tags the stored
+      // tour. Default "Just me / public as usual" merges nothing.
+      tourData.addAll(_communityTarget.generateFields());
       // Include narrative tone from onboarding (Storied personalization)
       final tone = prefs.getString('narrative_tone') ?? 'general';
       tourData['narrative_tone'] = tone;
@@ -1601,6 +1712,10 @@ class _TourGeneratorScreenState extends State<TourGeneratorScreen> {
               const SizedBox(height: 20),
             ],
 
+            // [LOCAL-701 / D663 §3] "For: my community" selector — organisers
+            // only, Tours mode only (not News/Audio). Default is "Just me".
+            if (_appMode != 'Audio') _buildCommunitySelector(),
+
             Row(
               children: [
                 Expanded(
@@ -1788,6 +1903,10 @@ class _TourGeneratorScreenState extends State<TourGeneratorScreen> {
       final prefs = await SharedPreferences.getInstance();
       final userId = prefs.getString('user_id') ?? '';
       if (userId.isNotEmpty) tourData['user_id'] = userId;
+      // [LOCAL-701 / D663 §3] If the organiser chose "For: my community", merge
+      // community_id + community_visibility so the orchestrator tags the stored
+      // tour. Default "Just me / public as usual" merges nothing.
+      tourData.addAll(_communityTarget.generateFields());
       // Include narrative tone from onboarding (Storied personalization)
       final tone = prefs.getString('narrative_tone') ?? 'general';
       tourData['narrative_tone'] = tone;

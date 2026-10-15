@@ -15,6 +15,7 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../services/communities_service.dart';
+import '../services/community_tour_service.dart';
 import '../services/iap_service.dart';
 import '../services/device_service.dart';
 import '../services/document_acceptance_service.dart';
@@ -41,6 +42,9 @@ class _CommunityPageScreenState extends State<CommunityPageScreen> {
   bool _waiverAccepted = false;
   String? _userId;
   String? _error;
+  // [LOCAL-701 / D663 §3] Tours MADE WITH Audioura for this community, listed
+  // on the page like episodes. Populated for an active member / the owner only.
+  List<CommunityTour> _communityTours = const [];
 
   @override
   void initState() {
@@ -65,8 +69,18 @@ class _CommunityPageScreenState extends State<CommunityPageScreen> {
     } else {
       c = await CommunitiesService.get(widget.communityId!, userId: _userId);
     }
+    // [LOCAL-701 / D663 §3] Load the community's Audioura-made tours. The server
+    // returns an empty list for a non-member / expired member (expiry blocks new
+    // content), so this is populated only when the member is active or owner.
+    List<CommunityTour> ctours = const [];
+    if (c != null) {
+      final list =
+          await CommunityTourService.communityTours(c.id, userId: _userId);
+      if (list != null) ctours = list.tours;
+    }
     setState(() {
       _community = c;
+      _communityTours = ctours;
       _loading = false;
     });
   }
@@ -258,6 +272,30 @@ class _CommunityPageScreenState extends State<CommunityPageScreen> {
               padding: EdgeInsets.symmetric(vertical: 8),
               child: Text('Join to listen to the episodes.'),
             ),
+
+          // [LOCAL-701 / D663 §3] Tours MADE WITH Audioura for this community,
+          // listed like episodes. The server only returns them to an active
+          // member / the owner (expiry blocks new content), so the list is
+          // empty otherwise. A public one carries a small "On the map" note.
+          if (_communityTours.isNotEmpty) ...[
+            _sectionTitle('Tours (${_communityTours.length})'),
+            ..._communityTours.map((t) => ListTile(
+                  leading: const Icon(Icons.headphones),
+                  title: Text(t.name),
+                  subtitle: Text(t.isPublic
+                      ? 'On the map · members download free'
+                      : 'Members only'),
+                  trailing: t.isPublic
+                      ? const Icon(Icons.public, size: 18, color: Colors.teal)
+                      : null,
+                )),
+          ] else if (canListen) ...[
+            _sectionTitle('Tours'),
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 8),
+              child: Text('No Audioura-made tours in this community yet.'),
+            ),
+          ],
         ],
       ),
     );
