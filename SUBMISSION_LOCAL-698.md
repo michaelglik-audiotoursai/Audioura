@@ -2,7 +2,15 @@
 
 **Branch:** `LOCAL-698-one-stop-at-a-time`
 **Base:** `subscribed` (`26364ceb` — "Bump app to 2.4.19+55 (697 + 699 merged)")
-**Build:** `2.4.19+55` → **`2.4.19+56`**
+**Build:** `2.4.19+55` → **`2.4.20+57`**
+
+> **Merge note.** This branch was merged with `origin/subscribed`, which had
+> advanced by one commit — `afc190d4` "Merge LOCAL-700: Communities UX round 1".
+> The only conflict was `pubspec.yaml`'s version line (both sides had bumped the
+> build): `subscribed` carried `2.4.20+56`, this branch `2.4.19+56`. Resolved to
+> the higher app version with a fresh build bump: **`2.4.20+57`**. No source
+> conflict — LOCAL-700 touched Communities screens, disjoint from the player
+> code this ticket changes.
 
 ## The report
 Michael, 2026-10-15 (Pixel-4, a **downloaded Russian translation**): tapping a
@@ -74,18 +82,43 @@ Each injects it two ways, for defence in depth:
    `onLoadStop` — a safety net ensuring the patch is present before anything can
    auto-start.
 
-Because the guard is injected by the Flutter shell at runtime (not baked into
+Because the guard by the Flutter shell at runtime (not baked into
 the tour HTML), it **also fixes tours and translations that were already
 downloaded** before this build — closing reason (2) above. And because it
 patches the prototype rather than wrapping app helpers, it covers native control
 taps — closing reason (1).
+
+## Full play-path audit
+The ticket asks for **every** code path that starts stop audio to be checked.
+All stop audio in the Listen/player experience plays **inside the WebView** as
+`<audio>` elements, so the prototype patch is the single choke point that covers
+them. Each path was traced:
+
+| Path | Where | Covered by | Verdict |
+|------|-------|-----------|---------|
+| Native `<audio controls>` tap on a stop | server/translation-generated HTML, inside the WebView | prototype `play()` patch | ✅ the regressed path — now stops the other first |
+| `window.playAudio()` / `goToStop()` / `playAudioByIndex()` / `nextStop` / `previousStop` | app JS helpers in `tour_player_screen.dart` | they call `el.play()`, which is patched | ✅ |
+| Autoplay / page-load auto-start | tour & translation HTML | patch installed `AT_DOCUMENT_START`, before any script runs | ✅ |
+| Voice commands ("play", "next"…) | `voice_control_service.dart`, `voice_control_service_news.dart`, `voice_methods.dart` | they drive the same WebView helpers → patched `play()` | ✅ |
+| News player stops | `news_player_screen.dart` WebView | same controller injected both ways | ✅ |
+| **Stop-1 preview** (`tour_preview_player.dart`, `flutter_sound`) | the **download dialog** for an *unbought* paid tour — a native player, not in the WebView | **single shared instance**; `play()` already stops the prior preview; the dialog's close always calls `stop()` (`home_screen.dart:1623`); the player screen is not open at that moment | ✅ cannot overlap with a player stop |
+| **Android Auto** (`audio_handler.dart`, `just_audio`) | car head-unit / media session — a native handler, not the in-app Listen screen | its own single `AudioPlayer`; `playMediaItem` is a car-queue path, not the per-stop WebView tap in the report | ✅ out of the reported scenario; already single-instance |
+
+**Why native players are out of scope for *this* bug.** The report is "tapping a
+different **stop** while one is speaking" — stops live in the WebView. The two
+native Dart players (`flutter_sound` preview, `just_audio` Android Auto) each
+already enforce a single instance and are never on screen simultaneously with a
+WebView stop, so no cross-engine overlap is reachable from the reported flow.
+Unifying those two native pipelines with the WebView under one controller would
+be a larger refactor outside this regression; it is noted here as a known
+boundary, not a gap in the fix.
 
 ## Files changed
 - `audio_tour_app/lib/services/single_playback_controller.dart` *(new)* — the controller JS + doc.
 - `audio_tour_app/lib/screens/tour_player_screen.dart` — inject at document-start + onLoadStop.
 - `audio_tour_app/lib/screens/news_player_screen.dart` — inject at document-start + onLoadStop.
 - `audio_tour_app/test/single_playback_controller_test.dart` *(new)* — proof test.
-- `audio_tour_app/pubspec.yaml` — build bump `2.4.19+55` → `2.4.19+56`.
+- `audio_tour_app/pubspec.yaml` — build bump → `2.4.20+57` (after merging `origin/subscribed`).
 
 ## Tests
 `audio_tour_app/test/single_playback_controller_test.dart` — **5/5 pass**.
@@ -110,8 +143,12 @@ Run: `cd audio_tour_app && flutter test test/single_playback_controller_test.dar
 > covering the shim) only if `node` is absent; here it ran on node v26.5.0.
 
 ## Build verification
+Re-run on the merged tree (`2.4.20+57`), Flutter 3.41.6, node v26.5.0:
+- `flutter test test/single_playback_controller_test.dart`: **5/5 pass**
+  (4 Dart-contract + the Node one-stop harness).
 - `flutter analyze` on the changed files: **0 errors, 0 warnings** (68
-  pre-existing `info`-level `prefer_const` lints only, none introduced here).
+  pre-existing `info`-level `prefer_const_constructors` lints only, none in the
+  new controller or introduced by this change).
 - **Android:** `flutter build apk --debug` → `✓ Built build/app/outputs/flutter-apk/app-debug.apk`.
 - **iOS:** `flutter build ios --debug --no-codesign` → `✓ Built build/ios/iphoneos/Runner.app`.
 
