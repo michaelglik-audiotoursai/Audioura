@@ -19,6 +19,9 @@ class MyCommunitiesScreen extends StatefulWidget {
 class _MyCommunitiesScreenState extends State<MyCommunitiesScreen> {
   List<JoinedCommunity> _communities = [];
   bool _loading = true;
+  // LOCAL-694: false when the Communities backend (Service.userDb) is not on
+  // the current server (Storied). Drives an explanatory empty state.
+  bool _featureAvailable = true;
 
   @override
   void initState() {
@@ -33,9 +36,15 @@ class _MyCommunitiesScreenState extends State<MyCommunitiesScreen> {
       setState(() => _loading = false);
       return;
     }
-    final list = await CommunitiesService.mine(userId);
+    // Probe once: if Communities is not offered here, show the Preview note
+    // rather than a misleading "you haven't joined any" message.
+    final available = await CommunitiesService.isAvailable();
+    final list = available
+        ? await CommunitiesService.mine(userId)
+        : const <JoinedCommunity>[];
     if (!mounted) return;
     setState(() {
+      _featureAvailable = available;
       _communities = list;
       _loading = false;
     });
@@ -71,7 +80,18 @@ class _MyCommunitiesScreenState extends State<MyCommunitiesScreen> {
       ),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
-          : _communities.isEmpty
+          : !_featureAvailable
+              ? const Center(
+                  child: Padding(
+                    padding: EdgeInsets.all(32),
+                    child: Text(
+                      'Communities is available in Preview only.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(color: Colors.grey),
+                    ),
+                  ),
+                )
+              : _communities.isEmpty
               ? const Center(
                   child: Text(
                     'You have not joined any communities yet.\n'
