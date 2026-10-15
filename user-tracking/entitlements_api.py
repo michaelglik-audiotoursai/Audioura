@@ -960,6 +960,40 @@ def _verify_tour_signed(store, transaction_id, product, signed_transaction):
     return VerificationResult(False, f'verify_mode_not_implemented:{IAP_VERIFY_MODE}')
 
 
+@entitlements_bp.route('/purchases/mode', methods=['GET'])
+def purchases_mode():
+    """[LOCAL-699] Report how this server verifies purchases, so the app can
+    choose the right buy path on BOTH platforms WITHOUT guessing from a device-
+    side flag.
+
+    Returns {"mode": <IAP_VERIFY_MODE>, "stub": <bool>, "verifies_real": <bool>}:
+      • mode          — the raw IAP_VERIFY_MODE ('stub' | 'apple' | 'google').
+      • stub          — true iff mode == 'stub': the server grants on any non-
+                        empty transaction id (no real store, no charge), so the
+                        app offers a TEST PURCHASE that posts store='stub' to
+                        /purchases/verify. This is the Mac Mini LOCAL stack.
+      • verifies_real — the inverse: a real-verification server (apple/google)
+                        where the app must drive StoreKit / Play billing.
+
+    A LOCAL stack with IAP_VERIFY_MODE=stub answers stub=true; cloud (apple,
+    the default) answers stub=false. This replaces the app's device-side
+    server_mode guess with the server's own authoritative answer, so the TEST
+    PURCHASE path can never be offered against a real-verification server (which
+    would reject a store='stub' body) nor hidden on a stub server (which has no
+    Apple/Google products yet). No DB access; auth is the same X-API-Key gate as
+    the other routes (the local bypass applies identically)."""
+    err = _require_api_key()
+    if err:
+        return err
+    mode = IAP_VERIFY_MODE
+    is_stub = (mode == 'stub')
+    return jsonify({
+        "mode": mode,
+        "stub": is_stub,
+        "verifies_real": not is_stub,
+    }), 200
+
+
 @entitlements_bp.route('/purchases/verify', methods=['POST'])
 def purchases_verify():
     err = _require_api_key()
