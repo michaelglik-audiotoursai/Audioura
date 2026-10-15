@@ -2,7 +2,7 @@
 
 **DRAFT for review. Not published. Audioura LLC must approve (and may have a lawyer review) before this goes live.**
 
-**Version:** 2026-10-14-draft1
+**Version:** 2026-10-14-draft2 (LOCAL-693 / D660)
 **Last updated:** 14 October 2026
 **Who we are:** Audioura LLC, 44 Sharpe Rd, Newton Centre, MA 02459, USA · info@audioura.com
 
@@ -36,7 +36,7 @@ Used **only to generate and run a tour** (to find places near you and give direc
 ### Purchase records
 When you buy a tour or a community pass:
 - **Payment is handled entirely by Apple or Google. We never receive or store your card number or billing address.**
-- We store a **record of the purchase** — what you bought, the store's transaction identifier, and the time — so we can unlock your tour or pass and keep it available to re-download.
+- We store a **record of the purchase** — what you bought, the store's transaction identifier, and the time — so we can unlock your download and know which purchases you have made (each tour purchase pays for one download; see the Terms).
 
 ### Tour unlocks and community memberships
 - `tour_unlocks`: which tours (and in which language) your device owns.

@@ -2,7 +2,7 @@
 
 **DRAFT for review. Not published. Audioura LLC must approve before this goes live.**
 
-**Version:** 2026-10-14-draft1
+**Version:** 2026-10-14-draft2 (LOCAL-693 / D660)
 **Last updated:** 14 October 2026
 Audioura LLC · 44 Sharpe Rd, Newton Centre, MA 02459, USA · info@audioura.com
 
@@ -16,10 +16,10 @@ To request a refund, use the store you bought from:
 Each store decides refunds under its own policy and timeframes.
 
 ## What happens to a refunded tour
-When Apple or Google tells us a tour purchase was refunded:
-- The **tour unlock is removed** at the next time your device checks in online. After that, the tour locks again (Stop 1 preview only), as if it had not been bought.
-- Any **verified rating or review** you left on that tour (which is "verified" because you had bought it) is **removed**.
-- Audio you had already downloaded may remain on your device until the next online check removes the unlock.
+Each tour purchase pays for **one download** of that tour in that language (see the Terms, "What a purchase gives you"). When Apple or Google tells us a tour purchase was refunded:
+- If the purchase had **not yet been used to download** the tour, the unlock is removed at the next time your device checks in online, so it can no longer be downloaded.
+- A **verified rating or review** you left on that tour (which is "verified" because you had bought it) is **removed** when all of your purchases of that tour are refunded.
+- Audio you had already downloaded with a purchase may remain on your device; a refund does not reach onto your device to delete files you already downloaded, but it removes the unused unlock on our side.
 
 ## What happens to a refunded pass
 When a community pass purchase is refunded:
