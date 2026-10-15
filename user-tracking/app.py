@@ -27,6 +27,16 @@ try:
 except Exception as _com_err:  # pragma: no cover - import-time safety
     print(f"[LOCAL-690] WARNING: could not register communities blueprint: {_com_err}")
 
+# [LOCAL-691] Legal-page acceptance capture: /document-acceptance (POST to
+# record a version-stamped acceptance, GET to list a user's acceptances).
+# Required + stored for selling a guide tour and creating a community.
+try:
+    from document_acceptance_api import document_acceptance_bp
+    app.register_blueprint(document_acceptance_bp)
+    print("[LOCAL-691] document_acceptance blueprint registered")
+except Exception as _doc_err:  # pragma: no cover - import-time safety
+    print(f"[LOCAL-691] WARNING: could not register document_acceptance blueprint: {_doc_err}")
+
 def get_db():
     return psycopg2.connect(os.getenv('DATABASE_URL'))
 
