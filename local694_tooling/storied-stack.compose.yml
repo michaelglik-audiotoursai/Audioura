@@ -1,0 +1,119 @@
+# LOCAL-694 — Storied stack, isolated under `docker compose -p local694`.
+# Built from the origin/storied worktree. Host ports remapped to 53xx so
+# NOTHING collides with the running `audioura` dev stack (5000-5030).
+# No hardcoded container_name (compose prefixes with project), peer/DB
+# discovery provided via network aliases matching storied's getenv defaults.
+#
+# storied's own compose uses a bare `build: .` + root `Dockerfile`, but that
+# Dockerfile is a build artifact absent from the tree. The canonical shared
+# image is Dockerfile.cloudrun (all services, CMD-selected); news/newsletter/
+# polly/translation have their own. We wire each service to its real Dockerfile.
+#
+# Brings up exactly storied's service set. Deliberately does NOT run
+# user_api_service (userDb:5003), voice_control_service (voice:5008),
+# generate_tour_text_service (generator:5000), tour_id_resolution_service
+# (:5025) or custom_audio_service (:5023) — Storied's compose hosts none of
+# these, which is the condition under test.
+
+services:
+  postgres-2:
+    image: postgres:13
+    environment:
+      POSTGRES_DB: audiotours
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: password123
+    ports: ["5399:5432"]
+    networks:
+      default:
+        aliases: [postgres-2, development-postgres-2-1]
+    volumes:
+      - local694_pg:/var/lib/postgresql/data
+
+  tour-processor:
+    build: {context: ., dockerfile: Dockerfile.cloudrun}
+    ports: ["5301:5001"]
+    volumes: ["./tours:/app/tours"]
+    networks:
+      default:
+        aliases: [development-tour-processor-1, development-tour-update-1]
+    command: python tour_generation_service.py
+
+  tour-orchestrator:
+    build: {context: ., dockerfile: Dockerfile.cloudrun}
+    ports: ["5302:5002"]
+    volumes: ["./tours:/app/tours"]
+    environment:
+      - USER_STOPS_ENABLED=true
+    networks:
+      default:
+        aliases: [development-tour-orchestrator-1]
+    command: python tour_orchestrator_service.py
+
+  map-delivery:
+    build: {context: ., dockerfile: Dockerfile.cloudrun}
+    ports: ["5305:5005"]
+    volumes: ["./tours:/app/tours"]
+    networks:
+      default:
+        aliases: [development-map-delivery-1]
+    command: python map_delivery_service.py
+
+  coordinates:
+    build: {context: ., dockerfile: Dockerfile.cloudrun}
+    ports: ["5306:5006"]
+    networks:
+      default:
+        aliases: [development-coordinates-1, coordinates-fromai]
+    command: python coordinates_service.py
+
+  treats:
+    build: {context: ., dockerfile: Dockerfile.cloudrun}
+    ports: ["5307:5006"]
+    networks:
+      default:
+        aliases: [development-treats-1]
+    command: python treats_service.py
+
+  news-orchestrator:
+    build: {context: ., dockerfile: Dockerfile.news-orchestrator}
+    ports: ["5312:5012"]
+    networks:
+      default:
+        aliases: [news-orchestrator-1]
+
+  newsletter-processor:
+    build: {context: ., dockerfile: Dockerfile.newsletter-processor}
+    ports: ["5317:5017"]
+    networks:
+      default:
+        aliases: [newsletter-processor-1]
+
+  tour-editing-phase2:
+    build: {context: ., dockerfile: Dockerfile.cloudrun}
+    ports: ["5322:5022"]
+    volumes: ["./tours:/app/tours"]
+    environment:
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID:-test}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY:-test}
+      - AWS_DEFAULT_REGION=us-east-1
+    networks:
+      default:
+        aliases: [tour-editing-phase2-1]
+    command: python tour_editing_phase2.py
+
+  translation-service:
+    build: ./translation-service
+    ports: ["5330:5030"]
+    environment:
+      - AWS_ACCESS_KEY_ID=test
+      - AWS_SECRET_ACCESS_KEY=test
+      - AWS_DEFAULT_REGION=us-east-1
+    networks:
+      default:
+        aliases: [translation-service-1]
+
+networks:
+  default:
+
+volumes:
+  local694_pg:
