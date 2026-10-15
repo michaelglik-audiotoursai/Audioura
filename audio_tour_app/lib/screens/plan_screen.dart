@@ -4,21 +4,20 @@
 //   • the current level (plain words),
 //   • the allowances left,
 //   • the anniversary date,
-//   • buy buttons for L3 ($10 Pack) and L4 (Curator, $25) — iOS only; the Android
-//     buttons are hidden behind kAndroidBillingEnabled (Google Play is out of
-//     scope for LOCAL-598),
+//   • buy buttons for L3 ($10 Pack) and L4 (Curator, $25) — ALWAYS visible on
+//     BOTH iOS and Android ([LOCAL-699]); in stub mode they run a TEST PURCHASE
+//     (no real charge) and show a banner, otherwise they drive the real store.
 //   • the five-level table in plain words.
 //
 // This screen replaces the old wallet / PPU / Unlimited UI (wallet_screen.dart),
 // which is no longer reachable from Settings (see about_screen.dart).
 
-import 'dart:io' show Platform;
 import 'package:flutter/material.dart';
 import '../services/entitlements_service.dart';
 import '../services/iap_service.dart';
 
 class PlanScreen extends StatefulWidget {
-  const PlanScreen({super.key, this.initialEntitlements});
+  const PlanScreen({super.key, this.initialEntitlements, this.initialStubMode});
 
   /// [LOCAL-610] Test seam only: when provided, the screen renders this
   /// snapshot immediately and skips the network load, so widget tests can
@@ -26,6 +25,13 @@ class PlanScreen extends StatefulWidget {
   /// without a running user-api. Null in production (the default), where the
   /// screen loads from EntitlementsService.me() as before.
   final Entitlements? initialEntitlements;
+
+  /// [LOCAL-699] Test seam only: when provided, the screen uses this value for
+  /// the stub/real purchase mode and skips the GET /purchases/mode call, so a
+  /// widget test can render either the TEST PURCHASE banner (true) or the real
+  /// Buy buttons (false) with no running user-api. Null in production (the
+  /// default), where the screen asks the server via purchasesModeIsStub().
+  final bool? initialStubMode;
 
   @override
   State<PlanScreen> createState() => _PlanScreenState();
@@ -36,6 +42,13 @@ class _PlanScreenState extends State<PlanScreen> {
   bool _loading = true;
   bool _buying = false;
   bool _claiming = false;
+
+  // [LOCAL-699] Whether the server verifies purchases in stub mode (asked via
+  // GET /purchases/mode). When true the Buy buttons run a TEST PURCHASE on BOTH
+  // platforms and the card shows a clearly-labelled TEST PURCHASE banner; when
+  // false they drive the real store (StoreKit on iOS, Play billing on Android).
+  // Null until resolved; the buttons are shown regardless (never gated on it).
+  bool _stubMode = false;
 
   // [LOCAL-604] The single code box on the Free card.
   final TextEditingController _codeController = TextEditingController();
@@ -50,6 +63,16 @@ class _PlanScreenState extends State<PlanScreen> {
   void initState() {
     super.initState();
     final seed = widget.initialEntitlements;
+    // [LOCAL-699] Resolve the purchase mode. Honour the test seam when given;
+    // otherwise ask the server (purchasesModeIsStub) without blocking the
+    // initial paint — the buttons are shown regardless and simply re-label when
+    // the mode arrives.
+    final seedStub = widget.initialStubMode;
+    if (seedStub != null) {
+      _stubMode = seedStub;
+    } else {
+      _resolveStubMode();
+    }
     if (seed != null) {
       // Test seam: render the injected snapshot without any network call.
       _ent = seed;
@@ -57,6 +80,15 @@ class _PlanScreenState extends State<PlanScreen> {
     } else {
       _load();
     }
+  }
+
+  /// [LOCAL-699] Ask the server whether it verifies purchases in stub mode and
+  /// update the card (never blocks the buttons from showing). No-op in a test
+  /// that passed initialStubMode.
+  Future<void> _resolveStubMode() async {
+    final stub = await IapService.instance.purchasesModeIsStub();
+    if (!mounted) return;
+    setState(() => _stubMode = stub);
   }
 
   Future<void> _load() async {
@@ -73,13 +105,21 @@ class _PlanScreenState extends State<PlanScreen> {
     if (_buying) return;
     setState(() => _buying = true);
     try {
-      final result = await IapService.instance.buy(product);
+      // [LOCAL-699] In stub mode (a LOCAL/Mac Mini server, IAP_VERIFY_MODE=stub,
+      // no Apple/Google pack products yet) run a TEST PURCHASE on BOTH
+      // platforms; otherwise drive the real store (StoreKit on iOS, Play billing
+      // on Android).
+      final result = _stubMode
+          ? await IapService.instance.testPurchasePack(product)
+          : await IapService.instance.buy(product);
       if (!mounted) return;
       final messenger = ScaffoldMessenger.of(context);
       switch (result.status) {
         case IapResultStatus.granted:
-          messenger.showSnackBar(const SnackBar(
-            content: Text('Purchase complete — your plan is updated.'),
+          messenger.showSnackBar(SnackBar(
+            content: Text(_stubMode
+                ? 'Test purchase complete — your plan is updated.'
+                : 'Purchase complete — your plan is updated.'),
             backgroundColor: Colors.green,
           ));
           await _load();
@@ -96,8 +136,13 @@ class _PlanScreenState extends State<PlanScreen> {
           ));
           break;
         case IapResultStatus.unavailable:
-          messenger.showSnackBar(const SnackBar(
-            content: Text('In-app purchases are not available on this device.'),
+          // [LOCAL-699] Show the SPECIFIC reason the service returned (e.g.
+          // "This pack isn't available on this store yet.") instead of a single
+          // generic line, so a missing store product reads as a clear
+          // store-not-ready message rather than a silent failure.
+          messenger.showSnackBar(SnackBar(
+            content: Text(result.message ??
+                'In-app purchases are not available on this device.'),
             backgroundColor: Colors.red,
           ));
           break;
@@ -194,10 +239,13 @@ class _PlanScreenState extends State<PlanScreen> {
   }
 
   Widget _buyCard() {
-    // [LOCAL-696] Android buy buttons are gated by kAndroidBillingEnabled —
-    // now true, so both iOS (StoreKit 2) and Android (Play Billing) show them.
-    final androidHidden = Platform.isAndroid && !kAndroidBillingEnabled;
-
+    // [LOCAL-699] Buy buttons are ALWAYS visible on BOTH iOS and Android for the
+    // $10 Pack and Curator — never gated on platform or a billing flag (the
+    // Pixel build that hid them predated kAndroidBillingEnabled going true).
+    // In stub mode the buttons run a TEST PURCHASE (see _buy / _stubMode) and
+    // the card shows a clearly-labelled banner so a tester knows no real charge
+    // is made; a missing store product on a real server surfaces a clear
+    // "not available on this store yet" message rather than failing silently.
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -212,45 +260,66 @@ class _PlanScreenState extends State<PlanScreen> {
               'there are no refunds.',
               style: TextStyle(fontSize: 12, color: Colors.black54),
             ),
-            const SizedBox(height: 14),
-            if (androidHidden)
-              const Padding(
-                padding: EdgeInsets.symmetric(vertical: 8),
-                child: Text(
-                  'In-app purchases are coming to Android soon. For now, packs '
-                  'are available on iOS.',
-                  style: TextStyle(fontSize: 13, color: Colors.black54),
-                ),
-              )
-            else ...[
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: _buying ? null : () => _buy(IapProduct.l3Pack),
-                  style: ElevatedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 14)),
-                  child: const Text('\$10 Pack — 5 new tours + 5 edits, up to 10 stops'),
-                ),
-              ),
-              const SizedBox(height: 10),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: _buying ? null : () => _buy(IapProduct.l4Round),
-                  style: ElevatedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 14)),
-                  child: const Text(
-                      'Curator (\$25) — 25 tours or edits, up to 25 stops, sell your tours'),
-                ),
-              ),
-              if (_buying)
-                const Padding(
-                  padding: EdgeInsets.only(top: 12),
-                  child: Center(child: CircularProgressIndicator()),
-                ),
+            if (_stubMode) ...[
+              const SizedBox(height: 12),
+              _testPurchaseBanner(),
             ],
+            const SizedBox(height: 14),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: _buying ? null : () => _buy(IapProduct.l3Pack),
+                style: ElevatedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 14)),
+                child: const Text('\$10 Pack — 5 new tours + 5 edits, up to 10 stops'),
+              ),
+            ),
+            const SizedBox(height: 10),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: _buying ? null : () => _buy(IapProduct.l4Round),
+                style: ElevatedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 14)),
+                child: const Text(
+                    'Curator (\$25) — 25 tours or edits, up to 25 stops, sell your tours'),
+              ),
+            ),
+            if (_buying)
+              const Padding(
+                padding: EdgeInsets.only(top: 12),
+                child: Center(child: CircularProgressIndicator()),
+              ),
           ],
         ),
+      ),
+    );
+  }
+
+  // [LOCAL-699] The amber TEST PURCHASE banner shown on a stub-verification
+  // server, mirroring the tour Buy sheet's banner (tour_buy_sheet.dart).
+  Widget _testPurchaseBanner() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(8),
+      decoration: BoxDecoration(
+        color: Colors.amber.shade100,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.amber.shade700),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.science, color: Colors.amber.shade900, size: 18),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              'TEST PURCHASE — no real charge. These buttons complete a fake '
+              'purchase on the local server so the plan buy flow can be tested '
+              'end to end.',
+              style: TextStyle(fontSize: 12, color: Colors.amber.shade900),
+            ),
+          ),
+        ],
       ),
     );
   }

@@ -231,7 +231,8 @@ class IapService {
           'IAP: product not found: ${product.storeId} '
           'err=${response.error?.message} notFound=${response.notFoundIDs}');
       return const IapResult(IapResultStatus.unavailable,
-          'This product is not available right now.');
+          'This pack isn\u2019t available on this store yet. Please try again '
+          'later.');
     }
 
     final details = response.productDetails.first;
@@ -269,6 +270,41 @@ class IapService {
   Future<bool> isLocalStubMode() async {
     final prefs = await SharedPreferences.getInstance();
     return (prefs.getString('server_mode') ?? 'cloud') == 'local';
+  }
+
+  /// [LOCAL-699] Whether the SERVER verifies purchases in stub mode. Asks the
+  /// server itself (GET /purchases/mode -> {stub}) rather than guessing from the
+  /// device's server_mode flag, so the TEST PURCHASE path is offered exactly
+  /// when the server will accept a store='stub' body — never against a real
+  /// apple/google server (which would reject it), never hidden on a stub server
+  /// (which has no Apple/Google products yet).
+  ///
+  /// Falls back to the device-side [isLocalStubMode] guess when the endpoint is
+  /// unreachable or returns a non-200 / malformed body (an older server without
+  /// the route, or a transient network error), so the buy flow still works. The
+  /// result is NOT cached: the server mode can change between a LOCAL and a
+  /// cloud stack as the tester switches servers.
+  Future<bool> purchasesModeIsStub() async {
+    try {
+      final resp = await Endpoints.get(
+        Service.userDb,
+        '/purchases/mode',
+        timeout: const Duration(seconds: 10),
+      );
+      if (resp.statusCode == 200) {
+        final map = Endpoints.tryDecodeMap(resp.body);
+        if (map != null && map['stub'] is bool) {
+          return map['stub'] as bool;
+        }
+      }
+      await DebugLogHelper.addDebugLog(
+          'IAP: /purchases/mode non-200/malformed ${resp.statusCode} '
+          '— falling back to device server_mode');
+    } catch (e) {
+      await DebugLogHelper.addDebugLog(
+          'IAP: /purchases/mode error: $e — falling back to device server_mode');
+    }
+    return isLocalStubMode();
   }
 
   /// Buy (unlock) ONE tour at the given price [tier] through the store, then the
@@ -378,6 +414,62 @@ class IapService {
           msg ?? 'The test purchase could not be completed.');
     } catch (e) {
       await DebugLogHelper.addDebugLog('IAP: TEST PURCHASE error: $e');
+      return IapResult(IapResultStatus.failed,
+          'Could not reach the server for the test purchase: $e');
+    }
+  }
+
+  /// [LOCAL-699] TEST PURCHASE of a LEVEL pack ($10 Pack / Curator) — the
+  /// pack/curator equivalent of [testPurchaseTour], for a stub-verification
+  /// server (IAP_VERIFY_MODE=stub). Posts straight to /purchases/verify with
+  /// store='stub' and a generated transaction id — no real store, no charge —
+  /// so the whole buy→grant flow for the plan's Buy buttons can be exercised end
+  /// to end on BOTH platforms (iOS and Android) before the Apple/Google pack
+  /// products exist. The server grants the level and resets the pack exactly as
+  /// a real purchase would. Idempotent on the transaction id (409 → granted).
+  Future<IapResult> testPurchasePack(IapProduct product) async {
+    final prefs = await SharedPreferences.getInstance();
+    final userId = prefs.getString('user_id') ?? '';
+    if (userId.isEmpty) {
+      return const IapResult(IapResultStatus.failed,
+          'No device id — cannot complete the test purchase.');
+    }
+    final transactionId =
+        'TEST-699-${DateTime.now().millisecondsSinceEpoch}-${product.serverProduct}';
+    final body = <String, dynamic>{
+      'store': 'stub',
+      'transaction_id': transactionId,
+      // The server accepts either the store id or the server key; send the
+      // store id so the stub path matches a real purchase's `product`.
+      'product': product.storeId,
+      'user_id': userId,
+    };
+    try {
+      final resp = await Endpoints.post(
+        Service.userDb,
+        '/purchases/verify',
+        body: body,
+        timeout: const Duration(seconds: 30),
+      );
+      // 200 granted, or 409 already_verified (idempotent) → treat as success.
+      if (resp.statusCode == 200 || resp.statusCode == 409) {
+        await DebugLogHelper.addDebugLog(
+            'IAP: TEST PURCHASE granted ${product.serverProduct}');
+        return const IapResult(IapResultStatus.granted);
+      }
+      String? msg;
+      try {
+        final decoded = jsonDecode(resp.body);
+        if (decoded is Map && decoded['message'] is String) {
+          msg = decoded['message'] as String;
+        }
+      } catch (_) {}
+      await DebugLogHelper.addDebugLog(
+          'IAP: TEST PURCHASE pack non-200 ${resp.statusCode}: ${resp.body}');
+      return IapResult(IapResultStatus.failed,
+          msg ?? 'The test purchase could not be completed.');
+    } catch (e) {
+      await DebugLogHelper.addDebugLog('IAP: TEST PURCHASE pack error: $e');
       return IapResult(IapResultStatus.failed,
           'Could not reach the server for the test purchase: $e');
     }
