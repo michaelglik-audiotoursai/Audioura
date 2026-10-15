@@ -132,17 +132,23 @@ SearchDispatch classifySearchInput(String raw) {
 }
 
 /// The result of the concurrent text search (tours found + place found), mapped
-/// to the single outcome the dialog should present. Pure so a unit test can
-/// enumerate every branch (LOCAL-665 Deliver §2c) without a geocoder or server.
+/// to the single outcome the widget should act on. Pure so a unit test can
+/// enumerate every branch without a geocoder or server.
+///
+/// [LEAD D662] A found PLACE always wins: the map relocates there immediately,
+/// showing the normal Home view of that area — no tours dialog, no "relocate?"
+/// confirmation. Only when NO place is found and tour names match do we open the
+/// tours dialog.
 enum TextSearchOutcome {
-  /// Tours were found AND a place was found: show the found tours, plus an extra
-  /// "Show <place> on the map" action.
+  /// Tours were found AND a place was found: RELOCATE the map to the place
+  /// immediately (Home view of that area), and show a small snackbar offering
+  /// 'N tours named "<query>" — Show' because tour names also matched.
   toursAndPlace,
 
   /// Only tours: present them with the shared found-tours dialogs.
   toursOnly,
 
-  /// Only a place: move the map there (today's location behaviour).
+  /// Only a place: move the map there (the plain place-search behaviour).
   placeOnly,
 
   /// Neither: "Nothing found for '<text>'".

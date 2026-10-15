@@ -1274,7 +1274,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
     switch (outcome) {
       case TextSearchOutcome.toursAndPlace:
-        _presentFoundToursWithPlace(tours, place!, query);
+        await _presentFoundToursWithPlace(tours, place!, query);
         return;
       case TextSearchOutcome.toursOnly:
         _presentFoundTours(tours);
@@ -1290,24 +1290,29 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  /// [LOCAL-665] Tours AND a place both matched the text. Show the found tours
-  /// (the shared single/multi-tour dialogs, exactly as the map does), but first
-  /// offer one extra action — "Show <place> on the map" — so the listener can
-  /// jump to the place instead of, or after, picking a tour.
-  void _presentFoundToursWithPlace(
-      List<Map<String, dynamic>> tours, LatLng place, String placeName) {
+  /// [LOCAL-697 / LEAD D662] Tours AND a place both matched the text. A found
+  /// PLACE wins: move the map there immediately and show the normal Home view of
+  /// that area — exactly as a plain place search does, with NO tours dialog and
+  /// NO "relocate?" confirmation (restores the pre-LOCAL-665 behaviour Michael
+  /// reported as regressed, Pixel-4 2026-10-15). Because tour NAMES also matched,
+  /// a small snackbar offers 'N tours named "<query>" — Show'; tapping Show opens
+  /// the usual found-tours dialog. The relocation is awaited so the map has moved
+  /// before the snackbar appears.
+  Future<void> _presentFoundToursWithPlace(
+      List<Map<String, dynamic>> tours, LatLng place, String placeName) async {
+    await _useCustomLocation(place, placeName);
+    if (!mounted) return;
+    final n = tours.length;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(
-            'Found ${tours.length} tour${tours.length == 1 ? '' : 's'} and a place for "$placeName"'),
+        content: Text('$n tour${n == 1 ? '' : 's'} named "$placeName"'),
         action: SnackBarAction(
-          label: 'Show $placeName on the map',
-          onPressed: () => _useCustomLocation(place, placeName),
+          label: 'Show',
+          onPressed: () => _presentFoundTours(tours),
         ),
         duration: const Duration(seconds: 6),
       ),
     );
-    _presentFoundTours(tours);
   }
   
   Future<void> _useCustomLocation(LatLng location, String name) async {
