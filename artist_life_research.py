@@ -79,17 +79,24 @@ import serper_plus_research as _spr  # noqa: E402
 
 # ── tunables (env-overridable) ────────────────────────────────────────────────
 EXTRACTOR_MODEL = os.environ.get('ARTIST_LIFE_EXTRACTOR', 'gpt-4.1-mini')
-MAX_LIFE_QUERIES = int(os.environ.get('ARTIST_LIFE_MAX_LIFE_QUERIES', '4'))
+# [LOCAL-692B / D659 LEAD review] COST: LOCAL-692's artist-life backend added
+# ~$0.45/tour (HCMC $1.16 -> $1.61). Michael capped the EXTRA research at
+# <= $0.10/tour: fewer, better queries + a per-artist cache. We cut the query
+# and page budgets (the extractor completion over many pages was the main cost),
+# gather the two BASE rungs together and extract ONCE, and only re-extract when
+# the ladder actually descends to an extra rung. A per-artist DB cache makes a
+# repeat artist (the same names recur across HCMC tours) FREE.
+MAX_LIFE_QUERIES = int(os.environ.get('ARTIST_LIFE_MAX_LIFE_QUERIES', '2'))
 MAX_WORK_QUERIES = int(os.environ.get('ARTIST_LIFE_MAX_WORK_QUERIES', '2'))
-MAX_WEB_PAGES = int(os.environ.get('ARTIST_LIFE_MAX_PAGES', '6'))
-PER_PAGE_CHARS = int(os.environ.get('ARTIST_LIFE_PER_PAGE_CHARS', '2800'))
-WIKI_CHARS = int(os.environ.get('ARTIST_LIFE_WIKI_CHARS', '3500'))
-# [LOCAL-692B / D659 addendum] Michael reverted the length increase: shorter
-# stories "feel of the right size", so the extractor budget is the SHORT one
-# (same as serper_research's object backend, 700), NOT the padded 900. The fix
-# for a thin stop is a SECOND short story (the ladder/second-story path), never
-# a longer first story.
+MAX_WEB_PAGES = int(os.environ.get('ARTIST_LIFE_MAX_PAGES', '4'))
+PER_PAGE_CHARS = int(os.environ.get('ARTIST_LIFE_PER_PAGE_CHARS', '2200'))
+WIKI_CHARS = int(os.environ.get('ARTIST_LIFE_WIKI_CHARS', '2500'))
 ANSWER_MAX_TOKENS = int(os.environ.get('ARTIST_LIFE_MAX_TOKENS', '700'))
+
+# Per-artist research cache (persists across tours). TTL long because an
+# artist's life story does not change; the same HCMC painters recur tour to tour.
+ARTIST_CACHE_TTL_DAYS = int(os.environ.get('ARTIST_LIFE_CACHE_TTL_DAYS', '30'))
+ARTIST_CACHE_DISABLE = os.environ.get('ARTIST_LIFE_CACHE_DISABLE', '').strip() == '1'
 
 # A Wikipedia page is kept as a FACT-CHECK source only — never the story. This
 # marker is prepended to its text in the corpus so the extractor can tell.
@@ -148,6 +155,126 @@ def _is_emotionally_charged(text: str) -> bool:
 
 def _blank() -> Dict:
     return {'text': '', 'sources': [], 'supports': [], 'queries': [], 'error': ''}
+
+
+# ── [LOCAL-692B] per-artist research cache (persists across tours) ────────────
+# The same artists recur across HCMC museum tours. Caching the finished
+# research per artist means a repeat artist costs ZERO Serper queries and ZERO
+# extractor tokens — the single biggest lever on the per-tour cost. Additive DB
+# table, same shape/pattern as story_leads.gemini_venue_research_cache: nothing
+# is ever DROPped or DELETEd; a stale row is ignored by TTL and overwritten on
+# refresh. Best-effort throughout — any DB error is a cache MISS so research
+# simply runs (never breaks generation).
+
+def _artist_cache_key(artist: str, local_code: str) -> str:
+    try:
+        from story_opportunity_scan import _fold as _f
+        folded = _f(artist)
+    except Exception:
+        folded = re.sub(r'\s+', ' ', (artist or '')).strip().lower()
+    return f"{folded}|{(local_code or '').lower()}"
+
+
+def _artist_cache_conn(db_url: str):
+    import psycopg2
+    return psycopg2.connect(db_url)
+
+
+def _ensure_artist_cache_table(conn) -> None:
+    with conn.cursor() as cur:
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS artist_life_research_cache (
+                cache_key   TEXT PRIMARY KEY,
+                artist      TEXT NOT NULL,
+                local_code  TEXT NOT NULL,
+                result_json TEXT NOT NULL,
+                fetched_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+            )
+        """)
+    conn.commit()
+
+
+def _artist_cache_get(artist: str, local_code: str, db_url: str):
+    """A cached artist-research result younger than the TTL, else None. Best-
+    effort: any error is a miss. The returned dict carries ``cached=True``."""
+    if ARTIST_CACHE_DISABLE or not db_url:
+        return None
+    try:
+        import json as _json
+        conn = _artist_cache_conn(db_url)
+        _ensure_artist_cache_table(conn)
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT result_json FROM artist_life_research_cache "
+                "WHERE cache_key = %s AND fetched_at > NOW() - INTERVAL '%s days'",
+                (_artist_cache_key(artist, local_code), ARTIST_CACHE_TTL_DAYS))
+            row = cur.fetchone()
+        conn.close()
+    except Exception:
+        return None
+    if not row:
+        return None
+    try:
+        import json as _json
+        res = _json.loads(row[0])
+        if isinstance(res, dict):
+            res['cached'] = True
+            return res
+    except (ValueError, TypeError):
+        return None
+    return None
+
+
+def _artist_cache_put(artist: str, local_code: str, result: Dict,
+                      db_url: str) -> None:
+    """Upsert the artist-research result. Additive; never raises. An errored or
+    empty result is NOT persisted (we want a real story cached, not a failure)."""
+    if ARTIST_CACHE_DISABLE or not db_url:
+        return
+    if result.get('error') or not (result.get('text') or '').strip():
+        return
+    try:
+        import json as _json
+        stored = dict(result)
+        stored['cached'] = False
+        conn = _artist_cache_conn(db_url)
+        _ensure_artist_cache_table(conn)
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                INSERT INTO artist_life_research_cache
+                    (cache_key, artist, local_code, result_json, fetched_at)
+                VALUES (%s, %s, %s, %s, NOW())
+                ON CONFLICT (cache_key) DO UPDATE SET
+                    artist = EXCLUDED.artist,
+                    local_code = EXCLUDED.local_code,
+                    result_json = EXCLUDED.result_json,
+                    fetched_at = NOW()
+                """,
+                (_artist_cache_key(artist, local_code), artist,
+                 (local_code or ''), _json.dumps(stored, ensure_ascii=False)))
+        conn.commit()
+        conn.close()
+    except Exception:
+        return
+
+
+def artist_cache_row_count(db_url: str = None) -> int:
+    """Row count of the per-artist cache (for the submission). -1 if unavailable."""
+    if db_url is None:
+        db_url = os.environ.get('DATABASE_URL')
+    if not db_url:
+        return -1
+    try:
+        conn = _artist_cache_conn(db_url)
+        _ensure_artist_cache_table(conn)
+        with conn.cursor() as cur:
+            cur.execute("SELECT COUNT(*) FROM artist_life_research_cache")
+            n = cur.fetchone()[0]
+        conn.close()
+        return int(n)
+    except Exception:
+        return -1
 
 
 # ── 1. artist identity from the per-stop context block ────────────────────────
@@ -503,17 +630,38 @@ def artist_life_research(prompt: str, model: str = None, resolve: bool = True,
         # the corpus on every rung — it only verifies dates/names, never the story.
         wiki_pages = gather_wikipedia_factcheck(artist, local_code, wiki=wiki)
 
-        # ── the ladder: (rung name, query list, is_base) ─────────────────────
-        # The first two rungs (exhibit + artist) are the BASE search — the normal
-        # LOCAL-692 research. Rungs 3-4 (museum, culture) are the EXTRA search
-        # Michael asked for: we only descend to them when nothing charged has
-        # been found yet, and every query they issue counts toward the cap.
-        rungs = [
-            ('exhibit', _exhibit_story_queries(title, artist, local_code)
-                        + _work_queries(prompt), True),
-            ('artist', _life_queries(artist, local_code), True),
-            ('museum', _museum_story_queries(venue), False),
-            ('culture', _culture_country_queries(ctx, local_code), False),
+        # [LOCAL-692B] PER-ARTIST CACHE. The same artists recur across tours, so
+        # a hit returns the finished story with ZERO Serper queries and ZERO
+        # extractor tokens — the main cost cut. Only consulted when the caller is
+        # not injecting test doubles (serp/fetch/answer stay None in production).
+        _db_url = os.environ.get('DATABASE_URL')
+        _live = serp is None and fetch is None and answer is _answer
+        if _live:
+            hit = _artist_cache_get(artist, local_code, _db_url)
+            if hit is not None and (hit.get('text') or '').strip():
+                hit.setdefault('rung', '')
+                hit.setdefault('extra_queries', 0)
+                hit.setdefault('second_story', '')
+                hit['extra_queries'] = 0  # a cache hit spends nothing
+                try:
+                    print(f"  [LOCAL-692B] artist cache HIT: {artist!r} "
+                          f"(rung={hit.get('rung')!r}, $0 extra)", flush=True)
+                except Exception:
+                    pass
+                return hit
+
+        # ── the ladder ───────────────────────────────────────────────────────
+        # The two BASE rungs (exhibit + artist) are the normal LOCAL-692 research;
+        # they are gathered TOGETHER and extracted ONCE (one extractor call, not
+        # two) to hold the cost down. The EXTRA rungs (museum, culture) are only
+        # descended — and re-extracted — when nothing charged has been found yet,
+        # each query counting toward MAX_EXTRA_QUERIES. Fewer, better queries.
+        base_queries = (_exhibit_story_queries(title, artist, local_code)
+                        + _work_queries(prompt)
+                        + _life_queries(artist, local_code))
+        extra_rungs = [
+            ('museum', _museum_story_queries(venue)),
+            ('culture', _culture_country_queries(ctx, local_code)),
         ]
 
         pages: List[Dict] = []
@@ -521,42 +669,54 @@ def artist_life_research(prompt: str, model: str = None, resolve: bool = True,
         extra_queries = 0
         chosen_rung = ''
 
-        for rung_name, queries, is_base in rungs:
-            if not queries:
-                continue
-            # Enforce the extra-query cap on the NON-base rungs: trim the rung's
-            # queries so the running extra total never exceeds MAX_EXTRA_QUERIES.
-            if not is_base:
-                remaining = MAX_EXTRA_QUERIES - extra_queries
-                if remaining <= 0:
-                    break  # cap reached — stop descending
-                queries = queries[:remaining]
-
-            budget = max(1, MAX_WEB_PAGES - len(pages))
-            new_pages, used = gather_web(
-                queries, budget, serp=serp, fetch=fetch, origin=rung_name)
-            pages.extend(new_pages)
-            out['queries'].extend(used)
-            if not is_base:
-                extra_queries += len(used)
-
-            # Extract over everything gathered so far (+ Wikipedia fact-check).
-            res = _extract(pages + wiki_pages)
+        def _consider(res, rung_name):
+            """Record a rung's extraction; return True to STOP (charged story)."""
+            nonlocal best, chosen_rung
             if res['error'] and not best['text']:
-                # Remember the error only if we have nothing better yet.
                 out['error'] = res['error']
             if res['text']:
-                # Keep the most recent non-empty story; prefer a charged one.
                 if _is_emotionally_charged(res['text']):
                     best = {'text': res['text'], 'supports': res['supports'],
                             'rung': rung_name}
                     chosen_rung = rung_name
                     out['error'] = ''
-                    break  # found a charged story — stop walking the ladder
+                    return True
                 if not best['text']:
                     best = {'text': res['text'], 'supports': res['supports'],
                             'rung': rung_name}
                     out['error'] = ''
+            return False
+
+        # BASE: gather exhibit+artist, extract ONCE. The rung is labelled by where
+        # the charged sentence came from downstream; we label the base story
+        # 'exhibit' when the work's own story carried the charge, else 'artist'.
+        base_pages, used_base = gather_web(
+            base_queries, MAX_WEB_PAGES, serp=serp, fetch=fetch, origin='base')
+        pages.extend(base_pages)
+        out['queries'].extend(used_base)
+        base_res = _extract(pages + wiki_pages)
+        # Attribute the base rung name by charge location (exhibit vs artist).
+        _base_rung = 'exhibit' if base_res['text'] and re.search(
+            r'(?i)commission|acquir|donat|exhibit|destroyed|stolen|refused',
+            base_res['text']) else 'artist'
+        _stop = _consider(base_res, _base_rung)
+
+        if not _stop:
+            for rung_name, queries in extra_rungs:
+                if not queries:
+                    continue
+                remaining = MAX_EXTRA_QUERIES - extra_queries
+                if remaining <= 0:
+                    break  # extra-query cap reached — stop descending
+                queries = queries[:remaining]
+                budget = max(1, MAX_WEB_PAGES - len(pages))
+                new_pages, used = gather_web(
+                    queries, budget, serp=serp, fetch=fetch, origin=rung_name)
+                pages.extend(new_pages)
+                out['queries'].extend(used)
+                extra_queries += len(used)
+                if _consider(_extract(pages + wiki_pages), rung_name):
+                    break
 
         # De-duplicated source list, order preserved (all rungs + Wikipedia).
         seen = set()
@@ -577,6 +737,12 @@ def artist_life_research(prompt: str, model: str = None, resolve: bool = True,
         if out['text']:
             out['second_story'] = _extract_second_story(
                 pages + wiki_pages, out['text'], answer, extractor)
+
+        # [LOCAL-692B] Persist to the per-artist cache so the next tour of this
+        # artist costs $0. Only on a live run (no injected test doubles) and only
+        # when we actually produced a story.
+        if _live:
+            _artist_cache_put(artist, local_code, out, _db_url)
         return out
     except Exception as e:
         out['error'] = f'{type(e).__name__}: {e}'

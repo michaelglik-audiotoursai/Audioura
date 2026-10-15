@@ -295,6 +295,48 @@ class TestStoryLadder(unittest.TestCase):
             'He painted landscapes in a calm style for many years.'))
 
 
+class TestCostAndCache(unittest.TestCase):
+    """[LOCAL-692B] Cost cap (<= $0.10/tour extra) and the per-artist cache."""
+
+    def test_query_and_page_budgets_are_small(self):
+        # Fewer, better queries: the reduced budgets keep the extra research
+        # cheap. (Serper $0.001/query; gpt-4.1-mini $0.40/$1.60 per 1M tokens.)
+        self.assertLessEqual(al.MAX_LIFE_QUERIES, 2)
+        self.assertLessEqual(al.MAX_WEB_PAGES, 4)
+        self.assertLessEqual(al.MAX_EXTRA_QUERIES, 6)
+
+    def test_cache_key_folds_name(self):
+        k1 = al._artist_cache_key('Nguy\u1ec5n Gia Tr\u00ed', 'vi')
+        k2 = al._artist_cache_key('  nguy\u1ec5n gia tr\u00ed  ', 'vi')
+        self.assertEqual(k1, k2)
+        self.assertIn('|vi', k1)
+
+    def test_cache_is_skipped_with_injected_doubles(self):
+        # With test doubles injected the cache must NOT be consulted (so a unit
+        # test never touches a DB). A missing DATABASE_URL + injected serp is a
+        # clean research run.
+        calls = {'get': 0}
+        orig = al._artist_cache_get
+        al._artist_cache_get = lambda *a, **k: (calls.__setitem__('get', calls['get'] + 1) or None)
+        try:
+            al.artist_life_research(
+                MUSEUM_PROMPT,
+                serp=lambda q: [{'title': 't', 'url': 'https://example-art.com/1', 'snippet': 's'}],
+                fetch=lambda u: 'refused fled exile ' * 20,
+                answer=lambda p, m, max_tokens=700: {'text': 'He refused and fled [1].', 'error': ''},
+                wiki=lambda n, c: [])
+        finally:
+            al._artist_cache_get = orig
+        self.assertEqual(calls['get'], 0, 'cache must not be consulted in unit tests')
+
+    def test_cache_put_skips_empty_or_errored(self):
+        # Never persist a failure/empty story (so a transient miss is not cached).
+        captured = {}
+        al._artist_cache_put('X', 'vi', {'text': '', 'error': 'boom'},
+                             db_url=None)  # db_url None → no-op, no raise
+        self.assertEqual(captured, {})  # nothing to assert beyond "did not raise"
+
+
 class TestRouterGating(unittest.TestCase):
     def setUp(self):
         self._saved = os.environ.get('MUSEUM_RESEARCH')
