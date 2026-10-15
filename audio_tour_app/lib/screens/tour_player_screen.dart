@@ -15,6 +15,7 @@ import '../services/playback_accumulator.dart';
 import '../services/tour_pricing_service.dart';
 import '../services/downloaded_tour_meta.dart';
 import '../widgets/tour_buy_sheet.dart';
+import '../services/single_playback_controller.dart';
 
 class TourPlayerScreen extends StatefulWidget {
   final String tourPath;
@@ -423,6 +424,24 @@ class _TourPlayerScreenState extends State<TourPlayerScreen> with VoiceMethods {
                       _controller = controller;
                       webController = controller;
                       await DebugLogHelper.addDebugLog('VOICE: InAppWebView created, controller set');
+                      // [LOCAL-698] Install the single-playback controller at
+                      // document start on EVERY load, so no stop audio (native
+                      // control, JS helper, autoplay) can start without first
+                      // stopping the one already playing. Covers downloaded
+                      // tours and translations (their HTML is already on-device,
+                      // so only an injected guard can fix them).
+                      try {
+                        await controller.addUserScript(
+                          userScript: UserScript(
+                            source: kSinglePlaybackControllerJs,
+                            injectionTime:
+                                UserScriptInjectionTime.AT_DOCUMENT_START,
+                          ),
+                        );
+                      } catch (e) {
+                        await DebugLogHelper.addDebugLog(
+                            'TOUR_PLAYER: single-playback user script registration failed: $e');
+                      }
                       controller.addJavaScriptHandler(
                         handlerName: 'openMap',
                         callback: (args) async {
@@ -489,6 +508,17 @@ class _TourPlayerScreenState extends State<TourPlayerScreen> with VoiceMethods {
                     },
                     onLoadStop: (InAppWebViewController controller, WebUri? url) async {
                       await DebugLogHelper.addDebugLog('VOICE: WebView loaded: $url');
+                      // [LOCAL-698] Safety net: ensure the single-playback
+                      // controller is installed before anything can auto-start.
+                      // Idempotent — a no-op if the document-start user script
+                      // already installed it.
+                      try {
+                        await controller.evaluateJavascript(
+                            source: kSinglePlaybackControllerJs);
+                      } catch (e) {
+                        await DebugLogHelper.addDebugLog(
+                            'TOUR_PLAYER: single-playback re-inject failed: $e');
+                      }
                       await DebugLogHelper.addDebugLog('VOICE: Getting tour info');
                       getTourInfo();
 
