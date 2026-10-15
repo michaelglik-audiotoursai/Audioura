@@ -12,6 +12,7 @@ import '../config/endpoints.dart';
 import '../utils/tour_path_healer.dart';
 import '../widgets/share_tour_sheet.dart';
 import '../widgets/rate_tour_dialog.dart';
+import '../widgets/delete_tour_prompt.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import 'tour_player_screen.dart';
@@ -1173,19 +1174,31 @@ class _MyToursScreenState extends State<MyToursScreen> {
   
   Future<void> _deleteTour(int index) async {
     final tour = _tours[index];
+    // [LOCAL-693 / D660 + LOCAL-693B / D660 addendum] A PAID tour on the phone is
+    // the listener's forever, but every download is a purchase: deleting it means
+    // buying again to get it back. No warning at purchase; the one calm
+    // confirmation lives HERE. A paid tour shows "Delete paid tour?" with the
+    // D660-addendum sentence; a free tour shows the plain confirmation. Pure
+    // decision in DeleteTourPrompt (unit-tested); paid from saved metadata.
+    final prompt = DeleteTourPrompt.decide(
+      tourTitle: (tour['title'] ?? 'this tour').toString(),
+      isPaid: DeleteTourPrompt.isPaidTour(tour),
+    );
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Delete Tour'),
-        content: Text('Delete "${tour['title']}"?'),
+        title: Text(prompt.title),
+        content: Text(prompt.body),
         actions: [
+          // Cancel is the default (listed first, no destructive styling).
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
+            child: Text(prompt.cancelLabel),
           ),
           TextButton(
             onPressed: () => Navigator.pop(context, true),
-            child: const Text('Delete', style: TextStyle(color: Colors.red)),
+            child: Text(prompt.confirmLabel,
+                style: const TextStyle(color: Colors.red)),
           ),
         ],
       ),

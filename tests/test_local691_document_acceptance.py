@@ -39,6 +39,27 @@ TEST_PREFIX = "TEST-691-"
 VERSION_1 = "2026-10-14-draft1"
 VERSION_2 = "2026-10-21-draft2"
 
+
+@pytest.fixture(scope="module", autouse=True)
+def _isolate_entitlements_env():
+    """[LOCAL-693B] Own this module's auth env and restore it afterwards. Other
+    modules (595/604/596) set GATEWAY_API_KEY at import and never restore it;
+    document_acceptance_api caches API_KEY from it at import, so a leaked key
+    would 401 our calls. Force the vars we need, then restore exactly what was
+    there so we poison no one else."""
+    keys = ("GATEWAY_API_KEY", "ALLOW_UNAUTHENTICATED_ENTITLEMENTS")
+    saved = {k: os.environ.get(k) for k in keys}
+    os.environ["GATEWAY_API_KEY"] = ""
+    os.environ["ALLOW_UNAUTHENTICATED_ENTITLEMENTS"] = "true"
+    try:
+        yield
+    finally:
+        for k, v in saved.items():
+            if v is None:
+                os.environ.pop(k, None)
+            else:
+                os.environ[k] = v
+
 _MIGRATION = os.path.join(
     os.path.dirname(os.path.dirname(__file__)),
     "migration", "sql", "030_document_acceptance.sql",
@@ -55,12 +76,16 @@ def _load_module(name, rel_path):
 
 
 @pytest.fixture(scope="module")
-def module(_apply_migration):
+def module(_apply_migration, _isolate_entitlements_env):
     os.environ["DATABASE_URL"] = get_database_url()
     ut_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "user-tracking")
     sys.path.insert(0, ut_dir)
-    return _load_module("document_acceptance_api",
-                        "user-tracking/document_acceptance_api.py")
+    mod = _load_module("document_acceptance_api",
+                       "user-tracking/document_acceptance_api.py")
+    # [LOCAL-693B] Pin the import-time-cached API key to this module's intent so a
+    # stale import order cannot leave auth required.
+    mod.API_KEY = ""
+    return mod
 
 
 @pytest.fixture(scope="module")

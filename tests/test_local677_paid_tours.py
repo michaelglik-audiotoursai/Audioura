@@ -40,6 +40,28 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 os.environ.setdefault("IAP_VERIFY_MODE", "stub")
 os.environ.setdefault("ALLOW_UNAUTHENTICATED_ENTITLEMENTS", "true")
 
+
+@pytest.fixture(scope="module", autouse=True)
+def _isolate_entitlements_env():
+    """[LOCAL-693B] Own this module's entitlements env and restore it afterwards.
+    Other modules (595/604/596) set GATEWAY_API_KEY / IAP_VERIFY_MODE at import
+    and never restore them; with those set, our fresh entitlements import would
+    require an X-API-Key and 401 our calls. Force the vars we need, then restore
+    exactly what was there so we poison no one else."""
+    keys = ("GATEWAY_API_KEY", "IAP_VERIFY_MODE", "ALLOW_UNAUTHENTICATED_ENTITLEMENTS")
+    saved = {k: os.environ.get(k) for k in keys}
+    os.environ["GATEWAY_API_KEY"] = ""
+    os.environ["IAP_VERIFY_MODE"] = "stub"
+    os.environ["ALLOW_UNAUTHENTICATED_ENTITLEMENTS"] = "true"
+    try:
+        yield
+    finally:
+        for k, v in saved.items():
+            if v is None:
+                os.environ.pop(k, None)
+            else:
+                os.environ[k] = v
+
 from db_connection import get_connection, check_db_available, get_database_url  # noqa: E402
 import price_tiers as price_tiers_cfg  # noqa: E402
 import tour_pricing_service as pricing_svc  # noqa: E402
@@ -83,8 +105,14 @@ def test_price_tiers_validation_and_labels():
 # ─── 2. map-delivery Free/Paid filter helpers (pure, no DB) ───────────────────
 
 def _load_md():
-    path = os.path.join(os.path.dirname(os.path.dirname(__file__)),
-                        "map_delivery", "app.py")
+    md_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)),
+                          "map_delivery")
+    path = os.path.join(md_dir, "app.py")
+    # map_delivery/app.py imports its sibling modules (e.g. personal_match) by
+    # bare name — in the container its own directory is the cwd. Mirror that so
+    # the module loads outside the container too.
+    if md_dir not in sys.path:
+        sys.path.insert(0, md_dir)
     spec = importlib.util.spec_from_file_location("md_app_local677", path)
     md = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(md)
@@ -436,7 +464,7 @@ def test_record_unlock_idempotent_and_sales_count(db):
 # ─── 7. Stub purchase endpoint writes an unlock idempotently ──────────────────
 
 @pytest.fixture(scope="module")
-def ent_client():
+def ent_client(_isolate_entitlements_env):
     # Point the entitlements module at the SAME database the tests use.
     os.environ["DATABASE_URL"] = get_database_url()
     ut_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "user-tracking")
@@ -445,6 +473,10 @@ def ent_client():
         "entitlements_api_677", os.path.join(ut_dir, "entitlements_api.py"))
     ea = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(ea)
+    # [LOCAL-693B] Pin the import-time-cached auth/verify knobs to this module's
+    # intent, so a stale import order cannot leave auth required or 'apple' mode.
+    ea.API_KEY = ""
+    ea.IAP_VERIFY_MODE = "stub"
     from flask import Flask
     app = Flask(__name__)
     app.register_blueprint(ea.entitlements_bp)

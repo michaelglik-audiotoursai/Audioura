@@ -93,8 +93,38 @@ class TourTranslationHelper {
               if (translatedResponse.statusCode == 200) {
                 final prefs = await SharedPreferences.getInstance();
                 final appDir = await getApplicationDocumentsDirectory();
-                await _saveTranslatedTour(translatedId, translatedResponse.bodyBytes, appDir.path, prefs, parentEditTourId, lang,
-                    version: version, updatedAt: updatedAt, sourceItem: sourceItem);
+                // [LOCAL-693B / D660 LEAD] Consumption is decided SERVER-SIDE
+                // (the server spends the purchase when it finishes streaming the
+                // zip). A paid translation is its own purchase (D653). The app
+                // only reports FAILURE: if the bytes arrived but the zip cannot
+                // be saved/validated, POST /tour/<id>/download-failed so the
+                // server restores that purchase once (within 24h). No confirm on
+                // success.
+                try {
+                  await _saveTranslatedTour(translatedId, translatedResponse.bodyBytes, appDir.path, prefs, parentEditTourId, lang,
+                      version: version, updatedAt: updatedAt, sourceItem: sourceItem);
+                } catch (saveError) {
+                  failures.add(lang);
+                  await DebugLogHelper.addDebugLog(
+                      'TRANSLATE: save/validate failed ($lang) after bytes — '
+                      'reporting download-failed: $saveError');
+                  final consumes =
+                      translatedResponse.headers['x-download-consumes-unlock'];
+                  if (consumes == '1') {
+                    try {
+                      await Endpoints.post(
+                        Service.mapDelivery,
+                        '/tour/$translatedId/download-failed',
+                        body: {'user_id': tUserId, 'reason': 'save_or_validate_failed'},
+                        timeout: const Duration(seconds: 15),
+                      );
+                    } catch (e) {
+                      await DebugLogHelper.addDebugLog(
+                          'TRANSLATE: download-failed report failed ($lang): $e');
+                    }
+                  }
+                  continue;
+                }
                 await DebugLogHelper.addDebugLog('TRANSLATE: Saved translated tour ($lang) ID: $translatedId');
               } else {
                 failures.add(lang);

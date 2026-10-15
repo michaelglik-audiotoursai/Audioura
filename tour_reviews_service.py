@@ -319,6 +319,12 @@ def compute_verified(cur, user_id, original_id):
     # D647). So check tour_unlocks for the original id AND every translation id.
     # This is checked FIRST and short-circuits. Absent table (pre-022) → falls
     # through unchanged.
+    # [LOCAL-693 / D660] A buyer stays VERIFIED on ANY purchase — the check does
+    # NOT filter on consumed_at, so a purchase already spent by a download (its
+    # unlock row still present, only stamped consumed) keeps the Verified mark.
+    # D660 only adds consumed_at and never deletes a row, so no change is needed
+    # here beyond this note: "a verified buyer stays verified (any purchase
+    # counts)".
     if _has_table(cur, "tour_unlocks"):
         try:
             family_ids = {int(original_id)}

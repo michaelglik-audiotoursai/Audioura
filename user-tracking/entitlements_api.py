@@ -142,6 +142,46 @@ def _is_tour_product(product):
     return product in TOUR_TIER_PRODUCTS
 
 
+_UNLOCK_CONSUMPTION_READY = False
+
+
+def _ensure_unlock_consumption_schema(cur):
+    """[LOCAL-693 / D660] Self-heal the per-download consumption schema on
+    tour_unlocks (mirrors migration 031) so writes here work whether or not 031
+    has run on this DB: add consumed_at + consumed_by_download_id, drop the old
+    full UNIQUE(user_id,tour_id), and create the partial unique index
+    uq_tour_unlocks_active. The INSERTs below target that partial index with
+    ON CONFLICT (user_id,tour_id) WHERE consumed_at IS NULL, so the index MUST
+    exist or the insert errors. Idempotent; cached so it runs at most once per
+    process. Does NOT commit (the caller owns the transaction). Never raises."""
+    global _UNLOCK_CONSUMPTION_READY
+    if _UNLOCK_CONSUMPTION_READY:
+        return
+    try:
+        cur.execute(
+            "ALTER TABLE tour_unlocks ADD COLUMN IF NOT EXISTS consumed_at TIMESTAMPTZ"
+        )
+        cur.execute(
+            "ALTER TABLE tour_unlocks "
+            "ADD COLUMN IF NOT EXISTS consumed_by_download_id VARCHAR(255)"
+        )
+        cur.execute(
+            "DO $$ BEGIN "
+            "IF EXISTS (SELECT 1 FROM pg_constraint "
+            "WHERE conname = 'uq_tour_unlocks_user_tour' "
+            "AND conrelid = 'tour_unlocks'::regclass) THEN "
+            "ALTER TABLE tour_unlocks DROP CONSTRAINT uq_tour_unlocks_user_tour; "
+            "END IF; END $$;"
+        )
+        cur.execute(
+            "CREATE UNIQUE INDEX IF NOT EXISTS uq_tour_unlocks_active "
+            "ON tour_unlocks (user_id, tour_id) WHERE consumed_at IS NULL"
+        )
+        _UNLOCK_CONSUMPTION_READY = True
+    except Exception:  # noqa: BLE001 — never fail a purchase over self-heal
+        pass
+
+
 def _tour_price_usd(cur, product):
     """The buyer price for a tour-tier product. Reads the price_tiers table when
     present (DB is authoritative — Michael's SQL edits take effect), else the
@@ -592,7 +632,9 @@ def _verify_tour_purchase(store, transaction_id, product, user_id,
     A tour purchase unlocks ONE tour for the buyer (writes tour_unlocks) and
     does NOT change their level. Flow mirrors the level path: idempotency on
     transaction_id, verify via the store (stub accepts any non-empty id), record
-    the purchase, then write the unlock idempotently (UNIQUE(user_id,tour_id)).
+    the purchase, then write the unlock idempotently (ON CONFLICT on the partial
+    index uq_tour_unlocks_active — one ACTIVE unlock per user+row; D660 lets a
+    re-buy after a download consumed the prior unlock).
     Requires tour_id in the body. Returns a Flask (json, status) tuple.
     """
     if not tour_id:
@@ -604,6 +646,11 @@ def _verify_tour_purchase(store, transaction_id, product, user_id,
     conn = _get_db()
     try:
         cur = conn.cursor()
+
+        # [LOCAL-693 / D660] Ensure the consumption schema (consumed_at + the
+        # partial unique index) exists before any ON CONFLICT ... WHERE
+        # consumed_at IS NULL insert below.
+        _ensure_unlock_consumption_schema(cur)
 
         # [LOCAL-677B / D653] The unlock keys on the OWN language id the buyer
         # purchased (buying Russian unlocks Russian only), NOT the source. We
@@ -637,7 +684,7 @@ def _verify_tour_purchase(store, transaction_id, product, user_id,
                 """
                 INSERT INTO tour_unlocks (user_id, tour_id, transaction_id, store, price_usd)
                 VALUES (%s, %s, %s, %s, %s)
-                ON CONFLICT (user_id, tour_id) DO NOTHING
+                ON CONFLICT (user_id, tour_id) WHERE consumed_at IS NULL DO NOTHING
                 """,
                 (user_id, own_tour_id, transaction_id, store,
                  _tour_price_usd(cur, product)),
@@ -676,7 +723,7 @@ def _verify_tour_purchase(store, transaction_id, product, user_id,
                     """
                     INSERT INTO tour_unlocks (user_id, tour_id, transaction_id, store, price_usd)
                     VALUES (%s, %s, %s, %s, %s)
-                    ON CONFLICT (user_id, tour_id) DO NOTHING
+                    ON CONFLICT (user_id, tour_id) WHERE consumed_at IS NULL DO NOTHING
                     """,
                     (user_id, own_tour_id, effective_txid, store,
                      _tour_price_usd(cur, product)),
@@ -707,7 +754,7 @@ def _verify_tour_purchase(store, transaction_id, product, user_id,
                 """
                 INSERT INTO tour_unlocks (user_id, tour_id, transaction_id, store, price_usd)
                 VALUES (%s, %s, %s, %s, %s)
-                ON CONFLICT (user_id, tour_id) DO NOTHING
+                ON CONFLICT (user_id, tour_id) WHERE consumed_at IS NULL DO NOTHING
                 """,
                 (user_id, own_tour_id, effective_txid, store, price_usd),
             )
@@ -727,7 +774,7 @@ def _verify_tour_purchase(store, transaction_id, product, user_id,
             """
             INSERT INTO tour_unlocks (user_id, tour_id, transaction_id, store, price_usd)
             VALUES (%s, %s, %s, %s, %s)
-            ON CONFLICT (user_id, tour_id) DO NOTHING
+            ON CONFLICT (user_id, tour_id) WHERE consumed_at IS NULL DO NOTHING
             """,
             (user_id, own_tour_id, effective_txid, store, price_usd),
         )

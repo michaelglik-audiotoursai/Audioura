@@ -58,6 +58,10 @@ import price_tiers as price_tiers_cfg  # noqa: E402
 # move without touching the gate logic.
 FREE_PREVIEW_STOPS = 1
 
+# [LOCAL-693 / D660] Cached presence of tour_unlocks.consumed_at (migration 031).
+# None = not yet checked. Lets unlock reads fall back on a pre-031 DB.
+_HAS_CONSUMED_COLUMN = None
+
 
 # ─── Curator entitlement ──────────────────────────────────────────────────────
 
@@ -233,8 +237,14 @@ def record_unlock(user_id, tour_id, transaction_id=None, store=None,
                   price_usd=None):
     """Record (idempotently) that a buyer unlocked a tour.
 
-    UNIQUE(user_id, tour_id) → a replayed/duplicate purchase is a no-op (ON
-    CONFLICT DO NOTHING).
+    [LOCAL-693 / D660] Idempotency is on the ACTIVE (unconsumed) unlock only:
+    ON CONFLICT (user_id, tour_id) WHERE consumed_at IS NULL DO NOTHING. A buyer
+    holds at most one unconsumed unlock per language row, so a replayed purchase
+    is still a no-op; but once a download has consumed the prior unlock, a fresh
+    purchase writes a NEW active row (buy again to download again). This targets
+    the partial unique index uq_tour_unlocks_active (migration 031) — the old
+    full UNIQUE(user_id,tour_id) is gone, so a bare ON CONFLICT (user_id,tour_id)
+    would error.
 
     [LOCAL-677B / D653] Every language copy unlocks SEPARATELY: the unlock keys
     on the GIVEN language row's OWN tour_id, NOT its source. Buying Russian
@@ -251,7 +261,7 @@ def record_unlock(user_id, tour_id, transaction_id=None, store=None,
             """
             INSERT INTO tour_unlocks (user_id, tour_id, transaction_id, store, price_usd)
             VALUES (%s, %s, %s, %s, %s)
-            ON CONFLICT (user_id, tour_id) DO NOTHING
+            ON CONFLICT (user_id, tour_id) WHERE consumed_at IS NULL DO NOTHING
             RETURNING id
             """,
             (user_id, own_id, transaction_id, store, price_usd),
@@ -270,19 +280,80 @@ def record_unlock(user_id, tour_id, transaction_id=None, store=None,
         conn.close()
 
 
+def _unlocks_has_consumed_column(cur):
+    """True if tour_unlocks has the LOCAL-693 consumed_at column. Cached on the
+    module. Lets is_unlocked_cur / the counts fall back gracefully on a DB that
+    predates migration 031 (treat every unlock as active)."""
+    global _HAS_CONSUMED_COLUMN
+    if _HAS_CONSUMED_COLUMN is not None:
+        return _HAS_CONSUMED_COLUMN
+    try:
+        cur.execute(
+            "SELECT 1 FROM information_schema.columns "
+            "WHERE table_name = 'tour_unlocks' AND column_name = 'consumed_at'"
+        )
+        _HAS_CONSUMED_COLUMN = cur.fetchone() is not None
+    except Exception:  # noqa: BLE001
+        _HAS_CONSUMED_COLUMN = False
+    return _HAS_CONSUMED_COLUMN
+
+
 def is_unlocked_cur(cur, user_id, original_id):
-    """True if this user has a tour_unlocks row for this (original) tour. Cursor
-    form, so it composes inside another transaction. Never raises."""
+    """[LOCAL-693 / D660] True if this user holds an UNCONSUMED tour_unlocks row
+    for this tour. A purchase now grants ONE download; once a download has
+    consumed the unlock (consumed_at set), the tour is no longer "unlocked" for
+    the purpose of a NEW download — the listener must buy again. (The row stays,
+    keeping the buyer Verified, D647.) Cursor form, so it composes inside another
+    transaction. Pre-031 DBs (no consumed_at) fall back to presence. Never
+    raises."""
     if not user_id:
         return False
     try:
-        cur.execute(
-            "SELECT 1 FROM tour_unlocks WHERE user_id = %s AND tour_id = %s LIMIT 1",
-            (user_id, int(original_id)),
-        )
+        if _unlocks_has_consumed_column(cur):
+            cur.execute(
+                "SELECT 1 FROM tour_unlocks "
+                "WHERE user_id = %s AND tour_id = %s AND consumed_at IS NULL LIMIT 1",
+                (user_id, int(original_id)),
+            )
+        else:
+            cur.execute(
+                "SELECT 1 FROM tour_unlocks WHERE user_id = %s AND tour_id = %s LIMIT 1",
+                (user_id, int(original_id)),
+            )
         return cur.fetchone() is not None
     except Exception:  # noqa: BLE001 — absent table (pre-022) → not unlocked
         return False
+
+
+def download_counts_cur(cur, user_id, tour_id):
+    """[LOCAL-693 / D660] (downloads_bought, downloads_used) for (user, language
+    row): how many unlocks the user has EVER bought for this row, and how many of
+    those have been consumed by a successful download. downloads_bought -
+    downloads_used = the unconsumed unlocks still spendable on a download. Keyed
+    on the OWN language id (unlocks are per language, D653). Pre-031 DB → used=0
+    (no unlock has been consumed because the column does not exist yet). Never
+    raises; returns (0, 0) on any error or absent table."""
+    if not user_id:
+        return 0, 0
+    try:
+        if _unlocks_has_consumed_column(cur):
+            cur.execute(
+                "SELECT COUNT(*), COUNT(consumed_at) "
+                "FROM tour_unlocks WHERE user_id = %s AND tour_id = %s",
+                (user_id, int(tour_id)),
+            )
+            row = cur.fetchone()
+            bought = int(row[0]) if row and row[0] is not None else 0
+            used = int(row[1]) if row and row[1] is not None else 0
+            return bought, used
+        cur.execute(
+            "SELECT COUNT(*) FROM tour_unlocks WHERE user_id = %s AND tour_id = %s",
+            (user_id, int(tour_id)),
+        )
+        row = cur.fetchone()
+        return (int(row[0]) if row and row[0] is not None else 0), 0
+    except Exception:  # noqa: BLE001
+        return 0, 0
 
 
 def is_unlocked(user_id, tour_id):
@@ -364,7 +435,15 @@ def preview_state(user_id, tour_id):
     [LOCAL-677B / D653] The PRICE is inherited from the source tour (resolve to
     original), but the UNLOCK is per LANGUAGE: `unlocked`/`locked` are decided by
     whether THIS tour_id (the language the listener opened) has its own unlock
-    row. Buying Russian leaves English `locked`.
+    row.
+
+    [LOCAL-693 / D660] `unlocked` now means the user holds an UNCONSUMED
+    purchase for this row (a download still available). After a download has
+    consumed the purchase the tour reads as `locked` again (buy again to
+    download again) — but anything already on the phone keeps playing offline
+    (D654), and the buyer stays Verified (D647). Two extra counts are reported:
+      * downloads_bought — unlocks ever bought for this row;
+      * downloads_used   — those consumed by a successful download.
     """
     conn = get_connection()
     try:
@@ -373,6 +452,7 @@ def preview_state(user_id, tour_id):
         price = _price_payload(cur, original_id)
         # Unlock keys on the OWN language id, not the source.
         unlocked = (not price["is_paid"]) or is_unlocked_cur(cur, user_id, int(tour_id))
+        bought, used = download_counts_cur(cur, user_id, int(tour_id))
         return {
             **price,
             # Report the id the listener actually opened (the language row).
@@ -380,6 +460,9 @@ def preview_state(user_id, tour_id):
             "unlocked": bool(unlocked),
             "free_preview_stops": FREE_PREVIEW_STOPS,
             "locked": bool(price["is_paid"] and not unlocked),
+            # [LOCAL-693 / D660] per-download accounting for this (user, row).
+            "downloads_bought": int(bought),
+            "downloads_used": int(used),
         }
     finally:
         conn.close()
