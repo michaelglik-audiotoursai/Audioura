@@ -8,6 +8,7 @@ import json
 import psycopg2
 import math
 import traceback
+import uuid
 import zipfile
 from io import BytesIO
 from datetime import datetime
@@ -1097,6 +1098,9 @@ def _passes_price_filter(price_filter, is_paid):
 
 _HAS_TOUR_UNLOCKS_TABLE = None
 _HAS_TOUR_DOWNLOADS_TABLE = None
+# [LOCAL-693 / D660] Cache for the per-download consumption columns on
+# tour_unlocks (consumed_at, consumed_by_download_id + partial active index).
+_HAS_UNLOCK_CONSUMPTION_COLS = False
 
 
 def _table_exists(cur, table_name):
@@ -1147,9 +1151,55 @@ def _row_price_tier(cur, tour_id):
     return None
 
 
+def _ensure_unlock_consumption_columns(cur):
+    """[LOCAL-693 / D660] Self-healing DDL for the consumption columns on
+    tour_unlocks (mirrors migration 031), so the per-download gate works whether
+    or not the migration file has run on this DB. Adds consumed_at and
+    consumed_by_download_id (both NULL = unconsumed), and the partial unique
+    index that lets a user re-buy after consuming while still rejecting a second
+    ACTIVE unlock. Idempotent (ADD COLUMN / CREATE INDEX IF NOT EXISTS). Caches
+    success so we touch the schema at most once per process. Does NOT commit (the
+    caller owns the transaction). Returns True if the columns are present."""
+    global _HAS_UNLOCK_CONSUMPTION_COLS
+    if _HAS_UNLOCK_CONSUMPTION_COLS:
+        return True
+    try:
+        cur.execute(
+            "ALTER TABLE tour_unlocks ADD COLUMN IF NOT EXISTS consumed_at TIMESTAMPTZ"
+        )
+        cur.execute(
+            "ALTER TABLE tour_unlocks "
+            "ADD COLUMN IF NOT EXISTS consumed_by_download_id VARCHAR(255)"
+        )
+        # Relax the old full UNIQUE so a re-buy after consumption is possible,
+        # then enforce "at most one ACTIVE unlock" with a partial unique index.
+        cur.execute(
+            "DO $$ BEGIN "
+            "IF EXISTS (SELECT 1 FROM pg_constraint "
+            "WHERE conname = 'uq_tour_unlocks_user_tour' "
+            "AND conrelid = 'tour_unlocks'::regclass) THEN "
+            "ALTER TABLE tour_unlocks DROP CONSTRAINT uq_tour_unlocks_user_tour; "
+            "END IF; END $$;"
+        )
+        cur.execute(
+            "CREATE UNIQUE INDEX IF NOT EXISTS uq_tour_unlocks_active "
+            "ON tour_unlocks (user_id, tour_id) WHERE consumed_at IS NULL"
+        )
+        _HAS_UNLOCK_CONSUMPTION_COLS = True
+        return True
+    except Exception:  # noqa: BLE001 — must never fail a download/gate
+        return False
+
+
 def _user_has_unlock(cur, user_id, tour_id):
-    """True if this user has a tour_unlocks row for THIS language row's own id
-    (per-language unlock, 677B/D653). Absent table (pre-022) → not unlocked."""
+    """[LOCAL-693 / D660] True if this user holds an UNCONSUMED tour_unlocks row
+    for THIS language row's own id (per-language unlock, 677B/D653). D660: a
+    purchase grants ONE download, so only an unlock whose consumed_at IS NULL
+    counts — once a download has spent it, the row stays (it keeps the buyer
+    Verified, D647) but no longer authorises a download, and a 402 asks the
+    listener to buy again. Absent table (pre-022) → not unlocked. A schema that
+    predates the consumed_at column (pre-031 and self-heal failed) falls back to
+    the presence check so a paid tour is never wrongly refused on an old DB."""
     global _HAS_TOUR_UNLOCKS_TABLE
     if not user_id:
         return False
@@ -1157,14 +1207,73 @@ def _user_has_unlock(cur, user_id, tour_id):
         _HAS_TOUR_UNLOCKS_TABLE = _table_exists(cur, 'tour_unlocks')
     if not _HAS_TOUR_UNLOCKS_TABLE:
         return False
+    has_cols = _ensure_unlock_consumption_columns(cur)
     try:
-        cur.execute(
-            "SELECT 1 FROM tour_unlocks WHERE user_id = %s AND tour_id = %s LIMIT 1",
-            (user_id, int(tour_id)),
-        )
+        if has_cols:
+            cur.execute(
+                "SELECT 1 FROM tour_unlocks "
+                "WHERE user_id = %s AND tour_id = %s AND consumed_at IS NULL LIMIT 1",
+                (user_id, int(tour_id)),
+            )
+        else:
+            # Pre-031 DB without the column — behave as before 693 (presence).
+            cur.execute(
+                "SELECT 1 FROM tour_unlocks WHERE user_id = %s AND tour_id = %s LIMIT 1",
+                (user_id, int(tour_id)),
+            )
         return cur.fetchone() is not None
     except Exception:  # noqa: BLE001
         return False
+
+
+def _consume_unlock(cur, user_id, tour_id, download_id):
+    """[LOCAL-693 / D660] Spend ONE unconsumed unlock for (user, language row):
+    stamp the OLDEST unconsumed row's consumed_at = NOW() and record the download
+    id that spent it. Called by POST /tour/<id>/download-complete AFTER the app
+    confirms a fully-written, valid zip — never during the stream, so a failed or
+    cut-off download leaves the unlock unconsumed and the listener retries free.
+
+    Returns (consumed: bool, remaining_unconsumed: int). consumed is False when
+    the user had no unconsumed unlock (e.g. a free/grandfathered/curator download,
+    or a double-confirm) — a harmless no-op. Marks exactly ONE row even if the
+    user somehow holds several. Never raises."""
+    global _HAS_TOUR_UNLOCKS_TABLE
+    if not user_id:
+        return False, 0
+    if _HAS_TOUR_UNLOCKS_TABLE is None:
+        _HAS_TOUR_UNLOCKS_TABLE = _table_exists(cur, 'tour_unlocks')
+    if not _HAS_TOUR_UNLOCKS_TABLE:
+        return False, 0
+    if not _ensure_unlock_consumption_columns(cur):
+        return False, 0
+    try:
+        cur.execute(
+            """
+            UPDATE tour_unlocks
+            SET consumed_at = NOW(),
+                consumed_by_download_id = %s
+            WHERE id = (
+                SELECT id FROM tour_unlocks
+                WHERE user_id = %s AND tour_id = %s AND consumed_at IS NULL
+                ORDER BY created_at ASC, id ASC
+                LIMIT 1
+            )
+            RETURNING id
+            """,
+            (str(download_id) if download_id is not None else None,
+             user_id, int(tour_id)),
+        )
+        consumed = cur.fetchone() is not None
+        cur.execute(
+            "SELECT COUNT(*) FROM tour_unlocks "
+            "WHERE user_id = %s AND tour_id = %s AND consumed_at IS NULL",
+            (user_id, int(tour_id)),
+        )
+        row = cur.fetchone()
+        remaining = int(row[0]) if row and row[0] is not None else 0
+        return consumed, remaining
+    except Exception:  # noqa: BLE001
+        return False, 0
 
 
 def _user_is_tour_creator(cur, user_id, tour_id):
@@ -1290,9 +1399,13 @@ def _download_gate(cur, user_id, tour_id):
     Order (the first that applies wins):
       1. FREE row (price_tier NULL)            → allowed.
       2. The tour's CREATOR (curator's own)    → allowed.
-      3. The user has an UNLOCK for this row   → allowed.
-      4. The user is GRANDFATHERED (free dl)   → allowed.
-      5. otherwise                             → 402 purchase_required.
+      3. The user has an UNCONSUMED UNLOCK     → allowed (D660: one download per
+                                                 purchase; a consumed unlock no
+                                                 longer authorises a download).
+      4. The user is GRANDFATHERED (free dl)   → allowed (LOCAL-677C, unchanged).
+      5. otherwise                             → 402 purchase_required (also the
+                                                 already-consumed-and-not-rebought
+                                                 case: buy again to download again).
     """
     tier = _row_price_tier(cur, tour_id)
     if tier is None:
@@ -1527,6 +1640,16 @@ def download_tour(tour_id):
         # of, and was not grandfathered on) is refused with HTTP 402 BEFORE the
         # zip is streamed. Free rows, the curator's own tour, an unlocked row and
         # a grandfathered (downloaded-while-free) row are unchanged.
+        #
+        # [LOCAL-693 / D660] A paid download now SPENDS an unlock — but exactly
+        # ONE successful download per purchase, and a FAILED/cut-off download
+        # must NOT spend it. The server cannot see whether the client received
+        # the whole zip (a mid-stream disconnect looks like a normal generator
+        # finish server-side), so we do NOT consume here. Instead we mint a
+        # download id, return it in the X-Download-Id header, and the app calls
+        # POST /tour/<id>/download-complete with it AFTER it has written a
+        # complete, valid zip to disk. That confirm consumes the unlock. Until
+        # then the unlock stays unconsumed and the listener may retry for free.
         allowed, deny = _download_gate(cur, user_id, tour_id)
         if not allowed:
             print(f"Tour {tour_id} is paid and not unlocked for {user_id}: 402")
@@ -1535,11 +1658,26 @@ def download_tour(tour_id):
             conn.close()
             return jsonify(deny), 402
 
+        # Does THIS download consume an unlock? Only when the row is paid AND the
+        # listener is riding an unlock (not free, not the curator's own, not
+        # grandfathered). We compute it now, while the cursor is open, so the
+        # confirm step (download-complete) and the app both know a token is live.
+        tier_now = _row_price_tier(cur, tour_id)
+        is_paid_now = tier_now is not None
+        consumes_unlock = bool(
+            is_paid_now
+            and not _user_is_tour_creator(cur, user_id, tour_id)
+            and not _user_grandfathered(cur, user_id, tour_id)
+            and _user_has_unlock(cur, user_id, tour_id)
+        )
+        # A short, unguessable id that ties this download to the confirm call.
+        download_id = uuid.uuid4().hex if consumes_unlock else ""
+
         # Record the download event (idempotent) so a free download now
         # grandfathers this user if the curator later prices the tour. was_free
         # is read from the row's governing tier at THIS moment.
         _record_download_event(cur, user_id, tour_id,
-                               was_free=(_row_price_tier(cur, tour_id) is None))
+                               was_free=(tier_now is None))
 
         cur.execute("""
             UPDATE audio_tours 
@@ -1556,7 +1694,8 @@ def download_tour(tour_id):
             safe_name = f"tour_{tour_id}"
         filename = f"{safe_name}_tour.zip"
         
-        print(f"Sending tour file: {filename}")
+        print(f"Sending tour file: {filename} (consumes_unlock={consumes_unlock}, "
+              f"download_id={download_id or '-'})")
         sys.stdout.flush()
         
         # Use streaming response for large files
@@ -1572,20 +1711,83 @@ def download_tour(tour_id):
                     break
                 yield chunk
         
+        resp_headers = {
+            'Content-Disposition': f'attachment; filename="{filename}"',
+            'Content-Length': str(len(audio_tour_data)),
+            'Content-Type': 'application/zip',
+        }
+        # [LOCAL-693 / D660] Tell the app whether this download must be confirmed
+        # to consume the purchase, and with which id. The app echoes the id to
+        # POST /tour/<id>/download-complete once the zip is fully, validly saved.
+        # Empty header (free / creator / grandfathered / unpaid) → nothing to
+        # confirm. Exposed via Access-Control-Expose-Headers so a browser client
+        # can read it under CORS.
+        resp_headers['X-Download-Id'] = download_id
+        resp_headers['X-Download-Consumes-Unlock'] = '1' if consumes_unlock else '0'
+        resp_headers['Access-Control-Expose-Headers'] = (
+            'X-Download-Id, X-Download-Consumes-Unlock'
+        )
         return Response(
             generate(),
             mimetype='application/zip',
-            headers={
-                'Content-Disposition': f'attachment; filename="{filename}"',
-                'Content-Length': str(len(audio_tour_data)),
-                'Content-Type': 'application/zip'
-            }
+            headers=resp_headers,
         )
         
     except Exception as e:
         print(f"ERROR in download_tour: {e}")
         sys.stdout.flush()
         return jsonify({'error': str(e)}), 500
+
+
+@app.route('/tour/<int:tour_id>/download-complete', methods=['POST', 'OPTIONS'])
+def download_complete(tour_id):
+    """[LOCAL-693 / D660] Confirm a fully-downloaded paid tour and SPEND one
+    unlock.
+
+    The app calls this AFTER it has written a complete, valid zip to disk for a
+    paid tour it rode an unlock to download. Spending here (not during the
+    stream) is the whole point of D660's "a download that FAILS does not consume
+    the purchase": a cut-off or failed download never reaches this call, so the
+    unlock stays unconsumed and the listener retries for free.
+
+    Body (JSON): {"user_id": "...", "download_id": "<hex from X-Download-Id>"}.
+    download_id is optional but recommended (audit trail of which download spent
+    the unlock). Idempotent and safe: if the user has no unconsumed unlock for
+    this row (free/curator/grandfathered download, or a double-confirm), it is a
+    harmless no-op that still returns 200. Never 500s the app over a confirm.
+
+    Returns 200 {consumed, remaining_unconsumed, tour_id}. consumed is True iff
+    an unconsumed unlock was spent by this call."""
+    if request.method == 'OPTIONS':
+        return ('', 204)
+    data = request.get_json(silent=True) or {}
+    user_id = data.get('user_id') or request.args.get('user_id') or 'anonymous'
+    download_id = data.get('download_id') or request.args.get('download_id') or ''
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor()
+        try:
+            consumed, remaining = _consume_unlock(cur, user_id, tour_id, download_id)
+            conn.commit()
+        except Exception:  # noqa: BLE001
+            conn.rollback()
+            consumed, remaining = False, 0
+        finally:
+            cur.close()
+            conn.close()
+        print(f"download-complete tour {tour_id} user {user_id}: "
+              f"consumed={consumed} remaining={remaining} id={download_id or '-'}")
+        sys.stdout.flush()
+        return jsonify({
+            "tour_id": int(tour_id),
+            "consumed": bool(consumed),
+            "remaining_unconsumed": int(remaining),
+        }), 200
+    except Exception as e:  # noqa: BLE001 — a confirm must never hard-fail the app
+        print(f"ERROR in download_complete: {e}")
+        sys.stdout.flush()
+        return jsonify({"tour_id": int(tour_id), "consumed": False,
+                        "remaining_unconsumed": 0, "error": str(e)}), 200
 
 @app.route('/tour/<int:tour_id>/preview-audio', methods=['GET'])
 def preview_tour_audio(tour_id):
