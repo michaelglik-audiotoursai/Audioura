@@ -58,6 +58,33 @@ APPLE_ROOT_CA_PATH = os.getenv(
 # check (we pass None), which keeps older stub tests working.
 APPLE_IAP_ENVIRONMENT = os.getenv('APPLE_IAP_ENVIRONMENT', '')
 
+# [LOCAL-696] Google Play verification config. The Play package the purchase
+# tokens belong to (same bundle as Apple — ClickUp wdvrdayx33), and the PATH to
+# the service-account JSON used to call the Google Play Developer API. The key
+# file is NEVER committed; LEAD/Michael place it in the container and set
+# GOOGLE_PLAY_SA_JSON to its path. When the path is unset, Google purchases
+# return 503 google_verify_unconfigured and NEVER grant (stub mode still works).
+GOOGLE_PACKAGE_NAME = os.getenv('GOOGLE_PACKAGE_NAME', APPLE_BUNDLE_ID)
+GOOGLE_PLAY_SA_JSON = os.getenv('GOOGLE_PLAY_SA_JSON', '')
+
+# A sentinel returned by the Google verify path when no service account is
+# configured, so the HTTP layer answers 503 google_verify_unconfigured. A
+# TEST may inject a fake Google API client here to exercise the google path
+# with no network and no SA file.
+_GOOGLE_API_CLIENT_OVERRIDE = None
+
+
+def _google_api_client():
+    """Return a Google Play API client for a real verification, or None when no
+    service account is configured (the caller then answers 503). A test can set
+    `_GOOGLE_API_CLIENT_OVERRIDE` to inject a fake client with no network/SA."""
+    if _GOOGLE_API_CLIENT_OVERRIDE is not None:
+        return _GOOGLE_API_CLIENT_OVERRIDE
+    if not GOOGLE_PLAY_SA_JSON:
+        return None
+    from google_play_verifier import build_api_client
+    return build_api_client(GOOGLE_PLAY_SA_JSON, package_name=GOOGLE_PACKAGE_NAME)
+
 # product -> level mapping. Data, not logic: a new product is one dict entry.
 # Keys are the SERVER product keys.
 PRODUCT_LEVELS = {
@@ -472,13 +499,78 @@ def _me_payload(cur, user_id, now=None):
 # IAP verifier interface + sandbox stub + offline Apple verification
 # ───────────────────────────────────────────────────────────────────────────
 class VerificationResult:
-    def __init__(self, ok, raw_status, amount=None):
+    def __init__(self, ok, raw_status, amount=None, unconfigured=False):
         self.ok = ok
         self.raw_status = raw_status
         self.amount = amount
+        # [LOCAL-696] True when Google verification was requested but no service
+        # account is configured — the HTTP layer must answer 503
+        # google_verify_unconfigured and NEVER grant (never a 402 as if the
+        # store refused). Distinct from ok=False so the two cases never blur.
+        self.unconfigured = unconfigured
 
 
 _PLAN_AMOUNTS = {'l3_pack_10': 10.00, 'l4_round_25': 25.00}
+
+
+def _google_verify(store, product_id, purchase_token, expected_product_id,
+                   amount, tag='LOCAL-696'):
+    """[LOCAL-696] Shared Google Play verification for every product kind (level,
+    tour, pass). Verifies the purchase token with the Google Play Developer API
+    (purchases.products.get), then acknowledges and consumes it so it can be
+    bought again (D660). Returns a VerificationResult:
+
+      * store != 'google'              -> ok=False  google_mode_wrong_store:<store>
+      * no purchase_token              -> ok=False  google_missing_purchase_token
+      * no service account configured  -> unconfigured=True (HTTP 503)
+      * verify/ack/consume failure      -> ok=False  google_<code>
+      * success                         -> ok=True   google_verified:<orderId>
+
+    The authoritative Google orderId is returned in raw_status
+    ('google_verified:<orderId>') so the caller records/idempotency-checks the
+    orderId on purchases.transaction_id (UNIQUE), exactly like the apple path."""
+    if store != 'google':
+        return VerificationResult(False, f'google_mode_wrong_store:{store}')
+    if not purchase_token:
+        return VerificationResult(False, 'google_missing_purchase_token')
+
+    client = _google_api_client()
+    if client is None:
+        return VerificationResult(False, 'google_verify_unconfigured',
+                                  unconfigured=True)
+
+    try:
+        from google_play_verifier import (
+            verify_product_purchase, GoogleVerificationError,
+        )
+    except Exception as e:  # pragma: no cover - import-time safety
+        logger.error(f"[{tag}] google verifier import failed: {e}")
+        return VerificationResult(False, f'google_verifier_unavailable:{e}')
+
+    try:
+        verified = verify_product_purchase(
+            client,
+            product_id=product_id,
+            purchase_token=purchase_token,
+            expected_product_id=expected_product_id,
+            package_name=GOOGLE_PACKAGE_NAME,
+            acknowledge=True,
+            consume=True,
+        )
+    except GoogleVerificationError as e:
+        # A missing/unreadable SA surfaces here only if the client was built but
+        # the file vanished mid-flight; treat the unconfigured-ish codes as 503.
+        if e.code in ('google_sa_unreadable', 'google_sa_invalid',
+                      'google_libs_unavailable'):
+            logger.error(f"[{tag}] google verify unconfigured: {e.code}")
+            return VerificationResult(False, f'google_{e.code}', unconfigured=True)
+        logger.warning(f"[{tag}] google verify failed: {e.code}")
+        return VerificationResult(False, f'google_{e.code}')
+    except Exception as e:  # noqa: BLE001
+        logger.error(f"[{tag}] google verify error: {e}")
+        return VerificationResult(False, f'google_error:{e}')
+
+    return VerificationResult(True, f'google_verified:{verified.order_id}', amount)
 
 
 def _load_apple_root_ca():
@@ -546,7 +638,19 @@ def verify_purchase(store, transaction_id, product, signed_transaction=None):
             True, f'apple_verified:{verified.transaction_id}',
             _PLAN_AMOUNTS.get(product))
 
-    # google / other: not implemented in LOCAL-598 (out of scope).
+    if IAP_VERIFY_MODE == 'google':
+        # [LOCAL-696] The device sends the STORE product id in `product` and the
+        # opaque purchaseToken in `signed_transaction` (reused field; the app's
+        # google path puts the token there). The Play product id for a level is
+        # the store id mapped from the server key.
+        expected_store_product = SERVER_TO_STORE_PRODUCT.get(product)
+        product_id = expected_store_product or product
+        return _google_verify(
+            store, product_id=product_id, purchase_token=signed_transaction,
+            expected_product_id=expected_store_product,
+            amount=_PLAN_AMOUNTS.get(product), tag='LOCAL-696')
+
+    # other: not implemented.
     return VerificationResult(False, f'verify_mode_not_implemented:{IAP_VERIFY_MODE}')
 
 
@@ -705,6 +809,11 @@ def _verify_tour_purchase(store, transaction_id, product, user_id,
         # level products, so a tour product uses the store id directly below).
         result = _verify_tour_signed(store, transaction_id, product,
                                      signed_transaction)
+        if getattr(result, 'unconfigured', False):
+            # [LOCAL-696] Google requested but no service account configured —
+            # 503, never a grant and never a 402 as if the store refused.
+            cur.close()
+            return jsonify({"error": "google_verify_unconfigured"}), 503
         if not result.ok:
             cur.close()
             return jsonify({
@@ -713,9 +822,11 @@ def _verify_tour_purchase(store, transaction_id, product, user_id,
                 "raw_status": result.raw_status,
             }), 402
 
-        # apple mode: the JWS yields the authoritative transaction id.
+        # apple/google mode: the verifier yields the authoritative transaction
+        # id (apple JWS transactionId, or the Google orderId).
         effective_txid = transaction_id
-        if isinstance(result.raw_status, str) and result.raw_status.startswith('apple_verified:'):
+        _auth_prefixes = ('apple_verified:', 'google_verified:')
+        if isinstance(result.raw_status, str) and result.raw_status.startswith(_auth_prefixes):
             effective_txid = result.raw_status.split(':', 1)[1]
             cur.execute("SELECT id FROM purchases WHERE transaction_id = %s", (effective_txid,))
             if cur.fetchone():
@@ -837,6 +948,15 @@ def _verify_tour_signed(store, transaction_id, product, signed_transaction):
             True, f'apple_verified:{verified.transaction_id}',
             TOUR_TIER_PRODUCTS.get(product, {}).get('price_usd'))
 
+    if IAP_VERIFY_MODE == 'google':
+        # [LOCAL-696] A tour product's store id IS `product`; the opaque
+        # purchaseToken arrives in signed_transaction (reused field).
+        return _google_verify(
+            store, product_id=product, purchase_token=signed_transaction,
+            expected_product_id=product,
+            amount=TOUR_TIER_PRODUCTS.get(product, {}).get('price_usd'),
+            tag='LOCAL-696-tour')
+
     return VerificationResult(False, f'verify_mode_not_implemented:{IAP_VERIFY_MODE}')
 
 
@@ -853,6 +973,24 @@ def purchases_verify():
     # [LOCAL-598] StoreKit 2 JWS signed transaction (apple mode). Optional in
     # stub mode so existing sandbox tests keep working.
     signed_transaction = data.get('signed_transaction')
+
+    # [LOCAL-696] Android/Google purchases carry different field names: the app
+    # sends {store:'google', purchase_token, product_id, order_id}. Normalise
+    # them onto the shared variables so the whole verify/record/idempotency
+    # pipeline below is store-agnostic:
+    #   • order_id      -> transaction_id (the authoritative Google order id;
+    #                       verify re-asserts it as google_verified:<orderId>);
+    #   • product_id    -> product (the Play store product id);
+    #   • purchase_token-> signed_transaction (the Google verify path reads the
+    #                       token from that field).
+    if store == 'google':
+        if not transaction_id:
+            transaction_id = data.get('order_id')
+        if not product:
+            product = data.get('product_id')
+        if not signed_transaction:
+            signed_transaction = data.get('purchase_token')
+
     if not all([store, transaction_id, product, user_id]):
         return jsonify({
             "error": "missing_fields",
@@ -910,11 +1048,16 @@ def purchases_verify():
                 "transaction_id": transaction_id,
             }), 409
 
-        # Verify with the store. apple mode verifies the JWS offline; stub
-        # accepts any non-empty transaction_id.
+        # Verify with the store. apple mode verifies the JWS offline; google
+        # mode verifies the token with the Play Developer API; stub accepts any
+        # non-empty transaction_id.
         result = verify_purchase(
             store, transaction_id, server_product,
             signed_transaction=signed_transaction)
+        if getattr(result, 'unconfigured', False):
+            # [LOCAL-696] Google requested but no service account configured.
+            cur.close()
+            return jsonify({"error": "google_verify_unconfigured"}), 503
         if not result.ok:
             cur.close()
             return jsonify({
@@ -923,11 +1066,12 @@ def purchases_verify():
                 "raw_status": result.raw_status,
             }), 402
 
-        # In apple mode the verified transaction id (from the signed payload) is
-        # authoritative — use it for recording and the uniqueness check, not the
-        # client-supplied one. raw_status is 'apple_verified:<txid>'.
+        # In apple/google mode the verified transaction id is authoritative —
+        # use it for recording and the uniqueness check, not the client-supplied
+        # one. raw_status is 'apple_verified:<txid>' or 'google_verified:<orderId>'.
         effective_txid = transaction_id
-        if isinstance(result.raw_status, str) and result.raw_status.startswith('apple_verified:'):
+        if isinstance(result.raw_status, str) and result.raw_status.startswith(
+                ('apple_verified:', 'google_verified:')):
             effective_txid = result.raw_status.split(':', 1)[1]
             # Re-check idempotency on the authoritative id.
             cur.execute("SELECT id FROM purchases WHERE transaction_id = %s", (effective_txid,))

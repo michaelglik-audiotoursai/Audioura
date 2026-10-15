@@ -60,6 +60,27 @@ APPLE_ROOT_CA_PATH = os.getenv(
 )
 APPLE_IAP_ENVIRONMENT = os.getenv('APPLE_IAP_ENVIRONMENT', '')
 
+# [LOCAL-696] Google Play config (mirror of entitlements_api). The pass products
+# are one-time products on Play too (D658: our server enforces pass length), so
+# a pass verifies through the SAME Google product path as a tour. The SA JSON
+# path comes from GOOGLE_PLAY_SA_JSON; absent it, a google pass purchase returns
+# 503 google_verify_unconfigured and never grants.
+GOOGLE_PACKAGE_NAME = os.getenv('GOOGLE_PACKAGE_NAME', APPLE_BUNDLE_ID)
+GOOGLE_PLAY_SA_JSON = os.getenv('GOOGLE_PLAY_SA_JSON', '')
+
+# A test may inject a fake Google API client to exercise the google pass path
+# with no network and no SA file.
+_GOOGLE_API_CLIENT_OVERRIDE = None
+
+
+def _google_api_client():
+    if _GOOGLE_API_CLIENT_OVERRIDE is not None:
+        return _GOOGLE_API_CLIENT_OVERRIDE
+    if not GOOGLE_PLAY_SA_JSON:
+        return None
+    from google_play_verifier import build_api_client
+    return build_api_client(GOOGLE_PLAY_SA_JSON, package_name=GOOGLE_PACKAGE_NAME)
+
 # [D657/D658] One reminder 3 days BEFORE expiry, one AT expiry.
 PASS_REMINDER_BEFORE_DAYS = int(os.getenv('PASS_REMINDER_BEFORE_DAYS', '3'))
 
@@ -363,6 +384,48 @@ def _verify_pass_signed(store, transaction_id, product, signed_transaction):
             return False, f'apple_error:{e}'
         return True, f'apple_verified:{verified.transaction_id}'
 
+    if IAP_VERIFY_MODE == 'google':
+        # [LOCAL-696] A pass product's store id IS `product`; the opaque Google
+        # purchaseToken arrives in signed_transaction (reused field). Verify,
+        # acknowledge and consume via the Play Developer API. The sentinel
+        # raw_status 'google_verify_unconfigured' tells verify_community_pass to
+        # answer 503 (no SA configured) rather than 402.
+        if store != 'google':
+            return False, f'google_mode_wrong_store:{store}'
+        if not signed_transaction:
+            return False, 'google_missing_purchase_token'
+        client = _google_api_client()
+        if client is None:
+            return False, 'google_verify_unconfigured'
+        try:
+            from google_play_verifier import (
+                verify_product_purchase, GoogleVerificationError,
+            )
+        except Exception as e:  # pragma: no cover
+            logger.error(f"[LOCAL-696] google verifier import failed: {e}")
+            return False, f'google_verifier_unavailable:{e}'
+        try:
+            verified = verify_product_purchase(
+                client,
+                product_id=product,
+                purchase_token=signed_transaction,
+                expected_product_id=product,
+                package_name=GOOGLE_PACKAGE_NAME,
+                acknowledge=True,
+                consume=True,
+            )
+        except GoogleVerificationError as e:
+            if e.code in ('google_sa_unreadable', 'google_sa_invalid',
+                          'google_libs_unavailable'):
+                logger.error(f"[LOCAL-696] google pass unconfigured: {e.code}")
+                return False, 'google_verify_unconfigured'
+            logger.warning(f"[LOCAL-696] google pass verify failed: {e.code}")
+            return False, f'google_{e.code}'
+        except Exception as e:  # noqa: BLE001
+            logger.error(f"[LOCAL-696] google pass verify error: {e}")
+            return False, f'google_error:{e}'
+        return True, f'google_verified:{verified.order_id}'
+
     return False, f'verify_mode_not_implemented:{IAP_VERIFY_MODE}'
 
 
@@ -432,6 +495,10 @@ def verify_community_pass(store, transaction_id, product, user_id,
 
         ok, raw_status = _verify_pass_signed(store, transaction_id, product,
                                              signed_transaction)
+        if not ok and raw_status == 'google_verify_unconfigured':
+            # [LOCAL-696] Google requested but no service account configured.
+            cur.close()
+            return jsonify({"error": "google_verify_unconfigured"}), 503
         if not ok:
             cur.close()
             return jsonify({"error": "verification_failed",
@@ -439,7 +506,8 @@ def verify_community_pass(store, transaction_id, product, user_id,
                             "raw_status": raw_status}), 402
 
         effective_txid = transaction_id
-        if isinstance(raw_status, str) and raw_status.startswith('apple_verified:'):
+        if isinstance(raw_status, str) and raw_status.startswith(
+                ('apple_verified:', 'google_verified:')):
             effective_txid = raw_status.split(':', 1)[1]
 
         now = datetime.utcnow()
