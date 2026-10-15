@@ -7,6 +7,7 @@ import 'dart:io';
 import 'dart:convert';
 import '../services/voice_control_service_news.dart';
 import '../services/webview_console_logger.dart';
+import '../services/single_playback_controller.dart';
 import 'debug_log_viewer_screen.dart';
 
 class NewsPlayerScreen extends StatefulWidget {
@@ -279,6 +280,21 @@ class _NewsPlayerScreenState extends State<NewsPlayerScreen> {
             onWebViewCreated: (controller) async {
               webController = controller;
               await DebugLogHelper.addDebugLog('NEWS: InAppWebView created');
+              // [LOCAL-698] Install the single-playback controller at document
+              // start on EVERY load so no topic/article audio can start without
+              // first stopping the one already playing (native control, JS
+              // helper, or autoplay). Fixes already-downloaded articles too.
+              try {
+                await controller.addUserScript(
+                  userScript: UserScript(
+                    source: kSinglePlaybackControllerJs,
+                    injectionTime: UserScriptInjectionTime.AT_DOCUMENT_START,
+                  ),
+                );
+              } catch (e) {
+                await DebugLogHelper.addDebugLog(
+                    'NEWS: single-playback user script registration failed: $e');
+              }
               await DebugLogHelper.addDebugLog('NEWS: Loading file: $fileUrl');
               final indexFile = File('$healedDir/index.html');
               final exists = await indexFile.exists();
@@ -289,6 +305,15 @@ class _NewsPlayerScreenState extends State<NewsPlayerScreen> {
             },
             onLoadStop: (controller, url) async {
               await DebugLogHelper.addDebugLog('NEWS: WebView loaded: $url');
+              // [LOCAL-698] Safety net: ensure the single-playback controller
+              // is installed before auto-play. Idempotent.
+              try {
+                await controller.evaluateJavascript(
+                    source: kSinglePlaybackControllerJs);
+              } catch (e) {
+                await DebugLogHelper.addDebugLog(
+                    'NEWS: single-playback re-inject failed: $e');
+              }
               try {
                 final jsResult = await controller.evaluateJavascript(source: 'document.title');
                 await DebugLogHelper.addDebugLog('NEWS: Document title: $jsResult');
