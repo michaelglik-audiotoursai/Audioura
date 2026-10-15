@@ -172,4 +172,38 @@ class CommunitiesService {
       return false;
     }
   }
+
+  /// [LOCAL-700 §4] Is a community name free? Calls GET
+  /// /communities/name-available?name= (case/space-insensitive, trimmed on the
+  /// server). Returns true only on a 200 with available:true; ANY failure
+  /// (transport error, non-200, malformed body) returns null so the caller can
+  /// show a neutral "couldn't check" state rather than a false ✓ or ✗.
+  static Future<bool?> nameAvailable(String name) async {
+    try {
+      final q = Uri.encodeQueryComponent(name);
+      final r = await Endpoints.get(
+          Service.userDb, '/communities/name-available?name=$q');
+      final map = Endpoints.tryDecodeMap(r.body);
+      if (r.statusCode == 200 && map != null && map['available'] is bool) {
+        return map['available'] as bool;
+      }
+    } catch (_) {}
+    return null;
+  }
+
+  /// [LOCAL-700 §4] Rotate a community's invite code (OWNER only). The old code
+  /// stops working server-side. Returns the {join_code, invite_message} map on
+  /// success, or null on any failure (owner mismatch 403, not found 404,
+  /// transport error).
+  static Future<Map<String, dynamic>?> regenerateCode(
+      int id, String ownerUserId) async {
+    try {
+      final r = await Endpoints.post(
+          Service.userDb, '/communities/$id/regenerate-code',
+          body: {'owner_user_id': ownerUserId});
+      final map = Endpoints.tryDecodeMap(r.body);
+      if (r.statusCode == 200 && map != null) return map;
+    } catch (_) {}
+    return null;
+  }
 }

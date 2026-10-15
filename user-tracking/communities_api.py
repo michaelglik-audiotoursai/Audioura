@@ -386,6 +386,12 @@ def _community_page(cur, community_id, user_id=None, now=None):
         'episodes': _episodes_for(cur, community_id) if active else [],
         'episode_count': _episode_count(cur, community_id),
     }
+    # [LOCAL-700 §4] The organiser's page ALWAYS carries the invite code (with
+    # Copy/Share/Email/Regenerate in the app). The code is owner-only — a member
+    # or non-member never sees another community's code here.
+    if is_owner:
+        payload['join_code'] = c['join_code']
+        payload['invite_message'] = build_invite_message(c['name'], c['join_code'])
     return payload
 
 

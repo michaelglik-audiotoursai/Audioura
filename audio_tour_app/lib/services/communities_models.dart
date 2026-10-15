@@ -268,3 +268,169 @@ class CommunityRules {
   /// community tour.
   static bool downloadByDefault() => true;
 }
+
+/// [LOCAL-700] Flutter-free COPY + form helpers for the Communities UI, so the
+/// wording and the create-form logic are unit-testable without a running app.
+class CommunityCopy {
+  /// §1: The plain description of BOTH kinds of community content, shown on the
+  /// About → Communities screen and (shorter) as the Create intro. Covers:
+  ///   • the organiser's OWN audio (MP3 links / an RSS feed they host) —
+  ///     Audioura plays it, never stores or checks it; it is theirs;
+  ///   • tours MADE WITH Audioura for the community — generated on the Generate
+  ///     tab, checked by Audioura (content rating, same as any tour), shown
+  ///     only to members. (The feature itself is a later task; only the TEXT
+  ///     ships now.)
+  static const String aboutContent =
+      'A community is a group an organiser runs inside Audioura. There are two '
+      'kinds of audio a community can offer its members:\n\n'
+      '• Your own audio — MP3 links, or an RSS feed you host. Audioura plays it '
+      'to your members. It stays yours: Audioura does not store it and does not '
+      'check it.\n\n'
+      '• Tours made with Audioura for your community — generated on the Generate '
+      'tab like any other tour, and checked by Audioura (content rating, the '
+      'same as every generated or edited tour). These are shown only to your '
+      'members.\n\n'
+      'Communities can be free (like a book club) or paid. A paid membership is '
+      'a pass you buy — a day, a week, a month, or a year. Nothing renews '
+      'automatically: when a pass ends we remind you, and you can buy again. '
+      'Audio you have already downloaded stays with you.';
+
+  /// §1: The shorter intro shown at the top of the Create form.
+  static const String createIntro =
+      'Your community can offer two kinds of audio: your OWN audio (MP3 links or '
+      'an RSS feed you host — Audioura plays it, never stores or checks it), and '
+      'tours MADE WITH Audioura for your members (generated on the Generate tab '
+      'and checked by Audioura, like any tour).';
+
+  /// §1: The close warning, shown on both About and the Create form (above the
+  /// button). A community cannot be closed once members have joined; the
+  /// organiser can step down instead.
+  static const String closeWarning =
+      'Once members have joined, a community cannot be closed. You can step down '
+      'as organiser.';
+
+  /// §2: The message when an invite code resolves to no community.
+  static const String noCommunityForCode = 'No community with that code.';
+
+  // ── §4: friendly, lightly-humorous prefill pools (≥ 8 variants each) ────────
+
+  /// Name stems — combined with a place to make "The Wandering Owls of Lisbon".
+  static const List<String> namePrefixes = [
+    'The Wandering Owls',
+    'The Curious Pigeons',
+    'The Midnight Ramblers',
+    'The Lost Umbrella Society',
+    'The Slightly Lost Explorers',
+    'The Cobblestone Collective',
+    'The Rooftop Dreamers',
+    'The Backstreet Historians',
+    'The Caffeinated Cartographers',
+    'The Unhurried Wanderers',
+  ];
+
+  static const List<String> descriptions = [
+    'We wander, we point at buildings, we make up facts (then correct them). '
+        'Mostly we have a good time.',
+    'A friendly circle for people who like stories about the places they walk '
+        'past every day.',
+    'Short audio strolls for the perpetually curious. Comfortable shoes '
+        'recommended, strong opinions optional.',
+    'We turn ordinary streets into little adventures. No prior wandering '
+        'experience required.',
+    'For folks who read every plaque and still want to know more. You are '
+        'among friends here.',
+    'Half history club, half excuse to go for a walk. We regret nothing.',
+    'A cosy group that believes every corner has a tale, and most of them are '
+        'even true.',
+    'We explore slowly, listen closely, and never, ever skip the snack break.',
+  ];
+
+  static const List<String> organiserNames = [
+    'Alex Rambler',
+    'Sam Cobblestone',
+    'Jamie Wayfarer',
+    'Riley Milestone',
+    'Casey Lamplight',
+    'Morgan Backstreet',
+    'Jordan Fieldnote',
+    'Taylor Breadcrumb',
+  ];
+
+  static const List<String> bios = [
+    'Chief wanderer, amateur historian, professional snack enthusiast.',
+    'I have gotten lost in more cities than I can count, and loved every one.',
+    'Local guide by day, map-hoarder by night. Ask me about shortcuts.',
+    'I collect stories the way other people collect fridge magnets.',
+    'Twenty years of walking the same streets and still finding new corners.',
+    'Reformed tour-bus skeptic. Now I just point at things and smile.',
+    'Equal parts curiosity and comfortable footwear.',
+    'I promise the detours are worth it. Usually.',
+  ];
+
+  static const List<String> rules = [
+    'Be kind, be curious, and keep the volume reasonable near the ducks.',
+    'Respect the neighbours, mind the traffic, and share the good spots.',
+    'No heckling the statues. Questions always welcome.',
+    'Walk at your own pace, look after each other, and have fun.',
+    'Leave places better than you found them. Take only photos.',
+    'Be on time-ish, be friendly, and never block a doorway.',
+    'Curiosity encouraged, littering forbidden, laughter mandatory.',
+    'Stay safe, stay together, and tip your local baker.',
+  ];
+
+  static const List<String> contacts = [
+    'hello@example.com',
+    'organiser@example.com',
+    'walks@example.com',
+    'say-hi@example.com',
+  ];
+
+  /// Where to get Audioura. Store links do not exist yet (D658 era), so use the
+  /// marketing site until they do.
+  static const String installUrl = 'https://audioura.com';
+
+  /// §4: A UNIQUE community name from a chosen stem + place, with a short
+  /// numeric suffix only when the plain name is already taken. [attempt] 0 is
+  /// the plain name; attempt ≥ 1 appends a 2-digit suffix. Deterministic given
+  /// [stem], [place] and [attempt] so a test can assert it.
+  static String uniqueName(String stem, String place, {int attempt = 0}) {
+    final base = place.trim().isEmpty ? stem : '$stem of ${place.trim()}';
+    if (attempt <= 0) return base;
+    // A short, friendly suffix (01..99) wrapped so it reads deliberately.
+    final suffix = (attempt % 99) + 1;
+    return '$base (${suffix.toString().padLeft(2, '0')})';
+  }
+
+  /// §4: The email body an organiser sends to invite members. Contains the
+  /// community name + description, the organiser name, how to get Audioura
+  /// (install link), and the exact join instruction with the CODE. The returned
+  /// string ALWAYS contains the code and the install line, which the tests
+  /// assert. Never claims the email was sent — that is the composer's job.
+  static String emailInviteBody({
+    required String communityName,
+    String? description,
+    String? organiserName,
+    required String code,
+  }) {
+    final buf = StringBuffer();
+    buf.writeln('You are invited to join "$communityName" on Audioura.');
+    buf.writeln();
+    if (description != null && description.trim().isNotEmpty) {
+      buf.writeln(description.trim());
+      buf.writeln();
+    }
+    if (organiserName != null && organiserName.trim().isNotEmpty) {
+      buf.writeln('Organiser: ${organiserName.trim()}');
+      buf.writeln();
+    }
+    buf.writeln('How to get Audioura: $installUrl');
+    buf.writeln('(App Store / Google Play links coming soon.)');
+    buf.writeln();
+    buf.writeln('Then open Audioura → Search → type the code $code');
+    return buf.toString();
+  }
+
+  /// §4: A short email SUBJECT for the invite.
+  static String emailInviteSubject(String communityName) =>
+      'Join "$communityName" on Audioura';
+}
