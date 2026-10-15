@@ -158,11 +158,36 @@ class TestVietnameseNameAid(unittest.TestCase):
         out, _ = vn.apply('S\u01a1n n\u1eef is a painting by L\u1ef1u.')
         self.assertIn('L\u00ea Th\u1ecb L\u1ef1u', out)
 
-    def test_adds_pronunciation_aid_once(self):
+    def test_narration_has_no_spoken_say_aid(self):
+        # [LOCAL-692B] The "(say: …)" aid must NOT be injected into narration
+        # (it was read aloud). apply() defaults with_aids=False.
         txt = ('Nguy\u1ec5n S\u00e1ng made it. Later Nguy\u1ec5n S\u00e1ng '
                'returned.')
         out, _ = vn.apply(txt)
-        self.assertEqual(out.count('(say: ngwen sahng)'), 1)
+        self.assertNotIn('(say:', out)
+        # The name itself is still corrected to its diacritic full form.
+        self.assertIn('Nguy\u1ec5n S\u00e1ng', out)
+
+    def test_pronunciation_moved_to_ssml_sub(self):
+        # [LOCAL-692B] Pronunciation lives in the TTS layer: to_ssml wraps the
+        # first mention of each known name in <sub alias="respelling">.
+        txt = 'Stand before Nguy\u1ec5n Gia Tr\u00ed and his work.'
+        ssml, notes = vn.to_ssml(txt)
+        self.assertTrue(ssml.startswith('<speak>') and ssml.endswith('</speak>'))
+        self.assertIn('<sub alias="ngwen zah chee">', ssml)
+        self.assertIn('Nguy\u1ec5n Gia Tr\u00ed</sub>', ssml)
+
+    def test_ssml_only_first_mention_wrapped(self):
+        txt = ('Nguy\u1ec5n Gia Tr\u00ed painted it. Nguy\u1ec5n Gia Tr\u00ed '
+               'later returned.')
+        ssml, _ = vn.to_ssml(txt)
+        self.assertEqual(ssml.count('<sub alias="ngwen zah chee">'), 1)
+
+    def test_ssml_clean_english_is_plain_speak(self):
+        s = 'A plain English tour of a Boston museum.'
+        ssml, notes = vn.to_ssml(s)
+        self.assertEqual(ssml, f'<speak>{s}</speak>')
+        self.assertEqual(notes, [])
 
     def test_clean_english_untouched(self):
         s = 'A plain English tour of a Boston museum with no Vietnamese names.'

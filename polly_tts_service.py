@@ -26,6 +26,41 @@ except Exception:  # pragma: no cover - meter ships via PYTHONPATH=/opt/meter (s
         return None
 
 
+# ── [LOCAL-692B / D659 LEAD review] TTS-LAYER PRONUNCIATION ───────────────────
+# Pronunciation of the Vietnamese artist names is done HERE, in the TTS layer,
+# not in the narration text (the LOCAL-692 "(say: …)" parenthetical was read
+# aloud — Michael flagged it). vietnamese_name_aid.ssml_pronunciation wraps each
+# known name in an SSML <sub alias="respelling"> (or <phoneme>) so the English
+# Polly voice (Joanna) says it correctly, while the visible/printed text stays
+# the correct diacritic name. Imported SOFTLY: if the module is unavailable the
+# chunk is synthesised as plain text exactly as before (fail-open). Only the
+# Polly path uses this; Kokoro (English voices) does not take SSML.
+try:
+    import vietnamese_name_aid as _vn_aid
+except Exception:  # pragma: no cover - fail open to plain text
+    _vn_aid = None
+
+
+def _maybe_ssml_for_polly(chunk_text):
+    """Return (payload, text_type) for a Polly synthesize_speech call. When the
+    chunk contains a known Vietnamese artist name, payload is an SSML
+    <speak>…</speak> document with <sub>/<phoneme> pronunciation and text_type is
+    'ssml'; otherwise payload is the original text and text_type is 'text'.
+    Deterministic and non-fatal — any error falls back to plain text."""
+    if _vn_aid is None or not chunk_text:
+        return chunk_text, 'text'
+    try:
+        has_name = any(
+            a.full in chunk_text for a in _vn_aid.LEXICON.values())
+        if not has_name:
+            return chunk_text, 'text'
+        ssml, _notes = _vn_aid.to_ssml(chunk_text)
+        return ssml, 'ssml'
+    except Exception as _ssml_err:  # pragma: no cover
+        logging.warning(f"[LOCAL-692B] SSML build failed, plain text: {_ssml_err}")
+        return chunk_text, 'text'
+
+
 def _compat_send_file(path_or_file, **kwargs):
     """Version-tolerant send_file wrapper.
 
@@ -169,8 +204,12 @@ def synthesize_speech():
         # is never blocked. Raises DailyPaidLimitExceeded (no call made) once today's
         # billed spend has reached DAILY_PAID_LIMIT_USD; fails open on meter/DB error.
         _check_daily_limit()
+        # [LOCAL-692B] Pronounce known Vietnamese names via SSML <sub>/<phoneme>
+        # at the TTS layer (not in the narration text). Plain text otherwise.
+        _polly_payload, _polly_text_type = _maybe_ssml_for_polly(chunk_text)
         response = polly_client.synthesize_speech(
-            Text=chunk_text,
+            Text=_polly_payload,
+            TextType=_polly_text_type,
             OutputFormat=output_format,
             VoiceId=voice_id,
             Engine=polly_engine,
@@ -321,8 +360,9 @@ def synthesize_speech():
                         f"[LOCAL-575] PCM combine failed ({_combine_err}); "
                         f"re-rendering whole stop on Polly"
                     )
+                    _wp, _wt = _maybe_ssml_for_polly(text)
                     _resp = polly_client.synthesize_speech(
-                        Text=text, OutputFormat=output_format,
+                        Text=_wp, TextType=_wt, OutputFormat=output_format,
                         VoiceId=voice_id, Engine=engine,
                     )
                     combined_audio = _resp['AudioStream'].read()

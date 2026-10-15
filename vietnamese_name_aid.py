@@ -18,13 +18,19 @@ misinterpreted." The HCMC cheap-arm tours showed three distinct TEXT faults
      short reference is the full given name or the full name, never the last
      syllable alone.
 
-And AUDIO: the Polly path sends PLAIN text to an ENGLISH neural voice (Joanna),
-with no SSML/phoneme/lexicon (polly_tts_service synthesize_speech sends Text=,
-no TextType='ssml'). So an English voice mangles the Vietnamese syllables. The
-only lever in a plain-text path is the NARRATION TEXT itself: on first mention we
-append a short, parenthetical, English-phonetic respelling the English voice can
-say — e.g. "Nguyễn Gia Trí (say: ngwen zah chee)". The diacritic name is kept so
-the printed text stays correct; the aid helps the ear.
+And AUDIO: the Polly path sent PLAIN text to an ENGLISH neural voice (Joanna),
+with no SSML/phoneme/lexicon, so an English voice mangles the Vietnamese
+syllables.
+
+[LOCAL-692B / D659 LEAD review] The LOCAL-692 fix put the pronunciation in the
+NARRATION TEXT — "Nguyễn Gia Trí (say: ngwen zah chee)" — and that parenthetical
+was READ ALOUD. Michael flagged it. Pronunciation now lives at the TTS LAYER
+only: ``ssml_pronunciation`` / ``to_ssml`` wrap each known name in an SSML
+``<sub alias="…">`` (or ``<phoneme>`` when IPA is present) using the verified
+respelling, and polly_tts_service synthesises that SSML with TextType='ssml'.
+The listener hears the correct name; the NARRATION TEXT stays clean (diacritic
+name only, no "(say: …)"). ``add_pronunciation_aids`` is kept for diagnostics but
+is NOT applied to narration (``apply`` defaults ``with_aids=False``).
 
 This module is PURE TEXT, deterministic, and does NOT call any model or network.
 It is applied to the finished tour only when the museum artist-life path is
@@ -35,7 +41,7 @@ from typing import Dict, List, Tuple
 
 __all__ = [
     'LEXICON', 'canonical_name', 'fix_names', 'add_pronunciation_aids',
-    'apply', 'WORK_ARTIST',
+    'apply', 'WORK_ARTIST', 'ssml_pronunciation', 'to_ssml',
 ]
 
 
@@ -50,10 +56,12 @@ class _Artist:
               (repaired only in the work-attribution pass).
     """
 
-    def __init__(self, full: str, say: str, variants: List[str]):
+    def __init__(self, full: str, say: str, variants: List[str], ipa: str = ''):
         self.full = full
         self.say = say
         self.variants = variants
+        # Optional IPA for an SSML <phoneme>; when empty we use <sub alias=say>.
+        self.ipa = ipa
 
 
 # Verified against >=2 independent sources each (see module docstring + ticket
@@ -218,10 +226,19 @@ def add_pronunciation_aids(text: str) -> Tuple[str, List[str]]:
     return text, notes
 
 
-def apply(text: str, with_aids: bool = True) -> Tuple[str, List[str]]:
-    """Full pass: fix names, then (optionally) add first-mention pronunciation
-    aids. Returns (new_text, notes). Pure/deterministic; safe on any text (a tour
-    with no Vietnamese names is returned unchanged with empty notes)."""
+def apply(text: str, with_aids: bool = False) -> Tuple[str, List[str]]:
+    """Full pass: fix names in the SPOKEN text. Returns (new_text, notes).
+    Pure/deterministic; safe on any text (a tour with no Vietnamese names is
+    returned unchanged with empty notes).
+
+    [LOCAL-692B / D659 LEAD review] ``with_aids`` now DEFAULTS TO FALSE. The
+    LOCAL-692 ``(say: …)`` parenthetical was being READ ALOUD by the voice
+    ("…Trí, say ngwen zah chee…"), which Michael flagged. Pronunciation is now
+    done at the TTS layer only (Polly SSML ``<sub>``; see ``ssml_pronunciation``
+    and polly_tts_service), so the NARRATION TEXT must stay clean: the diacritic
+    name is kept correct, but no spoken aid is injected. ``with_aids=True`` is
+    retained only for diagnostics/back-compat and must not be used on narration
+    that goes to TTS."""
     notes: List[str] = []
     text, n1 = fix_names(text)
     notes.extend(n1)
@@ -231,13 +248,95 @@ def apply(text: str, with_aids: bool = True) -> Tuple[str, List[str]]:
     return text, notes
 
 
+# ── [LOCAL-692B] TTS-LAYER PRONUNCIATION (SSML) ───────────────────────────────
+# Michael (D659 LEAD review): "(say: ngwen zah chee)" would be READ ALOUD. So
+# pronunciation must happen in the TTS layer, not the narration text. AWS Polly
+# supports two mechanisms inside SSML:
+#   <phoneme alphabet="ipa" ph="…">name</phoneme>  — exact, but needs valid IPA.
+#   <sub alias="spoken form">name</sub>            — substitutes a spoken string
+#       the (English) voice can pronounce; robust for an English neural voice
+#       reading Vietnamese, which is exactly our case (Joanna).
+# We use <sub> with the verified English-phonetic respelling (`say`), optionally
+# <phoneme> when an IPA string is present. The listener hears the respelling;
+# the on-screen/printed text keeps the correct diacritic name.
+import html as _html
+
+
+def _ssml_escape(s: str) -> str:
+    """XML-escape a string for inclusion in SSML (text + attribute values)."""
+    return _html.escape(s or '', quote=True)
+
+
+def ssml_pronunciation(text: str) -> Tuple[str, List[str]]:
+    """Wrap each known artist name in the SPOKEN text with an SSML ``<sub>`` (or
+    ``<phoneme>``) so the TTS voice pronounces it from the verified respelling,
+    while the visible name stays the correct diacritic form. Returns
+    (ssml_without_speak_wrapper, notes). The caller wraps the whole stop in a
+    single <speak> element. Deterministic; a text with no known names is
+    returned XML-escaped and unchanged (empty notes).
+
+    ONLY the first mention of each name is wrapped — later mentions are left as
+    plain (escaped) text so the audio is not over-annotated; Polly pronounces a
+    repeated name consistently once the voice has 'heard' the substitution."""
+    notes: List[str] = []
+    # Build first-mention spans for each known full name, longest-first so a
+    # longer name is matched before a shorter overlapping one.
+    names = sorted(LEXICON.values(), key=lambda a: len(a.full), reverse=True)
+    spans: List[Tuple[int, int, '_Artist']] = []
+    claimed: List[Tuple[int, int]] = []
+    for a in names:
+        pat = re.compile(r'(?<![\wÀ-ỹ])' + re.escape(a.full) + r'(?![\wÀ-ỹ])')
+        m = pat.search(text)
+        if not m:
+            continue
+        s, e = m.start(), m.end()
+        if any(not (e <= cs or s >= ce) for cs, ce in claimed):
+            continue  # overlaps an already-claimed span
+        spans.append((s, e, a))
+        claimed.append((s, e))
+    spans.sort(key=lambda t: t[0])
+
+    out_parts: List[str] = []
+    cursor = 0
+    for s, e, a in spans:
+        out_parts.append(_ssml_escape(text[cursor:s]))
+        alias = _ssml_escape(a.say)
+        name = _ssml_escape(a.full)
+        if getattr(a, 'ipa', ''):
+            out_parts.append(
+                f'<phoneme alphabet="ipa" ph="{_ssml_escape(a.ipa)}">{name}</phoneme>')
+            notes.append(f'ssml_phoneme:{a.full}->/{a.ipa}/')
+        else:
+            out_parts.append(f'<sub alias="{alias}">{name}</sub>')
+            notes.append(f'ssml_sub:{a.full}->{a.say}')
+        cursor = e
+    out_parts.append(_ssml_escape(text[cursor:]))
+    return ''.join(out_parts), notes
+
+
+def to_ssml(text: str) -> Tuple[str, List[str]]:
+    """Convenience: return a complete, Polly-ready ``<speak>…</speak>`` document
+    with every known name pronounced via <sub>/<phoneme>, plus the notes. If no
+    known name is present the text is still returned wrapped in <speak> (escaped),
+    which Polly treats identically to plain text."""
+    body, notes = ssml_pronunciation(text)
+    return f'<speak>{body}</speak>', notes
+
+
 if __name__ == '__main__':
     import sys
     src = sys.stdin.read() if not sys.stdin.isatty() else (
         'Spring Garden by Nguyen Van Tri. Later, Nguyễn Gia Trí worked. '
         'Sơn nữ is a painting by Lựu. Nguyen Sang made Thanh nien thanh dong.')
-    out, notes = apply(src)
+    out, notes = apply(src)                 # narration text — NO (say:) aid
+    ssml, ssml_notes = to_ssml(out)         # TTS layer — SSML pronunciation
+    print('--- narration text (clean, goes to the listener as words) ---')
     print(out)
-    print('\n--- notes ---')
+    print('\n--- SSML sent to Polly (TextType=ssml) ---')
+    print(ssml)
+    print('\n--- name-fix notes ---')
     for nnote in notes:
+        print(nnote)
+    print('\n--- ssml pronunciation notes ---')
+    for nnote in ssml_notes:
         print(nnote)

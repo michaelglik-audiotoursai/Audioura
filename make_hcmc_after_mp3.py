@@ -5,8 +5,10 @@ Produce MP3s for the HCMC after-version so Michael can listen. Reads the stored
 is_test tour from the DB by id, splits it into stops, and synthesises each stop
 with AWS Polly (Joanna, neural) via boto3 directly — using the AWS creds already
 in .env — writing MP3s to tours/local692_mp3/. Self-contained: does NOT touch any
-audioura-* service container. The pronunciation aids "(say: …)" are kept in the
-spoken text so the English voice says the Vietnamese names audibly.
+audioura-* service container. [LOCAL-692B] Pronunciation of the Vietnamese names
+is done at the TTS layer via Polly SSML <sub>/<phoneme> (TextType='ssml'); the
+narration text is clean (no "(say: …)"), so the listener hears the correct names
+without any respelling being read aloud.
 
 Usage: python3 make_hcmc_after_mp3.py <tour_id>
 """
@@ -80,14 +82,34 @@ def _polly_mp3(text, path):
     region = os.environ.get('AWS_REGION') or os.environ.get(
         'AWS_DEFAULT_REGION') or 'us-east-1'
     client = boto3.client('polly', region_name=region)
-    # Polly caps a single request at 3000 chars; split on sentences if needed.
+    # [LOCAL-692B] Pronounce known Vietnamese names via SSML <sub>/<phoneme> at
+    # the TTS layer (the narration text is clean — no "(say:)"). Build SSML per
+    # chunk so each chunk is an independent <speak> document.
+    try:
+        import vietnamese_name_aid as _vn
+    except Exception:
+        _vn = None
+
+    def _ssml_or_text(chunk):
+        if _vn is None:
+            return chunk, 'text'
+        try:
+            if any(a.full in chunk for a in _vn.LEXICON.values()):
+                ssml, _ = _vn.to_ssml(chunk)
+                return ssml, 'ssml'
+        except Exception:
+            pass
+        return chunk, 'text'
+
+    # Polly caps a single request at 3000 displayed chars; split on sentences if
+    # needed. SSML tags add a little length, so split the PLAIN text at 2600.
     chunks = []
-    if len(text) <= 2900:
+    if len(text) <= 2600:
         chunks = [text]
     else:
         cur = ''
         for sent in re.split(r'(?<=[.!?])\s+', text):
-            if len(cur) + len(sent) + 1 > 2900 and cur:
+            if len(cur) + len(sent) + 1 > 2600 and cur:
                 chunks.append(cur)
                 cur = sent
             else:
@@ -96,8 +118,10 @@ def _polly_mp3(text, path):
             chunks.append(cur)
     audio = b''
     for ch in chunks:
+        payload, ttype = _ssml_or_text(ch)
         resp = client.synthesize_speech(
-            Text=ch, OutputFormat='mp3', VoiceId=VOICE, Engine='neural')
+            Text=payload, TextType=ttype, OutputFormat='mp3',
+            VoiceId=VOICE, Engine='neural')
         audio += resp['AudioStream'].read()
     with open(path, 'wb') as f:
         f.write(audio)
