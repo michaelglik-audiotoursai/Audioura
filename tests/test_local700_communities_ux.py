@@ -139,6 +139,10 @@ def _create(client, owner, name, level="l2", **overrides):
     if level is not None:
         _seed_level(owner, level)
     body = {"owner_user_id": owner, "name": name}
+    # [LOCAL-704 / D665] Every community is paid and must offer a pass.
+    if "pass_products" not in overrides:
+        body["pass_products"] = [
+            {"product_id": "audioura.pass.usd1", "length": "month"}]
     body.update(overrides)
     return client.post("/communities", json=body)
 

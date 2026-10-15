@@ -137,14 +137,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   width: 44,
                   height: 44,
                   child: GestureDetector(
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                            builder: (_) =>
-                                CommunityPageScreen(communityId: p.id)),
-                      );
-                    },
+                    onTap: () => _showCommunityPinSheet(p),
                     child: Stack(
                       alignment: Alignment.center,
                       children: [
@@ -169,6 +162,60 @@ class _HomeScreenState extends State<HomeScreen> {
     } catch (_) {
       // Non-fatal: communities just won't appear on the map this session.
     }
+  }
+
+  /// [LOCAL-704 / D665] The map pin sheet for a Listed community: its name and
+  /// its member count ("12 members"), with an Open button to the community
+  /// page. The organiser is never counted (server-side).
+  void _showCommunityPinSheet(CommunityMapPin p) {
+    showModalBottomSheet(
+      context: context,
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(p.name,
+                  style: const TextStyle(
+                      fontSize: 18, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  const Icon(Icons.groups,
+                      size: 18, color: Colors.deepPurple),
+                  const SizedBox(width: 6),
+                  Text(
+                    CommunityCopy.memberCountLabel(p.memberCount),
+                    key: const Key('pin_sheet_member_count'),
+                    style: const TextStyle(
+                        fontWeight: FontWeight.w600,
+                        color: Colors.deepPurple),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: () {
+                    Navigator.pop(ctx);
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                          builder: (_) =>
+                              CommunityPageScreen(communityId: p.id)),
+                    );
+                  },
+                  child: const Text('Open community'),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
   
   Future<void> _initializeSecureEncryption() async {

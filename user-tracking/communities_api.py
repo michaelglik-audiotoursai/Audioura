@@ -335,6 +335,21 @@ COMMUNITY_LAUNCH_MEMBERS_NEEDED = int(os.getenv('COMMUNITY_LAUNCH_MEMBERS_NEEDED
 ARCHIVED_REASON_LAUNCH_MISSED = 'launch_window_missed'
 ARCHIVED_REASON_HANDOVER_EXPIRED = 'handover_expired'
 
+# [LOCAL-704 / D666] After launch, a community that stays at 0 active members
+# for this many consecutive days is archived (reason 'no_members'). Between 1
+# and 2 members it keeps running (with weekly warnings); only a full week at 0
+# dissolves it.
+ARCHIVED_REASON_NO_MEMBERS = 'no_members'
+COMMUNITY_ZERO_MEMBERS_ARCHIVE_DAYS = int(
+    os.getenv('COMMUNITY_ZERO_MEMBERS_ARCHIVE_DAYS', '7'))
+
+# [LOCAL-704 / D666] The launch bar — and the post-launch keep-alive bar — is 2
+# active members. Below it, the organiser and remaining members are warned the
+# day the count drops, then every this-many days while it stays below.
+COMMUNITY_MIN_ACTIVE_MEMBERS = int(os.getenv('COMMUNITY_MIN_ACTIVE_MEMBERS', '2'))
+LOW_MEMBERS_WARNING_EVERY_DAYS = int(
+    os.getenv('COMMUNITY_LOW_MEMBERS_WARNING_EVERY_DAYS', '7'))
+
 # [LOCAL-703 / D664] Organiser reminders at 48 h and 12 h left (once each). The
 # launch-window job stamps the matching column so a reminder never double-sends.
 LAUNCH_REMINDER_HOURS = (48, 12)
@@ -420,36 +435,50 @@ def archive_stale_handovers(cur, now=None, after_days=ARCHIVE_AFTER_DAYS):
 # downloads, D658).
 
 
-def _qualifying_member_count(cur, community_id, is_paid):
+def _qualifying_member_count(cur, community_id, is_paid=True):
     """How many QUALIFYING members a community has toward launch, EXCLUDING the
-    owner (D664). For a PAID community a qualifying member holds a verified paid
-    pass — community_memberships.transaction_id IS NOT NULL (a free join of a
-    paid community, which cannot happen through the API, would not count). For a
-    FREE community every membership row counts (a free join IS the bar). The
-    owner is excluded by joining against the community's owner_user_id.
+    owner (D664/D665). Every community is paid now (D665: no free communities),
+    so a qualifying member is one holding a verified PAID pass —
+    community_memberships.transaction_id IS NOT NULL. A grandfathered free
+    member of a converted community (transaction_id NULL) never counts: a
+    committed paid member is the bar. The owner is excluded by joining against
+    the community's owner_user_id.
 
-    Note on scope: a paid community's bar is specifically PAID members, so
-    free-joined rows never count toward a paid community's launch — exactly the
-    LEAD reading recorded in D664 ("free-joined don't count for paid")."""
-    if is_paid:
-        cur.execute(
-            """SELECT COUNT(*)
-                 FROM community_memberships m
-                 JOIN communities c ON c.id = m.community_id
-                WHERE m.community_id = %s
-                  AND m.transaction_id IS NOT NULL
-                  AND m.user_id <> c.owner_user_id""",
-            (community_id,),
-        )
-    else:
-        cur.execute(
-            """SELECT COUNT(*)
-                 FROM community_memberships m
-                 JOIN communities c ON c.id = m.community_id
-                WHERE m.community_id = %s
-                  AND m.user_id <> c.owner_user_id""",
-            (community_id,),
-        )
+    `is_paid` is accepted for backward compatibility with existing callers but
+    is ignored — the launch bar is always 2 PAYING members (D664 as amended by
+    D665; the free-community branch was removed in LOCAL-704)."""
+    cur.execute(
+        """SELECT COUNT(*)
+             FROM community_memberships m
+             JOIN communities c ON c.id = m.community_id
+            WHERE m.community_id = %s
+              AND m.transaction_id IS NOT NULL
+              AND m.user_id <> c.owner_user_id""",
+        (community_id,),
+    )
+    return cur.fetchone()[0]
+
+
+def _active_member_count(cur, community_id, now=None):
+    """[LOCAL-704 / D666] How many ACTIVE members a community has, EXCLUDING the
+    owner — the number shown as `member_count` and the one the post-launch
+    low-members rule watches. An active member holds a verified paid pass
+    (transaction_id IS NOT NULL) that has NOT expired (expires_at IS NULL — a
+    perpetual membership — or expires_at > now). The owner is never a member
+    (D665 addendum), so they are excluded via owner_user_id. A grandfathered
+    free member (transaction_id NULL) is not counted — only paid, unexpired
+    members are 'active' for the member count and the keep-alive bar."""
+    now = now or datetime.utcnow()
+    cur.execute(
+        """SELECT COUNT(*)
+             FROM community_memberships m
+             JOIN communities c ON c.id = m.community_id
+            WHERE m.community_id = %s
+              AND m.transaction_id IS NOT NULL
+              AND m.user_id <> c.owner_user_id
+              AND (m.expires_at IS NULL OR m.expires_at > %s)""",
+        (community_id, now),
+    )
     return cur.fetchone()[0]
 
 
@@ -591,11 +620,132 @@ def run_launch_window(cur, now=None):
             )
         reminded[hours] = ids
 
+    # ─── 3. Post-launch member health (D666) ─────────────────────────────────
+    health = run_post_launch_member_health(cur, now=now)
+
     return {
         'archived': archived,
         'reminded_48h': reminded.get(48, []),
         'reminded_12h': reminded.get(12, []),
+        # [LOCAL-704 / D666] Post-launch low/zero-member handling.
+        'low_members_warned': health['low_members_warned'],
+        'archived_no_members': health['archived_no_members'],
     }
+
+
+def run_post_launch_member_health(cur, now=None):
+    """[LOCAL-704 / D666] The post-launch member-health pass of the hourly job.
+
+    For every LAUNCHED, still-active community, compute its ACTIVE member count
+    (unexpired paid passes, owner excluded) and apply D666:
+
+      * count >= 2 → healthy: clear low_members_since / zero_members_since /
+        last_low_warning_at so a later dip starts a fresh warning cycle.
+      * count < 2  → low: stamp low_members_since the FIRST time it drops (day
+        0), warn the organiser + remaining members that day, then again every
+        LOW_MEMBERS_WARNING_EVERY_DAYS (7) days while it stays below. The warn
+        buckets are returned (ids to notify); the push itself is the app/
+        notification layer's job, exactly like the launch reminders.
+      * count == 0 → also track zero_members_since; at
+        COMMUNITY_ZERO_MEMBERS_ARCHIVE_DAYS (7) consecutive days at 0 → archive
+        (status 'archived', archived_reason 'no_members'). A community at 1
+        member for any length of time is NEVER archived (only a full week at 0).
+
+    Returns {'low_members_warned': [ids], 'archived_no_members': [ids]}.
+    Idempotent per cadence: last_low_warning_at guards the weekly warning;
+    zero_members_since guards the archive. A healthy community is cleared, so a
+    later drop warns again immediately (a fresh day 0).
+
+    Note: a membership expiring is what makes a count drop — expiry is not an
+    event the server is pinged on, so this pass is where the drop is observed
+    (the hourly cadence keeps it timely). Everything keys off
+    _active_member_count, the single source of truth for member_count."""
+    now = now or _utcnow_aware()
+    now = _as_aware(now)
+
+    low_warned = []
+    archived_no_members = []
+
+    # Every launched, still-active community is a candidate. (A launched
+    # community whose status is handover/archived is not 'active' and is left
+    # to the step-down / launch-window paths.)
+    cur.execute(
+        """SELECT id, low_members_since, last_low_warning_at, zero_members_since
+             FROM communities
+            WHERE status = %s AND launched_at IS NOT NULL""",
+        (STATUS_ACTIVE,),
+    )
+    rows = cur.fetchall()
+    for cid, low_since, last_warn, zero_since in rows:
+        count = _active_member_count(cur, cid, now=now)
+
+        if count >= COMMUNITY_MIN_ACTIVE_MEMBERS:
+            # Healthy — clear the low/zero tracking so a later dip starts fresh.
+            if low_since is not None or zero_since is not None or last_warn is not None:
+                cur.execute(
+                    "UPDATE communities SET low_members_since = NULL, "
+                    "zero_members_since = NULL, last_low_warning_at = NULL, "
+                    "updated_at = NOW() WHERE id = %s",
+                    (cid,),
+                )
+            continue
+
+        # Below the bar (0 or 1 active member).
+        set_cols = []
+        set_vals = []
+        # Stamp low_members_since the first time it drops.
+        if low_since is None:
+            low_since = now
+            set_cols.append("low_members_since = %s")
+            set_vals.append(now)
+        # Track zero_members_since only while at exactly 0.
+        if count == 0:
+            if zero_since is None:
+                zero_since = now
+                set_cols.append("zero_members_since = %s")
+                set_vals.append(now)
+        else:
+            # 1 member — not zero; clear any zero timer (a member came back to 1).
+            if zero_since is not None:
+                zero_since = None
+                set_cols.append("zero_members_since = NULL")
+
+        # Should we warn this run? Day 0 (no warning yet) OR >= 7 days since the
+        # last warning.
+        warn_now = False
+        if last_warn is None:
+            warn_now = True
+        else:
+            if (now - _as_aware(last_warn)) >= timedelta(days=LOW_MEMBERS_WARNING_EVERY_DAYS):
+                warn_now = True
+        if warn_now:
+            set_cols.append("last_low_warning_at = %s")
+            set_vals.append(now)
+
+        if set_cols:
+            cur.execute(
+                f"UPDATE communities SET {', '.join(set_cols)}, updated_at = NOW() "
+                "WHERE id = %s",
+                (*set_vals, cid),
+            )
+        if warn_now:
+            low_warned.append(cid)
+
+        # Archive after a full week at 0 active members.
+        if count == 0 and zero_since is not None:
+            if (now - _as_aware(zero_since)) >= timedelta(days=COMMUNITY_ZERO_MEMBERS_ARCHIVE_DAYS):
+                cur.execute(
+                    """UPDATE communities
+                          SET status = %s, archived_at = %s,
+                              archived_reason = %s, updated_at = NOW()
+                        WHERE id = %s AND status = %s""",
+                    (STATUS_ARCHIVED, now, ARCHIVED_REASON_NO_MEMBERS,
+                     cid, STATUS_ACTIVE),
+                )
+                archived_no_members.append(cid)
+
+    return {'low_members_warned': low_warned,
+            'archived_no_members': archived_no_members}
 
 
 # ───────────────────────────────────────────────────────────────────────────
@@ -707,6 +857,11 @@ def _community_page(cur, community_id, user_id=None, now=None):
         # Episodes only for an active member or the owner (D658 addendum §2).
         'episodes': _episodes_for(cur, community_id) if active else [],
         'episode_count': _episode_count(cur, community_id),
+        # [LOCAL-704 / D665] The community's member count: ACTIVE members
+        # (unexpired paid passes), EXCLUDING the owner (the organiser is never a
+        # member). Shown on the community page, My communities, search/code
+        # results, the map pin sheet and the invite email ("12 members").
+        'member_count': _active_member_count(cur, community_id, now=now),
         # [LOCAL-703 / D664] The launch window: the deadline, hours left, the bar
         # (2), how many qualifying members so far, and whether it has launched.
         # The organiser's page and the creation confirmation render the live
@@ -915,6 +1070,19 @@ def verify_community_pass(store, transaction_id, product, user_id,
             cur.close()
             return jsonify({"error": "community_disabled",
                             "message": "This community is unavailable."}), 403
+
+        # [LOCAL-704 / D665 addendum] The organiser is NOT a member and cannot
+        # buy a pass for their own community. The owner has full access to all
+        # content without a pass; a self-purchase is refused (409) so the owner
+        # never pads member_count or the launch bar.
+        if user_id == c['owner_user_id']:
+            cur.close()
+            return jsonify({
+                "error": "owner_cannot_join",
+                "message": "You are the organiser of this community. The "
+                           "organiser is not a member and has full access "
+                           "without a pass.",
+            }), 409
 
         # [LOCAL-702 / D663 §1] A community in hand-over or archived is CLOSED to
         # new members: no pass sales. An EXISTING member buying again (renewing)
@@ -1138,11 +1306,18 @@ def create_community():
         return jsonify({"error": "listed_needs_location",
                         "message": "A Listed community must have a location."}), 400
 
-    is_paid = bool(data.get('is_paid'))
+    # [LOCAL-704 / D665] No free communities: every community is paid and must
+    # offer at least one pass option. `is_paid` is accepted from the client for
+    # back-compat but is always forced TRUE — the create form no longer has a
+    # Free option. A create with no pass option is refused (400 pass_required).
+    is_paid = True
     pass_products = data.get('pass_products') or []
-    if is_paid and not pass_products:
-        return jsonify({"error": "paid_needs_passes",
-                        "message": "A paid community must offer at least one pass."}), 400
+    if not pass_products:
+        return jsonify({
+            "error": "pass_required",
+            "message": "Every community charges at least $1 to join. Offer at "
+                       "least one pass option.",
+        }), 400
 
     # Normalise each pass option to {product_id, length}. Back-compat: a bare
     # string product id (older client) is treated as a 'month' option. The
@@ -1382,8 +1557,11 @@ def regenerate_code(community_id):
 
 @communities_bp.route('/communities/<int:community_id>/join', methods=['POST'])
 def join_free_community(community_id):
-    """Free join (free communities only). A paid community refuses here (402) —
-    the member must buy a pass through /purchases/verify."""
+    """[LOCAL-704 / D665] Free join is gone — every community charges at least
+    $1. This endpoint now refuses every caller: the owner with 409
+    owner_cannot_join (the organiser is never a member), everyone else with 402
+    pass_required (buy a pass through /purchases/verify). Kept for the app's
+    old join path and for a clear, specific error."""
     err = _require_api_key()
     if err:
         return err
@@ -1398,32 +1576,24 @@ def join_free_community(community_id):
         if not c or c['disabled']:
             cur.close()
             return jsonify({"error": "not_found"}), 404
-        if c['is_paid']:
+        # [LOCAL-704 / D665 addendum] The organiser is not a member and cannot
+        # join their own community.
+        if user_id == c['owner_user_id']:
             cur.close()
-            return jsonify({"error": "payment_required",
-                            "message": "This community requires a pass."}), 402
-        # [LOCAL-702 / D663 §1] Closed to new members while in hand-over/archived.
-        # An existing member re-joining is a no-op the gate still allows; a NEW
-        # join is refused with 409 community_closed_to_new_members.
-        if not _accepts_new_members(c['status']):
-            existing_member = _membership(cur, user_id, community_id) is not None
-            if not existing_member:
-                cur.close()
-                return jsonify({
-                    "error": "community_closed_to_new_members",
-                    "message": "This community has stopped taking new members "
-                               "while it looks for a new organiser.",
-                    "status": c['status'],
-                }), 409
-        # Free membership: no expiry (NULL).
-        _upsert_membership(cur, user_id, community_id, None, None, None, None, None)
-        # [LOCAL-703 / D664] A free community launches on its 2nd joined member
-        # (owner excluded). Check and stamp launched_at once; never reverts.
-        _check_and_maybe_launch(cur, community_id)
-        conn.commit()
-        payload = _community_page(cur, community_id, user_id=user_id)
+            return jsonify({
+                "error": "owner_cannot_join",
+                "message": "You are the organiser of this community. The "
+                           "organiser is not a member and has full access "
+                           "without a pass.",
+            }), 409
+        # Every community is paid (D665): a free join is always refused — buy a
+        # pass through /purchases/verify.
         cur.close()
-        return jsonify(payload), 200
+        return jsonify({
+            "error": "pass_required",
+            "message": "This community requires a pass. Every member pays at "
+                       "least $1 to join.",
+        }), 402
     finally:
         conn.close()
 
@@ -1664,8 +1834,14 @@ def map_communities():
                WHERE visibility = 'listed' AND disabled = FALSE
                  AND latitude IS NOT NULL AND longitude IS NOT NULL""",
         )
-        out = [{'id': r[0], 'name': r[1], 'latitude': r[2], 'longitude': r[3],
-                'is_paid': r[4], 'badge': 'community'} for r in cur.fetchall()]
+        rows = cur.fetchall()
+        out = []
+        for r in rows:
+            out.append({'id': r[0], 'name': r[1], 'latitude': r[2],
+                        'longitude': r[3], 'is_paid': r[4], 'badge': 'community',
+                        # [LOCAL-704 / D665] The member count shown on the map
+                        # pin sheet for a Listed community (owner excluded).
+                        'member_count': _active_member_count(cur, r[0])})
         cur.close()
         return jsonify({"communities": out}), 200
     finally:
@@ -1702,6 +1878,9 @@ def my_communities():
                 'origin_label': r[1],  # the community name shown on the row
                 'expires_at': r[3].isoformat() if r[3] else None,
                 'active': is_membership_active(r[3], now),
+                # [LOCAL-704 / D665] The member count shown on each My
+                # communities row (active members, owner excluded).
+                'member_count': _active_member_count(cur, r[0], now=now),
             })
         cur.close()
         return jsonify({"communities": out}), 200

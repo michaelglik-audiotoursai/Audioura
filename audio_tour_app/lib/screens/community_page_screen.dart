@@ -334,6 +334,24 @@ class _CommunityPageScreenState extends State<CommunityPageScreen> {
           // once the bar is met.
           ..._launchCountdownSection(c),
 
+          // [LOCAL-704 / D665] The member count, shown prominently near the top
+          // of every community page (active members, organiser excluded).
+          Padding(
+            padding: const EdgeInsets.only(bottom: 4),
+            child: Row(
+              children: [
+                const Icon(Icons.groups, size: 18, color: Colors.deepPurple),
+                const SizedBox(width: 6),
+                Text(
+                  CommunityCopy.memberCountLabel(c.memberCount),
+                  key: const Key('member_count_label'),
+                  style: const TextStyle(
+                      fontWeight: FontWeight.w600, color: Colors.deepPurple),
+                ),
+              ],
+            ),
+          ),
+
           // Organiser card.
           _section('Organiser', [
             if (c.organiser.name != null) Text(c.organiser.name!,
@@ -388,7 +406,9 @@ class _CommunityPageScreenState extends State<CommunityPageScreen> {
 
           // Membership options / join. Hidden while the community is closed to
           // new members (hand-over / archived) — only the banner shows then.
-          if (!canListen && c.acceptsNewMembers) ...[
+          // [LOCAL-704 / D665 addendum] Also hidden from the OWNER: the
+          // organiser is not a member and has full access without a pass.
+          if (!c.isOwner && !canListen && c.acceptsNewMembers) ...[
             if (c.isPaid) ...[
               _sectionTitle('Membership passes'),
               const Padding(
