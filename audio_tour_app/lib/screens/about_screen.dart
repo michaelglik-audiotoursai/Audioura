@@ -15,6 +15,8 @@ import 'plan_screen.dart';
 import 'communities_about_screen.dart';
 import '../config/endpoints.dart';
 import '../services/error_handler_service.dart';
+import 'package:url_launcher/url_launcher.dart';
+import '../services/document_acceptance_service.dart';
 
 class AboutScreen extends StatefulWidget {
   const AboutScreen({super.key});
@@ -452,6 +454,42 @@ class _AboutScreenState extends State<AboutScreen> {
               ),
             ),
             const SizedBox(height: 20),
+            // [LOCAL-691] Legal links. Open the audioura.com pages (/terms,
+            // /privacy, /content-policy). They 404 until Michael publishes
+            // them — expected; we show them anyway.
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: Colors.blueGrey.shade50,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.blueGrey.shade200),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Row(
+                    children: [
+                      Icon(Icons.gavel, size: 30, color: Colors.blueGrey),
+                      SizedBox(width: 10),
+                      Text(
+                        'Legal',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.blueGrey,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  _buildLegalLink('Terms', LegalDoc.terms),
+                  _buildLegalLink('Privacy', LegalDoc.privacy),
+                  _buildLegalLink('Content policy', LegalDoc.contentPolicy),
+                ],
+              ),
+            ),
+            const SizedBox(height: 20),
             Container(
               width: double.infinity,
               padding: const EdgeInsets.all(20),
@@ -798,6 +836,34 @@ class _AboutScreenState extends State<AboutScreen> {
     
     // Reload app info to refresh the display
     await _loadAppInfo();
+  }
+
+  Widget _buildLegalLink(String label, String document) {
+    return InkWell(
+      onTap: () async {
+        final uri = Uri.parse(legalDocUrl(document));
+        if (await canLaunchUrl(uri)) {
+          await launchUrl(uri, mode: LaunchMode.externalApplication);
+        }
+      },
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        child: Row(
+          children: [
+            const Icon(Icons.open_in_new, size: 16, color: Colors.blueGrey),
+            const SizedBox(width: 8),
+            Text(
+              label,
+              style: const TextStyle(
+                fontSize: 15,
+                color: Color(0xFF3A3AC0),
+                decoration: TextDecoration.underline,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   Widget _buildInfoRow(String label, String value) {

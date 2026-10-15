@@ -12,8 +12,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../services/communities_service.dart';
 import '../services/iap_service.dart';
+import '../services/device_service.dart';
+import '../services/document_acceptance_service.dart';
 import 'community_page_screen.dart';
 
 class CommunitiesAboutScreen extends StatelessWidget {
@@ -91,6 +94,8 @@ class _CreateCommunityScreenState extends State<CreateCommunityScreen> {
   bool _isPaid = false;
   bool _listed = false;
   bool _submitting = false;
+  // [LOCAL-691] Required Organiser Terms acceptance before creating.
+  bool _organiserTermsAccepted = false;
 
   // [LOCAL-690C] The pass catalogue is ONE product per PRICE (the 34 ladder
   // prices, kPassLadderDollars); the LENGTH is chosen per community. The owner
@@ -284,8 +289,38 @@ class _CreateCommunityScreenState extends State<CreateCommunityScreen> {
           const Divider(),
           _field(_feedUrl, 'RSS feed URL (optional)'),
           const SizedBox(height: 16),
+          // [LOCAL-691] Required Organiser Terms acceptance.
+          CheckboxListTile(
+            contentPadding: EdgeInsets.zero,
+            dense: true,
+            value: _organiserTermsAccepted,
+            onChanged: (v) =>
+                setState(() => _organiserTermsAccepted = v ?? false),
+            title: Wrap(
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: [
+                const Text('I accept the ', style: TextStyle(fontSize: 13)),
+                InkWell(
+                  onTap: () async {
+                    final uri = Uri.parse(legalDocUrl(LegalDoc.organiserTerms));
+                    if (await canLaunchUrl(uri)) {
+                      await launchUrl(uri,
+                          mode: LaunchMode.externalApplication);
+                    }
+                  },
+                  child: const Text('Organiser Terms',
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: Color(0xFF3A3AC0),
+                        decoration: TextDecoration.underline,
+                      )),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 8),
           ElevatedButton(
-            onPressed: _submitting ? null : _submit,
+            onPressed: (_submitting || !_organiserTermsAccepted) ? null : _submit,
             child: _submitting
                 ? const SizedBox(
                     height: 18, width: 18, child: CircularProgressIndicator(strokeWidth: 2))
@@ -315,7 +350,9 @@ class _CreateCommunityScreenState extends State<CreateCommunityScreen> {
 
     setState(() => _submitting = true);
     final prefs = await SharedPreferences.getInstance();
-    final userId = prefs.getString('user_id');
+    final userId = prefs.getString('user_id') ?? await DeviceService.getUserId();
+    // [LOCAL-691] Record the Organiser Terms acceptance (required to create).
+    await DocumentAcceptanceService.record(userId, LegalDoc.organiserTerms);
     final body = <String, dynamic>{
       'owner_user_id': userId,
       'name': name,
