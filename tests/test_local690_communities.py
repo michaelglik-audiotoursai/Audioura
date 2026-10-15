@@ -125,6 +125,9 @@ def _cleanup(db):
             cur.execute(f"DELETE FROM {tbl} WHERE community_id = ANY(%s)", (ids,))
         cur.execute("DELETE FROM communities WHERE id = ANY(%s)", (ids,))
     cur.execute("DELETE FROM purchases WHERE transaction_id LIKE %s", (TEST_PREFIX + '%',))
+    # [LOCAL-700] The plan gate reads device_entitlement.level; our _create
+    # seeds TEST owners at l2 so creation is allowed. Clean those rows too.
+    cur.execute("DELETE FROM device_entitlement WHERE user_id LIKE %s", (TEST_PREFIX + '%',))
     db.commit()
     cur.close()
 
@@ -138,9 +141,32 @@ def _clean(db):
 
 # ─── helpers ──────────────────────────────────────────────────────────────────
 
+def _seed_owner_level(owner_user_id, level='l2'):
+    """[LOCAL-700] Give an owner a plan so the create gate (free plan or above)
+    lets them through. The gate reads device_entitlement.level; a brand-new TEST
+    owner has no row (→ l1 Introduction → 403), so seed l2 (Free) by default."""
+    conn = get_connection()
+    try:
+        cur = conn.cursor()
+        cur.execute(
+            "INSERT INTO device_entitlement (user_id, level, last_activity_at) "
+            "VALUES (%s, %s, NOW()) "
+            "ON CONFLICT (user_id) DO UPDATE SET level = EXCLUDED.level",
+            (owner_user_id, level),
+        )
+        conn.commit()
+        cur.close()
+    finally:
+        conn.close()
+
+
 def _create(client, **overrides):
+    owner = overrides.pop("owner_user_id", TEST_PREFIX + "owner")
+    # [LOCAL-700] Ensure the owner is on the free plan or above so create passes
+    # the plan gate (the gate itself is tested separately in test_local700).
+    _seed_owner_level(owner)
     body = {
-        "owner_user_id": overrides.pop("owner_user_id", TEST_PREFIX + "owner"),
+        "owner_user_id": owner,
         "name": overrides.pop("name", TEST_PREFIX + "Book Club"),
     }
     body.update(overrides)

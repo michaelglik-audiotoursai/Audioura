@@ -137,6 +137,69 @@ def _unique_join_code(cur):
 
 
 # ───────────────────────────────────────────────────────────────────────────
+# Who may create a community (LOCAL-700 §3)
+# ───────────────────────────────────────────────────────────────────────────
+# Creating a community requires being on a PLAN — the free plan (l2) or above,
+# NOT the default Introduction level (l1). The device level lives on
+# device_entitlement.level, the SAME column entitlements_api reads (migration
+# 016: l1 Introduction, l2 Free, l3 $10 Pack, l4 Curator, plus hidden
+# tester/admin). The server enforces this (403 plan_required) so the app's gate
+# can never be bypassed by a crafted request. Self-contained ON PURPOSE: the
+# user-api container cannot import repo-root modules.
+_INTRODUCTION_LEVEL = 'l1'
+
+
+def _owner_level(cur, user_id):
+    """The device's entitlement level, or 'l1' (Introduction) when it has no
+    row yet (a brand-new device defaults to Introduction, exactly as
+    entitlements_api._get_device_state does). Never raises: a missing table or
+    any read error is treated as Introduction, which is the SAFE default (it
+    refuses creation rather than letting an unknown device through)."""
+    try:
+        cur.execute("SELECT level FROM device_entitlement WHERE user_id = %s",
+                    (user_id,))
+        row = cur.fetchone()
+        if row and row[0]:
+            return row[0]
+    except Exception:  # noqa: BLE001 — treat any error as the default level
+        pass
+    return _INTRODUCTION_LEVEL
+
+
+def _plan_allows_create(level):
+    """True iff a device on `level` may create a community: the free plan (l2)
+    or above — anything that is NOT the Introduction level (l1). Tester/admin
+    and the paid levels (l3/l4) are all above Introduction, so they pass."""
+    return level != _INTRODUCTION_LEVEL
+
+
+def _normalize_name(name):
+    """The canonical form for a case- and space-insensitive name comparison:
+    trimmed, inner whitespace collapsed to a single space, lower-cased. Two
+    names that differ only in case or spacing normalise to the same string, so
+    the uniqueness check treats 'The  Owls' and 'the owls' as the same name."""
+    return ' '.join((name or '').split()).lower()
+
+
+def _name_is_available(cur, name):
+    """True iff no existing (non-disabled) community has `name` under the
+    case/space-insensitive comparison. A disabled community does not reserve its
+    name. Compares on the normalised form in SQL so an index-free scan still
+    matches 'the owls' to 'The  Owls'."""
+    norm = _normalize_name(name)
+    if not norm:
+        return False
+    cur.execute(
+        "SELECT 1 FROM communities "
+        "WHERE disabled = FALSE "
+        "AND lower(regexp_replace(btrim(name), '\\s+', ' ', 'g')) = %s "
+        "LIMIT 1",
+        (norm,),
+    )
+    return cur.fetchone() is None
+
+
+# ───────────────────────────────────────────────────────────────────────────
 # Pass products + expiry — the heart of the non-renewing model
 # ───────────────────────────────────────────────────────────────────────────
 def is_community_pass_product(product):
@@ -700,6 +763,33 @@ def create_community():
     conn = _get_db()
     try:
         cur = conn.cursor()
+
+        # [LOCAL-700 §3] Creating a community requires the free plan or above —
+        # NOT the default Introduction level. The server enforces it here (not
+        # just the app) so a crafted request cannot bypass the gate. Uses the
+        # SAME device_entitlement.level the entitlements API reads.
+        level = _owner_level(cur, owner_user_id)
+        if not _plan_allows_create(level):
+            cur.close()
+            return jsonify({
+                "error": "plan_required",
+                "message": "Creating a community requires the free plan or "
+                           "above. Join the free queue or buy a plan to create "
+                           "a community.",
+                "level": level,
+            }), 403
+
+        # [LOCAL-700 §4] Reject a name already taken by a (non-disabled)
+        # community, compared case- and space-insensitively — the same rule the
+        # name-available endpoint reports, so the app's live ✓ cannot disagree
+        # with the create.
+        if not _name_is_available(cur, name):
+            cur.close()
+            return jsonify({
+                "error": "name_taken",
+                "message": "That community name is taken. Try another.",
+            }), 409
+
         join_code = _unique_join_code(cur)
         cur.execute(
             """INSERT INTO communities
@@ -764,6 +854,29 @@ def build_invite_message(community_name, join_code):
             f'Search on the Home page and paste this code: {join_code}')
 
 
+@communities_bp.route('/communities/name-available', methods=['GET'])
+def name_available():
+    """[LOCAL-700 §4] Is a community name free? The Create form calls this on
+    every (debounced) name change to show ✓ / "Taken". The comparison is case-
+    AND space-insensitive and trims the input, so 'The  Owls', ' the owls ' and
+    'THE OWLS' all collide. A disabled community does not reserve its name.
+
+    Query: ?name=<name>. Returns 200 {name, available: bool}. An empty/blank
+    name is `available: false` (there is nothing to offer yet)."""
+    err = _require_api_key()
+    if err:
+        return err
+    name = request.args.get('name', '')
+    conn = _get_db()
+    try:
+        cur = conn.cursor()
+        available = _name_is_available(cur, name)
+        cur.close()
+        return jsonify({"name": name, "available": available}), 200
+    finally:
+        conn.close()
+
+
 @communities_bp.route('/communities/<int:community_id>', methods=['GET'])
 def get_community(community_id):
     err = _require_api_key()
@@ -808,6 +921,49 @@ def get_community_by_code(code):
         payload['join_message'] = f'This tour belongs to {payload["name"]}. Join to listen.'
         cur.close()
         return jsonify(payload), 200
+    finally:
+        conn.close()
+
+
+@communities_bp.route('/communities/<int:community_id>/regenerate-code', methods=['POST'])
+def regenerate_code(community_id):
+    """[LOCAL-700 §4] Rotate a community's invite code. OWNER ONLY. The OLD code
+    stops working immediately (the row's join_code is replaced), so anyone who
+    had the old code can no longer resolve it (by-code → 404); the owner shares
+    the new code going forward.
+
+    Body: {owner_user_id | user_id}. Returns 200 {join_code, invite_message} on
+    success; 404 if the community does not exist; 403 if the caller is not the
+    owner. Existing members are unaffected — the code only gates NEW joins."""
+    err = _require_api_key()
+    if err:
+        return err
+    data = request.get_json(silent=True) or {}
+    user_id = data.get('owner_user_id') or data.get('user_id')
+    if not user_id:
+        return jsonify({"error": "missing_fields",
+                        "message": "owner_user_id is required."}), 400
+    conn = _get_db()
+    try:
+        cur = conn.cursor()
+        c = _community_row(cur, community_id)
+        if not c:
+            cur.close()
+            return jsonify({"error": "not_found"}), 404
+        if c['owner_user_id'] != user_id:
+            cur.close()
+            return jsonify({"error": "forbidden",
+                            "message": "Only the owner can regenerate the code."}), 403
+        new_code = _unique_join_code(cur)
+        cur.execute(
+            "UPDATE communities SET join_code = %s, updated_at = NOW() WHERE id = %s",
+            (new_code, community_id),
+        )
+        conn.commit()
+        invite_message = build_invite_message(c['name'], new_code)
+        cur.close()
+        return jsonify({"join_code": new_code,
+                        "invite_message": invite_message}), 200
     finally:
         conn.close()
 
