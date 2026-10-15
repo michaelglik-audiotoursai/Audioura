@@ -31,17 +31,85 @@ const _html404 =
     '<h1>Not Found</h1>\n<p>The requested URL was not found on the server.</p>\n';
 
 void main() {
-  group('status classification (missing route -> Preview only)', () {
-    // Every orchestrator feature route (#7-23), mapDelivery #27-31, news
-    // #55-56 came back 404; delete-account #5 came back 405.
-    for (final code in [404, 405, 501]) {
-      test('$code is a feature-unavailable status', () {
-        expect(Endpoints.isFeatureUnavailableStatus(code), isTrue);
+  // LOCAL-694B (LEAD review): a route is MISSING ("Preview only") ONLY when a
+  // 404 is NOT the service's own JSON error — i.e. (a) the GCloud gateway's
+  // JSON {"error":"endpoint not found","service":"api-gateway"}, (b) a non-JSON
+  // (HTML) body, or (c) 405/501. A JSON 404 FROM THE SERVICE itself
+  // ({"error":"not_found"}, {"error":"Job not found"}) is a NORMAL not-found
+  // and must NOT be treated as feature-unavailable. Four cases, per helper.
+  group('route-missing vs normal not-found (isRouteMissing)', () {
+    // The exact GCloud gateway 404 envelope (api-gateway/main.py:297).
+    const gateway404 =
+        '{"error":"endpoint not found","service":"api-gateway"}';
+
+    // --- Case (a): gateway JSON 404 => MISSING ---
+    test('(a) gateway JSON 404 {endpoint not found, api-gateway} -> MISSING',
+        () {
+      expect(Endpoints.isRouteMissing(404, gateway404), isTrue);
+    });
+
+    // --- Case (b): non-JSON (HTML) 404 => MISSING ---
+    test('(b) HTML 404 page (service called directly) -> MISSING', () {
+      expect(Endpoints.isRouteMissing(404, _html404), isTrue);
+    });
+    test('(b) empty-body 404 -> MISSING (no JSON error to preserve)', () {
+      expect(Endpoints.isRouteMissing(404, ''), isTrue);
+      expect(Endpoints.isRouteMissing(404, null), isTrue);
+    });
+
+    // --- Case (c): 405 / 501 => MISSING regardless of body ---
+    for (final code in [405, 501]) {
+      test('(c) $code is MISSING regardless of body', () {
+        expect(Endpoints.isRouteMissing(code), isTrue);
+        expect(Endpoints.isRouteMissing(code, '{"error":"whatever"}'), isTrue);
+        expect(Endpoints.isRouteMissing(code, _html404), isTrue);
       });
     }
 
-    // These must NOT be treated as "feature missing": a real answer, an auth
-    // refusal, or a transient server error the caller handles differently.
+    // --- Case (d): service's OWN JSON 404 => NORMAL not-found, NOT missing ---
+    test('(d) service JSON 404 {"error":"not_found"} -> NORMAL (not missing)',
+        () {
+      expect(Endpoints.isRouteMissing(404, '{"error":"not_found"}'), isFalse);
+    });
+    test('(d) orchestrator JSON 404 {"error":"Job not found"} -> NORMAL', () {
+      expect(
+          Endpoints.isRouteMissing(404, '{"error":"Job not found"}'), isFalse);
+    });
+    test('(d) map-delivery JSON 404 {"error":"tour not found"} -> NORMAL', () {
+      expect(Endpoints.isRouteMissing(404, '{"error":"tour not found"}'),
+          isFalse);
+    });
+    test('(d) a service error that merely NAMES the gateway is still NORMAL',
+        () {
+      // Only the exact gateway envelope (both fields) is case (a); a service
+      // 404 that happens to mention one field must stay a normal not-found.
+      expect(
+          Endpoints.isRouteMissing(
+              404, '{"error":"not_found","service":"orchestrator"}'),
+          isFalse);
+      expect(
+          Endpoints.isRouteMissing(404, '{"service":"api-gateway"}'), isFalse);
+    });
+
+    // --- Non-404/405/501: never missing ---
+    for (final code in [200, 201, 400, 401, 403, 409, 500, 503]) {
+      test('$code is NOT route-missing (any body)', () {
+        expect(Endpoints.isRouteMissing(code, _html404), isFalse);
+        expect(Endpoints.isRouteMissing(code, '{"error":"x"}'), isFalse);
+      });
+    }
+  });
+
+  group('isFeatureUnavailableStatus is now 405/501-only (deprecated)', () {
+    // Status-only classifier must NO LONGER claim a 404 (needs the body).
+    test('404 is NOT classifiable from status alone', () {
+      expect(Endpoints.isFeatureUnavailableStatus(404), isFalse);
+    });
+    for (final code in [405, 501]) {
+      test('$code is still a feature-unavailable status', () {
+        expect(Endpoints.isFeatureUnavailableStatus(code), isTrue);
+      });
+    }
     for (final code in [200, 201, 400, 401, 403, 409, 500, 503]) {
       test('$code is NOT a feature-unavailable status', () {
         expect(Endpoints.isFeatureUnavailableStatus(code), isFalse);
@@ -146,14 +214,21 @@ void main() {
   // safe result rather than an exception. These mirror the replay table rows.
   group('per-endpoint handled-shape proofs (from the replay table)', () {
     test('#19 GET /wallet/<id> 404 HTML -> treated as feature-unavailable', () {
-      // The screen path: status is feature-unavailable, and even if parsing is
+      // The screen path: an HTML 404 is route-missing, and even if parsing is
       // attempted on the HTML body it yields null instead of throwing.
-      expect(Endpoints.isFeatureUnavailableStatus(404), isTrue);
+      expect(Endpoints.isRouteMissing(404, _html404), isTrue);
       expect(Endpoints.tryDecodeMap(_html404), isNull);
     });
 
     test('#17 POST /tour/<id>/rating 404 HTML -> null, no throw', () {
       expect(Endpoints.tryDecodeMap(_html404), isNull);
+    });
+
+    test('#2 GET /status/<job> 404 JSON {error:Job not found} -> NORMAL', () {
+      // LOCAL-694B: on real Storied this route EXISTS; its 404 for an unknown
+      // job is the service's own JSON and must NOT read as "Preview only".
+      expect(
+          Endpoints.isRouteMissing(404, '{"error":"Job not found"}'), isFalse);
     });
 
     test('#43 POST /communities 404/absent -> safe default', () {
@@ -167,9 +242,9 @@ void main() {
 
     test('#59 POST /submit_credentials 503 JSON {message,status} -> parseable',
         () {
-      // 503 is NOT feature-unavailable; the body is valid JSON the caller reads.
+      // 503 is NOT route-missing; the body is valid JSON the caller reads.
       const body = '{"message":"service unavailable","status":"error"}';
-      expect(Endpoints.isFeatureUnavailableStatus(503), isFalse);
+      expect(Endpoints.isRouteMissing(503, body), isFalse);
       final m = Endpoints.tryDecodeMap(body);
       expect(m, isNotNull);
       expect(m!['status'], 'error');
@@ -177,7 +252,7 @@ void main() {
 
     test('#1 POST /generate-complete-tour 400 JSON {error} -> parseable', () {
       const body = '{"error":"missing required field"}';
-      expect(Endpoints.isFeatureUnavailableStatus(400), isFalse);
+      expect(Endpoints.isRouteMissing(400, body), isFalse);
       expect(Endpoints.tryDecodeMap(body)!['error'], isNotNull);
     });
   });

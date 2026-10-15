@@ -37,6 +37,18 @@ MockClient _always404() =>
 MockClient _alwaysRefused() =>
     MockClient((req) async => throw const SocketException('Connection refused'));
 
+/// LOCAL-694B: the GCloud API gateway's JSON 404 for an unknown path. This is
+/// route-missing (the gateway doesn't know the route) and must read as Preview.
+const _gateway404 = '{"error":"endpoint not found","service":"api-gateway"}';
+MockClient _alwaysGateway404() => MockClient((req) async => http.Response(
+    _gateway404, 404,
+    headers: {'content-type': 'application/json'}));
+
+/// LOCAL-694B: a SERVICE'S OWN JSON 404 (normal not-found, e.g. an unknown id
+/// on a route that EXISTS). This must NOT be treated as feature-unavailable.
+MockClient _alwaysServiceJson404(String body) => MockClient((req) async =>
+    http.Response(body, 404, headers: {'content-type': 'application/json'}));
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
@@ -111,12 +123,21 @@ void main() {
   });
 
   group('TourShareService', () {
-    test('on 404: Preview-only message, ok == false, never throws', () async {
+    test('on HTML 404 (route missing): Preview-only message, ok == false',
+        () async {
       await http.runWithClient(() async {
         final r = await TourShareService.share(123);
         expect(r.ok, isFalse);
         expect(r.errorMessage, Endpoints.featureUnavailableMessage);
       }, _always404);
+    });
+
+    test('on gateway JSON 404 (route missing): Preview-only message', () async {
+      await http.runWithClient(() async {
+        final r = await TourShareService.share(123);
+        expect(r.ok, isFalse);
+        expect(r.errorMessage, Endpoints.featureUnavailableMessage);
+      }, _alwaysGateway404);
     });
 
     test('on connection refused (generator absent): Preview-only message',
@@ -126,6 +147,49 @@ void main() {
         expect(r.ok, isFalse);
         expect(r.errorMessage, Endpoints.featureUnavailableMessage);
       }, _alwaysRefused);
+    });
+  });
+
+  // LOCAL-694B (LEAD review): the END-TO-END proof that a SERVICE'S OWN JSON
+  // 404 (a normal not-found on a route that exists) is NOT turned into the
+  // "Preview only" message — it keeps the ordinary not-found handling.
+  group('normal not-found (service JSON 404) is NOT feature-unavailable', () {
+    test('WalletService.getWallet on JSON 404 -> plain Exception, NOT Preview',
+        () async {
+      await http.runWithClient(() async {
+        // The wrapper returns the response (not route-missing); wallet_service
+        // then throws its ordinary "Failed to fetch wallet" Exception.
+        try {
+          await WalletService.getWallet();
+          fail('expected an exception');
+        } on FeatureUnavailableException {
+          fail('a service JSON 404 must NOT be a FeatureUnavailableException');
+        } catch (e) {
+          expect(e, isA<Exception>());
+          expect(e.toString(), isNot(contains('Preview')));
+        }
+      }, () => _alwaysServiceJson404('{"error":"not_found"}'));
+    });
+
+    test('TourShareService on JSON 404 {error:tour not found} -> server message',
+        () async {
+      await http.runWithClient(() async {
+        final r = await TourShareService.share(123);
+        expect(r.ok, isFalse);
+        // Keeps the service's own message (capitalised), NOT "Preview only".
+        expect(r.errorMessage, 'Tour not found');
+        expect(r.errorMessage, isNot(Endpoints.featureUnavailableMessage));
+      }, () => _alwaysServiceJson404('{"error":"tour not found"}'));
+    });
+
+    test('CommunitiesService.get on JSON 404 -> null (normal), isAvailable true',
+        () async {
+      await http.runWithClient(() async {
+        // A JSON 404 is still a reachable service: isAvailable stays true and
+        // the lookup returns null (no community) rather than a Preview state.
+        expect(await CommunitiesService.get(1), isNull);
+        expect(await CommunitiesService.isAvailable(), isTrue);
+      }, () => _alwaysServiceJson404('{"error":"not_found"}'));
     });
   });
 }

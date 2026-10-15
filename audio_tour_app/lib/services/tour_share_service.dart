@@ -71,10 +71,12 @@ class TourShareService {
       final serverMsg = _serverMessage(response.body);
       await DebugLogHelper.addDebugLog(
           'SHARE: tour $numericId failed ${response.statusCode}: ${response.body}');
-      // LOCAL-694: a 404/405/501 here means the share ROUTE is not offered by
-      // this backend (Storied hosts no tour-generator), not that the tour is
-      // missing — tell the tester it is a Preview feature.
-      if (Endpoints.isFeatureUnavailableStatus(response.statusCode)) {
+      // LOCAL-694/694B: a route-missing answer here (405/501, the GCloud
+      // gateway's "endpoint not found" JSON, or an HTML 404) means the share
+      // ROUTE is not offered by this backend (Storied hosts no tour-generator)
+      // — tell the tester it is a Preview feature. A service's own JSON 404
+      // (e.g. "tour not found") is a normal not-found and keeps its message.
+      if (Endpoints.isRouteMissing(response.statusCode, response.body)) {
         return ShareResult.failure(Endpoints.featureUnavailableMessage);
       }
       switch (response.statusCode) {

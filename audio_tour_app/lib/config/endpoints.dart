@@ -233,11 +233,57 @@ class Endpoints {
   static const String featureUnavailableMessage =
       'This feature is available in Preview only.';
 
-  /// True when [statusCode] means "this route does not exist on this server":
-  /// 404 Not Found, 405 Method Not Allowed, 501 Not Implemented. On Storied
-  /// these come back with an HTML body, so callers must NOT try to parse them.
+  /// True when a response means "this ROUTE is not offered by this backend"
+  /// (i.e. the feature is unavailable, Preview-only) as opposed to an ordinary
+  /// "not found" the server deliberately returned.
+  ///
+  /// LOCAL-694B (LEAD review 2026-10-14): a bare 404 is NOT enough. On the
+  /// Subscribed server an unknown community code, a deleted tour, or an unknown
+  /// job all return a 404 whose body is the SERVICE'S OWN JSON error
+  /// (e.g. `{"error":"not_found"}`, `{"error":"Job not found"}`). That is a
+  /// normal not-found and must keep its existing message — never "Preview only".
+  ///
+  /// A route is MISSING only when the 404 is NOT the service's own JSON error:
+  ///   (a) the GCloud API gateway's JSON `{"error":"endpoint not found",
+  ///       "service":"api-gateway"}` — what GCloud returns today for an unknown
+  ///       path (LEAD saw it at storied-api.audioura.com/tour-info/431), or
+  ///   (b) a non-JSON body — Flask's HTML 404 page when a service is called
+  ///       directly, or
+  ///   (c) 405 Method Not Allowed / 501 Not Implemented (the route/verb is not
+  ///       served at all; body shape is irrelevant).
+  ///
+  /// [body] is the raw response body; pass it so a JSON 404 can be told apart
+  /// from an HTML/gateway 404. When [body] is omitted a 404 is treated
+  /// conservatively as a normal not-found (NOT feature-unavailable), so callers
+  /// that cannot supply a body never over-report "Preview only".
+  static bool isRouteMissing(int statusCode, [String? body]) {
+    // 405/501: the route (or that verb on it) simply is not served. Missing.
+    if (statusCode == 405 || statusCode == 501) return true;
+    if (statusCode != 404) return false;
+
+    // 404: decide by body. A JSON object that is the service's own error is a
+    // NORMAL not-found; the gateway's "endpoint not found" is the one JSON 404
+    // that still means missing.
+    final map = tryDecodeMap(body);
+    if (map == null) {
+      // Non-JSON (HTML 404 page) or empty body => route missing (case b).
+      return true;
+    }
+    // Case (a): the GCloud gateway's own 404 envelope.
+    if (map['service'] == 'api-gateway' &&
+        map['error'] == 'endpoint not found') {
+      return true;
+    }
+    // Any other JSON 404 is the service's own not-found => NORMAL, keep message.
+    return false;
+  }
+
+  /// @Deprecated LOCAL-694B. Status-only classifier retained ONLY so a 405/501
+  /// (where the body never matters) can be checked without a body. For 404 this
+  /// returns false, because a 404 cannot be classified from the status alone —
+  /// use [isRouteMissing(statusCode, body)] instead. Do not use this for 404s.
   static bool isFeatureUnavailableStatus(int statusCode) =>
-      statusCode == 404 || statusCode == 405 || statusCode == 501;
+      statusCode == 405 || statusCode == 501;
 
   /// Safely decode a response body as a JSON object. Returns null when the body
   /// is empty, not valid JSON (e.g. a Flask HTML 404 page), or not a JSON
@@ -275,11 +321,12 @@ class Endpoints {
       error is http.ClientException ||
       error is TimeoutException;
 
-  /// GET that throws [FeatureUnavailableException] when the endpoint is missing
-  /// on the current server (404/405/501) or the service is absent (connection
-  /// refused / unreachable). Any other response is returned to the caller as-is
-  /// for normal handling. Use for feature endpoints whose screens want to show
-  /// the "Preview only" message / empty state in one place.
+  /// GET that throws [FeatureUnavailableException] when the ROUTE is missing on
+  /// the current server (gateway/HTML 404, or 405/501) or the service is absent
+  /// (connection refused / unreachable). A service's OWN JSON 404 (a normal
+  /// not-found, e.g. `{"error":"not_found"}`) is NOT feature-unavailable and is
+  /// returned to the caller as-is for normal handling, as is any other
+  /// response. See [isRouteMissing] (LOCAL-694B).
   static Future<http.Response> getOrFeatureUnavailable(
     Service s,
     String path, {
@@ -294,7 +341,7 @@ class Endpoints {
       }
       rethrow;
     }
-    if (isFeatureUnavailableStatus(resp.statusCode)) {
+    if (isRouteMissing(resp.statusCode, resp.body)) {
       throw FeatureUnavailableException(
           service: s, path: path, statusCode: resp.statusCode);
     }
@@ -317,7 +364,7 @@ class Endpoints {
       }
       rethrow;
     }
-    if (isFeatureUnavailableStatus(resp.statusCode)) {
+    if (isRouteMissing(resp.statusCode, resp.body)) {
       throw FeatureUnavailableException(
           service: s, path: path, statusCode: resp.statusCode);
     }
