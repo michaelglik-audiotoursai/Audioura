@@ -83,8 +83,14 @@ def test_price_tiers_validation_and_labels():
 # ─── 2. map-delivery Free/Paid filter helpers (pure, no DB) ───────────────────
 
 def _load_md():
-    path = os.path.join(os.path.dirname(os.path.dirname(__file__)),
-                        "map_delivery", "app.py")
+    md_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)),
+                          "map_delivery")
+    path = os.path.join(md_dir, "app.py")
+    # map_delivery/app.py imports its sibling modules (e.g. personal_match) by
+    # bare name — in the container its own directory is the cwd. Mirror that so
+    # the module loads outside the container too.
+    if md_dir not in sys.path:
+        sys.path.insert(0, md_dir)
     spec = importlib.util.spec_from_file_location("md_app_local677", path)
     md = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(md)
