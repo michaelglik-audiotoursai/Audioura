@@ -190,9 +190,9 @@ class _MyCommunitiesScreenState extends State<MyCommunitiesScreen> {
                                     leading: const Icon(Icons.groups,
                                         color: Colors.deepPurple),
                                     title: Text(c.name),
-                                    subtitle: Text(c.active
-                                        ? 'Active member'
-                                        : 'Expired — renew to listen to new content'),
+                                    subtitle: Text(
+                                        '${c.active ? 'Active member' : 'Expired — renew to listen to new content'}'
+                                        ' · ${CommunityCopy.memberCountLabel(c.memberCount)}'),
                                     trailing: PopupMenuButton<String>(
                                       onSelected: (v) {
                                         if (v == 'origin') _showOrigin(c);

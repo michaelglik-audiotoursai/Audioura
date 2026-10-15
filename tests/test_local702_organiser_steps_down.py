@@ -140,6 +140,10 @@ def _seed_level(user_id, level):
 def _create(client, owner, name, level="l2", **overrides):
     _seed_level(owner, level)
     body = {"owner_user_id": owner, "name": name}
+    # [LOCAL-704 / D665] Every community is paid and must offer a pass.
+    if "pass_products" not in overrides:
+        body["pass_products"] = [
+            {"product_id": "audioura.pass.usd5", "length": "month"}]
     body.update(overrides)
     r = client.post("/communities", json=body)
     assert r.status_code == 201, r.get_json()
@@ -147,7 +151,15 @@ def _create(client, owner, name, level="l2", **overrides):
 
 
 def _join_free(client, cid, user_id):
-    return client.post(f"/communities/{cid}/join", json={"user_id": user_id})
+    """[LOCAL-704 / D665] Free join is gone — a member joins by buying a pass.
+    Kept under the old name so the step-down tests read unchanged; it now does a
+    stub pass purchase through /purchases/verify."""
+    return client.post("/purchases/verify", json={
+        "store": "stub",
+        "transaction_id": TEST_PREFIX + f"txn-{user_id}-{cid}",
+        "product": "audioura.pass.usd5", "length": "month",
+        "user_id": user_id, "community_id": cid,
+    })
 
 
 def _set_stepped_down_days_ago(db, cid, days):
@@ -215,10 +227,13 @@ def test_step_down_is_idempotent(client, db):
 # ─── (a) CLOSED TO NEW MEMBERS (409) ────────────────────────────────────────
 
 def test_handover_refuses_new_free_join_409(client):
+    # [LOCAL-704 / D665] Free join is gone — it returns 402 pass_required for
+    # every community (the handover 409 is covered by the pass-sale test below).
     owner = TEST_PREFIX + "a-closed"
     c = _create(client, owner, TEST_PREFIX + "Closed Free")
     client.post(f"/communities/{c['id']}/step-down", json={"owner_user_id": owner})
     r = _join_free(client, c["id"], TEST_PREFIX + "newcomer")
+    # A pass buy on a handover community is refused with 409 (closed to new).
     assert r.status_code == 409
     assert r.get_json()["error"] == "community_closed_to_new_members"
 

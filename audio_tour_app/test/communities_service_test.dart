@@ -128,10 +128,12 @@ void main() {
     test('map pin carries the community badge', () {
       final p = CommunityMapPin.fromJson({
         'id': 3, 'name': 'C', 'latitude': 1.0, 'longitude': 2.0,
-        'is_paid': true, 'badge': 'community'
+        'is_paid': true, 'badge': 'community', 'member_count': 12
       });
       expect(p.badge, 'community');
       expect(p.isPaid, isTrue);
+      // [LOCAL-704 / D665] the map pin sheet carries the member count.
+      expect(p.memberCount, 12);
     });
 
     test('joined community active flag', () {
@@ -144,13 +146,16 @@ void main() {
     });
   });
 
-  // [LOCAL-690C] The pass catalogue is ONE store product per PRICE (the 34
-  // ladder prices); the LENGTH is sent separately. No length in the product id.
+  // [LOCAL-690C / LOCAL-704] The pass catalogue is ONE store product per PRICE;
+  // the LENGTH is sent separately. No length in the product id. LOCAL-704 added
+  // a $1 floor (the commitment fee, D665), so the ladder is now 35 prices.
   group('community pass product ids (one per price)', () {
-    test('34 ladder prices, ids audioura.pass.usd<N>, no length suffix', () {
-      expect(kPassLadderDollars.length, 34);
-      expect(kPassStoreIds.length, 34);
-      // The lowest and highest ladder steps.
+    test('35 ladder prices with a \$1 floor, ids audioura.pass.usd<N>', () {
+      expect(kPassLadderDollars.length, 35);
+      expect(kPassStoreIds.length, 35);
+      // The $1 commitment-fee floor (D665) and the top of the ladder.
+      expect(kPassLadderDollars.first, 1);
+      expect(kPassStoreIds.contains('audioura.pass.usd1'), isTrue);
       expect(kPassStoreIds.contains('audioura.pass.usd2'), isTrue);
       expect(kPassStoreIds.contains('audioura.pass.usd200'), isTrue);
       // No id carries a length suffix (one product per price).
@@ -396,6 +401,49 @@ void main() {
       final o = MyOffer.fromJson({'status': 'offered', 'picked': false});
       expect(o.status, 'offered');
       expect(o.picked, isFalse);
+    });
+  });
+
+  // ── [LOCAL-704 / D665] member count everywhere ──────────────────────────────
+  group('LOCAL-704 member count (D665)', () {
+    test('Community.fromJson parses member_count', () {
+      final c = Community.fromJson(
+          {'id': 1, 'name': 'C', 'member_count': 7});
+      expect(c.memberCount, 7);
+    });
+
+    test('member_count defaults to 0 when absent', () {
+      expect(Community.fromJson({'id': 1, 'name': 'C'}).memberCount, 0);
+    });
+
+    test('JoinedCommunity parses member_count', () {
+      final j = JoinedCommunity.fromJson(
+          {'id': 1, 'name': 'C', 'active': true, 'member_count': 3});
+      expect(j.memberCount, 3);
+    });
+
+    test('memberCountLabel: singular vs plural', () {
+      expect(CommunityCopy.memberCountLabel(0), '0 members');
+      expect(CommunityCopy.memberCountLabel(1), '1 member');
+      expect(CommunityCopy.memberCountLabel(12), '12 members');
+    });
+
+    test('invite email carries the member count ("12 members")', () {
+      final body = CommunityCopy.emailInviteBody(
+        communityName: 'Owls',
+        organiserName: 'Alex',
+        code: 'AB12CD34',
+        memberCount: 12,
+      );
+      expect(body.contains('12 members'), isTrue);
+      expect(body.contains('AB12CD34'), isTrue);
+    });
+
+    test('about text no longer offers free communities (D665)', () {
+      // Every community is paid now — the "free (like a book club)" line is gone.
+      expect(CommunityCopy.aboutContent.contains('free (like a book club)'),
+          isFalse);
+      expect(CommunityCopy.aboutContent.contains('at least \$1'), isTrue);
     });
   });
 }

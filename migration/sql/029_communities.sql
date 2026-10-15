@@ -132,7 +132,12 @@ CREATE TABLE IF NOT EXISTS community_pass_products (
 -- community's option (table 3) picks the length. A new price is one more row
 -- with no redeploy. ON CONFLICT re-asserts the canonical price/label so a
 -- re-run restores them (idempotent).
+-- [LOCAL-704 / D665] The $1 commitment-fee pass. Every community member pays at
+-- least $1 to join; the catalogue therefore carries a $1 price point. This row
+-- is added here (as well as in migration 038) so a FRESH DB built from these
+-- migrations already has it; 038 re-asserts it for an already-migrated DB.
 INSERT INTO community_pass_products (product_id, price_usd, label) VALUES
+    ('audioura.pass.usd1',   1.00,   '$1'),
     ('audioura.pass.usd2',   2.00,   '$2'),
     ('audioura.pass.usd3',   3.00,   '$3'),
     ('audioura.pass.usd4',   4.00,   '$4'),

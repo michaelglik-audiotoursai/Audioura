@@ -194,7 +194,10 @@ class _CreateCommunityScreenState extends State<CreateCommunityScreen> {
   final _lat = TextEditingController();
   final _lng = TextEditingController();
 
-  bool _isPaid = false;
+  // [LOCAL-704 / D665] Every community is paid — there is no Free option. Kept
+  // as a const so the launch-rule copy ("paid members") and the submit body
+  // stay correct.
+  static const bool _isPaid = true;
   bool _listed = false;
   bool _submitting = false;
   // [LOCAL-691] Required Organiser Terms acceptance before creating.
@@ -211,9 +214,11 @@ class _CreateCommunityScreenState extends State<CreateCommunityScreen> {
   bool? _nameAvailable;
   bool _nameChecking = false;
 
-  // [LOCAL-690C] The pass catalogue is ONE product per PRICE (the 34 ladder
-  // prices, kPassLadderDollars); the LENGTH is chosen per community.
-  static const List<int> _quickPickDollars = [2, 3, 5, 10, 20, 50];
+  // [LOCAL-690C / LOCAL-704] The pass catalogue is ONE product per PRICE (the
+  // ladder in kPassLadderDollars, now with a $1 floor — D665); the LENGTH is
+  // chosen per community. Quick picks are $1, $3, $5, $10, $20 ($1 is the
+  // commitment-fee minimum); a custom price snaps to the ladder, floored at $1.
+  static const List<int> _quickPickDollars = [1, 3, 5, 10, 20];
   final Set<int> _selectedDollars = <int>{};
   final _customPrice = TextEditingController();
   final Map<String, bool> _lengthSelection = {
@@ -473,13 +478,20 @@ class _CreateCommunityScreenState extends State<CreateCommunityScreen> {
               ),
             ),
           const Divider(),
-          SwitchListTile(
-            title: const Text('Paid community'),
-            subtitle: const Text('Members buy a pass to join'),
-            value: _isPaid,
-            onChanged: (v) => setState(() => _isPaid = v),
+          // [LOCAL-704 / D665] No free communities — every community charges at
+          // least $1 to join (the commitment fee). The pass picker is always
+          // shown; at least one price + one length is required to create.
+          const Text('Membership',
+              style: TextStyle(fontWeight: FontWeight.bold)),
+          const Padding(
+            padding: EdgeInsets.only(top: 2, bottom: 4),
+            child: Text(
+              'Every member pays at least \$1 to join. Pick one or more pass '
+              'prices and lengths.',
+              style: TextStyle(fontSize: 12, color: Colors.grey),
+            ),
           ),
-          if (_isPaid) ..._buildPaidSection(),
+          ..._buildPaidSection(),
           SwitchListTile(
             title: const Text('Listed on the Home map'),
             subtitle: Text(_hasWaiver
@@ -611,15 +623,6 @@ class _CreateCommunityScreenState extends State<CreateCommunityScreen> {
 
   List<Widget> _buildPaidSection() {
     return [
-      const Padding(
-        padding: EdgeInsets.only(left: 16, top: 4),
-        child: Text('Pass price', style: TextStyle(fontWeight: FontWeight.bold)),
-      ),
-      const Padding(
-        padding: EdgeInsets.only(left: 16, bottom: 4),
-        child: Text('Pick one or more prices. The length is set below.',
-            style: TextStyle(fontSize: 12, color: Colors.grey)),
-      ),
       Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16),
         child: Wrap(
@@ -932,6 +935,7 @@ class _CommunityInviteToolsState extends State<CommunityInviteTools> {
       description: c.description,
       organiserName: c.organiser.name,
       code: _code,
+      memberCount: c.memberCount,
     );
     final subject = CommunityCopy.emailInviteSubject(c.name);
     final mailto = Uri(

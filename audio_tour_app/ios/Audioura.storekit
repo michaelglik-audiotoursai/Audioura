@@ -2,6 +2,21 @@
   "identifier": "A0A0A0A0-0000-4000-8000-000000000598",
   "nonRenewingSubscriptions": [
     {
+      "displayPrice": "1.00",
+      "familyShareable": false,
+      "internalID": "E001E001-0000-4000-8000-000000000704",
+      "localizations": [
+        {
+          "description": "A community membership pass. The organiser sets the length (a day, a week, a month, or a year). Non-renewing: nothing renews automatically — buy again to extend.",
+          "displayName": "Community pass ($1)",
+          "locale": "en_US"
+        }
+      ],
+      "productID": "audioura.pass.usd1",
+      "referenceName": "Community pass $1 (ladder)",
+      "type": "NonRenewingSubscription"
+    },
+    {
       "displayPrice": "2.00",
       "familyShareable": false,
       "internalID": "E002E002-0001-4000-8000-000000000690",

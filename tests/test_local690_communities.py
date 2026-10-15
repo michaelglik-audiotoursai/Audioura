@@ -169,6 +169,12 @@ def _create(client, **overrides):
         "owner_user_id": owner,
         "name": overrides.pop("name", TEST_PREFIX + "Book Club"),
     }
+    # [LOCAL-704 / D665] Every community is paid and must offer a pass. Unless a
+    # test provides its own pass_products, attach a $1/month option so the
+    # create passes the pass_required gate.
+    if "pass_products" not in overrides:
+        body["pass_products"] = [
+            {"product_id": "audioura.pass.usd1", "length": "month"}]
     body.update(overrides)
     return client.post("/communities", json=body)
 
@@ -247,10 +253,12 @@ def test_create_listed_needs_location(client):
     assert r.get_json()["error"] == "listed_needs_location"
 
 
-def test_create_paid_needs_passes(client):
-    r = _create(client, name=TEST_PREFIX + "Paid", is_paid=True)
+def test_create_requires_a_pass_option(client):
+    # [LOCAL-704 / D665] No free communities: a create with no pass option is
+    # refused with 400 pass_required.
+    r = _create(client, name=TEST_PREFIX + "NoPass", pass_products=[])
     assert r.status_code == 400
-    assert r.get_json()["error"] == "paid_needs_passes"
+    assert r.get_json()["error"] == "pass_required"
 
 
 def test_create_generates_unique_code_with_digit(client, modules):
@@ -288,17 +296,20 @@ def test_resolve_disabled_community_404(client, db):
     assert r2.status_code == 404
 
 
-def test_free_join_and_paid_refuses_free_join(client):
-    free = _create(client, name=TEST_PREFIX + "Free").get_json()
+def test_free_join_refused_pass_required(client):
+    # [LOCAL-704 / D665] No free communities: the free-join endpoint refuses
+    # every community with 402 pass_required (buy a pass instead).
+    c = _create(client, name=TEST_PREFIX + "Free").get_json()
     member = TEST_PREFIX + "freemember"
-    r = client.post(f"/communities/{free['id']}/join", json={"user_id": member})
-    assert r.status_code == 200
-    assert r.get_json()["my_status"]["active"] is True
+    r = client.post(f"/communities/{c['id']}/join", json={"user_id": member})
+    assert r.status_code == 402
+    assert r.get_json()["error"] == "pass_required"
 
-    paid = _create(client, name=TEST_PREFIX + "PaidC", is_paid=True,
+    paid = _create(client, name=TEST_PREFIX + "PaidC",
                    pass_products=[{"product_id": "audioura.pass.usd5", "length": "month"}]).get_json()
     r2 = client.post(f"/communities/{paid['id']}/join", json={"user_id": member})
     assert r2.status_code == 402
+    assert r2.get_json()["error"] == "pass_required"
 
 
 # ─── pass purchase + expiry (the non-renewing model) ────────────────────────────
@@ -590,9 +601,16 @@ def test_report_goes_to_owner(client):
 
 
 def test_mine_lists_origin_for_member(client):
-    free = _create(client, name=TEST_PREFIX + "MineC").get_json()
+    paid = _create(client, name=TEST_PREFIX + "MineC",
+                   pass_products=[{"product_id": "audioura.pass.usd5",
+                                   "length": "month"}]).get_json()
     member = TEST_PREFIX + "mine-member"
-    client.post(f"/communities/{free['id']}/join", json={"user_id": member})
+    # [LOCAL-704 / D665] Join by buying a pass (no more free join).
+    client.post("/purchases/verify", json={
+        "store": "stub", "transaction_id": TEST_PREFIX + "mine-txn",
+        "product": "audioura.pass.usd5", "length": "month",
+        "user_id": member, "community_id": paid["id"],
+    })
     r = client.get(f"/communities/mine?user_id={member}")
     assert r.status_code == 200
     comms = r.get_json()["communities"]

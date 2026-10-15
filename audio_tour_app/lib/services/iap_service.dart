@@ -125,15 +125,17 @@ final Set<String> kTourStoreIds = kTierProductIds.values.toSet();
 bool isCommunityPassProduct(String storeId) =>
     storeId.startsWith('audioura.pass.');
 
-/// [LOCAL-690C] The 34 community-PASS store product ids — ONE product per PRICE,
-/// the same round-dollar ladder as the tour tiers (migration 029 / LOCAL-686):
-/// $2..$20 /$1, $25..$50 /$5, $60..$100 /$10, $125..$200 /$25. Apple's
-/// non-renewing subscription product carries no length, so one product serves
-/// every community and every length — the LENGTH is sent on /purchases/verify
-/// and lives on the community's option. These are the ids added to
-/// ios/Audioura.storekit as non-renewing subscriptions.
+/// [LOCAL-690C] The community-PASS store product ids — ONE product per PRICE,
+/// the same round-dollar ladder as the tour tiers (migration 029 / LOCAL-686)
+/// EXCEPT that passes have a $1 floor (LOCAL-704 / D665: every community member
+/// pays at least $1 — the commitment fee), whereas tour prices keep the $2
+/// floor. So the pass ladder is $1, $2..$20 /$1, $25..$50 /$5, $60..$100 /$10,
+/// $125..$200 /$25. Apple's non-renewing subscription product carries no
+/// length, so one product serves every community and every length — the LENGTH
+/// is sent on /purchases/verify and lives on the community's option. These are
+/// the ids added to ios/Audioura.storekit as non-renewing subscriptions.
 const List<int> kPassLadderDollars = [
-  2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20,
+  1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20,
   25, 30, 35, 40, 45, 50, 60, 70, 80, 90, 100, 125, 150, 175, 200,
 ];
 

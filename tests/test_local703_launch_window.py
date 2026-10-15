@@ -145,16 +145,18 @@ def _seed_level(user_id, level):
 
 
 def _create(client, owner, name, level="l2", **overrides):
+    """[LOCAL-704 / D665] Every community is paid now. Unless the caller passes
+    its own pass_products, create a paid community with a single $1/month
+    option so the create passes the pass_required gate."""
     _seed_level(owner, level)
     body = {"owner_user_id": owner, "name": name}
+    if "pass_products" not in overrides:
+        body["pass_products"] = [
+            {"product_id": "audioura.pass.usd5", "length": "month"}]
     body.update(overrides)
     r = client.post("/communities", json=body)
     assert r.status_code == 201, r.get_json()
     return r.get_json()
-
-
-def _join_free(client, cid, user_id):
-    return client.post(f"/communities/{cid}/join", json={"user_id": user_id})
 
 
 def _buy_pass(client, cid, user_id, product="audioura.pass.usd5", length="month",
@@ -169,7 +171,7 @@ def _buy_pass(client, cid, user_id, product="audioura.pass.usd5", length="month"
 
 
 def _paid_community(client, owner, name):
-    return _create(client, owner, name, is_paid=True,
+    return _create(client, owner, name,
                    pass_products=[{"product_id": "audioura.pass.usd5",
                                    "length": "month"}])
 
@@ -250,13 +252,17 @@ def test_paid_two_members_launch(client, db):
 
 
 def test_paid_owner_does_not_count(client, db):
-    """The owner buying a pass of their own community does not count toward the
-    bar — only members excluding the owner do."""
+    """[LOCAL-704 / D665 addendum] The owner cannot buy a pass for their own
+    community (409 owner_cannot_join) and never counts toward the bar — only
+    members excluding the owner do."""
     owner = TEST_PREFIX + "po-owner"
     c = _paid_community(client, owner, TEST_PREFIX + "Owner Excluded")
     cid = c["id"]
-    # Owner "buys" (counts as owner, excluded) + one real member → still 1.
-    _buy_pass(client, cid, owner, txid=TEST_PREFIX + "owner-self")
+    # Owner "buys" their own community → refused with 409 owner_cannot_join.
+    r_owner = _buy_pass(client, cid, owner, txid=TEST_PREFIX + "owner-self")
+    assert r_owner.status_code == 409
+    assert r_owner.get_json()["error"] == "owner_cannot_join"
+    # One real member → still 1, not launched (bar is 2 non-owner members).
     _buy_pass(client, cid, TEST_PREFIX + "po-m1")
     page = client.get(f"/communities/{cid}",
                       query_string={"user_id": owner}).get_json()
@@ -265,51 +271,23 @@ def test_paid_owner_does_not_count(client, db):
     assert _row(db, cid)["launched_at"] is None
 
 
-def test_free_join_does_not_count_for_paid(client, db):
-    """A paid community's bar is PAID members; a free join of a paid community
-    (which the API refuses with 402 anyway) never counts. We assert that a paid
-    community with only paid members launches, and that the paid count is what
-    gates it."""
+def test_free_join_is_refused_pass_required(client, db):
+    """[LOCAL-704 / D665] No free communities: the free-join endpoint refuses
+    every community with 402 pass_required, and only PAID members gate the
+    launch bar."""
     owner = TEST_PREFIX + "fp-owner"
     c = _paid_community(client, owner, TEST_PREFIX + "Paid Needs Paid")
     cid = c["id"]
-    # A free join is refused for a paid community (402) — it cannot pad the bar.
-    r = _join_free(client, cid, TEST_PREFIX + "fp-freeloader")
+    # A free join is refused (402 pass_required) — it cannot pad the bar.
+    r = client.post(f"/communities/{cid}/join",
+                    json={"user_id": TEST_PREFIX + "fp-freeloader"})
     assert r.status_code == 402
+    assert r.get_json()["error"] == "pass_required"
     # Only after two PAID members does it launch.
     _buy_pass(client, cid, TEST_PREFIX + "fp-m1")
     assert _row(db, cid)["launched_at"] is None
     _buy_pass(client, cid, TEST_PREFIX + "fp-m2")
     assert _row(db, cid)["launched_at"] is not None
-
-
-# ─── FREE: 2 joins → launched ───────────────────────────────────────────────
-
-def test_free_two_joins_launch(client, db):
-    owner = TEST_PREFIX + "f2-owner"
-    c = _create(client, owner, TEST_PREFIX + "Free Two")  # free by default
-    cid = c["id"]
-    r1 = _join_free(client, cid, TEST_PREFIX + "f2-m1")
-    assert r1.status_code == 200
-    assert r1.get_json()["launch"]["members_so_far"] == 1
-    assert r1.get_json()["launch"]["launched"] is False
-    r2 = _join_free(client, cid, TEST_PREFIX + "f2-m2")
-    assert r2.status_code == 200
-    assert r2.get_json()["launch"]["members_so_far"] == 2
-    assert r2.get_json()["launch"]["launched"] is True
-    assert _row(db, cid)["launched_at"] is not None
-
-
-def test_free_owner_does_not_count(client, db):
-    owner = TEST_PREFIX + "fo-owner"
-    c = _create(client, owner, TEST_PREFIX + "Free Owner Excluded")
-    cid = c["id"]
-    # Owner "joins" own community (excluded) + one member → 1, not launched.
-    _join_free(client, cid, owner)
-    r = _join_free(client, cid, TEST_PREFIX + "fo-m1")
-    assert r.get_json()["launch"]["members_so_far"] == 1
-    assert r.get_json()["launch"]["launched"] is False
-    assert _row(db, cid)["launched_at"] is None
 
 
 # ─── JOB archives a past-deadline unlaunched community; code → 410 ──────────
@@ -319,8 +297,8 @@ def test_job_archives_past_deadline_miss_and_code_410(client, db):
     c = _create(client, owner, TEST_PREFIX + "Missed It")
     cid = c["id"]
     code = c["join_code"]
-    # One member only — short of the bar.
-    _join_free(client, cid, TEST_PREFIX + "mj-m1")
+    # One paid member only — short of the bar.
+    _buy_pass(client, cid, TEST_PREFIX + "mj-m1")
     # Deadline already passed.
     _set_deadline(db, cid, _now_utc() - timedelta(hours=1))
     r = client.post("/communities/launch-window/run")
@@ -364,8 +342,8 @@ def test_launched_never_archived(client, db):
     owner = TEST_PREFIX + "ln-owner"
     c = _create(client, owner, TEST_PREFIX + "Launched Stays")
     cid = c["id"]
-    _join_free(client, cid, TEST_PREFIX + "ln-m1")
-    _join_free(client, cid, TEST_PREFIX + "ln-m2")  # launches it
+    _buy_pass(client, cid, TEST_PREFIX + "ln-m1")
+    _buy_pass(client, cid, TEST_PREFIX + "ln-m2")  # launches it
     assert _row(db, cid)["launched_at"] is not None
     # Push the deadline into the past — a launched community is still safe.
     _set_deadline(db, cid, _now_utc() - timedelta(hours=5))
@@ -415,8 +393,8 @@ def test_launched_community_gets_no_reminders(client, db):
     owner = TEST_PREFIX + "lr-owner"
     c = _create(client, owner, TEST_PREFIX + "Launched No Remind")
     cid = c["id"]
-    _join_free(client, cid, TEST_PREFIX + "lr-m1")
-    _join_free(client, cid, TEST_PREFIX + "lr-m2")  # launched
+    _buy_pass(client, cid, TEST_PREFIX + "lr-m1")
+    _buy_pass(client, cid, TEST_PREFIX + "lr-m2")  # launched
     _set_deadline(db, cid, _now_utc() + timedelta(hours=6))
     r = client.post("/communities/launch-window/run").get_json()
     assert cid not in r["reminded_48h"]

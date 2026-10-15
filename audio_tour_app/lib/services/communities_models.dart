@@ -211,6 +211,10 @@ class Community {
   final List<CommunityPass> passes;
   final List<CommunityEpisode> episodes;
   final int episodeCount;
+  // [LOCAL-704 / D665] The community's member count: active members (unexpired
+  // paid passes), owner excluded. Shown on the community page, My communities,
+  // search/code results, the map pin sheet and the invite email.
+  final int memberCount;
   final bool isOwner;
   final MyStatus myStatus;
   final String? joinCode; // present on create / to the owner
@@ -244,6 +248,7 @@ class Community {
     required this.passes,
     required this.episodes,
     required this.episodeCount,
+    this.memberCount = 0,
     required this.isOwner,
     required this.myStatus,
     this.joinCode,
@@ -287,6 +292,8 @@ class Community {
       episodes: list(j['episodes'], CommunityEpisode.fromJson),
       episodeCount:
           (j['episode_count'] is num) ? (j['episode_count'] as num).toInt() : 0,
+      memberCount:
+          (j['member_count'] is num) ? (j['member_count'] as num).toInt() : 0,
       isOwner: j['is_owner'] == true,
       myStatus: MyStatus.fromJson(j['my_status'] as Map<String, dynamic>?),
       joinCode: j['join_code'] as String?,
@@ -329,6 +336,8 @@ class CommunityMapPin {
   final double longitude;
   final bool isPaid;
   final String badge; // 'community'
+  // [LOCAL-704 / D665] Member count shown on the map pin sheet.
+  final int memberCount;
 
   const CommunityMapPin({
     required this.id,
@@ -337,6 +346,7 @@ class CommunityMapPin {
     required this.longitude,
     required this.isPaid,
     required this.badge,
+    this.memberCount = 0,
   });
 
   factory CommunityMapPin.fromJson(Map<String, dynamic> j) => CommunityMapPin(
@@ -347,6 +357,8 @@ class CommunityMapPin {
             (j['longitude'] is num) ? (j['longitude'] as num).toDouble() : 0,
         isPaid: j['is_paid'] == true,
         badge: (j['badge'] ?? 'community') as String,
+        memberCount:
+            (j['member_count'] is num) ? (j['member_count'] as num).toInt() : 0,
       );
 }
 
@@ -357,6 +369,8 @@ class JoinedCommunity {
   final String? organiserName;
   final bool active;
   final String? expiresAt;
+  // [LOCAL-704 / D665] Member count shown on each My communities row.
+  final int memberCount;
 
   const JoinedCommunity({
     required this.id,
@@ -364,6 +378,7 @@ class JoinedCommunity {
     this.organiserName,
     required this.active,
     this.expiresAt,
+    this.memberCount = 0,
   });
 
   factory JoinedCommunity.fromJson(Map<String, dynamic> j) => JoinedCommunity(
@@ -372,6 +387,8 @@ class JoinedCommunity {
         organiserName: j['organiser_name'] as String?,
         active: j['active'] == true,
         expiresAt: j['expires_at'] as String?,
+        memberCount:
+            (j['member_count'] is num) ? (j['member_count'] as num).toInt() : 0,
       );
 }
 
@@ -430,10 +447,10 @@ class CommunityCopy {
       'tab like any other tour, and checked by Audioura (content rating, the '
       'same as every generated or edited tour). These are shown only to your '
       'members.\n\n'
-      'Communities can be free (like a book club) or paid. A paid membership is '
-      'a pass you buy — a day, a week, a month, or a year. Nothing renews '
-      'automatically: when a pass ends we remind you, and you can buy again. '
-      'Audio you have already downloaded stays with you.';
+      'Communities are paid: a membership is a pass you buy — a day, a week, a '
+      'month, or a year — and every member pays at least \$1 to join. Nothing '
+      'renews automatically: when a pass ends we remind you, and you can buy '
+      'again. Audio you have already downloaded stays with you.';
 
   /// §1: The shorter intro shown at the top of the Create form.
   static const String createIntro =
@@ -541,16 +558,26 @@ class CommunityCopy {
     return '$base (${suffix.toString().padLeft(2, '0')})';
   }
 
+  /// [LOCAL-704 / D665] A short "N members" label shown on the community page,
+  /// My communities, search/code results and the map pin sheet. Pure so the
+  /// exact wording ("1 member" vs "12 members") is unit-testable. The organiser
+  /// is never counted (D665 addendum).
+  static String memberCountLabel(int count) =>
+      count == 1 ? '1 member' : '$count members';
+
   /// §4: The email body an organiser sends to invite members. Contains the
   /// community name + description, the organiser name, how to get Audioura
   /// (install link), and the exact join instruction with the CODE. The returned
   /// string ALWAYS contains the code and the install line, which the tests
   /// assert. Never claims the email was sent — that is the composer's job.
+  /// [LOCAL-704 / D665] It also carries the community's member count ("12
+  /// members") when provided.
   static String emailInviteBody({
     required String communityName,
     String? description,
     String? organiserName,
     required String code,
+    int? memberCount,
   }) {
     final buf = StringBuffer();
     buf.writeln('You are invited to join "$communityName" on Audioura.');
@@ -561,6 +588,12 @@ class CommunityCopy {
     }
     if (organiserName != null && organiserName.trim().isNotEmpty) {
       buf.writeln('Organiser: ${organiserName.trim()}');
+    }
+    if (memberCount != null) {
+      buf.writeln(memberCountLabel(memberCount));
+    }
+    if ((organiserName != null && organiserName.trim().isNotEmpty) ||
+        memberCount != null) {
       buf.writeln();
     }
     buf.writeln('How to get Audioura: $installUrl');
