@@ -194,8 +194,8 @@ class _PlanScreenState extends State<PlanScreen> {
   }
 
   Widget _buyCard() {
-    // Google Play billing is out of scope for LOCAL-598: hide the buy buttons
-    // on Android behind the flag. iOS shows them (StoreKit 2).
+    // [LOCAL-696] Android buy buttons are gated by kAndroidBillingEnabled —
+    // now true, so both iOS (StoreKit 2) and Android (Play Billing) show them.
     final androidHidden = Platform.isAndroid && !kAndroidBillingEnabled;
 
     return Card(

@@ -1,24 +1,28 @@
-// [LOCAL-598] In-app purchase service — consumable packs, iOS first.
+// [LOCAL-598 / LOCAL-696] In-app purchase service — consumable packs, tours and
+// community passes, on BOTH iOS and Android.
 //
 // SUBSCRIPTION_LEVELS.md (D613): L3 ($10 pack) and L4 ($25 round) are
 // CONSUMABLES, never auto-renewing subscriptions, and nothing is charged
 // automatically. Purchases are verified SERVER-SIDE before any allowance is
 // granted; the same transaction id can never grant twice.
 //
-// Flow (StoreKit 2 via in_app_purchase + in_app_purchase_storekit):
+// Flow (in_app_purchase; StoreKit 2 on iOS, Play Billing on Android):
 //   1. buy(product) -> buyConsumable on the store.
-//   2. The purchase stream delivers a PurchaseDetails with the StoreKit 2 JWS
-//      in verificationData.serverVerificationData (the signed transaction).
-//   3. We POST {store, transaction_id, product, user_id, signed_transaction}
-//      to /purchases/verify. The server verifies the JWS OFFLINE (LOCAL-598
-//      D5, IAP_VERIFY_MODE=apple) and, on OK, grants the level.
+//   2. The purchase stream delivers a PurchaseDetails. On iOS
+//      verificationData.serverVerificationData is the StoreKit 2 JWS signed
+//      transaction; on Android it is the opaque Google purchaseToken.
+//   3. We POST to /purchases/verify:
+//        iOS     {store:'apple',  transaction_id, product,    signed_transaction}
+//        Android {store:'google', order_id,       product_id, purchase_token}
+//      The server verifies — Apple: the JWS OFFLINE (LOCAL-598, apple mode);
+//      Google: the token via the Play Developer API, then it acknowledges and
+//      consumes the purchase (LOCAL-696, google mode) — and on OK grants.
 //   4. ONLY after the server grants do we completePurchase() to finish the
 //      transaction with the store. If verification fails we still complete the
-//      transaction (so StoreKit stops re-delivering it) but do NOT grant.
+//      transaction (so the store stops re-delivering it) but do NOT grant.
 //
-// Google Play is out of scope for LOCAL-598: kAndroidBillingEnabled is false,
-// the plan screen hides the Android buy buttons, and buy() returns
-// `unavailable` on Android so nothing is charged.
+// kAndroidBillingEnabled is now true (LOCAL-696); the 11 phase-1 products exist
+// on Play with the SAME product ids as Apple.
 
 import 'dart:async';
 import 'dart:convert';
@@ -31,9 +35,11 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../config/endpoints.dart';
 import '../screens/debug_log_viewer_screen.dart';
 
-/// Google Play billing is intentionally OFF for LOCAL-598. Flip to true only
-/// when the Play Billing path is implemented and the products exist.
-const bool kAndroidBillingEnabled = false;
+/// [LOCAL-696] Google Play billing is now ON: the server verifies a Google
+/// purchase token with the Play Developer API (IAP_VERIFY_MODE=google), exactly
+/// as it verifies the Apple JWS. The 11 phase-1 products exist on Play with the
+/// SAME product ids as Apple (ClickUp wdvrdayx33). iOS is unchanged.
+const bool kAndroidBillingEnabled = true;
 
 /// The two consumable products. The STORE ids are what App Store Connect /
 /// the StoreKit config file use; the SERVER product key is what
@@ -547,22 +553,39 @@ class IapService {
           'No device id — cannot verify purchase.');
     }
 
-    // StoreKit 2: serverVerificationData is the JWS signed transaction. The
-    // transaction id is the store's purchase id.
-    final jws = p.verificationData.serverVerificationData;
+    // StoreKit 2 (iOS): serverVerificationData is the JWS signed transaction.
+    // Google Play (Android): serverVerificationData is the opaque purchaseToken.
+    // The transaction id is the store's purchase id (iOS) / order id (Android).
+    final String verificationData = p.verificationData.serverVerificationData;
     final transactionId = p.purchaseID ?? '';
 
+    final bool isGoogle = Platform.isAndroid;
+
     final body = <String, dynamic>{
-      'store': 'apple',
-      'transaction_id': transactionId,
-      'product': p.productID, // store id; server maps to the product key
       'user_id': userId,
-      'signed_transaction': jws,
       if (isTourPurchase) 'tour_id': _pendingTourId,
       if (isPassPurchase) 'community_id': _pendingCommunityId,
       if (isPassPurchase && _pendingPassLength != null)
         'length': _pendingPassLength,
     };
+    if (isGoogle) {
+      // [LOCAL-696] Android/Google: send the Play fields. The server verifies
+      // the token with the Play Developer API, then acknowledges + consumes it.
+      body.addAll(<String, dynamic>{
+        'store': 'google',
+        'product_id': p.productID,
+        'order_id': transactionId,
+        'purchase_token': verificationData,
+      });
+    } else {
+      // iOS/Apple path — unchanged (StoreKit 2 JWS verified offline server-side).
+      body.addAll(<String, dynamic>{
+        'store': 'apple',
+        'transaction_id': transactionId,
+        'product': p.productID, // store id; server maps to the product key
+        'signed_transaction': verificationData,
+      });
+    }
 
     try {
       final resp = await Endpoints.post(
@@ -573,7 +596,8 @@ class IapService {
       );
       if (resp.statusCode == 200) {
         await DebugLogHelper.addDebugLog(
-            'IAP: server granted $serverProduct for txn $transactionId');
+            'IAP: server granted $serverProduct for txn $transactionId '
+            '(${isGoogle ? 'google' : 'apple'})');
         return const IapResult(IapResultStatus.granted);
       }
       // 409 already_verified: the transaction was processed before — treat as
