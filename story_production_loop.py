@@ -407,6 +407,25 @@ def run_for_stop(matrix: Dict, stop_text: str, exhibition: str = '',
             if not (r1.get('text') or '').strip():
                 continue
 
+            # [LOCAL-692B / D659 addendum] "one more story", not a longer one.
+            # The museum artist-life backend may return a DISTINCT, charged
+            # SECOND story (same gathered sources, no extra queries). Append it
+            # to the research answer as additional facts so it flows through the
+            # same relevance/adjudication path as a short add-on — never by
+            # padding the first story. No-op for every other backend/tour.
+            _second = (r1.get('second_story') or '').strip() if isinstance(r1, dict) else ''
+            if _second and _second.lower() not in (r1.get('text') or '').lower():
+                r1['text'] = (r1['text'].rstrip()
+                              + '\n\nAdditional short story (distinct from the above): '
+                              + _second)
+            if isinstance(r1, dict) and r1.get('rung'):
+                try:
+                    print(f"  [LOCAL-692B] story ladder: rung={r1.get('rung')!r} "
+                          f"extra_queries={r1.get('extra_queries', 0)} "
+                          f"second_story={'yes' if _second else 'no'}", flush=True)
+                except Exception:
+                    pass
+
             judged1 = []
             for s in _sentences(r1['text']):
                 v = relevance_of(s, matrix, r1['text'], extra)
