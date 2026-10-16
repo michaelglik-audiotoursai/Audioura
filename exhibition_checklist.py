@@ -340,28 +340,27 @@ def _search_exhibition_url(exhibition_name: str, venue_base_url: str) -> str:
 
     payload = {"q": query, "num": 5}
     try:
-        data = _json.dumps(payload, ensure_ascii=False).encode('utf-8')
-        req = urllib.request.Request(
-            "https://google.serper.dev/search",
-            data=data,
-            headers={"X-API-KEY": SERP_API_KEY, "Content-Type": "application/json"},
-            method="POST",
-        )
-        with urllib.request.urlopen(req, timeout=15) as resp:
-            body = _json.loads(resp.read().decode())
-            organic = body.get("organic", [])
-            for hit in organic:
-                url = hit.get('link', '')
-                if not url:
-                    continue
-                hit_domain = urlparse(url).netloc
-                # Must be on the venue's domain
-                if hit_domain == domain or hit_domain.endswith('.' + domain.lstrip('www.')):
-                    print(f"  [LOCAL-425] Search hit: {url} — {hit.get('title', '')}")
-                    return url
-            # No on-domain hit
+        from serper_meter import serper_post  # [LOCAL-707] guaranteed-metered door
+        status, raw = serper_post(
+            "https://google.serper.dev/search", payload,
+            api_key=SERP_API_KEY, timeout=15)
+        if status != 200 or not raw:
             print(f"  [LOCAL-425] No on-domain results from search")
             return ''
+        body = _json.loads(raw.decode())
+        organic = body.get("organic", [])
+        for hit in organic:
+            url = hit.get('link', '')
+            if not url:
+                continue
+            hit_domain = urlparse(url).netloc
+            # Must be on the venue's domain
+            if hit_domain == domain or hit_domain.endswith('.' + domain.lstrip('www.')):
+                print(f"  [LOCAL-425] Search hit: {url} — {hit.get('title', '')}")
+                return url
+        # No on-domain hit
+        print(f"  [LOCAL-425] No on-domain results from search")
+        return ''
     except Exception as e:
         print(f"  [LOCAL-425] Exhibition URL search failed: {type(e).__name__}: {e}")
         return ''
@@ -510,16 +509,14 @@ def _search_exhibition_works_from_web(
 
     payload = {"q": query, "num": 8}
     try:
-        data = _json.dumps(payload, ensure_ascii=False).encode('utf-8')
-        req = urllib.request.Request(
-            "https://google.serper.dev/search",
-            data=data,
-            headers={"X-API-KEY": SERP_API_KEY, "Content-Type": "application/json"},
-            method="POST",
-        )
-        with urllib.request.urlopen(req, timeout=15) as resp:
-            body = _json.loads(resp.read().decode())
-            organic = body.get("organic", [])
+        from serper_meter import serper_post  # [LOCAL-707] guaranteed-metered door
+        status, raw = serper_post(
+            "https://google.serper.dev/search", payload,
+            api_key=SERP_API_KEY, timeout=15)
+        if status != 200 or not raw:
+            return [], ''
+        body = _json.loads(raw.decode())
+        organic = body.get("organic", [])
     except Exception as e:
         print(f"  [LOCAL-425] Works search failed: {type(e).__name__}: {e}")
         return [], ''

@@ -12,6 +12,55 @@ SERVICE = os.environ.get("METER_SERVICE", os.path.basename(sys.argv[0]) if sys.a
 _lock = threading.Lock()
 _INSTALLED = False  # guard so install() patches each HTTP client at most once
 
+# [LOCAL-707] Belt-and-suspenders explicit metering. Serper calls go out through
+# urllib/requests, which the network patches below already wrap. But the Oct 13
+# LOCAL-678 change (httpx/aiohttp patching) coincided with Serper DISAPPEARING
+# from paid_api_calls while httpx-based OpenAI/Gemini kept logging — i.e. in the
+# live container the urllib/requests patches stopped producing Serper rows. The
+# fix routes every real Serper call through serper_meter.serper_post(), which
+# records the row DIRECTLY via record_call() — independent of whether the network
+# patch is live. To avoid double-counting when the network patch IS active, an
+# explicit record sets a thread-local "already metered" marker keyed on the
+# request's id; the HTTP wrappers skip a response whose marker is set. Fail-open
+# throughout: the marker machinery never raises into a caller.
+_explicit = threading.local()
+
+
+def _mark_explicit(url):
+    """Mark that the current thread is about to make (and will itself record) a
+    paid call to ``url``, so the network wrapper does not record it a second
+    time. Returns a token to clear with _clear_explicit()."""
+    try:
+        marks = getattr(_explicit, "marks", None)
+        if marks is None:
+            marks = _explicit.marks = {}
+        key = _host_kind(url)
+        marks[key] = marks.get(key, 0) + 1
+        return key
+    except Exception:
+        return None
+
+
+def _clear_explicit(key):
+    try:
+        marks = getattr(_explicit, "marks", None)
+        if marks and key in marks:
+            marks[key] -= 1
+            if marks[key] <= 0:
+                marks.pop(key, None)
+    except Exception:
+        pass
+
+
+def _is_explicit(url):
+    """True when the current thread has an outstanding explicit-record marker for
+    this URL's host kind (so the network wrapper should not double-record)."""
+    try:
+        marks = getattr(_explicit, "marks", None)
+        return bool(marks and marks.get(_host_kind(url), 0) > 0)
+    except Exception:
+        return False
+
 # $ per 1M tokens. OpenAI: published list prices. Gemini Flash: derived from our own Google
 # invoice SKUs of 2026-10-05 (445,098 input tok = $0.33; 154,413 output tok = $0.58).
 OPENAI = {  # longest key wins
@@ -108,6 +157,25 @@ def _record(url, status, body, req_body=None):
     # Synchronous (3 s connect timeout): a daemon thread is killed when a short-lived
     # script exits, which lost the DB copy for isolated test runs.
     _db_write(rec)
+
+
+def record_call(url, status, body=b"", req_body=None):
+    """[LOCAL-707] Public, explicit metering entry point.
+
+    Writes exactly one paid_api_calls row for a paid request, with the same
+    costing, log and DB behaviour as the automatic network wrappers. Callers that
+    want a GUARANTEED record regardless of whether the network patch is installed
+    (e.g. serper_meter.serper_post) call this directly. Never raises.
+
+    A non-paid host is ignored (one choke point: _record returns on kind=None), so
+    passing a non-serper URL here is harmless. The paired _mark_explicit /
+    _clear_explicit calls prevent the network wrapper from double-recording the
+    same request on hosts where the patch is also live.
+    """
+    try:
+        _record(url, status, body, req_body)
+    except Exception:
+        pass
 
 
 def _db_write(rec):
@@ -313,7 +381,7 @@ def install():
                 check_daily_limit()
             resp = _orig(self, request, **kw)
             try:
-                if _host_kind(request.url):
+                if _host_kind(request.url) and not _is_explicit(request.url):
                     rb = None
                     try: rb = json.loads(request.body) if request.body else None
                     except Exception: pass
@@ -337,13 +405,16 @@ def install():
             try:
                 resp = _orig_open(req, *a, **kw)
             except Exception as e:
-                try: _record(url, getattr(e, "code", 0), b"")
+                try:
+                    if not _is_explicit(url):
+                        _record(url, getattr(e, "code", 0), b"")
                 except Exception: pass
                 raise
             try:
                 data = resp.read()
                 import io
-                _record(url, getattr(resp, "status", 200), data)
+                if not _is_explicit(url):
+                    _record(url, getattr(resp, "status", 200), data)
                 resp.read = lambda *x: data if not x else data  # replay
                 resp.fp = io.BytesIO(data)
             except Exception:
@@ -396,7 +467,7 @@ def install():
                 check_daily_limit()
             resp = _orig_httpx_send(self, request, stream=stream, **kw)
             try:
-                if _host_kind(url):
+                if _host_kind(url) and not _is_explicit(url):
                     _record(url, resp.status_code,
                             _httpx_resp_body(resp, stream), _httpx_req_body(request))
             except Exception:
@@ -412,7 +483,7 @@ def install():
                 check_daily_limit()
             resp = await _orig_httpx_asend(self, request, stream=stream, **kw)
             try:
-                if _host_kind(url):
+                if _host_kind(url) and not _is_explicit(url):
                     _record(url, resp.status_code,
                             _httpx_resp_body(resp, stream), _httpx_req_body(request))
             except Exception:
@@ -439,7 +510,7 @@ def install():
                 check_daily_limit()
             resp = await _orig_aiohttp_request(self, method, str_or_url, **kw)
             try:
-                if _host_kind(url):
+                if _host_kind(url) and not _is_explicit(url):
                     rb = kw.get("json")
                     if rb is None:
                         d = kw.get("data")

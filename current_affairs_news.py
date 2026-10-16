@@ -320,20 +320,18 @@ def _serp_news(query: str, tbs: str = 'qdr:m',
     if tbs:
         payload["tbs"] = tbs
     try:
-        data = json.dumps(payload, ensure_ascii=False).encode('utf-8')
-        req = urllib.request.Request(
-            SERP_NEWS_URL, data=data,
-            headers={"X-API-KEY": key, "Content-Type": "application/json"},
-            method="POST")
-        with urllib.request.urlopen(req, timeout=15) as resp:
-            body = json.loads(resp.read().decode())
-    except urllib.error.HTTPError as e:
-        try:
-            rb = e.read().decode('utf-8', errors='replace')[:300]
-        except Exception:
-            rb = '<unreadable>'
-        print(f"  [LOCAL-655] NEWS HTTP {e.code}: {e.reason}; body={rb}")
-        return []
+        # [LOCAL-707] Guaranteed-metered Serper door (one paid_api_calls row per
+        # query regardless of whether the network patch is live in this process).
+        from serper_meter import serper_post
+        status, raw = serper_post(SERP_NEWS_URL, payload, api_key=key, timeout=15)
+        if status != 200:
+            try:
+                rb = raw.decode('utf-8', errors='replace')[:300]
+            except Exception:
+                rb = '<unreadable>'
+            print(f"  [LOCAL-655] NEWS HTTP {status}; body={rb}")
+            return []
+        body = json.loads(raw.decode())
     except Exception as e:
         print(f"  [LOCAL-655] NEWS query failed: {type(e).__name__}: {e}")
         return []

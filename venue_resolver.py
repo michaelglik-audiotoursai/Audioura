@@ -2322,16 +2322,14 @@ def _serper_search(query: str, api_key: str = "", num: int = 10) -> List[Dict]:
         _ca.add_search_queries(1)
     except Exception:
         pass
-    payload = _json.dumps({"q": query, "num": num}, ensure_ascii=False).encode('utf-8')
     try:
-        req = urllib.request.Request(
-            "https://google.serper.dev/search",
-            data=payload,
-            headers={"X-API-KEY": key, "Content-Type": "application/json"},
-            method="POST",
-        )
-        with urllib.request.urlopen(req, timeout=15) as resp:
-            body = _json.loads(resp.read().decode())
+        from serper_meter import serper_post  # [LOCAL-707] guaranteed-metered door
+        status, raw = serper_post(
+            "https://google.serper.dev/search", {"q": query, "num": num},
+            api_key=key, timeout=15)
+        if status != 200 or not raw:
+            return []
+        body = _json.loads(raw.decode())
         return body.get("organic", []) or []
     except Exception as e:
         print(f"  [LOCAL-599] Serper search failed: {type(e).__name__}: {e}")
