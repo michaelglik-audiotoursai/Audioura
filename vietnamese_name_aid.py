@@ -42,6 +42,7 @@ from typing import Dict, List, Tuple
 __all__ = [
     'LEXICON', 'canonical_name', 'fix_names', 'add_pronunciation_aids',
     'apply', 'WORK_ARTIST', 'ssml_pronunciation', 'to_ssml',
+    'kokoro_pronunciation', 'to_kokoro',
 ]
 
 
@@ -56,12 +57,20 @@ class _Artist:
               (repaired only in the work-attribution pass).
     """
 
-    def __init__(self, full: str, say: str, variants: List[str], ipa: str = ''):
+    def __init__(self, full: str, say: str, variants: List[str], ipa: str = '',
+                 kokoro_ipa: str = ''):
         self.full = full
         self.say = say
         self.variants = variants
-        # Optional IPA for an SSML <phoneme>; when empty we use <sub alias=say>.
+        # Optional IPA for a Polly SSML <phoneme>; must be STANDARD IPA that AWS
+        # Polly accepts. Empty by default → Polly uses <sub alias=say> (the
+        # proven LOCAL-692B behaviour). Do NOT put misaki-flavoured IPA here.
         self.ipa = ipa
+        # [LOCAL-706] Optional IPA for the Kokoro/misaki G2P inline markup
+        # [name](/IPA/). Written in misaki's US-English phoneme vocabulary
+        # (A/Y/O/W/I diphthong tokens, ˈ/ˌ stress) — NOT the same alphabet as
+        # Polly's <phoneme>. Empty → the Kokoro path substitutes `say`.
+        self.kokoro_ipa = kokoro_ipa
 
 
 # Verified against >=2 independent sources each (see module docstring + ticket
@@ -91,6 +100,72 @@ LEXICON: Dict[str, _Artist] = {
         'Bùi Xuân Phái', 'booy swun fye',
         ['Bui Xuan Phai', 'Bùi Xuan Phai', 'Bui Xuân Phái']),
 }
+
+# ── [LOCAL-706 / D667] GENERIC lexicon overlay ───────────────────────────────
+# The verified records above seed the lexicon in code. LOCAL-706 adds a GENERIC,
+# data-driven lexicon file (pronunciation_lexicon.json) with language / written
+# / ipa / respelling / sources, so French/Russian/etc. names can be added later
+# WITHOUT touching this module. On import we overlay the JSON onto LEXICON:
+#   * a JSON `key` that matches an existing LEXICON key UPDATES that record's
+#     ipa/respelling/variants (this is how the Vietnamese names gain IPA, which
+#     the Kokoro path needs — see kokoro_pronunciation);
+#   * a new `key` is ADDED as a fresh _Artist.
+# Loading is SOFT: a missing/malformed file leaves the in-code LEXICON exactly as
+# it was (fail-safe), so neither TTS path can break if the file is absent.
+import json as _json
+import os as _os
+
+LEXICON_JSON_PATH = _os.path.join(
+    _os.path.dirname(_os.path.abspath(__file__)), 'pronunciation_lexicon.json')
+
+
+def _load_generic_lexicon(path: str = LEXICON_JSON_PATH) -> List[str]:
+    """Overlay pronunciation_lexicon.json onto LEXICON. Returns load notes.
+    Fail-safe: any error leaves LEXICON unchanged and returns a one-item note."""
+    notes: List[str] = []
+    try:
+        with open(path, encoding='utf-8') as fh:
+            data = _json.load(fh)
+        for e in data.get('entries', []):
+            key = (e.get('key') or '').strip()
+            written = (e.get('written') or '').strip()
+            if not key or not written:
+                continue
+            # `ipa` in the JSON is misaki/Kokoro IPA (US-English phoneme vocab).
+            # It feeds the Kokoro inline markup, NOT Polly's <phoneme> (different
+            # alphabet). A standard-IPA string for Polly, when known, goes in the
+            # optional `polly_ipa` field.
+            kokoro_ipa = (e.get('ipa') or '').strip()
+            polly_ipa = (e.get('polly_ipa') or '').strip()
+            say = (e.get('respelling') or '').strip()
+            variants = [v for v in (e.get('variants') or []) if v]
+            if key in LEXICON:
+                a = LEXICON[key]
+                if kokoro_ipa:
+                    a.kokoro_ipa = kokoro_ipa
+                if polly_ipa:
+                    a.ipa = polly_ipa
+                if say:
+                    a.say = say
+                for v in variants:
+                    if v not in a.variants:
+                        a.variants.append(v)
+                notes.append(f'overlay:{key}(kokoro_ipa={bool(kokoro_ipa)})')
+            else:
+                LEXICON[key] = _Artist(
+                    written, say or written, variants,
+                    ipa=polly_ipa, kokoro_ipa=kokoro_ipa)
+                notes.append(f'add:{key}(kokoro_ipa={bool(kokoro_ipa)})')
+    except FileNotFoundError:
+        notes.append('lexicon_json:absent (in-code lexicon kept)')
+    except Exception as _lex_err:  # pragma: no cover - never break TTS on bad file
+        notes.append(f'lexicon_json:error {_lex_err} (in-code lexicon kept)')
+    return notes
+
+
+# Overlay at import so both TTS paths see the IPA. Non-fatal.
+_LEXICON_LOAD_NOTES = _load_generic_lexicon()
+
 
 # Work -> correct artist (verified). Used to repair a WRONG attribution: when a
 # work's title appears next to a different person's name, the name is corrected.
@@ -323,6 +398,106 @@ def to_ssml(text: str) -> Tuple[str, List[str]]:
     return f'<speak>{body}</speak>', notes
 
 
+# ── [LOCAL-706 / D667] KOKORO-LAYER PRONUNCIATION (misaki inline markup) ──────
+# Michael prefers the free Kokoro voice (the Mac stack's English default,
+# TTS_ENGINE=kokoro, rendered WHOLE on the host service via
+# polly_tts_service._render_whole_via_host). The LOCAL-692B Polly SSML aid above
+# never reaches Kokoro — Kokoro does not take SSML — so real English tours hit
+# Kokoro with the raw diacritic names, which misaki cannot pronounce (bare
+# "Nguyễn Gia Trí" tokenises to the unknown-phoneme marker "❓ ❓ ❓").
+#
+# Kokoro's G2P front-end (misaki) DOES accept an inline markup identical in
+# spirit to Polly's phoneme/sub split:
+#   [grapheme](/IPA/)   → misaki uses the slash-delimited IPA verbatim as the
+#                         token's phonemes (validated: the IPA round-trips
+#                         through misaki.en.G2P unchanged). Used when the lexicon
+#                         has IPA.
+#   (no IPA)            → there is NO misaki markup for "say it like this English
+#                         word", so we substitute the verified English RESPELLING
+#                         as the spoken grapheme (e.g. "ngwen zah chee"), which an
+#                         English voice pronounces acceptably. This mirrors Polly's
+#                         <sub alias> fallback.
+# Only the FIRST mention of each name is annotated (later mentions stay plain) so
+# the audio is not over-marked, exactly like ssml_pronunciation. The visible/
+# printed TEXT is NEVER changed — only the string sent to the Kokoro host.
+#
+# IMPORTANT: the IPA strings in pronunciation_lexicon.json are written in
+# misaki's US-English phoneme vocabulary (A/Y/O/W/I diphthong tokens, ˈ/ˌ
+# stress). Keep them valid for misaki — see test_local706_kokoro_pronunciation.py
+# which asserts each one round-trips through the real misaki G2P.
+
+
+def _first_mention_spans(text: str) -> List[Tuple[int, int, '_Artist']]:
+    """Shared first-mention span finder: for each known full name, the first,
+    non-overlapping, longest-first match in ``text``. Returns (start, end,
+    artist) sorted by start. Used by both the SSML and Kokoro builders so the two
+    TTS paths annotate exactly the same mentions."""
+    names = sorted(LEXICON.values(), key=lambda a: len(a.full), reverse=True)
+    spans: List[Tuple[int, int, '_Artist']] = []
+    claimed: List[Tuple[int, int]] = []
+    for a in names:
+        pat = re.compile(r'(?<![\wÀ-ỹ])' + re.escape(a.full) + r'(?![\wÀ-ỹ])')
+        m = pat.search(text)
+        if not m:
+            continue
+        s, e = m.start(), m.end()
+        if any(not (e <= cs or s >= ce) for cs, ce in claimed):
+            continue
+        spans.append((s, e, a))
+        claimed.append((s, e))
+    spans.sort(key=lambda t: t[0])
+    return spans
+
+
+def _kokoro_escape(s: str) -> str:
+    """Escape the misaki markup delimiters in ordinary (non-annotated) text so a
+    stray '[', ']', '(' or ')' in the narration is not misread as markup. misaki
+    only treats a FULL ``[...](...)`` as a link, so escaping the brackets with a
+    backslash is sufficient and leaves normal prose untouched in practice."""
+    return (s or '').replace('[', r'\[').replace(']', r'\]')
+
+
+def kokoro_pronunciation(text: str) -> Tuple[str, List[str]]:
+    """Annotate the first mention of each known name for the Kokoro/misaki G2P:
+    ``[Name](/IPA/)`` when the lexicon has IPA, else substitute the verified
+    English respelling in place of the name. Returns (text_for_kokoro, notes).
+
+    Deterministic; a text with no known name is returned unchanged (empty notes).
+    The visible TEXT is not this — this is ONLY the string handed to the Kokoro
+    host service. Later mentions of a name are left as the plain diacritic form;
+    misaki will still mispronounce those, but the first, annotated mention gives
+    the correct pronunciation, matching the SSML path's first-mention policy."""
+    notes: List[str] = []
+    spans = _first_mention_spans(text)
+    if not spans:
+        return text, notes
+    out_parts: List[str] = []
+    cursor = 0
+    for s, e, a in spans:
+        out_parts.append(_kokoro_escape(text[cursor:s]))
+        name = text[s:e]
+        ipa = getattr(a, 'kokoro_ipa', '')
+        if ipa:
+            out_parts.append(f'[{name}](/{ipa}/)')
+            notes.append(f'kokoro_ipa:{a.full}->/{ipa}/')
+        elif a.say:
+            # No IPA: speak the respelling instead of the (unpronounceable) name.
+            out_parts.append(a.say)
+            notes.append(f'kokoro_respell:{a.full}->{a.say}')
+        else:
+            out_parts.append(_kokoro_escape(name))
+        cursor = e
+    out_parts.append(_kokoro_escape(text[cursor:]))
+    return ''.join(out_parts), notes
+
+
+def to_kokoro(text: str) -> Tuple[str, List[str]]:
+    """Convenience alias: return the Kokoro-host text (misaki inline markup for
+    every known name) plus notes. Named to parallel ``to_ssml``. If no known name
+    is present the text is returned unchanged."""
+    return kokoro_pronunciation(text)
+
+
 if __name__ == '__main__':
     import sys
     src = sys.stdin.read() if not sys.stdin.isatty() else (
@@ -330,13 +505,19 @@ if __name__ == '__main__':
         'Sơn nữ is a painting by Lựu. Nguyen Sang made Thanh nien thanh dong.')
     out, notes = apply(src)                 # narration text — NO (say:) aid
     ssml, ssml_notes = to_ssml(out)         # TTS layer — SSML pronunciation
+    kok, kok_notes = to_kokoro(out)         # TTS layer — Kokoro/misaki markup
     print('--- narration text (clean, goes to the listener as words) ---')
     print(out)
     print('\n--- SSML sent to Polly (TextType=ssml) ---')
     print(ssml)
+    print('\n--- text sent to Kokoro host (misaki inline markup) ---')
+    print(kok)
     print('\n--- name-fix notes ---')
     for nnote in notes:
         print(nnote)
     print('\n--- ssml pronunciation notes ---')
     for nnote in ssml_notes:
+        print(nnote)
+    print('\n--- kokoro pronunciation notes ---')
+    for nnote in kok_notes:
         print(nnote)

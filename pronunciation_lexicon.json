@@ -1,0 +1,100 @@
+{
+  "_about": "LOCAL-706 (D667) — Generic foreign-name pronunciation lexicon. Each entry gives the canonical written form (diacritics intact, family-name-first where applicable), an optional IPA string, an English respelling, and verified sources. Consumed by vietnamese_name_aid.py for BOTH TTS paths: AWS Polly (SSML <phoneme>/<sub>) and Kokoro/misaki (inline [name](/IPA/) markup, or respelling substitution when IPA is absent). The on-screen/narration TEXT is never changed by this lexicon — only the audio request. Not Vietnamese-specific: add French/Russian/etc. entries with their own `language` and `ipa`.",
+  "_ipa_notes": "`ipa` is the KOKORO/misaki IPA, written in misaki's US-English phoneme vocabulary so Kokoro accepts it verbatim inside the inline markup. misaki collapses the five US diphthongs to single tokens: A is the vowel in FACE, Y in PRICE, O in GOAT, W in MOUTH, I in CHOICE; primary stress is the vertical tick before the stressed syllable. Each `ipa` string was validated end-to-end through misaki.en.G2P (lang_code 'a') — see test_local706_kokoro_pronunciation.py. This is NOT the alphabet AWS Polly expects, so the Polly SSML path uses the respelling (sub alias) and NOT `ipa`; set the optional per-entry `polly_ipa` (standard IPA) only if you want Polly to use an SSML phoneme element. Leave `ipa` empty to make the Kokoro path substitute the respelling instead of inline markup.",
+  "_schema": {
+    "key": "stable snake_case id",
+    "language": "ISO-ish language tag of the NAME's origin (vi, fr, ru, ...)",
+    "written": "canonical written form shown to the reader (diacritics intact)",
+    "ipa": "misaki/Polly IPA, or empty string to use the respelling",
+    "respelling": "approximate English phonetic guide; the spoken fallback",
+    "variants": "written forms seen in the wild that must normalise to `written`",
+    "sources": "verified references (>=2 independent where possible)"
+  },
+  "entries": [
+    {
+      "key": "nguyen_gia_tri",
+      "language": "vi",
+      "written": "Nguyễn Gia Trí",
+      "ipa": "ˈwɪn ˈʒɑ ˈʧi",
+      "respelling": "ngwen zah chee",
+      "variants": ["Nguyen Gia Tri", "Nguyễn Gia Tri", "Nguyen Gia Trí"],
+      "sources": [
+        "HCMC Museum of Fine Arts field notes (work: Vườn xuân Trung Nam Bắc)",
+        "VnExpress national-treasure report on Vườn xuân Trung Nam Bắc",
+        "Nguyen Art Gallery artist page",
+        "English Wikipedia: Nguyễn Gia Trí (dates/spelling fact-check only)"
+      ]
+    },
+    {
+      "key": "nguyen_sang",
+      "language": "vi",
+      "written": "Nguyễn Sáng",
+      "ipa": "ˈwɪn ˈsɑŋ",
+      "respelling": "ngwen sahng",
+      "variants": ["Nguyen Sang", "Nguyễn Sang", "Nguyen Sáng"],
+      "sources": [
+        "HCMC Museum of Fine Arts collection labels",
+        "English Wikipedia: Nguyễn Sáng (spelling fact-check only)"
+      ]
+    },
+    {
+      "key": "nguyen_hai",
+      "language": "vi",
+      "written": "Nguyễn Hải",
+      "ipa": "ˈwɪn ˈhY",
+      "respelling": "ngwen high",
+      "variants": ["Nguyen Hai", "Nguyễn Hai", "Nguyen Hải"],
+      "sources": [
+        "HCMC Museum of Fine Arts sculpture collection labels",
+        "English Wikipedia: Nguyễn Hải (sculptor) (spelling fact-check only)"
+      ]
+    },
+    {
+      "key": "le_thi_luu",
+      "language": "vi",
+      "written": "Lê Thị Lựu",
+      "ipa": "ˈlA ˈti ˈlu",
+      "respelling": "lay tee luu",
+      "variants": ["Le Thi Luu", "Lê Thị Luu", "Le Thi Lựu"],
+      "sources": [
+        "Musée Cernuschi (Paris) exhibition notes on Lê Thị Lựu",
+        "English Wikipedia: Lê Thị Lựu (spelling fact-check only)"
+      ]
+    },
+    {
+      "key": "le_thi_kim",
+      "language": "vi",
+      "written": "Lê Thị Kim",
+      "ipa": "ˈlA ˈti ˈkɪm",
+      "respelling": "lay tee kim",
+      "variants": ["Le Thi Kim", "Lê Thi Kim"],
+      "sources": [
+        "HCMC Museum of Fine Arts collection labels"
+      ]
+    },
+    {
+      "key": "to_ngoc_van",
+      "language": "vi",
+      "written": "Tô Ngọc Vân",
+      "ipa": "ˈtO ˈnɑk ˈvʌn",
+      "respelling": "toh ngok vun",
+      "variants": ["To Ngoc Van", "Tô Ngoc Van", "To Ngọc Vân"],
+      "sources": [
+        "Vietnam National Fine Arts Museum biography of Tô Ngọc Vân",
+        "English Wikipedia: Tô Ngọc Vân (dates/spelling fact-check only)"
+      ]
+    },
+    {
+      "key": "bui_xuan_phai",
+      "language": "vi",
+      "written": "Bùi Xuân Phái",
+      "ipa": "ˈbwi ˈswʌn ˈfY",
+      "respelling": "booy swun fye",
+      "variants": ["Bui Xuan Phai", "Bùi Xuan Phai", "Bui Xuân Phái"],
+      "sources": [
+        "Vietnam National Fine Arts Museum biography of Bùi Xuân Phái",
+        "English Wikipedia: Bùi Xuân Phái (dates/spelling fact-check only)"
+      ]
+    }
+  ]
+}
