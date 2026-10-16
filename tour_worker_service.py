@@ -28,6 +28,7 @@ import time
 import requests
 import traceback
 import re
+import math
 from datetime import datetime
 from flask import Flask, request, jsonify
 
@@ -35,6 +36,27 @@ from flask import Flask, request, jsonify
 # Tasks target; guard here too so the switch holds on the cloud path even though
 # the orchestrator already neutralizes before enqueue. Default OFF.
 from user_stops_flag import neutralize_if_disabled as _neutralize_user_stops
+
+
+# [GCS-C1, 2026-10-16] Same guard as tour_orchestrator_service.py, same reason —
+# see the long note there and ClickUp wdvrdaz109. In short: [None, None] has
+# length 2 and so passed the old `len(...) < 2` check, and every failure path of
+# get_coordinates_direct() returns (0, 0). Both produce a tour that tours-near
+# can never return, while the app reports success. Deliberately duplicated rather
+# than shared, so neither service gains a new import to deploy.
+def _usable_coordinates(c):
+    """True only for a pair of finite, non-null, in-range, non-(0,0) numbers."""
+    if not isinstance(c, (list, tuple)) or len(c) < 2:
+        return False
+    lat, lng = c[0], c[1]
+    for v in (lat, lng):
+        if isinstance(v, bool) or not isinstance(v, (int, float)):
+            return False
+        if not math.isfinite(v):
+            return False
+    if lat == 0 and lng == 0:
+        return False
+    return -90 <= lat <= 90 and -180 <= lng <= 180
 
 # Configure unbuffered logging
 sys.stdout.reconfigure(line_buffering=True)
@@ -336,9 +358,26 @@ def run_generation(job_id, location, tour_type, total_stops, user_id=None, reque
             raise Exception(f"Audio generation timed out after {MAX_POLL_ITERATIONS} polls ({MAX_POLL_ITERATIONS * 5}s)")
 
         # --- Step 3: Get coordinates ---
-        if not coordinates or not isinstance(coordinates, list) or len(coordinates) < 2:
-            lat, lng = get_coordinates_direct(location)
-            coordinates = [lat, lng]
+        if not _usable_coordinates(coordinates):
+            print(f"[GCS-C1] No usable coordinates from modernized ({coordinates!r}) "
+                  f"— resolving for: {location}")
+            coords = None
+            try:
+                from geocode_stops import geocode as _geocode_place
+                coords = _geocode_place(location)
+                print(f"[GCS-C1] Nominatim for {location!r}: {coords}")
+            except Exception as _geo_err:
+                print(f"[GCS-C1] Nominatim unavailable ({_geo_err}) — falling through")
+            if not _usable_coordinates(coords):
+                coords = get_coordinates_direct(location)
+                print(f"[GCS-C1] get_coordinates_direct: {coords}")
+            if _usable_coordinates(coords):
+                coordinates = [coords[0], coords[1]]
+            else:
+                coordinates = None
+                print(f"ERROR: [GCS-C1] No usable coordinates for {location!r} "
+                      f"(job {job_id}) — storing NULL lat/lng. This tour will NOT "
+                      f"appear in tours-near until its coordinates are set.")
 
         # --- Step 4: Download and save ZIP ---
         update_job_status(job_id, 'processing', 'Step 3/5: Downloading tour package...')
@@ -369,8 +408,10 @@ def run_generation(job_id, location, tour_type, total_stops, user_id=None, reque
         # --- Step 6: Store in database ---
         update_job_status(job_id, 'processing', 'Step 5/5: Storing tour...')
         tour_name = f"{location} - {tour_type} Tour"
-        lat = coordinates[0] if coordinates and len(coordinates) >= 2 else None
-        lng = coordinates[1] if coordinates and len(coordinates) >= 2 else None
+        # [GCS-C1] _usable_coordinates, not len() >= 2: [None, None] passes the
+        # latter and silently stores NULL lat/lng.
+        lat = coordinates[0] if _usable_coordinates(coordinates) else None
+        lng = coordinates[1] if _usable_coordinates(coordinates) else None
 
         # Add tour_content.txt to ZIP if available
         if tour_content:

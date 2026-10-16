@@ -13,7 +13,175 @@ has lapsed twice and Michael has had to ask twice.
 
 ---
 
-## 📌 BEFORE THIS DEPLOY — read `HANDOFF_20260924_MORNING.md`
+# ✅ CURRENT STATE — 2026-10-14 01:10 EDT. READ THIS FIRST; IT SUPERSEDES EVERY DATED SECTION BELOW.
+
+Every `## STATE …` section further down is September history. Where they disagree with
+this block, **this block is right**. Written at Michael's request so a restart can continue.
+
+## What is live on Preview right now
+
+| | |
+|---|---|
+| image | `audioura-storied:v4`, digest `sha256:317b147f…` is **v3**; v4 was built from `d25454a` |
+| commit deployed | `d25454a` (storied), release tag **`v2t2`**, pushed |
+| revisions | `tour-generator-storied-00006-ls4`, `tour-modernized-storied-00004-ssx`, `tour-orchestrator-storied-00005-82r` |
+| flags | `USER_STOPS_ENABLED=true`, `TOUR_TRACK=storied`, `STORIED_MODE=true`, all 100% traffic, `/health` 200 |
+
+Beta/Stable is the frozen control and was untouched by all of it: `tour-generator-00024-tnp`,
+`tour-modernized-00012-7sg`, `tour-orchestrator-00026-55j`, `api-gateway-00022-t88`,
+`translation-service-00020-k7z`, `map-delivery-00014-bdp`. (Beta revisions moved between
+2026-10-04 and 10-13 by someone other than this session — not by us.)
+
+## ⛔ RULE ONE IS CURRENTLY SUSPENDED, BY MICHAEL, BECAUSE KIRO IS GONE
+
+**`kiro-cli.exe` is not on this machine.** Binary and its PATH entry are both absent from
+the whole C: drive; `AppData\Local\Kiro-Cli\` survives with `data.sqlite3`, `node.exe` and
+`run-receipts`. Last written during the 2026-10-02 deploy — it ran that job and vanished,
+which looks like a failed self-update. The Kiro **IDE** is unaffected.
+
+Reinstall is `irm https://cli.kiro.dev/install.ps1 | iex` (host verified live, HTTP 200),
+then `kiro-cli whoami` **before** logging in — credentials may have survived in
+`data.sqlite3`.
+
+Until it is back, **Michael has twice told this session to do the work directly**
+(2026-10-04 "can you finish installation and deployment", 2026-10-13 "work on
+wdvrdayz0w"). So LEAD has written and shipped code. **When Kiro returns, RULE ONE
+resumes** — it was suspended by necessity, not repealed. Declare it every time you write
+shipping code.
+
+## D591 IS LIFTED — the §BEFORE THIS DEPLOY block below is OBSOLETE on this point
+
+**D593, Michael approved 2026-10-01: user-chosen stops ship to Preview.**
+`USER_STOPS_ENABLED=true` on all three Storied services. The September instruction
+"Igor's work must NOT be deployed" is **no longer in force**. The kill switch
+(`user_stops_flag.py`) still exists and still defaults OFF; Preview turns it on
+explicitly. The regex fix `19358ae` shipped long ago. Nothing is gated here any more.
+
+## Michael can finally test — this was the real blocker, for a month
+
+His phone registered as **`USER-1073427300`** (2026-10-01 17:09:05, matching the gateway's
+`POST /user` 200 to the second — that is build 27 from TestFlight). It was on plan `free`
+= **1 tour/day**, which is why Preview showed no tours for weeks while this session kept
+asking him to test. Fixed 2026-10-04 by SQL only, no redeploy: `plan='tester'` (100/day),
+`users` row count 24 before and 24 after. Reverse with `plan='free'`.
+
+**Lesson, learned the hard way:** on 10-02 LEAD skipped the paid restaurant verification
+on the reasoning that Michael would generate real tours within the hour. He could not —
+quota — and nobody checked. **Handing a verification to a human only counts if you then
+confirm they ran it.**
+
+## Verified by effect on Preview (not by Kiro's report)
+
+- **LOCAL-557 named restaurants** — tour **430**, "Boston Sail Loft, Boston, MA", 1 stop.
+  `Stop 1: Boston Sail Loft`; log line `[LOCAL-557] Restaurant request names ['Boston Sail
+  Loft']`; `grep -ic 'union oyster|grill 23'` over the whole text = **0**. Left visible in
+  the Boston list deliberately (a correct tour, not a junk artifact); coordinates backed up
+  as 42.3661 / −71.0537 if it ever needs hiding.
+- **LOCAL-572 Wikidata outage fix** — tour **431**, Palais Lascaris 4 stops: **zero**
+  `Tier: unresolvable`. The fix holds.
+- **`pycountry`** — proved necessary with a control: `v4: 24.6.1 True True` vs
+  `v3: ModuleNotFoundError`. Until 10-04 the LOCAL-564 place gate was **inert in production**.
+- **FAILED and still open:** 431 delivered **3 of 4** requested stops.
+  `[EXISTENCE-GATE] 4/4 verified` → `[D1v2] DROPPED 'The Adoration of the Magi'` → R4
+  replenishment ran and did not restore the count. Filed `wdvrdayrhc`; probably the
+  production face of the already-open `LOCAL-19`.
+
+## The API keys, after 2026-10-13 — this is the current truth
+
+Three machines, and **as of now the laptop is on its own keys**:
+
+| where | OpenAI | Gemini |
+|---|---|---|
+| **GCloud** | `openai-api-key:latest` = v4, len 164, `…Nw8A`, `4398cdb0140a` | `GEMINI_API_KEY` v1, len 53, `…bGMw`, `5dbce1c7de78` |
+| **this laptop** | len 164, `…hpIA`, **`b40556d2d1fb`** | len 53, `…HX4Q`, **`874596c92160`** |
+
+- **REVOKABLE, in use nowhere:** the len-156 key `b67926c2c667` (= secret versions v2 and
+  v3; v2 is the same key plus a trailing newline, so they are **one** key). It was inline
+  on `news-generator` until `wdvrdayz0w`. Michael's to revoke at platform.openai.com.
+- **`wdvrdayz0w` is DONE** (LEAD, 10-13): `news-generator-00009-skh` resolves both
+  `OPENAI_API_KEY` and `DB_PASSWORD` from Secret Manager. Image, SA, scaling and the Cloud
+  SQL annotation unchanged; env count still 6; `/health` 200.
+- **12 inline credentials remain** across 6 live Beta services — the serious one is
+  `news-processor` `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY`, which **AWS rotation
+  (`wdvrdaxay9`) would miss** exactly as it would have missed `news-generator`. Also R2
+  pairs inline on `map-delivery` **and** `translation-service`, `INTERNAL_SERVICE_SECRET`
+  on two services, and `DB_PASSWORD` inline on four (all equal to `db-password:latest`).
+  Not filed as a ticket yet — Michael's call, six live services.
+- **Two standing exposures:** the GitHub repo is **PUBLIC** (no live key is in it; the five
+  key-shaped tracked strings are placeholders/fixtures with non-matching fingerprints, and
+  `.env` was never tracked), and **`GEMINI_API_KEY` has no IP/referrer/app restriction** —
+  anyone holding it can spend from anywhere.
+
+## The 2026-10-11 spend mystery — answered, `wdvrdayyqd`
+
+**GCloud did not spend it, and the ticket's window was off by hours.** Gemini is a GCP API
+key, so monitoring can measure it: **all** usage came from one credential (Michael's), 3,364×200
+and 316×402. Hourly it peaks at **626 calls in the hour 2026-10-11 04:00 UTC** and stops dead
+at **10:00–11:00 UTC = 06:55 EDT — the exact minute the Mac's meter went quiet.** The money
+went out *before* the "unexplained" gap, not during it.
+
+GCloud's entire output over those three days: **one** article (`d3e6e469`) and **one** Russian
+translation (`c2550fe9`) at 2026-10-12 17:26 UTC. Preview: nothing. No Cloud Scheduler at all
+(the API is not enabled). The 402s stop as soon as calls succeed, so no retry loop.
+Hypothesis for the Mac to confirm: commit `55edf2c` added an *isolated-container live-run
+harness*; generation inside its own container would use the same key and never touch the
+host's `paid_api_calls` meter.
+
+## Open queue, in order
+
+1. **Deploy `354da34` to Preview** (`wdvrdayu7q`, LOCAL-593/D612 museum factual-integrity).
+   It **supersedes `wdvrdayruf` (`690d6ba`) and `wdvrdayrhj` (`ef8fda6`)** — one deploy
+   covers all three; close the other two referencing it. Not started.
+2. `wdvrdayrhc` — 4 stops requested, 3 delivered (Mac Mini's).
+3. `wdvrdayqp3` — dispatcher allowlist, **3rd occurrence**.
+4. `wdvrdayrh7` — `_geo_vocab` docstring states the wrong safe direction.
+5. Michael's: revoke `b67926c2c667`; decide on the 12 inline credentials; confirm the Mac
+   is not on `…Nw8A` before retiring it.
+
+## Gotchas found the hard way in October — do not re-learn these
+
+- **The dispatcher watches `C:\adev-wt\kirotool\`, NOT the repo**, and appends to
+  `C:\adev-wt\kirotool\kiro_sessions_ran.md`, a *different file* from the repo copy. A task
+  file left in `development/` queues nothing; the dispatcher then claims the Mac Mini's
+  tracked `LOCAL-*` files and prints "Dispatched 3 new task(s)", which reads like success.
+  That is how `LOCAL-382/383/424` started here on 10-02 (killed in 40 s, no commits,
+  worktrees removed, `FAILED` records written to the kirotool copy).
+- **Docker Compose gives the shell environment precedence over `.env`.** A **User-scope
+  Windows** `OPENAI_API_KEY` held GCloud's key and silently overrode `.env` through two
+  `--force-recreate` runs. Removed 10-13. If a container's key does not match `.env`, check
+  `[Environment]::GetEnvironmentVariable('NAME','User')` before anything else.
+- **`GEMINI_API_KEY` was in no compose service at all** — the local stack ran without it
+  while four modules read it. Fixed in `07aef06` (added beside all 8 `OPENAI_API_KEY` lines
+  in `docker-compose-beta-local.yml`).
+- **`Dockerfile.cloudrun` never reads `requirements_generator.txt`** — it installs a
+  hand-maintained `pip install` list. Pinning a dependency in the requirements file puts
+  **nothing** in the Cloud Run image. Already burned twice: `cryptography` (`wdvrday52p`)
+  and `pycountry` (`wdvrdayrdp`).
+- **`COPY *.py /app/` ships every root `.py`, tracked or not.** Michael's
+  `audioura_books.py` (his bookkeeping tool, reads his Chase exports) would have gone into
+  the server image. Move stray root `.py` files aside for a build and restore them by hash.
+- **Verify a deploy by hashing against the WORKING TREE, not `git show <sha>:<file>`.**
+  Windows checks out CRLF and Docker copies the working tree, so every file looks changed
+  against the git blob. The sound method: `docker inspect … RepoDigests` must equal the
+  Cloud Run digest, then hash `/app` files against the clean build worktree.
+- **`--update-secrets` fails on a var that is already a literal** ("already been set with a
+  different type"). Use `--remove-env-vars X --update-secrets X=secret:latest` in **one**
+  call, so only one revision is created and the key is never missing from a serving one.
+- **`gcloud logging read` without a `logName` filter returns AUDIT logs.** Counting those
+  nearly produced a false "runaway pipeline" report — the ~40-minute "pings" on the news
+  services are `killswitch-sa@` calling `ReplaceService`. For real traffic filter
+  `logName="projects/…/logs/run.googleapis.com%2Frequests"`, and `%2Fstdout` / `%2Fstderr`
+  for application output.
+- **Run `date` immediately before every reply.** This session fabricated four timestamps by
+  estimating elapsed time and was off by ~7¾ hours; Michael caught it. Long Docker builds
+  and `gcloud logging` calls make elapsed time impossible to guess.
+
+---
+
+## 📌 HISTORICAL (2026-09-24) — read `HANDOFF_20260924_MORNING.md`
+
+> ⚠️ **The D591 instruction in this section is OBSOLETE** — see "D591 IS LIFTED" above.
+> Kept because the regex-fix and large-museum notes are still useful.
 
 Written by `Storied_Tours` (Mac Mini) on 2026-09-24 and tracked in git, because
 `.continuous_dev/STATUS.md` is gitignored and never reaches this machine.
@@ -24,8 +192,10 @@ deploy if you do not know them:
 - **A catastrophic regex backtrack was hanging every LARGE-MUSEUM generation.** Fixed,
   but if your E2E picks a big venue and reports *"status polling failed"*, that is the
   symptom — the generator is busy, not dead. Pick at least one large museum.
-- **⛔ User-chosen stops (Igor's work) must NOT be deployed. `storied` HEAD is
-  therefore not deployable as-is.** Michael, 2026-09-24, asked directly: *"only on
+- **⛔ ~~User-chosen stops (Igor's work) must NOT be deployed. `storied` HEAD is
+  therefore not deployable as-is.~~ LIFTED by D593, 2026-10-01 — they are live on
+  Preview with `USER_STOPS_ENABLED=true`. Ignore the rest of this bullet.** Original
+  text kept for the record:** Michael, 2026-09-24, asked directly: *"only on
   local Docker before we approve the results of the Igor's test."* (D591). The
   cloud-path threading of `stops` through `_enqueue_cloud_task` / `/run-job` /
   `run_generation` is real but unverified, and it stays unverified until he approves
@@ -41,6 +211,11 @@ morning of 2026-09-24** — so that is resolved, not an open issue.
 ---
 
 ## 🚫 RULE ONE — NEVER WRITE THE CODE. DISPATCH KIRO AND REVIEW IT.
+
+> ⚠️ **TEMPORARILY SUSPENDED since 2026-10-04 — `kiro-cli.exe` is missing from this
+> machine and Michael has twice told this session to do the work itself. See "RULE ONE IS
+> CURRENTLY SUSPENDED" at the top. Reinstall Kiro and this rule resumes immediately.**
+> The rest of this section is the rule as written, and is what to go back to.
 
 **Michael's ruling, 2026-09-15, after this session broke it.** This sits above
 everything else in this file, including RULE ZERO's "keep the queue moving".

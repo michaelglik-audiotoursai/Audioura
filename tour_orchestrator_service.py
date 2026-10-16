@@ -10,6 +10,7 @@ import threading
 import requests
 import traceback
 import re
+import math
 import logging
 from datetime import datetime, timedelta
 import flask
@@ -66,6 +67,40 @@ TRANSLATION_URL = os.getenv('TRANSLATION_URL', 'http://translation-service-1:503
 TOUR_UPDATE_URL = os.getenv('TOUR_UPDATE_URL', 'http://development-tour-update-1:5001')
 USER_API_URL = os.getenv('USER_API_URL', 'http://user-api-2:5000')
 COORDINATES_URL = os.getenv('COORDINATES_URL', 'http://coordinates-fromai:5004')
+
+# [GCS-C1, 2026-10-16] A tour with no usable coordinates is INVISIBLE: tours-near
+# filters on lat/lng, so the row can never be found by any listener while the app
+# is told generation succeeded. Two silent holes produced exactly that, both
+# proven on live Preview job 36b13113 (ClickUp wdvrdaz109):
+#
+#   1. The guard was `len(coordinates) < 2`, and the modernized service returns
+#      [None, None] -- a list of length 2. It PASSED, the fallback never ran, and
+#      the row was stored with NULL lat/lng:
+#        19:13:02  Coordinates from modernized service: [None, None]
+#      with no "No coordinates received" line after it. That absence is the bug.
+#   2. Every failure branch of get_coordinates_direct() returns (0, 0), written
+#      to the DB verbatim. 0,0 is in the Gulf of Guinea -- absent from tours-near
+#      anywhere a human is, and misplotted if opened. The coordinates service it
+#      calls has returned 500 on every request since it was built against
+#      openai<1.0.0, so (0, 0) was the only thing it could ever produce.
+#
+# "Is it a 2-element list" is the wrong question. The question is whether we hold
+# two real, finite numbers. 0,0 is rejected deliberately: it is the old sentinel,
+# it is in the ocean, and no tour of ours is there.
+def _usable_coordinates(c):
+    """True only for a pair of finite, non-null, in-range, non-(0,0) numbers."""
+    if not isinstance(c, (list, tuple)) or len(c) < 2:
+        return False
+    lat, lng = c[0], c[1]
+    for v in (lat, lng):
+        if isinstance(v, bool) or not isinstance(v, (int, float)):
+            return False
+        if not math.isfinite(v):
+            return False
+    if lat == 0 and lng == 0:
+        return False
+    return -90 <= lat <= 90 and -180 <= lng <= 180
+
 
 # Cloud Tasks configuration (Part B architecture)
 # When GENERATION_MODE=cloud_tasks, the orchestrator enqueues to Cloud Tasks instead of threading.
@@ -1414,22 +1449,46 @@ def orchestrate_tour_async(job_id, location, tour_type, total_stops, user_id=Non
         # Step 1.5: Get coordinates if not provided by modernized service
         print("\n==== COORDINATES CHECK IN ORCHESTRATE_TOUR_ASYNC ====")
         print(f"Coordinates from modernized service: {coordinates}")
-        if not coordinates or not isinstance(coordinates, list) or len(coordinates) < 2:
-            print(f"No coordinates received from modernized service, getting coordinates for: {location}")
-            
-            # Try to get coordinates using our function
-            print(f"Calling get_coordinates_direct for: {location}")
-            coords = get_coordinates_direct(location)
-            print(f"Result from get_coordinates_direct: {coords}")
-            if coords:
-                lat, lng = coords
-                coordinates = [lat, lng]
+        if not _usable_coordinates(coordinates):
+            print(f"No USABLE coordinates from modernized service ({coordinates!r}) — "
+                  f"resolving for: {location}")
+
+            # [GCS-C1] Real geocoder FIRST. geocode_stops asks Nominatim
+            # (OpenStreetMap): free, no API key, stdlib-only, already a dependency
+            # of the generator. It exists because model-recalled coordinates were
+            # measured 1.0-2.4 km wrong (Yury's BETA-4), so using the LLM service
+            # as the safety net meant the net was made of the material it was
+            # built to replace. Nominatim's 1 req/sec policy is enforced inside
+            # geocode_stops; one call per tour is nowhere near it.
+            coords = None
+            try:
+                from geocode_stops import geocode as _geocode_place
+                coords = _geocode_place(location)
+                print(f"[GCS-C1] Nominatim for {location!r}: {coords}")
+            except Exception as _geo_err:
+                print(f"[GCS-C1] Nominatim unavailable ({_geo_err}) — falling through")
+
+            # Legacy HTTP coordinates service, kept only as a second chance while
+            # it still exists. It returns (0, 0) on every failure, which
+            # _usable_coordinates rejects below.
+            if not _usable_coordinates(coords):
+                print(f"Calling get_coordinates_direct for: {location}")
+                coords = get_coordinates_direct(location)
+                print(f"Result from get_coordinates_direct: {coords}")
+
+            if _usable_coordinates(coords):
+                coordinates = [coords[0], coords[1]]
                 print(f"Using coordinates: {coordinates}")
             else:
-                print(f"ERROR: Could not get coordinates for {location}")
-                # Use 0,0 as fallback
-                coordinates = [0, 0]
-                print(f"Using fallback coordinates: {coordinates}")
+                # [GCS-C1] NEVER store 0,0. NULL is honest: tours-near skips the
+                # row either way, but 0,0 also plots a marker in the ocean and
+                # looks like real data to everything downstream. Logged at ERROR
+                # with the job id so an unreachable tour is findable in the logs
+                # instead of vanishing quietly.
+                coordinates = None
+                print(f"ERROR: [GCS-C1] No usable coordinates for {location!r} "
+                      f"(job {job_id}) — storing NULL lat/lng. This tour will NOT "
+                      f"appear in tours-near until its coordinates are set.")
         
         # Step 2: Download complete modernized tour ZIP
         log_job_update(job_id, ACTIVE_JOBS[job_id]["status"], "Step 2/5: Downloading complete modernized tour...")
@@ -1549,7 +1608,10 @@ def orchestrate_tour_async(job_id, location, tour_type, total_stops, user_id=Non
         # Extract coordinates
         lat = None
         lng = None
-        if coordinates and len(coordinates) >= 2:
+        # [GCS-C1] Same check as the guard above, for the same reason: [None, None]
+        # satisfies `len(...) >= 2` and would set lat/lng to None here even if the
+        # guard had been fixed in isolation.
+        if _usable_coordinates(coordinates):
             lat = coordinates[0]
             lng = coordinates[1]
         

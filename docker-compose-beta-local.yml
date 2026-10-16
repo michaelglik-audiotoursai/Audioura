@@ -50,6 +50,7 @@ services:
       - "5000:5000"
     environment:
       - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
       # [GCS-KS1] Local Docker keeps Igor's user-chosen-stops feature ON (D591).
       - USER_STOPS_ENABLED=true
     volumes:
@@ -71,6 +72,7 @@ services:
     environment:
       - PORT=5002
       - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
       - DB_HOST=postgres-2
       - DB_NAME=audiotours
       - DB_USER=admin
@@ -101,6 +103,7 @@ services:
     environment:
       - PORT=5021
       - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
     volumes:
       - ./tours:/app/tours
     restart: unless-stopped
@@ -121,6 +124,7 @@ services:
     environment:
       - PORT=5040
       - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
       - DB_HOST=postgres-2
       - DB_NAME=audiotours
       - DB_USER=admin
@@ -155,6 +159,7 @@ services:
       - "5006:5004"
     environment:
       - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
     restart: unless-stopped
 
   translation-service:
@@ -257,6 +262,7 @@ services:
     environment:
       - PORT=5010
       - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
       - DB_HOST=postgres-2
       - DB_NAME=audiotours
       - DB_USER=admin
@@ -275,6 +281,7 @@ services:
       - "5011:5011"
     environment:
       - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
       - DB_HOST=postgres-2
       - DB_NAME=audiotours
       - DB_USER=admin
@@ -297,6 +304,7 @@ services:
     environment:
       - PORT=5012
       - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
       - DB_HOST=postgres-2
       - DB_NAME=audiotours
       - DB_USER=admin
