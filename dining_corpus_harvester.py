@@ -372,13 +372,14 @@ def _web_search_restaurant(
     if serp_key and serp_provider == "serper":
         # Serper.dev API — prefer search for press/guide content
         try:
-            headers = {"X-API-KEY": serp_key, "Content-Type": "application/json"}
+            from serper_meter import serper_post  # [LOCAL-707] guaranteed-metered door
+            import json as _json707
             # Search query biased toward editorial/press content
             payload = {"q": f'"{stop_title}" {city} restaurant chef founded history', "num": 8}
-            resp = _http.post("https://google.serper.dev/search", json=payload,
-                             headers=headers, timeout=12)
-            if resp.status_code == 200:
-                data = resp.json()
+            status, raw = serper_post("https://google.serper.dev/search", payload,
+                                      api_key=serp_key, timeout=12)
+            if status == 200 and raw:
+                data = _json707.loads(raw.decode("utf-8", "ignore"))
                 organic = data.get("organic", [])[:8]
 
                 # Sort: preferred sources first, review sites last

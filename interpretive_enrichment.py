@@ -306,18 +306,16 @@ def _verify_attribution(
 
     query = f'"{attribution}" "{key_phrase[:30]}"'
 
-    headers = {"X-API-KEY": serp_key, "Content-Type": "application/json"}
     payload = {"q": query, "num": 5}
 
     try:
-        resp = _http.post(
-            "https://google.serper.dev/search",
-            json=payload,
-            headers=headers,
-            timeout=12,
-        )
-        if resp.status_code == 200:
-            data = resp.json()
+        from serper_meter import serper_post  # [LOCAL-707] guaranteed-metered door
+        import json as _json707
+        status, raw = serper_post(
+            "https://google.serper.dev/search", payload,
+            api_key=serp_key, timeout=12)
+        if status == 200 and raw:
+            data = _json707.loads(raw.decode("utf-8", "ignore"))
             organic = data.get("organic", [])
             # Check if any result is from a primary/authoritative source
             for result in organic[:5]:
@@ -339,7 +337,7 @@ def _verify_attribution(
             # No primary source found — attribution unverified
             return (False, f"no_primary_source_found_for:{attribution}")
 
-        elif resp.status_code == 429:
+        elif status == 429:
             return (False, "rate_limited_cannot_verify")
     except Exception as e:
         return (False, f"verification_error:{e}")
@@ -361,18 +359,16 @@ def _search_interpretive(query: str) -> List[Dict]:
         logger.warning("[INTERPRETIVE] No SERP_API_KEY — cannot search")
         return []
 
-    headers = {"X-API-KEY": serp_key, "Content-Type": "application/json"}
     payload = {"q": query, "num": 10}
 
     try:
-        resp = _http.post(
-            "https://google.serper.dev/search",
-            json=payload,
-            headers=headers,
-            timeout=12,
-        )
-        if resp.status_code == 200:
-            data = resp.json()
+        from serper_meter import serper_post  # [LOCAL-707] guaranteed-metered door
+        import json as _json707
+        status, raw = serper_post(
+            "https://google.serper.dev/search", payload,
+            api_key=serp_key, timeout=12)
+        if status == 200 and raw:
+            data = _json707.loads(raw.decode("utf-8", "ignore"))
             results = []
             for r in data.get("organic", [])[:10]:
                 results.append({
@@ -389,11 +385,11 @@ def _search_interpretive(query: str) -> List[Dict]:
                     'snippet': kg.get("description", ""),
                 })
             return results
-        elif resp.status_code == 429:
+        elif status == 429:
             logger.warning("[INTERPRETIVE] Serper 429 — rate limited")
             raise RuntimeError("Serper rate limited (429)")
         else:
-            logger.warning(f"[INTERPRETIVE] Serper {resp.status_code}")
+            logger.warning(f"[INTERPRETIVE] Serper {status}")
             return []
     except RuntimeError:
         raise

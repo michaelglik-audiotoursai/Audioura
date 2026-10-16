@@ -889,32 +889,29 @@ def _serp_search(query: str) -> Tuple[List[Dict], float]:
     start = time.time()
     payload = {"q": query, "num": 8}
     try:
-        data = json.dumps(payload, ensure_ascii=False).encode('utf-8')
-        req = urllib.request.Request(
-            "https://google.serper.dev/search",
-            data=data,
-            headers={"X-API-KEY": SERP_API_KEY, "Content-Type": "application/json"},
-            method="POST",
-        )
-        with urllib.request.urlopen(req, timeout=15) as resp:
-            body = json.loads(resp.read().decode())
-            organic = body.get("organic", [])
-            latency = (time.time() - start) * 1000
-            results = [{'title': r.get('title', ''), 'url': r.get('link', ''), 'snippet': r.get('snippet', '')}
-                      for r in organic]
-            return results, latency
-    except urllib.error.HTTPError as e:
+        # [LOCAL-707] Route through the guaranteed-metered Serper door so one
+        # paid_api_calls row is written per query even if the network patch is
+        # not live in this process. serper_post never raises on a meter error.
+        from serper_meter import serper_post
+        status, raw = serper_post(
+            "https://google.serper.dev/search", payload,
+            api_key=SERP_API_KEY, timeout=15)
         latency = (time.time() - start) * 1000
-        # [LOCAL-409] Print full request and response body for diagnosis
-        response_body = ''
-        try:
-            response_body = e.read().decode('utf-8', errors='replace')
-        except Exception:
-            response_body = '<unreadable>'
-        print(f"  [SQ-S2] SERP HTTP {e.code}: {e.reason}")
-        print(f"  [SQ-S2]   request payload: {json.dumps(payload, ensure_ascii=False)}")
-        print(f"  [SQ-S2]   response body:   {response_body[:500]}")
-        return [], latency
+        if status != 200:
+            response_body = ''
+            try:
+                response_body = raw.decode('utf-8', errors='replace')
+            except Exception:
+                response_body = '<unreadable>'
+            print(f"  [SQ-S2] SERP HTTP {status}")
+            print(f"  [SQ-S2]   request payload: {json.dumps(payload, ensure_ascii=False)}")
+            print(f"  [SQ-S2]   response body:   {response_body[:500]}")
+            return [], latency
+        body = json.loads(raw.decode())
+        organic = body.get("organic", [])
+        results = [{'title': r.get('title', ''), 'url': r.get('link', ''), 'snippet': r.get('snippet', '')}
+                  for r in organic]
+        return results, latency
     except Exception as e:
         latency = (time.time() - start) * 1000
         print(f"  [SQ-S2] SERP query failed: {type(e).__name__}: {e}")

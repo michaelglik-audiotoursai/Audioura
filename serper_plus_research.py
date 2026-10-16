@@ -339,18 +339,18 @@ def _serper_news(query: str) -> List[Dict]:
     """One Serper NEWS query via the google.serper.dev/news endpoint. Metered at
     the HTTP layer like any Serper call. Returns [{title,url,snippet}]; [] on
     failure."""
-    import urllib.request
     key = os.environ.get('SERP_API_KEY') or os.environ.get('SERPER_API_KEY')
     if not key:
         return []
     try:
-        data = json.dumps({'q': query, 'num': 5}).encode('utf-8')
-        req = urllib.request.Request(
-            'https://google.serper.dev/news', data=data,
-            headers={'X-API-KEY': key, 'Content-Type': 'application/json'},
-            method='POST')
-        with urllib.request.urlopen(req, timeout=15) as resp:
-            body = json.loads(resp.read().decode())
+        # [LOCAL-707] Guaranteed-metered Serper door.
+        from serper_meter import serper_post
+        status, raw = serper_post(
+            'https://google.serper.dev/news', {'q': query, 'num': 5},
+            api_key=key, timeout=15)
+        if status != 200 or not raw:
+            return []
+        body = json.loads(raw.decode())
         out = []
         for r in body.get('news', []) or []:
             out.append({'title': r.get('title', '') or '',

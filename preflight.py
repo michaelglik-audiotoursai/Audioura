@@ -90,10 +90,32 @@ def check_serper():
     k = os.environ.get('SERP_API_KEY')      # NOT SERPER_API_KEY — see the docstring
     if not k:
         return False, 'SERP_API_KEY missing from the environment'
-    return _probe(urllib.request.Request(
-        'https://google.serper.dev/search',
-        data=json.dumps({'q': 'ok'}).encode(),
-        headers={'X-API-KEY': k, 'Content-Type': 'application/json'}))
+    # [LOCAL-707] This probe spends one real Serper credit, so it must be metered
+    # like every other Serper call. Route it through the guaranteed-metered door
+    # (serper_meter.serper_post writes one paid_api_calls row regardless of the
+    # network patch state). The header-based quota line is dropped (serper_post
+    # returns status + body, not headers), which is acceptable for a probe.
+    try:
+        from serper_meter import serper_post
+        status, body = serper_post(
+            'https://google.serper.dev/search', {'q': 'ok'},
+            api_key=k, timeout=TIMEOUT)
+    except Exception as e:
+        return False, f'{type(e).__name__}: {str(e)[:100]}'
+    if status == 200:
+        return True, 'HTTP 200'
+    btxt = ''
+    try:
+        btxt = (body or b'').decode('utf-8', 'replace')[:300]
+    except Exception:
+        pass
+    if 'insufficient_quota' in btxt or 'credit_balance_exhausted' in btxt:
+        return False, 'OUT OF CREDITS — add funds before running a batch'
+    if status == 429:
+        return False, 'rate limited (transient)'
+    if status in (401, 403):
+        return False, f'auth rejected (HTTP {status}) — check the key'
+    return False, f'HTTP {status}: {btxt[:120]}'
 
 
 CHECKS = (('OpenAI', check_openai), ('Gemini', check_gemini), ('Serper', check_serper))

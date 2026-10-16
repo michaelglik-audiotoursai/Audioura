@@ -575,13 +575,12 @@ def default_serper(query: str) -> Dict:
         pass
     try:
         import json as _json
-        import urllib.request
-        data = _json.dumps({'q': query, 'num': 10}).encode('utf-8')
-        req = urllib.request.Request(
-            'https://google.serper.dev/search', data=data,
-            headers={'X-API-KEY': key, 'Content-Type': 'application/json'},
-            method='POST')
-        with urllib.request.urlopen(req, timeout=15) as resp:
-            return _json.loads(resp.read().decode('utf-8', 'ignore')) or {}
+        from serper_meter import serper_post  # [LOCAL-707] guaranteed-metered door
+        status, raw = serper_post(
+            'https://google.serper.dev/search', {'q': query, 'num': 10},
+            api_key=key, timeout=15)
+        if status != 200 or not raw:
+            return {}
+        return _json.loads(raw.decode('utf-8', 'ignore')) or {}
     except Exception:
         return {}
