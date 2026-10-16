@@ -14,6 +14,9 @@ WORKDIR /app
 RUN pip install flask boto3 requests psycopg2-binary
 
 COPY polly_tts_service.py .
+# [LOCAL-692B/706, LEAD] the name-pronunciation aid; without these the import fails open and NO pronunciation fix runs.
+COPY vietnamese_name_aid.py .
+COPY pronunciation_lexicon.json .
 # Lightweight modules kept in the image (no heavy deps imported at module load):
 #  - kokoro_engine.py: English-voice routing predicate (should_use_kokoro) +
 #    the in-process encoder used only as a code fallback when KOKORO_URL is unset.
