@@ -72,6 +72,9 @@ Temp/
 # excludes it and the lookup silently finds nothing in the container.
 !tests/known_closed_venues.json
 !source_tier_rules.json
+# [LOCAL-706, LEAD] the name-pronunciation lexicon read by polly-tts (vietnamese_name_aid.py). Without this,
+# *.json above drops it from the build context and the polly-tts image build FAILS.
+!pronunciation_lexicon.json
 !editor_common_words.json
 !docker-compose-master.yml
 !templates/
