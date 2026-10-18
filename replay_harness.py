@@ -37,6 +37,7 @@ USAGE (inside the generator container, which has the meter + keys + DB):
 ARMS (one draft per stop, no retries):
     A: gpt-4.1 (today)            B: gpt-4.1-mini      C: gpt-4.1-nano
     D: gemini-2.5-flash-lite      E: gemini-2.5-flash  (both ungrounded)
+    F: claude-haiku-4-5           G: claude-sonnet-5   (Anthropic API, LOCAL-712/D674)
 """
 
 # [LOCAL-678] Install the network paid-API meter for this HOST-run process. In a
@@ -86,7 +87,18 @@ ARMS = {
     # Flash family"). So D/E use the working 2.5 aliases.
     "D": ("gemini", "gemini-flash-lite-latest"),  # Gemini 2.5 Flash-Lite
     "E": ("gemini", "gemini-flash-latest"),        # Gemini 2.5 Flash
+    # [LOCAL-712 / D674] Claude arms via the Anthropic API, measured against
+    # today's narration model (gpt-4.1-mini, arm B) on the SAME 12 stops with
+    # identical inputs. Model ids are the ones D674 names.
+    "F": ("anthropic", "claude-haiku-4-5-20251001"),  # Claude Haiku 4.5
+    "G": ("anthropic", "claude-sonnet-5"),             # Claude Sonnet 5
 }
+
+# [LOCAL-712 / D674] The D674 bake-off arm set: today's narration model
+# (gpt-4.1-mini) against the two Claude candidates, on identical inputs. The
+# report/store commands default to all arms (ABCDEFG); pass --arms BFG to run
+# only the D674 comparison.
+D674_ARMS = ("B", "F", "G")
 
 # ─── the 12 stops: (museum label, venue_corpus qid, stop_pool venue_identity,
 #      pool_version). Stops themselves are read live from stop_pool so the
@@ -436,6 +448,45 @@ def call_gemini(model, system_msg, user_msg, timeout=120):
     return text, usage, status
 
 
+def call_anthropic(model, system_msg, user_msg, timeout=120):
+    """[LOCAL-712 / D674] One Anthropic /v1/messages draft, NO retries.
+
+    The system message goes in the TOP-LEVEL `system` field (not a message), the
+    user prompt is the single user message, and max_tokens / temperature mirror
+    the OpenAI arm (1000 / 0.7) so the only variable across arms stays the model.
+    Usage is normalised to the OpenAI shape (prompt_tokens/completion_tokens) so
+    the report aggregates every arm the same way; the network meter reads the raw
+    input_tokens/output_tokens off the wire for the $ ledger.
+    """
+    key = os.environ["ANTHROPIC_API_KEY"]
+    r = requests.post(
+        "https://api.anthropic.com/v1/messages",
+        headers={"x-api-key": key, "anthropic-version": "2023-06-01",
+                 "Content-Type": "application/json"},
+        json={"model": model, "max_tokens": 1000, "temperature": 0.7,
+              "system": system_msg,
+              "messages": [{"role": "user", "content": user_msg}]},
+        timeout=timeout)
+    status = r.status_code
+    j = r.json()
+    text = ""
+    usage = {}
+    if status == 200:
+        try:
+            text = "".join(p.get("text", "") for p in j.get("content", [])
+                           if p.get("type") == "text")
+        except (KeyError, AttributeError, TypeError):
+            text = f"[anthropic empty] {json.dumps(j)[:400]}"
+        u = j.get("usage", {}) or {}
+        usage = {"prompt_tokens": u.get("input_tokens", 0),
+                 "completion_tokens": u.get("output_tokens", 0),
+                 "total_tokens": (u.get("input_tokens", 0) + u.get("output_tokens", 0)),
+                 "cache_read_input_tokens": u.get("cache_read_input_tokens", 0)}
+    else:
+        text = f"[HTTP {status}] {json.dumps(j)[:500]}"
+    return text, usage, status
+
+
 def run_arm(arm, out_dir, diet=False, fixed_first=False, stops=None, limit=None):
     provider, model = ARMS[arm]
     # drive the production env hook so the model under test is selected the
@@ -457,6 +508,8 @@ def run_arm(arm, out_dir, diet=False, fixed_first=False, stops=None, limit=None)
         t0 = time.time()
         if provider == "openai":
             text, usage, status = call_openai(model, SYSTEM_MESSAGE, prompt)
+        elif provider == "anthropic":
+            text, usage, status = call_anthropic(model, SYSTEM_MESSAGE, prompt)
         else:
             text, usage, status = call_gemini(model, SYSTEM_MESSAGE, prompt)
         elapsed = round(time.time() - t0, 2)
@@ -624,7 +677,10 @@ def _main():
     elif cmd == "run-all":
         base = opt("--out", "/app/bench_out")
         limit = opt("--limit", None)
-        only = opt("--arms", "ABCDE")
+        # [LOCAL-712 / D674] default to the Claude bake-off arm set
+        # (B=gpt-4.1-mini baseline, F=claude-haiku-4-5, G=claude-sonnet-5).
+        # Pass --arms ABCDE to reproduce the original LOCAL-647 five-arm run.
+        only = opt("--arms", "".join(D674_ARMS))
         # load stops ONCE so every arm runs on byte-for-byte identical inputs
         stops = load_stops()
         for st in stops:
@@ -642,7 +698,7 @@ def _main():
         measure_prompts(out)
     elif cmd == "store":
         base = opt("--dir", "/app/bench_out")
-        store_results(base, list(opt("--arms", "ABCDE")))
+        store_results(base, list(opt("--arms", "".join(D674_ARMS))))
     else:
         print(f"unknown command: {cmd}")
         print(__doc__)

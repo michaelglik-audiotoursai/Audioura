@@ -1,16 +1,17 @@
 #!/usr/bin/env python3
-"""report.py — LOCAL-647 bake-off report table.
+"""report.py — LOCAL-647 / LOCAL-712 bake-off report table.
 
-Aggregates, per arm: mean score, min score, failures, $ per stop (from the
-paid_api_calls ledger — the network meter, not an estimate), median seconds per
-stop, and mean output tokens. Marks which arms are within 0.3 of arm A's mean.
+Aggregates, per arm: mean + min score UNDER EACH JUDGE (Kiro rubric and, for
+D674/LOCAL-712, the gpt-4.1 judge), deterministic + HTTP failures, $ per stop
+(from the paid_api_calls ledger — the network meter, not an estimate), median
+seconds per stop, and mean output tokens. A Claude "win" (D674) must clear the
+within-0.3 bar against the baseline arm (gpt-4.1-mini = arm B) under BOTH judges.
 
-$ per stop comes from the ledger: we read paid_api_calls for host=local647-gen,
-status=200, grouped by model, and divide by the number of bake-off stops for
-that arm (12). Latency and output tokens come from arm_X_results.json (the
-harness recorded wall-time and usage per draft).
+$ per stop comes from the ledger: we read paid_api_calls for host (default
+local712-gen for the D674 run), status=200, grouped by model, matched to each
+arm's model, divided by the number of stops.
 
-usage: python3 report.py --dir bench_out [--host local647-gen]
+usage: python3 report.py --dir bench_out [--host local712-gen] [--arms BFG] [--baseline B]
        (DB queried via docker exec on development-postgres-2-1)
 """
 import json
@@ -19,13 +20,16 @@ import statistics
 import subprocess
 import sys
 
-ARMS = ["A", "B", "C", "D", "E"]
+ARMS = ["A", "B", "C", "D", "E", "F", "G"]
 ARM_LABEL = {
     "A": ("gpt-4.1", "gpt-4.1 (today)"),
     "B": ("gpt-4.1-mini", "gpt-4.1-mini"),
     "C": ("gpt-4.1-nano", "gpt-4.1-nano"),
     "D": ("gemini-flash-lite-latest", "Gemini 2.5 Flash-Lite"),
     "E": ("gemini-flash-latest", "Gemini 2.5 Flash"),
+    # [LOCAL-712 / D674] Claude arms via the Anthropic API.
+    "F": ("claude-haiku-4-5", "Claude Haiku 4.5"),
+    "G": ("claude-sonnet-5", "Claude Sonnet 5"),
 }
 
 
@@ -63,6 +67,10 @@ def _model_matches(arm_key, ledger_model):
     # OpenAI dated suffix: '-2025-04-14'; a family suffix would be '-mini'/'-nano'
     if _re.match(r"^-\d{4}", rest):
         return True
+    # [LOCAL-712] Anthropic dated id: 'claude-haiku-4-5-20251001' — the arm key
+    # is the family 'claude-haiku-4-5' and the suffix is '-' + an 8-digit date.
+    if _re.match(r"^-\d{8}$", rest):
+        return True
     # Gemini aliases have no dated suffix; arm_key already equals the full alias
     return False
 
@@ -82,20 +90,40 @@ def arm_ledger_cost(arm, ledger, n_stops):
     return total_usd, total_calls, per_stop
 
 
-def build(base_dir, host):
-    kiro = json.load(open(os.path.join(base_dir, "kiro_scores.json"), encoding="utf-8"))
-    detectors = json.load(open(os.path.join(base_dir, "detectors.json"), encoding="utf-8"))
+def build(base_dir, host, arms=None, baseline="B"):
+    """Aggregate the bake-off into a table.
+
+    [LOCAL-712 / D674] Reports BOTH judges when their score files exist:
+    kiro_scores.json (judge 1, the Kiro rubric) and gpt_scores.json (judge 2,
+    gpt-4.1). The "within 0.3" column is measured against the baseline arm
+    (D674: gpt-4.1-mini = arm B) under EACH judge; a Claude win must clear the
+    bar under both. Only arms with an arm_<X>_results.json are included, so a
+    partial run (e.g. just B,F,G) reports cleanly."""
+    def _load_json(name):
+        p = os.path.join(base_dir, name)
+        return json.load(open(p, encoding="utf-8")) if os.path.exists(p) else {}
+
+    kiro = _load_json("kiro_scores.json")
+    gpt = _load_json("gpt_scores.json")
+    detectors = _load_json("detectors.json")
     ledger = ledger_by_model(host)
 
+    present = [a for a in (arms or ARMS)
+               if os.path.exists(os.path.join(base_dir, a, f"arm_{a}_results.json"))]
+
+    def _mean_min(score_map, arm):
+        scs = [s["score"] for s in score_map.get(arm, []) if s.get("score") is not None]
+        if not scs:
+            return None, None
+        return round(statistics.mean(scs), 2), min(scs)
+
     rows = []
-    arm_a_mean = None
-    for arm in ARMS:
+    for arm in present:
         recs = json.load(open(os.path.join(base_dir, arm, f"arm_{arm}_results.json"),
                               encoding="utf-8"))
-        scores = [s["score"] for s in kiro.get(arm, []) if s.get("score") is not None]
         n_stops = len(recs)
-        mean_score = round(statistics.mean(scores), 2) if scores else None
-        min_score = min(scores) if scores else None
+        kiro_mean, kiro_min = _mean_min(kiro, arm)
+        gpt_mean, gpt_min = _mean_min(gpt, arm)
         det_fails = sum(d["n_failures"] for d in detectors.get(arm, []))
         http_fails = sum(1 for r in recs if r["status"] != 200)
         secs = [r["seconds"] for r in recs]
@@ -104,47 +132,54 @@ def build(base_dir, host):
                       if isinstance(r.get("usage"), dict)]
         mean_out_tok = round(statistics.mean(out_tokens)) if out_tokens else None
         total_usd, calls, per_stop = arm_ledger_cost(arm, ledger, n_stops)
-        usd_total_12 = round(per_stop * n_stops, 5)  # clean 12-stop total (smoke-free)
-        if arm == "A":
-            arm_a_mean = mean_score
+        usd_total_n = round(per_stop * n_stops, 5)
         rows.append({
-            "arm": arm, "model": ARM_LABEL[arm][1],
-            "mean_score": mean_score, "min_score": min_score,
+            "arm": arm, "model": ARM_LABEL.get(arm, (arm, arm))[1],
+            "kiro_mean": kiro_mean, "kiro_min": kiro_min,
+            "gpt_mean": gpt_mean, "gpt_min": gpt_min,
             "detector_failures": det_fails, "http_failures": http_fails,
-            "usd_total": usd_total_12, "usd_ledger_raw": round(total_usd, 5),
-            "ledger_calls": calls,
-            "usd_per_stop": round(per_stop, 5),
+            "usd_total": usd_total_n, "usd_ledger_raw": round(total_usd, 5),
+            "ledger_calls": calls, "usd_per_stop": round(per_stop, 5),
             "median_seconds": med_secs, "mean_output_tokens": mean_out_tok,
             "n_stops": n_stops,
         })
 
+    base_row = next((r for r in rows if r["arm"] == baseline), None)
+    base_kiro = base_row["kiro_mean"] if base_row else None
+    base_gpt = base_row["gpt_mean"] if base_row else None
     for r in rows:
-        if arm_a_mean is not None and r["mean_score"] is not None:
-            r["within_0_3_of_A"] = abs(r["mean_score"] - arm_a_mean) <= 0.3
-        else:
-            r["within_0_3_of_A"] = None
+        r["within_0_3_kiro"] = (abs(r["kiro_mean"] - base_kiro) <= 0.3
+                                if (base_kiro is not None and r["kiro_mean"] is not None) else None)
+        r["within_0_3_gpt"] = (abs(r["gpt_mean"] - base_gpt) <= 0.3
+                               if (base_gpt is not None and r["gpt_mean"] is not None) else None)
 
-    report = {"host": host, "arm_a_mean": arm_a_mean, "rows": rows}
+    report = {"host": host, "baseline_arm": baseline,
+              "baseline_kiro_mean": base_kiro, "baseline_gpt_mean": base_gpt,
+              "rows": rows}
     with open(os.path.join(base_dir, "report.json"), "w", encoding="utf-8") as f:
         json.dump(report, f, ensure_ascii=False, indent=2)
 
-    # markdown table
+    # markdown table — both judges side by side
     md = []
-    md.append("| Arm | Model | Mean | Min | Det.fails | HTTP fails | $/stop | $ total | Median s | Mean out-tok | Within 0.3 of A |")
-    md.append("|-----|-------|------|-----|-----------|-----------|--------|---------|----------|--------------|-----------------|")
+    md.append("| Arm | Model | Kiro mean | Kiro min | gpt-4.1 mean | gpt-4.1 min | "
+              "Det.fails | HTTP fails | $/stop | $ total | Median s | Mean out-tok |")
+    md.append("|-----|-------|-----------|----------|--------------|-------------|"
+              "-----------|-----------|--------|---------|----------|--------------|")
     for r in rows:
         md.append(
-            f"| {r['arm']} | {r['model']} | {r['mean_score']} | {r['min_score']} | "
-            f"{r['detector_failures']} | {r['http_failures']} | ${r['usd_per_stop']:.5f} | "
-            f"${r['usd_total']:.5f} | {r['median_seconds']} | {r['mean_output_tokens']} | "
-            f"{'yes' if r['within_0_3_of_A'] else 'no'} |")
+            f"| {r['arm']} | {r['model']} | {r['kiro_mean']} | {r['kiro_min']} | "
+            f"{r['gpt_mean']} | {r['gpt_min']} | {r['detector_failures']} | "
+            f"{r['http_failures']} | ${r['usd_per_stop']:.5f} | ${r['usd_total']:.5f} | "
+            f"{r['median_seconds']} | {r['mean_output_tokens']} |")
     table = "\n".join(md)
     print(table)
     with open(os.path.join(base_dir, "report_table.md"), "w", encoding="utf-8") as f:
         f.write(table + "\n")
-    # within-0.3 summary
-    within = [r["arm"] for r in rows if r["within_0_3_of_A"] and r["arm"] != "A"]
-    print(f"\nArms within 0.3 of arm A ({arm_a_mean}): {within or 'none'}")
+    within_kiro = [r["arm"] for r in rows if r["within_0_3_kiro"] and r["arm"] != baseline]
+    within_gpt = [r["arm"] for r in rows if r["within_0_3_gpt"] and r["arm"] != baseline]
+    print(f"\nBaseline arm {baseline}: Kiro {base_kiro}, gpt-4.1 {base_gpt}")
+    print(f"Within 0.3 of baseline under Kiro: {within_kiro or 'none'}")
+    print(f"Within 0.3 of baseline under gpt-4.1: {within_gpt or 'none'}")
     return report
 
 
@@ -155,8 +190,10 @@ def _main():
         return args[args.index(name) + 1] if name in args else default
 
     base = opt("--dir", "bench_out")
-    host = opt("--host", "local647-gen")
-    build(base, host)
+    host = opt("--host", "local712-gen")
+    arms = list(opt("--arms", "BFG"))
+    baseline = opt("--baseline", "B")
+    build(base, host, arms=arms, baseline=baseline)
 
 
 if __name__ == "__main__":
