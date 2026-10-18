@@ -161,16 +161,6 @@ function codeFromPath(pathname) {
   return seg;
 }
 
-/* Read the tour name from the `n` query param. Returns "" when absent. */
-function nameFromQuery(search) {
-  try {
-    var params = new URLSearchParams(search || "");
-    return params.get("n") || "";
-  } catch (e) {
-    return "";
-  }
-}
-
 /* Build the Android Play URL carrying the deferred referrer, or "" when the
    base URL constant is empty. The referrer is audioura_code=<CODE>,
    URL-encoded as a single &referrer= value. */
@@ -207,18 +197,14 @@ function platformFromUA(ua) {
 if (typeof document !== "undefined" && document.getElementById) {
   (function () {
     var code = codeFromPath(location.pathname);
-    // Fallback for file:// previews: read from the hash (#/t/<CODE>?n=...).
+    // Fallback for file:// previews: read from the hash (#/t/<CODE>).
     if (!code && location.hash) {
       var h = location.hash.replace(/^#/, "");
       code = codeFromPath(h);
     }
-    var name = nameFromQuery(location.search) ||
-               (location.hash ? nameFromQuery(location.hash.replace(/^[^?]*/, "")) : "");
 
-    // Tour name is inserted as TEXT, never HTML (XSS-safe).
-    if (name) {
-      document.getElementById("headline").textContent = '“' + name + '” on Audioura';
-    }
+    // [LOCAL-710 / D672] The headline is ALWAYS "An Audioura tour for you" —
+    // the share link no longer carries a tour name query.
     var codeEl = document.getElementById("code");
     codeEl.textContent = code || "--------";
 
@@ -282,7 +268,6 @@ if (typeof document !== "undefined" && document.getElementById) {
 if (typeof module !== "undefined" && module.exports) {
   module.exports = {
     codeFromPath: codeFromPath,
-    nameFromQuery: nameFromQuery,
     androidUrlWithReferrer: androidUrlWithReferrer,
     storeButtonState: storeButtonState,
     platformFromUA: platformFromUA

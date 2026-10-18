@@ -824,7 +824,19 @@ class _TourPlayerScreenState extends State<TourPlayerScreen> with VoiceMethods {
   /// null/non-numeric id with a clear message and maps server/offline errors to
   /// a SnackBar, so this never crashes the player.
   void _shareTour() {
-    shareTour(context, audioTourId: widget.tourId, tourName: widget.tourTitle);
+    // [LOCAL-710 / D672] Hand the sharing flow what the player already holds:
+    // the downloaded tour's path (for the first stop's name + address), the
+    // known stop count, and the paid snapshot (is_paid + price label).
+    final meta = _localMeta;
+    shareTour(
+      context,
+      audioTourId: widget.tourId,
+      tourName: widget.tourTitle,
+      tourPath: widget.tourPath,
+      stopCount: _totalStops,
+      isPaid: meta?.isPaid ?? false,
+      price: (meta != null && meta.isPaid) ? meta.priceLabel : null,
+    );
   }
 
   void _showTourHelpDialog() {

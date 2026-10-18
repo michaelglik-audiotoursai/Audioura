@@ -54,14 +54,6 @@ eq(page.codeFromPath('/legal/terms'), '', 'codeFromPath: non-/t/ path → empty'
 eq(page.codeFromPath('/t/index.html'), '',
   'codeFromPath: a dotted segment (index.html) is not a code');
 
-// --- nameFromQuery: n → text ---------------------------------------------
-eq(page.nameFromQuery('?n=The%20Freedom%20Trail'), 'The Freedom Trail',
-  'nameFromQuery: decodes spaces');
-eq(page.nameFromQuery('?n=Caf%C3%A9%20%22L%C3%A9%22%20%26%20M%C3%A1s'),
-  'Café "Lé" & Más', 'nameFromQuery: accents, quotes, ampersand');
-eq(page.nameFromQuery(''), '', 'nameFromQuery: empty query → empty');
-eq(page.nameFromQuery('?x=1'), '', 'nameFromQuery: no n param → empty');
-
 // --- androidUrlWithReferrer: carries audioura_code ------------------------
 eq(
   page.androidUrlWithReferrer(
@@ -95,6 +87,19 @@ eq(page.platformFromUA('Mozilla/5.0 (iPhone; CPU iPhone OS 17_0)'), 'ios',
   'platformFromUA: iPhone');
 eq(page.platformFromUA('Mozilla/5.0 (Macintosh; Intel Mac OS X)'), 'desktop',
   'platformFromUA: desktop → both buttons');
+
+// --- [LOCAL-710 / D672] Fixed headline, no tour name in the page ----------
+// The headline is ALWAYS "An Audioura tour for you" — the `?n=` name is gone.
+eq(/<title>An Audioura tour for you<\/title>/.test(html), true,
+  'D672: <title> is the fixed "An Audioura tour for you"');
+eq(/id="headline"[^>]*>An Audioura tour for you</.test(html), true,
+  'D672: <h1 id="headline"> is the fixed "An Audioura tour for you"');
+eq(typeof page.nameFromQuery, 'undefined',
+  'D672: nameFromQuery is removed (no tour name parsing)');
+eq(/nameFromQuery/.test(html), false,
+  'D672: no nameFromQuery anywhere in the page');
+eq(/\?n=/.test(html) || /get\(["']n["']\)/.test(html), false,
+  'D672: the page no longer reads an n query param');
 
 if (failures > 0) {
   console.error(`\n${failures} test(s) FAILED`);

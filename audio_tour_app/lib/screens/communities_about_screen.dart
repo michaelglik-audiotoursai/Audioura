@@ -861,7 +861,8 @@ class _CommunityInviteToolsState extends State<CommunityInviteTools> {
   late String _code = widget.community.joinCode ?? '';
   late String _inviteMessage = widget.community.inviteMessage ??
       buildCommunityInviteMessage(
-          widget.community.name, widget.community.joinCode ?? '');
+          widget.community.name, widget.community.joinCode ?? '',
+          memberCount: widget.community.memberCount);
   bool _regenerating = false;
 
   @override
