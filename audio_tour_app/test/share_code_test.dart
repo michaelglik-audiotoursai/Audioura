@@ -392,7 +392,7 @@ void main() {
       ));
       expect(
           msg.contains(
-              'Membership is paid: a pass starts at \$5 for week, bought in the app.'),
+              'Membership is paid: a pass starts at \$5 for a week, bought in the app.'),
           isTrue);
       expect(msg.contains('Joining is free.'), isFalse);
     });
@@ -538,14 +538,10 @@ void main() {
         '\n'
         'About this community: Weekly walking stories around Boston.\n'
         '\n'
-        'Membership is paid: a pass starts at \$5 for week, bought in the app.\n'
-        '\n'
+        'Membership is paid: a pass starts at \$5 for a week, bought in the app.\n'
         "Anyone can find it in Audioura's Search.\n"
-        '\n'
         "Members accept the organiser's waiver when they join.\n"
-        '\n'
         'Rules: Members only.\n'
-        '\n'
         '$kCommunityDownloadsLine\n'
         '\n'
         'Organiser: Michael (demo)\n'
@@ -554,7 +550,7 @@ void main() {
         '\n'
         'Latest tour: "Faneuil Hall Marketplace — Walking Tour", 3 stops: https://audioura.com/t/Wo8Oj8lA\n'
         '\n'
-        'https://audioura.com/t/AzuwQYnf\n'
+        'Join here: https://audioura.com/t/AzuwQYnf\n'
         '\n'
         '(Or open Audioura, tap Search and paste AzuwQYnf.)',
       );
@@ -582,16 +578,13 @@ void main() {
         'About this community: Read together, one chapter a week.\n'
         '\n'
         'Joining is free.\n'
-        '\n'
         'It is private: only people with an invite can join.\n'
-        '\n'
         'Rules: Be kind in discussions.\n'
-        '\n'
         '$kCommunityDownloadsLine\n'
         '\n'
         'Organiser: Michael (demo)\n'
         '\n'
-        'https://audioura.com/t/AzuwQYnf\n'
+        'Join here: https://audioura.com/t/AzuwQYnf\n'
         '\n'
         '(Or open Audioura, tap Search and paste AzuwQYnf.)',
       );

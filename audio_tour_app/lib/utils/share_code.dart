@@ -475,8 +475,13 @@ String _membershipLine(CommunityInviteDetails d) {
   final price = _clean(d.cheapestPassPrice);
   final length = _clean(d.cheapestPassLength);
   if (price.isNotEmpty && length.isNotEmpty) {
-    return 'Membership is paid: a pass starts at $price for $length, bought in '
-        'the app.';
+    // [LEAD] "for a week", not "for week"; a counted length ("7 days") stays.
+    final withArticle =
+        RegExp(r'^[0-9]').hasMatch(length) || RegExp(r'^(a|an|one) ', caseSensitive: false).hasMatch(length)
+            ? length
+            : 'a $length';
+    return 'Membership is paid: a pass starts at $price for $withArticle, '
+        'bought in the app.';
   }
   // No concrete cheapest pass to quote → the plain paid statement.
   return 'Membership is paid: a pass is bought in the app.';
@@ -538,16 +543,17 @@ String buildCommunityInvite(CommunityInviteDetails d) {
   }
 
   // 4. Restriction lines, each only when it applies; downloads line always.
-  paragraphs.add(_membershipLine(d));
-  paragraphs.add(_visibilityLine(d));
+  // [LEAD] One paragraph, one line each: they read as a single block of terms.
+  final terms = <String>[_membershipLine(d), _visibilityLine(d)];
   if (d.hasWaiver) {
-    paragraphs.add('Members accept the organiser\'s waiver when they join.');
+    terms.add('Members accept the organiser\'s waiver when they join.');
   }
   final rules = _clean(d.rulesText);
   if (rules.isNotEmpty) {
-    paragraphs.add('Rules: $rules');
+    terms.add('Rules: $rules');
   }
-  paragraphs.add(kCommunityDownloadsLine);
+  terms.add(kCommunityDownloadsLine);
+  paragraphs.add(terms.join('\n'));
 
   // 5. Organiser, then the member count (only at ≥ 2, D672).
   final organiser = _clean(d.organiserName);
@@ -563,7 +569,8 @@ String buildCommunityInvite(CommunityInviteDetails d) {
   if (tourLine != null) paragraphs.add(tourLine);
 
   // 7. The join link + code fallback (as in D672).
-  paragraphs.add(buildCommunityInviteLink(d.code));
+  // [LEAD] Labelled, so it is never confused with the tour link above it.
+  paragraphs.add('Join here: ${buildCommunityInviteLink(d.code)}');
   paragraphs.add('(Or open Audioura, tap Search and paste ${d.code}.)');
 
   return paragraphs.join('\n\n').replaceAll(RegExp(r'  +'), ' ');

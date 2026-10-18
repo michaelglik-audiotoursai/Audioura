@@ -176,10 +176,10 @@ void main() {
     // The invites explain themselves and quote the real cheapest pass.
     expect(invite2.contains(kCommunityExplanation), isTrue);
     expect(invite2.contains(
-        'Membership is paid: a pass starts at \$5 for week, bought in the app.'),
+        'Membership is paid: a pass starts at \$5 for a week, bought in the app.'),
         isTrue);
     expect(invite1.contains(
-        'Membership is paid: a pass starts at \$1 for month, bought in the app.'),
+        'Membership is paid: a pass starts at \$1 for a month, bought in the app.'),
         isTrue);
     expect(inviteWithTour.contains(
         'Latest tour: "Faneuil Hall Marketplace — Walking Tour", 3 stops: https://audioura.com/t/TourFix1'),
