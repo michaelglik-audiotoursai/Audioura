@@ -334,58 +334,273 @@ void main() {
     });
   });
 
-  // ── [LOCAL-710 / D672] Community invite at 0 / 1 / 2 / 12 members ──────────
-  group('buildCommunityInviteMessage (D672 member-count gating)', () {
+  // ── [LOCAL-710B / D672 addenda 1 + 2] The self-explaining community invite ──
+  // The invite now leads with a standard explanation, prints the organiser's
+  // description as "About this community:", then the restriction lines generated
+  // from REAL settings (each only when true), the organiser + member count, the
+  // optional tour line (picked vs latest), and finally the join link + code.
+  group('buildCommunityInvite (D672 addenda — self-explaining invite)', () {
     test('invite link has no ?n= and carries the code', () {
       expect(buildCommunityInviteLink('AzuwQYnf'),
           'https://audioura.com/t/AzuwQYnf');
     });
 
-    test('0 members — no member-count line', () {
-      final msg = buildCommunityInviteMessage('Demo Boston Walkers', 'AzuwQYnf',
-          memberCount: 0);
-      expect(msg.contains('member'), isFalse);
+    // The standard explanation + the always-present downloads line are present
+    // in EVERY invite.
+    test('always: standard explanation + member-only downloads line', () {
+      final msg = buildCommunityInvite(const CommunityInviteDetails(
+          communityName: 'Demo Boston Walkers', code: 'AzuwQYnf'));
+      expect(msg.contains(kCommunityExplanation), isTrue);
+      expect(msg.contains(kCommunityDownloadsLine), isTrue);
+      expect(msg.startsWith(
+          'You are invited to join "Demo Boston Walkers" on Audioura.'),
+          isTrue);
       expect(extractShareCode(msg), 'AzuwQYnf');
     });
 
-    test('1 member — still no member-count line (< 2)', () {
-      final msg = buildCommunityInviteMessage('Demo Boston Walkers', 'AzuwQYnf',
-          memberCount: 1);
-      expect(msg.contains('member'), isFalse);
+    // ── member-count gating (0 / 1 / 2 / 12) ──────────────────────────────────
+    test('0 members — no member-count line', () {
+      final msg = buildCommunityInvite(const CommunityInviteDetails(
+          communityName: 'C', code: 'AzuwQYnf', memberCount: 0));
+      expect(RegExp(r'\d+ members').hasMatch(msg), isFalse);
     });
-
+    test('1 member — still no member-count line (< 2)', () {
+      final msg = buildCommunityInvite(const CommunityInviteDetails(
+          communityName: 'C', code: 'AzuwQYnf', memberCount: 1));
+      expect(RegExp(r'\d+ members').hasMatch(msg), isFalse);
+    });
     test('2 members — "2 members." shown', () {
-      final msg = buildCommunityInviteMessage('Demo Boston Walkers', 'AzuwQYnf',
-          memberCount: 2);
+      final msg = buildCommunityInvite(const CommunityInviteDetails(
+          communityName: 'C', code: 'AzuwQYnf', memberCount: 2));
       expect(msg.contains('2 members.'), isTrue);
     });
-
     test('12 members — "12 members." shown', () {
-      final msg = buildCommunityInviteMessage('Demo Boston Walkers', 'AzuwQYnf',
-          memberCount: 12);
+      final msg = buildCommunityInvite(const CommunityInviteDetails(
+          communityName: 'C', code: 'AzuwQYnf', memberCount: 12));
       expect(msg.contains('12 members.'), isTrue);
     });
 
-    test('null member count — no member-count line; no store/how-to lines', () {
-      final msg = buildCommunityInviteMessage('Demo Boston Walkers', 'AzuwQYnf');
-      expect(msg.contains('member'), isFalse);
-      expect(msg.contains('How to get Audioura'), isFalse);
-      expect(msg.contains('coming soon'), isFalse);
-      expect(extractShareCode(msg), 'AzuwQYnf');
+    // ── each restriction line appears ONLY when its setting is true ───────────
+    test('paid with a cheapest pass → the concrete paid line; not the free line',
+        () {
+      final msg = buildCommunityInvite(const CommunityInviteDetails(
+        communityName: 'C',
+        code: 'AzuwQYnf',
+        isPaid: true,
+        cheapestPassPrice: '\$5',
+        cheapestPassLength: 'week',
+      ));
+      expect(
+          msg.contains(
+              'Membership is paid: a pass starts at \$5 for a week, bought in the app.'),
+          isTrue);
+      expect(msg.contains('Joining is free.'), isFalse);
+    });
+    test('paid without a pass → the generic paid line', () {
+      final msg = buildCommunityInvite(const CommunityInviteDetails(
+          communityName: 'C', code: 'AzuwQYnf', isPaid: true));
+      expect(msg.contains('Membership is paid: a pass is bought in the app.'),
+          isTrue);
+    });
+    test('free → "Joining is free."; never a paid line', () {
+      final msg = buildCommunityInvite(const CommunityInviteDetails(
+          communityName: 'C', code: 'AzuwQYnf', isPaid: false));
+      expect(msg.contains('Joining is free.'), isTrue);
+      expect(msg.contains('Membership is paid'), isFalse);
+    });
+    test('private → the private line; not the listed line', () {
+      final msg = buildCommunityInvite(const CommunityInviteDetails(
+          communityName: 'C', code: 'AzuwQYnf', visibility: 'private'));
+      expect(
+          msg.contains('It is private: only people with an invite can join.'),
+          isTrue);
+      expect(msg.contains("Anyone can find it in Audioura's Search."), isFalse);
+    });
+    test('listed → the listed line; not the private line', () {
+      final msg = buildCommunityInvite(const CommunityInviteDetails(
+          communityName: 'C', code: 'AzuwQYnf', visibility: 'listed'));
+      expect(msg.contains("Anyone can find it in Audioura's Search."), isTrue);
+      expect(msg.contains('It is private'), isFalse);
+    });
+    test('waiver true → the waiver line; false → absent', () {
+      final on = buildCommunityInvite(const CommunityInviteDetails(
+          communityName: 'C', code: 'AzuwQYnf', hasWaiver: true));
+      final off = buildCommunityInvite(const CommunityInviteDetails(
+          communityName: 'C', code: 'AzuwQYnf', hasWaiver: false));
+      expect(
+          on.contains("Members accept the organiser's waiver when they join."),
+          isTrue);
+      expect(off.contains('waiver'), isFalse);
+    });
+    test('rules text → "Rules: <text>"; empty → absent', () {
+      final on = buildCommunityInvite(const CommunityInviteDetails(
+          communityName: 'C', code: 'AzuwQYnf', rulesText: 'Be kind.'));
+      final off = buildCommunityInvite(const CommunityInviteDetails(
+          communityName: 'C', code: 'AzuwQYnf', rulesText: '  '));
+      expect(on.contains('Rules: Be kind.'), isTrue);
+      expect(off.contains('Rules:'), isFalse);
     });
 
-    test('golden: 12-member invite', () {
+    // ── About this community: (D672 addendum 2) ───────────────────────────────
+    test('description present → "About this community: …"; empty → omitted', () {
+      final on = buildCommunityInvite(const CommunityInviteDetails(
+          communityName: 'C', code: 'AzuwQYnf', description: 'A demo.'));
+      final off = buildCommunityInvite(const CommunityInviteDetails(
+          communityName: 'C', code: 'AzuwQYnf', description: '  '));
+      expect(on.contains('About this community: A demo.'), isTrue);
+      expect(off.contains('About this community:'), isFalse);
+      // The explanation comes BEFORE the About paragraph (D672 addendum 2).
+      expect(on.indexOf(kCommunityExplanation) <
+          on.indexOf('About this community:'), isTrue);
+    });
+
+    // ── the tour line (picked vs latest vs none) ──────────────────────────────
+    test('no tour → no tour line', () {
+      final msg = buildCommunityInvite(const CommunityInviteDetails(
+          communityName: 'C', code: 'AzuwQYnf'));
+      expect(msg.contains('Latest tour:'), isFalse);
+      expect(msg.contains('Tour:'), isFalse);
+    });
+    test('latest tour → "Latest tour: ..." with stops + link', () {
+      final msg = buildCommunityInvite(CommunityInviteDetails(
+        communityName: 'C',
+        code: 'AzuwQYnf',
+        tour: const CommunityInviteTour(
+            title: 'Faneuil Hall Marketplace — Walking Tour',
+            code: 'Wo8Oj8lA',
+            stopCount: 3,
+            picked: false),
+      ));
       expect(
-        buildCommunityInviteMessage('Demo Boston Walkers', 'AzuwQYnf',
-            memberCount: 12),
-        'Join "Demo Boston Walkers" on Audioura.\n'
+          msg.contains(
+              'Latest tour: "Faneuil Hall Marketplace — Walking Tour", 3 stops: https://audioura.com/t/Wo8Oj8lA'),
+          isTrue);
+      // The invite still round-trips the JOIN code (last code-shaped token).
+      expect(extractShareCode(msg), 'AzuwQYnf');
+    });
+    test('picked tour → "Tour: ..." label instead of "Latest tour:"', () {
+      final msg = buildCommunityInvite(CommunityInviteDetails(
+        communityName: 'C',
+        code: 'AzuwQYnf',
+        tour: const CommunityInviteTour(
+            title: 'Beacon Hill — Walking Tour',
+            code: 'Wo8Oj8lA',
+            stopCount: 4,
+            picked: true),
+      ));
+      expect(
+          msg.contains(
+              'Tour: "Beacon Hill — Walking Tour", 4 stops: https://audioura.com/t/Wo8Oj8lA'),
+          isTrue);
+      expect(msg.contains('Latest tour:'), isFalse);
+    });
+    test('tour with no code or no title → tour line omitted', () {
+      final noCode = buildCommunityInvite(CommunityInviteDetails(
+        communityName: 'C',
+        code: 'AzuwQYnf',
+        tour: const CommunityInviteTour(title: 'X — Walking Tour', code: ''),
+      ));
+      final noTitle = buildCommunityInvite(CommunityInviteDetails(
+        communityName: 'C',
+        code: 'AzuwQYnf',
+        tour: const CommunityInviteTour(title: '  ', code: 'Wo8Oj8lA'),
+      ));
+      expect(noCode.contains('Tour'), isFalse);
+      expect(noTitle.contains('Tour'), isFalse);
+    });
+
+    // ── full golden: a paid LISTED community with a waiver + rules + latest tour
+    //    at 12 members. Exercises every section and asserts the exact order. ───
+    test('golden: paid listed + waiver + rules + latest tour, 12 members', () {
+      final msg = buildCommunityInvite(CommunityInviteDetails(
+        communityName: 'Demo Boston Walkers',
+        code: 'AzuwQYnf',
+        description: 'Weekly walking stories around Boston.',
+        organiserName: 'Michael (demo)',
+        memberCount: 12,
+        isPaid: true,
+        visibility: 'listed',
+        hasWaiver: true,
+        rulesText: 'Members only.',
+        cheapestPassPrice: '\$5',
+        cheapestPassLength: 'week',
+        tour: const CommunityInviteTour(
+            title: 'Faneuil Hall Marketplace — Walking Tour',
+            code: 'Wo8Oj8lA',
+            stopCount: 3,
+            picked: false),
+      ));
+      expect(
+        msg,
+        'You are invited to join "Demo Boston Walkers" on Audioura.\n'
+        '\n'
+        '$kCommunityExplanation\n'
+        '\n'
+        'About this community: Weekly walking stories around Boston.\n'
+        '\n'
+        'Membership is paid: a pass starts at \$5 for a week, bought in the app.\n'
+        "Anyone can find it in Audioura's Search.\n"
+        "Members accept the organiser's waiver when they join.\n"
+        'Rules: Members only.\n'
+        '$kCommunityDownloadsLine\n'
+        '\n'
+        'Organiser: Michael (demo)\n'
         '\n'
         '12 members.\n'
         '\n'
-        'https://audioura.com/t/AzuwQYnf\n'
+        'Latest tour: "Faneuil Hall Marketplace — Walking Tour", 3 stops: https://audioura.com/t/Wo8Oj8lA\n'
+        '\n'
+        'Join here: https://audioura.com/t/AzuwQYnf\n'
         '\n'
         '(Or open Audioura, tap Search and paste AzuwQYnf.)',
       );
+    });
+
+    // ── full golden: a FREE PRIVATE community with NO tours, 0 members ─────────
+    test('golden: free private, no tours, 0 members', () {
+      final msg = buildCommunityInvite(const CommunityInviteDetails(
+        communityName: 'Demo Book Club',
+        code: 'AzuwQYnf',
+        description: 'Read together, one chapter a week.',
+        organiserName: 'Michael (demo)',
+        memberCount: 0,
+        isPaid: false,
+        visibility: 'private',
+        hasWaiver: false,
+        rulesText: 'Be kind in discussions.',
+      ));
+      expect(
+        msg,
+        'You are invited to join "Demo Book Club" on Audioura.\n'
+        '\n'
+        '$kCommunityExplanation\n'
+        '\n'
+        'About this community: Read together, one chapter a week.\n'
+        '\n'
+        'Joining is free.\n'
+        'It is private: only people with an invite can join.\n'
+        'Rules: Be kind in discussions.\n'
+        '$kCommunityDownloadsLine\n'
+        '\n'
+        'Organiser: Michael (demo)\n'
+        '\n'
+        'Join here: https://audioura.com/t/AzuwQYnf\n'
+        '\n'
+        '(Or open Audioura, tap Search and paste AzuwQYnf.)',
+      );
+      // No waiver line, no member-COUNT line, no tour line.
+      expect(msg.contains('waiver'), isFalse);
+      expect(RegExp(r'\d+ members').hasMatch(msg), isFalse);
+      expect(msg.contains('tour:'), isFalse);
+    });
+
+    // ── the back-compat wrapper still round-trips the code ────────────────────
+    test('buildCommunityInviteMessage wrapper still works (name + code only)',
+        () {
+      final msg = buildCommunityInviteMessage('Demo Boston Walkers', 'AzuwQYnf',
+          memberCount: 12);
+      expect(msg.contains('12 members.'), isTrue);
+      expect(extractShareCode(msg), 'AzuwQYnf');
     });
   });
 

@@ -373,25 +373,243 @@ String buildShareSubject(ShareTourDetails details) {
   return 'An Audioura tour for you';
 }
 
-/// [LOCAL-710 / D672] The local fallback invite text an organiser shares for a
-/// community. Leads with the opening line, shows the member count only when
-/// known and ≥ 2, then the link + the code fallback. The "How to get Audioura"
-/// and "(links coming soon)" lines are GONE — the link already leads to the
-/// store. [memberCount] null or < 2 omits the member-count line.
+/// [LOCAL-710B / D672 addendum 1] Audioura's standard one-sentence explanation
+/// of what a community is. Replaces the organiser's description as the OPENING
+/// of the invite (the description still appears, as its own "About this
+/// community:" paragraph — D672 addendum 2).
+const String kCommunityExplanation =
+    'A community on Audioura is a group that listens together: the organiser '
+    'publishes tours for its members, and each new one appears in their Listen '
+    'page.';
+
+/// [LOCAL-710B / D663] The always-present restriction line: community tours are
+/// member-only downloads.
+const String kCommunityDownloadsLine =
+    'Community tours download only for members.';
+
+/// [LOCAL-710B / D672 addendum 1] The ONE tour a community invite may carry:
+/// either the tour the organiser PICKED to send, or (default) the community's
+/// LATEST tour. Pure data — the share [code] is fetched by the caller via the
+/// existing share endpoint (TourShareService.share), never a second code
+/// system. A null/empty [code] or [title] drops the tour line entirely.
+class CommunityInviteTour {
+  /// The SHORT, human tour title (run [shortTourTitle] before constructing).
+  final String title;
+
+  /// The 8-char share code, from TourShareService.share(audioTourId).
+  final String code;
+
+  /// Number of stops; null/≤ 0 omits the ", <N> stops" clause.
+  final int? stopCount;
+
+  /// True when the organiser explicitly PICKED this tour to send (vs the
+  /// default latest tour). Only changes the label ("Tour:" vs "Latest tour:").
+  final bool picked;
+
+  const CommunityInviteTour({
+    required this.title,
+    required this.code,
+    this.stopCount,
+    this.picked = false,
+  });
+}
+
+/// [LOCAL-710B / D672 addenda 1 + 2] The real-data a community invite needs to
+/// explain itself: the restriction-bearing settings (so the builder prints only
+/// the lines that apply), the organiser + member count, the optional About
+/// paragraph, and the optional tour line. Pure — no Flutter, no I/O — so the
+/// exact wording is unit-testable.
+class CommunityInviteDetails {
+  final String communityName;
+  final String code;
+
+  /// The organiser's own description → the "About this community:" paragraph.
+  /// Null/empty omits that line (D672 addendum 2: KEEP it unless empty).
+  final String? description;
+
+  /// The organiser's display name → the "Organiser: <name>" line.
+  final String? organiserName;
+
+  /// Active member count (owner excluded). Shown only at ≥ 2 (D672).
+  final int? memberCount;
+
+  // ── restriction-bearing real settings ──────────────────────────────────────
+  final bool isPaid;
+
+  /// 'listed' or 'private'. Drives the visibility restriction line.
+  final String visibility;
+
+  final bool hasWaiver;
+
+  /// The organiser's rules text → "Rules: <text>". Null/empty omits it.
+  final String? rulesText;
+
+  /// The cheapest pass's price label (e.g. "$5") and length (e.g. "week"),
+  /// used only when [isPaid]. Both must be present to print a concrete price;
+  /// otherwise the paid line degrades to a generic "Membership is paid …".
+  final String? cheapestPassPrice;
+  final String? cheapestPassLength;
+
+  /// The ONE optional tour line (picked or latest). Null omits it.
+  final CommunityInviteTour? tour;
+
+  const CommunityInviteDetails({
+    required this.communityName,
+    required this.code,
+    this.description,
+    this.organiserName,
+    this.memberCount,
+    this.isPaid = false,
+    this.visibility = 'private',
+    this.hasWaiver = false,
+    this.rulesText,
+    this.cheapestPassPrice,
+    this.cheapestPassLength,
+    this.tour,
+  });
+}
+
+/// [LOCAL-710B / D672 addendum 1] The paid / free membership line.
+String _membershipLine(CommunityInviteDetails d) {
+  if (!d.isPaid) return 'Joining is free.';
+  final price = _clean(d.cheapestPassPrice);
+  final length = _clean(d.cheapestPassLength);
+  if (price.isNotEmpty && length.isNotEmpty) {
+    // [LEAD] "for a week", not "for week"; a counted length ("7 days") stays.
+    final withArticle =
+        RegExp(r'^[0-9]').hasMatch(length) || RegExp(r'^(a|an|one) ', caseSensitive: false).hasMatch(length)
+            ? length
+            : 'a $length';
+    return 'Membership is paid: a pass starts at $price for $withArticle, '
+        'bought in the app.';
+  }
+  // No concrete cheapest pass to quote → the plain paid statement.
+  return 'Membership is paid: a pass is bought in the app.';
+}
+
+/// [LOCAL-710B / D672 addendum 1] The visibility line (private vs listed).
+String _visibilityLine(CommunityInviteDetails d) =>
+    (_clean(d.visibility).toLowerCase() == 'listed')
+        ? "Anyone can find it in Audioura's Search."
+        : 'It is private: only people with an invite can join.';
+
+/// [LOCAL-710B / D672 addendum 1] The one tour line, by picked/latest. Omits the
+/// stop clause when the count is unknown. Returns null when there is no tour or
+/// the tour carries no code/title.
+String? _inviteTourLine(CommunityInviteTour? t) {
+  if (t == null) return null;
+  final title = _clean(t.title);
+  final code = _clean(t.code);
+  if (title.isEmpty || code.isEmpty) return null;
+  final label = t.picked ? 'Tour' : 'Latest tour';
+  final link = buildShareLink(code);
+  final count = t.stopCount;
+  if (count != null && count > 0) {
+    final noun = count == 1 ? 'stop' : 'stops';
+    return '$label: "$title", $count $noun: $link';
+  }
+  return '$label: "$title": $link';
+}
+
+/// [LOCAL-710B / D672 addenda 1 + 2] The invite text an organiser sends. The
+/// invite now EXPLAINS ITSELF — Michael did not like "A demo PAID community:".
+///
+/// Body order (one blank line between paragraphs, no double spaces):
+///   1. the "You are invited to join …" line;
+///   2. the standard explanation of what a community is;
+///   3. "About this community: <description>"   (omitted only when empty);
+///   4. the restriction lines that apply (paid/free, private/listed, waiver,
+///      rules), then the always-present member-download line;
+///   5. "Organiser: <name>" and, at ≥ 2, "<N> members.";
+///   6. the tour line (picked, else latest; omitted with no tours);
+///   7. the join link and the code fallback.
+///
+/// Every restriction line appears ONLY when its real setting is true. The
+/// returned string ALWAYS contains the join code + link ([extractShareCode]
+/// round-trips it). Never claims the email was sent.
+String buildCommunityInvite(CommunityInviteDetails d) {
+  final paragraphs = <String>[];
+
+  // 1. The invitation line.
+  paragraphs.add('You are invited to join "${d.communityName}" on Audioura.');
+
+  // 2. The standard explanation (replaces the old description-first opening).
+  paragraphs.add(kCommunityExplanation);
+
+  // 3. About this community: <organiser's description> (D672 addendum 2).
+  final about = _clean(d.description);
+  if (about.isNotEmpty) {
+    paragraphs.add('About this community: $about');
+  }
+
+  // 4. Restriction lines, each only when it applies; downloads line always.
+  // [LEAD] One paragraph, one line each: they read as a single block of terms.
+  final terms = <String>[_membershipLine(d), _visibilityLine(d)];
+  if (d.hasWaiver) {
+    terms.add('Members accept the organiser\'s waiver when they join.');
+  }
+  final rules = _clean(d.rulesText);
+  if (rules.isNotEmpty) {
+    terms.add('Rules: $rules');
+  }
+  terms.add(kCommunityDownloadsLine);
+  paragraphs.add(terms.join('\n'));
+
+  // 5. Organiser, then the member count (only at ≥ 2, D672).
+  final organiser = _clean(d.organiserName);
+  if (organiser.isNotEmpty) {
+    paragraphs.add('Organiser: $organiser');
+  }
+  if (d.memberCount != null && d.memberCount! >= 2) {
+    paragraphs.add('${d.memberCount} members.');
+  }
+
+  // 6. The tour line (picked, else latest; omitted with no tours).
+  final tourLine = _inviteTourLine(d.tour);
+  if (tourLine != null) paragraphs.add(tourLine);
+
+  // 7. The join link + code fallback (as in D672).
+  // [LEAD] Labelled, so it is never confused with the tour link above it.
+  paragraphs.add('Join here: ${buildCommunityInviteLink(d.code)}');
+  paragraphs.add('(Or open Audioura, tap Search and paste ${d.code}.)');
+
+  return paragraphs.join('\n\n').replaceAll(RegExp(r'  +'), ' ');
+}
+
+/// [LOCAL-710 / D672 → LOCAL-710B addenda] Back-compatible wrapper kept for the
+/// few call-sites that only have a name + code (e.g. a freshly-created
+/// community before its page is loaded). Builds the self-explaining invite with
+/// whatever is known; callers with the full [Community] should use
+/// [buildCommunityInvite] (via CommunityCopy.emailInviteBody) to get the
+/// restriction and tour lines.
 String buildCommunityInviteMessage(
   String communityName,
   String code, {
   int? memberCount,
-}) {
-  final paragraphs = <String>[];
-  paragraphs.add('Join "$communityName" on Audioura.');
-  if (memberCount != null && memberCount >= 2) {
-    paragraphs.add('$memberCount members.');
-  }
-  paragraphs.add(buildCommunityInviteLink(code));
-  paragraphs.add('(Or open Audioura, tap Search and paste $code.)');
-  return paragraphs.join('\n\n').replaceAll(RegExp(r'  +'), ' ');
-}
+  String? description,
+  String? organiserName,
+  bool isPaid = false,
+  String visibility = 'private',
+  bool hasWaiver = false,
+  String? rulesText,
+  String? cheapestPassPrice,
+  String? cheapestPassLength,
+  CommunityInviteTour? tour,
+}) =>
+    buildCommunityInvite(CommunityInviteDetails(
+      communityName: communityName,
+      code: code,
+      memberCount: memberCount,
+      description: description,
+      organiserName: organiserName,
+      isPaid: isPaid,
+      visibility: visibility,
+      hasWaiver: hasWaiver,
+      rulesText: rulesText,
+      cheapestPassPrice: cheapestPassPrice,
+      cheapestPassLength: cheapestPassLength,
+      tour: tour,
+    ));
 
 /// A single base62 token of exactly 8 characters.
 // Whole words only (\b): never a slice of a longer word like "Commonwealth".

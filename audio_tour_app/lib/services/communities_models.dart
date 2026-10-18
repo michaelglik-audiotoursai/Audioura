@@ -85,6 +85,39 @@ class CommunityEpisode {
       );
 }
 
+/// [LOCAL-710B / D672 addendum 1] A tour MADE WITH Audioura for the community
+/// (`audio_tours.community_id = <id>`), newest first. These — never owner
+/// MP3/RSS episodes — fill the invite's optional tour line and the invite
+/// screen's "Tour to include" picker. The share CODE is NOT stored here: it is
+/// fetched on demand via TourShareService.share([id]) (the one share-code
+/// system, D671). [stopCount] feeds the "<N> stops" clause; [name] is the raw
+/// tour name (shorten with shortTourTitle before display).
+class CommunityInviteTourOption {
+  final int id;
+  final String name;
+  final int stopCount;
+  final String? createdAt;
+
+  const CommunityInviteTourOption({
+    required this.id,
+    required this.name,
+    this.stopCount = 0,
+    this.createdAt,
+  });
+
+  factory CommunityInviteTourOption.fromJson(Map<String, dynamic> j) =>
+      CommunityInviteTourOption(
+        id: (j['id'] is num) ? (j['id'] as num).toInt() : 0,
+        name: (j['name'] ?? j['tour_name'] ?? '') as String,
+        stopCount: (j['stop_count'] is num)
+            ? (j['stop_count'] as num).toInt()
+            : (j['stops_count'] is num)
+                ? (j['stops_count'] as num).toInt()
+                : 0,
+        createdAt: (j['created_at'] ?? j['createdAt']) as String?,
+      );
+}
+
 /// The member's own status on a community (D658 (c): "the member's own status
 /// and expiry").
 class MyStatus {
@@ -215,6 +248,10 @@ class Community {
   final List<CommunityPass> passes;
   final List<CommunityEpisode> episodes;
   final int episodeCount;
+  // [LOCAL-710B / D672 addendum 1] The community's own tours (audio_tours.
+  // community_id = id), newest first. Fills the invite tour line + the invite
+  // screen's "Tour to include" picker. Empty → no picker, no tour line.
+  final List<CommunityInviteTourOption> tours;
   // [LOCAL-704 / D665] The community's member count: active members (unexpired
   // paid passes), owner excluded. Shown on the community page, My communities,
   // search/code results, the map pin sheet and the invite email.
@@ -252,6 +289,7 @@ class Community {
     required this.passes,
     required this.episodes,
     required this.episodeCount,
+    this.tours = const [],
     this.memberCount = 0,
     required this.isOwner,
     required this.myStatus,
@@ -269,6 +307,12 @@ class Community {
     this.launch = const CommunityLaunch(
         hoursLeft: 0, membersNeeded: 2, membersSoFar: 0, launched: false),
   });
+
+  /// [LOCAL-710B / D672 addendum 1] The cheapest pass this community offers, or
+  /// null when it offers none. The server returns [passes] ordered by price
+  /// ascending, so the first is the cheapest. Quotes "a pass starts at $5 for
+  /// week" in the invite.
+  CommunityPass? get cheapestPass => passes.isEmpty ? null : passes.first;
 
   factory Community.fromJson(Map<String, dynamic> j) {
     List<T> list<T>(dynamic v, T Function(Map<String, dynamic>) f) =>
@@ -294,6 +338,7 @@ class Community {
           (j['longitude'] is num) ? (j['longitude'] as num).toDouble() : null,
       passes: list(j['passes'], CommunityPass.fromJson),
       episodes: list(j['episodes'], CommunityEpisode.fromJson),
+      tours: list(j['tours'], CommunityInviteTourOption.fromJson),
       episodeCount:
           (j['episode_count'] is num) ? (j['episode_count'] as num).toInt() : 0,
       memberCount:
@@ -569,38 +614,46 @@ class CommunityCopy {
   static String memberCountLabel(int count) =>
       count == 1 ? '1 member' : '$count members';
 
-  /// §4 + [LOCAL-710 / D672]: The email body an organiser sends to invite
-  /// members. D672 (Michael's review): lead with the invite line, show the
-  /// member count ONLY when ≥ 2, then the join link + the code fallback. The
-  /// "How to get Audioura" and "(App Store / Google Play links coming soon.)"
-  /// lines are DROPPED — the join link already leads to the store. The optional
-  /// community description and organiser are kept as context between the invite
-  /// line and the link. The returned string ALWAYS contains the code and the
-  /// link, which the tests assert. Never claims the email was sent.
+  /// §4 + [LOCAL-710 / D672 → LOCAL-710B addenda 1 + 2]: The email body an
+  /// organiser sends to invite members. The invite now EXPLAINS ITSELF
+  /// (Michael did not like "A demo PAID community:"): a standard sentence about
+  /// what a community is, the organiser's description as "About this
+  /// community:", the restriction lines generated from the community's REAL
+  /// settings (paid/free, private/listed, waiver, rules, member-only
+  /// downloads), the organiser + member count, an optional tour line (the
+  /// picked tour, else the latest), and finally the join link + code.
+  ///
+  /// Delegates to [buildCommunityInvite] (share_code.dart) so the sending side
+  /// and the tests share one implementation. The returned string ALWAYS
+  /// contains the code + the link. Never claims the email was sent.
   static String emailInviteBody({
     required String communityName,
     String? description,
     String? organiserName,
     required String code,
     int? memberCount,
-  }) {
-    final paragraphs = <String>[];
-    paragraphs.add('Join "$communityName" on Audioura.');
-    // [D672] Member count only at 2 or more.
-    if (memberCount != null && memberCount >= 2) {
-      paragraphs.add('$memberCount members.');
-    }
-    if (description != null && description.trim().isNotEmpty) {
-      paragraphs.add(description.trim());
-    }
-    if (organiserName != null && organiserName.trim().isNotEmpty) {
-      paragraphs.add('Organiser: ${organiserName.trim()}');
-    }
-    // [LOCAL-709 / D671 / D672] Lead with the link; keep the code as fallback.
-    paragraphs.add(buildCommunityInviteLink(code));
-    paragraphs.add('(Or open Audioura, tap Search and paste $code.)');
-    return paragraphs.join('\n\n').replaceAll(RegExp(r'  +'), ' ');
-  }
+    bool isPaid = false,
+    String visibility = 'private',
+    bool hasWaiver = false,
+    String? rulesText,
+    String? cheapestPassPrice,
+    String? cheapestPassLength,
+    CommunityInviteTour? tour,
+  }) =>
+      buildCommunityInvite(CommunityInviteDetails(
+        communityName: communityName,
+        code: code,
+        description: description,
+        organiserName: organiserName,
+        memberCount: memberCount,
+        isPaid: isPaid,
+        visibility: visibility,
+        hasWaiver: hasWaiver,
+        rulesText: rulesText,
+        cheapestPassPrice: cheapestPassPrice,
+        cheapestPassLength: cheapestPassLength,
+        tour: tour,
+      ));
 
   /// §4: A short email SUBJECT for the invite.
   static String emailInviteSubject(String communityName) =>
