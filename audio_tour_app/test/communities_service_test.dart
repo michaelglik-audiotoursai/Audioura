@@ -95,6 +95,12 @@ void main() {
           }
         ],
         'episode_count': 1,
+        'tours': [
+          {'id': 12, 'name': 'Beacon Hill - Walking Tour', 'stop_count': 4,
+           'created_at': '2026-10-18T09:00:00'},
+          {'id': 7, 'name': 'Faneuil Hall - Walking Tour', 'stop_count': 3,
+           'created_at': '2026-10-01T09:00:00'},
+        ],
         'is_owner': false,
         'my_status': {'is_member': true, 'active': true, 'expires_at': '2026-12-01T00:00:00'},
       });
@@ -109,6 +115,13 @@ void main() {
       expect(c.passes.single.durationDays, 30);
       expect(c.episodes.single.position, 1);
       expect(c.episodes.single.source, 'feed');
+      // [LOCAL-710B] Tours parse, newest first, with stop counts.
+      expect(c.tours.length, 2);
+      expect(c.tours.first.id, 12);
+      expect(c.tours.first.stopCount, 4);
+      expect(c.tours.last.name, 'Faneuil Hall - Walking Tour');
+      // [LOCAL-710B] cheapestPass is the first (server orders by price asc).
+      expect(c.cheapestPass?.label, r'$5 / month');
       expect(c.myStatus.isMember, isTrue);
       expect(c.myStatus.active, isTrue);
     });
@@ -118,6 +131,8 @@ void main() {
       expect(c.description, isNull);
       expect(c.passes, isEmpty);
       expect(c.episodes, isEmpty);
+      expect(c.tours, isEmpty);
+      expect(c.cheapestPass, isNull);
       expect(c.hasWaiver, isFalse);
       expect(c.isPaid, isFalse);
       expect(c.visibility, 'private');
@@ -273,9 +288,13 @@ void main() {
     test('[D672] member count shown only at 2 or more', () {
       String bodyFor(int? n) => CommunityCopy.emailInviteBody(
             communityName: 'Counters', code: 'AB12CD34', memberCount: n);
-      expect(bodyFor(null).contains('members'), isFalse);
-      expect(bodyFor(0).contains('members'), isFalse);
-      expect(bodyFor(1).contains('member'), isFalse);
+      // NB the always-present "Community tours download only for members." line
+      // contains the word "members", so the member-COUNT line is matched by its
+      // "<N> members" shape, never a bare substring.
+      final memberCount = RegExp(r'\d+ members');
+      expect(memberCount.hasMatch(bodyFor(null)), isFalse);
+      expect(memberCount.hasMatch(bodyFor(0)), isFalse);
+      expect(memberCount.hasMatch(bodyFor(1)), isFalse);
       expect(bodyFor(2).contains('2 members'), isTrue);
       expect(bodyFor(12).contains('12 members'), isTrue);
     });

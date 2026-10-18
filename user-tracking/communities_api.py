@@ -805,6 +805,30 @@ def _episodes_for(cur, community_id):
              'guid': r[3], 'source': r[4]} for r in cur.fetchall()]
 
 
+def _tours_for(cur, community_id):
+    """[LOCAL-710B / D672 addendum 1] The community's own tours — rows in
+    audio_tours tagged with this community_id — NEWEST FIRST. These are the
+    tours made WITH Audioura for the community; they fill the invite's optional
+    tour line and the invite screen's "Tour to include" picker. Owner MP3/RSS
+    episodes (community_episodes) are NOT tours and are never returned here.
+
+    The app fetches each tour's share CODE on demand via the existing share
+    endpoint (TourShareService.share) — the single share-code system (D671) —
+    so no code is embedded here. Drafts are excluded (an unfinished tour cannot
+    be shared). Returns id, name, stop_count and created_at per tour."""
+    cur.execute(
+        """SELECT id, tour_name, COALESCE(stops_count, 0), created_at
+             FROM audio_tours
+            WHERE community_id = %s
+              AND COALESCE(draft, FALSE) = FALSE
+            ORDER BY created_at DESC, id DESC""",
+        (community_id,),
+    )
+    return [{'id': r[0], 'name': r[1], 'stop_count': int(r[2]),
+             'created_at': r[3].isoformat() if r[3] else None}
+            for r in cur.fetchall()]
+
+
 def _community_page(cur, community_id, user_id=None, now=None):
     """The community page payload (D658 (c)): organiser, description, rules +
     waiver, passes, episodes, and the member's own status/expiry. Episodes are
@@ -857,6 +881,12 @@ def _community_page(cur, community_id, user_id=None, now=None):
         # Episodes only for an active member or the owner (D658 addendum §2).
         'episodes': _episodes_for(cur, community_id) if active else [],
         'episode_count': _episode_count(cur, community_id),
+        # [LOCAL-710B / D672 addendum 1] The community's own tours (audio_tours
+        # tagged with this community_id), NEWEST FIRST. The organiser's invite
+        # screen offers these in a "Tour to include" picker and the invite's
+        # tour line defaults to the latest. Returned for everyone who can see
+        # the page (the organiser builds the invite); empty when none exist.
+        'tours': _tours_for(cur, community_id),
         # [LOCAL-704 / D665] The community's member count: ACTIVE members
         # (unexpired paid passes), EXCLUDING the owner (the organiser is never a
         # member). Shown on the community page, My communities, search/code

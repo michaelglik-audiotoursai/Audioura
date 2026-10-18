@@ -28,6 +28,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../services/communities_service.dart';
 import '../utils/share_code.dart';
+import '../services/tour_share_service.dart';
 import '../services/entitlements_service.dart';
 import '../services/iap_service.dart';
 import '../services/device_service.dart';
@@ -859,11 +860,16 @@ class CommunityInviteTools extends StatefulWidget {
 
 class _CommunityInviteToolsState extends State<CommunityInviteTools> {
   late String _code = widget.community.joinCode ?? '';
-  late String _inviteMessage = widget.community.inviteMessage ??
-      buildCommunityInviteMessage(
-          widget.community.name, widget.community.joinCode ?? '',
-          memberCount: widget.community.memberCount);
   bool _regenerating = false;
+  bool _building = false;
+
+  // [LOCAL-710B / D672 addendum 1] The tour the organiser chooses to include in
+  // the invite. null = "Latest tour" (the default — the newest tour), which is
+  // only offered when the community actually has tours. A specific id means the
+  // organiser PICKED that tour to send.
+  int? _selectedTourId;
+
+  List<CommunityInviteTourOption> get _tours => widget.community.tours;
 
   @override
   Widget build(BuildContext context) {
@@ -879,23 +885,52 @@ class _CommunityInviteToolsState extends State<CommunityInviteTools> {
                 fontSize: 22,
                 fontWeight: FontWeight.bold,
                 letterSpacing: 2)),
+        // [LOCAL-710B / D672 addendum 1] "Tour to include" — only when the
+        // community has tours. Default "Latest tour"; the organiser may pick a
+        // specific one instead. No tours → no picker (and the invite leaves the
+        // tour line out).
+        if (_tours.isNotEmpty) ...[
+          const SizedBox(height: 12),
+          const Text('Tour to include',
+              style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 4),
+          DropdownButton<int?>(
+            isExpanded: true,
+            value: _selectedTourId,
+            onChanged: (v) => setState(() => _selectedTourId = v),
+            items: <DropdownMenuItem<int?>>[
+              const DropdownMenuItem<int?>(
+                value: null,
+                child: Text('Latest tour'),
+              ),
+              for (final t in _tours)
+                DropdownMenuItem<int?>(
+                  value: t.id,
+                  child: Text(
+                    shortTourTitle(t.name),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+            ],
+          ),
+        ],
         const SizedBox(height: 8),
         Wrap(
           spacing: 8,
           runSpacing: 4,
           children: [
             OutlinedButton.icon(
-              onPressed: _copy,
+              onPressed: _building ? null : _copy,
               icon: const Icon(Icons.copy, size: 18),
               label: const Text('Copy'),
             ),
             OutlinedButton.icon(
-              onPressed: _share,
+              onPressed: _building ? null : _share,
               icon: const Icon(Icons.ios_share, size: 18),
               label: const Text('Share'),
             ),
             OutlinedButton.icon(
-              onPressed: _email,
+              onPressed: _building ? null : _email,
               icon: const Icon(Icons.email_outlined, size: 18),
               label: const Text('Email'),
             ),
@@ -915,14 +950,71 @@ class _CommunityInviteToolsState extends State<CommunityInviteTools> {
     );
   }
 
-  void _copy() {
-    Clipboard.setData(ClipboardData(text: _inviteMessage));
+  /// [LOCAL-710B / D672 addenda 1 + 2] Build the full self-explaining invite
+  /// body from the community's REAL settings, resolving the chosen/latest
+  /// tour's share code via the EXISTING share endpoint (never a second code
+  /// system, D671). Returns null if the widget was disposed mid-await.
+  Future<String?> _buildInviteBody() async {
+    final c = widget.community;
+    final tour = await _resolveInviteTour();
+    if (!mounted) return null;
+    final pass = c.cheapestPass;
+    return CommunityCopy.emailInviteBody(
+      communityName: c.name,
+      description: c.description,
+      organiserName: c.organiser.name,
+      code: _code,
+      memberCount: c.memberCount,
+      isPaid: c.isPaid,
+      visibility: c.visibility,
+      hasWaiver: c.hasWaiver,
+      rulesText: c.rulesText,
+      cheapestPassPrice: pass?.label,
+      cheapestPassLength: pass?.length,
+      tour: tour,
+    );
+  }
+
+  /// Resolve the tour line's data: the picked tour, else the latest (the first,
+  /// since the server returns tours newest-first). Fetches the 8-char share
+  /// code via TourShareService.share. Returns null when there are no tours or
+  /// the share request fails (the invite simply omits the tour line).
+  Future<CommunityInviteTour?> _resolveInviteTour() async {
+    if (_tours.isEmpty) return null;
+    final bool picked = _selectedTourId != null;
+    final CommunityInviteTourOption t = picked
+        ? _tours.firstWhere((e) => e.id == _selectedTourId,
+            orElse: () => _tours.first)
+        : _tours.first; // newest-first → first is the latest
+    final res = await TourShareService.share(t.id);
+    if (!res.ok || res.code == null || res.code!.isEmpty) return null;
+    return CommunityInviteTour(
+      title: shortTourTitle(t.name),
+      code: res.code!,
+      stopCount: t.stopCount,
+      picked: picked,
+    );
+  }
+
+  Future<void> _copy() async {
+    setState(() => _building = true);
+    final body = await _buildInviteBody();
+    if (!mounted) return;
+    setState(() => _building = false);
+    if (body == null) return;
+    await Clipboard.setData(ClipboardData(text: body));
+    if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Invite copied.')));
   }
 
   Future<void> _share() async {
-    await Share.share(_inviteMessage,
+    setState(() => _building = true);
+    final body = await _buildInviteBody();
+    if (!mounted) return;
+    setState(() => _building = false);
+    if (body == null) return;
+    await Share.share(body,
         subject: CommunityCopy.emailInviteSubject(widget.community.name));
   }
 
@@ -932,13 +1024,11 @@ class _CommunityInviteToolsState extends State<CommunityInviteTools> {
   /// was sent.
   Future<void> _email() async {
     final c = widget.community;
-    final body = CommunityCopy.emailInviteBody(
-      communityName: c.name,
-      description: c.description,
-      organiserName: c.organiser.name,
-      code: _code,
-      memberCount: c.memberCount,
-    );
+    setState(() => _building = true);
+    final body = await _buildInviteBody();
+    if (!mounted) return;
+    setState(() => _building = false);
+    if (body == null) return;
     final subject = CommunityCopy.emailInviteSubject(c.name);
     final mailto = Uri(
       scheme: 'mailto',
@@ -993,8 +1083,9 @@ class _CommunityInviteToolsState extends State<CommunityInviteTools> {
     }
     setState(() {
       _code = result['join_code'] as String;
-      final msg = result['invite_message'];
-      if (msg is String && msg.isNotEmpty) _inviteMessage = msg;
+      // The invite body is rebuilt on demand from _code (+ the community's real
+      // settings and the chosen tour), so there is no cached message to refresh
+      // here (D672 addenda).
     });
     ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
         content: Text('New invite code generated. The old code no longer works.')));

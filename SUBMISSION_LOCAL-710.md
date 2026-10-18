@@ -127,3 +127,120 @@ Real stops read from the local DB (`docker exec development-postgres-2-1 psql
 
 No server change, no device install, no DB writes. Did not touch DECISIONS,
 CLAUDE, BACKLOG, WORK_QUEUE or `.continuous_dev`.
+
+
+---
+
+# 710B — the community invite explains itself (D672 addenda 1 + 2)
+
+Michael on the community invite: *"I do not like 'A demo PAID community:'. Instead
+put a couple of sentences explaining what a community is and the restrictions if
+any, and a link to the latest tour, unless the organiser sends the tour."* — then
+(addendum 2) *"we should print [the description] also."*
+
+The invite now **explains itself** and is **data-driven**.
+
+## What changed
+
+**Invite body (new order, `buildCommunityInvite` in `lib/utils/share_code.dart`):**
+1. `You are invited to join "<name>" on Audioura.`
+2. the standard explanation — `A community on Audioura is a group that listens
+   together: the organiser publishes tours for its members, and each new one
+   appears in their Listen page.`
+3. `About this community: <organiser's description>` — kept (D672 addendum 2);
+   omitted only when the description is empty.
+4. the restriction lines, each **only when its real setting is true**:
+   - paid → `Membership is paid: a pass starts at $<cheapest> for <length>, bought in the app.` (degrades to a generic paid line if no pass is quotable)
+   - free → `Joining is free.`
+   - private → `It is private: only people with an invite can join.`
+   - listed → `Anyone can find it in Audioura's Search.`
+   - waiver → `Members accept the organiser's waiver when they join.`
+   - rules → `Rules: <rules_text>`
+   - always → `Community tours download only for members.` (D663)
+5. `Organiser: <name>`, then `<N> members.` only at **≥ 2** (D672).
+6. the **tour line**, exactly one: the organiser's **picked** tour
+   (`Tour: "<short title>", <N> stops: <link>`) else the **latest**
+   (`Latest tour: …`); **omitted when the community has no tours**. Owner MP3/RSS
+   episodes are never used.
+7. the join link `https://audioura.com/t/<CODE>` + the `(Or open Audioura, tap
+   Search and paste <CODE>.)` fallback.
+
+`CommunityCopy.emailInviteBody` now delegates to this one builder;
+`buildCommunityInviteMessage(name, code)` is kept as a thin back-compat wrapper.
+
+**The tour line's code** reuses the existing share endpoint —
+`TourShareService.share(audioTourId)` — never a second code system (D671).
+
+**Invite screen (`communities_about_screen.dart`):** when the community has
+tours, a **"Tour to include"** dropdown appears (default **"Latest tour"**, or a
+specific tour). Copy / Share / Email now build the invite asynchronously:
+resolve the chosen/latest tour's share code, then assemble the body from the
+community's real settings. No tours → no picker and no tour line.
+
+## Server change (LEAD rebuilds `user-api-2`)
+
+`user-tracking/communities_api.py`: new `_tours_for(cur, community_id)` and a
+new **`tours`** key in the community page payload — the community's own tours
+(`audio_tours.community_id = <id>`), **newest first**
+(`ORDER BY created_at DESC, id DESC`), drafts excluded, each
+`{id, name, stop_count, created_at}`. Owner episodes are not consulted. This is
+the only server change in 710B.
+
+App model: `CommunityInviteTourOption` (id, name, stopCount, createdAt) +
+`Community.tours` + a `Community.cheapestPass` getter (passes already arrive
+price-ascending).
+
+## Tests
+
+- **`test/share_code_test.dart`** — the self-explaining invite: standard
+  explanation + downloads line always present; member count gated at 0/1/2/12;
+  **each restriction line appears only when its setting is true** (paid vs free,
+  private vs listed, waiver on/off, rules present/empty); About present/omitted
+  and ordered after the explanation; the tour line picked vs latest vs none; two
+  full-body goldens (paid·listed·waiver·rules·latest-tour·12-members, and
+  free·private·no-tours·0-members).
+- **`test/communities_service_test.dart`** — `Community.fromJson` parses `tours`
+  (newest first, stop counts) and `cheapestPass`; member-count line matched by
+  its `<N> members` shape (the always-present downloads line also contains the
+  word "members"); empty defaults.
+- **`test/share_email_samples_test.dart`** — prints the real-code invites for
+  communities 2 and 1 (real DB settings) + a labelled picked/latest-tour fixture
+  (into `SHARE_EMAIL_SAMPLES_LOCAL-710.md` §4).
+- **`tests/test_local710b_community_tours_payload.py`** (hermetic, fake cursor,
+  no DB writes) — `_tours_for` row shape, newest-first ordering, community-id
+  filter, drafts excluded, episodes table never consulted, and `_community_page`
+  includes `tours`. **5 pass**; existing 701 + 700 community tests (28) still
+  pass.
+- **Full `flutter test`** → **594 pass, 6 fail** — the 6 failures are the known
+  baseline, all in `test/local109_swipe_e2e_test.dart` (SocketException /
+  Connection refused — they need a live server), unrelated to this change.
+
+## Live test (own container, spare port, read-only)
+
+Ran the changed server in my **own** `user-api` container (image
+`audioura-user-api-2`, `communities_api.py` mounted read-only) on **port 5099**,
+on the compose network against the shared DB — never `-p audioura`, never
+touching `audioura-*`. `GET /communities/2` returned the new **`tours`** key
+(`[]`, matching reality — no community has any tours). The `_tours_for` SELECT
+(columns + `ORDER BY created_at DESC, id DESC`) was separately confirmed against
+the live DB read-only. Container removed after the check. No DB writes, no device
+install.
+
+## Data (read-only, real DB settings)
+
+`docker exec development-postgres-2-1 psql -U admin -d audiotours`:
+- community **2 "Demo Boston Walkers"**: `is_paid=t`, **listed**, no waiver,
+  rules "Members only. Share the invite code with friends who joined.", cheapest
+  pass **$5 / week**, join code `0tdZGgXg`, **0 members**, **no tours**.
+- community **1 "Demo Book Club — The Art of War"**: `is_paid=t`, **private**,
+  no waiver, rules "Be kind in discussions. One chapter per week.", cheapest
+  pass **$1 / month**, join code `1v7UDLsL`, **0 members**, **no tours**.
+
+Neither has any `audio_tours.community_id` rows, so both real invites omit the
+tour line; the picked/latest-tour sample (§4c) is a labelled **fixture**.
+
+## Version
+
+`2.4.26+64` → **`2.4.27+65`**.
+
+Did not touch DECISIONS, CLAUDE, BACKLOG, WORK_QUEUE or `.continuous_dev`.
