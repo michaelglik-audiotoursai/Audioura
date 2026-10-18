@@ -173,3 +173,85 @@ was **not** added to any whitelist.
 `website/.well-known/assetlinks.json`, `website/t/index.html`, `website/_redirects`,
 `website/_headers`, `website/README.md`, `website/tests/landing_page.test.js`,
 `website/screenshots/landing_390px.png`, `website/screenshots/landing_1280px.png`.
+
+---
+
+## 709B — LEAD review fixes (D671)
+
+LEAD reviewed LOCAL-709 at `fb679dc2`. Links, landing page and tests were good;
+two defects blocked the merge. Both are fixed on this branch
+(`LOCAL-709-tour-share-links`, continued from origin, base `subscribed` =
+`859b92e4`).
+
+### Fix 1 — no unexplained paste prompt on an existing user's update
+
+**Problem.** `runDeferredCheckOnce` fires on the first launch after an UPDATE
+(not only after a fresh install) because the one-shot flag
+`deferred_share_link_checked_v1` is new in this release — absent for everyone
+updating. On iOS 16+ its clipboard read pops the system "Allow Paste" prompt;
+on Android 12+ the clipboard branch (which also ran when the referrer was empty)
+shows a "pasted from your clipboard" toast. So Michael and every tester would
+get one unexplained prompt.
+
+**Change (two parts, `lib/services/deep_link_service.dart`):**
+
+1. **Existing-install guard in `DeepLinkService.init()`** (runs in `main()` at
+   startup, before onboarding or the deferred check can fire). If the one-shot
+   flag is absent AND this is an existing install, init silently sets the flag
+   to `true` and does nothing else. The existing-install signal is
+   `onboarding_complete` (`kExistingInstallSignalKey`): the app has always
+   written it when the user finishes first-launch onboarding, so it is **absent
+   on a fresh install at init time** (init runs before any screen) and
+   **present on every install old enough to have completed onboarding**. `init`
+   now takes an optional `prefs` for testing. Fresh installs (signal absent)
+   keep the current one-shot behaviour untouched.
+2. **Clipboard branch is iOS-only** in `runDeferredCheckOnce`: after the Android
+   Install Referrer yields nothing, the clipboard path runs only when
+   `defaultTargetPlatform == TargetPlatform.iOS`. On Android only the Install
+   Referrer is read — the clipboard is never touched. A `platform` parameter
+   (default `defaultTargetPlatform`) is injected so the iOS branch is testable
+   without a device.
+
+### Fix 2 — assetlinks.json holds only real fingerprints
+
+**Problem.** `website/.well-known/assetlinks.json` carried a non-hex placeholder
+(`"PLAY_APP_SIGNING_SHA256_FROM_PLAY_CONSOLE"`) as a second fingerprint; a
+malformed fingerprint risks Android rejecting the whole statement.
+
+**Change.** Removed the placeholder — the file now lists only the real
+`E6:2F:…:62:28` fingerprint. `website/README.md` now instructs Michael to add
+the Play App Signing SHA-256 as a **second array entry** in colon-hex format
+before uploading, and shows the exact resulting JSON shape with `<PASTE HERE>`
+(in the README only; never committed into `assetlinks.json`).
+
+### Version
+
+`audio_tour_app/pubspec.yaml`: `2.4.25+62` → `2.4.25+63` (build +1).
+
+### Verification
+
+- **Deep-link tests** (`flutter test test/deep_link_service_test.dart`): 19/19
+  pass, including the new cases:
+  - Existing install (`onboarding_complete` present, flag absent) → `init` sets
+    the flag; the referrer and clipboard readers are never called afterward.
+  - Fresh install → one-shot behaviour unchanged (referrer still read once).
+  - Android with an empty referrer → the clipboard reader is never called and
+    no prompt is shown; the one shot is still spent.
+  - The three pre-existing iOS clipboard tests now inject
+    `platform: TargetPlatform.iOS`.
+- **assetlinks.json**: `python3 -m json.tool` passes; every fingerprint matches
+  `^([0-9A-F]{2}:){31}[0-9A-F]{2}$` (1 fingerprint, matched).
+- **`flutter analyze`** on the changed Dart files
+  (`lib/services/deep_link_service.dart`, `test/deep_link_service_test.dart`):
+  "No issues found!".
+- **Full `flutter test`**: 554 pass, 6 fail — the same baseline failures only,
+  all in `test/local109_swipe_e2e_test.dart` (`SocketException: Connection
+  refused`, require a live server unavailable in this environment); unrelated to
+  these changes.
+
+### Files changed (709B)
+
+`audio_tour_app/lib/services/deep_link_service.dart`,
+`audio_tour_app/test/deep_link_service_test.dart`,
+`audio_tour_app/pubspec.yaml`, `website/.well-known/assetlinks.json`,
+`website/README.md`.

@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -168,6 +169,7 @@ void main() {
           return true;
         },
         prefs: prefs,
+        platform: TargetPlatform.iOS,
       );
       expect(PendingShareSearch.instance.code.value, code);
       expect(promptCount, 1);
@@ -182,6 +184,7 @@ void main() {
           return true;
         },
         prefs: prefs,
+        platform: TargetPlatform.iOS,
       );
       expect(promptCount, 1, reason: 'never ask again (D671 §4)');
       expect(PendingShareSearch.instance.code.value, isNull);
@@ -195,6 +198,7 @@ void main() {
         readClipboardCode: () async => code,
         prompt: (c) async => false, // "Not now"
         prefs: prefs,
+        platform: TargetPlatform.iOS,
       );
       expect(PendingShareSearch.instance.code.value, isNull);
       expect(prefs.getBool(kDeferredLinkCheckedKey), isTrue,
@@ -212,9 +216,102 @@ void main() {
           return true;
         },
         prefs: prefs,
+        platform: TargetPlatform.iOS,
       );
       expect(promptCount, 0, reason: 'no prompt when the clipboard is empty');
       expect(PendingShareSearch.instance.code.value, isNull);
+    });
+
+    test('Android with an empty referrer never touches the clipboard '
+        '(D671 §2: clipboard is iOS only)', () async {
+      final prefs = await SharedPreferences.getInstance();
+      var clipboardReads = 0;
+      var promptCount = 0;
+      await DeepLinkService.instance.runDeferredCheckOnce(
+        readInstallReferrer: () async => null, // Android, nothing in referrer
+        readClipboardCode: () async {
+          clipboardReads++;
+          return code;
+        },
+        prompt: (c) async {
+          promptCount++;
+          return true;
+        },
+        prefs: prefs,
+        platform: TargetPlatform.android,
+      );
+      expect(clipboardReads, 0,
+          reason: 'Android must never read the clipboard');
+      expect(promptCount, 0, reason: 'Android must never prompt');
+      expect(PendingShareSearch.instance.code.value, isNull);
+      expect(prefs.getBool(kDeferredLinkCheckedKey), isTrue,
+          reason: 'the one shot is still spent on Android');
+    });
+  });
+
+  group('init — existing-install guard (D671: no paste prompt on update)', () {
+    setUp(() {
+      TestWidgetsFlutterBinding.ensureInitialized();
+      PendingShareSearch.instance.consume();
+    });
+
+    test('existing install (onboarding_complete present, flag absent): init '
+        'sets the flag so the deferred readers never run', () async {
+      SharedPreferences.setMockInitialValues({'onboarding_complete': true});
+      final prefs = await SharedPreferences.getInstance();
+      expect(prefs.getBool(kDeferredLinkCheckedKey), isNull,
+          reason: 'precondition: the one-shot flag is new/absent');
+
+      await DeepLinkService.instance.init(prefs: prefs);
+
+      expect(prefs.getBool(kDeferredLinkCheckedKey), isTrue,
+          reason: 'init must consume the one shot for existing installs');
+
+      // And the deferred check is now a no-op: readers are never called.
+      var referrerReads = 0;
+      var clipboardReads = 0;
+      await DeepLinkService.instance.runDeferredCheckOnce(
+        readInstallReferrer: () async {
+          referrerReads++;
+          return 'audioura_code=$code';
+        },
+        readClipboardCode: () async {
+          clipboardReads++;
+          return code;
+        },
+        prompt: (c) async => true,
+        prefs: prefs,
+        platform: TargetPlatform.iOS,
+      );
+      expect(referrerReads, 0, reason: 'referrer reader must not run');
+      expect(clipboardReads, 0, reason: 'clipboard reader must not run');
+      expect(PendingShareSearch.instance.code.value, isNull);
+    });
+
+    test('fresh install (no onboarding_complete, flag absent): init does NOT '
+        'set the flag; the one-shot behaviour is unchanged', () async {
+      SharedPreferences.setMockInitialValues({});
+      final prefs = await SharedPreferences.getInstance();
+
+      await DeepLinkService.instance.init(prefs: prefs);
+
+      expect(prefs.getBool(kDeferredLinkCheckedKey), isNull,
+          reason: 'a fresh install must keep the deferred check available');
+
+      // The current one-shot behaviour still runs for a fresh install.
+      var referrerReads = 0;
+      await DeepLinkService.instance.runDeferredCheckOnce(
+        readInstallReferrer: () async {
+          referrerReads++;
+          return 'audioura_code=$code';
+        },
+        readClipboardCode: () async => null,
+        prompt: (c) async => true,
+        prefs: prefs,
+        platform: TargetPlatform.android,
+      );
+      expect(referrerReads, 1, reason: 'fresh install still reads the referrer');
+      expect(PendingShareSearch.instance.code.value, code);
     });
   });
 }

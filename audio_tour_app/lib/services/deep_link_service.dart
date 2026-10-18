@@ -105,11 +105,43 @@ class DeepLinkService {
     return isShareCodeShape(code) ? code : null;
   }
 
+  /// SharedPreferences key the app has ALWAYS written when a user finishes the
+  /// first-launch onboarding (see `onboarding_screen.dart`). On a fresh install
+  /// it is absent at [init] time (init runs in `main` before any screen); on
+  /// every install old enough to have completed onboarding it is present. We
+  /// use its presence as the "this is an existing install" signal (D671).
+  static const String kExistingInstallSignalKey = 'onboarding_complete';
+
   /// Wire up cold- and warm-start links. Call once, early (e.g. from `main`).
   /// Every incoming link that resolves to a code is parked in
   /// [PendingShareSearch]; Home consumes it. Safe to call when the plugin is
   /// unavailable (desktop/test) — it simply no-ops.
-  Future<void> init() async {
+  ///
+  /// [LOCAL-709 / D671] Existing-install guard: the deferred-link one-shot flag
+  /// [kDeferredLinkCheckedKey] is new in this release. Without this guard, an
+  /// existing user's FIRST launch after UPDATING would see the flag absent and
+  /// run the deferred check — a clipboard read that, on iOS 16+, pops the system
+  /// "Allow Paste" prompt (and on Android 12+ a "pasted from clipboard" toast).
+  /// That prompt would be unexplained and wrong: these users did not just
+  /// install from a share link. So: if the flag is absent AND this is an
+  /// existing install, silently mark the flag done and do nothing else. Fresh
+  /// installs (no existing-install signal) keep the current one-shot behaviour.
+  Future<void> init({SharedPreferences? prefs}) async {
+    try {
+      final store = prefs ?? await SharedPreferences.getInstance();
+      final alreadyChecked = store.getBool(kDeferredLinkCheckedKey) ?? false;
+      final existingInstall = store.containsKey(kExistingInstallSignalKey);
+      if (!alreadyChecked && existingInstall) {
+        // Existing user updating into this release: consume the one shot now,
+        // before onboarding or the deferred check can fire, so no paste prompt
+        // ever appears for them.
+        await store.setBool(kDeferredLinkCheckedKey, true);
+      }
+    } catch (_) {
+      // Prefs unavailable (desktop/test without a store) — fall through; the
+      // link wiring below is still safe to attempt.
+    }
+
     try {
       _appLinks ??= AppLinks();
     } catch (_) {
@@ -147,14 +179,22 @@ class DeepLinkService {
   /// plugins; [init]-time callers pass the real implementations.
   ///
   /// Order: Android referrer first (unambiguous, no prompt). If it yields a
-  /// code, run it and mark done. Otherwise, if the clipboard holds a code and
-  /// the user says yes, run it. Either way the one-shot flag is set so this
-  /// never runs again.
+  /// code, run it and mark done. Otherwise, ON iOS ONLY, if the clipboard holds
+  /// a code and the user says yes, run it. Either way the one-shot flag is set
+  /// so this never runs again.
+  ///
+  /// [LOCAL-709 / D671 §2] The clipboard branch is iOS-only. On Android we read
+  /// ONLY the Install Referrer: touching the clipboard there would pop a
+  /// "pasted from your clipboard" toast on Android 12+ and is never the deferred
+  /// mechanism for Android (that is the referrer). [platform] defaults to the
+  /// real [defaultTargetPlatform] and is injectable so tests can exercise the
+  /// iOS branch without a device.
   Future<void> runDeferredCheckOnce({
     required Future<String?> Function() readInstallReferrer,
     required Future<String?> Function() readClipboardCode,
     required DeferredPrompt prompt,
     SharedPreferences? prefs,
+    TargetPlatform? platform,
   }) async {
     final store = prefs ?? await SharedPreferences.getInstance();
     if (store.getBool(kDeferredLinkCheckedKey) ?? false) return;
@@ -170,10 +210,13 @@ class DeepLinkService {
         return;
       }
     } catch (_) {
-      // fall through to the clipboard branch.
+      // fall through to the clipboard branch (iOS only).
     }
 
-    // iOS (and anywhere the referrer had nothing): clipboard one-shot prompt.
+    // iOS ONLY: clipboard one-shot prompt. On Android we never touch the
+    // clipboard — the referrer above is Android's only deferred mechanism.
+    final effectivePlatform = platform ?? defaultTargetPlatform;
+    if (effectivePlatform != TargetPlatform.iOS) return;
     try {
       final code = await readClipboardCode();
       if (code == null) return; // nothing code-shaped on the clipboard.

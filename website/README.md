@@ -27,20 +27,36 @@ These static files make `https://audioura.com/t/<CODE>` work:
 
 ### 1. Play App Signing fingerprint (`assetlinks.json`)
 
-`assetlinks.json` currently lists two fingerprints:
+`assetlinks.json` currently lists exactly ONE fingerprint — the **real** one, so
+the published file is valid as-is:
 
 1. `E6:2F:E3:…:62:28` — the **real** SHA-256 of the keystore that signs our
    release APK today (the project debug keystore at
    `audio_tour_app/android/app/debug.keystore`; verified against the built
    `app-release.apk` with `apksigner verify --print-certs`). This makes App
    Links verify for the APKs we sideload now.
-2. `PLAY_APP_SIGNING_SHA256_FROM_PLAY_CONSOLE` — **placeholder.** Once the app is
-   on Google Play, Play re-signs it with Google's own key, so that key's
-   fingerprint must also be listed or App Links break for Play installs.
 
-   **Where to find it:** Play Console → **Test and release → App integrity → App
-   signing** → copy the **SHA-256 certificate fingerprint**. Replace the
-   placeholder string with it (keep the colon-separated upper-case format).
+Once the app is on Google Play, Play re-signs it with Google's own key, so that
+key's fingerprint must ALSO be listed or App Links break for Play installs.
+
+**Before uploading, add the Play App Signing SHA-256 as a SECOND array entry**
+in the same colon-separated upper-case hex format (`^([0-9A-F]{2}:){31}[0-9A-F]{2}$`).
+
+**Where to find it:** Play Console → **Test and release → App integrity → App
+signing** → copy the **SHA-256 certificate fingerprint**.
+
+The `sha256_cert_fingerprints` array should then read:
+
+```json
+"sha256_cert_fingerprints": [
+  "E6:2F:E3:27:9B:67:F4:79:BD:78:6A:DD:0E:CC:9A:44:0E:61:46:3E:1A:E8:00:33:14:D9:F4:D5:C8:46:62:28",
+  "<PASTE HERE>"
+]
+```
+
+Do NOT commit a placeholder into `assetlinks.json`: a non-hex string risks
+Android rejecting the whole statement. The file in the repo must hold only real
+fingerprints; add the second one at upload time.
 
 ### 2. Store URLs (`t/index.html`)
 
