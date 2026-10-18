@@ -159,3 +159,103 @@ All ≤ 60 chars. 365 and 557 match the values in the regenerated samples.
   leaves `short_title` NULL and the app behaves exactly as under D672.
 - The user-typed `tour_name` is never modified anywhere.
 - Did not edit DECISIONS / CLAUDE / BACKLOG / WORK_QUEUE / .continuous_dev.
+
+
+---
+
+# 711B — infer a blank type, never "… Tour — Tour" (LEAD review of 711)
+
+**Branch:** `LOCAL-711-short-titles` (continued from `ad62b358`, base `subscribed` = `57294733`)
+**App version:** `2.4.28+66` → `2.4.28+67` (build +1)
+
+## Why
+
+LEAD's 711 review found that every tour whose stored type is blank (`… -  Tour`)
+got a weak title: the type was dropped to a bare " — Tour" and the subject often
+repeated the category words. The four failing rows:
+
+| id | stored name | 711 short title | required |
+|----|-------------|-----------------|----------|
+| 368 | restaurant tour of Buttermilk & Bourbon - Back Bay, Boston, Ma -  Tour | Buttermilk & Bourbon — Tour | Buttermilk & Bourbon — Restaurant Tour |
+| 370 | restaurant tour, Boston, MA -  Tour | Restaurant Tour — Tour | Boston — Restaurant Tour |
+| 372 | chart house restaurant tour, Boston, MA -  Tour | Chart House Restaurant Tour — Tour | Chart House — Restaurant Tour |
+| 397 | WNDR museum, Boston, MA -  Tour | WNDR Museum — Tour | WNDR Museum — Museum Tour |
+
+## What changed (all in `tour_short_title.py`, deterministic, pure)
+
+1. **Infer the type when the suffix is blank.** `infer_tour_type(name, request,
+   stored_type)`: a non-empty stored suffix type always wins (Title-Cased). When
+   it is blank, a word-boundary keyword map (`TYPE_KEYWORDS`: restaurant, museum,
+   walking, cycling/biking, food, art, history, boat…) reads the type from the
+   name then the request. Nothing found → `''` → the plain " — Tour" (711's
+   typeless contract). This runs **before** the LLM and the fixed type is passed
+   to the prompt, so the model never invents one.
+2. **The subject never carries the type words.** The prompt now asks for the
+   **SUBJECT only**; the caller appends " — <Type> Tour" via `compose_title`, so
+   the type can never be doubled. `_strip_type_words` then removes any type word
+   the model still echoed — keeping "Museum" when it is part of a proper name
+   ("WNDR Museum", "McMullen Museum of Art") but dropping a bare leading "Museum".
+3. **Place-as-subject for a generic subject.** When the stripped subject is only
+   category words (`_is_generic_subject`), `_place_from_name` supplies the place
+   (first non-generic comma chunk of the name, state codes like "MA" dropped):
+   "restaurant tour, Boston" → **Boston — Restaurant Tour**.
+4. **Validator hardened.** `validate` now rejects any title whose subject ends in
+   "Tour" (the 711 weakness: "Chart House Restaurant Tour — Tour") and any
+   "Tour — Tour" anywhere, in addition to the empty / > 60-char checks.
+
+The user's `tour_name` is still never modified; the module stays self-contained;
+the orchestrator / translation / backfill callers are unchanged (they already
+pass the name-derived type, which `infer_tour_type` now upgrades).
+
+## Live test (read-only — NO backfill on the shared DB)
+
+`make_short_title` re-run for real (one `gpt-4o-mini` call each) on the same 10
+ids. The tour names were read **read-only** from the shared
+`development-postgres-2-1` (localhost:5433); the connection was closed and
+**nothing was written**. Tokens in 3933, out 41, ~**$0.0006**. All ≤ 60 chars.
+
+| id  | stored type | short_title |
+|-----|-------------|-------------|
+| 365 | walking     | Faneuil Hall Marketplace — Walking Tour |
+| 368 | *(blank)*   | Buttermilk & Bourbon — Restaurant Tour |
+| 370 | *(blank)*   | Boston — Restaurant Tour |
+| 372 | *(blank)*   | Chart House — Restaurant Tour |
+| 388 | biking      | Crystal Lake to Paul Revere Park — Biking Tour |
+| 397 | *(blank)*   | WNDR Museum — Museum Tour |
+| 399 | museum      | McMullen Museum of Art — Museum Tour |
+| 400 | museum      | Harvard Art Museums — Museum Tour |
+| 402 | museum      | Vietnam National Fine Arts Museum — Museum Tour |
+| 557 | walking     | Massachusetts Politics — Walking Tour |
+
+The four blank-type rows now match the required column exactly. 388 keeps
+"Biking" because its stored suffix type is non-blank (the keyword map only fires
+on a blank type).
+
+## Tests
+
+`tests/test_local711_short_title.py` — **33 pass** (was 16). Added, all with a
+stub LLM that echoes the SUBJECT it is given:
+
+- `infer_tour_type` — stored type wins and is Title-Cased; map reads the type
+  from the name when blank; biking → Cycling; nothing → `''`.
+- `_strip_type_words` — strips the category word and an echoed full suffix,
+  keeps proper-name "Museum", drops a bare "Museum".
+- `_is_generic_subject`, `_place_from_name` (state code "MA" dropped),
+  `compose_title`.
+- A parametrized row per id (`_B_ROWS`: the 4 failing + the 6 good from 711),
+  each asserting the required output, ≤ 60 chars, and no doubled "Tour".
+- `validate` rejects "Restaurant Tour — Tour", "Chart House Restaurant Tour —
+  Tour", "WNDR Museum Tour — Museum Tour", "X Tour — Tour"; accepts the clean
+  forms.
+
+The original 711 cases stay green (`_strip_type_words` reduces an echoed full
+title back to its subject); `test_empty_reply_rejected` now uses an empty
+name+request so it still returns `None` under the new place-as-subject rescue.
+Sibling map-delivery fixtures (`test_local687`, `test_local701`) unchanged and
+still pass.
+
+## Process
+
+Continued the existing `LOCAL-711-short-titles` branch. Did not edit DECISIONS /
+CLAUDE / BACKLOG / WORK_QUEUE / .continuous_dev. Own containers only — the shared
+`audioura-*` stack was never started, renamed, or written to.

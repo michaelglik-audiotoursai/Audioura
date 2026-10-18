@@ -15,6 +15,8 @@ import ast
 import pathlib
 import sys
 
+import pytest  # noqa: E402
+
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
@@ -53,7 +55,9 @@ def test_over_60_chars_rejected(monkeypatch):
 
 def test_empty_reply_rejected(monkeypatch):
     monkeypatch.setattr(tst, '_call_model', _stub_model(''))
-    title, _ = tst.make_short_title('n', 'r', 'walking')
+    # Empty reply AND no name/request to fall back on → None (the place-as-subject
+    # rescue added in LOCAL-711B has nothing to use here).
+    title, _ = tst.make_short_title('', '', 'walking')
     assert title is None
 
 
@@ -94,6 +98,119 @@ def test_tour_type_from_name():
     assert tst._tour_type_from_name('Museum of Fine Arts - museum Tour') == 'museum'
     assert tst._tour_type_from_name('X -  Tour') == ''
     assert tst._tour_type_from_name('No suffix') == ''
+
+
+# ─── LOCAL-711B: infer a blank type, strip type words, place-as-subject ─────────
+def _echo_subject(subject):
+    """Stub LLM that echoes a fixed SUBJECT regardless of inputs — the
+    deterministic layer (infer_tour_type / _strip_type_words / place-as-subject /
+    compose_title / validate) is what the 711B rows exercise."""
+    def _call(name, request_string, tour_type):
+        return subject, _Usage()
+    return _call
+
+
+def test_infer_type_stored_wins_title_cased():
+    # A non-empty stored suffix type wins and is Title-Cased; the map never fires.
+    assert tst.infer_tour_type('X - biking Tour', '', 'biking') == 'Biking'
+    assert tst.infer_tour_type('X - self guided Tour', '', 'self guided') == 'Self Guided'
+
+
+def test_infer_type_from_name_when_blank():
+    # Stored type blank → keyword map reads the type from the name/request.
+    assert tst.infer_tour_type('restaurant tour of X -  Tour', '', '') == 'Restaurant'
+    assert tst.infer_tour_type('WNDR museum, Boston -  Tour', '', '') == 'Museum'
+    assert tst.infer_tour_type('A cycling loop -  Tour', '', '') == 'Cycling'
+    assert tst.infer_tour_type('biking the coast -  Tour', '', '') == 'Cycling'
+    # Nothing names a type → '' → plain " — Tour".
+    assert tst.infer_tour_type('Just a place, Boston -  Tour', '', '') == ''
+
+
+def test_strip_type_words_keeps_proper_name_museum():
+    assert tst._strip_type_words('Buttermilk & Bourbon Restaurant Tour', 'Restaurant') \
+        == 'Buttermilk & Bourbon'
+    assert tst._strip_type_words('Chart House Restaurant', 'Restaurant') == 'Chart House'
+    assert tst._strip_type_words('WNDR Museum', 'Museum') == 'WNDR Museum'       # kept
+    assert tst._strip_type_words('Museum', 'Museum') == ''                       # bare dropped
+    assert tst._strip_type_words('McMullen Museum of Art', 'Museum') == \
+        'McMullen Museum of Art'
+    # A full echoed title reduces to its subject.
+    assert tst._strip_type_words('Faneuil Hall — Walking Tour', 'Walking') == 'Faneuil Hall'
+
+
+def test_is_generic_subject():
+    assert tst._is_generic_subject('Restaurant Tour') is True
+    assert tst._is_generic_subject('Museum') is True
+    assert tst._is_generic_subject('') is True
+    assert tst._is_generic_subject('Boston') is False
+    assert tst._is_generic_subject('Chart House') is False
+
+
+def test_place_from_name_drops_state_code():
+    assert tst._place_from_name('restaurant tour, Boston, MA -  Tour', '') == 'Boston'
+    assert tst._place_from_name('museum tour, Cambridge, MA -  Tour', '') == 'Cambridge'
+
+
+# The four LOCAL-711 weak rows + the six good ones, driven end-to-end through
+# make_short_title with a stub LLM that echoes the SUBJECT it would return. The
+# stored type is blank ("… -  Tour") for the four; the good six carry their real
+# suffix type (or a map-inferred one). Each asserts the required 711B output.
+_B_ROWS = [
+    # (id, name, stored_type, stub_subject, required)
+    (368, 'restaurant tour of Buttermilk & Bourbon - Back Bay, Boston, Ma -  Tour',
+     '', 'Buttermilk & Bourbon Restaurant Tour', 'Buttermilk & Bourbon — Restaurant Tour'),
+    (370, 'restaurant tour, Boston, MA -  Tour',
+     '', 'Restaurant Tour', 'Boston — Restaurant Tour'),
+    (372, 'chart house restaurant tour, Boston, MA -  Tour',
+     '', 'Chart House Restaurant', 'Chart House — Restaurant Tour'),
+    (397, 'WNDR museum, Boston, MA -  Tour',
+     '', 'WNDR Museum', 'WNDR Museum — Museum Tour'),
+    (365, 'Faneuil Hall Marketplace, Boston MA - Walking Tour',
+     'walking', 'Faneuil Hall Marketplace', 'Faneuil Hall Marketplace — Walking Tour'),
+    (388, 'Crystal Lake to Paul Revere Park, Boston - biking Tour',
+     'biking', 'Crystal Lake to Paul Revere Park',
+     'Crystal Lake to Paul Revere Park — Biking Tour'),
+    (399, 'McMullen Museum of Art, Boston - museum Tour',
+     'museum', 'McMullen Museum of Art', 'McMullen Museum of Art — Museum Tour'),
+    (400, 'Harvard Art Museums, Cambridge - museum Tour',
+     'museum', 'Harvard Art Museums', 'Harvard Art Museums — Museum Tour'),
+    (402, 'Vietnam National Fine Arts Museum - museum Tour',
+     'museum', 'Vietnam National Fine Arts Museum',
+     'Vietnam National Fine Arts Museum — Museum Tour'),
+    (557, 'Walking tour ... Massachusetts politics, Boston, MA - walking Tour',
+     'walking', 'Massachusetts Politics', 'Massachusetts Politics — Walking Tour'),
+]
+
+
+@pytest.mark.parametrize('tid,name,stored_type,stub_subject,required', _B_ROWS,
+                         ids=[str(r[0]) for r in _B_ROWS])
+def test_711b_rows(monkeypatch, tid, name, stored_type, stub_subject, required):
+    monkeypatch.setattr(tst, '_call_model', _echo_subject(stub_subject))
+    title, _ = tst.make_short_title(name, '', stored_type)
+    assert title == required, f'{tid}: {title!r} != {required!r}'
+    # Required post-conditions for every row: within 60 chars and never a doubled
+    # or echoed "Tour".
+    assert len(title) <= tst.MAX_CHARS
+    assert ' Tour — ' not in title
+    assert '— Tour — Tour' not in title
+
+
+def test_validator_rejects_subject_ending_in_tour():
+    # The exact 711 weakness: subject repeats the type.
+    assert tst.validate('Restaurant Tour — Tour') is None
+    assert tst.validate('Chart House Restaurant Tour — Tour') is None
+    assert tst.validate('WNDR Museum Tour — Museum Tour') is None
+    # "Tour — Tour" anywhere.
+    assert tst.validate('X Tour — Tour') is None
+    # A clean title passes.
+    assert tst.validate('Boston — Restaurant Tour') == 'Boston — Restaurant Tour'
+    assert tst.validate('WNDR Museum — Museum Tour') == 'WNDR Museum — Museum Tour'
+
+
+def test_compose_title_builds_suffix():
+    assert tst.compose_title('Boston', 'Restaurant') == 'Boston — Restaurant Tour'
+    assert tst.compose_title('Buttermilk & Bourbon', '') == 'Buttermilk & Bourbon — Tour'
+    assert tst.compose_title('', 'Restaurant') == ''
 
 
 # ─── fake DB for the backfill ───────────────────────────────────────────────────

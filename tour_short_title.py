@@ -60,26 +60,178 @@ MAX_CHARS = 60
 PRICES = {'gpt-4o-mini': (0.15, 0.60), 'gpt-4.1-mini': (0.40, 1.60),
           'gpt-4o': (2.5, 10.0), 'gpt-4.1': (2.0, 8.0)}
 
-PROMPT = """You write a SHORT title for an audio tour, for a share email. You are given the tour's full name (what the curator typed, often a whole sentence), the original request, and the tour TYPE.
+# ─── LOCAL-711B / D673 ──────────────────────────────────────────────────────
+# Deterministic TYPE inference. When the stored name's " - <Type> Tour" suffix
+# is blank (the curator left it as "… -  Tour"), the type is still usually named
+# somewhere in the name/request ("restaurant tour of …", "WNDR museum"). We map
+# those words to a canonical type BEFORE the LLM call and pass it as fixed, so
+# the model never has to invent — and never produces a bare " — Tour" when the
+# name actually says what kind of tour it is (368/370/372/397 in LOCAL-711).
+#
+# Order matters: the first keyword found (scanning the map in this order) wins,
+# so a more specific word ("cycling") is listed before a weaker synonym it
+# shares a stem with. Each entry maps a lowercase keyword/phrase to the
+# canonical Title-Case type word used in the suffix.
+TYPE_KEYWORDS = [
+    ('restaurant', 'Restaurant'),
+    ('dining', 'Restaurant'),
+    ('food', 'Food'),
+    ('museum', 'Museum'),
+    ('gallery', 'Museum'),
+    ('walking', 'Walking'),
+    ('cycling', 'Cycling'),
+    ('biking', 'Cycling'),
+    ('bike', 'Cycling'),
+    ('boat', 'Boat'),
+    ('cruise', 'Boat'),
+    ('art', 'Art'),
+    ('history', 'History'),
+    ('historical', 'History'),
+]
 
-Write a faithful short title in EXACTLY this shape:
-    <Subject> — <Type> Tour
-Rules:
-- <Subject> is 2 to 6 words naming what the tour IS ABOUT, taken only from the name/request. Title Case.
-- Do NOT invent facts. Do NOT add a place unless the place itself is the subject. No quotation marks, no trailing punctuation.
-- <Type> is the given type, Title Case (Walking, Museum, Restaurant, Cycling, …). If the type is empty, write just " — Tour" with no type word.
-- The whole title must be at most 60 characters.
+# Generic category words that must never stand alone as the SUBJECT. If the
+# model's subject is only these (e.g. "Restaurant Tour", "Museum"), the place
+# becomes the subject instead (370: "restaurant tour, Boston" -> "Boston —
+# Restaurant Tour"). These are matched case-insensitively against the whole
+# subject after the type words are stripped.
+_GENERIC_SUBJECT_WORDS = {
+    'restaurant', 'restaurants', 'dining', 'food', 'museum', 'museums',
+    'gallery', 'galleries', 'walking', 'walk', 'cycling', 'biking', 'bike',
+    'boat', 'cruise', 'art', 'arts', 'history', 'historical', 'tour', 'tours',
+    'of', 'the', 'a', 'an',
+}
+
+# The trailing " - <anything> Tour" suffix the curator's name carries, so we can
+# strip it to read what is left as the real subject material.
+_SUFFIX_RE = re.compile(r'\s*[-–—]\s*[^-–—]*?\s*tour\s*$', re.I)
+
+
+def infer_tour_type(tour_name, request_string, stored_type):
+    """Return the tour TYPE to put in the suffix.
+
+    If ``stored_type`` (from the name's " - <Type> Tour" suffix) is non-empty,
+    it wins, Title-Cased. Otherwise scan the name then the request for a keyword
+    from TYPE_KEYWORDS and return the first canonical type found. When nothing
+    names a type, return '' so the suffix is the plain " — Tour" (LOCAL-711's
+    contract for a genuinely typeless tour).
+
+    Deterministic and pure — the orchestrator and the backfill both call it
+    before the LLM, and the tests drive it directly.
+    """
+    st = (stored_type or '').strip()
+    if st:
+        return _capitalise_type(st)
+    haystack = f"{tour_name or ''} {request_string or ''}".lower()
+    # Word-boundary match so "art" does not fire inside "Hartford" etc.
+    for keyword, canonical in TYPE_KEYWORDS:
+        if re.search(r'\b' + re.escape(keyword) + r'\b', haystack):
+            return canonical
+    return ''
+
+
+def _strip_type_words(subject, tour_type):
+    """Remove the type words from the model's subject so the suffix is not echoed
+    inside it (368: "Buttermilk & Bourbon Restaurant Tour" -> "Buttermilk &
+    Bourbon"). The canonical type word (e.g. "Restaurant"), the literal "Tour",
+    and a leading generic phrase ("restaurant tour of") are stripped.
+
+    "Museum" is special: it is kept when it is part of a proper name — i.e. when
+    it is NOT the first word (397: "WNDR Museum" keeps Museum; a bare "Museum"
+    is dropped). The same courtesy is not needed for the other categories.
+    """
+    s = (subject or '').strip()
+    if not s:
+        return ''
+    # If the model echoed the whole "<Subject> — <Type> Tour", keep only the
+    # part before the final " — … Tour" dash-suffix.
+    m = re.match(r'^(.*?)\s*[-–—]\s*[^-–—]*?tours?\s*$', s, re.I)
+    if m and m.group(1).strip():
+        s = m.group(1).strip()
+    # Drop a trailing standalone "Tour"/"Tours" the model may have appended.
+    s = re.sub(r'\s+tours?\s*$', '', s, flags=re.I).strip()
+    type_word = (tour_type or '').strip()
+    if type_word:
+        tw = type_word.lower()
+        if tw == 'museum':
+            # Keep "Museum" only when it is NOT the sole / leading token: a
+            # trailing proper-name "… Museum" stays, a bare leading "Museum …"
+            # (generic) is dropped.
+            s = re.sub(r'^museum\b\s*', '', s, flags=re.I).strip()
+        else:
+            # Strip the category word wherever it appears (it is never part of a
+            # proper name for these types).
+            s = re.sub(r'\b' + re.escape(tw) + r's?\b', ' ', s, flags=re.I)
+    # Drop a dangling leading/trailing "of"/"the" and collapse whitespace.
+    s = re.sub(r'\s+', ' ', s).strip()
+    s = re.sub(r'^(of|the)\s+', '', s, flags=re.I).strip()
+    s = re.sub(r'\s+(of|the)$', '', s, flags=re.I).strip()
+    return s
+
+
+def _is_generic_subject(subject):
+    """True when the subject is ONLY generic category words (so it names no real
+    subject, e.g. "Restaurant Tour", "Museum"). Such a subject must be replaced
+    by the place (370)."""
+    s = (subject or '').strip()
+    if not s:
+        return True
+    words = re.findall(r"[\w&']+", s.lower())
+    return all(w in _GENERIC_SUBJECT_WORDS for w in words) if words else True
+
+
+def _place_from_name(tour_name, request_string):
+    """Best-effort PLACE to use as the subject when the real subject is only a
+    generic category (370). Takes the first comma-separated chunk of the name
+    (after stripping the " - … Tour" suffix and any leading generic phrase) that
+    is not itself purely generic; else the first chunk of the request.
+
+    "restaurant tour, Boston, MA -  Tour" -> "Boston". Deterministic, pure."""
+    for source in (tour_name, request_string):
+        text = _SUFFIX_RE.sub('', (source or '').strip()).strip()
+        for chunk in re.split(r'[,\n]', text):
+            cand = _strip_type_words(chunk.strip(), '')
+            # Drop a US state abbreviation chunk ("MA", "Ma").
+            if re.fullmatch(r'[A-Za-z]{2}', cand):
+                continue
+            if cand and not _is_generic_subject(cand):
+                return _title_case(cand)
+    return ''
+
+
+def _title_case(text):
+    """Title-case a short phrase, preserving all-caps acronyms (WNDR) and the
+    ampersand word boundaries ("Buttermilk & Bourbon")."""
+    out = []
+    for w in (text or '').split():
+        if w.isupper() and len(w) <= 5:
+            out.append(w)               # acronym: WNDR, MASS
+        elif w == '&':
+            out.append('&')
+        else:
+            out.append(w[:1].upper() + w[1:])
+    return ' '.join(out)
+
+
+PROMPT = """You write a SHORT title for an audio tour, for a share email. You are given the tour's full name (what the curator typed, often a whole sentence), the original request, and the tour TYPE (already decided — do not change it).
+
+Reply with ONLY the SUBJECT: 2 to 6 words naming what the tour IS ABOUT, in Title Case. The caller appends " — {type} Tour" itself, so:
+- Do NOT write the word "Tour" and do NOT write the type word ("{type}") — give the subject alone.
+- Take the subject only from the name/request; do NOT invent facts; no quotation marks, no trailing punctuation.
+- Keep a proper name intact, including a trailing "Museum" when it is part of the name (e.g. "WNDR Museum", "McMullen Museum of Art").
+- If the name only states the category and a place (e.g. "restaurant tour, Boston"), answer with the PLACE (e.g. "Boston").
 
 Examples:
-  name "Walking tour in Boston dedicated to Massachusetts politics and current affairs, Boston, MA - walking Tour", type "walking" -> Massachusetts Politics — Walking Tour
-  name "Faneuil Hall Marketplace, Boston MA, with a stop at Quincy Market ... - Walking Tour", type "walking" -> Faneuil Hall Marketplace — Walking Tour
-  name "Museum of Fine Arts, Boston, MA - museum Tour", type "museum" -> Museum of Fine Arts — Museum Tour
+  name "Walking tour in Boston dedicated to Massachusetts politics and current affairs, Boston, MA - walking Tour", type "Walking" -> Massachusetts Politics
+  name "restaurant tour of Buttermilk & Bourbon - Back Bay, Boston, Ma -  Tour", type "Restaurant" -> Buttermilk & Bourbon
+  name "restaurant tour, Boston, MA -  Tour", type "Restaurant" -> Boston
+  name "chart house restaurant tour, Boston, MA -  Tour", type "Restaurant" -> Chart House
+  name "WNDR museum, Boston, MA -  Tour", type "Museum" -> WNDR Museum
 
 Tour name: {name}
 Request: {request}
 Type: {type}
 
-Reply with ONLY the short title, nothing else."""
+Reply with ONLY the subject, nothing else."""
 
 
 def _capitalise_type(tour_type):
@@ -152,9 +304,14 @@ def _sanitise(raw):
 
 
 def validate(candidate):
-    """D673 validator: a non-empty title of at most 60 chars. Returns the title
-    on success, else None. Kept tiny and pure so the tests can drive it with a
-    stub model (good / >60 / empty)."""
+    """D673 + LOCAL-711B validator. Returns the title on success, else None.
+
+    Rejects, in addition to empty / > 60 chars:
+      * a SUBJECT that ends with "Tour" — i.e. "<something> Tour — <Type> Tour"
+        or a bare "Restaurant Tour — Tour" (the 711 weakness); the subject must
+        name the thing, not repeat the type.
+      * the literal doubled suffix "Tour — Tour" anywhere.
+    Kept tiny and pure so the tests can drive it directly."""
     if not candidate:
         return None
     c = candidate.strip()
@@ -162,25 +319,68 @@ def validate(candidate):
         return None
     if len(c) > MAX_CHARS:
         return None
+    # "Tour — Tour" (any dash) is always wrong.
+    if re.search(r'\btour\s*[-–—]\s*tour\b', c, re.I):
+        return None
+    # The subject is everything before the final " — <Type> Tour" suffix. If the
+    # subject itself ends in "Tour", the type got echoed into it — reject.
+    m = re.match(r'^(.*?)\s*[-–—]\s*[^-–—]*?tour\s*$', c, re.I)
+    subject = (m.group(1) if m else c).strip()
+    if re.search(r'\btours?\s*$', subject, re.I):
+        return None
     return c
 
 
+def compose_title(subject, tour_type):
+    """Assemble the final "<Subject> — <Type> Tour" deterministically from a
+    SUBJECT and the fixed type. The suffix is always built here, so the type can
+    never be doubled or echoed inside the subject. An empty type gives the plain
+    " — Tour" (LOCAL-711's typeless contract). Returns '' if there is no subject."""
+    s = (subject or '').strip()
+    if not s:
+        return ''
+    t = (tour_type or '').strip()
+    return f'{s} — {t} Tour' if t else f'{s} — Tour'
+
+
+def _subject_from_reply(raw, tour_name, request_string, tour_type):
+    """Turn the model's reply into the final SUBJECT, applying the LOCAL-711B
+    deterministic rules: sanitise → strip the type words out of it → if what is
+    left is only a generic category, use the place instead. Pure; the stub-LLM
+    tests drive it through make_short_title with a model that echoes a subject."""
+    subject = _strip_type_words(_sanitise(raw), tour_type)
+    if _is_generic_subject(subject):
+        place = _place_from_name(tour_name, request_string)
+        if place:
+            subject = place
+    return subject
+
+
 def make_short_title(tour_name, request_string, tour_type):
-    """D673 entry point. One cheap LLM call → a validated short title, or None.
+    """D673 + LOCAL-711B entry point. Deterministic type inference, then one
+    cheap LLM call for the subject, then deterministic assembly → a validated
+    short title, or None.
 
-    Returns (title, usage) when called internally so the CLI can total cost;
-    the orchestrator / translation callers use the thin make_short_title_only
-    wrapper that returns just the title (or None) and never raises.
+    Steps:
+      1. infer_tour_type: if the stored suffix type is blank, read the type from
+         the name/request (keyword map). The fixed type is passed to the prompt.
+      2. one chat call → a SUBJECT (2–6 words), never the type or "Tour".
+      3. strip any type words the model still echoed; if the subject is only a
+         generic category, use the place instead (place-as-subject).
+      4. compose "<Subject> — <Type> Tour" and validate.
 
-    ANY failure — an SDK error, an empty reply, a reply over 60 chars — returns
-    (None, usage_or_None). The caller then leaves short_title NULL.
+    Returns (title, usage); the orchestrator / translation callers use the thin
+    make_short_title_only wrapper. ANY failure returns (None, usage_or_None) and
+    the caller leaves short_title NULL.
     """
+    effective_type = infer_tour_type(tour_name, request_string, tour_type)
     try:
-        raw, usage = _call_model(tour_name, request_string, tour_type)
+        raw, usage = _call_model(tour_name, request_string, effective_type)
     except Exception as e:
         # Surfaced by the CLI's per-tour print; callers treat None as "leave NULL".
         return None, _Failure(str(e))
-    title = validate(_sanitise(raw))
+    subject = _subject_from_reply(raw, tour_name, request_string, effective_type)
+    title = validate(compose_title(subject, effective_type))
     return title, usage
 
 
