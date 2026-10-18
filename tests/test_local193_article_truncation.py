@@ -301,49 +301,67 @@ class TestRuntimeConfig(unittest.TestCase):
 
 
 class TestTTSUnchanged(unittest.TestCase):
-    """T8: TTS char count unchanged for >5000-char free article.
+    """T8: [LOCAL-708 / D670] clean_text_for_polly no longer imposes a cap.
 
-    The critical invariant: clean_text_for_polly() truncates at 5000 chars.
-    Article truncation happens AFTER TTS (at display/delivery), so a free
-    user's audio must be identical before and after this change.
+    Before LOCAL-708, clean_text_for_polly() hard-capped the text at 5,000
+    characters, so a free/admin alike could never hear more than ~1.5 pages.
+    LOCAL-708 removes that cap: article length is governed by the listener's
+    PLAN limit, applied upstream in process_audio() via truncate_for_user(), and
+    the full-article audio is synthesised from that already-truncated text.
 
-    We verify by importing clean_text_for_polly and checking that:
-    - A 12000-char article produces the same TTS output regardless of
-      whether article_truncation is applied (because truncation is display-only).
+    This test proves the cap is GONE: cleaning a 12,000-char article returns
+    ~12,000 chars (only the HTML/URL/whitespace cleaning shrinks it slightly),
+    NOT ~5,000. The per-plan truncation is exercised separately in the
+    LOCAL-708 test suite.
     """
 
-    def test_tts_chars_unchanged(self):
-        """Verify TTS output length is identical with/without display truncation."""
-        # Import the actual TTS cleaning function
+    def test_clean_text_no_longer_caps_at_5000(self):
+        """clean_text_for_polly must NOT truncate long text to 5,000 chars."""
         from news_processor_service import clean_text_for_polly
 
-        # Create a >5000-char article (simulating what a free user would have)
+        # A >5,000-char article with no HTML/URLs so cleaning barely changes length.
         article = _make_article_with_sentences(12000)
+        cleaned = clean_text_for_polly(article)
 
-        # TTS path: clean_text_for_polly is called on the ORIGINAL text
-        # (not the display-truncated text). This is the invariant we're proving.
-        tts_output_before = clean_text_for_polly(article)
+        # The old cap would have forced this to ~5,050; it must now be well above.
+        self.assertGreater(
+            len(cleaned), 10000,
+            f"clean_text_for_polly still appears to cap text (got {len(cleaned)} chars)"
+        )
+        # No "truncated for cost control" marker — that message is gone.
+        self.assertNotIn("truncated for cost control", cleaned.lower())
 
-        # Display path: truncation for display
-        display_text, was_truncated, _ = truncate_article_text(article, 'free')
+        print(f"  Original chars:        {len(article)}")
+        print(f"  clean_text_for_polly:  {len(cleaned)} (no 5,000 cap)")
+        print(f"  CAP REMOVED: ✓")
+
+    def test_display_and_audio_share_one_truncation(self):
+        """The audio and the displayed text come from the SAME truncated source.
+
+        truncate_for_user() is the single source of truth. Whatever it returns is
+        both shown and voiced — there is no second, different cap applied to the
+        audio. We assert the truncated text, once cleaned for TTS, still reflects
+        the plan limit (not a smaller hidden cap).
+        """
+        from news_processor_service import clean_text_for_polly
+
+        # Simulate the admin plan limit (15,000) via the legacy 'ppu' entry point
+        # (ppu/unlimited map to the ceiling, 15,000) so this test needs no DB.
+        article = _make_article_with_sentences(40000)
+        display_text, was_truncated, _ = truncate_article_text(article, 'ppu')
         self.assertTrue(was_truncated)
+        self.assertLessEqual(len(display_text), 15000)
 
-        # The TTS function is called on the ORIGINAL, not the display text.
-        # Verify the original still produces the same TTS output.
-        tts_output_after = clean_text_for_polly(article)
-
-        self.assertEqual(tts_output_before, tts_output_after)
-        self.assertEqual(len(tts_output_before), len(tts_output_after))
-
-        # Verify TTS is capped at ~5000 chars (the existing behavior)
-        # clean_text_for_polly adds "... Content truncated for cost control." (~44 chars)
-        self.assertLessEqual(len(tts_output_before), 5050)
-
-        print(f"  TTS chars (before): {len(tts_output_before)}")
-        print(f"  TTS chars (after):  {len(tts_output_after)}")
-        print(f"  Display chars:      {len(display_text)}")
-        print(f"  Original chars:     {len(article)}")
-        print(f"  TTS UNCHANGED: ✓")
+        # The TTS path cleans the SAME display_text — length stays near the plan
+        # limit (cleaning only strips HTML/whitespace, which this text has none).
+        voiced = clean_text_for_polly(display_text)
+        self.assertGreater(
+            len(voiced), 10000,
+            f"Voiced text shrank unexpectedly (got {len(voiced)} chars) — "
+            f"a hidden cap would show up here"
+        )
+        print(f"  Display chars:  {len(display_text)} (<= 15,000 plan limit)")
+        print(f"  Voiced chars:   {len(voiced)} (same source, no extra cap)")
 
 
 class TestNoticeCompliance(unittest.TestCase):
