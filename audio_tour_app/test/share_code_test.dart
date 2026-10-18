@@ -193,6 +193,8 @@ void main() {
         '\n'
         'Hands-free audio: press play and walk.\n'
         '\n'
+        '$kTranslationOfferLine\n'
+        '\n'
         '3 stops, starting at Quincy Market (4 S Market St, Boston, MA 02109).\n'
         '\n'
         'https://audioura.com/t/FFush25U\n'
@@ -222,6 +224,8 @@ void main() {
         'Welcome to my tour "Boston politics & current affairs — Walking Tour" on Audioura.\n'
         '\n'
         'Hands-free audio: press play and walk.\n'
+        '\n'
+        '$kTranslationOfferLine\n'
         '\n'
         '5 stops, starting at Old State House (206 Washington St, Boston, MA 02109).\n'
         '\n'
@@ -255,6 +259,8 @@ void main() {
         '\n'
         'Hands-free audio: press play and walk.\n'
         '\n'
+        '$kTranslationOfferLine\n'
+        '\n'
         '3 stops, starting at Quincy Market (4 S Market St, Boston, MA 02109).\n'
         '\n'
         'https://audioura.com/t/FFush25U\n'
@@ -279,6 +285,8 @@ void main() {
         'Welcome to my free tour "Mystery Walk — Walking Tour" on Audioura.\n'
         '\n'
         'Hands-free audio: press play and walk.\n'
+        '\n'
+        '$kTranslationOfferLine\n'
         '\n'
         'https://audioura.com/t/FFush25U\n'
         '\n'
@@ -536,6 +544,8 @@ void main() {
         '\n'
         '$kCommunityExplanation\n'
         '\n'
+        '$kTranslationOfferLine\n'
+        '\n'
         'About this community: Weekly walking stories around Boston.\n'
         '\n'
         'Membership is paid: a pass starts at \$5 for a week, bought in the app.\n'
@@ -574,6 +584,8 @@ void main() {
         'You are invited to join "Demo Book Club" on Audioura.\n'
         '\n'
         '$kCommunityExplanation\n'
+        '\n'
+        '$kTranslationOfferLine\n'
         '\n'
         'About this community: Read together, one chapter a week.\n'
         '\n'
@@ -617,5 +629,61 @@ void main() {
     expect(extractShareCode('Commonwealth Avenue Mall'), isNull);
     expect(extractShareCode('Brooklyn'), isNull);
     expect(extractShareCode('Montreal, Quebec'), isNull);
+  });
+
+  // ── [LOCAL-711 / D673] The translation offer line ──────────────────────────
+  group('D673 translation offer line', () {
+    test('the constant is exactly Michael\'s wording', () {
+      expect(kTranslationOfferLine,
+          'Prefer another language? Audioura plays it in yours: just pick '
+          'your language and listen.');
+    });
+
+    test('every share message (free / paid / community) carries it, right '
+        'after the hands-free line', () {
+      for (final kind in ShareTourKind.values) {
+        final msg = buildShareMessage(ShareTourDetails(
+          title: 'T — Walking Tour',
+          code: 'FFush25U',
+          kind: kind,
+          communityName: kind == ShareTourKind.community ? 'C' : null,
+          price: kind == ShareTourKind.paid ? '\$4.99' : null,
+        ));
+        expect(msg.contains(kTranslationOfferLine), isTrue,
+            reason: 'missing for $kind');
+        // It comes immediately after the hands-free line.
+        expect(
+          msg.contains(
+              'Hands-free audio: press play and walk.\n\n$kTranslationOfferLine'),
+          isTrue,
+          reason: 'wrong position for $kind',
+        );
+      }
+    });
+
+    test('a paid message still carries it (translation is not promised free)',
+        () {
+      final msg = buildShareMessage(const ShareTourDetails(
+        title: 'T — Walking Tour', code: 'FFush25U',
+        kind: ShareTourKind.paid, price: '\$4.99',
+      ));
+      expect(msg.contains(kTranslationOfferLine), isTrue);
+      // The price line is still LAST, after the offer.
+      expect(msg.indexOf(kTranslationOfferLine) <
+          msg.indexOf('The tour price is'), isTrue);
+    });
+
+    test('the community invite carries it, right after the explanation '
+        'sentence', () {
+      final msg = buildCommunityInvite(const CommunityInviteDetails(
+          communityName: 'C', code: 'AzuwQYnf'));
+      expect(msg.contains(kTranslationOfferLine), isTrue);
+      expect(
+        msg.contains('$kCommunityExplanation\n\n$kTranslationOfferLine'),
+        isTrue,
+      );
+      // The code still round-trips out.
+      expect(extractShareCode(msg), 'AzuwQYnf');
+    });
   });
 }

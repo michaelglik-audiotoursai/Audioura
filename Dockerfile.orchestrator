@@ -44,6 +44,10 @@ COPY tour_evaluator.py /app/
 COPY tour_rubric_scorer.py /app/
 COPY user_quality_index.py /app/
 COPY user_stops_flag.py /app/
+# [LOCAL-711 / D673] Written at creation after an original tour succeeds
+# (make_short_title_only, non-blocking). Self-contained (no llm_models import),
+# so this one COPY line is all the orchestrator image needs.
+COPY tour_short_title.py /app/
 
 # Build-time manifest: record checksums of all Python sources + git SHA
 ARG GIT_SHA=unknown

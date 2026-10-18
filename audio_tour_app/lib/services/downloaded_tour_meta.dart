@@ -51,6 +51,11 @@ class DownloadedTourMeta {
   final String priceLabel;
   final String? originalLanguage;
   final int? tourVersion;
+  // [LOCAL-711 / D673] The server-written SHORT title stamped at download time,
+  // so the share flow in the player can offer it offline (else it falls back to
+  // the app's own shortTourTitle of the raw name). Null when the download had
+  // none (older tour / NULL column).
+  final String? shortTitle;
 
   const DownloadedTourMeta({
     required this.serverTourId,
@@ -60,6 +65,7 @@ class DownloadedTourMeta {
     required this.priceLabel,
     required this.originalLanguage,
     required this.tourVersion,
+    this.shortTitle,
   });
 
   /// Read the snapshot off a saved_tours record map. Defensive: a record saved
@@ -90,6 +96,9 @@ class DownloadedTourMeta {
           ? null
           : (r['original_language'] as String).trim(),
       tourVersion: asInt(r['tour_version']) ?? asInt(r['version']),
+      shortTitle: (r['short_title'] as String?)?.trim().isEmpty ?? true
+          ? null
+          : (r['short_title'] as String).trim(),
     );
   }
 
@@ -103,6 +112,7 @@ class DownloadedTourMeta {
         'price_label': priceLabel,
         if (originalLanguage != null) 'original_language': originalLanguage,
         if (tourVersion != null) 'tour_version': tourVersion,
+        if (shortTitle != null) 'short_title': shortTitle,
       };
 
   /// The OFFLINE-CORRECT lock decision from this local snapshot (D647 add. 2).

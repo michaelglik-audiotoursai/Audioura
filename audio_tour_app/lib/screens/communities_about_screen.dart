@@ -988,8 +988,11 @@ class _CommunityInviteToolsState extends State<CommunityInviteTools> {
         : _tours.first; // newest-first → first is the latest
     final res = await TourShareService.share(t.id);
     if (!res.ok || res.code == null || res.code!.isEmpty) return null;
+    // [LOCAL-711 / D673] Prefer the server short title when the listing carries
+    // one; else fall back to the app's shortTourTitle of the raw name.
+    final serverShort = (t.shortTitle ?? '').trim();
     return CommunityInviteTour(
-      title: shortTourTitle(t.name),
+      title: serverShort.isNotEmpty ? serverShort : shortTourTitle(t.name),
       code: res.code!,
       stopCount: t.stopCount,
       picked: picked,

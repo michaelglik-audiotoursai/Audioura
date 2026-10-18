@@ -22,6 +22,11 @@ COPY translation_service.py blobstorage.py build_manifest.py cost_rates.py cost_
 # modules live at the repo root; a copy is kept here (same convention as
 # cost_meter.py) because this service's build context is ./translation-service.
 COPY article_truncation.py subscription_levels.py ./
+# [LOCAL-711 / D673] The translation path translates a source tour's short_title
+# the same way it translates tour_name. Self-contained (no llm_models import); a
+# copy lives in ./translation-service because this service's build context is
+# ./translation-service (same convention as cost_meter.py above).
+COPY tour_short_title.py ./
 
 # Build-time manifest: record checksums of all Python sources + git SHA
 ARG GIT_SHA=unknown

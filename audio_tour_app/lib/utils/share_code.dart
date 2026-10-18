@@ -108,6 +108,17 @@ String _clean(String? s) => (s ?? '').trim();
 
 bool _has(String? s) => _clean(s).isNotEmpty;
 
+/// [LOCAL-711 / D673] The translation advert Michael wants in every share email
+/// and the community invite: the listener can hear the tour in their own
+/// language. Stays true for paid tours — each language is bought separately
+/// (D660), so the line promises the capability, not that it is free. Placed
+/// right after "Hands-free audio: press play and walk." in a tour share, and
+/// after the community-explanation sentence in an invite (which has no
+/// hands-free line). One place so the wording cannot drift.
+const String kTranslationOfferLine =
+    'Prefer another language? Audioura plays it in yours: just pick your '
+    'language and listen.';
+
 /// [LOCAL-710 / D672] Shorten a raw tour name for an email / subject line.
 ///
 /// The server stores long display names like
@@ -326,11 +337,12 @@ String? _stopsLine(ShareTourDetails d) {
 /// Body order (one blank line between paragraphs, no double spaces):
 ///   1. opening line (by kind);
 ///   2. "Hands-free audio: press play and walk.";
-///   3. "<N> stops, starting at <first stop> (<location>).";   (when known)
-///   4. the short link;
-///   5. "(Or open Audioura, tap Search and paste <CODE>.)";
-///   6. community only: "Join the <community> community in Audioura to download it.";
-///   7. paid only, LAST: "The tour price is $<price>.".
+///   3. the translation offer ([kTranslationOfferLine], D673);
+///   4. "<N> stops, starting at <first stop> (<location>).";   (when known)
+///   5. the short link;
+///   6. "(Or open Audioura, tap Search and paste <CODE>.)";
+///   7. community only: "Join the <community> community in Audioura to download it.";
+///   8. paid only, LAST: "The tour price is $<price>.".
 ///
 /// [extractShareCode] still round-trips the code out of the result.
 String buildShareMessage(ShareTourDetails details) {
@@ -338,6 +350,8 @@ String buildShareMessage(ShareTourDetails details) {
 
   paragraphs.add(_openingLine(details));
   paragraphs.add('Hands-free audio: press play and walk.');
+  // [LOCAL-711 / D673] The translation advert, right after the hands-free line.
+  paragraphs.add(kTranslationOfferLine);
 
   final stops = _stopsLine(details);
   if (stops != null) paragraphs.add(stops);
@@ -535,6 +549,10 @@ String buildCommunityInvite(CommunityInviteDetails d) {
 
   // 2. The standard explanation (replaces the old description-first opening).
   paragraphs.add(kCommunityExplanation);
+
+  // [LOCAL-711 / D673] The translation advert. The invite has no hands-free
+  // line, so it goes right after the explanation sentence.
+  paragraphs.add(kTranslationOfferLine);
 
   // 3. About this community: <organiser's description> (D672 addendum 2).
   final about = _clean(d.description);

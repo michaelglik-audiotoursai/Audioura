@@ -1468,6 +1468,10 @@ class _MyToursScreenState extends State<MyToursScreen> {
     final isPaid = tour['is_paid'] == true || priceTier != null;
     final price = tour['price_label']?.toString();
     final communityName = tour['community_name']?.toString();
+    // [LOCAL-711 / D673] The server-written short title, when the tour record
+    // carries one (map-delivery now returns it; the downloaded tour stores it).
+    // Empty/absent => the sharing flow falls back to shortTourTitle(title).
+    final serverShortTitle = tour['short_title']?.toString();
     shareTour(
       context,
       audioTourId: _numericTourId(tour) ?? tour['tour_id'],
@@ -1480,6 +1484,7 @@ class _MyToursScreenState extends State<MyToursScreen> {
           (communityName != null && communityName.trim().isNotEmpty)
               ? communityName
               : null,
+      shortTitle: serverShortTitle,
     );
   }
 

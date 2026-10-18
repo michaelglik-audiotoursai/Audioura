@@ -90,12 +90,16 @@ _CREATED = datetime.datetime(2026, 10, 1, 8, 30, 0)
 
 
 def _row(tid, name, *, lat=43.70, lng=7.26, language="en", original_id=None,
-         own_lang="en", source_lang=None, content_rating=None, review_status=None):
-    """A 23-column /tours-near-shaped row. Version/rating/paid middle columns are
-    NULL/False — this suite is about the content-rating columns only."""
+         own_lang="en", source_lang=None, content_rating=None, review_status=None,
+         short_title=None):
+    """A 24-column /tours-near-shaped row. Version/rating/paid middle columns are
+    NULL/False — this suite is about the content-rating columns only.
+    [LOCAL-711] short_title is SELECTed just after price_tier, before the
+    original-language pair; default None here (this suite does not exercise it)."""
     return (tid, name, name.lower(), lat, lng, 3,
             language, original_id, None, None, _CREATED, None, None,
             None, None, None, None, False, None,       # ratings + is_paid + price_tier
+            short_title,                               # [LOCAL-711] short_title
             own_lang, source_lang,                     # original-language pair
             content_rating, review_status)             # the LOCAL-687 pair
 

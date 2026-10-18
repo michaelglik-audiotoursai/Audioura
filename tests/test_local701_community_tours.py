@@ -111,10 +111,12 @@ _CREATED = datetime.datetime(2026, 10, 1, 8, 30, 0)
 
 
 def _row(tid, name, *, lat=43.70, lng=7.26, content_rating=None, review_status=None):
-    """A 23-column /tours-near-shaped row (same shape as test_local687)."""
+    """A 24-column /tours-near-shaped row (same shape as test_local687).
+    [LOCAL-711] short_title SELECTed just after price_tier (None here)."""
     return (tid, name, name.lower(), lat, lng, 3,
             "en", None, None, None, _CREATED, None, None,
             None, None, None, None, False, None,
+            None,                 # [LOCAL-711] short_title
             "en", None,
             content_rating, review_status)
 

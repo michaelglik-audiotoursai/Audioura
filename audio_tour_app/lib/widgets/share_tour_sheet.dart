@@ -22,6 +22,9 @@ import '../utils/share_code.dart';
 ///   * [stopCount]      — the tour's stop count, when the screen knows it;
 ///   * [isPaid]/[price] — for the paid opening + the "The tour price is $X." line;
 ///   * [communityName]  — present → a community opening + the download line.
+///   * [shortTitle]      — [LOCAL-711 / D673] the server short_title, used for
+///                        the email title + subject when non-empty (else the
+///                        app's own shortTourTitle of the raw name).
 /// Never throws — the service maps every failure to a message.
 Future<void> shareTour(
   BuildContext context, {
@@ -32,6 +35,7 @@ Future<void> shareTour(
   bool isPaid = false,
   String? price,
   String? communityName,
+  String? shortTitle,
 }) async {
   // Brief, non-dismissible progress while the (idempotent) request runs.
   showDialog<void>(
@@ -76,6 +80,7 @@ Future<void> shareTour(
     stopCount: stopCount ?? firstStop.stopCount,
     firstStopName: firstStop.name,
     firstStopLocation: firstStop.location,
+    serverShortTitle: shortTitle,
   );
 
   await _showShareResultSheet(context, details: details);
@@ -95,13 +100,20 @@ ShareTourDetails buildShareTourDetails({
   int? stopCount,
   String? firstStopName,
   String? firstStopLocation,
+  String? serverShortTitle,
 }) {
   final hasCommunity = (communityName ?? '').trim().isNotEmpty;
   final kind = hasCommunity
       ? ShareTourKind.community
       : (isPaid ? ShareTourKind.paid : ShareTourKind.free);
+  // [LOCAL-711 / D673] Prefer the SERVER short_title when present; otherwise
+  // fall back to the app's own shortTourTitle() of the raw name. A blank/space
+  // server value counts as absent.
+  final serverShort = (serverShortTitle ?? '').trim();
+  final title =
+      serverShort.isNotEmpty ? serverShort : shortTourTitle(rawTourName);
   return ShareTourDetails(
-    title: shortTourTitle(rawTourName),
+    title: title,
     code: code,
     kind: kind,
     price: isPaid ? price : null,

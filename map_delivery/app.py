@@ -85,6 +85,7 @@ def get_tour_by_code(code):
                    {_ratings_select(cur)},
                    {_is_paid_select(cur)} AS is_paid,
                    {_price_tier_select(cur)} AS price_tier,
+                   {_short_title_select(cur)} AS short_title,
                    {_ORIGINAL_LANGUAGE_SELECT},
                    {_content_rating_select(cur)}
             FROM audio_tours t
@@ -115,9 +116,9 @@ def get_tour_by_code(code):
         (tour_id, tour_name, request_string, tour_lat, tour_lng, requests,
          language, original_id, max_vn, last_replaced, created_at,
          source_version, source_max_vn, rating_count, rating_values,
-         verified_values, created_values, is_paid, price_tier,
+         verified_values, created_values, is_paid, price_tier, short_title,
          own_content_language, source_content_language,
-         content_rating, content_review_status) = _row_with_rating(t, 21)
+         content_rating, content_review_status) = _row_with_rating(t, 22)
         # [LOCAL-687] Content gate for a shared code. A hidden tour (not_allowed,
         # or pending/rejected review) is a clean 404 — the same as a code that
         # resolves to nothing, so a held tour is indistinguishable from no tour.
@@ -148,6 +149,9 @@ def get_tour_by_code(code):
             'tours': [{
                 'id': tour_id,
                 'name': tour_name,
+                # [LOCAL-711 / D673] Server short title (NULL until generated);
+                # the app shows it in the share email, else shortTourTitle(name).
+                'short_title': short_title,
                 'request_string': request_string,
                 'lat': tour_lat,
                 'lng': tour_lng,
@@ -314,6 +318,35 @@ def _has_source_version_column(cur):
 def _source_version_select(cur):
     """SQL fragment selecting source_version (or a NULL literal on an older schema)."""
     return "t.source_version" if _has_source_version_column(cur) else "NULL::integer"
+
+
+# [LOCAL-711 / D673] The server-written SHORT title (migration 040). Exposed on
+# every payload that already carries tour_name, so the app can show it in the
+# share email (title + subject) and fall back to its own shortTourTitle() only
+# when the column is NULL. Probed once + cached; absent column reads as NULL,
+# fails OPEN to today's behaviour. A TRANSLATION carries its OWN translated
+# short_title (translation-service writes it), so this uses the ROW's own
+# t.short_title — not the original's — exactly like t.tour_name.
+_HAS_SHORT_TITLE_COLUMN = None
+
+
+def _has_short_title_column(cur):
+    global _HAS_SHORT_TITLE_COLUMN
+    if _HAS_SHORT_TITLE_COLUMN is None:
+        try:
+            cur.execute("""
+                SELECT 1 FROM information_schema.columns
+                WHERE table_name = 'audio_tours' AND column_name = 'short_title'
+            """)
+            _HAS_SHORT_TITLE_COLUMN = cur.fetchone() is not None
+        except Exception:
+            _HAS_SHORT_TITLE_COLUMN = False
+    return _HAS_SHORT_TITLE_COLUMN
+
+
+def _short_title_select(cur):
+    """SQL fragment selecting short_title (or a NULL literal on an older schema)."""
+    return "t.short_title" if _has_short_title_column(cur) else "NULL::text"
 
 
 # [LOCAL-671] original_language is appended as the LAST two SELECTed columns on every
@@ -1857,6 +1890,7 @@ def get_tours_near_location(lat, lng):
                    {_ratings_select(cur)},
                    {_is_paid_select(cur)} AS is_paid,
                    {_price_tier_select(cur)} AS price_tier,
+                   {_short_title_select(cur)} AS short_title,
                    {_ORIGINAL_LANGUAGE_SELECT},
                    {_content_rating_select(cur)}
             FROM audio_tours t
@@ -1894,9 +1928,9 @@ def get_tours_near_location(lat, lng):
             (tour_id, tour_name, request_string, tour_lat, tour_lng, requests,
              language, original_id, max_vn, last_replaced, created_at,
              source_version, source_max_vn, rating_count, rating_values,
-             verified_values, created_values, is_paid, price_tier,
+             verified_values, created_values, is_paid, price_tier, short_title,
              own_content_language, source_content_language,
-             content_rating, content_review_status) = _row_with_rating(tour, 21)
+             content_rating, content_review_status) = _row_with_rating(tour, 22)
             
             # [LOCAL-687] Content gate: hide not_allowed, hide pending/rejected,
             # hide mature unless adult=1. NULL rating == general (old tours list).
@@ -1931,6 +1965,8 @@ def get_tours_near_location(lat, lng):
                     tour_data = {
                         'id': tour_id,
                         'name': tour_name,
+                        # [LOCAL-711 / D673] Server short title (NULL until set).
+                        'short_title': short_title,
                         'request_string': request_string,
                         'lat': tour_lat,
                         'lng': tour_lng,
@@ -2332,6 +2368,7 @@ def get_tour_info(tour_id):
                    {_ratings_select(cur)},
                    {_is_paid_select(cur)} AS is_paid,
                    {_price_tier_select(cur)} AS price_tier,
+                   {_short_title_select(cur)} AS short_title,
                    {_ORIGINAL_LANGUAGE_SELECT},
                    {_content_rating_select(cur)}
             FROM audio_tours t
@@ -2358,8 +2395,9 @@ def get_tour_info(tour_id):
         (tour_id, tour_name, request_string, lat, lng, requests, language, original_id,
          max_vn, last_replaced, created_at, source_version, source_max_vn,
          rating_count, rating_values, verified_values, created_values, is_paid, price_tier,
+         short_title,
          own_content_language, source_content_language,
-         content_rating, content_review_status) = _row_with_rating(result, 21)
+         content_rating, content_review_status) = _row_with_rating(result, 22)
         editor = _editor_scores(cur)  # [LOCAL-685]
         cur.close()
         conn.close()
@@ -2384,6 +2422,8 @@ def get_tour_info(tour_id):
         return jsonify({
             'id': tour_id,
             'name': tour_name,
+            # [LOCAL-711 / D673] Server short title (NULL until generated).
+            'short_title': short_title,
             'request_string': request_string,
             'lat': lat,
             'lng': lng,

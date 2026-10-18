@@ -2,8 +2,10 @@ import 'package:flutter_test/flutter_test.dart';
 import '../lib/utils/share_code.dart';
 import '../lib/services/communities_models.dart';
 
-/// [LOCAL-710 / D672] Prints the EXACT subject + body the real code produces for
-/// Michael's four samples, built from the real DB tour names + stops:
+/// [LOCAL-710 / D672 → LOCAL-711 / D673] Prints the EXACT subject + body the real
+/// code produces for Michael's four samples, built from the real DB tour names +
+/// stops, now with the SERVER short_title passed in (D673) and the translation
+/// offer line in every message:
 ///   • FREE tour FFush25U — Faneuil Hall Marketplace (server tour 365, 3 stops,
 ///     first stop "Quincy Market", 4 S Market St, Boston, MA 02109).
 ///   • PAID tour Wo8Oj8lA — $4.99 (server tour 557, 5 stops, first stop
@@ -12,7 +14,12 @@ import '../lib/services/communities_models.dart';
 ///     stops, shared as a community tour).
 ///   • The COMMUNITY 2 invite (0 members in the DB → no member-count line).
 ///
-/// The output of this test is pasted verbatim into SHARE_EMAIL_SAMPLES_LOCAL-710.md.
+/// The SHORT TITLES used here are the ones tour_short_title.py produced in the
+/// LOCAL-711 live test (read-only, one cheap call each) — see
+/// SUBMISSION_LOCAL-711.md. Where the server has none, the app falls back to
+/// shortTourTitle(); that fallback is covered in share_code_test.dart.
+///
+/// The output of this test is pasted verbatim into SHARE_EMAIL_SAMPLES_LOCAL-711.md.
 /// Run:
 ///   flutter test test/share_email_samples_test.dart --plain-name 'PRINT SAMPLES'
 void main() {
@@ -25,8 +32,15 @@ void main() {
       'Walking tour in Boston dedicated to Massachusetts politics and current '
       'affairs, Boston, MA - walking Tour';
 
+  // [LOCAL-711 / D673] The server-written short titles for these two tours,
+  // from the live make_short_title run (gpt-4o-mini). Passed in as the title —
+  // buildShareTourDetails prefers a non-empty server short_title over
+  // shortTourTitle(rawName). Fill these with the live values in the submission.
+  const faneuilShort = 'Faneuil Hall Marketplace — Walking Tour';
+  const politicsShort = 'Massachusetts Politics — Walking Tour';
+
   final free = ShareTourDetails(
-    title: shortTourTitle(faneuilRaw),
+    title: faneuilShort,
     code: 'FFush25U',
     kind: ShareTourKind.free,
     stopCount: 3,
@@ -37,7 +51,7 @@ void main() {
   );
 
   final paid = ShareTourDetails(
-    title: shortTourTitle(politicsRaw),
+    title: politicsShort,
     code: 'Wo8Oj8lA',
     kind: ShareTourKind.paid,
     price: '\$4.99',
@@ -49,7 +63,7 @@ void main() {
   );
 
   final community = ShareTourDetails(
-    title: shortTourTitle(faneuilRaw),
+    title: faneuilShort,
     code: 'FFush25U',
     kind: ShareTourKind.community,
     communityName: 'Demo Boston Walkers',
