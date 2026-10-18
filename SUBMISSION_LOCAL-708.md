@@ -149,3 +149,160 @@ continuous MP3, versus the old 5,000-char (~1.5 page) hard cap.
 - **LEAD applies migrations** (039).
 - Branched from `subscribed` HEAD (`f2e16ba3`);
   `git merge-base --is-ancestor f2e16ba3 HEAD` exits 0.
+
+
+---
+
+# 708B — Tell the listener a better plan gives longer articles (listening + translation)
+
+**Design of record:** D670 **addendum** + **addendum 2** (Michael, 2026-10-18).
+
+Michael: *"User needs to know that if he would have a better plan, he would've
+had longer articles listened to and translated."* and (addendum 2) the **spoken**
+notice must **NAME the plans**, not say "a larger plan".
+
+## What changed
+
+The truncation notice is no longer a character count. A shortened article now
+tells the listener which plan they are on, how long it was cut to **in pages**
+(~3,000 chars ≈ 1 page), **which plans give longer articles — by NAME and page
+length** — and ends with a **"See plans"** marker the app turns into a button to
+Your plan. The top plans get length-only ("the maximum"). The same notice rides
+a **translated** article ("listened to and translated"), and a shortened
+article's **audio** ends with one spoken sentence that **names** the larger
+plans. Nothing is added when the article fits. No price figure anywhere (D58 —
+the plan *name* "$10 Pack" is allowed; a price *figure* is not).
+
+### 1. `article_truncation.py` — notices rebuilt around plan data
+
+- **Plan metadata.** `_PLAN_META_FALLBACK` holds each D613 plan's display name
+  (migration 016: Introduction / Free / $10 Pack / Curator / Administrator /
+  Tester) and `article_char_limit` (migration 039). `_load_plan_meta()` reads
+  the **live `plans` table** (`display_name`, `article_char_limit`) so an
+  operator's SQL edit flows straight into the notice; it falls back to the
+  constants on any DB error. **Verified live** by renaming `l3` in the DB and
+  seeing the on-screen notice change.
+- **Pages, not characters.** `_pages_for_limit()` maps 5,000 → "about 1½ pages"
+  / "about one and a half pages" (spoken), 10,000 → "about 3 pages" / "three",
+  15,000 → "about 5 pages" / "five". Hidden plans (admin, tester) are never
+  *named* in an upsell — they only ever appear as "the maximum".
+- **On-screen notice** `_build_text_notice(level, meta, ceiling, translated)`:
+  entry/mid plans name the current plan + the larger plans + their page lengths
+  + `See plans`; top plans get "Shortened to about 5 pages, the maximum." with
+  no button. `translated=True` swaps in the "listened to and translated"
+  wording.
+- **Spoken notice** `_build_spoken_notice(...)` (D670 addendum 2): one sentence
+  that names the plans as spoken words ("$10 Pack" → "ten-dollar Pack"). For l1
+  it reproduces Michael's example **verbatim**: *"This article was shortened to
+  about one and a half pages on your Introduction plan. The ten-dollar Pack
+  plays articles up to about three pages, and the Curator plan up to five."* Top
+  plans: *"This article was shortened to about five pages, the maximum."*
+- **Public helpers** for the two services: `build_text_notice_for_user`,
+  `build_spoken_notice_for_user`, `build_spoken_notice(level)`,
+  `truncate_for_user_with_notice(text, user_id, notice)`. `truncate_for_user`
+  now resolves the **level** (not just the limit), builds the rich notice from
+  it, and takes a `translated` flag.
+- Legacy symbols (`_FREE_NOTICE_A/_B`, `_SUBSCRIBED_NOTICE_A/_B`, `_get_notice`,
+  `_notice_for_limit`) are retained for the legacy tier path and the old tests;
+  `_notice_for_limit` now emits the page-based wording too.
+
+### 2. `news_processor_service.py` — English audio names the plans
+
+The full-article audio (`audio-99`) is still voiced from the plan-truncated
+`display_text` (708). **Only when `was_truncated`**, the spoken notice
+(`build_spoken_notice_for_user(secret_id, translated=False)`) is appended to the
+voiced text. Nothing is added for an article that fits.
+
+### 3. `translation-service/translation_service.py` — translated notice + audio
+
+`translate_article(..., user_id)` threads the requesting listener's `user_id`
+(already present on the `/translate-with-audio` endpoint) into
+`_create_english_structure_zip(..., user_id)`. There the **already-translated**
+full article is truncated to the listener's plan with
+`truncate_for_user_with_notice`, carrying a notice that is **built in English
+("listened to and translated") then translated into the target language** via
+the service's own `translate_text` (English fallback if the app isn't localised
+/ translation fails). The full-article audio ends with the **translated spoken
+notice**. Fail-open: any error delivers the untranslated-length text with no
+notice.
+
+### 4. Build plumbing (so the import actually resolves)
+
+`article_truncation` + `subscription_levels` are now **copied into the image**
+of the two services that call them:
+
+- `Dockerfile.news-processor` (build context = repo root): added
+  `COPY article_truncation.py .` and `COPY subscription_levels.py .` (these were
+  **not** copied before — a latent gap from 708 on the explicit-list Mac
+  Dockerfiles).
+- `translation-service/Dockerfile` (build context = `./translation-service`,
+  which cannot reach repo-root files): added copies of both modules **into
+  `translation-service/`** and to the Dockerfile `COPY` list — the same
+  convention the service already uses for `cost_meter.py`. The two
+  `article_truncation.py` copies are byte-identical and **must be kept in sync**.
+
+## Tests
+
+- `tests/test_local708b_plan_notice.py` (**16**): on-screen notice per plan
+  (l1 names $10 Pack + Curator lengths; l3 names Curator only; l4/admin
+  length-only "the maximum", no See plans); no price *figure* anywhere; a fitting
+  article gets no notice; translated wording present; spoken notice names the
+  larger plans and page lengths (l1 asserts the **exact** D670 addendum-2
+  sentence); translated spoken wording; the "only when truncated" audio gate.
+- `tests/test_local708b_translated_article.py` (**4**): drives
+  `TranslationService._create_english_structure_zip` with `translate_text` /
+  `generate_audio` stubbed — asserts the translated notice **and** `See plans`
+  reach the HTML `full_text`, the translated **spoken** notice reaches the
+  full-article audio, the top plan says "the maximum", a fitting article adds
+  nothing, and an `en` target is not re-translated.
+- Updated old-wording assertions to the D670 page wording in
+  `tests/test_local708_article_length_per_plan.py` (`TestNoticeByPlan`, the admin
+  boundary marker), `tests/test_local193_article_truncation.py` (T2), and
+  `tests/billing_dry_run/test_truncation.py` (free tier now asserts
+  "See plans" + "page", not "Subscribe"/char counts).
+
+**Result:** `test_local708 + test_local708b_plan_notice +
+test_local708b_translated_article + test_local193 + billing_dry_run/test_truncation
++ service_layer_dry_run/test_truncation_e2e` → **74 passed, 5 skipped** (same 5
+e2e skips as 708 — they need the live levels schema). TTS-metering suites
+(`test_local69_news_metering`, `test_local323_tts_metering`) → **97 passed**, no
+regression.
+
+## Live verification (own containers only)
+
+Ran the **real** `article_truncation` path against an **ephemeral own postgres**
+(`local708b-pg` on :5481, removed afterwards; the 14 shared `audioura-*`
+containers were left untouched) seeded with the migration-016 plan names and
+migration-039 limits and `device_entitlement` rows `dev-l1` / `dev-l3` /
+`dev-admin`.
+
+| device | resolved limit | delivered | on-screen notice | spoken notice |
+|--------|---------------:|----------:|------------------|---------------|
+| dev-l1 | 5,000 | 4,986 | "Shortened to about 1½ pages on the Introduction plan. The $10 Pack plays articles up to about 3 pages, Curator up to 5 — See plans" | matches the D670 addendum-2 example verbatim |
+| dev-l3 | 10,000 | 9,933 | "Shortened to about 3 pages on the $10 Pack plan. The Curator plays articles up to about 5 pages — See plans" | "…about three pages on your ten-dollar Pack plan. The Curator plays articles up to about five pages." |
+| dev-admin | 15,000 | 14,948 | "Shortened to about 5 pages, the maximum." | "This article was shortened to about five pages, the maximum." |
+
+Translated variants used the "listened to and translated" wording; a short
+article produced `truncated=False` and **no** notice. Renaming `l3` in the DB
+changed the on-screen notice, proving `_load_plan_meta` reads the **live** table.
+
+## Files (708B)
+
+- `article_truncation.py` (notices rebuilt; new public helpers) — and its
+  in-sync copy `translation-service/article_truncation.py`
+- `subscription_levels.py` copy added at `translation-service/subscription_levels.py`
+- `news_processor_service.py` (spoken notice appended to audio-99 when truncated)
+- `translation-service/translation_service.py` (user_id threaded; translated
+  notice + translated spoken notice)
+- `translation-service/Dockerfile`, `Dockerfile.news-processor` (COPY the two
+  shared modules)
+- `tests/test_local708b_plan_notice.py` (new), `tests/test_local708b_translated_article.py` (new)
+- `tests/test_local708_article_length_per_plan.py`, `tests/test_local193_article_truncation.py`,
+  `tests/billing_dry_run/test_truncation.py` (assertions updated to D670 wording)
+
+## Process notes (708B)
+
+- No edits to DECISIONS / CLAUDE / BACKLOG / WORK_QUEUE / `.continuous_dev`.
+- **LEAD applies migrations** (039 already from 708; 708B adds no migration).
+- Continued on `LOCAL-708-article-length-per-plan`; `git merge origin/subscribed`
+  was a no-op (already up to date); base `f2e16ba3` is an ancestor of HEAD.

@@ -222,7 +222,7 @@ class TestBoundaryRulesAtPlanLimit(unittest.TestCase):
         self.assertEqual(rule, 'sentence_boundary')
         self.assertLessEqual(len(result), 15000)
         # Content before the notice ends at a sentence boundary.
-        notice_idx = result.find('\n\nThis article has been shortened')
+        notice_idx = result.find('\n\nShortened to')
         content = result[:notice_idx] if notice_idx > 0 else result
         self.assertIn(content.rstrip()[-1], '.!?')
 
@@ -264,18 +264,23 @@ class TestNoticeByPlan(unittest.TestCase):
         article = _make_article_with_sentences(8000)
         with _Patched(_patch_resolution('l1', _PLAN_LIMITS)):
             result, _, _ = at.truncate_for_user(article, 'user-l1')
-        self.assertIn('5,000', result)
-        self.assertIn('15,000', result)          # names the higher ceiling
-        self.assertNotIn('$', result)
+        # D670: names the current plan, page lengths, the larger plans, See plans.
+        self.assertIn('Introduction plan', result)
+        self.assertIn('about 1½ pages', result)
+        self.assertIn('$10 Pack', result)        # names the larger plan (its NAME, not a price)
+        self.assertIn('Curator', result)
+        self.assertIn('See plans', result)
+        self.assertNotIn('characters', result)   # pages, not char counts
 
     def test_higher_plan_no_upsell(self):
         article = _make_article_with_sentences(40000)
         with _Patched(_patch_resolution('admin', _PLAN_LIMITS)):
             result, _, _ = at.truncate_for_user(article, 'user-admin')
-        self.assertIn('15,000', result)
-        # No "Subscribe to read ..." invitation on the top plan.
-        self.assertNotIn('Subscribe to read', result)
-        self.assertNotIn('$', result)
+        # Top plan: length + "the maximum", no upsell, no See plans button.
+        self.assertIn('about 5 pages', result)
+        self.assertIn('the maximum', result)
+        self.assertNotIn('See plans', result)
+        self.assertNotIn('Subscribe', result)
 
 
 class TestAudioFollowsTextLimit(unittest.TestCase):

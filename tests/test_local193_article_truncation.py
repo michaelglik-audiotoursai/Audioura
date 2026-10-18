@@ -116,11 +116,11 @@ class TestJustOverLimit(unittest.TestCase):
         self.assertEqual(rule, 'sentence_boundary')
         # Result must be <= 5000 chars
         self.assertLessEqual(len(result), 5000)
-        # Must end with the notice
-        self.assertIn("shortened to 5,000 characters", result)
+        # D670: the notice describes length in PAGES and offers "See plans".
+        self.assertIn("Shortened to about 1½ pages", result)
+        self.assertIn("See plans", result)
         # Must end at a sentence boundary (before notice)
-        # The content before the notice should end with sentence-ending punctuation
-        notice_start = result.find("\n\nThis article has been shortened")
+        notice_start = result.find("\n\nShortened to")
         content = result[:notice_start]
         self.assertTrue(
             content.rstrip().endswith('.') or
@@ -130,14 +130,15 @@ class TestJustOverLimit(unittest.TestCase):
         )
 
     def test_subscribed_just_over(self):
-        # 15100 chars, subscribed limit is 15000
+        # 15100 chars, subscribed limit is 15000 (the maximum)
         text = _make_article_with_sentences(15100)
         result, was_truncated, rule = truncate_article_text(text, 'unlimited')
 
         self.assertTrue(was_truncated)
         self.assertEqual(rule, 'sentence_boundary')
         self.assertLessEqual(len(result), 15000)
-        self.assertIn("shortened to 15,000 characters", result)
+        # Top of the scale: page length + "the maximum", no upsell.
+        self.assertIn("Shortened to about 5 pages, the maximum", result)
 
 
 class TestFarOverLimit(unittest.TestCase):

@@ -392,7 +392,22 @@ def process_audio(article_id):
             # article becomes one continuous MP3.
             full_path = os.path.join(temp_dir, "audio-99.mp3")
             full_text_complete = f"Full Article: {display_text}"
-            
+
+            # [LOCAL-708B / D670 addendum 2] If the article was shortened for the
+            # listener's plan, END the full-article audio with ONE short spoken
+            # sentence that NAMES the larger plans and their page lengths (built
+            # from the same plan data as the on-screen notice). Nothing is added
+            # when the article fit. This is an English article, so translated=False.
+            if was_truncated:
+                try:
+                    from article_truncation import build_spoken_notice_for_user
+                    spoken_notice = build_spoken_notice_for_user(secret_id or '', translated=False)
+                    if spoken_notice:
+                        full_text_complete = f"{full_text_complete}\n\n{spoken_notice}"
+                        logging.info(f"[LOCAL-708B] Spoken plan notice appended to full-article audio: {spoken_notice!r}")
+                except Exception as notice_err:
+                    logging.warning(f"[LOCAL-708B] Could not append spoken notice: {notice_err}")
+
             generate_audio_with_polly(full_text_complete, full_path)
             logging.info(f"Full article audio generated with Polly ({len(display_text)} chars voiced)")
             audio_files.append(("audio-99.mp3", "Full Article"))

@@ -10,6 +10,10 @@ RUN pip install --no-cache-dir -r requirements-news.txt
 
 COPY news_processor_service.py .
 COPY build_manifest.py .
+# [LOCAL-708 / 708B / D670] Per-plan article length + the plan-aware truncation
+# notice (names the plans, page lengths, "See plans") and the spoken audio notice.
+COPY article_truncation.py .
+COPY subscription_levels.py .
 
 # Build-time manifest: record checksums of all Python sources + git SHA
 ARG GIT_SHA=unknown
