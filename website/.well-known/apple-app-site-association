@@ -1,0 +1,19 @@
+{
+  "applinks": {
+    "apps": [],
+    "details": [
+      {
+        "appID": "4HGRU6TKGQ.com.audioura.audiotours",
+        "components": [
+          {
+            "/": "/t/*",
+            "comment": "Tour/community share links open the app's Search."
+          }
+        ],
+        "paths": [
+          "/t/*"
+        ]
+      }
+    ]
+  }
+}

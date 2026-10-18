@@ -11,6 +11,7 @@ import 'plan_screen.dart';
 import '../services/notification_service.dart';
 import '../services/background_service.dart';
 import '../services/entitlements_service.dart';
+import '../services/deep_link_service.dart';
 import '../renewal_logic.dart';
 import '../widgets/renewal_sheet.dart';
 
@@ -37,6 +38,61 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
     // on the renewal state it returns. Runs on launch; also on each resume via
     // didChangeAppLifecycleState.
     _runAppOpenEntitlementsCheck();
+    // [LOCAL-709 / D671] When a share link produces a code (cold/warm start or
+    // the deferred check), make sure we are on the Home tab so Home can fill
+    // Search and run it. Home itself consumes the code via the same notifier.
+    PendingShareSearch.instance.code.addListener(_onShareCodeArrived);
+    // The one-shot deferred-link check (Android Install Referrer; iOS clipboard
+    // prompt), run once ever, after the first frame so a BuildContext exists.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _onShareCodeArrived(); // act on a code already waiting at launch.
+      _runDeferredLinkCheck();
+    });
+  }
+
+  /// [LOCAL-709] A share code just became available: switch to Home so its
+  /// listener runs the search. If already on Home, Home handles it directly.
+  void _onShareCodeArrived() {
+    if (PendingShareSearch.instance.code.value == null) return;
+    if (_selectedIndex != 0 && mounted) {
+      setState(() => _selectedIndex = 0);
+    }
+  }
+
+  /// [LOCAL-709 / D671 §4] The deferred-link one-shot: on the FIRST launch only,
+  /// read the Android Play Install Referrer (no prompt) or, failing that, offer
+  /// once to open a code-shaped clipboard string on iOS. Guarded internally so
+  /// it never runs twice. Any failure is silent.
+  Future<void> _runDeferredLinkCheck() async {
+    await DeepLinkService.instance.runDeferredCheckOnce(
+      readInstallReferrer: DeepLinkService.readPlayInstallReferrer,
+      readClipboardCode: DeepLinkService.readClipboardShareCode,
+      prompt: _promptOpenSharedTour,
+    );
+  }
+
+  /// [D671 §4] The single iOS clipboard prompt: "Open the tour you were sent?".
+  Future<bool> _promptOpenSharedTour(String code) async {
+    if (!mounted) return false;
+    final open = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Open the tour you were sent?'),
+        content: Text('We found a tour code ($code) you copied. '
+            'Open it in Audioura?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Not now'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Open'),
+          ),
+        ],
+      ),
+    );
+    return open ?? false;
   }
 
   /// Guards against overlapping app-open checks (launch + a fast resume).
@@ -88,6 +144,7 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    PendingShareSearch.instance.code.removeListener(_onShareCodeArrived);
     BackgroundService.stopBackgroundMonitoring();
     super.dispose();
   }

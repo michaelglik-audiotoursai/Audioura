@@ -28,6 +28,7 @@ import '../config.dart';
 import '../config/endpoints.dart';
 import '../utils/share_code.dart';
 import '../utils/search_dispatch.dart';
+import '../services/deep_link_service.dart';
 import '../services/communities_service.dart';
 import 'community_page_screen.dart';
 // import '../services/credential_storage_service.dart';  // TEMPORARILY DISABLED - CAUSING BUILD ERRORS
@@ -122,6 +123,35 @@ class _HomeScreenState extends State<HomeScreen> {
     _initializeSecureEncryption();
     _loadAppMode();
     _loadCommunityPins();
+    // [LOCAL-709 / D671] A share link (cold/warm start) or a deferred link
+    // parks its code in PendingShareSearch; Home runs it through the SAME
+    // dispatch path a pasted code takes. Listen for later arrivals (warm start
+    // while Home is already open) and also act on any code already waiting
+    // (cold start, or a tab switch into Home after the link arrived).
+    PendingShareSearch.instance.code.addListener(_onPendingShareSearch);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _onPendingShareSearch();
+    });
+  }
+
+  /// [LOCAL-709] Act on a pending share code, if any: fill the shared search
+  /// path and consume it so a rebuild never runs the same code twice. Reuses
+  /// [_dispatchSearch] (classify → share-code branch → _resolveShareCode),
+  /// i.e. exactly what pasting the code into Search does today.
+  Future<void> _onPendingShareSearch() async {
+    final code = PendingShareSearch.instance.code.value;
+    if (code == null || code.isEmpty) return;
+    // Consume immediately so concurrent rebuilds / a second listener tick do
+    // not dispatch the same code twice.
+    PendingShareSearch.instance.consume();
+    if (!mounted) return;
+    await _dispatchSearch(code);
+  }
+
+  @override
+  void dispose() {
+    PendingShareSearch.instance.code.removeListener(_onPendingShareSearch);
+    super.dispose();
   }
 
   /// [LOCAL-690] Load Listed communities and render them as map pins with a

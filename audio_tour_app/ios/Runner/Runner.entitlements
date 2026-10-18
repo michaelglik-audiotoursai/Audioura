@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- [LOCAL-709 / D671] iOS Universal Links: https://audioura.com/t/<CODE>
+	     opens Audioura directly (Apple fetches /.well-known/apple-app-site-association
+	     from the domain). The app routes /t/<CODE> to Home → Search via the same
+	     path a pasted code takes. Verification succeeds only once the AASA file
+	     is published on audioura.com. -->
+	<key>com.apple.developer.associated-domains</key>
+	<array>
+		<string>applinks:audioura.com</string>
+	</array>
+</dict>
+</plist>

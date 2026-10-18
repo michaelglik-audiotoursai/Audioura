@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>An Audioura tour for you</title>
+<style>
+  /* [LOCAL-709 / D671] Self-contained landing page: no external scripts, no
+     fonts, no tracking. Works down to 360px wide. */
+  :root {
+    --brick: #A93105;
+    --ink: #2c3e50;
+    --muted: #5b6b7a;
+    --bg: #f7f5f2;
+    --card: #ffffff;
+    --line: #e4e0da;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    background: var(--bg);
+    color: var(--ink);
+    line-height: 1.5;
+    -webkit-text-size-adjust: 100%;
+  }
+  .wrap {
+    max-width: 480px;
+    margin: 0 auto;
+    padding: 28px 18px 48px;
+  }
+  header { text-align: center; margin-bottom: 20px; }
+  .brand {
+    font-size: 15px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--brick);
+    font-weight: 700;
+  }
+  h1 {
+    font-size: 26px;
+    line-height: 1.25;
+    margin: 18px 0 6px;
+    word-wrap: break-word;
+    overflow-wrap: anywhere;
+  }
+  .lede { color: var(--muted); font-size: 16px; margin: 10px 0 0; }
+  .card {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    padding: 20px 18px;
+    margin-top: 22px;
+  }
+  .label { font-size: 13px; color: var(--muted); margin: 0 0 8px; }
+  .code-row {
+    display: flex;
+    gap: 10px;
+    align-items: stretch;
+    flex-wrap: wrap;
+  }
+  .code {
+    flex: 1 1 140px;
+    min-width: 0;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 26px;
+    font-weight: 700;
+    letter-spacing: 3px;
+    color: var(--ink);
+    background: #f2f4f6;
+    border-radius: 10px;
+    padding: 12px 14px;
+    text-align: center;
+    overflow-wrap: anywhere;
+  }
+  button, .btn {
+    font-size: 16px;
+    font-weight: 600;
+    border-radius: 10px;
+    padding: 13px 16px;
+    border: 1px solid transparent;
+    cursor: pointer;
+    text-align: center;
+    text-decoration: none;
+    display: inline-block;
+  }
+  .copy-btn {
+    flex: 0 0 auto;
+    background: #fff;
+    color: var(--ink);
+    border-color: var(--line);
+  }
+  .copy-btn:active { background: #eef0f2; }
+  .stores { margin-top: 22px; display: grid; gap: 12px; }
+  .store-btn {
+    width: 100%;
+    background: var(--brick);
+    color: #fff;
+  }
+  .store-btn[aria-disabled="true"] {
+    background: #cfc9c2;
+    color: #7a7268;
+    cursor: not-allowed;
+    pointer-events: none;
+  }
+  .foot { margin-top: 26px; font-size: 13px; color: var(--muted); text-align: center; }
+  .pill { font-size: 12px; color: var(--muted); }
+</style>
+</head>
+<body>
+  <main class="wrap">
+    <header>
+      <div class="brand">Audioura</div>
+      <h1 id="headline">An Audioura tour for you</h1>
+      <p class="lede">Hands-free audio tours, made for wherever you are. Press play, look up, and let the place tell its story.</p>
+    </header>
+
+    <section class="card">
+      <p class="label">Your tour code</p>
+      <div class="code-row">
+        <div class="code" id="code" aria-label="Tour code">--------</div>
+        <button class="btn copy-btn" id="copyBtn" type="button">Copy</button>
+      </div>
+
+      <div class="stores" id="stores">
+        <a class="btn store-btn" id="androidBtn" href="#" role="button">Get it on Google Play</a>
+        <a class="btn store-btn" id="iosBtn" href="#" role="button">Download on the App Store</a>
+      </div>
+      <p class="pill" id="copyNote" aria-live="polite"></p>
+    </section>
+
+    <p class="foot">Already have Audioura? Open the app, tap Search, and paste your code.</p>
+  </main>
+
+<script>
+/* [LOCAL-709 / D671] ONE constant block for the store URLs. Neither listing is
+   public yet (both 404 on 2026-10-18). Leave a URL EMPTY and its button shows
+   "Coming soon …" and is disabled; the code + Copy button always stay. Fill
+   these in at release. */
+var STORE_URLS = {
+  // Android Play Store listing URL, WITHOUT the referrer (added at runtime).
+  // e.g. "https://play.google.com/store/apps/details?id=com.audioura.audiotours"
+  android: "",
+  // App Store listing URL.
+  // e.g. "https://apps.apple.com/app/idXXXXXXXXXX"
+  ios: ""
+};
+
+/* --- Pure parsing helpers (also unit-tested in website/tests) ------------- */
+
+/* Pull the CODE from a /t/<CODE> path. Returns "" when absent. A segment that
+   contains a dot (e.g. the literal "index.html" the dev server serves) is NOT a
+   share code, so it is ignored — in production the rewrite gives a clean
+   /t/<CODE>, and this keeps a file:// / http.server preview honest. */
+function codeFromPath(pathname) {
+  var m = /\/t\/([^\/?#]+)/.exec(pathname || "");
+  if (!m) return "";
+  var seg = decodeURIComponent(m[1]);
+  if (seg.indexOf(".") !== -1) return "";
+  return seg;
+}
+
+/* Read the tour name from the `n` query param. Returns "" when absent. */
+function nameFromQuery(search) {
+  try {
+    var params = new URLSearchParams(search || "");
+    return params.get("n") || "";
+  } catch (e) {
+    return "";
+  }
+}
+
+/* Build the Android Play URL carrying the deferred referrer, or "" when the
+   base URL constant is empty. The referrer is audioura_code=<CODE>,
+   URL-encoded as a single &referrer= value. */
+function androidUrlWithReferrer(baseUrl, code) {
+  if (!baseUrl) return "";
+  var ref = encodeURIComponent("audioura_code=" + code);
+  var sep = baseUrl.indexOf("?") === -1 ? "?" : "&";
+  return baseUrl + sep + "referrer=" + ref;
+}
+
+/* Decide a button's label + enabled state from its store URL. */
+function storeButtonState(platform, baseUrl) {
+  if (baseUrl) {
+    return {
+      enabled: true,
+      label: platform === "android" ? "Get it on Google Play" : "Download on the App Store"
+    };
+  }
+  return {
+    enabled: false,
+    label: platform === "android" ? "Coming soon to Google Play" : "Coming soon to the App Store"
+  };
+}
+
+/* Pick which store button(s) to show. Desktop shows both. */
+function platformFromUA(ua) {
+  ua = (ua || "").toLowerCase();
+  if (/android/.test(ua)) return "android";
+  if (/iphone|ipad|ipod/.test(ua)) return "ios";
+  return "desktop";
+}
+
+/* --- DOM wiring (skipped under test; guarded by typeof document) ---------- */
+if (typeof document !== "undefined" && document.getElementById) {
+  (function () {
+    var code = codeFromPath(location.pathname);
+    // Fallback for file:// previews: read from the hash (#/t/<CODE>?n=...).
+    if (!code && location.hash) {
+      var h = location.hash.replace(/^#/, "");
+      code = codeFromPath(h);
+    }
+    var name = nameFromQuery(location.search) ||
+               (location.hash ? nameFromQuery(location.hash.replace(/^[^?]*/, "")) : "");
+
+    // Tour name is inserted as TEXT, never HTML (XSS-safe).
+    if (name) {
+      document.getElementById("headline").textContent = '“' + name + '” on Audioura';
+    }
+    var codeEl = document.getElementById("code");
+    codeEl.textContent = code || "--------";
+
+    var platform = platformFromUA(navigator.userAgent);
+    var androidBtn = document.getElementById("androidBtn");
+    var iosBtn = document.getElementById("iosBtn");
+
+    function configure(btn, pf) {
+      var base = pf === "android" ? STORE_URLS.android : STORE_URLS.ios;
+      var state = storeButtonState(pf, base);
+      btn.textContent = state.label;
+      if (!state.enabled) {
+        btn.setAttribute("aria-disabled", "true");
+        btn.removeAttribute("href");
+        return;
+      }
+      var target = pf === "android" ? androidUrlWithReferrer(base, code) : base;
+      btn.setAttribute("href", target);
+      // Copy the code to the clipboard first, THEN go to the store.
+      btn.addEventListener("click", function (ev) {
+        ev.preventDefault();
+        copyCode(function () { location.href = target; });
+      });
+    }
+
+    // Show the relevant button(s); hide the other on mobile.
+    if (platform === "android") {
+      iosBtn.style.display = "none";
+      configure(androidBtn, "android");
+    } else if (platform === "ios") {
+      androidBtn.style.display = "none";
+      configure(iosBtn, "ios");
+    } else {
+      configure(androidBtn, "android");
+      configure(iosBtn, "ios");
+    }
+
+    function copyCode(done) {
+      var note = document.getElementById("copyNote");
+      function ok() { if (note) note.textContent = "Code copied."; if (done) done(); }
+      function fail() { if (note) note.textContent = "Copy failed — select the code and copy it."; if (done) done(); }
+      if (!code) { if (done) done(); return; }
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(code).then(ok, fail);
+      } else {
+        try {
+          var ta = document.createElement("textarea");
+          ta.value = code; document.body.appendChild(ta); ta.select();
+          document.execCommand("copy"); document.body.removeChild(ta); ok();
+        } catch (e) { fail(); }
+      }
+    }
+
+    document.getElementById("copyBtn").addEventListener("click", function () {
+      copyCode(null);
+    });
+  })();
+}
+
+/* Export for Node-based tests (ignored in the browser). */
+if (typeof module !== "undefined" && module.exports) {
+  module.exports = {
+    codeFromPath: codeFromPath,
+    nameFromQuery: nameFromQuery,
+    androidUrlWithReferrer: androidUrlWithReferrer,
+    storeButtonState: storeButtonState,
+    platformFromUA: platformFromUA
+  };
+}
+</script>
+</body>
+</html>
