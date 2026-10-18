@@ -27,6 +27,7 @@ import 'package:share_plus/share_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../services/communities_service.dart';
+import '../utils/share_code.dart';
 import '../services/entitlements_service.dart';
 import '../services/iap_service.dart';
 import '../services/device_service.dart';
@@ -859,8 +860,8 @@ class CommunityInviteTools extends StatefulWidget {
 class _CommunityInviteToolsState extends State<CommunityInviteTools> {
   late String _code = widget.community.joinCode ?? '';
   late String _inviteMessage = widget.community.inviteMessage ??
-      'Open Audioura, tap Search on the Home page and paste this code: '
-          '${widget.community.joinCode ?? ''}';
+      buildCommunityInviteMessage(
+          widget.community.name, widget.community.joinCode ?? '');
   bool _regenerating = false;
 
   @override

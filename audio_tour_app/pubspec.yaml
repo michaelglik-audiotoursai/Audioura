@@ -1,7 +1,7 @@
 name: audio_tour_app_dev
 description: AudioTours Dev - AI-powered audio tour generator
 publish_to: 'none'
-version: 2.4.24+61
+version: 2.4.25+62
 
 environment:
   sdk: '>=3.5.0 <4.0.0'
@@ -47,6 +47,23 @@ dependencies:
   # returns. 6.x supports Dart >=3.3 / Flutter >=3.19, within this project's
   # 3.5 SDK floor.
   connectivity_plus: ^6.0.5
+  # LOCAL-709 / D671: Android App Links + iOS Universal Links handler, so a
+  # https://audioura.com/t/<CODE> link opens Home → Search with the code run.
+  # Pinned (no caret) deliberately: 7.x raises the min Dart SDK to 3.10/3.12,
+  # above this project's 3.5 floor, so an unpinned range would break
+  # `flutter pub get` on a 3.5 toolchain. 6.4.1 requires Dart ^3.5.0 /
+  # Flutter >=3.24.0 — exactly the floor. (Same floor-protection rationale as
+  # share_plus above.)
+  app_links: 6.4.1
+  # LOCAL-709 / D671: Android Play Install Referrer for the DEFERRED link — on
+  # the first launch after a Play install, read audioura_code=<CODE> from the
+  # referrer and run that search once. Pinned at 0.4.0: it is the last version
+  # whose SDK constraint (>=2.12 <4.0) stays under this project's 3.5 floor; the
+  # successor `play_install_referrer` requires Dart >=3.7 and would raise the
+  # floor. 0.4.0 is marked discontinued upstream but is API-stable and
+  # Android-only (it throws on iOS, which we never call there). iOS uses the
+  # clipboard one-shot instead (D671 §4).
+  android_play_install_referrer: 0.4.0
 
 dev_dependencies:
   flutter_test:

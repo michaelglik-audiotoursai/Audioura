@@ -105,11 +105,77 @@ void main() {
   });
 
   group('buildShareMessage', () {
-    test('contains the tour name and the code verbatim', () {
+    test('contains the tour name, the code, and the share link (D671)', () {
       final msg = buildShareMessage('My Tour', code);
       expect(msg.contains('My Tour'), isTrue);
       expect(msg.contains(code), isTrue);
-      expect(msg.contains('paste this code: $code'), isTrue);
+      // [LOCAL-709 / D671] Leads with the link, keeps the code as a fallback.
+      expect(msg.contains(buildShareLink(code, 'My Tour')), isTrue);
+      expect(msg.contains('paste $code'), isTrue);
+      expect(extractShareCode(msg), code);
+    });
+  });
+
+  // [LOCAL-709 / D671] The link builder + its round-trip through the extractor.
+  group('buildShareLink (D671)', () {
+    test('canonical shape: https://audioura.com/t/<CODE>?n=<encoded name>', () {
+      // D671 specifies Uri.encodeQueryComponent, which form-encodes spaces as
+      // '+' (the landing page's URLSearchParams decodes '+' back to a space).
+      expect(buildShareLink(code, 'The Freedom Trail'),
+          'https://audioura.com/t/$code?n=The+Freedom+Trail');
+    });
+
+    test('encodes a name with quotes, ampersand and accents', () {
+      final link = buildShareLink(code, 'Café "Lé" & Más');
+      // The name must be URL-query-encoded (no raw quote/&/accent).
+      expect(link.startsWith('https://audioura.com/t/$code?n='), isTrue);
+      expect(link.contains('"'), isFalse);
+      expect(link.contains('Café'), isFalse); // accent is percent-encoded
+      // A bare '&' would split the query; it must be encoded as %26.
+      final query = link.split('?n=').last;
+      expect(query.contains('&'), isFalse);
+      // And it decodes back to the original name.
+      expect(Uri.decodeQueryComponent(query), 'Café "Lé" & Más');
+    });
+
+    test('extractShareCode round-trips the new message', () {
+      final msg = buildShareMessage('Harvard Yard & the Square', code);
+      expect(extractShareCode(msg), code);
+    });
+
+    test('extractShareCode reads the bare new-style link', () {
+      expect(extractShareCode('https://audioura.com/t/$code'), code);
+    });
+
+    test('extractShareCode reads the link with ?n=', () {
+      expect(
+          extractShareCode('https://audioura.com/t/$code?n=The%20Freedom%20Trail'),
+          code);
+    });
+
+    test('extractShareCode reads the link with a trailing slash', () {
+      expect(extractShareCode('https://audioura.com/t/$code/'), code);
+    });
+
+    test('a ?n= whose value is code-shaped does not override the path code', () {
+      // The path code wins; the query is never treated as the code.
+      expect(
+          extractShareCode('https://audioura.com/t/$code?n=AzuwQYnf'), code);
+    });
+  });
+
+  // [LOCAL-709 / D671] Community invites ride the SAME /t/ link.
+  group('buildCommunityInviteLink / message (D671)', () {
+    test('invite link has no ?n= and carries the code', () {
+      expect(buildCommunityInviteLink('AzuwQYnf'),
+          'https://audioura.com/t/AzuwQYnf');
+    });
+
+    test('invite message leads with the link and keeps the code', () {
+      final msg = buildCommunityInviteMessage('The Wandering Owls', 'AzuwQYnf');
+      expect(msg.contains('https://audioura.com/t/AzuwQYnf'), isTrue);
+      expect(msg.contains('paste AzuwQYnf'), isTrue);
+      expect(extractShareCode(msg), 'AzuwQYnf');
     });
   });
 

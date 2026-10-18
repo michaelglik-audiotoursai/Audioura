@@ -48,6 +48,21 @@
                 <category android:name="android.intent.category.DEFAULT" />
                 <data android:mimeType="text/html" />
             </intent-filter>
+            <!-- [LOCAL-709 / D671] Android App Links: https://audioura.com/t/<CODE>
+                 opens the app directly (autoVerify checks /.well-known/assetlinks.json
+                 on the domain). The app routes /t/<CODE> to Home → Search via the
+                 same path a pasted code takes. Domain verification only succeeds
+                 once the website is published; until then the link falls back to a
+                 browser/landing page. -->
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data
+                    android:scheme="https"
+                    android:host="audioura.com"
+                    android:pathPrefix="/t/" />
+            </intent-filter>
         </activity>
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->

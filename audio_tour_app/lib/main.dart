@@ -6,6 +6,7 @@ import 'dart:async';
 import 'screens/main_screen.dart';
 import 'screens/onboarding_screen.dart';
 import 'services/app_sync_coordinator.dart';
+import 'services/deep_link_service.dart';
 
 class MainScreenWithTreatsTab extends StatelessWidget {
   const MainScreenWithTreatsTab({super.key});
@@ -48,6 +49,12 @@ void main() async {
   // start) and whenever connectivity returns or the app resumes. Never blocks
   // startup — failures are retried by the outbox's own backoff.
   unawaited(AppSyncCoordinator.instance.start());
+
+  // [LOCAL-709 / D671] Capture cold/warm-start share links (App Links /
+  // Universal Links) as early as possible. The code is parked in
+  // PendingShareSearch; MainScreen switches to Home and Home runs the search
+  // through the same path a pasted code takes. Never blocks startup.
+  unawaited(DeepLinkService.instance.init());
 
   runApp(const AudioTourApp());
 }

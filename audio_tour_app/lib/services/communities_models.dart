@@ -4,9 +4,13 @@
 // — only Dart. It holds the JSON models and the pure UI rules so they can be
 // unit-tested directly (test/communities_service_test.dart) without a running
 // app. The networked client lives in communities_service.dart and imports this.
+// (share_code.dart is itself pure Dart, so importing it keeps this file
+// Flutter-free — it is the ONE place a share link is built, D671.)
 //
 // Parsing is defensive: a missing or malformed field never throws (the UI must
 // degrade gracefully if the user-api is briefly unreachable or older-shaped).
+
+import '../utils/share_code.dart';
 
 /// The organiser card shown on a community page (D658 (c)).
 class Organiser {
@@ -599,7 +603,11 @@ class CommunityCopy {
     buf.writeln('How to get Audioura: $installUrl');
     buf.writeln('(App Store / Google Play links coming soon.)');
     buf.writeln();
-    buf.writeln('Then open Audioura → Search → type the code $code');
+    // [LOCAL-709 / D671] Lead with the link; keep the code as the fallback. The
+    // link opens Audioura straight to Search with the code run (or the landing
+    // page → store without the app).
+    buf.writeln('Join here: ${buildCommunityInviteLink(code)}');
+    buf.writeln('Or open Audioura → Search → type the code $code');
     return buf.toString();
   }
 

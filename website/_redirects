@@ -1,0 +1,3 @@
+# [LOCAL-709 / D671] Serve the single landing page for every /t/<CODE> link.
+# 200 = rewrite (keep the URL so the page can read CODE from the path).
+/t/*  /t/index.html  200

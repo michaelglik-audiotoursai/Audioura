@@ -1,0 +1,6 @@
+# [LOCAL-709 / D671] Both association files MUST be served as JSON or app/OS
+# domain verification fails (Android App Links, iOS Universal Links).
+/.well-known/apple-app-site-association
+  Content-Type: application/json
+/.well-known/assetlinks.json
+  Content-Type: application/json
