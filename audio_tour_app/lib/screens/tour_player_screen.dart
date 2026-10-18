@@ -836,6 +836,8 @@ class _TourPlayerScreenState extends State<TourPlayerScreen> with VoiceMethods {
       stopCount: _totalStops,
       isPaid: meta?.isPaid ?? false,
       price: (meta != null && meta.isPaid) ? meta.priceLabel : null,
+      // [LOCAL-711 / D673] The server short title stamped at download time.
+      shortTitle: meta?.shortTitle,
     );
   }
 

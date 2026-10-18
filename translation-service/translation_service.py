@@ -1395,8 +1395,19 @@ class TranslationService:
             cursor = conn.cursor()
             
             # Get original tour with tour_content
+            # [LOCAL-711 / D673] short_title appended LAST so the historic
+            # positional indices (…[10] = stops_count) are unchanged; [11] =
+            # the source tour's short_title. Guarded: on an older schema without
+            # the column we select a NULL literal, so translation never 500s and
+            # simply carries no short_title (the app falls back to its own).
+            cursor.execute("""
+                SELECT 1 FROM information_schema.columns
+                WHERE table_name = 'audio_tours' AND column_name = 'short_title'
+            """)
+            _has_short_title = cursor.fetchone() is not None
+            _short_title_col = "short_title" if _has_short_title else "NULL::text AS short_title"
             cursor.execute(
-                "SELECT id, tour_name, request_string, audio_tour, number_requested, lat, lng, tour_content, content_language, tour_blob_uri, stops_count FROM audio_tours WHERE id = %s", 
+                f"SELECT id, tour_name, request_string, audio_tour, number_requested, lat, lng, tour_content, content_language, tour_blob_uri, stops_count, {_short_title_col} FROM audio_tours WHERE id = %s",
                 (original_tour_id,)
             )
             original_tour = cursor.fetchone()
@@ -1504,7 +1515,16 @@ class TranslationService:
             # Translate tour name and request string
             translated_name = self.translate_text(original_tour[1], target_language)
             translated_request = self.translate_text(original_tour[2], target_language)
-            
+
+            # [LOCAL-711 / D673] Translate the source tour's short_title the same
+            # way as tour_name, but only when the original actually has one.
+            # Written to the translation row below (guarded by the column check).
+            _source_short_title = original_tour[11] if len(original_tour) > 11 else None
+            translated_short_title = (
+                self.translate_text(_source_short_title, target_language)
+                if (_source_short_title and str(_source_short_title).strip()) else None
+            )
+
             # Split tour content into stops using the same logic as tour generation
             tour_stops = self._split_tour_content_into_stops(tour_content)
             logging.info(f"Split tour content into {len(tour_stops)} stops")
@@ -1624,6 +1644,13 @@ class TranslationService:
             if _has_source_version:
                 _cols.append("source_version")
                 _vals.append(_source_version)
+            # [LOCAL-711 / D673] Carry the TRANSLATED short_title onto the
+            # translation row, only when the column exists AND the original had a
+            # short_title to translate. Additive and orthogonal to the branches
+            # above; absent column or absent source title => the row keeps NULL.
+            if _has_short_title and translated_short_title:
+                _cols.append("short_title")
+                _vals.append(translated_short_title)
             _placeholders = ", ".join(["%s"] * len(_vals))
             cursor.execute(
                 f"INSERT INTO audio_tours ({', '.join(_cols)}) VALUES ({_placeholders}) RETURNING id",
@@ -3049,6 +3076,14 @@ Say 'What are my options' to hear this help again"""
         # Translate tour name and request string
         translated_name = self.translate_text(original_tour[1], target_language)
         translated_request = self.translate_text(original_tour[2], target_language)
+
+        # [LOCAL-711 / D673] Translate the source tour's short_title (index 11 of
+        # the SELECT) the same way as tour_name, only when it exists.
+        _source_short_title = original_tour[11] if len(original_tour) > 11 else None
+        translated_short_title = (
+            self.translate_text(_source_short_title, target_language)
+            if (_source_short_title and str(_source_short_title).strip()) else None
+        )
         
         # Process ZIP file for audio translation — use override if provided (e.g., from R2)
         original_zip_data = zip_data_override if zip_data_override else original_tour[3]
@@ -3110,6 +3145,17 @@ Say 'What are my options' to hear this help again"""
             if _has_source_version:
                 _cols.append("source_version")
                 _vals.append(_source_version)
+            # [LOCAL-711 / D673] Carry the translated short_title, guarded by its
+            # own column check (this path does not share the main method's scope)
+            # and by the presence of a translated value.
+            cursor.execute("""
+                SELECT 1 FROM information_schema.columns
+                WHERE table_name = 'audio_tours' AND column_name = 'short_title'
+            """)
+            _has_short_title = cursor.fetchone() is not None
+            if _has_short_title and translated_short_title:
+                _cols.append("short_title")
+                _vals.append(translated_short_title)
             _placeholders = ", ".join(["%s"] * len(_vals))
             cursor.execute(
                 f"INSERT INTO audio_tours ({', '.join(_cols)}) VALUES ({_placeholders}) RETURNING id",

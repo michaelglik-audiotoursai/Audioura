@@ -97,12 +97,15 @@ class CommunityInviteTourOption {
   final String name;
   final int stopCount;
   final String? createdAt;
+  // [LOCAL-711 / D673] The server short title, when the listing carries one.
+  final String? shortTitle;
 
   const CommunityInviteTourOption({
     required this.id,
     required this.name,
     this.stopCount = 0,
     this.createdAt,
+    this.shortTitle,
   });
 
   factory CommunityInviteTourOption.fromJson(Map<String, dynamic> j) =>
@@ -115,6 +118,9 @@ class CommunityInviteTourOption {
                 ? (j['stops_count'] as num).toInt()
                 : 0,
         createdAt: (j['created_at'] ?? j['createdAt']) as String?,
+        shortTitle: ((j['short_title'] as String?)?.trim().isEmpty ?? true)
+            ? null
+            : (j['short_title'] as String).trim(),
       );
 }
 

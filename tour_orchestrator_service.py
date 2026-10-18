@@ -1096,6 +1096,7 @@ def store_audio_tour(tour_name, request_string, zip_path, lat, lng, tour_content
                 INSERT INTO audio_tours (tour_name, request_string, audio_tour, number_requested, lat, lng,
                     tour_content, content_language, storied_mode, stops_count, zip_filename, is_test, track, tour_kind)
                 VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                RETURNING id
                 """,
                 (tour_name, request_string, psycopg2.Binary(zip_data), 1, lat, lng, tour_content, 'en',
                  os.getenv('STORIED_MODE', 'false').lower() == 'true', stops_count, zip_filename, _is_test_mode, _track,
@@ -1106,6 +1107,7 @@ def store_audio_tour(tour_name, request_string, zip_path, lat, lng, tour_content
                 """
                 INSERT INTO audio_tours (tour_name, request_string, audio_tour, number_requested, lat, lng, zip_filename, is_test, track)
                 VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                RETURNING id
                 """,
                 (tour_name, request_string, psycopg2.Binary(zip_data), 1, lat, lng, zip_filename, _is_test_mode, _track)
             )
@@ -1115,15 +1117,50 @@ def store_audio_tour(tour_name, request_string, zip_path, lat, lng, tour_content
                 """
                 INSERT INTO audio_tours (tour_name, request_string, is_test, track)
                 VALUES (%s, %s, %s, %s)
+                RETURNING id
                 """,
                 (tour_name, request_string, _is_test_mode, _track)
             )
+        # [LOCAL-711 / D673] Capture the new tour's id so short_title can be
+        # filled after commit. RETURNING id is additive — every branch now
+        # returns the row id; a failure to read it must never fail the store.
+        try:
+            _new_tour_id = cur.fetchone()[0]
+        except Exception:
+            _new_tour_id = None
         print(f"Inserted new tour: {tour_name} (zip={zip_filename}, is_test={_is_test_mode})")
         
         # Commit the transaction
         print(f"Committing transaction...")
         conn.commit()
         print(f"Transaction committed")
+
+        # [LOCAL-711 / D673] Write the server short_title for this new ORIGINAL
+        # tour. One cheap LLM call (gpt-4o-mini class), AFTER the tour is already
+        # committed, and strictly non-blocking: any failure is logged and the
+        # column stays NULL (the app falls back to its own shortTourTitle()).
+        # Skipped for test rows and when the id could not be read.
+        if _new_tour_id is not None and not _is_test_mode:
+            try:
+                from tour_short_title import make_short_title_only, _tour_type_from_name
+                _stype = _tour_type_from_name(tour_name)
+                _short = make_short_title_only(tour_name, request_string, _stype)
+                if _short:
+                    cur.execute(
+                        "UPDATE audio_tours SET short_title = %s WHERE id = %s",
+                        (_short, _new_tour_id))
+                    conn.commit()
+                    print(f"[LOCAL-711] short_title for tour {_new_tour_id}: {_short!r}")
+                else:
+                    print(f"[LOCAL-711] short_title left NULL for tour {_new_tour_id} "
+                          f"(generation returned nothing)")
+            except Exception as _st_err:
+                # Never let the short_title step affect the stored tour.
+                try:
+                    conn.rollback()
+                except Exception:
+                    pass
+                print(f"[LOCAL-711] short_title step skipped for tour {_new_tour_id}: {_st_err}")
         
         # Close cursor and connection
         print(f"Closing database connection...")
