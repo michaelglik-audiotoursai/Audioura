@@ -51,11 +51,13 @@ def test_free_tier_truncation():
     assert "shortened" in truncated.lower() or "truncated" in truncated.lower(), (
         "Notice should mention shortening"
     )
-    assert "subscribe" in truncated.lower(), (
-        "Free tier notice should encourage subscription"
+    # D670: the notice points to Your plan ("See plans") and names page lengths,
+    # not character counts or "Subscribe".
+    assert "see plans" in truncated.lower(), (
+        "Free/entry notice should offer See plans"
     )
-    assert "15,000" in truncated, (
-        "Free tier notice should mention the subscribed limit (15,000)"
+    assert "page" in truncated.lower(), (
+        "Notice should describe length in pages (D670)"
     )
     assert not _has_dollar_figure(truncated), (
         f"D58 violation: dollar figure found in user-facing text: {truncated[-200:]}"

@@ -182,10 +182,14 @@ def clean_text_for_polly(text):
     # Remove control characters
     text = re.sub(r'[\x00-\x1f\x7f-\x9f]', '', text)
     
-    # Limit to 5000 characters per TTS call to control costs
-    if len(text) > 5000:
-        text = text[:5000] + "... Content truncated for cost control."
-        logging.warning(f"Text truncated to 5000 characters for Polly cost control")
+    # [LOCAL-708 / D670] No fixed character cap here. Article length is governed
+    # by the listener's PLAN limit (plans.article_char_limit), applied upstream
+    # in process_audio() via article_truncation.truncate_for_user(). The full
+    # article audio is synthesised from that already-truncated text, so this
+    # function must NOT impose a second, smaller cap (that is what hard-capped
+    # the Administrator plan at 5,000 chars / ~1.5 pages). The polly-tts service
+    # splits anything over 2,000 chars into chunks and joins them, so there is no
+    # per-call length concern to handle here.
     
     return text.strip()
 
@@ -280,7 +284,34 @@ def process_audio(article_id):
             # Fallback if format is different
             summary_text = article_text[:200] + "..."
             full_text = article_text
-        
+
+        # ── [LOCAL-708 / D670] Per-plan article length (text AND audio) ───────
+        # Resolve the listener's plan limit (plans.article_char_limit, via the
+        # same entitlement lookup the tour quota uses) and truncate the full
+        # article to it ONCE. This single truncated text is the source of truth
+        # for BOTH what the listener reads (the HTML) AND what is voiced (the
+        # full-article audio below). Never synthesise more than the plan allows.
+        # Fail-open for display: on any error, show/voice the untruncated text.
+        try:
+            from article_truncation import truncate_for_user
+            display_text, was_truncated, truncation_rule = truncate_for_user(full_text, secret_id or '')
+            if was_truncated:
+                logging.info(
+                    f"[LOCAL-708] Article truncated to plan limit: "
+                    f"original={len(full_text)} -> delivered={len(display_text)} | "
+                    f"rule={truncation_rule} | user={secret_id}"
+                )
+            else:
+                logging.info(
+                    f"[LOCAL-708] Article within plan limit (no truncation): "
+                    f"chars={len(full_text)} | user={secret_id}"
+                )
+        except Exception as trunc_err:
+            logging.warning(f"[LOCAL-708] Truncation failed (delivering full text): {trunc_err}")
+            display_text = full_text
+            was_truncated, truncation_rule = False, 'none'
+        # ── end per-plan length ───────────────────────────────────────────────
+
         # Create temporary directory for HTML package
         with tempfile.TemporaryDirectory() as temp_dir:
             audio_files = []
@@ -353,11 +384,32 @@ def process_audio(article_id):
             
             # Generate full article audio (always last, high number to avoid conflicts)
             # Use high number for full article to avoid conflicts with topic numbering
+            # [LOCAL-708 / D670] Voice the PLAN-TRUNCATED text (display_text), not
+            # the original full_text. This is the whole point of the ticket: the
+            # audio length follows the listener's plan limit exactly — the admin
+            # plan hears up to ~5 pages, not the old fixed 5,000-char (~1.5 page)
+            # cap. polly-tts splits >2,000 chars and joins, so a 15,000-char admin
+            # article becomes one continuous MP3.
             full_path = os.path.join(temp_dir, "audio-99.mp3")
-            full_text_complete = f"Full Article: {full_text}"
-            
+            full_text_complete = f"Full Article: {display_text}"
+
+            # [LOCAL-708B / D670 addendum 2] If the article was shortened for the
+            # listener's plan, END the full-article audio with ONE short spoken
+            # sentence that NAMES the larger plans and their page lengths (built
+            # from the same plan data as the on-screen notice). Nothing is added
+            # when the article fit. This is an English article, so translated=False.
+            if was_truncated:
+                try:
+                    from article_truncation import build_spoken_notice_for_user
+                    spoken_notice = build_spoken_notice_for_user(secret_id or '', translated=False)
+                    if spoken_notice:
+                        full_text_complete = f"{full_text_complete}\n\n{spoken_notice}"
+                        logging.info(f"[LOCAL-708B] Spoken plan notice appended to full-article audio: {spoken_notice!r}")
+                except Exception as notice_err:
+                    logging.warning(f"[LOCAL-708B] Could not append spoken notice: {notice_err}")
+
             generate_audio_with_polly(full_text_complete, full_path)
-            logging.info("Full article audio generated with Polly")
+            logging.info(f"Full article audio generated with Polly ({len(display_text)} chars voiced)")
             audio_files.append(("audio-99.mp3", "Full Article"))
             
             # Create search content file for full-text search (clean HTML entities)
@@ -380,25 +432,9 @@ def process_audio(article_id):
             else:
                 logging.info(f"Title has {title_words} words (≤12), no short title needed")
             
-            # ── [LOCAL-193] Article text truncation for display ───────────────
-            # Truncate full_text for the HTML (what the user reads) at tier limit.
-            # TTS audio (audio-99 above) uses the ORIGINAL full_text — it has its
-            # own 5,000-char cap in clean_text_for_polly(), so no double-truncation.
-            # Search content also uses original (for full-text search quality).
-            try:
-                from article_truncation import truncate_for_user
-                display_text, was_truncated, truncation_rule = truncate_for_user(full_text, secret_id or '')
-                if was_truncated:
-                    logging.info(
-                        f"[LOCAL-193] Article truncated for display: "
-                        f"original={len(full_text)} → display={len(display_text)} | "
-                        f"rule={truncation_rule} | user={secret_id}"
-                    )
-            except Exception as trunc_err:
-                # Truncation is non-fatal — if it fails, show full text (fail open for display)
-                logging.warning(f"[LOCAL-193] Truncation failed (showing full text): {trunc_err}")
-                display_text = full_text
-            # ── end truncation ──────────────────────────────────────────────────
+            # [LOCAL-708] display_text (plan-truncated) was computed above, before
+            # audio generation, so the full-article audio and the HTML the user
+            # reads share one truncated source. Nothing to recompute here.
 
             # Create HTML file with all audio files
             html_content = create_news_html_with_points(summary_text, display_text, request_string, major_points, audio_files)

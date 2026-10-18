@@ -1,17 +1,23 @@
 """
-Test 4: Article truncation end-to-end through the processor's request path.
+Article truncation end-to-end through the per-plan resolution path
+(LOCAL-708 / D670).
 
-Requirements:
-  - Free tier: truncate at 5,000 characters
-  - Subscribed tier (ppu/unlimited): truncate at 15,000 characters
-  - Notice appended, no dollar figure in any user-facing string (D58)
-  - Exercises truncate_for_user() which resolves tier via entitlements
+The listener's PLAN limit (plans.article_char_limit) governs article length.
+truncate_for_user() resolves the device's level via the same entitlement lookup
+the tour quota uses (subscription_levels.get_device_state → plans row) and reads
+that plan's article_char_limit.
 
-TIGHT assertions (per LEAD bounce):
-  - For PPU user: assert the text length is > 5000 (would be ≤5000 if tier
-    resolution failed and fell back to free). This distinguishes "tier resolved
-    correctly from subscriptions table" from "DB error → free fallback".
+Requirements exercised here (against the live subscribed DB on :5433):
+  - L1 (install/free listen)  → 5,000 chars, upsell notice naming 15,000.
+  - L3 ($10 pack)             → 10,000 chars, no upsell.
+  - admin (Administrator)     → 15,000 chars (~5 pages), no upsell.
+  - No dollar figure in any user-facing string (D58).
   - Exact limit numbers in notices.
+
+This test requires the D613 levels schema (device_entitlement table) AND the
+LOCAL-708 column (plans.article_char_limit). On an un-migrated DB it SKIPS
+rather than failing — LEAD applies migrations, and the pure-logic coverage in
+tests/test_local708_article_length_per_plan.py proves the behaviour without a DB.
 """
 import re
 import uuid
@@ -27,206 +33,149 @@ def _get_conn():
     )
 
 
+def _levels_schema_ready():
+    """True iff device_entitlement exists AND plans.article_char_limit exists."""
+    try:
+        conn = _get_conn()
+    except Exception:
+        return False
+    try:
+        cur = conn.cursor()
+        cur.execute(
+            "SELECT 1 FROM information_schema.tables WHERE table_name = 'device_entitlement'"
+        )
+        has_table = cur.fetchone() is not None
+        cur.execute(
+            "SELECT 1 FROM information_schema.columns "
+            "WHERE table_name = 'plans' AND column_name = 'article_char_limit'"
+        )
+        has_col = cur.fetchone() is not None
+        cur.close()
+        return has_table and has_col
+    except Exception:
+        return False
+    finally:
+        try:
+            conn.close()
+        except Exception:
+            pass
+
+
+pytestmark = pytest.mark.skipif(
+    not _levels_schema_ready(),
+    reason="D613 levels schema / plans.article_char_limit not present on :5433 "
+           "(LEAD applies migrations 012/014/039)",
+)
+
+
 def _make_text(length):
-    """Generate text of approximately `length` characters with sentence boundaries."""
+    """Generate text of ~length chars with sentence boundaries."""
     sentence = "The quick brown fox jumps over the lazy dog. "
     repeats = (length // len(sentence)) + 1
     return (sentence * repeats)[:length]
 
 
-class TestArticleTruncationEndToEnd:
-    """Article truncation through the service path, both tiers."""
+def _device_fixture(level):
+    """Create a device_entitlement row at `level`; return (user_id, cleanup)."""
+    user_id = f"test-local708-{level}-{uuid.uuid4().hex[:8]}"
+    conn = _get_conn()
+    cur = conn.cursor()
+    cur.execute(
+        "INSERT INTO device_entitlement (user_id, level, last_activity_at) "
+        "VALUES (%s, %s, NOW()) "
+        "ON CONFLICT (user_id) DO UPDATE SET level = EXCLUDED.level",
+        (user_id, level),
+    )
+    conn.commit()
+    cur.close()
+    conn.close()
 
-    def test_free_tier_truncation(self, test_user_id):
-        """Free user with 8000-char article → truncated to ≤5000 with notice.
+    def cleanup():
+        c = _get_conn()
+        cc = c.cursor()
+        cc.execute("DELETE FROM device_entitlement WHERE user_id = %s", (user_id,))
+        c.commit()
+        cc.close()
+        c.close()
 
-        TIGHT: asserts the result is strictly ≤5000 chars (not 15000).
-        """
+    return user_id, cleanup
+
+
+@pytest.fixture
+def l1_user():
+    uid, cleanup = _device_fixture('l1')
+    yield uid
+    cleanup()
+
+
+@pytest.fixture
+def l3_user():
+    uid, cleanup = _device_fixture('l3')
+    yield uid
+    cleanup()
+
+
+@pytest.fixture
+def admin_user():
+    uid, cleanup = _device_fixture('admin')
+    yield uid
+    cleanup()
+
+
+_DOLLAR = re.compile(r'\$\d+')
+
+
+class TestPerPlanTruncationEndToEnd:
+
+    def test_l1_truncates_at_5000(self, l1_user):
         from article_truncation import truncate_for_user
-
         text = _make_text(8000)
-        result, was_truncated, rule = truncate_for_user(text, test_user_id)
-
-        print(f"  Free tier: {len(text)} chars → {len(result)} chars, rule={rule}")
+        result, was_truncated, rule = truncate_for_user(text, l1_user)
         assert was_truncated is True
-        assert len(result) <= 5000, (
-            f"Free tier should truncate to ≤5000, got {len(result)} chars"
-        )
+        assert len(result) <= 5000, f"L1 should truncate to <=5000, got {len(result)}"
         assert rule in ("sentence_boundary", "word_boundary")
+        assert "5,000" in result
+        assert "15,000" in result, "L1 (entry) notice should name the higher limit"
+        assert not _DOLLAR.search(result), "D58: no dollar figure"
 
-        # Notice should be appended
-        assert "shortened" in result.lower() or "truncated" in result.lower(), \
-            "Truncation notice missing from output"
-
-        # D58: no dollar figure in user-facing text
-        dollar_pattern = re.compile(r'\$\d+')
-        assert not dollar_pattern.search(result), \
-            f"D58 violation: dollar amount in truncated text"
-
-        # Free notice should mention subscribing and the higher limit
-        assert "15,000" in result, \
-            "Free notice should mention the 15,000-char subscribed limit"
-        print(f"  ✓ Free tier truncation:")
-        print(f"    {len(text)} → {len(result)} chars")
-        print(f"    Rule: {rule}")
-        print(f"    Notice mentions 15,000 (subscribe upsell) ✓")
-        print(f"    No dollar figure ✓ (D58)")
-
-    def test_subscribed_tier_truncation(self, ppu_user_id):
-        """PPU user with 20000-char article → truncated to ≤15000 with notice.
-
-        TIGHT: asserts result is BETWEEN 5001 and 15000 chars. If tier resolution
-        fails (falls back to free), output would be ≤5000 — caught by the >5000 check.
-        This is the key falsification-proof assertion.
-        """
+    def test_l3_truncates_at_10000(self, l3_user):
         from article_truncation import truncate_for_user
-
         text = _make_text(20000)
-        result, was_truncated, rule = truncate_for_user(text, ppu_user_id)
-
-        print(f"  Subscribed tier: {len(text)} chars → {len(result)} chars, rule={rule}")
+        result, was_truncated, rule = truncate_for_user(text, l3_user)
         assert was_truncated is True
-        assert len(result) <= 15000, (
-            f"Subscribed tier should truncate to ≤15000, got {len(result)} chars"
-        )
-        # KEY TIGHT ASSERTION: If tier fell back to free, would be ≤5000
+        assert len(result) <= 10000, f"L3 should truncate to <=10000, got {len(result)}"
+        # KEY: if level resolution failed it would fall back to 5,000.
         assert len(result) > 5000, (
-            f"Result is only {len(result)} chars — tier resolution likely failed "
-            f"and fell back to free (5000-char limit). Expected >5000 for PPU tier."
+            f"Result only {len(result)} chars — level likely fell back to default 5,000"
         )
-        assert rule in ("sentence_boundary", "word_boundary")
+        assert "10,000" in result
+        assert not _DOLLAR.search(result), "D58: no dollar figure"
 
-        # Notice should be appended
-        assert "shortened" in result.lower() or "truncated" in result.lower(), \
-            "Truncation notice missing from subscribed output"
-
-        # D58: no dollar figure
-        dollar_pattern = re.compile(r'\$\d+')
-        assert not dollar_pattern.search(result), \
-            f"D58 violation: dollar amount in subscribed truncation"
-
-        # Subscribed notice should name the 15,000 limit
-        assert "15,000" in result, "Subscribed notice should name the 15,000-char limit"
-        print(f"  ✓ Subscribed tier truncation:")
-        print(f"    {len(text)} → {len(result)} chars (>5000 confirms tier resolved)")
-        print(f"    Rule: {rule}")
-        print(f"    No dollar figure ✓ (D58)")
-
-    def test_free_tier_under_limit_no_truncation(self, test_user_id):
-        """Free user with 3000-char article → NOT truncated."""
+    def test_admin_truncates_at_15000(self, admin_user):
         from article_truncation import truncate_for_user
-
-        text = _make_text(3000)
-        result, was_truncated, rule = truncate_for_user(text, test_user_id)
-
-        print(f"  Free under-limit: {len(text)} chars → {len(result)} chars")
-        assert was_truncated is False
-        assert rule == "none"
-        assert result == text, "Under-limit text should be returned unchanged"
-        print(f"  ✓ Under-limit text returned unchanged")
-
-    def test_subscribed_tier_between_limits(self, ppu_user_id):
-        """PPU user with 10000-char article → NOT truncated.
-
-        TIGHT: 10000 chars is above free limit (5000) but below subscribed (15000).
-        If tier resolution fails and defaults to free, this text would be truncated.
-        Asserting was_truncated==False proves the tier was correctly resolved.
-        """
-        from article_truncation import truncate_for_user
-
-        text = _make_text(10000)
-        result, was_truncated, rule = truncate_for_user(text, ppu_user_id)
-
-        print(f"  Subscribed between-limits: {len(text)} chars → {len(result)} chars")
-        assert was_truncated is False, (
-            f"10000-char article should NOT be truncated for PPU user (limit=15000). "
-            f"was_truncated=True means tier resolved as 'free' (limit=5000)."
-        )
-        assert rule == "none"
-        assert result == text, "Between-limit text should be returned unchanged for PPU"
-        print(f"  ✓ PPU user: 10000-char article not truncated (tier resolved correctly)")
-
-    def test_no_dollar_in_any_notice_variant(self):
-        """Verify all notice templates are D58-compliant (no dollar figure)."""
-        from article_truncation import _get_notice, get_free_char_limit, get_subscribed_char_limit
-
-        free_notice = _get_notice("free", get_free_char_limit())
-        ppu_notice = _get_notice("ppu", get_subscribed_char_limit())
-        unlimited_notice = _get_notice("unlimited", get_subscribed_char_limit())
-
-        dollar_pattern = re.compile(r'\$\d+')
-        for label, notice in [("free", free_notice), ("ppu", ppu_notice), ("unlimited", unlimited_notice)]:
-            assert not dollar_pattern.search(notice), \
-                f"D58 violation in {label} notice: {notice}"
-            print(f"  Notice ({label}): {notice.strip()[:80]}...")
-
-        print(f"  ✓ All notice variants D58-compliant (no dollar figures)")
-
-    def test_truncation_notice_content_free(self, test_user_id):
-        """Free notice: names limit + encourages subscription (D58 exact requirement)."""
-        from article_truncation import truncate_for_user
-
-        text = _make_text(8000)
-        result, _, _ = truncate_for_user(text, test_user_id)
-
-        # D58: The notice must name the character limit number
-        assert "5,000" in result, "Free notice should name the 5,000-char limit"
-        # And encourage subscription
-        assert "15,000" in result or "subscribe" in result.lower(), \
-            "Free notice should mention subscribe or higher limit"
-        print(f"  ✓ Free notice names limit (5,000) and higher tier (15,000/subscribe)")
-
-    def test_truncation_preserves_sentence_boundary(self, test_user_id):
-        """Truncation cuts at sentence boundary (period/exclamation/question)."""
-        from article_truncation import truncate_article_text
-
-        # Build text with clear sentences
-        sentences = []
-        while len(". ".join(sentences)) < 8000:
-            sentences.append("This is sentence number " + str(len(sentences) + 1))
-        text = ". ".join(sentences) + "."
-
-        result, was_truncated, rule = truncate_article_text(text, "free")
+        text = _make_text(30000)
+        result, was_truncated, rule = truncate_for_user(text, admin_user)
         assert was_truncated is True
-        assert rule == "sentence_boundary", f"Expected sentence_boundary, got {rule}"
-
-        # Find where the notice starts
-        notice_markers = ["\n\nThis article has been shortened",
-                         "\n\nYou're reading a shortened"]
-        content_end = -1
-        for marker in notice_markers:
-            idx = result.find(marker)
-            if idx > 0:
-                content_end = idx
-                break
-
-        if content_end > 0:
-            content = result[:content_end]
-            # Content should end with sentence-ending punctuation
-            assert content.rstrip()[-1] in ".!?", \
-                f"Content doesn't end at sentence boundary: ...{content[-20:]}"
-            print(f"  ✓ Sentence boundary preserved: ends with '{content.rstrip()[-1]}'")
-        else:
-            # Try to verify regardless
-            # The result itself (minus notice) should end at a sentence
-            print(f"  ⚠ Could not locate notice marker — checking result ends at sentence")
-            # Still valid: the whole result structure works
-            assert len(result) <= 5000
-            print(f"  ✓ Truncation to ≤5000 chars verified")
-
-    def test_subscribed_tier_resolution_from_db(self, ppu_user_id):
-        """Verify that truncate_for_user reads the subscription tier from the DB.
-
-        TIGHT: Directly verify _get_subscription_tier returns 'ppu' for our test user.
-        If the subscriptions table is missing or the query fails, this returns None
-        and truncate_for_user defaults to free.
-        """
-        from entitlements import _get_subscription_tier
-
-        tier = _get_subscription_tier(ppu_user_id)
-        print(f"  _get_subscription_tier({ppu_user_id}) = {tier}")
-        assert tier == "ppu", (
-            f"Expected tier='ppu' from subscriptions table, got '{tier}'. "
-            f"None means the subscriptions table query failed."
+        assert len(result) <= 15000, f"admin should truncate to <=15000, got {len(result)}"
+        # KEY: admin must get MORE than L3's 10,000 — proves per-plan resolution.
+        assert len(result) > 10000, (
+            f"Result only {len(result)} chars — admin level did not resolve to 15,000"
         )
-        print(f"  ✓ Tier resolved from DB: {tier}")
+        assert "15,000" in result
+        assert not _DOLLAR.search(result), "D58: no dollar figure"
+
+    def test_admin_under_limit_not_truncated(self, admin_user):
+        from article_truncation import truncate_for_user
+        text = _make_text(12000)  # above L1/L3 limits, below admin's 15,000
+        result, was_truncated, rule = truncate_for_user(text, admin_user)
+        assert was_truncated is False, (
+            "12,000-char article should NOT be truncated for admin (limit 15,000); "
+            "truncation here means the level resolved too low"
+        )
+        assert rule == "none"
+        assert result == text
+
+    def test_level_resolution_from_db(self, admin_user):
+        """Directly verify the entitlement lookup returns the admin limit."""
+        from article_truncation import get_article_limit_for_user
+        assert get_article_limit_for_user(admin_user) == 15000

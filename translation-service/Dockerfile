@@ -17,6 +17,11 @@ RUN pip install --no-cache-dir -r requirements.txt
 # a module missing from it is absent in the image and import fails at runtime
 # (this trap bit twice this week), so new runtime deps MUST be added here.
 COPY translation_service.py blobstorage.py build_manifest.py cost_rates.py cost_meter.py ./
+# [LOCAL-708B / D670] Per-plan article length + the plan-aware truncation notice
+# (names the plans, page lengths, "See plans") for TRANSLATED articles. These two
+# modules live at the repo root; a copy is kept here (same convention as
+# cost_meter.py) because this service's build context is ./translation-service.
+COPY article_truncation.py subscription_levels.py ./
 
 # Build-time manifest: record checksums of all Python sources + git SHA
 ARG GIT_SHA=unknown

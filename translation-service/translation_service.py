@@ -1932,7 +1932,7 @@ class TranslationService:
             logging.error(f"ZIP audio translation error: {e}")
             return original_zip_data  # Return original on error
     
-    def translate_article(self, original_article_id, target_language):
+    def translate_article(self, original_article_id, target_language, user_id=None):
         """Translate a newsletter article with audio generation matching English structure"""
         conn = self.get_db_connection()
         try:
@@ -2008,7 +2008,8 @@ class TranslationService:
             
             # Create mobile-compatible ZIP matching English structure exactly
             translated_zip_data = self._create_english_structure_zip(
-                translated_title, translated_content, translated_topics, target_language
+                translated_title, translated_content, translated_topics, target_language,
+                user_id=user_id
             )
             
             # Generate new article ID
@@ -2054,7 +2055,7 @@ class TranslationService:
         finally:
             conn.close()
     
-    def _create_english_structure_zip(self, title, content, topics, target_language):
+    def _create_english_structure_zip(self, title, content, topics, target_language, user_id=None):
         """Create ZIP matching exact English article structure with multiple MP3 files"""
         import tempfile
         import os
@@ -2077,6 +2078,52 @@ class TranslationService:
                     else:
                         summary_text = content[:200] + '...'
                         full_text = content  # Use full content if too short to split
+
+                # ── [LOCAL-708B / D670 addendum] Per-plan length for TRANSLATED
+                # articles ────────────────────────────────────────────────────
+                # Truncate the (already-translated) full article to the listener's
+                # plan limit, exactly like the English path, and append the SAME
+                # notice worded "listened to and translated" — in the listener's
+                # LANGUAGE when the app is localised (we build the English notice
+                # then translate it), English otherwise. The spoken notice (which
+                # NAMES the plans) is appended to the full-article audio below and
+                # likewise translated. Nothing is added when the article fits.
+                # Fail-open: on any error, deliver the untruncated translated text.
+                spoken_notice_translated = ''
+                full_text_was_truncated = False
+                if user_id:
+                    try:
+                        import article_truncation as _at
+                        # Build the English notice (translated wording) then
+                        # translate it into the target language for display.
+                        en_notice = _at.build_text_notice_for_user(user_id, translated=True)
+                        notice_localised = en_notice
+                        if en_notice and target_language != 'en':
+                            try:
+                                notice_localised = '\n\n' + self.translate_text(
+                                    en_notice.strip(), target_language)
+                            except Exception as te:
+                                logging.warning(f"[LOCAL-708B] Notice translation failed ({target_language}); English fallback: {te}")
+                                notice_localised = en_notice
+                        full_text, full_text_was_truncated, _rule = _at.truncate_for_user_with_notice(
+                            full_text, user_id, notice_localised)
+                        if full_text_was_truncated:
+                            logging.info(f"[LOCAL-708B] Translated article truncated to plan limit for {user_id} ({target_language})")
+                            # Spoken notice (names the plans), English built then
+                            # translated for the audio.
+                            en_spoken = _at.build_spoken_notice_for_user(user_id, translated=True)
+                            spoken_notice_translated = en_spoken
+                            if en_spoken and target_language != 'en':
+                                try:
+                                    spoken_notice_translated = self.translate_text(en_spoken, target_language)
+                                except Exception as se:
+                                    logging.warning(f"[LOCAL-708B] Spoken notice translation failed ({target_language}); English fallback: {se}")
+                                    spoken_notice_translated = en_spoken
+                    except Exception as trunc_err:
+                        logging.warning(f"[LOCAL-708B] Translated truncation failed (delivering full text): {trunc_err}")
+                        full_text_was_truncated = False
+                        spoken_notice_translated = ''
+                # ── end per-plan length (translated) ──────────────────────────
                 
                 # Generate summary audio (audio_1.mp3)
                 summary_audio = self.generate_audio(f"Article Summary: {summary_text}", target_language)
@@ -2140,7 +2187,13 @@ class TranslationService:
                     audio_files.append(('audio-help.mp3', 'Help Commands'))
                 
                 # Generate full article audio (audio-99.mp3) - ONLY full article, not summary
-                full_audio = self.generate_audio(full_text, target_language)  # Remove "Full Article:" prefix
+                # [LOCAL-708B] If the translated article was shortened for the
+                # listener's plan, end the audio with the spoken notice that NAMES
+                # the larger plans (translated). Nothing added when it fits.
+                full_audio_text = full_text  # Remove "Full Article:" prefix
+                if full_text_was_truncated and spoken_notice_translated:
+                    full_audio_text = f"{full_text}\n\n{spoken_notice_translated}"
+                full_audio = self.generate_audio(full_audio_text, target_language)
                 if full_audio:
                     full_file = os.path.join(temp_dir, 'audio-99.mp3')
                     with open(full_file, 'wb') as f:
@@ -3181,7 +3234,7 @@ def translate_content_with_audio():
                 translated_id, _cache_hit = translation_service.translate_tour_with_audio(
                     content_id, lang, job_id=job_id, user_id=user_id)
             elif content_type == 'article':
-                translated_id = translation_service.translate_article(content_id, lang)
+                translated_id = translation_service.translate_article(content_id, lang, user_id=user_id)
             else:
                 translated_id = None
         except TranslationArtifactError as e:
