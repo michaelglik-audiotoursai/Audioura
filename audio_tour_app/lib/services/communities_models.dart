@@ -569,13 +569,14 @@ class CommunityCopy {
   static String memberCountLabel(int count) =>
       count == 1 ? '1 member' : '$count members';
 
-  /// §4: The email body an organiser sends to invite members. Contains the
-  /// community name + description, the organiser name, how to get Audioura
-  /// (install link), and the exact join instruction with the CODE. The returned
-  /// string ALWAYS contains the code and the install line, which the tests
-  /// assert. Never claims the email was sent — that is the composer's job.
-  /// [LOCAL-704 / D665] It also carries the community's member count ("12
-  /// members") when provided.
+  /// §4 + [LOCAL-710 / D672]: The email body an organiser sends to invite
+  /// members. D672 (Michael's review): lead with the invite line, show the
+  /// member count ONLY when ≥ 2, then the join link + the code fallback. The
+  /// "How to get Audioura" and "(App Store / Google Play links coming soon.)"
+  /// lines are DROPPED — the join link already leads to the store. The optional
+  /// community description and organiser are kept as context between the invite
+  /// line and the link. The returned string ALWAYS contains the code and the
+  /// link, which the tests assert. Never claims the email was sent.
   static String emailInviteBody({
     required String communityName,
     String? description,
@@ -583,32 +584,22 @@ class CommunityCopy {
     required String code,
     int? memberCount,
   }) {
-    final buf = StringBuffer();
-    buf.writeln('You are invited to join "$communityName" on Audioura.');
-    buf.writeln();
+    final paragraphs = <String>[];
+    paragraphs.add('Join "$communityName" on Audioura.');
+    // [D672] Member count only at 2 or more.
+    if (memberCount != null && memberCount >= 2) {
+      paragraphs.add('$memberCount members.');
+    }
     if (description != null && description.trim().isNotEmpty) {
-      buf.writeln(description.trim());
-      buf.writeln();
+      paragraphs.add(description.trim());
     }
     if (organiserName != null && organiserName.trim().isNotEmpty) {
-      buf.writeln('Organiser: ${organiserName.trim()}');
+      paragraphs.add('Organiser: ${organiserName.trim()}');
     }
-    if (memberCount != null) {
-      buf.writeln(memberCountLabel(memberCount));
-    }
-    if ((organiserName != null && organiserName.trim().isNotEmpty) ||
-        memberCount != null) {
-      buf.writeln();
-    }
-    buf.writeln('How to get Audioura: $installUrl');
-    buf.writeln('(App Store / Google Play links coming soon.)');
-    buf.writeln();
-    // [LOCAL-709 / D671] Lead with the link; keep the code as the fallback. The
-    // link opens Audioura straight to Search with the code run (or the landing
-    // page → store without the app).
-    buf.writeln('Join here: ${buildCommunityInviteLink(code)}');
-    buf.writeln('Or open Audioura → Search → type the code $code');
-    return buf.toString();
+    // [LOCAL-709 / D671 / D672] Lead with the link; keep the code as fallback.
+    paragraphs.add(buildCommunityInviteLink(code));
+    paragraphs.add('(Or open Audioura, tap Search and paste $code.)');
+    return paragraphs.join('\n\n').replaceAll(RegExp(r'  +'), ' ');
   }
 
   /// §4: A short email SUBJECT for the invite.

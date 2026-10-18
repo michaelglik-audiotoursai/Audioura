@@ -1457,7 +1457,30 @@ class _MyToursScreenState extends State<MyToursScreen> {
   /// non-numeric ids and surfaces server/offline errors as a SnackBar.
   void _shareTour(Map<String, dynamic> tour) {
     final title = (tour['title'] ?? 'this tour').toString();
-    shareTour(context, audioTourId: _numericTourId(tour) ?? tour['tour_id'], tourName: title);
+    // [LOCAL-710 / D672] Hand the sharing flow what the tour record holds: the
+    // downloaded tour's path (first stop's name + address), the stored stop
+    // count, the paid snapshot (price_tier / price_label) and a community name.
+    final rawStops = tour['stops']?.toString().trim();
+    final stopCount = (rawStops != null && rawStops.isNotEmpty)
+        ? int.tryParse(rawStops)
+        : null;
+    final priceTier = tour['price_tier'];
+    final isPaid = tour['is_paid'] == true || priceTier != null;
+    final price = tour['price_label']?.toString();
+    final communityName = tour['community_name']?.toString();
+    shareTour(
+      context,
+      audioTourId: _numericTourId(tour) ?? tour['tour_id'],
+      tourName: title,
+      tourPath: tour['path']?.toString(),
+      stopCount: stopCount,
+      isPaid: isPaid,
+      price: (isPaid && price != null && price != 'Free') ? price : null,
+      communityName:
+          (communityName != null && communityName.trim().isNotEmpty)
+              ? communityName
+              : null,
+    );
   }
 
   void _editTour(Map<String, dynamic> tour) {

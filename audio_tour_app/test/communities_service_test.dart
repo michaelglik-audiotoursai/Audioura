@@ -12,6 +12,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:audio_tour_app_dev/services/communities_models.dart';
 import 'package:audio_tour_app_dev/services/iap_service.dart';
+import 'package:audio_tour_app_dev/utils/share_code.dart';
 
 void main() {
   group('CommunityRules.originLabel', () {
@@ -236,8 +237,8 @@ void main() {
     });
   });
 
-  group('CommunityCopy.emailInviteBody — §4 email contains code + install', () {
-    test('ALWAYS contains the code and the install line', () {
+  group('CommunityCopy.emailInviteBody — §4 / D672 email contains code + link', () {
+    test('ALWAYS contains the code and the join link; drops install lines', () {
       final body = CommunityCopy.emailInviteBody(
         communityName: 'Night Owls',
         description: 'We walk at night.',
@@ -247,21 +248,36 @@ void main() {
       // The exact join instruction with the code.
       expect(body.contains('AB12CD34'), isTrue);
       expect(body.contains('Search'), isTrue);
-      // The install line (App Store / Google Play via audioura.com for now).
-      expect(body.contains(CommunityCopy.installUrl), isTrue);
+      // [D672] Lead with the /t/ link; the "How to get Audioura" + "links
+      // coming soon" lines are gone.
+      expect(body.contains('https://audioura.com/t/AB12CD34'), isTrue);
+      expect(body.contains('How to get Audioura'), isFalse);
+      expect(body.contains('links coming soon'), isFalse);
       // Carries the name, description and organiser.
       expect(body.contains('Night Owls'), isTrue);
       expect(body.contains('We walk at night.'), isTrue);
       expect(body.contains('Sam'), isTrue);
+      // The code round-trips back out of the invite.
+      expect(extractShareCode(body), 'AB12CD34');
     });
 
-    test('code + install present even with no description / organiser', () {
+    test('code + link present even with no description / organiser', () {
       final body = CommunityCopy.emailInviteBody(
         communityName: 'Minimal',
         code: 'ZZ99ZZ99',
       );
       expect(body.contains('ZZ99ZZ99'), isTrue);
-      expect(body.contains(CommunityCopy.installUrl), isTrue);
+      expect(body.contains('https://audioura.com/t/ZZ99ZZ99'), isTrue);
+    });
+
+    test('[D672] member count shown only at 2 or more', () {
+      String bodyFor(int? n) => CommunityCopy.emailInviteBody(
+            communityName: 'Counters', code: 'AB12CD34', memberCount: n);
+      expect(bodyFor(null).contains('members'), isFalse);
+      expect(bodyFor(0).contains('members'), isFalse);
+      expect(bodyFor(1).contains('member'), isFalse);
+      expect(bodyFor(2).contains('2 members'), isTrue);
+      expect(bodyFor(12).contains('12 members'), isTrue);
     });
   });
 
