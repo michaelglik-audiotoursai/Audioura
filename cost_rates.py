@@ -49,6 +49,32 @@ LLM_RATES = {
         "input_per_1m": 0.50,
         "output_per_1m": 1.50,
     },
+    # ─── Anthropic (Claude) — per 1M tokens ──────────────────────────────────
+    # [LOCAL-712 / D674] Claude candidate for the narration / story-pass call,
+    # via the Anthropic API (api.anthropic.com/v1/messages). Base-token list
+    # prices, standard tier (NOT the Batch API 50%-off column, which we do not
+    # use for the per-stop narration call).
+    #
+    # Source: https://docs.anthropic.com/en/docs/about-claude/pricing
+    # Read: 2026-10-18
+    #   Claude Haiku 4.5  — input $1.00 / MTok, output $5.00 / MTok
+    #   Claude Sonnet 5   — input $2.00 / MTok, output $10.00 / MTok
+    # (Both rows read from the "Additional models" block of the Model-pricing
+    # table; they are the two D674 bake-off arms. The page's cache-hit column
+    # lists 0.1x base input for Haiku 4.5 and 0.2x for Sonnet 5, but the
+    # narration call sends no cache_control, so only the base rates apply here.)
+    #
+    # Keys are the model-FAMILY strings; _resolve_model_rates() longest-substring
+    # match prices the dated ids too (e.g. "claude-haiku-4-5-20251001" matches
+    # "claude-haiku-4-5", and "claude-sonnet-5" matches "claude-sonnet-5").
+    "claude-haiku-4-5": {
+        "input_per_1m": 1.00,
+        "output_per_1m": 5.00,
+    },
+    "claude-sonnet-5": {
+        "input_per_1m": 2.00,
+        "output_per_1m": 10.00,
+    },
 }
 
 # Legacy constants — DEPRECATED. Kept for any code that reads them directly.

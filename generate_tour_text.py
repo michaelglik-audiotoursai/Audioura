@@ -255,6 +255,7 @@ def narration_model_route() -> tuple:
 
       * NARRATION_PROVIDER=openai  (or unset)  -> OpenAI chat-completions
       * NARRATION_PROVIDER=gemini               -> Gemini generateContent, NO grounding/tools
+      * NARRATION_PROVIDER=anthropic            -> Anthropic /v1/messages  [LOCAL-712 / D674]
 
     ``NARRATION_MODEL`` overrides the model string for whichever provider is
     chosen; when it is unset the OpenAI path falls back to story_pass_model()
@@ -271,6 +272,10 @@ def narration_model_route() -> tuple:
     model = (_cheap_arm.effective_env("NARRATION_MODEL", "") or "").strip()
     if provider == "gemini":
         return ("gemini", model or "gemini-2.5-flash")
+    if provider == "anthropic":
+        # [LOCAL-712 / D674] Claude via the Anthropic API. Default to the
+        # bake-off's Haiku 4.5 arm id when NARRATION_MODEL is unset.
+        return ("anthropic", model or "claude-haiku-4-5-20251001")
     # OpenAI (default): preserve the existing story_pass_model() default exactly.
     return ("openai", model or story_pass_model())
 

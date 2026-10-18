@@ -70,6 +70,16 @@ OPENAI = {  # longest key wins
     "text-embedding-ada-002": (0.10, 0.0, 0.10),
 }
 GEMINI_IN, GEMINI_OUT, GROUNDING_PER_QUERY, SERPER_PER_QUERY = 0.75, 3.75, 0.014, 0.001
+# [LOCAL-712 / D674] Anthropic (Claude) $ per 1M tokens: (input, output, cache_read).
+# Base-token list prices, standard tier. Source:
+# https://docs.anthropic.com/en/docs/about-claude/pricing (read 2026-10-18).
+#   Claude Haiku 4.5: $1.00 in / $5.00 out / $0.10 cache-read (0.1x base input).
+#   Claude Sonnet 5:  $2.00 in / $10.00 out / $0.20 cache-read (0.2x base input).
+# Longest matching key wins, so the dated ids (claude-haiku-4-5-20251001) price too.
+ANTHROPIC = {  # longest key wins
+    "claude-haiku-4-5": (1.00, 5.00, 0.10),
+    "claude-sonnet-5": (2.00, 10.00, 0.20),
+}
 # RATE_TAG names the price card every record was costed with (Michael 2026-10-08: "keep the tag
 # on the price we are using"). Bump it whenever any rate below changes; the history of tags and the
 # bill reconciliation behind each lives in .continuous_dev/PRICE_CARD.md.
@@ -79,6 +89,7 @@ GROUNDED_REQUEST_USD = 0.053  # r5 2026-10-10: GCloud SKU "Generate content sear
 def _host_kind(url):
     u = url or ""
     if "api.openai.com" in u: return "openai"
+    if "api.anthropic.com" in u: return "anthropic"
     if "generativelanguage.googleapis.com" in u: return "gemini"
     if "serper.dev" in u: return "serper"
     if "polly" in u and "amazonaws.com" in u: return "polly"
@@ -104,6 +115,20 @@ def _openai_cost(model, usage):
     cached = ((usage.get("prompt_tokens_details") or usage.get("input_tokens_details") or {}) .get("cached_tokens") or 0)
     return ((pt - cached) * i + cached * c + ct * o) / 1e6, key
 
+def _anthropic_cost(model, usage):
+    """[LOCAL-712] $ for one Anthropic /v1/messages call, read from the response
+    `usage` block. Anthropic reports input_tokens (UNCACHED only — cache reads
+    and cache writes are separate counters) and output_tokens; a cache hit is
+    reported in cache_read_input_tokens and billed at the 0.1x/0.2x cache rate.
+    Returns (usd, rate_key) or (None, None) for an unknown model."""
+    key = max((k for k in ANTHROPIC if k in (model or "")), key=len, default=None)
+    if not key: return None, None
+    i, o, c = ANTHROPIC[key]
+    pt = usage.get("input_tokens") or 0           # uncached input tokens
+    ct = usage.get("output_tokens") or 0
+    cached = usage.get("cache_read_input_tokens") or 0
+    return (pt * i + cached * c + ct * o) / 1e6, key
+
 def _record(url, status, body, req_body=None):
     kind = _host_kind(url)
     if not kind: return
@@ -119,6 +144,15 @@ def _record(url, status, body, req_body=None):
             model = d.get("model") or ((req_body or {}).get("model") if isinstance(req_body, dict) else "")
             usage = d.get("usage") or {}
             usd, key = _openai_cost(model, usage)
+            rec.update(model=model, usage=usage, usd=usd if status == 200 else 0.0, rate_key=key)
+        elif kind == "anthropic":
+            # Anthropic /v1/messages: the response carries `model` and a `usage`
+            # block {input_tokens, output_tokens, cache_read_input_tokens?}. On an
+            # error the model falls back to the request body's model so the row is
+            # still attributable. Usage is read for the $; a non-200 costs $0.
+            model = d.get("model") or ((req_body or {}).get("model") if isinstance(req_body, dict) else "")
+            usage = d.get("usage") or {}
+            usd, key = _anthropic_cost(model, usage)
             rec.update(model=model, usage=usage, usd=usd if status == 200 else 0.0, rate_key=key)
         elif kind == "gemini":
             um = d.get("usageMetadata") or {}
