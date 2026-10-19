@@ -75,10 +75,23 @@ GEMINI_IN, GEMINI_OUT, GROUNDING_PER_QUERY, SERPER_PER_QUERY = 0.75, 3.75, 0.014
 # https://docs.anthropic.com/en/docs/about-claude/pricing (read 2026-10-18).
 #   Claude Haiku 4.5: $1.00 in / $5.00 out / $0.10 cache-read (0.1x base input).
 #   Claude Sonnet 5:  $2.00 in / $10.00 out / $0.20 cache-read (0.2x base input).
-# Longest matching key wins, so the dated ids (claude-haiku-4-5-20251001) price too.
+# [LOCAL-712B / D674 addendum 2] CURRENT Claude lineup added as extra bake-off
+# arms (model IDs from docs.anthropic.com/en/docs/about-claude/models/overview,
+# read 2026-10-18), the LOCAL-712 rows above kept:
+#   Claude Haiku 5.5 (claude-haiku-5-5):  $0.10 in / $0.50 out / $0.01 cache-read
+#       for prompts <=100k tokens. ABOVE 100k it is $0.50 in / $2.50 out (our
+#       narration prompts are ~3k tokens, so only the <=100k tier ever applies).
+#   Claude Sonnet 5.5 (claude-sonnet-5-5): $2.00 in / $10.00 out / $0.10 cache-read.
+#   Claude Opus 5.5 (claude-opus-5-5):    $4.00 in / $20.00 out / $0.20 cache-read.
+#       (Opus "fast mode" $8/$40 is NOT used.)
+# Longest matching key wins, so the dated ids (claude-haiku-4-5-20251001) price too,
+# and claude-sonnet-5-5 wins over claude-sonnet-5 (claude-sonnet-5-5 is longer).
 ANTHROPIC = {  # longest key wins
     "claude-haiku-4-5": (1.00, 5.00, 0.10),
     "claude-sonnet-5": (2.00, 10.00, 0.20),
+    "claude-haiku-5-5": (0.10, 0.50, 0.01),   # prompts <=100k; >100k is (0.50, 2.50)
+    "claude-sonnet-5-5": (2.00, 10.00, 0.10),
+    "claude-opus-5-5": (4.00, 20.00, 0.20),
 }
 # RATE_TAG names the price card every record was costed with (Michael 2026-10-08: "keep the tag
 # on the price we are using"). Bump it whenever any rate below changes; the history of tags and the

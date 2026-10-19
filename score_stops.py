@@ -27,7 +27,11 @@ import re
 import subprocess
 import sys
 
-ARMS = ["A", "B", "C", "D", "E", "F", "G"]
+# [LOCAL-712B / D674 addendum 2] H/I/J are the current Claude lineup
+# (claude-haiku-5-5 / claude-sonnet-5-5 / claude-opus-5-5), added alongside the
+# original LOCAL-712 arms. The scorer/blind/judge flow treats every arm the
+# same, so H/I/J need no special handling beyond appearing in the arm list.
+ARMS = ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J"]
 KIRO = os.environ.get("KIRO_CLI", "kiro-cli")
 
 

@@ -257,7 +257,11 @@ def test_call_anthropic_timeout_propagates_like_openai(harness, monkeypatch):
 def test_harness_has_claude_arms(harness):
     assert harness.ARMS["F"] == ("anthropic", "claude-haiku-4-5-20251001")
     assert harness.ARMS["G"] == ("anthropic", "claude-sonnet-5")
-    assert harness.D674_ARMS == ("B", "F", "G")
+    # [LOCAL-712B / D674 addendum 2] D674_ARMS was extended with the current
+    # Claude lineup (H/I/J); the LOCAL-712 arms B/F/G remain in the set and are
+    # still checked above. The baseline (B) and both original Claude arms stay.
+    assert harness.D674_ARMS == ("B", "F", "G", "H", "I", "J")
+    assert ("B", "F", "G") == tuple(a for a in harness.D674_ARMS if a in ("B", "F", "G"))
 
 
 # ─────────────────────────────────────────────────────────────────────────────
