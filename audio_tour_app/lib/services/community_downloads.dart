@@ -25,16 +25,86 @@ import 'package:shared_preferences/shared_preferences.dart';
 /// the listening-language default can be computed without importing a widget.
 const List<String> kListeningLanguages = ['en', 'ru', 'es', 'fr', 'de', 'zh'];
 
+/// The display names for the listening languages, mirroring the names in
+/// widgets/language_selector. Kept here (dependency-free) so both About and the
+/// community page show identical names from ONE source.
+const Map<String, String> kListeningLanguageNames = {
+  'en': 'English',
+  'ru': 'Русский',
+  'es': 'Español',
+  'fr': 'Français',
+  'de': 'Deutsch',
+  'zh': '中文',
+};
+
+/// The display name for a listening-language [code], falling back to the code
+/// itself for an unknown one.
+String listeningLanguageName(String code) =>
+    kListeningLanguageNames[code] ?? code;
+
 /// The fallback listening language when the phone's language is not one
 /// Audioura offers (D675 §1: "otherwise English"; "maybe start with English").
 const String kDefaultListeningLanguage = 'en';
 
-/// The saved-setting key for the chosen listening language.
+/// The saved-setting key for the chosen listening language. This is About's
+/// "Listening language" — the DEFAULT for every community (D675 addendum 1).
 const String kListeningLanguagePrefKey = 'listening_language';
+
+/// [LOCAL-715 / D675 addendum 1] The per-community listening-language key:
+/// `listening_language_<community_id>`. When set, this community's tours
+/// download in this language; when absent, the page falls back to About's
+/// `listening_language` (then the phone locale, then English). A member can
+/// hear the Book Club in Russian and the Boston Walkers in English.
+String communityLanguagePrefKey(int communityId) =>
+    'listening_language_$communityId';
+
+/// [LOCAL-715 / D675 addendum 1] PURE precedence resolver for the language a
+/// given community's tours download in. Total, dependency-free, so all four
+/// cases are unit-tested without a running app:
+///   1. [communityChoice] — the per-community key, when set (non-empty);
+///   2. else [aboutDefault] — About's saved Listening language, when set;
+///   3. else the phone's [localeLanguageCode] when Audioura offers it;
+///   4. else English.
+/// (3) + (4) are exactly About's own default (defaultListeningLanguage), so a
+/// community with no choice and no About setting resolves the same way About
+/// would — the phone's language, else English.
+String resolveCommunityLanguage({
+  String? communityChoice,
+  String? aboutDefault,
+  String? localeLanguageCode,
+}) {
+  final chosen = (communityChoice ?? '').trim();
+  if (chosen.isNotEmpty) return chosen;
+  final about = (aboutDefault ?? '').trim();
+  if (about.isNotEmpty) return about;
+  return defaultListeningLanguage(localeLanguageCode);
+}
 
 /// The per-community auto-download switch key (default OFF). LOCAL-714 writes it
 /// at the join question; LOCAL-713 reads it for the sync-on-open baseline.
 String autoDownloadPrefKey(int communityId) => 'auto_download_$communityId';
+
+/// [LOCAL-715 / D675 addendum 1] The ONE place that resolves the language a
+/// community's tours download in, from SharedPreferences. Reads the
+/// per-community key (`listening_language_<id>`) and About's `listening_language`,
+/// then applies [resolveCommunityLanguage]. The sync on open, the background
+/// worker and the community-page Download button ALL call this — no other place
+/// may read `listening_language` for community tours (D675 addendum 1).
+///
+/// [localeLanguageCode] is the phone locale's language code (e.g. from
+/// `WidgetsBinding.instance.platformDispatcher.locale.languageCode`); passed in
+/// so this helper stays free of Flutter bindings and is testable.
+String languageForCommunity(
+  SharedPreferences prefs,
+  int communityId, {
+  String? localeLanguageCode,
+}) {
+  return resolveCommunityLanguage(
+    communityChoice: prefs.getString(communityLanguagePrefKey(communityId)),
+    aboutDefault: prefs.getString(kListeningLanguagePrefKey),
+    localeLanguageCode: localeLanguageCode,
+  );
+}
 
 /// Whether the member allowed auto-downloads on mobile data (default false —
 /// Wi-Fi/unmetered only). One switch for the whole app (D675 §2/§3).
@@ -265,8 +335,15 @@ bool shouldAdvanceSince({
 ///        * the tour id must NOT already be on the phone;
 ///        * the tour id must NOT be in the user's deleted set (never re-download
 ///          automatically, D675 §6);
-///      then plan it, in the listener's language when available else the
-///      original (pickDownloadLanguage).
+///      then plan it, in the listener's language FOR THAT COMMUNITY when the
+///      tour has it, else the original (pickDownloadLanguage).
+///
+/// [LOCAL-715 / D675 addendum 1] The listening language is PER COMMUNITY: the
+/// caller passes [languageByCommunity] (community id → the resolved language
+/// from languageForCommunity). [preferredLanguage] is the fallback used only
+/// for a community not present in the map (and keeps older callers/tests
+/// working). So two communities with different per-community languages produce
+/// two different download languages from one sync.
 ///
 /// The result preserves the input order of [newTours] (newest first from the
 /// server), so the caller downloads newest first.
@@ -279,6 +356,7 @@ class SyncPlanner {
     required bool cellularAllowed,
     required Set<int> autoDownloadCommunityIds,
     required String preferredLanguage,
+    Map<int, String> languageByCommunity = const {},
   }) {
     // 1 + 2: the connection gate. Nothing downloads offline, and nothing on a
     // metered connection unless mobile data was explicitly allowed.
@@ -296,9 +374,13 @@ class SyncPlanner {
       if (onPhoneTourIds.contains(idStr)) continue;
       // Deleted by the user → never re-download automatically.
       if (deletedTourIds.contains(idStr)) continue;
+      // The listener's language FOR THIS COMMUNITY (D675 addendum 1), falling
+      // back to the global preferred for a community not in the map.
+      final preferredForCommunity =
+          languageByCommunity[t.communityId] ?? preferredLanguage;
       final lang = pickDownloadLanguage(
         t.languages,
-        preferredLanguage,
+        preferredForCommunity,
         t.originalLanguage,
       );
       planned.add(PlannedDownload(
