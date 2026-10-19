@@ -75,6 +75,40 @@ LLM_RATES = {
         "input_per_1m": 2.00,
         "output_per_1m": 10.00,
     },
+    # ─── Anthropic (Claude) CURRENT lineup — per 1M tokens ────────────────────
+    # [LOCAL-712B / D674 addendum 2] Anthropic's CURRENT Claude models, added as
+    # extra bake-off arms alongside the LOCAL-712 Haiku 4.5 / Sonnet 5 rows above
+    # (both kept). Base-token list prices, standard tier (NOT Batch API, NOT the
+    # Opus "fast mode" $8/$40 column — we use neither).
+    #
+    # Source: https://docs.anthropic.com/en/docs/about-claude/pricing
+    #         (model IDs from .../about-claude/models/overview)
+    # Read: 2026-10-18
+    #   Claude Haiku 5.5  (claude-haiku-5-5)  — input $0.10 / MTok, output $0.50 / MTok
+    #       for prompts up to 100,000 tokens. ABOVE 100k the rate rises to
+    #       $0.50 input / $2.50 output per MTok. Our narration prompts are ~3k
+    #       tokens, so the <=100k tier always applies; we key the <=100k rate and
+    #       note the >100k tier here (we never hit it). Cache-hit rate $0.01/MTok.
+    #   Claude Sonnet 5.5 (claude-sonnet-5-5) — input $2.00 / MTok, output $10.00 / MTok
+    #       (cache-hit $0.10/MTok).
+    #   Claude Opus 5.5   (claude-opus-5-5)   — input $4.00 / MTok, output $20.00 / MTok
+    #       (cache-hit $0.20/MTok). Opus "fast mode" is $8/$40 and is NOT used.
+    # The narration call sends no cache_control, so only the base rates apply.
+    #
+    # Haiku 5.5 is cheaper than gpt-4.1-mini ($0.40 in / $1.60 out), so it is the
+    # arm that matters most for the D674 cost question.
+    "claude-haiku-5-5": {
+        "input_per_1m": 0.10,   # prompts <=100k tokens; >100k is $0.50 (see note)
+        "output_per_1m": 0.50,  # prompts <=100k tokens; >100k is $2.50 (see note)
+    },
+    "claude-sonnet-5-5": {
+        "input_per_1m": 2.00,
+        "output_per_1m": 10.00,
+    },
+    "claude-opus-5-5": {
+        "input_per_1m": 4.00,
+        "output_per_1m": 20.00,
+    },
 }
 
 # Legacy constants — DEPRECATED. Kept for any code that reads them directly.

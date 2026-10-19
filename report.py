@@ -20,7 +20,7 @@ import statistics
 import subprocess
 import sys
 
-ARMS = ["A", "B", "C", "D", "E", "F", "G"]
+ARMS = ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J"]
 ARM_LABEL = {
     "A": ("gpt-4.1", "gpt-4.1 (today)"),
     "B": ("gpt-4.1-mini", "gpt-4.1-mini"),
@@ -30,6 +30,10 @@ ARM_LABEL = {
     # [LOCAL-712 / D674] Claude arms via the Anthropic API.
     "F": ("claude-haiku-4-5", "Claude Haiku 4.5"),
     "G": ("claude-sonnet-5", "Claude Sonnet 5"),
+    # [LOCAL-712B / D674 addendum 2] current Claude lineup.
+    "H": ("claude-haiku-5-5", "Claude Haiku 5.5"),
+    "I": ("claude-sonnet-5-5", "Claude Sonnet 5.5"),
+    "J": ("claude-opus-5-5", "Claude Opus 5.5"),
 }
 
 

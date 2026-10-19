@@ -38,6 +38,8 @@ ARMS (one draft per stop, no retries):
     A: gpt-4.1 (today)            B: gpt-4.1-mini      C: gpt-4.1-nano
     D: gemini-2.5-flash-lite      E: gemini-2.5-flash  (both ungrounded)
     F: claude-haiku-4-5           G: claude-sonnet-5   (Anthropic API, LOCAL-712/D674)
+    H: claude-haiku-5-5           I: claude-sonnet-5-5
+    J: claude-opus-5-5            (current Claude lineup, LOCAL-712B/D674 addendum 2)
 """
 
 # [LOCAL-678] Install the network paid-API meter for this HOST-run process. In a
@@ -92,13 +94,24 @@ ARMS = {
     # identical inputs. Model ids are the ones D674 names.
     "F": ("anthropic", "claude-haiku-4-5-20251001"),  # Claude Haiku 4.5
     "G": ("anthropic", "claude-sonnet-5"),             # Claude Sonnet 5
+    # [LOCAL-712B / D674 addendum 2] Anthropic's CURRENT lineup, added as extra
+    # arms (the F/G arms above kept). Model ids confirmed from the Anthropic
+    # models overview page (docs.anthropic.com/en/docs/about-claude/models/
+    # overview, read 2026-10-18). Haiku 5.5 is cheaper than today's gpt-4.1-mini,
+    # so it is the arm that matters most for the D674 cost question.
+    "H": ("anthropic", "claude-haiku-5-5"),   # Claude Haiku 5.5
+    "I": ("anthropic", "claude-sonnet-5-5"),  # Claude Sonnet 5.5
+    "J": ("anthropic", "claude-opus-5-5"),    # Claude Opus 5.5 (NOT fast mode)
 }
 
 # [LOCAL-712 / D674] The D674 bake-off arm set: today's narration model
-# (gpt-4.1-mini) against the two Claude candidates, on identical inputs. The
-# report/store commands default to all arms (ABCDEFG); pass --arms BFG to run
-# only the D674 comparison.
-D674_ARMS = ("B", "F", "G")
+# (gpt-4.1-mini) against the Claude candidates, on identical inputs. The
+# report/store commands default to all arms; pass --arms to override.
+# [LOCAL-712B / D674 addendum 2] The current Claude models (H/I/J) are added to
+# the default comparison alongside the original LOCAL-712 arms (F/G), with
+# gpt-4.1-mini (B) still the baseline. Pass --arms BFG to run only the original
+# LOCAL-712 comparison, or --arms BHIJ for only the current Claude lineup.
+D674_ARMS = ("B", "F", "G", "H", "I", "J")
 
 # ─── the 12 stops: (museum label, venue_corpus qid, stop_pool venue_identity,
 #      pool_version). Stops themselves are read live from stop_pool so the
@@ -677,9 +690,13 @@ def _main():
     elif cmd == "run-all":
         base = opt("--out", "/app/bench_out")
         limit = opt("--limit", None)
-        # [LOCAL-712 / D674] default to the Claude bake-off arm set
-        # (B=gpt-4.1-mini baseline, F=claude-haiku-4-5, G=claude-sonnet-5).
-        # Pass --arms ABCDE to reproduce the original LOCAL-647 five-arm run.
+        # [LOCAL-712 / D674] default to the Claude bake-off arm set. [LOCAL-712B]
+        # this now spans both the original LOCAL-712 Claude arms and the current
+        # lineup: B=gpt-4.1-mini baseline, F=claude-haiku-4-5, G=claude-sonnet-5,
+        # H=claude-haiku-5-5, I=claude-sonnet-5-5, J=claude-opus-5-5.
+        # Pass --arms ABCDE to reproduce the original LOCAL-647 five-arm run,
+        # --arms BFG for only the LOCAL-712 comparison, or --arms BHIJ for only
+        # the current Claude lineup.
         only = opt("--arms", "".join(D674_ARMS))
         # load stops ONCE so every arm runs on byte-for-byte identical inputs
         stops = load_stops()
