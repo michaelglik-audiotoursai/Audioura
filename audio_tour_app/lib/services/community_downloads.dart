@@ -1,3 +1,4 @@
+import 'package:shared_preferences/shared_preferences.dart';
 // [LOCAL-713 / D675] Community-tour download foundation — PURE helpers.
 //
 // DEPENDENCY-FREE on purpose (no Flutter, no SharedPreferences, no http): the
@@ -46,6 +47,21 @@ const String kNewToursSincePrefKey = 'community_tours_since';
 /// The local set of tour ids the user DELETED, so a deleted tour is never
 /// re-downloaded automatically (D675 §6). Stored as a string list of tour ids.
 const String kDeletedTourIdsPrefKey = 'deleted_tour_ids';
+
+/// [LEAD review of LOCAL-713] Record a tour the listener deleted from Listen so
+/// the community sync never brings it back (D675 §6). Records both ids the
+/// on-phone check uses (`tour_id`, `server_tour_id`).
+Future<void> recordDeletedTours(
+    SharedPreferences prefs, Iterable<Map<String, dynamic>> tours) async {
+  final set = (prefs.getStringList(kDeletedTourIdsPrefKey) ?? const []).toSet();
+  for (final t in tours) {
+    for (final k in const ['tour_id', 'server_tour_id']) {
+      final v = t[k];
+      if (v != null && v.toString().isNotEmpty) set.add(v.toString());
+    }
+  }
+  await prefs.setStringList(kDeletedTourIdsPrefKey, set.toList());
+}
 
 /// Pick the language to download a tour in (D675 §1). The listener's [preferred]
 /// language wins when the tour already HAS it; otherwise the tour's [original]

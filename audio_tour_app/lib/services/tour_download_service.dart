@@ -174,8 +174,20 @@ class TourDownloadService {
           throw Exception('Failed to resolve tour ID $tourId: $e');
         }
       } else {
-        throw Exception('Tour download failed (ID: $tourId). Server returned '
-            'error ${resolutionResponse.statusCode}.');
+        // [LEAD review of LOCAL-713] Keep Home's original behaviour: surface the
+        // server's own reason when it gives one (it explains holds, paid tours…).
+        String errorMessage;
+        try {
+          final errorData = json.decode(resolutionResponse.body);
+          errorMessage = 'Tour "$baseTourName" (ID: $tourId) could not be '
+              'downloaded.\n\nError: ${errorData['message'] ?? 'Unknown error'}'
+              '\n\nPlease contact your administrator with this information.';
+        } catch (_) {
+          errorMessage = 'Tour download failed (ID: $tourId).\n\nServer returned '
+              'error ${resolutionResponse.statusCode}.\n\nPlease contact your '
+              'administrator with this information.';
+        }
+        throw Exception(errorMessage);
       }
 
       final savedTours = prefs.getStringList('saved_tours') ?? [];

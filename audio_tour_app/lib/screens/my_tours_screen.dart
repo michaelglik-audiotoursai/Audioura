@@ -11,6 +11,7 @@ import '../services/tour_translation_helper.dart';
 import '../config/endpoints.dart';
 import '../utils/tour_path_healer.dart';
 import '../widgets/share_tour_sheet.dart';
+import '../services/community_downloads.dart';
 import '../widgets/rate_tour_dialog.dart';
 import '../widgets/delete_tour_prompt.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -1212,6 +1213,8 @@ class _MyToursScreenState extends State<MyToursScreen> {
       
       // Then update SharedPreferences
       final prefs = await SharedPreferences.getInstance();
+      // [D675 §6] A deleted tour is never auto-downloaded again.
+      await recordDeletedTours(prefs, [Map<String, dynamic>.from(tour)]);
       final tours = prefs.getStringList('saved_tours') ?? [];
       
       // Make sure we're removing the correct tour from the list
@@ -1523,6 +1526,8 @@ class _MyToursScreenState extends State<MyToursScreen> {
     
     if (confirmed == true) {
       final prefs = await SharedPreferences.getInstance();
+      // [D675 §6] Remember every deleted tour so the community sync skips them.
+      await recordDeletedTours(prefs, _tours.map((t) => Map<String, dynamic>.from(t)));
       await prefs.remove('saved_tours');
       await prefs.remove('available_tours'); // Clear voice navigation list too
       

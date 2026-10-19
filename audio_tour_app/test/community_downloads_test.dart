@@ -1,3 +1,4 @@
+import 'package:shared_preferences/shared_preferences.dart';
 // [LOCAL-713 / D675] Community-tour download foundation — pure unit tests
 // (no running app, no network, no plugins). Covers:
 //   * pickDownloadLanguage (preferred if available, else original);
@@ -285,5 +286,16 @@ void main() {
       });
       expect(r.tours.first.originalLanguage, 'en');
     });
+  });
+
+  test('[LEAD] recordDeletedTours stores tour_id and server_tour_id, deduplicated', () async {
+    SharedPreferences.setMockInitialValues({});
+    final prefs = await SharedPreferences.getInstance();
+    await recordDeletedTours(prefs, [
+      {'tour_id': '557', 'server_tour_id': '557'},
+      {'tour_id': 'abc', 'server_tour_id': '901'},
+    ]);
+    final set = prefs.getStringList(kDeletedTourIdsPrefKey)!.toSet();
+    expect(set, {'557', 'abc', '901'});
   });
 }
