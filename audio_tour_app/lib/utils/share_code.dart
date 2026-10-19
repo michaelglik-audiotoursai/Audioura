@@ -115,9 +115,12 @@ bool _has(String? s) => _clean(s).isNotEmpty;
 /// right after "Hands-free audio: press play and walk." in a tour share, and
 /// after the community-explanation sentence in an invite (which has no
 /// hands-free line). One place so the wording cannot drift.
+// [D672 addendum 3, Michael 2026-10-18] ONE line replaces the old two
+// ("Hands-free audio: press play and walk." + "Prefer another language?…") in
+// every email: tour shares and community invites alike.
 const String kTranslationOfferLine =
-    'Prefer another language? Audioura plays it in yours: just pick your '
-    'language and listen.';
+    'Hands-free audio: press Play and listen to your tour in the language of '
+    'your choice while walking, running, biking or exercising.';
 
 /// [LOCAL-710 / D672] Shorten a raw tour name for an email / subject line.
 ///
@@ -349,8 +352,7 @@ String buildShareMessage(ShareTourDetails details) {
   final paragraphs = <String>[];
 
   paragraphs.add(_openingLine(details));
-  paragraphs.add('Hands-free audio: press play and walk.');
-  // [LOCAL-711 / D673] The translation advert, right after the hands-free line.
+  // [D672 addendum 3] The single hands-free + language line.
   paragraphs.add(kTranslationOfferLine);
 
   final stops = _stopsLine(details);

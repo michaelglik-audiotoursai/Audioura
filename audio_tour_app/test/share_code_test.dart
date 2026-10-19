@@ -191,8 +191,6 @@ void main() {
         buildShareMessage(free),
         'Welcome to my free tour "Faneuil Hall Marketplace — Walking Tour" on Audioura.\n'
         '\n'
-        'Hands-free audio: press play and walk.\n'
-        '\n'
         '$kTranslationOfferLine\n'
         '\n'
         '3 stops, starting at Quincy Market (4 S Market St, Boston, MA 02109).\n'
@@ -222,8 +220,6 @@ void main() {
       expect(
         msg,
         'Welcome to my tour "Boston politics & current affairs — Walking Tour" on Audioura.\n'
-        '\n'
-        'Hands-free audio: press play and walk.\n'
         '\n'
         '$kTranslationOfferLine\n'
         '\n'
@@ -257,8 +253,6 @@ void main() {
         buildShareMessage(community),
         'Welcome to my tour "Faneuil Hall Marketplace — Walking Tour" from the Demo Boston Walkers community on Audioura.\n'
         '\n'
-        'Hands-free audio: press play and walk.\n'
-        '\n'
         '$kTranslationOfferLine\n'
         '\n'
         '3 stops, starting at Quincy Market (4 S Market St, Boston, MA 02109).\n'
@@ -283,8 +277,6 @@ void main() {
       expect(
         msg,
         'Welcome to my free tour "Mystery Walk — Walking Tour" on Audioura.\n'
-        '\n'
-        'Hands-free audio: press play and walk.\n'
         '\n'
         '$kTranslationOfferLine\n'
         '\n'
@@ -635,8 +627,8 @@ void main() {
   group('D673 translation offer line', () {
     test('the constant is exactly Michael\'s wording', () {
       expect(kTranslationOfferLine,
-          'Prefer another language? Audioura plays it in yours: just pick '
-          'your language and listen.');
+          'Hands-free audio: press Play and listen to your tour in the language of '
+          'your choice while walking, running, biking or exercising.');
     });
 
     test('every share message (free / paid / community) carries it, right '
@@ -654,7 +646,7 @@ void main() {
         // It comes immediately after the hands-free line.
         expect(
           msg.contains(
-              'Hands-free audio: press play and walk.\n\n$kTranslationOfferLine'),
+              kTranslationOfferLine),
           isTrue,
           reason: 'wrong position for $kind',
         );
