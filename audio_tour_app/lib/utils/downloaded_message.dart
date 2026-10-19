@@ -18,8 +18,12 @@ library;
 ///                     them (0 when English-only).
 /// [alreadyDownloaded] number of selected tours that were already on the phone
 ///                     and so were skipped.
-/// [failures]          per-tour translation failures: tour name → the list of
+/// [failures]          per-tour TRANSLATION failures: tour name → the list of
 ///                     language labels that failed. Empty when nothing failed.
+/// [downloadFailures]  [LOCAL-717 / D677 §4] short titles of tours that FAILED
+///                     to download or save at all (e.g. tour 370's 409 resolve).
+///                     A batch must never hide one: each is named here, with its
+///                     count agreeing with its verb. Empty when every tour saved.
 ///
 /// Agreement rules (D-wording):
 ///   • 1 tour → "1 tour downloaded and is now on your Listen page"
@@ -28,11 +32,14 @@ library;
 ///   • "(1 was already downloaded)" / "(N were already downloaded)"
 ///   • downloaded == 0 → "No new tours downloaded - all selected tours were
 ///     already on your phone".
+///   • [LOCAL-717] download failures → ". 1 couldn't be downloaded: <name>" /
+///     ". N couldn't be downloaded: <name>, <name>".
 String downloadedMessage({
   required int downloaded,
   int translations = 0,
   int alreadyDownloaded = 0,
   Map<String, List<String>> failures = const {},
+  List<String> downloadFailures = const [],
 }) {
   final buffer = StringBuffer();
 
@@ -42,6 +49,7 @@ String downloadedMessage({
     // sensible rather than an empty snackbar.
     buffer.write(
         'No new tours downloaded - all selected tours were already on your phone');
+    _appendDownloadFailures(buffer, downloadFailures);
     _appendFailures(buffer, failures);
     return buffer.toString();
   }
@@ -67,8 +75,19 @@ String downloadedMessage({
     buffer.write(' ($alreadyDownloaded $alreadyVerb already downloaded)');
   }
 
+  _appendDownloadFailures(buffer, downloadFailures);
   _appendFailures(buffer, failures);
   return buffer.toString();
+}
+
+/// [LOCAL-717 / D677 §4] Append the "N couldn't be downloaded: <names>" clause,
+/// with the count agreeing with its verb. Shared by the success and the
+/// no-new-tours branches so a failure in a batch is always reported the same
+/// way — a batch NEVER drops a tour silently.
+void _appendDownloadFailures(StringBuffer buffer, List<String> downloadFailures) {
+  if (downloadFailures.isEmpty) return;
+  final n = downloadFailures.length;
+  buffer.write(". $n couldn't be downloaded: ${downloadFailures.join(', ')}");
 }
 
 /// Append a human list of per-tour translation failures, when any. Shared by

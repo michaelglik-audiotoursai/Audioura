@@ -176,4 +176,81 @@ void main() {
       );
     });
   });
+
+  // [LOCAL-717 / D677 §3] A trailing `*` is the explicit "tour NAMES, not a
+  // place" signal. Michael's "restaurant*" moved the map to a far-away place
+  // called "Restaurant"; the fix is that an input ENDING in `*` never geocodes
+  // and matches tour names only (starts-with), so no place can win.
+  group('classifySearchInput — d) trailing * is tour-name-only (D677)', () {
+    test('"restaurant*" → text, tourNameOnly', () {
+      final d = classifySearchInput('restaurant*');
+      expect(d.kind, SearchKind.text);
+      expect(d.tourNameOnly, isTrue);
+      expect(d.query, 'restaurant*');
+    });
+
+    test('"Boston*" → text, tourNameOnly', () {
+      final d = classifySearchInput('Boston*');
+      expect(d.kind, SearchKind.text);
+      expect(d.tourNameOnly, isTrue);
+    });
+
+    test('"restaurant tour*" (multi-word) → text, tourNameOnly', () {
+      final d = classifySearchInput('restaurant tour*');
+      expect(d.kind, SearchKind.text);
+      expect(d.tourNameOnly, isTrue);
+      expect(d.query, 'restaurant tour*');
+    });
+
+    test('"Boston" (no star) → text, NOT tourNameOnly (keeps D662)', () {
+      final d = classifySearchInput('Boston');
+      expect(d.kind, SearchKind.text);
+      expect(d.tourNameOnly, isFalse);
+    });
+
+    test('a `*` in the MIDDLE is not the signal ("walking*tour")', () {
+      final d = classifySearchInput('walking*tour');
+      expect(d.kind, SearchKind.text);
+      // Only a trailing `*` means name-only; a mid-string `*` does not.
+      expect(d.tourNameOnly, isFalse);
+    });
+
+    test('trailing whitespace after the star is trimmed, still name-only', () {
+      final d = classifySearchInput('restaurant*  ');
+      expect(d.tourNameOnly, isTrue);
+      expect(d.query, 'restaurant*');
+    });
+  });
+
+  // [LOCAL-717 / D677 §3] The outcome table for a name-only search: the place
+  // can never win (geocoder is not called), and no tours → noNamedTours (the
+  // widget says "No tours named '<text>…'"), NOT "nothing found".
+  group('resolveTextSearch — name-only outcome table (D677)', () {
+    test('name-only + tours → toursOnly', () {
+      expect(
+        resolveTextSearch(tourCount: 2, placeFound: false, nameOnly: true),
+        TextSearchOutcome.toursOnly,
+      );
+    });
+
+    test('name-only + no tours → noNamedTours (never "nothing")', () {
+      expect(
+        resolveTextSearch(tourCount: 0, placeFound: false, nameOnly: true),
+        TextSearchOutcome.noNamedTours,
+      );
+    });
+
+    test('name-only NEVER lets a place win, even if one was passed', () {
+      // The geocoder is not called for a name-only search, but guard anyway:
+      // a stray placeFound:true must not relocate the map.
+      expect(
+        resolveTextSearch(tourCount: 0, placeFound: true, nameOnly: true),
+        TextSearchOutcome.noNamedTours,
+      );
+      expect(
+        resolveTextSearch(tourCount: 3, placeFound: true, nameOnly: true),
+        TextSearchOutcome.toursOnly,
+      );
+    });
+  });
 }
