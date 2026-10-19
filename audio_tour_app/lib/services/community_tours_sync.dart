@@ -56,9 +56,21 @@ class CommunityToursSync {
 
   bool _running = false;
 
-  /// Run the sync-on-open baseline. Safe to call repeatedly (a run in flight is
-  /// a no-op). Returns a result for logging/tests. Never throws: any failure
-  /// leaves `since` unchanged so the next open retries.
+  /// Fetch the new tours for a user since [since]. Seam so the background entry
+  /// point and tests can stub the HTTP round trip; defaults to the real
+  /// endpoint client. ONE planner/downloader is shared either way (D675).
+  static Future<NewToursResult?> Function(String userId, {String? since})
+      fetchNewTours = CommunityTourService.newTours;
+
+  /// Download + save one tour by server id. Seam so tests can stub the
+  /// downloader; defaults to the SINGLE download path (TourDownloadService).
+  static Future<TourDownloadResult> Function(int tourId) download =
+      TourDownloadService.downloadAndSave;
+
+  /// Run the sync-on-open baseline — the SAME planner + downloader the Android
+  /// background worker runs (LOCAL-714). Safe to call repeatedly (a run in
+  /// flight is a no-op). Returns a result for logging/tests. Never throws: any
+  /// failure leaves `since` unchanged so the next open retries.
   Future<CommunityToursSyncResult> run() async {
     if (_running) return CommunityToursSyncResult.noop;
     _running = true;
@@ -68,8 +80,7 @@ class CommunityToursSync {
       if (userId.isEmpty) return CommunityToursSyncResult.noop;
 
       final since = prefs.getString(kNewToursSincePrefKey);
-      final result =
-          await CommunityTourService.newTours(userId, since: since);
+      final result = await fetchNewTours(userId, since: since);
       if (result == null) {
         // Transport failure — leave `since` unchanged (never advance on
         // failure).
@@ -127,7 +138,7 @@ class CommunityToursSync {
       int ok = 0;
       int failed = 0;
       for (final d in plan) {
-        final r = await TourDownloadService.downloadAndSave(d.tourId);
+        final r = await download(d.tourId);
         if (r.status == TourDownloadStatus.ok ||
             r.status == TourDownloadStatus.alreadyOnPhone) {
           ok++;

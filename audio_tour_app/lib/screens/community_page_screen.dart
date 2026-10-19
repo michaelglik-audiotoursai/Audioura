@@ -18,6 +18,8 @@ import 'dart:convert';
 import '../services/communities_service.dart';
 import '../services/community_tour_service.dart';
 import '../services/community_downloads.dart';
+import '../services/community_background.dart';
+import '../services/community_notifications.dart';
 import '../services/tour_download_service.dart';
 import '../services/iap_service.dart';
 import '../services/device_service.dart';
@@ -51,6 +53,10 @@ class _CommunityPageScreenState extends State<CommunityPageScreen> {
   Set<String> _onPhoneTourIds = const {};
   String _listeningLanguage = kDefaultListeningLanguage;
   final Set<int> _downloading = {};
+  // [LOCAL-714 / D675 part 2] The per-community auto-download switch (default
+  // OFF) and the app-wide "Also on mobile data" switch (default OFF).
+  bool _autoDownload = false;
+  bool _autoDownloadCellular = false;
 
   @override
   void initState() {
@@ -100,6 +106,10 @@ class _CommunityPageScreenState extends State<CommunityPageScreen> {
       _community = c;
       _onPhoneTourIds = onPhone;
       _listeningLanguage = lang;
+      _autoDownload =
+          c != null ? (prefs.getBool(autoDownloadPrefKey(c.id)) ?? false) : false;
+      _autoDownloadCellular =
+          prefs.getBool(kAutoDownloadCellularPrefKey) ?? false;
       _loading = false;
     });
   }
@@ -112,6 +122,9 @@ class _CommunityPageScreenState extends State<CommunityPageScreen> {
       setState(() => _community = updated);
       ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Joined — you can listen now.')));
+      // [LOCAL-714 / D675 part 2] After a free join, ask the auto-download
+      // question.
+      await _askAutoDownloadQuestion(updated.id);
     }
   }
 
@@ -134,6 +147,9 @@ class _CommunityPageScreenState extends State<CommunityPageScreen> {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
             content: Text('Membership active (${pass.label}).')));
       }
+      // [LOCAL-714 / D675 part 2] After a successful pass purchase, ask the
+      // auto-download question.
+      await _askAutoDownloadQuestion(c.id);
     } else if (result.status != IapResultStatus.cancelled) {
       ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(result.message ?? 'Purchase failed.')));
@@ -148,6 +164,85 @@ class _CommunityPageScreenState extends State<CommunityPageScreen> {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
           content: Text('Report sent to the community owner.')));
     }
+  }
+
+  /// [LOCAL-714 / D675 part 2] The join question — asked on a free join and
+  /// after a successful pass purchase: "Download this community's new tours
+  /// automatically? Only on Wi-Fi, when your phone isn't busy." Yes / Not now.
+  /// Yes sets `auto_download_<id>`, asks for notification permission (the ONLY
+  /// place permission is requested), and (re)registers the background task.
+  Future<void> _askAutoDownloadQuestion(int communityId) async {
+    if (!mounted) return;
+    final yes = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Get new tours automatically?'),
+        content: const Text(
+          "Download this community's new tours automatically? Only on Wi-Fi, "
+          "when your phone isn't busy.",
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Not now')),
+          FilledButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('Yes')),
+        ],
+      ),
+    );
+    await _setAutoDownload(communityId, yes == true);
+  }
+
+  /// Persist the per-community auto-download switch and keep the background task
+  /// in sync. Turning it ON asks for notification permission (D675 part 2 §3 —
+  /// only on Yes) and registers the periodic task; turning the LAST one off
+  /// leaves the task registered but harmless (it finds nothing to do).
+  Future<void> _setAutoDownload(int communityId, bool on) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(autoDownloadPrefKey(communityId), on);
+    if (mounted) setState(() => _autoDownload = on);
+    if (on) {
+      // Permission is requested ONLY here (on opt-in), never at app launch.
+      await CommunityNotifications.requestPermissionOnOptIn();
+      await registerCommunitySyncTask();
+    }
+  }
+
+  /// Persist the app-wide "Also on mobile data" switch (default OFF) and
+  /// re-register the task so its network constraint matches.
+  Future<void> _setAutoDownloadCellular(bool on) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(kAutoDownloadCellularPrefKey, on);
+    if (mounted) setState(() => _autoDownloadCellular = on);
+    await registerCommunitySyncTask();
+  }
+
+  /// [LOCAL-714 / D675 part 2] The auto-download controls shown to a member/
+  /// owner: the per-community switch and the app-wide "Also on mobile data"
+  /// switch (off by default). Hidden from non-members.
+  List<Widget> _autoDownloadSection(Community c) {
+    final canDownload = (c.myStatus.isMember && c.myStatus.active) || c.isOwner;
+    if (!canDownload) return const [];
+    return [
+      _sectionTitle('New tours'),
+      SwitchListTile(
+        key: const Key('auto_download_switch'),
+        contentPadding: EdgeInsets.zero,
+        value: _autoDownload,
+        onChanged: (v) => _setAutoDownload(c.id, v),
+        title: const Text('Download new tours automatically'),
+        subtitle: const Text("Only on Wi-Fi, when your phone isn't busy."),
+      ),
+      SwitchListTile(
+        key: const Key('auto_download_cellular_switch'),
+        contentPadding: EdgeInsets.zero,
+        value: _autoDownloadCellular,
+        onChanged: _autoDownload ? (v) => _setAutoDownloadCellular(v) : null,
+        title: const Text('Also on mobile data'),
+        subtitle: const Text('Off by default — uses your data allowance.'),
+      ),
+    ];
   }
 
   /// [LOCAL-713 / D675 §3] Download a community tour, running the SAME download
@@ -531,6 +626,10 @@ class _CommunityPageScreenState extends State<CommunityPageScreen> {
           // who can see the page, so a non-member sees the tours with the join
           // prompt. The Download button runs the SAME download path a
           // Home/Listen download uses (TourDownloadService).
+          //
+          // [LOCAL-714 / D675 part 2] Above the list, a member/owner sees the
+          // auto-download switch + the app-wide "Also on mobile data" toggle.
+          ..._autoDownloadSection(c),
           if (c.tours.isNotEmpty) ...[
             _sectionTitle('Tours (${c.tours.length})'),
             ...c.tours.map((t) => _communityTourTile(c, t)),

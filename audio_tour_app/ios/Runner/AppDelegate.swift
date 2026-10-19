@@ -2,6 +2,7 @@ import Flutter
 import UIKit
 import Speech
 import AVFoundation
+import workmanager_apple
 
 @main
 @objc class AppDelegate: FlutterAppDelegate {
@@ -15,6 +16,21 @@ import AVFoundation
     didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
   ) -> Bool {
     GeneratedPluginRegistrant.register(with: self)
+
+    // [LOCAL-714 / D675 part 2] Register the community-tours BGTaskScheduler
+    // identifier so iOS can run the background CHECK with the app closed. The
+    // identifier MUST also be listed under BGTaskSchedulerPermittedIdentifiers
+    // in Info.plist (it is: com.audioura.community_tours_sync). On iOS this is a
+    // BGAppRefreshTask (app refresh) — the Dart entry point (callbackDispatcher)
+    // runs the CHECK-only notification path there (no background download).
+    WorkmanagerPlugin.setPluginRegistrantCallback { registry in
+      GeneratedPluginRegistrant.register(with: registry)
+    }
+    if #available(iOS 13.0, *) {
+      WorkmanagerPlugin.registerPeriodicTask(
+        withIdentifier: "com.audioura.community_tours_sync")
+      WorkmanagerPlugin.registerLaunchHandlers()
+    }
     
     // Register native audio recorder plugin
     let controller = window?.rootViewController as! FlutterViewController
