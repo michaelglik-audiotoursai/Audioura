@@ -18,6 +18,7 @@
 
 import '../config/endpoints.dart';
 import 'community_tour_models.dart';
+import 'community_downloads.dart';
 
 export 'community_tour_models.dart';
 
@@ -71,6 +72,28 @@ class CommunityTourService {
           await Endpoints.get(Service.orchestrator, '/tour/$tourId/community');
       final j = Endpoints.tryDecodeMap(r.body);
       if (r.statusCode == 200 && j != null) return j;
+    } catch (_) {}
+    return null;
+  }
+
+  /// [LOCAL-713 / D675] The NEW community tours for this device across its
+  /// ACTIVE memberships since [since] (blank = from the beginning). Returns the
+  /// tours + the `server_time` to store as the next `since` after the downloads
+  /// succeed. Null on a transport failure so the caller leaves `since`
+  /// unchanged (never advance on failure). Served by Service.userDb (the same
+  /// user-api the other community reads use).
+  static Future<NewToursResult?> newTours(String userId, {String? since}) async {
+    try {
+      final q = StringBuffer('?user_id=$userId');
+      if (since != null && since.isNotEmpty) {
+        q.write('&since=${Uri.encodeQueryComponent(since)}');
+      }
+      final r =
+          await Endpoints.get(Service.userDb, '/communities/new-tours$q');
+      final j = Endpoints.tryDecodeMap(r.body);
+      if (r.statusCode == 200 && j != null) {
+        return NewToursResult.fromJson(j);
+      }
     } catch (_) {}
     return null;
   }

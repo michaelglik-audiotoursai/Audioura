@@ -1,0 +1,369 @@
+// [LOCAL-713 / D675] TourDownloadService — the ONE download+save path.
+//
+// The download of a tour to the phone (GET /download-tour/<id> on map-delivery,
+// then resolve, extract and record it in `saved_tours`) was private to
+// home_screen. LOCAL-713 lifts the SAVE + a thin DOWNLOAD wrapper here so the
+// community-page Download button runs the EXACT SAME path a Home/Listen
+// download uses (D675 §3: "never build a second path"). home_screen delegates
+// its _saveTourToMyTours to [saveTourToMyTours] here, so there is a single
+// implementation of the on-phone record contract.
+//
+// Pure of widgets/BuildContext: it only touches the network, the filesystem and
+// SharedPreferences, so the community page and Home share it without any UI
+// coupling. The caller owns the dialogs/snackbars.
+
+import 'dart:convert';
+import 'dart:io';
+
+import 'package:archive/archive.dart';
+import 'package:flutter/foundation.dart';
+import 'package:http/http.dart' as http;
+import 'package:path_provider/path_provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
+import '../config/endpoints.dart';
+import '../screens/debug_log_viewer_screen.dart';
+import 'downloaded_tour_meta.dart';
+import 'tour_pricing_service.dart';
+
+/// The outcome of a community-page download attempt.
+enum TourDownloadStatus {
+  /// Downloaded and saved to My Tours.
+  ok,
+
+  /// Already on the phone (nothing to do).
+  alreadyOnPhone,
+
+  /// The server refused because the caller is not an active member of the
+  /// tour's community (402 membership_required). The caller opens the community
+  /// page to join — the SAME flow a paid tour takes (D663 §3).
+  membershipRequired,
+
+  /// A transport error or a non-200/402 response. The caller shows a retry.
+  failed,
+}
+
+/// The result of a download attempt, with the community id to open on a
+/// membership_required refusal.
+class TourDownloadResult {
+  final TourDownloadStatus status;
+  final int? communityId;
+
+  const TourDownloadResult(this.status, {this.communityId});
+}
+
+class TourDownloadService {
+  /// Download a tour to the phone and save it to My Tours — the SAME server
+  /// path a Home/Listen download uses (GET /download-tour/<tourId> on
+  /// map-delivery, then [saveTourToMyTours]). [tourId] is the SERVER tour id of
+  /// the row to pull; for a non-original language the caller passes the
+  /// translation's own tour id (that is how Home downloads a language too —
+  /// a translation is a separate tour id). Idempotent: a tour already on the
+  /// phone returns [TourDownloadStatus.alreadyOnPhone] without re-downloading.
+  ///
+  /// A 402 membership_required (a community tour the device has no active pass
+  /// for) returns [TourDownloadStatus.membershipRequired] with the community id,
+  /// so the caller opens the community page to join — never a second purchase
+  /// path (D663 §3 / D665).
+  static Future<TourDownloadResult> downloadAndSave(
+    int tourId, {
+    Map<String, dynamic>? sourceItem,
+  }) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      // Already on the phone? (exact match by server/edit tour id — same check
+      // Home does before downloading.)
+      final saved = prefs.getStringList('saved_tours') ?? [];
+      for (final s in saved) {
+        try {
+          final m = json.decode(s) as Map<String, dynamic>;
+          if (m['tour_id'] == tourId.toString() ||
+              m['server_tour_id'] == tourId.toString()) {
+            return const TourDownloadResult(TourDownloadStatus.alreadyOnPhone);
+          }
+        } catch (_) {}
+      }
+
+      final userId = prefs.getString('user_id') ?? '';
+      final base =
+          await Endpoints.url(Service.mapDelivery, '/download-tour/$tourId');
+      final params = Map<String, String>.from(base.queryParameters);
+      if (userId.isNotEmpty) params['user_id'] = userId;
+      final uri = base.replace(queryParameters: params.isEmpty ? null : params);
+
+      final response = await http
+          .get(uri, headers: await Endpoints.apiHeaders(Service.mapDelivery))
+          .timeout(const Duration(seconds: 120));
+
+      if (response.statusCode == 200) {
+        await saveTourToMyTours(tourId, response.bodyBytes,
+            sourceItem: sourceItem);
+        return const TourDownloadResult(TourDownloadStatus.ok);
+      }
+      if (response.statusCode == 402) {
+        // [LOCAL-701 / D663 §3] A community tour needs an active membership. The
+        // body carries the community id; the caller opens that page to join.
+        int? communityId;
+        try {
+          final body = json.decode(response.body);
+          if (body is Map && body['error'] == 'membership_required') {
+            final cid = body['community_id'];
+            if (cid is int) {
+              communityId = cid;
+            } else if (cid is num) {
+              communityId = cid.toInt();
+            }
+          }
+        } catch (_) {}
+        return TourDownloadResult(TourDownloadStatus.membershipRequired,
+            communityId: communityId);
+      }
+      return const TourDownloadResult(TourDownloadStatus.failed);
+    } catch (e) {
+      await DebugLogHelper.addDebugLog('DOWNLOAD_SVC: download failed: $e');
+      return const TourDownloadResult(TourDownloadStatus.failed);
+    }
+  }
+
+  /// Save a downloaded tour ZIP to My Tours — the SINGLE implementation of the
+  /// on-phone record contract (lifted verbatim from home_screen so Home and the
+  /// community page write identical `saved_tours` records). [downloadId] is the
+  /// server/download tour id; [zipBytes] is the ZIP body from /download-tour.
+  static Future<void> saveTourToMyTours(
+    int downloadId,
+    List<int> zipBytes, {
+    Map<String, dynamic>? sourceItem,
+  }) async {
+    final tourId = downloadId;
+    try {
+      await DebugLogHelper.addDebugLog(
+          'DOWNLOAD_SVC: SAVE - Starting saveTourToMyTours');
+
+      final prefs = await SharedPreferences.getInstance();
+
+      String appDirPath;
+      if (kIsWeb) {
+        appDirPath = 'web_storage';
+      } else {
+        final appDir = await getApplicationDocumentsDirectory();
+        appDirPath = appDir.path;
+      }
+
+      final resolveUri = await Endpoints.url(
+          Service.tourIdResolution, '/tour/$tourId/resolve');
+      final resolutionResponse = await http.get(resolveUri,
+          headers: await Endpoints.apiHeaders(Service.tourIdResolution));
+
+      String editTourId;
+      String baseTourName = 'Downloaded Tour';
+      bool isEditable = false;
+      int? backendStopsCount;
+
+      if (resolutionResponse.statusCode == 200) {
+        try {
+          final resolutionData = json.decode(resolutionResponse.body);
+          if (resolutionData['status'] == 'success') {
+            editTourId = resolutionData['edit_tour_id'] ?? tourId.toString();
+            baseTourName = resolutionData['tour_name'] ?? 'Downloaded Tour';
+            isEditable = resolutionData['editable'] ?? false;
+            backendStopsCount = resolutionData['stops_count'];
+          } else {
+            throw Exception('Resolution failed: ${resolutionData['message']}');
+          }
+        } catch (e) {
+          throw Exception('Failed to resolve tour ID $tourId: $e');
+        }
+      } else {
+        throw Exception('Tour download failed (ID: $tourId). Server returned '
+            'error ${resolutionResponse.statusCode}.');
+      }
+
+      final savedTours = prefs.getStringList('saved_tours') ?? [];
+      final existingTours = savedTours
+          .map((tour) => json.decode(tour) as Map<String, dynamic>)
+          .toList();
+
+      String finalTourName = baseTourName;
+      int version = 1;
+      while (existingTours.any((tour) => tour['title'] == finalTourName)) {
+        version++;
+        finalTourName = '$baseTourName (v$version)';
+      }
+
+      final safeName = finalTourName.replaceAll(RegExp(r'[^a-zA-Z0-9_-]'), '_');
+      String tourDirPath;
+
+      if (kIsWeb) {
+        tourDirPath = 'web_tours/${safeName}_$editTourId';
+      } else {
+        final tourDir = Directory('$appDirPath/tours/${safeName}_$editTourId');
+        await tourDir.create(recursive: true);
+        tourDirPath = tourDir.path;
+      }
+
+      if (kIsWeb) {
+        final zipBase64 = base64Encode(zipBytes);
+        await prefs.setString('tour_zip_${safeName}_$editTourId', zipBase64);
+        final archive = ZipDecoder().decodeBytes(zipBytes);
+        for (final file in archive) {
+          final filename = file.name;
+          if (file.isFile) {
+            final data = file.content as List<int>;
+            final fileBase64 = base64Encode(data);
+            await prefs.setString(
+                'tour_file_${safeName}_${editTourId}_$filename', fileBase64);
+            String mimeType = 'application/octet-stream';
+            if (filename.endsWith('.html')) {
+              mimeType = 'text/html';
+            } else if (filename.endsWith('.mp3')) {
+              mimeType = 'audio/mpeg';
+            } else if (filename.endsWith('.json')) {
+              mimeType = 'application/json';
+            }
+            await prefs.setString(
+                'tour_file_${safeName}_${editTourId}_${filename}_mime',
+                mimeType);
+          }
+        }
+      } else {
+        final zipFile = File('$tourDirPath/tour.zip');
+        await zipFile.writeAsBytes(zipBytes);
+        final archive = ZipDecoder().decodeBytes(zipBytes);
+        for (final file in archive) {
+          final filename = file.name;
+          if (file.isFile) {
+            final data = file.content as List<int>;
+            final extractedFile = File('$tourDirPath/$filename');
+            await extractedFile.create(recursive: true);
+            await extractedFile.writeAsBytes(data);
+          }
+        }
+      }
+
+      int actualStops;
+      if (backendStopsCount != null && backendStopsCount > 0) {
+        actualStops = backendStopsCount;
+      } else {
+        actualStops = await _countTourStops(zipBytes);
+      }
+
+      final tourData = {
+        'title': finalTourName,
+        'path': tourDirPath,
+        'created': DateTime.now().toIso8601String(),
+        'stops': actualStops.toString(),
+        'original_request': baseTourName,
+        'tour_id': editTourId,
+        'editable': isEditable,
+        'is_web_storage': kIsWeb,
+      };
+      if (sourceItem != null) {
+        final v = sourceItem['version'];
+        final updatedAt = sourceItem['updated_at'];
+        if (v != null) tourData['version'] = v;
+        if (updatedAt != null) tourData['updated_at'] = updatedAt;
+      }
+
+      await _stampPaidSnapshot(tourData, tourId, sourceItem);
+
+      savedTours.add(json.encode(tourData));
+      await prefs.setStringList('saved_tours', savedTours);
+      await DebugLogHelper.addDebugLog(
+          'DOWNLOAD_SVC: SAVE - saved "$finalTourName" at $tourDirPath');
+    } catch (e) {
+      await DebugLogHelper.addDebugLog('DOWNLOAD_SVC: Error saving tour: $e');
+      rethrow;
+    }
+  }
+
+  /// Stamp the paid snapshot onto the record (lifted from home_screen so the
+  /// record contract is identical). A community tour is covered by the pass, so
+  /// this is inert for it (no price), but the same fields are written so My
+  /// Tours / the player read a uniform record.
+  static Future<void> _stampPaidSnapshot(
+    Map<String, dynamic> tourData,
+    int downloadId,
+    Map<String, dynamic>? sourceItem,
+  ) async {
+    try {
+      final serverId = downloadId.toString();
+      bool isPaid = false;
+      int? priceTier;
+      String priceLabel = 'Free';
+      String? originalLanguage;
+      if (sourceItem != null) {
+        isPaid = sourceItem['is_paid'] == true;
+        final rawTier = sourceItem['price_tier'];
+        if (rawTier is int) {
+          priceTier = rawTier;
+        } else if (rawTier is num) {
+          priceTier = rawTier.toInt();
+        } else if (rawTier is String) {
+          priceTier = int.tryParse(rawTier);
+        }
+        final rawLabel = sourceItem['price_label'];
+        if (rawLabel is String && rawLabel.trim().isNotEmpty) {
+          priceLabel = rawLabel.trim();
+        }
+        final rawLang = sourceItem['original_language'];
+        if (rawLang is String && rawLang.trim().isNotEmpty) {
+          originalLanguage = rawLang.trim();
+        }
+      }
+
+      bool unlocked = !isPaid;
+      if (isPaid) {
+        try {
+          final state = await TourPricingService.unlockState(serverId);
+          if (state.isPaid && state.unlocked) unlocked = true;
+        } catch (_) {}
+      }
+
+      final meta = DownloadedTourMeta(
+        serverTourId: serverId,
+        priceTier: priceTier,
+        isPaid: isPaid,
+        unlocked: unlocked,
+        priceLabel: priceLabel,
+        originalLanguage: originalLanguage,
+        tourVersion: null,
+      );
+      tourData.addAll(meta.toRecordFields());
+    } catch (e) {
+      await DebugLogHelper.addDebugLog('DOWNLOAD_SVC: paid snapshot skipped: $e');
+    }
+  }
+
+  /// Count stops in a tour ZIP (lifted from home_screen).
+  static Future<int> _countTourStops(List<int> zipBytes) async {
+    try {
+      final archive = ZipDecoder().decodeBytes(zipBytes);
+      for (final file in archive) {
+        if (file.name == 'tour.json' && file.isFile) {
+          final jsonContent = String.fromCharCodes(file.content as List<int>);
+          final tourData = json.decode(jsonContent);
+          if (tourData['stops'] != null && tourData['stops'] is List) {
+            return (tourData['stops'] as List).length;
+          }
+          int audioCount = 0;
+          for (final audioFile in archive) {
+            if (audioFile.name.endsWith('.mp3') && audioFile.isFile) {
+              audioCount++;
+            }
+          }
+          return audioCount > 0 ? audioCount : 10;
+        }
+      }
+      int audioCount = 0;
+      for (final file in archive) {
+        if (file.name.endsWith('.mp3') && file.isFile) {
+          audioCount++;
+        }
+      }
+      return audioCount > 0 ? audioCount : 10;
+    } catch (e) {
+      await DebugLogHelper.addDebugLog('DOWNLOAD_SVC: Error counting stops: $e');
+      return 10;
+    }
+  }
+}

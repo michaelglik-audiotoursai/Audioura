@@ -14,8 +14,11 @@
 
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:convert';
 import '../services/communities_service.dart';
 import '../services/community_tour_service.dart';
+import '../services/community_downloads.dart';
+import '../services/tour_download_service.dart';
 import '../services/iap_service.dart';
 import '../services/device_service.dart';
 import '../services/document_acceptance_service.dart';
@@ -42,9 +45,12 @@ class _CommunityPageScreenState extends State<CommunityPageScreen> {
   bool _waiverAccepted = false;
   String? _userId;
   String? _error;
-  // [LOCAL-701 / D663 §3] Tours MADE WITH Audioura for this community, listed
-  // on the page like episodes. Populated for an active member / the owner only.
-  List<CommunityTour> _communityTours = const [];
+  // [LOCAL-713 / D675] The server tour ids already on the phone (from the
+  // saved_tours records), used to show "On this phone ✓" vs "Download", and the
+  // listener's chosen language for pickDownloadLanguage.
+  Set<String> _onPhoneTourIds = const {};
+  String _listeningLanguage = kDefaultListeningLanguage;
+  final Set<int> _downloading = {};
 
   @override
   void initState() {
@@ -72,15 +78,28 @@ class _CommunityPageScreenState extends State<CommunityPageScreen> {
     // [LOCAL-701 / D663 §3] Load the community's Audioura-made tours. The server
     // returns an empty list for a non-member / expired member (expiry blocks new
     // content), so this is populated only when the member is active or owner.
-    List<CommunityTour> ctours = const [];
-    if (c != null) {
-      final list =
-          await CommunityTourService.communityTours(c.id, userId: _userId);
-      if (list != null) ctours = list.tours;
+    // [LOCAL-713 / D675] The set of server tour ids already on the phone, and
+    // the saved listening language — for the per-row Download / On this phone
+    // status. Defaults to the phone's language when Audioura offers it, else
+    // English.
+    final onPhone = <String>{};
+    for (final s in (prefs.getStringList('saved_tours') ?? const [])) {
+      try {
+        final m = json.decode(s) as Map<String, dynamic>;
+        final tid = m['tour_id'];
+        final sid = m['server_tour_id'];
+        if (tid is String && tid.isNotEmpty) onPhone.add(tid);
+        if (sid is String && sid.isNotEmpty) onPhone.add(sid);
+      } catch (_) {}
     }
+    final savedLang = prefs.getString(kListeningLanguagePrefKey);
+    final lang = savedLang ??
+        defaultListeningLanguage(
+            WidgetsBinding.instance.platformDispatcher.locale.languageCode);
     setState(() {
       _community = c;
-      _communityTours = ctours;
+      _onPhoneTourIds = onPhone;
+      _listeningLanguage = lang;
       _loading = false;
     });
   }
@@ -128,6 +147,53 @@ class _CommunityPageScreenState extends State<CommunityPageScreen> {
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
           content: Text('Report sent to the community owner.')));
+    }
+  }
+
+  /// [LOCAL-713 / D675 §3] Download a community tour, running the SAME download
+  /// path a Home/Listen download uses (TourDownloadService — never a second
+  /// path). The pass covers a member, so there is no purchase prompt here; if
+  /// the server still refuses with membership_required (e.g. an expired pass),
+  /// we open the community page's join/buy flow, exactly as the existing
+  /// community-tour flow does. The language is pickDownloadLanguage over the
+  /// tour's available languages, the listener's preferred language and the
+  /// tour's original — v1 never requests a new translation.
+  Future<void> _downloadCommunityTour(CommunityTour tour) async {
+    if (_downloading.contains(tour.id)) return;
+    setState(() => _downloading.add(tour.id));
+    try {
+      // The list endpoint does not carry a languages list, so `available` is
+      // empty here and pickDownloadLanguage falls back to the original — the
+      // tour's own row (its id) is downloaded. The sync-on-open path, which DOES
+      // carry languages, picks the preferred language when available.
+      final _ = pickDownloadLanguage(const [], _listeningLanguage, '');
+      final result = await TourDownloadService.downloadAndSave(tour.id);
+      if (!mounted) return;
+      switch (result.status) {
+        case TourDownloadStatus.ok:
+          setState(() => _onPhoneTourIds = {..._onPhoneTourIds, tour.id.toString()});
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+              content: Text('Downloaded — it’s now on this phone.')));
+          break;
+        case TourDownloadStatus.alreadyOnPhone:
+          setState(() => _onPhoneTourIds = {..._onPhoneTourIds, tour.id.toString()});
+          break;
+        case TourDownloadStatus.membershipRequired:
+          // The pass should cover a member; an expired pass lands here. Open the
+          // community join/buy flow (reload the page so the passes show).
+          await _load();
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                content: Text('Join this community to download its tours.')));
+          }
+          break;
+        case TourDownloadStatus.failed:
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+              content: Text('Download failed. Please try again.')));
+          break;
+      }
+    } finally {
+      if (mounted) setState(() => _downloading.remove(tour.id));
     }
   }
 
@@ -457,22 +523,17 @@ class _CommunityPageScreenState extends State<CommunityPageScreen> {
               child: Text('Join to listen to the episodes.'),
             ),
 
-          // [LOCAL-701 / D663 §3] Tours MADE WITH Audioura for this community,
-          // listed like episodes. The server only returns them to an active
-          // member / the owner (expiry blocks new content), so the list is
-          // empty otherwise. A public one carries a small "On the map" note.
-          if (_communityTours.isNotEmpty) ...[
-            _sectionTitle('Tours (${_communityTours.length})'),
-            ..._communityTours.map((t) => ListTile(
-                  leading: const Icon(Icons.headphones),
-                  title: Text(t.name),
-                  subtitle: Text(t.isPublic
-                      ? 'On the map · members download free'
-                      : 'Members only'),
-                  trailing: t.isPublic
-                      ? const Icon(Icons.public, size: 18, color: Colors.teal)
-                      : null,
-                )),
+          // [LOCAL-701 / D663 §3 + LOCAL-713 / D675 §5] Tours MADE WITH Audioura
+          // for this community. Every tour gets a status: a member/owner sees a
+          // "Download" button (or "On this phone ✓" when it is already in
+          // Listen, any language); a non-member sees "Join to download" (D663).
+          // The tours list on the page payload (c.tours) is visible to everyone
+          // who can see the page, so a non-member sees the tours with the join
+          // prompt. The Download button runs the SAME download path a
+          // Home/Listen download uses (TourDownloadService).
+          if (c.tours.isNotEmpty) ...[
+            _sectionTitle('Tours (${c.tours.length})'),
+            ...c.tours.map((t) => _communityTourTile(c, t)),
           ] else if (canListen) ...[
             _sectionTitle('Tours'),
             const Padding(
@@ -482,6 +543,63 @@ class _CommunityPageScreenState extends State<CommunityPageScreen> {
           ],
         ],
       ),
+    );
+  }
+
+  /// [LOCAL-713 / D675 §5] One community-tour row with its Download / On this
+  /// phone ✓ / Join to download status. A member or the owner can download; a
+  /// non-member is prompted to join.
+  Widget _communityTourTile(Community c, CommunityInviteTourOption t) {
+    final status = rowStatusFor(
+      tourId: t.id,
+      isMember: c.myStatus.isMember && c.myStatus.active,
+      isOwner: c.isOwner,
+      onPhoneTourIds: _onPhoneTourIds,
+    );
+    final title = (t.shortTitle != null && t.shortTitle!.trim().isNotEmpty)
+        ? t.shortTitle!
+        : t.name;
+    final isBusy = _downloading.contains(t.id);
+    Widget trailing;
+    switch (status) {
+      case CommunityTourRowStatus.onThisPhone:
+        trailing = const Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.check_circle, size: 18, color: Colors.green),
+            SizedBox(width: 4),
+            Text('On this phone', style: TextStyle(color: Colors.green)),
+          ],
+        );
+        break;
+      case CommunityTourRowStatus.joinToDownload:
+        trailing = const Text('Join to download',
+            style: TextStyle(color: Colors.deepPurple, fontWeight: FontWeight.w600));
+        break;
+      case CommunityTourRowStatus.download:
+        trailing = isBusy
+            ? const SizedBox(
+                width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
+            : ElevatedButton.icon(
+                key: Key('download_tour_${t.id}'),
+                onPressed: () => _downloadCommunityTour(
+                    CommunityTour(
+                      id: t.id,
+                      name: t.name,
+                      requestString: '',
+                      visibility: 'members',
+                      contentRating: 'general',
+                    )),
+                icon: const Icon(Icons.download, size: 18),
+                label: const Text('Download'),
+              );
+        break;
+    }
+    return ListTile(
+      leading: const Icon(Icons.headphones),
+      title: Text(title),
+      subtitle: t.stopCount > 0 ? Text('${t.stopCount} stops') : null,
+      trailing: trailing,
     );
   }
 

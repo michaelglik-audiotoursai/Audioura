@@ -829,6 +829,175 @@ def _tours_for(cur, community_id):
             for r in cur.fetchall()]
 
 
+# ───────────────────────────────────────────────────────────────────────────
+# [LOCAL-713 / D675] New community tours since the last sync
+# ───────────────────────────────────────────────────────────────────────────
+# One read returns the NEW community tours across the caller's ACTIVE
+# memberships, so the app can download each one that is not yet on the phone
+# (the sync-on-open baseline; LOCAL-714 adds the background run). It is
+# READ-ONLY and never errors on an expired/absent membership — such a community
+# simply contributes nothing (D675 §4: an expired pass returns nothing).
+#
+#   GET /communities/new-tours?user_id=<device user>&since=<iso8601|empty>
+#     → {tours: [ {community_id, community_name, tour_id,
+#                  short_title (fallback tour_name), stop_count, created_at,
+#                  languages: [<codes with a finished translation>, original
+#                              first]} … newest first ],
+#        server_time: <iso8601 — the next `since`>}
+#
+# A TOUR here is an ORIGINAL (original_tour_id IS NULL): a translation is a
+# derived row that the app downloads by its own id once it picks a language. The
+# languages list is the original's own language FIRST, then every language that
+# has a FINISHED (non-draft) translation row pointing back at the original.
+
+
+def _active_community_ids_for_user(cur, user_id, now=None):
+    """The community ids this device may receive new tours from: every community
+    it holds an ACTIVE membership in (expires_at IS NULL — perpetual — or
+    expires_at > now), PLUS every community it OWNS (the organiser counts for
+    their own communities, D675). A disabled community is excluded. Order is not
+    significant here (the caller sorts tours by created_at); duplicates are
+    collapsed. An expired/absent membership simply does not appear — the caller
+    never errors on it (D675 §4)."""
+    now = now or datetime.utcnow()
+    cur.execute(
+        """SELECT c.id
+             FROM communities c
+             JOIN community_memberships m ON m.community_id = c.id
+            WHERE m.user_id = %s
+              AND c.disabled = FALSE
+              AND (m.expires_at IS NULL OR m.expires_at > %s)
+            UNION
+           SELECT c.id
+             FROM communities c
+            WHERE c.owner_user_id = %s
+              AND c.disabled = FALSE""",
+        (user_id, now, user_id),
+    )
+    return [r[0] for r in cur.fetchall()]
+
+
+def _tour_languages(cur, tour_id, original_language):
+    """The language codes available for an original tour, ORIGINAL FIRST. The
+    original's own language leads; then every language with a FINISHED
+    (non-draft) translation row (original_tour_id = tour_id), in a stable order
+    (by the translation's id). A language already equal to the original is not
+    repeated. v1 lists only languages that already EXIST — the app never
+    requests a new translation automatically (D675 §1)."""
+    orig = (original_language or 'en')
+    langs = [orig]
+    cur.execute(
+        """SELECT language
+             FROM audio_tours
+            WHERE original_tour_id = %s
+              AND COALESCE(draft, FALSE) = FALSE
+              AND language IS NOT NULL
+            ORDER BY id""",
+        (tour_id,),
+    )
+    for (lang,) in cur.fetchall():
+        if lang and lang not in langs:
+            langs.append(lang)
+    return langs
+
+
+def _new_tours_for_community(cur, community_id, community_name, since=None):
+    """The non-draft ORIGINAL tours of one community, NEWEST FIRST, each with its
+    languages list. `since` (a datetime or None) filters to tours created
+    strictly AFTER it, so a repeat sync only sees what is genuinely new. A
+    translation row (original_tour_id IS NOT NULL) is never a row here — it is a
+    language OF an original, surfaced in that original's `languages`."""
+    if since is None:
+        cur.execute(
+            """SELECT id, tour_name, short_title, COALESCE(stops_count, 0),
+                      created_at, language
+                 FROM audio_tours
+                WHERE community_id = %s
+                  AND original_tour_id IS NULL
+                  AND COALESCE(draft, FALSE) = FALSE
+                ORDER BY created_at DESC, id DESC""",
+            (community_id,),
+        )
+    else:
+        cur.execute(
+            """SELECT id, tour_name, short_title, COALESCE(stops_count, 0),
+                      created_at, language
+                 FROM audio_tours
+                WHERE community_id = %s
+                  AND original_tour_id IS NULL
+                  AND COALESCE(draft, FALSE) = FALSE
+                  AND created_at > %s
+                ORDER BY created_at DESC, id DESC""",
+            (community_id, since),
+        )
+    rows = cur.fetchall()
+    out = []
+    for tour_id, tour_name, short_title, stops_count, created_at, language in rows:
+        out.append({
+            'community_id': community_id,
+            'community_name': community_name,
+            'tour_id': tour_id,
+            # short_title falls back to tour_name when the server has not written
+            # one yet (D675: the row the app shows/downloads).
+            'short_title': short_title or tour_name,
+            'stop_count': int(stops_count or 0),
+            'created_at': created_at.isoformat() if created_at else None,
+            'languages': _tour_languages(cur, tour_id, language),
+        })
+    return out
+
+
+def new_tours_for_user(cur, user_id, since=None, now=None):
+    """[LOCAL-713 / D675] Every NEW community tour for a device, across its
+    ACTIVE memberships (and the communities it owns), NEWEST FIRST. Pure of
+    Flask — a test drives it with a scripted cursor. Returns a list of tour
+    dicts (see module header). An expired/absent membership contributes nothing
+    (never an error). `since` is a datetime or None; `now` overrides the active-
+    membership clock for tests."""
+    now = now or datetime.utcnow()
+    community_ids = _active_community_ids_for_user(cur, user_id, now=now)
+    tours = []
+    for cid in community_ids:
+        name = _community_name(cur, cid)
+        tours.extend(_new_tours_for_community(cur, cid, name, since=since))
+    # Sort the merged list newest first across all communities. created_at is an
+    # ISO string here; a None (untimed tour) sorts last.
+    tours.sort(key=lambda t: (t['created_at'] or ''), reverse=True)
+    return tours
+
+
+def _community_name(cur, community_id):
+    """The community's name (for the new-tours rows). None when the row is gone
+    (it should not be, as the id came from a live join)."""
+    cur.execute("SELECT name FROM communities WHERE id = %s", (community_id,))
+    row = cur.fetchone()
+    return row[0] if row else None
+
+
+def _parse_since(raw):
+    """Parse the `since` query arg to a datetime, or None when absent/blank/
+    unparseable (a bad `since` is treated as 'from the beginning', never an
+    error — D675 §4 keeps this endpoint forgiving). Accepts ISO-8601, with or
+    without a trailing 'Z', and a naive or offset form."""
+    if not raw:
+        return None
+    s = raw.strip()
+    if not s:
+        return None
+    # Tolerate a trailing Z (UTC) — datetime.fromisoformat rejects it pre-3.11.
+    if s.endswith('Z'):
+        s = s[:-1] + '+00:00'
+    try:
+        dt = datetime.fromisoformat(s)
+    except (ValueError, TypeError):
+        return None
+    # Normalise to naive UTC so it compares with created_at (stored naive UTC).
+    if dt.tzinfo is not None:
+        from datetime import timezone
+        dt = dt.astimezone(timezone.utc).replace(tzinfo=None)
+    return dt
+
+
 def _community_page(cur, community_id, user_id=None, now=None):
     """The community page payload (D658 (c)): organiser, description, rules +
     waiver, passes, episodes, and the member's own status/expiry. Episodes are
@@ -1943,6 +2112,41 @@ def my_owned_communities():
         out = [{'id': r[0], 'name': r[1]} for r in cur.fetchall()]
         cur.close()
         return jsonify({"communities": out}), 200
+    finally:
+        conn.close()
+
+
+@communities_bp.route('/communities/new-tours', methods=['GET'])
+def new_tours():
+    """[LOCAL-713 / D675] The NEW community tours for a device, across its ACTIVE
+    memberships (and the communities it owns), since the last sync. The app
+    calls this on open (the sync-on-open baseline; LOCAL-714 adds the background
+    run) and downloads each tour that is not yet on the phone.
+
+    Query: ?user_id=<device user>&since=<iso8601|empty>.
+      * user_id is required (400 when missing).
+      * since filters to tours created strictly after it; blank/absent/
+        unparseable means 'from the beginning' (never an error — D675 §4).
+
+    Returns 200 {tours: [...newest first...], server_time: <iso8601>}. An
+    expired or absent membership contributes NOTHING (never an error): such a
+    community simply has no tours in the list. READ-ONLY — no writes, so a
+    repeated call is free. `server_time` is the value to store as the next
+    `since` AFTER the downloads succeed (D675 §: advance only on success)."""
+    err = _require_api_key()
+    if err:
+        return err
+    user_id = request.args.get('user_id')
+    if not user_id:
+        return jsonify({"error": "user_id is required"}), 400
+    since = _parse_since(request.args.get('since'))
+    conn = _get_db()
+    try:
+        cur = conn.cursor()
+        now = datetime.utcnow()
+        tours = new_tours_for_user(cur, user_id, since=since, now=now)
+        cur.close()
+        return jsonify({"tours": tours, "server_time": now.isoformat()}), 200
     finally:
         conn.close()
 
