@@ -7,7 +7,8 @@
 # BACK TO STORIED: the same command WITHOUT the second -f (rebuilds from ~/Audioura = storied).
 #
 # Code comes from the detached checkout ~/audioura-subscribed-local (git -C … checkout --detach
-# origin/subscribed to update). Volumes (./tours …) stay relative to ~/Audioura, the compose dir.
+# origin/subscribed to update). The tour store is pinned to the absolute /Users/micha/Audioura/tours below, so it
+# no longer matters which directory compose runs from (2026-10-19 split-store incident).
 # English voice: Kokoro on the HOST (launchd com.audioura.kokoro, port 5181).
 services:
   tour-generator:
@@ -33,6 +34,7 @@ services:
     volumes:
       - /Users/micha/audioura-subscribed-local/_meter:/opt/meter:ro
       - /Users/micha/Audioura/meterlogs:/meterlogs
+      - /Users/micha/Audioura/tours:/app/tours   # ONE tour store for every service (2026-10-19: ./tours resolved to the checkout when compose ran from it)
   tour-orchestrator:
     build: {context: /Users/micha/audioura-subscribed-local, dockerfile: Dockerfile.orchestrator}
     environment:
@@ -43,6 +45,7 @@ services:
     volumes:
       - /Users/micha/audioura-subscribed-local/_meter:/opt/meter:ro
       - /Users/micha/Audioura/meterlogs:/meterlogs
+      - /Users/micha/Audioura/tours:/app/tours   # ONE tour store for every service (2026-10-19: ./tours resolved to the checkout when compose ran from it)
   user-api-2:                             # LOCAL-595/596/598 entitlements, queue, IAP verify
     build: {context: /Users/micha/audioura-subscribed-local/user-tracking}
     environment:
@@ -57,6 +60,7 @@ services:
     volumes:
       - /Users/micha/audioura-subscribed-local/_meter:/opt/meter:ro
       - /Users/micha/Audioura/meterlogs:/meterlogs
+      - /Users/micha/Audioura/tours:/app/tours   # ONE tour store for every service (2026-10-19: ./tours resolved to the checkout when compose ran from it)
   polly-tts-1:
     build: {context: /Users/micha/audioura-subscribed-local, dockerfile: Dockerfile.polly-tts}
     environment:
@@ -86,5 +90,6 @@ services:
     volumes:
       - /Users/micha/audioura-subscribed-local/_meter:/opt/meter:ro
       - /Users/micha/Audioura/meterlogs:/meterlogs
+      - /Users/micha/Audioura/tours:/app/tours   # ONE tour store for every service (2026-10-19: ./tours resolved to the checkout when compose ran from it)
   map-delivery:                           # LOCAL-657 version/updated_at on /tours-near + /tour-by-code
     build: {context: /Users/micha/audioura-subscribed-local/map_delivery}
