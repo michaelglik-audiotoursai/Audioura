@@ -102,7 +102,7 @@ class TourTranslationHelper {
                 // success.
                 try {
                   await _saveTranslatedTour(translatedId, translatedResponse.bodyBytes, appDir.path, prefs, parentEditTourId, lang,
-                      version: version, updatedAt: updatedAt, sourceItem: sourceItem);
+                      version: version, updatedAt: updatedAt, sourceItem: sourceItem, parentServerTourId: tourId);
                 } catch (saveError) {
                   failures.add(lang);
                   await DebugLogHelper.addDebugLog(
@@ -187,7 +187,7 @@ class TourTranslationHelper {
 
   /// Saves a translated tour ZIP to the local filesystem and SharedPreferences.
   static Future<void> _saveTranslatedTour(dynamic tourId, List<int> zipBytes, String appDirPath, SharedPreferences prefs, String parentEditTourId, String lang,
-      {dynamic version, dynamic updatedAt, Map<String, dynamic>? sourceItem}) async {
+      {dynamic version, dynamic updatedAt, Map<String, dynamic>? sourceItem, int? parentServerTourId}) async {
     final archive = ZipDecoder().decodeBytes(zipBytes);
     String tourName = 'Translated Tour $tourId';
     // Try to extract tour name from ZIP manifest
@@ -223,6 +223,19 @@ class TourTranslationHelper {
       'editable': false,
       'is_translation': true,
       'parent_tour_id': parentEditTourId.isEmpty ? null : parentEditTourId,
+      // [LOCAL-716B] The TARGET language of this translation (e.g. 'ru'). Until
+      // now the language lived only in the directory name, so "View" after a
+      // "tour + translation" download could not tell which saved entry was the
+      // language just downloaded. Stamping it here lets the View planner open
+      // the exact language copy the user asked for (D358 field-test fix).
+      'language': lang,
+      // [LOCAL-716B / D358] The ORIGINAL (parent) tour's SERVER id. The snackbar
+      // offers the original server id (e.g. 117); this translation's own
+      // `tour_id`/`server_tour_id` are its OWN translated id (e.g. 437), and
+      // `parent_tour_id` is the non-numeric EDIT id (often null when the resolve
+      // endpoint is unavailable). Without this link the View matcher could not
+      // tie the Russian copy to the offered 117 — exactly the Pixel-4 miss.
+      if (parentServerTourId != null) 'parent_server_tour_id': parentServerTourId.toString(),
     };
     // [LOCAL-666] Persist the source version + updated date so the My Tours list can
     // label this translation (v{n} · updated {Mon D}) exactly like the English tour.

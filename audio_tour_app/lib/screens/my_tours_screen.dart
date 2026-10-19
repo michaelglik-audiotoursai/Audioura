@@ -10,6 +10,7 @@ import '../screens/debug_log_viewer_screen.dart';
 import '../services/tour_translation_helper.dart';
 import '../config/endpoints.dart';
 import '../utils/tour_path_healer.dart';
+import '../utils/view_after_download.dart';
 import '../widgets/share_tour_sheet.dart';
 import '../services/community_downloads.dart';
 import '../widgets/rate_tour_dialog.dart';
@@ -134,6 +135,13 @@ class _MyToursScreenState extends State<MyToursScreen> {
   final Map<String, int> _salesByTour = {};
 
   final ScrollController _scrollController = ScrollController();
+
+  // [LOCAL-716B / D358] The displayed index of a tour to briefly highlight
+  // after "View" when several tours were downloaded (or a single-tour open
+  // missed and fell back). Null when nothing is highlighted. A timer clears it
+  // after ~2s so the row flashes, then returns to normal.
+  int? _highlightIndex;
+  Timer? _highlightTimer;
   
   Future<void> _manualRefresh() async {
     await DebugLogHelper.addDebugLog('LISTEN: Manual refresh triggered');
@@ -148,6 +156,15 @@ class _MyToursScreenState extends State<MyToursScreen> {
     _setupVoiceCommands();
     _setupScrollListener();
     _loadCuratorStatus();
+  }
+
+  @override
+  void dispose() {
+    // [LOCAL-716B] Cancel the highlight flash timer and release the scroll
+    // controller so the newest-tour highlight path leaves nothing running.
+    _highlightTimer?.cancel();
+    _scrollController.dispose();
+    super.dispose();
   }
 
   /// [LOCAL-677] Learn whether this device is a Curator (plans.can_sell). Only a
@@ -1859,12 +1876,25 @@ class _MyToursScreenState extends State<MyToursScreen> {
               ),
             )
           : ListView.builder(
+              controller: _scrollController,
               itemCount: _tours.length,
               itemBuilder: (context, index) {
                 final tour = _tours[index];
-                
+                // [LOCAL-716B] A freshly-downloaded tour flashes briefly after
+                // "View" (the highlight path). The colour clears itself after
+                // ~2s via _highlightTimer.
+                final bool highlighted = _highlightIndex == index;
+
                 return Card(
                   margin: const EdgeInsets.all(8),
+                  color: highlighted ? Colors.amber.shade100 : null,
+                  shape: highlighted
+                      ? RoundedRectangleBorder(
+                          side: BorderSide(
+                              color: Colors.amber.shade700, width: 2),
+                          borderRadius: BorderRadius.circular(4),
+                        )
+                      : null,
                   child: ListTile(
                     leading: const Icon(Icons.tour, color: Color(0xFF3498db)),
                     title: Text(tour['title']),
@@ -2015,35 +2045,95 @@ class _MyToursScreenState extends State<MyToursScreen> {
     );
   }
 
-  /// [LOCAL-716] After the tours load, honour a pending "open tour X" request
-  /// (a download's "View" button for exactly one tour). Find the matching saved
-  /// tour by its id (either the editable `tour_id` or the numeric
-  /// `server_tour_id`) and open its player — the same screen a tap opens. The
-  /// request is consumed whether or not a match is found, so it fires at most
-  /// once; with no id (several tours downloaded) we stay on the list.
+  /// [LOCAL-716 / LOCAL-716B / D358] After the tours load, honour a pending
+  /// "View" request from a download snackbar.
+  ///
+  /// The pure [planViewAfterDownload] decides what to do from the loaded
+  /// entries alone:
+  ///   * exactly one tour downloaded, and a saved entry matches the offered
+  ///     server id → open the copy in the language just downloaded (the single
+  ///     translation, the listening-language translation when there are
+  ///     several, or the original when there are none);
+  ///   * several tours, no id, OR no entry matched the offered id → highlight
+  ///     the newest downloaded tour (and, on a miss, LOG it first — never the
+  ///     old silent return).
+  ///
+  /// The request is consumed up front so it fires at most once per load.
   void _consumePendingListenOpen() {
     final req = PendingListenOpen.instance.request.value;
     if (req == null) return;
     final wantedId = req.tourId;
+    final language = req.language;
     // Consume up front: this request is for THIS load; a miss must not leave it
     // armed for a later unrelated rebuild.
     PendingListenOpen.instance.consume();
-    if (wantedId == null) return; // "just show Listen" — nothing to open.
 
-    Map<String, dynamic>? match;
-    for (final tour in _tours) {
-      final tid = tour['tour_id']?.toString();
-      final sid = tour['server_tour_id']?.toString();
-      if (tid == wantedId || sid == wantedId) {
-        match = tour;
-        break;
-      }
+    // "Just show Listen" (several tours downloaded, no single id to open):
+    // highlight the newest and stop.
+    if (wantedId == null) {
+      _highlightNewestTour();
+      return;
     }
-    if (match == null) return; // not saved (yet) — leave the user on the list.
 
-    // Open after this frame so the list has built and a BuildContext exists.
+    final plan = planViewAfterDownload(
+      entries: _tours,
+      downloadedTourCount: 1,
+      wantedServerId: wantedId,
+      listeningLanguage: language,
+    );
+
+    if (plan.action == ViewAfterDownloadAction.openEntry &&
+        plan.entryIndex != null &&
+        plan.entryIndex! >= 0 &&
+        plan.entryIndex! < _tours.length) {
+      final match = _tours[plan.entryIndex!];
+      // Open after this frame so the list has built and a BuildContext exists.
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _openTourPlayer(match);
+      });
+      return;
+    }
+
+    // No silent miss (D358): the offered id matched no saved entry. Log which
+    // id missed and what we had, then fall back to the highlight path so the
+    // user is never left staring at an unchanged list with nothing opened.
+    unawaited(DebugLogHelper.addDebugLog(
+        'LISTEN: View miss — offered id "$wantedId" (lang=$language) matched no '
+        'saved entry among ${_tours.length} tours '
+        '[${_tours.map((t) => 'tid=${t['tour_id']},sid=${t['server_tour_id']},psid=${t['parent_server_tour_id']},tr=${t['is_translation']},lang=${t['language']}').join(' | ')}]'));
+    _highlightNewestTour();
+  }
+
+  /// [LOCAL-716B / D358] Scroll to and briefly highlight the NEWEST downloaded
+  /// tour. `_tours` is stored newest-first (the saved list reversed, new entries
+  /// appended), so the newest sits near the top — but we locate it by its
+  /// `created` timestamp via [newestEntryIndex] rather than trusting position,
+  /// as LOCAL-716 only CLAIMED "the first new one is at the top". The highlight
+  /// clears itself after ~2s.
+  void _highlightNewestTour() {
+    if (_tours.isEmpty) return;
+    final newest = newestEntryIndex(_tours);
+    if (newest == null) return;
+
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) _openTourPlayer(match!);
+      if (!mounted) return;
+      // Scroll the newest row into view. Each Card is ~96px tall; this is an
+      // estimate that lands the row on screen (exactness is not required — the
+      // highlight makes it obvious which one is new).
+      if (_scrollController.hasClients) {
+        final target = (newest * 96.0)
+            .clamp(0.0, _scrollController.position.maxScrollExtent);
+        _scrollController.animateTo(
+          target,
+          duration: const Duration(milliseconds: 400),
+          curve: Curves.easeInOut,
+        );
+      }
+      setState(() => _highlightIndex = newest);
+      _highlightTimer?.cancel();
+      _highlightTimer = Timer(const Duration(seconds: 2), () {
+        if (mounted) setState(() => _highlightIndex = null);
+      });
     });
   }
   String _buildAppBarTitle() {

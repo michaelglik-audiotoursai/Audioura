@@ -145,6 +145,34 @@ void main() {
       // token makes each request distinct, so both fire.
       expect(notifications, 2);
     });
+
+    test('[LOCAL-716B] offer carries the listening language', () {
+      PendingListenOpen.instance.offer('42', 'ru');
+      final req = PendingListenOpen.instance.request.value!;
+      expect(req.tourId, '42');
+      expect(req.language, 'ru');
+      // A single-tour open is NOT a highlight request.
+      expect(req.highlightNewest, isFalse);
+    });
+
+    test('[LOCAL-716B] a blank language is normalised to null', () {
+      PendingListenOpen.instance.offer('42', '   ');
+      expect(PendingListenOpen.instance.request.value!.language, isNull);
+    });
+
+    test('[LOCAL-716B] no id → highlightNewest is implied', () {
+      PendingListenOpen.instance.offer();
+      final req = PendingListenOpen.instance.request.value!;
+      expect(req.tourId, isNull);
+      expect(req.highlightNewest, isTrue);
+    });
+
+    test('[LOCAL-716B] several tours: explicit highlightNewest with null id', () {
+      PendingListenOpen.instance.offer(null, 'ru', true);
+      final req = PendingListenOpen.instance.request.value!;
+      expect(req.tourId, isNull);
+      expect(req.highlightNewest, isTrue);
+    });
   });
 
   group('MainScreen — View switches to the Listen tab', () {
@@ -220,8 +248,39 @@ void main() {
       expect(observer.pushedTourPlayer, isTrue);
     });
 
-    testWidgets('no matching tour → request is still consumed, no player',
-        (tester) async {
+    testWidgets('[LOCAL-716B] a translation entry opens from the offered '
+        'ORIGINAL server id (the Pixel-4 bug)', (tester) async {
+      // The snackbar offers the ORIGINAL server id (42). The ONLY saved entry
+      // is the Russian translation, whose tour_id/server_tour_id are its OWN id
+      // (1042) and whose parent_server_tour_id is 42. Before LOCAL-716B nothing
+      // linked it to 42, so View missed and opened nothing; now it matches via
+      // parent_server_tour_id and opens the translation.
+      SharedPreferences.setMockInitialValues({
+        'saved_tours': [
+          '{"title":"Freedom Trail (ru)","path":"/tmp/ft_ru",'
+              '"created":"2026-10-19T10:01:00Z","tour_id":"1042",'
+              '"server_tour_id":"1042","parent_server_tour_id":"42",'
+              '"is_translation":true,"language":"ru"}',
+        ],
+        'app_mode': 'Tours',
+      });
+      PendingListenOpen.instance.consume();
+      PendingListenOpen.instance.offer('42', 'ru');
+
+      final observer = _RecordingNavigatorObserver();
+      await tester.pumpWidget(MaterialApp(
+        home: const MyToursScreen(),
+        navigatorObservers: [observer],
+      ));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
+
+      expect(PendingListenOpen.instance.request.value, isNull);
+      expect(observer.pushedTourPlayer, isTrue);
+    });
+
+    testWidgets('no matching tour → request is still consumed, no player, '
+        'falls back to the highlight path', (tester) async {
       SharedPreferences.setMockInitialValues({
         'saved_tours': [
           '{"title":"Other","path":"/tmp/x","created":"2026-10-19T00:00:00Z","tour_id":"1"}',
@@ -237,6 +296,10 @@ void main() {
 
       expect(PendingListenOpen.instance.request.value, isNull);
       expect(find.byType(TourPlayerScreen), findsNothing);
+
+      // [LOCAL-716B] A miss highlights the newest for ~2s; pump the flash timer
+      // out so the test leaves nothing pending.
+      await tester.pump(const Duration(seconds: 2));
     });
   });
 }

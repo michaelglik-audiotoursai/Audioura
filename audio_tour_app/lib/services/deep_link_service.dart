@@ -64,10 +64,28 @@ class PendingShareSearch {
 /// same player a tap on it in Listen opens). [token] makes every request
 /// distinct so two identical offers both notify listeners — a plain String?
 /// would de-dupe when the same tour is opened twice in a row.
+///
+/// [LOCAL-716B / D358] Two fields were added so "View" can open the LANGUAGE
+/// the user just downloaded, not merely the English original:
+///   * [language] — the resolved listening language (About / per-community, or
+///     null). With several translations of the offered tour, the planner opens
+///     the one in this language; ignored when the tour has zero or one
+///     translation.
+///   * [highlightNewest] — true when the request is "several tours were
+///     downloaded, just highlight the newest in Listen". It is implied by a
+///     null [tourId], but kept explicit so a miss on a single-tour open can
+///     fall back onto the same highlight path without re-deriving intent.
 class PendingListenOpenRequest {
-  const PendingListenOpenRequest(this.tourId, this.token);
+  const PendingListenOpenRequest(
+    this.tourId,
+    this.token, {
+    this.language,
+    this.highlightNewest = false,
+  });
   final String? tourId;
   final int token;
+  final String? language;
+  final bool highlightNewest;
 }
 
 /// [LOCAL-716] The ONE way any screen says "take me to Listen, optionally
@@ -93,9 +111,21 @@ class PendingListenOpen {
   /// Ask to go to Listen. Pass a tour id to also open that tour, or null/empty
   /// to just show the Listen tab. Each call gets a fresh token so repeated
   /// offers always notify, even for the same tour id.
-  void offer([String? tourId]) {
+  ///
+  /// [LOCAL-716B] [language] carries the resolved listening language so the
+  /// View planner can pick the right language copy when a tour has several
+  /// translations. [highlightNewest] forces the "scroll to + highlight the
+  /// newest" path regardless of [tourId] (several tours downloaded).
+  void offer([String? tourId, String? language, bool highlightNewest = false]) {
     final id = (tourId == null || tourId.isEmpty) ? null : tourId;
-    request.value = PendingListenOpenRequest(id, _nextToken++);
+    final lang =
+        (language == null || language.trim().isEmpty) ? null : language.trim();
+    request.value = PendingListenOpenRequest(
+      id,
+      _nextToken++,
+      language: lang,
+      highlightNewest: highlightNewest || id == null,
+    );
   }
 
   /// Clear the pending request once MyTours has opened (or decided not to open)

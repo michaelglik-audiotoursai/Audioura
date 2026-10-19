@@ -2345,17 +2345,36 @@ class _HomeScreenState extends State<HomeScreen> {
 
     if (!mounted) return;
     if (freeOrOwned.isNotEmpty || paidToOffer.isEmpty) {
+      // [LOCAL-716B / D358] The language "View" should open for a single tour.
+      // The user just chose these [languages]; prefer the first non-English one
+      // (the translation they downloaded), else fall back to the saved About
+      // listening language, else English. The planner uses this only when a
+      // tour has SEVERAL translations — with exactly one translation it opens
+      // that translation regardless, and with none it opens the original.
+      final nonEnglishSelected =
+          (languages ?? const <String>[]).where((l) => l != 'en').toList();
+      final viewLanguage = nonEnglishSelected.isNotEmpty
+          ? nonEnglishSelected.first
+          : (prefs.getString('listening_language') ?? 'en');
+      // One tour downloaded → offer its id; several → offer null (highlight the
+      // newest in Listen). We count TOURS (one add per tour above), so a tour
+      // plus its translations is still exactly one id here.
+      final singleTourId =
+          downloadedTourIds.length == 1 ? downloadedTourIds.first : null;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(message),
-          // [LOCAL-716] "View" goes to the Listen tab. With exactly one new
-          // tour it opens that tour; with several it just shows the list (the
-          // first new one is at the top). Replaces a pushNamed('/my_tours')
-          // that did nothing — that route was never registered.
+          // [LOCAL-716 / LOCAL-716B] "View" goes to the Listen tab. With exactly
+          // one new tour it opens that tour in the language just downloaded
+          // (the translation, if any); with several it switches to Listen and
+          // highlights the newest. Replaces a pushNamed('/my_tours') that did
+          // nothing — that route was never registered.
           action: successCount > 0 ? SnackBarAction(
             label: 'View',
             onPressed: () => PendingListenOpen.instance.offer(
-              downloadedTourIds.length == 1 ? downloadedTourIds.first : null,
+              singleTourId,
+              viewLanguage,
+              singleTourId == null, // several tours → highlight newest
             ),
           ) : null,
         ),
@@ -2944,6 +2963,9 @@ class _HomeScreenState extends State<HomeScreen> {
       'editable': false,
       'is_translation': true,
       'parent_tour_id': parentEditTourId.isEmpty ? null : parentEditTourId,
+      // [LOCAL-716B] Target language of this translation, so "View" after a
+      // "tour + translation" download opens the exact language just downloaded.
+      'language': lang,
     };
     savedTours.add(json.encode(tourData));
     await prefs.setStringList('saved_tours', savedTours);
