@@ -24,6 +24,7 @@ screens/tour_generator_screen.dart | CORE generate/status/download + news; non-2
 services/background_service.dart | CORE /status + /download polling for a backgrounded generate; wrapped in try/catch, acts only on 200.
 services/background_tour_monitor.dart | CORE /status + /download polling; try/catch, acts only on 200.
 services/tour_translation_helper.dart | CORE download of a translated tour + translate POST; try/catch, 200-gated.
+services/tour_download_service.dart | CORE /download-tour + /tour/<id>/resolve — the single download+save path lifted from home_screen (LOCAL-713); every call in try/catch, 200-gated, 402 handled.
 services/tour_rating_service.dart | CORE POST/GET /tour/<id>/rating; typed catches (Socket/Timeout/Client) -> null, outbox-queued offline.
 services/tour_status_service.dart | CORE PUT /user + POST /tour-status tracking; try/catch -> void/'' on any failure.
 services/translation_service.dart | CORE POST /translate-with-audio; try/catch -> {status:error,message} map, never throws to the UI.

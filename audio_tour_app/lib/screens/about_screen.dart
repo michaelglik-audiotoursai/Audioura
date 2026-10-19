@@ -18,6 +18,7 @@ import '../config/endpoints.dart';
 import '../services/error_handler_service.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../services/document_acceptance_service.dart';
+import '../services/community_downloads.dart';
 
 class AboutScreen extends StatefulWidget {
   const AboutScreen({super.key});
@@ -41,11 +42,18 @@ class _AboutScreenState extends State<AboutScreen> {
   bool _usePathPrefixes = false;
   String _selectedMode = 'Tours';
 
+  // [LOCAL-713 / D675] The saved LISTENING LANGUAGE. An auto-download of a
+  // community tour takes this language when the tour has it, else the tour's
+  // original language. Default = the phone's language when Audioura offers it,
+  // else English (resolved in _loadListeningLanguage).
+  String _listeningLanguage = kDefaultListeningLanguage;
+
   @override
   void initState() {
     super.initState();
     _loadAppInfo();
     _loadSelectedMode();
+    _loadListeningLanguage();
   }
   
   Future<void> _loadSelectedMode() async {
@@ -60,6 +68,30 @@ class _AboutScreenState extends State<AboutScreen> {
     await prefs.setString('app_mode', mode);
     setState(() {
       _selectedMode = mode;
+    });
+  }
+
+  /// [LOCAL-713 / D675] Load the saved listening language. When none is saved
+  /// yet, default to the phone's language if Audioura offers it, else English
+  /// (defaultListeningLanguage). The resolved default is NOT written back until
+  /// the user picks one — so a later Audioura-language addition can still become
+  /// the default on a device that never chose.
+  Future<void> _loadListeningLanguage() async {
+    final prefs = await SharedPreferences.getInstance();
+    final saved = prefs.getString(kListeningLanguagePrefKey);
+    final resolved = saved ??
+        defaultListeningLanguage(
+            WidgetsBinding.instance.platformDispatcher.locale.languageCode);
+    setState(() {
+      _listeningLanguage = resolved;
+    });
+  }
+
+  Future<void> _saveListeningLanguage(String code) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(kListeningLanguagePrefKey, code);
+    setState(() {
+      _listeningLanguage = code;
     });
   }
 
@@ -334,6 +366,60 @@ class _AboutScreenState extends State<AboutScreen> {
                       ),
                       const Text('Audio'),
                     ],
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 20),
+            // [LOCAL-713 / D675] Listening language. The language a community
+            // tour is auto-downloaded in when it has it (else the tour's
+            // original language). The default is the phone's language when
+            // Audioura offers it, otherwise English.
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: Colors.teal.shade50,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.teal.shade200),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Row(
+                    children: [
+                      Icon(Icons.translate, size: 30, color: Colors.teal),
+                      SizedBox(width: 10),
+                      Text(
+                        'Listening language',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.teal,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  const Text(
+                    'New community tours download in this language when they '
+                    'have it, otherwise in the tour’s original language.',
+                    style: TextStyle(fontSize: 13, color: Colors.black54),
+                  ),
+                  const SizedBox(height: 12),
+                  DropdownButton<String>(
+                    key: const Key('listening_language_dropdown'),
+                    value: _listeningLanguage,
+                    isExpanded: true,
+                    items: kListeningLanguages
+                        .map((code) => DropdownMenuItem<String>(
+                              value: code,
+                              child: Text(_listeningLanguageName(code)),
+                            ))
+                        .toList(),
+                    onChanged: (code) {
+                      if (code != null) _saveListeningLanguage(code);
+                    },
                   ),
                 ],
               ),
@@ -897,8 +983,21 @@ class _AboutScreenState extends State<AboutScreen> {
     await _loadAppInfo();
   }
 
-  Widget _buildLegalLink(String label, String document) {
-    return InkWell(
+  /// A display name for a listening-language code, mirroring the names in
+  /// widgets/language_selector. Falls back to the code itself for an unknown.
+  String _listeningLanguageName(String code) {
+    const names = {
+      'en': 'English',
+      'ru': 'Русский',
+      'es': 'Español',
+      'fr': 'Français',
+      'de': 'Deutsch',
+      'zh': '中文',
+    };
+    return names[code] ?? code;
+  }
+
+  Widget _buildLegalLink(String label, String document) {    return InkWell(
       onTap: () async {
         final uri = Uri.parse(legalDocUrl(document));
         if (await canLaunchUrl(uri)) {
