@@ -57,6 +57,54 @@ class PendingShareSearch {
   }
 }
 
+/// [LOCAL-716] A single request to "go to the Listen tab, and optionally open
+/// tour X". [tourId] is null for "just show Listen" (several tours were
+/// downloaded — scroll to / highlight the first new one there) and a tour id
+/// string for "open this one tour" (exactly one tour was downloaded; open the
+/// same player a tap on it in Listen opens). [token] makes every request
+/// distinct so two identical offers both notify listeners — a plain String?
+/// would de-dupe when the same tour is opened twice in a row.
+class PendingListenOpenRequest {
+  const PendingListenOpenRequest(this.tourId, this.token);
+  final String? tourId;
+  final int token;
+}
+
+/// [LOCAL-716] The ONE way any screen says "take me to Listen, optionally
+/// opening tour X". Mirrors [PendingShareSearch]: a plain [ValueNotifier] (no
+/// streams, no plugins) so widget tests can fire an offer and assert MainScreen
+/// switches to Listen and MyTours opens the tour.
+///
+/// Flow: a download snackbar's View button calls [offer]. MainScreen listens
+/// and switches to index 2 (Listen), bumping its `_listenTabVersion` the way a
+/// notification tap does, which rebuilds MyToursScreen with a fresh key.
+/// MyToursScreen reads [request] once on load and, when it carries a tour id,
+/// opens that tour's player, then calls [consume] so a later rebuild never
+/// re-opens it.
+class PendingListenOpen {
+  PendingListenOpen._();
+  static final PendingListenOpen instance = PendingListenOpen._();
+
+  final ValueNotifier<PendingListenOpenRequest?> request =
+      ValueNotifier<PendingListenOpenRequest?>(null);
+
+  int _nextToken = 0;
+
+  /// Ask to go to Listen. Pass a tour id to also open that tour, or null/empty
+  /// to just show the Listen tab. Each call gets a fresh token so repeated
+  /// offers always notify, even for the same tour id.
+  void offer([String? tourId]) {
+    final id = (tourId == null || tourId.isEmpty) ? null : tourId;
+    request.value = PendingListenOpenRequest(id, _nextToken++);
+  }
+
+  /// Clear the pending request once MyTours has opened (or decided not to open)
+  /// the tour, so a rebuild does not act on it twice.
+  void consume() {
+    request.value = null;
+  }
+}
+
 /// SharedPreferences key: set true after the one-and-only deferred-link check,
 /// so the Install Referrer / clipboard prompt runs exactly once, ever (D671 §4:
 /// "one paste prompt, once, never again").

@@ -24,6 +24,8 @@ import '../services/tour_download_service.dart';
 import '../services/iap_service.dart';
 import '../services/device_service.dart';
 import '../services/document_acceptance_service.dart';
+import '../services/deep_link_service.dart';
+import '../utils/downloaded_message.dart';
 import '../widgets/tour_buy_sheet.dart' show TermsAgreeLine;
 import 'communities_about_screen.dart' show CommunityInviteTools;
 
@@ -394,8 +396,17 @@ class _CommunityPageScreenState extends State<CommunityPageScreen> {
       switch (result.status) {
         case TourDownloadStatus.ok:
           setState(() => _onPhoneTourIds = {..._onPhoneTourIds, tour.id.toString()});
-          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-              content: Text('Downloaded — it’s now on this phone.')));
+          // [LOCAL-716] Same wording helper as Home (exactly one tour here, so
+          // "1 tour downloaded and is now on your Listen page"), with a View
+          // button that opens the Listen tab on this tour.
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text(downloadedMessage(downloaded: 1)),
+            action: SnackBarAction(
+              label: 'View',
+              onPressed: () =>
+                  PendingListenOpen.instance.offer(tour.id.toString()),
+            ),
+          ));
           break;
         case TourDownloadStatus.alreadyOnPhone:
           setState(() => _onPhoneTourIds = {..._onPhoneTourIds, tour.id.toString()});

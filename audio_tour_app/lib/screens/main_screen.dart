@@ -42,6 +42,10 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
     // the deferred check), make sure we are on the Home tab so Home can fill
     // Search and run it. Home itself consumes the code via the same notifier.
     PendingShareSearch.instance.code.addListener(_onShareCodeArrived);
+    // [LOCAL-716] A download snackbar's "View" asks to go to the Listen tab
+    // (optionally opening one tour). Switch to index 2 exactly as a
+    // notification tap does; MyToursScreen consumes the tour id itself.
+    PendingListenOpen.instance.request.addListener(_onListenOpenRequested);
     // The one-shot deferred-link check (Android Install Referrer; iOS clipboard
     // prompt), run once ever, after the first frame so a BuildContext exists.
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -57,6 +61,21 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
     if (_selectedIndex != 0 && mounted) {
       setState(() => _selectedIndex = 0);
     }
+  }
+
+  /// [LOCAL-716] A "go to Listen (optionally open tour X)" request fired. Switch
+  /// to the Listen tab and bump `_listenTabVersion` so MyToursScreen rebuilds
+  /// with a fresh key — the SAME mechanism a notification tap uses in
+  /// [_initializeNotifications]. MyToursScreen reads the pending tour id on load
+  /// and opens that tour; it also calls consume(). We do NOT consume here: the
+  /// request must survive the rebuild so MyTours can read it.
+  void _onListenOpenRequested() {
+    if (PendingListenOpen.instance.request.value == null) return;
+    if (!mounted) return;
+    setState(() {
+      _listenTabVersion++;
+      _selectedIndex = 2;
+    });
   }
 
   /// [LOCAL-709 / D671 §4] The deferred-link one-shot: on the FIRST launch only,
@@ -145,6 +164,7 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     PendingShareSearch.instance.code.removeListener(_onShareCodeArrived);
+    PendingListenOpen.instance.request.removeListener(_onListenOpenRequested);
     BackgroundService.stopBackgroundMonitoring();
     super.dispose();
   }
