@@ -236,6 +236,34 @@ void main() {
       expect(req.tourId, isNull);
       expect(req.highlightNewest, isTrue);
     });
+
+    test('[LOCAL-719] offerBatch carries the ordered ids; tourId is the first',
+        () {
+      // D677 addendum 1: several tours → View opens the FIRST selected. The
+      // request carries every id in selection order; the first is the one the
+      // planner opens, and highlightNewest is FALSE (a player opens).
+      PendingListenOpen.instance.offerBatch(['43', '41', '42'], language: 'ru');
+      final req = PendingListenOpen.instance.request.value!;
+      expect(req.tourIds, ['43', '41', '42']);
+      expect(req.tourId, '43');
+      expect(req.language, 'ru');
+      expect(req.highlightNewest, isFalse);
+    });
+
+    test('[LOCAL-719] offerBatch trims/drops blanks and keeps order', () {
+      PendingListenOpen.instance.offerBatch(['  7 ', '', '  ', '9']);
+      final req = PendingListenOpen.instance.request.value!;
+      expect(req.tourIds, ['7', '9']);
+      expect(req.tourId, '7');
+    });
+
+    test('[LOCAL-719] offerBatch with no usable ids → highlightNewest', () {
+      PendingListenOpen.instance.offerBatch(const []);
+      final req = PendingListenOpen.instance.request.value!;
+      expect(req.tourIds, isEmpty);
+      expect(req.tourId, isNull);
+      expect(req.highlightNewest, isTrue);
+    });
   });
 
   group('MainScreen — View switches to the Listen tab', () {

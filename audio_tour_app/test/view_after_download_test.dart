@@ -1,16 +1,26 @@
-// [LOCAL-716B / D358] Tests for the pure View-after-download planner.
+// [LOCAL-716B / LOCAL-719 / D677 addendum 1] Tests for the pure
+// View-after-download planner. "View" ALWAYS opens a player.
 //
-// Michael's Pixel-4 field test on 2.4.30+72: downloaded ONE tour with its
-// Russian translation; "View" opened nothing. These goldens pin the decision
-// the planner now makes so that regression cannot return silently:
+// Michael's Pixel-4 field test on 2.4.30+72 (D358): downloaded ONE tour with
+// its Russian translation; "View" opened nothing. LOCAL-716B fixed the
+// single-tour case. LOCAL-719 (Michael, 2026-10-19) makes the behaviour
+// consistent for SEVERAL tours too: "we should start playing when multiple
+// tours are downloaded too, maybe the first one."
+//
+// These goldens pin the decision the planner now makes:
 //   * one tour + one translation  → open the translation;
 //   * one tour + two translations → open the listening-language one, else the
 //     first downloaded;
 //   * one tour, no translation     → open the original;
-//   * several tours / no id / miss → highlight the newest (never open).
-// Plus the matcher: a translation's saved entry (server_tour_id = the ORIGINAL
-// id, tour_id = its own translated id) is matched from the id the snackbar
-// offers (the original server id).
+//   * several tours                → open the FIRST selected tour (first id in
+//     the ordered list), in the language just downloaded;
+//   * several tours, first FAILED  → open the first that succeeded (the first
+//     offered id with a saved entry; a failed tour's id is simply absent, but
+//     we also skip an offered id that matched nothing);
+//   * no ids / none match          → highlight the newest (never open).
+// Plus the matcher: a translation's saved entry (server_tour_id = its OWN
+// translated id, parent_server_tour_id = the ORIGINAL id) is matched from the
+// original server id the snackbar offers.
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:audio_tour_app_dev/utils/view_after_download.dart';
@@ -20,11 +30,12 @@ import 'package:audio_tour_app_dev/utils/view_after_download.dart';
 Map<String, dynamic> original({
   required String serverId,
   String editId = 'edit-abc',
+  String title = 'Freedom Trail',
   String created = '2026-10-19T10:00:00Z',
 }) =>
     {
-      'title': 'Freedom Trail',
-      'path': '/tmp/ft',
+      'title': title,
+      'path': '/tmp/$serverId',
       'created': created,
       'tour_id': editId,
       'server_tour_id': serverId,
@@ -58,14 +69,13 @@ void main() {
     test('one tour + ONE translation → opens the translation', () {
       // English deselected (Russian only): the only saved entry is the Russian
       // translation. It still matches the offered original id via
-      // server_tour_id, and is opened.
+      // parent_server_tour_id, and is opened.
       final entries = [
         translation(originalServerId: '42', ownId: '1042', language: 'ru'),
       ];
       final plan = planViewAfterDownload(
         entries: entries,
-        downloadedTourCount: 1,
-        wantedServerId: '42',
+        downloadedTourIds: const ['42'],
         listeningLanguage: 'ru',
       );
       expect(plan, const ViewAfterDownloadPlan.openEntry(0));
@@ -80,8 +90,7 @@ void main() {
       ];
       final plan = planViewAfterDownload(
         entries: entries,
-        downloadedTourCount: 1,
-        wantedServerId: '42',
+        downloadedTourIds: const ['42'],
         listeningLanguage: 'ru',
       );
       expect(plan, const ViewAfterDownloadPlan.openEntry(1));
@@ -103,8 +112,7 @@ void main() {
       ];
       final plan = planViewAfterDownload(
         entries: entries,
-        downloadedTourCount: 1,
-        wantedServerId: '42',
+        downloadedTourIds: const ['42'],
         listeningLanguage: 'fr',
       );
       // French is the listening language → open the French translation (index 2).
@@ -130,8 +138,7 @@ void main() {
       ];
       final plan = planViewAfterDownload(
         entries: entries,
-        downloadedTourCount: 1,
-        wantedServerId: '42',
+        downloadedTourIds: const ['42'],
         // Listening language is German — neither translation matches.
         listeningLanguage: 'de',
       );
@@ -143,29 +150,99 @@ void main() {
       final entries = [original(serverId: '42')];
       final plan = planViewAfterDownload(
         entries: entries,
-        downloadedTourCount: 1,
-        wantedServerId: '42',
+        downloadedTourIds: const ['42'],
         listeningLanguage: 'ru',
       );
       expect(plan, const ViewAfterDownloadPlan.openEntry(0));
     });
   });
 
+  group('planViewAfterDownload — several tours (LOCAL-719 / D677 addendum 1)',
+      () {
+    test('THREE tours → opens the FIRST the user selected', () {
+      // Saved order is NOT selection order (tours arrive/append in any order);
+      // the selection order is the ids list ['43','41','42']. The first
+      // selected (43) must open, not whatever is first/newest in `entries`.
+      final entries = [
+        original(serverId: '41', title: 'Alpha'),
+        original(serverId: '42', title: 'Beta'),
+        original(serverId: '43', title: 'Gamma'),
+      ];
+      final plan = planViewAfterDownload(
+        entries: entries,
+        downloadedTourIds: const ['43', '41', '42'],
+        listeningLanguage: 'en',
+      );
+      // 43 is first selected and sits at index 2 in `entries`.
+      expect(plan, const ViewAfterDownloadPlan.openEntry(2));
+    });
+
+    test('THREE tours, FIRST selected failed to download → opens the first '
+        'that SUCCEEDED', () {
+      // The user selected 40, 41, 42 in that order, but 40 failed — the caller
+      // never saved it and never added its id, so the offered ids are
+      // ['41','42']. Even so, the planner also tolerates a stray offered id
+      // that matched nothing: here only 41 and 42 have saved entries, and 41 is
+      // the first that succeeded.
+      final entries = [
+        original(serverId: '41', title: 'Alpha'),
+        original(serverId: '42', title: 'Beta'),
+      ];
+      final plan = planViewAfterDownload(
+        entries: entries,
+        // 40 absent (failed); 41 is first that succeeded.
+        downloadedTourIds: const ['41', '42'],
+        listeningLanguage: 'en',
+      );
+      expect(plan, const ViewAfterDownloadPlan.openEntry(0)); // 41 at index 0
+    });
+
+    test('several tours where the first offered id has NO saved entry → skips '
+        'to the next offered id', () {
+      // Belt-and-braces: even if the caller listed a tour id whose save
+      // silently vanished (first id matches nothing), the planner walks on to
+      // the next selected id rather than stranding View on the missing one.
+      final entries = [
+        original(serverId: '42', title: 'Beta'),
+        original(serverId: '43', title: 'Gamma'),
+      ];
+      final plan = planViewAfterDownload(
+        entries: entries,
+        // 40 matches nothing; 42 is the next selected with a saved entry.
+        downloadedTourIds: const ['40', '42', '43'],
+        listeningLanguage: 'en',
+      );
+      expect(plan, const ViewAfterDownloadPlan.openEntry(0)); // 42 at index 0
+    });
+
+    test('several tours, first selected has a translation → opens that tour in '
+        'the language just downloaded', () {
+      // First selected is 42; it was downloaded with its Russian translation.
+      // View opens the Russian copy of the FIRST selected tour.
+      final entries = [
+        original(serverId: '41', title: 'Alpha'),
+        original(serverId: '42', title: 'Beta'),
+        translation(originalServerId: '42', ownId: '1042', language: 'ru'),
+      ];
+      final plan = planViewAfterDownload(
+        entries: entries,
+        downloadedTourIds: const ['42', '41'],
+        listeningLanguage: 'ru',
+      );
+      // Russian translation of 42 is at index 2.
+      expect(plan, const ViewAfterDownloadPlan.openEntry(2));
+    });
+  });
+
   group('planViewAfterDownload — matcher from the offered id', () {
     test("a translation's saved entry is matched from the id the snackbar "
         'offers (the original server id)', () {
-      // The snackbar offers the ORIGINAL server id (42). The saved entry is the
-      // translation, whose tour_id/server_tour_id are its OWN id (1042) and
-      // whose parent_server_tour_id is 42. The matcher must find it via
-      // parent_server_tour_id (the Pixel-4 miss was that no stored field linked
-      // the translation back to the offered 117).
       final entries = [
         translation(originalServerId: '42', ownId: '1042', language: 'ru'),
       ];
       final plan = planViewAfterDownload(
         entries: entries,
-        downloadedTourCount: 1,
-        wantedServerId: '42', // the original id, NOT 1042
+        downloadedTourIds: const ['42'], // the original id, NOT 1042
         listeningLanguage: null,
       );
       expect(plan.action, ViewAfterDownloadAction.openEntry);
@@ -180,8 +257,7 @@ void main() {
       ];
       final plan = planViewAfterDownload(
         entries: entries,
-        downloadedTourCount: 1,
-        wantedServerId: '42',
+        downloadedTourIds: const ['42'],
         listeningLanguage: 'ru',
       );
       expect(plan, const ViewAfterDownloadPlan.openEntry(1));
@@ -189,38 +265,31 @@ void main() {
   });
 
   group('planViewAfterDownload — highlight (no open)', () {
-    test('several tours downloaded → highlight newest, never open', () {
-      final entries = [
-        original(serverId: '42'),
-        original(serverId: '43'),
-      ];
-      final plan = planViewAfterDownload(
-        entries: entries,
-        downloadedTourCount: 2,
-        wantedServerId: null,
-        listeningLanguage: 'ru',
-      );
-      expect(plan, const ViewAfterDownloadPlan.highlightNewest());
-    });
-
-    test('no id offered → highlight newest', () {
+    test('no ids offered → highlight newest', () {
       final plan = planViewAfterDownload(
         entries: [original(serverId: '42')],
-        downloadedTourCount: 1,
-        wantedServerId: null,
+        downloadedTourIds: const [],
         listeningLanguage: 'ru',
       );
       expect(plan, const ViewAfterDownloadPlan.highlightNewest());
     });
 
-    test('offered id matches NOTHING → highlight newest (no silent miss path)',
+    test('offered ids match NOTHING → highlight newest (no silent miss path)',
         () {
       final entries = [original(serverId: '7')];
       final plan = planViewAfterDownload(
         entries: entries,
-        downloadedTourCount: 1,
-        wantedServerId: '42', // not among the saved entries
+        downloadedTourIds: const ['42', '43'], // none among the saved entries
         listeningLanguage: 'ru',
+      );
+      expect(plan, const ViewAfterDownloadPlan.highlightNewest());
+    });
+
+    test('blank ids are ignored; an all-blank list highlights', () {
+      final plan = planViewAfterDownload(
+        entries: [original(serverId: '42')],
+        downloadedTourIds: const ['', '   '],
+        listeningLanguage: null,
       );
       expect(plan, const ViewAfterDownloadPlan.highlightNewest());
     });
