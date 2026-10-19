@@ -401,9 +401,12 @@ class _AboutScreenState extends State<AboutScreen> {
                     ],
                   ),
                   const SizedBox(height: 8),
+                  // [LOCAL-715 / D675 addendum 1] The listening language on
+                  // About is now the DEFAULT for every community. Each community
+                  // page can override it with its own "Language for this
+                  // community's tours".
                   const Text(
-                    'New community tours download in this language when they '
-                    'have it, otherwise in the tour’s original language.',
+                    'Default for your communities',
                     style: TextStyle(fontSize: 13, color: Colors.black54),
                   ),
                   const SizedBox(height: 12),

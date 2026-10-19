@@ -48,10 +48,20 @@ class _CommunityPageScreenState extends State<CommunityPageScreen> {
   String? _userId;
   String? _error;
   // [LOCAL-713 / D675] The server tour ids already on the phone (from the
-  // saved_tours records), used to show "On this phone ✓" vs "Download", and the
-  // listener's chosen language for pickDownloadLanguage.
+  // saved_tours records), used to show "On this phone ✓" vs "Download".
   Set<String> _onPhoneTourIds = const {};
-  String _listeningLanguage = kDefaultListeningLanguage;
+  // [LOCAL-715 / D675 addendum 1] The listening language for THIS community's
+  // tours. `_communityLanguageChoice` is the explicit per-community choice
+  // (`listening_language_<id>`), null when none is set — then the page shows
+  // (and downloads in) the inherited default. `_resolvedLanguage` is what
+  // languageForCommunity resolves to (the choice, else About's default, else
+  // the phone locale, else English) — the Download button uses it.
+  String? _communityLanguageChoice;
+  String _resolvedLanguage = kDefaultListeningLanguage;
+  // [LOCAL-715] About's saved Listening language (null when none saved) — the
+  // DEFAULT this community inherits when it has no per-community choice. Used by
+  // the picker's "Use the default" row to show the inherited value.
+  String? _aboutDefaultLanguage;
   final Set<int> _downloading = {};
   // [LOCAL-714 / D675 part 2] The per-community auto-download switch (default
   // OFF) and the app-wide "Also on mobile data" switch (default OFF).
@@ -84,10 +94,8 @@ class _CommunityPageScreenState extends State<CommunityPageScreen> {
     // [LOCAL-701 / D663 §3] Load the community's Audioura-made tours. The server
     // returns an empty list for a non-member / expired member (expiry blocks new
     // content), so this is populated only when the member is active or owner.
-    // [LOCAL-713 / D675] The set of server tour ids already on the phone, and
-    // the saved listening language — for the per-row Download / On this phone
-    // status. Defaults to the phone's language when Audioura offers it, else
-    // English.
+    // [LOCAL-713 / D675] The set of server tour ids already on the phone — for
+    // the per-row Download / On this phone status.
     final onPhone = <String>{};
     for (final s in (prefs.getStringList('saved_tours') ?? const [])) {
       try {
@@ -98,14 +106,23 @@ class _CommunityPageScreenState extends State<CommunityPageScreen> {
         if (sid is String && sid.isNotEmpty) onPhone.add(sid);
       } catch (_) {}
     }
-    final savedLang = prefs.getString(kListeningLanguagePrefKey);
-    final lang = savedLang ??
-        defaultListeningLanguage(
-            WidgetsBinding.instance.platformDispatcher.locale.languageCode);
+    // [LOCAL-715 / D675 addendum 1] The per-community listening language: the
+    // explicit per-community choice (null when none), and the RESOLVED language
+    // the Download button uses (via languageForCommunity — choice → About →
+    // phone locale → English).
+    final locale = WidgetsBinding.instance.platformDispatcher.locale.languageCode;
+    final choice =
+        c != null ? prefs.getString(communityLanguagePrefKey(c.id)) : null;
+    final aboutDefault = prefs.getString(kListeningLanguagePrefKey);
+    final resolved = c != null
+        ? languageForCommunity(prefs, c.id, localeLanguageCode: locale)
+        : defaultListeningLanguage(locale);
     setState(() {
       _community = c;
       _onPhoneTourIds = onPhone;
-      _listeningLanguage = lang;
+      _communityLanguageChoice = choice;
+      _aboutDefaultLanguage = aboutDefault;
+      _resolvedLanguage = resolved;
       _autoDownload =
           c != null ? (prefs.getBool(autoDownloadPrefKey(c.id)) ?? false) : false;
       _autoDownloadCellular =
@@ -245,6 +262,114 @@ class _CommunityPageScreenState extends State<CommunityPageScreen> {
     ];
   }
 
+  /// [LOCAL-715 / D675 addendum 1] The per-community listening-language row,
+  /// shown to a member/owner only. It reads "Language for this community's
+  /// tours" with the current value as the trailing name, and opens the SAME
+  /// picker as About (the kListeningLanguages list). Until a language is chosen
+  /// for this community, the value shows the INHERITED default as e.g.
+  /// "Phone default (English)"; once chosen, it shows the chosen name. Tapping
+  /// offers a "Use the default" choice that removes the per-community key.
+  List<Widget> _languageSection(Community c) {
+    final canChoose = (c.myStatus.isMember && c.myStatus.active) || c.isOwner;
+    if (!canChoose) return const [];
+    final chosen = _communityLanguageChoice;
+    final subtitle = chosen != null
+        ? listeningLanguageName(chosen)
+        : 'Phone default (${listeningLanguageName(_resolvedLanguage)})';
+    return [
+      ListTile(
+        key: const Key('community_language_row'),
+        contentPadding: EdgeInsets.zero,
+        leading: const Icon(Icons.translate, color: Colors.teal),
+        title: const Text("Language for this community's tours"),
+        subtitle: Text(subtitle),
+        trailing: const Icon(Icons.chevron_right),
+        onTap: () => _pickCommunityLanguage(c),
+      ),
+    ];
+  }
+
+  /// [LOCAL-715 / D675 addendum 1] Open the language picker for THIS community.
+  /// Lists every Audioura language (kListeningLanguages) plus a "Use the
+  /// default" choice at the top that REMOVES the per-community key so the page
+  /// falls back to About's Listening language (then the phone locale, then
+  /// English). Picking a language stores `listening_language_<id>`.
+  Future<void> _pickCommunityLanguage(Community c) async {
+    final selected = await showModalBottomSheet<String?>(
+      context: context,
+      builder: (ctx) {
+        return SafeArea(
+          child: ListView(
+            shrinkWrap: true,
+            children: [
+              const Padding(
+                padding: EdgeInsets.fromLTRB(16, 16, 16, 8),
+                child: Text("Language for this community's tours",
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+              ),
+              // "Use the default" — removes the per-community key. The sentinel
+              // empty string distinguishes it from a real language code.
+              ListTile(
+                key: const Key('community_language_use_default'),
+                leading: const Icon(Icons.settings_backup_restore),
+                title: const Text('Use the default'),
+                subtitle: Text(
+                    'Phone default (${listeningLanguageName(_resolvedLanguageIgnoringChoice())})'),
+                trailing: _communityLanguageChoice == null
+                    ? const Icon(Icons.check, color: Colors.teal)
+                    : null,
+                onTap: () => Navigator.pop(ctx, ''),
+              ),
+              const Divider(height: 1),
+              ...kListeningLanguages.map((code) => ListTile(
+                    key: Key('community_language_$code'),
+                    title: Text(listeningLanguageName(code)),
+                    trailing: _communityLanguageChoice == code
+                        ? const Icon(Icons.check, color: Colors.teal)
+                        : null,
+                    onTap: () => Navigator.pop(ctx, code),
+                  )),
+            ],
+          ),
+        );
+      },
+    );
+    if (selected == null) return; // dismissed without choosing
+    await _setCommunityLanguage(c, selected.isEmpty ? null : selected);
+  }
+
+  /// Persist the per-community language choice (or remove the key when [code]
+  /// is null — "Use the default") and refresh the resolved display.
+  Future<void> _setCommunityLanguage(Community c, String? code) async {
+    final prefs = await SharedPreferences.getInstance();
+    if (code == null) {
+      await prefs.remove(communityLanguagePrefKey(c.id));
+    } else {
+      await prefs.setString(communityLanguagePrefKey(c.id), code);
+    }
+    final locale =
+        WidgetsBinding.instance.platformDispatcher.locale.languageCode;
+    final resolved = languageForCommunity(prefs, c.id, localeLanguageCode: locale);
+    if (!mounted) return;
+    setState(() {
+      _communityLanguageChoice = code;
+      _resolvedLanguage = resolved;
+    });
+  }
+
+  /// The language this community would resolve to with NO per-community choice —
+  /// i.e. About's default (then phone locale, then English). Used by the "Use
+  /// the default" row so it always shows the inherited value, even when a
+  /// per-community choice is currently set.
+  String _resolvedLanguageIgnoringChoice() {
+    final locale =
+        WidgetsBinding.instance.platformDispatcher.locale.languageCode;
+    return resolveCommunityLanguage(
+      aboutDefault: _aboutDefaultLanguage,
+      localeLanguageCode: locale,
+    );
+  }
+
   /// [LOCAL-713 / D675 §3] Download a community tour, running the SAME download
   /// path a Home/Listen download uses (TourDownloadService — never a second
   /// path). The pass covers a member, so there is no purchase prompt here; if
@@ -260,8 +385,10 @@ class _CommunityPageScreenState extends State<CommunityPageScreen> {
       // The list endpoint does not carry a languages list, so `available` is
       // empty here and pickDownloadLanguage falls back to the original — the
       // tour's own row (its id) is downloaded. The sync-on-open path, which DOES
-      // carry languages, picks the preferred language when available.
-      final _ = pickDownloadLanguage(const [], _listeningLanguage, '');
+      // carry languages, picks the per-community language when available.
+      // [LOCAL-715 / D675 addendum 1] The preferred language is THIS community's
+      // resolved language (languageForCommunity), not a single global one.
+      final _ = pickDownloadLanguage(const [], _resolvedLanguage, '');
       final result = await TourDownloadService.downloadAndSave(tour.id);
       if (!mounted) return;
       switch (result.status) {
@@ -630,6 +757,10 @@ class _CommunityPageScreenState extends State<CommunityPageScreen> {
           // [LOCAL-714 / D675 part 2] Above the list, a member/owner sees the
           // auto-download switch + the app-wide "Also on mobile data" toggle.
           ..._autoDownloadSection(c),
+          // [LOCAL-715 / D675 addendum 1] The per-community listening-language
+          // row (member/owner only): choose which language THIS community's
+          // tours download in, inheriting About's default until one is chosen.
+          ..._languageSection(c),
           if (c.tours.isNotEmpty) ...[
             _sectionTitle('Tours (${c.tours.length})'),
             ...c.tours.map((t) => _communityTourTile(c, t)),

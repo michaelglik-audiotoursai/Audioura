@@ -12,6 +12,7 @@
 // retried next open (never skipped).
 
 import 'dart:convert';
+import 'dart:ui' show PlatformDispatcher;
 
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -102,12 +103,28 @@ class CommunityToursSync {
           connectionFromResults(await Connectivity().checkConnectivity());
       final cellularAllowed =
           prefs.getBool(kAutoDownloadCellularPrefKey) ?? false;
-      final preferred = prefs.getString(kListeningLanguagePrefKey) ??
-          kDefaultListeningLanguage;
       final onPhone = _onPhoneTourIds(prefs);
       final deleted =
           (prefs.getStringList(kDeletedTourIdsPrefKey) ?? const []).toSet();
       final autoCommunities = _autoDownloadCommunityIds(prefs, result.tours);
+
+      // [LOCAL-715 / D675 addendum 1] The listening language is PER COMMUNITY.
+      // Resolve it ONCE per community that has new tours, via the single
+      // languageForCommunity helper (per-community key → About's default →
+      // phone locale → English). The planner uses this map so two communities
+      // with different languages download in two different languages.
+      final locale = _localeLanguageCode();
+      final languageByCommunity = <int, String>{};
+      for (final id in result.tours.map((t) => t.communityId).toSet()) {
+        languageByCommunity[id] =
+            languageForCommunity(prefs, id, localeLanguageCode: locale);
+      }
+      // The fallback preferred language = About's default for a phone without a
+      // per-community choice (also what communityId-not-in-map would resolve to).
+      final preferred = resolveCommunityLanguage(
+        aboutDefault: prefs.getString(kListeningLanguagePrefKey),
+        localeLanguageCode: locale,
+      );
 
       final plan = SyncPlanner.plan(
         newTours: result.tours,
@@ -117,6 +134,7 @@ class CommunityToursSync {
         cellularAllowed: cellularAllowed,
         autoDownloadCommunityIds: autoCommunities,
         preferredLanguage: preferred,
+        languageByCommunity: languageByCommunity,
       );
 
       if (plan.isEmpty) {
@@ -165,6 +183,18 @@ class CommunityToursSync {
       return CommunityToursSyncResult.noop;
     } finally {
       _running = false;
+    }
+  }
+
+  /// [LOCAL-715 / D675 addendum 1] The phone locale's language code, read
+  /// without a WidgetsBinding so it also works in the background isolate (the
+  /// WorkManager run has no bound widget tree). Null on any failure, which
+  /// resolveCommunityLanguage/defaultListeningLanguage treat as "English".
+  static String? _localeLanguageCode() {
+    try {
+      return PlatformDispatcher.instance.locale.languageCode;
+    } catch (_) {
+      return null;
     }
   }
 

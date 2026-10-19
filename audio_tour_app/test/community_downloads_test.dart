@@ -298,4 +298,192 @@ void main() {
     final set = prefs.getStringList(kDeletedTourIdsPrefKey)!.toSet();
     expect(set, {'557', 'abc', '901'});
   });
+
+  // ─── [LOCAL-715 / D675 addendum 1] Language PER COMMUNITY ──────────────────
+
+  group('resolveCommunityLanguage precedence (4 cases)', () {
+    test('1. the per-community choice wins over everything', () {
+      expect(
+        resolveCommunityLanguage(
+          communityChoice: 'ru',
+          aboutDefault: 'de',
+          localeLanguageCode: 'fr',
+        ),
+        'ru',
+      );
+    });
+
+    test('2. no community choice → About default', () {
+      expect(
+        resolveCommunityLanguage(
+          communityChoice: null,
+          aboutDefault: 'de',
+          localeLanguageCode: 'fr',
+        ),
+        'de',
+      );
+    });
+
+    test('3. no choice and no About default → phone locale when offered', () {
+      expect(
+        resolveCommunityLanguage(
+          communityChoice: null,
+          aboutDefault: null,
+          localeLanguageCode: 'es',
+        ),
+        'es',
+      );
+    });
+
+    test('4. nothing set and locale not offered → English', () {
+      expect(
+        resolveCommunityLanguage(
+          communityChoice: '',
+          aboutDefault: '',
+          localeLanguageCode: 'pt',
+        ),
+        'en',
+      );
+      // Also: no locale at all → English.
+      expect(resolveCommunityLanguage(), 'en');
+    });
+  });
+
+  group('languageForCommunity (SharedPreferences)', () {
+    test('reads the per-community key when set', () async {
+      SharedPreferences.setMockInitialValues({
+        kListeningLanguagePrefKey: 'de',
+        communityLanguagePrefKey(42): 'ru',
+      });
+      final prefs = await SharedPreferences.getInstance();
+      expect(
+        languageForCommunity(prefs, 42, localeLanguageCode: 'fr'),
+        'ru',
+      );
+    });
+
+    test('falls back to About default when the per-community key is absent',
+        () async {
+      SharedPreferences.setMockInitialValues({
+        kListeningLanguagePrefKey: 'de',
+      });
+      final prefs = await SharedPreferences.getInstance();
+      expect(
+        languageForCommunity(prefs, 42, localeLanguageCode: 'fr'),
+        'de',
+      );
+    });
+
+    test('falls back to the phone locale, else English, when nothing is set',
+        () async {
+      SharedPreferences.setMockInitialValues({});
+      final prefs = await SharedPreferences.getInstance();
+      expect(languageForCommunity(prefs, 42, localeLanguageCode: 'es'), 'es');
+      expect(languageForCommunity(prefs, 42, localeLanguageCode: 'pt'), 'en');
+    });
+
+    test('two communities resolve to two different languages', () async {
+      SharedPreferences.setMockInitialValues({
+        communityLanguagePrefKey(1): 'en', // Boston Walkers in English
+        communityLanguagePrefKey(2): 'ru', // Book Club in Russian
+      });
+      final prefs = await SharedPreferences.getInstance();
+      expect(languageForCommunity(prefs, 1), 'en');
+      expect(languageForCommunity(prefs, 2), 'ru');
+    });
+  });
+
+  group('SyncPlanner.plan — per-community language (D675 addendum 1)', () {
+    // Each community's new tour carries BOTH languages so the chosen one is
+    // always available — this isolates the per-community language selection
+    // from the pickDownloadLanguage original-fallback.
+    final tours = [
+      const NewCommunityTour(
+          communityId: 1,
+          tourId: 10,
+          languages: ['en', 'ru'],
+          originalLanguage: 'en'),
+      const NewCommunityTour(
+          communityId: 2,
+          tourId: 20,
+          languages: ['en', 'ru'],
+          originalLanguage: 'en'),
+    ];
+
+    test('two communities with different languages → two download languages',
+        () {
+      final plan = SyncPlanner.plan(
+        newTours: tours,
+        onPhoneTourIds: const {},
+        deletedTourIds: const {},
+        connection: SyncConnection.unmetered,
+        cellularAllowed: false,
+        autoDownloadCommunityIds: const {1, 2},
+        preferredLanguage: 'en', // the fallback
+        languageByCommunity: const {1: 'en', 2: 'ru'},
+      );
+      expect(plan.length, 2);
+      expect(plan[0],
+          const PlannedDownload(communityId: 1, tourId: 10, language: 'en'));
+      expect(plan[1],
+          const PlannedDownload(communityId: 2, tourId: 20, language: 'ru'));
+    });
+
+    test('a community absent from the map uses the fallback preferredLanguage',
+        () {
+      final plan = SyncPlanner.plan(
+        newTours: tours,
+        onPhoneTourIds: const {},
+        deletedTourIds: const {},
+        connection: SyncConnection.unmetered,
+        cellularAllowed: false,
+        autoDownloadCommunityIds: const {1, 2},
+        preferredLanguage: 'ru', // fallback for c2 (not in the map)
+        languageByCommunity: const {1: 'en'},
+      );
+      expect(plan[0].language, 'en'); // c1 from the map
+      expect(plan[1].language, 'ru'); // c2 from the fallback
+    });
+
+    test(
+        'the per-community language still respects pickDownloadLanguage: '
+        'unavailable → the tour original', () {
+      final plan = SyncPlanner.plan(
+        // c2's tour only has en; a Russian choice is not available → original.
+        newTours: [
+          const NewCommunityTour(
+              communityId: 1,
+              tourId: 10,
+              languages: ['en', 'ru'],
+              originalLanguage: 'en'),
+          const NewCommunityTour(
+              communityId: 2,
+              tourId: 20,
+              languages: ['en'],
+              originalLanguage: 'en'),
+        ],
+        onPhoneTourIds: const {},
+        deletedTourIds: const {},
+        connection: SyncConnection.unmetered,
+        cellularAllowed: false,
+        autoDownloadCommunityIds: const {1, 2},
+        preferredLanguage: 'en',
+        languageByCommunity: const {1: 'ru', 2: 'ru'},
+      );
+      expect(plan[0].language, 'ru'); // c1 has ru
+      expect(plan[1].language, 'en'); // c2 lacks ru → original en
+    });
+  });
+
+  group('communityLanguagePrefKey + listeningLanguageName', () {
+    test('the per-community key is listening_language_<id>', () {
+      expect(communityLanguagePrefKey(42), 'listening_language_42');
+    });
+
+    test('display names mirror the language selector', () {
+      expect(listeningLanguageName('en'), 'English');
+      expect(listeningLanguageName('ru'), 'Русский');
+      expect(listeningLanguageName('zz'), 'zz'); // unknown → the code
+    });
+  });
 }
