@@ -2285,6 +2285,12 @@ def promote_custom_tour(tour_id):
     tour_content      = data.get('tour_content', '')
     content_language  = (data.get('content_language') or 'en').strip().lower()
     derived_from_tour_id = data.get('derived_from_tour_id')
+    # [LOCAL-718 / D678] A promoted edit belongs to its creator too. Scope the
+    # name-conflict check by creator_user_id so a DIFFERENT creator is never
+    # blocked by, and never collides with, someone else's same-name tour. NULL
+    # (no user_id supplied) = "unknown creator": it only conflicts with other
+    # unknown-creator rows, matching the orchestrator's save path.
+    _creator_user_id = (data.get('user_id') or '').strip() or None
 
     # --- input validation ---
     if not custom_name:
@@ -2319,15 +2325,39 @@ def promote_custom_tour(tour_id):
         conn = get_db_connection()
         cur = conn.cursor()
 
-        # --- uniqueness check (original tours only, case-insensitive) ---
-        cur.execute(
-            "SELECT id FROM audio_tours "
-            "WHERE LOWER(tour_name) = LOWER(%s) AND original_tour_id IS NULL",
-            (custom_name,)
-        )
+        # [LOCAL-718 / D678] Self-healing creator_user_id column (additive) so
+        # this works on any Postgres whether or not migration 041 has run.
+        cur.execute("""
+            SELECT 1 FROM information_schema.columns
+            WHERE table_name = 'audio_tours' AND column_name = 'creator_user_id'
+        """)
+        if cur.fetchone() is None:
+            print("[PROMOTE] Adding creator_user_id column...")
+            cur.execute("ALTER TABLE audio_tours ADD COLUMN creator_user_id TEXT")
+            conn.commit()
+
+        # --- uniqueness check (original tours only, case-insensitive, creator-scoped) ---
+        # [LOCAL-718 / D678] Only THIS creator's own same-name original conflicts.
+        # A NULL request creator conflicts only with other NULL-creator rows
+        # (creator_user_id IS NULL); a set creator conflicts only with its own
+        # rows. A different creator is never blocked.
+        if _creator_user_id is not None:
+            cur.execute(
+                "SELECT id FROM audio_tours "
+                "WHERE LOWER(tour_name) = LOWER(%s) AND creator_user_id = %s "
+                "AND original_tour_id IS NULL",
+                (custom_name, _creator_user_id)
+            )
+        else:
+            cur.execute(
+                "SELECT id FROM audio_tours "
+                "WHERE LOWER(tour_name) = LOWER(%s) AND creator_user_id IS NULL "
+                "AND original_tour_id IS NULL",
+                (custom_name,)
+            )
         existing = cur.fetchone()
         if existing:
-            print(f"[PROMOTE] NAME_EXISTS: {custom_name!r} -> existing id={existing[0]}")
+            print(f"[PROMOTE] NAME_EXISTS (creator={_creator_user_id!r}): {custom_name!r} -> existing id={existing[0]}")
             return jsonify({
                 'status': 'conflict',
                 'error_code': 'NAME_EXISTS',
@@ -2342,8 +2372,9 @@ def promote_custom_tour(tour_id):
                 INSERT INTO audio_tours
                     (tour_name, request_string, audio_tour, lat, lng,
                      content_language, creator_type, stops_count, tour_content,
-                     original_tour_id, derived_from_tour_id, number_requested)
-                VALUES (%s, %s, %s, %s, %s, %s, 'Custom', %s, %s, NULL, %s, 0)
+                     original_tour_id, derived_from_tour_id, number_requested,
+                     creator_user_id)
+                VALUES (%s, %s, %s, %s, %s, %s, 'Custom', %s, %s, NULL, %s, 0, %s)
                 RETURNING id
             """, (
                 custom_name,
@@ -2354,15 +2385,27 @@ def promote_custom_tour(tour_id):
                 stops_count,
                 tour_content or None,
                 derived_from_tour_id,
+                _creator_user_id,
             ))
             new_id = cur.fetchone()[0]
             conn.commit()
         except pg_errors.UniqueViolation:
             conn.rollback()
-            cur.execute(
-                "SELECT id FROM audio_tours WHERE LOWER(tour_name) = LOWER(%s) AND original_tour_id IS NULL",
-                (custom_name,)
-            )
+            # [LOCAL-718] Index is no longer unique; this catch remains as defence
+            # (e.g. a DB where the old uq_audio_tours_original_name has not yet
+            # been dropped). Report the creator-scoped conflicting row.
+            if _creator_user_id is not None:
+                cur.execute(
+                    "SELECT id FROM audio_tours WHERE LOWER(tour_name) = LOWER(%s) "
+                    "AND creator_user_id = %s AND original_tour_id IS NULL",
+                    (custom_name, _creator_user_id)
+                )
+            else:
+                cur.execute(
+                    "SELECT id FROM audio_tours WHERE LOWER(tour_name) = LOWER(%s) "
+                    "AND creator_user_id IS NULL AND original_tour_id IS NULL",
+                    (custom_name,)
+                )
             row = cur.fetchone()
             existing_id = row[0] if row else None
             return jsonify({
