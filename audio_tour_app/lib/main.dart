@@ -6,7 +6,9 @@ import 'dart:async';
 import 'screens/main_screen.dart';
 import 'screens/onboarding_screen.dart';
 import 'services/app_sync_coordinator.dart';
+import 'services/community_background.dart';
 import 'services/deep_link_service.dart';
+import 'package:workmanager/workmanager.dart';
 
 class MainScreenWithTreatsTab extends StatelessWidget {
   const MainScreenWithTreatsTab({super.key});
@@ -49,6 +51,21 @@ void main() async {
   // start) and whenever connectivity returns or the app resumes. Never blocks
   // startup — failures are retried by the outbox's own backoff.
   unawaited(AppSyncCoordinator.instance.start());
+
+  // [LOCAL-714 / D675 part 2] Register the background community-tours sync
+  // (Android WorkManager periodic / iOS BGTaskScheduler app-refresh). The
+  // worker runs the SAME planner + downloader as the sync on open. The periodic
+  // task is only meaningful once a member opts a community into auto-download
+  // (the join question), but registering it here is harmless (nothing to do
+  // when every switch is OFF) and idempotent. Never blocks startup.
+  unawaited(() async {
+    try {
+      await Workmanager().initialize(callbackDispatcher);
+      await registerCommunitySyncTask();
+    } catch (_) {
+      // A platform without WorkManager (desktop/web/test) simply gets no task.
+    }
+  }());
 
   // [LOCAL-709 / D671] Capture cold/warm-start share links (App Links /
   // Universal Links) as early as possible. The code is parked in

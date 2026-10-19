@@ -1,7 +1,7 @@
 name: audio_tour_app_dev
 description: AudioTours Dev - AI-powered audio tour generator
 publish_to: 'none'
-version: 2.4.29+69
+version: 2.4.30+70
 
 environment:
   sdk: '>=3.5.0 <4.0.0'
@@ -64,6 +64,24 @@ dependencies:
   # Android-only (it throws on iOS, which we never call there). iOS uses the
   # clipboard one-shot instead (D671 §4).
   android_play_install_referrer: 0.4.0
+  # LOCAL-714 / D675 part 2: run the community-tours sync in the background —
+  # Android WorkManager periodic task; iOS BGTaskScheduler app-refresh (CHECK +
+  # one quiet notification). Pinned (no caret) deliberately, same floor-
+  # protection rationale as app_links/share_plus above. 0.9.3 is the last 0.9.x
+  # before the 0.10.x line; its SDK floor is exactly `>=3.5.0 <4.0.0` (this
+  # project's Dart 3.5 floor) and Flutter `>=3.32.0`, so it stays on the floor
+  # while using the v2 Android embedding (the older 0.5.2 referenced the removed
+  # v1 `ShimPluginRegistry`/`registerWith` and no longer compiles on current
+  # Flutter). A caret range would pull 0.10.x, which raises the floor — hence
+  # the exact pin. The Dart API (Workmanager().initialize / registerPeriodicTask
+  # / Constraints / NetworkType) is unchanged; iOS registration is via the
+  # federated workmanager_apple module in AppDelegate.swift.
+  workmanager: 0.9.3
+  # LOCAL-714: zoned scheduling for the single morning notification when a check
+  # lands in quiet hours. Matches flutter_local_notifications' own `timezone:
+  # ^0.9.0` so pub resolves the SAME version it already uses transitively (0.11+
+  # requires Dart 3.10, above the 3.5 floor).
+  timezone: ^0.9.0
 
 dev_dependencies:
   flutter_test:

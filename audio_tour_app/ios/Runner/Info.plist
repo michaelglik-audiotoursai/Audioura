@@ -27,6 +27,21 @@
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>audio</string>
+		<!-- [LOCAL-714 / D675 part 2] Background App Refresh for the community-
+		     tours CHECK (BGTaskScheduler app-refresh via workmanager). iOS only
+		     CHECKS /communities/new-tours and posts one quiet notification; the
+		     download happens at the next app open. -->
+		<string>fetch</string>
+		<string>processing</string>
+	</array>
+	<!-- [LOCAL-714 / D675 part 2] The BGTaskScheduler identifiers iOS is allowed
+	     to run. MUST match the task identifier scheduled via workmanager
+	     (kCommunitySyncTaskName) or iOS refuses to schedule it. With workmanager
+	     0.5.2 the identifier is the task's uniqueName, registered natively in
+	     AppDelegate via WorkmanagerPlugin.registerTask(withIdentifier:). -->
+	<key>BGTaskSchedulerPermittedIdentifiers</key>
+	<array>
+		<string>com.audioura.community_tours_sync</string>
 	</array>
 	<key>UILaunchStoryboardName</key>
 	<string>LaunchScreen</string>
