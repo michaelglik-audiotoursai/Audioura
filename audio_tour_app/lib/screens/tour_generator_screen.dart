@@ -24,6 +24,7 @@ import '../screens/news_player_screen.dart';
 import '../widgets/language_selector.dart';
 import '../utils/tour_request_parser.dart';
 import '../utils/tour_error_resolver.dart';
+import '../utils/generation_completion_message.dart';
 import '../utils/user_stops.dart';
 import 'user_stops_screen.dart';
 import 'main_screen.dart';
@@ -904,7 +905,20 @@ class _TourGeneratorScreenState extends State<TourGeneratorScreen> {
         if (wantsEnglish) _progress = '';
       });
       
-      if (wantsEnglish) _showSuccess('Tour ready! Opening now...');
+      if (wantsEnglish) {
+        // [LOCAL-717 / D677 §2] If this generation REPLACED an existing tour
+        // (server reports replaced + version_no), say "Updated your tour
+        // '<title>' — now version N" instead of announcing a new tour, so the
+        // listener does not look for a second tour (Michael's restaurant-tour
+        // confusion). A brand-new tour keeps the "Tour ready!" message.
+        final completionMsg = generationCompletionMessage(
+          statusData is Map<String, dynamic>
+              ? statusData
+              : Map<String, dynamic>.from(statusData as Map),
+          fallbackTitle: location,
+        );
+        _showSuccess(completionMsg);
+      }
       
       // Verify the tour files exist before opening
       final indexFile = File('$extractPath/index.html');

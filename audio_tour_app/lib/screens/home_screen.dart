@@ -1293,7 +1293,7 @@ class _HomeScreenState extends State<HomeScreen> {
         );
         return;
       case SearchKind.text:
-        await _dispatchTextSearch(dispatch.query);
+        await _dispatchTextSearch(dispatch);
         return;
     }
   }
@@ -1347,12 +1347,19 @@ class _HomeScreenState extends State<HomeScreen> {
   /// [LOCAL-665] (c) Not a code, not coordinates: run the tour-name search and
   /// the place geocoder CONCURRENTLY, then present the single combined outcome
   /// (resolveTextSearch): tours+place, tours only, place only, or nothing.
-  Future<void> _dispatchTextSearch(String query) async {
-    // [LOCAL-680] A '*' marks a tour-name pattern ("Boston*"), never a place.
-    final isNamePattern = query.contains('*');
+  ///
+  /// [LOCAL-717 / D677 §3] When the input's LAST character is `*`
+  /// ([SearchDispatch.tourNameOnly]) it is a tour-NAME search ONLY: the geocoder
+  /// is NEVER called, so a far-away place called "Restaurant" can never win
+  /// (Michael's "restaurant*" bug). No tours matched → "No tours named
+  /// '<text>…'", never a place relocation.
+  Future<void> _dispatchTextSearch(SearchDispatch dispatch) async {
+    final query = dispatch.query;
+    final nameOnly = dispatch.tourNameOnly;
     final results = await Future.wait([
       _searchTours(query),
-      isNamePattern ? Future<LatLng?>.value(null) : _geocodeLocation(query),
+      // A trailing-`*` name search skips the geocoder entirely.
+      nameOnly ? Future<LatLng?>.value(null) : _geocodeLocation(query),
     ]);
     if (!mounted) return;
 
@@ -1362,6 +1369,7 @@ class _HomeScreenState extends State<HomeScreen> {
     final outcome = resolveTextSearch(
       tourCount: tours.length,
       placeFound: place != null,
+      nameOnly: nameOnly,
     );
 
     switch (outcome) {
@@ -1377,6 +1385,16 @@ class _HomeScreenState extends State<HomeScreen> {
       case TextSearchOutcome.nothing:
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Nothing found for "$query"')),
+        );
+        return;
+      case TextSearchOutcome.noNamedTours:
+        // [LOCAL-717 / D677 §3] A trailing-`*` name search with no matches.
+        // Strip the trailing `*` so the message names what the user typed.
+        final typed = query.endsWith('*')
+            ? query.substring(0, query.length - 1)
+            : query;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("No tours named '$typed…'")),
         );
         return;
     }
@@ -2313,21 +2331,39 @@ class _HomeScreenState extends State<HomeScreen> {
     int successCount = 0;
     int translationSuccessCount = 0;
     final Map<String, List<String>> failuresByTour = {};
+    // [LOCAL-717 / D677 §4] Whole-tour download/save failures (e.g. tour 370's
+    // 409 resolve). A batch must NEVER drop a tour silently: each failed tour's
+    // short title is collected here, named in the snackbar, and logged to
+    // DebugLogHelper with the reason. Distinct from failuresByTour, which is
+    // per-tour TRANSLATION failures on tours that DID save.
+    final List<String> downloadFailures = [];
     // [LOCAL-716] Track the ids of the tours actually downloaded this run. When
     // exactly one was downloaded, the "View" button opens that one tour.
     final List<String> downloadedTourIds = [];
     for (final tour in freeOrOwned) {
+      // [LOCAL-717] A readable short title for the message and the log — the
+      // tour's own name, else a "Tour <id>" fallback.
+      final shortTitle =
+          (tour['name'] ?? tour['title'] ?? 'Tour ${tour['id']}').toString();
       try {
         final failures = await _downloadSingleTourSilent(tour['id'], languages, tour);
+        // [LOCAL-717 / D677 §4] Count a tour as downloaded ONLY after the save
+        // returned without throwing. The resolve/save failure throws, so we
+        // never reach here for a dropped tour.
         successCount++;
         downloadedTourIds.add(tour['id'].toString());
         final nonEnglish = (languages ?? []).where((l) => l != 'en').toList();
         translationSuccessCount += nonEnglish.length - failures.length;
         if (failures.isNotEmpty) {
-          failuresByTour[tour['name'] ?? 'Tour ${tour['id']}'] = failures;
+          failuresByTour[shortTitle] = failures;
         }
       } catch (e) {
-        // Continue with next tour
+        // [LOCAL-717 / D677 §4] Report, never hide. Name the tour in the
+        // snackbar and log the full reason (HTTP status + body are carried in
+        // the thrown Exception's message by _saveTourToMyTours).
+        downloadFailures.add(shortTitle);
+        await DebugLogHelper.addDebugLog(
+            'HOME: DOWNLOAD FAILED for "$shortTitle" (id=${tour['id']}): $e');
       }
     }
 
@@ -2341,6 +2377,7 @@ class _HomeScreenState extends State<HomeScreen> {
       translations: translationSuccessCount,
       alreadyDownloaded: alreadyDownloaded,
       failures: failuresByTour,
+      downloadFailures: downloadFailures,
     );
 
     if (!mounted) return;

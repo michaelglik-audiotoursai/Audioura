@@ -100,6 +100,69 @@ void main() {
         'Some translations failed: Freedom Trail: French, German',
       );
     });
+
+    // [LOCAL-717 / D677 §4] A batch NEVER drops a tour silently. A tour that
+    // downloaded but failed to resolve/save (tour 370's 409) is named in the
+    // message, with the count agreeing. The spec example:
+    //   "2 tours downloaded ... 1 couldn't be downloaded: Boston — Restaurant Tour"
+    group('[LOCAL-717] download failures are always reported', () {
+      test('2 ok + 1 failed → the D677 message', () {
+        expect(
+          downloadedMessage(
+            downloaded: 2,
+            downloadFailures: ['Boston — Restaurant Tour'],
+          ),
+          '2 tours downloaded and are now on your Listen page. '
+          "1 couldn't be downloaded: Boston — Restaurant Tour",
+        );
+      });
+
+      test('1 ok + 1 failed → singular tour clause, singular failure count', () {
+        expect(
+          downloadedMessage(
+            downloaded: 1,
+            downloadFailures: ['Boston — Restaurant Tour'],
+          ),
+          '1 tour downloaded and is now on your Listen page. '
+          "1 couldn't be downloaded: Boston — Restaurant Tour",
+        );
+      });
+
+      test('0 ok + 1 failed → the "no new tours" line, then the failure', () {
+        expect(
+          downloadedMessage(
+            downloaded: 0,
+            downloadFailures: ['Boston — Restaurant Tour'],
+          ),
+          'No new tours downloaded - all selected tours were already on your '
+          "phone. 1 couldn't be downloaded: Boston — Restaurant Tour",
+        );
+      });
+
+      test('2 ok + 2 failed → plural failure count, names joined', () {
+        expect(
+          downloadedMessage(
+            downloaded: 2,
+            downloadFailures: ['Tour A', 'Tour B'],
+          ),
+          '2 tours downloaded and are now on your Listen page. '
+          "2 couldn't be downloaded: Tour A, Tour B",
+        );
+      });
+
+      test('download failures AND translation failures both appear', () {
+        expect(
+          downloadedMessage(
+            downloaded: 1,
+            downloadFailures: ['Tour B'],
+            failures: {'Freedom Trail': ['French']},
+          ),
+          '1 tour downloaded and is now on your Listen page. '
+          "1 couldn't be downloaded: Tour B. "
+          'Some translations failed: Freedom Trail: French',
+        );
+      });
+    });
   });
 
   group('PendingListenOpen — one-shot offer/consume', () {

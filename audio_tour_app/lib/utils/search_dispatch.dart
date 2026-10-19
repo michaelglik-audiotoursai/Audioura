@@ -42,8 +42,18 @@ class SearchDispatch {
   final double? longitude;
 
   /// Set for every kind: the trimmed input. For [SearchKind.text] this is the
-  /// string to pass to both the tour-name search and the place geocoder.
+  /// string to pass to the tour-name search (and the place geocoder, unless
+  /// [tourNameOnly]).
   final String query;
+
+  /// [LOCAL-717 / D677 §3] True when [kind] == [SearchKind.text] AND the input's
+  /// LAST character is `*` — the user's explicit "search tour NAMES, not a
+  /// place" signal. When true the geocoder is NEVER called and no place can win;
+  /// the search is a starts-with match against tour names only. False for every
+  /// other input, including a `*` that is NOT the final character ("walking*tour"
+  /// is still a normal text search that also tries the geocoder — only a
+  /// trailing `*` is the name-only signal).
+  final bool tourNameOnly;
 
   const SearchDispatch._({
     required this.kind,
@@ -51,6 +61,7 @@ class SearchDispatch {
     this.shareCode,
     this.latitude,
     this.longitude,
+    this.tourNameOnly = false,
   });
 
   factory SearchDispatch.shareCode(String code, String query) =>
@@ -63,8 +74,9 @@ class SearchDispatch {
           longitude: lng,
           query: query);
 
-  factory SearchDispatch.text(String query) =>
-      SearchDispatch._(kind: SearchKind.text, query: query);
+  factory SearchDispatch.text(String query, {bool tourNameOnly = false}) =>
+      SearchDispatch._(
+          kind: SearchKind.text, query: query, tourNameOnly: tourNameOnly);
 
   @override
   String toString() {
@@ -74,7 +86,8 @@ class SearchDispatch {
       case SearchKind.coordinates:
         return 'SearchDispatch.coordinates($latitude, $longitude)';
       case SearchKind.text:
-        return 'SearchDispatch.text("$query")';
+        return 'SearchDispatch.text("$query"'
+            '${tourNameOnly ? ', tourNameOnly' : ''})';
     }
   }
 }
@@ -128,7 +141,13 @@ SearchDispatch classifySearchInput(String raw) {
     return SearchDispatch.coordinates(coords.lat, coords.lng, query);
   }
 
-  return SearchDispatch.text(query);
+  // [LOCAL-717 / D677 §3] A trailing `*` is the user's explicit "these are tour
+  // NAMES, not a place" signal (the "Boston*" starts-with rule). Only the LAST
+  // character counts: "restaurant*" / "Boston*" / "restaurant tour*" are
+  // name-only; "walking*tour" (a `*` in the middle) stays an ordinary text
+  // search that also tries the geocoder.
+  final tourNameOnly = query.endsWith('*');
+  return SearchDispatch.text(query, tourNameOnly: tourNameOnly);
 }
 
 /// The result of the concurrent text search (tours found + place found), mapped
@@ -153,16 +172,33 @@ enum TextSearchOutcome {
 
   /// Neither: "Nothing found for '<text>'".
   nothing,
+
+  /// [LOCAL-717 / D677 §3] A tour-NAME-ONLY search (input ended in `*`) that
+  /// matched no tours. The geocoder was never consulted, so this is NOT
+  /// "nothing found" (which implies no place either) — the widget says
+  /// "No tours named '<text>…'".
+  noNamedTours,
 }
 
-/// Decide what to present after the tour-name search and place lookup both
-/// return. [tourCount] is how many tours matched; [placeFound] is whether the
-/// geocoder resolved the text to a location.
+/// Decide what to present after a text search. [tourCount] is how many tours
+/// matched. [placeFound] is whether the geocoder resolved the text to a
+/// location — it is always false for a [nameOnly] search (the geocoder is never
+/// called). When [nameOnly] is true and no tours matched, the outcome is
+/// [TextSearchOutcome.noNamedTours] rather than [TextSearchOutcome.nothing], so
+/// the widget can say "No tours named '<text>…'" instead of "Nothing found".
 TextSearchOutcome resolveTextSearch({
   required int tourCount,
   required bool placeFound,
+  bool nameOnly = false,
 }) {
   final hasTours = tourCount > 0;
+  // [LOCAL-717 / D677 §3] A name-only search never geocodes, so a place can
+  // never win here even if the caller mistakenly passed placeFound: true.
+  if (nameOnly) {
+    return hasTours
+        ? TextSearchOutcome.toursOnly
+        : TextSearchOutcome.noNamedTours;
+  }
   if (hasTours && placeFound) return TextSearchOutcome.toursAndPlace;
   if (hasTours) return TextSearchOutcome.toursOnly;
   if (placeFound) return TextSearchOutcome.placeOnly;

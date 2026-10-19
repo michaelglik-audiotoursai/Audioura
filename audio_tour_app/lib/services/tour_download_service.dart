@@ -176,6 +176,13 @@ class TourDownloadService {
       } else {
         // [LEAD review of LOCAL-713] Keep Home's original behaviour: surface the
         // server's own reason when it gives one (it explains holds, paid tours…).
+        // [LOCAL-717 / D677 §4] Always log the raw HTTP status + body of the
+        // failing /resolve so a dropped tour (e.g. tour 370's 409) is findable
+        // in the logs instead of vanishing — the batch path also names it to the
+        // user, but the single path's log must carry the same detail.
+        await DebugLogHelper.addDebugLog(
+            'DOWNLOAD_SVC: /tour/$tourId/resolve FAILED '
+            'status=${resolutionResponse.statusCode} body=${resolutionResponse.body}');
         String errorMessage;
         try {
           final errorData = json.decode(resolutionResponse.body);

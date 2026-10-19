@@ -746,10 +746,18 @@ def store_audio_tour(tour_name, request_string, zip_path, lat, lng, tour_content
     print(f"Coordinates: lat={lat}, lng={lng}")
     print(f"Tour content length: {len(tour_content) if tour_content else 0} characters")
 
-    def _result(success, action, existing_tour_id=None, error=None):
-        """Build a result dict that also supports bool() for backward compat."""
+    def _result(success, action, existing_tour_id=None, error=None, version_no=None):
+        """Build a result dict that also supports bool() for backward compat.
+
+        [LOCAL-717 / D677 §2] version_no is the version of the CURRENT row after
+        this call: 1 for a fresh insert, N for the Nth content (a 'replaced'
+        action that archives version N-1 leaves the live row at version N), and
+        the current count for a byte-identical cache hit. The app shows
+        "Updated your tour '<title>' — now version N" when N >= 2.
+        """
         return {"success": success, "action": action,
                 "existing_tour_id": existing_tour_id, "error": error,
+                "version_no": version_no,
                 "__bool__": success}
     
     try:
@@ -961,11 +969,22 @@ def store_audio_tour(tour_name, request_string, zip_path, lat, lng, tour_content
                     "UPDATE audio_tours SET number_requested = number_requested + 1 WHERE id = %s",
                     (existing_id,)
                 )
+                # [LOCAL-717 / D677 §2] The current version of an unchanged row is
+                # the number of archived versions + 1 (no new version is created).
+                cur.execute(
+                    "SELECT COALESCE(MAX(version_no), 0) + 1 "
+                    "FROM audio_tour_versions WHERE tour_id = %s",
+                    (existing_id,)
+                )
+                _current_version = cur.fetchone()[0]
                 conn.commit()
                 cur.close()
                 conn.close()
-                print(f"==== AUDIO TOUR ALREADY EXISTS — REUSING id={existing_id} ====")
-                return _result(success=True, action="already_exists", existing_tour_id=existing_id)
+                print(f"==== AUDIO TOUR ALREADY EXISTS — REUSING id={existing_id} "
+                      f"(version {_current_version}) ====")
+                return _result(success=True, action="already_exists",
+                               existing_tour_id=existing_id,
+                               version_no=_current_version)
 
             # --- Replacement path (text differs or stored content was NULL) ---
             print(f"[LOCAL-606] Tour id={existing_id} regenerated with DIFFERENT text "
@@ -1056,7 +1075,13 @@ def store_audio_tour(tour_name, request_string, zip_path, lat, lng, tour_content
                 cur.close()
                 conn.close()
                 print(f"==== AUDIO TOUR CONTENT REPLACED — id={existing_id} ====")
-                return _result(success=True, action="replaced", existing_tour_id=existing_id)
+                # [LOCAL-717 / D677 §2] The OLD content was archived as
+                # version=next_version; the live row now holds the NEW content,
+                # so its version is next_version + 1. Michael's tour 370: old v1
+                # archived (next_version=1) → live row is version 2.
+                return _result(success=True, action="replaced",
+                               existing_tour_id=existing_id,
+                               version_no=next_version + 1)
             except Exception as _replace_err:
                 conn.rollback()
                 print(f"[LOCAL-606] ERROR during replacement of id={existing_id}: {_replace_err}")
@@ -1169,7 +1194,8 @@ def store_audio_tour(tour_name, request_string, zip_path, lat, lng, tour_content
         print(f"Database connection closed")
         
         print(f"==== AUDIO TOUR STORED SUCCESSFULLY ====")
-        return _result(success=True, action="inserted")
+        # [LOCAL-717 / D677 §2] A brand-new tour is version 1.
+        return _result(success=True, action="inserted", version_no=1)
         
     except Exception as e:
         print(f"ERROR storing audio tour: {e}")
@@ -1777,6 +1803,11 @@ def orchestrate_tour_async(job_id, location, tour_type, total_stops, user_id=Non
         store_action = store_result.get("action", "unknown") if isinstance(store_result, dict) else ("inserted" if store_result else "error")
         store_existing_id = store_result.get("existing_tour_id") if isinstance(store_result, dict) else None
         store_error = store_result.get("error") if isinstance(store_result, dict) else None
+        # [LOCAL-717 / D677 §2] Version of the CURRENT row after this store. The
+        # app shows "Updated your tour '<title>' — now version N" when a
+        # regeneration REPLACED an existing tour (action 'replaced', N >= 2).
+        store_version_no = store_result.get("version_no") if isinstance(store_result, dict) else None
+        store_replaced = (store_action == "replaced")
         
         if not store_success:
             # [LOCAL-156] FAIL CLOSED: storage failed — do NOT report completed.
@@ -1896,7 +1927,19 @@ def orchestrate_tour_async(job_id, location, tour_type, total_stops, user_id=Non
                 conn.close()
             except Exception as db_error:
                 print(f"Warning: Could not get tour ID from database: {db_error}")
-        
+
+        # [LOCAL-717 / D677 §2] Record the version of the delivered tour and
+        # whether this generation REPLACED an existing tour, so the app can say
+        # "Updated your tour '<title>' — now version N" instead of announcing a
+        # brand-new tour. version_no comes straight from store_audio_tour
+        # (1 = fresh insert, N = Nth content). 'replaced' is the signal the app
+        # keys on; a plain insert (version 1) is a new tour, not an update.
+        if store_version_no is not None:
+            ACTIVE_JOBS[job_id]["version_no"] = store_version_no
+        ACTIVE_JOBS[job_id]["replaced"] = bool(store_replaced)
+        # Carry a short title for the app's message (the tour name the user sees).
+        ACTIVE_JOBS[job_id]["tour_title"] = tour_name
+
         # LOCAL-128: Link stop_metrics to this tour via tour_id.
         # The text generator wrote stop_metrics with job_id = job_id_1
         # but could not set tour_id (the tour didn't exist yet).
@@ -2643,6 +2686,15 @@ def get_job_status(job_id):
                 response["final_tour_id"] = job["final_tour_id"]
             if "translated_tour_id" in job:
                 response["translated_tour_id"] = job["translated_tour_id"]
+            # [LOCAL-717 / D677 §2] Version of the delivered tour and whether this
+            # generation replaced an existing one, so the app says "Updated your
+            # tour '<title>' — now version N" rather than announcing a new tour.
+            if "version_no" in job:
+                response["version_no"] = job["version_no"]
+            if "replaced" in job:
+                response["replaced"] = job["replaced"]
+            if "tour_title" in job:
+                response["tour_title"] = job["tour_title"]
             if "expected_stops" in job:
                 response["expected_stops"] = job["expected_stops"]
             if "actual_stops" in job:
@@ -2682,6 +2734,14 @@ def get_job_status(job_id):
                     response["final_tour_id"] = db_job["final_tour_id"]
                 if "english_tour_id" in db_job:
                     response["english_tour_id"] = db_job["english_tour_id"]
+                # [LOCAL-717 / D677 §2] Same version fields as the memory path,
+                # for cloud_tasks/database mode (merged from output_data).
+                if "version_no" in db_job:
+                    response["version_no"] = db_job["version_no"]
+                if "replaced" in db_job:
+                    response["replaced"] = db_job["replaced"]
+                if "tour_title" in db_job:
+                    response["tour_title"] = db_job["tour_title"]
                 if "coordinates" in db_job:
                     response["coordinates"] = db_job["coordinates"]
                 if "output_zip" in db_job:
