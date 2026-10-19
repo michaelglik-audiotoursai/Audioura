@@ -93,3 +93,9 @@ services:
       - /Users/micha/Audioura/tours:/app/tours   # ONE tour store for every service (2026-10-19: ./tours resolved to the checkout when compose ran from it)
   map-delivery:                           # LOCAL-657 version/updated_at on /tours-near + /tour-by-code
     build: {context: /Users/micha/audioura-subscribed-local/map_delivery}
+  tour-id-resolution:                     # pin only (2026-10-19): never build/mount from the checkout copy
+    volumes:
+      - /Users/micha/Audioura/tours:/app/tours
+  tour-processor:
+    volumes:
+      - /Users/micha/Audioura/tours:/app/tours
