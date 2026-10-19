@@ -28,6 +28,7 @@ import '../utils/tour_display.dart';
 import '../config.dart';
 import '../config/endpoints.dart';
 import '../utils/share_code.dart';
+import '../utils/downloaded_message.dart';
 import '../utils/search_dispatch.dart';
 import '../services/deep_link_service.dart';
 import '../services/communities_service.dart';
@@ -2312,10 +2313,14 @@ class _HomeScreenState extends State<HomeScreen> {
     int successCount = 0;
     int translationSuccessCount = 0;
     final Map<String, List<String>> failuresByTour = {};
+    // [LOCAL-716] Track the ids of the tours actually downloaded this run. When
+    // exactly one was downloaded, the "View" button opens that one tour.
+    final List<String> downloadedTourIds = [];
     for (final tour in freeOrOwned) {
       try {
         final failures = await _downloadSingleTourSilent(tour['id'], languages, tour);
         successCount++;
+        downloadedTourIds.add(tour['id'].toString());
         final nonEnglish = (languages ?? []).where((l) => l != 'en').toList();
         translationSuccessCount += nonEnglish.length - failures.length;
         if (failures.isNotEmpty) {
@@ -2329,35 +2334,29 @@ class _HomeScreenState extends State<HomeScreen> {
     if (!mounted) return;
     if (Navigator.canPop(context)) Navigator.pop(context);
 
-    String message;
-    if (successCount > 0) {
-      final tourWord = successCount == 1 ? 'tour' : 'tours';
-      if (translationSuccessCount > 0) {
-        message = '$successCount $tourWord downloaded with $translationSuccessCount translation${translationSuccessCount == 1 ? '' : 's'}';
-      } else {
-        message = '$successCount $tourWord downloaded and now are available on your Listen Page';
-      }
-      if (alreadyDownloaded > 0) {
-        message += ' ($alreadyDownloaded were already downloaded)';
-      }
-      if (failuresByTour.isNotEmpty) {
-        message += '. Some translations failed: ' + failuresByTour.entries.map((e) => '${e.key}: ${e.value.join(", ")}').join('; ');
-      }
-    } else {
-      message = 'No new tours downloaded';
-      if (alreadyDownloaded > 0) {
-        message += ' - all selected tours were already available';
-      }
-    }
+    // [LOCAL-716] One helper builds the text, with correct singular/plural
+    // agreement for every count (tours, translations, already-downloaded).
+    final message = downloadedMessage(
+      downloaded: successCount,
+      translations: translationSuccessCount,
+      alreadyDownloaded: alreadyDownloaded,
+      failures: failuresByTour,
+    );
 
     if (!mounted) return;
     if (freeOrOwned.isNotEmpty || paidToOffer.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(message),
+          // [LOCAL-716] "View" goes to the Listen tab. With exactly one new
+          // tour it opens that tour; with several it just shows the list (the
+          // first new one is at the top). Replaces a pushNamed('/my_tours')
+          // that did nothing — that route was never registered.
           action: successCount > 0 ? SnackBarAction(
             label: 'View',
-            onPressed: () => Navigator.pushNamed(context, '/my_tours'),
+            onPressed: () => PendingListenOpen.instance.offer(
+              downloadedTourIds.length == 1 ? downloadedTourIds.first : null,
+            ),
           ) : null,
         ),
       );
@@ -2400,7 +2399,9 @@ class _HomeScreenState extends State<HomeScreen> {
             action: SnackBarAction(
               label: 'Open',
               onPressed: () {
-                Navigator.pushNamed(context, '/my_tours');
+                // [LOCAL-716] Go to Listen and open this one tour (the route
+                // '/my_tours' was never registered, so this used to do nothing).
+                PendingListenOpen.instance.offer(tourId.toString());
               },
             ),
           ),
@@ -2496,7 +2497,7 @@ class _HomeScreenState extends State<HomeScreen> {
               backgroundColor: Colors.green,
               action: SnackBarAction(
                 label: 'View',
-                onPressed: () => Navigator.pushNamed(context, '/my_tours'),
+                onPressed: () => PendingListenOpen.instance.offer(tourId.toString()),
               ),
             ),
           );
@@ -2727,13 +2728,27 @@ class _HomeScreenState extends State<HomeScreen> {
         if (!wantEnglish && nonEnglish.isNotEmpty) {
           // English deselected: only translations were saved.
           msg = 'Tour downloaded in ${nonEnglish.join(", ")}';
-        } else if (nonEnglish.isEmpty) {
-          msg = 'Tour downloaded successfully!';
         } else {
-          msg = 'Tour downloaded with ${nonEnglish.length} translation${nonEnglish.length == 1 ? '' : 's'} (${nonEnglish.join(", ")})';
+          // [LOCAL-716] Same wording helper as the other download sites, with
+          // correct singular/plural agreement. Exactly one tour here, so
+          // "1 tour downloaded and is now on your Listen page" (plus the
+          // "with N translation(s)" clause when extra languages were saved).
+          msg = downloadedMessage(
+            downloaded: 1,
+            translations: nonEnglish.length,
+          );
         }
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(msg), backgroundColor: Colors.green),
+          SnackBar(
+            content: Text(msg),
+            backgroundColor: Colors.green,
+            // [LOCAL-716] View goes to the Listen tab and opens this one tour.
+            action: SnackBarAction(
+              label: 'View',
+              onPressed: () =>
+                  PendingListenOpen.instance.offer(tourId.toString()),
+            ),
+          ),
         );
       } else {
         final failedNames = translationFailures.map((l) => TourTranslationHelper.availableLanguages[l] ?? l).join(', ');

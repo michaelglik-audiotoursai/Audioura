@@ -26,6 +26,7 @@ import '../services/entitlements_service.dart';
 import '../services/device_service.dart';
 import '../services/score_explanation_service.dart';
 import '../services/document_acceptance_service.dart';
+import '../services/deep_link_service.dart';
 
 /// LOCAL-484 — build the subtitle line shown under each tour on the Listen
 /// (My Tours) list.
@@ -1059,6 +1060,10 @@ class _MyToursScreenState extends State<MyToursScreen> {
     }
     setState(() { _tours = healedParsed.reversed.toList(); });
 
+    // [LOCAL-716] If we arrived here from a download's "View" button for a
+    // single tour, open that tour now that the list is loaded.
+    _consumePendingListenOpen();
+
     final tourInfoList = _tours.map((tour) => '${tour['title']}|${tour['path']}').toList();
     await prefs.setStringList('available_tours', tourInfoList);
     unawaited(_detectMapTours());
@@ -1961,37 +1966,7 @@ class _MyToursScreenState extends State<MyToursScreen> {
                     ),
                     onTap: () async {
                       // Save current tour info for voice navigation
-                      final prefs = await SharedPreferences.getInstance();
-                      await prefs.setString('current_tour_id', tour['title']);
-                      await prefs.setString('current_tour_path', tour['path']);
-                      await prefs.setInt('current_stop', 0);
-                      await prefs.setString('current_tour_type', tour['type'] ?? '');
-                      
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => TourPlayerScreen(
-                            tourPath: tour['path'],
-                            tourTitle: tour['title'],
-                            tourId: tour['tour_id']?.toString(),
-                            // [LOCAL-677B] The NUMERIC server id the pricing/
-                            // unlock endpoints key on, stamped at download. This
-                            // is what the player needs to ask /unlock-state (the
-                            // editable tour_id above is non-numeric, which is why
-                            // the player never asked — the Bounce). Falls back to
-                            // the local snapshot inside the player when absent.
-                            serverTourId: tour['server_tour_id']?.toString(),
-                            originalLanguage:
-                                tour['original_language']?.toString(),
-                            track: tour['track'] as String?,
-                            buildNumber: tour['build_number'] is int
-                                ? tour['build_number'] as int
-                                : (tour['build_number'] is String
-                                    ? int.tryParse(tour['build_number'])
-                                    : null),
-                          ),
-                        ),
-                      );
+                      await _openTourPlayer(tour);
                     },
                   ),
                 );
@@ -1999,7 +1974,78 @@ class _MyToursScreenState extends State<MyToursScreen> {
             ),
     );
   }
-  
+
+  /// [LOCAL-716] Open a saved tour's player — the SINGLE place the Listen list
+  /// opens a tour. A tap on a tour row calls it, and so does the pending-open
+  /// path (a download's "View" button for one tour). Extracted verbatim from
+  /// the row tap so both routes open exactly the same screen with exactly the
+  /// same arguments.
+  Future<void> _openTourPlayer(Map<String, dynamic> tour) async {
+    // Save current tour info for voice navigation
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('current_tour_id', tour['title']);
+    await prefs.setString('current_tour_path', tour['path']);
+    await prefs.setInt('current_stop', 0);
+    await prefs.setString('current_tour_type', tour['type'] ?? '');
+
+    if (!mounted) return;
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => TourPlayerScreen(
+          tourPath: tour['path'],
+          tourTitle: tour['title'],
+          tourId: tour['tour_id']?.toString(),
+          // [LOCAL-677B] The NUMERIC server id the pricing/
+          // unlock endpoints key on, stamped at download. This
+          // is what the player needs to ask /unlock-state (the
+          // editable tour_id above is non-numeric, which is why
+          // the player never asked — the Bounce). Falls back to
+          // the local snapshot inside the player when absent.
+          serverTourId: tour['server_tour_id']?.toString(),
+          originalLanguage: tour['original_language']?.toString(),
+          track: tour['track'] as String?,
+          buildNumber: tour['build_number'] is int
+              ? tour['build_number'] as int
+              : (tour['build_number'] is String
+                  ? int.tryParse(tour['build_number'])
+                  : null),
+        ),
+      ),
+    );
+  }
+
+  /// [LOCAL-716] After the tours load, honour a pending "open tour X" request
+  /// (a download's "View" button for exactly one tour). Find the matching saved
+  /// tour by its id (either the editable `tour_id` or the numeric
+  /// `server_tour_id`) and open its player — the same screen a tap opens. The
+  /// request is consumed whether or not a match is found, so it fires at most
+  /// once; with no id (several tours downloaded) we stay on the list.
+  void _consumePendingListenOpen() {
+    final req = PendingListenOpen.instance.request.value;
+    if (req == null) return;
+    final wantedId = req.tourId;
+    // Consume up front: this request is for THIS load; a miss must not leave it
+    // armed for a later unrelated rebuild.
+    PendingListenOpen.instance.consume();
+    if (wantedId == null) return; // "just show Listen" — nothing to open.
+
+    Map<String, dynamic>? match;
+    for (final tour in _tours) {
+      final tid = tour['tour_id']?.toString();
+      final sid = tour['server_tour_id']?.toString();
+      if (tid == wantedId || sid == wantedId) {
+        match = tour;
+        break;
+      }
+    }
+    if (match == null) return; // not saved (yet) — leave the user on the list.
+
+    // Open after this frame so the list has built and a BuildContext exists.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _openTourPlayer(match!);
+    });
+  }
   String _buildAppBarTitle() {
     String title = '📰 Listen';
     
