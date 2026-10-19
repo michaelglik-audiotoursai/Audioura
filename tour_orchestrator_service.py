@@ -726,7 +726,7 @@ def _rename_superseded_zip(old_zip_filename, version_no):
     return archived
 
 
-def store_audio_tour(tour_name, request_string, zip_path, lat, lng, tour_content=None, stops_count=None, is_test=None, tour_kind=None, job_id=None):
+def store_audio_tour(tour_name, request_string, zip_path, lat, lng, tour_content=None, stops_count=None, is_test=None, tour_kind=None, job_id=None, user_id=None):
     """Store the audio tour in the database with original tour content.
 
     Returns:
@@ -746,10 +746,18 @@ def store_audio_tour(tour_name, request_string, zip_path, lat, lng, tour_content
     print(f"Coordinates: lat={lat}, lng={lng}")
     print(f"Tour content length: {len(tour_content) if tour_content else 0} characters")
 
-    def _result(success, action, existing_tour_id=None, error=None):
-        """Build a result dict that also supports bool() for backward compat."""
+    def _result(success, action, existing_tour_id=None, error=None,
+                replaced_version_no=None):
+        """Build a result dict that also supports bool() for backward compat.
+
+        [LOCAL-718 / D678] replaced_version_no is the version number archived when
+        a creator re-generates their OWN same-name tour (action='replaced'); it is
+        None for an insert, a cache-hit, or any error. LOCAL-717's "Updated your
+        tour — now version N" reads this field.
+        """
         return {"success": success, "action": action,
                 "existing_tour_id": existing_tour_id, "error": error,
+                "replaced_version_no": replaced_version_no,
                 "__bool__": success}
     
     try:
@@ -897,7 +905,27 @@ def store_audio_tour(tour_name, request_string, zip_path, lat, lng, tour_content
         _tour_kind_value = (tour_kind or 'full').strip().lower()
         if _tour_kind_value not in ('full', 'overview'):
             _tour_kind_value = 'full'
-        
+
+        # [LOCAL-718 / D678] creator_user_id records WHO created the tour. Set at
+        # INSERT from the request's user_id; the existing-tour lookup is scoped by
+        # it so a tour is only ever versioned by its OWN creator. Self-healing,
+        # additive column so this works on any Postgres whether or not migration
+        # 041 has run. NULL creator = "unknown creator" (existing/backfilled rows).
+        cur.execute("""
+            SELECT column_name
+            FROM information_schema.columns
+            WHERE table_name = 'audio_tours' AND column_name = 'creator_user_id'
+        """)
+        has_creator_user_id = cur.fetchone() is not None
+        if not has_creator_user_id:
+            print(f"Adding creator_user_id column...")
+            cur.execute("ALTER TABLE audio_tours ADD COLUMN creator_user_id TEXT")
+            conn.commit()
+            has_creator_user_id = True
+            print("Added creator_user_id column")
+        # Normalise: treat empty/whitespace user_id as NULL (unknown creator).
+        _creator_user_id = (user_id or '').strip() or None
+
         # [LOCAL-606] Make sure the versioning archive + stale flag exist before
         # we may need them in the existing-row branch. Self-healing, additive.
         _ensure_versioning_objects(cur)
@@ -910,14 +938,25 @@ def store_audio_tour(tour_name, request_string, zip_path, lat, lng, tour_content
         # [LOCAL-606] Also pull the stored content/zip/stops/lat/lng so the
         # existing-row branch can decide: replace (text differs) vs increment
         # (byte-identical cache hit).
-        print(f"Checking if tour already exists (case-insensitive, matching unique index)...")
+        # [LOCAL-718 / D678] NOW ALSO scoped by creator_user_id: a tour belongs to
+        # its creator. The lookup matches only this creator's own same-name
+        # original, so a DIFFERENT creator (or a NULL request creator) never
+        # matches and falls through to the INSERT path = a NEW, separate tour.
+        # SQL NULL semantics do the right thing for free: when _creator_user_id is
+        # NULL the predicate `creator_user_id = NULL` matches no row (unknown
+        # creator always creates new); when it is set, a NULL-creator existing row
+        # does not match it either (rule 3). Nothing is replaced across creators.
+        print(f"Checking if tour already exists (case-insensitive, creator-scoped, matching index)...")
         cur.execute(
             "SELECT id, tour_content, zip_filename, stops_count, lat, lng "
-            "FROM audio_tours WHERE lower(tour_name) = lower(%s) AND original_tour_id IS NULL",
-            (tour_name,)
+            "FROM audio_tours "
+            "WHERE lower(tour_name) = lower(%s) AND creator_user_id = %s "
+            "AND original_tour_id IS NULL",
+            (tour_name, _creator_user_id)
         )
         existing_tour = cur.fetchone()
-        print(f"Existing tour (unique-index-aware check): {existing_tour[0] if existing_tour else None}")
+        print(f"Existing tour (creator-scoped check, creator={_creator_user_id!r}): "
+              f"{existing_tour[0] if existing_tour else None}")
 
         # [LEAD 2026-10-07] A TEST request must never touch a real tour. The LOCAL-611
         # canary's McMullen run (is_test) replaced Michael's tour 399 via the LOCAL-606
@@ -1056,7 +1095,8 @@ def store_audio_tour(tour_name, request_string, zip_path, lat, lng, tour_content
                 cur.close()
                 conn.close()
                 print(f"==== AUDIO TOUR CONTENT REPLACED — id={existing_id} ====")
-                return _result(success=True, action="replaced", existing_tour_id=existing_id)
+                return _result(success=True, action="replaced", existing_tour_id=existing_id,
+                               replaced_version_no=next_version)
             except Exception as _replace_err:
                 conn.rollback()
                 print(f"[LOCAL-606] ERROR during replacement of id={existing_id}: {_replace_err}")
@@ -1094,32 +1134,33 @@ def store_audio_tour(tour_name, request_string, zip_path, lat, lng, tour_content
             cur.execute(
                 """
                 INSERT INTO audio_tours (tour_name, request_string, audio_tour, number_requested, lat, lng,
-                    tour_content, content_language, storied_mode, stops_count, zip_filename, is_test, track, tour_kind)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    tour_content, content_language, storied_mode, stops_count, zip_filename, is_test, track, tour_kind,
+                    creator_user_id)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 RETURNING id
                 """,
                 (tour_name, request_string, psycopg2.Binary(zip_data), 1, lat, lng, tour_content, 'en',
                  os.getenv('STORIED_MODE', 'false').lower() == 'true', stops_count, zip_filename, _is_test_mode, _track,
-                 _tour_kind_value)
+                 _tour_kind_value, _creator_user_id)
             )
         elif has_audio_tour and has_lat and has_number_requested:
             cur.execute(
                 """
-                INSERT INTO audio_tours (tour_name, request_string, audio_tour, number_requested, lat, lng, zip_filename, is_test, track)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                INSERT INTO audio_tours (tour_name, request_string, audio_tour, number_requested, lat, lng, zip_filename, is_test, track, creator_user_id)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 RETURNING id
                 """,
-                (tour_name, request_string, psycopg2.Binary(zip_data), 1, lat, lng, zip_filename, _is_test_mode, _track)
+                (tour_name, request_string, psycopg2.Binary(zip_data), 1, lat, lng, zip_filename, _is_test_mode, _track, _creator_user_id)
             )
         else:
             # Fallback if columns don't exist
             cur.execute(
                 """
-                INSERT INTO audio_tours (tour_name, request_string, is_test, track)
-                VALUES (%s, %s, %s, %s)
+                INSERT INTO audio_tours (tour_name, request_string, is_test, track, creator_user_id)
+                VALUES (%s, %s, %s, %s, %s)
                 RETURNING id
                 """,
-                (tour_name, request_string, _is_test_mode, _track)
+                (tour_name, request_string, _is_test_mode, _track, _creator_user_id)
             )
         # [LOCAL-711 / D673] Capture the new tour's id so short_title can be
         # filled after commit. RETURNING id is additive — every branch now
@@ -1769,14 +1810,16 @@ def orchestrate_tour_async(job_id, location, tour_type, total_stops, user_id=Non
                 print(f"[USER_INDEX] Non-fatal error: {idx_err}")
 
         # Store in database with tour content
-        store_result = store_audio_tour(tour_name, request_string or location, zip_path, lat, lng, tour_content, stops_count=ACTIVE_JOBS[job_id].get("actual_stops"), is_test=is_test, tour_kind=ACTIVE_JOBS[job_id].get("tour_kind"), job_id=job_id)
+        store_result = store_audio_tour(tour_name, request_string or location, zip_path, lat, lng, tour_content, stops_count=ACTIVE_JOBS[job_id].get("actual_stops"), is_test=is_test, tour_kind=ACTIVE_JOBS[job_id].get("tour_kind"), job_id=job_id, user_id=user_id)
         
         # [LOCAL-156] store_audio_tour now returns a dict:
         #   {"success": bool, "action": str, "existing_tour_id": int|None, "error": str|None}
+        # [LOCAL-718] + "replaced_version_no": int|None (set only on action='replaced').
         store_success = store_result["success"] if isinstance(store_result, dict) else store_result
         store_action = store_result.get("action", "unknown") if isinstance(store_result, dict) else ("inserted" if store_result else "error")
         store_existing_id = store_result.get("existing_tour_id") if isinstance(store_result, dict) else None
         store_error = store_result.get("error") if isinstance(store_result, dict) else None
+        store_replaced_version_no = store_result.get("replaced_version_no") if isinstance(store_result, dict) else None
         
         if not store_success:
             # [LOCAL-156] FAIL CLOSED: storage failed — do NOT report completed.
@@ -1871,31 +1914,49 @@ def orchestrate_tour_async(job_id, location, tour_type, total_stops, user_id=Non
             _release_generation_reservation(user_id, job_id, reason='cache_hit')
         else:
             print(f"Tour stored successfully with coordinates: lat={lat}, lng={lng}")
-            
-            # Get the tour ID from database (always needed for final_tour_id)
-            english_tour_id = None
-            try:
-                import psycopg2
-                conn = psycopg2.connect(
-                    host=os.getenv('DB_HOST', 'postgres-2'),
-                    database=os.getenv('DB_NAME', 'audiotours'),
-                    user=os.getenv('DB_USER', 'admin'),
-                    password=os.getenv('DB_PASSWORD', 'password123'),
-                    port=os.getenv('DB_PORT', '5432')
-                )
-                cur = conn.cursor()
-                cur.execute(
-                    "SELECT id FROM audio_tours WHERE lower(tour_name) = lower(%s) AND original_tour_id IS NULL ORDER BY id DESC LIMIT 1",
-                    (tour_name,)
-                )
-                result = cur.fetchone()
-                if result:
-                    english_tour_id = result[0]
-                    print(f"English tour ID: {english_tour_id}")
-                cur.close()
-                conn.close()
-            except Exception as db_error:
-                print(f"Warning: Could not get tour ID from database: {db_error}")
+
+            # [LOCAL-718 / D678] On the 'replaced' path store_audio_tour already
+            # returns the authoritative row id — use it directly. For a fresh
+            # INSERT we must re-read, and the read MUST be creator-scoped: two
+            # creators may now hold the same name, so an unscoped
+            # "ORDER BY id DESC LIMIT 1" could return the OTHER creator's tour.
+            english_tour_id = store_existing_id if store_action == "replaced" else None
+            if english_tour_id is None:
+                try:
+                    import psycopg2
+                    _creator_lookup = (user_id or '').strip() or None
+                    conn = psycopg2.connect(
+                        host=os.getenv('DB_HOST', 'postgres-2'),
+                        database=os.getenv('DB_NAME', 'audiotours'),
+                        user=os.getenv('DB_USER', 'admin'),
+                        password=os.getenv('DB_PASSWORD', 'password123'),
+                        port=os.getenv('DB_PORT', '5432')
+                    )
+                    cur = conn.cursor()
+                    # creator_user_id = %s with a NULL param matches no row, so a
+                    # NULL-creator insert falls to the IS NULL branch below.
+                    if _creator_lookup is not None:
+                        cur.execute(
+                            "SELECT id FROM audio_tours "
+                            "WHERE lower(tour_name) = lower(%s) AND creator_user_id = %s "
+                            "AND original_tour_id IS NULL ORDER BY id DESC LIMIT 1",
+                            (tour_name, _creator_lookup)
+                        )
+                    else:
+                        cur.execute(
+                            "SELECT id FROM audio_tours "
+                            "WHERE lower(tour_name) = lower(%s) AND creator_user_id IS NULL "
+                            "AND original_tour_id IS NULL ORDER BY id DESC LIMIT 1",
+                            (tour_name,)
+                        )
+                    result = cur.fetchone()
+                    if result:
+                        english_tour_id = result[0]
+                        print(f"English tour ID: {english_tour_id}")
+                    cur.close()
+                    conn.close()
+                except Exception as db_error:
+                    print(f"Warning: Could not get tour ID from database: {db_error}")
         
         # LOCAL-128: Link stop_metrics to this tour via tour_id.
         # The text generator wrote stop_metrics with job_id = job_id_1
@@ -2177,6 +2238,12 @@ def orchestrate_tour_async(job_id, location, tour_type, total_stops, user_id=Non
         log_job_update(job_id, "completed", final_message)
         ACTIVE_JOBS[job_id]["netlify_ready"] = True
         ACTIVE_JOBS[job_id]["language"] = language
+        # [LOCAL-718 / D678] Surface the archived version number when a creator
+        # re-generated their OWN same-name tour (action='replaced'). LOCAL-717's
+        # "Updated your tour — now version N" reads this. It is set ONLY on a true
+        # same-creator replace; an insert / cache-hit / cross-creator new tour
+        # leaves it None, which the app reads as "an ordinary new tour" (D678 §6).
+        ACTIVE_JOBS[job_id]["replaced_version_no"] = store_replaced_version_no
         if coordinates:
             ACTIVE_JOBS[job_id]["coordinates"] = coordinates
         
@@ -2641,6 +2708,10 @@ def get_job_status(job_id):
                 response["coordinates"] = job["coordinates"]
             if "final_tour_id" in job:
                 response["final_tour_id"] = job["final_tour_id"]
+            # [LOCAL-718 / D678] int (version archived on a same-creator replace)
+            # or null (ordinary new tour / insert / cache hit). Always present on
+            # a completed job so LOCAL-717 can read it without a KeyError.
+            response["replaced_version_no"] = job.get("replaced_version_no")
             if "translated_tour_id" in job:
                 response["translated_tour_id"] = job["translated_tour_id"]
             if "expected_stops" in job:
@@ -2682,6 +2753,10 @@ def get_job_status(job_id):
                     response["final_tour_id"] = db_job["final_tour_id"]
                 if "english_tour_id" in db_job:
                     response["english_tour_id"] = db_job["english_tour_id"]
+                # [LOCAL-718 / D678] Mirror the memory branch: present (int|null)
+                # on a completed job. In database mode the worker writes it into
+                # output_data; if absent (older worker), default to null.
+                response["replaced_version_no"] = db_job.get("replaced_version_no")
                 if "coordinates" in db_job:
                     response["coordinates"] = db_job["coordinates"]
                 if "output_zip" in db_job:
