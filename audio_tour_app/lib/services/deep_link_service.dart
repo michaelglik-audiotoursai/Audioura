@@ -58,34 +58,43 @@ class PendingShareSearch {
 }
 
 /// [LOCAL-716] A single request to "go to the Listen tab, and optionally open
-/// tour X". [tourId] is null for "just show Listen" (several tours were
-/// downloaded — scroll to / highlight the first new one there) and a tour id
-/// string for "open this one tour" (exactly one tour was downloaded; open the
-/// same player a tap on it in Listen opens). [token] makes every request
-/// distinct so two identical offers both notify listeners — a plain String?
-/// would de-dupe when the same tour is opened twice in a row.
+/// tour X". [token] makes every request distinct so two identical offers both
+/// notify listeners — a plain String? would de-dupe when the same tour is
+/// opened twice in a row.
 ///
-/// [LOCAL-716B / D358] Two fields were added so "View" can open the LANGUAGE
-/// the user just downloaded, not merely the English original:
+/// [LOCAL-719 / D677 addendum 1] "View" ALWAYS opens a player. [tourIds] is the
+/// SERVER ids downloaded this run, in the order the user selected them (one for
+/// a single tour, several for a batch — a tour that failed to download is
+/// absent). The planner opens the FIRST of these that has a saved entry. The
+/// legacy [tourId] getter returns the first id and stays valid for the
+/// single-tour callers (an already-downloaded tour's "Open" / "View").
+/// [tourIds] empty means "just show Listen" (nothing could be opened — highlight
+/// the newest).
+///
+/// [LOCAL-716B / D358] Two fields carry language and the highlight fallback:
 ///   * [language] — the resolved listening language (About / per-community, or
-///     null). With several translations of the offered tour, the planner opens
+///     null). With several translations of the chosen tour, the planner opens
 ///     the one in this language; ignored when the tour has zero or one
 ///     translation.
-///   * [highlightNewest] — true when the request is "several tours were
-///     downloaded, just highlight the newest in Listen". It is implied by a
-///     null [tourId], but kept explicit so a miss on a single-tour open can
-///     fall back onto the same highlight path without re-deriving intent.
+///   * [highlightNewest] — true when the request is "nothing to open, just
+///     highlight the newest in Listen". Implied by an empty [tourIds], but kept
+///     explicit so a miss on an open can fall back onto the same highlight path
+///     without re-deriving intent.
 class PendingListenOpenRequest {
-  const PendingListenOpenRequest(
-    this.tourId,
+  PendingListenOpenRequest(
+    this.tourIds,
     this.token, {
     this.language,
     this.highlightNewest = false,
   });
-  final String? tourId;
+  final List<String> tourIds;
   final int token;
   final String? language;
   final bool highlightNewest;
+
+  /// The first offered id, or null when none were offered. Kept for the
+  /// single-tour callers and for logging.
+  String? get tourId => tourIds.isEmpty ? null : tourIds.first;
 }
 
 /// [LOCAL-716] The ONE way any screen says "take me to Listen, optionally
@@ -108,23 +117,45 @@ class PendingListenOpen {
 
   int _nextToken = 0;
 
-  /// Ask to go to Listen. Pass a tour id to also open that tour, or null/empty
-  /// to just show the Listen tab. Each call gets a fresh token so repeated
-  /// offers always notify, even for the same tour id.
+  /// Ask to go to Listen and open ONE tour. Pass a tour id to open that tour,
+  /// or null/empty to just show the Listen tab. Each call gets a fresh token so
+  /// repeated offers always notify, even for the same tour id. This is the
+  /// single-tour entry point (an already-downloaded tour's "Open"/"View").
   ///
   /// [LOCAL-716B] [language] carries the resolved listening language so the
   /// View planner can pick the right language copy when a tour has several
   /// translations. [highlightNewest] forces the "scroll to + highlight the
-  /// newest" path regardless of [tourId] (several tours downloaded).
+  /// newest" path regardless of [tourId].
   void offer([String? tourId, String? language, bool highlightNewest = false]) {
     final id = (tourId == null || tourId.isEmpty) ? null : tourId;
+    offerBatch(
+      id == null ? const <String>[] : <String>[id],
+      language: language,
+      highlightNewest: highlightNewest,
+    );
+  }
+
+  /// [LOCAL-719 / D677 addendum 1] Ask to go to Listen and open the FIRST of
+  /// [tourIds] (in the order the user selected them) that has a saved entry —
+  /// the batch-download entry point. "View" always opens a player; the other
+  /// tours of the batch are highlighted when the user returns to Listen.
+  /// An empty [tourIds] just shows the Listen tab and highlights the newest.
+  void offerBatch(
+    List<String> tourIds, {
+    String? language,
+    bool highlightNewest = false,
+  }) {
+    final ids = tourIds
+        .map((e) => e.trim())
+        .where((e) => e.isNotEmpty)
+        .toList(growable: false);
     final lang =
         (language == null || language.trim().isEmpty) ? null : language.trim();
     request.value = PendingListenOpenRequest(
-      id,
+      ids,
       _nextToken++,
       language: lang,
-      highlightNewest: highlightNewest || id == null,
+      highlightNewest: highlightNewest || ids.isEmpty,
     );
   }
 

@@ -2382,9 +2382,9 @@ class _HomeScreenState extends State<HomeScreen> {
 
     if (!mounted) return;
     if (freeOrOwned.isNotEmpty || paidToOffer.isEmpty) {
-      // [LOCAL-716B / D358] The language "View" should open for a single tour.
-      // The user just chose these [languages]; prefer the first non-English one
-      // (the translation they downloaded), else fall back to the saved About
+      // [LOCAL-716B / D358] The language "View" should open. The user just
+      // chose these [languages]; prefer the first non-English one (the
+      // translation they downloaded), else fall back to the saved About
       // listening language, else English. The planner uses this only when a
       // tour has SEVERAL translations — with exactly one translation it opens
       // that translation regardless, and with none it opens the original.
@@ -2393,25 +2393,22 @@ class _HomeScreenState extends State<HomeScreen> {
       final viewLanguage = nonEnglishSelected.isNotEmpty
           ? nonEnglishSelected.first
           : (prefs.getString('listening_language') ?? 'en');
-      // One tour downloaded → offer its id; several → offer null (highlight the
-      // newest in Listen). We count TOURS (one add per tour above), so a tour
-      // plus its translations is still exactly one id here.
-      final singleTourId =
-          downloadedTourIds.length == 1 ? downloadedTourIds.first : null;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(message),
-          // [LOCAL-716 / LOCAL-716B] "View" goes to the Listen tab. With exactly
-          // one new tour it opens that tour in the language just downloaded
-          // (the translation, if any); with several it switches to Listen and
-          // highlights the newest. Replaces a pushNamed('/my_tours') that did
-          // nothing — that route was never registered.
+          // [LOCAL-716 / LOCAL-716B / LOCAL-719 / D677 addendum 1] "View" goes
+          // to the Listen tab and ALWAYS opens a player, in the language just
+          // downloaded. With one new tour it opens that tour; with several it
+          // opens the FIRST the user selected (that succeeded) — the planner
+          // walks `downloadedTourIds` in selection order. The other tours of
+          // the batch are highlighted when the user returns to Listen.
+          // `downloadedTourIds` holds only tours that saved successfully, in
+          // selection order, so a failed first pick is naturally skipped.
           action: successCount > 0 ? SnackBarAction(
             label: 'View',
-            onPressed: () => PendingListenOpen.instance.offer(
-              singleTourId,
-              viewLanguage,
-              singleTourId == null, // several tours → highlight newest
+            onPressed: () => PendingListenOpen.instance.offerBatch(
+              downloadedTourIds,
+              language: viewLanguage,
             ),
           ) : null,
         ),

@@ -1,34 +1,48 @@
-// [LOCAL-716B / D358] PURE planner for the download snackbar's "View" button.
+// [LOCAL-719 / D677 addendum 1] PURE planner for the download snackbar's
+// "View" button. View ALWAYS opens a player.
 //
-// Michael tested 2.4.30+72 on the Pixel-4: he downloaded ONE tour with its
-// Russian translation. The message was right ("1 tour downloaded with 1
-// translation … is"), but "View" opened nothing — it showed the Listen list
-// and stopped. Two faults fed that:
-//   * Home offered a tour id only when exactly one FILE was downloaded; a
-//     translation is a second file, so it offered null and View just showed
-//     the list.
-//   * My Tours matched the offered id against a saved entry's `tour_id` /
-//     `server_tour_id` and, on a miss, returned silently — a translation's
-//     saved entry keys differently from the English original, so even a
-//     correct offer could miss with no trace.
+// Michael (2026-10-19): "if we start playing when one tour with a translation
+// is downloaded, we should start playing when multiple tours are downloaded
+// too, maybe the first one; in any case the behaviour should be consistent."
 //
-// This file is the ONE place that decides, from the saved entries alone, WHICH
-// copy "View" opens for a single downloaded tour, and otherwise says "highlight
-// the newest". It is dependency-free (no Flutter, no SharedPreferences, no
+// LOCAL-716B (D358) made "View" open a player for a SINGLE downloaded tour
+// (picking the right language copy across the original and its translations),
+// but for SEVERAL tours it only highlighted the newest in Listen and opened
+// nothing — the inconsistency Michael is pointing at. This file now makes the
+// decision uniform:
+//   * one tour   → open that tour, in the language just downloaded
+//                  (the LOCAL-716B logic, unchanged);
+//   * several    → open the FIRST tour in the order the user selected them,
+//                  in the language just downloaded. "First" is the first id in
+//                  the ordered list the caller passes; the caller only adds a
+//                  tour's id AFTER it saved, so a tour that failed to download
+//                  is simply absent and the first that SUCCEEDED is opened.
+//
+// (The other tours from the batch are highlighted when the user goes back to
+// Listen — that is the caller's amber-highlight path, unchanged. This planner
+// only decides which ONE player to open.)
+//
+// This is the ONE place that decides, from the saved entries alone, WHICH copy
+// "View" opens. It is dependency-free (no Flutter, no SharedPreferences, no
 // http) so every branch is unit-tested directly (test/view_after_download_test
 // .dart) with plain maps — the same style as community_downloads.dart.
 //
-// The rule (D358 required behaviour):
+// The rule:
 //   1. A tour is ONE tour even with translations — we match on the SERVER tour
-//      id the snackbar offers, across the original and every translation of it.
-//   2. For exactly one tour, open the copy in the language just downloaded:
+//      id across the original and every translation of it.
+//   2. The tour to open is the FIRST id in [downloadedTourIds] that has a
+//      matching saved entry. For one downloaded tour that is simply that tour;
+//      for several it is the first the user selected (that succeeded). Ids with
+//      no matching saved entry are skipped (a save that silently vanished must
+//      not strand "View").
+//   3. For the chosen tour, open the copy in the language just downloaded:
 //        * exactly one translation  → that translation;
 //        * several translations      → the one matching the listening language
 //          if present, else the first one downloaded (oldest `created`);
 //        * no translation            → the original.
-//   3. For several tours, there is no single id to open: highlight the newest.
-//   4. No silent miss: when nothing matches the offered id, the caller logs it
-//      and falls back to the highlight path — this planner returns
+//   4. No silent miss: when NO offered id matches any saved entry (and when no
+//      id was offered at all), the caller logs it and falls back to the
+//      highlight path — this planner returns
 //      [ViewAfterDownloadPlan.highlightNewest] for that case too.
 library;
 
@@ -38,6 +52,8 @@ enum ViewAfterDownloadAction {
   openEntry,
 
   /// Do not open anything; scroll to and briefly highlight the newest entry.
+  /// Reached only when nothing could be opened (no ids offered, or none of the
+  /// offered ids matched a saved entry).
   highlightNewest,
 }
 
@@ -107,41 +123,59 @@ bool _belongsToTour(Map<String, dynamic> entry, String wantedServerId) {
   return false;
 }
 
-/// Decide what "View" does after a download, given the loaded saved [entries]
-/// (in ANY order — this reads `created` to order them), the number of distinct
-/// tours downloaded this run ([downloadedTourCount]), the SERVER tour id the
-/// snackbar offered ([wantedServerId], null when several tours were
-/// downloaded), and the resolved [listeningLanguage] (About / per-community, or
-/// null — defaults to English).
+/// Decide what "View" does after a download. View ALWAYS opens a player when
+/// anything can be opened.
 ///
-/// Returns [ViewAfterDownloadPlan.openEntry] with the index of the entry to
-/// open for a single tour that has a match, or
-/// [ViewAfterDownloadPlan.highlightNewest] when several tours were downloaded,
-/// no id was offered, or no saved entry matches the offered id.
+/// Given the loaded saved [entries] (in ANY order — this reads `created` to
+/// order them), the SERVER tour ids downloaded this run IN THE ORDER THE USER
+/// SELECTED THEM ([downloadedTourIds]; one element for a single tour, several
+/// for a batch — a tour that failed to download is simply absent), and the
+/// resolved [listeningLanguage] (About / per-community, or null — defaults to
+/// English):
+///
+///   * opens the FIRST id in [downloadedTourIds] that has a matching saved
+///     entry, choosing the copy in the language just downloaded (the single
+///     translation, the listening-language translation when there are several,
+///     or the original when there are none);
+///   * returns [ViewAfterDownloadPlan.highlightNewest] only when
+///     [downloadedTourIds] is empty or NONE of its ids matches any saved entry
+///     (the caller logs the miss and falls back to highlighting the newest).
 ViewAfterDownloadPlan planViewAfterDownload({
   required List<Map<String, dynamic>> entries,
-  required int downloadedTourCount,
-  String? wantedServerId,
+  required List<String> downloadedTourIds,
   String? listeningLanguage,
 }) {
-  // Several tours (or none identifiable) → highlight the newest, never open.
-  if (downloadedTourCount != 1 ||
-      wantedServerId == null ||
-      wantedServerId.isEmpty) {
-    return const ViewAfterDownloadPlan.highlightNewest();
+  // Walk the offered ids in selection order and open the first one that has a
+  // saved entry. A tour the caller lists but that saved no entry (should not
+  // happen — ids are added only after a successful save) is skipped rather
+  // than stranding "View" on it.
+  for (final rawId in downloadedTourIds) {
+    final wantedServerId = rawId.trim();
+    if (wantedServerId.isEmpty) continue;
+
+    // Gather every saved entry that belongs to this tour, keeping each one's
+    // original index so we can return a stable pointer into `entries`.
+    final matches = <int>[];
+    for (var i = 0; i < entries.length; i++) {
+      if (_belongsToTour(entries[i], wantedServerId)) matches.add(i);
+    }
+    if (matches.isEmpty) continue; // try the next selected tour
+
+    return _planForTour(entries, matches, listeningLanguage);
   }
 
-  // Gather every saved entry that belongs to the offered tour, keeping each
-  // one's original index so we can return a stable pointer into `entries`.
-  final matches = <int>[];
-  for (var i = 0; i < entries.length; i++) {
-    if (_belongsToTour(entries[i], wantedServerId)) matches.add(i);
-  }
-  if (matches.isEmpty) {
-    // No silent miss: the caller logs and falls back to the highlight path.
-    return const ViewAfterDownloadPlan.highlightNewest();
-  }
+  // Nothing could be opened (no ids, or no id matched a saved entry). No silent
+  // miss: the caller logs and falls back to the highlight path.
+  return const ViewAfterDownloadPlan.highlightNewest();
+}
 
+/// Pick the copy of ONE tour to open, from the indices [matches] of its saved
+/// entries, applying the "language just downloaded" rule.
+ViewAfterDownloadPlan _planForTour(
+  List<Map<String, dynamic>> entries,
+  List<int> matches,
+  String? listeningLanguage,
+) {
   final translations =
       matches.where((i) => _isTranslation(entries[i])).toList();
   final originals =

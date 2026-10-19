@@ -273,6 +273,15 @@ class TourDownloadService {
         'stops': actualStops.toString(),
         'original_request': baseTourName,
         'tour_id': editTourId,
+        // [LOCAL-719 / D677 addendum 1] Stamp the NUMERIC server/download id onto
+        // the record. The download snackbar's "View" offers this id (the map
+        // listing's `tour['id']`), and the pure planner matches a saved entry by
+        // it (server_tour_id / tour_id / parent_server_tour_id). Without it a
+        // plain downloaded original — whose `tour_id` is the NON-numeric edit id
+        // (e.g. "2027698c") — matched nothing, so "View" fell back to merely
+        // highlighting instead of opening (observed live on the emulator). It is
+        // also the id the player keys `/unlock-state` on (LOCAL-677B).
+        'server_tour_id': tourId.toString(),
         'editable': isEditable,
         'is_web_storage': kIsWeb,
       };

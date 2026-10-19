@@ -2045,40 +2045,40 @@ class _MyToursScreenState extends State<MyToursScreen> {
     );
   }
 
-  /// [LOCAL-716 / LOCAL-716B / D358] After the tours load, honour a pending
-  /// "View" request from a download snackbar.
+  /// [LOCAL-716 / LOCAL-716B / LOCAL-719 / D677 addendum 1] After the tours
+  /// load, honour a pending "View" request from a download snackbar.
   ///
-  /// The pure [planViewAfterDownload] decides what to do from the loaded
-  /// entries alone:
-  ///   * exactly one tour downloaded, and a saved entry matches the offered
-  ///     server id → open the copy in the language just downloaded (the single
-  ///     translation, the listening-language translation when there are
+  /// "View" ALWAYS opens a player. The pure [planViewAfterDownload] decides
+  /// WHICH from the loaded entries alone:
+  ///   * it walks the offered server ids IN SELECTION ORDER and opens the FIRST
+  ///     that has a saved entry — one tour for a single download, the first the
+  ///     user selected (that succeeded) for a batch;
+  ///   * for that tour it opens the copy in the language just downloaded (the
+  ///     single translation, the listening-language translation when there are
   ///     several, or the original when there are none);
-  ///   * several tours, no id, OR no entry matched the offered id → highlight
-  ///     the newest downloaded tour (and, on a miss, LOG it first — never the
-  ///     old silent return).
+  ///   * only when NO offered id matches any saved entry (or none were offered)
+  ///     does it fall back to highlighting the newest downloaded tour — and on
+  ///     a miss we LOG it first (never the old silent return).
   ///
   /// The request is consumed up front so it fires at most once per load.
   void _consumePendingListenOpen() {
     final req = PendingListenOpen.instance.request.value;
     if (req == null) return;
-    final wantedId = req.tourId;
+    final wantedIds = req.tourIds;
     final language = req.language;
     // Consume up front: this request is for THIS load; a miss must not leave it
     // armed for a later unrelated rebuild.
     PendingListenOpen.instance.consume();
 
-    // "Just show Listen" (several tours downloaded, no single id to open):
-    // highlight the newest and stop.
-    if (wantedId == null) {
+    // "Just show Listen" (nothing to open): highlight the newest and stop.
+    if (wantedIds.isEmpty) {
       _highlightNewestTour();
       return;
     }
 
     final plan = planViewAfterDownload(
       entries: _tours,
-      downloadedTourCount: 1,
-      wantedServerId: wantedId,
+      downloadedTourIds: wantedIds,
       listeningLanguage: language,
     );
 
@@ -2094,11 +2094,11 @@ class _MyToursScreenState extends State<MyToursScreen> {
       return;
     }
 
-    // No silent miss (D358): the offered id matched no saved entry. Log which
-    // id missed and what we had, then fall back to the highlight path so the
-    // user is never left staring at an unchanged list with nothing opened.
+    // No silent miss (D358): none of the offered ids matched a saved entry. Log
+    // which ids missed and what we had, then fall back to the highlight path so
+    // the user is never left staring at an unchanged list with nothing opened.
     unawaited(DebugLogHelper.addDebugLog(
-        'LISTEN: View miss — offered id "$wantedId" (lang=$language) matched no '
+        'LISTEN: View miss — offered ids ${wantedIds.toList()} (lang=$language) matched no '
         'saved entry among ${_tours.length} tours '
         '[${_tours.map((t) => 'tid=${t['tour_id']},sid=${t['server_tour_id']},psid=${t['parent_server_tour_id']},tr=${t['is_translation']},lang=${t['language']}').join(' | ')}]'));
     _highlightNewestTour();
