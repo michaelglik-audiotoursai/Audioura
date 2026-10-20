@@ -87,3 +87,4 @@ tools/.venv-play/
 canary/venue_pool.jsonl
 canary/venue_pool.jsonl.tmp
 canary/tried_venues.jsonl
+.local721_live/
