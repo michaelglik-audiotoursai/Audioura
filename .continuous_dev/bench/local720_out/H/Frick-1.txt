@@ -1,0 +1,12 @@
+ARM H | anthropic:claude-haiku-5-5 | Frick | Portrait of Sir Thomas More
+prompt_chars=8478 status=200 seconds=2.76 usage={'prompt_tokens': 3005, 'completion_tokens': 374, 'total_tokens': 3379, 'cache_read_input_tokens': 0}
+================================================================================
+I'm sorry, but I can't write this audio description as requested, because the source material you've provided doesn't include anything about a work titled "Portrait of Sir Thomas More" at the Frick Collection. The venue sources describe the Gainsborough exhibition and a Cabinet installation of eighteenth-century French fashion plates from Gallerie des modes et costumes français. Nothing in them mentions a More portrait, its medium, its maker, or its history.
+
+Since the guidelines require every physical property, date, and consequence to come from the source material, I'd be inventing the painter, the date, the technique, and the story. I'd rather not do that for a visitor standing in front of a real object.
+
+Here are some ways I can help:
+
+- If you send the wall label, catalogue entry, or a passage about the More portrait, I can write the full stop from that text.
+- I can write an audio description for the Gainsborough exhibition or the fashion-plate Cabinet installation, since both are covered in the sources you've shared.
+- If you want a generic framework for a More portrait stop, I can provide a template with clearly marked placeholders for the details you'd need to fill in from the museum's records.

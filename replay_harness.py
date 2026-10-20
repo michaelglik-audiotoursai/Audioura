@@ -465,20 +465,59 @@ def call_anthropic(model, system_msg, user_msg, timeout=120):
     """[LOCAL-712 / D674] One Anthropic /v1/messages draft, NO retries.
 
     The system message goes in the TOP-LEVEL `system` field (not a message), the
-    user prompt is the single user message, and max_tokens / temperature mirror
-    the OpenAI arm (1000 / 0.7) so the only variable across arms stays the model.
+    user prompt is the single user message, and max_tokens mirrors the OpenAI arm
+    (1000). temperature=0.7 mirrors the OpenAI arm for the LOCAL-712 arms, but the
+    [LOCAL-720] current 5.5 lineup rejects `temperature` (HTTP 400), so it is
+    omitted for those models; the only variable across arms stays the model.
     Usage is normalised to the OpenAI shape (prompt_tokens/completion_tokens) so
     the report aggregates every arm the same way; the network meter reads the raw
     input_tokens/output_tokens off the wire for the $ ledger.
     """
     key = os.environ["ANTHROPIC_API_KEY"]
+    # [LOCAL-720 / D674] The current Claude lineup (Haiku/Sonnet/Opus 5.5) REJECTS
+    # the `temperature` parameter: the live API returns HTTP 400
+    # invalid_request_error "`temperature` is deprecated for this model." The
+    # older LOCAL-712 arms (claude-haiku-4-5, claude-sonnet-5) still accept it.
+    # Omitting an unsupported parameter is required to call these models at all
+    # and does not alter the experiment — temperature was only set to mirror the
+    # OpenAI arm's default; each model simply uses its own default sampling. The
+    # ONLY variable across arms stays the model string.
+    body = {"model": model, "max_tokens": 1000,
+            "system": system_msg,
+            "messages": [{"role": "user", "content": user_msg}]}
+    if "-5-5" not in model:  # 5.5 lineup deprecates temperature; keep it for 712 arms
+        body["temperature"] = 0.7
+    # [LOCAL-720 / D674] The current 5.5 lineup has EXTENDED THINKING on by
+    # default. On our ~4-5k-token narration prompts the hidden reasoning eats the
+    # whole 1000-token output budget, so the `text` block is truncated or never
+    # emitted (chars=0, completion_tokens pinned at the 1000 cap). That is the
+    # same failure the Gemini arm already avoids with thinkingConfig
+    # {thinkingBudget: 0}. To keep every arm a single-pass draft under the SAME
+    # 1000-token budget (the only variable stays the model), turn thinking off
+    # per the control each model accepts — the live API rejects the wrong one
+    # with HTTP 400 and tells you which to use:
+    #   Haiku 5.5  -> {"type": "disabled"}
+    #   Sonnet 5.5 -> {"type": "between_tools"} ("does not think before
+    #                 responding"; with no tools there are no thinking blocks)
+    #   Opus 5.5   -> {"type": "adaptive"} ("disabled" unsupported) plus
+    #                 output_config.effort "low" (the minimum). Opus is a
+    #                 reasoning model whose thinking CANNOT be fully turned off;
+    #                 "low" minimises it (~300 thinking tokens) so the most
+    #                 narration text possible lands within the shared 1000-token
+    #                 budget. On the longest prompts Opus still reaches the cap
+    #                 (stop_reason=max_tokens) — recorded as a finding, not hidden.
+    if model == "claude-haiku-5-5":
+        body["thinking"] = {"type": "disabled"}
+    elif model == "claude-sonnet-5-5":
+        body["thinking"] = {"type": "between_tools"}
+    elif model == "claude-opus-5-5":
+        body["thinking"] = {"type": "adaptive"}
+        body["output_config"] = {"effort": "low"}
     r = requests.post(
         "https://api.anthropic.com/v1/messages",
         headers={"x-api-key": key, "anthropic-version": "2023-06-01",
                  "Content-Type": "application/json"},
-        json={"model": model, "max_tokens": 1000, "temperature": 0.7,
-              "system": system_msg,
-              "messages": [{"role": "user", "content": user_msg}]},
+        json=body,
         timeout=timeout)
     status = r.status_code
     j = r.json()

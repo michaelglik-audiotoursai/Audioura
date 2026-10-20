@@ -1,0 +1,12 @@
+ARM H | anthropic:claude-haiku-5-5 | Walters | Springtime (1872)
+prompt_chars=9465 status=200 seconds=5.11 usage={'prompt_tokens': 3634, 'completion_tokens': 688, 'total_tokens': 4322, 'cache_read_input_tokens': 0}
+================================================================================
+Stand in front of the canvas at an angle, a few steps to the left of center, so the lilac canopy sits above your eye line. From this spot the dappled light on the ground and across the muslin dress reads as separate patches of color rather than blending into a single tone, which is exactly what Monet intended. Head-on, you will miss how the brushwork breaks up the figure's outline.
+
+Springtime, painted in 1872, shows a woman seated in a garden, absorbed in a book. She sits beneath a canopy of lilacs, and sunlight filters through the leaves and falls in loose spots across the ground and her white dress. Monet built the picture from quick, open strokes. Rather than drawing edges, he laid down touches of pale and bright color side by side and let the eye mix them. This method, working outdoors and capturing a fleeting moment of light, is the core of Impressionism. Critics have often pointed to the painting's calm and intimacy. The figure is close and clearly drawn, while the surrounding foliage dissolves into color, so the viewer feels pulled into a quiet domestic scene.
+
+Monet painted this in 1872 in his garden at Argenteuil, a village northwest of Paris. He had married Camille Doncieux in 1870, after she had been his companion and the model for many of his figure paintings of the 1860s and early 1870s. The family had only recently settled in Argenteuil, a riverside village popular with Parisians looking for a day's pleasure. During the spring of 1872, Monet painted several canvases in the garden, several of them showing Camille. This work reflects his effort to turn ordinary family life and the surrounding landscape into the subject of serious painting, using the open-air method that would define his career.
+
+The painting also carries a more sobering history. When Monet's second wife, Alice Hoschedé, had Camille's pictures and personal mementos destroyed, Monet's canvases became one of the few lasting records of Camille's life. Standing here, you are looking at one of the surviving traces of her.
+
+Viewers tend to feel a stillness here, a sense of a private afternoon held in place by light and leaves.

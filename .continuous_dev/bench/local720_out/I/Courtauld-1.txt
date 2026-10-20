@@ -1,0 +1,18 @@
+ARM I | anthropic:claude-sonnet-5-5 | Courtauld | Van Gogh’s iconic Self-Portrait with Bandaged Ear
+prompt_chars=11623 status=200 seconds=9.41 usage={'prompt_tokens': 4255, 'completion_tokens': 1000, 'total_tokens': 5255, 'cache_read_input_tokens': 0}
+================================================================================
+Stand directly in front of Van Gogh's Self-Portrait with Bandaged Ear, about an arm's length back, and let your eyes settle on the right-hand side of the canvas, where the bandage wraps around his head. From here, the paint stops looking like a flat picture and starts looking like something built. You can see the ridges and furrows in the thick strokes along the bandage and the green overcoat, and you can see the small marks on the blank canvas behind him, which seem to be nothing at all.
+
+Van Gogh painted himself in a blue cap trimmed with black fur and a green overcoat. A white bandage covers his ear and runs down under his chin. Behind him, a window stands open, and beside it sits an easel holding a canvas with a few indistinct marks. Pinned to the wall is a Japanese woodblock print, Geishas in a Landscape, made by Satō Torakiyo in the 1870s.
+
+Look at how the paint is applied. Van Gogh used impasto, a technique where paint is laid on so thickly that the marks of the painting knife stay visible. Here that thickness gives the surface a restless energy, and the choice matters because it makes the portrait feel urgent rather than composed. He had admired the same method in the paintings of Adolphe Monticelli, a French painter whose heavily built-up colour Van Gogh praised in a letter to his brother Theo in 1888.
+
+Notice the print on the wall. Van Gogh collected hundreds of Japanese woodblock prints, and he loved their bold colours and flattened space. He copied this one into the background of his own portrait, and the Japanese influence pushed him to modernise his style, flattening the room into zones of colour rather than building depth in the traditional way.
+
+The fur cap has its own story. He had bought it to hold his heavy bandage in place and to protect the wound from the January cold, so it records the hard circumstances in which he was working. In a letter to Theo dated 17 January 1889, he mentioned a new self-portrait, and this is believed to be it.
+
+Now consider the ear itself. On the evening of 23 December 1888, in Arles, Van Gogh's friend and fellow painter Paul Gauguin threatened to leave, and Van Gogh approached him with a razor. Later that night Van Gogh sliced off his own left ear and brought it to a woman named Rachel, who worked as a prostitute in Arles. She was horrified, and the police were called to arrest him as a lunatic. In the painting, the bandage appears on the right side. That is because he painted himself using a mirror, which reverses the image. The wound is on the left, but the picture shows it on the right.
+
+This portrait comes from the collapse of a hope. Van Gogh had left Paris for Arles to found a community of supportive artists he called the Studio of the South. He rented four rooms in the Yellow House and invited Gauguin to join him. The ear was lost in the breakdown of that plan. Within weeks, he picked up his brush and painted himself anyway, working from the mirror, bandage and all.
+
+In this room, he looks out from under the f

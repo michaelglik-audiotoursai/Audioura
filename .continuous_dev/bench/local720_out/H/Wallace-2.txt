@@ -1,0 +1,12 @@
+ARM H | anthropic:claude-haiku-5-5 | Wallace | Madame de Pompadour
+prompt_chars=5829 status=200 seconds=4.8 usage={'prompt_tokens': 2144, 'completion_tokens': 663, 'total_tokens': 2807, 'cache_read_input_tokens': 0}
+================================================================================
+Stand in front of the painting, at about the distance where you can see the whole figure against the dark ground. From here, the soft, almost powdery handling of the face and hands reads clearly, and so does the way the sitter's pose opens diagonally across the canvas. Up close, that surface detail dissolves; from a step back, the composition makes sense.
+
+This is Madame de Pompadour, painted by François Boucher in 1759. Boucher was the leading painter of the French Rococo, the lighter, more playful style of eighteenth-century France that favoured graceful curves, pastel tones and intimate subjects over the heavy drama of earlier court art. Madame de Pompadour was the mistress of King Louis XV and one of the most influential figures at Versailles, and she used art deliberately to shape her public image. Boucher's portrait shows her in a relaxed, elegant attitude, her gaze turned toward the viewer, with the soft modelling of oil paint giving the skin a luminous, almost porcelain quality.
+
+The painting is an oil on canvas, and the artist's brushwork is most visible in the loosely handled lace, the silk and the flowers at the edges of the composition. Those passages are looser than the carefully blended face, a contrast that draws the eye to her features. Boucher was a painter who worked quickly and with great facility, and that fluency is legible here in the sure, economical strokes.
+
+This was the last of a series of seven portraits Boucher made of the marquise, which means the work sits at the end of a long working relationship. By 1759 Boucher had painted her many times, so this canvas records a painter who knew his subject thoroughly and had refined his approach over years. The portrait was first shown at the Château de Versailles, the royal palace where Pompadour's status was most visible, before passing to her brother.
+
+The painting makes you aware of how carefully a court figure presented herself. Her poised, composed expression and the softness of the light suggest a woman who understood the power of an image. You are looking at a portrait designed to be seen, and it still holds that attention today.

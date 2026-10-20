@@ -1,0 +1,22 @@
+ARM J | anthropic:claude-opus-5-5 | Wallace | Madame de Pompadour
+prompt_chars=5829 status=200 seconds=11.88 usage={'prompt_tokens': 2145, 'completion_tokens': 894, 'total_tokens': 3039, 'cache_read_input_tokens': 0}
+================================================================================
+# Madame de Pompadour, by François Boucher
+
+Stand close enough to the canvas of *Madame de Pompadour* that the surface itself comes into focus. From there, the oil paint stops reading as a smooth image and shows the hand of the painter who had studied this same face six times before.
+
+## The Work
+
+This is an oil-on-canvas portrait, painted in 1759, of Madame de Pompadour. Oil paint is slow-drying, so a painter can blend and rework a face over many sittings. That suited a portrait that was meant to refine an image rather than record it for the first time.
+
+That refinement is the key to this canvas. It is the last of seven portraits Boucher painted of her. Each earlier version shaped how she was seen, and this one is the final word in that sequence. Whatever Boucher had settled on after six attempts is what hangs in front of you.
+
+## The Artist
+
+François Boucher was a painter of the French Rococo, the light, ornamental style that dominated French interiors and painting in the eighteenth century. By 1759 he had returned to the same sitter again and again. A series of seven portraits of one person is a sustained working relationship, not a single commission.
+
+The painting was first shown at the Château de Versailles, the French royal palace, before it passed to Madame de Pompadour's brother.
+
+## The Reading
+
+Knowing that this is the seventh and final likeness changes what you see. The face is not a first impression. It is the version that an artist who knew her well chose to leave as his last account of her.

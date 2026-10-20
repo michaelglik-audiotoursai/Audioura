@@ -1,0 +1,230 @@
+[
+  {
+    "arm": "B",
+    "provider": "blind",
+    "model": "blind",
+    "stop_id": "Courtauld-0",
+    "museum": "Courtauld",
+    "title": "Manet’s A Bar at the Folies-Bergère",
+    "artist": "",
+    "prompt_chars": 13031,
+    "status": 200,
+    "seconds": 9.1,
+    "usage": {
+      "prompt_tokens": 4783,
+      "completion_tokens": 980,
+      "total_tokens": 5763,
+      "cache_read_input_tokens": 0
+    },
+    "output": "Stand in the LVMH Great Room, about two metres back from Manet's A Bar at the Folies-Bergère, and let your eyes settle on the barmaid's face first. From here, her expression and the long gold edge of the mirror behind her both fit into your view. Then slide your gaze to the right edge of the canvas, where a small reflected figure appears. That man in the mirror is the key to the picture, and you only catch him once you step back.\n\nThis is oil on canvas, a little over four feet wide, and the whole width is taken up by a mirror. The barmaid, a real woman named Suzon who worked at the Folies-Bergère in the early 1880s, stands facing you. Manet posed her in his studio, not in the music hall itself. Behind her, the mirror reflects the crowded room: the glow of lights, the balconies, and, in the upper left corner, a pair of small green feet, the legs of a trapeze artist performing above the audience.\n\nThe puzzle is the reflection. Her back appears at the right, bent toward a top-hatted man, yet she stands upright and faces you. Critics accused Manet of not understanding perspective. In 2000, the art historian Malcolm Park staged a physical reconstruction of the scene and showed the geometry works. The man is not standing in front of her at all. He stands to the left, outside the painter's view, looking away from her. The viewer is meant to stand to the right, closer to the bar than he is, which departs from the single central viewpoint most perspective pictures assume.\n\nLook at the foreground. A dish of oranges sits on the marble. According to the art historian Larry Ligo, Manet habitually used oranges to signal prostitution. T. J. Clark reads the barmaid as both a saleswoman and a commodity, something to be purchased along with a drink. The beer bottles, the champagne, and the flowers at her bodice are all painted with the same careful attention as her face.\n\nThat face is the center of the picture. Manet's preliminary study placed her off to the right. In the finished canvas he moved her to the middle but left her reflection at the right. In the mirror she seems engaged with a customer. Head-on, she is remote and self-protective.\n\nThe painting also echoes Las Meninas, the masterpiece by Diego Velázquez, an artist Manet admired. Both use a mirror to complicate where the viewer stands.\n\nThis was Manet's last major work. He painted it in 1882 and showed it at the Paris Salon that year, and he died the following year. He was ill, and the scene, full of glitter and noise, is painted with a stillness that sets the barmaid apart from the crowd she serves.\n\nThe painting came to the Courtauld through the collection of Samuel Courtauld, who also owned a version of Manet's Déjeuner sur l'Herbe, Renoir's La Loge, and eight major works by Cézanne.\n\nLook again at the small figure at the far right. The tilt of her reflected body, set against the stillness of the woman facing you, is the last thing Manet wanted you to notice."
+  },
+  {
+    "arm": "B",
+    "provider": "blind",
+    "model": "blind",
+    "stop_id": "Courtauld-1",
+    "museum": "Courtauld",
+    "title": "Van Gogh’s iconic Self-Portrait with Bandaged Ear",
+    "artist": "",
+    "prompt_chars": 11623,
+    "status": 200,
+    "seconds": 9.41,
+    "usage": {
+      "prompt_tokens": 4255,
+      "completion_tokens": 1000,
+      "total_tokens": 5255,
+      "cache_read_input_tokens": 0
+    },
+    "output": "Stand directly in front of Van Gogh's Self-Portrait with Bandaged Ear, about an arm's length back, and let your eyes settle on the right-hand side of the canvas, where the bandage wraps around his head. From here, the paint stops looking like a flat picture and starts looking like something built. You can see the ridges and furrows in the thick strokes along the bandage and the green overcoat, and you can see the small marks on the blank canvas behind him, which seem to be nothing at all.\n\nVan Gogh painted himself in a blue cap trimmed with black fur and a green overcoat. A white bandage covers his ear and runs down under his chin. Behind him, a window stands open, and beside it sits an easel holding a canvas with a few indistinct marks. Pinned to the wall is a Japanese woodblock print, Geishas in a Landscape, made by Satō Torakiyo in the 1870s.\n\nLook at how the paint is applied. Van Gogh used impasto, a technique where paint is laid on so thickly that the marks of the painting knife stay visible. Here that thickness gives the surface a restless energy, and the choice matters because it makes the portrait feel urgent rather than composed. He had admired the same method in the paintings of Adolphe Monticelli, a French painter whose heavily built-up colour Van Gogh praised in a letter to his brother Theo in 1888.\n\nNotice the print on the wall. Van Gogh collected hundreds of Japanese woodblock prints, and he loved their bold colours and flattened space. He copied this one into the background of his own portrait, and the Japanese influence pushed him to modernise his style, flattening the room into zones of colour rather than building depth in the traditional way.\n\nThe fur cap has its own story. He had bought it to hold his heavy bandage in place and to protect the wound from the January cold, so it records the hard circumstances in which he was working. In a letter to Theo dated 17 January 1889, he mentioned a new self-portrait, and this is believed to be it.\n\nNow consider the ear itself. On the evening of 23 December 1888, in Arles, Van Gogh's friend and fellow painter Paul Gauguin threatened to leave, and Van Gogh approached him with a razor. Later that night Van Gogh sliced off his own left ear and brought it to a woman named Rachel, who worked as a prostitute in Arles. She was horrified, and the police were called to arrest him as a lunatic. In the painting, the bandage appears on the right side. That is because he painted himself using a mirror, which reverses the image. The wound is on the left, but the picture shows it on the right.\n\nThis portrait comes from the collapse of a hope. Van Gogh had left Paris for Arles to found a community of supportive artists he called the Studio of the South. He rented four rooms in the Yellow House and invited Gauguin to join him. The ear was lost in the breakdown of that plan. Within weeks, he picked up his brush and painted himself anyway, working from the mirror, bandage and all.\n\nIn this room, he looks out from under the f"
+  },
+  {
+    "arm": "B",
+    "provider": "blind",
+    "model": "blind",
+    "stop_id": "Courtauld-2",
+    "museum": "Courtauld",
+    "title": "Georges Seurat",
+    "artist": "",
+    "prompt_chars": 11634,
+    "status": 200,
+    "seconds": 8.7,
+    "usage": {
+      "prompt_tokens": 4796,
+      "completion_tokens": 845,
+      "total_tokens": 5641,
+      "cache_read_input_tokens": 0
+    },
+    "output": "Find the Georges Seurat on the gallery wall and stand about two metres back, directly in front. Look at the wall behind the seated woman, in the upper left. From this distance the wall's surface hums with tiny dots of colour, and your eye starts blending them into shadow and light. Step in close and they fall apart again into separate specks.\n\nThe painting is Young Woman Powdering Herself, made around 1888 to 1890. A woman sits at a dressing table, bare to the waist, her head bowed over a powder puff held in her raised hand. Her skin is built from small dots of pure colour placed side by side rather than mixed on a palette. Seurat's theory was that the eye, not the brush, should do the mixing, so the paint stays unblended and the colour looks brighter than any mixed pigment could. The technique is called pointillism, and this canvas applies it to an intimate indoor moment rather than a sunlit park or riverbank.\n\nThe woman is Madeleine Knobloch, Seurat's mistress, who bore him two sons. That makes the picture personal in a way his large public canvases were not. Now look to the top left corner. A vase of flowers sits there on a small table. A scanner developed by the Italian Institute of Optics revealed that the vase was originally a reflection of Seurat himself at work, which would have made it the only self-portrait he ever painted. He covered it over, so the one image of himself he made is hidden beneath flowers.\n\nSeurat was in his late twenties, and he was fiercely protective of his private life. He is said to have kept the relationship hidden from his family and friends for years, which gives the overpainted self-portrait added weight. The picture also takes a pointed turn from his earlier work. He had already shown monumental outdoor scenes built from his dot technique, and here he tests it on a single figure, a mirror, and the soft artificial light of a bedroom.\n\nNotice how the dots on the wall shift in density, packed tighter in the shadows and looser where the light falls. That is where Seurat's discipline shows most clearly. The cost of the method was time. Every area required thousands of deliberate touches, and he worked this way until his death at thirty-one in 1891.\n\nWhat lingers is the quiet. A woman lost in a private ritual, painted by a man who first put himself in the room and then removed himself from it.\n\nThe Courtauld shows Seurat alongside its Impressionist and Post-Impressionist masterpieces in the LVMH Great Room, where Manet's A Bar at the Folies Bergère and Van Gogh's Self-Portrait with Bandaged Ear hang nearby."
+  },
+  {
+    "arm": "B",
+    "provider": "blind",
+    "model": "blind",
+    "stop_id": "Walters-0",
+    "museum": "Walters",
+    "title": "Springtime (1872)",
+    "artist": "",
+    "prompt_chars": 9465,
+    "status": 200,
+    "seconds": 8.58,
+    "usage": {
+      "prompt_tokens": 3634,
+      "completion_tokens": 887,
+      "total_tokens": 4521,
+      "cache_read_input_tokens": 0
+    },
+    "output": "Stand about six feet back from Springtime, 1872, and look at the lower half of the canvas, where Camille's muslin dress meets the ground. From here you can see how the same patches of sunlight fall across her lap and across the grass, which is what ties her to the garden around her. Step closer and the dress and the dappled earth break into separate daubs of paint.\n\nSpringtime shows Camille Doncieux, Monet's first wife, seated reading beneath a canopy of lilacs. Her face and form are held in close focus, while the foliage and the light are handled more loosely. Sunlight comes down through the leaves and lands in patches on the ground and on her dress. Muslin is a light, thin cotton, and Monet uses it as a surface that catches those patches and shows them off. The effect is a quiet scene of domestic life, a woman absorbed in her book in a private garden. When the painting was shown in 1876, it carried the plainer title Woman Reading.\n\nThat showing was the second exhibition organized by the Impressionists, the group of painters then working outside the official Salon, held at Paul Durand-Ruel's Paris gallery from March 30 to April 30, 1876. Monet sent eighteen works, and Camille posed for six of them.\n\nMonet painted this in the spring of 1872, soon after settling with his family in Argenteuil, a village northwest of Paris that was a popular resort for city pleasure-seekers. Colleagues often joined him there, and the village became closely associated with Impressionism. He and Camille had married in 1870. Before that she had been his mistress and a model for his figure paintings of the 1860s, and she was talented enough at the work that Auguste Renoir and Édouard Manet used her too. That spring Monet painted a number of canvases in his own garden, often with Camille or with Adélaïde-Eugénie Lescouezec, the companion of fellow painter Alfred Sisley.\n\nThere is a loss attached to this picture. Monet's second wife, Alice Hoschedé, ordered the complete destruction of pictures and mementos from Camille's life with him. As a result, Camille's image survives almost entirely through Monet's paintings. Later depictions show her older and far less attractive, which makes this early garden portrait, with its clear and youthful face, all the more precious.\n\nLook at how little the lilacs ask of her. She is not posed for the viewer. She reads, and the light moves over her, and the painting records an afternoon in a garden that was still hers.\n\nThe Walters Art Museum owns Springtime, and it came out onto the streets of Baltimore in 2012 as a weather-resistant vinyl reproduction at the Cylburn Arboretum, part of an open-air exhibition called Off the Wall."
+  },
+  {
+    "arm": "B",
+    "provider": "blind",
+    "model": "blind",
+    "stop_id": "Walters-1",
+    "museum": "Walters",
+    "title": "The Death of Caesar",
+    "artist": "",
+    "prompt_chars": 7526,
+    "status": 200,
+    "seconds": 9.09,
+    "usage": {
+      "prompt_tokens": 2792,
+      "completion_tokens": 915,
+      "total_tokens": 3707,
+      "cache_read_input_tokens": 0
+    },
+    "output": "I have to flag a problem before the guide begins. The source material for this stop places Camuccini's The Death of Caesar in the National Museum of Capodimonte in Naples, and it contains nothing connecting that painting to the Walters Art Museum in Baltimore. The venue notes concern other works, a 12th-century missal and a Rene Treviño sculpture, so they cannot support a stop at the Walters. Rather than invent a Baltimore location, a gallery position, or a Walters acquisition, I've written the stop around what the sources confirm, and I've left out any physical description of the canvas, since the material gives none.\n\n**Audio Description: The Death of Caesar**\n\nFind The Death of Caesar and stand at the center of the room, a few paces back from the canvas. From there the whole composition reads as one scene, and you can follow how the figures are arranged around the single fallen man.\n\nThis is Vincenzo Camuccini's painting of the assassination of Julius Caesar, the Roman dictator killed by a group of senators in the year 44 BC. Camuccini finished this version in 1806. He had been working on the subject for thirteen years.\n\nThe story begins in 1793, when Frederick Hervey, the Earl of Bristol, commissioned the painting. Camuccini had already made a copy of Raphael's Deposition for him. That same year he completed a cartoon, a full-scale preparatory drawing, and art critics in Rome received it favorably. Then came the setback. In 1796 he produced a first painted version, and it was less well received. Camuccini destroyed it and started again from scratch. The painting before you is the second attempt, and it took another decade.\n\nThe cost of that persistence arrived in 1803, when the Earl died. His heirs refused to pay for the work. Camuccini had spent years on a commission that no one now owed him money for, and he sold the painting to Joachim Murat in 1807. Murat was a French marshal who became king of Naples under Napoleon. After Murat's fall, the painting passed to Ferdinand II of the Two Sicilies and hung in the royal palace in Naples before entering the National Museum of Capodimonte in 1864.\n\nCamuccini was a Roman painter working in the generation after the French Revolution, when artists across Europe turned to ancient Rome for subjects about tyranny, republican virtue, and violent political change. A scene in which senators kill a ruler they believe has grown too powerful spoke directly to that moment. His willingness to destroy a finished picture in 1796 shows how seriously he took the subject.\n\nLook at how the figures press in on the central body. A composition built this way concentrates the violence at a single point rather than scattering it across the room.\n\nThe painting's history, thirteen years of work, a destroyed first version, and a buyer who died before paying, sits behind every figure you see."
+  },
+  {
+    "arm": "B",
+    "provider": "blind",
+    "model": "blind",
+    "stop_id": "Walters-2",
+    "museum": "Walters",
+    "title": "Sappho and Alcaeus",
+    "artist": "",
+    "prompt_chars": 6993,
+    "status": 200,
+    "seconds": 10.06,
+    "usage": {
+      "prompt_tokens": 2592,
+      "completion_tokens": 1000,
+      "total_tokens": 3592,
+      "cache_read_input_tokens": 0
+    },
+    "output": "Stand a few paces back from Sappho and Alcaeus, centered in front of it. The painting is nearly four feet wide, a long horizontal, and from here you can take in the whole sweep of white marble seating at once. Up close you see paint. From this distance you see the theater, and the curve of the tiers pulling your eye toward the two figures at the center.\n\nAlma-Tadema painted this in oil on a wooden panel, 66 by 122 centimeters. The panel gives the surface a hard, smooth finish, which suits the subject. The marble steps are rendered so crisply that the stone seems to hold sunlight. Look at the long bench running through the middle of the picture. Carved into its front edge are names. In the real Theatre of Dionysus in Athens, which this setting is based on, seats were inscribed with the names of Athenian officials. Alma-Tadema replaced those names with the names of Sappho's friends. It is a private joke for anyone who bothers to read the stone.\n\nNow the scene itself. On the left, Alcaeus of Mytilene plays the kithara, a large wooden concert lyre with a sound box and two upright arms, plucked with a pick. Alcaeus was a poet from the island of Lesbos in the late seventh century BC. Facing him sits Sappho, the other great poet of Lesbos, leaning forward with her arm on a cushion. Resting on that cushion is a laurel wreath, the traditional prize for a performer. She holds the reward in reserve while she listens. Around her are several of her female friends, some attentive, some drifting. Behind them, through a screen of trees, is the blue line of the Aegean Sea.\n\nThe picture illustrates a passage by the ancient poet Hermesianax, preserved in a text by Athenaeus called the Deipnosophistae, meaning The Philosophers' Banquet. Alma-Tadema was a scholar's painter. He built his scenes from texts and archaeology, then staged them with a precision that made antiquity look like a place you could walk into.\n\nThe painting was exhibited at the Royal Academy in London in 1881 and was well received. Punch, the satirical magazine, called it \"marbellous,\" a pun on all that marble. The painter William Powell Frith included it in his picture of that same exhibition, A Private View at the Royal Academy, 1881, where the artist John Everett Millais can be seen studying it at the far right.\n\nLawrence Alma-Tadema was Dutch by birth and settled in Britain, becoming one of the most successful painters of the Victorian era. His specialty was the ancient Greek and Roman world, recreated with obsessive archaeological detail. Sappho and Alcaeus shows him at the height of that method, taking a few lines of an ancient poem and building a whole afternoon around them.\n\nNotice how the composition keeps the two poets apart. Alcaeus plays to Sappho, and Sappho listens only to him, while the marble and the sea stretch away behind. The moment is quiet, held between the last note and the wreath.\n\nThe painting came to the Walters through the Balt"
+  },
+  {
+    "arm": "B",
+    "provider": "blind",
+    "model": "blind",
+    "stop_id": "Wallace-0",
+    "museum": "Wallace",
+    "title": "The Laughing Cavalier",
+    "artist": "",
+    "prompt_chars": 9639,
+    "status": 200,
+    "seconds": 9.04,
+    "usage": {
+      "prompt_tokens": 3436,
+      "completion_tokens": 1000,
+      "total_tokens": 4436,
+      "cache_read_input_tokens": 0
+    },
+    "output": "Stand directly in front of The Laughing Cavalier, a little below the frame's midpoint, so your eyes sit around the level of his chest. Hals painted him from a low viewpoint, and from here you look up into the turned shoulder and the great embroidered sleeve. Then step a pace to the left and a pace to the right. His gaze stays fixed on you, and his smile seems to shift with your position.\n\nThe portrait is small for its fame, about 83 by 67 centimetres. The title is a Victorian invention. When the painting was shown in London in 1872, the catalogue called it simply A Cavalier. The word Laughing arrived by 1888, and the man is not laughing at all. He wears a controlled, enigmatic smile, and his upturned moustache does most of the work of making it a grin.\n\nNow look at the sleeve. It is covered in embroidered emblems, and each one means something. Bees, arrows, flaming cornucopiae, which are overflowing horns of plenty set alight, lovers' knots and tongues of fire stand for the pleasures and pains of love. An obelisk or pyramid signifies strength. Mercury's winged cap and his snake-entwined staff, the caduceus, signify good fortune. This is the costume of a man advertising his romantic and commercial hopes.\n\nThen move close to the paint itself. The black silk, the white lace cuff and the embroidery look painstaking, yet they are built from long, quick brushstrokes. Hals did not fuss the surface smooth. He laid the marks down fast and left them visible, so the sleeve seems to shimmer as you move. That speed is the whole point. It gives the portrait its sense of a man caught mid-turn, rather than posed and held. The fabric was also staggeringly costly, yet the painter spent his effort on the flick of the brush, not on polish.\n\nAn inscription at upper right reads aetatis suae 26, anno 1624. It tells us the sitter was twenty-six, so born in 1597 or 1598, and that this was painted in 1624. His name is lost. The old titles suggested a soldier, perhaps an officer in one of the part-time militia companies that Dutch painters often portrayed in group pictures. He may just as easily have been a wealthy civilian. The art historian Pieter Biesboer has proposed the cloth merchant Tieleman Roosterman, who sat for Hals on another occasion.\n\nThe smile matters because it breaks a convention. Commissioned portraits rarely showed adults smiling until the late eighteenth century. Smiles belonged to tronies, which are character studies of expressive faces, and to scenes of everyday life. Hals, the Dutch Golden Age painter working in Haarlem, was the exception. He often gave sitters broader smiles than this, in relaxed poses that suggest movement. The art historian Seymour Slive called this \"one of the most brilliant of all Baroque portraits.\"\n\nAs for Hals himself, the source material here gives us his city and his habits, not the details of his circumstances in 1624, so what can be said is this: the portrait shows a painter"
+  },
+  {
+    "arm": "B",
+    "provider": "blind",
+    "model": "blind",
+    "stop_id": "Wallace-1",
+    "museum": "Wallace",
+    "title": "A Dance to the Music of Time",
+    "artist": "",
+    "prompt_chars": 9704,
+    "status": 200,
+    "seconds": 9.06,
+    "usage": {
+      "prompt_tokens": 3436,
+      "completion_tokens": 1000,
+      "total_tokens": 4436,
+      "cache_read_input_tokens": 0
+    },
+    "output": "Stand a few steps back from *A Dance to the Music of Time*, near the centre of the canvas, so that the ring of four dancers sits at eye level. From here the circle reads as a closed loop, and you can see how the whole picture turns on it. Then let your eye travel up and to the left, into the sky, where a second, smaller procession is easy to miss from close range.\n\nThe painting shows four figures holding hands and dancing in a ring, one seen mostly from behind. At the right sits Time, a winged, naked greybeard, playing a lyre. Behind them, in the early-morning sky, Aurora, goddess of the dawn, goes ahead of the chariot of Apollo, the sun god. The Hours accompany him, and he holds a ring that stands for the Zodiac. The dancers and the sky are two views of the same clock: one turning on the ground, one turning overhead.\n\nWho the dancers are has never been settled. According to the biographer Gian Pietro Bellori, the patron, Giulio Rospigliosi, dictated the subject. On that account the four are Poverty, Labour, Riches, and Pleasure or Luxury, a cycle in which Pleasure leads back round to Poverty. Map those onto the Four Seasons and Poverty is Autumn, Labour is Winter, and so on. The art historian Anthony Blunt argued that the figure at the back, unusually for a Season, is male, and the museum now describes him as Bacchus, the god of wine. That fits a story in which Jupiter, answering complaints from the Seasons and Time about the misery of mortal life, gave the world Bacchus and his wine as compensation.\n\nNot everyone accepts this as the original idea. Malcolm Bull traces the imagery to the Greek poet Nonnus, as filtered through the French poet Ronsard. In that text Spring wears roses in her hair, Autumn's brow is wreathed with olive, Winter has bound hair and a shadowed face, and Summer is dressed in white with ears of corn in her braids. Bull suggests Rospigliosi, a writer fond of allegory, invented the Poverty-and-Riches reading during or after the painting's completion. The scholar Ingamells goes further and doubts that Poussin cared much about pinning down each identity.\n\nLook closely at the surface and you can see the painter changing his mind. Pentimenti, the ghostly traces of earlier decisions, show that Poussin removed a second, larger tree on the right, between Winter and Time, clearing space around the old musician. The painting is in generally good condition, though it has been retouched. A large L-shaped tear once ran straight through the central group of dancers, and the repair is part of what you are looking at.\n\nPoussin was a French painter working in Rome, and this canvas, made between about 1634 and 1636, comes from the period when he was turning toward the ordered, classical manner that would define him. It was a commission, and he was working to a patron's intricate programme rather than inventing freely.\n\nThe title is later than the picture. Before the Wallace Collection catalogue of 1913, it went by"
+  },
+  {
+    "arm": "B",
+    "provider": "blind",
+    "model": "blind",
+    "stop_id": "Wallace-2",
+    "museum": "Wallace",
+    "title": "Madame de Pompadour",
+    "artist": "",
+    "prompt_chars": 5829,
+    "status": 200,
+    "seconds": 7.97,
+    "usage": {
+      "prompt_tokens": 2144,
+      "completion_tokens": 648,
+      "total_tokens": 2792,
+      "cache_read_input_tokens": 0
+    },
+    "output": "Stand about two metres back from Madame de Pompadour, centred on the canvas, and let your eye settle on her face before the room's other paintings pull it away. From this distance the whole composition resolves at once: the sitter, the dress, and the setting read as a single arrangement, and the face stays calm at the centre while the rest of the picture moves around it.\n\nThis is a 1759 oil painting on canvas by François Boucher, the leading French Rococo painter of his day. Rococo was the light, ornamental style of the French court in the mid-eighteenth century, built on curving lines, soft colour, and scenes of leisure and elegance. Boucher painted Madame de Pompadour, the official mistress of King Louis XV, and this canvas was the last of seven portraits he made of her. That count matters. It closes a long run of images in which he had shown her in different guises across the years.\n\nThe picture was first shown at the Château de Versailles, the royal palace outside Paris where the king held court. A portrait of the king's favourite, hung in his own residence, was a public statement as much as a likeness. After that it passed to the sitter's brother.\n\nLook at what the oil paint is doing. Boucher builds the surface from thin, luminous layers, so that skin, silk, and flowers each carry their own sheen. The fabric is where his technique shows most. Satin and lace are rendered through small shifts of light and shadow rather than hard outlines, which is why the dress seems to rustle even though nothing moves.\n\nOf Boucher's life, the source material tells us only what the series itself shows. He returned to the same sitter seven times, and this was the final return.\n\nBecause it ends that sequence, the painting carries a sense of an ending. The soft finish and the poised, unhurried sitter give it a quiet, settled mood, and knowing it is the last of seven makes that stillness feel deliberate.\n\nThis portrait now hangs in the Wallace Collection, whose strength in eighteenth-century French art makes it a natural home for Boucher's work."
+  },
+  {
+    "arm": "B",
+    "provider": "blind",
+    "model": "blind",
+    "stop_id": "Frick-0",
+    "museum": "Frick",
+    "title": "Officer and Laughing Girl",
+    "artist": "",
+    "prompt_chars": 10658,
+    "status": 200,
+    "seconds": 9.17,
+    "usage": {
+      "prompt_tokens": 3742,
+      "completion_tokens": 985,
+      "total_tokens": 4727,
+      "cache_read_input_tokens": 0
+    },
+    "output": "Stand a few feet back from Officer and Laughing Girl and center yourself on the woman's face. From there you can take in the whole small canvas at once: the soldier's dark bulk on the left, the pale window light, and the map behind them. Then step closer to the officer's hat, where the paint becomes more interesting.\n\nThis is an oil painting on canvas, about 50 centimeters by 46, made around 1657. The soldier is huge by comparison with the woman. He sits in the immediate foreground, in a red coat with a black sash that marks him as an officer, and his wide-brimmed hat is a dark mass that blocks much of the left side. Painters call this device repoussoir, a French term for placing a large object up front so that everything behind it seems to recede. It makes the room feel deep and makes the girl look small and distant, bathed in light. Vermeer probably learned it from followers of Caravaggio, the Italian master of dramatic shadow.\n\nLook at that hat. It is beaver pelt, which was weather-resistant, and the pelts were imported from the New World, probably from New Netherland, the Dutch colony in what is now the eastern United States. The painting is carrying the fur trade into a small room in Delft.\n\nThe map on the wall is the other piece of global trade. It is identifiable as Willem Blaeu's 1621 map of Holland and West Friesland, mounted on linen and wooden rods. Vermeer evidently owned a copy, because he used it in three paintings.\n\nNow the woman. She wears a yellow bodice with braiding, called a schort, which was everyday dress, and a blue apron mostly lost in the shadow of the table. Blue aprons were common because they hid stains. That detail has led historians to suggest the officer has dropped in on her during her morning chores. She holds a wine glass, and since wine cost more than beer, it hints at some wealth.\n\nX-ray photographs reveal that Vermeer changed his mind. He first planned to give her a large white collar that would have covered much of the yellow dress. He painted it out. He also later extended her cap to cover all her hair, which pulls the eye toward her face and her smile.\n\nScholars disagree about what is happening. Many see an innocent, honorable courtship. Others read her open hand and smile as a discreet willingness to engage in sex. Historians believe a painting by Gerard van Honthorst inspired the composition, and that Vermeer may have used a camera obscura, an early optical device that projects a room's image, to set the perspective.\n\nThe woman resembles Vermeer's wife, Catharina Bolnes, who is believed to have posed for many of his paintings. The yellow dress, the window on the left, and the map all return in other works. What is new here is the man at the table.\n\nThe picture hangs here as one of the Frick's three Vermeers, alongside Girl Interrupted at Her Music and Mistress and Maid.\n\nThe light touches her face, yet the large, dark shape of the officer is what stays with you, a presence that fills the room and leaves her smile the brightest thing in it."
+  },
+  {
+    "arm": "B",
+    "provider": "blind",
+    "model": "blind",
+    "stop_id": "Frick-1",
+    "museum": "Frick",
+    "title": "Portrait of Sir Thomas More",
+    "artist": "",
+    "prompt_chars": 8478,
+    "status": 200,
+    "seconds": 7.77,
+    "usage": {
+      "prompt_tokens": 3005,
+      "completion_tokens": 821,
+      "total_tokens": 3826,
+      "cache_read_input_tokens": 0
+    },
+    "output": "I have to flag a problem before I begin. The source material you've given me covers a Gainsborough exhibition and a Cabinet installation of French fashion plates, but it says nothing about Portrait of Sir Thomas More, the painting by Hans Holbein the Younger that hangs at the Frick. I have no source facts about its medium, date, composition, or Holbein's circumstances, and I won't invent them. Below is a stop that gives you accurate orientation and uses what the sources do establish. If you can send me material on the Holbein itself, I will write the full work-and-artist description you asked for.\n\nHere is the audio text I can responsibly offer.\n\nStand directly in front of Portrait of Sir Thomas More, at about arm's length from the rope, with your eyes level with the sitter's face. From that distance you can read the expression in the eyes and mouth, which is where a portrait like this does its work and where you would lose it by hanging back.\n\nI can't responsibly describe how this painting was made or what it meant to its painter, because the material in front of me doesn't cover it. What I can tell you is how the Frick frames the act of looking at portraits right now.\n\nThe museum is currently showing Gainsborough: The Fashion of Portraiture, its first special exhibition devoted to the artist and the first on his portraiture ever held in New York. It argues that a painted portrait was subject to fashion just as the sitter's clothing was. The shape, size, and handling of a portrait could be avant-garde or out of date, the same way the cut of a jacket could.\n\nThat idea is worth carrying to this painting. A portrait is a record of a person, and it is also a choice about how to present them, made within the conventions of its moment.\n\nAlongside the Gainsborough show, a Cabinet installation displays twenty-four hand-colored engravings of French fashion from the late eighteenth century. They come from Gallerie des modes et costumes français, published between 1778 and 1787 and the largest and most influential series of its kind. It ran to over four hundred images, billed as drawn from life, showing the headwear, jewelry, and dress of French people from many walks of life. No complete set survives, because many sheets were thrown away when styles changed and others may have been lost in the French Revolution.\n\nThe Frick Art Research Library holds three hundred and seventy original prints from the series, and this is the first time a selection has been shown at the museum.\n\nIf you send me the facts on Holbein's portrait, I'll replace this with the full stop: the technique, the cost, the artist's turning point, and the emotional reading."
+  },
+  {
+    "arm": "B",
+    "provider": "blind",
+    "model": "blind",
+    "stop_id": "Frick-2",
+    "museum": "Frick",
+    "title": "Portrait of Comtesse d'Haussonville",
+    "artist": "",
+    "prompt_chars": 12516,
+    "status": 200,
+    "seconds": 9.35,
+    "usage": {
+      "prompt_tokens": 4319,
+      "completion_tokens": 1000,
+      "total_tokens": 5319,
+      "cache_read_input_tokens": 0
+    },
+    "output": "Stand directly in front of Portrait of Comtesse d'Haussonville, a few steps back and level with her face. From here the small mirror behind her comes into focus. Her profile and the back of her head are reflected in it, and you can only see the full trick of the composition when you face the painting squarely.\n\nThe painting is oil on canvas, finished in 1845, and the palette is held to pale blue, grey, brown, gold and white. Louise de Broglie, Countess d'Haussonville, stands fully frontal and looks out at you with a demure expression. Her dress is heavily folded satin in a cold grey-blue, painted in the same hue as her eyes. That match is deliberate. The color of the gown and the color of the gaze become one cool note running through the picture.\n\nLook at her arms. Her right arm is sinuous and unnaturally elongated, bending in a way a real arm would not. Her left index finger rests coyly near her mouth. Ingres bent anatomy to serve line, because he cared more about a flowing contour than about measured accuracy. That finger and that arm were the central motif of every version he attempted.\n\nThe mirror is a motif Ingres first used in his 1814 Portrait of Madame de Senonnes, where the sitter is also reflected in the background. Here it lets him show her from two angles at once. On the dresser in front of it sit writing materials, pots, flowers and a lavishly decorated oriental vase. The writing materials suit her. Louise de Broglie was highly educated and later became an essayist and biographer, publishing historical romance novels based on the lives of Lord Byron, Robert Emmett and Margaret of Valois. A crimson ribbon sits at the back of her parted hair, the one hot color against all that cool blue.\n\nThe picture cost its sitter and its maker real patience. Ingres had sketched her in black chalk two or three years earlier and begun an oil version, which left out the mirror and reversed the pose. He abandoned it when she became pregnant with her third child and could no longer pose. The sessions were long and slow, and she found them wearisome, complaining that for nine days Ingres had been painting on one of the hands. The 1842 canvas stayed unfinished.\n\nIngres was the leading French Neoclassical painter, a movement that favored clear outline and ideals drawn from ancient Greece and Rome. By 1845 his fame was at its height and portraits were in demand. He resented that. He saw history painting, scenes from myth and the past, as his true calling, yet it paid far less. He committed to only two portraits at that time, this one and the Baronne de Rothschild. Today those portraits are what he is best known for.\n\nHe was never satisfied. Even after the family approved, and after the statesman Adolphe Thiers remarked that Ingres must be in love with her to have painted her that way, Ingres wrote that he did not feel he had conveyed all the graces of his charming model.\n\nWhen it was shown at the 1846 Bonne-Nouvelle exhibition, the poet Charles Baudelaire praised it for its voluptuousness and called Ingres the quintess"
+  }
+]

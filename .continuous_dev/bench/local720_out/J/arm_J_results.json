@@ -1,0 +1,230 @@
+[
+  {
+    "arm": "J",
+    "provider": "anthropic",
+    "model": "claude-opus-5-5",
+    "stop_id": "Courtauld-0",
+    "museum": "Courtauld",
+    "title": "Manet’s A Bar at the Folies-Bergère",
+    "artist": "",
+    "prompt_chars": 13031,
+    "status": 200,
+    "seconds": 11.02,
+    "usage": {
+      "prompt_tokens": 4784,
+      "completion_tokens": 1000,
+      "total_tokens": 5784,
+      "cache_read_input_tokens": 0
+    },
+    "output": "# Manet's *A Bar at the Folies-Bergère*: Audio Description\n\n**Orientation**\n\nStand in front of Manet's *A Bar at the Folies-Bergère*, then move a few steps to your right and slightly closer to the canvas. In 2000, the art historian Malcolm Park staged a physical reconstruction of this scene and found that the painting's viewpoint lies there, to the right and nearer the bar than the man reflected at the far right edge. From that spot, the reflections that critics called impossible fall into place, and the picture's central trick becomes clear.\n\n**The Work**\n\nA young woman stands behind a mar"
+  },
+  {
+    "arm": "J",
+    "provider": "anthropic",
+    "model": "claude-opus-5-5",
+    "stop_id": "Courtauld-1",
+    "museum": "Courtauld",
+    "title": "Van Gogh’s iconic Self-Portrait with Bandaged Ear",
+    "artist": "",
+    "prompt_chars": 11623,
+    "status": 200,
+    "seconds": 13.06,
+    "usage": {
+      "prompt_tokens": 4256,
+      "completion_tokens": 1000,
+      "total_tokens": 5256,
+      "cache_read_input_tokens": 0
+    },
+    "output": "# Van Gogh's Self-Portrait with Bandaged Ear\n\n**Orientation**\n\nVan Gogh's iconic Self-Portrait with Bandaged Ear rewards two positions. Start a step or two back, roughly centred, so the whole room behind him comes into view: an open window on one side, an easel, and a Japanese print on the wall. From a distance these read as one interior. Then move in close and stand slightly to one side, so the gallery light rakes across the surface. From that angle the paint stops being flat colour and becomes ridges. These raised marks are what Van Gogh wanted you to see, and from straight on they almost disappear.\n\n**The Work**\n\nVan Gogh shows himself in a green overcoat and a blue cap trimmed with black fur. A white bandage covers one ear and wraps down under his chin. The cap was a recent purchase. He bought it to hold the heavy dressing in place and to keep out the winter cold, so even his clothing records the injury.\n\nThe bandage appears over his right ear, but it was his left ear he had cut. He painted the portrait by looking into a mirror, which reversed the image. What you see is his reflection, not the face others saw.\n\nBehind him, the easel holds a canvas with only a few indistinct marks on it. This is a painter showing himself at work again, with the next picture barely begun. On the wall hangs a real Japanese woodblock print, *Geishas in a Landscape*, made by Satō Torakiyo in the 1870s. Van Gogh owned it. He collected hundreds of Japanese prints, and their bold colours and spatial effects pushed him to modernise his own style. Here he places one of those prints directly beside his wounded face, as if"
+  },
+  {
+    "arm": "J",
+    "provider": "anthropic",
+    "model": "claude-opus-5-5",
+    "stop_id": "Courtauld-2",
+    "museum": "Courtauld",
+    "title": "Georges Seurat",
+    "artist": "",
+    "prompt_chars": 11634,
+    "status": 200,
+    "seconds": 11.25,
+    "usage": {
+      "prompt_tokens": 4797,
+      "completion_tokens": 1000,
+      "total_tokens": 5797,
+      "cache_read_input_tokens": 0
+    },
+    "output": "# Georges Seurat: *Young Woman Powdering Herself*\n\n## Orientation\n\nSeurat's *Young Woman Powdering Herself* is best seen from two distances. From a few paces back, the wall behind the woman looks like a smooth field of shifting light and shade. Step closer and that field breaks apart into thousands of small, separate dots of colour, which is how Seurat built the whole image. Then look to the top left-hand corner, at the vase of flowers. That patch hides the most personal secret in the painting.\n\n## The Work\n\nA young woman sits at a small dressing table, powder puff raised, absorbed in her own reflection. The painting dates from between 1888 and 1890, and it is one of the major works Seurat completed before his early death.\n\nThe technique matters most here. Seurat did not mix his colours on the palette. He placed small dots of pure, unmixed colour side by side and varied how densely and intensely he clustered them. The modulation of light and shadow on the wall comes entirely from those changing concentrations. Where the dots crowd together or deepen in tone, the wall darkens. Where they thin out or brighten, it seems to glow. Your eye does the blending, so the colour stays vivid rather than muddy.\n\nThis method is called pointillism, after the French word for a point or dot. Seurat developed it together with the painter Paul Signac. It became the signature of Neo-Impressionism, the movement that took the Impressionists' interest in light and tried to make it systematic and almost scientific.\n\nThe subject is intimate. The model was Madeleine Knobloch, Seurat's mistress, who bore him two sons. Seurat kept this relationship largely private, so the painting is unusually personal: a portrait of the woman he shared his life with, caught in a private daily ritual.\n\nThe painting held an even more personal layer. A scanner developed by the Italian Institute of Optics revealed that the vase of flowers in the top left corner was not"
+  },
+  {
+    "arm": "J",
+    "provider": "anthropic",
+    "model": "claude-opus-5-5",
+    "stop_id": "Walters-0",
+    "museum": "Walters",
+    "title": "Springtime (1872)",
+    "artist": "",
+    "prompt_chars": 9465,
+    "status": 200,
+    "seconds": 12.25,
+    "usage": {
+      "prompt_tokens": 3635,
+      "completion_tokens": 1000,
+      "total_tokens": 4635,
+      "cache_read_input_tokens": 0
+    },
+    "output": "# Springtime (1872): Audio Description\n\n## Orientation\n\nStand a few steps back from **Springtime (1872)**, roughly in the centre of the gallery floor rather than right up against the frame. Up close, the canvas breaks apart into separate touches of paint. From a little distance, those touches settle into what Monet was chasing: sunlight filtering through a canopy of lilacs and landing in bright patches on the ground and across a woman's pale muslin dress. Then move closer to her face, which Monet painted in sharper focus than anything around it.\n\n## The Work\n\nA young woman sits quietly reading in a garden, shaded by flowering lilacs. She is Camille Doncieux, Monet's first wife. The painting has gone by two names. Today it is called *Springtime*, and it is also known as *The Reader*.\n\nThe key to the picture is light. Monet did not paint the sun directly. He showed it breaking through leaves and scattering across the scene, so that the muslin of Camille's dress catches it in irregular pools. That fine, thin cotton fabric becomes a surface for recording light, and the dappled patches are the real subject as much as the woman herself. Her face and figure are held in close focus, which gives her a calm stillness at the centre of all that flickering brightness. The scene is an intimate moment of domestic life in a private garden, painted at home"
+  },
+  {
+    "arm": "J",
+    "provider": "anthropic",
+    "model": "claude-opus-5-5",
+    "stop_id": "Walters-1",
+    "museum": "Walters",
+    "title": "The Death of Caesar",
+    "artist": "",
+    "prompt_chars": 7526,
+    "status": 200,
+    "seconds": 13.1,
+    "usage": {
+      "prompt_tokens": 2793,
+      "completion_tokens": 1000,
+      "total_tokens": 3793,
+      "cache_read_input_tokens": 0
+    },
+    "output": "**A note before the script:** The source material places Vincenzo Camuccini's *The Death of Julius Caesar* in the National Museum of Capodimonte in Naples, not the Walters Art Museum. The venue sources do not mention this painting at all. Please confirm which work is on view in Baltimore before recording. The source also gives no details about the painting's medium, size, or composition, so the script below does not invent them.\n\n---\n\n**The Death of Caesar — Audio Stop**\n\nStand back far enough from *The Death of Caesar* to take in the whole scene at once. This is a painting about a crowd closing in on one man, and its meaning depends on the relationship between the figures, not on any single face. Up close, you see individuals. From a distance, you see the trap.\n\nThe painting shows the assassination of Julius Caesar, the Roman general and dictator stabbed by senators in 44 BC. For artists around 1800, this was more than ancient history. It was a story about power, conspiracy, and whether killing a ruler could be justified. Those questions felt urgent in a Europe living through revolution.\n\nThe painter is Vincenzo Camuccini. The painting was commissioned in 1793 by Frederick Hervey, the 4th Earl of Bristol, an English aristocrat and collector. Camuccini had already made him a copy of Raphael's *Deposition*, a Renaissance painting of Christ's body being carried to the tomb. The new commission was Camuccini's chance to move from copying a master to inventing his own grand composition.\n\nHe began with a cartoon, a full-scale preparatory drawing used to plan a large painting. Critics in Rome received it favourably. But when he finished a first painted version in 1796, it was less well received. So Camuccini destroyed it and started again from nothing. The version that survives took another ten years and was completed in 1806. Thirteen years separate the first drawing from the final brushstroke.\n\nEven then, the work nearly went unpaid. The Earl had died in 1803, and his heirs refused to pay for it. Camuccini sold it instead in 1807"
+  },
+  {
+    "arm": "J",
+    "provider": "anthropic",
+    "model": "claude-opus-5-5",
+    "stop_id": "Walters-2",
+    "museum": "Walters",
+    "title": "Sappho and Alcaeus",
+    "artist": "",
+    "prompt_chars": 6993,
+    "status": 200,
+    "seconds": 12.02,
+    "usage": {
+      "prompt_tokens": 2593,
+      "completion_tokens": 1000,
+      "total_tokens": 3593,
+      "cache_read_input_tokens": 0
+    },
+    "output": "# Sappho and Alcaeus: Audio Description\n\n**Orientation**\n\nBegin a few steps back from *Sappho and Alcaeus* so the whole wide panel fits in your view. The painting is nearly twice as wide as it is tall, and from a distance you can see how it is built: a single musician on one side, a curved bank of listeners on the other, and the sea beyond them. Then move in close to the white marble seats where the women sit. Letters are carved into the stone, and up close they become readable. That lettering holds the painter's most deliberate change to history.\n\n**The Work**\n\nThis is an oil painting on a wooden panel, about 66 by 122 centimetres. It imagines a concert on the Greek island of Lesbos in the late 7th century BC. The performer is Alcaeus of Mytilene, a lyric poet from the island's chief city. He plays the kithara, the large stringed instrument used by professional Greek musicians. Facing him is Sappho, the most celebrated woman poet of the ancient world and his fellow islander. Several of her female friends sit with her.\n\nSappho leans forward, listening closely. Her arm rests on a cushion, and on that cushion lies a laurel wreath, the traditional prize for a winning performer. It is presumably meant for Alcaeus. The painting gives no sign of whether he will receive it.\n\nThe scene illustrates a passage by Hermesianax, a Greek poet whose lines survive only because a later writer quoted them. That writer was Athenaeus, who preserved them in his *Deipnosophistae*, or *The Philosophers' Banquet*, a sprawling collection of dinner-table conversation and quotation. So the painting rests on a fragment of a fragment, a scene reconstructed from a text that itself survives only secondhand.\n\nThe setting is borrowed. The tiers of white marble seating are modelled on the Theatre of"
+  },
+  {
+    "arm": "J",
+    "provider": "anthropic",
+    "model": "claude-opus-5-5",
+    "stop_id": "Wallace-0",
+    "museum": "Wallace",
+    "title": "The Laughing Cavalier",
+    "artist": "",
+    "prompt_chars": 9639,
+    "status": 200,
+    "seconds": 12.07,
+    "usage": {
+      "prompt_tokens": 3437,
+      "completion_tokens": 1000,
+      "total_tokens": 4437,
+      "cache_read_input_tokens": 0
+    },
+    "output": "# The Laughing Cavalier, by Frans Hals\n\n## Orientation\n\nStand close to *The Laughing Cavalier*, within arm's length of the frame, and look at the man's right sleeve and lace cuff. From here, the embroidery dissolves into long, quick strokes of the brush, which you cannot see from across the room. Then step back and walk slowly from one side of the painting to the other. His eyes stay on you the whole way.\n\n## The Work\n\nA man of twenty-six turns toward you, one hand on his hip, his elbow pushing out at the viewer. We know his age because Frans Hals painted it into the picture. In the top right corner, a small Latin inscription reads *aetatis suae 26, anno 1624*: \"in his twenty-sixth year, in the year 1624.\" He was therefore born in 1597 or 1598.\n\nWe do not know his name. Nineteenth-century titles in Dutch, English and French cast him as a soldier, perhaps an officer in the part-time civic militias that the Dutch liked to have painted in large group portraits. Hals painted several of those groups, and so did Rembrandt, the Amsterdam painter whose *Night Watch* of 1642 is the most famous example. But this man could just as easily have been a wealthy civilian. The art historian Pieter Biesboer has suggested he may be Tieleman Roosterman, a Dutch cloth merchant born in 1598, whom Hals portrayed on another occasion.\n\nWhoever he was, he paid for display. His silk costume was gorgeous and very expensive, and Hals arranged the picture to show it off. The low viewpoint and the turning pose, which Hals used in other portraits too, push the embroidered sleeve and the lace cuff toward the front of the picture. Up close, you can see the trick behind the effect. Embroidery that must have taken someone weeks to stitch is rendered in long, rapid brushstrokes. That speed is what makes the portrait feel lively and spontaneous rather than stiff.\n\nThe embroidery also carries a message. Some of the stitched emblems stand for the"
+  },
+  {
+    "arm": "J",
+    "provider": "anthropic",
+    "model": "claude-opus-5-5",
+    "stop_id": "Wallace-1",
+    "museum": "Wallace",
+    "title": "A Dance to the Music of Time",
+    "artist": "",
+    "prompt_chars": 9704,
+    "status": 200,
+    "seconds": 12.6,
+    "usage": {
+      "prompt_tokens": 3437,
+      "completion_tokens": 1000,
+      "total_tokens": 4437,
+      "cache_read_input_tokens": 0
+    },
+    "output": "# A Dance to the Music of Time, by Nicolas Poussin\n\n## Where to Stand\n\nStand first at arm's length from the left edge of *A Dance to the Music of Time*, level with the stone pillar beside the dancers. From here you can see that its carved head has two faces, one young and one old. From across the room it reads as a plain garden statue. Then step back to the centre of the room and look up into the sky. The dancers' rhythm is repeated by a second procession overhead, moving across the dawn clouds.\n\n## The Work\n\nFour figures hold hands and dance in a ring, facing outward. On the right, Time sits and plays a lyre. He is the winged, naked, grey-bearded old man. Above them, the day is beginning. Aurora, goddess of the dawn, flies ahead of the chariot of Apollo, the sun-god. Apollo holds a ring that stands for the Zodiac, the circle of constellations that marks the passing year. Around him travel the Hours, the goddesses of time's divisions. Down on the ground, the seasons turn. Up in the sky, the hours turn. Time keeps both in step.\n\nPoussin painted it between about 1634 and 1636 for Giulio Rospigliosi, a churchman who later became Pope Clement IX. Gian Pietro Bellori left one of the earliest written accounts of the picture. He says Rospigliosi"
+  },
+  {
+    "arm": "J",
+    "provider": "anthropic",
+    "model": "claude-opus-5-5",
+    "stop_id": "Wallace-2",
+    "museum": "Wallace",
+    "title": "Madame de Pompadour",
+    "artist": "",
+    "prompt_chars": 5829,
+    "status": 200,
+    "seconds": 11.88,
+    "usage": {
+      "prompt_tokens": 2145,
+      "completion_tokens": 894,
+      "total_tokens": 3039,
+      "cache_read_input_tokens": 0
+    },
+    "output": "# Madame de Pompadour, by François Boucher\n\nStand close enough to the canvas of *Madame de Pompadour* that the surface itself comes into focus. From there, the oil paint stops reading as a smooth image and shows the hand of the painter who had studied this same face six times before.\n\n## The Work\n\nThis is an oil-on-canvas portrait, painted in 1759, of Madame de Pompadour. Oil paint is slow-drying, so a painter can blend and rework a face over many sittings. That suited a portrait that was meant to refine an image rather than record it for the first time.\n\nThat refinement is the key to this canvas. It is the last of seven portraits Boucher painted of her. Each earlier version shaped how she was seen, and this one is the final word in that sequence. Whatever Boucher had settled on after six attempts is what hangs in front of you.\n\n## The Artist\n\nFrançois Boucher was a painter of the French Rococo, the light, ornamental style that dominated French interiors and painting in the eighteenth century. By 1759 he had returned to the same sitter again and again. A series of seven portraits of one person is a sustained working relationship, not a single commission.\n\nThe painting was first shown at the Château de Versailles, the French royal palace, before it passed to Madame de Pompadour's brother.\n\n## The Reading\n\nKnowing that this is the seventh and final likeness changes what you see. The face is not a first impression. It is the version that an artist who knew her well chose to leave as his last account of her."
+  },
+  {
+    "arm": "J",
+    "provider": "anthropic",
+    "model": "claude-opus-5-5",
+    "stop_id": "Frick-0",
+    "museum": "Frick",
+    "title": "Officer and Laughing Girl",
+    "artist": "",
+    "prompt_chars": 10658,
+    "status": 200,
+    "seconds": 12.24,
+    "usage": {
+      "prompt_tokens": 3743,
+      "completion_tokens": 1000,
+      "total_tokens": 4743,
+      "cache_read_input_tokens": 0
+    },
+    "output": "# Officer and Laughing Girl: Audio Description\n\n**Orientation**\n\nStand directly in front of *Officer and Laughing Girl*, about three paces back, with your eyes level with the woman's face. From here the officer's dark back fills the lower left like a shadow cast toward you, and the room seems to recede past him to her and to the open window. Then step close to the wall map behind her. Up close you can see that Vermeer painted it as a real object, mounted on linen and hung from wooden rods.\n\n**The Work**\n\nThis is an oil painting on canvas, only 50.5 by 46 centimetres, made around 1657 by the Dutch painter Johannes Vermeer. A young woman sits at a table near a window, with light falling from the left across her face. Opposite her, with his back half-turned to us, sits a cavalry officer in a red coat. His black sash marks his rank as an officer. His wide-brimmed hat is made of beaver pelt, which was prized because it resisted rain and snow. Those pelts were imported from the New World, probably from New Netherland, the Dutch-controlled territory in what is now the eastern United States.\n\nThe officer is the painting's key compositional choice. Vermeer pushes him into the immediate foreground, large and dark, so that he frames the brighter, smaller woman beyond him. This device is called repoussoir, which means placing an object up front to deepen the space behind it. Caravaggio, the Italian painter, used it often, and Vermeer probably learned it from the work of Caravaggio's imitators. Art historians also believe Vermeer may have used a camera obscura, a darkened box with a lens that projects an image. That would help explain why the officer looms so much larger than the woman, though they sit only a table's width apart.\n\nX"
+  },
+  {
+    "arm": "J",
+    "provider": "anthropic",
+    "model": "claude-opus-5-5",
+    "stop_id": "Frick-1",
+    "museum": "Frick",
+    "title": "Portrait of Sir Thomas More",
+    "artist": "",
+    "prompt_chars": 8478,
+    "status": 200,
+    "seconds": 10.43,
+    "usage": {
+      "prompt_tokens": 3006,
+      "completion_tokens": 928,
+      "total_tokens": 3934,
+      "cache_read_input_tokens": 0
+    },
+    "output": "# Portrait of Sir Thomas More: Audio Stop Not Possible With the Provided Sources\n\nI can't write this stop accurately with the material provided.\n\n## The Problem\n\nThe source material contains no information about *Portrait of Sir Thomas More*. It covers two other things at the Frick:\n\n- **Gainsborough: The Fashion of Portraiture**, an exhibition of more than two dozen portraits by Thomas Gainsborough (1727–1788).\n- **A Cabinet installation of twenty-four hand-colored engravings** from *Gallerie des modes et costumes français* (1778–87).\n\nYour instructions require every name, date, material, and consequence to come from the sources. Nothing provided describes the More portrait, its artist, its medium, its date, or what was at stake in its making. If I wrote the stop anyway, I would have to invent all of it:\n\n- the orientation\n- the physical property\n- the cost or stake\n- the scholarly reception\n- the artist's turning point\n\nThat would break the core rules of this brief.\n\n## Options\n\n1. **Send source material on the More portrait.** Useful sources include the Frick's catalogue entry, a wall label, or a scholarly text. I'll then write the full stop to spec.\n2. **Let me write a stop the current sources do support.** The fashion-plate installation has enough material for a compliant stop:\n   - **A physical property:** hand-colored engravings, a selection from 370 original prints held by the Frick Art Research Library.\n   - **A cost:** no complete set survives. Many plates were thrown away when fashions changed, and others may have been destroyed during the French Revolution.\n   - **A meaning:** the plates claimed to be drawn from life and anticipated true fashion magazines.\n3. **Authorize me to draw on general art-historical knowledge for the More portrait.** The stop would then not be limited to your sources, and you would want to fact-check it before recording.\n\nTell me which you'd prefer, and I'll produce the stop."
+  },
+  {
+    "arm": "J",
+    "provider": "anthropic",
+    "model": "claude-opus-5-5",
+    "stop_id": "Frick-2",
+    "museum": "Frick",
+    "title": "Portrait of Comtesse d'Haussonville",
+    "artist": "",
+    "prompt_chars": 12516,
+    "status": 200,
+    "seconds": 14.02,
+    "usage": {
+      "prompt_tokens": 4320,
+      "completion_tokens": 1000,
+      "total_tokens": 5320,
+      "cache_read_input_tokens": 0
+    },
+    "output": "# Portrait of Comtesse d'Haussonville: Audio Description\n\n**Orientation**\n\nStand close to *Portrait of Comtesse d'Haussonville*, about an arm's length away, and look past the young woman's shoulder into the mirror behind her. From here you can see what a distant glance misses: the back of her head reflected in the glass, a crimson ribbon tied in her hair that is invisible from the front, and the cluttered dresser beneath it. Then step back several paces. From a distance the strangeness of her right arm emerges, too long and too supple to belong to a real body.\n\n**The Work**\n\nThis is an oil-on-canvas portrait, signed and dated 1845 at the lower left. The sitter is Louise de Broglie, Countess d'Haussonville, aged twenty-seven. She came from the wealthy House of Broglie and would later become an essayist, a biographer and a writer of historical romance novels.\n\nShe faces us fully frontal, with a demure expression. Her left index finger rises coyly toward her mouth. Her right arm curls across her body in a long"
+  }
+]

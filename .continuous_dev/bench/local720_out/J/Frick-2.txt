@@ -1,0 +1,14 @@
+ARM J | anthropic:claude-opus-5-5 | Frick | Portrait of Comtesse d'Haussonville
+prompt_chars=12516 status=200 seconds=14.02 usage={'prompt_tokens': 4320, 'completion_tokens': 1000, 'total_tokens': 5320, 'cache_read_input_tokens': 0}
+================================================================================
+# Portrait of Comtesse d'Haussonville: Audio Description
+
+**Orientation**
+
+Stand close to *Portrait of Comtesse d'Haussonville*, about an arm's length away, and look past the young woman's shoulder into the mirror behind her. From here you can see what a distant glance misses: the back of her head reflected in the glass, a crimson ribbon tied in her hair that is invisible from the front, and the cluttered dresser beneath it. Then step back several paces. From a distance the strangeness of her right arm emerges, too long and too supple to belong to a real body.
+
+**The Work**
+
+This is an oil-on-canvas portrait, signed and dated 1845 at the lower left. The sitter is Louise de Broglie, Countess d'Haussonville, aged twenty-seven. She came from the wealthy House of Broglie and would later become an essayist, a biographer and a writer of historical romance novels.
+
+She faces us fully frontal, with a demure expression. Her left index finger rises coyly toward her mouth. Her right arm curls across her body in a long
