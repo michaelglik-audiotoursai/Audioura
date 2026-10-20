@@ -88,6 +88,100 @@ _SECTION_LEAD_RE = re.compile(
     r"(?i)^\s*(?:profile|home|visit|tickets?|about(?:\s+us)?|whats?\s*['’]?s?\s*on)"
     r"\s*(?:[:\-–—]\s|$)")
 
+# ─────────────────────────────────────────────────────────────────────────────
+# [LOCAL-721] CALL-TO-ACTION / imperative site-phrase intake reject. The Courtauld
+# site (and any modern museum CMS) wraps each work's image in a link whose anchor
+# text is a visitor instruction — "Explore this painting in our virtual tour",
+# "Explore this sculpture in our virtual tour". That anchor text is scraped into
+# the venue corpus / candidate-works list as if it were a work title (it appears
+# ~80× in a single Courtauld generation log) and, lacking any chrome separator or
+# bare-nav shape, it sailed past every existing junk rule and became a STOP.
+#
+# A CTA is not a thing on a wall; it is an instruction ABOUT the website. Two
+# deterministic, venue-agnostic signatures identify one without ever touching a
+# real work title:
+#
+#   (a) IMPERATIVE OPENER — the title STARTS with a base-form action verb that is
+#       followed by MORE words ("Explore this …", "View our …", "Discover the …",
+#       "Book your tickets", "Learn more", "Plan your visit", "Join and support",
+#       "Sign up …", "Watch the video"). The follow-on requirement is what keeps a
+#       one-word noun title that merely LOOKS verb-like ("Explosion", "Discover" as
+#       a bare exhibition name, "Visitation") safe: a lone word is never an
+#       instruction, and a real work almost never opens "Verb + this/our/your/us".
+#
+#   (b) WEBSITE-OBJECT PHRASE — the title contains an unambiguous online/marketing
+#       object anywhere ("virtual tour", "online collection", "e-newsletter",
+#       "gift shop", "buy tickets", "download the app"). These name a website
+#       feature, not an artwork, so their presence is itself the reject.
+#
+# Both are kept deliberately tight (a closed verb list, an explicit object list)
+# so a descriptive work title is never caught: "A Bar at the Folies-Bergère",
+# "Self-Portrait with Bandaged Ear", "Explosion", "The Card Players", "Still Life
+# with Pears", "Virgin and Child" all fail BOTH tests.
+
+# (a) The CTA imperative verbs a museum site uses for its visitor-action links.
+#     Base form only; the opener must be FOLLOWED by an instruction object/
+#     connective (enforced in the pattern) so a bare one-word title is never
+#     matched. Split into two tiers by false-positive risk:
+#       STRONG verbs practically never open a real work title, so verb + a generic
+#         connective ("this/our/your/more/…") is enough to reject.
+#       WEAK verbs ("take"/"make"/"give"/… ) DO open real work titles ("Take Your
+#         Son, Sir!", "Giving Alms", "Make Believe"), so they reject ONLY when the
+#         title also carries an explicit website/marketing OBJECT (rule b).
+_CTA_VERB_STRONG = (
+    r"explore|discover|browse|book|buy|purchase|order|reserve|"
+    r"learn|join|donate|subscribe|register|shop|plan|download|"
+    r"sign|view|visit|read")
+
+# A title that OPENS with a STRONG CTA verb and then continues with an instruction
+# connective/object — "Explore this painting in our virtual tour", "Book your
+# tickets", "Learn more", "Plan your visit", "Join and Support", "Sign up". A lone
+# verb ("Explore") or a verb that ends the title is NOT matched. The connective
+# set is instruction-specific so a work whose second word is a plain content noun
+# is never caught.
+_CTA_IMPERATIVE_RE = re.compile(
+    r"(?i)^\s*(?:" + _CTA_VERB_STRONG + r")\b"
+    r"\s+(?:this|that|these|those|our|your|my|us|the\s+museum|the\s+gallery|"
+    r"more|now|here|today|online|up|in\b|to\s+(?:our|the|a)\b|"
+    r"and\s+(?:support|donate|give|save)|"
+    r"tickets?|a\s+ticket|the\s+(?:tour|video|app|collection|newsletter|catalogue|catalog))\b")
+
+# (b) Website / marketing OBJECTS — a phrase naming an online feature, never an
+#     artwork. Matched anywhere in the title.
+_CTA_OBJECT_RE = re.compile(
+    r"(?i)\b("
+    r"virtual\s+tours?|online\s+(?:collection|shop|store|tours?|exhibition)|"
+    r"e[-\s]?newsletter|newsletter\s+sign\s*up|mailing\s+list|"
+    r"gift\s+shop|museum\s+shop|online\s+shop|the\s+shop|"
+    r"buy\s+tickets?|book\s+tickets?|book\s+(?:now|online|your\s+visit)|"
+    r"download\s+the\s+app|mobile\s+app|audio\s+guide\s+app|"
+    r"shop\s+the\s+(?:catalogue|catalog|collection)|"
+    r"create\s+your\s+own\s+gallery|join\s+and\s+support"
+    r")\b")
+
+
+def _is_call_to_action_title(title: str) -> bool:
+    """[LOCAL-721] True when ``title`` is website call-to-action / link text, not a
+    work: an imperative visitor instruction ("Explore this painting in our virtual
+    tour", "Book your tickets", "Learn more", "Plan your visit") or a phrase naming
+    an online/marketing feature ("virtual tour", "gift shop", "create your own
+    gallery"). Pure; venue-agnostic.
+
+    Conservative on purpose: a real work title that merely STARTS with a verb-like
+    word is safe because the imperative test requires an instruction object/
+    connective after the verb — a lone "Explosion"/"Discover" or a descriptive
+    noun phrase is never matched — and the object test only fires on an explicit
+    website-feature phrase.
+    """
+    t = (title or "").strip()
+    if not t:
+        return False
+    if _CTA_OBJECT_RE.search(t):
+        return True
+    if _CTA_IMPERATIVE_RE.search(t):
+        return True
+    return False
+
 
 def _norm(text: str) -> str:
     """Lowercase, drop a leading article, collapse punctuation/whitespace to a
@@ -165,6 +259,16 @@ def is_junk_page_title(title: str, venue_name: str = "") -> bool:
     #     names the venue, not a work. Conservative: requires the venue name to be
     #     fully present so a real work ("Vienna Woods") is never caught.
     if _title_is_venue_with_filler(t, venue_name):
+        return True
+
+    # 5. [LOCAL-721] website call-to-action / link text ("Explore this painting in
+    #    our virtual tour", "Book your tickets", "Learn more", "Create your own
+    #    gallery"). Modern museum CMS wraps each work's image in a visitor-action
+    #    link; that anchor text is scraped as a work title and, lacking any chrome
+    #    separator or bare-nav shape, slipped past rules 1–4. Venue-agnostic and
+    #    conservative — a real work that merely starts with a verb-like word
+    #    ("Explosion") is not caught.
+    if _is_call_to_action_title(t):
         return True
 
     return False
