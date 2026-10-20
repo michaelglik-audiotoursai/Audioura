@@ -44,6 +44,11 @@ _J = _jss.attach_to_module(__name__, {
     "FAIL_COUNT": lambda: 0,
     "FACTUAL_FAIL_COUNT": lambda: 0,
     "G4_UNGROUNDED_SENTENCES": list,
+    # [LOCAL-722] Per-job list of (duplicate_title, first_title) pairs that made
+    # D3(e) fire. The service reads this back to apply the corrective (drop the
+    # duplicate stop and re-check) instead of refusing the whole tour, the same
+    # pattern as G4_UNGROUNDED_SENTENCES.
+    "DUPLICATE_STOP_TITLES": list,
 })
 
 
@@ -476,23 +481,40 @@ def run_qa(tour_text, tour_file="", story_elements=None, venue_context=None):
         _J.FACTUAL_FAIL_COUNT += 1
 
     # D3(e) Duplicate-stop detection: no two stops may be the same work under different labels
-    # Catches: "Resurrection" / "Résurrection", "Le Roi David" / "King David"
+    # Catches: "Resurrection" / "Résurrection", "Le Roi David" / "King David",
+    # "A Bar at the Folies-Bergère" / "…Bergère." (trailing period), and a work
+    # the writer narrated twice (LOCAL-721/LOCAL-722).
+    # [LOCAL-722] The normalisation is the SHARED one (stop_title_dedup) that the
+    # delivery dedup and the replenishment guard also use, so the check that fails
+    # the tour and the guard that prevents the duplicate can never drift. The
+    # duplicate pairs are recorded on a job-scoped list so the service can apply
+    # the corrective (drop the duplicate stop, re-check) instead of refusing.
     _stop_names = [re.sub(r'^Stop\s+\d+:\s*', '', h).strip() for h in _stop_headers]
-    _normalized_names = {}
-    _duplicate_stops = []
-    for name in _stop_names:
-        # Normalize: lowercase, strip accents, strip punctuation
+    try:
+        from stop_title_dedup import find_duplicate_stop_titles as _find_dups722
+        _dup_pairs = _find_dups722(_stop_names)
+    except Exception:
+        # Fallback: inline normalisation identical to stop_title_dedup.
         import unicodedata as _ud
-        _nfkd = _ud.normalize('NFKD', name.lower())
-        _norm = ''.join(c for c in _nfkd if not _ud.combining(c))
-        _norm = re.sub(r'[^\w\s]', ' ', _norm).strip()
-        _norm = ' '.join(_norm.split())
-        
-        if _norm in _normalized_names:
-            _duplicate_stops.append(f"'{name}' = '{_normalized_names[_norm]}' (same work)")
-        else:
-            _normalized_names[_norm] = name
-    
+        def _norm722_inline(name):
+            _nfkd = _ud.normalize('NFKD', name.lower())
+            _n = ''.join(c for c in _nfkd if not _ud.combining(c))
+            _n = re.sub(r'[^\w\s]', ' ', _n)
+            return ' '.join(_n.split())
+        _first_by_norm = {}
+        _dup_pairs = []
+        for name in _stop_names:
+            _n = _norm722_inline(name)
+            if not _n:
+                continue
+            if _n in _first_by_norm:
+                _dup_pairs.append((name, _first_by_norm[_n]))
+            else:
+                _first_by_norm[_n] = name
+
+    _duplicate_stops = [f"'{_dup}' = '{_first}' (same work)" for _dup, _first in _dup_pairs]
+    _J.DUPLICATE_STOP_TITLES = list(_dup_pairs)
+
     _passed_dedup = len(_duplicate_stops) == 0
     check("D3(e) No duplicate stops (same work under different labels) (FACTUAL)",
           _passed_dedup,
