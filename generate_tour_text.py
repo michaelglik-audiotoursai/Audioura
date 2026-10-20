@@ -2151,6 +2151,23 @@ def replenish_to_count(poi_list, want, scope, headers, propose, make_poi,
     Returns (added, rejected, rounds).
     """
     seen = seen if seen is not None else {(p.get('name') or '').lower() for p in poi_list}
+    # [LOCAL-722] A replenishment candidate that is the SAME WORK as a stop we
+    # already have — differing only by a trailing period, an accent, a hyphen or
+    # curly quotes ("A Bar at the Folies-Bergère." vs "…Bergère") — must never be
+    # added as a second stop. The lowercase `seen` set (kept as-is so the proposer
+    # still gets the exact names to avoid) cannot catch that, so we also track the
+    # normalised title of every stop already present and of every candidate we
+    # accept, using the one normalisation D3(e) and the delivery dedup share.
+    try:
+        from stop_title_dedup import normalize_stop_title as _norm722
+    except Exception:  # pragma: no cover - fallback keeps replenishment working
+        def _norm722(_t):
+            import unicodedata as _ud722, re as _re722
+            _n = _ud722.normalize('NFKD', (_t or '').lower())
+            _n = ''.join(_c for _c in _n if not _ud722.combining(_c))
+            return ' '.join(_re722.sub(r'[^\w\s]', ' ', _n).split())
+    _seen_norm = {_norm722(p.get('name') or '') for p in poi_list}
+    _seen_norm.discard('')
     added, rejected, rounds = 0, 0, 0
 
     while len(poi_list) < want and rounds < max_rounds:
@@ -2166,7 +2183,16 @@ def replenish_to_count(poi_list, want, scope, headers, propose, make_poi,
             name = (c.get('name') or '').strip()
             if not name or name.lower() in seen:
                 continue
+            _name_norm = _norm722(name)
+            if _name_norm and _name_norm in _seen_norm:
+                seen.add(name.lower())      # never re-propose it either
+                rejected += 1
+                print(f"  [LOCAL-722] Replenish: rejected {name[:44]!r} — same "
+                      f"work as an existing stop (normalised-title duplicate)")
+                continue
             seen.add(name.lower())          # never re-propose it, valid or not
+            if _name_norm:
+                _seen_norm.add(_name_norm)
             # [LOCAL-662B] Reject a corrupted / truncated name the same way Phase
             # 3A and the LOCAL-290 replenishment do. A proposer that returned a
             # truncation artifact ("John F." — a first name + a bare trailing
@@ -8581,6 +8607,27 @@ def _apply_delivery_hours_guard(result):
                       f"that ended with no hand-off to the next stop", flush=True)
         except Exception as _dge:  # pragma: no cover
             _import_logger.error(f"[LOCAL-638] directions guarantee skipped: {_dge}")
+        # 3z. [LOCAL-722] DUPLICATE-STOP dedup on the DELIVERED text — the single
+        #     choke point every path returns through. Selection stays unique by
+        #     normalised title (D1v2 [A6+] title-dedup), but a second copy of an
+        #     already-selected work can still reach the SHIPPED text after
+        #     selection: the writer narrated "Landscape with the Flight into
+        #     Egypt" twice (LOCAL-721 gpt-4.1 run), and a replenished / rewritten
+        #     title can differ only by a trailing period ("A Bar at the
+        #     Folies-Bergère." vs "…Bergère", LEAD Sonnet run). Dropping the later
+        #     block here — BEFORE the conclusion/header rebuild below — keeps the
+        #     delivered work set unique by the SAME normalisation D3(e) uses, so
+        #     the "That's N stops" count, the orientation "first stop" name and the
+        #     Directions are all rebuilt against the deduped set. Deterministic and
+        #     idempotent; a no-op when every delivered title is already distinct.
+        try:
+            import stop_title_dedup as _std722
+            final, _dup722 = _std722.dedupe_delivered_stops(final)
+            for _dup_t, _first_t in _dup722:
+                print(f"  [LOCAL-722] delivery dedup: dropped duplicate stop "
+                      f"{_dup_t[:50]!r} (same work as {_first_t[:50]!r})", flush=True)
+        except Exception as _d722e:  # pragma: no cover
+            _import_logger.error(f"[LOCAL-722] delivery dedup skipped: {_d722e}")
         # 4. [LOCAL-619] THE ONE CONCLUSION — built from the FINAL delivered text,
         #    as the LAST step on EVERY path (fresh, pool, cache, by_reference,
         #    overview), after every other gate above. This is the single choke

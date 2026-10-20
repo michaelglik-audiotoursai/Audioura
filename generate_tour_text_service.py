@@ -748,6 +748,58 @@ def generate_tour_async(job_id, location, tour_type, total_stops=10, user_id=Non
                     _g4_corrected_text = tour_text
                     continue
                 elif (content_qa_runner.FACTUAL_FAIL_COUNT > 0
+                      and getattr(content_qa_runner, 'DUPLICATE_STOP_TITLES', None)
+                      and _qa_round < _QA_MAX_ROUNDS):
+                    # [LOCAL-722] A duplicate stop (D3(e): the same work delivered
+                    # twice — a writer that narrated it twice, or a replenished/
+                    # rewritten title differing only by a trailing period) is a
+                    # correctable DELIVERY defect, not a reason to refuse a tour
+                    # whose facts are sound. Same corrective pattern as G4 above and
+                    # LOCAL-639 below: DROP the duplicate stop block, re-check, and
+                    # refuse only if fewer than the minimum stops remain. Michael's
+                    # Courtauld request — one of the best-documented museums in
+                    # London — was reaching the listener as "We couldn't verify
+                    # enough facts…" purely because of this.
+                    _D3E_MIN_STOPS_AFTER_DEDUP = 2  # a tour needs ≥2 distinct stops
+                    try:
+                        import stop_title_dedup as _std_qa
+                        _deduped_text, _dropped_qa = _std_qa.dedupe_delivered_stops(tour_text)
+                        _remaining = len(re.findall(r'^Stop\s+\d+:', _deduped_text, re.MULTILINE))
+                    except Exception as _dedup_err:
+                        print(f"[BLOCKER4c] [LOCAL-722] dedup corrective error: {_dedup_err}")
+                        _deduped_text, _dropped_qa, _remaining = tour_text, [], 0
+                    if _dropped_qa and _remaining >= _D3E_MIN_STOPS_AFTER_DEDUP:
+                        for _dup_t, _first_t in _dropped_qa:
+                            print(f"[BLOCKER4c] [LOCAL-722] D3(e) corrective: dropped "
+                                  f"duplicate stop {_dup_t[:60]!r} (same work as "
+                                  f"{_first_t[:60]!r})")
+                        # Rebuild the conclusion / orientation / directions against
+                        # the deduped stop set so the delivered text stays coherent
+                        # ("That's N stops", the first-stop name, hand-offs).
+                        try:
+                            from tour_conclusion import (
+                                normalise_stop_headers as _nh722,
+                                rebuild_conclusion as _rc722,
+                                fix_orientation_first_stop as _ff722,
+                                count_delivered_stops as _cd722,
+                            )
+                            _deduped_text = _nh722(_deduped_text)
+                            if _cd722(_deduped_text) > 0:
+                                _deduped_text = _ff722(_deduped_text)
+                                _deduped_text = _rc722(_deduped_text, use_llm=False)
+                        except Exception as _rebuild_err:
+                            print(f"[BLOCKER4c] [LOCAL-722] post-dedup rebuild skipped: "
+                                  f"{_rebuild_err}")
+                        tour_text = _deduped_text
+                        _g4_corrected_text = tour_text
+                        print(f"[BLOCKER4c] [LOCAL-722] D3(e) corrective applied: "
+                              f"{_remaining} distinct stop(s) remain; re-checking")
+                        continue
+                    print(f"[BLOCKER4c] [LOCAL-722] D3(e) corrective could not save the "
+                          f"tour (dropped={len(_dropped_qa)}, remaining={_remaining} < "
+                          f"{_D3E_MIN_STOPS_AFTER_DEDUP}); proceeding to factual verdict")
+                    # (fall through to the refusal below)
+                elif (content_qa_runner.FACTUAL_FAIL_COUNT > 0
                       and _qa_round < _QA_MAX_ROUNDS
                       and _header_formatting_defect(tour_text)):
                     # [LOCAL-639 defect 2] A factual failure caused by a LOST-NEWLINE
