@@ -1,0 +1,190 @@
+Create a detailed audio description for Georges Seurat at The Courtauld Gallery, London, United Kingdom, focusing on museum.
+
+Start with a brief orientation that names "Georges Seurat" specifically (not "the exhibit" or "this piece") and tells the listener WHERE to stand or look AND WHY — what becomes visible, legible, or striking from that position that they would miss otherwise.
+
+Then provide a detailed description of the exhibit, in THIS ORDER OF PRIORITY
+(LOCAL-607 — spend your words on the WORK and the ARTIST, not on how the museum
+acquired it):
+
+(a) THE WORK ITSELF — lead with it and give it the most words: what it shows or
+    consists of, how it was made (one specific technique, material, or
+    compositional choice and WHY it matters), why it was made, what it means, and
+    what critics or scholars have said about it. This is what the listener is
+    standing in front of.
+(b) THE ARTIST — the maker's life and the turning point this work marks for them:
+    where they were, what had just happened to them, what they were trying to do
+    at this moment in their career. Name the artist and anchor the work in their life.
+(c) THE EMOTIONAL READING — one or two sentences on what the work makes a viewer
+    feel or notice, grounded in (a) and (b), never free-floating.
+
+ACQUISITION / DONATION IS CAPPED AT ONE SENTENCE (hard limit): how the museum came
+to own the work (donor, gift, bequest, purchase, the collection it belongs to) may
+occupy AT MOST ONE sentence, and only if it is genuinely about THIS work. Do NOT
+retell the museum's founding, renaming, relocation, or the donors behind the
+building — that belongs to the tour's opening, not to a work's stop. If you have
+nothing to say about the work or the artist, write less; do not pad with provenance.
+Also include, when relevant: how this piece connects to the broader collection or museum.
+
+NAME THE OBJECT, AND SAY WHAT IT COST (D468-D471 — the two rules that moved the score):
+- AT LEAST ONE SENTENCE MUST NAME A PHYSICAL PROPERTY OF THE THING IN FRONT OF THE
+  LISTENER — its medium, material, technique, edition size, count, binding, colour or
+  condition — and tie that property to the story. "A set of ten drypoints and
+  lithographs on sheepskin" is the standard; "an important work" is not. The listener
+  is standing in front of the object; a story that never mentions it is a caption about
+  something else. Take the property from the source material. If the material names
+  none, write nothing about the physical object rather than inventing a property.
+- SAY WHAT IT COST OR WHAT WAS AT STAKE. What was lost, refused, destroyed, left
+  unfinished, done only once, done for the last time, or done despite something. That
+  is the difference between a story and a caption. It must come from the source
+  material — if there is no such consequence there, write without one rather than
+  inventing drama.
+
+EXPLAIN-WHAT-YOU-NAME RULE (critical):
+Every concept, motif, symbol, technique, cultural reference, or person you mention
+MUST get at least one clause of explanation. If you cannot explain it in a clause, cut it.
+- BAD: "the rich cultural heritage of Bengal" (names but explains nothing)
+- GOOD: "the Pala dynasty tradition of Bengal, where Buddhist monasteries commissioned
+  bronze casting between the 8th and 12th centuries"
+- BAD: "delicate floral motifs adorning the crown" (what do they mean?)
+- GOOD: "lotus petals on the crown — a symbol of spiritual purity in Hindu iconography,
+  also found on temple lintels across Southeast Asia"
+- BAD: "Each intricate detail tells a story of creation and rebirth"
+  (asserts meaning without delivering it)
+- GOOD: "The four arms each hold a specific object: the axe that severs attachment,
+  the rope that pulls devotees from illusion, the tusk broken as a writing implement,
+  and the sweetmeat representing the reward of a disciplined life"
+The stop's own subject (the exhibit itself) needs no gloss — the whole stop explains it.
+But a person referenced in passing (e.g. Ulysses Grant) needs one clause: "the American
+Civil War general who became president." If most visitors won't know it, explain it or cut it.
+
+NO UNSUPPORTED PRAISE: Do not end paragraphs with evaluative claims ("a truly remarkable
+achievement", "a testament to the artist's genius") unless you have just provided the
+specific evidence that earns the evaluation. If the preceding sentences do not contain
+that evidence, delete the praise — it is filler. A shorter stop that explains three things
+beats a longer one that names eight and explains none.
+
+AUDIO RULES (this will be heard, not read):
+- NEVER end with a rhetorical question. End on a statement — an image, a fact, or a thought the listener can carry forward.
+- NEVER list more than three items in a row. Listeners lose track after three.
+- Write for the EAR: short-to-medium sentences, concrete language, no parenthetical asides.
+
+NO PREACHING — NEVER INSTRUCT THE LISTENER (critical):
+- NEVER end by telling the listener to consider, reflect, imagine, or feel something.
+  End on a FACT or OBSERVATION. The listener is an adult — no commands, no "Take a moment to..."
+
+NO CONDESCENSION / NO DESCRIBING THE OBVIOUS:
+- Never "To truly appreciate..." or "It is worth noting..." — just state the thing.
+- The listener is in front of the object. Describe what they'd MISS, not what's obvious.
+
+SOURCE MATERIAL (use ONLY these facts; do not invent names, dates or numbers):
+
+[Reference extract]
+This is a list of notable paintings by Georges Seurat (2 December 1859 – 29 March 1891). He is a Neo-Impressionist painter and together with Paul Signac noted for being the inventor of pointillism. The listing follows the 1980 book Georges Seurat and uses its catalogue numbers.
+
+
+== Paintings ==
+
+
+== Museums ==
+Albright-Knox Art Gallery, Buffalo
+Art Institute of Chicago, Chicago
+Baltimore Museum of Art
+Barnes Foundation, Philadelphia
+Bristol Museum & Art Gallery, Bristol
+Cleveland Museum of Art, Cleveland
+Courtauld Institute of Art, London
+Dallas Museum of Art, Dallas
+Detroit Institute of Arts
+Dumbarton Oaks Research Library and Collection, Washington. D.C.
+Fine Arts Museums of San Francisco
+Fogg Art Museum, Cambridge (Massachusetts)
+Hermitage Museum, Saint Petersburg
+Indianapolis Museum of Art, Indianapolis
+Hiroshima Museum of Art, Hiroshima
+Kelvingrove Art Gallery and Museum, Glasgow
+Kröller-Müller Museum, Otterlo
+Kunsthaus Zürich
+Kunstmuseum Basel
+Metropolitan Museum of Art, New York City
+Museum of Modern Art, New York City
+Minneapolis Institute of Art
+Minnesota Marine Art Museum, Winona, Minnesota
+Musée d'art moderne de Troyes
+Musée d'Orsay, Paris
+fr:Musée de l'Annonciade, Saint-Tropez
+Musée des beaux-arts de Bordeaux
+Musée des Beaux-Arts, Tournai
+Nationalmuseum, Stockholm
+National Gallery, London
+National Gallery of Art, Washington, D.C.
+National Gallery of Australia, Canberra
+National Gallery Prague
+Nelson-Atkins Museum of Art, Kansas City, Missouri
+Norton Simon Museum, Pasadena, California
+Palais des Beaux-Arts de Lille
+Philadelphia Museum of Art, Philadelphia
+Phillips Collection, Washington D.C.
+Pola Museum of Art, Hakone
+Royal Museums of Fine Arts of Belgium, Brussels
+Saint Louis Art Museum
+Scottish National Gallery, Edinburgh
+Smith College Museum of Art, Northampton (Massachusetts)
+Solomon R. Guggenheim Museum, New York City
+Stiftung Sammlung E. G. Bührle, Zürich
+Tate Gallery
+The Hyde Collection, Glens Falls
+Van Gogh Museum, Amsterdam
+Virginia Museum of Fine Arts, Richmond (Virginia)
+Walker Art Gallery, Liverpool
+Wallraf-Richartz-Museum, Cologne
+Yale University Art Gallery, New Haven, Connecticut
+
+
+== See also ==
+Bathers at Asnières (1884)
+A Sunday Afternoon on the Island of La Grande Jatte (1884–1886)
+Models (1884–1886)
+Parade de cirque (1887–1888)
+Young Woman Powdering Herself (1889–1890)
+Le Chahut (1889–1890)
+The Channel of Gravelines, Petit Fort Philippe (1890)
+The Circus (1890–1891)
+
+
+== Notes ==
+
+
+== References ==
+Courtion, Pierre (1980). Georges Seurat, das Gesamtwerk (in German). Frankfurt: Ullstein. ISBN 3-548-36024-6.
+artic (2023a). "Final Study for "Bathers at Asnières"". artic.edu.
+artic (2023b). "Oil Sketch for "La Grande Jatte"". artic.edu.
+artic (2023c). "A Sunday on La Grande Jatte". artic.edu.
+artsandculture (2023a). "Georges Seurat" – via Google Arts & Culture.
+artsandculture (2023b). "Houses and Garden" – via Google Arts & Culture.
+artsandculture (2023c). "The Stone Breaker" – via Google Arts & Culture.
+artsandculture (2023d). "Grandcamp, Evening" – via Google Arts & Culture.
+artsandculture (2023e). "Preparatory Sketch for the Painting "La Grève du Bas-Butin, Honfleur"" – via Google Arts & Culture.
+artsandculture (2023f). "Eiffel Tower" – via Google Arts & Culture.
+artsandculture (2023g). "The Channel of Gravelines, Petit Fort Philippe" – via Google Arts & Culture.
+artsmia (2023a). "Port-en-Bessin". artsmia.org.
+artuk (2023a). "Sunset". artuk.org.
+artuk (2023b). "Boy Sitting in a Meadow". artuk.org.
+artuk (2023c). "Ville d'Avray, France, maisons blanches". artuk.org.
+artuk (2023d). "House among Trees". artuk.org.
+artuk (2023e). "Man Painting a Boat". artuk.org.
+artuk (2023f). "A River Bank (The Seine at Asnières)". artuk.org.
+artuk (2023g). "Boat by the Bank, Asnieres". artuk.org.
+artuk (2023h). "Clothes on the Grass". artuk.org.
+artuk (2023i). "Bathers at Asnières". artuk.org.
+artuk (2023k). "The Rue St Vincent, Paris in Spring". artuk.org.
+artuk (2023l). "Study for "La Grande Jatte"". artuk.org.
+
+
+[Venue sources]
+Georges Seurat, (1859-1891), Young Woman Powdering Herself, (1888-90), The Courtauld, London (Samuel Courtauld Trust) © The Courtauld
+In this particular painting, Young Woman Powdering Herself, the modulation of light and shadow on the wall is achieved with the use of small dots of pure colour juxtaposed in varying concentrations and intensity. The young model depicted by Seurat was his mistress, Madeleine Knobloch, who bore him two sons, and this painting therefore takes on a very personal meaning.
+An even more personal touch was revealed by a scanner created by the Italian Institute of Optics, showing that the vase of flowers in the top left-hand corner of the image was originally a reflection of Seurat at work, and would have been the only self-portrait of the artist to exist.
+The Courtauld presents the first ever exhibition dedicated to the seascapes of the French artist Georges Seurat (1859–1891). This major, focused display is the first devoted to Seurat in the UK in almost 30 years. It charts the evolution of his radical and distinctive style through the recurring motif of the sea.
+The Gallery is renowned for its remarkable group of Impressionist and Post-Impressionist paintings, including the world-famous A Bar at the Folies Bergère by Édouard Manet, Self-Portrait with Bandaged Ear by Vincent van Gogh and the most significant collection of works by Cézanne in the UK. These masterpieces are presented in the Courtauld Gallery’s spectacular LVMH Great Room, alongside works by artists including Degas, Monet, Renoir, Seurat and more.
+Experience the first ever exhibition dedicated to the seascapes of the French artist Georges Seurat.
+His collection included Manet's A Bar at the Folies-Bergère and a version of the Déjeuner sur l'Herbe, Renoir's La Loge, landscapes by Claude Monet and Camille Pissarro, a ballet scene by Edgar Degas, and a group of eight major works by Cézanne. Other paintings include Vincent van Gogh's Self-Portrait with Bandaged Ear  and Peach Blossoms in the Crau, Gauguin's Nevermore and Te Rerioa, and important works by Seurat, Henri "le Douanier" Rousseau, Toulouse-Lautrec and Modigliani.

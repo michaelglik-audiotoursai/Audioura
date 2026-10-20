@@ -1,0 +1,18 @@
+ARM H | anthropic:claude-haiku-5-5 | Walters | Springtime (1872)
+prompt_chars=6884 status=200 seconds=4.55 max_tokens=2500 finish_reason=end_turn truncated=False usage={'prompt_tokens': 2608, 'completion_tokens': 575, 'total_tokens': 3183, 'cache_read_input_tokens': 0}
+================================================================================
+I'm unable to write this audio description accurately. The source material you provided is a disambiguation page listing various works titled "Springtime," and it mentions only that Claude Monet painted a work called *Springtime* in 1872. It says nothing about where that painting hangs at the Walters Art Museum, its medium, its dimensions, its acquisition, Monet's life at the time, or any critical reception. Writing those details would mean inventing them, and the brief forbids inventing names, dates, or physical properties.
+
+Here is what I can say from the source alone, and what a museum guide would need to supply before this stop could be recorded:
+
+**Orientation (what can be said):** The listener should be told to look for *Springtime* (1872), the Claude Monet painting, and the stop cannot yet tell them where to stand, because the gallery position is not in the source.
+
+**The work:** The source confirms only the title, date, and artist. A finished stop needs the painting's medium and support (for example, oil on canvas), its dimensions, the subject as it appears, and one specific technique, such as the brushwork or colour handling, with an explanation of why it matters.
+
+**The artist:** The source names Claude Monet and the year 1872. To anchor the work in his life, a guide would need his whereabouts and circumstances that year, and what he was attempting in his career at that point.
+
+**Emotional reading:** This depends on the description of the work above, so it cannot be written yet.
+
+**Acquisition:** The source gives no information on how the Walters came to own it, so none should be stated.
+
+To produce a complete audio stop, please provide a catalogue entry or curatorial text for this specific painting at the Walters, including its medium, dimensions, gallery location, and any documented circumstances of its creation. With that material, I can write the full description within the required structure.

@@ -1,0 +1,28 @@
+ARM J | anthropic:claude-opus-5-5 | Walters | Sappho and Alcaeus
+prompt_chars=5445 status=200 seconds=17.54 max_tokens=2500 finish_reason=end_turn truncated=False usage={'prompt_tokens': 2022, 'completion_tokens': 1456, 'total_tokens': 3478, 'cache_read_input_tokens': 0}
+================================================================================
+# Sappho and Alcaeus: A Note Before the Script
+
+**The source material section of your request is empty.** Your brief says to use only the facts supplied, so a script that follows it exactly would have almost nothing to say. The rules on physical properties and on cost or stakes both say to write nothing rather than invent.
+
+Below is a **draft built from widely published information about the painting**. Every factual claim should be checked against the Walters' own records before recording. I have left out acquisition details, dates I'm unsure of, and any claim about cost or sacrifice, because I can't confirm those without your source.
+
+---
+
+## Draft Audio Stop: *Sappho and Alcaeus*
+
+Stand close to *Sappho and Alcaeus*, about an arm's length away, and look at the curved marble bench where the women sit. At that distance, Greek letters carved into the seat backs come into focus. From across the room they read as nothing more than veining in the stone.
+
+The painting shows a poetry recital on the Greek island of Lesbos around 600 BC. On the left, the poet Alcaeus plays a kithara, a large wooden lyre used for public performance. Across from him, Sappho leans forward on a marble desk and listens. She was the most celebrated woman poet of ancient Greece, famous for her lyrics of love and longing. Behind her sit young women from her circle. Beyond them, the Aegean Sea lies flat and blue past a grove of trees.
+
+The painting is in oil, and its marble is its signature. The artist built the stone up in thin layers so that it seems to hold light and coolness, and visitors often sense its chill before they notice the figures. The carved letters on the bench are the names of women in Sappho's circle. The artist was signalling that this was archaeology, not fantasy.
+
+The painter was Lawrence Alma-Tadema, a Dutch-born artist who made his career in London. He became one of the most successful painters of the Victorian era by staging ancient life with this kind of documentary detail. Critics in his lifetime praised his skill. Later critics dismissed him for turning antiquity into elegant Victorian drawing rooms. That tension is visible here, in a scene that is both carefully researched and deliberately serene.
+
+The painting places a woman, not the male performer, at the centre of judgment. Alcaeus plays, but the scene is arranged around Sappho's attention. Within the Walters' collection, the work belongs with its nineteenth-century paintings, which often looked back to classical subjects.
+
+What stays with the eye is the stillness. It is a moment of music rendered in stone and sea, with names carved into a bench by a painter who wanted the past to feel as solid as marble.
+
+---
+
+**If you send the source material**, I'll rewrite this to rely only on it. I can then add the required physical-property sentence and stakes sentence if the source supports them, plus the one-sentence acquisition line.

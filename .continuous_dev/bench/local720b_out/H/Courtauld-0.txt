@@ -1,0 +1,24 @@
+ARM H | anthropic:claude-haiku-5-5 | Courtauld | Manet’s A Bar at the Folies-Bergère
+prompt_chars=13031 status=200 seconds=5.57 max_tokens=2500 finish_reason=end_turn truncated=False usage={'prompt_tokens': 4783, 'completion_tokens': 921, 'total_tokens': 5704, 'cache_read_input_tokens': 0}
+================================================================================
+**Orientation**
+
+Stand directly in front of Manet's *A Bar at the Folies-Bergère*, at the centre of the room, and look first at the barmaid's face. From this position, the painting's famous puzzle becomes visible: the mirror behind her shows a customer who should be standing where you are. Step slightly to the right, toward the edge of the frame, and the reflected scene shifts. Only from there do you see the man in the mirror clearly, and the picture's strange geometry starts to make sense.
+
+**The Work**
+
+Manet painted this scene in 1882, and it hung at the Paris Salon that same year. It shows the bar of the Folies-Bergère, a Paris music hall and nightclub. A young woman stands behind a marble counter loaded with bottles, oranges, and a bowl of flowers. Above her, a trapeze artist's green feet hang at the upper left, and a large mirror fills the background, reflecting the crowd in the room.
+
+The mirror is the painting's central trick. The barmaid faces us head-on, but her reflection turns toward a customer on the right, and that man's reflection appears at the picture's right edge. Critics attacked the picture for these inconsistencies, accusing Manet of ignoring perspective. In 2000, the art historian Malcolm Park staged a reconstruction of the scene and showed that Manet's viewpoint was physically possible. The man at the right stands outside your field of view. The conversation the picture seems to suggest is an optical illusion.
+
+The barmaid herself was a real person, known as Suzon, who worked at the Folies-Bergère. Manet posed her in his studio. The oranges are a clue to her status. The art historian Larry L. Ligo notes that Manet often used oranges to signal prostitution, and T. J. Clark argues that the barmaid is presented as both a seller of drinks and a commodity for purchase. Her expression is blank and withdrawn, while her reflection seems to engage with a customer.
+
+**The Artist**
+
+By 1882, Manet was seriously ill. He had suffered from a degenerative condition that would kill him within a year, and this was among the last major pictures he completed. He had spent his career painting modern Paris, its cafés, theatres, and crowds, and he insisted that art should record contemporary life as it was. This painting brings that commitment to its fullest form, combining close observation of a real place with a deliberately unsettling structure.
+
+The work also owed a debt to Velázquez, whose *Las Meninas* uses a mirror to complicate who is looking at whom. Manet adapted that idea to a modern nightclub.
+
+**The Emotional Reading**
+
+The painting holds two things at once: a woman who seems present and a woman who seems far away. Standing in front of it, you can feel the gap between what the mirror shows and what the barmaid's face shows.
