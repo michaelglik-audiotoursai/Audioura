@@ -100,6 +100,28 @@ def stop_detectors(text):
     chk("llm_refusal",
         bool(re.search(r"(?i)\b(I'?m sorry|I cannot|I can'?t|as an AI|I'?m unable)\b",
                        spoken[:400])))
+    # [LOCAL-720B / D674] A draft that TALKS TO THE REQUESTER instead of narrating
+    # is not a tour stop. LOCAL-720's Opus Frick-1 ended "Tell me which you'd
+    # prefer, and I'll produce the stop." — it asked the user to pick an option
+    # and deferred the writing. The narration voice never addresses "you, the
+    # requester" or promises to produce output later; it speaks to the listener
+    # standing in front of the work. Flag the tell-tale meta phrases.
+    chk("non_narration_reply",
+        bool(re.search(
+            r"(?i)\b("
+            r"tell me (which|what|how|if|whether)"
+            r"|let me know (which|what|if|whether)"
+            r"|which (would you|do you) (prefer|want|like)"
+            r"|would you (like|prefer) me to"
+            r"|i'?ll (produce|write|draft|create|generate) the (stop|narration|tour|description)"
+            r"|i can (produce|write|draft|create|generate) (the|a|an|one|either|both|two)"
+            r"|authorize me to"
+            r"|please (choose|confirm|specify|clarify|let me know|pick|select)"
+            r"|(do you|would you) want me to"
+            r"|here are (two|three|a few|several|some) (options|versions|drafts|approaches)"
+            r")\b",
+            spoken)),
+        "reply addresses the requester / offers options instead of narrating")
     return fails
 
 

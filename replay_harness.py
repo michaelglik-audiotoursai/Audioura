@@ -78,6 +78,18 @@ except Exception as _e:  # pragma: no cover
 SYSTEM_MESSAGE = ("You are a knowledgeable museum guide with expertise in art, "
                   "architecture, and history.")
 
+# [LOCAL-720B / D674] Shared output-token budget for EVERY arm (the only variable
+# across arms stays the model). LOCAL-720 ran at 1000; Claude's tokenizer gives
+# ~3 chars/token vs ~5 for gpt-4.1-mini, and Opus still spends tokens thinking,
+# so at 1000 most Claude stops hit the cap mid-sentence (stop_reason="max_tokens")
+# and the judges scored truncation, not writing. 2500 is high enough that a
+# complete ~3k-char narration stop finishes on its own (gpt-4.1-mini averaged
+# ~591 out-tok / ~3k chars at the old cap) while staying a single-pass draft.
+# stop_reason/finish_reason is recorded per stop; acceptance is zero stops
+# ending on max_tokens/length. If any arm still truncates, raise to 4000 for
+# THAT arm only, re-run it, and say so.
+MAX_TOKENS = int(os.environ.get("BENCH_MAX_TOKENS", "2500"))
+
 # ─── arm definitions ─────────────────────────────────────────────────────────
 ARMS = {
     "A": ("openai", "gpt-4.1"),
@@ -410,7 +422,7 @@ def call_openai(model, system_msg, user_msg, timeout=120):
     r = requests.post(
         "https://api.openai.com/v1/chat/completions",
         headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"},
-        json={"model": model, "temperature": 0.7, "max_tokens": 1000,
+        json={"model": model, "temperature": 0.7, "max_tokens": MAX_TOKENS,
               "messages": [{"role": "system", "content": system_msg},
                            {"role": "user", "content": user_msg}]},
         timeout=timeout)
@@ -418,19 +430,24 @@ def call_openai(model, system_msg, user_msg, timeout=120):
     j = r.json()
     text = ""
     usage = {}
+    finish = None  # [LOCAL-720B] OpenAI finish_reason: "stop" = complete, "length" = hit cap
     if status == 200:
         text = j["choices"][0]["message"]["content"]
         usage = j.get("usage", {}) or {}
+        try:
+            finish = j["choices"][0].get("finish_reason")
+        except (KeyError, IndexError, AttributeError):
+            finish = None
     else:
         text = f"[HTTP {status}] {json.dumps(j)[:500]}"
-    return text, usage, status
+    return text, usage, status, finish
 
 
 def call_gemini(model, system_msg, user_msg, timeout=120):
     """Ungrounded Gemini generateContent — NO tools, NO grounding."""
     key = os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
     prompt = system_msg + "\n\n" + user_msg
-    gen_cfg = {"temperature": 0.7, "maxOutputTokens": 1400}
+    gen_cfg = {"temperature": 0.7, "maxOutputTokens": MAX_TOKENS}
     # gemini-flash-latest (2.5 Flash) accepts thinkingConfig; gemini-flash-lite-latest
     # (2.5 Flash-Lite) rejects it with HTTP 400. Only send it to the full Flash.
     if "lite" not in model:
@@ -445,12 +462,17 @@ def call_gemini(model, system_msg, user_msg, timeout=120):
     j = r.json()
     text = ""
     usage = {}
+    finish = None  # [LOCAL-720B] Gemini finishReason: "STOP" = complete, "MAX_TOKENS" = hit cap
     if status == 200:
         try:
             parts = j["candidates"][0]["content"]["parts"]
             text = "".join(p.get("text", "") for p in parts)
         except (KeyError, IndexError):
             text = f"[gemini empty] {json.dumps(j)[:400]}"
+        try:
+            finish = j["candidates"][0].get("finishReason")
+        except (KeyError, IndexError, AttributeError):
+            finish = None
         um = j.get("usageMetadata", {}) or {}
         usage = {"prompt_tokens": um.get("promptTokenCount", 0),
                  "completion_tokens": (um.get("candidatesTokenCount", 0)
@@ -458,7 +480,7 @@ def call_gemini(model, system_msg, user_msg, timeout=120):
                  "total_tokens": um.get("totalTokenCount", 0)}
     else:
         text = f"[HTTP {status}] {json.dumps(j)[:500]}"
-    return text, usage, status
+    return text, usage, status, finish
 
 
 def call_anthropic(model, system_msg, user_msg, timeout=120):
@@ -482,18 +504,17 @@ def call_anthropic(model, system_msg, user_msg, timeout=120):
     # and does not alter the experiment — temperature was only set to mirror the
     # OpenAI arm's default; each model simply uses its own default sampling. The
     # ONLY variable across arms stays the model string.
-    body = {"model": model, "max_tokens": 1000,
+    body = {"model": model, "max_tokens": MAX_TOKENS,
             "system": system_msg,
             "messages": [{"role": "user", "content": user_msg}]}
     if "-5-5" not in model:  # 5.5 lineup deprecates temperature; keep it for 712 arms
         body["temperature"] = 0.7
     # [LOCAL-720 / D674] The current 5.5 lineup has EXTENDED THINKING on by
     # default. On our ~4-5k-token narration prompts the hidden reasoning eats the
-    # whole 1000-token output budget, so the `text` block is truncated or never
-    # emitted (chars=0, completion_tokens pinned at the 1000 cap). That is the
-    # same failure the Gemini arm already avoids with thinkingConfig
+    # output budget, so the `text` block is truncated or never emitted. That is
+    # the same failure the Gemini arm already avoids with thinkingConfig
     # {thinkingBudget: 0}. To keep every arm a single-pass draft under the SAME
-    # 1000-token budget (the only variable stays the model), turn thinking off
+    # output budget (the only variable stays the model), turn thinking off
     # per the control each model accepts — the live API rejects the wrong one
     # with HTTP 400 and tells you which to use:
     #   Haiku 5.5  -> {"type": "disabled"}
@@ -503,9 +524,13 @@ def call_anthropic(model, system_msg, user_msg, timeout=120):
     #                 output_config.effort "low" (the minimum). Opus is a
     #                 reasoning model whose thinking CANNOT be fully turned off;
     #                 "low" minimises it (~300 thinking tokens) so the most
-    #                 narration text possible lands within the shared 1000-token
-    #                 budget. On the longest prompts Opus still reaches the cap
-    #                 (stop_reason=max_tokens) — recorded as a finding, not hidden.
+    #                 narration text possible lands within the shared budget.
+    # [LOCAL-720B / D674] LOCAL-720 ran every arm at max_tokens=1000; Claude's
+    # tokenizer (~3 chars/token vs ~5 for gpt-4.1-mini) plus Opus's thinking
+    # spend meant most Claude stops hit the cap mid-sentence (stop_reason=
+    # "max_tokens") and the judges scored truncation, not writing. The shared
+    # budget is now MAX_TOKENS=2500 for EVERY arm and stop_reason is recorded per
+    # stop; acceptance is zero stops ending on max_tokens.
     if model == "claude-haiku-5-5":
         body["thinking"] = {"type": "disabled"}
     elif model == "claude-sonnet-5-5":
@@ -523,12 +548,14 @@ def call_anthropic(model, system_msg, user_msg, timeout=120):
     j = r.json()
     text = ""
     usage = {}
+    finish = None  # [LOCAL-720B] Anthropic stop_reason: "end_turn" = complete, "max_tokens" = hit cap
     if status == 200:
         try:
             text = "".join(p.get("text", "") for p in j.get("content", [])
                            if p.get("type") == "text")
         except (KeyError, AttributeError, TypeError):
             text = f"[anthropic empty] {json.dumps(j)[:400]}"
+        finish = j.get("stop_reason")
         u = j.get("usage", {}) or {}
         usage = {"prompt_tokens": u.get("input_tokens", 0),
                  "completion_tokens": u.get("output_tokens", 0),
@@ -536,7 +563,7 @@ def call_anthropic(model, system_msg, user_msg, timeout=120):
                  "cache_read_input_tokens": u.get("cache_read_input_tokens", 0)}
     else:
         text = f"[HTTP {status}] {json.dumps(j)[:500]}"
-    return text, usage, status
+    return text, usage, status, finish
 
 
 def run_arm(arm, out_dir, diet=False, fixed_first=False, stops=None, limit=None):
@@ -559,18 +586,24 @@ def run_arm(arm, out_dir, diet=False, fixed_first=False, stops=None, limit=None)
         prompt = build_prompt(stop, si, diet=diet, fixed_first=fixed_first)
         t0 = time.time()
         if provider == "openai":
-            text, usage, status = call_openai(model, SYSTEM_MESSAGE, prompt)
+            text, usage, status, finish = call_openai(model, SYSTEM_MESSAGE, prompt)
         elif provider == "anthropic":
-            text, usage, status = call_anthropic(model, SYSTEM_MESSAGE, prompt)
+            text, usage, status, finish = call_anthropic(model, SYSTEM_MESSAGE, prompt)
         else:
-            text, usage, status = call_gemini(model, SYSTEM_MESSAGE, prompt)
+            text, usage, status, finish = call_gemini(model, SYSTEM_MESSAGE, prompt)
         elapsed = round(time.time() - t0, 2)
+        # [LOCAL-720B] A stop is TRUNCATED when the provider says it stopped on the
+        # token cap: Anthropic stop_reason="max_tokens", OpenAI finish_reason=
+        # "length", Gemini finishReason="MAX_TOKENS". Acceptance is zero truncations.
+        truncated = str(finish).lower() in ("max_tokens", "length", "max_token")
         rec = {
             "arm": arm, "provider": provider, "model": model,
             "stop_id": stop["stop_id"], "museum": stop["museum"],
             "title": stop["title"], "artist": stop["artist"],
             "prompt_chars": len(prompt), "status": status,
             "seconds": elapsed, "usage": usage,
+            "max_tokens": MAX_TOKENS, "finish_reason": finish,
+            "truncated": truncated, "chars": len(text),
             "output": text,
         }
         results.append(rec)
@@ -578,15 +611,24 @@ def run_arm(arm, out_dir, diet=False, fixed_first=False, stops=None, limit=None)
         safe = re.sub(r"[^A-Za-z0-9_.-]+", "_", stop["stop_id"])
         with open(os.path.join(out_dir, f"{safe}.txt"), "w", encoding="utf-8") as f:
             f.write(f"ARM {arm} | {provider}:{model} | {stop['museum']} | {stop['title']}\n")
-            f.write(f"prompt_chars={len(prompt)} status={status} seconds={elapsed} usage={usage}\n")
+            f.write(f"prompt_chars={len(prompt)} status={status} seconds={elapsed} "
+                    f"max_tokens={MAX_TOKENS} finish_reason={finish} "
+                    f"truncated={truncated} usage={usage}\n")
             f.write("=" * 80 + "\n")
             f.write(text)
         print(f"[{arm}] {stop['stop_id']:16s} status={status} "
               f"{elapsed:5.1f}s out_tok={usage.get('completion_tokens','?')} "
-              f"chars={len(text)}", flush=True)
+              f"chars={len(text)} finish={finish}"
+              f"{'  *** TRUNCATED ***' if truncated else ''}", flush=True)
     with open(os.path.join(out_dir, f"arm_{arm}_results.json"), "w", encoding="utf-8") as f:
         json.dump(results, f, ensure_ascii=False, indent=2)
-    print(f"[{arm}] wrote {len(results)} stop results -> {out_dir}", flush=True)
+    n_trunc = sum(1 for r in results if r.get("truncated"))
+    print(f"[{arm}] wrote {len(results)} stop results -> {out_dir} "
+          f"(truncations={n_trunc})", flush=True)
+    if n_trunc:
+        print(f"[{arm}] WARNING: {n_trunc} stop(s) ended on the token cap "
+              f"(max_tokens={MAX_TOKENS}). Per LOCAL-720B acceptance, re-run this "
+              f"arm with BENCH_MAX_TOKENS=4000 and record it.", flush=True)
     return results
 
 

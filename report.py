@@ -135,16 +135,29 @@ def build(base_dir, host, arms=None, baseline="B"):
         out_tokens = [r["usage"].get("completion_tokens", 0) for r in recs
                       if isinstance(r.get("usage"), dict)]
         mean_out_tok = round(statistics.mean(out_tokens)) if out_tokens else None
+        # [LOCAL-720B] characters DELIVERED per stop (the listener-facing length,
+        # the thing that was truncated in LOCAL-720). Prefer the recorded `chars`
+        # field; fall back to len(output) for older result files.
+        char_counts = [r.get("chars", len(r.get("output", ""))) for r in recs]
+        mean_chars = round(statistics.mean(char_counts)) if char_counts else None
+        n_truncated = sum(1 for r in recs if r.get("truncated"))
         total_usd, calls, per_stop = arm_ledger_cost(arm, ledger, n_stops)
         usd_total_n = round(per_stop * n_stops, 5)
+        # [LOCAL-720B] price per 1,000 DELIVERED characters — a per-listener-minute
+        # proxy, not per-token: $/stop divided by chars/stop, scaled to 1k chars.
+        usd_per_1k_chars = (round(per_stop / mean_chars * 1000, 5)
+                            if (mean_chars and per_stop) else None)
         rows.append({
             "arm": arm, "model": ARM_LABEL.get(arm, (arm, arm))[1],
             "kiro_mean": kiro_mean, "kiro_min": kiro_min,
             "gpt_mean": gpt_mean, "gpt_min": gpt_min,
             "detector_failures": det_fails, "http_failures": http_fails,
+            "truncations": n_truncated,
             "usd_total": usd_total_n, "usd_ledger_raw": round(total_usd, 5),
             "ledger_calls": calls, "usd_per_stop": round(per_stop, 5),
+            "usd_per_1k_chars": usd_per_1k_chars,
             "median_seconds": med_secs, "mean_output_tokens": mean_out_tok,
+            "mean_chars": mean_chars,
             "n_stops": n_stops,
         })
 
@@ -166,15 +179,19 @@ def build(base_dir, host, arms=None, baseline="B"):
     # markdown table — both judges side by side
     md = []
     md.append("| Arm | Model | Kiro mean | Kiro min | gpt-4.1 mean | gpt-4.1 min | "
-              "Det.fails | HTTP fails | $/stop | $ total | Median s | Mean out-tok |")
+              "Det.fails | Trunc. | HTTP fails | $/stop | $ total | $/1k chars | "
+              "Median s | Mean chars | Mean out-tok |")
     md.append("|-----|-------|-----------|----------|--------------|-------------|"
-              "-----------|-----------|--------|---------|----------|--------------|")
+              "-----------|--------|-----------|--------|---------|------------|"
+              "----------|------------|--------------|")
     for r in rows:
+        ppk = f"${r['usd_per_1k_chars']:.5f}" if r['usd_per_1k_chars'] is not None else "—"
         md.append(
             f"| {r['arm']} | {r['model']} | {r['kiro_mean']} | {r['kiro_min']} | "
             f"{r['gpt_mean']} | {r['gpt_min']} | {r['detector_failures']} | "
-            f"{r['http_failures']} | ${r['usd_per_stop']:.5f} | ${r['usd_total']:.5f} | "
-            f"{r['median_seconds']} | {r['mean_output_tokens']} |")
+            f"{r['truncations']} | {r['http_failures']} | ${r['usd_per_stop']:.5f} | "
+            f"${r['usd_total']:.5f} | {ppk} | "
+            f"{r['median_seconds']} | {r['mean_chars']} | {r['mean_output_tokens']} |")
     table = "\n".join(md)
     print(table)
     with open(os.path.join(base_dir, "report_table.md"), "w", encoding="utf-8") as f:

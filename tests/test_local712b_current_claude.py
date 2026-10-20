@@ -217,7 +217,8 @@ class _FakeResp:
 
 def test_call_anthropic_current_arm_request_shape(harness, monkeypatch):
     """A current-lineup arm (Opus 5.5) sends the identical request shape as the
-    LOCAL-712 arms: system TOP-LEVEL, the model id, max_tokens=1000, temp=0.7."""
+    LOCAL-712 arms: system TOP-LEVEL, the model id, max_tokens=2500 (LOCAL-720B
+    shared budget). The 5.5 lineup deprecates `temperature`, so it is omitted."""
     captured = {}
 
     def fake_post(url, headers=None, json=None, timeout=None):
@@ -228,12 +229,13 @@ def test_call_anthropic_current_arm_request_shape(harness, monkeypatch):
             "model": "claude-opus-5-5",
             "content": [{"type": "text", "text": "The painting glows."}],
             "usage": {"input_tokens": 800, "output_tokens": 300},
+            "stop_reason": "end_turn",
         })
 
     monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-ant-TESTKEY")
     monkeypatch.setattr(harness.requests, "post", fake_post)
 
-    text, usage, status = harness.call_anthropic(
+    text, usage, status, finish = harness.call_anthropic(
         "claude-opus-5-5", "SYS MESSAGE", "USER PROMPT")
 
     assert captured["url"] == "https://api.anthropic.com/v1/messages"
@@ -243,12 +245,15 @@ def test_call_anthropic_current_arm_request_shape(harness, monkeypatch):
     assert body["system"] == "SYS MESSAGE"
     assert body["messages"] == [{"role": "user", "content": "USER PROMPT"}]
     assert body["model"] == "claude-opus-5-5"
-    assert body["max_tokens"] == 1000
-    assert body["temperature"] == 0.7
+    # [LOCAL-720B] shared budget 2500 for every arm (was 1000 in LOCAL-720)
+    assert body["max_tokens"] == 2500
+    # [LOCAL-720] the 5.5 lineup deprecates `temperature`; it is omitted for Opus
+    assert "temperature" not in body
     assert status == 200
     assert text == "The painting glows."
     assert usage["prompt_tokens"] == 800
     assert usage["completion_tokens"] == 300
+    assert finish == "end_turn"
 
 
 def test_call_anthropic_requires_key_env(harness, monkeypatch):

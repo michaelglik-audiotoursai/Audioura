@@ -197,12 +197,13 @@ def test_call_anthropic_request_shape(harness, monkeypatch):
             "model": "claude-haiku-4-5-20251001",
             "content": [{"type": "text", "text": "The painting glows."}],
             "usage": {"input_tokens": 800, "output_tokens": 300},
+            "stop_reason": "end_turn",
         })
 
     monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-ant-TESTKEY")
     monkeypatch.setattr(harness.requests, "post", fake_post)
 
-    text, usage, status = harness.call_anthropic(
+    text, usage, status, finish = harness.call_anthropic(
         "claude-haiku-4-5-20251001", "SYS MESSAGE", "USER PROMPT")
 
     # endpoint + required headers
@@ -213,9 +214,10 @@ def test_call_anthropic_request_shape(harness, monkeypatch):
     body = captured["body"]
     assert body["system"] == "SYS MESSAGE"
     assert body["messages"] == [{"role": "user", "content": "USER PROMPT"}]
-    # model, max_tokens (REQUIRED by Anthropic) and temperature mirror the OpenAI arm
+    # model, max_tokens (REQUIRED by Anthropic) and temperature mirror the OpenAI arm.
+    # [LOCAL-720B] the shared budget is 2500 for every arm (was 1000 in LOCAL-720).
     assert body["model"] == "claude-haiku-4-5-20251001"
-    assert body["max_tokens"] == 1000
+    assert body["max_tokens"] == 2500
     assert body["temperature"] == 0.7
     # response parsed; usage normalised to the OpenAI-shaped keys the report reads
     assert status == 200
@@ -223,6 +225,8 @@ def test_call_anthropic_request_shape(harness, monkeypatch):
     assert usage["prompt_tokens"] == 800
     assert usage["completion_tokens"] == 300
     assert usage["total_tokens"] == 1100
+    # [LOCAL-720B] the provider stop_reason is captured so truncation is visible
+    assert finish == "end_turn"
 
 
 def test_call_anthropic_http_error_fallback(harness, monkeypatch):
@@ -234,10 +238,11 @@ def test_call_anthropic_http_error_fallback(harness, monkeypatch):
 
     monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-ant-TESTKEY")
     monkeypatch.setattr(harness.requests, "post", fake_post)
-    text, usage, status = harness.call_anthropic("claude-sonnet-5", "SYS", "USER")
+    text, usage, status, finish = harness.call_anthropic("claude-sonnet-5", "SYS", "USER")
     assert status == 400
     assert text.startswith("[HTTP 400]")
     assert usage == {}  # no usage attributed on an error
+    assert finish is None  # [LOCAL-720B] no stop_reason on an error response
 
 
 def test_call_anthropic_timeout_propagates_like_openai(harness, monkeypatch):
