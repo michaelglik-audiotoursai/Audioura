@@ -1,3 +1,119 @@
+# LOCAL-720B results — the FAIR Claude replay (D674)
+
+**Agent:** Mac Mini Kiro · **Branch:** `LOCAL-720B-fair-replay` · **Base:** subscribed @ `d4e7855b`
+**Why this re-run:** LOCAL-720 ran every arm at `max_tokens=1000`. Claude's tokenizer gives ~3 characters per
+token (vs ~5 for `gpt-4.1-mini`) and Opus still spends tokens thinking, so Claude hit the cap mid-sentence on
+most stops (Opus 10/12). The judges were scoring **truncation, not writing** — Opus came last at 5.62 / 6.17
+purely for being cut off. This replay fixes that: **`max_tokens = 2500` for EVERY arm**, and the provider's
+`stop_reason` / `finish_reason` is recorded per stop.
+
+**Acceptance met: 0 truncations across all 48 stops.** Every stop finished on its own
+(`finish_reason` = `stop` for gpt-4.1-mini, `end_turn` for all three Claude models). No arm needed the 4000-token
+fallback. Identical inputs to LOCAL-720 (same 12 stops, same disk-cached Wikipedia extracts — the Walters
+"Sappho" / "Springtime" extracts are empty in both runs, so those stops have no wiki source in either). One draft
+per stop, no retries. Blind, double-judged (Kiro + gpt-4.1), relabelled with seed 720.
+
+## 1. Per-arm replay table — BOTH judges (fair, `max_tokens=2500`, truncations=0)
+| Arm | Model | Kiro mean | Kiro min | gpt-4.1 mean | gpt-4.1 min | Det.fails | Trunc. | $/stop | $ total (12) | $/1k chars | Median s | Mean chars | Mean out-tok | Within 0.3 of B |
+|-----|-------|-----------|----------|--------------|-------------|-----------|--------|--------|--------------|------------|----------|------------|--------------|-----------------|
+| B | gpt-4.1-mini | **6.83** | 4.5 | **7.92** | 5.5 | 0 | 0 | $0.00140 | $0.01683 | $0.00049 | 4.12 | 2868 | 555 | (baseline) |
+| H | Claude Haiku 5.5 | 6.33 | 0.0 | 7.35 | 2.0 | 4 | 0 | $0.00077 | $0.00918 | $0.00030 | 5.59 | 2555 | 830 | no / no |
+| I | Claude Sonnet 5.5 | 6.94 | 0.0 | 7.62 | 2.0 | 4 | 0 | $0.01726 | $0.20708 | $0.00553 | 10.61 | 3122 | 1025 | **yes / yes** |
+| J | Claude Opus 5.5 | **7.88** | 2.5 | **8.47** | 3.0 | 1 | 0 | $0.04542 | $0.54502 | $0.01345 | 18.4 | 3378 | 1570 | **beats B / beats B** |
+
+`$/stop` and `$ total` come from the `paid_api_calls` ledger (network meter, host `local720b-gen`), not an
+estimate — one metered narration call per stop. `$/1k chars` = $/stop ÷ delivered characters × 1000 (a
+per-listener-minute price, not per-token). `Mean chars` is the characters the listener actually hears. Median
+seconds and mean out-tok come from each arm's `arm_X_results.json`.
+
+**Compared to the invalid LOCAL-720 table** (B 7.67 / H 7.33 / I 7.25 / J **5.62** Kiro): once nothing is
+truncated, **Opus 5.5 is the best writer under both judges** and Sonnet 5.5 ties the baseline. The old Opus score
+measured the 1000-token cap, not Opus.
+
+## 2. Per-stop scores (both judges, un-blinded)
+| Stop | B K | H K | I K | J K | B g | H g | I g | J g |
+|------|-----|-----|-----|-----|-----|-----|-----|-----|
+| Courtauld-0 | 7.5 | 7.0 | 7.5 | 8.5 | 7.5 | 9.2 | 8.5 | 9.2 |
+| Courtauld-1 | 8.5 | 8.5 | 8.5 | 8.5 | 8.5 | 9.2 | 9.2 | 9.2 |
+| Courtauld-2 | 6.5 | 8.5 | 8.0 | 9.0 | 8.5 | 8.5 | 8.5 | 9.2 |
+| Walters-0 | 6.5 | 0.0 | 0.0 | 2.5 | 7.5 | 2.0 | 2.0 | 3.0 |
+| Walters-1 | 4.5 | 3.0 | 7.5 | 7.5 | 8.2 | 4.5 | 7.5 | 7.5 |
+| Walters-2 | 4.5 | 0.0 | 1.0 | 7.5 | 5.5 | 2.0 | 2.0 | 8.5 |
+| Wallace-0 | 7.5 | 8.5 | 8.5 | 9.0 | 8.5 | 9.2 | 8.5 | 9.5 |
+| Wallace-1 | 7.0 | 8.5 | 9.3 | 9.0 | 8.5 | 8.2 | 9.2 | 9.2 |
+| Wallace-2 | 7.5 | 7.5 | 7.5 | 6.5 | 8.5 | 8.5 | 8.5 | 8.5 |
+| Frick-0 | 7.0 | 7.5 | 8.5 | 8.5 | 7.5 | 9.2 | 9.2 | 9.5 |
+| Frick-1 | 6.5 | 8.5 | 8.5 | 8.5 | 8.2 | 8.5 | 9.2 | 9.2 |
+| Frick-2 | 8.5 | 8.5 | 8.5 | 9.5 | 8.2 | 9.2 | 9.2 | 9.2 |
+
+The two low Walters stops are the ones with **no source material** (the Walters "Springtime" and "Sappho and
+Alcaeus" Wikipedia extracts are empty — identical to LOCAL-720). gpt-4.1-mini (B) invents its way through them
+and scores ~6–8; Haiku and Sonnet instead **refuse and ask the operator for a catalogue entry** (caught by the
+new `non_narration_reply` + `llm_refusal` detectors, scored 0 by Kiro). Sonnet and Opus also prepend a
+one-paragraph *note to the requester* on Walters-1 (The Death of Caesar — the sources place it in Naples, not the
+Walters), then still write the stop. That honesty is arguably correct behaviour, but it is **not narration** and
+is scored as a defect. The detector failures (H 4, I 4, J 1) are concentrated entirely on these three
+empty-/wrong-source Walters stops; on the nine well-sourced stops every Claude arm scores 7.0–9.5.
+
+## 3. Detectors (LEAD review item #3)
+A new deterministic detector, `non_narration_reply`, now fails any draft that talks to the **requester** instead
+of narrating — "tell me which you'd prefer", "I'll produce the stop", "please confirm", "here are two options",
+etc. It fires on exactly the stops above (and, validated against LOCAL-720, on that run's Opus Frick-1 "Tell me
+which you'd prefer, and I'll produce the stop." reply) and on no legitimate narration stop.
+
+## 4. Two sample stops per arm (verbatim, first ~700 chars)
+### Arm B — gpt-4.1-mini (baseline)
+> *Courtauld-0:* "You are standing in front of Édouard Manet's A Bar at the Folies-Bergère, positioned to the
+> right side of the painting to fully appreciate its complex use of perspective and reflection… This work,
+> painted in oil on canvas in 1882, is Manet's last major painting…"
+>
+> *Frick-0:* "You are standing directly in front of Johannes Vermeer's oil painting on canvas titled Officer and
+> Laughing Girl, dated around 1657, measuring 50.5 by 46 centimetres…"
+
+### Arm H — Claude Haiku 5.5
+> *Wallace-0:* "Welcome to the Wallace Collection. Stand in front of Frans Hals's *The Laughing Cavalier*…Step
+> closer and the brushwork breaks apart into loose, quick strokes that the distance hides."
+>
+> *Frick-2:* "Stand at the centre of the room, about six feet back from the canvas, and look for the mirror.
+> Ingres painted the sitter fully frontal, but behind her, in the dresser's glass, a second image of her
+> appears…"
+
+### Arm I — Claude Sonnet 5.5
+> *Wallace-1:* "Stand a few steps back from the canvas… From here you can take in the ring of dancers and the sky
+> above them in a single glance. Then let your eye travel upward… That vertical reading is the key to this
+> painting."
+>
+> *Frick-0:* "Stand a few steps back from Officer and Laughing Girl… Move in close afterward, and you will see
+> how little paint it takes to make her smile."
+
+### Arm J — Claude Opus 5.5 (best under both judges)
+> *Courtauld-0:* "Stand slightly to the right of the centre of Manet's A Bar at the Folies-Bergère… In 2000, the
+> art historian Malcolm Park staged a physical reconstruction of the scene and showed that its puzzling geometry
+> works only from this position… From dead centre, the mirror seems to lie. From here, the picture starts to make
+> sense."
+>
+> *Wallace-1:* "Stand a few paces back… the painting reads as two linked bands of movement: four figures turning
+> on the ground, and a sun-god's chariot sweeping across the dawn sky."
+
+*Note:* Opus wraps its stops in markdown headings (`#`, `**bold**`). The voice would read those literally, so a
+production switch to Opus needs a markdown-stripping post-step — a small, known fix, not a quality problem.
+
+## 5. For Michael — five plain lines (D674: does Claude write better, faster, cheaper?)
+1. **Quality (Kiro judge):** Opus 5.5 is the best writer at **7.88** vs today's gpt-4.1-mini **6.83**; Sonnet 5.5
+   ties at 6.94; Haiku 5.5 is a touch below at 6.33.
+2. **Quality (gpt-4.1 judge, the bias guard):** same order — Opus **8.47** vs today **7.92**, Sonnet 7.62, Haiku
+   7.35. Opus beats today's model under **both** judges; Sonnet matches it; the Opus win is real, not a
+   one-judge fluke.
+3. **Price:** Haiku is the cheapest of all ($0.0008/stop, below today's $0.0014); Sonnet costs ~12× today
+   ($0.017/stop); Opus costs ~32× today ($0.045/stop, $0.013 per 1,000 spoken characters).
+4. **Speed:** today's model is fastest (~4s/stop); Haiku ~6s, Sonnet ~11s, Opus ~18s — Opus is the slowest by far.
+5. **Bottom line:** if you want the **best-written** tours and will pay ~30× per stop and wait ~4× longer, **Opus
+   5.5** is a clear upgrade; if you want **as-good-as-today for less money**, **Haiku 5.5** is cheaper and close;
+   nothing here forces a change — it is a quality-for-price-and-speed choice, and the earlier "Claude is worse"
+   result was a truncation bug, now fixed.
+
+---
+
 # BAKEOFF_LOCAL-712 — Claude as the tour writer (D674)
 
 **Agent:** Mac Mini Kiro · **Branch:** `LOCAL-712-claude-bakeoff` · **Base:** subscribed @ `18028ba8`
