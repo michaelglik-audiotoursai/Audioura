@@ -1,0 +1,34 @@
+ARM J | anthropic:claude-opus-5-5 | Frick | Portrait of Sir Thomas More
+prompt_chars=8478 status=200 seconds=10.43 usage={'prompt_tokens': 3006, 'completion_tokens': 928, 'total_tokens': 3934, 'cache_read_input_tokens': 0}
+================================================================================
+# Portrait of Sir Thomas More: Audio Stop Not Possible With the Provided Sources
+
+I can't write this stop accurately with the material provided.
+
+## The Problem
+
+The source material contains no information about *Portrait of Sir Thomas More*. It covers two other things at the Frick:
+
+- **Gainsborough: The Fashion of Portraiture**, an exhibition of more than two dozen portraits by Thomas Gainsborough (1727–1788).
+- **A Cabinet installation of twenty-four hand-colored engravings** from *Gallerie des modes et costumes français* (1778–87).
+
+Your instructions require every name, date, material, and consequence to come from the sources. Nothing provided describes the More portrait, its artist, its medium, its date, or what was at stake in its making. If I wrote the stop anyway, I would have to invent all of it:
+
+- the orientation
+- the physical property
+- the cost or stake
+- the scholarly reception
+- the artist's turning point
+
+That would break the core rules of this brief.
+
+## Options
+
+1. **Send source material on the More portrait.** Useful sources include the Frick's catalogue entry, a wall label, or a scholarly text. I'll then write the full stop to spec.
+2. **Let me write a stop the current sources do support.** The fashion-plate installation has enough material for a compliant stop:
+   - **A physical property:** hand-colored engravings, a selection from 370 original prints held by the Frick Art Research Library.
+   - **A cost:** no complete set survives. Many plates were thrown away when fashions changed, and others may have been destroyed during the French Revolution.
+   - **A meaning:** the plates claimed to be drawn from life and anticipated true fashion magazines.
+3. **Authorize me to draw on general art-historical knowledge for the More portrait.** The stop would then not be limited to your sources, and you would want to fact-check it before recording.
+
+Tell me which you'd prefer, and I'll produce the stop.

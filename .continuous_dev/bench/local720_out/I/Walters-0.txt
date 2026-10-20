@@ -1,0 +1,16 @@
+ARM I | anthropic:claude-sonnet-5-5 | Walters | Springtime (1872)
+prompt_chars=9465 status=200 seconds=8.58 usage={'prompt_tokens': 3634, 'completion_tokens': 887, 'total_tokens': 4521, 'cache_read_input_tokens': 0}
+================================================================================
+Stand about six feet back from Springtime, 1872, and look at the lower half of the canvas, where Camille's muslin dress meets the ground. From here you can see how the same patches of sunlight fall across her lap and across the grass, which is what ties her to the garden around her. Step closer and the dress and the dappled earth break into separate daubs of paint.
+
+Springtime shows Camille Doncieux, Monet's first wife, seated reading beneath a canopy of lilacs. Her face and form are held in close focus, while the foliage and the light are handled more loosely. Sunlight comes down through the leaves and lands in patches on the ground and on her dress. Muslin is a light, thin cotton, and Monet uses it as a surface that catches those patches and shows them off. The effect is a quiet scene of domestic life, a woman absorbed in her book in a private garden. When the painting was shown in 1876, it carried the plainer title Woman Reading.
+
+That showing was the second exhibition organized by the Impressionists, the group of painters then working outside the official Salon, held at Paul Durand-Ruel's Paris gallery from March 30 to April 30, 1876. Monet sent eighteen works, and Camille posed for six of them.
+
+Monet painted this in the spring of 1872, soon after settling with his family in Argenteuil, a village northwest of Paris that was a popular resort for city pleasure-seekers. Colleagues often joined him there, and the village became closely associated with Impressionism. He and Camille had married in 1870. Before that she had been his mistress and a model for his figure paintings of the 1860s, and she was talented enough at the work that Auguste Renoir and Édouard Manet used her too. That spring Monet painted a number of canvases in his own garden, often with Camille or with Adélaïde-Eugénie Lescouezec, the companion of fellow painter Alfred Sisley.
+
+There is a loss attached to this picture. Monet's second wife, Alice Hoschedé, ordered the complete destruction of pictures and mementos from Camille's life with him. As a result, Camille's image survives almost entirely through Monet's paintings. Later depictions show her older and far less attractive, which makes this early garden portrait, with its clear and youthful face, all the more precious.
+
+Look at how little the lilacs ask of her. She is not posed for the viewer. She reads, and the light moves over her, and the painting records an afternoon in a garden that was still hers.
+
+The Walters Art Museum owns Springtime, and it came out onto the streets of Baltimore in 2012 as a weather-resistant vinyl reproduction at the Cylburn Arboretum, part of an open-air exhibition called Off the Wall.

@@ -1,0 +1,14 @@
+ARM H | anthropic:claude-haiku-5-5 | Wallace | A Dance to the Music of Time
+prompt_chars=9704 status=200 seconds=5.21 usage={'prompt_tokens': 3436, 'completion_tokens': 870, 'total_tokens': 4306, 'cache_read_input_tokens': 0}
+================================================================================
+Stand in front of the painting at the centre of the room, about two metres back, so the whole canvas fits your view. From here you can see the four dancers as one linked ring, and the figure of Time at the right, which close up you would lose against the frame's edge.
+
+This is A Dance to the Music of Time, a painting by Nicolas Poussin, made between about 1634 and 1636. It shows four figures holding hands in a circle, moving to the music of a lyre played by Time, a winged, naked old man with a grey beard. Behind them, in the early morning sky, Aurora, the goddess of dawn, runs ahead of the chariot of Apollo, the sun-god, who holds a ring marking the signs of the zodiac. The dancers are the four seasons, which the painting presents as stages of human life. Working from the left, the figures are Spring with roses in her hair, Summer in white with ears of corn in her braids, and Winter with bound hair and a shadowed face. The figure at the back, seen mostly from behind, is Autumn, and he is male. The museum now calls him Bacchus, the god of wine, a reading that follows a story in which Jupiter gave mortals wine to ease their hard lives.
+
+The painting's subject was set by Giulio Rospigliosi, a patron who later became Pope Clement IX, and the writer Gian Pietro Bellori recorded that he dictated the detailed iconography. The scholar Malcolm Bull has traced the figures to the Greek poet Nonnus, whose descriptions of the seasons Poussin follows closely. Other scholars argue that Poussin cared little for exact identities, so the question remains open.
+
+The painting also carries a record of its making. Poussin made several pentimenti, changes visible beneath the paint, including removing a second, larger tree on the right between Winter and Time. Later, a large L-shaped tear running through the central group was repaired, and retouching over that repair is still visible on close inspection.
+
+Nicolas Poussin was a French painter who spent most of his working life in Rome, where he absorbed classical sculpture and ancient literature. This work belongs to that Roman period, when he was building a reputation on subjects drawn from myth and poetry. The painting is also the source of the title of Anthony Powell's twelve-novel sequence, A Dance to the Music of Time. The title appeared in a Wallace Collection catalogue only in 1913, and the painting had earlier been known under titles referring to the Four Seasons.
+
+What the painting gives the viewer is a slow, looping rhythm. The dancers' linked hands carry the eye around the circle and back to the lyre, and the sky above keeps the morning light moving toward them.

@@ -1,0 +1,14 @@
+ARM J | anthropic:claude-opus-5-5 | Walters | Springtime (1872)
+prompt_chars=9465 status=200 seconds=12.25 usage={'prompt_tokens': 3635, 'completion_tokens': 1000, 'total_tokens': 4635, 'cache_read_input_tokens': 0}
+================================================================================
+# Springtime (1872): Audio Description
+
+## Orientation
+
+Stand a few steps back from **Springtime (1872)**, roughly in the centre of the gallery floor rather than right up against the frame. Up close, the canvas breaks apart into separate touches of paint. From a little distance, those touches settle into what Monet was chasing: sunlight filtering through a canopy of lilacs and landing in bright patches on the ground and across a woman's pale muslin dress. Then move closer to her face, which Monet painted in sharper focus than anything around it.
+
+## The Work
+
+A young woman sits quietly reading in a garden, shaded by flowering lilacs. She is Camille Doncieux, Monet's first wife. The painting has gone by two names. Today it is called *Springtime*, and it is also known as *The Reader*.
+
+The key to the picture is light. Monet did not paint the sun directly. He showed it breaking through leaves and scattering across the scene, so that the muslin of Camille's dress catches it in irregular pools. That fine, thin cotton fabric becomes a surface for recording light, and the dappled patches are the real subject as much as the woman herself. Her face and figure are held in close focus, which gives her a calm stillness at the centre of all that flickering brightness. The scene is an intimate moment of domestic life in a private garden, painted at home

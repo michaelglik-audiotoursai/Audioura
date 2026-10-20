@@ -20,6 +20,13 @@ usage:
   python3 score_stops.py kiro --dir bench_out [--arms BFG]    # judge 1: Kiro rubric
   python3 score_stops.py gpt  --dir bench_out [--arms BFG]    # judge 2: gpt-4.1 rubric (D674)
   python3 score_stops.py all  --dir bench_out                 # detectors + both judges
+
+Blind double-judging (D674 bias guard), reproducibly:
+  blind      --dir OUT --arms BHIJ --seed 720          # OUT/_blind/<label> + blind_key.json
+  kiro/gpt   --dir OUT/_blind --arms <blind labels>    # judges score the BLIND tree only
+  unblind    --dir OUT                                 # remap _blind/*_scores.json -> OUT/*_scores.json
+The judges never see the real arm; unblind re-keys their scores to real arms via
+_blind/blind_key.json for report.py. The blind files stay as the audit trail.
 """
 import json
 import os
@@ -100,6 +107,28 @@ def stop_detectors(text):
     chk("llm_refusal",
         bool(re.search(r"(?i)\b(I'?m sorry|I cannot|I can'?t|as an AI|I'?m unable)\b",
                        spoken[:400])))
+    # [LOCAL-720B / D674] A draft that TALKS TO THE REQUESTER instead of narrating
+    # is not a tour stop. LOCAL-720's Opus Frick-1 ended "Tell me which you'd
+    # prefer, and I'll produce the stop." — it asked the user to pick an option
+    # and deferred the writing. The narration voice never addresses "you, the
+    # requester" or promises to produce output later; it speaks to the listener
+    # standing in front of the work. Flag the tell-tale meta phrases.
+    chk("non_narration_reply",
+        bool(re.search(
+            r"(?i)\b("
+            r"tell me (which|what|how|if|whether)"
+            r"|let me know (which|what|if|whether)"
+            r"|which (would you|do you) (prefer|want|like)"
+            r"|would you (like|prefer) me to"
+            r"|i'?ll (produce|write|draft|create|generate) the (stop|narration|tour|description)"
+            r"|i can (produce|write|draft|create|generate) (the|a|an|one|either|both|two)"
+            r"|authorize me to"
+            r"|please (choose|confirm|specify|clarify|let me know|pick|select)"
+            r"|(do you|would you) want me to"
+            r"|here are (two|three|a few|several|some) (options|versions|drafts|approaches)"
+            r")\b",
+            spoken)),
+        "reply addresses the requester / offers options instead of narrating")
     return fails
 
 
@@ -368,6 +397,40 @@ def make_blind(base_dir, arms=None, seed=None):
     return key
 
 
+def unblind_scores(base_dir):
+    """[LOCAL-720B / D674] Un-blind the judge scores produced on the _blind tree.
+
+    The judges run on <base>/_blind (blind labels A,B,C,…) and write
+    _blind/kiro_scores.json and _blind/gpt_scores.json keyed by BLIND label. This
+    reads _blind/blind_key.json (blind_label -> real_arm) and rewrites those two
+    files, re-keyed by REAL arm, to <base>/kiro_scores.json and
+    <base>/gpt_scores.json — the shape report.py consumes. The blind files are
+    left intact as the audit trail (the judges never saw the real arm). Idempotent.
+    """
+    blind_dir = os.path.join(base_dir, "_blind")
+    key_path = os.path.join(blind_dir, "blind_key.json")
+    if not os.path.exists(key_path):
+        print(f"[unblind] no blind_key.json in {blind_dir}; nothing to do", flush=True)
+        return {}
+    key = json.load(open(key_path, encoding="utf-8"))  # blind_label -> real_arm
+    for judge in ("kiro_scores.json", "gpt_scores.json"):
+        src = os.path.join(blind_dir, judge)
+        if not os.path.exists(src):
+            print(f"[unblind] {judge}: not present in _blind (judge not run?)", flush=True)
+            continue
+        blind_scores = json.load(open(src, encoding="utf-8"))
+        real = {}
+        for blind_label, rows in blind_scores.items():
+            real_arm = key.get(blind_label, blind_label)
+            real[real_arm] = rows
+        dst = os.path.join(base_dir, judge)
+        with open(dst, "w", encoding="utf-8") as f:
+            json.dump(real, f, ensure_ascii=False, indent=2)
+        mapping = ", ".join(f"{b}->{key.get(b, b)}" for b in sorted(blind_scores))
+        print(f"[unblind] {judge}: remapped {mapping} -> {dst}", flush=True)
+    return key
+
+
 def _main():
     if len(sys.argv) < 2:
         print(__doc__)
@@ -390,6 +453,8 @@ def _main():
     elif cmd == "blind":
         seed = opt("--seed", None)
         make_blind(base, arms, seed=int(seed) if seed is not None else None)
+    elif cmd == "unblind":
+        unblind_scores(base)
     elif cmd == "all":
         run_detectors(base, arms)
         run_kiro(base, arms)

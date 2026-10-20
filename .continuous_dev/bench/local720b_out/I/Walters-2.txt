@@ -1,0 +1,24 @@
+ARM I | anthropic:claude-sonnet-5-5 | Walters | Sappho and Alcaeus
+prompt_chars=5445 status=200 seconds=6.8 max_tokens=2500 finish_reason=end_turn truncated=False usage={'prompt_tokens': 2021, 'completion_tokens': 638, 'total_tokens': 2659, 'cache_read_input_tokens': 0}
+================================================================================
+I have to be straightforward with you before going any further. The source material section of this request is empty. No facts were supplied about "Sappho and Alcaeus" at the Walters Art Museum, and your rules say to use only the supplied facts and to invent no names, dates, numbers, or physical properties.
+
+I could draw on what I think I know about this work. But I can't verify the artist, the date, the medium, the dimensions, or how the museum acquired it, and an audio stop with an invented medium or a wrong attribution would be worse than none. Your own rule says that if the material names no physical property, I should write nothing about the physical object rather than invent one.
+
+Here is what I can offer instead.
+
+**Option 1: Send me the source material.** If you paste the museum's catalogue entry, label text, or curatorial notes, I will write the full stop in the structure you specified: an orientation naming "Sappho and Alcaeus" and telling the listener where to stand and why, then the work, the artist, and the emotional reading. Acquisition will be held to one sentence, and the physical property and the cost or stake will come from your text.
+
+**Option 2: A clearly labeled placeholder skeleton.** Here is a template you can fill in once the facts arrive.
+
+*Orientation:* Stand about [distance] from Sappho and Alcaeus, [position], where [specific visual feature] comes into view.
+
+*The work:* Sappho and Alcaeus is [medium, material, dimensions]. [One specific technique or compositional choice and why it matters.] [What it shows, why it was made, what scholars have said.]
+
+*The artist:* [Name] made this in [place and year], just after [turning point]. [What they were trying to do.]
+
+*Emotional reading:* [One or two sentences grounded in the above.]
+
+*Acquisition (one sentence maximum):* [Donor, gift, bequest, or purchase, only if specific to this work.]
+
+If you share the catalogue details, I will turn this into the finished audio script right away.

@@ -1,0 +1,20 @@
+ARM I | anthropic:claude-sonnet-5-5 | Walters | The Death of Caesar
+prompt_chars=7526 status=200 seconds=9.09 usage={'prompt_tokens': 2792, 'completion_tokens': 915, 'total_tokens': 3707, 'cache_read_input_tokens': 0}
+================================================================================
+I have to flag a problem before the guide begins. The source material for this stop places Camuccini's The Death of Caesar in the National Museum of Capodimonte in Naples, and it contains nothing connecting that painting to the Walters Art Museum in Baltimore. The venue notes concern other works, a 12th-century missal and a Rene Treviño sculpture, so they cannot support a stop at the Walters. Rather than invent a Baltimore location, a gallery position, or a Walters acquisition, I've written the stop around what the sources confirm, and I've left out any physical description of the canvas, since the material gives none.
+
+**Audio Description: The Death of Caesar**
+
+Find The Death of Caesar and stand at the center of the room, a few paces back from the canvas. From there the whole composition reads as one scene, and you can follow how the figures are arranged around the single fallen man.
+
+This is Vincenzo Camuccini's painting of the assassination of Julius Caesar, the Roman dictator killed by a group of senators in the year 44 BC. Camuccini finished this version in 1806. He had been working on the subject for thirteen years.
+
+The story begins in 1793, when Frederick Hervey, the Earl of Bristol, commissioned the painting. Camuccini had already made a copy of Raphael's Deposition for him. That same year he completed a cartoon, a full-scale preparatory drawing, and art critics in Rome received it favorably. Then came the setback. In 1796 he produced a first painted version, and it was less well received. Camuccini destroyed it and started again from scratch. The painting before you is the second attempt, and it took another decade.
+
+The cost of that persistence arrived in 1803, when the Earl died. His heirs refused to pay for the work. Camuccini had spent years on a commission that no one now owed him money for, and he sold the painting to Joachim Murat in 1807. Murat was a French marshal who became king of Naples under Napoleon. After Murat's fall, the painting passed to Ferdinand II of the Two Sicilies and hung in the royal palace in Naples before entering the National Museum of Capodimonte in 1864.
+
+Camuccini was a Roman painter working in the generation after the French Revolution, when artists across Europe turned to ancient Rome for subjects about tyranny, republican virtue, and violent political change. A scene in which senators kill a ruler they believe has grown too powerful spoke directly to that moment. His willingness to destroy a finished picture in 1796 shows how seriously he took the subject.
+
+Look at how the figures press in on the central body. A composition built this way concentrates the violence at a single point rather than scattering it across the room.
+
+The painting's history, thirteen years of work, a destroyed first version, and a buyer who died before paying, sits behind every figure you see.

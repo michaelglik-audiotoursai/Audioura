@@ -1,0 +1,16 @@
+ARM I | anthropic:claude-sonnet-5-5 | Courtauld | Georges Seurat
+prompt_chars=11634 status=200 seconds=8.7 usage={'prompt_tokens': 4796, 'completion_tokens': 845, 'total_tokens': 5641, 'cache_read_input_tokens': 0}
+================================================================================
+Find the Georges Seurat on the gallery wall and stand about two metres back, directly in front. Look at the wall behind the seated woman, in the upper left. From this distance the wall's surface hums with tiny dots of colour, and your eye starts blending them into shadow and light. Step in close and they fall apart again into separate specks.
+
+The painting is Young Woman Powdering Herself, made around 1888 to 1890. A woman sits at a dressing table, bare to the waist, her head bowed over a powder puff held in her raised hand. Her skin is built from small dots of pure colour placed side by side rather than mixed on a palette. Seurat's theory was that the eye, not the brush, should do the mixing, so the paint stays unblended and the colour looks brighter than any mixed pigment could. The technique is called pointillism, and this canvas applies it to an intimate indoor moment rather than a sunlit park or riverbank.
+
+The woman is Madeleine Knobloch, Seurat's mistress, who bore him two sons. That makes the picture personal in a way his large public canvases were not. Now look to the top left corner. A vase of flowers sits there on a small table. A scanner developed by the Italian Institute of Optics revealed that the vase was originally a reflection of Seurat himself at work, which would have made it the only self-portrait he ever painted. He covered it over, so the one image of himself he made is hidden beneath flowers.
+
+Seurat was in his late twenties, and he was fiercely protective of his private life. He is said to have kept the relationship hidden from his family and friends for years, which gives the overpainted self-portrait added weight. The picture also takes a pointed turn from his earlier work. He had already shown monumental outdoor scenes built from his dot technique, and here he tests it on a single figure, a mirror, and the soft artificial light of a bedroom.
+
+Notice how the dots on the wall shift in density, packed tighter in the shadows and looser where the light falls. That is where Seurat's discipline shows most clearly. The cost of the method was time. Every area required thousands of deliberate touches, and he worked this way until his death at thirty-one in 1891.
+
+What lingers is the quiet. A woman lost in a private ritual, painted by a man who first put himself in the room and then removed himself from it.
+
+The Courtauld shows Seurat alongside its Impressionist and Post-Impressionist masterpieces in the LVMH Great Room, where Manet's A Bar at the Folies Bergère and Van Gogh's Self-Portrait with Bandaged Ear hang nearby.

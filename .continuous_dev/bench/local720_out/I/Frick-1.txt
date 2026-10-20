@@ -1,0 +1,20 @@
+ARM I | anthropic:claude-sonnet-5-5 | Frick | Portrait of Sir Thomas More
+prompt_chars=8478 status=200 seconds=7.77 usage={'prompt_tokens': 3005, 'completion_tokens': 821, 'total_tokens': 3826, 'cache_read_input_tokens': 0}
+================================================================================
+I have to flag a problem before I begin. The source material you've given me covers a Gainsborough exhibition and a Cabinet installation of French fashion plates, but it says nothing about Portrait of Sir Thomas More, the painting by Hans Holbein the Younger that hangs at the Frick. I have no source facts about its medium, date, composition, or Holbein's circumstances, and I won't invent them. Below is a stop that gives you accurate orientation and uses what the sources do establish. If you can send me material on the Holbein itself, I will write the full work-and-artist description you asked for.
+
+Here is the audio text I can responsibly offer.
+
+Stand directly in front of Portrait of Sir Thomas More, at about arm's length from the rope, with your eyes level with the sitter's face. From that distance you can read the expression in the eyes and mouth, which is where a portrait like this does its work and where you would lose it by hanging back.
+
+I can't responsibly describe how this painting was made or what it meant to its painter, because the material in front of me doesn't cover it. What I can tell you is how the Frick frames the act of looking at portraits right now.
+
+The museum is currently showing Gainsborough: The Fashion of Portraiture, its first special exhibition devoted to the artist and the first on his portraiture ever held in New York. It argues that a painted portrait was subject to fashion just as the sitter's clothing was. The shape, size, and handling of a portrait could be avant-garde or out of date, the same way the cut of a jacket could.
+
+That idea is worth carrying to this painting. A portrait is a record of a person, and it is also a choice about how to present them, made within the conventions of its moment.
+
+Alongside the Gainsborough show, a Cabinet installation displays twenty-four hand-colored engravings of French fashion from the late eighteenth century. They come from Gallerie des modes et costumes français, published between 1778 and 1787 and the largest and most influential series of its kind. It ran to over four hundred images, billed as drawn from life, showing the headwear, jewelry, and dress of French people from many walks of life. No complete set survives, because many sheets were thrown away when styles changed and others may have been lost in the French Revolution.
+
+The Frick Art Research Library holds three hundred and seventy original prints from the series, and this is the first time a selection has been shown at the museum.
+
+If you send me the facts on Holbein's portrait, I'll replace this with the full stop: the technique, the cost, the artist's turning point, and the emotional reading.

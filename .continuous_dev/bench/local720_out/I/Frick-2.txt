@@ -1,0 +1,18 @@
+ARM I | anthropic:claude-sonnet-5-5 | Frick | Portrait of Comtesse d'Haussonville
+prompt_chars=12516 status=200 seconds=9.35 usage={'prompt_tokens': 4319, 'completion_tokens': 1000, 'total_tokens': 5319, 'cache_read_input_tokens': 0}
+================================================================================
+Stand directly in front of Portrait of Comtesse d'Haussonville, a few steps back and level with her face. From here the small mirror behind her comes into focus. Her profile and the back of her head are reflected in it, and you can only see the full trick of the composition when you face the painting squarely.
+
+The painting is oil on canvas, finished in 1845, and the palette is held to pale blue, grey, brown, gold and white. Louise de Broglie, Countess d'Haussonville, stands fully frontal and looks out at you with a demure expression. Her dress is heavily folded satin in a cold grey-blue, painted in the same hue as her eyes. That match is deliberate. The color of the gown and the color of the gaze become one cool note running through the picture.
+
+Look at her arms. Her right arm is sinuous and unnaturally elongated, bending in a way a real arm would not. Her left index finger rests coyly near her mouth. Ingres bent anatomy to serve line, because he cared more about a flowing contour than about measured accuracy. That finger and that arm were the central motif of every version he attempted.
+
+The mirror is a motif Ingres first used in his 1814 Portrait of Madame de Senonnes, where the sitter is also reflected in the background. Here it lets him show her from two angles at once. On the dresser in front of it sit writing materials, pots, flowers and a lavishly decorated oriental vase. The writing materials suit her. Louise de Broglie was highly educated and later became an essayist and biographer, publishing historical romance novels based on the lives of Lord Byron, Robert Emmett and Margaret of Valois. A crimson ribbon sits at the back of her parted hair, the one hot color against all that cool blue.
+
+The picture cost its sitter and its maker real patience. Ingres had sketched her in black chalk two or three years earlier and begun an oil version, which left out the mirror and reversed the pose. He abandoned it when she became pregnant with her third child and could no longer pose. The sessions were long and slow, and she found them wearisome, complaining that for nine days Ingres had been painting on one of the hands. The 1842 canvas stayed unfinished.
+
+Ingres was the leading French Neoclassical painter, a movement that favored clear outline and ideals drawn from ancient Greece and Rome. By 1845 his fame was at its height and portraits were in demand. He resented that. He saw history painting, scenes from myth and the past, as his true calling, yet it paid far less. He committed to only two portraits at that time, this one and the Baronne de Rothschild. Today those portraits are what he is best known for.
+
+He was never satisfied. Even after the family approved, and after the statesman Adolphe Thiers remarked that Ingres must be in love with her to have painted her that way, Ingres wrote that he did not feel he had conveyed all the graces of his charming model.
+
+When it was shown at the 1846 Bonne-Nouvelle exhibition, the poet Charles Baudelaire praised it for its voluptuousness and called Ingres the quintess

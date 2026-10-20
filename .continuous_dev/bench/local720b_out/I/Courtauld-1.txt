@@ -1,0 +1,22 @@
+ARM I | anthropic:claude-sonnet-5-5 | Courtauld | Van Gogh’s iconic Self-Portrait with Bandaged Ear
+prompt_chars=11623 status=200 seconds=10.34 max_tokens=2500 finish_reason=end_turn truncated=False usage={'prompt_tokens': 4255, 'completion_tokens': 1086, 'total_tokens': 5341, 'cache_read_input_tokens': 0}
+================================================================================
+Stand a few steps back from Van Gogh's iconic Self-Portrait with Bandaged Ear, centered in front of it, so that his face sits at your eye level. From here you can read the whole stack of the picture at once: the man, the easel behind him, and the print pinned beside it. Step closer afterward, and the surface breaks into thick ridges of paint.
+
+Van Gogh shows himself in a blue cap trimmed with black fur and a green overcoat. A white bandage wraps over his ear and runs under his chin. His eyes look out at you, steady and tired. Behind him on the left is a canvas on an easel, with a few marks on it that tell you nothing. On the right hangs a Japanese woodblock print, Geishas in a Landscape, by Satō Torakiyo, made in the 1870s. At the top is an open window.
+
+Look at how the paint was applied. Van Gogh used impasto, a technique where paint is laid on thickly so that the marks of the brush or palette knife stay visible. Here it gives the coat and cap a heavy, almost sculpted surface and puts energy into every edge. He had learned to admire this approach in the paintings of Adolphe Monticelli, a French painter whose thick, jewel-like surfaces Van Gogh praised in a letter to his brother Theo in 1888.
+
+The cap has a story too. It was bought to hold the heavy bandage in place and to keep out the winter cold, so it records the practical misery of January 1889. Van Gogh told Theo in a letter dated 17 January that he had made a new self-portrait, and this is believed to be it.
+
+The bandage is on the wrong side. Van Gogh sliced off his left ear, but he painted himself from a mirror, which reverses everything, so the bandage appears over his right ear. He had moved from Paris to Arles, in the south of France, to found a community of supportive artists he called the Studio of the South. He rented four rooms in the Yellow House and invited Paul Gauguin to join him. On the evening of 23 December 1888, Gauguin threatened to leave, and Van Gogh approached him with a razor. That night he cut off his ear and brought it to a woman in Arles named Rachel. She was distressed, and the police were called. The dream of a shared studio ended there.
+
+The print behind him matters because Van Gogh collected Japanese woodblock prints, hundreds of them over his life. He loved their bold colour and flattened space, and he used those qualities to modernise his own style. Here the print sits beside his bandaged head as an equal presence, a reminder of the kind of art he was trying to build a life around.
+
+The picture does not ask for pity. His gaze is level, the colours are calm greens and blues set against a hard orange-red behind him, and the injury is stated plainly as one more fact among the cap, the easel, and the print.
+
+The painting came to the Courtauld through Samuel Courtauld, who bought it in 1928.
+
+It is one of the best-known works in a collection famous for its Impressionist and Post-Impressionist paintings, and it hangs among works by Manet and Cézanne that explore the same moment when painters broke from tradition.
+
+Before it reached London, it belonged to Julien Tanguy, the Paris colour merchant who had posed twice for Van Gogh in 1887. He still had it when Van Gogh died.

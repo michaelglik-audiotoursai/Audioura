@@ -1,0 +1,31 @@
+ARM J | anthropic:claude-opus-5-5 | Courtauld | Georges Seurat
+prompt_chars=11634 status=200 seconds=18.27 max_tokens=2500 finish_reason=end_turn truncated=False usage={'prompt_tokens': 4797, 'completion_tokens': 1556, 'total_tokens': 6353, 'cache_read_input_tokens': 0}
+================================================================================
+# Georges Seurat: *Young Woman Powdering Herself*
+### The Courtauld Gallery, London
+
+**Orientation**
+
+You are standing before *Young Woman Powdering Herself* by Georges Seurat. Step close to the wall behind the seated woman, close enough to see the surface as separate marks rather than a smooth tone. From there, the shadows dissolve into tiny dots of distinct colour. Then step back several paces and watch them fuse into soft light and shade. Before you move on, look at the upper left corner, where a small vase of flowers sits in a frame on the wall. The most personal part of this painting is hidden there.
+
+**The Work**
+
+A full-figured young woman sits at a small dressing table and lifts a powder puff toward her face. She fills almost the entire lower canvas. The table looks almost toy-like against her, and her pose is stiff and upright, like a figure in a shop window.
+
+The painting's method is its argument. Seurat built the modulation of light and shadow on the wall from small dots of pure, unmixed colour, set side by side in varying concentrations and intensity. Where the dots cluster densely and darkly, the wall falls into shadow. Where they thin and brighten, it glows. Seurat left the mixing to the viewer's eye instead of blending colours on his palette. This technique is called pointillism, and he developed it with Paul Signac, the younger French painter who became its leading advocate. That is why the surface looks granular up close and luminous from a distance. You are completing the colour yourself.
+
+The model was Madeleine Knobloch, Seurat's mistress, who bore him two sons. That turns what looks like a modern scene of a woman at her toilette into a private portrait of the woman he lived with.
+
+The corner holds something more personal still. A scan carried out by the Italian Institute of Optics revealed that the framed vase of flowers was originally a mirror. In it was a reflection of Seurat himself, at work at his easel, painting her. He covered it over. In doing so he erased what would have been the only self-portrait of the artist known to exist. The flowers you see now are a substitute for the painter's own face.
+
+**The Artist**
+
+Seurat was a French Neo-Impressionist, part of the generation that took the Impressionists' interest in light and tried to make it systematic, almost scientific. He painted this canvas between 1888 and 1890, near the end of a very short career. He died in March 1891, aged thirty-one. This is one of the few works in which his strict, theoretical method turns toward his own household, and then pulls back from it.
+
+**The Emotional Reading**
+
+Knowing about the hidden mirror changes how the painting feels. The cool, orderly dots record an intimate domestic moment, and the man who shared it chose to remove himself from the picture, leaving a vase where his face had been.
+
+**In the Collection**
+
+The painting belongs to the Samuel Courtauld Trust. It hangs in the Courtauld's Impressionist and Post-Impressionist galleries alongside Édouard Manet's *A Bar at the Folies-Bergère*, another image of a woman framed by a mirror, and Vincent van Gogh's *Self-Portrait with Bandaged Ear*. Van Gogh painted himself unflinchingly. A few steps away, Seurat painted himself and then painted himself out.

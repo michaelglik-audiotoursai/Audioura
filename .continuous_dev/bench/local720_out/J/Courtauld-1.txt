@@ -1,0 +1,16 @@
+ARM J | anthropic:claude-opus-5-5 | Courtauld | Van Gogh’s iconic Self-Portrait with Bandaged Ear
+prompt_chars=11623 status=200 seconds=13.06 usage={'prompt_tokens': 4256, 'completion_tokens': 1000, 'total_tokens': 5256, 'cache_read_input_tokens': 0}
+================================================================================
+# Van Gogh's Self-Portrait with Bandaged Ear
+
+**Orientation**
+
+Van Gogh's iconic Self-Portrait with Bandaged Ear rewards two positions. Start a step or two back, roughly centred, so the whole room behind him comes into view: an open window on one side, an easel, and a Japanese print on the wall. From a distance these read as one interior. Then move in close and stand slightly to one side, so the gallery light rakes across the surface. From that angle the paint stops being flat colour and becomes ridges. These raised marks are what Van Gogh wanted you to see, and from straight on they almost disappear.
+
+**The Work**
+
+Van Gogh shows himself in a green overcoat and a blue cap trimmed with black fur. A white bandage covers one ear and wraps down under his chin. The cap was a recent purchase. He bought it to hold the heavy dressing in place and to keep out the winter cold, so even his clothing records the injury.
+
+The bandage appears over his right ear, but it was his left ear he had cut. He painted the portrait by looking into a mirror, which reversed the image. What you see is his reflection, not the face others saw.
+
+Behind him, the easel holds a canvas with only a few indistinct marks on it. This is a painter showing himself at work again, with the next picture barely begun. On the wall hangs a real Japanese woodblock print, *Geishas in a Landscape*, made by Satō Torakiyo in the 1870s. Van Gogh owned it. He collected hundreds of Japanese prints, and their bold colours and spatial effects pushed him to modernise his own style. Here he places one of those prints directly beside his wounded face, as if

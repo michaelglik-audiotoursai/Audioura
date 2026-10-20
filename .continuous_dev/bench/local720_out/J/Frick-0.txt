@@ -1,0 +1,16 @@
+ARM J | anthropic:claude-opus-5-5 | Frick | Officer and Laughing Girl
+prompt_chars=10658 status=200 seconds=12.24 usage={'prompt_tokens': 3743, 'completion_tokens': 1000, 'total_tokens': 4743, 'cache_read_input_tokens': 0}
+================================================================================
+# Officer and Laughing Girl: Audio Description
+
+**Orientation**
+
+Stand directly in front of *Officer and Laughing Girl*, about three paces back, with your eyes level with the woman's face. From here the officer's dark back fills the lower left like a shadow cast toward you, and the room seems to recede past him to her and to the open window. Then step close to the wall map behind her. Up close you can see that Vermeer painted it as a real object, mounted on linen and hung from wooden rods.
+
+**The Work**
+
+This is an oil painting on canvas, only 50.5 by 46 centimetres, made around 1657 by the Dutch painter Johannes Vermeer. A young woman sits at a table near a window, with light falling from the left across her face. Opposite her, with his back half-turned to us, sits a cavalry officer in a red coat. His black sash marks his rank as an officer. His wide-brimmed hat is made of beaver pelt, which was prized because it resisted rain and snow. Those pelts were imported from the New World, probably from New Netherland, the Dutch-controlled territory in what is now the eastern United States.
+
+The officer is the painting's key compositional choice. Vermeer pushes him into the immediate foreground, large and dark, so that he frames the brighter, smaller woman beyond him. This device is called repoussoir, which means placing an object up front to deepen the space behind it. Caravaggio, the Italian painter, used it often, and Vermeer probably learned it from the work of Caravaggio's imitators. Art historians also believe Vermeer may have used a camera obscura, a darkened box with a lens that projects an image. That would help explain why the officer looms so much larger than the woman, though they sit only a table's width apart.
+
+X
