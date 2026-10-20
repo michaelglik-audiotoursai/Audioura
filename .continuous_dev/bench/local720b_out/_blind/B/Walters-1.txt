@@ -1,0 +1,22 @@
+ARM B | blind | Walters | The Death of Caesar
+status=200
+================================================================================
+**A note before the script:** The source material conflicts with the venue. The reference extract describes Vincenzo Camuccini's *The Death of Julius Caesar* (1806), which it places in the National Museum of Capodimonte in Naples, not the Walters. The Walters' venue sources don't mention a *Death of Caesar* at all. Before this stop is recorded, please confirm which work hangs at the Walters. If it is a different painting, this script will need new source material.
+
+The script below uses only the Camuccini facts provided. The source gives no details about the canvas's size, colours or composition, so the orientation stays general rather than inventing what the listener will see.
+
+---
+
+**Audio Stop: The Death of Caesar**
+
+Stand back from *The Death of Caesar* far enough to take in the whole canvas at once. This is a history painting, a picture meant to stage a turning point of the ancient world as a single scene. Its argument depends on seeing every figure together rather than one face at a time.
+
+The painting shows the assassination of Julius Caesar, the Roman general and dictator stabbed by senators in 44 BC. Its painter was Vincenzo Camuccini, working in Rome. He finished this version in 1806, but it was not his first attempt.
+
+Camuccini began with a cartoon in 1793. A cartoon is a full-scale preparatory drawing that maps out the composition before any paint is applied. That drawing won praise from the art critics of Rome. Three years later, in 1796, he completed a first painted version, and it was received less warmly. Camuccini destroyed it and started again from scratch. The canvas in front of you is the second painting, the product of roughly a decade of work on one subject.
+
+The commission came from Frederick Hervey, the 4th Earl of Bristol, an English aristocrat and patron. Camuccini had already painted him a copy of Raphael's *Deposition*, the Renaissance master's scene of Christ's body being carried to the tomb. For a young painter, the leap from copying Raphael to inventing a grand Roman scene of his own was the step from apprentice to master. Camuccini staked that step on this painting.
+
+The Earl died in 1803, three years before the painting was finished. His heirs refused to pay for it. In 1807 Camuccini sold it to Joachim Murat, the French cavalry commander Napoleon made King of Naples, and after Murat's fall it passed to the royal palace in Naples.
+
+So the painting carries two kinds of loss. There is the first version Camuccini chose to destroy, and there is the patron who never lived to see the replacement. A picture about a murdered ruler was finished for a man already dead, and then sold to a king whose own reign would soon collapse.

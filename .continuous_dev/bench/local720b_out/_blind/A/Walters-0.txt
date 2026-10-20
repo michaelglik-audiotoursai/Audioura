@@ -1,0 +1,15 @@
+ARM A | blind | Walters | Springtime (1872)
+status=200
+================================================================================
+I can't responsibly write this stop as asked, because the source material doesn't support it. The only thing it tells me is that an 1872 painting called "Springtime" by Claude Monet exists. It says nothing about the Walters Art Museum holding that work, and it gives no details about the canvas, its technique, its subject, its colors, its critical reception, or Monet's circumstances in 1872.
+
+Writing the detailed description you want would mean inventing a physical description, a technique, a history, and a critical reading, and the same goes for where a visitor should stand. An audio guide that gets the facts wrong is worse than no guide, so I won't fabricate them.
+
+Two things are also worth flagging before anyone builds on this:
+
+1. **The attribution is unconfirmed.** The extract lists three different paintings titled "Springtime," by Monet (1872), Pierre Auguste Cot (1873), and Wilbur Winfield Woodward (late 19th century). Nothing in the source ties any of them to the Walters Art Museum in Baltimore.
+2. **The Monet "Springtime" of 1872 is not a Walters work, as far as the source shows.** If the Walters holds a "Springtime" dated 1872, it may be a different painting or a different artist than the extract assumes.
+
+**What I need to proceed:** the museum's own catalogue entry or wall label for the work, which would give the artist, date, medium, dimensions, subject, and acquisition. With that, I can write the full stop in your required order: the work, then the artist, then the emotional reading, with acquisition held to one sentence, a physical property named, and what was at stake included only where the record supports it.
+
+If you can confirm that the Walters piece is Monet's "Springtime" (1872), or send the catalogue text, I'll draft it right away.
