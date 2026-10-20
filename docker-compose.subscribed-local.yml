@@ -31,7 +31,7 @@ services:
       # but NOT the mounted file, so it can never qualify as a listener.
       - METER_ROLE=listener
       - METER_ROLE_TOKEN=${METER_ROLE_TOKEN}       # LEAD sets this in ~/Audioura/.env; must match the token file's contents.
-      - METER_ROLE_TOKEN_FILE=/opt/meter/role_token
+      - METER_ROLE_TOKEN_FILE=/run/meter_role_token
       - ALERTS_MD=/meterlogs/ALERTS_DAILY_LIMIT.md
       # D645 re-enabled for MUSEUM tours only (LOCAL-664, 2026-10-10). Walking stays on Gemini research (Serper costs ~2 Kiro points there).
       - CHEAP_ARM_CATEGORIES=museum
@@ -41,7 +41,7 @@ services:
       - RESEARCH_BACKEND=serper
     volumes:
       - /Users/micha/audioura-subscribed-local/_meter:/opt/meter:ro
-      - /Users/micha/Audioura/listener_role.token:/opt/meter/role_token:ro   # LOCAL-723: proof-of-listener token; mounted ONLY into listener services. NOT inside _meter, so test containers that mount _meter do not get it.
+      - /Users/micha/Audioura/listener_role.token:/run/meter_role_token:ro   # LOCAL-723: proof-of-listener token; mounted ONLY into listener services. NOT inside _meter, so test containers that mount _meter do not get it.
       - /Users/micha/Audioura/meterlogs:/meterlogs
       - /Users/micha/Audioura/tours:/app/tours   # ONE tour store for every service (2026-10-19: ./tours resolved to the checkout when compose ran from it)
   tour-orchestrator:
@@ -54,10 +54,10 @@ services:
       # LOCAL-723: listener-facing — stamp role='listener' on this service's paid rows so its spend counts toward the listeners' limit. (Proof = token env == mounted token file; see tour-generator.)
       - METER_ROLE=listener
       - METER_ROLE_TOKEN=${METER_ROLE_TOKEN}
-      - METER_ROLE_TOKEN_FILE=/opt/meter/role_token
+      - METER_ROLE_TOKEN_FILE=/run/meter_role_token
     volumes:
       - /Users/micha/audioura-subscribed-local/_meter:/opt/meter:ro
-      - /Users/micha/Audioura/listener_role.token:/opt/meter/role_token:ro   # LOCAL-723: proof-of-listener token (listener services only)
+      - /Users/micha/Audioura/listener_role.token:/run/meter_role_token:ro   # LOCAL-723: proof-of-listener token (listener services only)
       - /Users/micha/Audioura/meterlogs:/meterlogs
       - /Users/micha/Audioura/tours:/app/tours   # ONE tour store for every service (2026-10-19: ./tours resolved to the checkout when compose ran from it)
   user-api-2:                             # LOCAL-595/596/598 entitlements, queue, IAP verify
@@ -85,10 +85,10 @@ services:
       # LOCAL-723: listener-facing — stamp role='listener' so this service's Polly/AWS spend counts toward the listeners' limit. (Proof = token env == mounted token file; see tour-generator.)
       - METER_ROLE=listener
       - METER_ROLE_TOKEN=${METER_ROLE_TOKEN}
-      - METER_ROLE_TOKEN_FILE=/opt/meter/role_token
+      - METER_ROLE_TOKEN_FILE=/run/meter_role_token
     volumes:
       - /Users/micha/audioura-subscribed-local/_meter:/opt/meter:ro
-      - /Users/micha/Audioura/listener_role.token:/opt/meter/role_token:ro   # LOCAL-723: proof-of-listener token (listener services only)
+      - /Users/micha/Audioura/listener_role.token:/run/meter_role_token:ro   # LOCAL-723: proof-of-listener token (listener services only)
       - /Users/micha/Audioura/meterlogs:/meterlogs
   translation-service:
     build: {context: /Users/micha/audioura-subscribed-local/translation-service, dockerfile: Dockerfile}
@@ -100,11 +100,11 @@ services:
       # LOCAL-723: listener-facing — see tour-generator. Role-scoped limit; the old DAILY_PAID_LIMIT_SERVICES list is gone (test containers shared those service names).
       - METER_ROLE=listener
       - METER_ROLE_TOKEN=${METER_ROLE_TOKEN}
-      - METER_ROLE_TOKEN_FILE=/opt/meter/role_token
+      - METER_ROLE_TOKEN_FILE=/run/meter_role_token
       - ALERTS_MD=/meterlogs/ALERTS_DAILY_LIMIT.md
     volumes:
       - /Users/micha/audioura-subscribed-local/_meter:/opt/meter:ro
-      - /Users/micha/Audioura/listener_role.token:/opt/meter/role_token:ro   # LOCAL-723: proof-of-listener token (listener services only)
+      - /Users/micha/Audioura/listener_role.token:/run/meter_role_token:ro   # LOCAL-723: proof-of-listener token (listener services only)
       - /Users/micha/Audioura/meterlogs:/meterlogs
   tour-editing-phase2:
     environment:
