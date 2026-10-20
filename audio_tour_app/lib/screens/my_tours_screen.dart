@@ -1426,7 +1426,7 @@ class _MyToursScreenState extends State<MyToursScreen> {
         title: const Text('Report This Tour'),
         content: Text(
           'Report "$tourTitle" as objectionable content?\n\n'
-          'This will open an email to our support team with the tour details.',
+          'This sends the report to our review team in the app.',
         ),
         actions: [
           TextButton(
@@ -1447,6 +1447,42 @@ class _MyToursScreenState extends State<MyToursScreen> {
 
     if (confirmed != true) return;
 
+    // [LOCAL-724 item 5] Send the report to the server (one row per report in
+    // tour_reports via map-delivery POST /report-tour). On any failure, fall
+    // back to the old mailto: so a report is never simply lost.
+    final numericId = _numericTourId(tour) ?? tour['tour_id'];
+    try {
+      final reportUri = await Endpoints.url(Service.mapDelivery, '/report-tour');
+      final resp = await http
+          .post(
+            reportUri,
+            headers: {
+              'Content-Type': 'application/json',
+              ...await Endpoints.apiHeaders(Service.mapDelivery),
+            },
+            body: jsonEncode({
+              'tour_id': numericId,
+              'tour_name': tourTitle,
+            }),
+          )
+          .timeout(const Duration(seconds: 15));
+      if (resp.statusCode == 201 || resp.statusCode == 200) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Thanks — your report was sent to our review team.'),
+              backgroundColor: Colors.green,
+            ),
+          );
+        }
+        return;
+      }
+      // Non-2xx: fall through to the mailto fallback below.
+    } catch (_) {
+      // Network/offline: fall through to the mailto fallback below.
+    }
+
+    // Fallback: open an email (the pre-LOCAL-724 behaviour).
     final subject = Uri.encodeComponent('Content Report: $tourTitle');
     final body = Uri.encodeComponent(
       'I would like to report the following tour content:\n\n'

@@ -41,7 +41,9 @@ import psycopg2
 
 MODEL = os.getenv('CONTENT_RATING_MODEL', 'gpt-4.1-mini')
 RATINGS = ('general', 'mature', 'not_allowed')
-MAX_CHARS = 24000  # ~6k tokens; long tours are judged on their first part
+MAX_CHARS = 24000  # ~6k tokens; the size of ONE rating window (LOCAL-724: the
+                   # whole tour is now covered by as many windows as it takes —
+                   # see _chunk_text / rate_text — not truncated to the first one).
 
 PROMPT = """You are a content-rating moderator for an audio-tour app, rating a tour script like a film classification board rates a film. Judge ONLY the three categories below. Do NOT use a word list — judge meaning and intent, not isolated words ("class", "Assisi", "Scunthorpe" are not profanity; a history of a red-light district is not itself adult entertainment).
 
@@ -64,9 +66,45 @@ Reply with JSON only:
 # Price per 1M tokens (in, out) for the cost line.
 PRICES = {'gpt-4.1': (2.0, 8.0), 'gpt-4o-mini': (0.15, 0.60), 'gpt-4.1-mini': (0.40, 1.60)}
 
+# LOCAL-724 item 3: judge the WHOLE text, not just the first MAX_CHARS. The text
+# is split into windows of CHUNK_CHARS (= MAX_CHARS, so a short tour is still one
+# call, unchanged from LOCAL-687), each window is classified on its own, and the
+# tour takes the MOST RESTRICTIVE rating any window earns. Windows overlap by
+# CHUNK_OVERLAP so a mature passage straddling a boundary is seen whole by at
+# least one window. Chosen over tail-sampling because sampling can miss mature
+# content in the middle of a long tour; chunking reads every character once.
+CHUNK_CHARS = MAX_CHARS
+CHUNK_OVERLAP = 500
+# Severity order for "take the highest": not_allowed > mature > general.
+_SEVERITY = {'general': 0, 'mature': 1, 'not_allowed': 2}
+
+
+def _chunk_text(text, size=CHUNK_CHARS, overlap=CHUNK_OVERLAP):
+    """Split text into overlapping windows that together cover EVERY character.
+
+    A tour at or under `size` yields exactly one window equal to the whole text,
+    so the common short-tour case costs one model call, exactly as before. Longer
+    tours yield ceil-style windows stepping by (size - overlap)."""
+    text = text or ''
+    if len(text) <= size:
+        return [text]
+    step = max(1, size - overlap)
+    chunks = []
+    start = 0
+    while start < len(text):
+        chunks.append(text[start:start + size])
+        if start + size >= len(text):
+            break
+        start += step
+    return chunks
+
 
 def classify(title, text, stops):
-    """Ask the model for {rating, reason}. Returns (detail dict, usage)."""
+    """Classify ONE chunk of text. Returns (detail dict, usage).
+
+    This judges exactly the `text` it is given (truncated defensively at
+    CHUNK_CHARS). Whole-tour coverage is rate_text's job: it calls classify once
+    per chunk. Kept single-chunk so callers and tests can mock one model call."""
     from openai import OpenAI
     client = OpenAI()
     resp = client.chat.completions.create(
@@ -74,7 +112,7 @@ def classify(title, text, stops):
         temperature=0,
         response_format={'type': 'json_object'},
         messages=[{'role': 'user', 'content': PROMPT.format(
-            title=title, stops=stops or '?', text=text[:MAX_CHARS])}],
+            title=title, stops=stops or '?', text=text[:CHUNK_CHARS])}],
     )
     detail = json.loads(resp.choices[0].message.content)
     rating = str(detail.get('rating', '')).strip().lower()
@@ -93,15 +131,127 @@ def review_status_for(rating):
 
 
 def rate_text(title, text, stops):
-    detail, usage = classify(title, text, stops)
-    detail.update({'model': MODEL,
-                   'tokens_in': usage.prompt_tokens, 'tokens_out': usage.completion_tokens})
-    return detail['rating'], detail
+    """Rate a whole tour across ALL its text, returning (rating, detail).
+
+    Classifies every chunk (see _chunk_text) and keeps the MOST RESTRICTIVE
+    rating found, with the reason from the chunk that earned it. Token usage is
+    summed across chunks so the cost line stays honest. detail['chunks'] records
+    how many windows were judged (1 for an ordinary tour)."""
+    chunks = _chunk_text(text or '')
+    best_detail = None
+    best_sev = -1
+    tokens_in = tokens_out = 0
+    for idx, chunk in enumerate(chunks):
+        detail, usage = classify(title, chunk, stops)
+        tokens_in += getattr(usage, 'prompt_tokens', 0) or 0
+        tokens_out += getattr(usage, 'completion_tokens', 0) or 0
+        sev = _SEVERITY.get(detail['rating'], 1)
+        if sev > best_sev:
+            best_sev = sev
+            best_detail = detail
+            if sev == _SEVERITY['not_allowed']:
+                # Already the most restrictive possible; reading further windows
+                # cannot change the verdict, so stop paying for them.
+                break
+    if best_detail is None:  # empty text: nothing to judge, fail safe to held.
+        best_detail = {'rating': 'mature', 'reason': 'no text to rate'}
+    best_detail.update({'model': MODEL, 'chunks': len(chunks),
+                        'tokens_in': tokens_in, 'tokens_out': tokens_out})
+    return best_detail['rating'], best_detail
 
 
 def _conn():
     return psycopg2.connect(os.getenv(
         'DATABASE_URL', 'postgresql://admin:password123@localhost:5433/audiotours'))
+
+
+# ─── LOCAL-724 items 1 & 2: rate in the SERVING path, before listing ──────────
+# The orchestrator (and any other generation/edit path) calls this with an OPEN
+# cursor, inside the SAME transaction that makes the tour listable, BEFORE it
+# commits. The row therefore carries its rating the instant it becomes visible —
+# a new tour is never listed before it is rated, and the rating does not depend
+# on the Mac Mini launchd tick (which stays only as a backfill safety net, and
+# never runs on GCloud). The OpenAI key is read from the environment by OpenAI()
+# (on GCloud: injected from Secret Manager by name) — never written anywhere.
+def rate_tour_row(cur, tour_id, tour_name, tour_content, stops_count,
+                  model_override=None):
+    """Rate one ORIGINAL tour and write its rating columns using `cur`.
+
+    Does NOT commit — the caller owns the transaction, so the rating lands
+    atomically with (or just before) the row becoming listable. Returns the
+    detail dict on success, or None if it could not rate (too little text, a
+    model error, or a schema without the content_rating columns) — in which case
+    the row keeps whatever it had and the launchd backfill will pick it up later.
+    Never raises: rating must never be able to fail a tour store/edit.
+
+    A translation (original_tour_id set) must NOT be passed here — translations
+    inherit their original's rating in the listing layer. Callers rate originals
+    only.
+    """
+    text = tour_content or ''
+    if len(text) < 200:
+        # Too little text to classify meaningfully (same floor the backfill uses).
+        return None
+    global MODEL
+    _saved_model = MODEL
+    if model_override:
+        MODEL = model_override
+    try:
+        rating, detail = rate_text(tour_name or '', text, stops_count)
+    except Exception as e:
+        print(f'[LOCAL-724] rate_tour_row: rating tour {tour_id} failed, left for '
+              f'backfill: {e}')
+        MODEL = _saved_model
+        return None
+    MODEL = _saved_model
+    status = review_status_for(rating)
+    # Schema-tolerant write: an older DB without the 027 columns must not abort
+    # the caller's transaction. Guard with a SAVEPOINT so a failure here rolls
+    # back only this UPDATE, leaving the tour store intact.
+    try:
+        cur.execute('SAVEPOINT content_rating_write')
+        cur.execute(
+            """UPDATE audio_tours SET content_rating = %s, content_rating_reason = %s,
+               review_status = %s, content_rated_at = %s WHERE id = %s""",
+            (rating, detail.get('reason'), status, datetime.now(timezone.utc), tour_id))
+        cur.execute('RELEASE SAVEPOINT content_rating_write')
+    except Exception as e:
+        try:
+            cur.execute('ROLLBACK TO SAVEPOINT content_rating_write')
+        except Exception:
+            pass
+        print(f'[LOCAL-724] rate_tour_row: could not write rating for tour '
+              f'{tour_id} (schema?): {e}')
+        return None
+    print(f'[LOCAL-724] rated tour {tour_id} {rating}'
+          f'{"" if status is None else " [" + status + "]"} '
+          f'({detail.get("chunks", 1)} window(s))')
+    return detail
+
+
+def clear_rating(cur, tour_id):
+    """LOCAL-724 item 4: wipe a tour's rating so it is re-rated (and held until
+    then). Used by edit paths that change a tour's text. Uses the caller's
+    cursor/transaction; never commits; never raises. Setting review_status back
+    to 'pending' means the edited tour is NOT listable until it is re-rated and,
+    if still not clearly general, re-reviewed — the listing layer hides pending.
+    """
+    try:
+        cur.execute('SAVEPOINT content_rating_clear')
+        cur.execute(
+            """UPDATE audio_tours SET content_rating = NULL, content_rating_reason = NULL,
+               review_status = 'pending', content_rated_at = NULL WHERE id = %s""",
+            (tour_id,))
+        cur.execute('RELEASE SAVEPOINT content_rating_clear')
+        return True
+    except Exception as e:
+        try:
+            cur.execute('ROLLBACK TO SAVEPOINT content_rating_clear')
+        except Exception:
+            pass
+        print(f'[LOCAL-724] clear_rating: could not clear rating for tour '
+              f'{tour_id} (schema?): {e}')
+        return False
 
 
 def main():

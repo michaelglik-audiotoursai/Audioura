@@ -1092,6 +1092,27 @@ def store_audio_tour(tour_name, request_string, zip_path, lat, lng, tour_content
                 except Exception:
                     cur.execute("ROLLBACK TO SAVEPOINT clear_editor_score")
 
+                # [LOCAL-724 item 4] The tour's TEXT just changed, so its old
+                # content rating is stale. Re-rate it now, in this same
+                # transaction, before the replacement commits — so the edited
+                # tour is never listed under a rating earned by its previous
+                # text. rate_tour_row clears/overwrites content_rating,
+                # review_status, content_rated_at; it never raises and never
+                # commits. If it cannot rate (model error / old schema), the row
+                # keeps its prior rating and the launchd backfill re-rates later.
+                try:
+                    import tour_content_rating
+                    _redetail = tour_content_rating.rate_tour_row(
+                        cur, existing_id, tour_name, tour_content, stops_count)
+                    if _redetail is None:
+                        # Could not re-rate synchronously: do NOT keep showing the
+                        # tour under its stale rating. Hold it (clear + pending)
+                        # until the backfill re-rates it.
+                        tour_content_rating.clear_rating(cur, existing_id)
+                except Exception as _rerate_err:
+                    print(f"[LOCAL-724] re-rate skipped for tour {existing_id}: "
+                          f"{_rerate_err}")
+
                 # Flag translations (original_tour_id = this id) stale so the next
                 # translation request regenerates them. Never deleted.
                 cur.execute(
@@ -1187,8 +1208,29 @@ def store_audio_tour(tour_name, request_string, zip_path, lat, lng, tour_content
         except Exception:
             _new_tour_id = None
         print(f"Inserted new tour: {tour_name} (zip={zip_filename}, is_test={_is_test_mode})")
-        
-        # Commit the transaction
+
+        # [LOCAL-724 items 1 & 2] Rate this new ORIGINAL tour BEFORE the row is
+        # committed, i.e. before it can appear in /tours-near. The rater runs
+        # here in the serving path (not the Mac Mini launchd tick), so it also
+        # works on GCloud; the OpenAI key is read from the environment and never
+        # written. Synchronous and in THIS transaction so the row is never
+        # listable unrated. Non-blocking by design: rate_tour_row never raises,
+        # and if it cannot rate (short text, model error, old schema) the row is
+        # simply committed unrated and the launchd backfill picks it up — the
+        # same safety net as before. Test rows are skipped, exactly like the
+        # launchd backfill (is_test IS NOT TRUE).
+        if _new_tour_id is not None and not _is_test_mode:
+            try:
+                import tour_content_rating
+                tour_content_rating.rate_tour_row(
+                    cur, _new_tour_id, tour_name, tour_content, stops_count)
+            except Exception as _rate_err:
+                # Defensive: the import or call must never fail the store.
+                print(f"[LOCAL-724] content rating skipped for tour "
+                      f"{_new_tour_id}: {_rate_err}")
+
+        # Commit the transaction (the rating, if any, commits atomically with the
+        # row — so the tour is rated the instant it becomes listable).
         print(f"Committing transaction...")
         conn.commit()
         print(f"Transaction committed")
