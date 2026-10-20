@@ -23,7 +23,15 @@ services:
       - FAST_PIPELINE=1
       # LOCAL-673 (Michael: a stop, not an email): refuse paid calls once today's spend passes $8; the alert lands in ~/Audioura/meterlogs.
       - DAILY_PAID_LIMIT_USD=8
-      - DAILY_PAID_LIMIT_SERVICES=generate_tour_text_service.py,translation_service.py,tour_orchestrator_service.py,polly_tts_service.py
+      # LOCAL-723: the limit counts role='listener' spend ONLY (test/bench containers run the same
+      # services, so the old service-list scope let their spend trip the listeners' limit). This
+      # service is listener-facing: prove it so the meter stamps role='listener'. METER_ROLE_TOKEN
+      # must EQUAL the contents of the file at METER_ROLE_TOKEN_FILE, which is bind-mounted ONLY into
+      # the listener services below. A test container that copies this env inherits the token value
+      # but NOT the mounted file, so it can never qualify as a listener.
+      - METER_ROLE=listener
+      - METER_ROLE_TOKEN=${METER_ROLE_TOKEN}       # LEAD sets this in ~/Audioura/.env; must match the token file's contents.
+      - METER_ROLE_TOKEN_FILE=/opt/meter/role_token
       - ALERTS_MD=/meterlogs/ALERTS_DAILY_LIMIT.md
       # D645 re-enabled for MUSEUM tours only (LOCAL-664, 2026-10-10). Walking stays on Gemini research (Serper costs ~2 Kiro points there).
       - CHEAP_ARM_CATEGORIES=museum
@@ -33,6 +41,7 @@ services:
       - RESEARCH_BACKEND=serper
     volumes:
       - /Users/micha/audioura-subscribed-local/_meter:/opt/meter:ro
+      - /Users/micha/Audioura/listener_role.token:/opt/meter/role_token:ro   # LOCAL-723: proof-of-listener token; mounted ONLY into listener services. NOT inside _meter, so test containers that mount _meter do not get it.
       - /Users/micha/Audioura/meterlogs:/meterlogs
       - /Users/micha/Audioura/tours:/app/tours   # ONE tour store for every service (2026-10-19: ./tours resolved to the checkout when compose ran from it)
   tour-orchestrator:
@@ -42,8 +51,13 @@ services:
       - PAID_API_LOG=/meterlogs/paid_api_calls.jsonl
       - L2_SEAT_JOB_ENABLED=true          # LOCAL-596 hourly L2 eviction/offer job
       - RECOVERY_CODE_PEPPER=${RECOVERY_CODE_PEPPER}   # LOCAL-695B: HMAC selector key for O(1) recovery-code lookup; LEAD must set it in ~/Audioura/.env (32+ random bytes). If unset, recovery routes are disabled (never a scan).
+      # LOCAL-723: listener-facing — stamp role='listener' on this service's paid rows so its spend counts toward the listeners' limit. (Proof = token env == mounted token file; see tour-generator.)
+      - METER_ROLE=listener
+      - METER_ROLE_TOKEN=${METER_ROLE_TOKEN}
+      - METER_ROLE_TOKEN_FILE=/opt/meter/role_token
     volumes:
       - /Users/micha/audioura-subscribed-local/_meter:/opt/meter:ro
+      - /Users/micha/Audioura/listener_role.token:/opt/meter/role_token:ro   # LOCAL-723: proof-of-listener token (listener services only)
       - /Users/micha/Audioura/meterlogs:/meterlogs
       - /Users/micha/Audioura/tours:/app/tours   # ONE tour store for every service (2026-10-19: ./tours resolved to the checkout when compose ran from it)
   user-api-2:                             # LOCAL-595/596/598 entitlements, queue, IAP verify
@@ -68,8 +82,13 @@ services:
       - PAID_API_LOG=/meterlogs/paid_api_calls.jsonl
       - TTS_ENGINE=kokoro
       - KOKORO_URL=http://host.docker.internal:5181/render
+      # LOCAL-723: listener-facing — stamp role='listener' so this service's Polly/AWS spend counts toward the listeners' limit. (Proof = token env == mounted token file; see tour-generator.)
+      - METER_ROLE=listener
+      - METER_ROLE_TOKEN=${METER_ROLE_TOKEN}
+      - METER_ROLE_TOKEN_FILE=/opt/meter/role_token
     volumes:
       - /Users/micha/audioura-subscribed-local/_meter:/opt/meter:ro
+      - /Users/micha/Audioura/listener_role.token:/opt/meter/role_token:ro   # LOCAL-723: proof-of-listener token (listener services only)
       - /Users/micha/Audioura/meterlogs:/meterlogs
   translation-service:
     build: {context: /Users/micha/audioura-subscribed-local/translation-service, dockerfile: Dockerfile}
@@ -78,10 +97,14 @@ services:
       - PAID_API_LOG=/meterlogs/paid_api_calls.jsonl
       - TRANSLATION_ENGINE=llm
       - DAILY_PAID_LIMIT_USD=8
-      - DAILY_PAID_LIMIT_SERVICES=generate_tour_text_service.py,translation_service.py,tour_orchestrator_service.py,polly_tts_service.py
+      # LOCAL-723: listener-facing — see tour-generator. Role-scoped limit; the old DAILY_PAID_LIMIT_SERVICES list is gone (test containers shared those service names).
+      - METER_ROLE=listener
+      - METER_ROLE_TOKEN=${METER_ROLE_TOKEN}
+      - METER_ROLE_TOKEN_FILE=/opt/meter/role_token
       - ALERTS_MD=/meterlogs/ALERTS_DAILY_LIMIT.md
     volumes:
       - /Users/micha/audioura-subscribed-local/_meter:/opt/meter:ro
+      - /Users/micha/Audioura/listener_role.token:/opt/meter/role_token:ro   # LOCAL-723: proof-of-listener token (listener services only)
       - /Users/micha/Audioura/meterlogs:/meterlogs
   tour-editing-phase2:
     environment:

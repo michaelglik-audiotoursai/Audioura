@@ -5,12 +5,82 @@ and urllib.request.urlopen so EVERY call to a paid host is logged with its usage
 computed $, and the calling file:line — regardless of which module made it.
 Never raises into the caller.
 """
-import json, os, sys, time, threading, traceback
+import json, os, sys, time, threading, traceback, socket
 
 LOG = os.environ.get("PAID_API_LOG", "/meterlogs/paid_api_calls.jsonl")
 SERVICE = os.environ.get("METER_SERVICE", os.path.basename(sys.argv[0]) if sys.argv else "?")
 _lock = threading.Lock()
 _INSTALLED = False  # guard so install() patches each HTTP client at most once
+
+
+# --------------------------------------------------------------------------- #
+# Listener role (LOCAL-723)
+#
+# The daily limit (LOCAL-673) must count LISTENER spend only. Every row the meter
+# writes carries a `role`; the limit query sums only role = 'listener'. A row is
+# 'listener' ONLY when the container PROVES it is part of the real listener stack
+# — being labelled is not enough.
+#
+# THREAT: the LOCAL-721/722 test containers copied the shared generator's whole
+# env (including HOSTNAME, METER_SERVICE), so the meter mislabelled their spend as
+# the shared host and it counted toward the $8 limit (LEAD, 2026-10-20). A copied
+# env must therefore NOT be able to qualify a test container as a listener.
+#
+# PROOF (simplest robust mechanism — a mounted-file token):
+#   * The override sets METER_ROLE=listener and METER_ROLE_TOKEN=<secret> on the
+#     four listener-facing services, AND bind-mounts a file at METER_ROLE_TOKEN_FILE
+#     whose contents are that same secret. The file is mounted ONLY into the shared
+#     containers.
+#   * A row is 'listener' iff METER_ROLE == 'listener' AND the env token is
+#     non-empty AND it equals the file's contents.
+#   * A test container that copies the env inherits METER_ROLE and the token VALUE,
+#     but it does NOT inherit the bind-mounted file. env_token == file_contents is
+#     then false (the file is absent / unreadable), so the row is NOT a listener
+#     row. Copying env alone can never qualify.
+#
+# FAIL SAFE FOR LISTENERS: any error, or no proof, yields role None (not counted).
+# Mislabelling a listener as a non-listener only relaxes the limit for that row; it
+# never lets test spend count. The token is an anti-spoof proof of container
+# identity, NOT a secret whose leak is dangerous — it only decides whether a row
+# counts toward a spend cap.
+# --------------------------------------------------------------------------- #
+METER_ROLE_ENV = "METER_ROLE"
+METER_ROLE_TOKEN_ENV = "METER_ROLE_TOKEN"
+METER_ROLE_TOKEN_FILE_ENV = "METER_ROLE_TOKEN_FILE"
+
+
+def _real_hostname():
+    """The REAL hostname of the box/container (socket.gethostname()), never the
+    copyable HOSTNAME env. LOCAL-721/722 copied HOSTNAME into test containers, so
+    the meter stamped the shared host's name on test rows. Never raises."""
+    try:
+        return socket.gethostname() or ""
+    except Exception:
+        return ""
+
+
+def _meter_role():
+    """Return 'listener' only when this container PROVES it is a real listener
+    (METER_ROLE=listener AND the env token equals the mounted token file's
+    contents); otherwise None. Never raises — any problem -> None (not counted)."""
+    try:
+        if (os.environ.get(METER_ROLE_ENV) or "").strip().lower() != "listener":
+            return None
+        token = (os.environ.get(METER_ROLE_TOKEN_ENV) or "").strip()
+        if not token:
+            return None
+        path = (os.environ.get(METER_ROLE_TOKEN_FILE_ENV) or "").strip()
+        if not path:
+            return None
+        with open(path) as f:
+            file_token = f.read().strip()
+        # A copied env carries `token` but NOT this mounted file, so a test
+        # container's read fails (-> except -> None) or mismatches here.
+        if file_token and token == file_token:
+            return "listener"
+        return None
+    except Exception:
+        return None
 
 # [LOCAL-707] Belt-and-suspenders explicit metering. Serper calls go out through
 # urllib/requests, which the network patches below already wrap. But the Oct 13
@@ -147,7 +217,7 @@ def _record(url, status, body, req_body=None):
     if not kind: return
     rec = {"ts": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()), "kind": kind, "status": status, "rate_tag": RATE_TAG,
            "service": SERVICE, "caller": _caller(), "url": (url or "").split("?")[0][-120:],
-           "job": os.environ.get("METER_JOB", ""), "usd": None}
+           "job": os.environ.get("METER_JOB", ""), "role": _meter_role(), "usd": None}
     try:
         d = json.loads(body) if isinstance(body, (bytes, str)) and body else {}
     except Exception:
@@ -235,11 +305,11 @@ def _db_write(rec):
             user=os.environ.get("DB_USER", "admin"), password=os.environ.get("DB_PASSWORD", "password123"),
             port=os.environ.get("DB_PORT", "5432"), connect_timeout=3)
         with conn, conn.cursor() as cur:
-            cur.execute("INSERT INTO paid_api_calls (kind,status,service,caller,url,model,usd,detail,host) "
-                        "VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)",
+            cur.execute("INSERT INTO paid_api_calls (kind,status,service,caller,url,model,usd,detail,host,role) "
+                        "VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)",
                         (rec.get("kind"), rec.get("status"), rec.get("service"), rec.get("caller"),
                          rec.get("url"), rec.get("model"), rec.get("usd"), json.dumps(rec, default=str),
-                         os.environ.get("HOSTNAME", "")))
+                         _real_hostname(), rec.get("role")))
         conn.close()
     except Exception:
         pass
@@ -258,6 +328,13 @@ def _db_write(rec):
 # FAIL-OPEN: any error reading the limit or the DB -> allow and log. A meter bug
 # must never block a tour. The limit is OFF when DAILY_PAID_LIMIT_USD is unset
 # or non-positive.
+#
+# [LOCAL-723] The total counts role = 'listener' rows ONLY. Earlier the scope was
+# DAILY_PAID_LIMIT_SERVICES (a `service` list), but test/bench containers run the
+# same services, so their spend tripped the listeners' limit (LEAD 2026-10-20).
+# role is proven, not merely labelled (see _meter_role), so a test container that
+# copies the listener env cannot be counted. DAILY_PAID_LIMIT_SERVICES is no
+# longer read.
 # --------------------------------------------------------------------------- #
 LIMIT_ENV = "DAILY_PAID_LIMIT_USD"
 _LIMIT_CACHE_TTL = 60.0  # seconds
@@ -320,23 +397,22 @@ def _query_today_total_usd(day_str):
             # ts is timestamptz; compare its NY calendar date to the NY day we are
             # metering. Doing the AT TIME ZONE conversion in SQL keeps the day
             # boundary correct regardless of the DB session timezone.
-            # [LEAD 2026-10-10] DAILY_PAID_LIMIT_SERVICES (comma list of `service` values) scopes
-            # the limit to the listener-facing stack. Unscoped, a night of Kiro/bench test spend
-            # (their own containers) tripped the shared stack's $8 limit at 23:20.
-            svcs = [x.strip() for x in os.environ.get("DAILY_PAID_LIMIT_SERVICES", "").split(",") if x.strip()]
-            if svcs:
-                cur.execute(
-                    "SELECT COALESCE(SUM(usd), 0) FROM paid_api_calls "
-                    "WHERE status = 200 "
-                    "AND (ts AT TIME ZONE 'America/New_York')::date = %s::date "
-                    "AND service = ANY(%s)",
-                    (day_str, svcs))
-            else:
-                cur.execute(
-                    "SELECT COALESCE(SUM(usd), 0) FROM paid_api_calls "
-                    "WHERE status = 200 "
-                    "AND (ts AT TIME ZONE 'America/New_York')::date = %s::date",
-                    (day_str,))
+            #
+            # [LOCAL-723] The limit counts LISTENER spend only. Earlier (LOCAL-673)
+            # it scoped by `service`, but test/bench containers run the SAME
+            # services as the listener stack, so their spend tripped the listeners'
+            # $8 limit while listeners had spent $0 (LEAD 2026-10-20). Now the meter
+            # stamps role = 'listener' on PROVEN listener rows only (see
+            # _meter_role: env label + mounted-token-file proof) and the limit sums
+            # exactly those. role NULL / anything-but-'listener' (old rows, every
+            # test/bench row) is never counted — fail safe for listeners: test
+            # spend can never trip their limit.
+            cur.execute(
+                "SELECT COALESCE(SUM(usd), 0) FROM paid_api_calls "
+                "WHERE status = 200 "
+                "AND (ts AT TIME ZONE 'America/New_York')::date = %s::date "
+                "AND role = 'listener'",
+                (day_str,))
             row = cur.fetchone()
         return float(row[0] or 0.0)
     finally:
