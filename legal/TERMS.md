@@ -34,7 +34,7 @@ Refunds are requested from, and decided by, Apple or Google under their policies
 ## 5. Acceptable use
 Do not: break the law or help others do so; copy, resell or redistribute content you do not own; try to break, overload, reverse-engineer or bypass the security or payment parts of the app; submit unlawful, hateful or infringing content; impersonate anyone or misuse another person's device or account.
 
-We may remove content and suspend or end the access of anyone who breaks these rules. You can **block** a member or an organiser so you no longer see their content.
+We may remove content and suspend or end the access of anyone who breaks these rules. You can report any tour, community or organiser to us in the app or at info@audioura.com. We review reports and may remove content, bar a member from a community, or end access for anyone who breaks these rules.
 
 ## 6. Content you provide
 This section is about content **you** provide: ratings and reviews, tours you create as a guide, and community audio and text. You keep ownership, and you grant Audioura LLC a non-exclusive, worldwide, royalty-free, sublicensable licence to host, store, reproduce, display and distribute it within Audioura as necessary to operate the service. You confirm you have all rights to submit it and that it follows the Content Policy.
@@ -53,7 +53,7 @@ Every listed tour starts with an automated **Audioura score** based on the tour'
 You may stop using Audioura at any time. We may suspend or end access if you break these Terms, the Content Policy or the law, or to comply with Apple or Google requirements. We may remove content and ban violators. Tours and passes you have already downloaded remain on your device; Audioura does not retrieve or delete files after download.
 
 ## 10. Tours are information, not instructions
-Tours are generated with the help of AI from public sources and may be **inaccurate, incomplete or out of date** — opening hours, admission, routes and facts can change. This accuracy caution applies in three ways:
+Tours are created with the help of AI and by guides and curators, from public sources, and may be **inaccurate, incomplete or out of date** — opening hours, admission, routes and facts can change. This accuracy caution applies in three ways:
 
 - **In these Terms:** tours are provided for **informational purposes only** and are **not navigational, legal or safety advice**. Treat a tour as background information, not official guidance.
 - **In the app:** when you first use Audioura, an in-app notice explains that tours are AI-generated and may be wrong, and asks you to use your own judgement.

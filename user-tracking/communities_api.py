@@ -124,6 +124,35 @@ def _require_api_key():
 
 
 # ───────────────────────────────────────────────────────────────────────────
+# Admin auth — a SEPARATE secret from the app's gateway key (LOCAL-728 / D691)
+# ───────────────────────────────────────────────────────────────────────────
+# D691: only the ADMINISTRATOR bars a member from a community or bans a user
+# from the service. The app sends GATEWAY_API_KEY on EVERY call, so gating the
+# moderation endpoints on the gateway key would still let any app user reach
+# them. The admin endpoints therefore require a DISTINCT secret, ADMIN_API_KEY,
+# which the app never carries — it lives only in the admin operator's env and in
+# moderation.py. The header is the same X-API-Key (checked like the gateway key,
+# constant-time), but compared against ADMIN_API_KEY.
+#
+# Fail CLOSED: if ADMIN_API_KEY is unset the admin surface is unreachable (503
+# admin_not_configured) — an admin action must never run against a blank key.
+# (The unauthenticated-entitlements escape hatch does NOT apply here: admin is
+# always gated.)
+ADMIN_API_KEY = os.getenv('ADMIN_API_KEY', '')
+
+
+def _require_admin_key():
+    if not ADMIN_API_KEY:
+        # No admin key configured → the admin surface is closed. Never fall back
+        # to "allow": an un-keyed admin endpoint would be a hole.
+        return jsonify({"error": "admin_not_configured"}), 503
+    client_key = request.headers.get('X-API-Key', '')
+    if not client_key or not hmac.compare_digest(client_key, ADMIN_API_KEY):
+        return jsonify({"error": "unauthorized"}), 401
+    return None
+
+
+# ───────────────────────────────────────────────────────────────────────────
 # Invite code generation
 # ───────────────────────────────────────────────────────────────────────────
 def generate_join_code():
@@ -303,31 +332,43 @@ def _membership(cur, user_id, community_id):
 
 
 # ───────────────────────────────────────────────────────────────────────────
-# Block function (LOCAL-726, lawyer review item 10 — Apple Guideline 1.2)
+# Bars and bans (LOCAL-728, D691 — admin-only moderation)
 # ───────────────────────────────────────────────────────────────────────────
-# community_blocks (migration 044) carries two kinds of block:
-#   'member_block'  — a MEMBER hides a blocked user's communities/tours from
-#                     their OWN view (the block is the blocker's business only).
-#   'organiser_bar' — an ORGANISER removes and bars a MEMBER from THEIR
-#                     community: the barred member gets no NEW content and cannot
-#                     rejoin by code. Downloaded audio stays on the device (D658).
-BLOCK_MEMBER = 'member_block'
-BLOCK_ORGANISER_BAR = 'organiser_bar'
+# community_blocks (migration 044 + 046) carries the bar kinds. Under D691
+# there is NO user-level blocking: members and organisers report to Audioura,
+# and only the ADMINISTRATOR bars a member from a community. The kinds:
+#   'member_block'  — LEGACY (LOCAL-726, removed by D691). No app path creates
+#                     these any more; any existing row (should be 0) is left as
+#                     history and no longer filters anything.
+#   'organiser_bar' — LEGACY (LOCAL-726, removed by D691). Same: history only.
+#   'admin_bar'     — the ADMINISTRATOR bars a member from one community: the
+#                     membership is ended by expiry (never DELETE — D690: the
+#                     row is the purchase record) and a bar is recorded so they
+#                     cannot rejoin by code. Downloaded audio stays (D658).
+BLOCK_MEMBER = 'member_block'        # legacy (D691 removed the user path)
+BLOCK_ORGANISER_BAR = 'organiser_bar'  # legacy (D691 removed the user path)
+BLOCK_ADMIN_BAR = 'admin_bar'        # the only bar created now (admin-only)
+
+# The bar kinds that STOP a rejoin (the join / pass-purchase gate). An
+# organiser_bar row may still exist as history from LOCAL-726 (D691 says there
+# should be 0), so it is honoured too; the admin_bar is the live one.
+_BARRING_KINDS = (BLOCK_ORGANISER_BAR, BLOCK_ADMIN_BAR)
 
 
 def is_user_barred(cur, community_id, user_id):
-    """True iff `user_id` is barred (organiser_bar) from `community_id`. The gate
-    the join / pass-purchase paths read so a barred member cannot rejoin by code.
-    Schema-tolerant: if community_blocks does not exist yet (un-migrated DB), no
-    one is barred — the feature is simply inert until the migration runs."""
+    """True iff `user_id` is barred from `community_id` by an admin_bar (or a
+    legacy organiser_bar). The gate the join / pass-purchase paths read so a
+    barred member cannot rejoin by code. Schema-tolerant: if community_blocks
+    does not exist yet (un-migrated DB), no one is barred — the feature is
+    simply inert until the migration runs."""
     if not user_id:
         return False
     try:
         cur.execute(
             "SELECT 1 FROM community_blocks "
-            "WHERE community_id = %s AND blocked_user_id = %s AND kind = %s "
-            "LIMIT 1",
-            (community_id, user_id, BLOCK_ORGANISER_BAR),
+            "WHERE community_id = %s AND blocked_user_id = %s "
+            "AND kind = ANY(%s) LIMIT 1",
+            (community_id, user_id, list(_BARRING_KINDS)),
         )
         return cur.fetchone() is not None
     except Exception:  # noqa: BLE001 — un-migrated DB: nobody barred (inert)
@@ -335,23 +376,33 @@ def is_user_barred(cur, community_id, user_id):
         return False
 
 
-def blocked_owner_ids_for(cur, user_id):
-    """The set of OWNER user_ids this user (as a member) has blocked
-    (member_block). A blocked organiser's communities and community tours
-    disappear FOR THIS USER — the member's 'mine', map and new-tours views filter
-    these out. Schema-tolerant: empty set on an un-migrated DB."""
+def is_user_service_banned(cur, user_id):
+    """[LOCAL-728 / D691 / D658] True iff `user_id` has an ACTIVE service ban
+    (service_bans row with lifted_at IS NULL). A banned user may not purchase,
+    generate, or join/create communities; their downloaded audio stays on the
+    device (D658 — a ban blocks NEW access only). Schema-tolerant: an
+    un-migrated DB (no service_bans table) means nobody is banned (inert)."""
     if not user_id:
-        return set()
+        return False
     try:
         cur.execute(
-            "SELECT DISTINCT blocked_user_id FROM community_blocks "
-            "WHERE blocker_user_id = %s AND kind = %s",
-            (user_id, BLOCK_MEMBER),
+            "SELECT 1 FROM service_bans "
+            "WHERE user_id = %s AND lifted_at IS NULL LIMIT 1",
+            (user_id,),
         )
-        return {r[0] for r in cur.fetchall()}
-    except Exception:  # noqa: BLE001 — un-migrated DB: nothing blocked (inert)
+        return cur.fetchone() is not None
+    except Exception:  # noqa: BLE001 — un-migrated DB: nobody banned (inert)
         _rollback_quietly(cur)
-        return set()
+        return False
+
+
+def blocked_owner_ids_for(cur, user_id):
+    """[LEGACY — LOCAL-726, neutralised by D691] The user-level member_block is
+    gone: members no longer hide organisers. This returns an EMPTY set so the
+    'mine' / map / new-tours views no longer filter anything by a member's
+    blocks. Kept as a function (callers still invoke it) but inert — any legacy
+    member_block rows are ignored, not applied."""
+    return set()
 
 
 def _rollback_quietly(cur):
@@ -1361,15 +1412,27 @@ def verify_community_pass(store, transaction_id, product, user_id,
                            "without a pass.",
             }), 409
 
-        # [LOCAL-726 item 10] A member the organiser has BARRED cannot rejoin by
-        # buying a pass. The bar survives a code rotation and a new purchase —
-        # it is keyed on the user, not the code. Downloaded audio stays on the
-        # device (D658); this only blocks NEW access.
+        # [LOCAL-728 / D691 / D658] A user banned from the service cannot buy
+        # anything. The ban blocks NEW access only; downloaded audio stays on
+        # the device (D658). Checked before the per-community bar so a banned
+        # user gets the service-level error.
+        if is_user_service_banned(cur, user_id):
+            cur.close()
+            return jsonify({
+                "error": "banned",
+                "message": "Your access to Audioura has ended.",
+            }), 403
+
+        # [LOCAL-728 / D691] A member the ADMINISTRATOR has BARRED (admin_bar)
+        # cannot rejoin by buying a pass. The bar survives a code rotation and a
+        # new purchase — it is keyed on the user, not the code. Downloaded audio
+        # stays on the device (D658); this only blocks NEW access. (A legacy
+        # organiser_bar row, if any, is honoured the same way.)
         if is_user_barred(cur, int(community_id), user_id):
             cur.close()
             return jsonify({
                 "error": "barred",
-                "message": "The organiser has removed you from this community.",
+                "message": "You have been removed from this community.",
             }), 403
 
         # [LOCAL-702 / D663 §1] A community in hand-over or archived is CLOSED to
@@ -1626,6 +1689,16 @@ def create_community():
     try:
         cur = conn.cursor()
 
+        # [LOCAL-728 / D691 / D658] A user banned from the service cannot create
+        # a community (no purchases, no generation, no joins or creation). The
+        # ban blocks NEW access only; their downloaded audio stays (D658).
+        if is_user_service_banned(cur, owner_user_id):
+            cur.close()
+            return jsonify({
+                "error": "banned",
+                "message": "Your access to Audioura has ended.",
+            }), 403
+
         # [LOCAL-700 §3] Creating a community requires the free plan or above —
         # NOT the default Introduction level. The server enforces it here (not
         # just the app) so a crafted request cannot bypass the gate. Uses the
@@ -1876,14 +1949,15 @@ def join_free_community(community_id):
             }), 409
         # Every community is paid (D665): a free join is always refused — buy a
         # pass through /purchases/verify.
-        # [LOCAL-726 item 10] A barred member is refused with a specific error
-        # even before the generic pass_required, so the app can show "removed by
-        # the organiser" rather than a buy prompt.
+        # [LOCAL-728 / D691] A barred member (admin_bar, or legacy organiser_bar)
+        # is refused with a specific error even before the generic pass_required,
+        # so the app can show "removed from this community" rather than a buy
+        # prompt.
         if is_user_barred(cur, community_id, user_id):
             cur.close()
             return jsonify({
                 "error": "barred",
-                "message": "The organiser has removed you from this community.",
+                "message": "You have been removed from this community.",
             }), 403
         cur.close()
         return jsonify({
@@ -2085,8 +2159,15 @@ def list_episodes(community_id):
 
 @communities_bp.route('/communities/<int:community_id>/report', methods=['POST'])
 def report_community(community_id):
-    """A report on a community tour -> the OWNER (D658 addendum 2 §). Audioura
-    keeps the per-community disabled off-switch separately."""
+    """[LOCAL-728 / D691] A report on a community, organiser or community tour
+    goes to AUDIOURA (not the owner). Members and organisers can only report;
+    the administrator reviews with moderation.py and may bar/ban/disable.
+
+    Body: {user_id?, reason?, detail?}. `reason` is a short reason code chosen
+    in the app (e.g. 'spam', 'offensive', 'inaccurate', 'other'); `detail` is
+    the reporter's optional free text. Writes ONE row to community_reports
+    (status 'open'). The organiser is NOT notified by the app — Audioura may
+    forward the report. Returns 200 {reported:true, report_id}."""
     err = _require_api_key()
     if err:
         return err
@@ -2098,106 +2179,139 @@ def report_community(community_id):
         if not c:
             cur.close()
             return jsonify({"error": "not_found"}), 404
-        cur.execute(
-            "INSERT INTO community_reports (community_id, reporter_user_id, reason) "
-            "VALUES (%s, %s, %s) RETURNING id",
-            (community_id, data.get('user_id'), data.get('reason')),
-        )
+        # Write reason + optional detail. `detail`/`status` are the additive
+        # 045 columns; fall back gracefully on an un-migrated DB (reason only)
+        # so a report is never lost to a missing column.
+        try:
+            cur.execute(
+                "INSERT INTO community_reports "
+                "(community_id, reporter_user_id, reason, detail, status) "
+                "VALUES (%s, %s, %s, %s, 'open') RETURNING id",
+                (community_id, data.get('user_id'), data.get('reason'),
+                 data.get('detail')),
+            )
+        except Exception:  # noqa: BLE001 — un-migrated DB: reason-only insert
+            _rollback_quietly(cur)
+            cur.execute(
+                "INSERT INTO community_reports "
+                "(community_id, reporter_user_id, reason) "
+                "VALUES (%s, %s, %s) RETURNING id",
+                (community_id, data.get('user_id'), data.get('reason')),
+            )
         report_id = cur.fetchone()[0]
         conn.commit()
         cur.close()
-        # The report goes to the owner (surfaced to the owner's device; the row
-        # carries owner_user_id via the community join).
-        return jsonify({"reported": True, "report_id": report_id,
-                        "owner_user_id": c['owner_user_id']}), 200
+        # The report goes to Audioura's review queue (moderation.py). The
+        # organiser is not notified by the app.
+        return jsonify({"reported": True, "report_id": report_id}), 200
     finally:
         conn.close()
 
 
 # ───────────────────────────────────────────────────────────────────────────
-# Block function (LOCAL-726, lawyer review item 10 — Apple Guideline 1.2)
+# Admin-only moderation (LOCAL-728, D691 / D690 / D658)
 # ───────────────────────────────────────────────────────────────────────────
-@communities_bp.route('/communities/<int:community_id>/members', methods=['GET'])
-def list_members(community_id):
-    """[LOCAL-726 item 10] The OWNER's list of a community's members, for the
-    member-row ⋯ menu where the organiser bars a member. Owner only.
+# D691 removed user-level blocking entirely: members and organisers REPORT to
+# Audioura (POST /communities/<id>/report), and only the ADMINISTRATOR acts.
+# Every endpoint below requires the DISTINCT admin key (_require_admin_key —
+# ADMIN_API_KEY, which the app never carries), so no app user can reach them.
+# Every action writes one row to the admin_actions ledger (who, when, target,
+# reason, report id).
 
-    Query: ?user_id=<owner>. 404 unknown community; 403 not the owner. 200
-    {members:[{user_id, expires_at, active, barred}, ...]}. `barred` lets the
-    app show "Barred" and offer Unbar instead of Bar on an already-barred row.
-    The owner is never listed (the organiser is not a member, D665)."""
-    err = _require_api_key()
+def _log_admin_action(cur, action, actor=None, target_user_id=None,
+                      target_community_id=None, reason=None, report_id=None):
+    """Append one row to the admin_actions ledger (D691: every admin action is
+    recorded). Best-effort on an un-migrated DB is NOT acceptable here — the
+    ledger is the point — but we still guard so a missing table surfaces as a
+    clear error rather than a half-done action with no record."""
+    cur.execute(
+        """INSERT INTO admin_actions
+               (action, actor, target_user_id, target_community_id, reason,
+                report_id)
+           VALUES (%s, %s, %s, %s, %s, %s) RETURNING id""",
+        (action, actor, target_user_id, target_community_id, reason, report_id),
+    )
+    return cur.fetchone()[0]
+
+
+@communities_bp.route('/communities/admin/reports', methods=['GET'])
+def admin_list_reports():
+    """[LOCAL-728 / D691] ADMIN ONLY. The open reports — community reports and
+    tour reports together — for the administrator to triage. Query:
+    ?status=open (default) | reviewed | dismissed | all. Returns
+    {community_reports:[...], tour_reports:[...]} newest first. Read-only."""
+    err = _require_admin_key()
     if err:
         return err
-    user_id = request.args.get('user_id')
-    if not user_id:
-        return jsonify({"error": "user_id is required"}), 400
+    status = (request.args.get('status') or 'open').strip().lower()
     conn = _get_db()
     try:
         cur = conn.cursor()
-        c = _community_row(cur, community_id)
-        if not c:
-            cur.close()
-            return jsonify({"error": "not_found"}), 404
-        if c['owner_user_id'] != user_id:
-            cur.close()
-            return jsonify({"error": "forbidden",
-                            "message": "Only the organiser can list members."}), 403
-        now = datetime.utcnow()
-        cur.execute(
-            "SELECT user_id, expires_at FROM community_memberships "
-            "WHERE community_id = %s AND user_id <> %s ORDER BY created_at",
-            (community_id, c['owner_user_id']),
-        )
-        members = cur.fetchall()
-        out = []
-        for m_user, expires_at in members:
-            out.append({
-                'user_id': m_user,
-                'expires_at': expires_at.isoformat() if expires_at else None,
-                'active': is_membership_active(expires_at, now),
-                'barred': is_user_barred(cur, community_id, m_user),
-            })
+        want_all = status == 'all'
+        comm = []
+        try:
+            if want_all:
+                cur.execute(
+                    "SELECT id, community_id, reporter_user_id, reason, detail, "
+                    "status, created_at FROM community_reports "
+                    "ORDER BY created_at DESC")
+            else:
+                cur.execute(
+                    "SELECT id, community_id, reporter_user_id, reason, detail, "
+                    "status, created_at FROM community_reports "
+                    "WHERE status = %s ORDER BY created_at DESC", (status,))
+            comm = [{'id': r[0], 'community_id': r[1], 'reporter_user_id': r[2],
+                     'reason': r[3], 'detail': r[4], 'status': r[5],
+                     'created_at': r[6].isoformat() if r[6] else None}
+                    for r in cur.fetchall()]
+        except Exception:  # noqa: BLE001 — pre-045 DB (no detail/status columns)
+            _rollback_quietly(cur)
+            cur.execute(
+                "SELECT id, community_id, reporter_user_id, reason, created_at "
+                "FROM community_reports ORDER BY created_at DESC")
+            comm = [{'id': r[0], 'community_id': r[1], 'reporter_user_id': r[2],
+                     'reason': r[3], 'detail': None, 'status': 'open',
+                     'created_at': r[4].isoformat() if r[4] else None}
+                    for r in cur.fetchall()]
+        tours = []
+        try:
+            if want_all:
+                cur.execute(
+                    "SELECT id, tour_id, tour_name, reason, reporter_user_id, "
+                    "status, created_at FROM tour_reports ORDER BY created_at DESC")
+            else:
+                cur.execute(
+                    "SELECT id, tour_id, tour_name, reason, reporter_user_id, "
+                    "status, created_at FROM tour_reports WHERE status = %s "
+                    "ORDER BY created_at DESC", (status,))
+            tours = [{'id': r[0], 'tour_id': r[1], 'tour_name': r[2],
+                      'reason': r[3], 'reporter_user_id': r[4], 'status': r[5],
+                      'created_at': r[6].isoformat() if r[6] else None}
+                     for r in cur.fetchall()]
+        except Exception:  # noqa: BLE001 — tour_reports absent on an old DB
+            _rollback_quietly(cur)
+            tours = []
         cur.close()
-        return jsonify({"members": out}), 200
+        return jsonify({"community_reports": comm, "tour_reports": tours}), 200
     finally:
         conn.close()
 
 
-@communities_bp.route('/communities/<int:community_id>/block', methods=['POST'])
-def block_user(community_id):
-    """[LOCAL-726 item 10 — Apple Guideline 1.2] Block within a community.
-
-    Body: {user_id, blocked_user_id, kind?, reason?}.
-      kind 'member_block' (default): a MEMBER (user_id) hides a blocked user's
-        communities and community tours from their OWN view. Anyone may do this;
-        it affects only the blocker. A member blocks an organiser (the
-        community's owner) or another member this way.
-      kind 'organiser_bar': the ORGANISER (must be the community owner) REMOVES
-        and BARS a member. The member's membership is expired now, not deleted (no new
-        content) and a bar is recorded so they cannot rejoin by code; downloaded
-        audio stays on their device (D658). 403 if the caller is not the owner.
-
-    Idempotent: blocking twice is a no-op (ON CONFLICT DO NOTHING). 200
-    {blocked:true, kind}. 400 missing fields / self-block; 404 unknown
-    community."""
-    err = _require_api_key()
+@communities_bp.route('/communities/<int:community_id>/admin/bar', methods=['POST'])
+def admin_bar_member(community_id):
+    """[LOCAL-728 / D691 / D690] ADMIN ONLY. Bar a user from ONE community. Ends
+    the membership BY EXPIRY (never DELETE — D690: the row is the purchase
+    record) and records an admin_bar so they cannot rejoin by code. Downloaded
+    audio stays on the device (D658). Body: {user_id, reason?, actor?,
+    report_id?}. Writes the ledger. Idempotent (ON CONFLICT DO NOTHING)."""
+    err = _require_admin_key()
     if err:
         return err
     data = request.get_json(silent=True) or {}
     user_id = data.get('user_id')
-    blocked_user_id = data.get('blocked_user_id')
-    kind = data.get('kind') or BLOCK_MEMBER
-    reason = data.get('reason')
-    if not user_id or not blocked_user_id:
+    if not user_id:
         return jsonify({"error": "missing_fields",
-                        "message": "user_id and blocked_user_id are required."}), 400
-    if kind not in (BLOCK_MEMBER, BLOCK_ORGANISER_BAR):
-        return jsonify({"error": "bad_kind",
-                        "message": "kind must be member_block or organiser_bar."}), 400
-    if user_id == blocked_user_id:
-        return jsonify({"error": "cannot_block_self",
-                        "message": "You cannot block yourself."}), 400
+                        "message": "user_id is required."}), 400
     conn = _get_db()
     try:
         cur = conn.cursor()
@@ -2205,116 +2319,203 @@ def block_user(community_id):
         if not c:
             cur.close()
             return jsonify({"error": "not_found"}), 404
-        if kind == BLOCK_ORGANISER_BAR:
-            # Only the organiser (owner) may bar-and-remove a member.
-            if c['owner_user_id'] != user_id:
-                cur.close()
-                return jsonify({
-                    "error": "forbidden",
-                    "message": "Only the organiser can remove and bar a member.",
-                }), 403
-            # End the membership now (no new content) — downloaded audio stays
-            # on the device (D658). [LEAD review] The row is NOT deleted: it is
-            # the purchase record (transaction_id, store, price) that refunds,
-            # replay checks and accounting rely on. Expiring it is enough; the
-            # bar in community_blocks stops a rejoin.
-            cur.execute(
-                "UPDATE community_memberships "
-                "SET expires_at = NOW(), updated_at = NOW() "
-                "WHERE community_id = %s AND user_id = %s "
-                "AND (expires_at IS NULL OR expires_at > NOW())",
-                (community_id, blocked_user_id),
-            )
+        # End the membership by expiry — NOT deleted (D690): the row is the
+        # purchase record (transaction_id, store, price). Expiring it stops new
+        # content; the admin_bar stops a rejoin.
+        cur.execute(
+            "UPDATE community_memberships "
+            "SET expires_at = NOW(), updated_at = NOW() "
+            "WHERE community_id = %s AND user_id = %s "
+            "AND (expires_at IS NULL OR expires_at > NOW())",
+            (community_id, user_id),
+        )
         cur.execute(
             """INSERT INTO community_blocks
                    (community_id, blocker_user_id, blocked_user_id, kind, reason)
                VALUES (%s, %s, %s, %s, %s)
                ON CONFLICT (community_id, blocker_user_id, blocked_user_id, kind)
                DO NOTHING""",
-            (community_id, user_id, blocked_user_id, kind, reason),
+            (community_id, (data.get('actor') or 'admin'), user_id,
+             BLOCK_ADMIN_BAR, data.get('reason')),
         )
+        _log_admin_action(cur, 'bar', actor=data.get('actor'),
+                          target_user_id=user_id,
+                          target_community_id=community_id,
+                          reason=data.get('reason'),
+                          report_id=data.get('report_id'))
         conn.commit()
         cur.close()
-        return jsonify({"blocked": True, "kind": kind,
-                        "community_id": community_id,
-                        "blocked_user_id": blocked_user_id}), 200
+        return jsonify({"barred": True, "community_id": community_id,
+                        "user_id": user_id}), 200
     finally:
         conn.close()
 
 
-@communities_bp.route('/communities/<int:community_id>/unblock', methods=['POST'])
-def unblock_user(community_id):
-    """[LOCAL-726 item 10] Lift a block. Body: {user_id, blocked_user_id,
-    kind?}. The caller must be the blocker (user_id) who made the block — a
-    member lifts their own member_block from Settings; the organiser lifts an
-    organiser_bar from the member list. Deletes the one block row (if present)
-    and returns 200 {unblocked:true, removed:<0|1>}. Lifting an organiser_bar
-    does NOT auto-rejoin the member — they buy a pass again if they wish.
-    Idempotent: unblocking what is not blocked returns removed:0."""
-    err = _require_api_key()
+@communities_bp.route('/communities/<int:community_id>/admin/unbar', methods=['POST'])
+def admin_unbar_member(community_id):
+    """[LOCAL-728 / D691] ADMIN ONLY. Lift an admin_bar on a user for a
+    community. Deletes the bar row (community_blocks only holds bar rows — safe
+    to DELETE FROM; no membership/purchase row is touched). Does NOT auto-
+    rejoin the member. Body: {user_id, actor?, reason?, report_id?}. Writes the
+    ledger. Idempotent: unbarring what is not barred returns removed:0."""
+    err = _require_admin_key()
     if err:
         return err
     data = request.get_json(silent=True) or {}
     user_id = data.get('user_id')
-    blocked_user_id = data.get('blocked_user_id')
-    kind = data.get('kind') or BLOCK_MEMBER
-    if not user_id or not blocked_user_id:
+    if not user_id:
         return jsonify({"error": "missing_fields",
-                        "message": "user_id and blocked_user_id are required."}), 400
+                        "message": "user_id is required."}), 400
     conn = _get_db()
     try:
         cur = conn.cursor()
         cur.execute(
             "DELETE FROM community_blocks "
-            "WHERE community_id = %s AND blocker_user_id = %s "
-            "AND blocked_user_id = %s AND kind = %s",
-            (community_id, user_id, blocked_user_id, kind),
+            "WHERE community_id = %s AND blocked_user_id = %s AND kind = %s",
+            (community_id, user_id, BLOCK_ADMIN_BAR),
         )
         removed = cur.rowcount
+        _log_admin_action(cur, 'unbar', actor=data.get('actor'),
+                          target_user_id=user_id,
+                          target_community_id=community_id,
+                          reason=data.get('reason'),
+                          report_id=data.get('report_id'))
         conn.commit()
         cur.close()
-        return jsonify({"unblocked": True, "removed": removed}), 200
+        return jsonify({"unbarred": True, "removed": removed}), 200
     finally:
         conn.close()
 
 
-@communities_bp.route('/communities/blocks', methods=['GET'])
-def list_my_blocks():
-    """[LOCAL-726 item 10] Everything THIS user has blocked, for the Settings
-    "Blocked" / unblock list. Query: ?user_id=<device user>. Returns 200
-    {blocks:[{community_id, community_name, blocked_user_id, kind, created_at},
-    ...]}, newest first, both kinds (a member's member_blocks and, for an
-    organiser, the organiser_bars they issued). The app offers Unblock on each.
-    Schema-tolerant: an un-migrated DB returns an empty list."""
-    err = _require_api_key()
+@communities_bp.route('/communities/admin/ban', methods=['POST'])
+def admin_ban_user():
+    """[LOCAL-728 / D691 / D658] ADMIN ONLY. Ban a user from the whole service:
+    no purchases, no generation, no community joins or creation. Their
+    downloaded audio STAYS on the device (D658 — a ban blocks NEW access only).
+    Body: {user_id, reason?, actor?, report_id?}. Writes service_bans (ON
+    CONFLICT on the active-ban partial index → a second active ban is a no-op)
+    and the ledger. 200 {banned:true}."""
+    err = _require_admin_key()
     if err:
         return err
-    user_id = request.args.get('user_id')
+    data = request.get_json(silent=True) or {}
+    user_id = data.get('user_id')
     if not user_id:
-        return jsonify({"error": "user_id is required"}), 400
+        return jsonify({"error": "missing_fields",
+                        "message": "user_id is required."}), 400
     conn = _get_db()
     try:
         cur = conn.cursor()
-        try:
-            cur.execute(
-                """SELECT b.community_id, c.name, b.blocked_user_id, b.kind,
-                          b.created_at
-                     FROM community_blocks b
-                     LEFT JOIN communities c ON c.id = b.community_id
-                    WHERE b.blocker_user_id = %s
-                    ORDER BY b.created_at DESC""",
-                (user_id,),
-            )
-            rows = cur.fetchall()
-        except Exception:  # noqa: BLE001 — un-migrated DB: no blocks
-            _rollback_quietly(cur)
-            rows = []
+        cur.execute(
+            """INSERT INTO service_bans (user_id, reason, report_id, banned_by)
+               VALUES (%s, %s, %s, %s)
+               ON CONFLICT (user_id) WHERE lifted_at IS NULL DO NOTHING""",
+            (user_id, data.get('reason'), data.get('report_id'),
+             data.get('actor')),
+        )
+        _log_admin_action(cur, 'ban', actor=data.get('actor'),
+                          target_user_id=user_id, reason=data.get('reason'),
+                          report_id=data.get('report_id'))
+        conn.commit()
         cur.close()
-        out = [{'community_id': r[0], 'community_name': r[1],
-                'blocked_user_id': r[2], 'kind': r[3],
-                'created_at': r[4].isoformat() if r[4] else None}
-               for r in rows]
-        return jsonify({"blocks": out}), 200
+        return jsonify({"banned": True, "user_id": user_id}), 200
+    finally:
+        conn.close()
+
+
+@communities_bp.route('/communities/admin/unban', methods=['POST'])
+def admin_unban_user():
+    """[LOCAL-728 / D691] ADMIN ONLY. Lift a service ban: set lifted_at on the
+    active ban (the row is KEPT as history — never deleted). Body: {user_id,
+    actor?, reason?}. Writes the ledger. Idempotent: lifting when there is no
+    active ban returns lifted:0."""
+    err = _require_admin_key()
+    if err:
+        return err
+    data = request.get_json(silent=True) or {}
+    user_id = data.get('user_id')
+    if not user_id:
+        return jsonify({"error": "missing_fields",
+                        "message": "user_id is required."}), 400
+    conn = _get_db()
+    try:
+        cur = conn.cursor()
+        cur.execute(
+            "UPDATE service_bans SET lifted_at = NOW(), lifted_by = %s "
+            "WHERE user_id = %s AND lifted_at IS NULL",
+            (data.get('actor'), user_id),
+        )
+        lifted = cur.rowcount
+        _log_admin_action(cur, 'unban', actor=data.get('actor'),
+                          target_user_id=user_id, reason=data.get('reason'))
+        conn.commit()
+        cur.close()
+        return jsonify({"unbanned": True, "lifted": lifted}), 200
+    finally:
+        conn.close()
+
+
+@communities_bp.route('/communities/<int:community_id>/admin/disable', methods=['POST'])
+def admin_disable_community(community_id):
+    """[LOCAL-728 / D691] ADMIN ONLY. The existing off-switch: set
+    communities.disabled = TRUE. A disabled community lists/serves nothing and
+    its code resolves to 404. Body: {actor?, reason?, report_id?, enable?}. Pass
+    enable:true to re-enable. Writes the ledger. Never deletes anything."""
+    err = _require_admin_key()
+    if err:
+        return err
+    data = request.get_json(silent=True) or {}
+    enable = bool(data.get('enable'))
+    conn = _get_db()
+    try:
+        cur = conn.cursor()
+        c = _community_row(cur, community_id)
+        if not c:
+            cur.close()
+            return jsonify({"error": "not_found"}), 404
+        cur.execute(
+            "UPDATE communities SET disabled = %s, updated_at = NOW() WHERE id = %s",
+            (not enable, community_id),
+        )
+        _log_admin_action(cur,
+                          'enable_community' if enable else 'disable_community',
+                          actor=data.get('actor'),
+                          target_community_id=community_id,
+                          reason=data.get('reason'),
+                          report_id=data.get('report_id'))
+        conn.commit()
+        cur.close()
+        return jsonify({"community_id": community_id,
+                        "disabled": (not enable)}), 200
+    finally:
+        conn.close()
+
+
+@communities_bp.route('/communities/admin/actions', methods=['GET'])
+def admin_list_actions():
+    """[LOCAL-728 / D691] ADMIN ONLY. The admin_actions ledger, newest first,
+    for an audit read. Query: ?limit=50. Read-only."""
+    err = _require_admin_key()
+    if err:
+        return err
+    try:
+        limit = min(int(request.args.get('limit', '50')), 500)
+    except (TypeError, ValueError):
+        limit = 50
+    conn = _get_db()
+    try:
+        cur = conn.cursor()
+        cur.execute(
+            "SELECT id, action, actor, target_user_id, target_community_id, "
+            "reason, report_id, created_at FROM admin_actions "
+            "ORDER BY created_at DESC, id DESC LIMIT %s", (limit,))
+        out = [{'id': r[0], 'action': r[1], 'actor': r[2],
+                'target_user_id': r[3], 'target_community_id': r[4],
+                'reason': r[5], 'report_id': r[6],
+                'created_at': r[7].isoformat() if r[7] else None}
+               for r in cur.fetchall()]
+        cur.close()
+        return jsonify({"actions": out}), 200
     finally:
         conn.close()
 
