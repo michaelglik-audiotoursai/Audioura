@@ -2174,7 +2174,7 @@ def block_user(community_id):
         it affects only the blocker. A member blocks an organiser (the
         community's owner) or another member this way.
       kind 'organiser_bar': the ORGANISER (must be the community owner) REMOVES
-        and BARS a member. The member's membership row is deleted (no new
+        and BARS a member. The member's membership is expired now, not deleted (no new
         content) and a bar is recorded so they cannot rejoin by code; downloaded
         audio stays on their device (D658). 403 if the caller is not the owner.
 
@@ -2213,11 +2213,16 @@ def block_user(community_id):
                     "error": "forbidden",
                     "message": "Only the organiser can remove and bar a member.",
                 }), 403
-            # Remove the membership (no new content) — downloaded audio stays on
-            # the device (D658); the server never deletes it.
+            # End the membership now (no new content) — downloaded audio stays
+            # on the device (D658). [LEAD review] The row is NOT deleted: it is
+            # the purchase record (transaction_id, store, price) that refunds,
+            # replay checks and accounting rely on. Expiring it is enough; the
+            # bar in community_blocks stops a rejoin.
             cur.execute(
-                "DELETE FROM community_memberships "
-                "WHERE community_id = %s AND user_id = %s",
+                "UPDATE community_memberships "
+                "SET expires_at = NOW(), updated_at = NOW() "
+                "WHERE community_id = %s AND user_id = %s "
+                "AND (expires_at IS NULL OR expires_at > NOW())",
                 (community_id, blocked_user_id),
             )
         cur.execute(

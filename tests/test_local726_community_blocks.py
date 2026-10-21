@@ -294,11 +294,14 @@ def test_organiser_bar_removes_membership_and_blocks_rejoin_by_code(client, db):
                           "kind": "organiser_bar", "reason": "spam"})
     assert r.status_code == 200
     assert r.get_json()["kind"] == "organiser_bar"
-    # Membership was removed (no new content).
+    # Membership is ENDED (no new content) but the row — the purchase record —
+    # is kept (LEAD review): expires_at is now, transaction_id still present.
     cur = db.cursor()
-    cur.execute("SELECT COUNT(*) FROM community_memberships "
+    cur.execute("SELECT COUNT(*), BOOL_AND(expires_at <= clock_timestamp()::timestamp), "
+                "BOOL_AND(transaction_id IS NOT NULL) FROM community_memberships "
                 "WHERE community_id = %s AND user_id = %s", (cid, member))
-    assert cur.fetchone()[0] == 0
+    n, expired, has_txn = cur.fetchone()
+    assert n == 1 and expired and has_txn
     cur.close()
     # The barred member cannot rejoin by code — a fresh pass purchase is 403.
     rejoin = _buy_pass(client, cid, member, txn_suffix="rejoin")
