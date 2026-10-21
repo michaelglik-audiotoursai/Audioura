@@ -48,6 +48,14 @@ COPY user_stops_flag.py /app/
 # (make_short_title_only, non-blocking). Self-contained (no llm_models import),
 # so this one COPY line is all the orchestrator image needs.
 COPY tour_short_title.py /app/
+# [LOCAL-724B defect 1] store_audio_tour does `import tour_content_rating` in the
+# serving path to rate a new/edited ORIGINAL before it can list (LOCAL-724 items
+# 1, 2 & 4). This Dockerfile COPYies sources one-by-one, and the rater was NOT in
+# the list, so in the built image the import raised, the except printed, and the
+# tour committed UNRATED (NULL) — listed as General. LOCAL-724's live proof
+# imported the module on the HOST, never from the image, so it could not see
+# this. Copy it so `python -c "import tour_content_rating"` works in-container.
+COPY tour_content_rating.py /app/
 
 # Build-time manifest: record checksums of all Python sources + git SHA
 ARG GIT_SHA=unknown

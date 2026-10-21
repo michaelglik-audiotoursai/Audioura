@@ -1214,16 +1214,31 @@ def store_audio_tour(tour_name, request_string, zip_path, lat, lng, tour_content
         # here in the serving path (not the Mac Mini launchd tick), so it also
         # works on GCloud; the OpenAI key is read from the environment and never
         # written. Synchronous and in THIS transaction so the row is never
-        # listable unrated. Non-blocking by design: rate_tour_row never raises,
-        # and if it cannot rate (short text, model error, old schema) the row is
-        # simply committed unrated and the launchd backfill picks it up — the
-        # same safety net as before. Test rows are skipped, exactly like the
-        # launchd backfill (is_test IS NOT TRUE).
+        # listable unrated. Non-blocking by design: rate_tour_row never raises.
+        # [LOCAL-724B defect 2] If it CANNOT rate (short text, model error, no
+        # key, old schema) we no longer commit the row unrated (unrated reads as
+        # general and would list); instead we HOLD it (clear_rating -> NULL +
+        # review_status 'pending'), exactly as the edit path does, so it is not
+        # listable until the launchd backfill rates it. Test rows are skipped,
+        # exactly like the launchd backfill (is_test IS NOT TRUE).
         if _new_tour_id is not None and not _is_test_mode:
             try:
                 import tour_content_rating
-                tour_content_rating.rate_tour_row(
+                _ndetail = tour_content_rating.rate_tour_row(
                     cur, _new_tour_id, tour_name, tour_content, stops_count)
+                if _ndetail is None:
+                    # [LOCAL-724B defect 2] The rater could not rate this new
+                    # ORIGINAL (no OpenAI key, model error, or a schema without
+                    # the 027 columns). The approved policy is "nothing lists
+                    # before it is rated": an unrated row reads as general in the
+                    # listing layer and would be shown. HOLD it instead — exactly
+                    # as the edit/replace path does — by clearing to NULL +
+                    # review_status 'pending', so it is NOT listable until the
+                    # launchd backfill rates it (and, if general, un-holds it).
+                    # Short text (< 200 chars) also lands here: held, backfill
+                    # decides. clear_rating never raises and never commits, so a
+                    # schema without the columns simply leaves the row as-is.
+                    tour_content_rating.clear_rating(cur, _new_tour_id)
             except Exception as _rate_err:
                 # Defensive: the import or call must never fail the store.
                 print(f"[LOCAL-724] content rating skipped for tour "

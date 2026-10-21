@@ -104,17 +104,53 @@ def classify(title, text, stops):
 
     This judges exactly the `text` it is given (truncated defensively at
     CHUNK_CHARS). Whole-tour coverage is rate_text's job: it calls classify once
-    per chunk. Kept single-chunk so callers and tests can mock one model call."""
-    from openai import OpenAI
-    client = OpenAI()
-    resp = client.chat.completions.create(
-        model=MODEL,
-        temperature=0,
-        response_format={'type': 'json_object'},
-        messages=[{'role': 'user', 'content': PROMPT.format(
-            title=title, stops=stops or '?', text=text[:CHUNK_CHARS])}],
-    )
-    detail = json.loads(resp.choices[0].message.content)
+    per chunk. Kept single-chunk so callers and tests can mock one model call.
+
+    [LOCAL-724B defect 1] SDK-tolerant, mirroring tour_editor_score.judge
+    (LOCAL-692B). The modern ``from openai import OpenAI`` client is preferred,
+    but the generator/tour-editing image (Dockerfile.generator) and anything
+    sharing it ship the LEGACY ``openai`` SDK (0.27.0 — no ``OpenAI`` class), on
+    which the modern import raised; rate_tour_row then caught it, returned None,
+    and every tour was held instead of rated. We fall back to the legacy
+    ``openai.ChatCompletion.create`` so the rater actually rates INSIDE the
+    container — the only place the shipped SDK is what runs."""
+    import re as _re
+    _messages = [{'role': 'user', 'content': PROMPT.format(
+        title=title, stops=stops or '?', text=text[:CHUNK_CHARS])}]
+    try:
+        from openai import OpenAI  # modern SDK (>=1.0)
+        client = OpenAI()
+        resp = client.chat.completions.create(
+            model=MODEL,
+            temperature=0,
+            response_format={'type': 'json_object'},
+            messages=_messages,
+        )
+        content = resp.choices[0].message.content
+        usage = resp.usage
+    except (ImportError, AttributeError):
+        # Legacy SDK (0.x): openai.ChatCompletion, no response_format support —
+        # the PROMPT already demands JSON-only output ("Reply with JSON only").
+        import openai as _legacy
+        _key = os.getenv('OPENAI_API_KEY')
+        if _key:
+            _legacy.api_key = _key
+        resp = _legacy.ChatCompletion.create(
+            model=MODEL, temperature=0, messages=_messages)
+        content = resp['choices'][0]['message']['content']
+        _u = resp.get('usage', {}) if isinstance(resp, dict) else {}
+
+        class _Usage:
+            prompt_tokens = int((_u or {}).get('prompt_tokens', 0) or 0)
+            completion_tokens = int((_u or {}).get('completion_tokens', 0) or 0)
+        usage = _Usage()
+    # Legacy output may wrap the JSON in prose/fences — extract the object.
+    content = (content or '').strip()
+    if not content.startswith('{'):
+        _m = _re.search(r'\{.*\}', content, _re.S)
+        if _m:
+            content = _m.group(0)
+    detail = json.loads(content)
     rating = str(detail.get('rating', '')).strip().lower()
     if rating not in RATINGS:
         # The model returned something off-menu. Fail SAFE: treat as not clearly
@@ -122,7 +158,7 @@ def classify(title, text, stops):
         rating = 'not_allowed' if 'not' in rating or 'allow' in rating else 'mature'
     detail['rating'] = rating
     detail['reason'] = str(detail.get('reason', '')).strip()
-    return detail, resp.usage
+    return detail, usage
 
 
 def review_status_for(rating):

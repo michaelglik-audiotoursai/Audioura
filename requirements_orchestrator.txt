@@ -6,3 +6,11 @@ werkzeug==1.0.1
 markupsafe==1.1.1
 itsdangerous==1.1.0
 jinja2==2.11.3
+# [LOCAL-724B defect 1 / D685] The orchestrator now rates a new/edited ORIGINAL
+# in the serving path (store_audio_tour -> tour_content_rating.rate_tour_row),
+# so the OpenAI SDK must be present in THIS image. Without it the import inside
+# classify() raised, rate_tour_row returned None, and every new tour was held
+# (D685 gave the orchestrator OPENAI_API_KEY precisely so it can rate). Pinned
+# to the same version the rest of the stack ships (generator); classify() is
+# SDK-tolerant (LOCAL-692B pattern) and works against this legacy SDK.
+openai==0.27.0

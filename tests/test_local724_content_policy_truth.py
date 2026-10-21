@@ -300,6 +300,144 @@ class ReportEndpointTest(unittest.TestCase):
         self.assertEqual(resp.status_code, 204)
 
 
+# ─── Defect 1: classify is SDK-tolerant (legacy openai 0.27.0 in the image) ───
+class SdkTolerantClassifyTest(unittest.TestCase):
+    """LOCAL-724B defect 1. The generator/tour-editing image ships the LEGACY
+    openai SDK (0.27.0 — no ``OpenAI`` class). classify() must fall back to
+    ``openai.ChatCompletion.create`` so the rater actually rates in-container,
+    instead of raising, being caught by rate_tour_row, and holding every tour.
+    We inject a fake ``openai`` module with NO OpenAI attribute (so the modern
+    import raises AttributeError) and a legacy ChatCompletion, and assert
+    classify parses its JSON — no modern SDK present."""
+
+    def setUp(self):
+        self._saved = sys.modules.get("openai")
+
+    def tearDown(self):
+        if self._saved is not None:
+            sys.modules["openai"] = self._saved
+        else:
+            sys.modules.pop("openai", None)
+
+    def test_classify_falls_back_to_legacy_chatcompletion(self):
+        import types
+        legacy = types.ModuleType("openai")  # NO `OpenAI` attribute → modern import fails
+        legacy.api_key = None
+
+        class _ChatCompletion:
+            @staticmethod
+            def create(model=None, temperature=0, messages=None):
+                # Legacy dict-shaped response; wrap JSON in prose to also prove
+                # the fence/prose extraction path.
+                return {
+                    "choices": [{"message": {"content":
+                        'Here you go: {"rating": "mature", "reason": "a pub crawl"}'}}],
+                    "usage": {"prompt_tokens": 11, "completion_tokens": 7},
+                }
+
+        legacy.ChatCompletion = _ChatCompletion
+        sys.modules["openai"] = legacy
+
+        detail, usage = tour_content_rating.classify(
+            "Night Out", "a pub crawl with shots at six bars", 6)
+        self.assertEqual(detail["rating"], "mature")
+        self.assertEqual(detail["reason"], "a pub crawl")
+        self.assertEqual(usage.prompt_tokens, 11)
+        self.assertEqual(usage.completion_tokens, 7)
+
+
+# ─── Defect 4: the launchd backfill re-rates HELD rows and un-holds general ───
+class BackfillReRateHandoffTest(unittest.TestCase):
+    """LOCAL-724B defect 4. A new/edited tour that could not be rated is HELD
+    (content_rating NULL, review_status 'pending'). The launchd backfill
+    (tour_content_rating.main --backfill) must pick such rows up — it selects
+    ``content_rating IS NULL``, which a held row satisfies — and a successful
+    'general' rating must RESET review_status to NULL so the tour becomes
+    listable. We drive the real main() with a fake connection and assert both:
+    the select targets content_rating IS NULL, and the UPDATE for a general
+    result writes review_status = NULL."""
+
+    def setUp(self):
+        self._orig_classify = tour_content_rating.classify
+        self._orig_conn = tour_content_rating._conn
+
+    def tearDown(self):
+        tour_content_rating.classify = self._orig_classify
+        tour_content_rating._conn = self._orig_conn
+        sys.argv = self._orig_argv
+
+    def test_backfill_selects_null_and_unholds_a_general_tour(self):
+        # One HELD row (content_rating was NULL). The backfill SELECT returns the
+        # (id, name, text, stops) tuple the real query projects.
+        held_id = 321
+        long_text = "An ordinary museum of fine art. " * 20  # > 200 chars, general
+        plan = [("select id, tour_name, tour_content, stops_count from audio_tours",
+                 [(held_id, "Museum", long_text, 5)])]
+        writes = []
+        conn = _FakeConn(plan, writes)
+        tour_content_rating._conn = lambda: conn
+        tour_content_rating.classify = _script_classify([("museum", "general")])
+
+        self._orig_argv = sys.argv
+        sys.argv = ["tour_content_rating.py", "--backfill"]
+        tour_content_rating.main()
+
+        # 1) The backfill SELECT filters on content_rating IS NULL (so a held
+        #    row — NULL rating + pending status — is in scope).
+        selects = [w for w in writes
+                   if "from audio_tours" in w[0] and "content_rating is null" in w[0]]
+        self.assertTrue(selects, "backfill must select content_rating IS NULL")
+
+        # 2) The UPDATE for this general tour sets review_status = NULL (un-held).
+        updates = [w for w in writes
+                   if "update audio_tours set content_rating" in w[0]]
+        self.assertEqual(len(updates), 1)
+        params = updates[0][1]
+        self.assertIn(held_id, params)
+        self.assertIn("general", params)
+        # params order: (rating, reason, status, content_rated_at, id).
+        self.assertIsNone(params[2],
+                          "a general re-rate must reset review_status to NULL (listable)")
+        # And through the REAL listing predicate, the un-held row is now visible.
+        self.assertTrue(map_app._content_visible("general", None, False))
+
+
+# ─── Defect 2: an unratable new tour is HELD, never left listable ─────────────
+class HeldWhenUnratableContractTest(unittest.TestCase):
+    """LOCAL-724B defect 2. The store's new-tour path calls rate_tour_row; when
+    it returns None (no key / model error / short text), the caller MUST
+    clear_rating (NULL + pending) so the row is not listable. This proves the
+    two halves of that contract against the real functions: rate_tour_row
+    returns None on a model error, and clear_rating then holds the row; the real
+    listing predicate hides the held row."""
+
+    def setUp(self):
+        self._orig = tour_content_rating.classify
+
+    def tearDown(self):
+        tour_content_rating.classify = self._orig
+
+    def test_model_error_then_hold_makes_row_unlistable(self):
+        def _boom(title, text, stops):
+            raise RuntimeError("no OPENAI_API_KEY in container")
+
+        tour_content_rating.classify = _boom
+        writes = []
+        cur = _FakeConn([], writes).cursor()
+
+        # rate_tour_row cannot rate → None (the trigger for the hold).
+        self.assertIsNone(
+            tour_content_rating.rate_tour_row(cur, 88, "New Tour", "x" * 500, 3))
+        # The caller's response to None: clear_rating holds it (NULL + pending).
+        self.assertTrue(tour_content_rating.clear_rating(cur, 88))
+        held = [w for w in writes if "content_rating = null" in w[0]
+                and "review_status = 'pending'" in w[0]]
+        self.assertEqual(len(held), 1, "an unratable new tour must be held")
+        # The held row is NOT listable (pending hides regardless of adult).
+        self.assertFalse(map_app._content_visible(None, "pending", False))
+        self.assertFalse(map_app._content_visible(None, "pending", True))
+
+
 # ─── RED: break "rate before listing" and show the guard catches it ───────────
 class RateBeforeListingRedTest(unittest.TestCase):
     """The green guarantee is: a new mature tour is rated BEFORE it can list, so

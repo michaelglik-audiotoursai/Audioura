@@ -55,6 +55,12 @@ services:
       - METER_ROLE=listener
       - METER_ROLE_TOKEN=${METER_ROLE_TOKEN}
       - METER_ROLE_TOKEN_FILE=/run/meter_role_token
+      # LOCAL-724B defect 3 (D685): the orchestrator now rates a new/edited tour
+      # in the serving path (store_audio_tour -> tour_content_rating). D673 kept
+      # OpenAI keys OUT of the orchestrator; D685 reverses that FOR THE RATER so
+      # a new tour is rated before it lists (otherwise rate_tour_row returns None
+      # and every new tour is held pending). Read from ~/Audioura/.env.
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
     volumes:
       - /Users/micha/audioura-subscribed-local/_meter:/opt/meter:ro
       - /Users/micha/Audioura/listener_role.token:/run/meter_role_token:ro   # LOCAL-723: proof-of-listener token (listener services only)
@@ -110,6 +116,11 @@ services:
     environment:
       - PYTHONPATH=/opt/meter
       - PAID_API_LOG=/meterlogs/paid_api_calls.jsonl
+      # LOCAL-724B defect 3 (D685): tour_editing_phase2.py rates an edited/
+      # promoted ORIGINAL in its serving path (promote_custom_tour ->
+      # tour_content_rating). It had no OpenAI key, so the rater returned None
+      # and every edited/promoted tour was held pending. Give it the key too.
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
     volumes:
       - /Users/micha/audioura-subscribed-local/_meter:/opt/meter:ro
       - /Users/micha/Audioura/meterlogs:/meterlogs
