@@ -284,4 +284,94 @@ class CommunitiesService {
     } catch (_) {}
     return null;
   }
+
+  // ─── [LOCAL-726 item 10] Block function (Apple Guideline 1.2) ──────────────
+
+  /// A MEMBER blocks an organiser or another member within a community
+  /// (kind 'member_block'): the blocked user's communities and community tours
+  /// disappear from THIS user's own views. Affects only the blocker. Returns
+  /// true on success.
+  static Future<bool> blockUser(int communityId, String userId,
+          String blockedUserId) =>
+      _block(communityId, userId, blockedUserId, 'member_block', null);
+
+  /// An ORGANISER removes and bars a member (kind 'organiser_bar'): the member's
+  /// membership is removed and they cannot rejoin by code. Owner only. Returns
+  /// true on success (false on 403 not-owner or any error).
+  static Future<bool> barMember(int communityId, String ownerUserId,
+          String memberUserId, {String? reason}) =>
+      _block(communityId, ownerUserId, memberUserId, 'organiser_bar', reason);
+
+  static Future<bool> _block(int communityId, String userId,
+      String blockedUserId, String kind, String? reason) async {
+    try {
+      final body = <String, dynamic>{
+        'user_id': userId,
+        'blocked_user_id': blockedUserId,
+        'kind': kind,
+      };
+      if (reason != null) body['reason'] = reason;
+      final r = await Endpoints.post(
+          Service.userDb, '/communities/$communityId/block', body: body);
+      return r.statusCode == 200;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// Lift a block the caller made. [kind] must match the block being lifted
+  /// ('member_block' for a member's own block, 'organiser_bar' for an
+  /// organiser's bar). Returns true on success.
+  static Future<bool> unblockUser(int communityId, String userId,
+      String blockedUserId, {String kind = 'member_block'}) async {
+    try {
+      final r = await Endpoints.post(
+          Service.userDb, '/communities/$communityId/unblock',
+          body: {
+            'user_id': userId,
+            'blocked_user_id': blockedUserId,
+            'kind': kind,
+          });
+      return r.statusCode == 200;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// The OWNER's list of a community's members (for the member-row ⋯ menu).
+  /// Owner only; returns an empty list on 403/any error.
+  static Future<List<CommunityMember>> members(
+      int communityId, String ownerUserId) async {
+    try {
+      final r = await Endpoints.get(Service.userDb,
+          '/communities/$communityId/members?user_id=$ownerUserId');
+      final j = Endpoints.tryDecodeMap(r.body);
+      if (r.statusCode == 200 && j != null) {
+        final list = (j['members'] as List?) ?? const [];
+        return list
+            .whereType<Map<String, dynamic>>()
+            .map(CommunityMember.fromJson)
+            .toList(growable: false);
+      }
+    } catch (_) {}
+    return const [];
+  }
+
+  /// Everything THIS user has blocked, for Settings → Blocked. Returns an empty
+  /// list on any error.
+  static Future<List<CommunityBlock>> myBlocks(String userId) async {
+    try {
+      final r = await Endpoints.get(
+          Service.userDb, '/communities/blocks?user_id=$userId');
+      final j = Endpoints.tryDecodeMap(r.body);
+      if (r.statusCode == 200 && j != null) {
+        final list = (j['blocks'] as List?) ?? const [];
+        return list
+            .whereType<Map<String, dynamic>>()
+            .map(CommunityBlock.fromJson)
+            .toList(growable: false);
+      }
+    } catch (_) {}
+    return const [];
+  }
 }

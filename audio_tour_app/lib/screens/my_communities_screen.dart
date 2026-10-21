@@ -19,6 +19,7 @@ class MyCommunitiesScreen extends StatefulWidget {
 class _MyCommunitiesScreenState extends State<MyCommunitiesScreen> {
   List<JoinedCommunity> _communities = [];
   bool _loading = true;
+  String? _userId;
   // LOCAL-694: false when the Communities backend (Service.userDb) is not on
   // the current server (Storied). Drives an explanatory empty state.
   bool _featureAvailable = true;
@@ -45,6 +46,7 @@ class _MyCommunitiesScreenState extends State<MyCommunitiesScreen> {
       setState(() => _loading = false);
       return;
     }
+    _userId = userId;
     // Probe once: if Communities is not offered here, show the Preview note
     // rather than a misleading "you haven't joined any" message.
     final available = await CommunitiesService.isAvailable();
@@ -141,6 +143,43 @@ class _MyCommunitiesScreenState extends State<MyCommunitiesScreen> {
     );
   }
 
+  /// [LOCAL-726 item 10] Block the organiser of a joined community from the
+  /// Listen-tab ⋯ menu. JoinedCommunity does not carry the owner id, so fetch
+  /// the full page (which does) and block that id. The organiser's communities
+  /// and tours then disappear from this member's views; undo in Settings.
+  Future<void> _blockOrganiser(JoinedCommunity c) async {
+    if (_userId == null) return;
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Block this organiser?'),
+        content: Text(
+          "You won't see ${c.name} or this organiser's other communities and "
+          'tours anymore. You can undo this later in Settings → Blocked.',
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Cancel')),
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('Block')),
+        ],
+      ),
+    );
+    if (confirm != true) return;
+    final full = await CommunitiesService.get(c.id, userId: _userId);
+    final ownerId = full?.ownerUserId;
+    var ok = false;
+    if (ownerId != null) {
+      ok = await CommunitiesService.blockUser(c.id, _userId!, ownerId);
+    }
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(ok ? 'Organiser blocked.' : 'Could not block.')));
+    if (ok) _load();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -196,6 +235,7 @@ class _MyCommunitiesScreenState extends State<MyCommunitiesScreen> {
                                     trailing: PopupMenuButton<String>(
                                       onSelected: (v) {
                                         if (v == 'origin') _showOrigin(c);
+                                        if (v == 'block') _blockOrganiser(c);
                                         if (v == 'open') {
                                           Navigator.push(
                                             context,
@@ -213,6 +253,9 @@ class _MyCommunitiesScreenState extends State<MyCommunitiesScreen> {
                                         PopupMenuItem(
                                             value: 'open',
                                             child: Text('Open community')),
+                                        PopupMenuItem(
+                                            value: 'block',
+                                            child: Text('Block organiser')),
                                       ],
                                     ),
                                     onTap: () {

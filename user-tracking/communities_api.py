@@ -303,6 +303,67 @@ def _membership(cur, user_id, community_id):
 
 
 # ───────────────────────────────────────────────────────────────────────────
+# Block function (LOCAL-726, lawyer review item 10 — Apple Guideline 1.2)
+# ───────────────────────────────────────────────────────────────────────────
+# community_blocks (migration 044) carries two kinds of block:
+#   'member_block'  — a MEMBER hides a blocked user's communities/tours from
+#                     their OWN view (the block is the blocker's business only).
+#   'organiser_bar' — an ORGANISER removes and bars a MEMBER from THEIR
+#                     community: the barred member gets no NEW content and cannot
+#                     rejoin by code. Downloaded audio stays on the device (D658).
+BLOCK_MEMBER = 'member_block'
+BLOCK_ORGANISER_BAR = 'organiser_bar'
+
+
+def is_user_barred(cur, community_id, user_id):
+    """True iff `user_id` is barred (organiser_bar) from `community_id`. The gate
+    the join / pass-purchase paths read so a barred member cannot rejoin by code.
+    Schema-tolerant: if community_blocks does not exist yet (un-migrated DB), no
+    one is barred — the feature is simply inert until the migration runs."""
+    if not user_id:
+        return False
+    try:
+        cur.execute(
+            "SELECT 1 FROM community_blocks "
+            "WHERE community_id = %s AND blocked_user_id = %s AND kind = %s "
+            "LIMIT 1",
+            (community_id, user_id, BLOCK_ORGANISER_BAR),
+        )
+        return cur.fetchone() is not None
+    except Exception:  # noqa: BLE001 — un-migrated DB: nobody barred (inert)
+        _rollback_quietly(cur)
+        return False
+
+
+def blocked_owner_ids_for(cur, user_id):
+    """The set of OWNER user_ids this user (as a member) has blocked
+    (member_block). A blocked organiser's communities and community tours
+    disappear FOR THIS USER — the member's 'mine', map and new-tours views filter
+    these out. Schema-tolerant: empty set on an un-migrated DB."""
+    if not user_id:
+        return set()
+    try:
+        cur.execute(
+            "SELECT DISTINCT blocked_user_id FROM community_blocks "
+            "WHERE blocker_user_id = %s AND kind = %s",
+            (user_id, BLOCK_MEMBER),
+        )
+        return {r[0] for r in cur.fetchall()}
+    except Exception:  # noqa: BLE001 — un-migrated DB: nothing blocked (inert)
+        _rollback_quietly(cur)
+        return set()
+
+
+def _rollback_quietly(cur):
+    """Roll back the current transaction after a schema-tolerant probe failed, so
+    the connection is usable again. Best-effort; never raises."""
+    try:
+        cur.connection.rollback()
+    except Exception:  # noqa: BLE001
+        pass
+
+
+# ───────────────────────────────────────────────────────────────────────────
 # Organiser step-down state machine (LOCAL-702, D663 §1)
 # ───────────────────────────────────────────────────────────────────────────
 # A community's `status` is the state machine:
@@ -874,7 +935,21 @@ def _active_community_ids_for_user(cur, user_id, now=None):
               AND c.disabled = FALSE""",
         (user_id, now, user_id),
     )
-    return [r[0] for r in cur.fetchall()]
+    ids = [r[0] for r in cur.fetchall()]
+    # [LOCAL-726 item 10] A blocked organiser's communities disappear for the
+    # blocker: drop any community whose owner this user has member_blocked.
+    blocked_owners = blocked_owner_ids_for(cur, user_id)
+    if blocked_owners:
+        ids = [cid for cid in ids
+               if _community_owner_id(cur, cid) not in blocked_owners]
+    return ids
+
+
+def _community_owner_id(cur, community_id):
+    """The owner_user_id of a community (for the block filter). None if gone."""
+    cur.execute("SELECT owner_user_id FROM communities WHERE id = %s", (community_id,))
+    row = cur.fetchone()
+    return row[0] if row else None
 
 
 def _tour_languages(cur, tour_id, original_language):
@@ -1015,6 +1090,9 @@ def _community_page(cur, community_id, user_id=None, now=None):
         'id': c['id'],
         'name': c['name'],
         'description': c['description'],
+        # [LOCAL-726 item 10] The owner's user_id, so a member can block the
+        # organiser from the community page (the block targets this id).
+        'owner_user_id': c['owner_user_id'],
         'organiser': {
             'name': c['organiser_name'],
             'photo_url': c['organiser_photo_url'],
@@ -1282,6 +1360,17 @@ def verify_community_pass(store, transaction_id, product, user_id,
                            "organiser is not a member and has full access "
                            "without a pass.",
             }), 409
+
+        # [LOCAL-726 item 10] A member the organiser has BARRED cannot rejoin by
+        # buying a pass. The bar survives a code rotation and a new purchase —
+        # it is keyed on the user, not the code. Downloaded audio stays on the
+        # device (D658); this only blocks NEW access.
+        if is_user_barred(cur, int(community_id), user_id):
+            cur.close()
+            return jsonify({
+                "error": "barred",
+                "message": "The organiser has removed you from this community.",
+            }), 403
 
         # [LOCAL-702 / D663 §1] A community in hand-over or archived is CLOSED to
         # new members: no pass sales. An EXISTING member buying again (renewing)
@@ -1787,6 +1876,15 @@ def join_free_community(community_id):
             }), 409
         # Every community is paid (D665): a free join is always refused — buy a
         # pass through /purchases/verify.
+        # [LOCAL-726 item 10] A barred member is refused with a specific error
+        # even before the generic pass_required, so the app can show "removed by
+        # the organiser" rather than a buy prompt.
+        if is_user_barred(cur, community_id, user_id):
+            cur.close()
+            return jsonify({
+                "error": "barred",
+                "message": "The organiser has removed you from this community.",
+            }), 403
         cur.close()
         return jsonify({
             "error": "pass_required",
@@ -2016,6 +2114,206 @@ def report_community(community_id):
         conn.close()
 
 
+# ───────────────────────────────────────────────────────────────────────────
+# Block function (LOCAL-726, lawyer review item 10 — Apple Guideline 1.2)
+# ───────────────────────────────────────────────────────────────────────────
+@communities_bp.route('/communities/<int:community_id>/members', methods=['GET'])
+def list_members(community_id):
+    """[LOCAL-726 item 10] The OWNER's list of a community's members, for the
+    member-row ⋯ menu where the organiser bars a member. Owner only.
+
+    Query: ?user_id=<owner>. 404 unknown community; 403 not the owner. 200
+    {members:[{user_id, expires_at, active, barred}, ...]}. `barred` lets the
+    app show "Barred" and offer Unbar instead of Bar on an already-barred row.
+    The owner is never listed (the organiser is not a member, D665)."""
+    err = _require_api_key()
+    if err:
+        return err
+    user_id = request.args.get('user_id')
+    if not user_id:
+        return jsonify({"error": "user_id is required"}), 400
+    conn = _get_db()
+    try:
+        cur = conn.cursor()
+        c = _community_row(cur, community_id)
+        if not c:
+            cur.close()
+            return jsonify({"error": "not_found"}), 404
+        if c['owner_user_id'] != user_id:
+            cur.close()
+            return jsonify({"error": "forbidden",
+                            "message": "Only the organiser can list members."}), 403
+        now = datetime.utcnow()
+        cur.execute(
+            "SELECT user_id, expires_at FROM community_memberships "
+            "WHERE community_id = %s AND user_id <> %s ORDER BY created_at",
+            (community_id, c['owner_user_id']),
+        )
+        members = cur.fetchall()
+        out = []
+        for m_user, expires_at in members:
+            out.append({
+                'user_id': m_user,
+                'expires_at': expires_at.isoformat() if expires_at else None,
+                'active': is_membership_active(expires_at, now),
+                'barred': is_user_barred(cur, community_id, m_user),
+            })
+        cur.close()
+        return jsonify({"members": out}), 200
+    finally:
+        conn.close()
+
+
+@communities_bp.route('/communities/<int:community_id>/block', methods=['POST'])
+def block_user(community_id):
+    """[LOCAL-726 item 10 — Apple Guideline 1.2] Block within a community.
+
+    Body: {user_id, blocked_user_id, kind?, reason?}.
+      kind 'member_block' (default): a MEMBER (user_id) hides a blocked user's
+        communities and community tours from their OWN view. Anyone may do this;
+        it affects only the blocker. A member blocks an organiser (the
+        community's owner) or another member this way.
+      kind 'organiser_bar': the ORGANISER (must be the community owner) REMOVES
+        and BARS a member. The member's membership row is deleted (no new
+        content) and a bar is recorded so they cannot rejoin by code; downloaded
+        audio stays on their device (D658). 403 if the caller is not the owner.
+
+    Idempotent: blocking twice is a no-op (ON CONFLICT DO NOTHING). 200
+    {blocked:true, kind}. 400 missing fields / self-block; 404 unknown
+    community."""
+    err = _require_api_key()
+    if err:
+        return err
+    data = request.get_json(silent=True) or {}
+    user_id = data.get('user_id')
+    blocked_user_id = data.get('blocked_user_id')
+    kind = data.get('kind') or BLOCK_MEMBER
+    reason = data.get('reason')
+    if not user_id or not blocked_user_id:
+        return jsonify({"error": "missing_fields",
+                        "message": "user_id and blocked_user_id are required."}), 400
+    if kind not in (BLOCK_MEMBER, BLOCK_ORGANISER_BAR):
+        return jsonify({"error": "bad_kind",
+                        "message": "kind must be member_block or organiser_bar."}), 400
+    if user_id == blocked_user_id:
+        return jsonify({"error": "cannot_block_self",
+                        "message": "You cannot block yourself."}), 400
+    conn = _get_db()
+    try:
+        cur = conn.cursor()
+        c = _community_row(cur, community_id)
+        if not c:
+            cur.close()
+            return jsonify({"error": "not_found"}), 404
+        if kind == BLOCK_ORGANISER_BAR:
+            # Only the organiser (owner) may bar-and-remove a member.
+            if c['owner_user_id'] != user_id:
+                cur.close()
+                return jsonify({
+                    "error": "forbidden",
+                    "message": "Only the organiser can remove and bar a member.",
+                }), 403
+            # Remove the membership (no new content) — downloaded audio stays on
+            # the device (D658); the server never deletes it.
+            cur.execute(
+                "DELETE FROM community_memberships "
+                "WHERE community_id = %s AND user_id = %s",
+                (community_id, blocked_user_id),
+            )
+        cur.execute(
+            """INSERT INTO community_blocks
+                   (community_id, blocker_user_id, blocked_user_id, kind, reason)
+               VALUES (%s, %s, %s, %s, %s)
+               ON CONFLICT (community_id, blocker_user_id, blocked_user_id, kind)
+               DO NOTHING""",
+            (community_id, user_id, blocked_user_id, kind, reason),
+        )
+        conn.commit()
+        cur.close()
+        return jsonify({"blocked": True, "kind": kind,
+                        "community_id": community_id,
+                        "blocked_user_id": blocked_user_id}), 200
+    finally:
+        conn.close()
+
+
+@communities_bp.route('/communities/<int:community_id>/unblock', methods=['POST'])
+def unblock_user(community_id):
+    """[LOCAL-726 item 10] Lift a block. Body: {user_id, blocked_user_id,
+    kind?}. The caller must be the blocker (user_id) who made the block — a
+    member lifts their own member_block from Settings; the organiser lifts an
+    organiser_bar from the member list. Deletes the one block row (if present)
+    and returns 200 {unblocked:true, removed:<0|1>}. Lifting an organiser_bar
+    does NOT auto-rejoin the member — they buy a pass again if they wish.
+    Idempotent: unblocking what is not blocked returns removed:0."""
+    err = _require_api_key()
+    if err:
+        return err
+    data = request.get_json(silent=True) or {}
+    user_id = data.get('user_id')
+    blocked_user_id = data.get('blocked_user_id')
+    kind = data.get('kind') or BLOCK_MEMBER
+    if not user_id or not blocked_user_id:
+        return jsonify({"error": "missing_fields",
+                        "message": "user_id and blocked_user_id are required."}), 400
+    conn = _get_db()
+    try:
+        cur = conn.cursor()
+        cur.execute(
+            "DELETE FROM community_blocks "
+            "WHERE community_id = %s AND blocker_user_id = %s "
+            "AND blocked_user_id = %s AND kind = %s",
+            (community_id, user_id, blocked_user_id, kind),
+        )
+        removed = cur.rowcount
+        conn.commit()
+        cur.close()
+        return jsonify({"unblocked": True, "removed": removed}), 200
+    finally:
+        conn.close()
+
+
+@communities_bp.route('/communities/blocks', methods=['GET'])
+def list_my_blocks():
+    """[LOCAL-726 item 10] Everything THIS user has blocked, for the Settings
+    "Blocked" / unblock list. Query: ?user_id=<device user>. Returns 200
+    {blocks:[{community_id, community_name, blocked_user_id, kind, created_at},
+    ...]}, newest first, both kinds (a member's member_blocks and, for an
+    organiser, the organiser_bars they issued). The app offers Unblock on each.
+    Schema-tolerant: an un-migrated DB returns an empty list."""
+    err = _require_api_key()
+    if err:
+        return err
+    user_id = request.args.get('user_id')
+    if not user_id:
+        return jsonify({"error": "user_id is required"}), 400
+    conn = _get_db()
+    try:
+        cur = conn.cursor()
+        try:
+            cur.execute(
+                """SELECT b.community_id, c.name, b.blocked_user_id, b.kind,
+                          b.created_at
+                     FROM community_blocks b
+                     LEFT JOIN communities c ON c.id = b.community_id
+                    WHERE b.blocker_user_id = %s
+                    ORDER BY b.created_at DESC""",
+                (user_id,),
+            )
+            rows = cur.fetchall()
+        except Exception:  # noqa: BLE001 — un-migrated DB: no blocks
+            _rollback_quietly(cur)
+            rows = []
+        cur.close()
+        out = [{'community_id': r[0], 'community_name': r[1],
+                'blocked_user_id': r[2], 'kind': r[3],
+                'created_at': r[4].isoformat() if r[4] else None}
+               for r in rows]
+        return jsonify({"blocks": out}), 200
+    finally:
+        conn.close()
+
+
 @communities_bp.route('/communities/map', methods=['GET'])
 def map_communities():
     """Listed communities for the Home map (community badge). Only visibility=
@@ -2024,18 +2322,24 @@ def map_communities():
     err = _require_api_key()
     if err:
         return err
+    user_id = request.args.get('user_id')
     conn = _get_db()
     try:
         cur = conn.cursor()
         cur.execute(
-            """SELECT id, name, latitude, longitude, is_paid
+            """SELECT id, name, latitude, longitude, is_paid, owner_user_id
                FROM communities
                WHERE visibility = 'listed' AND disabled = FALSE
                  AND latitude IS NOT NULL AND longitude IS NOT NULL""",
         )
         rows = cur.fetchall()
+        # [LOCAL-726 item 10] A blocked organiser's Listed communities disappear
+        # from the map for the blocker (member_block).
+        blocked_owners = blocked_owner_ids_for(cur, user_id) if user_id else set()
         out = []
         for r in rows:
+            if r[5] in blocked_owners:
+                continue
             out.append({'id': r[0], 'name': r[1], 'latitude': r[2],
                         'longitude': r[3], 'is_paid': r[4], 'badge': 'community',
                         # [LOCAL-704 / D665] The member count shown on the map
@@ -2062,15 +2366,23 @@ def my_communities():
     try:
         cur = conn.cursor()
         cur.execute(
-            """SELECT c.id, c.name, c.organiser_name, m.expires_at
+            """SELECT c.id, c.name, c.organiser_name, m.expires_at, c.owner_user_id
                FROM community_memberships m
                JOIN communities c ON c.id = m.community_id
                WHERE m.user_id = %s""",
             (user_id,),
         )
         now = datetime.utcnow()
+        rows = cur.fetchall()
+        # [LOCAL-726 item 10] Hide communities whose organiser this member has
+        # blocked (member_block): a blocked organiser's communities disappear.
+        # (Fetched the membership rows first — blocked_owner_ids_for reuses this
+        # cursor, which would otherwise clobber the unread result set.)
+        blocked_owners = blocked_owner_ids_for(cur, user_id)
         out = []
-        for r in cur.fetchall():
+        for r in rows:
+            if r[4] in blocked_owners:
+                continue
             out.append({
                 'id': r[0], 'name': r[1], 'organiser_name': r[2],
                 'origin': 'community',

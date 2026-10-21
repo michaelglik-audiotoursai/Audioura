@@ -13,6 +13,7 @@ import 'dart:io' show Platform, Directory;
 import 'debug_log_viewer_screen.dart';
 import 'plan_screen.dart';
 import 'communities_about_screen.dart';
+import 'blocked_users_screen.dart';
 import 'recovery_code_screen.dart';
 import '../config/endpoints.dart';
 import '../services/error_handler_service.dart';
@@ -536,6 +537,28 @@ class _AboutScreenState extends State<AboutScreen> {
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.deepPurple,
                         foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                      ),
+                    ),
+                  ),
+                  // [LOCAL-726 item 10 — Apple Guideline 1.2] The unblock list.
+                  // Organisers and members you have blocked live here; you can
+                  // lift any block.
+                  const SizedBox(height: 10),
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton.icon(
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                              builder: (context) => const BlockedUsersScreen()),
+                        );
+                      },
+                      icon: const Icon(Icons.block),
+                      label: const Text('Blocked'),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: Colors.deepPurple,
                         padding: const EdgeInsets.symmetric(vertical: 14),
                       ),
                     ),

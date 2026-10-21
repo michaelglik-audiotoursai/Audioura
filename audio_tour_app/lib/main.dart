@@ -5,6 +5,7 @@ import 'dart:async';
 
 import 'screens/main_screen.dart';
 import 'screens/onboarding_screen.dart';
+import 'screens/informational_notice_screen.dart';
 import 'services/app_sync_coordinator.dart';
 import 'services/community_background.dart';
 import 'services/deep_link_service.dart';
@@ -85,6 +86,9 @@ class AudioTourApp extends StatefulWidget {
 
 class _AudioTourAppState extends State<AudioTourApp> {
   bool _onboardingComplete = true; // assume complete until loaded
+  // [LOCAL-726 item 2] The first-run informational notice. Assume seen until
+  // loaded so we never flash it on a hot reload before the real value arrives.
+  bool _noticeSeen = true;
 
   @override
   void initState() {
@@ -95,22 +99,38 @@ class _AudioTourAppState extends State<AudioTourApp> {
   Future<void> _checkOnboarding() async {
     final prefs = await SharedPreferences.getInstance();
     final complete = prefs.getBool('onboarding_complete') ?? false;
-    if (mounted) setState(() { _onboardingComplete = complete; });
+    final noticeSeen = await InformationalNoticeScreen.seen();
+    if (mounted) setState(() {
+      _onboardingComplete = complete;
+      _noticeSeen = noticeSeen;
+    });
   }
 
   @override
   Widget build(BuildContext context) {
+    // Flow: onboarding (new installs) → informational notice (new installs AND
+    // existing installs that have not yet seen it) → the app. An existing
+    // install already has onboarding_complete=true, so it falls straight to the
+    // notice once, then never again (the ack key is set on "Got it").
+    final Widget home;
+    if (!_onboardingComplete) {
+      home = OnboardingScreen(onComplete: () {
+        setState(() { _onboardingComplete = true; });
+      });
+    } else if (!_noticeSeen) {
+      home = InformationalNoticeScreen(onAcknowledged: () {
+        setState(() { _noticeSeen = true; });
+      });
+    } else {
+      home = const MainScreen();
+    }
     return MaterialApp(
       title: 'Audioura',
       theme: ThemeData(
         primarySwatch: Colors.blue,
         useMaterial3: true,
       ),
-      home: _onboardingComplete
-          ? const MainScreen()
-          : OnboardingScreen(onComplete: () {
-              setState(() { _onboardingComplete = true; });
-            }),
+      home: home,
       routes: {
         '/treats': (context) => const MainScreenWithTreatsTab(),
       },

@@ -242,6 +242,9 @@ class Community {
   final int id;
   final String name;
   final String? description;
+  // [LOCAL-726 item 10] The organiser's user_id — the target when a member
+  // blocks the organiser from the community page. May be null on older payloads.
+  final String? ownerUserId;
   final Organiser organiser;
   final String? rulesText;
   final String? waiverText;
@@ -283,6 +286,7 @@ class Community {
     required this.id,
     required this.name,
     this.description,
+    this.ownerUserId,
     required this.organiser,
     this.rulesText,
     this.waiverText,
@@ -332,6 +336,7 @@ class Community {
       id: (j['id'] is num) ? (j['id'] as num).toInt() : 0,
       name: (j['name'] ?? '') as String,
       description: j['description'] as String?,
+      ownerUserId: j['owner_user_id'] as String?,
       organiser: Organiser.fromJson(j['organiser'] as Map<String, dynamic>?),
       rulesText: j['rules_text'] as String?,
       waiverText: j['waiver_text'] as String?,
@@ -734,4 +739,59 @@ class CommunityCopy {
   /// (archived) community — the server returns 410 community_closed. Exactly
   /// the server wording (D664).
   static const String communityClosed = 'This community has closed.';
+}
+
+
+/// [LOCAL-726 item 10] A member row in the organiser's member list (the ⋯ →
+/// "Remove & bar" lives on each row). `barred` lets the row show "Barred" and
+/// offer Unbar instead of Bar.
+class CommunityMember {
+  final String userId;
+  final String? expiresAt;
+  final bool active;
+  final bool barred;
+
+  const CommunityMember({
+    required this.userId,
+    this.expiresAt,
+    required this.active,
+    required this.barred,
+  });
+
+  factory CommunityMember.fromJson(Map<String, dynamic> j) => CommunityMember(
+        userId: (j['user_id'] ?? '') as String,
+        expiresAt: j['expires_at'] as String?,
+        active: j['active'] == true,
+        barred: j['barred'] == true,
+      );
+}
+
+/// [LOCAL-726 item 10] A block the current user has made, shown in Settings →
+/// Blocked with an Unblock action. Both kinds appear: a member's member_block
+/// and, for an organiser, the organiser_bars they issued.
+class CommunityBlock {
+  final int communityId;
+  final String? communityName;
+  final String blockedUserId;
+  final String kind; // member_block | organiser_bar
+  final String? createdAt;
+
+  const CommunityBlock({
+    required this.communityId,
+    this.communityName,
+    required this.blockedUserId,
+    required this.kind,
+    this.createdAt,
+  });
+
+  bool get isOrganiserBar => kind == 'organiser_bar';
+
+  factory CommunityBlock.fromJson(Map<String, dynamic> j) => CommunityBlock(
+        communityId:
+            (j['community_id'] is num) ? (j['community_id'] as num).toInt() : 0,
+        communityName: j['community_name'] as String?,
+        blockedUserId: (j['blocked_user_id'] ?? '') as String,
+        kind: (j['kind'] ?? 'member_block') as String,
+        createdAt: j['created_at'] as String?,
+      );
 }
