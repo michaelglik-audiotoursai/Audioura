@@ -1,12 +1,10 @@
 # Audioura — Privacy Policy
 
-**DRAFT for review. Not published. Audioura LLC must approve (and may have a lawyer review) before this goes live.**
-
-**Version:** 2026-10-21-final · updates the policy at audioura.com/privacy
+**Version:** 2026-10-21 · **Effective:** 21 October 2026
 **Last updated:** 21 October 2026
 **Who we are:** Audioura LLC, 44 Sharpe Rd, Newton Centre, MA 02459, USA · info@audioura.com
 
-**What changed from the live policy:** purchases (we never see card numbers); tour unlocks, languages and community memberships; public ratings and reviews; swipe preferences and Match %; automated evaluation (score and content rating); 18+ confirmation; community data; retention and deletion clarified; the processor list corrected.
+**What changed in this version (21 October 2026):** purchases (we never see card numbers); tour unlocks, languages and community memberships; public ratings and reviews; swipe preferences and Match %; automated evaluation (score and content rating); 18+ confirmation; community data; retention and deletion clarified; the processor list corrected.
 
 ---
 
@@ -58,7 +56,7 @@ If you turn on "Show 18+ tours" we store that you confirmed you are 18 or older.
 ## Communities
 From organisers: the community name and description, organiser details, rules or waiver text, pass options, and audio **metadata only** — titles, order, and the links or feed URL. We do not store or review organiser-hosted audio. From members: membership status and pass expiry. A report about a community, an organiser or community content goes to **Audioura** (not to the owner); we keep a record, review it, and may forward it to the organiser and act on it (remove content, bar a member, or end access).
 
-## Unchanged from the live policy
+## Other data we keep
 Subscription credentials (encrypted on the device), referral codes, share counts, and app-attestation tokens (transient, not stored; logs kept about 30 days for fraud prevention).
 
 ## Sharing

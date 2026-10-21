@@ -20,6 +20,7 @@ It writes legal/html/<name>.html for each legal/<NAME>.md.
 """
 
 import html
+import sys
 import os
 import re
 
@@ -208,8 +209,7 @@ PAGE = """<!DOCTYPE html>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="robots" content="noindex">
-<title>{title} — Audioura</title>
+{robots}<title>{title} — Audioura</title>
 <style>{style}</style>
 </head>
 <body>
@@ -218,9 +218,7 @@ PAGE = """<!DOCTYPE html>
   <h1>{title}</h1>
   <div class="accent"></div>
 </div></header>
-<div class="draft">DRAFT for review — not published. This will live at
-  <code>{route}</code> on audioura.com once approved.</div>
-<main>
+{draft}<main>
 {body}
 </main>
 <footer class="doc">© Audioura LLC · 44 Sharpe Rd, Newton Centre, MA 02459, USA ·
@@ -228,6 +226,12 @@ PAGE = """<!DOCTYPE html>
 </body>
 </html>
 """
+
+
+# --publish (Michael's "publish", 2026-10-21, D697): no DRAFT banner, indexable.
+PUBLISH = "--publish" in sys.argv
+DRAFT_BANNER = ('<div class="draft">DRAFT for review — not published. This will live at\n'
+                '  <code>{route}</code> on audioura.com once approved.</div>\n')
 
 
 def main():
@@ -242,6 +246,8 @@ def main():
             style=STYLE,
             route=html.escape(route, quote=False),
             body=body,
+            robots='' if PUBLISH else '<meta name="robots" content="noindex">\n',
+            draft='' if PUBLISH else DRAFT_BANNER.format(route=html.escape(route, quote=False)),
         )
         out_path = os.path.join(OUT_DIR, f"{slug}.html")
         with open(out_path, "w", encoding="utf-8") as f:

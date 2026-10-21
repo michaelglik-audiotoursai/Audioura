@@ -1,8 +1,6 @@
 # Audioura — Refunds
 
-**DRAFT for review. Not published. Audioura LLC must approve before this goes live.**
-
-**Version:** 2026-10-21-final · part of our [Terms of Service](/terms)
+**Version:** 2026-10-21 · **Effective:** 21 October 2026 · part of our [Terms of Service](/terms)
 **Last updated:** 21 October 2026
 Audioura LLC, 44 Sharpe Rd, Newton Centre, MA 02459, USA · info@audioura.com
 
