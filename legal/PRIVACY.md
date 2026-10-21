@@ -13,8 +13,12 @@
 ## How we identify you
 We give your device a **private, random device ID (`secret_id`)**. We do not require your name, email or phone number to create an account. The `secret_id` is stored on your device and on our server, so we can recognise your purchases.
 
-## Location
-Used **only to generate and run a tour** for the place you ask for, and to find tours near you. You can deny location permission and type a place instead. We never use location for advertising.
+## Location and places
+**Your phone's location (where your phone is).** If you allow location permission, we use your phone's location only to generate a tour for where you are and to find tours near you. You can deny permission and type a place instead. We do **not** use your phone's location to choose ads, offers or Treats, and we never share it with advertisers or businesses.
+
+If we ever offer Treats based on where your phone is, it will be a **separate, optional setting that stays off until you turn it on**, and we will update this policy and our App Store and Google Play privacy details before it is used.
+
+**Places in your tours (tour and stop locations).** The places and stops in a tour are used to build and play the tour, and to show **Treats** — offers and coupons from businesses near those places — on the Treats page only. For example, if your tour has a stop on Hanover Street, the Treats page may show a café nearby. If you have typed a place on the Home screen, Treats may also use that place. Treats are chosen from these places, **not from your phone's location**. Businesses that list Treats receive no information about you, and we do not tell them who viewed a Treat.
 
 ## Purchase records
 Payment is handled entirely by the **Apple App Store or Google Play**. We never receive your card number, bank account or billing address. We store a **record of the purchase** — what you bought (tour and language), the store's transaction ID, the purchase time, and the expiry for a pass — so that we can **unlock your download and record which purchases you have made** (each tour purchase pays for one download; see the [Terms](/terms)).
