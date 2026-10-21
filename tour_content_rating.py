@@ -7,11 +7,14 @@ list (word lists flag "class", "Assisi", "Scunthorpe"). This routine reads a
 tour's text, has gpt-4.1-mini classify it, and writes the rating.
 
 Three ratings (the exact definitions the model is held to):
-    general      — listed for everyone.
-    mature       — strong language, alcohol-focused, crime, gambling, nightlife,
-                   casinos. Listed ONLY to listeners who confirmed they are 18+.
+    general      — listed for everyone. Includes the HISTORY of crime told
+                   factually (a heist, a gangster, a prison museum).
+    mature       — strong language, alcohol-focused, gambling, nightlife,
+                   casinos, or crime dwelt on luridly / glamorised as
+                   entertainment. Listed ONLY to listeners who confirmed 18+.
     not_allowed  — sexual services / adult entertainment, explicit sex, hate,
-                   encouraging illegal acts. Never listed.
+                   or instructions that teach the listener HOW to commit a
+                   crime. Never listed.
 
 Review gate: anything NOT clearly general waits for a human before it lists.
     general              -> review_status NULL  (lists immediately)
@@ -48,9 +51,9 @@ MAX_CHARS = 24000  # ~6k tokens; the size of ONE rating window (LOCAL-724: the
 PROMPT = """You are a content-rating moderator for an audio-tour app, rating a tour script like a film classification board rates a film. Judge ONLY the three categories below. Do NOT use a word list — judge meaning and intent, not isolated words ("class", "Assisi", "Scunthorpe" are not profanity; a history of a red-light district is not itself adult entertainment).
 
 Choose exactly one rating:
-- "general": suitable to list for everyone. The default. Ordinary history, culture, architecture, nature, food, art — even when it mentions war, death, religion or politics factually and without dwelling on the lurid. Restaurants, cafés and markets are general even when they serve or describe wine, beer, cocktails or spirits, or have "bar"/"bourbon"/"brewery" in their name — a meal with drinks is not an alcohol-focused tour.
-- "mature": fine for adults but not for a general audience — strong/frequent profanity; a tour whose PURPOSE is drinking (bar crawl, pub crawl, wine or spirits tasting, brewery-hopping) or nightlife/clubs; casinos or gambling; crime treated as entertainment. List ONLY to confirmed-18+ listeners.
-- "not_allowed": must never be listed — sexual services or adult entertainment as a selling point, explicit sexual content, hate toward a protected group, or content that encourages illegal acts.
+- "general": suitable to list for everyone. The default. Ordinary history, culture, architecture, nature, food, art — even when it mentions war, death, religion or politics factually and without dwelling on the lurid. The HISTORY of crime — a tour about a famous heist, a notorious gangster, a red-light district's past, a prison museum, a true-crime site — is general when it recounts past events factually as history, the way a museum or documentary would; it does NOT become mature merely for naming crimes or criminals. Restaurants, cafés and markets are general even when they serve or describe wine, beer, cocktails or spirits, or have "bar"/"bourbon"/"brewery" in their name — a meal with drinks is not an alcohol-focused tour.
+- "mature": fine for adults but not for a general audience — strong/frequent profanity; a tour whose PURPOSE is drinking (bar crawl, pub crawl, wine or spirits tasting, brewery-hopping) or nightlife/clubs; casinos or gambling; crime dwelt on for lurid thrill or glamorised as entertainment rather than told as history. List ONLY to confirmed-18+ listeners.
+- "not_allowed": must never be listed — sexual services or adult entertainment as a selling point, explicit sexual content, hate toward a protected group, or content that teaches, instructs or otherwise encourages the listener to COMMIT a crime (how to pick a lock, evade police, make a weapon, buy drugs). The dividing line for crime is intent: recounting the history of a crime is allowed (general, or mature if lurid); explaining how to commit one is not_allowed.
 
 When a tour sits between two ratings, pick the HIGHER (more restrictive) one — a human reviews everything that is not clearly general.
 

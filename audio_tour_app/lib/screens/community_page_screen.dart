@@ -185,6 +185,53 @@ class _CommunityPageScreenState extends State<CommunityPageScreen> {
     }
   }
 
+  /// [LOCAL-726 item 10 — Apple Guideline 1.2] A member blocks the organiser.
+  /// The organiser's communities and community tours disappear from this
+  /// member's own views; the block is lifted later from Settings → Blocked.
+  Future<void> _blockOrganiser() async {
+    final c = _community;
+    if (c == null || _userId == null || c.ownerUserId == null) return;
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Block this organiser?'),
+        content: const Text(
+          "You won't see this organiser's communities or their community tours "
+          'anymore. You can undo this later in Settings → Blocked.',
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Cancel')),
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('Block')),
+        ],
+      ),
+    );
+    if (confirm != true) return;
+    final ok =
+        await CommunitiesService.blockUser(c.id, _userId!, c.ownerUserId!);
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(ok ? 'Organiser blocked.' : 'Could not block.')));
+      if (ok) Navigator.of(context).maybePop();
+    }
+  }
+
+  /// [LOCAL-726 item 10] The owner opens the member list to remove & bar a
+  /// member. Each row carries a ⋯ → "Remove & bar" / "Unbar".
+  Future<void> _manageMembers() async {
+    final c = _community;
+    if (c == null || _userId == null) return;
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      builder: (ctx) =>
+          _ManageMembersSheet(communityId: c.id, ownerUserId: _userId!),
+    );
+  }
+
   /// [LOCAL-714 / D675 part 2] The join question — asked on a free join and
   /// after a successful pass purchase: "Download this community's new tours
   /// automatically? Only on Wi-Fi, when your phone isn't busy." Yes / Not now.
@@ -600,10 +647,51 @@ class _CommunityPageScreenState extends State<CommunityPageScreen> {
       appBar: AppBar(
         title: Text(c.name),
         actions: [
-          IconButton(
-            tooltip: 'Report to owner',
-            icon: const Icon(Icons.flag_outlined),
-            onPressed: _report,
+          // [LOCAL-726 item 10] The ⋯ menu: Report (everyone), Block organiser
+          // (a member only — not the owner), Manage members (owner only).
+          PopupMenuButton<String>(
+            icon: const Icon(Icons.more_vert),
+            onSelected: (v) {
+              switch (v) {
+                case 'report':
+                  _report();
+                  break;
+                case 'block_organiser':
+                  _blockOrganiser();
+                  break;
+                case 'manage_members':
+                  _manageMembers();
+                  break;
+              }
+            },
+            itemBuilder: (ctx) => [
+              const PopupMenuItem<String>(
+                value: 'report',
+                child: ListTile(
+                  leading: Icon(Icons.flag_outlined),
+                  title: Text('Report to owner'),
+                  contentPadding: EdgeInsets.zero,
+                ),
+              ),
+              if (!c.isOwner && c.ownerUserId != null)
+                const PopupMenuItem<String>(
+                  value: 'block_organiser',
+                  child: ListTile(
+                    leading: Icon(Icons.block),
+                    title: Text('Block organiser'),
+                    contentPadding: EdgeInsets.zero,
+                  ),
+                ),
+              if (c.isOwner)
+                const PopupMenuItem<String>(
+                  value: 'manage_members',
+                  child: ListTile(
+                    leading: Icon(Icons.group),
+                    title: Text('Manage members'),
+                    contentPadding: EdgeInsets.zero,
+                  ),
+                ),
+            ],
           ),
         ],
       ),
@@ -1035,4 +1123,133 @@ class _CommunityPageScreenState extends State<CommunityPageScreen> {
           ...children,
         ],
       );
+}
+
+
+/// [LOCAL-726 item 10 — Apple Guideline 1.2] The organiser's member list,
+/// opened from the community page ⋯ → "Manage members". Each row has a ⋯ menu
+/// with "Remove & bar" (organiser_bar: removes the membership and bars the
+/// member from rejoining by code — downloaded audio stays on their device,
+/// D658). A barred member no longer appears here; the organiser lifts a bar
+/// from Settings → Blocked. The list is short by design (communities are small).
+class _ManageMembersSheet extends StatefulWidget {
+  final int communityId;
+  final String ownerUserId;
+
+  const _ManageMembersSheet(
+      {required this.communityId, required this.ownerUserId});
+
+  @override
+  State<_ManageMembersSheet> createState() => _ManageMembersSheetState();
+}
+
+class _ManageMembersSheetState extends State<_ManageMembersSheet> {
+  List<CommunityMember> _members = const [];
+  bool _loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    final m = await CommunitiesService.members(
+        widget.communityId, widget.ownerUserId);
+    if (mounted) setState(() {
+      _members = m;
+      _loading = false;
+    });
+  }
+
+  Future<void> _bar(CommunityMember member) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Remove and bar this member?'),
+        content: const Text(
+          'They will lose access to new content and cannot rejoin with the '
+          'invite code. Audio they already downloaded stays on their device. '
+          'You can undo this later in Settings → Blocked.',
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Cancel')),
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('Remove & bar')),
+        ],
+      ),
+    );
+    if (confirm != true) return;
+    final ok = await CommunitiesService.barMember(
+        widget.communityId, widget.ownerUserId, member.userId);
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(ok ? 'Member removed and barred.' : 'Could not bar.')));
+    if (ok) _load();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Members',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 8),
+            if (_loading)
+              const Padding(
+                padding: EdgeInsets.all(24),
+                child: Center(child: CircularProgressIndicator()),
+              )
+            else if (_members.isEmpty)
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 24),
+                child: Text('No members yet.'),
+              )
+            else
+              ConstrainedBox(
+                constraints: BoxConstraints(
+                    maxHeight: MediaQuery.of(context).size.height * 0.5),
+                child: ListView.builder(
+                  shrinkWrap: true,
+                  itemCount: _members.length,
+                  itemBuilder: (ctx, i) {
+                    final m = _members[i];
+                    return ListTile(
+                      leading: const Icon(Icons.person_outline),
+                      title: Text(m.userId,
+                          overflow: TextOverflow.ellipsis),
+                      subtitle: Text(m.active ? 'Active' : 'Expired'),
+                      trailing: PopupMenuButton<String>(
+                        icon: const Icon(Icons.more_vert),
+                        onSelected: (v) {
+                          if (v == 'bar') _bar(m);
+                        },
+                        itemBuilder: (ctx) => [
+                          const PopupMenuItem<String>(
+                            value: 'bar',
+                            child: ListTile(
+                              leading: Icon(Icons.block),
+                              title: Text('Remove & bar'),
+                              contentPadding: EdgeInsets.zero,
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
 }
