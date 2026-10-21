@@ -1,12 +1,26 @@
+// [LOCAL-730 / D694, Privacy "Location and places"] The Treats screen.
+//
+// Treats are chosen from the PLACES IN THE USER'S TOURS, or a place typed on
+// Home — NEVER from the phone's location. The point selection lives entirely in
+// [TreatsSourceResolver], which has no path to the device GPS; this screen does
+// not import `geolocator` and must never read it. Phone-location Treats are a
+// FUTURE opt-in (D694), built only on demand with a policy update first — see
+// _kLocationTreatsOptInEnabled below (a build-time flag, OFF).
+
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-import 'package:geolocator/geolocator.dart';
 import 'package:http/http.dart' as http;
 import 'package:url_launcher/url_launcher.dart';
 import 'dart:convert';
-import 'dart:math';
-import 'dart:typed_data';
 import '../config/endpoints.dart';
+import '../services/treats_source_resolver.dart';
+
+/// [LOCAL-730 / D694] Opt-in hook for "Show Treats near me (uses your
+/// location)", hidden behind a build-time feature flag that is OFF. While it is
+/// false the switch is never shown and no GPS is read. Flipping it on is NOT
+/// enough to ship the feature: D694 requires a Privacy Policy update first.
+/// Kept as a flag (vs. deleted) so the opt-in has a single, documented home.
+const bool _kLocationTreatsOptInEnabled =
+    bool.fromEnvironment('TREATS_LOCATION_OPT_IN', defaultValue: false);
 
 class TreatsScreen extends StatefulWidget {
   const TreatsScreen({super.key});
@@ -18,7 +32,6 @@ class TreatsScreen extends StatefulWidget {
 class _TreatsScreenState extends State<TreatsScreen> {
   List<Map<String, dynamic>> _treats = [];
   bool _isLoading = true;
-  Position? _userPosition;
 
   @override
   void initState() {
@@ -32,41 +45,24 @@ class _TreatsScreenState extends State<TreatsScreen> {
     });
 
     try {
-      final prefs = await SharedPreferences.getInstance();
-      
-      // Check for custom location first
-      final customLat = prefs.getDouble('custom_location_lat');
-      final customLng = prefs.getDouble('custom_location_lng');
-      
-      double searchLat, searchLng;
-      
-      if (customLat != null && customLng != null) {
-        // Use custom location
-        searchLat = customLat;
-        searchLng = customLng;
-      } else {
-        // Use current location
-        _userPosition = await Geolocator.getCurrentPosition();
-        searchLat = _userPosition!.latitude;
-        searchLng = _userPosition!.longitude;
-      }
+      // Resolve the points from the tour places (never the phone's GPS).
+      final resolved = await TreatsSourceResolver.production().resolve();
 
-      // Treats: always call the backend — works on local WiFi, may fail on cloud (handled gracefully below)
-      
-      final response = await http.get(
-        await Endpoints.url(Service.treats, '/treats-near/$searchLat/$searchLng'),
-        headers: await Endpoints.apiHeaders(Service.treats),
-      );
-
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        final treats = data['treats'] as List;
-        
+      if (resolved.isEmpty) {
+        // Source (d): no tour places and no Home place ⇒ no request at all.
         setState(() {
-          _treats = treats.cast<Map<String, dynamic>>();
+          _treats = [];
           _isLoading = false;
         });
+        return;
       }
+
+      final treats = await _fetchTreatsForPoints(resolved.points);
+
+      setState(() {
+        _treats = treats;
+        _isLoading = false;
+      });
     } catch (e) {
       print('Error loading treats: $e');
       setState(() {
@@ -75,23 +71,86 @@ class _TreatsScreenState extends State<TreatsScreen> {
     }
   }
 
-  double _calculateDistance(double lat1, double lng1, double lat2, double lng2) {
-    const double earthRadius = 6371; // km
-    final double dLat = _degreesToRadians(lat2 - lat1);
-    final double dLng = _degreesToRadians(lng2 - lng1);
-    final double a = sin(dLat / 2) * sin(dLat / 2) +
-        cos(_degreesToRadians(lat1)) * cos(_degreesToRadians(lat2)) *
-        sin(dLng / 2) * sin(dLng / 2);
-    final double c = 2 * atan2(sqrt(a), sqrt(1 - a));
-    return earthRadius * c;
+  /// Ask the server for treats near the resolved [points]. Prefers the batch
+  /// POST /treats-near-places (one request, server merges + de-dups); falls
+  /// back to the legacy GET /treats-near/<lat>/<lng> for the single-point case
+  /// or if the batch endpoint is unavailable (older server).
+  Future<List<Map<String, dynamic>>> _fetchTreatsForPoints(
+      List<TreatPoint> points) async {
+    // Single point ⇒ the legacy GET is enough.
+    if (points.length == 1) {
+      return _getTreatsNear(points.first);
+    }
+
+    // Try the batch endpoint first.
+    try {
+      final response = await Endpoints.post(
+        Service.treats,
+        '/treats-near-places',
+        body: {
+          'points': points.map((p) => p.toJson()).toList(),
+        },
+      );
+      if (response.statusCode == 200) {
+        return _parseTreats(response.body);
+      }
+      // 404/405 ⇒ older server without the batch route: fall back below.
+    } catch (e) {
+      print('Treats batch request failed, falling back to GET: $e');
+    }
+
+    // Fallback: repeated GETs, merged + de-duplicated client-side by treat id.
+    final merged = <Object, Map<String, dynamic>>{};
+    for (final p in points) {
+      final treats = await _getTreatsNear(p);
+      for (final t in treats) {
+        final key = t['id'] ?? '${t['name']}|${t['link_to_vendor']}';
+        merged.putIfAbsent(key, () => t);
+      }
+    }
+    final list = merged.values.toList();
+    list.sort((a, b) {
+      final da = (a['distance_km'] as num?)?.toDouble() ?? double.infinity;
+      final db = (b['distance_km'] as num?)?.toDouble() ?? double.infinity;
+      return da.compareTo(db);
+    });
+    return list.take(5).toList();
   }
 
-  double _degreesToRadians(double degrees) {
-    return degrees * (pi / 180);
+  Future<List<Map<String, dynamic>>> _getTreatsNear(TreatPoint p) async {
+    final response = await http.get(
+      await Endpoints.url(Service.treats, '/treats-near/${p.lat}/${p.lng}'),
+      headers: await Endpoints.apiHeaders(Service.treats),
+    );
+    if (response.statusCode == 200) {
+      return _parseTreats(response.body);
+    }
+    return [];
+  }
+
+  List<Map<String, dynamic>> _parseTreats(String body) {
+    final data = json.decode(body);
+    final treats = data['treats'] as List;
+    return treats.cast<Map<String, dynamic>>();
+  }
+
+  /// [LOCAL-730 / D694] The "Show Treats near me (uses your location)" opt-in.
+  /// Returns null (nothing shown) while the feature flag is OFF — and because it
+  /// is OFF, this screen reads no GPS. When the flag is turned on in a future
+  /// build (with a Privacy Policy update first, D694), this is the single place
+  /// the switch would live. Kept deliberately inert today.
+  Widget? _buildLocationOptInSwitch() {
+    if (!_kLocationTreatsOptInEnabled) return null; // hidden + no GPS read
+    return SwitchListTile(
+      title: const Text('Show Treats near me (uses your location)'),
+      value: false,
+      onChanged: (_) {},
+    );
   }
 
   @override
   Widget build(BuildContext context) {
+    final optInSwitch = _buildLocationOptInSwitch();
     return Scaffold(
       appBar: AppBar(
         title: const Text('🍰 Treats'),
@@ -107,14 +166,26 @@ class _TreatsScreenState extends State<TreatsScreen> {
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : _treats.isEmpty
-              ? const Center(
-                  child: Text(
-                    'No treats nearby yet',
-                    style: TextStyle(fontSize: 18, color: Colors.grey),
+              ? Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Padding(
+                        padding: EdgeInsets.all(32),
+                        child: Text(
+                          'Treats appear along the stops of your tours — '
+                          'download a tour or search a place on Home.',
+                          style: TextStyle(fontSize: 16, color: Colors.grey),
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                      if (optInSwitch != null) optInSwitch,
+                    ],
                   ),
                 )
               : Column(
                   children: [
+                    if (optInSwitch != null) optInSwitch,
                     Container(
                         width: double.infinity,
                         padding: const EdgeInsets.all(12),
