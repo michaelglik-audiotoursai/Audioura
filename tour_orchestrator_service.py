@@ -726,8 +726,15 @@ def _rename_superseded_zip(old_zip_filename, version_no):
     return archived
 
 
-def store_audio_tour(tour_name, request_string, zip_path, lat, lng, tour_content=None, stops_count=None, is_test=None, tour_kind=None, job_id=None, user_id=None):
+def store_audio_tour(tour_name, request_string, zip_path, lat, lng, tour_content=None, stops_count=None, is_test=None, tour_kind=None, job_id=None, user_id=None, track=None):
     """Store the audio tour in the database with original tour content.
+
+    [LOCAL-727 / bug 432] ``track`` is the deployment track that produced this
+    tour ('beta' or 'storied'). It is part of the existing-tour lookup key
+    (alongside creator and name) so a Beta tour and a Storied tour with the same
+    name and creator never collapse into one row on the shared GCloud DB. When
+    None it falls back to the ``TOUR_TRACK`` env var; any other value is
+    normalised to 'beta'.
 
     Returns:
         dict with keys:
@@ -928,10 +935,35 @@ def store_audio_tour(tour_name, request_string, zip_path, lat, lng, tour_content
         # Normalise: treat empty/whitespace user_id as NULL (unknown creator).
         _creator_user_id = (user_id or '').strip() or None
 
+        # [LOCAL-727 / bug 432] Resolve the deployment track BEFORE the
+        # existing-tour lookup so the lookup can be scoped by it. `track` is
+        # per-DEPLOYMENT, not per-request: Beta and Storied are separate Cloud
+        # Run services that each always write their own value (TRACK_B_STORIED_
+        # VS_BETA.md), but they SHARE the GCloud DB. The explicit `track=`
+        # argument (passed by the serving path) wins; otherwise fall back to the
+        # TOUR_TRACK env var, exactly as the INSERT path has always done. Any
+        # value other than 'beta'/'storied' is normalised to 'beta'.
+        _track = (track if track is not None else os.getenv('TOUR_TRACK', 'beta'))
+        _track = (_track or 'beta').strip().lower()
+        if _track not in ('beta', 'storied'):
+            _track = 'beta'
+
         # [LOCAL-606] Make sure the versioning archive + stale flag exist before
         # we may need them in the existing-row branch. Self-healing, additive.
         _ensure_versioning_objects(cur)
         conn.commit()
+
+        # [LOCAL-727] Self-heal the `track` column here too (same additive,
+        # idempotent pattern as the Track-B block above) so the track-scoped
+        # lookup below works on any Postgres whether or not migration 007/043 has
+        # run against it. Existing/backfilled rows default to 'beta'.
+        cur.execute("""
+            SELECT column_name FROM information_schema.columns
+            WHERE table_name = 'audio_tours' AND column_name = 'track'
+        """)
+        if cur.fetchone() is None:
+            cur.execute("ALTER TABLE audio_tours ADD COLUMN track VARCHAR(16) NOT NULL DEFAULT 'beta'")
+            conn.commit()
 
         # [LOCAL-156] Check if tour already exists using the SAME logic as the unique index:
         # lower(tour_name) WHERE original_tour_id IS NULL.
@@ -940,25 +972,31 @@ def store_audio_tour(tour_name, request_string, zip_path, lat, lng, tour_content
         # [LOCAL-606] Also pull the stored content/zip/stops/lat/lng so the
         # existing-row branch can decide: replace (text differs) vs increment
         # (byte-identical cache hit).
-        # [LOCAL-718 / D678] NOW ALSO scoped by creator_user_id: a tour belongs to
-        # its creator. The lookup matches only this creator's own same-name
-        # original, so a DIFFERENT creator (or a NULL request creator) never
-        # matches and falls through to the INSERT path = a NEW, separate tour.
-        # SQL NULL semantics do the right thing for free: when _creator_user_id is
-        # NULL the predicate `creator_user_id = NULL` matches no row (unknown
-        # creator always creates new); when it is set, a NULL-creator existing row
-        # does not match it either (rule 3). Nothing is replaced across creators.
-        print(f"Checking if tour already exists (case-insensitive, creator-scoped, matching index)...")
+        # [LOCAL-718 / D678] Scoped by creator_user_id: a tour belongs to its
+        # creator. A DIFFERENT creator (or a NULL request creator) never matches
+        # and falls through to the INSERT path = a NEW, separate tour.
+        # [LOCAL-727 / bug 432] NOW ALSO scoped by `track`. On the shared GCloud
+        # DB a Beta tour and a Storied tour can hold the SAME name under the SAME
+        # (non-NULL) creator; without the track in the key the second track's
+        # store matched the first track's row and REPLACED it, mixing columns and
+        # making the first track's tour vanish while reporting success. With
+        # `AND track = %s` a different track always falls through to INSERT and
+        # gets its own row. FOR UPDATE takes a row lock so two concurrent stores
+        # of the SAME (name, creator, track) serialise on the existing row
+        # instead of racing to replace it and mixing columns; same-track
+        # identical requests (the versioning case) are then handled one at a time.
+        print(f"Checking if tour already exists (case-insensitive, creator- and track-scoped, matching index)...")
         cur.execute(
             "SELECT id, tour_content, zip_filename, stops_count, lat, lng "
             "FROM audio_tours "
             "WHERE lower(tour_name) = lower(%s) AND creator_user_id = %s "
-            "AND original_tour_id IS NULL",
-            (tour_name, _creator_user_id)
+            "AND track = %s AND original_tour_id IS NULL "
+            "FOR UPDATE",
+            (tour_name, _creator_user_id, _track)
         )
         existing_tour = cur.fetchone()
-        print(f"Existing tour (creator-scoped check, creator={_creator_user_id!r}): "
-              f"{existing_tour[0] if existing_tour else None}")
+        print(f"Existing tour (creator+track-scoped check, creator={_creator_user_id!r}, "
+              f"track={_track!r}): {existing_tour[0] if existing_tour else None}")
 
         # [LEAD 2026-10-07] A TEST request must never touch a real tour. The LOCAL-611
         # canary's McMullen run (is_test) replaced Michael's tour 399 via the LOCAL-606
@@ -1165,9 +1203,11 @@ def store_audio_tour(tour_name, request_string, zip_path, lat, lng, tour_content
         # services (TRACK_B_STORIED_VS_BETA.md), each always writing their own
         # value. Distinct from storied_mode above, which is Track A's story-
         # pipeline quality flag and can vary per-request within either track.
-        _track = os.getenv('TOUR_TRACK', 'beta').lower()
-        if _track not in ('beta', 'storied'):
-            _track = 'beta'
+        # [LOCAL-727] `_track` was already resolved (track= arg or TOUR_TRACK env)
+        # and normalised BEFORE the existing-tour lookup so the lookup is
+        # track-scoped. Reuse that exact value here — the INSERT must store the
+        # SAME track the lookup keyed on, or the row could be found under one
+        # track and written under another.
         if has_audio_tour and has_lat and has_number_requested and has_tour_content:
             cur.execute(
                 """
@@ -1885,7 +1925,15 @@ def orchestrate_tour_async(job_id, location, tour_type, total_stops, user_id=Non
                 print(f"[USER_INDEX] Non-fatal error: {idx_err}")
 
         # Store in database with tour content
-        store_result = store_audio_tour(tour_name, request_string or location, zip_path, lat, lng, tour_content, stops_count=ACTIVE_JOBS[job_id].get("actual_stops"), is_test=is_test, tour_kind=ACTIVE_JOBS[job_id].get("tour_kind"), job_id=job_id, user_id=user_id)
+        # [LOCAL-727] Pass the deployment track explicitly so the store's
+        # track-scoped lookup and the post-store re-read key on the same value.
+        # store_audio_tour also falls back to TOUR_TRACK when track is None, so
+        # this is belt-and-braces; resolving it here keeps the two call paths in
+        # lockstep and makes the chosen track visible at the call site.
+        _store_track = (os.getenv('TOUR_TRACK', 'beta') or 'beta').strip().lower()
+        if _store_track not in ('beta', 'storied'):
+            _store_track = 'beta'
+        store_result = store_audio_tour(tour_name, request_string or location, zip_path, lat, lng, tour_content, stops_count=ACTIVE_JOBS[job_id].get("actual_stops"), is_test=is_test, tour_kind=ACTIVE_JOBS[job_id].get("tour_kind"), job_id=job_id, user_id=user_id, track=_store_track)
         
         # [LOCAL-156] store_audio_tour now returns a dict:
         #   {"success": bool, "action": str, "existing_tour_id": int|None, "error": str|None}
@@ -2000,11 +2048,20 @@ def orchestrate_tour_async(job_id, location, tour_type, total_stops, user_id=Non
             # INSERT we must re-read, and the read MUST be creator-scoped: two
             # creators may now hold the same name, so an unscoped
             # "ORDER BY id DESC LIMIT 1" could return the OTHER creator's tour.
+            # [LOCAL-727 / bug 432] The re-read MUST ALSO be track-scoped: with
+            # the track now part of the store's key, a Beta and a Storied row can
+            # share the same name+creator, so an unscoped re-read could pick the
+            # OTHER track's row for this job's english_tour_id. Resolve the same
+            # track the store used (TOUR_TRACK env, normalised) and add it to the
+            # predicate.
             english_tour_id = store_existing_id if store_action == "replaced" else None
             if english_tour_id is None:
                 try:
                     import psycopg2
                     _creator_lookup = (user_id or '').strip() or None
+                    _track_lookup = (os.getenv('TOUR_TRACK', 'beta') or 'beta').strip().lower()
+                    if _track_lookup not in ('beta', 'storied'):
+                        _track_lookup = 'beta'
                     conn = psycopg2.connect(
                         host=os.getenv('DB_HOST', 'postgres-2'),
                         database=os.getenv('DB_NAME', 'audiotours'),
@@ -2019,15 +2076,17 @@ def orchestrate_tour_async(job_id, location, tour_type, total_stops, user_id=Non
                         cur.execute(
                             "SELECT id FROM audio_tours "
                             "WHERE lower(tour_name) = lower(%s) AND creator_user_id = %s "
-                            "AND original_tour_id IS NULL ORDER BY id DESC LIMIT 1",
-                            (tour_name, _creator_lookup)
+                            "AND track = %s AND original_tour_id IS NULL "
+                            "ORDER BY id DESC LIMIT 1",
+                            (tour_name, _creator_lookup, _track_lookup)
                         )
                     else:
                         cur.execute(
                             "SELECT id FROM audio_tours "
                             "WHERE lower(tour_name) = lower(%s) AND creator_user_id IS NULL "
-                            "AND original_tour_id IS NULL ORDER BY id DESC LIMIT 1",
-                            (tour_name,)
+                            "AND track = %s AND original_tour_id IS NULL "
+                            "ORDER BY id DESC LIMIT 1",
+                            (tour_name, _track_lookup)
                         )
                     result = cur.fetchone()
                     if result:
