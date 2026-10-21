@@ -2,110 +2,78 @@
 
 **DRAFT for review. Not published. Audioura LLC must approve (and may have a lawyer review) before this goes live.**
 
-**Version:** 2026-10-14-draft4 (LOCAL-695 / profile portability addendum)
-**Last updated:** 14 October 2026
+**Version:** 2026-10-21-final · updates the policy at audioura.com/privacy
+**Last updated:** 21 October 2026
 **Who we are:** Audioura LLC, 44 Sharpe Rd, Newton Centre, MA 02459, USA · info@audioura.com
 
-This policy explains what Audioura collects, why, and your choices. It updates the existing Audioura privacy policy to cover **payments, tour unlocks, communities, ratings and reviews, personalization, and automated content evaluation**. Everything in the previous policy that is still accurate is kept.
+**What changed from the live policy:** purchases (we never see card numbers); tour unlocks, languages and community memberships; public ratings and reviews; swipe preferences and Match %; automated evaluation (score and content rating); 18+ confirmation; community data; retention and deletion clarified; the processor list corrected.
 
 ---
 
-## What changed (summary)
-- **Purchases:** we now sell tours and community passes. **We never see your card number** — Apple or Google processes payment. We keep a record of *what* you bought (tour unlocks, community memberships), not *how* you paid.
-- **Tour unlocks & community memberships:** we store which tours you own and which communities you have an active pass for, with the pass expiry.
-- **Ratings & reviews:** these are **public**. Your rating and review text are shown to other listeners.
-- **Swipe preferences / persona:** your taste signals and selected persona are used to compute a personal "Match %" and to tailor narration. Stored in our database, not shared.
-- **Editor score & content rating:** tour *text* is evaluated automatically (by AI providers — see §4) to produce a quality score and a content rating. This evaluates the tour, not you.
-- **Age confirmation:** if you choose to see 18+ (Mature) tours, we store that you confirmed you are 18 or older.
-- **Community data:** if you organise or join a community, we store community and membership details (see "Communities" below).
-- **Recovery code (new):** you can save an anonymous recovery code to restore your Listen page on a new phone. We store only a scrambled (hashed) copy of the code, never the code itself.
-- **Retention & deletion:** clarified below.
+## How we identify you
+We give your device a **private, random device ID (`secret_id`)**. We do not require your name, email or phone number to create an account. The `secret_id` is stored on your device and on our server, so we can recognise your purchases.
 
----
+## Location
+Used **only to generate and run a tour** for the place you ask for, and to find tours near you. You can deny location permission and type a place instead. We never use location for advertising.
 
-## 1. Who we are
-Audioura LLC is the data controller for the Audioura app. Contact: info@audioura.com.
+## Purchase records
+Payment is handled entirely by the **Apple App Store or Google Play**. We never receive your card number, bank account or billing address. We store a **record of the purchase** — what you bought (tour and language), the store's transaction ID, the purchase time, and the expiry for a pass — so that we can **unlock your download and record which purchases you have made** (each tour purchase pays for one download; see the [Terms](/terms)).
 
-## 2. How we identify you
-We identify your device with a **private, random ID (`secret_id`)** generated on your device. It is pseudonymous — it is not your name, email, or phone number. We do not require you to create an account with personal details to use the app.
+## Tour unlocks and community memberships
+Which tours and languages your device has unlocked, which communities you belong to, and when a pass expires. Nothing renews automatically. Community audio you downloaded while a pass was active stays on your device.
 
-## 3. What we collect and why
+## Ratings and reviews
+Public, linked to your device ID and not to your name. You can delete your reviews. If a purchase is refunded by Apple or Google, access and any verified rating associated with it may be removed or adjusted.
 
-### Location
-Used **only to generate and run a tour** (to find places near you and give directions). We do not track your movements for advertising. (Unchanged from the previous policy.)
+## Swipe preferences and persona
+Used to compute your **Match %** and to tailor narration. Never shared for advertising and never sold. Deleted when you ask us to delete your data.
 
-### Purchase records
-When you buy a tour or a community pass:
-- **Payment is handled entirely by Apple or Google. We never receive or store your card number or billing address.**
-- We store a **record of the purchase** — what you bought, the store's transaction identifier, and the time — so we can unlock your download and know which purchases you have made (each tour purchase pays for one download; see the Terms).
+## Automated evaluation
+The **text of a tour** — the tour, not you — is evaluated by AI to produce a quality score and a content rating (General, Mature 18+, or Not listed). The rating reads meaning in context, not a banned-word list.
 
-### Tour unlocks and community memberships
-- `tour_unlocks`: which tours (and in which language) your device owns.
-- `community_memberships`: which communities you have joined and when your pass expires.
-These let the app unlock what you paid for and remind you before a pass ends. Nothing renews automatically.
+## Recovery code
+Because your identity is anonymous — a device-generated `secret_id`, not an email and password — a new or replaced phone would otherwise start with an empty Listen page. You can save a **recovery code**: a random, anonymous code, shown to you once, offered after your first purchase and always available in *About → Recovery code*. We store only a **scrambled (hashed) copy, never the code itself**. Use it to restore your Listen page (including paid tours) on a new phone, without paying again. Keep it private. If you have linked more than one phone to your profile with a recovery code, deleting your data removes it for **all linked devices** under that profile, including the code and the restore history.
 
-### Ratings and reviews (public)
-If you rate or review a tour, your star rating and any review text are **shown publicly** to other listeners, associated with your device, not your name. A refunded tour's verified rating from you is removed.
+## Services that process a tour request and the tour text
+Your request goes to our own server, which builds the tour and calls these processors with the place or topic you typed and the draft tour text — **never your name, email or contact details**:
 
-### Swipe preferences and persona (personalization)
-Your swipe/taste signals and your chosen persona (for example art lover, history buff, family, first-time visitor) are used to compute a personal **Match %** and to tailor how tours are written for you. Stored in our database; not shared with third parties for advertising. You can change your persona at any time; it is deleted when you delete your data.
+- **OpenAI** — writing, scoring, content rating, and part of translation;
+- **Google Gemini** — researching places (where enabled);
+- **Serper** — web search over public pages;
+- **Amazon Web Services** — Polly for speech and **Translate** for translation, under the AWS data-processing terms;
+- **Wikipedia / Wikidata / OpenStreetMap data** — public reference; no information about you is sent.
 
-### Automated content evaluation (editor score & content rating)
-To keep quality up and to rate content, the **text of a tour** is evaluated automatically:
-- an **editor score** (a quality number) and a **content rating** (General / Mature / Not allowed) are produced by an AI model;
-- this processes the **tour text**, not your personal data.
-Services that process the **tour request and tour text** (the place or topic you asked for, never your name or contact details):
-- **OpenAI** — writing narration, fact sheets, scoring and content rating.
-- **Google (Gemini)** — researching facts about the places in a tour.
-- **Serper** (web search) — finding public web pages about the places in a tour.
-- **Wikipedia / Wikidata** — public reference text; no user data is sent.
-- **Amazon Web Services (Polly)** — turning tour text into speech.
-- **DeepL** — translating tours into other languages.
-Under these providers' API terms, the text we send is not used to train their models.
+We do not send your device ID to any of these providers, and we do not send your device's GPS position. Place coordinates may appear in the text of a tour, because a tour is about places. Under these providers' current API terms, content we send through their APIs is not used to train their models.
 
-### Age confirmation for 18+ tours
-If you turn on "Show 18+ tours", we store that you confirmed you are 18 or older, so Mature tours can be shown to you. You can turn this off again.
+## Maps
+Map tiles come from **OpenStreetMap** and place search uses **Nominatim**. Your device requests map images directly, so those services can see your device's IP address. The place you search for, and your approximate location if you allow it, are sent to our server to find tours near you.
 
-### Communities
-- If you **organise** a community, we store the community's name, description, your organiser details (name, photo, bio, contact), the rules/waiver text, pass options, and the audio **metadata only** (titles, order, and links/feed URL). **We do not store or review the audio files themselves** — the organiser hosts those (see the Organiser Terms).
-- If you **join** a community, we store your membership and pass expiry.
-- A report you make about a community is sent to the community's **owner**; we keep a record and a per-community off switch.
+## Age confirmation
+If you turn on "Show 18+ tours" we store that you confirmed you are 18 or older. You can turn it off at any time in Settings. We do not store your date of birth.
 
-### Recovery code (restoring your Listen page on a new phone)
-Because your identity is anonymous (a device-generated `secret_id`, not an email or password), a new or replaced phone would otherwise start with an empty Listen page. To let you move your profile across phones, you can save a **recovery code** — a random, anonymous code shown to you once (offered after your first purchase, and always available in *About → Recovery code*).
-- We store **only a salted, hashed copy** of the code (PBKDF2-HMAC-SHA256), never the code itself. Holding our database does not reveal your code.
-- The code is **not** linked to your name, email, or any contact detail — it is anonymous by design.
-- On a new phone, entering the code links that phone to your profile and **signs it out of your old phone** (one profile lives on one phone at a time), and your paid tours re-download without paying again.
-- Entering a code is rate-limited and logged (the device, the time, and whether it succeeded) to prevent abuse; repeated restores in a short period are refused and you are asked to contact support.
-- If you lose the code, your profile cannot be recovered — this is the trade-off of a design that holds no identifying information about you.
+## Communities
+From organisers: the community name and description, organiser details, rules or waiver text, pass options, and audio **metadata only** — titles, order, and the links or feed URL. We do not store or review organiser-hosted audio. From members: membership status and pass expiry. A report about community content goes to the community owner; Audioura keeps a record and an off switch.
 
-### App functionality and anti-abuse (unchanged)
-As in the previous policy, we also handle: subscription credentials (encrypted at rest), referral codes and redemptions, share counts, and app-attestation tokens (sent to Apple/Google to confirm the app is genuine; **not stored** by us — only logged transiently). See the app-store privacy labels for the full list.
+## Unchanged from the live policy
+Subscription credentials (encrypted on the device), referral codes, share counts, and app-attestation tokens (transient, not stored; logs kept about 30 days for fraud prevention).
 
-## 4. Who we share data with
-- **Apple / Google:** process payments and refunds (we never see card data), and verify the app via attestation.
-- **AI, research, voice and translation providers:** OpenAI, Google (Gemini), Serper, Wikipedia, Amazon Web Services (Polly), DeepL — for tour requests and tour text only (above).
-- **Maps:** OpenStreetMap map tiles and Nominatim place search. When you view the map or search a place, your device requests map images and sends the place you typed; these services can see your device's IP address. The location you search from is also sent to our server to find nearby tours.
-- We do **not** sell your personal data, and we do not share it with advertisers.
+## Sharing
+We share only what is needed to run Audioura: Apple and Google (payments, refunds, app attestation); the processors listed above; **Google Cloud** (hosting, database); and **Cloudflare R2** (storage of the audio files). We do not sell personal data and do not share it with advertisers.
 
-## 5. Retention
-- Purchase records, tour unlocks, and community memberships are kept while you use Audioura, so your purchases stay available.
-- Your recovery code's hashed copy and a log of restore events are kept while the profile exists, so restoring your Listen page keeps working; both are deleted when you delete your data.
-- Ratings/reviews are kept while published.
-- Attestation tokens are not stored (only transient logs, ~30 days).
-- You can delete your data (below), after which we remove your records except where we must keep a minimal record for legal, tax, or fraud-prevention reasons.
+## Retention
+Purchases, unlocks and memberships for as long as you use Audioura, and transaction records **for as long as tax and accounting law requires**. Reviews while they are published, or until you delete them. We honour deletion requests except for the minimal records we must keep for legal, tax, fraud or security reasons.
 
-## 6. Deletion and your choices
-You can request deletion of your data from within the app or by emailing info@audioura.com. If you have linked more than one phone to your profile with a recovery code, deletion removes the data for **all linked devices** under that profile, including your recovery code and restore history. You can change your persona, turn 18+ tours on/off, and remove your reviews. Note that purchases are recorded by Apple/Google independently of us.
+## Deletion and choices
+In the app you can delete your data, change your persona, turn 18+ tours on or off, and remove your reviews — or email info@audioura.com. Purchases are also recorded by Apple or Google in your store account, independently of us.
 
-## 7. Children
-Audioura is not directed to children. Some content is for adults only and is gated (18+). Do not use Audioura if you are below the age of digital consent where you live.
+## Children
+Audioura is not directed to children under 13, and we do not knowingly collect personal information from children under 13. Adult content is gated behind an 18+ confirmation.
 
-## 8. Changes
-We will update the version and date above when this policy changes and summarise material changes in the "What changed" list.
+## Your local rights
+If you are a resident of the European Economic Area, the United Kingdom, or another jurisdiction with non-waivable data-protection or consumer rights, you keep those rights under your local law, whatever this policy says.
 
-## 9. Contact
-info@audioura.com · Audioura LLC, 44 Sharpe Rd, Newton Centre, MA 02459, USA.
+## Contact and controller
+Data controller: Audioura LLC, 44 Sharpe Rd, Newton Centre, MA 02459, USA · info@audioura.com.
 
 ---
 *Related: [Terms of Service](/terms) · [Refunds](/refunds) · [Content Policy](/content-policy)*
