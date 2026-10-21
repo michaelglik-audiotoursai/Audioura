@@ -108,15 +108,17 @@ class InformationalNoticeScreen extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       _point(Icons.auto_awesome,
+                          // D692: Michael's exact wording.
                           'Audioura tours are created with AI and by guides '
-                          'and curators. They can contain mistakes — enjoy '
-                          'them as stories, not as official guidance.'),
+                          'and curators to be helpful and accurate, but they '
+                          'may contain mistakes. Follow local signs and rules, '
+                          'and enjoy them as stories, not as official guidance.'),
                       _point(Icons.menu_book_outlined,
                           'They are for information and entertainment — not '
                           'navigation, directions, or safety advice.'),
                       _point(Icons.directions_walk,
-                          'Follow local signs and laws. Watch where you are '
-                          'going, and walk, ride or drive at your own risk.'),
+                          'Watch where you are going, and walk, ride or '
+                          'drive at your own risk.'),
                       const SizedBox(height: 4),
                       InkWell(
                         onTap: _openTerms,
