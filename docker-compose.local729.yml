@@ -1,0 +1,17 @@
+# LOCAL-729: an ISOLATED Postgres for the reimbursement migration row-count run
+# and the pytest suite. Own project (-p local729), own volume, own host port
+# 55433 — never touches the shared audioura-* stack or development-postgres-2-1.
+#
+#   docker compose -p local729 -f docker-compose.local729.yml up -d
+#   docker compose -p local729 -f docker-compose.local729.yml down -v
+services:
+  postgres-local729:
+    image: postgres:15
+    environment:
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: password123
+      POSTGRES_DB: audiotours
+    ports:
+      - "55433:5432"
+    tmpfs:
+      - /var/lib/postgresql/data   # ephemeral: isolated, wiped on down

@@ -364,6 +364,24 @@ class GooglePlayApiClient:
             raise GoogleApiError(resp.status_code, resp.text)
         return resp.json()
 
+    # ── Refunds: Orders refund (used by the admin refund-google path) ─────────
+    def refund_order(self, package_name=None, order_id=None, revoke=True):
+        """POST orders.refund — refund ONE order (LOCAL-729). With revoke=True
+        Google refunds the buyer AND revokes the entitlement (a full refund);
+        revoke=False refunds without revoking (a partial money refund, the buyer
+        keeps access). The endpoint answers 204 No Content on success, so we
+        return None on 2xx and raise GoogleApiError on a non-2xx. NOTE: this
+        issues a REAL refund — tests inject a mock client and never call it."""
+        if not order_id:
+            raise GoogleApiError('missing_order_id', 'order_id is required')
+        pkg = package_name or self.package_name
+        url = (f'{GOOGLE_API_BASE}/androidpublisher/v3/applications/'
+               f'{pkg}/orders/{order_id}:refund')
+        resp = self._session.post(url, params={'revoke': bool(revoke)}, timeout=30)
+        if resp.status_code >= 400:
+            raise GoogleApiError(resp.status_code, resp.text)
+        return None
+
 
 def build_api_client(sa_json_path: Optional[str] = None,
                      package_name: str = GOOGLE_PACKAGE_NAME):
