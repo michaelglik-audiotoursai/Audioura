@@ -72,6 +72,7 @@ services:
       IAP_VERIFY_MODE: stub                 # D652: TEST PURCHASE on the local stack until the Apple/Google products exist (was: apple)
       APPLE_IAP_ENVIRONMENT: Sandbox
       ALLOW_UNAUTHENTICATED_ENTITLEMENTS: "true"   # LOCAL ONLY (LOCAL-598B); no GATEWAY_API_KEY on the Mac Mini
+      ADMIN_API_KEY: ${ADMIN_API_KEY}       # D691: admin-only moderation endpoints; fail closed (503) when unset. Value lives only in ~/Audioura/.env
   tour-generation-modernized-1:
     build: {context: /Users/micha/audioura-subscribed-local, dockerfile: Dockerfile.modernized}
     environment:

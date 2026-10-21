@@ -25,7 +25,7 @@ Rules covered:
     re-import upserts on guid, not duplicates.
   * reminders: one 3-days-before reminder and one at-expiry reminder, each once.
   * map: only Listed+located+not-disabled communities appear; Private never.
-  * report: writes a row and returns the owner_user_id (report → owner).
+  * report: writes a row and returns reported:true (report → Audioura, D691).
 
 Safety: every row uses an owner/user id or community name starting with
 'TEST-690-'. Cleanup deletes ONLY rows reachable from communities whose name has
@@ -591,13 +591,16 @@ def test_map_only_lists_listed_located_not_disabled(client, db):
             assert c["badge"] == "community"
 
 
-def test_report_goes_to_owner(client):
+def test_report_goes_to_audioura(client):
+    # [LOCAL-728 / D691] A report goes to AUDIOURA, not the owner: it writes a
+    # row and no longer leaks the owner id in the response.
     owner = TEST_PREFIX + "reportowner"
     c = _create(client, owner_user_id=owner, name=TEST_PREFIX + "Reported").get_json()
     r = client.post(f"/communities/{c['id']}/report",
                     json={"user_id": TEST_PREFIX + "reporter", "reason": "spam"})
     assert r.status_code == 200
-    assert r.get_json()["owner_user_id"] == owner
+    assert r.get_json()["reported"] is True
+    assert "owner_user_id" not in r.get_json()
 
 
 def test_mine_lists_origin_for_member(client):

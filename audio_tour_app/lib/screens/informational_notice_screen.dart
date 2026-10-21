@@ -14,6 +14,9 @@
 // bumping the version in a future release could re-show a materially changed
 // notice. main.dart gates the app on [InformationalNoticeScreen.seen]; tapping
 // "Got it" calls [InformationalNoticeScreen.markSeen] and continues to the app.
+//
+//   * Audioura tours are created with AI and by guides and curators, and may
+//     contain mistakes (LOCAL-728 / D691);
 
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -24,9 +27,12 @@ class InformationalNoticeScreen extends StatelessWidget {
 
   const InformationalNoticeScreen({super.key, required this.onAcknowledged});
 
-  /// The per-device ack key. Versioned so a future, materially different notice
-  /// can be re-shown by bumping the suffix. v1 is the LOCAL-726 first-run notice.
-  static const String ackKey = 'info_notice_ack_v1';
+  /// The per-device ack key. Versioned so a materially different notice can be
+  /// re-shown by bumping the suffix. v2 (LOCAL-728, D691): the first point now
+  /// says Audioura tours are created with AI AND by guides and curators (not
+  /// AI alone) — a material wording change, so already-acknowledged v1 installs
+  /// see the corrected notice once after this update.
+  static const String ackKey = 'info_notice_ack_v2';
 
   /// The published Terms page (lawyer review item 13: exact, consistent URL).
   static const String termsUrl = 'https://audioura.com/terms';
@@ -102,15 +108,17 @@ class InformationalNoticeScreen extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       _point(Icons.auto_awesome,
-                          'Tours are written with AI. They can get things '
-                          'wrong, so enjoy them as stories, not as fact-checked '
-                          'guides.'),
+                          // D692: Michael's exact wording.
+                          'Audioura tours are created with AI and by guides '
+                          'and curators to be helpful and accurate, but they '
+                          'may contain mistakes. Follow local signs and rules, '
+                          'and enjoy them as stories, not as official guidance.'),
                       _point(Icons.menu_book_outlined,
                           'They are for information and entertainment — not '
                           'navigation, directions, or safety advice.'),
                       _point(Icons.directions_walk,
-                          'Follow local signs and laws. Watch where you are '
-                          'going, and walk, ride or drive at your own risk.'),
+                          'Watch where you are going, and walk, ride or '
+                          'drive at your own risk.'),
                       const SizedBox(height: 4),
                       InkWell(
                         onTap: _openTerms,

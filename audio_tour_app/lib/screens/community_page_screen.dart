@@ -175,61 +175,31 @@ class _CommunityPageScreenState extends State<CommunityPageScreen> {
     }
   }
 
+  /// [LOCAL-728 / D691] Report this community, organiser or its tours to
+  /// AUDIOURA. There is no user-level blocking: a member or organiser can only
+  /// report, and Audioura reviews it (and may bar, ban or disable). Opens a
+  /// short form — a reason choice plus optional free text — then POSTs it. The
+  /// organiser is not notified by the app.
   Future<void> _report() async {
     final c = _community;
     if (c == null) return;
-    await CommunitiesService.report(c.id, userId: _userId, reason: 'Reported from app');
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-          content: Text('Report sent to the community owner.')));
-    }
-  }
-
-  /// [LOCAL-726 item 10 — Apple Guideline 1.2] A member blocks the organiser.
-  /// The organiser's communities and community tours disappear from this
-  /// member's own views; the block is lifted later from Settings → Blocked.
-  Future<void> _blockOrganiser() async {
-    final c = _community;
-    if (c == null || _userId == null || c.ownerUserId == null) return;
-    final confirm = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Block this organiser?'),
-        content: const Text(
-          "You won't see this organiser's communities or their community tours "
-          'anymore. You can undo this later in Settings → Blocked.',
-        ),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('Cancel')),
-          TextButton(
-              onPressed: () => Navigator.pop(ctx, true),
-              child: const Text('Block')),
-        ],
-      ),
-    );
-    if (confirm != true) return;
-    final ok =
-        await CommunitiesService.blockUser(c.id, _userId!, c.ownerUserId!);
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text(ok ? 'Organiser blocked.' : 'Could not block.')));
-      if (ok) Navigator.of(context).maybePop();
-    }
-  }
-
-  /// [LOCAL-726 item 10] The owner opens the member list to remove & bar a
-  /// member. Each row carries a ⋯ → "Remove & bar" / "Unbar".
-  Future<void> _manageMembers() async {
-    final c = _community;
-    if (c == null || _userId == null) return;
-    await showModalBottomSheet<void>(
+    final result = await showModalBottomSheet<_ReportResult>(
       context: context,
       isScrollControlled: true,
-      builder: (ctx) =>
-          _ManageMembersSheet(communityId: c.id, ownerUserId: _userId!),
+      builder: (ctx) => const _ReportToAudiouraSheet(),
     );
+    if (result == null) return; // cancelled
+    final ok = await CommunitiesService.report(
+      c.id,
+      userId: _userId,
+      reason: result.reason,
+      detail: result.detail,
+    );
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(ok
+            ? 'Thanks — Audioura will review this.'
+            : 'Could not send the report. Please try again.')));
   }
 
   /// [LOCAL-714 / D675 part 2] The join question — asked on a free join and
@@ -647,51 +617,13 @@ class _CommunityPageScreenState extends State<CommunityPageScreen> {
       appBar: AppBar(
         title: Text(c.name),
         actions: [
-          // [LOCAL-726 item 10] The ⋯ menu: Report (everyone), Block organiser
-          // (a member only — not the owner), Manage members (owner only).
-          PopupMenuButton<String>(
-            icon: const Icon(Icons.more_vert),
-            onSelected: (v) {
-              switch (v) {
-                case 'report':
-                  _report();
-                  break;
-                case 'block_organiser':
-                  _blockOrganiser();
-                  break;
-                case 'manage_members':
-                  _manageMembers();
-                  break;
-              }
-            },
-            itemBuilder: (ctx) => [
-              const PopupMenuItem<String>(
-                value: 'report',
-                child: ListTile(
-                  leading: Icon(Icons.flag_outlined),
-                  title: Text('Report to owner'),
-                  contentPadding: EdgeInsets.zero,
-                ),
-              ),
-              if (!c.isOwner && c.ownerUserId != null)
-                const PopupMenuItem<String>(
-                  value: 'block_organiser',
-                  child: ListTile(
-                    leading: Icon(Icons.block),
-                    title: Text('Block organiser'),
-                    contentPadding: EdgeInsets.zero,
-                  ),
-                ),
-              if (c.isOwner)
-                const PopupMenuItem<String>(
-                  value: 'manage_members',
-                  child: ListTile(
-                    leading: Icon(Icons.group),
-                    title: Text('Manage members'),
-                    contentPadding: EdgeInsets.zero,
-                  ),
-                ),
-            ],
+          // [LOCAL-728 / D691] One action: Report to Audioura. No user-level
+          // blocking — a member or organiser can only report; Audioura
+          // reviews and may bar, ban or disable.
+          IconButton(
+            tooltip: 'Report to Audioura',
+            icon: const Icon(Icons.flag_outlined),
+            onPressed: _report,
           ),
         ],
       ),
@@ -1126,127 +1058,113 @@ class _CommunityPageScreenState extends State<CommunityPageScreen> {
 }
 
 
-/// [LOCAL-726 item 10 — Apple Guideline 1.2] The organiser's member list,
-/// opened from the community page ⋯ → "Manage members". Each row has a ⋯ menu
-/// with "Remove & bar" (organiser_bar: removes the membership and bars the
-/// member from rejoining by code — downloaded audio stays on their device,
-/// D658). A barred member no longer appears here; the organiser lifts a bar
-/// from Settings → Blocked. The list is short by design (communities are small).
-class _ManageMembersSheet extends StatefulWidget {
-  final int communityId;
-  final String ownerUserId;
 
-  const _ManageMembersSheet(
-      {required this.communityId, required this.ownerUserId});
-
-  @override
-  State<_ManageMembersSheet> createState() => _ManageMembersSheetState();
+/// [LOCAL-728 / D691] The result of the Report-to-Audioura form: a reason code
+/// and the reporter's optional free text. Null is returned when the sheet is
+/// dismissed without submitting.
+class _ReportResult {
+  final String reason;
+  final String? detail;
+  const _ReportResult(this.reason, this.detail);
 }
 
-class _ManageMembersSheetState extends State<_ManageMembersSheet> {
-  List<CommunityMember> _members = const [];
-  bool _loading = true;
+/// [LOCAL-728 / D691] The single "Report to Audioura" form, opened from the
+/// community page. A member or organiser picks a short reason and may add
+/// optional detail; there is NO user-level blocking. On submit it returns a
+/// [_ReportResult]; the caller POSTs it and shows "Thanks — Audioura will
+/// review this." The organiser is not notified by the app.
+class _ReportToAudiouraSheet extends StatefulWidget {
+  const _ReportToAudiouraSheet();
 
   @override
-  void initState() {
-    super.initState();
-    _load();
-  }
+  State<_ReportToAudiouraSheet> createState() => _ReportToAudiouraSheetState();
+}
 
-  Future<void> _load() async {
-    final m = await CommunitiesService.members(
-        widget.communityId, widget.ownerUserId);
-    if (mounted) setState(() {
-      _members = m;
-      _loading = false;
-    });
-  }
+class _ReportToAudiouraSheetState extends State<_ReportToAudiouraSheet> {
+  // The reason codes the app offers. The server stores the code in `reason`.
+  static const Map<String, String> _reasons = {
+    'spam': 'Spam or scam',
+    'offensive': 'Offensive or abusive',
+    'inaccurate': 'Inaccurate or misleading',
+    'inappropriate': 'Inappropriate content',
+    'other': 'Something else',
+  };
 
-  Future<void> _bar(CommunityMember member) async {
-    final confirm = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Remove and bar this member?'),
-        content: const Text(
-          'They will lose access to new content and cannot rejoin with the '
-          'invite code. Audio they already downloaded stays on their device. '
-          'You can undo this later in Settings → Blocked.',
-        ),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('Cancel')),
-          TextButton(
-              onPressed: () => Navigator.pop(ctx, true),
-              child: const Text('Remove & bar')),
-        ],
-      ),
-    );
-    if (confirm != true) return;
-    final ok = await CommunitiesService.barMember(
-        widget.communityId, widget.ownerUserId, member.userId);
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text(ok ? 'Member removed and barred.' : 'Could not bar.')));
-    if (ok) _load();
+  String _reason = 'spam';
+  final TextEditingController _detail = TextEditingController();
+
+  @override
+  void dispose() {
+    _detail.dispose();
+    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     return SafeArea(
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: EdgeInsets.only(
+          left: 16,
+          right: 16,
+          top: 16,
+          bottom: MediaQuery.of(context).viewInsets.bottom + 16,
+        ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Members',
+            const Text('Report to Audioura',
                 style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
             const SizedBox(height: 8),
-            if (_loading)
-              const Padding(
-                padding: EdgeInsets.all(24),
-                child: Center(child: CircularProgressIndicator()),
-              )
-            else if (_members.isEmpty)
-              const Padding(
-                padding: EdgeInsets.symmetric(vertical: 24),
-                child: Text('No members yet.'),
-              )
-            else
-              ConstrainedBox(
-                constraints: BoxConstraints(
-                    maxHeight: MediaQuery.of(context).size.height * 0.5),
-                child: ListView.builder(
-                  shrinkWrap: true,
-                  itemCount: _members.length,
-                  itemBuilder: (ctx, i) {
-                    final m = _members[i];
-                    return ListTile(
-                      leading: const Icon(Icons.person_outline),
-                      title: Text(m.userId,
-                          overflow: TextOverflow.ellipsis),
-                      subtitle: Text(m.active ? 'Active' : 'Expired'),
-                      trailing: PopupMenuButton<String>(
-                        icon: const Icon(Icons.more_vert),
-                        onSelected: (v) {
-                          if (v == 'bar') _bar(m);
-                        },
-                        itemBuilder: (ctx) => [
-                          const PopupMenuItem<String>(
-                            value: 'bar',
-                            child: ListTile(
-                              leading: Icon(Icons.block),
-                              title: Text('Remove & bar'),
-                              contentPadding: EdgeInsets.zero,
-                            ),
-                          ),
-                        ],
-                      ),
-                    );
-                  },
-                ),
+            const Text(
+              'Tell us what\'s wrong. Audioura reviews every report and may '
+              'remove content, bar a member, or end access. The organiser is '
+              'not told who reported.',
+              style: TextStyle(color: Colors.black54, fontSize: 13),
+            ),
+            const SizedBox(height: 12),
+            for (final entry in _reasons.entries)
+              RadioListTile<String>(
+                key: Key('report_reason_${entry.key}'),
+                value: entry.key,
+                groupValue: _reason,
+                onChanged: (v) => setState(() => _reason = v ?? _reason),
+                title: Text(entry.value),
+                contentPadding: EdgeInsets.zero,
+                dense: true,
               ),
+            const SizedBox(height: 8),
+            TextField(
+              key: const Key('report_detail'),
+              controller: _detail,
+              maxLines: 3,
+              maxLength: 1000,
+              decoration: const InputDecoration(
+                labelText: 'Anything to add? (optional)',
+                border: OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('Cancel'),
+                ),
+                const Spacer(),
+                ElevatedButton(
+                  key: const Key('report_submit'),
+                  onPressed: () {
+                    final text = _detail.text.trim();
+                    Navigator.pop(
+                        context,
+                        _ReportResult(
+                            _reason, text.isEmpty ? null : text));
+                  },
+                  child: const Text('Send report'),
+                ),
+              ],
+            ),
           ],
         ),
       ),

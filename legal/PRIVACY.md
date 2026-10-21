@@ -52,7 +52,7 @@ Map tiles come from **OpenStreetMap** and place search uses **Nominatim**. Your 
 If you turn on "Show 18+ tours" we store that you confirmed you are 18 or older. You can turn it off at any time in Settings. We do not store your date of birth.
 
 ## Communities
-From organisers: the community name and description, organiser details, rules or waiver text, pass options, and audio **metadata only** — titles, order, and the links or feed URL. We do not store or review organiser-hosted audio. From members: membership status and pass expiry. A report about community content goes to the community owner; Audioura keeps a record and an off switch.
+From organisers: the community name and description, organiser details, rules or waiver text, pass options, and audio **metadata only** — titles, order, and the links or feed URL. We do not store or review organiser-hosted audio. From members: membership status and pass expiry. A report about a community, an organiser or community content goes to **Audioura** (not to the owner); we keep a record, review it, and may forward it to the organiser and act on it (remove content, bar a member, or end access).
 
 ## Unchanged from the live policy
 Subscription credentials (encrypted on the device), referral codes, share counts, and app-attestation tokens (transient, not stored; logs kept about 30 days for fraud prevention).
