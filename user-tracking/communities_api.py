@@ -2520,6 +2520,455 @@ def admin_list_actions():
         conn.close()
 
 
+# ───────────────────────────────────────────────────────────────────────────
+# Admin-only REIMBURSEMENT (LOCAL-729, D691 / D690 / D692 — ClickUp wdvrdaz3tb)
+# ───────────────────────────────────────────────────────────────────────────
+# Only Audioura reimburses a tour buyer, a community member or a plan purchaser.
+# Every endpoint below is gated by the SAME DISTINCT admin key as the moderation
+# endpoints (_require_admin_key — ADMIN_API_KEY, which the app never carries), so
+# no app user can reach them. Every action writes EXACTLY ONE admin_actions row
+# (reusing the LOCAL-728 ledger, widened by migration 047). No purchase-bearing
+# row is ever deleted (D690). The service shares the moderation.py rules.
+
+def _log_reimbursement(cur, action, actor=None, target_user_id=None,
+                       target_community_id=None, reason=None, amount_usd=None,
+                       transaction_id=None, store=None, target_tour_id=None):
+    """Append one reimbursement row to admin_actions (migration 047 columns)."""
+    cur.execute(
+        """INSERT INTO admin_actions
+               (action, actor, target_user_id, target_community_id, reason,
+                amount_usd, transaction_id, store, target_tour_id)
+           VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s) RETURNING id""",
+        (action, actor, target_user_id, target_community_id, reason,
+         amount_usd, transaction_id, store, target_tour_id),
+    )
+    return cur.fetchone()[0]
+
+
+def _resolve_device(cur, token):
+    """Resolve a device id or public Support ID (AU-XXXX) to the device user_id,
+    or None for an unknown Support ID."""
+    import support_id as _sid
+    return _sid.resolve_to_user_id(cur, token)
+
+
+_PASS_DURATION_DAYS = {'day': 1, 'week': 7, 'month': 30, 'year': 365}
+
+
+@communities_bp.route('/communities/admin/support-id', methods=['POST'])
+def admin_support_id():
+    """[LOCAL-729/D692] ADMIN ONLY. Show (allocating if needed) a device's public
+    Support ID (AU-XXXX). Body: {user_id}. Returns {support_id}. No grant."""
+    err = _require_admin_key()
+    if err:
+        return err
+    data = request.get_json(silent=True) or {}
+    user_id = data.get('user_id')
+    if not user_id:
+        return jsonify({"error": "missing_fields",
+                        "message": "user_id is required."}), 400
+    import support_id as _sid
+    conn = _get_db()
+    try:
+        cur = conn.cursor()
+        sid = _sid.ensure_support_id(cur, user_id)
+        conn.commit()
+        cur.close()
+        return jsonify({"user_id": user_id, "support_id": sid}), 200
+    finally:
+        conn.close()
+
+
+@communities_bp.route('/communities/admin/grant-tour', methods=['POST'])
+def admin_grant_tour():
+    """[LOCAL-729/D692/D660] ADMIN ONLY. Re-grant a tour download: one UNCONSUMED
+    tour_unlocks row, store='admin_grant'. The download gate honours it once and
+    consumes it on download. Body: {device, tour_id, language?, reason?, actor?}.
+    `device` is a device id or Support ID. Writes the ledger. No money."""
+    err = _require_admin_key()
+    if err:
+        return err
+    data = request.get_json(silent=True) or {}
+    device = data.get('device') or data.get('user_id')
+    tour_id = data.get('tour_id')
+    if not device or tour_id is None:
+        return jsonify({"error": "missing_fields",
+                        "message": "device and tour_id are required."}), 400
+    conn = _get_db()
+    try:
+        cur = conn.cursor()
+        user_id = _resolve_device(cur, device)
+        if not user_id:
+            cur.close()
+            return jsonify({"error": "unknown_device"}), 404
+        cur.execute(
+            "SELECT COALESCE(original_tour_id, id) FROM audio_tours WHERE id = %s",
+            (tour_id,))
+        row = cur.fetchone()
+        if not row:
+            cur.close()
+            return jsonify({"error": "tour_not_found"}), 404
+        original_id = row[0]
+        cur.execute(
+            "SELECT 1 FROM tour_unlocks WHERE user_id = %s AND tour_id = %s "
+            "AND consumed_at IS NULL", (user_id, original_id))
+        already = cur.fetchone() is not None
+        if not already:
+            cur.execute(
+                """INSERT INTO tour_unlocks
+                       (user_id, tour_id, transaction_id, store, price_usd)
+                   VALUES (%s, %s, NULL, 'admin_grant', 0)""",
+                (user_id, original_id))
+        _log_reimbursement(cur, 'grant_tour', actor=data.get('actor'),
+                           target_user_id=user_id, reason=data.get('reason'),
+                           store='admin_grant', target_tour_id=original_id)
+        conn.commit()
+        cur.close()
+        return jsonify({"granted": True, "user_id": user_id,
+                        "tour_id": original_id,
+                        "already_active": already}), 200
+    finally:
+        conn.close()
+
+
+@communities_bp.route('/communities/<int:community_id>/admin/extend-pass',
+                      methods=['POST'])
+def admin_extend_pass(community_id):
+    """[LOCAL-729] ADMIN ONLY. Extend an existing membership by N days
+    (expires_at only). Body: {device, days, reason?, actor?}. Writes the
+    ledger."""
+    err = _require_admin_key()
+    if err:
+        return err
+    data = request.get_json(silent=True) or {}
+    device = data.get('device') or data.get('user_id')
+    days = data.get('days')
+    if not device or days is None:
+        return jsonify({"error": "missing_fields",
+                        "message": "device and days are required."}), 400
+    conn = _get_db()
+    try:
+        cur = conn.cursor()
+        user_id = _resolve_device(cur, device)
+        if not user_id:
+            cur.close()
+            return jsonify({"error": "unknown_device"}), 404
+        cur.execute(
+            "UPDATE community_memberships "
+            "SET expires_at = GREATEST(COALESCE(expires_at, NOW()), NOW()) "
+            "    + make_interval(days => %s), updated_at = NOW() "
+            "WHERE community_id = %s AND user_id = %s",
+            (int(days), community_id, user_id))
+        changed = cur.rowcount
+        if changed == 0:
+            _rollback_quietly(cur)
+            cur.close()
+            return jsonify({"error": "no_membership"}), 404
+        _log_reimbursement(cur, 'extend_pass', actor=data.get('actor'),
+                           target_user_id=user_id,
+                           target_community_id=community_id,
+                           reason=data.get('reason'))
+        conn.commit()
+        cur.close()
+        return jsonify({"extended": True, "user_id": user_id,
+                        "community_id": community_id, "days": int(days)}), 200
+    finally:
+        conn.close()
+
+
+@communities_bp.route('/communities/<int:community_id>/admin/grant-pass',
+                      methods=['POST'])
+def admin_grant_pass(community_id):
+    """[LOCAL-729] ADMIN ONLY. Grant/extend a community pass by its length
+    (day|week|month|year). Body: {device, length, reason?, actor?}. One
+    membership row per (user, community) — granting again extends the expiry.
+    Writes the ledger."""
+    err = _require_admin_key()
+    if err:
+        return err
+    data = request.get_json(silent=True) or {}
+    device = data.get('device') or data.get('user_id')
+    length = data.get('length')
+    days = _PASS_DURATION_DAYS.get(length)
+    if not device or days is None:
+        return jsonify({"error": "missing_fields",
+                        "message": "device and a valid length are required."}), 400
+    conn = _get_db()
+    try:
+        cur = conn.cursor()
+        user_id = _resolve_device(cur, device)
+        if not user_id:
+            cur.close()
+            return jsonify({"error": "unknown_device"}), 404
+        c = _community_row(cur, community_id)
+        if not c:
+            cur.close()
+            return jsonify({"error": "not_found"}), 404
+        cur.execute(
+            """INSERT INTO community_memberships
+                   (user_id, community_id, expires_at, store, created_at,
+                    updated_at)
+               VALUES (%s, %s, NOW() + make_interval(days => %s), 'admin_grant',
+                       NOW(), NOW())
+               ON CONFLICT (user_id, community_id) DO UPDATE SET
+                   expires_at = GREATEST(
+                       COALESCE(community_memberships.expires_at, NOW()), NOW())
+                       + make_interval(days => %s),
+                   updated_at = NOW()""",
+            (user_id, community_id, days, days))
+        _log_reimbursement(cur, 'grant_pass', actor=data.get('actor'),
+                           target_user_id=user_id,
+                           target_community_id=community_id,
+                           reason=data.get('reason'), store='admin_grant')
+        conn.commit()
+        cur.close()
+        return jsonify({"granted": True, "user_id": user_id,
+                        "community_id": community_id, "length": length,
+                        "days": days}), 200
+    finally:
+        conn.close()
+
+
+@communities_bp.route('/communities/admin/add-plan-units', methods=['POST'])
+def admin_add_plan_units():
+    """[LOCAL-729/D613] ADMIN ONLY. Grant N more generations this pack (lower
+    fresh_used, floor 0). Body: {device, n, reason?, actor?}. Writes the
+    ledger."""
+    err = _require_admin_key()
+    if err:
+        return err
+    data = request.get_json(silent=True) or {}
+    device = data.get('device') or data.get('user_id')
+    n = data.get('n')
+    if not device or n is None:
+        return jsonify({"error": "missing_fields",
+                        "message": "device and n are required."}), 400
+    conn = _get_db()
+    try:
+        cur = conn.cursor()
+        user_id = _resolve_device(cur, device)
+        if not user_id:
+            cur.close()
+            return jsonify({"error": "unknown_device"}), 404
+        cur.execute(
+            "UPDATE device_entitlement "
+            "SET fresh_used = GREATEST(fresh_used - %s, 0), updated_at = NOW() "
+            "WHERE user_id = %s", (int(n), user_id))
+        if cur.rowcount == 0:
+            _rollback_quietly(cur)
+            cur.close()
+            return jsonify({"error": "no_plan_state"}), 404
+        _log_reimbursement(cur, 'add_plan_units', actor=data.get('actor'),
+                           target_user_id=user_id, reason=data.get('reason'))
+        conn.commit()
+        cur.close()
+        return jsonify({"added": True, "user_id": user_id, "n": int(n)}), 200
+    finally:
+        conn.close()
+
+
+@communities_bp.route('/communities/admin/extend-plan', methods=['POST'])
+def admin_extend_plan():
+    """[LOCAL-729/D613] ADMIN ONLY. Extend the plan window by N days
+    (anniversary_at only). Body: {device, days, reason?, actor?}. Writes the
+    ledger."""
+    err = _require_admin_key()
+    if err:
+        return err
+    data = request.get_json(silent=True) or {}
+    device = data.get('device') or data.get('user_id')
+    days = data.get('days')
+    if not device or days is None:
+        return jsonify({"error": "missing_fields",
+                        "message": "device and days are required."}), 400
+    conn = _get_db()
+    try:
+        cur = conn.cursor()
+        user_id = _resolve_device(cur, device)
+        if not user_id:
+            cur.close()
+            return jsonify({"error": "unknown_device"}), 404
+        cur.execute(
+            "UPDATE device_entitlement "
+            "SET anniversary_at = COALESCE(anniversary_at, NOW()) "
+            "    + make_interval(days => %s), updated_at = NOW() "
+            "WHERE user_id = %s", (int(days), user_id))
+        if cur.rowcount == 0:
+            _rollback_quietly(cur)
+            cur.close()
+            return jsonify({"error": "no_plan_state"}), 404
+        _log_reimbursement(cur, 'extend_plan', actor=data.get('actor'),
+                           target_user_id=user_id, reason=data.get('reason'))
+        conn.commit()
+        cur.close()
+        return jsonify({"extended": True, "user_id": user_id,
+                        "days": int(days)}), 200
+    finally:
+        conn.close()
+
+
+@communities_bp.route('/communities/admin/refund-google', methods=['POST'])
+def admin_refund_google():
+    """[LOCAL-729/D688/D690] ADMIN ONLY. Refund a Google order (Android Publisher
+    Orders refund with revoke), then reverse the local grant via the existing
+    void path. The purchase receipt row is KEPT (D690). Body: {order_id,
+    partial_usd?, reason?, actor?}. Needs GOOGLE_PLAY_SA_JSON; without it, 503
+    refund_not_configured (nothing granted/refunded, NO ledger row). Writes the
+    ledger on success."""
+    err = _require_admin_key()
+    if err:
+        return err
+    data = request.get_json(silent=True) or {}
+    order_id = data.get('order_id')
+    if not order_id:
+        return jsonify({"error": "missing_fields",
+                        "message": "order_id is required."}), 400
+    partial_usd = data.get('partial_usd')
+    import google_play_refund as _gpr
+    conn = _get_db()
+    try:
+        cur = conn.cursor()
+        cur.execute("SELECT amount, store FROM purchases WHERE transaction_id = %s",
+                    (order_id,))
+        prow = cur.fetchone()
+        purchase_amount = (float(prow[0]) if prow and prow[0] is not None
+                           else None)
+        store = prow[1] if prow else 'google'
+        try:
+            summary = _gpr.refund_order(cur, order_id, api_client=None,
+                                        partial_usd=partial_usd)
+        except _gpr.RefundNotConfigured as e:
+            _rollback_quietly(cur)
+            cur.close()
+            return jsonify({"error": "refund_not_configured",
+                            "message": str(e)}), 503
+        except _gpr.RefundApiError as e:
+            _rollback_quietly(cur)
+            cur.close()
+            return jsonify({"error": "refund_failed",
+                            "message": str(e)}), 502
+        amount = partial_usd if partial_usd is not None else purchase_amount
+        _log_reimbursement(cur, 'refund_google', actor=data.get('actor'),
+                           reason=data.get('reason'), amount_usd=amount,
+                           transaction_id=order_id, store=store)
+        conn.commit()
+        cur.close()
+        return jsonify({"refunded": True, "order_id": order_id,
+                        "revoked": summary["revoked"],
+                        "partial_usd": partial_usd,
+                        "local_reversal": summary["local_reversal"]}), 200
+    finally:
+        conn.close()
+
+
+@communities_bp.route('/communities/admin/apple-refund-message',
+                      methods=['POST'])
+def admin_apple_refund_message():
+    """[LOCAL-729/D692] ADMIN ONLY. Return the ready-to-send customer text
+    (reportaproblem.apple.com) and mark the buyer's Apple purchase(s)
+    refund_supported, so the consumption answer (wdvrdaz2zf) can say we support
+    it. Body: {target, reason?, actor?} — target is an order id, Support ID, or
+    device id. Writes the ledger."""
+    err = _require_admin_key()
+    if err:
+        return err
+    data = request.get_json(silent=True) or {}
+    token = data.get('target') or data.get('order_id') or data.get('device')
+    if not token:
+        return jsonify({"error": "missing_fields",
+                        "message": "target is required."}), 400
+    import support_id as _sid
+    conn = _get_db()
+    try:
+        cur = conn.cursor()
+        marked = 0
+        target_user = None
+        txid = None
+        if _sid.is_support_id(token) or str(token).startswith('USER-'):
+            target_user = _sid.resolve_to_user_id(cur, token)
+            if not target_user:
+                cur.close()
+                return jsonify({"error": "unknown_device"}), 404
+            cur.execute(
+                "UPDATE purchases SET refund_supported = TRUE "
+                "WHERE user_id = %s AND store = 'apple'", (target_user,))
+            marked = cur.rowcount
+        else:
+            txid = token
+            cur.execute(
+                "UPDATE purchases SET refund_supported = TRUE "
+                "WHERE transaction_id = %s", (token,))
+            marked = cur.rowcount
+            cur.execute("SELECT user_id FROM purchases WHERE transaction_id = %s",
+                        (token,))
+            r = cur.fetchone()
+            target_user = r[0] if r else None
+        _log_reimbursement(cur, 'apple_refund_support', actor=data.get('actor'),
+                           target_user_id=target_user, reason=data.get('reason'),
+                           transaction_id=txid, store='apple')
+        conn.commit()
+        cur.close()
+        return jsonify({"message": APPLE_REFUND_MESSAGE_TEXT,
+                        "marked": marked, "user_id": target_user}), 200
+    finally:
+        conn.close()
+
+
+@communities_bp.route('/communities/admin/ledger', methods=['GET'])
+def admin_reimbursement_ledger():
+    """[LOCAL-729] ADMIN ONLY. The admin_actions ledger with the reimbursement
+    columns, newest first. Query: ?device=<id|AU-XXXX> (one device) &limit=50.
+    Read-only."""
+    err = _require_admin_key()
+    if err:
+        return err
+    try:
+        limit = min(int(request.args.get('limit', '50')), 500)
+    except (TypeError, ValueError):
+        limit = 50
+    device = request.args.get('device')
+    conn = _get_db()
+    try:
+        cur = conn.cursor()
+        user_id = None
+        if device:
+            user_id = _resolve_device(cur, device)
+            if not user_id:
+                cur.close()
+                return jsonify({"error": "unknown_device"}), 404
+        base = ("SELECT id, action, actor, target_user_id, target_community_id, "
+                "reason, report_id, amount_usd, transaction_id, store, "
+                "target_tour_id, created_at FROM admin_actions ")
+        if user_id:
+            cur.execute(base + "WHERE target_user_id = %s "
+                        "ORDER BY created_at DESC, id DESC LIMIT %s",
+                        (user_id, limit))
+        else:
+            cur.execute(base + "ORDER BY created_at DESC, id DESC LIMIT %s",
+                        (limit,))
+        out = [{'id': r[0], 'action': r[1], 'actor': r[2],
+                'target_user_id': r[3], 'target_community_id': r[4],
+                'reason': r[5], 'report_id': r[6],
+                'amount_usd': float(r[7]) if r[7] is not None else None,
+                'transaction_id': r[8], 'store': r[9], 'target_tour_id': r[10],
+                'created_at': r[11].isoformat() if r[11] else None}
+               for r in cur.fetchall()]
+        cur.close()
+        return jsonify({"ledger": out}), 200
+    finally:
+        conn.close()
+
+
+# The customer-facing Apple refund text (shared with moderation.py). Apple
+# refunds its own IAPs; we point the buyer at reportaproblem.apple.com and record
+# that we support it (purchases.refund_supported).
+APPLE_REFUND_MESSAGE_TEXT = (
+    "Hi — thanks for reaching out. Apple handles refunds for in-app purchases, "
+    "so please request one at https://reportaproblem.apple.com using the Apple "
+    "ID that made the purchase. We've recorded that Audioura supports this "
+    "refund, so if Apple asks us we'll confirm it. Sorry for the trouble!")
+
+
 @communities_bp.route('/communities/map', methods=['GET'])
 def map_communities():
     """Listed communities for the Home map (community badge). Only visibility=

@@ -8,6 +8,7 @@ import 'package:device_info_plus/device_info_plus.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:path_provider/path_provider.dart';
 import 'dart:convert';
+import 'dart:async';
 import 'dart:io' show Platform, Directory;
 
 import 'debug_log_viewer_screen.dart';
@@ -19,6 +20,7 @@ import '../services/error_handler_service.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../services/document_acceptance_service.dart';
 import '../services/community_downloads.dart';
+import '../widgets/support_id_row.dart';
 
 class AboutScreen extends StatefulWidget {
   const AboutScreen({super.key});
@@ -31,6 +33,10 @@ class _AboutScreenState extends State<AboutScreen> {
   String _appVersion = 'Loading...';
   String _buildNumber = 'Loading...';
   String _userId = 'Loading...';
+  // [LOCAL-729/D692] The device's public Support ID (AU-XXXX), shown with a Copy
+  // button so a buyer can quote it when asking Audioura for a reimbursement. It
+  // is a public ALIAS of the device — never the secret user id.
+  String _supportId = 'Loading...';
   String _deviceModel = 'Loading...';
   String _androidVersion = 'Loading...';
   final TextEditingController _serverIpController = TextEditingController();
@@ -155,6 +161,7 @@ class _AboutScreenState extends State<AboutScreen> {
         _appVersion = packageInfo.version;
         _buildNumber = packageInfo.buildNumber;
         _userId = userId!;
+        _supportId = computeLocalSupportId(userId);
         _deviceModel = deviceModel;
         _androidVersion = osVersion;
         _currentServerIp = savedIp;
@@ -165,6 +172,10 @@ class _AboutScreenState extends State<AboutScreen> {
         _usePathPrefixes = savedUsePathPrefixes;
         _apiKeyController.text = savedApiKey;
       });
+      // Confirm (or allocate) the authoritative Support ID on the server so the
+      // alias shown here matches what the admin tools resolve. Best-effort: the
+      // deterministic local value above is shown until/unless the server answers.
+      unawaited(_loadSupportId(userId));
     } catch (e) {
       await DebugLogHelper.addDebugLog('ABOUT: Error loading app info: $e');
       setState(() {
@@ -187,6 +198,28 @@ class _AboutScreenState extends State<AboutScreen> {
       deviceId = 'WEB-${DateTime.now().millisecondsSinceEpoch}';
     }
     return 'USER-${deviceId.padLeft(8, '0')}';
+  }
+
+  /// Confirm/allocate the authoritative Support ID on the server (GET
+  /// /support-id?user_id=...). Best-effort: on any error the deterministic local
+  /// value already shown (computeLocalSupportId) is kept.
+  Future<void> _loadSupportId(String userId) async {
+    try {
+      final uri = await Endpoints.url(Service.userDb, '/support-id');
+      final resp = await http.get(
+        uri.replace(queryParameters: {'user_id': userId}),
+        headers: await Endpoints.apiHeaders(Service.userDb),
+      ).timeout(const Duration(seconds: 8));
+      if (resp.statusCode == 200) {
+        final body = jsonDecode(resp.body) as Map<String, dynamic>;
+        final sid = body['support_id'] as String?;
+        if (sid != null && sid.isNotEmpty && mounted) {
+          setState(() => _supportId = sid);
+        }
+      }
+    } catch (e) {
+      await DebugLogHelper.addDebugLog('ABOUT: support-id fetch failed: $e');
+    }
   }
 
   @override
@@ -233,6 +266,10 @@ class _AboutScreenState extends State<AboutScreen> {
                   // see _syncUserToDatabase (DB test) which logs app + services
                   // versions alongside the connection result.
                   _buildInfoRow('User ID', _userId),
+                  // [LOCAL-729/D692] The public Support ID with a Copy button.
+                  // A buyer quotes this when asking Audioura for a reimbursement
+                  // so we can find them without any private data.
+                  SupportIdRow(supportId: _supportId),
                   const SizedBox(height: 10),
                   // Server mode toggle
                   Row(

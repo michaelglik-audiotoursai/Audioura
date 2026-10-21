@@ -675,6 +675,38 @@ def entitlements_me():
         conn.close()
 
 
+@entitlements_bp.route('/support-id', methods=['GET', 'POST'])
+def support_id_endpoint():
+    """[LOCAL-729/D692] The device's public Support ID (AU-XXXX), shown in About
+    with a Copy button. The app sends its device user_id (GET ?user_id= or POST
+    {user_id}); we allocate one on first call and return the SAME alias forever
+    (support_ids.user_id UNIQUE). This is the ONLY non-admin surface for the
+    Support ID: it creates/reads the device's own alias and nothing else — it
+    never reveals the secret id and cannot read another device's data. Gateway
+    key only (the admin tools resolve a Support ID back to a device separately).
+    """
+    err = _require_api_key()
+    if err:
+        return err
+    if request.method == 'POST':
+        data = request.get_json(silent=True) or {}
+        user_id = data.get('user_id') or data.get('secret_id')
+    else:
+        user_id = request.args.get('user_id')
+    if not user_id:
+        return jsonify({"error": "user_id is required"}), 400
+    import support_id as _sid
+    conn = _get_db()
+    try:
+        cur = conn.cursor()
+        sid = _sid.ensure_support_id(cur, user_id)
+        conn.commit()
+        cur.close()
+        return jsonify({"user_id": user_id, "support_id": sid}), 200
+    finally:
+        conn.close()
+
+
 @entitlements_bp.route('/entitlements/app-open', methods=['POST'])
 def entitlements_app_open():
     err = _require_api_key()
