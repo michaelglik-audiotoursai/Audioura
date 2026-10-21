@@ -28,7 +28,7 @@ A model reads the tour and assigns one of the three ratings below, with a short 
 
 Ratings are automated and best-effort. They are not a guarantee that a tour is suitable for any particular listener, and the model can be wrong in either direction — it can rate a tour higher than it needed to be, or miss something. Where the model's answer is unclear, the more restrictive rating applies.
 
-A rating is written after the tour is generated, so a newly created tour may be listed as General for a short time before its rating is in place.
+A tour is rated before it is listed. A new or edited tour that cannot be rated yet is held, not listed, until its rating is in place.
 
 ### General — available to everyone
 Factual treatment of history, art, architecture, nature, culture, and food and drink in ordinary context. For example: a history or architecture walk; a museum tour; a restaurant tour that happens to include a place that serves drinks; a nature or park tour.

@@ -29,7 +29,7 @@ When a member's pass expires, they do not receive new audio or updates. Audio al
 Paid content is sold through the Apple App Store or Google Play and tied to the member's device profile:
 
 - **Community passes** give fixed-duration access and do not renew; a member buys again to continue. Audio downloaded while a pass was active stays on the device.
-- **Audioura-generated tours** follow the general Terms: each purchase pays for **one download**; deleting a tour or moving to a new phone means buying it again. If a member loses or replaces a phone, they can restore their **Listen page** (paid tours included) with their **recovery code** at no charge. A download that fails or is interrupted may be retried at no charge.
+- **Audioura-generated tours** follow the general Terms: each purchase pays for **one download**; deleting a tour means buying it again. If a member loses or replaces a phone, they can restore their **Listen page** (paid tours included) with their **recovery code** at no charge. A download that fails or is interrupted may be retried at no charge.
 
 ## 6. Payments — Apple App Store / Google Play only
 All paid passes and Audioura-generated tours are sold exclusively through in-app purchase via the Apple App Store or Google Play.

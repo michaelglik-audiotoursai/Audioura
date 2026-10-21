@@ -16,7 +16,7 @@ You use Audioura from a device. We identify your device with a private, random I
 ## 2. What a purchase gives you
 Audioura sells individual audio tours and community passes.
 
-- **(a) One download per purchase.** When you buy a tour, you buy **one download of that tour in that language**, to your device. Once it is on your device it is **yours to keep** — you can play it offline as many times as you like, forever, at no further charge. Each purchase pays for one download, so if you delete the tour and want it again, or move to a new phone, that is a **new purchase**. An app update installs in place and does not remove a tour you already have.
+- **(a) One download per purchase.** When you buy a tour, you buy **one download of that tour in that language**, to your device. Once it is on your device it is **yours to keep** — you can play it offline as many times as you like, forever, at no further charge. Each purchase pays for one download, so if you delete the tour and want it again, that is a **new purchase**. (A lost or replaced phone is different — see (e).) An app update installs in place and does not remove a tour you already have.
 - **(b) Languages are separate.** A translation of the same tour into another language is a separate product with its own price. Each language is listed and priced separately before you buy.
 - **(c) Offline use.** Once downloaded, a tour is yours to keep on the device and to play offline as many times as you like.
 - **(d) Failed downloads.** A download that **fails or is interrupted does not use up your purchase** — you may retry at no extra charge until it completes.
@@ -34,7 +34,7 @@ Refunds are requested from, and decided by, Apple or Google under their policies
 ## 5. Acceptable use
 Do not: break the law or help others do so; copy, resell or redistribute content you do not own; try to break, overload, reverse-engineer or bypass the security or payment parts of the app; submit unlawful, hateful or infringing content; impersonate anyone or misuse another person's device or account.
 
-We may remove content and suspend or end the access of anyone who breaks these rules. You can **block** a member or an organiser so you no longer see their content or receive their messages.
+We may remove content and suspend or end the access of anyone who breaks these rules. You can **block** a member or an organiser so you no longer see their content.
 
 ## 6. Content you provide
 This section is about content **you** provide: ratings and reviews, tours you create as a guide, and community audio and text. You keep ownership, and you grant Audioura LLC a non-exclusive, worldwide, royalty-free, sublicensable licence to host, store, reproduce, display and distribute it within Audioura as necessary to operate the service. You confirm you have all rights to submit it and that it follows the Content Policy.
