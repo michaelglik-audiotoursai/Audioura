@@ -1,0 +1,27 @@
+# docker-compose.local724-proof.yml — LOCAL-724 OWN isolated stack for the live proof.
+# Separate project (-p local724), OWN postgres volume, spare ports (55433/55005).
+# Never touches the shared audioura-* containers or Michael's development-postgres-2-1.
+# UP:   docker compose -p local724 -f docker-compose.local724-proof.yml up -d --build
+# DOWN: docker compose -p local724 -f docker-compose.local724-proof.yml down -v
+services:
+  postgres-2:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: audiotours
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: password123
+    ports:
+      - "55433:5432"
+    volumes:
+      - local724_pg:/var/lib/postgresql/data
+
+  map-delivery:
+    build:
+      context: ./map_delivery
+    ports:
+      - "55005:5005"
+    depends_on:
+      - postgres-2
+
+volumes:
+  local724_pg:

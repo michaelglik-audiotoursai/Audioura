@@ -208,6 +208,83 @@ def get_db_connection():
         password="password123"
     )
 
+def _ensure_tour_reports_table(cur):
+    """LOCAL-724 item 5: self-healing create of tour_reports (migration 042), so
+    /report-tour works on any DB whether or not the migration has run. Additive
+    and idempotent."""
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS tour_reports (
+            id            SERIAL PRIMARY KEY,
+            tour_id       INTEGER REFERENCES audio_tours(id) ON DELETE SET NULL,
+            tour_name     TEXT,
+            reason        TEXT,
+            reporter_user_id TEXT,
+            status        VARCHAR(16) NOT NULL DEFAULT 'open'
+                          CHECK (status IN ('open', 'reviewed', 'dismissed')),
+            created_at    TIMESTAMPTZ NOT NULL DEFAULT now()
+        )
+    """)
+
+
+@app.route('/report-tour', methods=['POST', 'OPTIONS'])
+def report_tour():
+    """LOCAL-724 item 5: record an in-app content report as ONE row in
+    tour_reports. The app's "Report This Tour" posts here instead of opening a
+    mailto:, so each report is a reviewable row, not an inbox message. This
+    endpoint ONLY records a report; it never hides, lists, approves or rejects a
+    tour — triage and the approve/reject decision stay with a human
+    (review_queue.py; D656 add. 2).
+
+    Body (JSON): { "tour_id": <int, optional>, "tour_name": <str, optional>,
+                   "reason": <str, optional>, "user_id": <str, optional> }
+    At least one of tour_id / tour_name must be present.
+    Returns 201 { "status": "received", "report_id": <int> } on success.
+    """
+    if request.method == 'OPTIONS':
+        return make_response(('', 204))
+    data = request.get_json(silent=True) or {}
+    tour_id = data.get('tour_id')
+    tour_name = (data.get('tour_name') or '').strip() or None
+    reason = (data.get('reason') or '').strip() or None
+    reporter_user_id = (data.get('user_id') or '').strip() or None
+    try:
+        tour_id = int(tour_id) if tour_id is not None and str(tour_id).strip() != '' else None
+    except (TypeError, ValueError):
+        tour_id = None
+    if tour_id is None and not tour_name:
+        return jsonify({'status': 'error',
+                        'error': 'tour_id or tour_name is required'}), 400
+    conn = None
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor()
+        _ensure_tour_reports_table(cur)
+        cur.execute(
+            """INSERT INTO tour_reports (tour_id, tour_name, reason, reporter_user_id)
+               VALUES (%s, %s, %s, %s) RETURNING id""",
+            (tour_id, tour_name, reason, reporter_user_id))
+        report_id = cur.fetchone()[0]
+        conn.commit()
+        cur.close()
+        print(f"[LOCAL-724] content report #{report_id} for tour_id={tour_id} "
+              f"name={tour_name!r}")
+        return jsonify({'status': 'received', 'report_id': report_id}), 201
+    except Exception as e:
+        if conn is not None:
+            try:
+                conn.rollback()
+            except Exception:
+                pass
+        print(f"[LOCAL-724] /report-tour failed: {e}")
+        return jsonify({'status': 'error', 'error': 'could not record report'}), 500
+    finally:
+        if conn is not None:
+            try:
+                conn.close()
+            except Exception:
+                pass
+
+
 def _version_fields(max_version_no, last_replaced_at, created_at):
     """[LOCAL-657] Derive the (version, updated_at) pair the app shows next to Downloads.
 

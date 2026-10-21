@@ -1,0 +1,84 @@
+# docker-compose.local724b-proof.yml — LOCAL-724B OWN isolated stack for the
+# in-container proof (D684). Separate project (-p local724b), OWN postgres volume,
+# spare ports. NEVER touches the shared audioura-* containers or
+# development-postgres-2-1. Builds the orchestrator and the tour-editing image
+# FROM THE REAL DOCKERFILES (Dockerfile.orchestrator / Dockerfile.generator —
+# the same images master+subscribed-local build), overriding ports/names/DB to
+# this isolated postgres and dropping the host-specific volumes/HOSTNAME, keeping
+# the env/volumes STRUCTURE (per D684).
+#
+# UP:   docker compose -p local724b -f docker-compose.local724b-proof.yml up -d --build
+# DOWN: docker compose -p local724b -f docker-compose.local724b-proof.yml down -v
+services:
+  postgres-2:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: audiotours
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: password123
+      # The orchestrator image pins psycopg2-binary==2.9.1 whose bundled libpq
+      # predates SCRAM; postgres:15 defaults to scram-sha-256. Use md5 for this
+      # throwaway proof DB so that old client can authenticate (prod uses a
+      # matching libpq). Isolated project only — never the shared stack.
+      POSTGRES_HOST_AUTH_METHOD: md5
+      POSTGRES_INITDB_ARGS: "--auth-host=md5 --auth-local=md5"
+    ports:
+      - "55434:5432"          # spare host port; isolated from dev 5433 and prod
+    volumes:
+      - local724b_pg:/var/lib/postgresql/data
+
+  # Built from Dockerfile.orchestrator (the real image). Env mirrors
+  # master+subscribed-local: DB points at THIS isolated postgres, and the rater
+  # key (D685) is passed through from the environment at `up` time.
+  tour-orchestrator:
+    build:
+      context: .
+      dockerfile: Dockerfile.orchestrator
+    environment:
+      - DB_HOST=postgres-2
+      - DB_NAME=audiotours
+      - DB_USER=admin
+      - DB_PASSWORD=password123
+      - DB_PORT=5432
+      - TOUR_TEST_MODE_ALLOW_REQUEST=true
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}   # D685: rater key; blank in the "held" proof
+    ports:
+      - "55002:5002"
+    depends_on:
+      - postgres-2
+
+  # The tour-editing image is audioura-tour-generator (Dockerfile.generator),
+  # exactly as master runs it; boto3 is pip-installed at start like master does.
+  tour-editing-phase2:
+    build:
+      context: .
+      dockerfile: Dockerfile.generator
+    command: sh -c "pip install boto3 --quiet && python tour_editing_phase2.py"
+    environment:
+      - DB_HOST=postgres-2
+      - DB_NAME=audiotours
+      - DB_USER=admin
+      - DB_PASSWORD=password123
+      - DB_PORT=5432
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+    ports:
+      - "55022:5022"
+    depends_on:
+      - postgres-2
+
+  map-delivery:
+    build:
+      context: ./map_delivery
+    environment:
+      - DB_HOST=postgres-2
+      - DB_NAME=audiotours
+      - DB_USER=admin
+      - DB_PASSWORD=password123
+      - DB_PORT=5432
+    ports:
+      - "55005:5005"
+    depends_on:
+      - postgres-2
+
+volumes:
+  local724b_pg:

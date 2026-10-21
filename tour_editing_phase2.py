@@ -2388,6 +2388,22 @@ def promote_custom_tour(tour_id):
                 _creator_user_id,
             ))
             new_id = cur.fetchone()[0]
+            # [LOCAL-724 items 1 & 4] A promoted custom edit is a brand-new
+            # listable ORIGINAL (lat/lng set, original_tour_id NULL) carrying
+            # user-supplied text. Rate it in THIS transaction, before the commit
+            # that makes it visible, so an edited/custom tour is never listed
+            # before it is rated. rate_tour_row reads the OpenAI key from the
+            # environment, never raises, and never commits on its own; a row it
+            # cannot rate is held (clear + pending) until the backfill rates it.
+            try:
+                import tour_content_rating
+                _pdetail = tour_content_rating.rate_tour_row(
+                    cur, new_id, custom_name, tour_content or '', stops_count)
+                if _pdetail is None and (tour_content or ''):
+                    tour_content_rating.clear_rating(cur, new_id)
+            except Exception as _prate_err:
+                print(f"[LOCAL-724] rating skipped for promoted tour {new_id}: "
+                      f"{_prate_err}")
             conn.commit()
         except pg_errors.UniqueViolation:
             conn.rollback()
