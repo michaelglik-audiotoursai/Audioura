@@ -445,6 +445,86 @@ def _allowances_left(cur, state, plan):
     return out
 
 
+def _pack_units_left(plan, state):
+    """What is left on the device's CURRENT pack, per unit kind, as a dict.
+    Uses the same max(0, per_pack - used) the app sees. Only the pack-unit
+    kinds the level defines are present (L3: fresh/edits; L4: ops)."""
+    out = {}
+    if plan is None:
+        return out
+    if plan.get('fresh_per_pack') is not None:
+        out['fresh'] = max(0, plan['fresh_per_pack'] - state['fresh_used'])
+    if plan.get('edits_per_pack') is not None:
+        out['edits'] = max(0, plan['edits_per_pack'] - state['edits_used'])
+    if plan.get('ops_per_pack') is not None:
+        out['ops'] = max(0, plan['ops_per_pack'] - state['ops_used'])
+    return out
+
+
+def _carry_over_used(old_state, old_plan, new_level, new_plan, now):
+    """[LOCAL-733 / D703] Compute the fresh_used/edits_used/ops_used for a NEW
+    pack purchase, carrying over what is left on the current pack.
+
+    Rules (D703):
+      1. Same level while the current pack is active (now < anniversary_at):
+         the new pack ADDS to what is left. We lower the used counters by the
+         new pack's per-pack allowance (used = used - per_pack), so a negative
+         "used" is the carried extra and max(0, per_pack - used) = per_pack +
+         extra. The columns allow negatives (no CHECK; INTEGER NOT NULL).
+      2. Different level while active (L3 $10 Pack <-> L4 Curator): what is left
+         converts ONE FOR ONE into the new level's units, then the new pack is
+         added.
+           - L3 -> L4: (fresh_left + edits_left) become extra L4 ops.
+           - L4 -> L3: ops_left become extra L3 fresh tours (edits start fresh).
+      3. Expired pack (now >= anniversary_at), first purchase, or no prior pack
+         window: start fresh from zero.
+
+    Returns (fresh_used, edits_used, ops_used) for the new row. Carried extra
+    shows up as a NEGATIVE used on the kind(s) the new level has.
+    """
+    def fresh_from_zero():
+        # A new pack's counters begin at the new pack's full allowance unused.
+        return (0, 0, 0)
+
+    # Rule 3: no active prior pack -> fresh.
+    old_ann = old_state.get('anniversary_at') if old_state else None
+    if old_ann is None or now >= old_ann:
+        return fresh_from_zero()
+    if old_plan is None:
+        return fresh_from_zero()
+
+    left = _pack_units_left(old_plan, old_state)
+    old_level = old_state['level']
+
+    # Rule 1: same level -> add. Lower each used by the new pack's allowance so
+    # the carried units stack on top of the fresh pack.
+    if old_level == new_level:
+        fresh_used = edits_used = ops_used = 0
+        if new_plan.get('fresh_per_pack') is not None:
+            fresh_used = -left.get('fresh', 0)
+        if new_plan.get('edits_per_pack') is not None:
+            edits_used = -left.get('edits', 0)
+        if new_plan.get('ops_per_pack') is not None:
+            ops_used = -left.get('ops', 0)
+        return (fresh_used, edits_used, ops_used)
+
+    # Rule 2: different level -> convert 1:1 into the new level's units.
+    fresh_used = edits_used = ops_used = 0
+    if new_level == 'l4':
+        # L3 -> L4: fresh_left + edits_left become extra L4 ops.
+        carried_ops = left.get('fresh', 0) + left.get('edits', 0)
+        if new_plan.get('ops_per_pack') is not None:
+            ops_used = -carried_ops
+    elif new_level == 'l3':
+        # L4 -> L3: ops_left become extra L3 fresh tours.
+        carried_fresh = left.get('ops', 0)
+        if new_plan.get('fresh_per_pack') is not None:
+            fresh_used = -carried_fresh
+        # edits start fresh (nothing to convert into edits).
+    # Any other cross-level pairing starts fresh (no pack units to carry).
+    return (fresh_used, edits_used, ops_used)
+
+
 def _me_payload(cur, user_id, now=None):
     now = now or datetime.utcnow()
     state = _get_device_state(cur, user_id)
@@ -1165,21 +1245,37 @@ def purchases_verify():
             cur2.close()
             return jsonify(payload), 409
 
-        # Grant the level: reset the pack and set the anniversary (paid now +
-        # 1 calendar month, clamped). Paying early replaces the allowance.
+        # [LOCAL-733 / D703] Grant the level and start a new month at the
+        # purchase (anniversary = now + 1 calendar month, clamped). A pack
+        # bought while the current pack is still active carries over what is
+        # left: same level ADDS, a different level converts the remainder 1:1
+        # into the new level's units. An expired pack or a first purchase starts
+        # fresh from zero. Carried units live as NEGATIVE used counters so
+        # max(0, per_pack - used) = per_pack + carried (columns allow negatives;
+        # no CHECK constraint). Idempotency above still guarantees one grant per
+        # transaction.
         paid_at = datetime.utcnow()
         anniversary = add_one_calendar_month(paid_at)
+        old_state = _get_device_state(cur, user_id)
+        old_plan = _get_plan(cur, old_state['level'])
+        new_plan = _get_plan(cur, level)
+        fresh_used, edits_used, ops_used = _carry_over_used(
+            old_state, old_plan, level, new_plan, paid_at)
         cur.execute("""
             INSERT INTO device_entitlement
                 (user_id, level, pack_started_at, anniversary_at,
                  fresh_used, edits_used, ops_used, last_activity_at)
-            VALUES (%s, %s, %s, %s, 0, 0, 0, NOW())
+            VALUES (%s, %s, %s, %s, %s, %s, %s, NOW())
             ON CONFLICT (user_id) DO UPDATE SET
                 level = EXCLUDED.level,
                 pack_started_at = EXCLUDED.pack_started_at,
                 anniversary_at = EXCLUDED.anniversary_at,
-                fresh_used = 0, edits_used = 0, ops_used = 0, updated_at = NOW()
-        """, (user_id, level, paid_at, anniversary))
+                fresh_used = EXCLUDED.fresh_used,
+                edits_used = EXCLUDED.edits_used,
+                ops_used = EXCLUDED.ops_used,
+                updated_at = NOW()
+        """, (user_id, level, paid_at, anniversary,
+              fresh_used, edits_used, ops_used))
         conn.commit()
 
         payload = _me_payload(cur, user_id)
