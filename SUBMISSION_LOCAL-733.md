@@ -2,7 +2,7 @@
 
 **Agent:** Mac Mini Kiro
 **Branch:** `LOCAL-733-pack-carryover` (from `subscribed` @ `6416a986`)
-**code_sha:** _`<CODE_SHA>`_ (the commit on this branch; see `git log -1`)
+**code_sha:** `d4ac1cc4` (the commit on this branch; see `git log -1`)
 
 A pack bought while a pack is still active now ADDS to what is left (same level)
 or converts the remainder 1:1 into the new level's units (different level). No
