@@ -368,8 +368,33 @@ def test_buying_again_extends_expiry(client, db):
                 (buyer, paid["id"]))
     n, exp2 = cur.fetchone()
     cur.close()
-    assert n == 1              # one row — nothing stacks
-    assert exp2 > exp1         # the new (year) expiry is later
+    assert n == 1              # one row
+    # [D701] the year is ADDED to the remaining day, not started from now.
+    assert abs((exp2 - exp1) - timedelta(days=365)) < timedelta(seconds=5)
+
+
+def test_buying_after_lapse_starts_from_now(client, db):
+    paid = _create(client, name=TEST_PREFIX + "Lapse", is_paid=True,
+                   pass_products=[{"product_id": "audioura.pass.usd5", "length": "week"}]).get_json()
+    buyer = TEST_PREFIX + "lapser"
+    client.post("/purchases/verify", json={
+        "store": "stub", "transaction_id": TEST_PREFIX + "l-1",
+        "product": "audioura.pass.usd5", "length": "week", "user_id": buyer,
+        "community_id": paid["id"]})
+    cur = db.cursor()
+    # Lapse it (test row only).
+    cur.execute("UPDATE community_memberships SET expires_at = NOW() - INTERVAL '3 days' "
+                "WHERE user_id=%s AND community_id=%s", (buyer, paid["id"]))
+    db.commit()
+    client.post("/purchases/verify", json={
+        "store": "stub", "transaction_id": TEST_PREFIX + "l-2",
+        "product": "audioura.pass.usd5", "length": "week", "user_id": buyer,
+        "community_id": paid["id"]})
+    cur.execute("SELECT expires_at FROM community_memberships WHERE user_id=%s AND community_id=%s",
+                (buyer, paid["id"]))
+    exp = cur.fetchone()[0]
+    cur.close()
+    assert abs(exp - (datetime.utcnow() + timedelta(days=7))) < timedelta(minutes=1)
 
 
 def test_pass_not_offered_refused(client):

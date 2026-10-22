@@ -1488,7 +1488,15 @@ def verify_community_pass(store, transaction_id, product, user_id,
             effective_txid = raw_status.split(':', 1)[1]
 
         now = datetime.utcnow()
-        new_expiry = compute_expiry(now, option['duration_days'])
+        # [D701] Buying while a pass is still active ADDS the new days to the
+        # remaining ones (no paid day is lost). A lapsed or first pass starts now.
+        # An already-processed transaction never stacks (idempotent, below).
+        base = now
+        if not already:
+            current = _membership(cur, user_id, int(community_id))
+            if current and current['expires_at'] and current['expires_at'] > now:
+                base = current['expires_at']
+        new_expiry = compute_expiry(base, option['duration_days'])
         price_usd = option['price_usd']
 
         if already:
@@ -1556,7 +1564,8 @@ def verify_community_pass(store, transaction_id, product, user_id,
 def _upsert_membership(cur, user_id, community_id, expires_at, txid, store,
                        product, price_usd, extend_only=False):
     """Grant or extend a membership. One row per (user, community): buying again
-    sets a FRESH expiry (now + duration), which is "buy again to renew" (D657).
+    sets the new expiry: now + duration, or the remaining active time + duration
+    when the pass is still active (D701; "buy again to renew", D657).
     Resets the reminder flags so the new period gets its own reminders."""
     cur.execute(
         """INSERT INTO community_memberships
