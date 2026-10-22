@@ -742,6 +742,10 @@ class _CommunityPageScreenState extends State<CommunityPageScreen> {
           if (!c.isOwner && canListen && c.isPaid && c.acceptsNewMembers &&
               c.passes.isNotEmpty) ...[
             _sectionTitle('Renew your pass'),
+            const Padding(
+              padding: EdgeInsets.only(bottom: 4),
+              child: TermsAgreeLine(),
+            ),
             ...c.passes.map((p) => Card(
                   child: ListTile(
                     title: Text(p.label),
