@@ -52,7 +52,7 @@ class _PlanScreenState extends State<PlanScreen> {
   // Null until resolved; the buttons are shown regardless (never gated on it).
   bool _stubMode = false;
 
-  // [LOCAL-604] The single code box on the Free card.
+  // [LOCAL-604 / LOCAL-735] The single code box on the "Upgrade your plan" card.
   final TextEditingController _codeController = TextEditingController();
 
   @override
@@ -183,9 +183,17 @@ class _PlanScreenState extends State<PlanScreen> {
               child: ListView(
                 padding: const EdgeInsets.all(16),
                 children: [
+                  // [LOCAL-735] Order (Michael, 2026-10-22): the current plan on
+                  // top, then "Upgrade your plan" (the code box) on EVERY level,
+                  // then "Apply for the Free plan" ONLY on Introduction, then
+                  // "Buy a pack" and "The plans" unchanged.
                   _currentPlanCard(),
                   const SizedBox(height: 16),
-                  _freeCard(),
+                  _upgradeCard(),
+                  if (_ent.level == 'l1') ...[
+                    const SizedBox(height: 16),
+                    _applyFreeCard(),
+                  ],
                   const SizedBox(height: 16),
                   _buyCard(),
                   const SizedBox(height: 16),
@@ -356,27 +364,43 @@ class _PlanScreenState extends State<PlanScreen> {
     );
   }
 
-  // [LOCAL-610 req 1] The Free/code card is LEVEL-AWARE. The code box is always
-  // present (it is how any level switches level with a level code, and how a
-  // friend's invitation or a queue offer is redeemed), but the queue and the
-  // "Get the Free plan" framing only make sense for the install level:
-  //
-  //   • l1 (Introduction): the only level that can still JOIN the free queue.
-  //     Title "Get the Free plan", show BOTH the queue action and the code box.
-  //   • l2 (Free): already has a free seat — never invite it to "get" the Free
-  //     plan. Title "Have a code?", code box ONLY, no queue.
-  //   • paid (l3/l4), tester, admin: title "Have a code?", code box ONLY, no
-  //     queue and no "Get the Free plan".
-  //
-  // One text box accepts any of the three code kinds; the server decides which.
-  Widget _freeCard() {
-    final isIntroduction = _ent.level == 'l1';
-    return isIntroduction ? _freeCardIntroduction() : _codeOnlyCard();
+  // [LOCAL-735] "Upgrade your plan" — shown on EVERY level (Michael,
+  // 2026-10-22). Directly beneath the current-plan card: one short line and the
+  // single code box. One box accepts every code kind (an Audioura level code, a
+  // friend's invitation, or a Free-plan queue code); the server decides which
+  // and switches the plan. This replaces the old level-aware "Get the Free
+  // plan" / "Have a code?" framing — the queue action moved to _applyFreeCard.
+  Widget _upgradeCard() {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Upgrade your plan',
+                key: Key('upgrade_card_title'),
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 8),
+            const Text(
+              'Have a code from Audioura, a friend\u2019s invitation or the '
+              'Free-plan queue? Enter it here to switch your plan.',
+              style: TextStyle(fontSize: 13, height: 1.3),
+            ),
+            const SizedBox(height: 12),
+            _codeBox(),
+          ],
+        ),
+      ),
+    );
   }
 
-  // l1 only: the full card — ask for a queue place (with an email) OR enter a
-  // code. [LOCAL-604 D619]
-  Widget _freeCardIntroduction() {
+  // [LOCAL-735] "Apply for the Free plan" — shown ONLY on Introduction (l1).
+  // Explains the generation allowance the Free plan grants (from the plan data
+  // the screen already loaded, not hard-coded) and carries the existing queue
+  // action and queue-position / pending-offer text. Hidden on Free, paid,
+  // tester and admin — those levels either already have a seat or cannot join
+  // the queue, so inviting them to "apply" makes no sense.
+  Widget _applyFreeCard() {
     final pos = _ent.queuePosition;
     final pending = _ent.pendingOfferCode;
     return Card(
@@ -385,14 +409,14 @@ class _PlanScreenState extends State<PlanScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Get the Free plan',
+            const Text('Apply for the Free plan',
+                key: Key('apply_free_card_title'),
                 style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
             const SizedBox(height: 8),
-            const Text(
-              'Ask for a place in the queue, or enter a code. The code arrives '
-              'by email and is valid for 10 minutes once the queue reaches you — '
-              'or it can be an invitation from a friend on a paid plan.',
-              style: TextStyle(fontSize: 13, height: 1.3),
+            Text(
+              _freePlanAllowanceText(),
+              key: const Key('apply_free_allowance_text'),
+              style: const TextStyle(fontSize: 13, height: 1.3),
             ),
             const SizedBox(height: 14),
             if (pending != null) ...[
@@ -405,7 +429,8 @@ class _PlanScreenState extends State<PlanScreen> {
                 ),
                 child: Text(
                   'A seat is ready for you. Your code: $pending\n'
-                  'Enter it below within 10 minutes to claim the Free plan.',
+                  'Enter it in "Upgrade your plan" above within 10 minutes to '
+                  'claim the Free plan.',
                   style: const TextStyle(fontSize: 13),
                 ),
               ),
@@ -425,50 +450,35 @@ class _PlanScreenState extends State<PlanScreen> {
                 child: Text(pos != null ? 'Update my queue email' : 'Join the queue'),
               ),
             ),
-            const SizedBox(height: 16),
-            _codeBox(withHeading: true),
           ],
         ),
       ),
     );
   }
 
-  // l2 / paid / tester / admin: a small "Have a code?" card with the code box
-  // only. No queue, no "Get the Free plan".
-  Widget _codeOnlyCard() {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text('Have a code?',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 8),
-            const Text(
-              'Enter a level code, a friend\u2019s invitation, or a queue code. '
-              'This is how you switch levels.',
-              style: TextStyle(fontSize: 13, height: 1.3),
-            ),
-            const SizedBox(height: 12),
-            _codeBox(withHeading: false),
-          ],
-        ),
-      ),
-    );
+  // [LOCAL-735] The Free-plan generation allowance, in plain words. The numbers
+  // come from the plan data the screen already loads — the Free (l2) level's
+  // max_stops — not hard-coded, with the stated sentence as the fallback when
+  // the server did not send the l2 row (older payload / offline).
+  String _freePlanAllowanceText() {
+    int? maxStops;
+    for (final l in _ent.levels) {
+      if (l.planId == 'l2') {
+        maxStops = l.maxStops;
+        break;
+      }
+    }
+    final stops = maxStops ?? 5;
+    return 'On the Free plan you can generate your own tours: 1 new tour a day, '
+        '3 a month, up to $stops stops. Free seats are limited, so we keep a '
+        'queue. Join it and we email you a code when a seat opens.';
   }
 
-  // The shared code box + "Use code" button. [withHeading] adds the
-  // "I have a code" label used on the l1 card above the queue action.
-  Widget _codeBox({required bool withHeading}) {
+  // The shared code box + "Use code" button, used by "Upgrade your plan".
+  Widget _codeBox() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        if (withHeading) ...[
-          const Text('I have a code',
-              style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
-          const SizedBox(height: 8),
-        ],
         TextField(
           controller: _codeController,
           enabled: !_claiming,

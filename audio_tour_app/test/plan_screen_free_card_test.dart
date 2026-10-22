@@ -1,16 +1,16 @@
-// [LOCAL-604 D619] Widget + parsing tests for the plan page's Free card and the
-// server-driven visible-levels list.
+// [LOCAL-604 / LOCAL-735] Parsing tests for the server-driven visible-levels
+// list, plus widget tests for the plan page's Upgrade + Apply cards.
 //
-// The Free card must offer "Join the queue" and a single "I have a code" box,
-// with the explanation text from Michael's request 2 (code by email, valid 10
-// minutes, or a friend's invitation). The level table must render ONLY the
-// visible levels the server sent, by display name, and never show the hidden
-// Tester/Administrator levels. Curator's first bullet must be "Create tours for
-// sale", and Pack/Curator must show the invitations line.
+// LOCAL-735 reorganised "Your plan": "Upgrade your plan" (the single code box)
+// shows on every level, and "Apply for the Free plan" (the queue action and the
+// Free generation allowance) shows ONLY on Introduction. The level table must
+// render ONLY the visible levels the server sent, by display name, and never
+// show the hidden Tester/Administrator levels. Curator's first bullet must be
+// "Create tours for sale", and Pack/Curator must show the invitations line.
 //
 // PlanScreen.me() reads SharedPreferences for the device id; with the mock set
-// to empty it returns Entitlements.unknown without any network call, so the
-// screen builds deterministically offline.
+// to empty it returns Entitlements.unknown (level l1) without any network call,
+// so the screen builds deterministically offline.
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -79,28 +79,32 @@ void main() {
     });
   });
 
-  group('PlanScreen Free card', () {
-    testWidgets('shows Join the queue, a single code box, and the explanation',
+  group('PlanScreen Upgrade + Apply cards (LOCAL-735)', () {
+    testWidgets(
+        'Introduction shows the Upgrade card (code box) and the Apply card (queue)',
         (tester) async {
       await tester.pumpWidget(const MaterialApp(home: PlanScreen()));
       await tester.pumpAndSettle();
 
-      // The Free card title and its two actions.
-      expect(find.text('Get the Free plan'), findsOneWidget);
-      expect(find.text('Join the queue'), findsOneWidget);
-      expect(find.text('I have a code'), findsOneWidget);
+      // "Upgrade your plan" — the single code box, on every level including l1.
+      expect(find.text('Upgrade your plan'), findsOneWidget);
       expect(find.text('Use code'), findsOneWidget);
-
-      // Exactly one code text box on the card.
       expect(find.widgetWithText(TextField, 'Enter your code'), findsOneWidget);
 
-      // The explanation text (request 2): email + 10 minutes + friend's invite.
-      final explanation = find.byWidgetPredicate((w) =>
+      // "Apply for the Free plan" — only on Introduction (the default unknown
+      // snapshot is l1): the queue action and the generation allowance.
+      expect(find.text('Apply for the Free plan'), findsOneWidget);
+      expect(find.text('Join the queue'), findsOneWidget);
+      final allowance = find.byWidgetPredicate((w) =>
           w is Text &&
-          (w.data ?? '').contains('by email') &&
-          (w.data ?? '').contains('10 minutes') &&
-          (w.data ?? '').contains('invitation from a friend'));
-      expect(explanation, findsOneWidget);
+          (w.data ?? '').contains('generate your own tours') &&
+          (w.data ?? '').contains('a queue'));
+      expect(allowance, findsOneWidget);
+
+      // The old framing is gone.
+      expect(find.text('Get the Free plan'), findsNothing);
+      expect(find.text('Have a code?'), findsNothing);
+      expect(find.text('I have a code'), findsNothing);
     });
 
     testWidgets('empty code shows a prompt, does not crash', (tester) async {
