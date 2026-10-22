@@ -24,6 +24,11 @@ class PassExpiryFormat {
     'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
   ];
 
+  // Dart's DateTime.weekday is 1 (Mon) .. 7 (Sun).
+  static const List<String> _weekdays = [
+    'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun',
+  ];
+
   /// Parse the server's `expires_at`. A zone-less string is treated as UTC
   /// (the server stores UTC). Returns a LOCAL-time [DateTime], or null when the
   /// input is null/blank/unparseable.
@@ -86,5 +91,45 @@ class PassExpiryFormat {
     final days = remaining.inDays;
     final dayWord = days == 1 ? 'day' : 'days';
     return 'Member until ${formatDate(local)} · $days $dayWord left';
+  }
+
+  /// `Fri 24 Oct` — weekday, day and short month, no year. Used by the short
+  /// countdown variant [formatShort] that the 3-day pass-expiry WARNING shows
+  /// (LOCAL-732). The year is dropped because the warning only fires inside a
+  /// 72-hour window, so the year is never ambiguous.
+  static String formatWeekdayDate(DateTime local) =>
+      '${_weekdays[local.weekday - 1]} ${local.day} ${_months[local.month - 1]}';
+
+  /// [LOCAL-732] The short expiry line for the 3-day warning dialog, e.g.
+  /// `Fri 24 Oct · in 2 days` or `Sat 25 Oct · in 5 hours`. Returns null when
+  /// there is no expiry (free community / owner) or the pass has already
+  /// expired — the warning only concerns an ACTIVE pass that ends soon, and the
+  /// caller filters those out, but we return null defensively so a caller can
+  /// never render a nonsensical "in 0 days" line for a lapsed pass.
+  ///
+  /// [now] is injectable for deterministic tests; it defaults to DateTime.now().
+  static String? formatShort(String? expiresAt, {DateTime? now}) {
+    final local = parse(expiresAt);
+    if (local == null) return null;
+    final current = (now ?? DateTime.now()).toLocal();
+    final remaining = local.difference(current);
+
+    // Already expired (or exactly now): nothing left to warn about.
+    if (remaining <= Duration.zero) return null;
+
+    final when = formatWeekdayDate(local);
+
+    // Under 24 hours left: count down in hours (a "days" count would read 0).
+    if (remaining.inHours < 24) {
+      final hours = remaining.inHours;
+      if (hours < 1) return '$when · ends soon';
+      final hourWord = hours == 1 ? 'hour' : 'hours';
+      return '$when · in $hours $hourWord';
+    }
+
+    // A day or more left: whole days, rounded down.
+    final days = remaining.inDays;
+    final dayWord = days == 1 ? 'day' : 'days';
+    return '$when · in $days $dayWord';
   }
 }

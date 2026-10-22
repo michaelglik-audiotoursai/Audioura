@@ -14,6 +14,10 @@ import '../services/entitlements_service.dart';
 import '../services/deep_link_service.dart';
 import '../renewal_logic.dart';
 import '../widgets/renewal_sheet.dart';
+import '../services/communities_service.dart';
+import '../services/pass_expiry_warning.dart';
+import '../widgets/pass_expiry_warning_dialog.dart';
+import 'community_page_screen.dart';
 
 class MainScreen extends StatefulWidget {
   final int initialTab;
@@ -26,6 +30,15 @@ class MainScreen extends StatefulWidget {
 class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
   late int _selectedIndex;
   int _listenTabVersion = 0;
+
+  // [LOCAL-732] When the app last went to the background. A resume is only a
+  // fresh "entry" (that re-checks pass expiry) when it has been more than an
+  // hour. Null until the first pause.
+  DateTime? _lastPausedAt;
+
+  // [LOCAL-732] Guards against two overlapping warning checks (e.g. cold-start
+  // post-frame racing a very fast background→foreground on some platforms).
+  bool _passWarnInFlight = false;
 
   @override
   void initState() {
@@ -51,6 +64,10 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _onShareCodeArrived(); // act on a code already waiting at launch.
       _runDeferredLinkCheck();
+      // [LOCAL-732] Cold start: once Home is visible, warn (once) about any
+      // community pass ending within 3 days. Deferred to the first frame so a
+      // BuildContext exists and Home is mounted.
+      _maybeWarnPassExpiry();
     });
   }
 
@@ -160,6 +177,69 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
     }
   }
 
+  /// [LOCAL-732] Warn the member, ONCE per pass period, that a community pass
+  /// ends within 3 days. Only when Home (tab 0) is the visible tab — the task
+  /// says "once Home is visible, not over the onboarding or first-run notice
+  /// screens". (MainScreen is only mounted AFTER onboarding + the first-run
+  /// notice, so those screens can never be on top of this dialog; the Home-tab
+  /// check keeps the warning off the Generate/Listen/Treats/About tabs.)
+  ///
+  /// Loads My communities (the same endpoint My communities uses, which carries
+  /// expires_at + active), selects the active passes ending within 72 h, drops
+  /// any already warned for this exact expires_at, shows ONE dialog for the
+  /// rest, and only THEN marks them warned. A network failure shows nothing and
+  /// stores nothing (CommunitiesService returns an empty list on error).
+  Future<void> _maybeWarnPassExpiry() async {
+    if (_passWarnInFlight) return;
+    // Only on the Home tab.
+    if (_selectedIndex != 0) return;
+    _passWarnInFlight = true;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final userId = prefs.getString('user_id');
+      if (userId == null || userId.isEmpty) return;
+
+      // Network failure / feature absent → empty list → nothing shown, nothing
+      // stored (CommunitiesService.mine swallows transport errors to []).
+      final mine = await CommunitiesService.mine(userId);
+      if (mine.isEmpty) return;
+
+      final qualifying = PassExpiryWarning.select(mine);
+      if (qualifying.isEmpty) return;
+
+      // Drop the pass periods already warned (the once rule). A renewal changes
+      // expires_at (D701), so its new period is not yet in the store.
+      final toShow = await PassWarnedStore.unwarned(qualifying);
+      if (toShow.isEmpty) return;
+
+      // Re-check we are still on Home and mounted before putting up a dialog.
+      if (!mounted || _selectedIndex != 0) return;
+
+      await showDialog<void>(
+        context: context,
+        builder: (ctx) => PassExpiryWarningDialog(
+          passes: toShow,
+          onRenew: (communityId) {
+            Navigator.pop(ctx);
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                  builder: (_) =>
+                      CommunityPageScreen(communityId: communityId)),
+            );
+          },
+          onLater: () => Navigator.pop(ctx),
+        ),
+      );
+
+      // Mark warned AFTER the dialog was actually shown — never before, so a
+      // network failure (handled above) can never silently consume a warning.
+      await PassWarnedStore.markWarned(toShow.map((p) => p.warnedKey));
+    } finally {
+      _passWarnInFlight = false;
+    }
+  }
+
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
@@ -171,10 +251,24 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.paused) {
+      // [LOCAL-732] Remember when we went to the background so a later resume
+      // can tell "away for more than an hour" from a brief switch-away.
+      _lastPausedAt = DateTime.now();
+    }
     if (state == AppLifecycleState.resumed) {
       BackgroundService.startBackgroundMonitoring();
       // LOCAL-598 D2: app-open fires on resume too, not just launch.
       _runAppOpenEntitlementsCheck();
+      // [LOCAL-732] Resume after more than an hour in the background re-runs the
+      // 3-day pass-expiry warning (the once-per-pass-period key still prevents a
+      // repeat for the same pass). A brief switch-away does not re-check.
+      final pausedAt = _lastPausedAt;
+      if (pausedAt != null &&
+          DateTime.now().difference(pausedAt) > const Duration(hours: 1)) {
+        _maybeWarnPassExpiry();
+      }
+      _lastPausedAt = null;
       // Refresh Home, My Tours, or Treats screen when app is resumed
       if (_selectedIndex == 0 || _selectedIndex == 2 || _selectedIndex == 3) {
         if (_selectedIndex == 2) _listenTabVersion++; // NF10: force Listen reload on resume
