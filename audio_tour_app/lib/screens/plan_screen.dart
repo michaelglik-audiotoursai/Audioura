@@ -15,6 +15,8 @@
 import 'package:flutter/material.dart';
 import '../services/entitlements_service.dart';
 import '../services/iap_service.dart';
+import '../services/pass_expiry_format.dart';
+import '../utils/plan_left_summary.dart';
 
 class PlanScreen extends StatefulWidget {
   const PlanScreen({super.key, this.initialEntitlements, this.initialStubMode});
@@ -116,13 +118,24 @@ class _PlanScreenState extends State<PlanScreen> {
       final messenger = ScaffoldMessenger.of(context);
       switch (result.status) {
         case IapResultStatus.granted:
+          // [LOCAL-733 / D703] Refresh first so the message reflects the NEW
+          // balance (carry-over may have ADDED to what was left), then say what
+          // the member now has and until when, e.g. "You now have 8 new tours
+          // and 6 edits until 22 Nov 2026."
+          await _load();
+          if (!mounted) break;
+          final endLocal = PassExpiryFormat.parse(_ent.anniversaryAt);
+          final endText = endLocal != null
+              ? PassExpiryFormat.formatDate(endLocal)
+              : null;
+          final whatsLeft =
+              PlanLeftSummary.purchaseMessage(_ent, endDate: endText);
           messenger.showSnackBar(SnackBar(
             content: Text(_stubMode
-                ? 'Test purchase complete — your plan is updated.'
-                : 'Purchase complete — your plan is updated.'),
+                ? 'Test purchase complete. $whatsLeft'
+                : whatsLeft),
             backgroundColor: Colors.green,
           ));
-          await _load();
           break;
         case IapResultStatus.cancelled:
           messenger.showSnackBar(const SnackBar(
@@ -198,6 +211,16 @@ class _PlanScreenState extends State<PlanScreen> {
 
     final ann = _ent.anniversary;
 
+    // [LOCAL-733 / D703] One block at the top of the card that tells the member
+    // what is left and when the pack ends, e.g.
+    //   "$10 Pack · 8 new tours and 6 stop-adding edits left · until 22 Nov 2026".
+    // Introduction shows nothing here (cardLine returns null); Free shows the
+    // day/month count. The date reuses PassExpiryFormat.formatDate (LOCAL-731).
+    final endDateLocal = PassExpiryFormat.parse(_ent.anniversaryAt);
+    final endDateText =
+        endDateLocal != null ? PassExpiryFormat.formatDate(endDateLocal) : null;
+    final leftLine = PlanLeftSummary.cardLine(_ent, endDate: endDateText);
+
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -213,6 +236,15 @@ class _PlanScreenState extends State<PlanScreen> {
                         fontSize: 18, fontWeight: FontWeight.bold)),
               ],
             ),
+            if (leftLine != null) ...[
+              const SizedBox(height: 8),
+              Text(
+                leftLine,
+                key: const Key('plan_left_line'),
+                style: const TextStyle(
+                    fontSize: 14, fontWeight: FontWeight.w600),
+              ),
+            ],
             const SizedBox(height: 12),
             if (rows.isEmpty)
               const Text(
@@ -621,9 +653,9 @@ class _PlanScreenState extends State<PlanScreen> {
         const SizedBox(height: 2),
         const Text(
           'Each purchase is good for one month. Anything unused after a month '
-          'expires, and you can buy another pack at any time. Buying early '
-          'starts a new month and replaces what\u2019s left. Nothing renews '
-          'automatically.',
+          'expires, and you can buy another pack at any time. Buying another '
+          'pack adds it to what\u2019s left and starts a new month. Nothing '
+          'renews automatically.',
           style: TextStyle(fontSize: 13, height: 1.3),
         ),
         if (ann != null) ...[

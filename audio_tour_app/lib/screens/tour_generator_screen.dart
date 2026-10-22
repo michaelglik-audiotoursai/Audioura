@@ -17,6 +17,7 @@ import '../config/endpoints.dart';
 import '../services/translation_service.dart';
 import '../services/error_handler_service.dart';
 import '../services/community_tour_service.dart';
+import '../services/entitlements_service.dart';
 
 import '../screens/debug_log_viewer_screen.dart';
 import '../screens/tour_player_screen.dart';
@@ -25,6 +26,7 @@ import '../widgets/language_selector.dart';
 import '../utils/tour_request_parser.dart';
 import '../utils/tour_error_resolver.dart';
 import '../utils/generation_completion_message.dart';
+import '../utils/plan_left_summary.dart';
 import '../utils/user_stops.dart';
 import 'user_stops_screen.dart';
 import 'main_screen.dart';
@@ -32,7 +34,14 @@ import 'plan_screen.dart';
 import 'communities_about_screen.dart';
 
 class TourGeneratorScreen extends StatefulWidget {
-  const TourGeneratorScreen({super.key});
+  const TourGeneratorScreen({super.key, this.initialEntitlements});
+
+  /// [LOCAL-733 / D703] Test seam only: when provided, the screen uses this
+  /// snapshot for the "tours left" line instead of loading it from the
+  /// user-api, so a widget test can render the grey allowance line at any level
+  /// with no running server. Null in production (the default), where the screen
+  /// loads it from EntitlementsService.me() in initState.
+  final Entitlements? initialEntitlements;
 
   @override
   State<TourGeneratorScreen> createState() => _TourGeneratorScreenState();
@@ -76,12 +85,19 @@ class _TourGeneratorScreenState extends State<TourGeneratorScreen> {
   // in dispose() so it does not outlive the screen.
   Timer? _refreshTimer;
 
+  // [LOCAL-733 / D703] The device's current entitlement snapshot, used ONLY to
+  // show a short grey "N new tours left …" line near the Generate button. Null
+  // until loaded (or when the user-api is unreachable); the line is hidden
+  // until it arrives and is always hidden on Introduction / hidden / admin.
+  Entitlements? _entitlements;
+
   @override
   void initState() {
     super.initState();
     _loadBackgroundStatus();
     _loadAppMode();
     _loadOwnedCommunities();  // [LOCAL-701] populate the "For:" selector (organisers only)
+    _loadEntitlements();      // [LOCAL-733] populate the "tours left" line
     
     // Check for stalled tours immediately
     BackgroundTourMonitor.checkStalledTours();
@@ -145,6 +161,21 @@ class _TourGeneratorScreenState extends State<TourGeneratorScreen> {
     });
   }
 
+  // [LOCAL-733 / D703] Load the entitlement snapshot for the "tours left" line.
+  // Honours the test seam (initialEntitlements); otherwise asks the user-api.
+  // Never blocks the screen and never throws: on any failure the line simply
+  // stays hidden.
+  Future<void> _loadEntitlements() async {
+    final seed = widget.initialEntitlements;
+    if (seed != null) {
+      setState(() => _entitlements = seed);
+      return;
+    }
+    final ent = await EntitlementsService.me();
+    if (!mounted) return;
+    setState(() => _entitlements = ent);
+  }
+
   Map<String, dynamic> _parseTourRequest(String request) {
     // [LOCAL-358] Delegates to top-level utility for testability.
     return parseTourRequest(request);
@@ -170,6 +201,26 @@ class _TourGeneratorScreenState extends State<TourGeneratorScreen> {
   // [LOCAL-701 / D663 §3] The "For:" selector widget. Shown ONLY to an
   // organiser. "Just me / public as usual" is the default; choosing a community
   // reveals the members/public visibility choice with a one-line hint.
+  // [LOCAL-733 / D703] The short grey allowance line shown just above the
+  // Generate button. Returns an empty box (renders nothing) until the snapshot
+  // has loaded and whenever the level has no line to show (Introduction, which
+  // cannot generate, and hidden/admin plans — PlanLeftSummary.generateLine
+  // returns null there).
+  Widget _buildToursLeftLine() {
+    final ent = _entitlements;
+    if (ent == null) return const SizedBox.shrink();
+    final line = PlanLeftSummary.generateLine(ent);
+    if (line == null) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Text(
+        line,
+        key: const Key('generate_tours_left_line'),
+        style: const TextStyle(fontSize: 13, color: Colors.grey),
+      ),
+    );
+  }
+
   Widget _buildCommunitySelector() {
     if (!CommunityTourRules.selectorVisible(_ownedCommunities)) {
       return const SizedBox.shrink();
@@ -1729,6 +1780,13 @@ class _TourGeneratorScreenState extends State<TourGeneratorScreen> {
             // [LOCAL-701 / D663 §3] "For: my community" selector — organisers
             // only, Tours mode only (not News/Audio). Default is "Just me".
             if (_appMode != 'Audio') _buildCommunitySelector(),
+
+            // [LOCAL-733 / D703] One short grey line telling the member how many
+            // tours are left, e.g. "3 new tours left in your pack" (paid) or
+            // "1 new tour left today" (Free). Hidden on Introduction (which
+            // cannot generate) and on hidden/admin plans — generateLine returns
+            // null there — and hidden until the snapshot has loaded.
+            _buildToursLeftLine(),
 
             Row(
               children: [

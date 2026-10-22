@@ -177,12 +177,18 @@ void main() {
     testWidgets('pack/Curator one-month rule is shown in plain words', (tester) async {
       await _pump(tester, _ent('l2'));
       await _scrollToRules(tester);
+      // [LOCAL-733 / D703] The rule now states that buying another pack ADDS to
+      // what is left (carry-over), not that it replaces it.
       final rule = find.byWidgetPredicate((w) =>
           w is Text &&
           (w.data ?? '').contains('good for one month') &&
-          (w.data ?? '').contains('Buying early') &&
+          (w.data ?? '').contains('Buying another pack adds it to what') &&
           (w.data ?? '').contains('Nothing renews'));
       expect(rule, findsOneWidget);
+      // The OLD "Buying early … replaces what's left" wording must be gone.
+      final old = find.byWidgetPredicate((w) =>
+          w is Text && (w.data ?? '').contains('Buying early'));
+      expect(old, findsNothing);
     });
 
     testWidgets('anniversary date is shown when the device holds a pack',
