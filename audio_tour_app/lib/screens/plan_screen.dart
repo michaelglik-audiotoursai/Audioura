@@ -296,8 +296,8 @@ class _PlanScreenState extends State<PlanScreen> {
                 style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
             const SizedBox(height: 4),
             const Text(
-              'Packs are one-time purchases. Nothing renews automatically and '
-              'there are no refunds.',
+              'Packs are one-time purchases. Nothing renews automatically. '
+              'Refunds are handled by Apple or Google.',
               style: TextStyle(fontSize: 12, color: Colors.black54),
             ),
             if (_stubMode) ...[

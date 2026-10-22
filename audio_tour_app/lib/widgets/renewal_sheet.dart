@@ -1,7 +1,7 @@
 // [LOCAL-598] Renewal UI — the sheet shown at/after a pack's anniversary and
 // the one-time 3-day warning banner. SUBSCRIPTION_LEVELS.md (D613).
 //
-// Nothing renews automatically and there are no refunds: the copy says so in
+// Nothing renews automatically; refunds go through Apple or Google (Refunds policy): the copy says so in
 // plain words. "Renew" takes the user to the plan screen to buy again (the
 // buy buttons and the StoreKit flow live there); "Continue on the free level"
 // lapses the device to L1 server-side.
@@ -48,9 +48,9 @@ Future<RenewalChoice?> showRenewalSheet(
             dateStr != null
                 ? 'Your pack ran from your last purchase to $dateStr. '
                     'Nothing is charged automatically. You can renew by buying '
-                    'again, or continue on the free level. There are no refunds.'
+                    'again, or continue on the free level. Refunds are handled by Apple or Google.'
                 : 'Nothing is charged automatically. You can renew by buying '
-                    'again, or continue on the free level. There are no refunds.',
+                    'again, or continue on the free level. Refunds are handled by Apple or Google.',
             style: const TextStyle(fontSize: 14, height: 1.4),
           ),
           const SizedBox(height: 20),
