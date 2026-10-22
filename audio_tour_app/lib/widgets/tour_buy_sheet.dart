@@ -24,7 +24,7 @@ class TourBuySheet {
     required String priceLabel,
     String? tourTitle,
   }) async {
-    final isStub = await IapService.instance.isLocalStubMode();
+    final isStub = await IapService.instance.purchasesModeIsStub(); // [LOCAL-734] ask the server, per platform
     if (!context.mounted) return false;
 
     return await showModalBottomSheet<bool>(
