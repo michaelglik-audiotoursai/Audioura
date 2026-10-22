@@ -635,11 +635,11 @@ class _PlanScreenState extends State<PlanScreen> {
                     ? 'This device has no Internet connection, so we can\u2019t '
                         'reach our servers and the plan details aren\u2019t '
                         'available right now. Please connect to the Internet, '
-                        'then pull down to refresh.'
+                        'then drag this page down to try again.'
                     : 'We can\u2019t reach our servers, so the plan details '
                         'aren\u2019t available right now. Please make sure you '
-                        'are connected to the Internet, then pull down to '
-                        'refresh.',
+                        'are connected to the Internet, then drag this page '
+                        'down to try again.',
                 key: const Key('plan_details_unavailable'),
                 style: const TextStyle(fontSize: 13, color: Colors.black54),
               )
