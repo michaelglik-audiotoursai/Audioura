@@ -114,9 +114,9 @@ def ctx():
     cur.execute("ALTER TABLE tour_unlocks ADD COLUMN IF NOT EXISTS consumed_at TIMESTAMPTZ")
     cur.execute("ALTER TABLE tour_unlocks "
                 "ADD COLUMN IF NOT EXISTS consumed_by_download_id VARCHAR(255)")
-    cur.execute("INSERT INTO audio_tours (id, tour_name, is_test) VALUES (%s, %s, TRUE) "
+    cur.execute("INSERT INTO audio_tours (id, tour_name, request_string, is_test) VALUES (%s, %s, %s, TRUE) "
                 "ON CONFLICT (id) DO NOTHING RETURNING id",
-                (tour_id, f"LOCAL-734 route test {tour_id}-{uuid.uuid4().hex[:8]}"))
+                (tour_id, f"LOCAL-734 route test {tour_id}-{uuid.uuid4().hex[:8]}", "LOCAL-734 route test"))
     created_tour = cur.fetchone() is not None  # LEAD: delete only a row WE created
     yield ea, client, conn, cur, tour_id
     # Clean up ONLY our own throwaway rows (never a bulk/purchase-bearing delete
