@@ -152,7 +152,7 @@ class _CommunityPageScreenState extends State<CommunityPageScreen> {
   Future<void> _buyPass(CommunityPass pass) async {
     final c = _community;
     if (c == null) return;
-    final isStub = await IapService.instance.isLocalStubMode();
+    final isStub = await IapService.instance.purchasesModeIsStub(); // [LOCAL-734] ask the server, per platform
     final result = isStub
         ? await IapService.instance
             .testPurchaseCommunityPass(pass.productId, c.id, pass.length)

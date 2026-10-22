@@ -274,18 +274,26 @@ class IapService {
     return (prefs.getString('server_mode') ?? 'cloud') == 'local';
   }
 
-  /// [LOCAL-699] Whether the SERVER verifies purchases in stub mode. Asks the
-  /// server itself (GET /purchases/mode -> {stub}) rather than guessing from the
-  /// device's server_mode flag, so the TEST PURCHASE path is offered exactly
-  /// when the server will accept a store='stub' body — never against a real
-  /// apple/google server (which would reject it), never hidden on a stub server
-  /// (which has no Apple/Google products yet).
+  /// [LOCAL-699 / LOCAL-734] Whether THIS platform should run the server's
+  /// TEST PURCHASE (stub) path rather than drive the real store. Asks the
+  /// server (GET /purchases/mode) rather than guessing from the device's
+  /// server_mode flag, so the TEST PURCHASE path is offered exactly when the
+  /// server will accept a store='stub' body for this platform.
+  ///
+  /// [LOCAL-734] per_store: the server verifies by platform from ONE stack —
+  /// real Apple sandbox on iOS, a TEST PURCHASE on Android (there is no Play
+  /// service account locally yet). So the decision is now PER-PLATFORM:
+  ///   • if the body carries a `platforms` map (a per_store-aware server), use
+  ///     THIS platform's value: 'stub' ⇒ TEST PURCHASE (return true); 'apple'
+  ///     or 'google' ⇒ drive the real store (return false). On iOS that means
+  ///     StoreKit (real sandbox on a dev/TestFlight build); on Android TEST
+  ///     PURCHASE only when android == 'stub'.
+  ///   • without `platforms` (an older server), fall back to today's single
+  ///     top-level `stub` bool, so behaviour is unchanged for old servers.
   ///
   /// Falls back to the device-side [isLocalStubMode] guess when the endpoint is
-  /// unreachable or returns a non-200 / malformed body (an older server without
-  /// the route, or a transient network error), so the buy flow still works. The
-  /// result is NOT cached: the server mode can change between a LOCAL and a
-  /// cloud stack as the tester switches servers.
+  /// unreachable or returns a non-200 / malformed body. The result is NOT
+  /// cached: the server mode can change as the tester switches servers.
   Future<bool> purchasesModeIsStub() async {
     try {
       final resp = await Endpoints.get(
@@ -295,8 +303,13 @@ class IapService {
       );
       if (resp.statusCode == 200) {
         final map = Endpoints.tryDecodeMap(resp.body);
-        if (map != null && map['stub'] is bool) {
-          return map['stub'] as bool;
+        if (map != null) {
+          final decided = stubFromModeResponse(
+            map,
+            isIOS: Platform.isIOS,
+            isAndroid: Platform.isAndroid,
+          );
+          if (decided != null) return decided;
         }
       }
       await DebugLogHelper.addDebugLog(
@@ -307,6 +320,38 @@ class IapService {
           'IAP: /purchases/mode error: $e — falling back to device server_mode');
     }
     return isLocalStubMode();
+  }
+
+  /// [LOCAL-734] Pure per-platform decision for [purchasesModeIsStub], split out
+  /// so it can be unit-tested without a network call or a running server.
+  ///
+  /// Given a decoded GET /purchases/mode body and the current platform, returns
+  /// whether THIS platform should run the TEST PURCHASE (stub) path:
+  ///   • if `platforms` is present (a per_store-aware server), decide by this
+  ///     platform's value — 'stub' ⇒ true (TEST PURCHASE); 'apple'/'google' ⇒
+  ///     false (drive the real store). iOS therefore uses StoreKit; Android
+  ///     uses TEST PURCHASE only when android == 'stub'.
+  ///   • without `platforms` (a legacy server), fall back to the top-level
+  ///     `stub` bool (today's behaviour).
+  ///   • if neither is usable, return null so the caller falls back to its
+  ///     device-side guess.
+  static bool? stubFromModeResponse(
+    Map<dynamic, dynamic> map, {
+    required bool isIOS,
+    required bool isAndroid,
+  }) {
+    final platforms = map['platforms'];
+    if (platforms is Map) {
+      final key = isIOS ? 'ios' : 'android';
+      final v = platforms[key];
+      if (v is String) {
+        // Only the stub value means "run the TEST PURCHASE path here".
+        return v == 'stub';
+      }
+    }
+    final stub = map['stub'];
+    if (stub is bool) return stub;
+    return null;
   }
 
   /// Buy (unlock) ONE tour at the given price [tier] through the store, then the

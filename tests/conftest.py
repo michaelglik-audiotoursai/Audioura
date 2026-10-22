@@ -91,6 +91,16 @@ class _GuardedConnection:
     def __getattr__(self, name):
         return getattr(self._conn, name)
 
+    def __setattr__(self, name, value):
+        # [LOCAL-734, LEAD] Forward public attributes (autocommit, isolation_level,
+        # readonly, …) to the real connection. Without this, `conn.autocommit =
+        # True` landed on the wrapper only, the real connection stayed in a
+        # transaction, and a test that then hit an app `ALTER TABLE` deadlocked.
+        if name.startswith('_'):
+            object.__setattr__(self, name, value)
+        else:
+            setattr(self._conn, name, value)
+
     def __enter__(self):
         return self
 

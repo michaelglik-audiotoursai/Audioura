@@ -544,11 +544,20 @@ def register_pricing_routes(app):
         finally:
             conn.close()
         # Shape as an ordered list the app can render directly. Each row carries
-        # tier, product_id, price_usd, label and [LOCAL-686] in_picker (TRUE for
-        # the 34 ladder steps the guide's picker offers; FALSE for the legacy .99
-        # tiers kept only for already-priced tours).
-        out = [
-            {"tier": t, **info}
-            for t, info in sorted(tiers.items())
-        ]
+        # tier, product_id, price_usd, label and in_picker.
+        #
+        # [LOCAL-734] Release plan L4: the picker must offer ONLY tour products
+        # that exist on the stores now. We cap the served in_picker to the
+        # Apple-live allowlist (price_tiers.APPLE_LIVE_TOUR_PRODUCTS) HERE, over
+        # whatever the DB table carries, so the app (which filters on in_picker)
+        # can never offer a price with no store product — without a DB rewrite
+        # and without hard-coding the list in the app. A tour already priced
+        # outside the list keeps its price; this only governs the picker.
+        live = price_tiers_cfg.APPLE_LIVE_TOUR_PRODUCTS
+        out = []
+        for t, info in sorted(tiers.items()):
+            row = {"tier": t, **info}
+            row["in_picker"] = bool(info.get("in_picker")) and (
+                info.get("product_id") in live)
+            out.append(row)
         return jsonify({"tiers": out}), 200

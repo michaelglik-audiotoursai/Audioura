@@ -69,7 +69,15 @@ services:
   user-api-2:                             # LOCAL-595/596/598 entitlements, queue, IAP verify
     build: {context: /Users/micha/audioura-subscribed-local/user-tracking}
     environment:
-      IAP_VERIFY_MODE: stub                 # D652: TEST PURCHASE on the local stack until the Apple/Google products exist (was: apple)
+      # LOCAL-734: per-platform verification from ONE server. The iPhone drives
+      # REAL Apple sandbox purchases (store='apple' → the JWS verifier, Sandbox
+      # per APPLE_IAP_ENVIRONMENT); the sideloaded Pixel debug build runs a TEST
+      # PURCHASE (store='stub'), which the server grants ONLY because
+      # IAP_ALLOW_STUB_STORE is on. There is no Play service account locally yet,
+      # so a store='google' purchase is refused (never granted). GCloud must
+      # NEVER set IAP_ALLOW_STUB_STORE. (Was: IAP_VERIFY_MODE: stub — D652.)
+      IAP_VERIFY_MODE: per_store
+      IAP_ALLOW_STUB_STORE: "true"          # LOCAL ONLY (LOCAL-734): allow the Android TEST PURCHASE (store='stub'). GCloud never sets this.
       APPLE_IAP_ENVIRONMENT: Sandbox
       ALLOW_UNAUTHENTICATED_ENTITLEMENTS: "true"   # LOCAL ONLY (LOCAL-598B); no GATEWAY_API_KEY on the Mac Mini
       ADMIN_API_KEY: ${ADMIN_API_KEY}       # D691: admin-only moderation endpoints; fail closed (503) when unset. Value lives only in ~/Audioura/.env

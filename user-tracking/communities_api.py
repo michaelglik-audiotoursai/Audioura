@@ -251,6 +251,22 @@ def is_community_pass_product(product):
     return isinstance(product, str) and product.startswith('audioura.pass.')
 
 
+# [LOCAL-734] Release plan L4: the organiser's pass picker must offer ONLY the
+# pass products that EXIST on the stores now. Michael created the phase-1
+# products on 2026-10-22; the PASS prices among them are $1/$5/$10/$20. The pass
+# catalogue (community_pass_products, migration 029/038) still seeds usd1..usd200
+# so existing communities keep any price they already offer, but a NEW community
+# may only pick from this list — offering a price with no store product would
+# make the join purchase fail with "product not found". One shared, server-side
+# list (not hard-coded in the app); adding a store product is one edit here.
+APPLE_LIVE_PASS_PRODUCTS = frozenset({
+    'audioura.pass.usd1',
+    'audioura.pass.usd5',
+    'audioura.pass.usd10',
+    'audioura.pass.usd20',
+})
+
+
 # The four lengths and their day durations (calendar-free arithmetic). The
 # LENGTH lives on the community's pass OPTION (community_passes), not the Apple
 # product — one product per PRICE serves every length (LEAD review of LOCAL-690).
@@ -1268,18 +1284,52 @@ class _PassResult:
         self.payload = payload
 
 
+def _resolve_verify_mode(store):
+    """[LOCAL-734] Resolve the verification backend for a pass purchase with the
+    given request `store`, using the SAME shared selector every other purchase
+    path uses so the pass path can never drift.
+
+    Delegates to entitlements_api._verifier_for (one source of truth for the
+    per_store policy — which store the Android TEST PURCHASE/stub path is allowed
+    on, when Google is unconfigured, etc.). If that import is unavailable (a
+    deployment that ships communities_api without entitlements_api), fall back to
+    this module's own IAP_VERIFY_MODE — the three original modes behave exactly
+    as before, so the fallback only loses the (import-only) per_store policy.
+
+    Returns 'stub' | 'apple' | 'google', or a refusal string
+    ('stub_store_not_allowed' | 'google_not_configured')."""
+    try:
+        import entitlements_api
+        return entitlements_api._verifier_for(store)
+    except Exception:  # noqa: BLE001 — never fail a purchase over the import
+        return IAP_VERIFY_MODE
+
+
 def _verify_pass_signed(store, transaction_id, product, signed_transaction):
     """Verify a community PASS purchase with the configured backend.
 
     stub : any non-empty transaction id (sandbox). apple : the StoreKit 2 JWS
     checked offline against the pass store product id (a Consumable — a non-
-    renewing pass is a consumable to StoreKit). Returns (ok, raw_status)."""
-    if IAP_VERIFY_MODE == 'stub':
+    renewing pass is a consumable to StoreKit). Returns (ok, raw_status).
+
+    [LOCAL-734] The backend is chosen by the SAME shared helper every other
+    purchase path uses (entitlements_api._verifier_for), so per_store mode
+    routes a pass purchase identically to a level/tour: Apple on iOS, stub or
+    Google on Android. The three original modes are unchanged."""
+    mode = _resolve_verify_mode(store)
+    if mode == 'stub_store_not_allowed':
+        return False, 'stub_store_not_allowed'
+    if mode == 'google_not_configured':
+        # Treated as "unconfigured": verify_community_pass maps the
+        # google_verify_unconfigured sentinel to a 503 (never a 402/ grant).
+        return False, 'google_verify_unconfigured'
+
+    if mode == 'stub':
         if not transaction_id:
             return False, 'stub_rejected_empty_transaction'
         return True, 'stub_verified'
 
-    if IAP_VERIFY_MODE == 'apple':
+    if mode == 'apple':
         if store != 'apple':
             return False, f'apple_mode_wrong_store:{store}'
         if not signed_transaction:
@@ -1310,7 +1360,7 @@ def _verify_pass_signed(store, transaction_id, product, signed_transaction):
             return False, f'apple_error:{e}'
         return True, f'apple_verified:{verified.transaction_id}'
 
-    if IAP_VERIFY_MODE == 'google':
+    if mode == 'google':
         # [LOCAL-696] A pass product's store id IS `product`; the opaque Google
         # purchaseToken arrives in signed_transaction (reused field). Verify,
         # acknowledge and consume via the Play Developer API. The sentinel
@@ -1352,7 +1402,7 @@ def _verify_pass_signed(store, transaction_id, product, signed_transaction):
             return False, f'google_error:{e}'
         return True, f'google_verified:{verified.order_id}'
 
-    return False, f'verify_mode_not_implemented:{IAP_VERIFY_MODE}'
+    return False, f'verify_mode_not_implemented:{mode}'
 
 
 def verify_community_pass(store, transaction_id, product, user_id,
@@ -1765,6 +1815,19 @@ def create_community():
                 cur.close()
                 return jsonify({"error": "bad_length",
                                 "message": f"Unknown pass length '{length}'."}), 400
+            # [LOCAL-734] Release plan L4: only offer pass prices that exist on
+            # the stores now. Refuse a product outside the Apple-live list even
+            # if it is an active catalogue row (the picker should never have
+            # shown it); this is the server-side gate behind the organiser's
+            # pass picker, mirroring the tour price picker's in_picker cap.
+            if product_id not in APPLE_LIVE_PASS_PRODUCTS:
+                conn.rollback()
+                cur.close()
+                return jsonify({
+                    "error": "pass_product_not_available",
+                    "message": f"Pass product '{product_id}' is not available "
+                               f"yet. Choose $1, $5, $10 or $20.",
+                }), 400
             cur.execute(
                 "SELECT 1 FROM community_pass_products WHERE product_id = %s AND active = TRUE",
                 (product_id,),

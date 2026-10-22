@@ -30,10 +30,29 @@ a tour.
 # product ids are CONSUMABLES in App Store Connect / the StoreKit config file;
 # the app sells exactly these. Keep in lock-step with the migration seed rows.
 #
-# in_picker (LOCAL-686): TRUE if the guide's price PICKER offers this tier. The
-# seven legacy .99 tiers (1..7, migrations 022/024) are kept ACTIVE so tours
-# already priced with them keep their price, but in_picker is FALSE — the picker
-# offers only the LADDER (tiers 8..41, migration 026).
+# in_picker (LOCAL-686 → [LOCAL-734]): TRUE if the guide's price PICKER offers
+# this tier. LOCAL-686 opened the whole 34-step round-dollar ladder (tiers
+# 8..41). Release plan L4 (LOCAL-734) NARROWS the picker to ONLY the tour
+# products that EXIST on the App Store / Play right now — Michael created the 11
+# phase-1 products on 2026-10-22, of which the TOUR tiers are $3/$5/$10/$20/$50.
+# Offering a price with no store product would make the buy fail (the store
+# returns "product not found"), so the picker must not show it. The other ladder
+# steps stay VALID (a tour already priced at, say, $7 keeps its price — no DB
+# rewrite) but in_picker is FALSE until their store products exist. The seven
+# legacy .99 tiers (1..7) remain in_picker FALSE as before.
+#
+# APPLE_LIVE_TOUR_PRODUCTS is the single list of tour products that exist on the
+# stores now; in_picker below is derived from it, so adding a product on the
+# store is one edit here (and the matching migration row). It is defined just
+# before the table and referenced by product_id.
+APPLE_LIVE_TOUR_PRODUCTS = frozenset({
+    "audioura.tour.usd3",
+    "audioura.tour.usd5",
+    "audioura.tour.usd10",
+    "audioura.tour.usd20",
+    "audioura.tour.usd50",
+})
+
 DEFAULT_PRICE_TIERS = {
     # ── Legacy .99 tiers 1..7 (022/024) — ACTIVE but hidden from the picker ──
     1: {"product_id": "audioura.tour.tier1", "price_usd": 1.99, "label": "$1.99", "in_picker": False},
@@ -44,42 +63,49 @@ DEFAULT_PRICE_TIERS = {
     6: {"product_id": "audioura.tour.tier6", "price_usd": 19.99, "label": "$19.99", "in_picker": False},
     7: {"product_id": "audioura.tour.tier7", "price_usd": 49.99, "label": "$49.99", "in_picker": False},
     # ── [LOCAL-686] the round-dollar LADDER (migration 026), tiers 8..41 ──────
-    # $2..$20 /$1, $25..$50 /$5, $60..$100 /$10, $125..$200 /$25 = 34 steps.
-    8: {"product_id": "audioura.tour.usd2", "price_usd": 2.0, "label": "$2", "in_picker": True},
+    # [LOCAL-734] in_picker is TRUE only for the Apple-live tour products
+    # ($3/$5/$10/$20/$50); the rest stay valid but are hidden until their store
+    # products exist.
+    8: {"product_id": "audioura.tour.usd2", "price_usd": 2.0, "label": "$2", "in_picker": False},
     9: {"product_id": "audioura.tour.usd3", "price_usd": 3.0, "label": "$3", "in_picker": True},
-    10: {"product_id": "audioura.tour.usd4", "price_usd": 4.0, "label": "$4", "in_picker": True},
+    10: {"product_id": "audioura.tour.usd4", "price_usd": 4.0, "label": "$4", "in_picker": False},
     11: {"product_id": "audioura.tour.usd5", "price_usd": 5.0, "label": "$5", "in_picker": True},
-    12: {"product_id": "audioura.tour.usd6", "price_usd": 6.0, "label": "$6", "in_picker": True},
-    13: {"product_id": "audioura.tour.usd7", "price_usd": 7.0, "label": "$7", "in_picker": True},
-    14: {"product_id": "audioura.tour.usd8", "price_usd": 8.0, "label": "$8", "in_picker": True},
-    15: {"product_id": "audioura.tour.usd9", "price_usd": 9.0, "label": "$9", "in_picker": True},
+    12: {"product_id": "audioura.tour.usd6", "price_usd": 6.0, "label": "$6", "in_picker": False},
+    13: {"product_id": "audioura.tour.usd7", "price_usd": 7.0, "label": "$7", "in_picker": False},
+    14: {"product_id": "audioura.tour.usd8", "price_usd": 8.0, "label": "$8", "in_picker": False},
+    15: {"product_id": "audioura.tour.usd9", "price_usd": 9.0, "label": "$9", "in_picker": False},
     16: {"product_id": "audioura.tour.usd10", "price_usd": 10.0, "label": "$10", "in_picker": True},
-    17: {"product_id": "audioura.tour.usd11", "price_usd": 11.0, "label": "$11", "in_picker": True},
-    18: {"product_id": "audioura.tour.usd12", "price_usd": 12.0, "label": "$12", "in_picker": True},
-    19: {"product_id": "audioura.tour.usd13", "price_usd": 13.0, "label": "$13", "in_picker": True},
-    20: {"product_id": "audioura.tour.usd14", "price_usd": 14.0, "label": "$14", "in_picker": True},
-    21: {"product_id": "audioura.tour.usd15", "price_usd": 15.0, "label": "$15", "in_picker": True},
-    22: {"product_id": "audioura.tour.usd16", "price_usd": 16.0, "label": "$16", "in_picker": True},
-    23: {"product_id": "audioura.tour.usd17", "price_usd": 17.0, "label": "$17", "in_picker": True},
-    24: {"product_id": "audioura.tour.usd18", "price_usd": 18.0, "label": "$18", "in_picker": True},
-    25: {"product_id": "audioura.tour.usd19", "price_usd": 19.0, "label": "$19", "in_picker": True},
+    17: {"product_id": "audioura.tour.usd11", "price_usd": 11.0, "label": "$11", "in_picker": False},
+    18: {"product_id": "audioura.tour.usd12", "price_usd": 12.0, "label": "$12", "in_picker": False},
+    19: {"product_id": "audioura.tour.usd13", "price_usd": 13.0, "label": "$13", "in_picker": False},
+    20: {"product_id": "audioura.tour.usd14", "price_usd": 14.0, "label": "$14", "in_picker": False},
+    21: {"product_id": "audioura.tour.usd15", "price_usd": 15.0, "label": "$15", "in_picker": False},
+    22: {"product_id": "audioura.tour.usd16", "price_usd": 16.0, "label": "$16", "in_picker": False},
+    23: {"product_id": "audioura.tour.usd17", "price_usd": 17.0, "label": "$17", "in_picker": False},
+    24: {"product_id": "audioura.tour.usd18", "price_usd": 18.0, "label": "$18", "in_picker": False},
+    25: {"product_id": "audioura.tour.usd19", "price_usd": 19.0, "label": "$19", "in_picker": False},
     26: {"product_id": "audioura.tour.usd20", "price_usd": 20.0, "label": "$20", "in_picker": True},
-    27: {"product_id": "audioura.tour.usd25", "price_usd": 25.0, "label": "$25", "in_picker": True},
-    28: {"product_id": "audioura.tour.usd30", "price_usd": 30.0, "label": "$30", "in_picker": True},
-    29: {"product_id": "audioura.tour.usd35", "price_usd": 35.0, "label": "$35", "in_picker": True},
-    30: {"product_id": "audioura.tour.usd40", "price_usd": 40.0, "label": "$40", "in_picker": True},
-    31: {"product_id": "audioura.tour.usd45", "price_usd": 45.0, "label": "$45", "in_picker": True},
+    27: {"product_id": "audioura.tour.usd25", "price_usd": 25.0, "label": "$25", "in_picker": False},
+    28: {"product_id": "audioura.tour.usd30", "price_usd": 30.0, "label": "$30", "in_picker": False},
+    29: {"product_id": "audioura.tour.usd35", "price_usd": 35.0, "label": "$35", "in_picker": False},
+    30: {"product_id": "audioura.tour.usd40", "price_usd": 40.0, "label": "$40", "in_picker": False},
+    31: {"product_id": "audioura.tour.usd45", "price_usd": 45.0, "label": "$45", "in_picker": False},
     32: {"product_id": "audioura.tour.usd50", "price_usd": 50.0, "label": "$50", "in_picker": True},
-    33: {"product_id": "audioura.tour.usd60", "price_usd": 60.0, "label": "$60", "in_picker": True},
-    34: {"product_id": "audioura.tour.usd70", "price_usd": 70.0, "label": "$70", "in_picker": True},
-    35: {"product_id": "audioura.tour.usd80", "price_usd": 80.0, "label": "$80", "in_picker": True},
-    36: {"product_id": "audioura.tour.usd90", "price_usd": 90.0, "label": "$90", "in_picker": True},
-    37: {"product_id": "audioura.tour.usd100", "price_usd": 100.0, "label": "$100", "in_picker": True},
-    38: {"product_id": "audioura.tour.usd125", "price_usd": 125.0, "label": "$125", "in_picker": True},
-    39: {"product_id": "audioura.tour.usd150", "price_usd": 150.0, "label": "$150", "in_picker": True},
-    40: {"product_id": "audioura.tour.usd175", "price_usd": 175.0, "label": "$175", "in_picker": True},
-    41: {"product_id": "audioura.tour.usd200", "price_usd": 200.0, "label": "$200", "in_picker": True},
+    33: {"product_id": "audioura.tour.usd60", "price_usd": 60.0, "label": "$60", "in_picker": False},
+    34: {"product_id": "audioura.tour.usd70", "price_usd": 70.0, "label": "$70", "in_picker": False},
+    35: {"product_id": "audioura.tour.usd80", "price_usd": 80.0, "label": "$80", "in_picker": False},
+    36: {"product_id": "audioura.tour.usd90", "price_usd": 90.0, "label": "$90", "in_picker": False},
+    37: {"product_id": "audioura.tour.usd100", "price_usd": 100.0, "label": "$100", "in_picker": False},
+    38: {"product_id": "audioura.tour.usd125", "price_usd": 125.0, "label": "$125", "in_picker": False},
+    39: {"product_id": "audioura.tour.usd150", "price_usd": 150.0, "label": "$150", "in_picker": False},
+    40: {"product_id": "audioura.tour.usd175", "price_usd": 175.0, "label": "$175", "in_picker": False},
+    41: {"product_id": "audioura.tour.usd200", "price_usd": 200.0, "label": "$200", "in_picker": False},
 }
+
+# [LOCAL-734] Belt-and-braces: derive in_picker from the Apple-live list so the
+# two can never drift (a hand-edited row above that disagrees is corrected here).
+for _t, _info in DEFAULT_PRICE_TIERS.items():
+    _info["in_picker"] = _info["product_id"] in APPLE_LIVE_TOUR_PRODUCTS
 
 # The valid tier numbers, in order.
 TIER_NUMBERS = tuple(sorted(DEFAULT_PRICE_TIERS.keys()))
@@ -230,11 +256,21 @@ def picker_tiers(cur=None):
     """{tier: info} for only the tiers the guide's PICKER offers (in_picker TRUE).
 
     The 34 round-dollar ladder steps (migration 026). The seven legacy .99 tiers
-    stay valid for already-priced tours but never appear here."""
+    stay valid for already-priced tours but never appear here.
+
+    [LOCAL-734] Release plan L4: the picker is additionally capped to the tour
+    products that EXIST on the stores now (APPLE_LIVE_TOUR_PRODUCTS —
+    $3/$5/$10/$20/$50). This cap is applied HERE, over whatever in_picker the DB
+    table carries, so a DB that still marks the whole ladder in_picker (migration
+    026 seeded them all TRUE) cannot make the app offer a price with no store
+    product. Adding a store product is one edit to APPLE_LIVE_TOUR_PRODUCTS (and
+    the matching migration row). A tour already priced outside this list keeps
+    its price — this only governs what the PICKER offers, not existing prices."""
     return {
         t: info
         for t, info in load_price_tiers(cur).items()
         if info.get("in_picker", True)
+        and info.get("product_id") in APPLE_LIVE_TOUR_PRODUCTS
     }
 
 

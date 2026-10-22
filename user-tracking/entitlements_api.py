@@ -41,8 +41,22 @@ DATABASE_URL = os.getenv('DATABASE_URL', 'postgresql://admin:password123@localho
 API_KEY = os.getenv('GATEWAY_API_KEY', '')
 # LEAD 2026-10-06: default 'apple' — a 'stub' default would grant a free pack to any
 # POST /purchases/verify. Tests set IAP_VERIFY_MODE=stub explicitly.
-IAP_VERIFY_MODE = os.getenv('IAP_VERIFY_MODE', 'apple')  # 'stub' | 'apple' | 'google'
+#
+# [LOCAL-734] A fourth mode, 'per_store', chooses the backend by the request's
+# `store` instead of one global value, so ONE server can verify real Apple
+# sandbox purchases from the iPhone AND accept a TEST PURCHASE from a sideloaded
+# Android build at the same time (Michael's Subscribed review uses both phones,
+# and there is no Play service account locally yet). The three original modes
+# ('stub' | 'apple' | 'google') keep working EXACTLY as before.
+IAP_VERIFY_MODE = os.getenv('IAP_VERIFY_MODE', 'apple')  # 'stub' | 'apple' | 'google' | 'per_store'
 RENEWAL_WARN_DAYS = int(os.getenv('RENEWAL_WARN_DAYS', '3'))
+
+# [LOCAL-734] In per_store mode a store=='stub' purchase (the Android TEST
+# PURCHASE path) is granted ONLY when this flag is explicitly on. It defaults
+# OFF so a per_store server never grants on an unsigned stub transaction by
+# accident; GCloud must NEVER set it. It has no effect in the other three modes
+# (plain 'stub' mode already grants; 'apple'/'google' never take a stub store).
+IAP_ALLOW_STUB_STORE = os.getenv('IAP_ALLOW_STUB_STORE', '').lower() in ('true', '1', 'yes')
 
 # [LOCAL-598] Apple verification config. The bundle id the JWS must carry; the
 # path to the bundled Apple Root CA G3 we pin the x5c chain to.
@@ -576,6 +590,93 @@ def _me_payload(cur, user_id, now=None):
 
 
 # ───────────────────────────────────────────────────────────────────────────
+# [LOCAL-734] Shared verifier selection — the ONE place every purchase path
+# (level, tour, pass, restore) asks "which backend verifies THIS store?". It
+# replaces three copies of `if IAP_VERIFY_MODE == ...` so a new mode or policy
+# lives in exactly one function.
+# ───────────────────────────────────────────────────────────────────────────
+# Returned by _verifier_for when a store must be REFUSED (never granted). The
+# code travels in raw_status so the HTTP layer can map it (stub-not-allowed and
+# google-not-configured both become refusals, never a silent grant).
+_STUB_STORE_NOT_ALLOWED = 'stub_store_not_allowed'
+_GOOGLE_NOT_CONFIGURED = 'google_not_configured'
+
+
+def _verifier_for(store):
+    """[LOCAL-734] Resolve the verification backend for a purchase with the
+    given request `store`, honouring the configured IAP_VERIFY_MODE.
+
+    Returns one of:
+      * 'stub'   — grant on any non-empty transaction id (no crypto, no charge);
+      * 'apple'  — verify the StoreKit 2 JWS offline (Sandbox/Production per
+                   APPLE_IAP_ENVIRONMENT);
+      * 'google' — verify the purchase token with the Play Developer API;
+      * a REFUSAL string (never grant): _STUB_STORE_NOT_ALLOWED or
+        _GOOGLE_NOT_CONFIGURED.
+
+    The three ORIGINAL modes are unchanged: 'stub'/'apple'/'google' always
+    resolve to themselves (the per-store verify functions already reject a
+    mismatched store, e.g. apple mode + store='google'). Only 'per_store' uses
+    the request store:
+      * store == 'apple'  -> 'apple'  (real Apple JWS);
+      * store == 'google' -> 'google' when a Play service account is configured,
+                             else _GOOGLE_NOT_CONFIGURED (never grant);
+      * store == 'stub'   -> 'stub' ONLY when IAP_ALLOW_STUB_STORE is on, else
+                             _STUB_STORE_NOT_ALLOWED;
+      * any other store   -> _STUB_STORE_NOT_ALLOWED (unknown store, refuse).
+
+    Read live (module globals, not captured) so a test that monkeypatches
+    IAP_VERIFY_MODE / IAP_ALLOW_STUB_STORE sees the change.
+    """
+    mode = IAP_VERIFY_MODE
+    if mode != 'per_store':
+        # 'stub' / 'apple' / 'google' (and anything unrecognised) pass through
+        # exactly as before; the verify functions handle an unknown mode with
+        # their existing verify_mode_not_implemented path.
+        return mode
+
+    if store == 'apple':
+        return 'apple'
+    if store == 'google':
+        # Never grant a Google purchase without a service account to verify it.
+        return 'google' if _google_api_client() is not None else _GOOGLE_NOT_CONFIGURED
+    if store == 'stub':
+        return 'stub' if IAP_ALLOW_STUB_STORE else _STUB_STORE_NOT_ALLOWED
+    # Unknown store under per_store: refuse rather than guess.
+    return _STUB_STORE_NOT_ALLOWED
+
+
+def _platform_modes():
+    """[LOCAL-734] The per-platform verifier answer for /purchases/mode, so the
+    app chooses the right buy path on EACH platform without guessing.
+
+    Returns {'ios': <v>, 'android': <v>} where each <v> is one of 'apple',
+    'google' or 'stub' — what store the app should drive on that platform:
+      * per_store: ios -> 'apple' (real StoreKit sandbox/prod); android ->
+        'google' when a Play SA is configured, else 'stub' when
+        IAP_ALLOW_STUB_STORE is on (the Android TEST PURCHASE path), else
+        'google' (the app will attempt real Play billing and the server will
+        refuse an unverifiable purchase — it never silently grants).
+      * stub:   both platforms -> 'stub'.
+      * apple:  both platforms -> 'apple'.
+      * google: both platforms -> 'google'.
+    """
+    mode = IAP_VERIFY_MODE
+    if mode == 'per_store':
+        if _google_api_client() is not None:
+            android = 'google'
+        elif IAP_ALLOW_STUB_STORE:
+            android = 'stub'
+        else:
+            android = 'google'
+        return {'ios': 'apple', 'android': android}
+    if mode in ('stub', 'apple', 'google'):
+        return {'ios': mode, 'android': mode}
+    # Unknown/unimplemented mode: report it verbatim on both platforms.
+    return {'ios': mode, 'android': mode}
+
+
+# ───────────────────────────────────────────────────────────────────────────
 # IAP verifier interface + sandbox stub + offline Apple verification
 # ───────────────────────────────────────────────────────────────────────────
 class VerificationResult:
@@ -673,13 +774,22 @@ def verify_purchase(store, transaction_id, product, signed_transaction=None):
              CA G3, ES256 signature, bundleId, productId and type==Consumable.
              No API key, no network. The verified transactionId from the JWS is
              authoritative; it is returned in raw_status for the caller.
+
+    [LOCAL-734] The backend is chosen by the shared _verifier_for(store) helper,
+    so per_store mode (Apple on iOS, stub/Google on Android) routes here too.
     """
-    if IAP_VERIFY_MODE == 'stub':
+    mode = _verifier_for(store)
+    if mode == _STUB_STORE_NOT_ALLOWED:
+        return VerificationResult(False, _STUB_STORE_NOT_ALLOWED)
+    if mode == _GOOGLE_NOT_CONFIGURED:
+        return VerificationResult(False, _GOOGLE_NOT_CONFIGURED, unconfigured=True)
+
+    if mode == 'stub':
         if not transaction_id:
             return VerificationResult(False, 'stub_rejected_empty_transaction')
         return VerificationResult(True, 'stub_verified', _PLAN_AMOUNTS.get(product))
 
-    if IAP_VERIFY_MODE == 'apple':
+    if mode == 'apple':
         if store != 'apple':
             return VerificationResult(False, f'apple_mode_wrong_store:{store}')
         if not signed_transaction:
@@ -718,7 +828,7 @@ def verify_purchase(store, transaction_id, product, signed_transaction=None):
             True, f'apple_verified:{verified.transaction_id}',
             _PLAN_AMOUNTS.get(product))
 
-    if IAP_VERIFY_MODE == 'google':
+    if mode == 'google':
         # [LOCAL-696] The device sends the STORE product id in `product` and the
         # opaque purchaseToken in `signed_transaction` (reused field; the app's
         # google path puts the token there). The Play product id for a level is
@@ -731,7 +841,7 @@ def verify_purchase(store, transaction_id, product, signed_transaction=None):
             amount=_PLAN_AMOUNTS.get(product), tag='LOCAL-696')
 
     # other: not implemented.
-    return VerificationResult(False, f'verify_mode_not_implemented:{IAP_VERIFY_MODE}')
+    return VerificationResult(False, f'verify_mode_not_implemented:{mode}')
 
 
 # ───────────────────────────────────────────────────────────────────────────
@@ -1021,14 +1131,23 @@ def _verify_tour_signed(store, transaction_id, product, signed_transaction):
     stub : any non-empty transaction id (sandbox) — the LOCAL path until Apple
            and Google products exist. apple : the StoreKit 2 JWS checked offline
            against the tour store product id (a Consumable). google : not yet.
+
+    [LOCAL-734] The backend is chosen by the shared _verifier_for(store) helper,
+    so per_store mode routes a tour purchase the same way as a level/pass.
     """
-    if IAP_VERIFY_MODE == 'stub':
+    mode = _verifier_for(store)
+    if mode == _STUB_STORE_NOT_ALLOWED:
+        return VerificationResult(False, _STUB_STORE_NOT_ALLOWED)
+    if mode == _GOOGLE_NOT_CONFIGURED:
+        return VerificationResult(False, _GOOGLE_NOT_CONFIGURED, unconfigured=True)
+
+    if mode == 'stub':
         if not transaction_id:
             return VerificationResult(False, 'stub_rejected_empty_transaction')
         return VerificationResult(True, 'stub_verified',
                                   TOUR_TIER_PRODUCTS.get(product, {}).get('price_usd'))
 
-    if IAP_VERIFY_MODE == 'apple':
+    if mode == 'apple':
         if store != 'apple':
             return VerificationResult(False, f'apple_mode_wrong_store:{store}')
         if not signed_transaction:
@@ -1060,7 +1179,7 @@ def _verify_tour_signed(store, transaction_id, product, signed_transaction):
             True, f'apple_verified:{verified.transaction_id}',
             TOUR_TIER_PRODUCTS.get(product, {}).get('price_usd'))
 
-    if IAP_VERIFY_MODE == 'google':
+    if mode == 'google':
         # [LOCAL-696] A tour product's store id IS `product`; the opaque
         # purchaseToken arrives in signed_transaction (reused field).
         return _google_verify(
@@ -1069,40 +1188,52 @@ def _verify_tour_signed(store, transaction_id, product, signed_transaction):
             amount=TOUR_TIER_PRODUCTS.get(product, {}).get('price_usd'),
             tag='LOCAL-696-tour')
 
-    return VerificationResult(False, f'verify_mode_not_implemented:{IAP_VERIFY_MODE}')
+    return VerificationResult(False, f'verify_mode_not_implemented:{mode}')
 
 
 @entitlements_bp.route('/purchases/mode', methods=['GET'])
 def purchases_mode():
-    """[LOCAL-699] Report how this server verifies purchases, so the app can
-    choose the right buy path on BOTH platforms WITHOUT guessing from a device-
-    side flag.
+    """[LOCAL-699 / LOCAL-734] Report how this server verifies purchases, so the
+    app can choose the right buy path on EACH platform WITHOUT guessing from a
+    device-side flag.
 
-    Returns {"mode": <IAP_VERIFY_MODE>, "stub": <bool>, "verifies_real": <bool>}:
-      • mode          — the raw IAP_VERIFY_MODE ('stub' | 'apple' | 'google').
-      • stub          — true iff mode == 'stub': the server grants on any non-
-                        empty transaction id (no real store, no charge), so the
-                        app offers a TEST PURCHASE that posts store='stub' to
-                        /purchases/verify. This is the Mac Mini LOCAL stack.
-      • verifies_real — the inverse: a real-verification server (apple/google)
-                        where the app must drive StoreKit / Play billing.
+    Returns
+      {"mode": <IAP_VERIFY_MODE>, "stub": <bool>, "verifies_real": <bool>,
+       "platforms": {"ios": <v>, "android": <v>}}:
+      • mode          — the raw IAP_VERIFY_MODE
+                        ('stub' | 'apple' | 'google' | 'per_store').
+      • stub          — [legacy, unchanged for old apps] true ONLY in plain
+                        'stub' mode: the whole server grants on any non-empty
+                        transaction id (no real store, no charge). A per_store
+                        server answers stub=FALSE even though it accepts a stub
+                        store on Android — an old app (no `platforms` key) must
+                        NOT treat per_store as a global TEST PURCHASE server.
+      • verifies_real — the inverse of `stub` (legacy meaning preserved).
+      • platforms     — [LOCAL-734] the per-platform answer a new app reads
+                        first: each value is the store that platform should
+                        drive — 'apple' (StoreKit), 'google' (Play billing) or
+                        'stub' (the TEST PURCHASE path that posts store='stub').
+                        per_store ⇒ {"ios":"apple","android":"stub"|"google"};
+                        the three original modes repeat the mode on both.
 
-    A LOCAL stack with IAP_VERIFY_MODE=stub answers stub=true; cloud (apple,
-    the default) answers stub=false. This replaces the app's device-side
-    server_mode guess with the server's own authoritative answer, so the TEST
-    PURCHASE path can never be offered against a real-verification server (which
-    would reject a store='stub' body) nor hidden on a stub server (which has no
-    Apple/Google products yet). No DB access; auth is the same X-API-Key gate as
-    the other routes (the local bypass applies identically)."""
+    A LOCAL stack with IAP_VERIFY_MODE=stub answers stub=true; cloud (apple, the
+    default) answers stub=false. The per_store Mac Mini stack answers stub=false
+    with platforms={"ios":"apple","android":"stub"} (SA absent + stub allowed),
+    so the iPhone drives real Apple sandbox and the Pixel runs a TEST PURCHASE,
+    from ONE server. No DB access; auth is the same X-API-Key gate as the other
+    routes (the local bypass applies identically)."""
     err = _require_api_key()
     if err:
         return err
     mode = IAP_VERIFY_MODE
+    # Legacy field: true ONLY for plain 'stub' mode (never for per_store), so an
+    # old app without the platforms key keeps today's exact behaviour.
     is_stub = (mode == 'stub')
     return jsonify({
         "mode": mode,
         "stub": is_stub,
         "verifies_real": not is_stub,
+        "platforms": _platform_modes(),
     }), 200
 
 
