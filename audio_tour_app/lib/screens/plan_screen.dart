@@ -12,6 +12,7 @@
 // This screen replaces the old wallet / PPU / Unlimited UI (wallet_screen.dart),
 // which is no longer reachable from Settings (see about_screen.dart).
 
+import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/material.dart';
 import '../services/entitlements_service.dart';
 import '../services/iap_service.dart';
@@ -42,6 +43,8 @@ class PlanScreen extends StatefulWidget {
 class _PlanScreenState extends State<PlanScreen> {
   Entitlements _ent = Entitlements.unknown;
   bool _loading = true;
+  // True when the last load found no network at all (Wi-Fi and mobile off).
+  bool _offline = false;
   bool _buying = false;
   bool _claiming = false;
 
@@ -96,9 +99,20 @@ class _PlanScreenState extends State<PlanScreen> {
   Future<void> _load() async {
     setState(() => _loading = true);
     final ent = await EntitlementsService.me();
+    var offline = false;
+    if (ent.levels.isEmpty) {
+      try {
+        // Bounded: the check must never keep the screen on its spinner.
+        final results = await Connectivity()
+            .checkConnectivity()
+            .timeout(const Duration(seconds: 2));
+        offline = results.every((r) => r == ConnectivityResult.none);
+      } catch (_) {}
+    }
     if (!mounted) return;
     setState(() {
       _ent = ent;
+      _offline = offline;
       _loading = false;
     });
   }
@@ -616,9 +630,18 @@ class _PlanScreenState extends State<PlanScreen> {
                 style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
             const SizedBox(height: 12),
             if (rows.isEmpty)
-              const Text(
-                'Plan details are briefly unavailable. Pull to refresh.',
-                style: TextStyle(fontSize: 13, color: Colors.black54),
+              Text(
+                _offline
+                    ? 'This device has no Internet connection, so we can\u2019t '
+                        'reach our servers and the plan details aren\u2019t '
+                        'available right now. Please connect to the Internet, '
+                        'then pull down to refresh.'
+                    : 'We can\u2019t reach our servers, so the plan details '
+                        'aren\u2019t available right now. Please make sure you '
+                        'are connected to the Internet, then pull down to '
+                        'refresh.',
+                key: const Key('plan_details_unavailable'),
+                style: const TextStyle(fontSize: 13, color: Colors.black54),
               )
             else
               ...rows,
@@ -693,8 +716,9 @@ class _PlanScreenState extends State<PlanScreen> {
         break;
       case 'l2': // Free
         bullets.add(
-            '1 new tour a day, 3 a month, up to ${lvl.maxStops ?? 5} stops, from '
-            'material that already exists. Everything the Introduction has.');
+            'Lets you generate your own tours: 1 new tour a day, 3 a month, up '
+            'to ${lvl.maxStops ?? 5} stops. Downloads from the Home page and '
+            'translations stay free, as in the Introduction.');
         break;
       case 'l3': // $10 Pack
         bullets.add(
