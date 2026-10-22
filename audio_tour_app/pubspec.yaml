@@ -1,7 +1,7 @@
 name: audio_tour_app_dev
 description: AudioTours Dev - AI-powered audio tour generator
 publish_to: 'none'
-version: 2.4.30+75
+version: 2.4.30+76
 
 environment:
   sdk: '>=3.5.0 <4.0.0'
@@ -89,6 +89,16 @@ dev_dependencies:
   integration_test:
     sdk: flutter
   flutter_lints: ^3.0.0
+
+# Play Console refuses any release on Play Billing Library < 8.0.0 (wdvrdaz41q,
+# 2026-10-21). in_app_purchase 3.2.x pins the Android implementation to ^0.4.0
+# (Billing 7.1.1); 0.5.0 is Billing 8.0.0 and the last version that builds on
+# Flutter 3.41 (0.5.0+1 needs 3.44). Overriding only Android leaves iOS StoreKit
+# untouched. The app calls no Android-only API, so 0.5.0's one breaking change
+# (queryPurchaseHistory removed) does not reach it. Drop this override once the
+# toolchain is on Flutter >= 3.44 and in_app_purchase >= 3.3.0.
+dependency_overrides:
+  in_app_purchase_android: 0.5.0
 
 flutter:
   uses-material-design: true
