@@ -1616,7 +1616,20 @@ def l2_claim():
         cur = conn.cursor()
 
         # ── 1. Level code (checked first) ──────────────────────────────────
-        lc = level_codes.claim_level_code(cur, user_id, code)
+        # [LOCAL-735 / D703] A code that switches to a PAID level while a paid
+        # pack is active must carry over what is left, exactly as a purchase
+        # does. We inject _carry_over_used (the single LOCAL-733 implementation,
+        # reused — never copied into the framework-free level_codes module) via
+        # a small adapter that reads the device's CURRENT pack before the switch
+        # overwrites it. A code to l1/l2/tester/admin never calls this.
+        def _carry_over(cur_, user_id_, new_level_, now_):
+            old_state = _get_device_state(cur_, user_id_)
+            old_plan = _get_plan(cur_, old_state['level'])
+            new_plan = _get_plan(cur_, new_level_)
+            return _carry_over_used(old_state, old_plan, new_level_, new_plan, now_)
+
+        lc = level_codes.claim_level_code(
+            cur, user_id, code, carry_over=_carry_over)
         if lc['ok']:
             conn.commit()
             payload = _me_payload(cur, user_id)

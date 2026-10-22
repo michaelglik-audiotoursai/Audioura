@@ -134,13 +134,22 @@ def lookup_code(cur, code):
     return {'level': row[0], 'revoked_at': row[1]}
 
 
-def claim_level_code(cur, user_id, code, now=None):
+def claim_level_code(cur, user_id, code, now=None, carry_over=None):
     """Attempt to switch `user_id` to the level a level code grants.
 
     Returns {'ok': bool, 'code': <LEVEL_* enum>, 'level': str|None,
              'message': str}. On ok the device's level is set and (for l3/l4) a
     test pack is started with a store='level_code' purchases row. The caller
     owns the transaction and must COMMIT on ok.
+
+    [LOCAL-735 / D703] `carry_over` is an OPTIONAL callable
+    (cur, user_id, new_level, now) -> (fresh_used, edits_used, ops_used). When a
+    code switches to a PAID level (l3/l4) and the device still holds an active
+    paid pack, the caller passes it so what is left carries over into the new
+    pack exactly as a purchase does (reusing entitlements_api._carry_over_used —
+    never copied here, keeping this module framework-free). Omitted (the CLI
+    path) or returning 0/0/0 (no active pack) means the pack starts fresh, which
+    is the pre-LOCAL-735 behaviour. A code to l1/l2/tester/admin ignores it.
 
     This is the FIRST code kind checked by /l2/claim: a code that is not shaped
     like a level code (hash_code -> None) or whose hash is unknown returns
@@ -161,17 +170,37 @@ def claim_level_code(cur, user_id, code, now=None):
     if level in ('l3', 'l4'):
         # Start a test pack exactly as a purchase does.
         anniversary = _add_one_calendar_month(now)
+        # [LOCAL-735 / D703] A code that switches to a PAID level while the
+        # device still holds an active paid pack must NOT wipe what is left —
+        # it carries over exactly as a purchase does (LOCAL-733). The caller
+        # injects `carry_over`, a callable (cur, user_id, new_level, now) ->
+        # (fresh_used, edits_used, ops_used) that REUSES
+        # entitlements_api._carry_over_used (the single source of truth — never
+        # copied here, so level_codes.py stays framework-free). It MUST be read
+        # BEFORE the INSERT below overwrites the row. When no carry_over is
+        # given (the CLI switch, or a device with no active pack) the counters
+        # start fresh at 0/0/0, which is today's behaviour. Carried units live
+        # as NEGATIVE used counters, so max(0, per_pack - used) = per_pack +
+        # carried (the columns allow negatives; no CHECK constraint).
+        fresh_used = edits_used = ops_used = 0
+        if carry_over is not None:
+            fresh_used, edits_used, ops_used = carry_over(
+                cur, user_id, level, now)
         cur.execute("""
             INSERT INTO device_entitlement
                 (user_id, level, pack_started_at, anniversary_at,
                  fresh_used, edits_used, ops_used, last_activity_at)
-            VALUES (%s, %s, %s, %s, 0, 0, 0, NOW())
+            VALUES (%s, %s, %s, %s, %s, %s, %s, NOW())
             ON CONFLICT (user_id) DO UPDATE SET
                 level = EXCLUDED.level,
                 pack_started_at = EXCLUDED.pack_started_at,
                 anniversary_at = EXCLUDED.anniversary_at,
-                fresh_used = 0, edits_used = 0, ops_used = 0, updated_at = NOW()
-        """, (user_id, level, now, anniversary))
+                fresh_used = EXCLUDED.fresh_used,
+                edits_used = EXCLUDED.edits_used,
+                ops_used = EXCLUDED.ops_used,
+                updated_at = NOW()
+        """, (user_id, level, now, anniversary,
+              fresh_used, edits_used, ops_used))
         # Record the switch as a purchase so pack counting is identical to a buy.
         # transaction_id is UNIQUE; synthesize a per-switch id that cannot clash.
         product = 'l3_pack_10' if level == 'l3' else 'l4_round_25'

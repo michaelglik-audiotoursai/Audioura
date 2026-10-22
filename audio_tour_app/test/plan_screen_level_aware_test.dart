@@ -1,18 +1,21 @@
-// [LOCAL-610] Widget tests for Michael's plan-page corrections (2026-10-07):
+// [LOCAL-610 / LOCAL-735] Widget tests for the plan page's structure.
 //
-//   req 1  the Free/code card is LEVEL-AWARE:
-//            • l1 (Introduction) shows "Get the Free plan" with BOTH the queue
-//              action and the code box;
-//            • l2 (Free) shows "Have a code?" with the code box ONLY — no
-//              "Join the queue" and no "Get the Free plan";
-//            • l3, l4 and admin show the small "Have a code?" code row — no
-//              queue, no "Get the Free plan".
+// LOCAL-735 (Michael, 2026-10-22) reorganised "Your plan". Top to bottom:
+//   1. the current-plan card (unchanged, incl. the LOCAL-733 "what's left" line);
+//   2. "Upgrade your plan" — shown on EVERY level: a short line + the single
+//      code box (the old "Get the Free plan" / "Have a code?" framing is gone);
+//   3. "Apply for the Free plan" — shown ONLY on Introduction (l1): the Free
+//      generation allowance (from the plan data, not hard-coded) + the queue
+//      action. Hidden on Free, paid, tester and admin;
+//   4. "Buy a pack", then "The plans" — unchanged.
+//
+// Also kept from LOCAL-610:
 //   req 2  the buy buttons read "$10 Pack — …" and "Curator ($25) — …", and the
 //            word "round" appears nowhere a user sees it.
 //   req 3  the plain rules under the levels: the Free inactivity rule takes its
 //            day count FROM THE API (plans.inactivity_days), and the pack rule
-//            states the one-month / replace-on-early-buy behaviour, with the
-//            anniversary date shown when the device holds a pack.
+//            states the one-month / carry-over behaviour, with the anniversary
+//            date shown when the device holds a pack.
 //
 // PlanScreen takes an optional initialEntitlements test seam (null in
 // production) so these states render with no running user-api.
@@ -26,11 +29,13 @@ import 'package:audio_tour_app_dev/services/entitlements_service.dart';
 /// Build an Entitlements snapshot for [level] with the four visible levels the
 /// server would send, including the Free level's inactivity_days so the rules
 /// text can read it. [inactivityDays] sets the Free level's window;
-/// [anniversary] sets a pack anniversary when non-null.
+/// [anniversary] sets a pack anniversary when non-null; [freeMaxStops] sets the
+/// Free (l2) level's max_stops so the allowance copy can read it.
 Entitlements _ent(
   String level, {
   int inactivityDays = 7,
   String? anniversary,
+  int freeMaxStops = 5,
 }) {
   return Entitlements.fromJson({
     'level': level,
@@ -45,7 +50,7 @@ Entitlements _ent(
     'anniversary_at': anniversary,
     'levels': [
       {'plan_id': 'l1', 'display_name': 'Introduction', 'price_usd': 0, 'can_sell': false, 'referrals_allowed': 0, 'referral_period': null, 'max_stops': 0, 'inactivity_days': null},
-      {'plan_id': 'l2', 'display_name': 'Free', 'price_usd': 0, 'can_sell': false, 'referrals_allowed': 0, 'referral_period': null, 'max_stops': 5, 'inactivity_days': inactivityDays},
+      {'plan_id': 'l2', 'display_name': 'Free', 'price_usd': 0, 'can_sell': false, 'referrals_allowed': 0, 'referral_period': null, 'max_stops': freeMaxStops, 'inactivity_days': inactivityDays},
       {'plan_id': 'l3', 'display_name': '\$10 Pack', 'price_usd': 10, 'can_sell': false, 'referrals_allowed': 3, 'referral_period': 'lifetime', 'max_stops': 10, 'inactivity_days': null},
       {'plan_id': 'l4', 'display_name': 'Curator', 'price_usd': 25, 'can_sell': true, 'referrals_allowed': 5, 'referral_period': 'month', 'max_stops': 25, 'inactivity_days': null},
     ],
@@ -67,6 +72,9 @@ Future<void> _scrollToRules(WidgetTester tester) async {
   await tester.pumpAndSettle();
 }
 
+/// The vertical position of a widget's centre, used to assert section order.
+double _dy(WidgetTester tester, Finder f) => tester.getCenter(f).dy;
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
@@ -74,73 +82,116 @@ void main() {
     SharedPreferences.setMockInitialValues({});
   });
 
-  group('req 1 — level-aware Free/code card', () {
-    testWidgets('l1 Introduction: "Get the Free plan" with queue AND code',
-        (tester) async {
-      await _pump(tester, _ent('l1'));
-      expect(find.text('Get the Free plan'), findsOneWidget);
-      expect(find.text('Join the queue'), findsOneWidget);
-      // The code box is present on l1 too.
-      expect(find.widgetWithText(TextField, 'Enter your code'), findsOneWidget);
-      expect(find.text('Use code'), findsOneWidget);
-      // No "Have a code?" title on l1.
-      expect(find.text('Have a code?'), findsNothing);
-    });
-
-    testWidgets('l2 Free: "Have a code?", code box ONLY, no queue, no "Get the Free plan"',
-        (tester) async {
-      await _pump(tester, _ent('l2'));
-      expect(find.text('Have a code?'), findsOneWidget);
-      expect(find.widgetWithText(TextField, 'Enter your code'), findsOneWidget);
-      expect(find.text('Use code'), findsOneWidget);
-      // The things a Free user must NOT be invited to.
-      expect(find.text('Get the Free plan'), findsNothing);
-      expect(find.text('Join the queue'), findsNothing);
-      expect(find.text('Update my queue email'), findsNothing);
-    });
-
-    testWidgets('l3 Pack: small "Have a code?" row, no queue / no "Get the Free plan"',
-        (tester) async {
-      await _pump(tester, _ent('l3'));
-      expect(find.text('Have a code?'), findsOneWidget);
-      expect(find.widgetWithText(TextField, 'Enter your code'), findsOneWidget);
-      expect(find.text('Get the Free plan'), findsNothing);
-      expect(find.text('Join the queue'), findsNothing);
-    });
-
-    testWidgets('l4 Curator: small "Have a code?" row, no queue / no "Get the Free plan"',
-        (tester) async {
-      await _pump(tester, _ent('l4'));
-      expect(find.text('Have a code?'), findsOneWidget);
-      expect(find.widgetWithText(TextField, 'Enter your code'), findsOneWidget);
-      expect(find.text('Get the Free plan'), findsNothing);
-      expect(find.text('Join the queue'), findsNothing);
-    });
-
-    testWidgets('admin: small "Have a code?" row, no queue / no "Get the Free plan"',
-        (tester) async {
-      await _pump(tester, _ent('admin'));
-      expect(find.text('Have a code?'), findsOneWidget);
-      expect(find.widgetWithText(TextField, 'Enter your code'), findsOneWidget);
-      expect(find.text('Get the Free plan'), findsNothing);
-      expect(find.text('Join the queue'), findsNothing);
-    });
-
-    testWidgets('the code box is reachable from EVERY level',
-        (tester) async {
-      for (final lvl in ['l1', 'l2', 'l3', 'l4', 'admin']) {
+  group('LOCAL-735 — "Upgrade your plan" card on EVERY level', () {
+    for (final lvl in ['l1', 'l2', 'l3', 'l4', 'admin']) {
+      testWidgets('level $lvl shows "Upgrade your plan" with the code box',
+          (tester) async {
         await _pump(tester, _ent(lvl));
+        expect(find.text('Upgrade your plan'), findsOneWidget,
+            reason: 'Upgrade card must be present at level $lvl');
         expect(find.widgetWithText(TextField, 'Enter your code'), findsOneWidget,
             reason: 'code box must be present at level $lvl');
         expect(find.text('Use code'), findsOneWidget,
             reason: 'Use code button must be present at level $lvl');
-      }
+        // The old framing is gone everywhere.
+        expect(find.text('Get the Free plan'), findsNothing);
+        expect(find.text('Have a code?'), findsNothing);
+      });
+    }
+
+    testWidgets('the upgrade line explains the three code kinds', (tester) async {
+      await _pump(tester, _ent('l3'));
+      final line = find.byWidgetPredicate((w) =>
+          w is Text &&
+          (w.data ?? '').contains('a friend') &&
+          (w.data ?? '').contains('Free-plan queue') &&
+          (w.data ?? '').contains('switch your plan'));
+      expect(line, findsOneWidget);
+    });
+  });
+
+  group('LOCAL-735 — "Apply for the Free plan" card ONLY on Introduction', () {
+    testWidgets('l1 Introduction shows the Apply card with the queue action',
+        (tester) async {
+      await _pump(tester, _ent('l1'));
+      expect(find.text('Apply for the Free plan'), findsOneWidget);
+      expect(find.text('Join the queue'), findsOneWidget);
+    });
+
+    testWidgets('the Apply card states the Free generation allowance from the data',
+        (tester) async {
+      // Server sends Free max_stops = 6; the copy must read "up to 6 stops"
+      // and "1 new tour a day, 3 a month", not a hard-coded number.
+      await _pump(tester, _ent('l1', freeMaxStops: 6));
+      final text = find.byWidgetPredicate((w) =>
+          w is Text &&
+          (w.data ?? '').contains('generate your own tours') &&
+          (w.data ?? '').contains('1 new tour a day, 3 a month') &&
+          (w.data ?? '').contains('up to 6 stops'));
+      expect(text, findsOneWidget);
+    });
+
+    for (final lvl in ['l2', 'l3', 'l4', 'admin']) {
+      testWidgets('level $lvl does NOT show "Apply for the Free plan"',
+          (tester) async {
+        await _pump(tester, _ent(lvl));
+        expect(find.text('Apply for the Free plan'), findsNothing,
+            reason: 'Apply card must be hidden at level $lvl');
+        // The queue action lives only on the Apply card, so it is gone too.
+        expect(find.text('Join the queue'), findsNothing);
+        expect(find.text('Update my queue email'), findsNothing);
+      });
+    }
+
+    // RED test: if the Apply card were ever shown on a paid level, this fails.
+    // It pins the l1-only rule — on the $10 Pack there must be no Apply card.
+    testWidgets('RED: Apply card must not appear on a paid level (l3)',
+        (tester) async {
+      await _pump(tester, _ent('l3'));
+      expect(find.text('Apply for the Free plan'), findsNothing,
+          reason:
+              'showing "Apply for the Free plan" on a paid level is the bug this guards');
+    });
+  });
+
+  group('LOCAL-735 — section order on Introduction', () {
+    testWidgets('current → Upgrade → Apply, then Buy a pack below',
+        (tester) async {
+      await _pump(tester, _ent('l1'));
+      // The three cards at the top of the list are all laid out in the first
+      // viewport — assert their vertical order directly.
+      final current = _dy(tester, find.textContaining('Current plan:'));
+      final upgrade = _dy(tester, find.text('Upgrade your plan'));
+      final apply = _dy(tester, find.text('Apply for the Free plan'));
+      expect(current < upgrade, isTrue,
+          reason: 'current plan card is above the Upgrade card');
+      expect(upgrade < apply, isTrue,
+          reason: 'Upgrade card is above the Apply card');
+      // "Buy a pack" is further down the (lazy) list; scroll to bring it into
+      // view and confirm it exists below the Apply card.
+      expect(find.text('Buy a pack'), findsNothing,
+          reason: 'Buy a pack sits below the fold on Introduction');
+      await tester.drag(find.byType(Scrollable).first, const Offset(0, -600));
+      await tester.pumpAndSettle();
+      expect(find.text('Buy a pack'), findsOneWidget);
+    });
+
+    testWidgets('on a paid level the order is current → Upgrade → Buy a pack',
+        (tester) async {
+      await _pump(tester, _ent('l3'));
+      final current = _dy(tester, find.textContaining('Current plan:'));
+      final upgrade = _dy(tester, find.text('Upgrade your plan'));
+      final buy = _dy(tester, find.text('Buy a pack'));
+      expect(current < upgrade, isTrue);
+      expect(upgrade < buy, isTrue);
+      expect(find.text('Apply for the Free plan'), findsNothing);
     });
   });
 
   group('req 2 — buy button labels, no user-facing "round"', () {
     testWidgets('shows the "\$10 Pack" and "Curator (\$25)" labels', (tester) async {
-      await _pump(tester, _ent('l1'));
+      // l2 has no Apply card, so the Buy buttons sit within the first viewport.
+      await _pump(tester, _ent('l2'));
       expect(
           find.text('\$10 Pack — 5 new tours + 5 edits, up to 10 stops'),
           findsOneWidget);
@@ -150,7 +201,7 @@ void main() {
     });
 
     testWidgets('no visible Text widget contains the word "round"', (tester) async {
-      await _pump(tester, _ent('l1'));
+      await _pump(tester, _ent('l2'));
       final roundText = find.byWidgetPredicate((w) =>
           w is Text && (w.data ?? '').toLowerCase().contains('round'));
       expect(roundText, findsNothing);
