@@ -23,10 +23,12 @@ import '../services/community_notifications.dart';
 import '../services/tour_download_service.dart';
 import '../services/iap_service.dart';
 import '../services/device_service.dart';
+import '../services/pass_expiry_format.dart';
 import '../services/document_acceptance_service.dart';
 import '../services/deep_link_service.dart';
 import '../utils/downloaded_message.dart';
 import '../widgets/tour_buy_sheet.dart' show TermsAgreeLine;
+import '../widgets/pass_expiry_display.dart';
 import 'communities_about_screen.dart' show CommunityInviteTools;
 
 class CommunityPageScreen extends StatefulWidget {
@@ -163,8 +165,16 @@ class _CommunityPageScreenState extends State<CommunityPageScreen> {
       await DocumentAcceptanceService.record(userId, LegalDoc.terms);
       await _load(); // refresh my_status + episodes
       if (mounted) {
+        // [LOCAL-731 / D701] Include the NEW expiry in the success message so
+        // the member sees how long they are a member for (and, after a renewal,
+        // that the days were added). Falls back to the old wording if the
+        // refreshed status carries no expiry.
+        final newExpiry = PassExpiryFormat.parse(_community?.myStatus.expiresAt);
+        final msg = newExpiry != null
+            ? "You're a member until ${PassExpiryFormat.formatDate(newExpiry)}."
+            : 'Membership active (${pass.label}).';
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-            content: Text('Membership active (${pass.label}).')));
+            content: Text(msg)));
       }
       // [LOCAL-714 / D675 part 2] After a successful pass purchase, ask the
       // auto-download question.
@@ -714,14 +724,35 @@ class _CommunityPageScreenState extends State<CommunityPageScreen> {
             ]),
 
           // My status.
+          // [LOCAL-731 / D701] Readable expiry (formatted local time) via the
+          // shared CommunityMyStatus widget — replaces the raw ISO line. For an
+          // active paid member it also carries the "buying adds days" note.
           _section('My status', [
-            Text(c.myStatus.isMember
-                ? (c.myStatus.active ? 'Active member' : 'Membership expired — renew to listen to new content')
-                : 'Not a member'),
-            if (c.myStatus.expiresAt != null)
-              Text('Expires: ${c.myStatus.expiresAt}',
-                  style: const TextStyle(color: Colors.grey)),
+            CommunityMyStatus(
+              myStatus: c.myStatus,
+              isPaid: c.isPaid,
+              isOwner: c.isOwner,
+            ),
           ]),
+
+          // [LOCAL-731 / D701] An ACTIVE member of a paid community can renew:
+          // buying another pass ADDS its days to the remaining time. The note
+          // (rendered inside My status above) sits above this pass list. The
+          // Buy buttons are the same ones a joining non-member uses.
+          if (!c.isOwner && canListen && c.isPaid && c.acceptsNewMembers &&
+              c.passes.isNotEmpty) ...[
+            _sectionTitle('Renew your pass'),
+            ...c.passes.map((p) => Card(
+                  child: ListTile(
+                    title: Text(p.label),
+                    subtitle: Text('${p.durationDays} days'),
+                    trailing: ElevatedButton(
+                      onPressed: () => _buyPass(p),
+                      child: const Text('Buy'),
+                    ),
+                  ),
+                )),
+          ],
 
           // Membership options / join. Hidden while the community is closed to
           // new members (hand-over / archived) — only the banner shows then.

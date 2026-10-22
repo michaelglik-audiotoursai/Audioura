@@ -7,6 +7,7 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../services/communities_service.dart';
+import '../widgets/pass_expiry_display.dart';
 import 'community_page_screen.dart';
 
 class MyCommunitiesScreen extends StatefulWidget {
@@ -190,9 +191,11 @@ class _MyCommunitiesScreenState extends State<MyCommunitiesScreen> {
                                     leading: const Icon(Icons.groups,
                                         color: Colors.deepPurple),
                                     title: Text(c.name),
-                                    subtitle: Text(
-                                        '${c.active ? 'Active member' : 'Expired — renew to listen to new content'}'
-                                        ' · ${CommunityCopy.memberCountLabel(c.memberCount)}'),
+                                    // [LOCAL-731 / D701] Readable expiry after
+                                    // the organiser / member count; expired
+                                    // rows show it in the error colour.
+                                    subtitle:
+                                        JoinedCommunitySubtitle(community: c),
                                     trailing: PopupMenuButton<String>(
                                       onSelected: (v) {
                                         if (v == 'origin') _showOrigin(c);
