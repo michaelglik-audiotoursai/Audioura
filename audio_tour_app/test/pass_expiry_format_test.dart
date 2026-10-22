@@ -93,4 +93,46 @@ void main() {
       expect(PassExpiryFormat.formatTime(e), '09:03');
     });
   });
+
+  // [LOCAL-732] The short countdown variant used by the 3-day warning dialog.
+  group('PassExpiryFormat.formatShort', () {
+    test('2 days left → "<weekday> <d> <mon> · in 2 days"', () {
+      final now = DateTime.parse('2026-10-22T12:00:00Z');
+      final expires = now.add(const Duration(days: 2)).toUtc().toIso8601String();
+      final out = PassExpiryFormat.formatShort(expires, now: now);
+      final local = PassExpiryFormat.parse(expires)!;
+      expect(out, '${PassExpiryFormat.formatWeekdayDate(local)} · in 2 days');
+    });
+
+    test('under 24 h → "... · in N hours"', () {
+      final now = DateTime.parse('2026-10-22T12:00:00Z');
+      final expires = now.add(const Duration(hours: 5)).toUtc().toIso8601String();
+      final out = PassExpiryFormat.formatShort(expires, now: now);
+      expect(out, endsWith('· in 5 hours'));
+    });
+
+    test('exactly 1 day / 1 hour → singular', () {
+      final now = DateTime.parse('2026-10-22T12:00:00Z');
+      final oneDay = now.add(const Duration(days: 1)).toUtc().toIso8601String();
+      expect(PassExpiryFormat.formatShort(oneDay, now: now), endsWith('· in 1 day'));
+      final oneHour = now.add(const Duration(hours: 1)).toUtc().toIso8601String();
+      expect(PassExpiryFormat.formatShort(oneHour, now: now), endsWith('· in 1 hour'));
+    });
+
+    test('null / blank / expired → null', () {
+      final now = DateTime.parse('2026-10-22T12:00:00Z');
+      expect(PassExpiryFormat.formatShort(null, now: now), isNull);
+      expect(PassExpiryFormat.formatShort('   ', now: now), isNull);
+      final past = now.subtract(const Duration(hours: 1)).toUtc().toIso8601String();
+      expect(PassExpiryFormat.formatShort(past, now: now), isNull);
+    });
+
+    test('formatWeekdayDate shape: "Fri 24 Oct"', () {
+      // 2026-10-24 is a Saturday; pick a known weekday deterministically.
+      final sat = DateTime(2026, 10, 24); // Saturday
+      expect(PassExpiryFormat.formatWeekdayDate(sat), 'Sat 24 Oct');
+      final fri = DateTime(2026, 10, 23); // Friday
+      expect(PassExpiryFormat.formatWeekdayDate(fri), 'Fri 23 Oct');
+    });
+  });
 }
