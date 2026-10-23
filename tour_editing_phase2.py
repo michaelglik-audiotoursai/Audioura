@@ -637,6 +637,282 @@ def cleanup_tmp_tour_path(tour_path):
             print(f"Cloud mode: Cleanup warning for {tour_path}: {e}")
 
 
+def _zip_filename_for_tour(tour_identifier):
+    """[LOCAL-745] The stored audio_tours.zip_filename for a tour, or None.
+
+    Michael's community tour 716 lives in /app/tours only as its ZIP
+    (audio_tours.zip_filename) with NO extracted directory, so the volume-mode
+    directory search found nothing and the edit answered 404. This reads the
+    one column that names that ZIP so the resolver can extract it. Accepts a
+    numeric id directly; for a non-numeric (edited UUID) it maps back to the
+    source numeric id via the edit-blob table first. Never raises → None on any
+    lookup problem (the resolver then falls through exactly as before)."""
+    if tour_identifier is None:
+        return None
+    resolved_id = str(tour_identifier)
+    if not resolved_id.isdigit():
+        try:
+            _blob_uri, mapped_src = _lookup_edit_blob(resolved_id)
+        except Exception:  # noqa: BLE001
+            mapped_src = None
+        if mapped_src:
+            resolved_id = str(mapped_src)
+    if not resolved_id.isdigit():
+        return None
+    conn = None
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor()
+        cur.execute(
+            "SELECT zip_filename FROM audio_tours WHERE id = %s",
+            (int(resolved_id),))
+        row = cur.fetchone()
+        cur.close()
+        if row and row[0]:
+            return str(row[0]).strip()
+        return None
+    except Exception as e:  # noqa: BLE001
+        print(f"[LOCAL-745] zip_filename lookup failed for {tour_identifier}: {e}")
+        return None
+    finally:
+        if conn is not None:
+            conn.close()
+
+
+def _extract_zip_only_tour_to_workdir(tour_identifier):
+    """[LOCAL-745] Volume-mode fallback: resolve a tour that exists only as a
+    ZIP (no extracted directory) to a readable directory, by extracting its
+    audio_tours.zip_filename from the shared /app/tours store.
+
+    Returns a Path to a directory holding the tour's files (the same flat
+    audio_*.txt / audio_*.mp3 layout the bulk-save reader expects), or None when
+    there is no ZIP to extract. The extraction is idempotent: the work directory
+    is named after the ZIP (<stem>_work) so a repeat edit of the same tour
+    reuses it instead of piling up temp dirs; it is rebuilt when stale.
+
+    This is the volume-mode sibling of _resolve_tour_from_db (the cloud path):
+    both turn a stored ZIP into a directory. We do NOT duplicate the cloud
+    R2/BYTEA logic here — volume mode's source of truth is the ZIP file already
+    sitting in TOURS_DIR, named by zip_filename.
+    """
+    zip_name = _zip_filename_for_tour(tour_identifier)
+    if not zip_name:
+        return None
+
+    tours_dir = Path(TOURS_DIR)
+    # zip_filename is a bare basename; guard against a stray path separator.
+    zip_path = tours_dir / Path(zip_name).name
+    if not zip_path.exists():
+        print(f"[LOCAL-745] zip_filename {zip_name!r} for tour "
+              f"{tour_identifier} not found under {TOURS_DIR}")
+        return None
+
+    work_dir = tours_dir / f"{zip_path.stem}_work"
+    try:
+        # Rebuild the work dir if it is missing or older than the ZIP, so an
+        # out-of-band ZIP refresh is picked up; otherwise reuse it.
+        rebuild = True
+        if work_dir.is_dir():
+            try:
+                rebuild = zip_path.stat().st_mtime > work_dir.stat().st_mtime
+            except OSError:
+                rebuild = True
+            if not rebuild and not any(work_dir.glob('audio_*.txt')):
+                rebuild = True  # empty/partial extraction — redo it
+        if rebuild:
+            if work_dir.exists():
+                shutil.rmtree(work_dir, ignore_errors=True)
+            work_dir.mkdir(parents=True, exist_ok=True)
+            with zipfile.ZipFile(zip_path, 'r') as zf:
+                zf.extractall(work_dir)
+            print(f"[LOCAL-745] extracted ZIP-only tour {tour_identifier} "
+                  f"({zip_path.name}) -> {work_dir}")
+        return work_dir
+    except Exception as e:  # noqa: BLE001
+        print(f"[LOCAL-745] failed to extract ZIP-only tour "
+              f"{tour_identifier} ({zip_path}): {e}")
+        return None
+
+
+def _community_edit_block(cur, tour_id, user_id):
+    """[LOCAL-745] Organiser-only gate for editing a community tour.
+
+    Michael: "we should not allow anyone who is not the community organizer edit
+    the tours." Given an open cursor, the tour being edited and the editing
+    user, return:
+
+      * None                     — the edit is allowed (ordinary tour, or the
+                                   caller IS the community owner);
+      * (403, body)              — the tour belongs to a community and the user
+                                   is not its owner (error_code
+                                   NOT_COMMUNITY_OWNER);
+      * (401, body)              — the tour belongs to a community but no user_id
+                                   was supplied, so ownership cannot be proven
+                                   (fail closed — a community tour is never
+                                   editable anonymously).
+
+    A non-community tour (no community_id, or a schema without the community
+    columns) returns None: today's rule is unchanged, anyone may edit it.
+    Never raises — any lookup problem on an ORDINARY tour returns None (the edit
+    proceeds exactly as before); a problem while a community_id IS known fails
+    closed with 403.
+    """
+    try:
+        from community_tours_service import community_tour_tag, community_owner
+    except Exception as e:  # noqa: BLE001 — module missing → feature off, allow
+        print(f"[LOCAL-745] community_tours_service unavailable, allowing edit: {e}")
+        return None
+
+    try:
+        tag = community_tour_tag(cur, tour_id)
+    except Exception as e:  # noqa: BLE001
+        # Could not read the tag — treat as an ordinary tour (unchanged rule).
+        print(f"[LOCAL-745] community tag lookup failed for {tour_id}: {e}")
+        return None
+
+    community_id = tag.get('community_id') if tag else None
+    if not community_id:
+        return None  # ordinary tour — anyone may edit (today's rule)
+
+    # This IS a community tour. From here we fail closed.
+    uid = (str(user_id).strip() if user_id is not None else '')
+    if not uid:
+        return (401, {
+            "status": "error",
+            "error_code": "USER_ID_REQUIRED",
+            "message": "Please sign in as the community organiser to edit this "
+                       "community tour.",
+            "recoverable": False,
+            "community_id": community_id,
+        })
+
+    try:
+        owner = community_owner(cur, community_id)
+    except Exception as e:  # noqa: BLE001
+        owner = None
+        print(f"[LOCAL-745] community_owner lookup failed for {community_id}: {e}")
+
+    if owner is not None and str(owner) == uid:
+        return None  # the organiser — allowed
+
+    return (403, {
+        "status": "error",
+        "error_code": "NOT_COMMUNITY_OWNER",
+        "message": "Only the community organiser can edit this tour.",
+        "recoverable": False,
+        "community_id": community_id,
+    })
+
+
+def _ensure_version_archive_columns(cur):
+    """[LOCAL-745] Make the audio_tour_versions archive exist with the columns we
+    write, additively and idempotently — the same self-healing the orchestrator
+    does (_ensure_versioning_objects), so this works whether or not migration 017
+    has run. No DROP, no DELETE; purely additive."""
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS audio_tour_versions (
+            id SERIAL PRIMARY KEY,
+            tour_id INTEGER NOT NULL,
+            version_no INTEGER NOT NULL,
+            replaced_at TIMESTAMP WITHOUT TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+            CONSTRAINT uq_audio_tour_versions_tour_version UNIQUE (tour_id, version_no)
+        )
+    """)
+    for col, ddl in (
+        ("tour_content", "TEXT"),
+        ("zip_filename", "VARCHAR(512)"),
+        ("stops_count", "INTEGER"),
+        ("lat", "DOUBLE PRECISION"),
+        ("lng", "DOUBLE PRECISION"),
+        ("replaced_by_job", "VARCHAR(128)"),
+    ):
+        cur.execute(
+            f"ALTER TABLE audio_tour_versions ADD COLUMN IF NOT EXISTS {col} {ddl}")
+    # The (tour_id, version_no) uniqueness may be missing on a table that
+    # predates migration 017 (it exists in minimal test schemas without the
+    # constraint). Add it idempotently so the archive insert can ON CONFLICT.
+    cur.execute("""
+        SELECT 1 FROM pg_constraint
+        WHERE conname = 'uq_audio_tour_versions_tour_version'
+    """)
+    if cur.fetchone() is None:
+        try:
+            cur.execute(
+                "ALTER TABLE audio_tour_versions ADD CONSTRAINT "
+                "uq_audio_tour_versions_tour_version UNIQUE (tour_id, version_no)")
+        except Exception as e:  # noqa: BLE001 — a concurrent add is fine
+            print(f"[LOCAL-745] version-archive unique constraint add skipped: {e}")
+
+
+def _replace_community_tour_in_place(cur, tour_id, new_zip_bytes,
+                                     new_stops_count=None,
+                                     new_zip_filename=None,
+                                     new_tour_content=None):
+    """[LOCAL-745] Requirement 3 — write an organiser's edit BACK onto the
+    community tour row so members get it.
+
+    A member downloads a community tour by its numeric id from map-delivery
+    (/download-tour/<id>), which serves audio_tours.audio_tour; and the version
+    the app shows (LOCAL-657) is MAX(audio_tour_versions.version_no)+1. So the
+    edit must REPLACE the community tour's stored content in place — not mint a
+    new, untagged tour the member's new-tours sync would never see. This:
+
+      1. archives the row's CURRENT content into audio_tour_versions as the next
+         per-tour version_no (append-only, reversible — never deletes);
+      2. overwrites audio_tours.audio_tour with the edited ZIP bytes, and
+         updates zip_filename / stops_count / tour_content when supplied.
+
+    The caller owns the transaction (cursor form); commit after this returns.
+    tour_id must be the numeric community tour id. Raises on a real DB error so
+    the caller can report it — it is only ever invoked for an owner-authorised
+    community edit, where silently losing the write would be worse than failing.
+    """
+    tid = int(tour_id)
+    _ensure_version_archive_columns(cur)
+
+    # Snapshot the current (about-to-be-superseded) content for the archive.
+    cur.execute(
+        "SELECT zip_filename, stops_count, tour_content, lat, lng "
+        "FROM audio_tours WHERE id = %s", (tid,))
+    row = cur.fetchone()
+    old_zip, old_stops, old_content, old_lat, old_lng = (
+        row if row else (None, None, None, None, None))
+
+    cur.execute(
+        "SELECT COALESCE(MAX(version_no), 0) + 1 FROM audio_tour_versions "
+        "WHERE tour_id = %s", (tid,))
+    next_version = cur.fetchone()[0]
+
+    cur.execute(
+        "INSERT INTO audio_tour_versions "
+        "(tour_id, version_no, tour_content, zip_filename, stops_count, lat, lng) "
+        "VALUES (%s, %s, %s, %s, %s, %s, %s) "
+        "ON CONFLICT (tour_id, version_no) DO NOTHING",
+        (tid, next_version, old_content, old_zip, old_stops, old_lat, old_lng))
+
+    # Replace the live content. audio_tour is what map-delivery serves to a
+    # member's /download-tour, so overwriting it IS the member-facing update.
+    sets = ["audio_tour = %s"]
+    params = [psycopg2.Binary(bytes(new_zip_bytes))]
+    if new_zip_filename is not None:
+        sets.append("zip_filename = %s")
+        params.append(new_zip_filename)
+    if new_stops_count is not None:
+        sets.append("stops_count = %s")
+        params.append(int(new_stops_count))
+    if new_tour_content is not None:
+        sets.append("tour_content = %s")
+        params.append(new_tour_content)
+    params.append(tid)
+    cur.execute(
+        f"UPDATE audio_tours SET {', '.join(sets)} WHERE id = %s", params)
+
+    print(f"[LOCAL-745] replaced community tour {tid} in place "
+          f"(archived v{next_version}, new is v{next_version + 1}, "
+          f"{len(bytes(new_zip_bytes))} ZIP bytes)")
+    return next_version + 1
+
+
 def resolve_numeric_to_uuid_directory(tour_id):
     try:
         conn = get_db_connection()
@@ -687,7 +963,14 @@ def resolve_tour_to_directory(tour_identifier):
         return exact_path
     
     if tour_identifier.isdigit():
-        return resolve_numeric_to_uuid_directory(tour_identifier)
+        numeric_dir = resolve_numeric_to_uuid_directory(tour_identifier)
+        if numeric_dir is not None:
+            return numeric_dir
+        # [LOCAL-745] No extracted directory for this numeric id. Michael's
+        # community tour 716 lives in /app/tours only as its ZIP
+        # (audio_tours.zip_filename), so the keyword-dir search above found
+        # nothing and the edit answered 404. Resolve via the stored ZIP.
+        return _extract_zip_only_tour_to_workdir(tour_identifier)
     
     uuid_part = None
     if '-' in tour_identifier:
@@ -700,7 +983,9 @@ def resolve_tour_to_directory(tour_identifier):
             if item.is_dir() and uuid_part in item.name:
                 return item
     
-    return None
+    # [LOCAL-745] Last resort for a non-numeric id: an edited UUID that maps
+    # back (via tour_edit_blobs) to a source tour stored only as a ZIP.
+    return _extract_zip_only_tour_to_workdir(tour_identifier)
 
 def has_custom_audio(tour_id, stop_number, user_id=None):
     """Check if custom audio exists for a stop (safe fallback)"""
@@ -1674,6 +1959,31 @@ def _bulk_save_core(tour_id, data):
     tour_edit_blobs.source_tour_id) instead of blindly 'en'. An explicit request
     value always wins.
     """
+    # [LOCAL-745] Organiser-only gate for a community tour. A tour carrying
+    # audio_tours.community_id may be edited only by that community's owner
+    # (communities.owner_user_id). Checked BEFORE any metering/build so an
+    # unauthorised member edit is refused cleanly (403) and consumes nothing.
+    # An ordinary (non-community) tour is unaffected — anyone may edit it.
+    _edit_user_id = (data.get('user_id') or data.get('secret_id') or '')
+    _community_conn = None
+    try:
+        _community_conn = get_db_connection()
+        _ccur = _community_conn.cursor()
+        _community_block = _community_edit_block(_ccur, tour_id, _edit_user_id)
+        _ccur.close()
+    except Exception as _comm_err:  # noqa: BLE001 — never 500 on the gate itself
+        print(f"[LOCAL-745] community edit gate error (allowing, ordinary-tour "
+              f"default): {_comm_err}")
+        _community_block = None
+    finally:
+        if _community_conn is not None:
+            _community_conn.close()
+    if _community_block is not None:
+        _status, _body = _community_block
+        print(f"[LOCAL-745] community edit refused ({_status}) for tour "
+              f"{tour_id} user={_edit_user_id!r}: {_body.get('error_code')}")
+        return jsonify(_body), _status
+
     explicit_language = data.get('content_language')
     if explicit_language:
         content_language = str(explicit_language).strip().lower()
@@ -2025,6 +2335,57 @@ def _bulk_save_core(tour_id, data):
                 # /tmp build dir is ephemeral; clean it up now that it's in R2.
                 cleanup_tmp_tour_path(new_tour_info.get('tour_path'))
 
+        # [LOCAL-745] Requirement 3 — members get the edit. When the edited tour
+        # is a COMMUNITY tour (numeric id with community_id; the organiser gate
+        # above has already proven the caller is the owner), write the edit BACK
+        # onto that community tour row so a member's phone gets the new version
+        # via the existing download + LOCAL-657 version path. Without this the
+        # edit only ever lived as a new, untagged tour the member's new-tours
+        # sync never sees. Best-effort: a failure here does not fail the save
+        # (the organiser's own copy is already updated) but is reported.
+        member_update = None
+        try:
+            if str(tour_id).isdigit():
+                _mu_conn = get_db_connection()
+                try:
+                    _mu_cur = _mu_conn.cursor()
+                    _tag = None
+                    try:
+                        from community_tours_service import community_tour_tag
+                        _tag = community_tour_tag(_mu_cur, tour_id)
+                    except Exception as _tag_err:  # noqa: BLE001
+                        print(f"[LOCAL-745] community tag re-read failed: {_tag_err}")
+                    if _tag and _tag.get('community_id'):
+                        _zip_path = new_tour_info['zip_path']
+                        if not os.path.exists(_zip_path):
+                            print(f"[LOCAL-745] edited ZIP {_zip_path} no longer "
+                                  f"on disk (cloud cleanup) — skipping in-place "
+                                  f"community update")
+                            _mu_cur.close()
+                        else:
+                            with open(_zip_path, 'rb') as _zf:
+                                _new_zip_bytes = _zf.read()
+                            _new_version = _replace_community_tour_in_place(
+                                _mu_cur, tour_id, _new_zip_bytes,
+                                new_stops_count=len(final_stops_data),
+                                new_zip_filename=f"{new_tour_info['tour_path'].name}.zip")
+                            _mu_conn.commit()
+                            member_update = {
+                                "community_id": _tag.get('community_id'),
+                                "replaced_in_place": True,
+                                "new_version": _new_version,
+                            }
+                            print(f"[LOCAL-745] community tour {tour_id} edit "
+                                  f"written back in place -> members get version "
+                                  f"{_new_version}")
+                    else:
+                        _mu_cur.close()
+                finally:
+                    _mu_conn.close()
+        except Exception as _mu_err:  # noqa: BLE001 — never fail the save on this
+            print(f"[LOCAL-745] in-place community update failed (organiser copy "
+                  f"still saved): {_mu_err}")
+
         # REQ-024: Proper success message with descriptive content
         custom_audio_count = sum(1 for stop in response_stops if stop.get('audio_source') == 'user_recorded')
         tts_count = len(response_stops) - custom_audio_count
@@ -2041,6 +2402,10 @@ def _bulk_save_core(tour_id, data):
             "new_tour_id": new_tour_info['new_tour_id'],
             "download_url": f"/tour/{new_tour_info['new_tour_id']}/download"
         }
+        if member_update is not None:
+            # [LOCAL-745] Tell the app the community row was updated in place so
+            # members will receive version N on their next download/version check.
+            response["member_update"] = member_update
         
         print(f"\n==== REQ-022/023 DEBUG: SENDING RESPONSE ====")
         print(f"Response stops: {len(response_stops)}")

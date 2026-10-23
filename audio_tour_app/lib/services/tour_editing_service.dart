@@ -23,6 +23,22 @@ class TourEditRefusal implements Exception {
       'TourEditRefusal($statusCode, ${body['error_code']}: ${body['message']})';
 }
 
+/// [LOCAL-745] Pick the human-readable message out of a server error body.
+///
+/// Michael saw "Save failed: Exception: Save Failed" — the generic fallback —
+/// on a 404 TOUR_NOT_FOUND (and would see it on the 403 organiser-only refusal
+/// too) because the edit service read only `body['error']`, which the server
+/// does not send: its error bodies carry `message`. This prefers `message`,
+/// then the legacy `error`, and only falls back to a generic string when the
+/// body has neither, so the real server reason reaches the Save-All snackbar.
+String tourEditErrorMessage(Map<dynamic, dynamic> body) {
+  final message = body['message'];
+  if (message is String && message.trim().isNotEmpty) return message;
+  final error = body['error'];
+  if (error is String && error.trim().isNotEmpty) return error;
+  return 'Save failed';
+}
+
 class TourEditingService {
   static Future<String> _getBaseUrl() async {
     // Editing is now deployed to Cloud Run behind the gateway (GCS-5), so it
@@ -83,8 +99,15 @@ class TourEditingService {
         await DebugLogHelper.addDebugLog('EDIT API: Success - ${result['message']}');
         return result;
       } else {
-        final error = jsonDecode(response.body);
-        throw Exception(error['error'] ?? 'Update failed');
+        // [LOCAL-745] Surface the server's own message (prefer message, then
+        // error) so a 403/404/500 shows the real reason, not "Update failed".
+        Map<dynamic, dynamic> error;
+        try {
+          error = jsonDecode(response.body) as Map;
+        } catch (_) {
+          error = const {};
+        }
+        throw Exception(tourEditErrorMessage(error));
       }
     } catch (e) {
       await DebugLogHelper.addDebugLog('EDIT API: Error updating stop: $e');
@@ -307,10 +330,19 @@ class TourEditingService {
           await DebugLogHelper.addDebugLog('EDIT API: Missing audio data error - ${error['message']}');
           throw Exception('Custom audio error: ${error['message']}');
         }
-        throw Exception(error['message'] ?? error['error'] ?? 'Save failed');
+        // [LOCAL-745] Surface the server's own message (prefer message, then
+        // error) instead of a bare "Save failed".
+        throw Exception(tourEditErrorMessage(error as Map));
       } else {
-        final error = jsonDecode(response.body);
-        throw Exception(error['error'] ?? 'Save failed');
+        // [LOCAL-745] Any other status (e.g. 403 organiser-only, 404
+        // TOUR_NOT_FOUND, 500) — show the server message, not "Save failed".
+        Map<dynamic, dynamic> error;
+        try {
+          error = jsonDecode(response.body) as Map;
+        } catch (_) {
+          error = const {};
+        }
+        throw Exception(tourEditErrorMessage(error));
       }
     } catch (e) {
       await DebugLogHelper.addDebugLog('EDIT API: Error in save: $e');
