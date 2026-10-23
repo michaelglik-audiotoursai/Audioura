@@ -582,6 +582,53 @@ def _check_geographic_existence_tier1(
         "Accept": "application/json",
     }
 
+    # [LOCAL-744] GENERIC city-metro coordinate proximity. The Riviera bbox above
+    # is a hard-coded special case: before this, ANY city whose name was not
+    # literally in a place's Wikipedia extract had NO coordinate fallback at all,
+    # so a real Salem place like "Pickering Wharf" (whose summary extract reads
+    # "a waterfront marketplace and marina on the South River" — no "Salem" token)
+    # was dropped as "no evidence" even though its coordinates sit squarely in
+    # Salem. This resolves the toured city's centre (lazily, once) and accepts any
+    # Wikipedia/Wikidata coordinate within a generous metro radius — the same
+    # EXISTENCE question the walking path (LOCAL-662B) already asks. A place in the
+    # wrong city still fails (its coordinates are far from the centre). A failed
+    # city geocode is inert here (None) — it never fabricates proximity.
+    _METRO_RADIUS_KM = 35.0
+    _city_signals_744 = _city_signals_from_venue(venue_name)
+    _city_center_box = {}  # memo: computed on first coordinate hit
+
+    def _city_center_744():
+        if 'v' not in _city_center_box:
+            try:
+                _city_center_box['v'] = _geocode_city_center(venue_name, _city_signals_744)
+            except Exception:
+                # A throttled/failed city geocode is not evidence of absence (D162):
+                # treat as "no anchor" (inert) rather than crashing the tier-1 check.
+                _city_center_box['v'] = None
+        return _city_center_box['v']
+
+    def _within_metro_744(lat, lng):
+        """True when (lat,lng) is within the metro radius of the toured city.
+
+        Returns False (not True) when there is no city anchor — a coordinate with
+        nothing to compare against is NOT evidence the place is in this city."""
+        try:
+            lat = float(lat); lng = float(lng)
+        except (TypeError, ValueError):
+            return False
+        center = _city_center_744()
+        if not center:
+            return False
+        import math
+        lat1, lon1 = center
+        r = 6371.0
+        p1, p2 = math.radians(lat1), math.radians(lat)
+        dp = math.radians(lat - lat1)
+        dl = math.radians(lng - lon1)
+        h = (math.sin(dp / 2) ** 2
+             + math.cos(p1) * math.cos(p2) * math.sin(dl / 2) ** 2)
+        return 2 * r * math.asin(min(1.0, math.sqrt(h))) <= _METRO_RADIUS_KM
+
     # --- Check 1: Wikipedia summary (en + fr) ---
     for lang in ('en', 'fr'):
         try:
@@ -609,6 +656,16 @@ def _check_geographic_existence_tier1(
                         if _use_riviera_bbox:
                             if 43.0 <= lat <= 44.0 and 5.5 <= lng <= 7.8:
                                 has_region = True
+                        # [LOCAL-744] Generic metro fallback: the article the stop
+                        # title resolved to carries coordinates inside the toured
+                        # city's metro. The summary endpoint is queried BY the stop
+                        # title, and we additionally require the returned title to
+                        # match, so this cannot verify via a coincidental redirect.
+                        elif (_title_match(stop_title, title_returned)
+                              and _within_metro_744(lat, lng)):
+                            return True, (f"wikipedia_{lang}_coords: '{title_returned}' "
+                                          f"at {float(lat):.4f},{float(lng):.4f} within "
+                                          f"metro of {venue_name[:40]!r}")
 
                 if has_region:
                     return True, (f"wikipedia_{lang}_summary: '{title_returned}' "
@@ -679,6 +736,15 @@ def _check_geographic_existence_tier1(
                                             return True, (f"wikipedia_{lang}_coords: "
                                                           f"'{r_title}' at {lat:.2f},{lng:.2f} "
                                                           f"within Riviera bounds")
+                                    # [LOCAL-744] Generic metro fallback — the title
+                                    # already matched the stop; its article's
+                                    # coordinates sit in the toured city's metro.
+                                    if lat and lng and not _use_riviera_bbox \
+                                            and _within_metro_744(lat, lng):
+                                        return True, (f"wikipedia_{lang}_coords: "
+                                                      f"'{r_title}' at {float(lat):.4f},"
+                                                      f"{float(lng):.4f} within metro of "
+                                                      f"{venue_name[:40]!r}")
                         except Exception:
                             pass
         except Exception as e:
@@ -730,6 +796,14 @@ def _check_geographic_existence_tier1(
                                                           f"'{wd_label}' (QID:{qid}) "
                                                           f"at {lat:.2f},{lng:.2f} "
                                                           f"within region")
+                                    # [LOCAL-744] Generic metro fallback — a Wikidata
+                                    # geographic entity whose label matched the stop
+                                    # and whose P625 lands in the toured city's metro.
+                                    elif _within_metro_744(lat, lng):
+                                        return True, (f"wikidata_{lang}_coords: "
+                                                      f"'{wd_label}' (QID:{qid}) at "
+                                                      f"{float(lat):.4f},{float(lng):.4f} "
+                                                      f"within metro of {venue_name[:40]!r}")
     except Exception as e:
         logger.debug(f"[EXISTENCE-GATE] Wikidata check failed for {stop_title!r}: {e}")
 
@@ -755,6 +829,12 @@ def _check_geographic_existence_tier1(
                                 return True, (f"wikipedia_proper_noun: '{pn}' "
                                               f"at {lat:.2f},{lng:.2f} confirms "
                                               f"'{stop_title}' is in region")
+                        # [LOCAL-744] Generic metro fallback for the extracted
+                        # geographic proper noun ("…of Salem" → "Salem").
+                        elif _within_metro_744(lat, lng):
+                            return True, (f"wikipedia_proper_noun: '{pn}' at "
+                                          f"{float(lat):.4f},{float(lng):.4f} within "
+                                          f"metro, confirms '{stop_title}'")
                 # No coords but article mentions region
                 pn_text = _strip_accents(
                     f"{pn_data.get('extract', '')} {pn_data.get('description', '')}"
@@ -1791,14 +1871,31 @@ def verify_stop_existence(
         # 'unknown' and fails the corpus COVERAGE test above. Before dropping it,
         # ask the EXISTENCE question the LEAD requires: is there a Wikidata item
         # (label/alias + P625 near the city) or an OSM named feature for it? Only
-        # for walking/specialized outdoor tours — museum/dining keep their own
-        # paths, and a tour with its own venue page never routes here.
+        # for place-based OUTDOOR tours — museum/dining keep their own paths, and
+        # a tour with its own venue page never routes here.
+        #
+        # [LOCAL-744] Why this used to be ('walking', 'specialized') only, and why
+        # that dropped real Salem places. Tour 716 — "episode 1 of season 1 biking
+        # tour, Salem, MA" — had NO venue_corpus row, so it reached here with
+        # venue_kind 'unknown'. But its tour_category is 'biking', which was NOT in
+        # this set, so the robust Wikidata-P625/OSM existence check was skipped
+        # entirely: Pickering Wharf, Winter Island Park and Fort Pickering
+        # Lighthouse — all real, all in Salem, all resolvable on Wikidata/OSM — fell
+        # straight through to the unverified return below and were dropped as "no
+        # evidence". A biking / cycling / driving / animal / road-trip tour of a city
+        # is the SAME shape as a walking tour: a place-based outdoor tour with no
+        # venue page to ground against. It must ask the same existence question.
+        # Museum/dining/facility/restaurant keep their own dedicated paths above and
+        # never reach this branch.
         #
         # LOCAL-661 / D162: a Wikimedia/OSM search that could not run (429,
         # timeout, connection error) raises RuntimeError → classified 'unknown'
         # (search_failed) so the stop is KEPT, never dropped on non-evidence.
         _tt = (tour_type or '').strip().lower()
-        _WALKING_KINDS = ('walking', 'specialized')
+        _WALKING_KINDS = ('walking', 'specialized',
+                          'biking', 'cycling', 'bike',
+                          'driving', 'drive', 'vehicle',
+                          'animal', 'country_scale')
         if _tt in _WALKING_KINDS:
             try:
                 verified, evidence = _check_walking_stop_existence(stop_title, venue_name)

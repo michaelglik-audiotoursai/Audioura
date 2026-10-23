@@ -1448,6 +1448,96 @@ Examples:
     # If we get here without returning, all retries failed
     return None
 
+
+def filming_location_lookup(api_key):
+    """[LOCAL-744] Build the INJECTED, sourced filming-location lookup for
+    screen_work_tour.build_filming_disclosure.
+
+    Returns a callable ``lookup(work, location)`` that asks the model where the
+    named work was filmed AND for a citable source, then returns one of:
+
+      * ``{"work_name", "filmed_place", "source"}``  — filmed elsewhere, sourced.
+      * ``{"work_name", "filmed_here": True, "filmed_place", "source"}``
+                                                      — the toured place IS a set.
+      * ``None``                                      — could not confirm.
+
+    The contract that keeps us honest (Michael: *never guess*): a result is only
+    returned when the model supplies BOTH a filming place AND a source. "unknown"
+    confidence, an empty source, or any error → ``None`` (→ "we could not confirm
+    where it was filmed"). The model is told explicitly to answer "unknown" rather
+    than guess. Cost: ~$0.001 per tour (one short call, only for work tours).
+    """
+    def _lookup(work, location):
+        if not api_key:
+            return None
+        _title = (work.get('theme_name') or '').strip()
+        _tt = (work.get('theme_type') or '').strip()
+        # Give the model the raw request so it can resolve "episode 1 of season 1
+        # … Salem, MA" to the work even when no title was typed.
+        _prompt = (
+            "A tour was requested based on a TV show, film, or book. Identify the "
+            "work and state WHERE IT WAS FILMED (for a book: where any screen "
+            "adaptation was filmed, else report unknown), with a citable source.\n\n"
+            f"Tour request / place: {location!r}\n"
+            f"Detected theme type: {_tt or 'unknown'}\n"
+            f"Detected title (may be empty): {_title or 'unknown'}\n\n"
+            "Respond with ONLY JSON:\n"
+            "{\n"
+            '  "work_name": "the canonical title of the work, or null if you cannot identify it",\n'
+            '  "filmed_place": "the primary real-world filming location as City, Region/Country, '
+            'or null if unknown",\n'
+            '  "source": "a specific citable source for the filming location (e.g. a Wikipedia '
+            'article title or a named publication), or null if you do not have one",\n'
+            '  "confidence": "high | medium | low | unknown"\n'
+            "}\n\n"
+            "Rules: NEVER guess a filming location. If you are not confident or have no "
+            "source, set filmed_place=null and source=null and confidence=\"unknown\". "
+            "Only give filmed_place together with a real source."
+        )
+        headers = {"Content-Type": "application/json",
+                   "Authorization": f"Bearer {api_key}"}
+        data = {
+            "model": _check_model(),
+            "messages": [
+                {"role": "system",
+                 "content": "You are a film/TV production researcher. Respond only with valid "
+                            "JSON. Never fabricate a filming location or a source."},
+                {"role": "user", "content": _prompt},
+            ],
+            "temperature": 0,
+            "max_tokens": 250,
+        }
+        try:
+            resp = requests.post("https://api.openai.com/v1/chat/completions",
+                                 headers=headers, data=json.dumps(data), timeout=30)
+            if resp.status_code != 200:
+                print(f"  [LOCAL-744] filming lookup HTTP {resp.status_code} — treating as unknown")
+                return None
+            raw = resp.json()["choices"][0]["message"]["content"]
+            parsed = json.loads(strip_llm_json_fences(raw))
+        except Exception as e:
+            print(f"  [LOCAL-744] filming lookup failed ({e}) — treating as unknown")
+            return None
+
+        _conf = (parsed.get('confidence') or '').strip().lower()
+        _place = (parsed.get('filmed_place') or '').strip() if parsed.get('filmed_place') else ''
+        _source = (parsed.get('source') or '').strip() if parsed.get('source') else ''
+        _name = (parsed.get('work_name') or '').strip() if parsed.get('work_name') else ''
+
+        # Honesty gate: no place, no source, or explicit "unknown" → cannot confirm.
+        if _conf == 'unknown' or not _place or not _source:
+            print(f"  [LOCAL-744] filming location unconfirmed "
+                  f"(conf={_conf!r}, place={_place!r}, source={'yes' if _source else 'no'})")
+            return None
+
+        out = {"work_name": _name or None, "filmed_place": _place, "source": _source}
+        print(f"  [LOCAL-744] filming location (sourced): {_name or _title!r} → "
+              f"{_place!r} [src: {_source[:60]!r}]")
+        return out
+
+    return _lookup
+
+
 def verify_poi_matches_type(poi_name, poi_type, api_key):
     """
     Verify each POI matches the requested type.
@@ -4503,6 +4593,12 @@ _J = _jss.attach_to_module(__name__, {
     #   {"stops": [stop_dict, ...], "opening": opening_dict|None,
     #    "closing": closing_dict|None}
     "_LAST_STRUCTURED_RECORDS": dict,
+    # [LOCAL-744] The sourced filming-location disclosure sentence(s) the impl
+    # computed for a screen/book-work tour, to be spliced into the Orientation at
+    # the single every-path delivery choke point (_apply_delivery_hours_guard).
+    # Empty string for a plain place tour (no work named) — no disclosure, no
+    # false positive. Set once per generation in the impl; read by the guard.
+    "_LAST_SCREEN_WORK_DISCLOSURE": lambda: "",
 })
 
 # [LOCAL-582] Module-level: how the LAST generation was delivered.
@@ -8794,6 +8890,23 @@ def _apply_delivery_hours_guard(result):
                       "idempotence)", flush=True)
         except Exception as _msf:  # pragma: no cover
             _import_logger.error(f"[LOCAL-662] final marker strip skipped: {_msf}")
+        # [LOCAL-744] SCREEN-WORK DISCLOSURE. Splice the sourced filming-location
+        # opening into the Orientation on EVERY delivery path. The impl computed
+        # it from intent + the injected lookup and stashed it on
+        # _J._LAST_SCREEN_WORK_DISCLOSURE (empty for a plain place tour → no-op).
+        # Runs LAST, after all other text guards, so it leads the final spoken
+        # opening. Idempotent: inject_orientation_disclosure never doubles it.
+        try:
+            _disc = (getattr(_J, "_LAST_SCREEN_WORK_DISCLOSURE", "") or "").strip()
+            if _disc and final:
+                import screen_work_tour as _swt_final
+                _before = final
+                final = _swt_final.inject_orientation_disclosure(final, _disc)
+                if final != _before:
+                    print("  [LOCAL-744] spliced sourced filming-location disclosure "
+                          "into the Orientation opening.", flush=True)
+        except Exception as _swe:  # pragma: no cover
+            _import_logger.error(f"[LOCAL-744] disclosure injection skipped: {_swe}")
         if final != text and out_file:
             # Rewrite the delivered file so the service (which reads the file,
             # not the return value) ships the cleaned text on every path.
@@ -9759,6 +9872,32 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
     else:
         user_request = f"{tour_type} {location}"
     intent = analyze_tour_intent(user_request, api_key)
+
+    # [LOCAL-744] Screen/book-work disclosure. When the request is about a TV
+    # show / film / book (e.g. "episode 1 of season 1 biking tour, Salem, MA" —
+    # WGN's *Salem*, filmed in Shreveport, Louisiana), the Orientation must OPEN
+    # with one honest, SOURCED sentence saying where the work was filmed and how
+    # this tour relates — Michael, 2026-10-23: "this is the most important part".
+    # A plain place request names no work → detect returns None → no disclosure
+    # (no false positive). The filming lookup is injected and only returns a fact
+    # WITH a source; otherwise the disclosure honestly says we could not confirm
+    # (never a guess). We compute the sentence here (where intent + api_key live)
+    # and stash it; the every-path delivery choke point splices it into the
+    # Orientation so it ships on fresh/cache/pool paths alike.
+    try:
+        import screen_work_tour as _swt744
+        _work744 = _swt744.detect_screen_work(user_request, intent or {})
+        if _work744:
+            _disc744 = _swt744.build_filming_disclosure(
+                _work744, location, filming_location_lookup(api_key))
+            _J._LAST_SCREEN_WORK_DISCLOSURE = _disc744 or ""
+            print(f"  [LOCAL-744] screen-work tour detected ({_work744.get('signal')}); "
+                  f"Orientation disclosure: {(_disc744 or '')[:120]!r}")
+        else:
+            _J._LAST_SCREEN_WORK_DISCLOSURE = ""
+    except Exception as _swt_err:  # never block generation on the disclosure
+        _J._LAST_SCREEN_WORK_DISCLOSURE = ""
+        _import_logger.error(f"[LOCAL-744] screen-work disclosure skipped: {_swt_err}")
 
     # Transport mode detection (Layer 1: keyword, Layer 2: intent field)
     _transport_keyword = _detect_transport_mode(location)
