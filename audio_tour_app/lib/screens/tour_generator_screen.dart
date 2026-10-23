@@ -39,7 +39,11 @@ import 'plan_screen.dart';
 import 'communities_about_screen.dart';
 
 class TourGeneratorScreen extends StatefulWidget {
-  const TourGeneratorScreen({super.key, this.initialEntitlements});
+  const TourGeneratorScreen(
+      {super.key,
+      this.initialEntitlements,
+      this.initialCommunityId,
+      this.initialOwnedCommunities});
 
   /// [LOCAL-733 / D703] Test seam only: when provided, the screen uses this
   /// snapshot for the "tours left" line instead of loading it from the
@@ -47,6 +51,22 @@ class TourGeneratorScreen extends StatefulWidget {
   /// with no running server. Null in production (the default), where the screen
   /// loads it from EntitlementsService.me() in initState.
   final Entitlements? initialEntitlements;
+
+  /// [LOCAL-742] When set (e.g. from an organiser's community page "Add a tour"
+  /// button), the "For:" selector is PRESELECTED to this community once the
+  /// owned-communities list has loaded, with visibility =
+  /// CommunityTourRules.defaultVisibility ('members'). Null → today's behaviour
+  /// exactly: the selector defaults to "Just me / public as usual". If the id
+  /// is not among the organiser's owned communities (e.g. ownership changed),
+  /// the preselect is a no-op and the default "Just me" stands.
+  final int? initialCommunityId;
+
+  /// [LOCAL-742] Test seam only: when provided, the screen uses this list as
+  /// the organiser's owned communities instead of loading it from the user-api,
+  /// so a widget test can render the "For:" selector (and verify the
+  /// initialCommunityId preselect) with no running server. Null in production
+  /// (the default), where the screen loads it in initState.
+  final List<OwnedCommunity>? initialOwnedCommunities;
 
   @override
   State<TourGeneratorScreen> createState() => _TourGeneratorScreenState();
@@ -197,6 +217,20 @@ class _TourGeneratorScreenState extends State<TourGeneratorScreen> {
   // (owner of ≥ 1 community) sees it; a listener with none sees nothing. Never
   // throws — an empty list just hides the selector.
   Future<void> _loadOwnedCommunities() async {
+    // [LOCAL-742] Test seam: when the owned list is supplied, use it directly
+    // (no user-api call) and apply the same preselect the networked path does.
+    final seed = widget.initialOwnedCommunities;
+    if (seed != null) {
+      setState(() {
+        _ownedCommunities = seed;
+        _isCommunityMember = CommunityRules.hasAnyCommunity(
+          joinedCount: 0,
+          ownedCount: seed.length,
+        );
+        _applyInitialCommunity(seed);
+      });
+      return;
+    }
     try {
       final prefs = await SharedPreferences.getInstance();
       final userId = prefs.getString('user_id') ?? '';
@@ -212,9 +246,27 @@ class _TourGeneratorScreenState extends State<TourGeneratorScreen> {
           joinedCount: joined.length,
           ownedCount: owned.length,
         );
+        _applyInitialCommunity(owned);
       });
     } catch (_) {
       // Non-fatal: the selector simply stays hidden.
+    }
+  }
+
+  /// [LOCAL-742] Preselect the community the screen was opened FOR (from an
+  /// organiser's community page "Add a tour"). Only applies when the id is one
+  /// the organiser actually owns and nothing has been chosen yet; otherwise the
+  /// default "Just me" stands. Visibility is the members-default
+  /// (CommunityTourRules.defaultVisibility), matching the community page's own
+  /// default. Call from within a setState (it mutates _communityTarget only).
+  void _applyInitialCommunity(List<OwnedCommunity> owned) {
+    final wantId = widget.initialCommunityId;
+    if (wantId == null || _communityTarget.community != null) return;
+    final match = owned.where((c) => c.id == wantId).toList(growable: false);
+    if (match.isNotEmpty) {
+      _communityTarget = CommunityTourTarget(
+          community: match.first,
+          visibility: CommunityTourRules.defaultVisibility);
     }
   }
 
@@ -253,11 +305,15 @@ class _TourGeneratorScreenState extends State<TourGeneratorScreen> {
       alignment: Alignment.centerLeft,
       child: TextButton.icon(
         key: const Key('generate_my_communities_link'),
-        onPressed: () {
-          Navigator.push(
+        onPressed: () async {
+          await Navigator.push(
             context,
             MaterialPageRoute(builder: (_) => const CommunitiesHubScreen()),
           );
+          // [LOCAL-742, LEAD] A community created from the hub must show in
+          // the "For:" selector at once (Michael 2026-10-23: Salem was missing
+          // until he switched tabs). This screen stays mounted under the hub.
+          if (mounted) await _loadOwnedCommunities();
         },
         icon: const Icon(Icons.groups, size: 18),
         label: const Text('My communities'),

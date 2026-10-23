@@ -34,6 +34,7 @@ import '../services/entitlements_service.dart';
 import '../services/device_service.dart';
 import '../services/document_acceptance_service.dart';
 import 'community_page_screen.dart';
+import 'tour_generator_screen.dart';
 import 'plan_screen.dart';
 
 class CommunitiesAboutScreen extends StatefulWidget {
@@ -964,6 +965,20 @@ class _CreateCommunityScreenState extends State<CreateCommunityScreen> {
               );
             },
             child: const Text('Open community'),
+          ),
+          // [LOCAL-742, LEAD] The organiser's first job is a tour (Michael
+          // 2026-10-23): go straight to Generate with this community chosen.
+          FilledButton(
+            key: const Key('create_first_tour_button'),
+            onPressed: () {
+              Navigator.pop(ctx);
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(
+                    builder: (_) => TourGeneratorScreen(initialCommunityId: c.id)),
+              );
+            },
+            child: const Text('Create your first tour'),
           ),
         ],
       ),

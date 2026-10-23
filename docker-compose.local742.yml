@@ -1,0 +1,54 @@
+# docker-compose.local742.yml — LOCAL-742 live test stack.
+#
+# A fully ISOLATED stack built from THIS worktree, on its own project name
+# (local742) and spare host ports (549xx), with its OWN throwaway Postgres —
+# NEVER the shared postgres-2 that the running `audioura` stack and Michael's
+# phone use. LOCAL-742 is an APP-SIDE change (the organiser community page gets
+# an "Add a tour" button that opens the generator with the community
+# preselected); the data it reads — the community payload with is_owner, and
+# the community-tagged tours list — is served by the user-api alone. No AI, no
+# generation: budget $0.
+#
+# HARD ISOLATION RULES (task contract):
+#   * project name: local742  (never `audioura` / `audioura-*`)
+#   * spare host ports in the 549xx range
+#   * dedicated postgres `postgres-742` with a tmpfs volume — no shared DB
+#   * build context is THIS worktree ('./user-tracking')
+#
+# UP:
+#   docker compose -p local742 -f docker-compose.local742.yml up -d --build
+# DOWN (remove containers AND the throwaway DB):
+#   docker compose -p local742 -f docker-compose.local742.yml down -v
+
+services:
+  postgres-742:
+    image: postgres:15-alpine
+    container_name: postgres-742
+    environment:
+      POSTGRES_DB: audiotours
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: password123
+    ports:
+      - "54932:5432"
+    tmpfs:
+      - /var/lib/postgresql/data   # throwaway: gone on `down -v`, never persisted
+    restart: "no"
+
+  user-api-742:
+    build:
+      context: ./user-tracking
+    container_name: user-api-742
+    ports:
+      - "54903:5000"
+    environment:
+      - ALLOW_UNAUTHENTICATED_ENTITLEMENTS=true
+      - DB_HOST=postgres-742
+      - DB_NAME=audiotours
+      - DB_USER=admin
+      - DB_PASSWORD=password123
+      - DB_PORT=5432
+      - DATABASE_URL=postgresql://admin:password123@postgres-742:5432/audiotours
+      - IAP_VERIFY_MODE=stub
+    depends_on:
+      - postgres-742
+    restart: "no"
