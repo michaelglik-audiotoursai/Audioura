@@ -2,7 +2,7 @@
 
 **Branch:** `LOCAL-746-member-gets-edit`
 **Base:** `subscribed` @ `eee10caa` (contains LOCAL-745). `git merge-base --is-ancestor eee10caa HEAD` → exit 0.
-**code_sha (base):** `eee10caaf0e38c877333a6ebfc76ad6d964619c4` (the commit SHA of this work is the tip of `LOCAL-746-member-gets-edit`).
+**code_sha:** `0b9c1a6ee7f49a034e5fd978b4721272dfa1d160` (tip of `LOCAL-746-member-gets-edit`; base `eee10caaf0e38c877333a6ebfc76ad6d964619c4` = `subscribed`, contains LOCAL-745).
 
 ## The problem
 
