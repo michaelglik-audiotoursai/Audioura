@@ -158,6 +158,57 @@ _LABEL_GLUED_STOP_HEADER = re.compile(
     r'(?im)^[ \t]*(?:Address|Directions|Coordinates|Orientation):[ \t]*(Stop\s+\d+:\s)')
 
 
+# [LOCAL-743] A stop heading the model wrote as a SENTENCE instead of the house
+# "Stop N:" header — the live tour 716 defect: Stop 1 was delivered as
+#
+#     Stop 1 is the Salem Maritime National Historic Site.
+#
+# while stops 2–5 used "Stop N: <name>". The modernized splitter and the stop
+# counter both key on "Stop N:" (colon), so this sentence-form header was never
+# a header: the splitter folded it into the pre-stop title part and dropped it,
+# and stop 1 lost its audio (4 of 5 delivered; stops_count=4). No code emits this
+# shape — the model wrote it — so the repair is deterministic normalisation of
+# the known connective forms back to the colon header, BEFORE anything splits or
+# counts. Matched connectives, at line-start only, case-insensitive:
+#   "Stop N is the <name>"   → "Stop N: <name>"
+#   "Stop N is <name>"       → "Stop N: <name>"
+#   "Stop N - <name>" / em/en dash → "Stop N: <name>"
+# A trailing sentence period on the name is dropped ("…Site." → "…Site") so the
+# title matches the colon-form the renderer produces; interior punctuation in a
+# real title (e.g. "No. 14", "Whaam!") is preserved because only ONE trailing
+# ".", "!" or "?" is stripped. A header already in colon form is never touched
+# (the alternation requires a non-colon connective), so the pass is idempotent.
+_HEADING_VARIANT = re.compile(
+    r'(?im)^[ \t]*Stop[ \t]+(\d+)[ \t]+'
+    r'(?:is[ \t]+the[ \t]+|is[ \t]+|[\-\u2013\u2014][ \t]*)'
+    r'(.+?)[ \t]*$')
+
+
+def normalize_heading_variants(tour_text: str) -> str:
+    """[LOCAL-743] Rewrite a sentence-form stop heading to the house "Stop N:" form.
+
+    "Stop 1 is the Salem Maritime National Historic Site." → "Stop 1: Salem
+    Maritime National Historic Site". Deterministic, offline, idempotent. Keys
+    only on the "Stop N" prefix and a connective ("is the", "is", "-"/"–"/"—");
+    a header already in "Stop N:" colon form is left untouched because the
+    alternation never matches a colon. One trailing sentence terminator on the
+    name is dropped so the title matches the colon-form the renderer emits.
+    """
+    if not tour_text:
+        return tour_text or ""
+
+    def _sub(m):
+        num = m.group(1)
+        name = m.group(2).strip()
+        # Drop exactly one trailing sentence terminator ("…Site." → "…Site"),
+        # preserving interior punctuation in a real title.
+        if name[-1:] in ".!?":
+            name = name[:-1].rstrip()
+        return f"Stop {num}: {name}"
+
+    return _HEADING_VARIANT.sub(_sub, tour_text)
+
+
 # ─── [LOCAL-642] Flattened-block / duplicated-transition invariant ────────────
 #
 # National Gallery 495 (Bench R9, R12): the stop whose title carries parentheses
@@ -178,8 +229,18 @@ _LABEL_GLUED_STOP_HEADER = re.compile(
 
 # The house field labels, as a line-anchored alternation. A label "starts a
 # line" when it is at the beginning of a physical line (optionally indented).
-_FIELD_LABELS_TC = ("Address", "Coordinates", "Orientation", "Directions")
-_FIELD_LABEL_ALT = "(?:" + "|".join(_FIELD_LABELS_TC) + ")"
+# [LOCAL-743] Type/Specialty and Specific Examples are included: the live tour
+# 716 leak glued a NEXT stop's "Type/Specialty: … Specific Examples: …" fields
+# onto the end of the previous stop's Directions line ("…Specific Examples:
+# Amusement rides… — it is about a minute's walk away."), so those labels were
+# never re-broken onto their own line and could reach the spoken text. The
+# alternation is ordered longest-first and the two-word / slashed labels are
+# written as explicit regex so "Type/Specialty" and "Specific Examples" match
+# literally (the "/" and the space are part of the label).
+_FIELD_LABELS_TC = ("Address", "Coordinates", "Orientation", "Directions",
+                    "Type/Specialty", "Specific Examples")
+_FIELD_LABEL_ALT = ("(?:Type/Specialty|Specific Examples|"
+                    "Address|Coordinates|Orientation|Directions)")
 
 # A field label that is glued AFTER other content on the same physical line —
 # i.e. preceded by a non-newline, non-space char then whitespace, OR directly by
@@ -272,9 +333,14 @@ def normalise_stop_headers(tour_text: str) -> str:
     """
     if not tour_text:
         return tour_text
+    # (0) [LOCAL-743] Rewrite a sentence-form heading the model wrote instead of
+    #     the house "Stop N:" header ("Stop 1 is the Salem Maritime …" → "Stop 1:
+    #     Salem Maritime …", tour 716). Done FIRST so the colon header exists
+    #     before the glued-header re-breaks and the count below see it.
+    out = normalize_heading_variants(tour_text)
     # (1) A header glued onto an EMPTY field label ("Directions:Stop 3:"): drop
     #     the valueless label and put the header on its own line.
-    out = _LABEL_GLUED_STOP_HEADER.sub(r'\n\n\1', tour_text)
+    out = _LABEL_GLUED_STOP_HEADER.sub(r'\n\n\1', out)
     # (2) A header glued onto the end of a sentence ("…once more.Stop 3:").
     out = _GLUED_STOP_HEADER.sub(r'\n\n\1', out)
     # (3) [LOCAL-642] Un-flatten a run-on header / field chain and drop a
@@ -296,6 +362,32 @@ def count_delivered_stops(tour_text: str) -> int:
     (see ``normalise_stop_headers``).
     """
     return len(_STOP_HEADER.findall(normalise_stop_headers(tour_text or "")))
+
+
+# [LOCAL-743] Field labels that are STRUCTURE, never speech. If any of these
+# appears inside a stop's spoken narration (e.g. a next stop's "Type/Specialty:"
+# / "Specific Examples:" / "Coordinates:" block glued onto the previous stop's
+# Directions line, the live tour 716 leak), a synthesiser would read the label
+# aloud. These are matched mid-line (not line-anchored) because the leak glues
+# them AFTER narration text on one physical line — exactly what the field-line
+# invariant must have already re-broken onto their own lines.
+_SPOKEN_LEAK_LABELS = ("Coordinates", "Type/Specialty", "Specific Examples")
+_SPOKEN_LEAK_RE = re.compile(
+    r'(?<=\S)[ \t]+(?:Coordinates|Type/Specialty|Specific Examples):')
+
+
+def find_leaked_field_labels(tour_text: str) -> List[str]:
+    """[LOCAL-743] Return field labels that leaked INTO spoken narration.
+
+    A field label belongs on its own line as tour structure; the spoken text a
+    listener hears must never contain "Coordinates:", "Type/Specialty:" or
+    "Specific Examples:" mid-sentence. Returns the list of offending label
+    snippets (empty when the text is clean). Pure/offline; used by the tests and
+    as a cheap post-normalisation assertion in the generator.
+    """
+    if not tour_text:
+        return []
+    return [m.group(0).strip() for m in _SPOKEN_LEAK_RE.finditer(tour_text)]
 
 
 def has_thematic_conclusion(tour_text: str) -> bool:
