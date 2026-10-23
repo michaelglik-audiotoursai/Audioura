@@ -2986,6 +2986,20 @@ Say 'What are my options' to hear this help again"""
         <span class="language-indicator">{target_language.upper()}</span>
     </div>'''
         
+        # [LOCAL-747] Per-category stop icon, mirroring tour_html_map.CATEGORY_ICONS.
+        # Biking/cycling now get the bike icon instead of the generic map pin.
+        # (This translation service builds its own Docker image and does not share
+        # the root package, so the small map is inlined here rather than imported.)
+        _category_icons = {
+            'walking': '\U0001F6B6',       # 🚶
+            'restaurant': '\U0001F374',    # 🍴
+            'museum': '\U0001F3DB\uFE0F',  # 🏛️
+            'specialized': '\U0001F5FA\uFE0F',  # 🗺️
+            'biking': '\U0001F6B2',        # 🚲
+            'cycling': '\U0001F6B2',       # 🚲
+        }
+        _fallback_icon = '\U0001F5FA\uFE0F'  # 🗺️
+
         for i, (stop_text, audio_data) in enumerate(zip(translated_stops, audio_files)):
             # Extract stop title from text content
             lines = stop_text.split('\n')
@@ -2994,7 +3008,10 @@ Say 'What are my options' to hear this help again"""
             # Map button — only if stop has coordinates
             map_button = ''
             if re.search(r'^Coordinates:\s*[-\d.]+\s*,\s*[-\d.]+', stop_text, re.IGNORECASE | re.MULTILINE):
-                map_button = f'<button class="map-btn" onclick="openMap({i+1})" title="View on map">🗺</button>'
+                _cat_match = re.search(r'^Tour-Category:\s*(\w+)', stop_text[:500], re.IGNORECASE | re.MULTILINE)
+                _cat = _cat_match.group(1).lower() if _cat_match else ''
+                _icon = _category_icons.get(_cat, _fallback_icon)
+                map_button = f'<button class="map-btn" onclick="openMap({i+1})" title="View on map">{_icon}</button>'
             
             # Create audio data URL if audio is available
             audio_element = ""

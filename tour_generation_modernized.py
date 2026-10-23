@@ -20,9 +20,34 @@ except Exception:  # noqa: BLE001
         n = len(text) if isinstance(text, str) else int(text or 0)
         return min(180.0, 30.0 + 0.05 * max(0, n))
 from datetime import datetime
-from flask import Flask, request, jsonify, send_file
+from flask import Flask, request, jsonify, send_file as _send_file
 from flask_cors import CORS
 import threading
+import inspect as _inspect
+
+
+def _compat_send_file(path_or_file, **kwargs):
+    """Version-tolerant send_file wrapper (LOCAL-747).
+
+    Flask <2.0 (the 1.1.4 service image) uses ``attachment_filename``; Flask
+    >=2.0 renamed it to ``download_name``. This maps whichever caller keyword is
+    given to whichever the installed Flask supports, so the same code runs on
+    both. Same helper already shipped in 6 other services (Docker round 4).
+    """
+    sig = _inspect.signature(_send_file)
+    params = sig.parameters
+    download_name = kwargs.pop("download_name", None)
+    attachment_filename = kwargs.pop("attachment_filename", None)
+    name = download_name or attachment_filename
+    if name:
+        if "download_name" in params:
+            kwargs["download_name"] = name
+        else:
+            kwargs["attachment_filename"] = name
+    return _send_file(path_or_file, **kwargs)
+
+
+send_file = _compat_send_file
 
 # Labels stripped from TTS audio (kept in .txt files for mobile app parsing)
 # Matches all 5 structured metadata fields — same set as translation_service._NAV_FIELD_PREFIXES
@@ -114,12 +139,15 @@ def create_modernized_tour_zip(tour_data, job_id):
     
     return zip_filename
 
-_COORDINATES_RE = re.compile(r'^Coordinates:\s*[-\d.]+\s*,\s*[-\d.]+', re.IGNORECASE | re.MULTILINE)
-_CATEGORY_ICONS = {'walking': '🚶', 'restaurant': '🍴', 'museum': '🏛️', 'specialized': '🗺️'}
-
-def _stop_has_coordinates(stop_text):
-    """Return True if the stop text contains a Coordinates: line with valid lat,lng."""
-    return bool(_COORDINATES_RE.search(stop_text))
+# [LOCAL-747] Map-button building blocks moved to the shared tour_html_map
+# module so the editor's create_clean_html renders the identical button. The
+# names below stay as module-level aliases for any existing importer.
+from tour_html_map import (
+    COORDINATES_RE as _COORDINATES_RE,
+    CATEGORY_ICONS as _CATEGORY_ICONS,
+    stop_has_coordinates as _stop_has_coordinates,
+    build_map_button as _build_map_button,
+)
 
 def generate_html_with_external_audio(tour_data):
     """Generate HTML that references external MP3 files"""
@@ -157,10 +185,7 @@ def generate_html_with_external_audio(tour_data):
         lines = text.split('\n')
         stop_title = lines[0].strip() if lines else f"Stop {i}"
         
-        map_button = ''
-        if _stop_has_coordinates(text):
-            icon = _CATEGORY_ICONS.get(tour_data.get('tour_category', ''), '🗺️')
-            map_button = f'<button class="map-btn" onclick="openMap({i})" title="View on map">{icon}</button>'
+        map_button = _build_map_button(text, i, tour_data.get('tour_category', ''))
         
         html += f'''
     <div class="audio-item">
