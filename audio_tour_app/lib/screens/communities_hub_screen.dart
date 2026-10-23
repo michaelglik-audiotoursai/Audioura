@@ -24,6 +24,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../services/communities_service.dart';
 import '../services/community_tour_service.dart';
+import '../services/app_sync_coordinator.dart';
 import '../widgets/pass_expiry_display.dart';
 import 'communities_about_screen.dart';
 import 'community_page_screen.dart';
@@ -85,6 +86,9 @@ class _CommunitiesHubScreenState extends State<CommunitiesHubScreen> {
   @override
   void initState() {
     super.initState();
+    // [LOCAL-750 C] Opening the Communities hub kicks off a community sync so
+    // new/updated tours show up without waiting for the next app resume.
+    AppSyncCoordinator.instance.syncNow();
     _load();
   }
 

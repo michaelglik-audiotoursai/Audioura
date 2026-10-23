@@ -27,7 +27,7 @@ void main() {
             const TourDownloadResult(TourDownloadStatus.failed);
     CommunityToursSync.download =
         (tourId) async => const TourDownloadResult(TourDownloadStatus.ok);
-    CommunityToursSync.onRefreshMessage = (_) {};
+    CommunityToursSync.onRefreshMessage = (_, {int? tourId}) {};
     CommunityToursSync.onNewTourAnnouncement = (_, __) {};
     _mockConnectivityWifi();
   });

@@ -18,6 +18,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 import '../services/communities_service.dart';
 import '../services/community_tour_service.dart';
+import '../services/app_sync_coordinator.dart';
 import '../services/community_downloads.dart';
 import '../services/community_background.dart';
 import '../services/community_notifications.dart';
@@ -62,6 +63,12 @@ class CommunityPageScreen extends StatefulWidget {
       this.initialCommunity})
       : assert(communityId != null || joinCode != null || initialCommunity != null);
 
+  /// [LOCAL-750 C] Called once when a community page opens, to kick a community
+  /// sync so new/updated tours arrive without leaving the app. Defaults to the
+  /// real coordinator; a test overrides it to assert the open triggers a sync.
+  static void Function() onOpenSync =
+      () => AppSyncCoordinator.instance.syncNow();
+
   @override
   State<CommunityPageScreen> createState() => _CommunityPageScreenState();
 }
@@ -96,6 +103,8 @@ class _CommunityPageScreenState extends State<CommunityPageScreen> {
   @override
   void initState() {
     super.initState();
+    // [LOCAL-750 C] Opening a community page kicks off a community sync.
+    CommunityPageScreen.onOpenSync();
     _load();
   }
 

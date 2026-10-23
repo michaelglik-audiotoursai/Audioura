@@ -1610,19 +1610,24 @@ def _derive_tour_category(tour_path, stop_texts):
     return ''
 
 
-def create_clean_html(tour_path, final_stops):
-    """Create clean HTML focused on audio controls.
+def create_clean_html(tour_path, final_stops, tour_name=None):
+    """Create the tour's index.html for an edited tour.
 
-    [LOCAL-747] The saved-edit page must carry the same per-stop map button as a
-    freshly generated tour (round `.map-btn` calling `openMap(stop)`, shown only
-    when the stop text has a `Coordinates:` line, with a per-category icon). Those
-    pieces come from the shared tour_html_map module so the button is defined
-    once and matches the generator. The audio player and voice-control script the
-    editor page already had are kept unchanged.
+    [LOCAL-750 B] The page markup, header and CSS now come from the shared
+    tour_html_map.build_tour_page_html, so an edited page is byte-for-byte
+    identical to a freshly generated one for the same stops: the map button sits
+    right after the "<stop>: Audio N" title and the page header is the tour name
+    (not a generic "Audio Tour"). The map button still appears only when the
+    stop text has a Coordinates: line, with the per-category icon (LOCAL-747),
+    and the shared voice-control script keeps the player working.
+
+    [tour_name] is optional for backward compatibility (older callers, and the
+    LOCAL-747 test, call with just tour_path + final_stops). When omitted the
+    name is derived from the tour folder: the trailing id token (a UUID prefix
+    or edit id) is dropped so "<safe name>_<id>" reads back as the tour name.
     """
-    from tour_html_map import (
-        MAP_BTN_CSS, OPENMAP_SCRIPT, build_map_button,
-    )
+    from tour_html_map import build_tour_page_html
+
     html_file = tour_path / "index.html"
 
     # Read each stop's text once: used for the title AND to decide the map button
@@ -1638,176 +1643,22 @@ def create_clean_html(tour_path, final_stops):
 
     tour_category = _derive_tour_category(tour_path, list(stop_texts.values()))
 
-    html_content = '''<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Audio Tour</title>
-    <style>
-        body { font-family: Arial, sans-serif; margin: 20px; background: #f5f5f5; }
-        .container { max-width: 800px; margin: 0 auto; }
-        h1 { text-align: center; color: #333; margin-bottom: 30px; }
-        .stop-item { 
-            background: white; 
-            margin: 15px 0; 
-            padding: 20px; 
-            border-radius: 8px; 
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        }
-        .stop-title { 
-            font-size: 1.3em; 
-            font-weight: bold; 
-            color: #2c3e50; 
-            margin-bottom: 15px; 
-        }
-        audio { 
-            width: 100%; 
-            height: 40px;
-            margin: 10px 0;
-        }
-        .stop-counter {
-            background: #3498db;
-            color: white;
-            border-radius: 50%;
-            width: 30px;
-            height: 30px;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            margin-right: 10px;
-            font-weight: bold;
-        }
-        ''' + MAP_BTN_CSS + '''
-    </style>
-</head>
-<body>
-    <div class="container">
-        <h1>Audio Tour</h1>
-''' + OPENMAP_SCRIPT + '''
-'''
-    
-    for stop_num in sorted(final_stops):
-        text_content = stop_texts.get(stop_num)
-        if text_content is None:
-            continue
-        first_line = text_content.split('\n')[0]
-        title = first_line[:50] + "..." if len(first_line) > 50 else first_line
+    # Derive the display name from the folder when not supplied. The folder is
+    # "<safe name>_<id>"; drop a trailing token that is a UUID prefix (8 hex) or
+    # any short id so the header shows the tour name, not the id.
+    if tour_name is None:
+        folder = tour_path.name
+        parts = folder.split('_')
+        if len(parts) > 1 and re.fullmatch(r'[0-9a-fA-F]{6,}', parts[-1] or ''):
+            parts = parts[:-1]
+        tour_name = '_'.join(parts) if parts else folder
 
-        # [LOCAL-747] Same map button as the generator — only when the stop has
-        # a Coordinates: line, with the per-category icon.
-        map_button = build_map_button(text_content, stop_num, tour_category)
+    # Pass the REAL (possibly renumbered) stop numbers so the audio_<n>.mp3 and
+    # openMap(<n>) references stay correct.
+    stops = [(n, stop_texts[n]) for n in sorted(stop_texts)]
 
-        html_content += f'''        <div class="stop-item">
-            <div class="stop-title">
-                <span class="stop-counter">{stop_num}</span>
-                {title}
-                {map_button}
-            </div>
-            <audio id="audio{stop_num}" controls preload="metadata">
-                <source src="audio_{stop_num}.mp3" type="audio/mpeg">
-                Your browser does not support the audio element.
-            </audio>
-        </div>
-'''
-    
-    html_content += '''    </div>
-    
-    <script>
-        // Voice Control JavaScript Functions
-        var currentStopIndex = 0;
-        var totalStops = ''' + str(len(final_stops)) + ''';
-        var audioElements = [];
-        
-        // Initialize audio elements array (0-based indexing)
-        document.addEventListener('DOMContentLoaded', function() {
-            var stopNumbers = [''' + ','.join(map(str, sorted(final_stops))) + '''];
-            for (let i = 0; i < stopNumbers.length; i++) {
-                var audioElement = document.getElementById('audio' + stopNumbers[i]);
-                audioElements.push(audioElement);
-                
-                // Update currentStopIndex when manually played
-                audioElement.addEventListener('play', function() {
-                    audioElements.forEach(function(otherAudio, otherIndex) {
-                        if (otherIndex !== i && otherAudio && !otherAudio.paused) {
-                            otherAudio.pause();
-                        }
-                    });
-                    currentStopIndex = i;
-                });
-            }
-        });
-        
-        window.playAudio = function() {
-            if (audioElements[currentStopIndex]) {
-                audioElements[currentStopIndex].play();
-                return "success";
-            }
-            return "error";
-        };
-        
-        window.pauseAudio = function() {
-            if (audioElements[currentStopIndex]) {
-                audioElements[currentStopIndex].pause();
-                return "success";
-            }
-            return "error";
-        };
-        
-        window.nextStop = function() {
-            if (currentStopIndex < totalStops - 1) {
-                pauseAllAudio();
-                currentStopIndex++;
-                audioElements[currentStopIndex].play();
-                return "success";
-            }
-            return "error";
-        };
-        
-        window.previousStop = function() {
-            if (currentStopIndex > 0) {
-                pauseAllAudio();
-                currentStopIndex--;
-                audioElements[currentStopIndex].play();
-                return "success";
-            }
-            return "error";
-        };
-        
-        window.goToStop = function(stopNumber) {
-            if (stopNumber >= 1 && stopNumber <= totalStops) {
-                pauseAllAudio();
-                currentStopIndex = stopNumber - 1;
-                audioElements[currentStopIndex].play();
-                return "success";
-            }
-            return "error";
-        };
-        
-        window.pauseAllAudio = function() {
-            audioElements.forEach(function(audio) {
-                if (audio) audio.pause();
-            });
-            return "success";
-        };
-        
-        window.repeatStop = function() {
-            if (audioElements[currentStopIndex]) {
-                audioElements[currentStopIndex].currentTime = 0;
-                audioElements[currentStopIndex].play();
-                return "success";
-            }
-            return "error";
-        };
-        
-        window.initializeAudio = function() {
-            currentStopIndex = 0;
-            return "success";
-        };
-    </script>
-</body>
-</html>'''
-    
+    html_content = build_tour_page_html(tour_name, stops, tour_category)
+
     with open(html_file, 'w', encoding='utf-8') as f:
         f.write(html_content)
 

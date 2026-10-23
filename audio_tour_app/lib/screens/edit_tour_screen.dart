@@ -53,6 +53,81 @@ bool applyEditStopResult(
   return true;
 }
 
+/// LOCAL-750 (A) — which id to send to `/tour/<id>/update-multiple-stops`.
+///
+/// Michael re-edited community tour 716 after re-downloading it from the
+/// community page. The second save hit `/tour/the_episode_1_…_13ed30d1/…` and
+/// got a 404 (×3); only after a fallback did `/tour/734/…` succeed.
+///
+/// Cause: the id was derived purely from the LAST PATH SEGMENT of
+/// `tourData['path']`. A freshly generated tour's folder embeds a UUID, and a
+/// server-downloaded tour's folder once ended in its numeric id — but a tour
+/// re-downloaded from the community page is `<safeName>_<editTourId>`, whose
+/// trailing token (`13ed30d1`) is neither a UUID nor numeric. The old rule then
+/// fell through to the WHOLE FOLDER NAME, which the edit service cannot resolve.
+///
+/// The record itself already carries the authoritative numeric id the server
+/// edits by: `server_tour_id` (stamped at download, LOCAL-677B). For a community
+/// tour (`community_id` present) the server edits in place by that numeric id
+/// (LOCAL-745), so we prefer `server_tour_id` outright. For any other tour we
+/// keep the path-derived id when it is a UUID or numeric, and only fall back to
+/// `server_tour_id` when the path yields neither — so we never POST a folder
+/// name.
+///
+/// Pure + top-level so the id contract is unit-testable without the widget
+/// (mirrors [applyEditStopResult]). Returns `null` only when nothing usable is
+/// available (the caller then logs and surfaces the failure rather than POSTing
+/// a folder name).
+String? deriveBackendTourId(Map<String, dynamic> tourData) {
+  // The record's own numeric server id, if present and numeric.
+  String? serverTourId() {
+    final raw = tourData['server_tour_id']?.toString().trim();
+    if (raw != null && raw.isNotEmpty && int.tryParse(raw) != null) return raw;
+    return null;
+  }
+
+  // Is this a community tour? (community_id may be int or numeric String.)
+  int? communityId;
+  final rawCid = tourData['community_id'];
+  if (rawCid is int) {
+    communityId = rawCid;
+  } else if (rawCid is num) {
+    communityId = rawCid.toInt();
+  } else if (rawCid is String) {
+    communityId = int.tryParse(rawCid.trim());
+  }
+  final isCommunityTour = communityId != null && communityId != 0;
+
+  // A community tour is edited in place by its numeric server id (LOCAL-745).
+  // Prefer server_tour_id outright; only if it is missing do we look elsewhere.
+  if (isCommunityTour) {
+    final sid = serverTourId();
+    if (sid != null) return sid;
+  }
+
+  final path = tourData['path']?.toString() ?? '';
+  final lastSegment = path.isEmpty ? '' : path.split('/').last;
+
+  // A UUID embedded in the folder name is a valid edit id.
+  final uuidMatch = RegExp(
+    r'[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}',
+  ).firstMatch(lastSegment);
+  if (uuidMatch != null) return uuidMatch.group(0);
+
+  // A folder that ends in a numeric id (older downloaded tours).
+  final parts = lastSegment.split('_');
+  if (parts.isNotEmpty && int.tryParse(parts.last) != null) return parts.last;
+
+  // Path yielded neither a UUID nor a numeric id (e.g. a re-downloaded
+  // community tour `…_13ed30d1`). Fall back to the record's server id rather
+  // than POSTing the folder name.
+  final sid = serverTourId();
+  if (sid != null) return sid;
+
+  // Nothing usable. Return null; the caller must not POST a folder name.
+  return null;
+}
+
 /// LOCAL-484 — the Listen page's stop count must follow the edit.
 ///
 /// The `saved_tours` SharedPreferences list holds one JSON entry per tour.
@@ -428,19 +503,26 @@ class _EditTourScreenState extends State<EditTourScreen> {
 
       final tourPath = widget.tourData['path'] as String;
       final tourId = tourPath.split('/').last;
-      String backendTourId = tourId;
 
-      final uuidPattern = RegExp(r'[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}');
-      final uuidMatch = uuidPattern.firstMatch(tourId);
-
-      if (uuidMatch != null) {
-        backendTourId = uuidMatch.group(0)!;
-      } else {
-        final numericId = _extractTourId(tourPath);
-        if (numericId != null) {
-          backendTourId = numericId.toString();
-        }
+      // LOCAL-750 (A): derive the backend id from the record, not the folder
+      // name — a re-downloaded community tour's folder ends in a non-numeric,
+      // non-UUID token and must fall back to its numeric server_tour_id.
+      final derivedId = deriveBackendTourId(widget.tourData);
+      if (derivedId == null) {
+        await DebugLogHelper.addDebugLog(
+            'EDIT: Could not derive a backend tour id from record '
+            '(path=$tourPath, server_tour_id=${widget.tourData['server_tour_id']}, '
+            'community_id=${widget.tourData['community_id']}) — aborting save');
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Save failed: could not determine the tour id.'),
+            backgroundColor: Colors.red,
+            duration: Duration(seconds: 4),
+          ),
+        );
+        return;
       }
+      final String backendTourId = derivedId;
 
       await DebugLogHelper.addDebugLog('EDIT: Using backend tour ID: $backendTourId');
 
@@ -701,15 +783,6 @@ class _EditTourScreenState extends State<EditTourScreen> {
     _showSuccessMessage('Changes saved successfully!');
     _resetAllModifiedFlags();
     _navigateToListenPage();
-  }
-
-  int? _extractTourId(String tourPath) {
-    try {
-      final parts = tourPath.split('_');
-      return int.parse(parts.last);
-    } catch (e) {
-      return null;
-    }
   }
 
   void _resetAllModifiedFlags() {

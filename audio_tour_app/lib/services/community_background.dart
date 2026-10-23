@@ -168,7 +168,7 @@ Future<bool> runAndroidBackgroundSync() async {
   // [LOCAL-746] With the app CLOSED there is no main() to set the hook, so wire
   // the "<tour> was updated by the organiser." heads-up here too (a quiet local
   // notification). Harmless when nothing is refreshed.
-  CommunityToursSync.onRefreshMessage = (message) {
+  CommunityToursSync.onRefreshMessage = (message, {int? tourId}) {
     CommunityNotifications.postTourUpdated(message);
   };
   // [LOCAL-748] Announce a new community tour from the background sync too.

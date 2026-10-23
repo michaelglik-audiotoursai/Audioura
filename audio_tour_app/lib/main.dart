@@ -11,6 +11,8 @@ import 'services/app_sync_coordinator.dart';
 import 'services/community_background.dart';
 import 'services/community_notifications.dart';
 import 'services/community_tours_sync.dart';
+import 'services/foreground_community_messages.dart';
+import 'services/saved_tours_refresh.dart';
 import 'services/deep_link_service.dart';
 import 'package:workmanager/workmanager.dart';
 
@@ -54,17 +56,39 @@ void main() async {
   // [LOCAL-670C] Start the offline-outbox sync coordinator: flush now (app
   // start) and whenever connectivity returns or the app resumes. Never blocks
   // startup — failures are retried by the outbox's own backoff.
-  // [LOCAL-746] Surface the ONE "<tour> was updated by the organiser." heads-up
-  // when the sync-on-open re-downloads a held community tour the organiser
-  // edited — a quiet local notification (same channel as the new-tours one).
-  CommunityToursSync.onRefreshMessage = (message) {
-    unawaited(CommunityNotifications.postTourUpdated(message));
+  // [LOCAL-746 / LOCAL-750 C] Surface the ONE "<tour> was updated by the
+  // organiser." heads-up when the sync-on-open re-downloads a held community
+  // tour the organiser edited. When the app is in the FOREGROUND show it IN THE
+  // APP (SnackBar + "View"); when in the BACKGROUND keep the quiet system
+  // notification. A refreshed tour is already on the phone, so "View" can open
+  // it directly.
+  CommunityToursSync.onRefreshMessage = (message, {int? tourId}) {
+    routeCommunityMessage(
+      message,
+      tourId: tourId,
+      isForeground: ForegroundCommunityMessages.instance.isForeground,
+      postSystem: () =>
+          unawaited(CommunityNotifications.postTourUpdated(message)),
+    );
   };
-  // [LOCAL-748] Surface the ONE "New tour in <community>: <tour>" heads-up when
-  // the sync finds a new tour in a community the member belongs to (never for
-  // the member's own tours; once per tour).
+  // [LOCAL-748 / LOCAL-750 C] Surface the ONE "New tour in <community>: <tour>"
+  // heads-up when the sync finds a new tour in a community the member belongs to
+  // (never for the member's own tours; once per tour). Foreground → in-app
+  // SnackBar; a "View" action is offered only when the tour was auto-downloaded
+  // (and so is already on the phone). Background → quiet system notification.
   CommunityToursSync.onNewTourAnnouncement = (announcement, message) {
-    unawaited(CommunityNotifications.postNewTourAvailable(message));
+    routeCommunityMessage(
+      message,
+      tourId: announcement.autoDownloaded ? announcement.tourId : null,
+      isForeground: ForegroundCommunityMessages.instance.isForeground,
+      postSystem: () =>
+          unawaited(CommunityNotifications.postNewTourAvailable(message)),
+    );
+  };
+  // [LOCAL-750 C] When a sync downloads/refreshes a tour, nudge the Listen page
+  // to reload so the change shows without leaving and coming back.
+  CommunityToursSync.onToursChanged = () {
+    SavedToursRefresh.instance.bump();
   };
   unawaited(AppSyncCoordinator.instance.start());
 
@@ -146,6 +170,7 @@ class _AudioTourAppState extends State<AudioTourApp> {
     }
     return MaterialApp(
       title: 'Audioura',
+      scaffoldMessengerKey: communityScaffoldMessengerKey,
       theme: ThemeData(
         primarySwatch: Colors.blue,
         useMaterial3: true,
