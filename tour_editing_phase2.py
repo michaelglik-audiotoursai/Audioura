@@ -27,12 +27,41 @@ import tempfile
 import io
 from datetime import datetime
 from pathlib import Path
-from flask import Flask, request, jsonify, send_file
+from flask import Flask, request, jsonify, send_file as _send_file
 from flask_cors import CORS
 import threading
 import time
 import boto3
+import inspect as _inspect
 from psycopg2 import errors as pg_errors
+
+
+def _compat_send_file(path_or_file, **kwargs):
+    """Version-tolerant send_file wrapper (LOCAL-747).
+
+    The edit-service image runs Flask 1.1.4, whose send_file keyword is
+    ``attachment_filename``; Flask >=2.0 renamed it to ``download_name``. The
+    three download call sites below pass ``download_name``, which raised
+    ``TypeError: send_file() got an unexpected keyword argument 'download_name'``
+    on 1.1.4 and turned Michael's "Save All" into a red "download failed". This
+    maps whichever keyword is given to whichever the installed Flask supports,
+    so the same code runs on both. Same helper already shipped in 6 other
+    services (Docker round 4).
+    """
+    sig = _inspect.signature(_send_file)
+    params = sig.parameters
+    download_name = kwargs.pop("download_name", None)
+    attachment_filename = kwargs.pop("attachment_filename", None)
+    name = download_name or attachment_filename
+    if name:
+        if "download_name" in params:
+            kwargs["download_name"] = name
+        else:
+            kwargs["attachment_filename"] = name
+    return _send_file(path_or_file, **kwargs)
+
+
+send_file = _compat_send_file
 
 app = Flask(__name__)
 CORS(app)
@@ -1550,10 +1579,65 @@ def generate_audio_for_stop(tour_path, stop_number, text_content, tour_id=None, 
         print(f"Audio generation failed for stop {stop_number}: {e}")
         raise AudioGenerationError(stop_number, status=None, body_snippet=str(e)[:200])
 
+def _derive_tour_category(tour_path, stop_texts):
+    """Best-effort tour category for per-stop map icons (LOCAL-747).
+
+    The editor never tracked a category, so we recover it fail-soft from the
+    `Tour-Category: <word>` line that generate_tour_text.py writes. We scan the
+    stop texts first, then any source .txt the editor copied from the original
+    tour. Anything not found -> '' -> the generic map-pin fallback, exactly the
+    behaviour the generator already has for an unknown category.
+    """
+    import re as _re
+    pat = _re.compile(r'^Tour-Category:\s*(\w+)', _re.IGNORECASE | _re.MULTILINE)
+    for text in (stop_texts or []):
+        m = pat.search(text or '')
+        if m:
+            return m.group(1).lower()
+    try:
+        for f in sorted(Path(tour_path).glob('*.txt')):
+            if f.name.startswith('audio_'):
+                continue
+            try:
+                head = f.read_text(encoding='utf-8')[:500]
+            except Exception:
+                continue
+            m = pat.search(head)
+            if m:
+                return m.group(1).lower()
+    except Exception:
+        pass
+    return ''
+
+
 def create_clean_html(tour_path, final_stops):
-    """Create clean HTML focused on audio controls"""
+    """Create clean HTML focused on audio controls.
+
+    [LOCAL-747] The saved-edit page must carry the same per-stop map button as a
+    freshly generated tour (round `.map-btn` calling `openMap(stop)`, shown only
+    when the stop text has a `Coordinates:` line, with a per-category icon). Those
+    pieces come from the shared tour_html_map module so the button is defined
+    once and matches the generator. The audio player and voice-control script the
+    editor page already had are kept unchanged.
+    """
+    from tour_html_map import (
+        MAP_BTN_CSS, OPENMAP_SCRIPT, build_map_button,
+    )
     html_file = tour_path / "index.html"
-    
+
+    # Read each stop's text once: used for the title AND to decide the map button
+    # (the edited audio_N.txt keep their Coordinates: lines).
+    stop_texts = {}
+    for stop_num in sorted(final_stops):
+        text_file = tour_path / f"audio_{stop_num}.txt"
+        if text_file.exists():
+            try:
+                stop_texts[stop_num] = text_file.read_text(encoding='utf-8').strip()
+            except Exception as e:
+                print(f"Error reading stop {stop_num}: {e}")
+
+    tour_category = _derive_tour_category(tour_path, list(stop_texts.values()))
+
     html_content = '''<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1594,26 +1678,31 @@ def create_clean_html(tour_path, final_stops):
             margin-right: 10px;
             font-weight: bold;
         }
+        ''' + MAP_BTN_CSS + '''
     </style>
 </head>
 <body>
     <div class="container">
         <h1>Audio Tour</h1>
+''' + OPENMAP_SCRIPT + '''
 '''
     
     for stop_num in sorted(final_stops):
-        text_file = tour_path / f"audio_{stop_num}.txt"
-        if text_file.exists():
-            try:
-                with open(text_file, 'r', encoding='utf-8') as f:
-                    text_content = f.read().strip()
-                
-                title = text_content.split('\n')[0][:50] + "..." if len(text_content.split('\n')[0]) > 50 else text_content.split('\n')[0]
-                
-                html_content += f'''        <div class="stop-item">
+        text_content = stop_texts.get(stop_num)
+        if text_content is None:
+            continue
+        first_line = text_content.split('\n')[0]
+        title = first_line[:50] + "..." if len(first_line) > 50 else first_line
+
+        # [LOCAL-747] Same map button as the generator — only when the stop has
+        # a Coordinates: line, with the per-category icon.
+        map_button = build_map_button(text_content, stop_num, tour_category)
+
+        html_content += f'''        <div class="stop-item">
             <div class="stop-title">
                 <span class="stop-counter">{stop_num}</span>
                 {title}
+                {map_button}
             </div>
             <audio id="audio{stop_num}" controls preload="metadata">
                 <source src="audio_{stop_num}.mp3" type="audio/mpeg">
@@ -1621,8 +1710,6 @@ def create_clean_html(tour_path, final_stops):
             </audio>
         </div>
 '''
-            except Exception as e:
-                print(f"Error reading stop {stop_num}: {e}")
     
     html_content += '''    </div>
     
