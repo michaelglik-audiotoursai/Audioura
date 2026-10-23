@@ -43,9 +43,15 @@ _os.environ.setdefault('LOCAL603_PREFLIGHT', '1')
 # The existence gate must actually DROP fabricated stops and KEEP real ones — run
 # it in enforce so the LOCAL-744 fix (real Salem places verify) is exercised live.
 _os.environ.setdefault('STOP_EXISTENCE_GATE_MODE', 'enforce')
+# [LOCAL-744] Budget discipline: the task cap is $1.00 for TWO fresh tours. The
+# cheap arm (gpt-4.1-mini narration + serper research) brings each fresh tour to
+# well under $0.50 so both fit under the cap. These mirror the LOCAL-668 CHEAP
+# arm's knobs.
+_os.environ.setdefault('NARRATION_MODEL', 'gpt-4.1-mini')
+_os.environ.setdefault('RESEARCH_BACKEND', 'serper')
 
 HARD_CAP_USD = 1.00
-RESERVE_USD = 0.40          # start an arm only if spend + 0.40 <= cap
+RESERVE_USD = 0.45          # start an arm only if spend + 0.45 <= cap
 HOST = socket.gethostname()
 
 ARMS = [
@@ -95,10 +101,27 @@ def _test_row_count():
     return _scalar("SELECT count(*) FROM audio_tours WHERE is_test = true")
 
 
-def _spend_so_far():
+def _host_spend():
     v = _scalar("SELECT COALESCE(SUM(usd),0) FROM paid_api_calls WHERE host = %s",
                 (HOST,))
     return float(v) if v is not None else None
+
+
+# [LOCAL-744] Budget is measured for THIS run. The paid_api_calls table is
+# cumulative per host (a previous shakeout run already spent on this host), so we
+# capture a baseline at start and report spend RELATIVE to it — the honest cost of
+# this run, and the number the $1.00 cap/reserve gate must respect.
+_SPEND_BASELINE = None
+
+
+def _spend_so_far():
+    """Spend during THIS run (host spend minus the baseline captured at start)."""
+    cur = _host_spend()
+    if cur is None:
+        return None
+    if _SPEND_BASELINE is None:
+        return cur
+    return max(0.0, cur - _SPEND_BASELINE)
 
 
 _STOP_HEADER_RE = re.compile(r"(?mi)^Stop\s+\d+:\s*(.+)$")
@@ -206,16 +229,20 @@ def _run_arm(slug, location, tour_type, stops):
 
 print(f"[db] audio_tours row count BEFORE: {_row_count()} "
       f"(is_test rows BEFORE: {_test_row_count()})", flush=True)
-print(f"[db] paid_api_calls spend for host {HOST} BEFORE: ${_spend_so_far()}",
-      flush=True)
+_SPEND_BASELINE = _host_spend() or 0.0
+print(f"[db] paid_api_calls spend baseline for host {HOST}: ${_SPEND_BASELINE:.4f} "
+      f"(this run is measured RELATIVE to this)", flush=True)
 
 results = []
 for _slug, _loc, _tt, _n in ARMS:
     results.append(_run_arm(_slug, _loc, _tt, _n))
 
+_run_spend = _spend_so_far()
+_abs_spend = _host_spend()
 print(f"\n[db] audio_tours row count AFTER: {_row_count()} "
       f"(is_test rows AFTER: {_test_row_count()})", flush=True)
-print(f"[db] paid_api_calls spend for host {HOST} AFTER: ${_spend_so_far()}",
+print(f"[db] THIS RUN spend (host {HOST}): ${_run_spend if _run_spend is not None else '?'} "
+      f"(cap ${HARD_CAP_USD}); host cumulative now ${_abs_spend if _abs_spend is not None else '?'}",
       flush=True)
 print("=== LOCAL-744 run complete ===", flush=True)
 for _slug, _id, _outcome, _opening, _filmed, _cost, _secs in results:

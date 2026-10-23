@@ -1553,15 +1553,93 @@ def filming_location_lookup(api_key):
                   f"source={'yes' if _source else 'no'})")
             return None
 
+        # [LOCAL-744] CORROBORATE the filming place against a REAL source before we
+        # assert it. The live run showed the model name the right work (TV series
+        # 'Salem') but the WRONG filming location ("Salem, Massachusetts" — it was
+        # actually Shreveport, Louisiana), with a plausible-sounding but unchecked
+        # "source". Michael's rule is "only with a source" and "never guess" — so we
+        # ship a positive filming claim ONLY when a real source (the work's
+        # Wikipedia article) actually corroborates the place with a filming cue.
+        # Anything less — not mentioned, or mentioned without a filming cue, or
+        # Wikipedia unreachable — is "could not confirm". Fail-closed: we would
+        # rather say we could not confirm than ship a wrong sourced-sounding claim.
+        _corroborated, _wiki_src = _corroborate_filming_place(_name, _place)
+        if _corroborated is not True:
+            print(f"  [LOCAL-744] filming place NOT corroborated by the work's "
+                  f"Wikipedia article for {_name!r} (place={_place!r}, "
+                  f"check={_corroborated!r}) → 'could not confirm' (never ship a guess)")
+            return None
+        _source = _wiki_src or _source  # prefer the real, checked source
+
         out = {"work_name": _name, "work_kind": _kind or None,
                "filmed_place": _place, "source": _source}
         if _here:
             out["filmed_here"] = True
-        print(f"  [LOCAL-744] filming location (sourced): {_name!r} ({_kind}) → "
-              f"{_place!r} filmed_here={_here} [src: {_source[:60]!r}]")
+        print(f"  [LOCAL-744] filming location (sourced+corroborated): "
+              f"{_name!r} ({_kind}) → {_place!r} filmed_here={_here} "
+              f"[src: {_source[:60]!r}]")
         return out
 
     return _lookup
+
+
+def _corroborate_filming_place(work_name, filmed_place):
+    """[LOCAL-744] Check the work's Wikipedia article whether `filmed_place` is a
+    corroborated FILMING location (place token co-occurring with a filming cue).
+
+    Returns (corroborated, source):
+      * (True, "<article> - Wikipedia")  — the article ties the place to filming.
+      * (False, None)                    — reachable but no filming-cue corroboration.
+      * (None, None)                     — Wikipedia could not be reached.
+
+    The caller ships a positive claim ONLY on True (fail-closed). Uses the fuller
+    plain-text extract (prop=extracts) so a 'Production'/'Filming' section is seen,
+    not just the one-paragraph REST summary. Cheap and free (one GET).
+    """
+    try:
+        _title = (work_name or '').strip()
+        _place = (filmed_place or '').strip()
+        if not _title or not _place:
+            return (None, None)
+        _noise = {'city', 'county', 'usa', 'united', 'states', 'america', 'region',
+                  'near', 'area', 'greater', 'metro', 'north', 'south', 'east', 'west'}
+        _place_tokens = [w.lower() for w in re.findall(r"[A-Za-z]{4,}", _place)
+                         if w.lower() not in _noise]
+        if not _place_tokens:
+            return (None, None)
+        _hdr = {"User-Agent": "Audioura/2.2 (tour-generation; support@audioura.com)",
+                "Accept": "application/json"}
+        _params = {
+            "action": "query", "prop": "extracts", "explaintext": "1",
+            "redirects": "1", "titles": _title, "format": "json",
+            "exsectionformat": "plain",
+        }
+        r = requests.get("https://en.wikipedia.org/w/api.php",
+                         params=_params, headers=_hdr, timeout=10)
+        if r.status_code != 200:
+            return (None, None)  # unreachable → inconclusive (D162)
+        pages = (r.json().get("query", {}) or {}).get("pages", {}) or {}
+        page = next(iter(pages.values()), {}) if pages else {}
+        _text = (page.get("extract", "") or "").lower()
+        _returned_title = page.get("title", _title)
+        if not _text.strip():
+            return (None, None)
+        # Corroboration requires a FILMING VERB shortly BEFORE the place — the
+        # directional "filmed/shot/... <place>" pattern. A place that is merely the
+        # SETTING or the show's NAME (the 'Salem' series, set in Salem) co-occurs
+        # with production talk constantly; that is why an undirected co-occurrence
+        # test wrongly corroborated "Salem filmed in Salem". We match a filming cue
+        # followed within ~60 chars by the place token.
+        _verb = (r"(?:filmed|shot|shooting|filming|principal photography|"
+                 r"produced|lensed|soundstage)")
+        for tok in _place_tokens:
+            pat = re.compile(_verb + r"[^.]{0,60}?" + re.escape(tok))
+            if pat.search(_text):
+                return (True, f"{_returned_title} - Wikipedia")
+        return (False, None)
+    except Exception as _ce:
+        print(f"  [LOCAL-744] filming-place corroboration check error ({_ce}) — inconclusive")
+        return (None, None)
 
 
 def verify_poi_matches_type(poi_name, poi_type, api_key):
