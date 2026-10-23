@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'services/iap_service.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:async';
@@ -74,6 +75,11 @@ void main() async {
   // through the same path a pasted code takes. Never blocks startup.
   unawaited(DeepLinkService.instance.init());
 
+  // [iOS IAP] StoreKit 2 must be enabled before InAppPurchase is first used,
+  // and the purchase listener must run from launch. Bounded inside.
+  try {
+    await IapService.initAtStartup().timeout(const Duration(seconds: 6));
+  } catch (_) {}
   runApp(const AudioTourApp());
 }
 

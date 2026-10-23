@@ -40,8 +40,10 @@ dependencies:
   # Product ids audioura.pack.l3 ($10) and audioura.round.l4 ($25), both
   # consumable, never subscriptions. Google Play is out of scope for
   # LOCAL-598 (Android buy buttons hidden behind a flag).
-  in_app_purchase: ^3.2.0
-  in_app_purchase_storekit: ^0.3.19
+  in_app_purchase: 3.2.4
+  # 0.4.2+ passes the StoreKit 2 signed transaction (JWS) as serverVerificationData;
+  # 0.3.x sent it empty, so the server refused every Apple purchase (2026-10-22).
+  in_app_purchase_storekit: 0.4.13
   # LOCAL-670C: detect connectivity changes to flush the offline outbox
   # (listened events, ratings, reviews, per-stop thumbs) when a connection
   # returns. 6.x supports Dart >=3.3 / Flutter >=3.19, within this project's

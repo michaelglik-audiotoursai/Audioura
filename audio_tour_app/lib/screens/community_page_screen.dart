@@ -13,6 +13,7 @@
 // (CommunityRules.downloadByDefault()).
 
 import 'package:flutter/material.dart';
+import 'debug_log_viewer_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 import '../services/communities_service.dart';
@@ -153,6 +154,7 @@ class _CommunityPageScreenState extends State<CommunityPageScreen> {
     final c = _community;
     if (c == null) return;
     final isStub = await IapService.instance.purchasesModeIsStub(); // [LOCAL-734] ask the server, per platform
+    await DebugLogHelper.addDebugLog('IAP: pass tap ${pass.productId} stub=$isStub');
     final result = isStub
         ? await IapService.instance
             .testPurchaseCommunityPass(pass.productId, c.id, pass.length)

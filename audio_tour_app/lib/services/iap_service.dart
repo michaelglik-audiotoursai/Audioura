@@ -170,6 +170,46 @@ class IapService {
   /// Completer for the in-flight buy(), resolved when the purchase stream
   /// delivers the matching product's terminal state. One purchase at a time.
   Completer<IapResult>? _pending;
+  DateTime? _pendingSince;
+
+  /// True while a purchase is genuinely in flight. A purchase the store never
+  /// answered (no update for 3 minutes) is dropped, so it cannot block every
+  /// later Buy tap with "Another purchase is already in progress".
+  bool _hasLivePending() {
+    final c = _pending;
+    if (c == null || c.isCompleted) return false;
+    final since = _pendingSince;
+    if (since != null &&
+        DateTime.now().difference(since) > const Duration(minutes: 3)) {
+      DebugLogHelper.addDebugLog('IAP: dropping a stale pending purchase '
+          '($_pendingStoreId, started $since)');
+      _pending = null;
+      c.complete(const IapResult(IapResultStatus.failed,
+          'The store did not answer. Please try again.'));
+      return false;
+    }
+    return true;
+  }
+
+  /// [iOS] Switch the store plugin to StoreKit 2 and start listening for
+  /// purchases at APP START. The plugin requires enableStoreKit2() before
+  /// InAppPurchase.instance is first used; called later (as before, on the
+  /// first Buy tap) the app listened on the StoreKit 1 stream while buying
+  /// through StoreKit 2, so a finished Apple purchase never reached the app or
+  /// the server. Listening at launch also receives purchases that finished
+  /// while the app was closed. Safe to call more than once.
+  static Future<void> initAtStartup() async {
+    if (Platform.isIOS) {
+      try {
+        final on = await InAppPurchaseStoreKitPlatform.enableStoreKit2()
+            .timeout(const Duration(seconds: 5));
+        await DebugLogHelper.addDebugLog('IAP: StoreKit 2 enabled at start=$on');
+      } catch (e) {
+        await DebugLogHelper.addDebugLog('IAP: enableStoreKit2 at start failed: $e');
+      }
+    }
+    await instance._ensureListening();
+  }
   String? _pendingStoreId;
   // [LOCAL-677] When the in-flight purchase is a TOUR unlock, the tour id to
   // send to /purchases/verify so the server writes tour_unlocks for this tour.
@@ -190,13 +230,8 @@ class IapService {
     _initialised = true;
     // Prefer the StoreKit 2 backend on iOS (SUBSCRIPTION_LEVELS.md asks for
     // StoreKit 2). Enabling it is a no-op on platforms that don't support it.
-    if (Platform.isIOS) {
-      try {
-        await InAppPurchaseStoreKitPlatform.enableStoreKit2();
-      } catch (e) {
-        await DebugLogHelper.addDebugLog('IAP: enableStoreKit2 skipped: $e');
-      }
-    }
+    // StoreKit 2 is enabled in initAtStartup(), before InAppPurchase is used.
+    await DebugLogHelper.addDebugLog('IAP: listening to the purchase stream');
     _sub = _iap.purchaseStream.listen(
       _onPurchaseUpdates,
       onError: (Object e) async {
@@ -214,7 +249,14 @@ class IapService {
           'In-app purchases are not available on Android yet.');
     }
 
-    final available = await _iap.isAvailable();
+    // Bounded: a store that never answers must not freeze the Buy button.
+    bool available;
+    try {
+      available = await _iap.isAvailable().timeout(const Duration(seconds: 8));
+    } catch (e) {
+      await DebugLogHelper.addDebugLog('IAP: isAvailable failed: $e');
+      available = false;
+    }
     if (!available) {
       return const IapResult(IapResultStatus.unavailable,
           'The store is not available on this device.');
@@ -225,7 +267,10 @@ class IapService {
     // StoreKit 2 is selected via the storekit2 backend when available; the
     // in_app_purchase_storekit plugin exposes it. Querying the product details
     // confirms the product exists in the store / StoreKit config file.
-    final response = await _iap.queryProductDetails({product.storeId});
+    final response = await _iap.queryProductDetails({product.storeId}).timeout(
+        const Duration(seconds: 20),
+        onTimeout: () => ProductDetailsResponse(
+            productDetails: const [], notFoundIDs: [product.storeId]));
     if (response.error != null ||
         response.productDetails.isEmpty ||
         response.notFoundIDs.contains(product.storeId)) {
@@ -240,11 +285,12 @@ class IapService {
     final details = response.productDetails.first;
 
     // One purchase at a time.
-    if (_pending != null && !_pending!.isCompleted) {
+    if (_hasLivePending()) {
       return const IapResult(
           IapResultStatus.failed, 'Another purchase is already in progress.');
     }
     _pending = Completer<IapResult>();
+    _pendingSince = DateTime.now();
     _pendingStoreId = product.storeId;
 
     final param = PurchaseParam(productDetails: details);
@@ -366,14 +412,24 @@ class IapService {
     }
     final storeId = tourProductForTier(tier);
 
-    final available = await _iap.isAvailable();
+    // Bounded: a store that never answers must not freeze the Buy button.
+    bool available;
+    try {
+      available = await _iap.isAvailable().timeout(const Duration(seconds: 8));
+    } catch (e) {
+      await DebugLogHelper.addDebugLog('IAP: isAvailable failed: $e');
+      available = false;
+    }
     if (!available) {
       return const IapResult(IapResultStatus.unavailable,
           'The store is not available on this device.');
     }
     await _ensureListening();
 
-    final response = await _iap.queryProductDetails({storeId});
+    final response = await _iap.queryProductDetails({storeId}).timeout(
+        const Duration(seconds: 20),
+        onTimeout: () => ProductDetailsResponse(
+            productDetails: const [], notFoundIDs: [storeId]));
     if (response.error != null ||
         response.productDetails.isEmpty ||
         response.notFoundIDs.contains(storeId)) {
@@ -385,11 +441,12 @@ class IapService {
     }
     final details = response.productDetails.first;
 
-    if (_pending != null && !_pending!.isCompleted) {
+    if (_hasLivePending()) {
       return const IapResult(
           IapResultStatus.failed, 'Another purchase is already in progress.');
     }
     _pending = Completer<IapResult>();
+    _pendingSince = DateTime.now();
     _pendingStoreId = storeId;
     _pendingTourId = tourId;
 
@@ -530,18 +587,33 @@ class IapService {
   /// expiry. A pass is a non-renewing consumable: buying again extends.
   Future<IapResult> buyCommunityPass(
       String passProductId, int communityId, String length) async {
+    await DebugLogHelper.addDebugLog(
+        'IAP: pass buy start $passProductId c=$communityId pending=${_pending != null && !_pending!.isCompleted}');
     if (Platform.isAndroid && !kAndroidBillingEnabled) {
       return const IapResult(IapResultStatus.unavailable,
           'In-app purchases are not available on Android yet.');
     }
-    final available = await _iap.isAvailable();
+    // Bounded: a store that never answers must not freeze the Buy button.
+    bool available;
+    try {
+      available = await _iap.isAvailable().timeout(const Duration(seconds: 8));
+    } catch (e) {
+      await DebugLogHelper.addDebugLog('IAP: isAvailable failed: $e');
+      available = false;
+    }
     if (!available) {
       return const IapResult(IapResultStatus.unavailable,
           'The store is not available on this device.');
     }
     await _ensureListening();
 
-    final response = await _iap.queryProductDetails({passProductId});
+    await DebugLogHelper.addDebugLog('IAP: pass store available=$available');
+    final response = await _iap.queryProductDetails({passProductId}).timeout(
+        const Duration(seconds: 20),
+        onTimeout: () => ProductDetailsResponse(
+            productDetails: const [], notFoundIDs: [passProductId]));
+    await DebugLogHelper.addDebugLog(
+        'IAP: pass query found=${response.productDetails.length} notFound=${response.notFoundIDs} err=${response.error?.message}');
     if (response.error != null ||
         response.productDetails.isEmpty ||
         response.notFoundIDs.contains(passProductId)) {
@@ -552,18 +624,21 @@ class IapService {
     }
     final details = response.productDetails.first;
 
-    if (_pending != null && !_pending!.isCompleted) {
+    if (_hasLivePending()) {
       return const IapResult(
           IapResultStatus.failed, 'Another purchase is already in progress.');
     }
     _pending = Completer<IapResult>();
+    _pendingSince = DateTime.now();
     _pendingStoreId = passProductId;
     _pendingCommunityId = communityId.toString();
     _pendingPassLength = length;
 
     final param = PurchaseParam(productDetails: details);
     try {
-      await _iap.buyConsumable(purchaseParam: param, autoConsume: false);
+      final started =
+          await _iap.buyConsumable(purchaseParam: param, autoConsume: false);
+      await DebugLogHelper.addDebugLog('IAP: pass buyConsumable returned $started');
     } catch (e) {
       await DebugLogHelper.addDebugLog('IAP: pass buyConsumable threw: $e');
       _pendingStoreId = null;
@@ -634,6 +709,10 @@ class IapService {
   }
 
   Future<void> _handleOne(PurchaseDetails p) async {
+    await DebugLogHelper.addDebugLog(
+        'IAP: update ${p.status} ${p.productID} id=${p.purchaseID} '
+        'pendingStore=$_pendingStoreId c=$_pendingCommunityId '
+        'needsFinish=${p.pendingCompletePurchase} err=${p.error?.message}');
     switch (p.status) {
       case PurchaseStatus.pending:
         // Still in flight — don't resolve yet.
@@ -681,6 +760,8 @@ class IapService {
         ? p.productID
         : serverProductForStoreId(p.productID);
     if (serverProduct == null) {
+      await DebugLogHelper.addDebugLog(
+          'IAP: no server product for ${p.productID} (no staged tour/community)');
       return const IapResult(
           IapResultStatus.failed, 'Unknown product — not granted.');
     }
