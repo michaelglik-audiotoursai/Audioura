@@ -211,3 +211,26 @@ class TestExistingSplitUnaffected(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
+
+
+# [LOCAL-743 addendum, LEAD] Red test: the Willows story must reach the spoken text.
+def test_willows_story_survives_tts_strip():
+    import os
+    import tour_conclusion as tc
+    import tour_generation_modernized as t
+    here = os.path.dirname(os.path.abspath(__file__))
+    txt = open(os.path.join(here, "fixtures", "tour716_full.txt")).read()
+    if "In 1858" not in txt:
+        import pytest
+        pytest.skip("fixture lacks the Willows story")
+    blocks = t.parse_tour_content_to_modernized(tc.normalise_stop_headers(txt))["text_content"]
+    spoken = [t._strip_nav_fields_for_tts(b) for b in blocks]
+    assert any("In 1858, the city designated" in s for s in spoken)
+    for s in spoken:
+        assert "Specific Examples:" not in s and "Coordinates:" not in s
+
+
+def test_short_field_line_untouched():
+    import tour_conclusion as tc
+    line = "Specific Examples: Amusement rides, arcade games."
+    assert tc.split_story_off_field_lines(line) == line

@@ -348,9 +348,46 @@ def normalise_stop_headers(tour_text: str) -> str:
     out, _inv_actions = enforce_header_field_line_invariant(out)
     for _a in _inv_actions:
         print(f"  [LOCAL-642] header/field invariant: {_a}")
+    # (4) [LOCAL-743 addendum, LEAD] Story glued onto a metadata field line.
+    #     Tour 716 stop "Salem Willows Park": the whole narrative followed
+    #     "Specific Examples: <short list>." on ONE line; the voice step drops
+    #     metadata lines whole, so the story was never spoken (11 s audio).
+    out = split_story_off_field_lines(out)
     # Collapse any 3+ newline run the re-breaks may create.
     out = re.sub(r'\n{3,}', '\n\n', out)
     return out
+
+
+# [LOCAL-743 addendum, LEAD] A metadata value is short ("Public Park",
+# "Amusement rides, arcade games, picnic areas by the water."). When such a line
+# runs on past _FIELD_STORY_MIN chars, everything after the value's first
+# sentence is narration: move it to its own paragraph so the text view shows it
+# and the TTS stripper (which drops these lines whole) keeps it.
+_STORY_FIELD_RE = re.compile(r'^([ \t]*(?:Type/Specialty|Specific Examples)[ \t]*:[^\n]*)$', re.MULTILINE)
+_FIELD_STORY_MIN = 240
+_SENTENCE_END_RE = re.compile(r'[.!?][\"\u201d\u2019)]?[ \t]+(?=[A-Z\u201c\"])')
+
+
+def split_story_off_field_lines(tour_text: str) -> str:
+    """Move narration glued onto a Type/Specialty or Specific Examples line
+    into its own paragraph. Idempotent; short field lines are untouched."""
+    if not tour_text:
+        return tour_text or ""
+
+    def _sub(m):
+        line = m.group(1)
+        if len(line) < _FIELD_STORY_MIN:
+            return line
+        e = _SENTENCE_END_RE.search(line, line.index(':') + 1)
+        if not e:
+            return line
+        head, tail = line[:e.start() + 1].rstrip(), line[e.end():].strip()
+        if not tail:
+            return line
+        print(f"  [LOCAL-743] moved {len(tail)} chars of narration off a field line")
+        return f"{head}\n\n{tail}"
+
+    return _STORY_FIELD_RE.sub(_sub, tour_text)
 
 
 def count_delivered_stops(tour_text: str) -> int:
