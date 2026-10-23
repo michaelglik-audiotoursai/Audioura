@@ -67,8 +67,7 @@ subscribed DB.**
 
 ## code_sha
 
-The create commit on `LOCAL-738-community-create-form` (recorded in the PR /
-branch head). Base: `98cc6dc6`.
+`77d77a6a` on `LOCAL-738-community-create-form`. Base: `98cc6dc6`.
 
 ## Migration
 
