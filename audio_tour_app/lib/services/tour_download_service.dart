@@ -125,6 +125,166 @@ class TourDownloadService {
     }
   }
 
+  /// [LOCAL-746] RE-DOWNLOAD a community tour already on the phone and replace
+  /// its content IN PLACE — the member picks up the organiser's edit. Unlike
+  /// [downloadAndSave] (which short-circuits a tour already on the phone with
+  /// alreadyOnPhone), this REPLACES the extracted files in the SAME tour folder
+  /// and bumps the saved record's `version`/`updated_at`, keeping the same list
+  /// entry (same title, same `path`) so Listen opens the new audio in place.
+  ///
+  /// SAFETY (LOCAL-746 Req 2): a failed re-download leaves the OLD copy intact —
+  /// the member is never left with nothing. The new content is downloaded and
+  /// decoded FIRST; only once a valid ZIP is in hand are the old files replaced.
+  /// A transport error, a non-200, or an undecodable body returns
+  /// [TourDownloadStatus.failed] WITHOUT touching the folder or the record.
+  ///
+  /// [tourId] is the SERVER/download id (the saved record's server_tour_id);
+  /// [newVersion] is the server's current version (for the "v2 · updated" label)
+  /// and [updatedAt] the ISO date the server reports (may be null). Returns
+  /// [TourDownloadStatus.ok] on a successful replace, [failed] otherwise.
+  static Future<TourDownloadResult> reDownloadAndReplace(
+    int tourId, {
+    required int newVersion,
+    String? updatedAt,
+  }) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+
+      // Locate the held record by its server/edit id. Nothing to replace if the
+      // tour is not actually on the phone (the planner only picks held tours, so
+      // this is a guard, not an expected path).
+      final saved = prefs.getStringList('saved_tours') ?? [];
+      int recordIndex = -1;
+      Map<String, dynamic>? record;
+      for (var i = 0; i < saved.length; i++) {
+        try {
+          final m = Map<String, dynamic>.from(json.decode(saved[i]) as Map);
+          if (m['server_tour_id'] == tourId.toString() ||
+              m['tour_id'] == tourId.toString()) {
+            recordIndex = i;
+            record = m;
+            break;
+          }
+        } catch (_) {}
+      }
+      if (record == null || recordIndex < 0) {
+        await DebugLogHelper.addDebugLog(
+            'DOWNLOAD_SVC: re-download $tourId — no held record, nothing to '
+            'replace');
+        return const TourDownloadResult(TourDownloadStatus.failed);
+      }
+
+      // 1) Fetch the NEW content first. Any non-200 keeps the old copy.
+      final userId = prefs.getString('user_id') ?? '';
+      final base =
+          await Endpoints.url(Service.mapDelivery, '/download-tour/$tourId');
+      final params = Map<String, String>.from(base.queryParameters);
+      if (userId.isNotEmpty) params['user_id'] = userId;
+      final uri = base.replace(queryParameters: params.isEmpty ? null : params);
+
+      final response = await http
+          .get(uri, headers: await Endpoints.apiHeaders(Service.mapDelivery))
+          .timeout(const Duration(seconds: 120));
+      if (response.statusCode != 200) {
+        await DebugLogHelper.addDebugLog(
+            'DOWNLOAD_SVC: re-download $tourId failed '
+            'status=${response.statusCode} — keeping old copy');
+        return const TourDownloadResult(TourDownloadStatus.failed);
+      }
+
+      final zipBytes = response.bodyBytes;
+
+      // 2) Decode the new ZIP IN MEMORY before touching the old files, so an
+      // undecodable body never destroys the working copy.
+      final Archive archive;
+      try {
+        archive = ZipDecoder().decodeBytes(zipBytes);
+      } catch (e) {
+        await DebugLogHelper.addDebugLog(
+            'DOWNLOAD_SVC: re-download $tourId — ZIP decode failed ($e), '
+            'keeping old copy');
+        return const TourDownloadResult(TourDownloadStatus.failed);
+      }
+
+      final path = record['path'] as String?;
+      if (path == null || path.isEmpty) {
+        return const TourDownloadResult(TourDownloadStatus.failed);
+      }
+
+      // 3) Replace the content IN PLACE. On web, the files live in prefs keyed by
+      // the dir name; on device they live under the tour folder. We overwrite the
+      // extracted files and tour.zip in the SAME location.
+      if (kIsWeb) {
+        final dirName = path.startsWith('web_tours/')
+            ? path.substring('web_tours/'.length)
+            : path;
+        await prefs.setString('tour_zip_$dirName', base64Encode(zipBytes));
+        for (final file in archive) {
+          if (file.isFile) {
+            final data = file.content as List<int>;
+            await prefs.setString(
+                'tour_file_${dirName}_${file.name}', base64Encode(data));
+            String mimeType = 'application/octet-stream';
+            if (file.name.endsWith('.html')) {
+              mimeType = 'text/html';
+            } else if (file.name.endsWith('.mp3')) {
+              mimeType = 'audio/mpeg';
+            } else if (file.name.endsWith('.json')) {
+              mimeType = 'application/json';
+            }
+            await prefs.setString(
+                'tour_file_${dirName}_${file.name}_mime', mimeType);
+          }
+        }
+      } else {
+        final dir = Directory(path);
+        await dir.create(recursive: true);
+        // Remove the previous extracted files (but keep the folder) so a shorter
+        // new tour does not leave orphan stops behind. Then write the new ZIP +
+        // extracted files.
+        try {
+          for (final entity in dir.listSync()) {
+            if (entity is File) {
+              await entity.delete();
+            }
+          }
+        } catch (_) {}
+        final zipFile = File('$path/tour.zip');
+        await zipFile.writeAsBytes(zipBytes);
+        for (final file in archive) {
+          if (file.isFile) {
+            final data = file.content as List<int>;
+            final extractedFile = File('$path/${file.name}');
+            await extractedFile.create(recursive: true);
+            await extractedFile.writeAsBytes(data);
+          }
+        }
+      }
+
+      // 4) Bump the saved record's version/updated_at (and stop count) IN PLACE —
+      // same title, same path, so Listen keeps the one entry and now opens v2.
+      record['version'] = newVersion;
+      record['tour_version'] = newVersion;
+      if (updatedAt != null && updatedAt.isNotEmpty) {
+        record['updated_at'] = updatedAt;
+      }
+      try {
+        final stops = await _countTourStops(zipBytes);
+        if (stops > 0) record['stops'] = stops.toString();
+      } catch (_) {}
+
+      saved[recordIndex] = json.encode(record);
+      await prefs.setStringList('saved_tours', saved);
+      await DebugLogHelper.addDebugLog(
+          'DOWNLOAD_SVC: re-download $tourId replaced in place → v$newVersion');
+      return const TourDownloadResult(TourDownloadStatus.ok);
+    } catch (e) {
+      await DebugLogHelper.addDebugLog(
+          'DOWNLOAD_SVC: re-download $tourId threw ($e) — keeping old copy');
+      return const TourDownloadResult(TourDownloadStatus.failed);
+    }
+  }
+
   /// Save a downloaded tour ZIP to My Tours — the SINGLE implementation of the
   /// on-phone record contract (lifted verbatim from home_screen so Home and the
   /// community page write identical `saved_tours` records). [downloadId] is the

@@ -83,6 +83,8 @@ List<String> applyTourEditToSavedTours(
   String tourPath, {
   String? newTourId,
   int? stopCount,
+  int? newVersion,
+  String? updatedAt,
 }) {
   final result = List<String>.from(savedTours);
 
@@ -103,6 +105,20 @@ List<String> applyTourEditToSavedTours(
     if (entry['path'] == tourPath) {
       if (newTourId != null) {
         entry['new_tour_id'] = newTourId;
+      }
+      // [LOCAL-746 Req 4] Stamp the server's NEW version onto the organiser's
+      // own saved record when the save replaced a COMMUNITY tour in place
+      // (member_update.new_version). This keeps the organiser's local version in
+      // step with the server, so the sync-on-open refresh does NOT later see the
+      // tour as "out of date" and re-download it (or message the organiser about
+      // their own edit). An ordinary edit passes newVersion == null and this is
+      // a no-op.
+      if (newVersion != null) {
+        entry['version'] = newVersion;
+        entry['tour_version'] = newVersion;
+      }
+      if (updatedAt != null && updatedAt.isNotEmpty) {
+        entry['updated_at'] = updatedAt;
       }
       if (stopCount != null) {
         // Stored as a String to match the value written at download time
@@ -633,7 +649,24 @@ class _EditTourScreenState extends State<EditTourScreen> {
         // audio_*.mp3 files there: that is the authoritative new stop count,
         // because the Save All response carries no stops_count (LOCAL-484).
         final diskStopCount = countStopsOnDisk(tourPath);
-        await _updateLocalTourId(newTourId, stopCount: diskStopCount);
+        // [LOCAL-746 Req 4] If this was a COMMUNITY tour edited in place, the
+        // server reports the new version in member_update — stamp it locally so
+        // the organiser's own record matches the server and the sync-on-open
+        // refresh does not later re-flag the organiser's own edit.
+        int? memberNewVersion;
+        final mu = result['member_update'];
+        if (mu is Map && mu['new_version'] != null) {
+          final raw = mu['new_version'];
+          if (raw is int) {
+            memberNewVersion = raw;
+          } else if (raw is num) {
+            memberNewVersion = raw.toInt();
+          } else if (raw is String) {
+            memberNewVersion = int.tryParse(raw);
+          }
+        }
+        await _updateLocalTourId(newTourId,
+            stopCount: diskStopCount, newVersion: memberNewVersion);
 
         final oldTourPath = widget.tourData['path'] as String;
         final newTourPath = oldTourPath.replaceAll(RegExp(r'[0-9a-f-]{36}'), newTourId);
@@ -705,7 +738,8 @@ class _EditTourScreenState extends State<EditTourScreen> {
 
   // ── part3 methods ──────────────────────────────────────────────────────────
 
-  Future<void> _updateLocalTourId(String newTourId, {int? stopCount}) async {
+  Future<void> _updateLocalTourId(String newTourId,
+      {int? stopCount, int? newVersion}) async {
     try {
       await DebugLogHelper.addDebugLog('DEBUG_UPDATE_ID: Starting _updateLocalTourId with newTourId: $newTourId, stopCount: $stopCount');
 
@@ -713,13 +747,15 @@ class _EditTourScreenState extends State<EditTourScreen> {
       final prefs = await SharedPreferences.getInstance();
       final savedTours = prefs.getStringList('saved_tours') ?? [];
 
-      // Single walk that rewrites both new_tour_id and the stop count. See
-      // applyTourEditToSavedTours — no divergent copy of this logic (LOCAL-484).
+      // Single walk that rewrites new_tour_id, the stop count, and (for a
+      // community in-place edit) the version. See applyTourEditToSavedTours —
+      // no divergent copy of this logic (LOCAL-484 / LOCAL-746).
       final updated = applyTourEditToSavedTours(
         savedTours,
         tourPath,
         newTourId: newTourId,
         stopCount: stopCount,
+        newVersion: newVersion,
       );
 
       await prefs.setStringList('saved_tours', updated);

@@ -97,4 +97,34 @@ class CommunityTourService {
     } catch (_) {}
     return null;
   }
+
+  /// [LOCAL-746] The CURRENT (version, updated_at) of a tour from map-delivery's
+  /// `/tour-info/<id>` — the SAME LOCAL-657 number the app already reads next to
+  /// Downloads. Used by the sync-on-open to detect an organiser's in-place edit
+  /// of a held community tour (the version rises when the tour is replaced).
+  /// Returns null on any failure / a missing version, so the caller simply does
+  /// not re-download that tour (never an error, never a spurious re-download).
+  static Future<({int version, String? updatedAt})?> serverTourVersion(
+      int tourId) async {
+    try {
+      final r =
+          await Endpoints.get(Service.mapDelivery, '/tour-info/$tourId');
+      final j = Endpoints.tryDecodeMap(r.body);
+      if (r.statusCode == 200 && j != null) {
+        final raw = j['version'];
+        int? v;
+        if (raw is int) {
+          v = raw;
+        } else if (raw is num) {
+          v = raw.toInt();
+        } else if (raw is String) {
+          v = int.tryParse(raw);
+        }
+        if (v != null) {
+          return (version: v, updatedAt: j['updated_at'] as String?);
+        }
+      }
+    } catch (_) {}
+    return null;
+  }
 }

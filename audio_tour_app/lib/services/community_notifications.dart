@@ -146,4 +146,24 @@ class CommunityNotifications {
       _tzInited = true;
     } catch (_) {}
   }
+
+  /// [LOCAL-746 Req 3] Post the ONE short "<tour> was updated by the organiser."
+  /// heads-up after a held community tour is refreshed to the organiser's new
+  /// version. Quiet (no sound), same channel as the new-tours heads-up. Each
+  /// message gets its own id (derived from the message hash) so two edits in one
+  /// sync do not overwrite each other. No-ops on a host without the plugin.
+  static Future<void> postTourUpdated(String message) async {
+    try {
+      await ensureInitialized();
+      final id = 746000 + (message.hashCode & 0x7ff);
+      await _plugin.show(
+        id,
+        'Community tour updated',
+        message,
+        _quietDetails,
+      );
+    } catch (_) {
+      // Missing plugin on a test host — nothing to do.
+    }
+  }
 }
