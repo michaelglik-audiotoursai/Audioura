@@ -31,6 +31,7 @@ import '../utils/downloaded_message.dart';
 import '../widgets/tour_buy_sheet.dart' show TermsAgreeLine;
 import '../widgets/pass_expiry_display.dart';
 import 'communities_about_screen.dart' show CommunityInviteTools;
+import 'tour_generator_screen.dart';
 
 class CommunityPageScreen extends StatefulWidget {
   /// Open by community id (from a map pin or the Listen tab) …
@@ -46,12 +47,20 @@ class CommunityPageScreen extends StatefulWidget {
   /// after-download behaviour as any other download. Null for an ordinary open.
   final int? pendingDownloadTourId;
 
+  /// [LOCAL-742] Test seam only: when provided, the page renders this community
+  /// directly instead of loading it from the user-api, so a widget test can
+  /// assert the owner-only "Add a tour" button (and its absence for members /
+  /// non-members) with no running server. Null in production (the default),
+  /// where _load() fetches the community from CommunitiesService.
+  final Community? initialCommunity;
+
   const CommunityPageScreen(
       {super.key,
       this.communityId,
       this.joinCode,
-      this.pendingDownloadTourId})
-      : assert(communityId != null || joinCode != null);
+      this.pendingDownloadTourId,
+      this.initialCommunity})
+      : assert(communityId != null || joinCode != null || initialCommunity != null);
 
   @override
   State<CommunityPageScreen> createState() => _CommunityPageScreenState();
@@ -95,7 +104,10 @@ class _CommunityPageScreenState extends State<CommunityPageScreen> {
     final prefs = await SharedPreferences.getInstance();
     _userId = prefs.getString('user_id');
     Community? c;
-    if (widget.joinCode != null) {
+    // [LOCAL-742] Test seam: render a supplied community directly, no network.
+    if (widget.initialCommunity != null) {
+      c = widget.initialCommunity;
+    } else if (widget.joinCode != null) {
       c = await CommunitiesService.resolveByCode(widget.joinCode!, userId: _userId);
       if (c == null) {
         setState(() {
@@ -770,6 +782,23 @@ class _CommunityPageScreenState extends State<CommunityPageScreen> {
             ),
           ),
 
+          // [LOCAL-742] Prominent owner-only "Add a tour" button, near the top
+          // above the tour list. An organiser looking at their own community
+          // now has an obvious way to generate a tour FOR it (Michael's
+          // "no ability to create a tour" from the community page). Tapping it
+          // opens the Tours-mode generator with this community preselected.
+          // Non-owners (members, visitors) never see it.
+          if (c.isOwner)
+            Padding(
+              padding: const EdgeInsets.only(top: 12, bottom: 4),
+              child: FilledButton.icon(
+                key: const Key('add_a_tour_button'),
+                onPressed: () => _openAddTour(c),
+                icon: const Icon(Icons.add),
+                label: const Text('Add a tour'),
+              ),
+            ),
+
           // Organiser card.
           _section('Organiser', [
             if (c.organiser.name != null) Text(c.organiser.name!,
@@ -919,6 +948,25 @@ class _CommunityPageScreenState extends State<CommunityPageScreen> {
           if (c.tours.isNotEmpty) ...[
             _sectionTitle('Tours (${c.tours.length})'),
             ...c.tours.map((t) => _communityTourTile(c, t)),
+          ] else if (c.isOwner) ...[
+            // [LOCAL-742] Owner empty-state: no tours yet, so the empty-state
+            // itself is the call to action — "No tours yet. Add the first one."
+            // with the same "Add a tour" button, so an organiser on a brand-new
+            // community has an obvious first step.
+            _sectionTitle('Tours'),
+            const Padding(
+              padding: EdgeInsets.only(top: 4, bottom: 8),
+              child: Text('No tours yet. Add the first one.'),
+            ),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: FilledButton.icon(
+                key: const Key('add_first_tour_button'),
+                onPressed: () => _openAddTour(c),
+                icon: const Icon(Icons.add),
+                label: const Text('Add a tour'),
+              ),
+            ),
           ] else if (canListen) ...[
             _sectionTitle('Tours'),
             const Padding(
@@ -1164,6 +1212,24 @@ class _CommunityPageScreenState extends State<CommunityPageScreen> {
       }
     }
     return widgets;
+  }
+
+  /// [LOCAL-742] The organiser taps "Add a tour" on their own community page.
+  /// Opens the Tours-mode generator (TourGeneratorScreen) with THIS community
+  /// preselected in the "For:" selector and the members-default visibility —
+  /// the same place today's only path lands (Generate → "For: my community X"),
+  /// but reached straight from the community page. After the tour generates it
+  /// appears in this community's tour list through the existing community_id
+  /// path (nothing extra to do here). Pushed as a route so the organiser
+  /// returns to the community page afterwards.
+  Future<void> _openAddTour(Community c) async {
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => TourGeneratorScreen(initialCommunityId: c.id),
+      ),
+    );
+    // Refresh so a tour just generated for this community shows in the list.
+    if (mounted) await _load();
   }
 
   Widget _sectionTitle(String title) => Padding(
