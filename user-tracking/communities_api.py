@@ -945,15 +945,22 @@ def _tours_for(cur, community_id):
     so no code is embedded here. Drafts are excluded (an unfinished tour cannot
     be shared). Returns id, name, stop_count and created_at per tour."""
     cur.execute(
-        """SELECT id, tour_name, COALESCE(stops_count, 0), created_at
-             FROM audio_tours
-            WHERE community_id = %s
-              AND COALESCE(draft, FALSE) = FALSE
-            ORDER BY created_at DESC, id DESC""",
+        # [LOCAL-748 LEAD] Also return the tour's version, computed exactly as
+        # map-delivery /tour-info does (MAX(audio_tour_versions.version_no) + 1),
+        # so a community-page download saves the right version and the refresh
+        # does not re-download a tour the phone just got.
+        """SELECT t.id, t.tour_name, COALESCE(t.stops_count, 0), t.created_at,
+                  COALESCE((SELECT MAX(v.version_no) FROM audio_tour_versions v
+                             WHERE v.tour_id = t.id), 0) + 1
+             FROM audio_tours t
+            WHERE t.community_id = %s
+              AND COALESCE(t.draft, FALSE) = FALSE
+            ORDER BY t.created_at DESC, t.id DESC""",
         (community_id,),
     )
     return [{'id': r[0], 'name': r[1], 'stop_count': int(r[2]),
-             'created_at': r[3].isoformat() if r[3] else None}
+             'created_at': r[3].isoformat() if r[3] else None,
+             'version': int(r[4])}
             for r in cur.fetchall()]
 
 

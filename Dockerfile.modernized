@@ -6,6 +6,7 @@ WORKDIR /app
 COPY requirements-modernized.txt .
 RUN pip install --no-cache-dir -r requirements-modernized.txt
 COPY tour_generation_modernized.py /app/
+COPY tour_html_map.py /app/
 COPY job_store.py /app/
 COPY build_manifest.py /app/
 COPY spoken_text_hygiene.py /app/
