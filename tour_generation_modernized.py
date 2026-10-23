@@ -147,185 +147,22 @@ from tour_html_map import (
     CATEGORY_ICONS as _CATEGORY_ICONS,
     stop_has_coordinates as _stop_has_coordinates,
     build_map_button as _build_map_button,
+    build_tour_page_html as _build_tour_page_html,
 )
 
 def generate_html_with_external_audio(tour_data):
-    """Generate HTML that references external MP3 files"""
+    """Generate HTML that references external MP3 files.
+
+    [LOCAL-750 B] The page markup, header and CSS now come from the shared
+    tour_html_map.build_tour_page_html so a generated page and an EDITED page
+    (tour_editing_phase2.create_clean_html) are byte-for-byte identical for the
+    same stops — the map button sits right after the "<stop>: Audio N" title and
+    the page header is the tour name, on both.
+    """
     tour_name = tour_data.get('tour_name', 'Audio Tour')
     stops = tour_data.get('text_content', [])
-    
-    html = f'''<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{tour_name}</title>
-    <style>
-        body {{ font-family: Arial, sans-serif; margin: 20px; }}
-        .audio-item {{ margin: 20px 0; padding: 15px; border: 1px solid #ccc; }}
-        audio {{ width: 100%; }}
-        .map-btn {{ background: #3d7ebf; border: none; border-radius: 50%; width: 36px; height: 36px;
-                    font-size: 20px; line-height: 1;
-                    cursor: pointer; display: inline-flex; align-items: center; justify-content: center;
-                    margin-left: 8px; vertical-align: middle; }}
-    </style>
-</head>
-<body>
-    <h1>{tour_name.replace('_', ' ').title()}</h1>
-    <script>
-        function openMap(stopNum) {{
-            if (window.flutter_inappwebview && window.flutter_inappwebview.callHandler) {{
-                window.flutter_inappwebview.callHandler('openMap', {{stop: stopNum}});
-            }}
-        }}
-    </script>'''
-    
-    for i, text in enumerate(stops, 1):
-        # Extract stop title from text content
-        lines = text.split('\n')
-        stop_title = lines[0].strip() if lines else f"Stop {i}"
-        
-        map_button = _build_map_button(text, i, tour_data.get('tour_category', ''))
-        
-        html += f'''
-    <div class="audio-item">
-        <h3>{stop_title}: Audio {i}</h3>
-        {map_button}
-        <audio id="audio-{i-1}" controls preload="metadata">
-            <source src="audio_{i}.mp3" type="audio/mpeg">
-            Your browser does not support the audio element.
-        </audio>
-    </div>'''
-    
-    # Add the voice control JavaScript from build_web_page_fixed.py
-    html += '''
-    
-    <script>
-        let audioElements = [];
-        let currentStopIndex = 0;
-        let wasPlayingBeforeVoice = false;
-        
-        // Core audio control - always call this to play current audio
-        window.playAudio = function() {
-            // Stop all other audio first
-            audioElements.forEach((audio, index) => {
-                if (index !== currentStopIndex) {
-                    audio.pause();
-                    audio.currentTime = 0;
-                }
-            });
-            
-            // Play current audio
-            if (audioElements[currentStopIndex]) {
-                audioElements[currentStopIndex].play();
-                return "Success: Playing stop-" + currentStopIndex;
-            }
-            return "Error: No audio to play";
-        };
-        
-        window.pauseAudio = function() {
-            if (audioElements[currentStopIndex]) {
-                audioElements[currentStopIndex].pause();
-                return "Success: Audio paused";
-            }
-            return "Error: No audio to pause";
-        };
-        
-        // Pause for voice recognition
-        window.pauseAllAudio = function() {
-            wasPlayingBeforeVoice = false;
-            if (audioElements[currentStopIndex] && !audioElements[currentStopIndex].paused) {
-                wasPlayingBeforeVoice = true;
-                audioElements[currentStopIndex].pause();
-            }
-            return "Success: Audio paused for voice recognition";
-        };
-        
-        // Navigation - just change pointer, don't play
-        window.nextStop = function() {
-            if (currentStopIndex < audioElements.length - 1) {
-                currentStopIndex++;
-                return "Success: Moved to stop-" + currentStopIndex;
-            }
-            return "Error: Already at last stop";
-        };
-        
-        window.previousStop = function() {
-            if (currentStopIndex > 0) {
-                currentStopIndex--;
-                return "Success: Moved to stop-" + currentStopIndex;
-            }
-            return "Error: Already at first stop";
-        };
-        
-        // Reset current audio to beginning
-        window.repeatStop = function() {
-            if (audioElements[currentStopIndex]) {
-                audioElements[currentStopIndex].currentTime = 0;
-                return "Success: Reset stop-" + currentStopIndex + " to beginning";
-            }
-            return "Error: No audio to reset";
-        };
-        
-        // Seek forward/backward in current audio with bounds checking
-        window.seekForward = function(seconds = 10) {
-            if (audioElements[currentStopIndex]) {
-                const audio = audioElements[currentStopIndex];
-                const newTime = audio.currentTime + seconds;
-                const maxTime = audio.duration || 0;
-                
-                if (newTime >= maxTime) {
-                    audio.currentTime = maxTime - 1; // 1 second before end
-                    return "Success: Moved to near end (" + seconds + "s would exceed duration)";
-                } else {
-                    audio.currentTime = newTime;
-                    return "Success: Moved forward " + seconds + " seconds";
-                }
-            }
-            return "Error: No audio to seek";
-        };
-        
-        window.seekBackward = function(seconds = 10) {
-            if (audioElements[currentStopIndex]) {
-                const audio = audioElements[currentStopIndex];
-                const newTime = audio.currentTime - seconds;
-                
-                if (newTime < 0) {
-                    audio.currentTime = 0; // Beginning of audio
-                    return "Success: Moved to beginning (" + seconds + "s would go below 0)";
-                } else {
-                    audio.currentTime = newTime;
-                    return "Success: Moved backward " + seconds + " seconds";
-                }
-            }
-            return "Error: No audio to seek";
-        };
-        
-        window.initializeAudio = function() {
-            return "Success: Audio system initialized with " + audioElements.length + " stops";
-        };
-        
-        // Initialize audio elements array
-        document.addEventListener('DOMContentLoaded', function() {
-            const audios = document.querySelectorAll('audio');
-            audioElements = Array.from(audios);
-            
-            // Track current playing audio
-            audioElements.forEach((audio, index) => {
-                audio.addEventListener('play', function() {
-                    audioElements.forEach((otherAudio, otherIndex) => {
-                        if (otherIndex !== index && !otherAudio.paused) {
-                            otherAudio.pause();
-                        }
-                    });
-                    currentStopIndex = index;
-                });
-            });
-        });
-    </script>
-</body>
-</html>'''
-    return html
+    tour_category = tour_data.get('tour_category', '')
+    return _build_tour_page_html(tour_name, stops, tour_category)
 
 def generate_manifest(tour_name):
     """Generate PWA manifest"""

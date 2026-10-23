@@ -21,7 +21,7 @@ void main() {
   setUp(() {
     CommunityToursSync.fetchNewTours = (userId, {since}) async => null;
     CommunityToursSync.fetchActiveCommunityIds = (userId) async => const {1};
-    CommunityToursSync.onRefreshMessage = (_) {};
+    CommunityToursSync.onRefreshMessage = (_, {int? tourId}) {};
   });
 
   String recordJson({
@@ -57,7 +57,7 @@ void main() {
       reDownloaded.add(tourId);
       return const TourDownloadResult(TourDownloadStatus.ok);
     };
-    CommunityToursSync.onRefreshMessage = messages.add;
+    CommunityToursSync.onRefreshMessage = (m, {int? tourId}) => messages.add(m);
 
     // Force an unmetered connection by stubbing nothing — connectionFromResults
     // reads the real Connectivity plugin, which in a test host returns none.
@@ -86,7 +86,7 @@ void main() {
       reDownloaded.add(tourId);
       return const TourDownloadResult(TourDownloadStatus.ok);
     };
-    CommunityToursSync.onRefreshMessage = messages.add;
+    CommunityToursSync.onRefreshMessage = (m, {int? tourId}) => messages.add(m);
     _mockConnectivityWifi();
 
     final result = await CommunityToursSync.instance.run();
@@ -151,7 +151,7 @@ void main() {
       // The replace-in-place keeps the old copy on failure; here it reports it.
       return const TourDownloadResult(TourDownloadStatus.failed);
     };
-    CommunityToursSync.onRefreshMessage = messages.add;
+    CommunityToursSync.onRefreshMessage = (m, {int? tourId}) => messages.add(m);
     _mockConnectivityWifi();
 
     final result = await CommunityToursSync.instance.run();

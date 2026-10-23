@@ -99,9 +99,14 @@ class CommunityToursSync {
 
   /// Emit the ONE short "<tour> was updated by the organiser." message after a
   /// successful refresh. Defaults to a no-op; main wires it to a snackbar/toast.
-  static void Function(String message) onRefreshMessage = _noopMessage;
+  ///
+  /// [LOCAL-750 C] Carries the refreshed tour's id so a FOREGROUND in-app
+  /// message can offer a "View" action that opens it. The id is optional so the
+  /// background wiring (notification only) can ignore it.
+  static void Function(String message, {int? tourId}) onRefreshMessage =
+      _noopMessage;
 
-  static void _noopMessage(String _) {}
+  static void _noopMessage(String _, {int? tourId}) {}
 
   /// [LOCAL-748] The community ids the user OWNS — a tour in one of these is the
   /// user's OWN tour and is NEVER announced to them. Seam for tests; defaults to
@@ -120,6 +125,13 @@ class CommunityToursSync {
       onNewTourAnnouncement = _noopAnnouncement;
 
   static void _noopAnnouncement(NewTourAnnouncement _, String __) {}
+
+  /// [LOCAL-750 C] Fired once after a run that downloaded a new tour or
+  /// refreshed a held one, so the Listen page reloads without the user leaving
+  /// and coming back. Defaults to a no-op; main wires it to SavedToursRefresh.
+  static void Function() onToursChanged = _noopToursChanged;
+
+  static void _noopToursChanged() {}
 
   static Future<Set<int>> _defaultOwnedCommunityIds(String userId) async {
     final ids = <int>{};
@@ -272,6 +284,13 @@ class CommunityToursSync {
         deletedTourIds: deleted,
       );
 
+      // [LOCAL-750 C] If this run downloaded a new tour or refreshed a held one,
+      // tell the Listen page to reload so the change appears without the user
+      // leaving and coming back. One signal per run (not per tour).
+      if (ok > 0 || refreshed > 0) {
+        onToursChanged();
+      }
+
       return CommunityToursSyncResult(
         planned: planned,
         downloaded: ok,
@@ -385,7 +404,7 @@ class CommunityToursSync {
       if (r.status == TourDownloadStatus.ok) {
         refreshed++;
         // Req 3: ONE short message per refreshed tour.
-        onRefreshMessage(refreshedMessage(p.name));
+        onRefreshMessage(refreshedMessage(p.name), tourId: p.tourId);
       }
       // A failed re-download keeps the old copy (reDownloadAndReplace never
       // touches the files on failure) — nothing to undo here.

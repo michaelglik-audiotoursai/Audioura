@@ -24,6 +24,7 @@ import 'tour_map_screen.dart';
 import 'communities_hub_screen.dart';
 import '../services/communities_service.dart';
 import '../services/community_tour_service.dart';
+import '../services/saved_tours_refresh.dart';
 import '../services/tour_pricing_service.dart';
 import '../services/entitlements_service.dart';
 import '../services/device_service.dart';
@@ -204,12 +205,27 @@ class _MyToursScreenState extends State<MyToursScreen> {
     _setupScrollListener();
     _loadCuratorStatus();
     _loadCommunityCount();
+    // [LOCAL-750 C] Reload when a community sync downloads/refreshes a tour, so
+    // the new/updated tour appears on the Listen page without leaving it.
+    SavedToursRefresh.instance.tick.addListener(_onSavedToursChanged);
+  }
+
+  /// [LOCAL-750 C] A community sync changed saved_tours — reload the current
+  /// list (tours or news) in place.
+  void _onSavedToursChanged() {
+    if (!mounted) return;
+    if (_appMode == 'Audio') {
+      _loadNews();
+    } else {
+      _loadTours();
+    }
   }
 
   @override
   void dispose() {
     // [LOCAL-716B] Cancel the highlight flash timer and release the scroll
     // controller so the newest-tour highlight path leaves nothing running.
+    SavedToursRefresh.instance.tick.removeListener(_onSavedToursChanged);
     _highlightTimer?.cancel();
     _scrollController.dispose();
     super.dispose();
