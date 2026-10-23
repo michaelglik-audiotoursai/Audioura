@@ -508,6 +508,13 @@ def _requested_track(req):
     """
     raw = (req.args.get('track') or '').strip()
     if not raw:
+        # [LOCAL-737, LEAD] A deployment that serves ONE track (the Subscribed
+        # map-delivery on GCloud) sets DELIVERY_TRACK_FILTER=subscribed, so its
+        # lists show only its own tours even though the app sends no ?track=.
+        # Deliberately NOT TOUR_TRACK: an existing Beta/Storied deploy that sets
+        # TOUR_TRACK must keep listing exactly what it lists today.
+        raw = (os.getenv('DELIVERY_TRACK_FILTER') or '').strip()
+    if not raw:
         return None
     return normalize_track(raw)
 

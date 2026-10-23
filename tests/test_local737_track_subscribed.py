@@ -372,3 +372,24 @@ class ToursNearTrackFilterTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
+
+
+def test_delivery_track_filter_env_defaults_the_filter(monkeypatch):
+    """[LEAD] DELIVERY_TRACK_FILTER makes a one-track deployment filter without ?track=."""
+    import importlib.util, os as _os
+    from flask import Flask
+    spec = importlib.util.spec_from_file_location(
+        "md_app_737_env",
+        _os.path.join(_os.path.dirname(_os.path.dirname(__file__)), "map_delivery", "app.py"))
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    app = Flask(__name__)
+    with app.test_request_context('/tours-near/1/1'):
+        from flask import request
+        monkeypatch.delenv('DELIVERY_TRACK_FILTER', raising=False)
+        assert mod._requested_track(request) is None
+        monkeypatch.setenv('DELIVERY_TRACK_FILTER', 'subscribed')
+        assert mod._requested_track(request) == 'subscribed'
+    with app.test_request_context('/tours-near/1/1?track=beta'):
+        from flask import request
+        assert mod._requested_track(request) == 'beta'
