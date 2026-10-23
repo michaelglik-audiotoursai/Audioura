@@ -724,7 +724,8 @@ class _CommunityPageScreenState extends State<CommunityPageScreen> {
         padding: const EdgeInsets.all(16),
         children: [
           // Non-member join framing (D658 addendum 2 §3).
-          if (!c.myStatus.isMember)
+          // [LOCAL-742, LEAD] Never tell the organiser to join their own community.
+          if (!c.myStatus.isMember && !c.isOwner)
             Card(
               color: Theme.of(context).colorScheme.surfaceContainerHighest,
               child: Padding(

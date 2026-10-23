@@ -305,11 +305,15 @@ class _TourGeneratorScreenState extends State<TourGeneratorScreen> {
       alignment: Alignment.centerLeft,
       child: TextButton.icon(
         key: const Key('generate_my_communities_link'),
-        onPressed: () {
-          Navigator.push(
+        onPressed: () async {
+          await Navigator.push(
             context,
             MaterialPageRoute(builder: (_) => const CommunitiesHubScreen()),
           );
+          // [LOCAL-742, LEAD] A community created from the hub must show in
+          // the "For:" selector at once (Michael 2026-10-23: Salem was missing
+          // until he switched tabs). This screen stays mounted under the hub.
+          if (mounted) await _loadOwnedCommunities();
         },
         icon: const Icon(Icons.groups, size: 18),
         label: const Text('My communities'),
