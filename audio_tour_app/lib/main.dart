@@ -60,6 +60,12 @@ void main() async {
   CommunityToursSync.onRefreshMessage = (message) {
     unawaited(CommunityNotifications.postTourUpdated(message));
   };
+  // [LOCAL-748] Surface the ONE "New tour in <community>: <tour>" heads-up when
+  // the sync finds a new tour in a community the member belongs to (never for
+  // the member's own tours; once per tour).
+  CommunityToursSync.onNewTourAnnouncement = (announcement, message) {
+    unawaited(CommunityNotifications.postNewTourAvailable(message));
+  };
   unawaited(AppSyncCoordinator.instance.start());
 
   // [LOCAL-714 / D675 part 2] Register the background community-tours sync

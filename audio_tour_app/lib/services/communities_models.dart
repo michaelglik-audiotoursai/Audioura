@@ -99,6 +99,14 @@ class CommunityInviteTourOption {
   final String? createdAt;
   // [LOCAL-711 / D673] The server short title, when the listing carries one.
   final String? shortTitle;
+  // [LOCAL-748] The tour's current server version (LOCAL-657) and the ISO date
+  // it was last updated, when the listing carries them. Carried so the
+  // community-page Download stamps them onto the saved record as its sourceItem
+  // (community_id/version/updated_at), which is what CommunityToursSync's
+  // held-tour refresh and RefreshPlanner read. Default version 1 (an edit bumps
+  // it); updatedAt null when the server omits it.
+  final int version;
+  final String? updatedAt;
 
   const CommunityInviteTourOption({
     required this.id,
@@ -106,6 +114,8 @@ class CommunityInviteTourOption {
     this.stopCount = 0,
     this.createdAt,
     this.shortTitle,
+    this.version = 1,
+    this.updatedAt,
   });
 
   factory CommunityInviteTourOption.fromJson(Map<String, dynamic> j) =>
@@ -121,6 +131,8 @@ class CommunityInviteTourOption {
         shortTitle: ((j['short_title'] as String?)?.trim().isEmpty ?? true)
             ? null
             : (j['short_title'] as String).trim(),
+        version: (j['version'] is num) ? (j['version'] as num).toInt() : 1,
+        updatedAt: (j['updated_at'] ?? j['updatedAt']) as String?,
       );
 }
 

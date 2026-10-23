@@ -171,6 +171,10 @@ Future<bool> runAndroidBackgroundSync() async {
   CommunityToursSync.onRefreshMessage = (message) {
     CommunityNotifications.postTourUpdated(message);
   };
+  // [LOCAL-748] Announce a new community tour from the background sync too.
+  CommunityToursSync.onNewTourAnnouncement = (announcement, message) {
+    CommunityNotifications.postNewTourAvailable(message);
+  };
   final result = await CommunityToursSync.instance.run();
   return result.failed == 0;
 }

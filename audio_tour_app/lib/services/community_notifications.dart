@@ -166,4 +166,24 @@ class CommunityNotifications {
       // Missing plugin on a test host — nothing to do.
     }
   }
+
+  /// [LOCAL-748] Post the ONE short "New tour in <community>: <tour>" heads-up
+  /// when the sync finds a new tour in a community the member belongs to. Quiet
+  /// (no sound), same channel as the other community heads-ups. Each message
+  /// gets its own id (derived from the message hash) so two new tours in one
+  /// sync do not overwrite each other. No-ops on a host without the plugin.
+  static Future<void> postNewTourAvailable(String message) async {
+    try {
+      await ensureInitialized();
+      final id = 748000 + (message.hashCode & 0x7ff);
+      await _plugin.show(
+        id,
+        'New community tour',
+        message,
+        _quietDetails,
+      );
+    } catch (_) {
+      // Missing plugin on a test host — nothing to do.
+    }
+  }
 }

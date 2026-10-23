@@ -134,6 +134,23 @@ class _CommunityPageScreenState extends State<CommunityPageScreen> {
         if (sid is String && sid.isNotEmpty) onPhone.add(sid);
       } catch (_) {}
     }
+    // [LOCAL-748] Repair records already on the phone: a tour downloaded BEFORE
+    // this fix carries no community_id, so CommunityToursSync's held-tour
+    // refresh skips it and the organiser's edit never arrives. When the
+    // community page loads, stamp community_id (and version 1 when missing) onto
+    // every saved record whose server/edit id matches one of THIS community's
+    // tours. No re-download is needed — only the record is updated.
+    if (c != null && c.tours.isNotEmpty) {
+      final communityTourIds = c.tours.map((t) => t.id.toString()).toSet();
+      final stamped = stampCommunityIdOnSavedRecords(
+        savedToursJson: prefs.getStringList('saved_tours') ?? const [],
+        communityId: c.id,
+        communityTourIds: communityTourIds,
+      );
+      if (stamped != null) {
+        await prefs.setStringList('saved_tours', stamped);
+      }
+    }
     // [LOCAL-715 / D675 addendum 1] The per-community listening language: the
     // explicit per-community choice (null when none), and the RESOLVED language
     // the Download button uses (via languageForCommunity — choice → About →
@@ -231,7 +248,30 @@ class _CommunityPageScreenState extends State<CommunityPageScreen> {
     if (_downloading.contains(tourId)) return;
     setState(() => _downloading.add(tourId));
     try {
-      final result = await TourDownloadService.downloadAndSave(tourId);
+      // [LOCAL-748] Stamp the community id (and version/updated_at when the page
+      // payload carries the tour row) onto the saved record, so the held-tour
+      // refresh later picks up the organiser's edits. The community is known
+      // here (this page), so community_id is always available.
+      final c = _community;
+      Map<String, dynamic>? sourceItem;
+      if (c != null) {
+        CommunityInviteTourOption? row;
+        for (final t in c.tours) {
+          if (t.id == tourId) {
+            row = t;
+            break;
+          }
+        }
+        sourceItem = communityTourSourceItem(
+          communityId: c.id,
+          version: row?.version ?? 1,
+          updatedAt: row?.updatedAt,
+        );
+      }
+      final result = await TourDownloadService.downloadAndSave(
+        tourId,
+        sourceItem: sourceItem,
+      );
       if (!mounted) return;
       switch (result.status) {
         case TourDownloadStatus.ok:
@@ -490,7 +530,12 @@ class _CommunityPageScreenState extends State<CommunityPageScreen> {
   /// community-tour flow does. The language is pickDownloadLanguage over the
   /// tour's available languages, the listener's preferred language and the
   /// tour's original — v1 never requests a new translation.
-  Future<void> _downloadCommunityTour(CommunityTour tour) async {
+  Future<void> _downloadCommunityTour(
+    CommunityTour tour, {
+    required int communityId,
+    int version = 1,
+    String? updatedAt,
+  }) async {
     if (_downloading.contains(tour.id)) return;
     setState(() => _downloading.add(tour.id));
     try {
@@ -501,7 +546,18 @@ class _CommunityPageScreenState extends State<CommunityPageScreen> {
       // [LOCAL-715 / D675 addendum 1] The preferred language is THIS community's
       // resolved language (languageForCommunity), not a single global one.
       final _ = pickDownloadLanguage(const [], _resolvedLanguage, '');
-      final result = await TourDownloadService.downloadAndSave(tour.id);
+      // [LOCAL-748] Pass the tour's row as sourceItem so the saved record is
+      // stamped with community_id (and version/updated_at). Without it the
+      // record carried no community_id, so CommunityToursSync's held-tour
+      // refresh skipped it and the organiser's edit never reached the member.
+      final result = await TourDownloadService.downloadAndSave(
+        tour.id,
+        sourceItem: communityTourSourceItem(
+          communityId: communityId,
+          version: version,
+          updatedAt: updatedAt,
+        ),
+      );
       if (!mounted) return;
       switch (result.status) {
         case TourDownloadStatus.ok:
@@ -517,6 +573,10 @@ class _CommunityPageScreenState extends State<CommunityPageScreen> {
                   PendingListenOpen.instance.offer(tour.id.toString()),
             ),
           ));
+          // [LOCAL-748] Auto-add to the Listen page without a second action —
+          // the member should not have to tap "View". Opening Listen on this
+          // tour is the SAME mechanism the after-pass download already uses.
+          PendingListenOpen.instance.offer(tour.id.toString());
           break;
         case TourDownloadStatus.alreadyOnPhone:
           setState(() => _onPhoneTourIds = {..._onPhoneTourIds, tour.id.toString()});
@@ -720,7 +780,12 @@ class _CommunityPageScreenState extends State<CommunityPageScreen> {
           ),
         ],
       ),
-      body: ListView(
+      // [LOCAL-748] SelectionArea makes the page's text selectable so Michael
+      // can copy a tour's request words to reuse them. Buttons, switches and the
+      // tappable rows still work — SelectionArea only intercepts text drags, not
+      // taps on interactive widgets.
+      body: SelectionArea(
+        child: ListView(
         padding: const EdgeInsets.all(16),
         children: [
           // Non-member join framing (D658 addendum 2 §3).
@@ -977,6 +1042,7 @@ class _CommunityPageScreenState extends State<CommunityPageScreen> {
           ],
         ],
       ),
+      ),
     );
   }
 
@@ -994,16 +1060,36 @@ class _CommunityPageScreenState extends State<CommunityPageScreen> {
         ? t.shortTitle!
         : t.name;
     final isBusy = _downloading.contains(t.id);
+    // [LOCAL-748] When the tour is already on the phone, the whole row opens
+    // the player — Michael wanted "On this phone ✓" to be a link so he does not
+    // have to go back, find the Listen tab and open the tour by hand. Opening
+    // via PendingListenOpen is the SAME mechanism the download's "View" uses.
+    final onPhone = status == CommunityTourRowStatus.onThisPhone;
+    VoidCallback? openPlayer =
+        onPhone ? () => PendingListenOpen.instance.offer(t.id.toString()) : null;
     Widget trailing;
     switch (status) {
       case CommunityTourRowStatus.onThisPhone:
-        trailing = const Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.check_circle, size: 18, color: Colors.green),
-            SizedBox(width: 4),
-            Text('On this phone', style: TextStyle(color: Colors.green)),
-          ],
+        trailing = InkWell(
+          key: Key('open_tour_${t.id}'),
+          onTap: openPlayer,
+          borderRadius: BorderRadius.circular(6),
+          child: const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.check_circle, size: 18, color: Colors.green),
+                SizedBox(width: 4),
+                Text('On this phone',
+                    style: TextStyle(
+                        color: Colors.green,
+                        decoration: TextDecoration.underline)),
+                SizedBox(width: 2),
+                Icon(Icons.play_arrow, size: 16, color: Colors.green),
+              ],
+            ),
+          ),
         );
         break;
       case CommunityTourRowStatus.joinToDownload:
@@ -1023,7 +1109,10 @@ class _CommunityPageScreenState extends State<CommunityPageScreen> {
                       requestString: '',
                       visibility: 'members',
                       contentRating: 'general',
-                    )),
+                    ),
+                    communityId: c.id,
+                    version: t.version,
+                    updatedAt: t.updatedAt),
                 icon: const Icon(Icons.download, size: 18),
                 label: const Text('Download'),
               );
@@ -1034,6 +1123,8 @@ class _CommunityPageScreenState extends State<CommunityPageScreen> {
       title: Text(title),
       subtitle: t.stopCount > 0 ? Text('${t.stopCount} stops') : null,
       trailing: trailing,
+      // [LOCAL-748] Tapping anywhere on an already-downloaded row opens it too.
+      onTap: openPlayer,
     );
   }
 
