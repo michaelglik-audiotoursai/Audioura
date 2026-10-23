@@ -18,12 +18,14 @@ import '../config/endpoints.dart';
 import '../services/translation_service.dart';
 import '../services/error_handler_service.dart';
 import '../services/community_tour_service.dart';
+import '../services/communities_service.dart';
 import '../services/entitlements_service.dart';
 
 import '../screens/debug_log_viewer_screen.dart';
 import '../screens/tour_player_screen.dart';
 import '../screens/news_player_screen.dart';
 import 'recovery_code_screen.dart';
+import 'communities_hub_screen.dart';
 import '../widgets/language_selector.dart';
 import '../utils/tour_request_parser.dart';
 import '../utils/tour_error_resolver.dart';
@@ -77,6 +79,12 @@ class _TourGeneratorScreenState extends State<TourGeneratorScreen> {
   // charges this organiser's plan allowance as for any tour.
   List<OwnedCommunity> _ownedCommunities = const [];
   CommunityTourTarget _communityTarget = CommunityTourTarget.justMe;
+
+  // [LOCAL-739 §2] True when the user BELONGS TO or ORGANISES at least one
+  // community — the gate for the Generate "My communities" link (members only).
+  // An organiser (owner of ≥ 1 community) qualifies even with no membership row.
+  // Loaded alongside the owned communities in initState.
+  bool _isCommunityMember = false;
 
   // [LOCAL-581] Snapshot of the last tour request submitted this session, so
   // "Try again" can re-submit the IDENTICAL request (location text, tour type,
@@ -194,8 +202,17 @@ class _TourGeneratorScreenState extends State<TourGeneratorScreen> {
       final userId = prefs.getString('user_id') ?? '';
       if (userId.isEmpty) return;
       final owned = await CommunityTourService.ownedCommunities(userId);
+      // [LOCAL-739 §2] Also learn whether the user is a MEMBER of any community,
+      // so the "My communities" link shows to members as well as organisers.
+      final joined = await CommunitiesService.mine(userId);
       if (!mounted) return;
-      setState(() => _ownedCommunities = owned);
+      setState(() {
+        _ownedCommunities = owned;
+        _isCommunityMember = CommunityRules.hasAnyCommunity(
+          joinedCount: joined.length,
+          ownedCount: owned.length,
+        );
+      });
     } catch (_) {
       // Non-fatal: the selector simply stays hidden.
     }
@@ -220,6 +237,30 @@ class _TourGeneratorScreenState extends State<TourGeneratorScreen> {
         line,
         key: const Key('generate_tours_left_line'),
         style: const TextStyle(fontSize: 13, color: Colors.grey),
+      ),
+    );
+  }
+
+  /// [LOCAL-739 §2] A "My communities" link on the Generate tab, shown ONLY to a
+  /// user who belongs to or organises at least one community. It opens the
+  /// single Communities page. A non-member sees nothing (an empty box). This is
+  /// separate from the organiser-only "For:" selector below and from the
+  /// Generate → Community create path (LOCAL-738), which is unchanged and open
+  /// to everyone.
+  Widget _buildMyCommunitiesLink() {
+    if (!_isCommunityMember) return const SizedBox.shrink();
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: TextButton.icon(
+        key: const Key('generate_my_communities_link'),
+        onPressed: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const CommunitiesHubScreen()),
+          );
+        },
+        icon: const Icon(Icons.groups, size: 18),
+        label: const Text('My communities'),
       ),
     );
   }
@@ -1785,6 +1826,7 @@ class _TourGeneratorScreenState extends State<TourGeneratorScreen> {
 
             // [LOCAL-701 / D663 §3] "For: my community" selector — organisers
             // only, Tours mode only (not News/Audio). Default is "Just me".
+            if (_appMode != 'Audio') _buildMyCommunitiesLink(),
             if (_appMode != 'Audio') _buildCommunitySelector(),
 
             // [LOCAL-733 / D703] One short grey line telling the member how many

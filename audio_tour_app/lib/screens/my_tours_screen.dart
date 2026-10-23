@@ -21,7 +21,9 @@ import 'tour_player_screen.dart';
 import 'news_player_screen.dart';
 import 'edit_tour_screen.dart';
 import 'tour_map_screen.dart';
-import 'my_communities_screen.dart';
+import 'communities_hub_screen.dart';
+import '../services/communities_service.dart';
+import '../services/community_tour_service.dart';
 import '../services/tour_pricing_service.dart';
 import '../services/entitlements_service.dart';
 import '../services/device_service.dart';
@@ -142,6 +144,14 @@ class _MyToursScreenState extends State<MyToursScreen> {
   // after ~2s so the row flashes, then returns to normal.
   int? _highlightIndex;
   Timer? _highlightTimer;
+
+  // [LOCAL-739 §2] The count of communities the user BELONGS TO or ORGANISES,
+  // for the visible "My communities (N)" row at the top of the Listen tours
+  // view. Null until loaded. The row is shown ONLY when this is > 0 (a
+  // non-member sees no row — this replaces the always-present hidden app-bar
+  // icon). Loaded in initState and refreshed whenever the tours reload.
+  int _communityCount = 0;
+  bool _communityCountLoaded = false;
   
   Future<void> _manualRefresh() async {
     await DebugLogHelper.addDebugLog('LISTEN: Manual refresh triggered');
@@ -156,6 +166,7 @@ class _MyToursScreenState extends State<MyToursScreen> {
     _setupVoiceCommands();
     _setupScrollListener();
     _loadCuratorStatus();
+    _loadCommunityCount();
   }
 
   @override
@@ -174,6 +185,36 @@ class _MyToursScreenState extends State<MyToursScreen> {
       final ent = await EntitlementsService.me();
       if (mounted) setState(() => _canSell = ent.canSell);
     } catch (_) {/* not a curator / offline → no price control */}
+  }
+
+  /// [LOCAL-739 §2] Count the communities this user BELONGS TO or ORGANISES, to
+  /// decide whether the visible "My communities (N)" row shows at the top of the
+  /// Listen tours view. A non-member (count 0) sees NO row — this replaces the
+  /// always-present hidden app-bar icon. Both reads swallow transport errors and
+  /// return empty lists (so an unreachable Communities backend → no row).
+  Future<void> _loadCommunityCount() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final userId = prefs.getString('user_id');
+      if (userId == null || userId.isEmpty) {
+        if (mounted) setState(() => _communityCountLoaded = true);
+        return;
+      }
+      final joined = await CommunitiesService.mine(userId);
+      final owned = await CommunityTourService.ownedCommunities(userId);
+      final count = CommunityRules.yourCommunitiesCount(
+        joinedIds: joined.map((j) => j.id),
+        ownedIds: owned.map((o) => o.id),
+      );
+      if (mounted) {
+        setState(() {
+          _communityCount = count;
+          _communityCountLoaded = true;
+        });
+      }
+    } catch (_) {
+      if (mounted) setState(() => _communityCountLoaded = true);
+    }
   }
 
   /// [LOCAL-677] The numeric tour id of a saved tour, or null for a local-only
@@ -1892,18 +1933,10 @@ class _MyToursScreenState extends State<MyToursScreen> {
         backgroundColor: const Color(0xFF2c3e50),
         foregroundColor: Colors.white,
         actions: [
-          // [LOCAL-690] Joined communities live beside My tours in the Listen
-          // tab; each carries its origin (the community + organiser).
-          IconButton(
-            icon: const Icon(Icons.groups),
-            tooltip: 'My communities',
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const MyCommunitiesScreen()),
-              );
-            },
-          ),
+          // [LOCAL-739 §2] The joined-communities list no longer hides behind a
+          // small app-bar icon (Michael's C0 ruling). It is reached from the
+          // visible "My communities (N)" row below (members only), from the
+          // About "Communities" button, the Home chip and the Generate link.
           if (_tours.isNotEmpty)
             IconButton(
               icon: const Icon(Icons.delete_sweep),
@@ -1911,15 +1944,22 @@ class _MyToursScreenState extends State<MyToursScreen> {
             ),
         ],
       ),
-      body: _tours.isEmpty
-          ? const Center(
-              child: Text(
-                'No tours yet.\nGenerate your first tour!',
-                textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 18, color: Colors.grey),
-              ),
-            )
-          : ListView.builder(
+      body: Column(
+        children: [
+          // [LOCAL-739 §2] A VISIBLE "My communities (N)" row at the top, shown
+          // ONLY to a user who belongs to or organises ≥ 1 community. A
+          // non-member sees nothing here. Replaces the hidden app-bar icon.
+          _buildMyCommunitiesRow(),
+          Expanded(
+            child: _tours.isEmpty
+                ? const Center(
+                    child: Text(
+                      'No tours yet.\nGenerate your first tour!',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(fontSize: 18, color: Colors.grey),
+                    ),
+                  )
+                : ListView.builder(
               controller: _scrollController,
               itemCount: _tours.length,
               itemBuilder: (context, index) {
@@ -2046,9 +2086,33 @@ class _MyToursScreenState extends State<MyToursScreen> {
                 );
               },
             ),
+          ),
+        ],
+      ),
     );
   }
 
+  /// [LOCAL-739 §2] The visible "My communities (N)" row at the top of the
+  /// Listen tours view. Shown ONLY to a user who belongs to or organises at
+  /// least one community (count > 0); a non-member sees nothing (an empty
+  /// SizedBox). Tapping it opens the single Communities page. The count is not
+  /// yet loaded → nothing is shown (never a flash of an empty row).
+  Widget _buildMyCommunitiesRow() {
+    if (!_communityCountLoaded || _communityCount <= 0) {
+      return const SizedBox.shrink();
+    }
+    return ListenMyCommunitiesRow(
+      count: _communityCount,
+      onTap: () async {
+        await Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const CommunitiesHubScreen()),
+        );
+        if (mounted) _loadCommunityCount();
+      },
+    );
+  }
+  /// opens a tour. A tap on a tour row calls it, and so does the pending-open
   /// [LOCAL-716] Open a saved tour's player — the SINGLE place the Listen list
   /// opens a tour. A tap on a tour row calls it, and so does the pending-open
   /// path (a download's "View" button for one tour). Extracted verbatim from

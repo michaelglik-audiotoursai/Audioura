@@ -39,7 +39,18 @@ class CommunityPageScreen extends StatefulWidget {
   /// … or by invite code (from the Home search box — the join flow).
   final String? joinCode;
 
-  const CommunityPageScreen({super.key, this.communityId, this.joinCode})
+  /// [LOCAL-739 §3] When set, this community page was opened from a NON-MEMBER
+  /// tapping Download on a members-only tour (on Home or from an emailed link).
+  /// After the pass is granted here (free join or pass purchase), that exact
+  /// tour is downloaded automatically and the Listen tab opens — the SAME
+  /// after-download behaviour as any other download. Null for an ordinary open.
+  final int? pendingDownloadTourId;
+
+  const CommunityPageScreen(
+      {super.key,
+      this.communityId,
+      this.joinCode,
+      this.pendingDownloadTourId})
       : assert(communityId != null || joinCode != null);
 
   @override
@@ -147,6 +158,9 @@ class _CommunityPageScreenState extends State<CommunityPageScreen> {
       // [LOCAL-714 / D675 part 2] After a free join, ask the auto-download
       // question.
       await _askAutoDownloadQuestion(updated.id);
+      // [LOCAL-739 §3] If this page was opened from a members-only tour on Home
+      // / an emailed link, download that tour now and open Listen.
+      await _maybeDownloadPendingTour();
     }
   }
 
@@ -181,9 +195,64 @@ class _CommunityPageScreenState extends State<CommunityPageScreen> {
       // [LOCAL-714 / D675 part 2] After a successful pass purchase, ask the
       // auto-download question.
       await _askAutoDownloadQuestion(c.id);
+      // [LOCAL-739 §3] If this page was opened from a members-only tour on Home
+      // / an emailed link, download that tour now and open Listen.
+      await _maybeDownloadPendingTour();
     } else if (result.status != IapResultStatus.cancelled) {
       ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(result.message ?? 'Purchase failed.')));
+    }
+  }
+
+  /// [LOCAL-739 §3] After a pass is granted (free join or pass purchase) on a
+  /// page opened from a members-only tour, download THAT tour and open the
+  /// Listen tab — exactly as after any other download. Runs the SAME download
+  /// path every other download uses (TourDownloadService), and on success
+  /// offers the tour to Listen via PendingListenOpen (the same mechanism the
+  /// community-page tour list and the Home download use). A no-op when there is
+  /// no pending tour or the pass did not actually make the member active.
+  Future<void> _maybeDownloadPendingTour() async {
+    final tourId = widget.pendingDownloadTourId;
+    if (tourId == null) return;
+    // Only proceed once the grant has actually made the member active.
+    if (_community?.myStatus.active != true) return;
+    if (_downloading.contains(tourId)) return;
+    setState(() => _downloading.add(tourId));
+    try {
+      final result = await TourDownloadService.downloadAndSave(tourId);
+      if (!mounted) return;
+      switch (result.status) {
+        case TourDownloadStatus.ok:
+          setState(() =>
+              _onPhoneTourIds = {..._onPhoneTourIds, tourId.toString()});
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text(downloadedMessage(downloaded: 1)),
+            action: SnackBarAction(
+              label: 'View',
+              onPressed: () =>
+                  PendingListenOpen.instance.offer(tourId.toString()),
+            ),
+          ));
+          // Open Listen on this tour, exactly as after any other download.
+          PendingListenOpen.instance.offer(tourId.toString());
+          break;
+        case TourDownloadStatus.alreadyOnPhone:
+          setState(() =>
+              _onPhoneTourIds = {..._onPhoneTourIds, tourId.toString()});
+          PendingListenOpen.instance.offer(tourId.toString());
+          break;
+        case TourDownloadStatus.membershipRequired:
+          // The pass should cover the member; an immediate re-refusal is rare.
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+              content: Text('Join this community to download its tours.')));
+          break;
+        case TourDownloadStatus.failed:
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+              content: Text('Download failed. Please try again.')));
+          break;
+      }
+    } finally {
+      if (mounted) setState(() => _downloading.remove(tourId));
     }
   }
 
