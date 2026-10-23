@@ -806,13 +806,21 @@ def is_single_article_page(url, soup=None):
         if path in ('', '/'):
             return False
 
-        # Default: a normal content URL with a real path is a single article.
-        return True
+        # [LEAD review] Unknown host with a real path: a single article only when
+        # the page SAYS it is one (og:type=article, or one <article> element).
+        # Otherwise keep the historic behaviour (follow its links), so a real
+        # newsletter on a host we do not know is not silently cut to one item.
+        if soup is not None:
+            og = soup.find('meta', attrs={'property': 'og:type'})
+            if og and (og.get('content') or '').strip().lower() == 'article':
+                return True
+            if len(soup.find_all('article')) == 1:
+                return True
+        return False
     except Exception as e:
         logging.error(f"is_single_article_page failed for {url}: {e}")
-        # Fail safe toward the cheaper behaviour: treat as single article so we
-        # do not crawl a pile of linked pages the listener never asked for.
-        return True
+        # On an error keep the historic behaviour (newsletter: follow links).
+        return False
 
 
 @app.route('/health', methods=['GET'])

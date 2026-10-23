@@ -141,8 +141,19 @@ class TestIsSingleArticlePage(unittest.TestCase):
         )
 
     def test_normal_story_url_is_single(self):
+        from bs4 import BeautifulSoup
+        art = BeautifulSoup('<html><head><meta property="og:type" content="article"></head>'
+                            '<body><article>story</article></body></html>', 'html.parser')
         self.assertTrue(nps.is_single_article_page(
-            "https://www.bostonglobe.com/2026/05/01/metro/some-story/"))
+            "https://www.bostonglobe.com/2026/05/01/metro/some-story/", art))
+
+    def test_unknown_host_without_article_signal_stays_newsletter(self):
+        """[LEAD] An unknown newsletter host keeps the historic crawl."""
+        from bs4 import BeautifulSoup
+        idx = BeautifulSoup('<html><body><a href="/a">a</a><a href="/b">b</a></body></html>',
+                            'html.parser')
+        self.assertFalse(nps.is_single_article_page(
+            "https://news.example-museum.org/october-2026", idx))
 
     def test_mailchimp_is_newsletter(self):
         self.assertFalse(nps.is_single_article_page(
