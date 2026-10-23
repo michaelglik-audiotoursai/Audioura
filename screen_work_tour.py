@@ -168,9 +168,19 @@ def _toured_place_label(location: str) -> str:
         r'audio|guided|tour|tours)\b',
         re.IGNORECASE,
     )
+    # [LOCAL-749] A segment that names the WORK or the theme ("Salem TV series filming
+    # locations", "real locations mentioned in Salem TV show") is never the place.
+    # Drop those segments before choosing; keep the old behaviour if nothing is left.
+    _THEME = re.compile(
+        r'\b(?:tv|series|show|shows|film|films|filmed|filming|movie|movies|locations?|'
+        r'mentioned|episodes?|seasons?|novel|book|story|stories|real)\b',
+        re.IGNORECASE,
+    )
+    raw_segs = re.sub(r'\([^)]*\)', ' ', raw).split(',')
+    place_segs = [_NOISE.sub(' ', seg) for seg in raw_segs if not _THEME.search(seg)]
     cleaned = _NOISE.sub(' ', cleaned)
     # Prefer a comma segment with a capitalised word (e.g. "Salem, MA").
-    for seg in cleaned.split(','):
+    for seg in (place_segs or cleaned.split(',')):
         seg = seg.strip(' ,.-')
         if seg and re.search(r'[A-Z][a-z]+', seg):
             # Drop a trailing bare state abbreviation ("Salem MA" → "Salem").
