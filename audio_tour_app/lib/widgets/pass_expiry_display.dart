@@ -44,11 +44,15 @@ class CommunityMyStatus extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(myStatus.isMember
-            ? (myStatus.active
-                ? 'Active member'
-                : 'Membership expired — renew to listen to new content')
-            : 'Not a member'),
+        // [LOCAL-736] The organiser is not a member, but their status must say
+        // they are the organiser — never "Not a member" on their own page.
+        Text(isOwner
+            ? 'You are the organizer'
+            : (myStatus.isMember
+                ? (myStatus.active
+                    ? 'Active member'
+                    : 'Membership expired — renew to listen to new content')
+                : 'Not a member')),
         if (expiryLine != null)
           Text(
             expiryLine,

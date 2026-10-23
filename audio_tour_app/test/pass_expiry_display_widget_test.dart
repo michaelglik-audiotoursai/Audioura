@@ -59,7 +59,8 @@ void main() {
       expect(find.byKey(const Key('adds_days_note')), findsNothing);
     });
 
-    testWidgets('owner sees no expiry line and no note', (tester) async {
+    testWidgets('owner sees "You are the organizer", no expiry and no note',
+        (tester) async {
       await tester.pumpWidget(_wrap(CommunityMyStatus(
         myStatus: const MyStatus(
             isMember: false, active: false, expiresAt: activeExpiry),
@@ -69,8 +70,26 @@ void main() {
       )));
       await tester.pump();
 
+      // [LOCAL-736] The organiser's own status says they are the organiser,
+      // never "Not a member".
+      expect(find.text('You are the organizer'), findsOneWidget);
+      expect(find.text('Not a member'), findsNothing);
       expect(find.byKey(const Key('my_status_expiry')), findsNothing);
       expect(find.byKey(const Key('adds_days_note')), findsNothing);
+    });
+
+    testWidgets('[LOCAL-736] a non-member (not owner) still sees "Not a member"',
+        (tester) async {
+      await tester.pumpWidget(_wrap(CommunityMyStatus(
+        myStatus: const MyStatus(isMember: false, active: false),
+        isPaid: true,
+        isOwner: false,
+        now: now,
+      )));
+      await tester.pump();
+
+      expect(find.text('Not a member'), findsOneWidget);
+      expect(find.text('You are the organizer'), findsNothing);
     });
 
     testWidgets('RED: the raw ISO expiresAt is never printed', (tester) async {

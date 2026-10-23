@@ -28,6 +28,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io' show Platform;
 
+import 'package:http/http.dart' as http;
 import 'package:in_app_purchase/in_app_purchase.dart';
 import 'package:in_app_purchase_storekit/in_app_purchase_storekit.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -152,6 +153,146 @@ final Set<String> kPassStoreIds =
 /// store product — it is chosen per community and sent to /purchases/verify.
 const List<String> kPassLengths = ['day', 'week', 'month', 'year'];
 
+// ─── [LOCAL-736] Staged purchase context that survives an app restart ───────
+//
+// A pass/tour purchase needs more than the store product id to verify: a pass
+// carries {community_id, length}, a tour carries {tour_id}. Before LOCAL-736
+// that context lived ONLY in memory (_pendingCommunityId / _pendingTourId /
+// _pendingPassLength). When Apple/Play finished a purchase while the app was
+// closed and redelivered it at the next launch, the in-memory context was gone,
+// serverProductForStoreId() returned null (a pass/tour id is not a pack), and
+// the transaction was FINISHED without ever reaching the server — a paid
+// listener got nothing (LEAD's log, audioura.pass.usd1, 2026-10-22).
+//
+// Fix: persist the context in SharedPreferences, keyed by the STORE product id,
+// just before buyConsumable. On a purchased/restored update with no in-memory
+// context, read it back. Clear it once the server answers 200/409 (verified).
+// A pack (serverProductForStoreId != null) needs no context, so none is stored.
+
+/// SharedPreferences key under which the staged context for [storeId] lives.
+String kStagedContextKey(String storeId) => 'iap_staged_ctx_$storeId';
+
+/// The shape of a staged pass/tour context, independent of SharedPreferences so
+/// it can be built and inspected in a unit test. `kind` is 'pass' or 'tour'.
+class StagedPurchaseContext {
+  final String kind; // 'pass' | 'tour'
+  final String? communityId; // pass
+  final String? length; // pass (day|week|month|year)
+  final String? tourId; // tour
+  final int stagedAtMs; // when staged (ms since epoch)
+
+  const StagedPurchaseContext({
+    required this.kind,
+    this.communityId,
+    this.length,
+    this.tourId,
+    required this.stagedAtMs,
+  });
+
+  bool get isPass => kind == 'pass';
+  bool get isTour => kind == 'tour';
+
+  Map<String, dynamic> toJson() => <String, dynamic>{
+        'kind': kind,
+        if (communityId != null) 'community_id': communityId,
+        if (length != null) 'length': length,
+        if (tourId != null) 'tour_id': tourId,
+        'staged_at': stagedAtMs,
+      };
+
+  static StagedPurchaseContext forPass(String communityId, String length,
+          {required int nowMs}) =>
+      StagedPurchaseContext(
+          kind: 'pass',
+          communityId: communityId,
+          length: length,
+          stagedAtMs: nowMs);
+
+  static StagedPurchaseContext forTour(String tourId, {required int nowMs}) =>
+      StagedPurchaseContext(kind: 'tour', tourId: tourId, stagedAtMs: nowMs);
+
+  /// Parse a persisted JSON string back into a context, or null if the string
+  /// is absent / malformed / not a pass or tour context. Never throws.
+  static StagedPurchaseContext? tryParse(String? jsonStr) {
+    if (jsonStr == null || jsonStr.isEmpty) return null;
+    try {
+      final decoded = jsonDecode(jsonStr);
+      if (decoded is! Map) return null;
+      final kind = decoded['kind'];
+      final stagedAt = decoded['staged_at'];
+      final stagedAtMs = stagedAt is int
+          ? stagedAt
+          : (stagedAt is num ? stagedAt.toInt() : 0);
+      if (kind == 'pass') {
+        final c = decoded['community_id'];
+        final l = decoded['length'];
+        if (c is String && c.isNotEmpty && l is String && l.isNotEmpty) {
+          return StagedPurchaseContext(
+              kind: 'pass',
+              communityId: c,
+              length: l,
+              stagedAtMs: stagedAtMs);
+        }
+        return null;
+      }
+      if (kind == 'tour') {
+        final t = decoded['tour_id'];
+        if (t is String && t.isNotEmpty) {
+          return StagedPurchaseContext(
+              kind: 'tour', tourId: t, stagedAtMs: stagedAtMs);
+        }
+        return null;
+      }
+      return null;
+    } catch (_) {
+      return null;
+    }
+  }
+}
+
+/// [LOCAL-736] Pure: the extra fields a staged [ctx] contributes to the
+/// /purchases/verify body (community_id + length for a pass, tour_id for a
+/// tour). Split out so a unit test can assert the body carries the right keys
+/// without a network call or the StoreKit plugin. Returns an empty map for a
+/// null context.
+Map<String, dynamic> verifyBodyAdditionsFor(StagedPurchaseContext? ctx) {
+  if (ctx == null) return <String, dynamic>{};
+  if (ctx.isPass) {
+    return <String, dynamic>{
+      if (ctx.communityId != null) 'community_id': ctx.communityId,
+      if (ctx.length != null) 'length': ctx.length,
+    };
+  }
+  if (ctx.isTour) {
+    return <String, dynamic>{
+      if (ctx.tourId != null) 'tour_id': ctx.tourId,
+    };
+  }
+  return <String, dynamic>{};
+}
+
+/// [LOCAL-736] Pure: whether a pass/tour transaction for [storeId] may be
+/// FINISHED (completePurchase) after a verify attempt. A paid transaction is
+/// NEVER discarded without context, and a failed verify is left for the next
+/// launch to retry.
+///
+///   • A pack (serverProductForStoreId != null) keeps today's behaviour: always
+///     finish, so pass this `isPack: true` and it returns true.
+///   • A pass/tour with NO context at all (neither in-memory nor persisted) must
+///     NOT be finished — return false, log, leave it for the store to redeliver.
+///   • A pass/tour that WAS verified (server answered 200/409) is finished.
+///   • A pass/tour whose verify FAILED (402/5xx or unreachable) is left
+///     unfinished so the next launch retries.
+bool shouldFinishPassOrTour({
+  required bool isPack,
+  required bool hadContext,
+  required bool verified,
+}) {
+  if (isPack) return true;
+  if (!hadContext) return false;
+  return verified;
+}
+
 enum IapResultStatus { granted, cancelled, pending, unavailable, failed }
 
 class IapResult {
@@ -222,7 +363,33 @@ class IapService {
   // length must travel to /purchases/verify alongside the community id.
   String? _pendingPassLength;
 
+  // [LOCAL-736] Transaction ids this app start has already attempted to verify
+  // for a pass/tour. Guards against a redelivery loop: a failed verify leaves
+  // the transaction UNFINISHED so the next LAUNCH retries, but within THIS
+  // launch the store may redeliver the same transaction repeatedly — we attempt
+  // the server at most once per transaction id per app start.
+  final Set<String> _attemptedTxnThisLaunch = <String>{};
+
   bool _initialised = false;
+
+  /// [LOCAL-736] Test seam: completes (finishes) a transaction with the store.
+  /// Overridable so a unit/red test can assert whether completePurchase was
+  /// called WITHOUT a real StoreKit plugin. Defaults to the real plugin call.
+  Future<void> Function(PurchaseDetails p)? completePurchaseOverride;
+
+  /// [LOCAL-736] Test seam: reads a persisted staged context for [storeId].
+  /// Overridable so a unit test can inject a context without SharedPreferences.
+  /// Defaults to reading SharedPreferences under [kStagedContextKey].
+  Future<StagedPurchaseContext?> Function(String storeId)?
+      readStagedContextOverride;
+
+  /// [LOCAL-736] Test seam: posts the /purchases/verify body to the server.
+  /// Overridable so a unit/red test can CAPTURE the exact body (asserting it
+  /// carries community_id + length) and return a canned status, with no network.
+  /// Defaults to the real Endpoints.post to userDb /purchases/verify.
+  Future<http.Response> Function(Map<String, dynamic> body)?
+      verifyPostOverride;
+
 
   /// Start listening to the purchase stream exactly once. Safe to call repeatedly.
   Future<void> _ensureListening() async {
@@ -450,6 +617,12 @@ class IapService {
     _pendingStoreId = storeId;
     _pendingTourId = tourId;
 
+    // [LOCAL-736] Persist the tour context BEFORE buying, so a purchase Apple/
+    // Play finishes while the app is closed can still be verified at next launch.
+    await _persistStagedContext(storeId,
+        StagedPurchaseContext.forTour(tourId,
+            nowMs: DateTime.now().millisecondsSinceEpoch));
+
     final param = PurchaseParam(productDetails: details);
     try {
       await _iap.buyConsumable(purchaseParam: param, autoConsume: false);
@@ -457,6 +630,7 @@ class IapService {
       await DebugLogHelper.addDebugLog('IAP: tour buyConsumable threw: $e');
       _pendingStoreId = null;
       _pendingTourId = null;
+      await _clearStagedContext(storeId);
       final c = _pending;
       _pending = null;
       if (c != null && !c.isCompleted) {
@@ -634,6 +808,14 @@ class IapService {
     _pendingCommunityId = communityId.toString();
     _pendingPassLength = length;
 
+    // [LOCAL-736] Persist the pass context BEFORE buying, so a purchase Apple/
+    // Play finishes while the app is closed can still be verified at next launch
+    // with its community_id + length (the bug in LEAD's log was exactly this).
+    await _persistStagedContext(
+        passProductId,
+        StagedPurchaseContext.forPass(communityId.toString(), length,
+            nowMs: DateTime.now().millisecondsSinceEpoch));
+
     final param = PurchaseParam(productDetails: details);
     try {
       final started =
@@ -644,6 +826,7 @@ class IapService {
       _pendingStoreId = null;
       _pendingCommunityId = null;
       _pendingPassLength = null;
+      await _clearStagedContext(passProductId);
       final c = _pending;
       _pending = null;
       if (c != null && !c.isCompleted) {
@@ -702,6 +885,50 @@ class IapService {
     }
   }
 
+  // ─── [LOCAL-736] Persisted staged context ──────────────────────────────────
+
+  /// Persist the staged [ctx] for [storeId] in SharedPreferences, just before
+  /// buyConsumable, so a purchase redelivered after an app restart can still be
+  /// verified with its community_id+length (pass) or tour_id (tour).
+  Future<void> _persistStagedContext(
+      String storeId, StagedPurchaseContext ctx) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(
+          kStagedContextKey(storeId), jsonEncode(ctx.toJson()));
+      await DebugLogHelper.addDebugLog(
+          'IAP: staged context for $storeId ${ctx.toJson()}');
+    } catch (e) {
+      await DebugLogHelper.addDebugLog('IAP: persist staged context failed: $e');
+    }
+  }
+
+  /// Read the persisted staged context for [storeId], or null if none/malformed.
+  Future<StagedPurchaseContext?> _readStagedContext(String storeId) async {
+    final override = readStagedContextOverride;
+    if (override != null) return override(storeId);
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      return StagedPurchaseContext.tryParse(
+          prefs.getString(kStagedContextKey(storeId)));
+    } catch (e) {
+      await DebugLogHelper.addDebugLog('IAP: read staged context failed: $e');
+      return null;
+    }
+  }
+
+  /// Clear the persisted staged context for [storeId] — called once the server
+  /// has answered 200/409 (the purchase is verified; the context is spent).
+  Future<void> _clearStagedContext(String storeId) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove(kStagedContextKey(storeId));
+      await DebugLogHelper.addDebugLog('IAP: cleared staged context for $storeId');
+    } catch (e) {
+      await DebugLogHelper.addDebugLog('IAP: clear staged context failed: $e');
+    }
+  }
+
   Future<void> _onPurchaseUpdates(List<PurchaseDetails> purchases) async {
     for (final p in purchases) {
       await _handleOne(p);
@@ -732,29 +959,127 @@ class IapService {
         return;
       case PurchaseStatus.purchased:
       case PurchaseStatus.restored:
-        final result = await _verifyAndGrant(p);
-        // Always finish the transaction so StoreKit stops re-delivering it,
-        // whether or not the server granted (a failed verify must not loop).
-        await _finishIfNeeded(p);
-        _resolve(p.productID, result);
+        await _handlePurchasedOrRestored(p);
         return;
     }
   }
 
-  /// Send the StoreKit 2 JWS signed transaction to /purchases/verify and grant
-  /// only on the server's OK.
-  Future<IapResult> _verifyAndGrant(PurchaseDetails p) async {
-    // [LOCAL-677] A TOUR unlock: the product is a tour-tier id and a tour id was
-    // staged by buyTour(). Verify with tour_id so the server writes tour_unlocks
-    // for that tour (it does NOT change the buyer's level).
-    final bool isTourPurchase =
-        kTourStoreIds.contains(p.productID) && _pendingTourId != null;
+  /// [LOCAL-736] Handle a purchased/restored update. The core guarantee: a PAID
+  /// pass/tour transaction is NEVER finished (discarded) without context, and a
+  /// failed server verify is left unfinished so the next launch retries — but at
+  /// most one server attempt per transaction id per app start, to avoid a loop.
+  Future<void> _handlePurchasedOrRestored(PurchaseDetails p) async {
+    final bool isPack = serverProductForStoreId(p.productID) != null;
+    final String txnId = p.purchaseID ?? '';
 
-    // [LOCAL-690] A COMMUNITY PASS: a pass product (audioura.pass.*) and a
-    // community id staged by buyCommunityPass(). Verify with community_id so the
-    // server grants/extends membership (non-renewing; expiry = now + duration).
+    // Resolve the context for this product: in-memory (a buy() in this session)
+    // first, else the context persisted before buyConsumable (survives restart).
+    final _PurchaseContext ctx = await _resolveContext(p);
+
+    // A pass/tour with NO context anywhere must NOT be finished — a paid
+    // transaction is never discarded. Log it and leave it for the store to
+    // redeliver; a later launch (with context, or after the server learns the
+    // txn) can complete it. Packs always have an implicit context (the product
+    // itself maps to a level) so they never land here.
+    if (!isPack && !ctx.hasContext) {
+      await DebugLogHelper.addDebugLog(
+          'IAP: pass/tour ${p.productID} id=$txnId has NO context (in-memory '
+          'or persisted) — NOT finishing; leaving for redelivery');
+      _resolve(
+          p.productID,
+          const IapResult(IapResultStatus.failed,
+              'This purchase could not be matched yet — it was not discarded.'));
+      return;
+    }
+
+    // Per-launch retry guard: attempt the server at most once per txn id per app
+    // start. If we've already attempted this txn this launch and it is still
+    // being redelivered, do not hammer the server; leave it unfinished.
+    if (txnId.isNotEmpty && _attemptedTxnThisLaunch.contains(txnId)) {
+      await DebugLogHelper.addDebugLog(
+          'IAP: txn $txnId already attempted this launch — skipping retry, '
+          'leaving ${isPack ? 'pack' : 'pass/tour'} for next launch');
+      _resolve(
+          p.productID,
+          const IapResult(IapResultStatus.failed,
+              'Already retried this session — will retry on next launch.'));
+      return;
+    }
+    if (txnId.isNotEmpty) _attemptedTxnThisLaunch.add(txnId);
+
+    final result = await _verifyAndGrant(p, ctx);
+    final bool verified = result.status == IapResultStatus.granted;
+
+    // Decide whether to finish the transaction. Packs always finish (today's
+    // behaviour). A pass/tour finishes only when verified; a failed verify is
+    // left unfinished so the next launch retries.
+    final bool finish = shouldFinishPassOrTour(
+        isPack: isPack, hadContext: ctx.hasContext, verified: verified);
+    if (finish) {
+      await _finishIfNeeded(p);
+    } else {
+      await DebugLogHelper.addDebugLog(
+          'IAP: NOT finishing ${p.productID} id=$txnId (verified=$verified) — '
+          'leaving for next-launch retry');
+    }
+
+    // Clear the persisted context only once the server has answered (verified).
+    if (verified) {
+      await _clearStagedContext(p.productID);
+    }
+
+    _resolve(p.productID, result);
+  }
+
+  /// [LOCAL-736] Resolve the staged context for [p]: prefer the in-memory
+  /// context from a buy() in this session; otherwise read the context persisted
+  /// before buyConsumable (which survives an app restart). A pack has no context
+  /// (its product maps to a level directly).
+  Future<_PurchaseContext> _resolveContext(PurchaseDetails p) async {
+    final bool isTour = kTourStoreIds.contains(p.productID);
+    final bool isPass = isCommunityPassProduct(p.productID);
+
+    // In-memory context staged by a buy() in this same app session.
+    if (isTour && _pendingTourId != null) {
+      return _PurchaseContext(tourId: _pendingTourId);
+    }
+    if (isPass && _pendingCommunityId != null) {
+      return _PurchaseContext(
+          communityId: _pendingCommunityId, length: _pendingPassLength);
+    }
+
+    // No in-memory context (e.g. the app was restarted) — read the persisted
+    // context staged before buyConsumable.
+    if (isTour || isPass) {
+      final persisted = await _readStagedContext(p.productID);
+      if (persisted != null) {
+        await DebugLogHelper.addDebugLog(
+            'IAP: using PERSISTED context for ${p.productID} ${persisted.toJson()}');
+        if (persisted.isTour) {
+          return _PurchaseContext(tourId: persisted.tourId);
+        }
+        if (persisted.isPass) {
+          return _PurchaseContext(
+              communityId: persisted.communityId, length: persisted.length);
+        }
+      }
+    }
+    return const _PurchaseContext();
+  }
+
+  /// Send the StoreKit 2 JWS signed transaction to /purchases/verify and grant
+  /// only on the server's OK. [ctx] carries the pass/tour context (in-memory or
+  /// persisted) so the verify body reaches the server with community_id+length
+  /// (pass) or tour_id (tour) even after an app restart.
+  Future<IapResult> _verifyAndGrant(
+      PurchaseDetails p, _PurchaseContext ctx) async {
+    // [LOCAL-677] A TOUR unlock: a tour-tier product with a tour id in context.
+    final bool isTourPurchase =
+        kTourStoreIds.contains(p.productID) && ctx.tourId != null;
+
+    // [LOCAL-690] A COMMUNITY PASS: a pass product with a community id in context.
     final bool isPassPurchase =
-        isCommunityPassProduct(p.productID) && _pendingCommunityId != null;
+        isCommunityPassProduct(p.productID) && ctx.communityId != null;
 
     final serverProduct = (isTourPurchase || isPassPurchase)
         ? p.productID
@@ -783,10 +1108,9 @@ class IapService {
 
     final body = <String, dynamic>{
       'user_id': userId,
-      if (isTourPurchase) 'tour_id': _pendingTourId,
-      if (isPassPurchase) 'community_id': _pendingCommunityId,
-      if (isPassPurchase && _pendingPassLength != null)
-        'length': _pendingPassLength,
+      if (isTourPurchase) 'tour_id': ctx.tourId,
+      if (isPassPurchase) 'community_id': ctx.communityId,
+      if (isPassPurchase && ctx.length != null) 'length': ctx.length,
     };
     if (isGoogle) {
       // [LOCAL-696] Android/Google: send the Play fields. The server verifies
@@ -808,12 +1132,15 @@ class IapService {
     }
 
     try {
-      final resp = await Endpoints.post(
-        Service.userDb,
-        '/purchases/verify',
-        body: body,
-        timeout: const Duration(seconds: 30),
-      );
+      final override = verifyPostOverride;
+      final resp = override != null
+          ? await override(body)
+          : await Endpoints.post(
+              Service.userDb,
+              '/purchases/verify',
+              body: body,
+              timeout: const Duration(seconds: 30),
+            );
       if (resp.statusCode == 200) {
         await DebugLogHelper.addDebugLog(
             'IAP: server granted $serverProduct for txn $transactionId '
@@ -846,7 +1173,12 @@ class IapService {
   Future<void> _finishIfNeeded(PurchaseDetails p) async {
     if (p.pendingCompletePurchase) {
       try {
-        await _iap.completePurchase(p);
+        final override = completePurchaseOverride;
+        if (override != null) {
+          await override(p);
+        } else {
+          await _iap.completePurchase(p);
+        }
       } catch (e) {
         await DebugLogHelper.addDebugLog('IAP: completePurchase error: $e');
       }
@@ -871,5 +1203,31 @@ class IapService {
     await _sub?.cancel();
     _sub = null;
     _initialised = false;
+    _attemptedTxnThisLaunch.clear();
   }
+
+  /// [LOCAL-736] Test-only: expose the per-launch attempt set so a red/unit test
+  /// can assert the retry guard, and reset it between cases.
+  Set<String> get debugAttemptedTxnThisLaunch => _attemptedTxnThisLaunch;
+
+  /// [LOCAL-736] Test-only entry point: drive the purchased/restored handling
+  /// for a single [PurchaseDetails] exactly as the purchase stream would, so a
+  /// unit/red test can exercise the "no context ⇒ do not finish" and
+  /// "persisted context ⇒ verify body carries it" paths without the plugin.
+  Future<void> debugHandlePurchasedOrRestored(PurchaseDetails p) =>
+      _handlePurchasedOrRestored(p);
+}
+
+/// [LOCAL-736] The resolved pass/tour context for a purchased/restored update,
+/// from either the in-memory pending fields (a buy() this session) or the
+/// context persisted before buyConsumable (survives an app restart). Empty when
+/// there is no context at all (a pack, or a pass/tour we have lost track of).
+class _PurchaseContext {
+  final String? communityId;
+  final String? length;
+  final String? tourId;
+
+  const _PurchaseContext({this.communityId, this.length, this.tourId});
+
+  bool get hasContext => communityId != null || tourId != null;
 }
