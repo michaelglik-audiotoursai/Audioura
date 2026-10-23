@@ -118,6 +118,35 @@ def _has_track_column(cur):
     return _TRACK_COLUMN
 
 
+# [LOCAL-737 / D708] Valid deployment tracks. Beta, Storied and Subscribed are
+# separate stacks sharing one GCloud Postgres. Subscribed is a first-class
+# track; anything unknown normalises to 'beta'.
+VALID_TRACKS = ('beta', 'storied', 'subscribed')
+
+
+def normalize_track(value):
+    """Resolve a raw track value to one of VALID_TRACKS, defaulting to 'beta'."""
+    normalized = (value or 'beta').strip().lower()
+    if normalized not in VALID_TRACKS:
+        normalized = 'beta'
+    return normalized
+
+
+def _requested_track(req):
+    """The explicit track filter from a request's ?track= query param, if any.
+
+    Returns a normalised track ('beta'/'storied'/'subscribed') when the caller
+    sent a non-empty ?track=, else None. None means "no track filter" so the
+    historic behaviour (list every track's tours, each labelled with its own
+    track) is preserved exactly for Beta and Storied, which never send it.
+    A Subscribed app sends ?track=subscribed to list only its own tours (D708).
+    """
+    raw = (req.args.get('track') or '').strip()
+    if not raw:
+        return None
+    return normalize_track(raw)
+
+
 def calculate_distance(lat1, lng1, lat2, lng2):
     """Calculate distance between two points in kilometers"""
     R = 6371
@@ -172,7 +201,20 @@ def get_tours_near_location(lat, lng):
         # rather than NULL. The app must never have to guess which engine made a
         # tour -- guessing only works within one session and breaks for anything
         # generated before the Stable/Preview selector shipped (ClickUp wdvrdaxywb).
-        cur.execute("""
+        # [LOCAL-737 / D708] Optional ?track= filter. When a Subscribed app asks
+        # for track=subscribed it must see ONLY subscribed tours, exactly as Beta
+        # and Storied are isolated. Beta/Storied apps send no ?track= and so keep
+        # the historic behaviour (every track's tours, each labelled). The filter
+        # is only meaningful when the column exists; a track-less DB has nothing
+        # but Beta, so an explicit non-beta filter correctly matches nothing.
+        _track_filter = _requested_track(request)
+        _track_sql_expr = "COALESCE(track, 'beta')" if _has_track_column(cur) else "'beta'"
+        _where_track = ""
+        _track_params = []
+        if _track_filter is not None:
+            _where_track = " AND %s = %%s" % _track_sql_expr
+            _track_params.append(_track_filter)
+        cur.execute(("""
             -- The track column is selected only when it EXISTS. audio_tours.track
             -- is created by the Storied orchestrator's self-healing ALTER, so on a
             -- database that has never run it the column is absent -- and an
@@ -188,8 +230,8 @@ def get_tours_near_location(lat, lng):
             FROM audio_tours 
             WHERE lat IS NOT NULL AND lng IS NOT NULL
               AND (is_test IS NOT TRUE)
-              AND original_tour_id IS NULL
-        """ % ("COALESCE(track, 'beta')" if _has_track_column(cur) else "'beta'"))
+              AND original_tour_id IS NULL%s
+        """ % (_track_sql_expr, _where_track)), _track_params)
         
         tours = cur.fetchall()
         nearby_tours = []
@@ -211,7 +253,8 @@ def get_tours_near_location(lat, lng):
                         'popularity': requests,
                         'type': 'walking_tour',
                         'is_custom': False,
-                        # 'beta' | 'storied'. Additive: older app builds ignore it.
+                        # 'beta' | 'storied' | 'subscribed'. Additive: older app
+                        # builds ignore it. (LOCAL-737)
                         'track': track or 'beta'
                     })
         
@@ -420,13 +463,23 @@ def search_tours():
         
         if query:
             # Search original tours
-            cur.execute("""
+            # [LOCAL-737 / D708] Optional ?track= filter, same contract as
+            # tours-near: a Subscribed app (track=subscribed) sees only its own
+            # tours; Beta/Storied send no ?track= and behaviour is unchanged.
+            # Guarded by column presence so a track-less DB never 500s.
+            _track_filter = _requested_track(request)
+            _where_track = ""
+            _search_params = [f'%{query}%', f'%{query}%']
+            if _track_filter is not None and _has_track_column(cur):
+                _where_track = " AND COALESCE(track, 'beta') = %s"
+                _search_params.append(_track_filter)
+            cur.execute(("""
                 SELECT id, tour_name, request_string, lat, lng, number_requested
                 FROM audio_tours 
                 WHERE (LOWER(tour_name) LIKE LOWER(%s) OR LOWER(request_string) LIKE LOWER(%s))
                 AND lat IS NOT NULL AND lng IS NOT NULL
-                AND (is_test IS NOT TRUE)
-            """, (f'%{query}%', f'%{query}%'))
+                AND (is_test IS NOT TRUE)""" + _where_track + """
+            """), _search_params)
             
             tours = cur.fetchall()
             

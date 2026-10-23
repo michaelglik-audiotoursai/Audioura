@@ -1,0 +1,152 @@
+# docker-compose.local737.yml — LOCAL-737 live test stack.
+#
+# A fully ISOLATED stack built from THIS worktree, on its own project name and
+# spare host ports, with its OWN throwaway Postgres (NOT the shared postgres-2
+# that the running `audioura` stack and Michael's phone use). TOUR_TRACK is set
+# to 'subscribed' so one real generation proves a subscribed row is written with
+# track='subscribed' end-to-end.
+#
+# HARD ISOLATION RULES (task contract):
+#   * project name: local737  (never `audioura`)
+#   * spare host ports in the 547xx range (nothing else binds them)
+#   * dedicated postgres `postgres-737` with a fresh volume — no shared DB
+#   * build context is THIS worktree ('.'), never ~/audioura-subscribed-local
+#
+# UP (one short generation is enough, budget <= $0.30):
+#   docker compose -p local737 -f docker-compose.local737.yml up -d --build \
+#     postgres-737 tour-generator tour-orchestrator tour-generation-modernized-1 \
+#     polly-tts-1 user-api-2 coordinates-fromai map-delivery
+#
+# DOWN (remove containers AND the throwaway DB volume):
+#   docker compose -p local737 -f docker-compose.local737.yml down -v
+#
+# Row counts before/after: scripts/local737_live_rowcounts.sh (reads postgres-737).
+
+services:
+  postgres-737:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: audiotours
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: password123
+    ports:
+      - "54733:5432"
+    tmpfs:
+      - /var/lib/postgresql/data   # throwaway: gone on `down`, never persisted
+    restart: "no"
+
+  tour-generator:
+    build:
+      context: .
+      dockerfile: Dockerfile.generator
+    ports:
+      - "54700:5000"
+    environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - SERP_API_KEY=${SERP_API_KEY}
+      - SERP_PROVIDER=${SERP_PROVIDER:-serper}
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - STORIED_MODE=false
+      - TOUR_TRACK=subscribed          # LOCAL-737: this deployment writes track='subscribed'
+      - ATTESTATION_MODE=log_only
+      - ALLOW_UNAUTHENTICATED_SHARING=true
+      - DB_HOST=postgres-737
+      - DB_PORT=5432
+      - DB_NAME=audiotours
+      - DB_USER=admin
+      - DB_PASSWORD=password123
+      - PYTHONUNBUFFERED=1
+    volumes:
+      - ./tours_local737:/app/tours    # isolated tour store, not the shared ./tours
+    depends_on:
+      - postgres-737
+    restart: "no"
+
+  tour-orchestrator:
+    build:
+      context: .
+      dockerfile: Dockerfile.orchestrator
+    ports:
+      - "54702:5002"
+    environment:
+      - TOUR_GENERATOR_URL=http://tour-generator:5000
+      - MODERNIZED_URL=http://tour-generation-modernized-1:5021
+      - USER_API_URL=http://user-api-2:5000
+      - TOUR_TRACK=subscribed          # LOCAL-737: orchestrator stamps track='subscribed'
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - DB_HOST=postgres-737
+      - DB_NAME=audiotours
+      - DB_USER=admin
+      - DB_PASSWORD=password123
+      - DB_PORT=5432
+      - TOUR_TEST_MODE_ALLOW_REQUEST=true
+    volumes:
+      - ./tours_local737:/app/tours
+    depends_on:
+      - tour-generator
+      - tour-generation-modernized-1
+      - user-api-2
+      - coordinates-fromai
+    restart: "no"
+
+  tour-generation-modernized-1:
+    build:
+      context: .
+      dockerfile: Dockerfile.modernized
+    ports:
+      - "54721:5021"
+    volumes:
+      - ./tours_local737:/app/tours
+    restart: "no"
+
+  polly-tts-1:
+    build:
+      context: .
+      dockerfile: Dockerfile.polly-tts
+    ports:
+      - "54718:5018"
+    environment:
+      - TTS_ENGINE=${TTS_ENGINE:-kokoro}
+      - KOKORO_URL=http://host.docker.internal:5181/render
+    env_file:
+      - .env
+    restart: "no"
+
+  user-api-2:
+    build:
+      context: ./user-tracking
+    ports:
+      - "54703:5000"
+    environment:
+      - ALLOW_UNAUTHENTICATED_ENTITLEMENTS=true
+      - DB_HOST=postgres-737
+      - DB_NAME=audiotours
+      - DB_USER=admin
+      - DB_PASSWORD=password123
+      - DB_PORT=5432
+      - DATABASE_URL=postgresql://admin:password123@postgres-737:5432/audiotours
+    depends_on:
+      - postgres-737
+    restart: "no"
+
+  coordinates-fromai:
+    build:
+      context: ./coordinates_fromAI
+    ports:
+      - "54706:5004"
+    environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+    restart: "no"
+
+  map-delivery:
+    build:
+      context: ./map_delivery
+    ports:
+      - "54705:5005"
+    environment:
+      - DB_HOST=postgres-737
+      - DB_NAME=audiotours
+      - DB_USER=admin
+      - DB_PASSWORD=password123
+      - DB_PORT=5432
+    restart: "no"

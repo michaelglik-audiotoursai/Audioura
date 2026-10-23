@@ -20,6 +20,22 @@ import os
 import json
 from bs4 import BeautifulSoup, NavigableString
 
+# [LOCAL-737 / D708] Valid deployment tracks. Beta, Storied and Subscribed are
+# separate services sharing one GCloud Postgres; a translation inherits its
+# source tour's track, falling back to TOUR_TRACK (then 'beta') only when the
+# source row has no track. Subscribed is a first-class track; anything unknown
+# still normalises to 'beta'.
+VALID_TRACKS = ('beta', 'storied', 'subscribed')
+
+
+def normalize_track(value):
+    """Resolve a raw track value to one of VALID_TRACKS, defaulting to 'beta'."""
+    normalized = (value or 'beta').strip().lower()
+    if normalized not in VALID_TRACKS:
+        normalized = 'beta'
+    return normalized
+
+
 # [LOCAL-559] Centralised cost rates (gpt-4o-mini input/output per 1M tokens).
 try:
     import cost_rates
@@ -1625,9 +1641,7 @@ class TranslationService:
             # tour's track (the service is shared by both Beta and Storied, so an env var
             # alone cannot know the caller). If the source row has no track (older rows),
             # fall back to this deployment's TOUR_TRACK env var, then to 'beta'.
-            _env_track = os.getenv('TOUR_TRACK', 'beta').lower()
-            if _env_track not in ('beta', 'storied'):
-                _env_track = 'beta'
+            _env_track = normalize_track(os.getenv('TOUR_TRACK', 'beta'))
             _track = source_track if (has_track and source_track) else _env_track
             # [LOCAL-666] Build the column/value lists so source_version is appended only
             # when the column exists. Keeps the two historic branches (track present/absent)
@@ -3127,9 +3141,7 @@ Say 'What are my options' to hear this help again"""
                 source_track = _row[0] if _row else None
             # [GCS-TR1 + LOCAL-162] Inherit the source tour's track; fall back to this
             # deployment's TOUR_TRACK env var, then to 'beta', when the source has none.
-            _env_track = os.getenv('TOUR_TRACK', 'beta').lower()
-            if _env_track not in ('beta', 'storied'):
-                _env_track = 'beta'
+            _env_track = normalize_track(os.getenv('TOUR_TRACK', 'beta'))
             _track = source_track if (has_track and source_track) else _env_track
             # [LOCAL-666] Same source-version pin as the main path, for the ZIP fallback.
             _has_source_version = self._ensure_source_version_column(cursor)
