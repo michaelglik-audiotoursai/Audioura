@@ -443,6 +443,22 @@ def parse_tour_content_to_modernized(tour_content):
     category_match = re.search(r'^Tour-Category:\s*(\w+)', tour_content[:500], re.IGNORECASE | re.MULTILINE)
     tour_category = category_match.group(1).lower() if category_match else ''
 
+    # [LOCAL-743] Normalise any sentence-form stop heading the model wrote
+    # ("Stop 1 is the Salem Maritime National Historic Site.") back to the house
+    # "Stop N:" header BEFORE the split below, so this splitter and the
+    # generator's count see the same stops. The live tour 716 lost stop 1 (4 of 5
+    # delivered, no audio for stop 1) because the split keys on "Stop N:" and this
+    # sentence form never matched. Fail-soft: a missing/old tour_conclusion leaves
+    # the content untouched rather than crashing the live packer.
+    try:
+        from tour_conclusion import normalize_heading_variants as _norm_variants
+        _before = tour_content
+        tour_content = _norm_variants(tour_content)
+        if tour_content != _before:
+            print("[LOCAL-743] normalised sentence-form stop heading(s) to 'Stop N:' before split")
+    except Exception as _nhv_err:  # pragma: no cover - defensive
+        print(f"[LOCAL-743] heading-variant normalisation unavailable: {_nhv_err}")
+
     # Split content by stops
     stops = re.split(r'\n\s*Stop\s+(\d+):', tour_content)
     

@@ -8647,6 +8647,7 @@ def _apply_delivery_hours_guard(result):
                 count_delivered_stops as _count_delivered,
                 has_thematic_conclusion as _has_thematic,
                 normalise_stop_headers as _normalise_headers,
+                find_leaked_field_labels as _find_leaked_labels,
             )
             # [LOCAL-639 defect 1] FINAL header guarantee: restore any ``Stop N:``
             # header the render glued onto a prior sentence or an empty field
@@ -8656,6 +8657,45 @@ def _apply_delivery_hours_guard(result):
             # branch below, so stops_count and the "That's N stops" close both
             # agree with what the listener hears.
             final = _normalise_headers(final)
+            # [LOCAL-743] Cross-check the RENDERED-HEADER count against what the
+            # modernized splitter (tour_generation_modernized) will actually
+            # produce audio files for — HERE in the generator, on the final text.
+            # The LOCAL-394 invariant counts poi_list OBJECTS, so it reported
+            # "OK (5 selected == 5 delivered)" while the live splitter saw 4 and
+            # stop 1 lost its audio (tour 716): a sentence-form "Stop 1 is the X."
+            # header that normalise_headers has just repaired. These two numbers
+            # MUST now agree; any disagreement is logged loudly in the generator
+            # rather than surfacing only later in the orchestrator ("STOP COUNT
+            # MISMATCH"). Also assert no structural field label reached the spoken
+            # text. Fail-soft: never fatal to delivery.
+            try:
+                _l743_headers = _count_delivered(final)
+                _l743_blocks = None
+                try:
+                    import tour_generation_modernized as _l743_tgm
+                    _l743_blocks = len(
+                        _l743_tgm.parse_tour_content_to_modernized(final)
+                        .get("text_content", []))
+                except Exception as _l743_se:
+                    print(f"  [LOCAL-743] splitter cross-check unavailable: {_l743_se}",
+                          flush=True)
+                if _l743_blocks is not None and _l743_blocks != _l743_headers:
+                    print(f"  [LOCAL-743] ⚠️  SPLIT/HEADER COUNT MISMATCH: "
+                          f"rendered_headers={_l743_headers} "
+                          f"splitter_blocks={_l743_blocks} — the packer would "
+                          f"write {_l743_blocks} audio file(s), losing "
+                          f"{_l743_headers - _l743_blocks} stop(s)", flush=True)
+                else:
+                    print(f"  [LOCAL-743] stop count agrees: "
+                          f"{_l743_headers} rendered header(s) == "
+                          f"{_l743_blocks} splitter block(s)", flush=True)
+                _l743_leaks = _find_leaked_labels(final)
+                if _l743_leaks:
+                    print(f"  [LOCAL-743] ⚠️  FIELD LABEL LEAK into spoken text: "
+                          f"{_l743_leaks} — a synthesiser would read these aloud",
+                          flush=True)
+            except Exception as _l743_err:  # pragma: no cover - defensive
+                print(f"  [LOCAL-743] cross-check skipped: {_l743_err}", flush=True)
             if _count_delivered(final) > 0:
                 _concl_venue = _recover_tour_venue(final)
                 final = _fix_first_stop(final)
