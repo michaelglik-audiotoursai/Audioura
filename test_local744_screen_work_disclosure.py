@@ -305,5 +305,155 @@ class TestExistenceGateRealSalemPlaces(unittest.TestCase):
             print(f"  [LOCAL-744] VERIFIED {name!r} — {ev}")
 
 
+class TestFilmingPlaceFromArticle(unittest.TestCase):
+    """LOCAL-744 live-run fix: derive the filming place from the WORK'S Wikipedia
+    article (authoritative), not from the model's unreliable guess.
+
+    The live run exposed the real defect: the model named the right work (the TV
+    series *Salem*) but gave the WRONG place ("Salem, Massachusetts" — the
+    setting), so the trust-then-corroborate path failed closed and the Orientation
+    said "could not confirm" even though the Salem (TV series) article states
+    verbatim "It was filmed in Shreveport, Louisiana". These tests mock the
+    Wikipedia extract so they stay offline, and pin the article-derived behaviour.
+    """
+
+    def _mock_requests(self, extract_text, title="Salem (TV series)"):
+        import generate_tour_text as gtt
+
+        class _Resp:
+            status_code = 200
+
+            def json(self):
+                return {"query": {"pages": {"123": {"title": title,
+                                                    "extract": extract_text}}}}
+
+        class _FakeRequests:
+            @staticmethod
+            def get(*a, **k):
+                return _Resp()
+        return gtt, _FakeRequests
+
+    def test_extracts_shreveport_from_salem_article(self):
+        import generate_tour_text as gtt
+        orig = gtt.requests
+        _, fake = self._mock_requests(
+            "The series premiered in 2014. It was filmed in Shreveport, Louisiana, "
+            "on sets built to represent 17th century Massachusetts.")
+        gtt.requests = fake
+        try:
+            place, src = gtt._filming_place_from_article("Salem (TV series)")
+        finally:
+            gtt.requests = orig
+        self.assertEqual(place, "Shreveport, Louisiana")
+        self.assertIn("Wikipedia", src)
+
+    def test_setting_only_article_yields_no_place(self):
+        # An article that only names the SETTING (no "filmed in <place>") must not
+        # fabricate a filming location.
+        import generate_tour_text as gtt
+        orig = gtt.requests
+        _, fake = self._mock_requests(
+            "Salem is a 2014 television series set in Salem, Massachusetts during "
+            "the witch trials. It stars several actors.")
+        gtt.requests = fake
+        try:
+            place, src = gtt._filming_place_from_article("Salem (TV series)")
+        finally:
+            gtt.requests = orig
+        self.assertIsNone(place)
+
+    def test_full_lookup_prefers_article_place_over_model_guess(self):
+        # End-to-end: the model names the work 'Salem' and WRONGLY proposes
+        # 'Salem, Massachusetts'; the article says Shreveport. The lookup must
+        # return the article-derived Shreveport, and the disclosure must say
+        # "filmed in Shreveport, Louisiana, not in Salem".
+        import generate_tour_text as gtt
+        orig_req = gtt.requests
+        orig_post_model = getattr(gtt, "_check_model", None)
+
+        class _ChatResp:
+            status_code = 200
+
+            def json(self):
+                import json as _j
+                return {"choices": [{"message": {"content": _j.dumps({
+                    "work_name": "Salem", "work_kind": "tv series",
+                    "filmed_place": "Salem, Massachusetts, USA",
+                    "filmed_in_requested_place": True,
+                    "source": "some-unchecked-source",
+                    "confidence": "high"})}}]}
+
+        class _WikiResp:
+            status_code = 200
+
+            def json(self):
+                return {"query": {"pages": {"1": {
+                    "title": "Salem (TV series)",
+                    "extract": "It was filmed in Shreveport, Louisiana, on sets "
+                               "built to represent 17th century Massachusetts."}}}}
+
+        class _FakeRequests:
+            @staticmethod
+            def post(*a, **k):
+                return _ChatResp()
+
+            @staticmethod
+            def get(*a, **k):
+                return _WikiResp()
+
+        gtt.requests = _FakeRequests
+        try:
+            lookup = gtt.filming_location_lookup("fake-key")
+            work = swt.detect_screen_work(
+                "episode 1 of season 1 biking tour, Salem, MA", {})
+            disc = swt.build_filming_disclosure(
+                work, "episode 1 of season 1 biking tour, Salem, MA", lookup)
+        finally:
+            gtt.requests = orig_req
+        self.assertIn("Shreveport, Louisiana", disc)
+        self.assertIn("not in Salem", disc)
+        self.assertNotIn("could not confirm", disc.lower())
+
+
+    def test_disambiguation_bare_title_tries_tv_series_variant(self):
+        # The live run's real failure: the model returns bare "Salem", whose
+        # Wikipedia page is a DISAMBIGUATION (no filming cue). The extractor must
+        # then try "Salem (TV series)" and find "Shreveport, Louisiana".
+        import generate_tour_text as gtt
+        orig = gtt.requests
+        _calls = {"n": 0}
+
+        class _Resp:
+            def __init__(self, title, extract):
+                self.status_code = 200
+                self._t = title
+                self._e = extract
+
+            def json(self):
+                return {"query": {"pages": {"1": {"title": self._t,
+                                                  "extract": self._e}}}}
+
+        class _FakeRequests:
+            @staticmethod
+            def get(*a, **k):
+                _calls["n"] += 1
+                titles = k.get("params", {}).get("titles", "")
+                if titles == "Salem":
+                    return _Resp("Salem", "Salem may refer to: Places ... "
+                                          "various disambiguation entries.")
+                return _Resp("Salem (TV series)",
+                             "It was filmed in Shreveport, Louisiana, on sets "
+                             "built to represent 17th century Massachusetts.")
+
+        gtt.requests = _FakeRequests
+        try:
+            place, src = gtt._filming_place_from_article("Salem", "tv series")
+        finally:
+            gtt.requests = orig
+        self.assertEqual(place, "Shreveport, Louisiana")
+        self.assertIn("Salem (TV series)", src)
+        self.assertGreaterEqual(_calls["n"], 2)  # tried bare then disambiguated
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

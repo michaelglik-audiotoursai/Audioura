@@ -1553,16 +1553,40 @@ def filming_location_lookup(api_key):
                   f"source={'yes' if _source else 'no'})")
             return None
 
-        # [LOCAL-744] CORROBORATE the filming place against a REAL source before we
-        # assert it. The live run showed the model name the right work (TV series
-        # 'Salem') but the WRONG filming location ("Salem, Massachusetts" — it was
-        # actually Shreveport, Louisiana), with a plausible-sounding but unchecked
-        # "source". Michael's rule is "only with a source" and "never guess" — so we
-        # ship a positive filming claim ONLY when a real source (the work's
-        # Wikipedia article) actually corroborates the place with a filming cue.
-        # Anything less — not mentioned, or mentioned without a filming cue, or
-        # Wikipedia unreachable — is "could not confirm". Fail-closed: we would
-        # rather say we could not confirm than ship a wrong sourced-sounding claim.
+        # [LOCAL-744] DERIVE-then-corroborate the filming place against a REAL
+        # source. The live run showed the model name the right work (TV series
+        # 'Salem') but give the WRONG filming location ("Salem, Massachusetts" — it
+        # was actually Shreveport, Louisiana), and for the Shreveport request it
+        # even named the WRONG work ("True Blood"). Trusting the model's place and
+        # only corroborating it fails closed on exactly the case Michael cares about,
+        # so the Orientation said "could not confirm" when the answer ("filmed in
+        # Shreveport, Louisiana") is stated verbatim in the Salem (TV series)
+        # Wikipedia article. Fix: read the filming place DIRECTLY FROM the work's
+        # Wikipedia article (the authoritative source) with a directional
+        # "filmed/shot in <Place>" pattern, and PREFER that article-derived place.
+        # The model only has to name the WORK (reliable); the PLACE comes from the
+        # source itself — strictly more honest than trusting the model's place.
+        # Michael's rule holds: only with a source, never a guess.
+        _art_place, _art_src = _filming_place_from_article(_name, _kind)
+        if _art_place:
+            # Article is authoritative. Recompute filmed_here from the toured place
+            # vs the article-derived place (the model's own filmed_here flag was
+            # unreliable — it is derived from its wrong place).
+            _toured = (location or '')
+            _here_art = _filmed_place_matches_toured(_art_place, _toured)
+            out = {"work_name": _name, "work_kind": _kind or None,
+                   "filmed_place": _art_place, "source": _art_src}
+            if _here_art:
+                out["filmed_here"] = True
+            print(f"  [LOCAL-744] filming location (from the work's article): "
+                  f"{_name!r} ({_kind}) → {_art_place!r} filmed_here={_here_art} "
+                  f"[src: {_art_src[:60]!r}]")
+            return out
+
+        # No article-derived place. Fall back to corroborating the model's proposed
+        # place against the work's article (ship ONLY when the article's own
+        # filming cue ties the place to filming). Anything less — not mentioned, no
+        # filming cue, or Wikipedia unreachable — is "could not confirm".
         _corroborated, _wiki_src = _corroborate_filming_place(_name, _place)
         if _corroborated is not True:
             print(f"  [LOCAL-744] filming place NOT corroborated by the work's "
@@ -1581,6 +1605,122 @@ def filming_location_lookup(api_key):
         return out
 
     return _lookup
+
+
+def _filming_place_from_article(work_name, work_kind=None):
+    """[LOCAL-744] Extract the filming location DIRECTLY from the work's Wikipedia
+    article — the authoritative, citable source.
+
+    Returns (place, source):
+      * ("Shreveport, Louisiana", "<article> - Wikipedia")  — a filming place the
+        article states with a directional filming cue.
+      * (None, None)                                        — no article-stated
+        filming place (or Wikipedia unreachable). The caller then falls back to
+        corroborating the model's proposed place, and failing that says "could not
+        confirm" (never a guess).
+
+    Why derive instead of trust-then-check: the model reliably NAMES the work but
+    is unreliable about WHERE it was filmed (the live run: it put *Salem* in
+    "Salem, Massachusetts" — the setting — not Shreveport, Louisiana, where the
+    article plainly says it was filmed). Reading the place from the article makes
+    the claim come from the source itself. We match a filming VERB immediately
+    followed by "in <Proper Place>", then take the City[, Region] span — the exact
+    shape of "It was filmed in Shreveport, Louisiana".
+
+    DISAMBIGUATION (second live-run lesson): the model returns a bare title like
+    "Salem", and Wikipedia's "Salem" is a DISAMBIGUATION page (no filming cue), so
+    the first attempt found nothing. We therefore try the bare title AND
+    kind-qualified variants — "Salem (TV series)", "Salem (2014 TV series)",
+    "Salem (film)", etc. — and take the first article that yields a filming place.
+    A disambiguation page never contains the directional "filmed in <place>"
+    pattern, so it is naturally skipped; only a real work article matches.
+    """
+    try:
+        _title = (work_name or '').strip()
+        if not _title:
+            return (None, None)
+        _hdr = {"User-Agent": "Audioura/2.2 (tour-generation; support@audioura.com)",
+                "Accept": "application/json"}
+        # Candidate article titles, in order. The bare title first (often correct
+        # for an unambiguous work), then kind-qualified disambiguations.
+        _kind = (work_kind or '').strip().lower()
+        _cands = [_title]
+        _already_qual = _title.endswith(')') and '(' in _title
+        if not _already_qual:
+            if _kind in ('tv series', 'tv', 'series', 'television series',
+                         'miniseries'):
+                _cands += [f"{_title} (TV series)",
+                           f"{_title} (American TV series)"]
+            elif _kind in ('film', 'movie'):
+                _cands += [f"{_title} (film)"]
+            elif _kind in ('book', 'novel'):
+                _cands += [f"{_title} (novel)"]
+            else:
+                # Unknown kind: try the two most common screen disambiguations.
+                _cands += [f"{_title} (TV series)", f"{_title} (film)"]
+
+        _verb = (r"(?:filmed|shot|shooting|filming|principal photography|"
+                 r"produced|lensed|soundstage)")
+        _place_pat = (r"[A-Z][a-zA-Z.'-]+(?:\s+[A-Z][a-zA-Z.'-]+){0,2}"
+                      r"(?:,\s+[A-Z][a-zA-Z.'-]+(?:\s+[A-Z][a-zA-Z.'-]+){0,2}){0,1}")
+        pat = re.compile(_verb + r"\b[^.]{0,40}?\bin\s+(" + _place_pat + r")")
+        _skip = {"massachusetts", "17th", "century", "the", "a", "an", "on",
+                 "sets", "set"}
+
+        for _cand in _cands:
+            _params = {
+                "action": "query", "prop": "extracts", "explaintext": "1",
+                "redirects": "1", "titles": _cand, "format": "json",
+                "exsectionformat": "plain",
+            }
+            r = requests.get("https://en.wikipedia.org/w/api.php",
+                             params=_params, headers=_hdr, timeout=10)
+            if r.status_code != 200:
+                continue  # this candidate unreachable; try the next
+            pages = (r.json().get("query", {}) or {}).get("pages", {}) or {}
+            page = next(iter(pages.values()), {}) if pages else {}
+            _text = (page.get("extract", "") or "")
+            _returned_title = page.get("title", _cand)
+            if not _text.strip():
+                continue
+            # A filming cue ("filmed/shot/filming/principal photography/produced
+            # ...") directly followed (within a few words, e.g. "began in") by "in
+            # <Place>". <Place> is a run of Capitalised words, optionally ",
+            # Region" (state / country). This captures "filmed in Shreveport,
+            # Louisiana" and "filming of the series began in Shreveport, Louisiana".
+            for m in pat.finditer(_text):
+                cand = (m.group(1) or '').strip().strip('.,;:')
+                # Reject a bare setting/era token ("17th century Massachusetts") —
+                # the directional "in <Place>" after the verb is normally the real
+                # place, but guard against "...sets built to represent 17th century
+                # Massachusetts" by rejecting a first token in the skip set.
+                _first = cand.split(',')[0].split()[0].lower() if cand else ''
+                if not cand or _first in _skip:
+                    continue
+                return (cand, f"{_returned_title} - Wikipedia")
+        return (None, None)
+    except Exception as _fe:
+        print(f"  [LOCAL-744] filming-place extraction error ({_fe}) — inconclusive")
+        return (None, None)
+
+
+def _filmed_place_matches_toured(filmed_place, toured_location):
+    """[LOCAL-744] True when the article-derived filming place names the toured
+    place (so it was filmed HERE, not elsewhere). Token-overlap on the city/region
+    words, ignoring tour-type/episode noise in the raw request."""
+    try:
+        import screen_work_tour as _swt
+        _toured_city = _swt._toured_place_label(toured_location or '')
+    except Exception:
+        _toured_city = (toured_location or '').split(',')[0].strip()
+    if not _toured_city:
+        return False
+    _noise = {'city', 'county', 'usa', 'united', 'states', 'america', 'region'}
+    _ftok = {w.lower() for w in re.findall(r"[A-Za-z]{3,}", filmed_place or '')
+             if w.lower() not in _noise}
+    _ttok = {w.lower() for w in re.findall(r"[A-Za-z]{3,}", _toured_city)
+             if w.lower() not in _noise}
+    return bool(_ftok and _ttok and (_ttok & _ftok))
 
 
 def _corroborate_filming_place(work_name, filmed_place):
