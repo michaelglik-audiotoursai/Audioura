@@ -60,3 +60,41 @@ String formatRecoveryCodeForDisplay(String? code) {
   return '${n.substring(0, 4)}-${n.substring(4, 8)}-'
       '${n.substring(8, 12)}-${n.substring(12, 16)}';
 }
+
+/// [LOCAL-740 / B5] The fixed subject of the "email it to myself" message. The
+/// app opens the device mail composer with this — it NEVER sends mail itself.
+const String kRecoveryEmailSubject = 'My Audioura recovery code';
+
+/// [LOCAL-740 / B5] The body text that accompanies the code in the email / share
+/// sheet. [code] is interpolated as-is (already display-formatted by the caller).
+String recoveryShareBody(String code) =>
+    'Keep this Audioura recovery code somewhere outside your phone. If this '
+    'phone is lost, stolen or broken, it restores your Listen page — your '
+    'tours, paid tours and articles — on a new phone.\n\n'
+    'Recovery code: $code';
+
+/// [LOCAL-740 / B5] Build the `mailto:` URI that opens the device mail composer
+/// pre-filled with the recovery code (subject [kRecoveryEmailSubject], the code
+/// in the body). No recipient — the listener emails it to whoever they like
+/// (usually themselves). The app opens this with url_launcher; it never sends
+/// mail itself, so the code never leaves the phone through us.
+///
+/// Pure + testable: the widget test asserts the built intent CARRIES the code.
+Uri recoveryEmailUri(String code) {
+  return Uri(
+    scheme: 'mailto',
+    query: _encodeMailtoQuery({
+      'subject': kRecoveryEmailSubject,
+      'body': recoveryShareBody(code),
+    }),
+  );
+}
+
+/// mailto query encoding: `+` must mean a literal plus in a mail body, so encode
+/// spaces as %20 (Uri.encodeQueryComponent would turn them into '+').
+String _encodeMailtoQuery(Map<String, String> params) {
+  return params.entries
+      .map((e) =>
+          '${Uri.encodeComponent(e.key)}=${Uri.encodeComponent(e.value)}')
+      .join('&');
+}

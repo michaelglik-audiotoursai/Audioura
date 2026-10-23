@@ -52,6 +52,33 @@ void main() {
     });
   });
 
+  // [LOCAL-740 / B5] The "email it to myself" intent and share body carry the
+  // code so the listener can keep it OFF the phone. The app only opens the
+  // composer/share sheet — it never sends anything itself.
+  group('recoveryEmailUri / recoveryShareBody (B5)', () {
+    const code = 'ABCD-EFGH-JKMN-PQRS';
+
+    test('the mailto intent carries the code and the fixed subject', () {
+      final uri = recoveryEmailUri(code);
+      expect(uri.scheme, 'mailto');
+      // The whole query, decoded, contains the subject and the code.
+      final decoded = Uri.decodeFull(uri.query);
+      expect(decoded, contains('subject=My Audioura recovery code'));
+      expect(decoded, contains(code));
+    });
+
+    test('the share body carries the code and the off-phone reason', () {
+      final body = recoveryShareBody(code);
+      expect(body, contains(code));
+      expect(body, contains('outside your phone'));
+      expect(body, contains('lost, stolen or broken'));
+    });
+
+    test('the email subject is exactly the ticket wording', () {
+      expect(kRecoveryEmailSubject, 'My Audioura recovery code');
+    });
+  });
+
   group('RecoveryCodeScreen widget', () {
     setUp(() {
       SharedPreferences.setMockInitialValues({'user_id': 'USER-TEST-0001'});
@@ -70,14 +97,37 @@ void main() {
       expect(find.textContaining('Save this code'), findsOneWidget);
     });
 
+    // [LOCAL-740 / B5] The off-phone text is always on the screen (it does not
+    // wait for a code), so a listener learns to keep the code elsewhere before
+    // they even make one.
+    testWidgets('shows the off-phone text', (tester) async {
+      await tester.pumpWidget(const MaterialApp(home: RecoveryCodeScreen()));
+      await tester.pumpAndSettle();
+      expect(
+          find.textContaining(
+              'Keep this code outside this phone, for example email it to '
+              'yourself.'),
+          findsOneWidget);
+      expect(
+          find.textContaining(
+              'restores your Listen page on a new phone: your tours, paid '
+              'tours and articles.'),
+          findsOneWidget);
+    });
+
     testWidgets('Restore rejects an incomplete code without a network call',
         (tester) async {
       await tester.pumpWidget(const MaterialApp(home: RecoveryCodeScreen()));
       await tester.pumpAndSettle();
       // Enter an obviously-too-short code.
       await tester.enterText(find.byType(TextField), 'ABCD');
-      await tester.tap(
-          find.widgetWithText(ElevatedButton, 'Restore my Listen page'));
+      // [LOCAL-740] The off-phone text made the page taller; scroll the Restore
+      // button into view before tapping it (the body is a ListView).
+      final restoreBtn =
+          find.widgetWithText(ElevatedButton, 'Restore my Listen page');
+      await tester.ensureVisible(restoreBtn);
+      await tester.pumpAndSettle();
+      await tester.tap(restoreBtn);
       await tester.pump();
       expect(find.textContaining('does not look like a complete recovery code'),
           findsOneWidget);
@@ -88,6 +138,29 @@ void main() {
           home: RecoveryCodeScreen(offeredAfterPurchase: true)));
       await tester.pumpAndSettle();
       expect(find.textContaining('first purchase'), findsOneWidget);
+    });
+
+    // [LOCAL-740 / B5] Once a code is on screen, the three ways to keep it off
+    // the phone are all present: Copy, Email it to myself, Share — plus the
+    // New-code explanation.
+    testWidgets('shows Copy, Email it to myself and Share when a code exists',
+        (tester) async {
+      await tester.pumpWidget(const MaterialApp(
+          home: RecoveryCodeScreen(initialCode: 'ABCD-EFGH-JKMN-PQRS')));
+      await tester.pumpAndSettle();
+      expect(find.widgetWithText(ElevatedButton, 'Copy'), findsOneWidget);
+      expect(find.widgetWithText(OutlinedButton, 'Email it to myself'),
+          findsOneWidget);
+      expect(find.widgetWithText(OutlinedButton, 'Share'), findsOneWidget);
+      expect(find.widgetWithText(OutlinedButton, 'New code'), findsOneWidget);
+      // The New-code explanation (B5 wording).
+      expect(
+          find.textContaining(
+              'Replaces your code. The old code stops working.'),
+          findsOneWidget);
+      // The code itself is shown (the restore field also uses this string as a
+      // placeholder hint, so there is more than one match).
+      expect(find.text('ABCD-EFGH-JKMN-PQRS'), findsWidgets);
     });
   });
 }

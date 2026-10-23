@@ -33,6 +33,7 @@ import '../utils/search_dispatch.dart';
 import '../services/deep_link_service.dart';
 import '../services/communities_service.dart';
 import 'community_page_screen.dart';
+import 'recovery_code_screen.dart';
 // import '../services/credential_storage_service.dart';  // TEMPORARILY DISABLED - CAUSING BUILD ERRORS
 // import '../services/subscription_article_storage.dart';  // TEMPORARILY DISABLED - CAUSING BUILD ERRORS
 import '../widgets/subscription_credential_dialog.dart';
@@ -2559,7 +2560,15 @@ class _HomeScreenState extends State<HomeScreen> {
           await DebugLogHelper.addDebugLog('HOME: MAIN - UI update error: $uiError');
           // Download completed successfully even if UI update failed
         }
-        
+
+        // [LOCAL-740 / B5b] A download just finished — offer the recovery code
+        // the first time (then once more after the 3rd download if "Later",
+        // then never; never the same day as the first-purchase offer). The
+        // helper is fully guarded and no-ops when it should not show.
+        if (mounted) {
+          await maybeOfferRecoveryCodeAfterDownload(context);
+        }
+
         await DebugLogHelper.addDebugLog('HOME: MAIN - Download function completing');
       } else {
         await DebugLogHelper.addDebugLog('HOME: Download failed: ${response.body}');
