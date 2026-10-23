@@ -1,0 +1,49 @@
+# docker-compose.local738.yml — LOCAL-738 live test stack.
+#
+# A fully ISOLATED stack built from THIS worktree, on its own project name
+# (local738) and spare host ports (548xx), with its OWN throwaway Postgres —
+# NEVER the shared postgres-2 that the running `audioura` stack and Michael's
+# phone use. LOCAL-738 is a user-api-only change (the community create flow),
+# so only the user-api + its DB are needed — no generation, no AI, budget $0.
+#
+# HARD ISOLATION RULES (task contract):
+#   * project name: local738  (never `audioura` / `audioura-*`)
+#   * spare host ports in the 548xx range
+#   * dedicated postgres `postgres-738` with a tmpfs volume — no shared DB
+#   * build context is THIS worktree ('./user-tracking')
+#
+# UP:
+#   docker compose -p local738 -f docker-compose.local738.yml up -d --build
+# DOWN (remove containers AND the throwaway DB):
+#   docker compose -p local738 -f docker-compose.local738.yml down -v
+
+services:
+  postgres-738:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: audiotours
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: password123
+    ports:
+      - "54832:5432"
+    tmpfs:
+      - /var/lib/postgresql/data   # throwaway: gone on `down -v`, never persisted
+    restart: "no"
+
+  user-api-738:
+    build:
+      context: ./user-tracking
+    ports:
+      - "54803:5000"
+    environment:
+      - ALLOW_UNAUTHENTICATED_ENTITLEMENTS=true
+      - DB_HOST=postgres-738
+      - DB_NAME=audiotours
+      - DB_USER=admin
+      - DB_PASSWORD=password123
+      - DB_PORT=5432
+      - DATABASE_URL=postgresql://admin:password123@postgres-738:5432/audiotours
+      - IAP_VERIFY_MODE=stub
+    depends_on:
+      - postgres-738
+    restart: "no"

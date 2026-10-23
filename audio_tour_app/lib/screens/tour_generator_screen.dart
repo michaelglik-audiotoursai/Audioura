@@ -1482,8 +1482,10 @@ class _TourGeneratorScreenState extends State<TourGeneratorScreen> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             // [LOCAL-690] Generate split: Tour | Community. "Tour" is the normal
-            // generator below; "Community" opens the create-a-community flow
-            // (organisers create communities here — D658 addendum §).
+            // generator below; "Community" opens the create-a-community flow.
+            // [LOCAL-738 / C-entry] Michael's review: open the CREATE FORM
+            // directly, not the About/Communities page — the organiser came to
+            // make a community, so take them straight there.
             if (_appMode == 'Tours') ...[
               Padding(
                 padding: const EdgeInsets.only(bottom: 16),
@@ -1497,7 +1499,7 @@ class _TourGeneratorScreenState extends State<TourGeneratorScreen> {
                     if (sel.contains('community')) {
                       Navigator.push(
                         context,
-                        MaterialPageRoute(builder: (_) => const CommunitiesAboutScreen()),
+                        MaterialPageRoute(builder: (_) => const CreateCommunityScreen()),
                       );
                     }
                   },

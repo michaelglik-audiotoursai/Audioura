@@ -56,15 +56,58 @@ class CommunitiesService {
 
   /// Create a community (owner). [body]'s `pass_products` are store product ids
   /// (audioura.pass.*) the community will offer; a free community passes none.
-  static Future<Community?> create(Map<String, dynamic> body) async {
+  ///
+  /// [LOCAL-738 §3] Prefer [createResult] — it returns the server's real error
+  /// + message on failure. This thin wrapper is kept for callers that only need
+  /// the community (null on any failure).
+  static Future<Community?> create(Map<String, dynamic> body) async =>
+      (await createResult(body)).community;
+
+  /// [LOCAL-738 §3 / Michael's review C2] Create a community and return the
+  /// SERVER's outcome: on 201 the [Community]; on any error the server's `error`
+  /// + `message` (e.g. "That community name is taken.", "$15 is not available
+  /// as a pass price."). The form shows that exact message instead of the old
+  /// generic guess. A transport failure (no HTTP answer) comes back with a
+  /// short connection message and no community.
+  static Future<CreateResult> createResult(Map<String, dynamic> body) async {
     try {
       final r = await Endpoints.post(Service.userDb, '/communities', body: body);
       final map = Endpoints.tryDecodeMap(r.body);
       if (r.statusCode == 201 && map != null) {
-        return Community.fromJson(map);
+        return CreateResult(community: Community.fromJson(map));
+      }
+      // A non-201 with a JSON error/message → show the server's own words.
+      return CreateResult(
+        error: map?['error'] as String?,
+        message: (map?['message'] as String?) ??
+            'Could not create the community (error ${r.statusCode}).',
+      );
+    } catch (_) {
+      return const CreateResult(
+        message: 'Could not reach the server. Check your connection and try '
+            'again.',
+      );
+    }
+  }
+
+  /// [LOCAL-738 §2 / Michael's review C2b] The allowed pass PRICES for a NEW
+  /// community, in price order, from the SERVER (GET /communities/pass-prices —
+  /// built from the single APPLE_LIVE_PASS_PRODUCTS list). The create form's
+  /// price chips come from here. Returns an empty list on any failure so the
+  /// form can fall back to its $1/$5/$10/$20 default.
+  static Future<List<PassPrice>> passPrices() async {
+    try {
+      final r = await Endpoints.get(Service.userDb, '/communities/pass-prices');
+      final j = Endpoints.tryDecodeMap(r.body);
+      if (r.statusCode == 200 && j != null) {
+        final list = (j['prices'] as List?) ?? const [];
+        return list
+            .whereType<Map<String, dynamic>>()
+            .map(PassPrice.fromJson)
+            .toList(growable: false);
       }
     } catch (_) {}
-    return null;
+    return const [];
   }
 
   /// Resolve an invite/share code to a community (the join flow). Returns null
