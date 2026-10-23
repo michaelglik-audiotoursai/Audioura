@@ -320,7 +320,6 @@ class TourDownloadService {
       String priceLabel = 'Free';
       String? originalLanguage;
       if (sourceItem != null) {
-        isPaid = sourceItem['is_paid'] == true;
         final rawTier = sourceItem['price_tier'];
         if (rawTier is int) {
           priceTier = rawTier;
@@ -329,6 +328,17 @@ class TourDownloadService {
         } else if (rawTier is String) {
           priceTier = int.tryParse(rawTier);
         }
+        // [LOCAL-740 / B3] A tour is PAID when the row says so OR carries a
+        // positive price tier. The old code trusted ONLY `is_paid == true`, so
+        // a tour that arrived with `price_tier > 0` but no explicit `is_paid`
+        // flag (how map-delivery sends priced rows, and how a tour bought via
+        // the pay-per-download / `tour_unlocks` path reaches the save) was
+        // stamped `is_paid:false`. The delete-confirmation then treated it as
+        // free and showed no warning (Michael's $5 "Massachusetts politics"
+        // tour). This now matches every other paid check in the app
+        // (home_screen, DeleteTourPrompt.isPaidTour): is_paid OR price_tier > 0.
+        isPaid = sourceItem['is_paid'] == true ||
+            (priceTier != null && priceTier > 0);
         final rawLabel = sourceItem['price_label'];
         if (rawLabel is String && rawLabel.trim().isNotEmpty) {
           priceLabel = rawLabel.trim();
@@ -340,12 +350,22 @@ class TourDownloadService {
       }
 
       bool unlocked = !isPaid;
-      if (isPaid) {
-        try {
-          final state = await TourPricingService.unlockState(serverId);
-          if (state.isPaid && state.unlocked) unlocked = true;
-        } catch (_) {}
-      }
+      // [LOCAL-740 / B3] Consult the server unlock-state as a fallback. This
+      // does double duty: (a) for a tour already known paid it records that THIS
+      // device unlocked it (so the offline lock lifts), and (b) for a tour the
+      // inline row did NOT mark paid, a `state.isPaid` of true reveals it IS a
+      // paid tour the listener unlocked via `tour_unlocks` — so we stamp it paid
+      // and the delete warning shows. Never throws out; if the check fails we
+      // keep whatever the inline row told us.
+      try {
+        final state = await TourPricingService.unlockState(serverId);
+        if (state.isPaid) {
+          isPaid = true;
+          unlocked = state.unlocked;
+        } else if (isPaid && state.unlocked) {
+          unlocked = true;
+        }
+      } catch (_) {}
 
       final meta = DownloadedTourMeta(
         serverTourId: serverId,

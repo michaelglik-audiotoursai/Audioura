@@ -61,4 +61,74 @@ void main() {
       expect(DeleteTourPrompt.isPaidTour({'is_paid': false}), isFalse);
     });
   });
+
+  // [LOCAL-740 / B3] The delete-all path must also carry the paid warning.
+  group('DeleteTourPrompt.decideDeleteAll (B3)', () {
+    test('a batch with a paid tour warns about re-purchase', () {
+      final p = DeleteTourPrompt.decideDeleteAll(tours: [
+        {'title': 'Free Walk'},
+        {'title': 'Massachusetts politics', 'price_tier': 3},
+      ]);
+      expect(p.isPaidWarning, isTrue);
+      expect(p.confirmLabel, 'Delete All');
+      expect(p.cancelLabel, 'Cancel');
+      // The re-purchase warning is present (this is the B3 regression guard).
+      expect(p.body, contains('another purchase'));
+      expect(p.body, contains('paid tour'));
+    });
+
+    test('a batch of only free tours stays the plain confirmation', () {
+      final p = DeleteTourPrompt.decideDeleteAll(tours: [
+        {'title': 'Free Walk'},
+        {'title': 'Another Free'},
+      ]);
+      expect(p.isPaidWarning, isFalse);
+      expect(p.title, 'Delete All Tours');
+      expect(p.body, contains('Delete all 2 tours'));
+      expect(p.body.contains('another purchase'), isFalse);
+    });
+
+    test('paidCount counts only the paid tours', () {
+      expect(
+          DeleteTourPrompt.paidCount([
+            {'title': 'a', 'is_paid': true},
+            {'title': 'b', 'price_tier': 2},
+            {'title': 'c'},
+          ]),
+          2);
+    });
+  });
+
+  // [LOCAL-740 / B3] RED TEST — deleting a paid tour WITHOUT the confirmation
+  // warning must fail. These assertions mirror exactly what the Listen-screen
+  // delete paths render (single: DeleteTourPrompt.decide; all:
+  // decideDeleteAll). If a regression dropped the paid warning — the B3 bug,
+  // where a $5 paid tour deleted with no warning — these expectations go red.
+  group('RED: a paid tour never deletes without the re-purchase warning', () {
+    final paidTour = {'title': 'Massachusetts politics', 'price_tier': 3};
+
+    test('single delete of a paid tour shows the paid warning', () {
+      final prompt = DeleteTourPrompt.decide(
+        tourTitle: paidTour['title'].toString(),
+        isPaid: DeleteTourPrompt.isPaidTour(paidTour),
+      );
+      // Would fail if the screen treated the paid tour as free (the B3 bug).
+      expect(prompt.isPaidWarning, isTrue,
+          reason: 'a paid tour must get the paid-delete warning');
+      expect(prompt.title, 'Delete paid tour?');
+      expect(prompt.body,
+          'Are you sure you want to delete this paid tour? Downloading it '
+          'again will require another purchase.');
+    });
+
+    test('delete-all including a paid tour shows the paid warning', () {
+      final prompt = DeleteTourPrompt.decideDeleteAll(tours: [
+        {'title': 'Free Walk'},
+        paidTour,
+      ]);
+      expect(prompt.isPaidWarning, isTrue,
+          reason: 'delete-all with a paid tour must warn about re-purchase');
+      expect(prompt.body, contains('another purchase'));
+    });
+  });
 }
