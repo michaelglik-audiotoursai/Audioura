@@ -683,6 +683,24 @@ class _CommunityPageScreenState extends State<CommunityPageScreen> {
             ),
           ),
 
+          // [LOCAL-738 / C2c] How often members get new tours ("New tours:
+          // weekly"), from the community's release_cadence.
+          Padding(
+            padding: const EdgeInsets.only(bottom: 4),
+            child: Row(
+              children: [
+                const Icon(Icons.schedule, size: 18, color: Colors.teal),
+                const SizedBox(width: 6),
+                Text(
+                  CommunityCopy.releaseCadenceLabel(c.releaseCadence),
+                  key: const Key('release_cadence_label'),
+                  style: const TextStyle(
+                      fontWeight: FontWeight.w600, color: Colors.teal),
+                ),
+              ],
+            ),
+          ),
+
           // Organiser card.
           _section('Organiser', [
             if (c.organiser.name != null) Text(c.organiser.name!,

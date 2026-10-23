@@ -886,7 +886,7 @@ def _community_row(cur, community_id):
                   rules_text, waiver_text, has_waiver, is_paid, visibility,
                   latitude, longitude, join_code, feed_url, disabled,
                   status, stepped_down_at, archived_at,
-                  launch_deadline, launched_at, archived_reason
+                  launch_deadline, launched_at, archived_reason, release_cadence
            FROM communities WHERE id = %s""",
         (community_id,),
     )
@@ -898,7 +898,7 @@ def _community_row(cur, community_id):
             'rules_text', 'waiver_text', 'has_waiver', 'is_paid', 'visibility',
             'latitude', 'longitude', 'join_code', 'feed_url', 'disabled',
             'status', 'stepped_down_at', 'archived_at',
-            'launch_deadline', 'launched_at', 'archived_reason']
+            'launch_deadline', 'launched_at', 'archived_reason', 'release_cadence']
     return dict(zip(keys, row))
 
 
@@ -1174,6 +1174,9 @@ def _community_page(cur, community_id, user_id=None, now=None):
         'disabled': c['disabled'],
         'latitude': c['latitude'],
         'longitude': c['longitude'],
+        # [LOCAL-738 / C2c] How often members get new tours (day|week|month|
+        # year, default 'week'). The community page shows "New tours: weekly".
+        'release_cadence': c.get('release_cadence') or 'week',
         # [LOCAL-702 / D663 §1] The hand-over state machine. `status` is active |
         # handover | archived. `looking_for_organiser` is the banner flag the
         # member sees while the community is in hand-over (closed to new members,
@@ -1716,6 +1719,15 @@ def create_community():
         return jsonify({"error": "listed_needs_location",
                         "message": "A Listed community must have a location."}), 400
 
+    # [LOCAL-738 / C2c] How often members get new tours — required choice, one
+    # of the four lengths; default 'week' when the client omits it (older app).
+    release_cadence = (data.get('release_cadence') or 'week').strip().lower()
+    if release_cadence not in PASS_LENGTH_DAYS:
+        return jsonify({
+            "error": "bad_release_cadence",
+            "message": "release_cadence must be one of day, week, month, year.",
+        }), 400
+
     # [LOCAL-704 / D665] No free communities: every community is paid and must
     # offer at least one pass option. `is_paid` is accepted from the client for
     # back-compat but is always forced TRUE — the create form no longer has a
@@ -1790,8 +1802,9 @@ def create_community():
                    (owner_user_id, name, description, organiser_name,
                     organiser_photo_url, organiser_bio, organiser_contact,
                     rules_text, waiver_text, has_waiver, is_paid, visibility,
-                    latitude, longitude, join_code, feed_url, launch_deadline)
-               VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,
+                    latitude, longitude, join_code, feed_url, release_cadence,
+                    launch_deadline)
+               VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,
                        NOW() + make_interval(hours => %s))
                RETURNING id""",
             (owner_user_id, name, data.get('description'),
@@ -1799,7 +1812,7 @@ def create_community():
              data.get('organiser_bio'), data.get('organiser_contact'),
              data.get('rules_text'), data.get('waiver_text'), has_waiver,
              is_paid, visibility, lat, lng, join_code, data.get('feed_url'),
-             COMMUNITY_LAUNCH_HOURS),
+             release_cadence, COMMUNITY_LAUNCH_HOURS),
         )
         community_id = cur.fetchone()[0]
 
@@ -1882,6 +1895,42 @@ def name_available():
         available = _name_is_available(cur, name)
         cur.close()
         return jsonify({"name": name, "available": available}), 200
+    finally:
+        conn.close()
+
+
+@communities_bp.route('/communities/pass-prices', methods=['GET'])
+def pass_prices():
+    """[LOCAL-738 §2 / Michael's review C2b] The pass PRICES an organiser may
+    offer a NEW community, in price order. There is ONE source of truth —
+    APPLE_LIVE_PASS_PRODUCTS (the store products that exist now) — crossed with
+    the catalogue (community_pass_products) for each product's price and label.
+    The create form fills its price chips from THIS list (no second copy in the
+    app); offering a price not here would make the join purchase fail with
+    "product not found", which is exactly what broke on Michael's iPhone.
+
+    Returns 200 {prices: [{product_id, price_usd, label}, ...]} sorted ascending
+    by price. A product in the live set that has no active catalogue row is
+    skipped (it has no price to show); if the catalogue read fails entirely the
+    app falls back to its $1/$5/$10/$20 default."""
+    err = _require_api_key()
+    if err:
+        return err
+    conn = _get_db()
+    try:
+        cur = conn.cursor()
+        cur.execute(
+            "SELECT product_id, price_usd, label FROM community_pass_products "
+            "WHERE active = TRUE AND product_id = ANY(%s)",
+            (list(APPLE_LIVE_PASS_PRODUCTS),),
+        )
+        rows = cur.fetchall()
+        cur.close()
+        prices = [{'product_id': r[0], 'price_usd': float(r[1]), 'label': r[2]}
+                  for r in rows]
+        # Price order (ascending) — the ladder the organiser sees.
+        prices.sort(key=lambda p: p['price_usd'])
+        return jsonify({"prices": prices}), 200
     finally:
         conn.close()
 

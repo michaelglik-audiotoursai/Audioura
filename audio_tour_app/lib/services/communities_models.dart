@@ -254,6 +254,8 @@ class Community {
   final bool disabled;
   final double? latitude;
   final double? longitude;
+  // [LOCAL-738 / C2c] How often members get new tours (day|week|month|year).
+  final String releaseCadence;
   final List<CommunityPass> passes;
   final List<CommunityEpisode> episodes;
   final int episodeCount;
@@ -296,6 +298,7 @@ class Community {
     required this.disabled,
     this.latitude,
     this.longitude,
+    this.releaseCadence = 'week',
     required this.passes,
     required this.episodes,
     required this.episodeCount,
@@ -347,6 +350,7 @@ class Community {
       latitude: (j['latitude'] is num) ? (j['latitude'] as num).toDouble() : null,
       longitude:
           (j['longitude'] is num) ? (j['longitude'] as num).toDouble() : null,
+      releaseCadence: (j['release_cadence'] ?? 'week') as String,
       passes: list(j['passes'], CommunityPass.fromJson),
       episodes: list(j['episodes'], CommunityEpisode.fromJson),
       tours: list(j['tours'], CommunityInviteTourOption.fromJson),
@@ -373,6 +377,46 @@ class Community {
       launch: CommunityLaunch.fromJson(j['launch'] as Map<String, dynamic>?),
     );
   }
+}
+
+/// [LOCAL-738 §2 / Michael's review C2b] One allowed pass PRICE the organiser
+/// may offer, from the SERVER (GET /communities/pass-prices, built from the
+/// single APPLE_LIVE_PASS_PRODUCTS list). The create form fills its price chips
+/// from these — never a second hard-coded copy in the app. [label] is the
+/// server's display price ('$5'); [priceUsd] orders them.
+class PassPrice {
+  final String productId;
+  final double priceUsd;
+  final String label;
+
+  const PassPrice({
+    required this.productId,
+    required this.priceUsd,
+    required this.label,
+  });
+
+  factory PassPrice.fromJson(Map<String, dynamic> j) => PassPrice(
+        productId: (j['product_id'] ?? '') as String,
+        priceUsd: (j['price_usd'] is num) ? (j['price_usd'] as num).toDouble() : 0.0,
+        label: (j['label'] ?? '') as String,
+      );
+}
+
+/// [LOCAL-738 §3 / Michael's review C2] The outcome of a create attempt. On
+/// success [community] is non-null; on failure it is null and [error] +
+/// [message] carry the SERVER's own words (e.g. error 'name_taken', message
+/// "That community name is taken.") so the form shows the real reason — never
+/// the generic "the name may be taken, or you may need a plan" guess that
+/// hid every failure on Michael's iPhone. A transport failure (no HTTP answer)
+/// leaves both null and sets [message] to a short connection note.
+class CreateResult {
+  final Community? community;
+  final String? error;
+  final String? message;
+
+  const CreateResult({this.community, this.error, this.message});
+
+  bool get ok => community != null;
 }
 
 /// [LOCAL-703 / D664] The outcome of resolving an invite code. Exactly one of
@@ -735,8 +779,80 @@ class CommunityCopy {
         '$membersSoFar of $membersNeeded so far';
   }
 
+  /// [LOCAL-738 / C2c] The "New tours: weekly" line shown on the community
+  /// page, from the community's release_cadence (day|week|month|year). Pure so
+  /// the exact wording is unit-testable without a widget. An unknown cadence
+  /// falls back to the raw value so the line is never empty.
+  static String releaseCadenceLabel(String cadence) {
+    switch (cadence) {
+      case 'day':
+        return 'New tours: daily';
+      case 'week':
+        return 'New tours: weekly';
+      case 'month':
+        return 'New tours: monthly';
+      case 'year':
+        return 'New tours: yearly';
+      default:
+        return 'New tours: $cadence';
+    }
+  }
+
   /// The message a listener sees when an invite code resolves to a CLOSED
   /// (archived) community — the server returns 410 community_closed. Exactly
   /// the server wording (D664).
   static const String communityClosed = 'This community has closed.';
+}
+
+/// [LOCAL-738 §1 / Michael's review C2/C2d] Pure, Flutter-free logic for the
+/// create form's membership block: ONE PRICE PER LENGTH. The organiser ticks a
+/// length ON and picks exactly ONE price for it. This holds the rules so the
+/// payload (exactly one {product_id, length} per ticked length), the validity
+/// gate, and the "only server prices" guard are unit-testable without a widget
+/// — the bugs Michael hit (the cross-product, the stale custom value, an
+/// off-list price) are all caught here.
+class CommunityPassForm {
+  /// The four pass lengths, in display order.
+  static const List<String> lengths = ['day', 'week', 'month', 'year'];
+
+  /// Build the `pass_products` payload: exactly one {product_id, length} per
+  /// TICKED length, using that length's chosen price. A ticked length with no
+  /// price (or a price not in [allowed], when [allowed] is non-empty) is
+  /// SKIPPED — never sent. The result's order follows [lengths]. This is what
+  /// makes "what is shown selected is exactly what is sent" true: there is no
+  /// cross-product and no stale custom value.
+  static List<Map<String, String>> passOptions({
+    required Map<String, bool> enabled,
+    required Map<String, String?> price,
+    Set<String> allowed = const {},
+  }) {
+    final out = <Map<String, String>>[];
+    for (final len in lengths) {
+      if (enabled[len] != true) continue;
+      final product = price[len];
+      if (product == null) continue;
+      if (allowed.isNotEmpty && !allowed.contains(product)) continue;
+      out.add({'product_id': product, 'length': len});
+    }
+    return out;
+  }
+
+  /// The create gate's pass condition: at least one length is on, and EVERY
+  /// enabled length has a price (and, when [allowed] is given, a price that is
+  /// in the allowed set — the red-test guard: an off-list price can never make
+  /// the form valid).
+  static bool passesValid({
+    required Map<String, bool> enabled,
+    required Map<String, String?> price,
+    Set<String> allowed = const {},
+  }) {
+    final on = lengths.where((l) => enabled[l] == true).toList();
+    if (on.isEmpty) return false;
+    return on.every((l) {
+      final p = price[l];
+      if (p == null) return false;
+      if (allowed.isNotEmpty && !allowed.contains(p)) return false;
+      return true;
+    });
+  }
 }

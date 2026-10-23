@@ -23,6 +23,7 @@ import 'dart:math';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -30,7 +31,6 @@ import '../services/communities_service.dart';
 import '../utils/share_code.dart';
 import '../services/tour_share_service.dart';
 import '../services/entitlements_service.dart';
-import '../services/iap_service.dart';
 import '../services/device_service.dart';
 import '../services/document_acceptance_service.dart';
 import 'community_page_screen.dart';
@@ -216,25 +216,47 @@ class _CreateCommunityScreenState extends State<CreateCommunityScreen> {
   bool? _nameAvailable;
   bool _nameChecking = false;
 
-  // [LOCAL-690C / LOCAL-704] The pass catalogue is ONE product per PRICE (the
-  // ladder in kPassLadderDollars, now with a $1 floor — D665); the LENGTH is
-  // chosen per community. Quick picks are $1, $3, $5, $10, $20 ($1 is the
-  // commitment-fee minimum); a custom price snaps to the ladder, floored at $1.
-  static const List<int> _quickPickDollars = [1, 3, 5, 10, 20];
-  final Set<int> _selectedDollars = <int>{};
-  final _customPrice = TextEditingController();
-  final Map<String, bool> _lengthSelection = {
+  // [LOCAL-738 §1+§2 / Michael's review C2/C2b/C2d] ONE PRICE PER LENGTH. For
+  // each length the organiser ticks it ON and picks exactly ONE price for it
+  // (no cross-product of every price × every length, which let "$15/month AND
+  // $15/year" through meaninglessly). The price chips come from the SERVER
+  // (CommunitiesService.passPrices → APPLE_LIVE_PASS_PRODUCTS, the one list) —
+  // there is no "Custom price" any more, so what is shown selected is exactly
+  // what is sent. The app falls back to $1/$5/$10/$20 only if the call fails.
+  static const List<String> _lengths = ['day', 'week', 'month', 'year'];
+  // The server-supplied prices (empty until loaded / on failure → fallback).
+  List<PassPrice> _passPrices = const [];
+  bool _pricesLoading = true;
+  // Per length: is it offered, and which ONE product_id is its price.
+  final Map<String, bool> _lengthEnabled = {
     'day': false,
     'week': false,
     'month': true,
     'year': false,
   };
+  final Map<String, String?> _lengthPrice = {
+    'day': null,
+    'week': null,
+    'month': null,
+    'year': null,
+  };
+
+  // [LOCAL-738 §4 / C2c] How often members get new tours — required single
+  // select, default 'week'.
+  String _releaseCadence = 'week';
+
+  // [LOCAL-738 §5] Listed location WITHOUT typing numbers: "Use my location"
+  // (device GPS) fills the lat/lng controllers; manual entry stays as a
+  // fallback (the controllers remain the single source for the submitted
+  // coordinates). _locating guards the GPS button's spinner.
+  bool _locating = false;
 
   @override
   void initState() {
     super.initState();
     _checkPlan();
     _prefill();
+    _loadPrices();
     _name.addListener(_onNameChanged);
   }
 
@@ -244,12 +266,42 @@ class _CreateCommunityScreenState extends State<CreateCommunityScreen> {
     _name.removeListener(_onNameChanged);
     for (final c in [
       _name, _description, _organiserName, _organiserBio, _organiserContact,
-      _rules, _waiver, _lat, _lng, _customPrice,
+      _rules, _waiver, _lat, _lng,
     ]) {
       c.dispose();
     }
     super.dispose();
   }
+
+  /// [LOCAL-738 §2] Load the allowed pass PRICES from the server (the single
+  /// APPLE_LIVE_PASS_PRODUCTS list). On failure, fall back to the documented
+  /// $1/$5/$10/$20 set so the form still works offline. The default month price
+  /// is seeded to the first (cheapest) price once prices are known.
+  Future<void> _loadPrices() async {
+    final prices = await CommunitiesService.passPrices();
+    if (!mounted) return;
+    setState(() {
+      _passPrices = prices.isNotEmpty ? prices : _fallbackPrices;
+      _pricesLoading = false;
+      // Seed every enabled length that has no price yet with the cheapest.
+      final cheapest = _passPrices.first.productId;
+      for (final len in _lengths) {
+        if (_lengthEnabled[len] == true && _lengthPrice[len] == null) {
+          _lengthPrice[len] = cheapest;
+        }
+      }
+    });
+  }
+
+  /// The offline fallback price list — used ONLY when the server call fails.
+  /// Matches APPLE_LIVE_PASS_PRODUCTS ($1/$5/$10/$20) so a fallback create still
+  /// sends a product the server accepts.
+  static const List<PassPrice> _fallbackPrices = [
+    PassPrice(productId: 'audioura.pass.usd1', priceUsd: 1, label: '\$1'),
+    PassPrice(productId: 'audioura.pass.usd5', priceUsd: 5, label: '\$5'),
+    PassPrice(productId: 'audioura.pass.usd10', priceUsd: 10, label: '\$10'),
+    PassPrice(productId: 'audioura.pass.usd20', priceUsd: 20, label: '\$20'),
+  ];
 
   /// [LOCAL-700 §3] Read the device plan; the free plan (l2) or above may
   /// create, Introduction (l1) may not.
@@ -332,33 +384,28 @@ class _CreateCommunityScreenState extends State<CreateCommunityScreen> {
     });
   }
 
-  static int snapDollarsToLadder(double amount) {
-    const ladder = kPassLadderDollars;
-    if (amount <= ladder.first) return ladder.first;
-    if (amount >= ladder.last) return ladder.last;
-    int best = ladder.first;
-    double bestDist = (amount - best).abs();
-    for (final d in ladder.skip(1)) {
-      final dist = (amount - d).abs();
-      if (dist < bestDist) {
-        best = d;
-        bestDist = dist;
-      }
-    }
-    return best;
-  }
+  /// [LOCAL-738 §1] Exactly one `{product_id, length}` per TICKED length, using
+  /// that length's ONE chosen price, filtered to the server's allowed prices so
+  /// an off-list price can never be sent. Delegates to the pure helper so the
+  /// UI and the unit tests run the same logic.
+  List<Map<String, String>> _passOptions() => CommunityPassForm.passOptions(
+        enabled: _lengthEnabled,
+        price: _lengthPrice,
+        allowed: _allowedProductIds,
+      );
 
-  List<Map<String, String>> _passOptions() {
-    final lengths =
-        _lengthSelection.entries.where((e) => e.value).map((e) => e.key);
-    final options = <Map<String, String>>[];
-    for (final d in _selectedDollars) {
-      for (final len in lengths) {
-        options.add({'product_id': passProductForDollars(d), 'length': len});
-      }
-    }
-    return options;
-  }
+  /// Every ticked length has an allowed price chosen, and at least one length
+  /// is on — the condition the Create button needs.
+  bool get _passesValid => CommunityPassForm.passesValid(
+        enabled: _lengthEnabled,
+        price: _lengthPrice,
+        allowed: _allowedProductIds,
+      );
+
+  /// The product ids currently offered to the organiser (server prices, or the
+  /// fallback). Empty while loading — the gate stays closed until prices load.
+  Set<String> get _allowedProductIds =>
+      _passPrices.map((p) => p.productId).toSet();
 
   bool get _hasWaiver => _waiver.text.trim().isNotEmpty;
 
@@ -379,6 +426,7 @@ class _CreateCommunityScreenState extends State<CreateCommunityScreen> {
   /// and the name is not known-taken).
   bool get _canSubmit =>
       !_submitting &&
+      _passesValid &&
       CommunityCopy.createEnabled(
         requiredFilled: _requiredFilled,
         termsAccepted: _organiserTermsAccepted,
@@ -481,19 +529,23 @@ class _CreateCommunityScreenState extends State<CreateCommunityScreen> {
             ),
           const Divider(),
           // [LOCAL-704 / D665] No free communities — every community charges at
-          // least $1 to join (the commitment fee). The pass picker is always
-          // shown; at least one price + one length is required to create.
+          // least $1 to join (the commitment fee). [LOCAL-738 §1] ONE price per
+          // length: tick a length and pick ONE price for it; at least one
+          // length must be on.
           const Text('Membership',
               style: TextStyle(fontWeight: FontWeight.bold)),
           const Padding(
             padding: EdgeInsets.only(top: 2, bottom: 4),
             child: Text(
-              'Every member pays at least \$1 to join. Pick one or more pass '
-              'prices and lengths.',
+              'Every member pays at least \$1 to join. Tick each pass length you '
+              'offer and pick one price for it.',
               style: TextStyle(fontSize: 12, color: Colors.grey),
             ),
           ),
           ..._buildPaidSection(),
+          // [LOCAL-738 §4 / C2c] How often members get new tours.
+          ..._buildReleaseCadenceSection(),
+          const Divider(),
           SwitchListTile(
             title: const Text('Listed on the Home map'),
             subtitle: Text(_hasWaiver
@@ -502,10 +554,9 @@ class _CreateCommunityScreenState extends State<CreateCommunityScreen> {
             value: effectiveListed,
             onChanged: _hasWaiver ? null : (v) => setState(() => _listed = v),
           ),
-          if (effectiveListed) ...[
-            _field(_lat, 'Latitude', required: true),
-            _field(_lng, 'Longitude', required: true),
-          ],
+          // [LOCAL-738 §5] Listed location via GPS ("Use my location") with
+          // manual entry as a fallback — no more typing numbers by hand.
+          if (effectiveListed) ..._buildLocationSection(),
           const Divider(),
           // [LOCAL-700 §4] The RSS feed URL field is REMOVED from Create —
           // content is added per tour on the Generate tab.
@@ -624,94 +675,200 @@ class _CreateCommunityScreenState extends State<CreateCommunityScreen> {
   }
 
   List<Widget> _buildPaidSection() {
-    return [
-      Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16),
-        child: Wrap(
-          spacing: 8,
-          children: _quickPickDollars
-              .map((d) => FilterChip(
-                    label: Text('\$$d'),
-                    selected: _selectedDollars.contains(d),
-                    onSelected: (v) => setState(() {
-                      if (v) {
-                        _selectedDollars.add(d);
-                      } else {
-                        _selectedDollars.remove(d);
-                      }
-                    }),
-                  ))
-              .toList(),
+    if (_pricesLoading) {
+      return const [
+        Padding(
+          padding: EdgeInsets.all(16),
+          child: Center(
+            child: SizedBox(
+                height: 20, width: 20,
+                child: CircularProgressIndicator(strokeWidth: 2)),
+          ),
         ),
-      ),
-      Padding(
-        padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-        child: Row(
+      ];
+    }
+    // One row per length: a tick to offer it, and — when ticked — a single-
+    // select of ONE server price for that length. What is shown is what is sent.
+    return _lengths.map((len) {
+      final enabled = _lengthEnabled[len] == true;
+      return Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 8),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Expanded(
-              child: TextField(
-                controller: _customPrice,
-                keyboardType: TextInputType.number,
-                decoration: const InputDecoration(
-                  labelText: 'Custom price (\$)',
-                  helperText: 'Snaps to the nearest step',
-                  border: OutlineInputBorder(),
-                  isDense: true,
+            CheckboxListTile(
+              contentPadding: EdgeInsets.zero,
+              dense: true,
+              title: Text('Per $len'),
+              subtitle: enabled
+                  ? const Text('Pick one price for this length')
+                  : null,
+              value: enabled,
+              onChanged: (v) => setState(() {
+                final on = v ?? false;
+                _lengthEnabled[len] = on;
+                if (on && _lengthPrice[len] == null && _passPrices.isNotEmpty) {
+                  // Default to the cheapest price so a ticked length is valid.
+                  _lengthPrice[len] = _passPrices.first.productId;
+                }
+                if (!on) _lengthPrice[len] = null;
+              }),
+            ),
+            if (enabled)
+              Padding(
+                padding: const EdgeInsets.only(left: 16, bottom: 8),
+                child: Wrap(
+                  spacing: 8,
+                  children: _passPrices.map((p) {
+                    final selected = _lengthPrice[len] == p.productId;
+                    return ChoiceChip(
+                      label: Text(p.label),
+                      selected: selected,
+                      onSelected: (_) =>
+                          setState(() => _lengthPrice[len] = p.productId),
+                    );
+                  }).toList(),
                 ),
               ),
+          ],
+        ),
+      );
+    }).toList();
+  }
+
+  /// [LOCAL-738 §4 / C2c] The "How often will members get new tours?" single
+  /// select — day / week / month / year, default week.
+  List<Widget> _buildReleaseCadenceSection() {
+    return [
+      const Divider(),
+      const Text('How often will members get new tours?',
+          style: TextStyle(fontWeight: FontWeight.bold)),
+      const Padding(
+        padding: EdgeInsets.only(top: 2, bottom: 4),
+        child: Text(
+          'Tell members how often to expect a new tour.',
+          style: TextStyle(fontSize: 12, color: Colors.grey),
+        ),
+      ),
+      Wrap(
+        spacing: 8,
+        children: _lengths.map((len) {
+          return ChoiceChip(
+            label: Text(_cadenceLabel(len)),
+            selected: _releaseCadence == len,
+            onSelected: (_) => setState(() => _releaseCadence = len),
+          );
+        }).toList(),
+      ),
+    ];
+  }
+
+  static String _cadenceLabel(String len) {
+    switch (len) {
+      case 'day':
+        return 'Daily';
+      case 'week':
+        return 'Weekly';
+      case 'month':
+        return 'Monthly';
+      case 'year':
+        return 'Yearly';
+      default:
+        return len;
+    }
+  }
+
+  /// [LOCAL-738 §5] The Listed-community location block: "Use my location" (GPS)
+  /// fills the coordinates, with manual lat/lng fields as a fallback.
+  List<Widget> _buildLocationSection() {
+    final hasCoords =
+        _lat.text.trim().isNotEmpty && _lng.text.trim().isNotEmpty;
+    return [
+      Padding(
+        padding: const EdgeInsets.only(top: 8, bottom: 4),
+        child: Row(
+          children: [
+            ElevatedButton.icon(
+              onPressed: _locating ? null : _useMyLocation,
+              icon: _locating
+                  ? const SizedBox(
+                      height: 16,
+                      width: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2))
+                  : const Icon(Icons.my_location, size: 18),
+              label: const Text('Use my location'),
             ),
-            const SizedBox(width: 8),
-            OutlinedButton(
-              onPressed: () {
-                final typed = double.tryParse(_customPrice.text.trim());
-                if (typed == null) {
-                  _snack('Enter a dollar amount to snap.');
-                  return;
-                }
-                final snapped = snapDollarsToLadder(typed);
-                setState(() {
-                  _selectedDollars.add(snapped);
-                  _customPrice.clear();
-                });
-                _snack('Added \$$snapped pass price.');
-              },
-              child: const Text('Add'),
-            ),
+            const SizedBox(width: 12),
+            if (hasCoords)
+              Expanded(
+                child: Text(
+                  'Pinned: ${_lat.text.trim()}, ${_lng.text.trim()}',
+                  style: const TextStyle(fontSize: 12, color: Colors.green),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
           ],
         ),
       ),
-      if (_selectedDollars.isNotEmpty)
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-          child: Text(
-            'Prices: ${(_selectedDollars.toList()..sort()).map((d) => '\$$d').join(', ')}',
-            style: const TextStyle(fontSize: 12, color: Colors.grey),
-          ),
-        ),
       const Padding(
-        padding: EdgeInsets.only(left: 16, top: 12),
-        child: Text('Pass length', style: TextStyle(fontWeight: FontWeight.bold)),
+        padding: EdgeInsets.only(bottom: 4),
+        child: Text(
+          'Or enter coordinates manually:',
+          style: TextStyle(fontSize: 12, color: Colors.grey),
+        ),
       ),
-      ..._lengthSelection.keys.map((len) => CheckboxListTile(
-            dense: true,
-            title: Text('Per $len'),
-            value: _lengthSelection[len],
-            onChanged: (v) =>
-                setState(() => _lengthSelection[len] = v ?? false),
-          )),
+      _field(_lat, 'Latitude', required: true, onChanged: (_) => setState(() {})),
+      _field(_lng, 'Longitude', required: true, onChanged: (_) => setState(() {})),
     ];
+  }
+
+  /// [LOCAL-738 §5] Fill the latitude/longitude from the device GPS. Follows the
+  /// same permission/best-effort pattern as NavigationService: if permission is
+  /// denied or the fix fails, show a short message and leave manual entry.
+  Future<void> _useMyLocation() async {
+    setState(() => _locating = true);
+    try {
+      var permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+      }
+      if (permission == LocationPermission.denied ||
+          permission == LocationPermission.deniedForever) {
+        if (!mounted) return;
+        setState(() => _locating = false);
+        _snack('Location permission denied. You can enter coordinates manually.');
+        return;
+      }
+      final pos = await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.high,
+          timeLimit: Duration(seconds: 8),
+        ),
+      );
+      if (!mounted) return;
+      setState(() {
+        _lat.text = pos.latitude.toStringAsFixed(6);
+        _lng.text = pos.longitude.toStringAsFixed(6);
+        _locating = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _locating = false);
+      _snack('Could not get your location. You can enter coordinates manually.');
+    }
   }
 
   Future<void> _submit() async {
     final name = _name.text.trim();
     final listed = _hasWaiver ? false : _listed;
     if (listed && (_lat.text.trim().isEmpty || _lng.text.trim().isEmpty)) {
-      _snack('A listed community needs a latitude and longitude.');
+      _snack('A listed community needs a location. Tap "Use my location" or '
+          'enter coordinates.');
       return;
     }
     final passes = _passOptions();
-    if (_isPaid && passes.isEmpty) {
-      _snack('A paid community needs at least one price and one length.');
+    if (passes.isEmpty) {
+      _snack('Tick at least one pass length and pick a price for it.');
       return;
     }
 
@@ -733,17 +890,20 @@ class _CreateCommunityScreenState extends State<CreateCommunityScreen> {
       if (listed) 'latitude': double.tryParse(_lat.text.trim()),
       if (listed) 'longitude': double.tryParse(_lng.text.trim()),
       'pass_products': passes,
+      // [LOCAL-738 §4 / C2c] How often members get new tours.
+      'release_cadence': _releaseCadence,
     };
 
-    final community = await CommunitiesService.create(body);
+    // [LOCAL-738 §3] Use the server's real error + message on failure, instead
+    // of the old generic "the name may be taken, or you may need a plan" guess.
+    final result = await CommunitiesService.createResult(body);
     if (!mounted) return;
     setState(() => _submitting = false);
-    if (community == null) {
-      _snack('Could not create the community. The name may be taken, or you '
-          'may need a plan.');
+    if (!result.ok) {
+      _snack(result.message ?? 'Could not create the community.');
       return;
     }
-    _showInvite(community);
+    _showInvite(result.community!);
   }
 
   void _showInvite(Community c) {
