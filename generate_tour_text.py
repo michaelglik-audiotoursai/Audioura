@@ -1475,24 +1475,40 @@ def filming_location_lookup(api_key):
         # Give the model the raw request so it can resolve "episode 1 of season 1
         # … Salem, MA" to the work even when no title was typed.
         _prompt = (
-            "A tour was requested based on a TV show, film, or book. Identify the "
-            "work and state WHERE IT WAS FILMED (for a book: where any screen "
-            "adaptation was filmed, else report unknown), with a citable source.\n\n"
+            "A self-guided tour was requested that is based on a specific TV series, "
+            "film, or book. Two jobs:\n"
+            "  (1) Identify the ONE specific work the request refers to.\n"
+            "  (2) State where that work was FILMED (for a book with no screen "
+            "adaptation, report unknown), with a citable source.\n\n"
             f"Tour request / place: {location!r}\n"
-            f"Detected theme type: {_tt or 'unknown'}\n"
+            f"Detected kind: {_tt or 'unknown'}\n"
             f"Detected title (may be empty): {_title or 'unknown'}\n\n"
+            "Identifying the work:\n"
+            "- A request that says \"episode N\" or \"season N\" is a TELEVISION "
+            "series, never a film. If a place name is given and a title is not, the "
+            "work is almost always the TV SERIES whose title IS that place or whose "
+            "story is SET in that place (e.g. a 'season 1 … Salem' request is the TV "
+            "series titled 'Salem', not a film that happens to have been shot there).\n"
+            "- Do NOT substitute a different, more famous work associated with the "
+            "same place. If you cannot confidently identify the SPECIFIC work the "
+            "request means, set confidence=\"unknown\" and work_name=null.\n\n"
             "Respond with ONLY JSON:\n"
             "{\n"
-            '  "work_name": "the canonical title of the work, or null if you cannot identify it",\n'
-            '  "filmed_place": "the primary real-world filming location as City, Region/Country, '
-            'or null if unknown",\n'
-            '  "source": "a specific citable source for the filming location (e.g. a Wikipedia '
+            '  "work_name": "the exact canonical title of the work, or null if you cannot '
+            'confidently identify it",\n'
+            '  "work_kind": "tv series | film | book",\n'
+            '  "filmed_place": "the primary real-world filming location as City, '
+            'Region/Country, or null if unknown",\n'
+            '  "filmed_in_requested_place": true/false '
+            '(true if the requested place IS a filming location of the work),\n'
+            '  "source": "a specific citable source for the filming location (a Wikipedia '
             'article title or a named publication), or null if you do not have one",\n'
             '  "confidence": "high | medium | low | unknown"\n'
             "}\n\n"
-            "Rules: NEVER guess a filming location. If you are not confident or have no "
-            "source, set filmed_place=null and source=null and confidence=\"unknown\". "
-            "Only give filmed_place together with a real source."
+            "Rules: NEVER guess, and NEVER invent a source. If you are not confident "
+            "about the work OR the filming location, or you have no real source, set "
+            "filmed_place=null, source=null, confidence=\"unknown\". Only return a "
+            "filmed_place together with a real source."
         )
         headers = {"Content-Type": "application/json",
                    "Authorization": f"Bearer {api_key}"}
@@ -1501,11 +1517,12 @@ def filming_location_lookup(api_key):
             "messages": [
                 {"role": "system",
                  "content": "You are a film/TV production researcher. Respond only with valid "
-                            "JSON. Never fabricate a filming location or a source."},
+                            "JSON. Never fabricate a work, a filming location, or a source; "
+                            "answer \"unknown\" rather than guess."},
                 {"role": "user", "content": _prompt},
             ],
             "temperature": 0,
-            "max_tokens": 250,
+            "max_tokens": 300,
         }
         try:
             resp = requests.post("https://api.openai.com/v1/chat/completions",
@@ -1523,16 +1540,25 @@ def filming_location_lookup(api_key):
         _place = (parsed.get('filmed_place') or '').strip() if parsed.get('filmed_place') else ''
         _source = (parsed.get('source') or '').strip() if parsed.get('source') else ''
         _name = (parsed.get('work_name') or '').strip() if parsed.get('work_name') else ''
+        _kind = (parsed.get('work_kind') or '').strip() if parsed.get('work_kind') else ''
+        _here = bool(parsed.get('filmed_in_requested_place'))
 
         # Honesty gate: no place, no source, or explicit "unknown" → cannot confirm.
-        if _conf == 'unknown' or not _place or not _source:
+        # Also: if the work itself was not identified, we have nothing honest to say
+        # about WHERE it was filmed — treat as unknown rather than attach a place to
+        # an unnamed work (the live LOCAL-744 lesson: no name → no claim).
+        if _conf == 'unknown' or not _place or not _source or not _name:
             print(f"  [LOCAL-744] filming location unconfirmed "
-                  f"(conf={_conf!r}, place={_place!r}, source={'yes' if _source else 'no'})")
+                  f"(conf={_conf!r}, work={_name!r}, place={_place!r}, "
+                  f"source={'yes' if _source else 'no'})")
             return None
 
-        out = {"work_name": _name or None, "filmed_place": _place, "source": _source}
-        print(f"  [LOCAL-744] filming location (sourced): {_name or _title!r} → "
-              f"{_place!r} [src: {_source[:60]!r}]")
+        out = {"work_name": _name, "work_kind": _kind or None,
+               "filmed_place": _place, "source": _source}
+        if _here:
+            out["filmed_here"] = True
+        print(f"  [LOCAL-744] filming location (sourced): {_name!r} ({_kind}) → "
+              f"{_place!r} filmed_here={_here} [src: {_source[:60]!r}]")
         return out
 
     return _lookup

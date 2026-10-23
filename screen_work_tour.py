@@ -95,16 +95,30 @@ def detect_screen_work(user_request: str, intent: Optional[Dict] = None) -> Opti
     theme_type = (intent.get('theme_type') or '').strip().upper()
     theme_name = (intent.get('theme_name') or '').strip() or None
 
+    # A season/episode reference is the STRONGEST and most specific signal, and it
+    # is unambiguously television. It overrides the intent pass's theme_type (the
+    # live LOCAL-744 run showed intent classify "episode 1 of season 1 … Salem"
+    # as MOVIE, which then mis-framed the work as a film). Detect it up front.
+    _has_season_episode = bool(_SEASON_EPISODE_RE.search(req))
+
+    # A theme_name that is really just the episode/season phrase (no title was
+    # typed) is NOT a usable title — drop it so we never say "the film episode 1
+    # of season 1". The sourced lookup supplies the real title.
+    if theme_name and (_SEASON_EPISODE_RE.search(theme_name)
+                       or re.fullmatch(r'(?i)[\s,]*(?:the\s+)?(?:episode|season|pilot|'
+                                       r's\d+e\d+)[\s\d,]*', theme_name or '')):
+        theme_name = None
+
     signal = None
-    if theme_type in _WORK_THEME_TYPES:
-        signal = f'intent.theme_type={theme_type}'
-    elif _SEASON_EPISODE_RE.search(req):
+    if _has_season_episode:
         signal = 'season/episode reference in request'
+        theme_type = 'TV'
+    elif theme_type in _WORK_THEME_TYPES:
+        signal = f'intent.theme_type={theme_type}'
     else:
         # A bare work keyword counts only as a screen/book signal, not as proof of
-        # a place name — but it is enough to WANT a disclosure. Require a multi-word
-        # keyword OR a clear one ("filmed", "filming location") so "a book shop
-        # tour" alone does not trip it.
+        # a place name — but it is enough to WANT a disclosure. Require a clear
+        # keyword so "a book shop tour" alone does not trip it.
         for kw in _WORK_KEYWORDS:
             if kw in req_lower:
                 signal = f'work keyword: {kw!r}'
@@ -179,12 +193,24 @@ def _work_phrase(work: Dict, fact: Optional[Dict]) -> str:
     name = None
     if fact and isinstance(fact, dict):
         name = (fact.get('work_name') or '').strip() or None
+
     if not name:
         name = (work.get('theme_name') or '').strip() or None
 
-    tt = (work.get('theme_type') or '').upper()
-    kind = {'TV': 'TV series', 'SERIES': 'TV series', 'MOVIE': 'film',
-            'FILM': 'film', 'BOOK': 'book'}.get(tt, 'work')
+    # A sourced lookup may correct the KIND too (the request's "episode/season"
+    # heuristic can be wrong — e.g. the work turns out to be a film). Prefer the
+    # lookup's work_kind when it supplied one.
+    kind = None
+    if fact and isinstance(fact, dict):
+        _wk = (fact.get('work_kind') or '').strip().lower()
+        kind = {'tv': 'TV series', 'tv series': 'TV series', 'series': 'TV series',
+                'television series': 'TV series', 'miniseries': 'TV series',
+                'film': 'film', 'movie': 'film',
+                'book': 'book', 'novel': 'book'}.get(_wk)
+    if not kind:
+        tt = (work.get('theme_type') or '').upper()
+        kind = {'TV': 'TV series', 'SERIES': 'TV series', 'MOVIE': 'film',
+                'FILM': 'film', 'BOOK': 'book'}.get(tt, 'work')
     if name:
         return f'The {kind} {name}'
     return f'The {kind}'
@@ -194,6 +220,23 @@ def _work_phrase_mid(work: Dict, fact: Optional[Dict]) -> str:
     """Mid-sentence form of _work_phrase ("the TV series Salem")."""
     p = _work_phrase(work, fact)
     return 'the' + p[3:] if p.startswith('The ') else p
+
+
+def _work_ref_noconfirm(work: Dict) -> str:
+    """How to refer to the work in "we could not confirm where ___ was filmed",
+    WITHOUT the lookup (so it never leans on an unconfirmed title).
+
+    With a real title from intent: "the TV series Salem". Without one (the
+    title-less "episode 1 of season 1" case): "this TV series" / "this film" /
+    "this book" — natural, and it never invents a name.
+    """
+    name = (work.get('theme_name') or '').strip() or None
+    tt = (work.get('theme_type') or '').upper()
+    kind = {'TV': 'TV series', 'SERIES': 'TV series', 'MOVIE': 'film',
+            'FILM': 'film', 'BOOK': 'book'}.get(tt, 'work')
+    if name:
+        return f'the {kind} {name}'
+    return f'this {kind}'
 
 
 def build_filming_disclosure(work: Dict, location: str,
@@ -229,13 +272,12 @@ def build_filming_disclosure(work: Dict, location: str,
     fact = fact if isinstance(fact, dict) else None
     phrase = _work_phrase(work, fact)          # "The TV series Salem"
     mid = _work_phrase_mid(work, fact)         # "the TV series Salem"
-    mid_noconfirm = _work_phrase_mid(work, None)  # title we can state without the lookup
 
     # Guard: a usable fact must carry a source. No source → cannot confirm.
     sourced = fact is not None and (fact.get('source') or '').strip()
 
     if not sourced:
-        return f"We could not confirm where {mid_noconfirm} was filmed."
+        return f"We could not confirm where {_work_ref_noconfirm(work)} was filmed."
 
     # Case 2: the toured place is itself a filming location.
     if fact.get('filmed_here'):
@@ -246,7 +288,7 @@ def build_filming_disclosure(work: Dict, location: str,
     filmed_place = (fact.get('filmed_place') or '').strip()
     if not filmed_place:
         # Sourced but no place extracted — treat as cannot-confirm (never guess).
-        return f"We could not confirm where {mid_noconfirm} was filmed."
+        return f"We could not confirm where {_work_ref_noconfirm(work)} was filmed."
 
     # The sourced filming place CONTAINS the toured place → it was filmed here.
     if toured and _norm_place(toured) in _norm_place(filmed_place):
