@@ -94,6 +94,36 @@ String? tourVersionLabel(Map<String, dynamic> tour) {
   return label;
 }
 
+/// [LOCAL-745] May THIS device edit [tour]? Michael: "we should not allow anyone
+/// who is not the community organizer edit the tours." So a tour that belongs to
+/// a community (carries `community_id`) is editable only when this device OWNS
+/// that community ([ownedCommunityIds] comes from
+/// CommunityTourService.ownedCommunities). An ordinary (non-community) tour has
+/// no `community_id` and keeps today's rule — anyone may edit it.
+///
+/// Kept a top-level pure function (like tourVersionLabel) so the Edit menu item
+/// can gate on it and the rule is unit-testable without the widget. The server
+/// enforces the same rule (403 NOT_COMMUNITY_OWNER); this just hides the control
+/// so a member never sees an Edit that would only fail. Every read is defensive:
+/// a missing/garbled `community_id` reads as "not a community tour" (editable),
+/// never a throw. `community_id` may arrive as an int or a numeric String.
+bool canEditTour(Map<String, dynamic> tour,
+    {required Set<int> ownedCommunityIds}) {
+  final raw = tour['community_id'];
+  int? communityId;
+  if (raw is int) {
+    communityId = raw;
+  } else if (raw is num) {
+    communityId = raw.toInt();
+  } else if (raw is String) {
+    communityId = int.tryParse(raw.trim());
+  }
+  // Not a community tour (no/garbled community_id, or 0) → anyone may edit.
+  if (communityId == null || communityId == 0) return true;
+  // A community tour is editable only by the community's organiser.
+  return ownedCommunityIds.contains(communityId);
+}
+
 class MyToursScreen extends StatefulWidget {
   const MyToursScreen({super.key});
 
@@ -108,6 +138,13 @@ class _MyToursScreenState extends State<MyToursScreen> {
   Map<String, String> _displayTitles = {}; // Pre-loaded display titles
   String _appMode = 'Tours';
   String _selectedTypeFilter = 'All';
+
+  // [LOCAL-745] The community ids this device OWNS (organiser of). A community
+  // tour's Edit control is shown only when its community_id is in this set —
+  // members never see Edit on a community tour. Loaded alongside the community
+  // count in _loadCommunityCount; empty until then (so Edit stays hidden on a
+  // community tour until ownership is known — fail closed).
+  Set<int> _ownedCommunityIds = <int>{};
   final List<String> _articleTypes = [
     'All',
     'News and Politics',
@@ -210,6 +247,9 @@ class _MyToursScreenState extends State<MyToursScreen> {
         setState(() {
           _communityCount = count;
           _communityCountLoaded = true;
+          // [LOCAL-745] Remember which communities this device owns, so the Edit
+          // control appears only on this organiser's own community tours.
+          _ownedCommunityIds = owned.map((o) => o.id).toSet();
         });
       }
     } catch (_) {
@@ -2064,7 +2104,12 @@ class _MyToursScreenState extends State<MyToursScreen> {
                             // still enforces ownership.
                             if (_canSell && !TourTranslationHelper.isTranslation(tour) && _numericTourId(tour) != null)
                               const PopupMenuItem(value: 'price', child: ListTile(leading: Icon(Icons.sell, color: Color(0xFF1B6B2E)), title: Text('Price'), dense: true)),
-                            const PopupMenuItem(value: 'edit', child: ListTile(leading: Icon(Icons.edit, color: Colors.orange), title: Text('Edit'), dense: true)),
+                            // [LOCAL-745] Edit is organiser-only on a community
+                            // tour: a member never sees it (the server also
+                            // refuses 403). Ordinary tours stay editable by
+                            // anyone.
+                            if (canEditTour(tour, ownedCommunityIds: _ownedCommunityIds))
+                              const PopupMenuItem(value: 'edit', child: ListTile(leading: Icon(Icons.edit, color: Colors.orange), title: Text('Edit'), dense: true)),
                             // [LOCAL-688] One free re-score after an edit, on the
                             // guide's OWN original tour (numeric id). The server
                             // enforces ownership and the one-per-version limit.

@@ -290,6 +290,18 @@ class TourDownloadService {
         final updatedAt = sourceItem['updated_at'];
         if (v != null) tourData['version'] = v;
         if (updatedAt != null) tourData['updated_at'] = updatedAt;
+        // [LOCAL-745] Carry the community id onto the saved record so My Tours
+        // can show Edit only to the community organiser (canEditTour). A
+        // community download's sourceItem (new-tours row / map listing /
+        // community page tour) carries community_id; an ordinary tour has none.
+        final cid = sourceItem['community_id'];
+        if (cid is int) {
+          tourData['community_id'] = cid;
+        } else if (cid is num) {
+          tourData['community_id'] = cid.toInt();
+        } else if (cid is String && int.tryParse(cid.trim()) != null) {
+          tourData['community_id'] = int.parse(cid.trim());
+        }
       }
 
       await _stampPaidSnapshot(tourData, tourId, sourceItem);
