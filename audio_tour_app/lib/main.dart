@@ -9,6 +9,8 @@ import 'screens/onboarding_screen.dart';
 import 'screens/informational_notice_screen.dart';
 import 'services/app_sync_coordinator.dart';
 import 'services/community_background.dart';
+import 'services/community_notifications.dart';
+import 'services/community_tours_sync.dart';
 import 'services/deep_link_service.dart';
 import 'package:workmanager/workmanager.dart';
 
@@ -52,6 +54,12 @@ void main() async {
   // [LOCAL-670C] Start the offline-outbox sync coordinator: flush now (app
   // start) and whenever connectivity returns or the app resumes. Never blocks
   // startup — failures are retried by the outbox's own backoff.
+  // [LOCAL-746] Surface the ONE "<tour> was updated by the organiser." heads-up
+  // when the sync-on-open re-downloads a held community tour the organiser
+  // edited — a quiet local notification (same channel as the new-tours one).
+  CommunityToursSync.onRefreshMessage = (message) {
+    unawaited(CommunityNotifications.postTourUpdated(message));
+  };
   unawaited(AppSyncCoordinator.instance.start());
 
   // [LOCAL-714 / D675 part 2] Register the background community-tours sync

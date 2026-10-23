@@ -392,3 +392,155 @@ class SyncPlanner {
     return planned;
   }
 }
+
+// ─── [LOCAL-746 / D675 §4 addendum] Version-aware RE-DOWNLOAD of a held tour ──
+//
+// Why this exists (Michael, 2026-10-23): an organiser edits the Salem community
+// tour on the iPhone; the member's Pixel-4 must get the change. LOCAL-745 made
+// the server side work — the edit replaces the tour in place, archives the old
+// content and the version RISES (map-delivery reports it, LOCAL-657). But the
+// app's sync-on-open never re-downloads a tour already on the phone: SyncPlanner
+// skips held ids and the edit never appears in /communities/new-tours (that
+// endpoint filters created_at > since, and an in-place edit keeps created_at).
+// So the member kept the old audio (SUBMISSION_LOCAL-745 §Req 3).
+//
+// RefreshPlanner is the PURE policy for the OTHER half of the sync: for the
+// community tours ALREADY on the phone, re-download the ones whose server
+// version rose above the saved one — and nothing else. Kept here, dependency-
+// free, alongside SyncPlanner so it is unit-tested without a running app.
+
+/// A community tour ALREADY on the phone, with the facts the refresh planner
+/// needs. [savedVersion] is the LOCAL-657 version stamped on the saved record
+/// at download (absent → 1); [serverVersion] is the tour's CURRENT version read
+/// from the server now (the same LOCAL-657 number map-delivery reports).
+/// [isCommunityTour] is false for an ordinary tour (no community_id) — such a
+/// tour is NEVER re-downloaded, so the member's own generations are untouched.
+class HeldCommunityTour {
+  final int tourId;
+  final int communityId;
+  final int savedVersion;
+  final int serverVersion;
+
+  /// The language the held copy is in, so the re-download pulls the SAME
+  /// language the member already had (not a surprise switch to the original).
+  final String language;
+
+  /// Whether this is a community tour (carries a community_id). An ordinary
+  /// tour is false and is excluded by the planner.
+  final bool isCommunityTour;
+
+  /// The tour's display name, for the "<name> was updated by the organiser."
+  /// message after a successful refresh.
+  final String name;
+
+  const HeldCommunityTour({
+    required this.tourId,
+    required this.communityId,
+    required this.savedVersion,
+    required this.serverVersion,
+    required this.language,
+    required this.isCommunityTour,
+    required this.name,
+  });
+}
+
+/// One re-download the refresh planner decided to perform: WHICH held tour, in
+/// WHICH language, to WHICH server version (for the new "v2 · updated" label and
+/// the message).
+class PlannedRefresh {
+  final int tourId;
+  final int communityId;
+  final int serverVersion;
+  final String language;
+  final String name;
+
+  const PlannedRefresh({
+    required this.tourId,
+    required this.communityId,
+    required this.serverVersion,
+    required this.language,
+    required this.name,
+  });
+
+  @override
+  bool operator ==(Object other) =>
+      other is PlannedRefresh &&
+      other.tourId == tourId &&
+      other.communityId == communityId &&
+      other.serverVersion == serverVersion &&
+      other.language == language &&
+      other.name == name;
+
+  @override
+  int get hashCode =>
+      Object.hash(tourId, communityId, serverVersion, language, name);
+
+  @override
+  String toString() =>
+      'PlannedRefresh(t:$tourId, c:$communityId, v:$serverVersion, '
+      'lang:$language, name:$name)';
+}
+
+/// The PURE re-download planner (LOCAL-746). Given the community tours already
+/// on the phone — each with its saved version and the server's CURRENT version
+/// — plus the communities the member is still active in (or owns), the deleted
+/// set, the connectivity and the cellular allowance, it returns EXACTLY the
+/// re-downloads to perform. No I/O.
+///
+/// Rules, in order:
+///   1. offline (none)                      → re-download nothing.
+///   2. metered + cellular not allowed      → re-download nothing.
+///   3. for each held tour:
+///        * it must be a COMMUNITY tour (isCommunityTour) — an ordinary tour is
+///          never re-downloaded;
+///        * the server version must be STRICTLY GREATER than the saved one
+///          (an unchanged tour, or a stale/lower server read, is skipped — never
+///          a downgrade);
+///        * its community must be in [activeCommunityIds] — the member is still
+///          active, or owns it (an expired membership contributes nothing);
+///        * it must NOT be in the user's [deletedTourIds] (a tour the member
+///          deleted is never brought back, D675 §6).
+///
+/// The result preserves the input order of [held].
+class RefreshPlanner {
+  static List<PlannedRefresh> plan({
+    required List<HeldCommunityTour> held,
+    required Set<int> activeCommunityIds,
+    required SyncConnection connection,
+    required bool cellularAllowed,
+    required Set<String> deletedTourIds,
+  }) {
+    // 1 + 2: the SAME connection gate as SyncPlanner. Nothing offline, and
+    // nothing on a metered connection unless mobile data was explicitly allowed.
+    if (connection == SyncConnection.none) return const [];
+    if (connection == SyncConnection.metered && !cellularAllowed) {
+      return const [];
+    }
+
+    final planned = <PlannedRefresh>[];
+    for (final t in held) {
+      // Only community tours (an ordinary tour is never re-downloaded).
+      if (!t.isCommunityTour) continue;
+      // The server version must have risen above the saved one.
+      if (t.serverVersion <= t.savedVersion) continue;
+      // The member must still be active in (or own) the community.
+      if (!activeCommunityIds.contains(t.communityId)) continue;
+      // Never re-download a tour the user deleted.
+      if (deletedTourIds.contains(t.tourId.toString())) continue;
+      planned.add(PlannedRefresh(
+        tourId: t.tourId,
+        communityId: t.communityId,
+        serverVersion: t.serverVersion,
+        language: t.language,
+        name: t.name,
+      ));
+    }
+    return planned;
+  }
+}
+
+/// [LOCAL-746 Req 3] The ONE short message shown after a held tour is refreshed
+/// to the organiser's new version. Kept here (dependency-free) so the wording is
+/// unit-tested and comes from a single source.
+String refreshedMessage(String tourName) =>
+    '$tourName was updated by the organiser.';

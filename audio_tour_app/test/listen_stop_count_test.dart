@@ -248,4 +248,58 @@ void main() {
       expect(line, isNot(contains('stops')));
     });
   });
+
+  // ── [LOCAL-746 Req 4] The organiser's OWN phone: a community in-place edit
+  //    stamps the new version onto the saved record so Listen reflects it and
+  //    the sync-on-open refresh does not later re-flag the organiser's edit. ──
+  group('LOCAL-746 applyTourEditToSavedTours — version stamp', () {
+    List<String> seed() => [
+          jsonEncode({
+            'title': 'Salem Witch Walk',
+            'path': '/tours/salem_10',
+            'tour_id': '10',
+            'server_tour_id': '10',
+            'community_id': 1,
+            'version': 1,
+            'stops': '4',
+          }),
+        ];
+
+    Map<String, dynamic> entry(List<String> saved, String path) {
+      for (final s in saved) {
+        final m = jsonDecode(s);
+        if (m is Map<String, dynamic> && m['path'] == path) return m;
+      }
+      fail('no entry for $path');
+    }
+
+    test('stamps version + tour_version when newVersion is given', () {
+      final updated = applyTourEditToSavedTours(
+        seed(),
+        '/tours/salem_10',
+        newTourId: 'edit-uuid',
+        stopCount: 5,
+        newVersion: 2,
+        updatedAt: '2026-10-23',
+      );
+      final e = entry(updated, '/tours/salem_10');
+      expect(e['version'], 2);
+      expect(e['tour_version'], 2);
+      expect(e['updated_at'], '2026-10-23');
+      expect(e['stops'], '5');
+      expect(e['new_tour_id'], 'edit-uuid');
+    });
+
+    test('leaves version untouched when newVersion is null (ordinary edit)', () {
+      final updated = applyTourEditToSavedTours(
+        seed(),
+        '/tours/salem_10',
+        newTourId: 'edit-uuid',
+        stopCount: 5,
+      );
+      final e = entry(updated, '/tours/salem_10');
+      expect(e['version'], 1); // unchanged
+      expect(e.containsKey('tour_version'), isFalse);
+    });
+  });
 }

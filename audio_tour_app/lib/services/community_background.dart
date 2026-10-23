@@ -165,6 +165,12 @@ Future<bool> runAndroidBackgroundSync() async {
   if (!hasEnoughFreeStorage(free)) {
     return true; // Not an error — just nothing to do this cycle.
   }
+  // [LOCAL-746] With the app CLOSED there is no main() to set the hook, so wire
+  // the "<tour> was updated by the organiser." heads-up here too (a quiet local
+  // notification). Harmless when nothing is refreshed.
+  CommunityToursSync.onRefreshMessage = (message) {
+    CommunityNotifications.postTourUpdated(message);
+  };
   final result = await CommunityToursSync.instance.run();
   return result.failed == 0;
 }

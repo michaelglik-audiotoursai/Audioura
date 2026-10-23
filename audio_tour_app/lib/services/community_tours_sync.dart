@@ -17,6 +17,7 @@ import 'dart:ui' show PlatformDispatcher;
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'communities_service.dart';
 import 'community_downloads.dart';
 import 'community_tour_service.dart';
 import 'tour_download_service.dart';
@@ -28,11 +29,16 @@ class CommunityToursSyncResult {
   final int failed;
   final bool sinceAdvanced;
 
+  /// [LOCAL-746] How many HELD community tours were re-downloaded to the
+  /// organiser's newer version this run (independent of the new-tours plan).
+  final int refreshed;
+
   const CommunityToursSyncResult({
     required this.planned,
     required this.downloaded,
     required this.failed,
     required this.sinceAdvanced,
+    this.refreshed = 0,
   });
 
   static const CommunityToursSyncResult noop = CommunityToursSyncResult(
@@ -68,6 +74,52 @@ class CommunityToursSync {
   static Future<TourDownloadResult> Function(int tourId) download =
       TourDownloadService.downloadAndSave;
 
+  // ─── [LOCAL-746] Re-download of a HELD community tour the organiser edited ──
+
+  /// Read the CURRENT server (version, updated_at) of a tour — the LOCAL-657
+  /// number the app already shows. Seam for tests; defaults to the real
+  /// map-delivery `/tour-info` client. Null on any failure (that tour is simply
+  /// not refreshed).
+  static Future<({int version, String? updatedAt})?> Function(int tourId)
+      fetchServerVersion = CommunityTourService.serverTourVersion;
+
+  /// The community ids the member is STILL active in (active membership) PLUS
+  /// the ones the member OWNS — the set the refresh planner gates on. Seam for
+  /// tests; defaults to merging `/communities/mine` (active flag) with
+  /// `/communities/mine-owned`. Empty on any failure (fail closed → nothing is
+  /// re-downloaded when membership cannot be confirmed).
+  static Future<Set<int>> Function(String userId) fetchActiveCommunityIds =
+      _defaultActiveCommunityIds;
+
+  /// Re-download a held tour and replace it in place. Seam for tests; defaults
+  /// to [TourDownloadService.reDownloadAndReplace].
+  static Future<TourDownloadResult> Function(int tourId,
+          {required int newVersion, String? updatedAt}) reDownload =
+      TourDownloadService.reDownloadAndReplace;
+
+  /// Emit the ONE short "<tour> was updated by the organiser." message after a
+  /// successful refresh. Defaults to a no-op; main wires it to a snackbar/toast.
+  static void Function(String message) onRefreshMessage = _noopMessage;
+
+  static void _noopMessage(String _) {}
+
+  static Future<Set<int>> _defaultActiveCommunityIds(String userId) async {
+    final ids = <int>{};
+    try {
+      final mine = await CommunitiesService.mine(userId);
+      for (final c in mine) {
+        if (c.active && c.id != 0) ids.add(c.id);
+      }
+    } catch (_) {}
+    try {
+      final owned = await CommunityTourService.ownedCommunities(userId);
+      for (final c in owned) {
+        if (c.id != 0) ids.add(c.id);
+      }
+    } catch (_) {}
+    return ids;
+  }
+
   /// Run the sync-on-open baseline — the SAME planner + downloader the Android
   /// background worker runs (LOCAL-714). Safe to call repeatedly (a run in
   /// flight is a no-op). Returns a result for logging/tests. Never throws: any
@@ -80,111 +132,194 @@ class CommunityToursSync {
       final userId = prefs.getString('user_id') ?? '';
       if (userId.isEmpty) return CommunityToursSyncResult.noop;
 
-      final since = prefs.getString(kNewToursSincePrefKey);
-      final result = await fetchNewTours(userId, since: since);
-      if (result == null) {
-        // Transport failure — leave `since` unchanged (never advance on
-        // failure).
-        return CommunityToursSyncResult.noop;
+      // The connection + cellular allowance gate BOTH the new-tours downloads
+      // and the held-tour refreshes, so resolve them once up front. A failure
+      // reading connectivity (e.g. no plugin on a test host) must NOT abort the
+      // run — treat it as `none` (nothing auto-downloads) and still let the
+      // new-tours fetch below run so `since` can advance on an empty result.
+      SyncConnection connection;
+      try {
+        connection =
+            connectionFromResults(await Connectivity().checkConnectivity());
+      } catch (_) {
+        connection = SyncConnection.none;
       }
-      if (result.tours.isEmpty) {
-        // Nothing new. Still advance `since` to server_time so the next sync
-        // starts from here (there was a successful round trip with no work).
-        if (result.serverTime != null && result.serverTime!.isNotEmpty) {
-          await prefs.setString(kNewToursSincePrefKey, result.serverTime!);
-          return const CommunityToursSyncResult(
-              planned: 0, downloaded: 0, failed: 0, sinceAdvanced: true);
-        }
-        return CommunityToursSyncResult.noop;
-      }
-
-      // Gather the inputs the pure planner needs.
-      final connection =
-          connectionFromResults(await Connectivity().checkConnectivity());
       final cellularAllowed =
           prefs.getBool(kAutoDownloadCellularPrefKey) ?? false;
-      final onPhone = _onPhoneTourIds(prefs);
       final deleted =
           (prefs.getStringList(kDeletedTourIdsPrefKey) ?? const []).toSet();
-      final autoCommunities = _autoDownloadCommunityIds(prefs, result.tours);
 
-      // [LOCAL-715 / D675 addendum 1] The listening language is PER COMMUNITY.
-      // Resolve it ONCE per community that has new tours, via the single
-      // languageForCommunity helper (per-community key → About's default →
-      // phone locale → English). The planner uses this map so two communities
-      // with different languages download in two different languages.
-      final locale = _localeLanguageCode();
-      final languageByCommunity = <int, String>{};
-      for (final id in result.tours.map((t) => t.communityId).toSet()) {
-        languageByCommunity[id] =
-            languageForCommunity(prefs, id, localeLanguageCode: locale);
-      }
-      // The fallback preferred language = About's default for a phone without a
-      // per-community choice (also what communityId-not-in-map would resolve to).
-      final preferred = resolveCommunityLanguage(
-        aboutDefault: prefs.getString(kListeningLanguagePrefKey),
-        localeLanguageCode: locale,
-      );
-
-      final plan = SyncPlanner.plan(
-        newTours: result.tours,
-        onPhoneTourIds: onPhone,
-        deletedTourIds: deleted,
-        connection: connection,
-        cellularAllowed: cellularAllowed,
-        autoDownloadCommunityIds: autoCommunities,
-        preferredLanguage: preferred,
-        languageByCommunity: languageByCommunity,
-      );
-
-      if (plan.isEmpty) {
-        // Nothing to download under the current switches/connection, but the
-        // round trip succeeded — advance `since` so we do not re-evaluate the
-        // same tours forever.
-        if (result.serverTime != null && result.serverTime!.isNotEmpty) {
-          await prefs.setString(kNewToursSincePrefKey, result.serverTime!);
-          return const CommunityToursSyncResult(
-              planned: 0, downloaded: 0, failed: 0, sinceAdvanced: true);
-        }
-        return CommunityToursSyncResult.noop;
-      }
-
-      // Perform the planned downloads via the SINGLE download path. The planner
-      // chose the language; the download pulls that tour id. (v1: the language
-      // tour id is the planned tour id — a translation is downloaded by the
-      // planner picking the original when the preferred is not available.)
+      // ── Part A: the LOCAL-713 new-tours baseline (unchanged policy). ──
+      int planned = 0;
       int ok = 0;
       int failed = 0;
-      for (final d in plan) {
-        final r = await download(d.tourId);
-        if (r.status == TourDownloadStatus.ok ||
-            r.status == TourDownloadStatus.alreadyOnPhone) {
-          ok++;
+      bool advanced = false;
+
+      final since = prefs.getString(kNewToursSincePrefKey);
+      final result = await fetchNewTours(userId, since: since);
+      if (result != null) {
+        if (result.tours.isEmpty) {
+          // Nothing new. Still advance `since` to server_time so the next sync
+          // starts from here (a successful round trip with no work).
+          if (result.serverTime != null && result.serverTime!.isNotEmpty) {
+            await prefs.setString(kNewToursSincePrefKey, result.serverTime!);
+            advanced = true;
+          }
         } else {
-          failed++;
+          final onPhone = _onPhoneTourIds(prefs);
+          final autoCommunities =
+              _autoDownloadCommunityIds(prefs, result.tours);
+
+          // [LOCAL-715 / D675 addendum 1] The listening language is PER
+          // COMMUNITY. Resolve it ONCE per community that has new tours.
+          final locale = _localeLanguageCode();
+          final languageByCommunity = <int, String>{};
+          for (final id in result.tours.map((t) => t.communityId).toSet()) {
+            languageByCommunity[id] =
+                languageForCommunity(prefs, id, localeLanguageCode: locale);
+          }
+          final preferred = resolveCommunityLanguage(
+            aboutDefault: prefs.getString(kListeningLanguagePrefKey),
+            localeLanguageCode: locale,
+          );
+
+          final plan = SyncPlanner.plan(
+            newTours: result.tours,
+            onPhoneTourIds: onPhone,
+            deletedTourIds: deleted,
+            connection: connection,
+            cellularAllowed: cellularAllowed,
+            autoDownloadCommunityIds: autoCommunities,
+            preferredLanguage: preferred,
+            languageByCommunity: languageByCommunity,
+          );
+          planned = plan.length;
+
+          for (final d in plan) {
+            final r = await download(d.tourId);
+            if (r.status == TourDownloadStatus.ok ||
+                r.status == TourDownloadStatus.alreadyOnPhone) {
+              ok++;
+            } else {
+              failed++;
+            }
+          }
+
+          // D675 §: advance `since` only after the downloads SUCCEED.
+          final haveServerTime =
+              result.serverTime != null && result.serverTime!.isNotEmpty;
+          if (shouldAdvanceSince(
+              haveServerTime: haveServerTime, failedCount: failed)) {
+            await prefs.setString(kNewToursSincePrefKey, result.serverTime!);
+            advanced = true;
+          }
         }
       }
+      // result == null is a transport failure: leave `since` unchanged. The
+      // refresh pass below is independent (it has its own per-tour reads), so a
+      // new-tours transport failure must not stop it.
 
-      // D675 §: store server_time as the next `since` only after the downloads
-      // SUCCEED — if any failed, leave `since` so the next open retries.
-      final haveServerTime =
-          result.serverTime != null && result.serverTime!.isNotEmpty;
-      bool advanced = false;
-      if (shouldAdvanceSince(haveServerTime: haveServerTime, failedCount: failed)) {
-        await prefs.setString(kNewToursSincePrefKey, result.serverTime!);
-        advanced = true;
-      }
+      // ── Part B: [LOCAL-746] re-download HELD community tours the organiser
+      // edited (version rose). Runs EVERY sync, independent of new-tours — an
+      // in-place edit never appears in /communities/new-tours. ──
+      final refreshed = await _refreshHeldCommunityTours(
+        prefs: prefs,
+        userId: userId,
+        connection: connection,
+        cellularAllowed: cellularAllowed,
+        deletedTourIds: deleted,
+      );
+
       return CommunityToursSyncResult(
-          planned: plan.length,
-          downloaded: ok,
-          failed: failed,
-          sinceAdvanced: advanced);
+        planned: planned,
+        downloaded: ok,
+        failed: failed,
+        sinceAdvanced: advanced,
+        refreshed: refreshed,
+      );
     } catch (_) {
       return CommunityToursSyncResult.noop;
     } finally {
       _running = false;
     }
   }
+
+  /// [LOCAL-746] The held-community-tour refresh pass. Gathers the community
+  /// tours ALREADY on the phone, reads each one's CURRENT server version, runs
+  /// the pure [RefreshPlanner], re-downloads the ones whose version rose (the
+  /// member is still active / owner, the tour was not deleted, the connection
+  /// allows it), replacing them in place, and emits ONE message per tour that
+  /// actually refreshed. A failed re-download keeps the old copy (never leaves
+  /// the member with nothing). Returns how many tours were refreshed.
+  Future<int> _refreshHeldCommunityTours({
+    required SharedPreferences prefs,
+    required String userId,
+    required SyncConnection connection,
+    required bool cellularAllowed,
+    required Set<String> deletedTourIds,
+  }) async {
+    // Cheap connection gate first — avoid the network reads when nothing could
+    // be re-downloaded anyway.
+    if (connection == SyncConnection.none) return 0;
+    if (connection == SyncConnection.metered && !cellularAllowed) return 0;
+
+    final onPhone = _heldCommunityTourRecords(prefs);
+    if (onPhone.isEmpty) return 0;
+
+    // The communities the member is still active in (or owns).
+    final activeIds = await fetchActiveCommunityIds(userId);
+
+    // Read each held community tour's CURRENT server version. A null read
+    // (transport error / missing) is treated as "no change" (savedVersion), so
+    // that tour is simply not re-downloaded this run.
+    final held = <HeldCommunityTour>[];
+    for (final rec in onPhone) {
+      final serverVer = await fetchServerVersion(rec.serverTourId);
+      held.add(HeldCommunityTour(
+        tourId: rec.serverTourId,
+        communityId: rec.communityId,
+        savedVersion: rec.savedVersion,
+        serverVersion: serverVer?.version ?? rec.savedVersion,
+        language: rec.language,
+        isCommunityTour: true,
+        name: rec.name,
+      ));
+      // Stash the server updated_at alongside, keyed by id, for the label.
+      if (serverVer != null) {
+        _serverUpdatedAt[rec.serverTourId] = serverVer.updatedAt;
+      }
+    }
+
+    final plan = RefreshPlanner.plan(
+      held: held,
+      activeCommunityIds: activeIds,
+      connection: connection,
+      cellularAllowed: cellularAllowed,
+      deletedTourIds: deletedTourIds,
+    );
+    if (plan.isEmpty) return 0;
+
+    int refreshed = 0;
+    for (final p in plan) {
+      final r = await reDownload(
+        p.tourId,
+        newVersion: p.serverVersion,
+        updatedAt: _serverUpdatedAt[p.tourId],
+      );
+      if (r.status == TourDownloadStatus.ok) {
+        refreshed++;
+        // Req 3: ONE short message per refreshed tour.
+        onRefreshMessage(refreshedMessage(p.name));
+      }
+      // A failed re-download keeps the old copy (reDownloadAndReplace never
+      // touches the files on failure) — nothing to undo here.
+    }
+    return refreshed;
+  }
+
+  /// The server updated_at read for each held tour this run (id → ISO date),
+  /// used to stamp the "v2 · updated <date>" label on a refreshed record.
+  final Map<int, String?> _serverUpdatedAt = {};
 
   /// [LOCAL-715 / D675 addendum 1] The phone locale's language code, read
   /// without a WidgetsBinding so it also works in the background isolate (the
@@ -228,4 +363,78 @@ class CommunityToursSync {
     }
     return ids;
   }
+
+  /// [LOCAL-746] The COMMUNITY tours already on the phone, with the facts the
+  /// refresh pass needs: the numeric server id, the community id, the saved
+  /// version, the held language and the display name. An ordinary tour (no
+  /// `community_id`) or one with no numeric server id is skipped — the refresh
+  /// only touches community tours.
+  static List<_HeldRecord> _heldCommunityTourRecords(SharedPreferences prefs) {
+    final out = <_HeldRecord>[];
+    for (final s in (prefs.getStringList('saved_tours') ?? const [])) {
+      try {
+        final m = json.decode(s);
+        if (m is! Map<String, dynamic>) continue;
+
+        // community_id (int or numeric string); skip ordinary tours.
+        final rawCid = m['community_id'];
+        int? cid;
+        if (rawCid is int) {
+          cid = rawCid;
+        } else if (rawCid is num) {
+          cid = rawCid.toInt();
+        } else if (rawCid is String) {
+          cid = int.tryParse(rawCid.trim());
+        }
+        if (cid == null || cid == 0) continue;
+
+        // The numeric server/download id the version endpoints key on.
+        final sid = int.tryParse((m['server_tour_id'] ?? '').toString());
+        if (sid == null) continue;
+
+        // Saved version (version | tour_version), default 1.
+        int savedVersion = 1;
+        final rawV = m['version'] ?? m['tour_version'];
+        if (rawV is int) {
+          savedVersion = rawV;
+        } else if (rawV is num) {
+          savedVersion = rawV.toInt();
+        } else if (rawV is String) {
+          savedVersion = int.tryParse(rawV) ?? 1;
+        }
+
+        final language =
+            (m['language'] ?? m['original_language'] ?? 'en').toString();
+        final name = (m['title'] ?? m['original_request'] ?? 'This tour')
+            .toString();
+
+        out.add(_HeldRecord(
+          serverTourId: sid,
+          communityId: cid,
+          savedVersion: savedVersion,
+          language: language.isEmpty ? 'en' : language,
+          name: name,
+        ));
+      } catch (_) {}
+    }
+    return out;
+  }
+}
+
+/// [LOCAL-746] A held community tour's facts, gathered from its saved_tours
+/// record for the refresh pass.
+class _HeldRecord {
+  final int serverTourId;
+  final int communityId;
+  final int savedVersion;
+  final String language;
+  final String name;
+
+  const _HeldRecord({
+    required this.serverTourId,
+    required this.communityId,
+    required this.savedVersion,
+    required this.language,
+    required this.name,
+  });
 }
