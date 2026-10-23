@@ -464,6 +464,66 @@ _ORIGINAL_LANGUAGE_JOIN = """
 # price_tier / is_paid do. Appended as the LAST two SELECTed columns on every
 # endpoint — content_rating, content_review_status — so existing column positions
 # (and sibling test fixtures) stay stable, mirroring LOCAL-671/670.
+
+
+# [LOCAL-737 / D708] Optional deployment-track filter on the list endpoints.
+# Beta, Storied and Subscribed are separate stacks sharing one GCloud Postgres.
+# A Subscribed app must list only track='subscribed' tours; Beta/Storied apps
+# send no ?track= and keep the historic behaviour (every track listed). Unknown
+# normalises to 'beta'. The track column is guarded (self-healed by the
+# orchestrator / migration 043) so an older schema never 500s.
+VALID_TRACKS = ('beta', 'storied', 'subscribed')
+_HAS_TRACK_COLUMN = None
+
+
+def _has_track_column(cur):
+    """True if audio_tours.track exists. Looked up once, then cached."""
+    global _HAS_TRACK_COLUMN
+    if _HAS_TRACK_COLUMN is None:
+        try:
+            cur.execute("""
+                SELECT 1 FROM information_schema.columns
+                WHERE table_name = 'audio_tours' AND column_name = 'track'
+            """)
+            _HAS_TRACK_COLUMN = cur.fetchone() is not None
+        except Exception:
+            _HAS_TRACK_COLUMN = False
+    return _HAS_TRACK_COLUMN
+
+
+def normalize_track(value):
+    """Resolve a raw track value to one of VALID_TRACKS, defaulting to 'beta'."""
+    normalized = (value or 'beta').strip().lower()
+    if normalized not in VALID_TRACKS:
+        normalized = 'beta'
+    return normalized
+
+
+def _requested_track(req):
+    """The explicit ?track= filter, normalised, or None when not sent.
+
+    None means "no track filter" so Beta/Storied (which never send it) keep the
+    historic behaviour. A Subscribed app sends ?track=subscribed to see only its
+    own tours (D708).
+    """
+    raw = (req.args.get('track') or '').strip()
+    if not raw:
+        return None
+    return normalize_track(raw)
+
+
+def _track_filter_clause(cur, req):
+    """Build the (sql_fragment, params) for an optional track filter.
+
+    Returns ('', []) when no ?track= is sent or the column is absent, so the
+    historic queries are byte-for-byte unchanged for Beta and Storied.
+    """
+    trk = _requested_track(req)
+    if trk is None or not _has_track_column(cur):
+        return "", []
+    return " AND COALESCE(t.track, 'beta') = %s", [trk]
+
+
 _HAS_CONTENT_RATING_COLUMN = None
 
 
@@ -1957,6 +2017,9 @@ def get_tours_near_location(lat, lng):
         min_rating = _parse_min_rating(request.args)
         # [LOCAL-677] Optional Free/Paid filter (home page: Free/Paid/Any).
         price_filter = _parse_price_filter(request.args)
+        # [LOCAL-737 / D708] Optional ?track= filter (Subscribed lists only its
+        # own tours; Beta/Storied send nothing and are unchanged).
+        _track_clause, _track_params = _track_filter_clause(cur, request)
 
         cur.execute(f"""
             SELECT t.id, t.tour_name, t.request_string, t.lat, t.lng,
@@ -1988,8 +2051,8 @@ def get_tours_near_location(lat, lng):
             WHERE t.lat IS NOT NULL AND t.lng IS NOT NULL
             AND (t.content_language = 'en' OR t.content_language IS NULL)
             AND t.original_tour_id IS NULL
-            AND (t.is_test IS NOT TRUE)
-        """)
+            AND (t.is_test IS NOT TRUE){_track_clause}
+        """, _track_params)
         
         tours = cur.fetchall()
         editor = _editor_scores(cur)  # [LOCAL-685]
@@ -2543,6 +2606,8 @@ def search_tours():
         min_rating = _parse_min_rating(request.args)
         # [LOCAL-677] Optional Free/Paid filter.
         price_filter = _parse_price_filter(request.args)
+        # [LOCAL-737 / D708] Optional ?track= filter, same contract as tours-near.
+        _track_clause, _track_params = _track_filter_clause(cur, request)
         
         # [LOCAL-657, LEAD] Search results open the same tour dialogs, so they carry
         # the version label fields too (one grouped LEFT JOIN, as in /tours-near).
@@ -2575,10 +2640,10 @@ def search_tours():
             {_ORIGINAL_LANGUAGE_JOIN}
             WHERE (t.tour_name ILIKE %s OR t.request_string ILIKE %s)
             AND t.lat IS NOT NULL AND t.lng IS NOT NULL
-            AND (t.is_test IS NOT TRUE)
+            AND (t.is_test IS NOT TRUE){_track_clause}
             ORDER BY t.number_requested DESC
             LIMIT 50
-        """, (sql_pattern, sql_pattern))
+        """, [sql_pattern, sql_pattern] + _track_params)
         
         tours = cur.fetchall()
         editor = _editor_scores(cur)  # [LOCAL-685]

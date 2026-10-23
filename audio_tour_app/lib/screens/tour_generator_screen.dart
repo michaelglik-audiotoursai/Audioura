@@ -13,6 +13,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../services/tour_status_service.dart';
 import '../services/background_tour_monitor.dart';
+import '../config.dart';
 import '../config/endpoints.dart';
 import '../services/translation_service.dart';
 import '../services/error_handler_service.dart';
@@ -1069,10 +1070,11 @@ class _TourGeneratorScreenState extends State<TourGeneratorScreen> {
       double? lat;
       double? lng;
       // Track provenance: read from the server response, never recompute.
-      // 'track' is 'beta'|'storied' (missing/unknown ⇒ 'beta', which is also
-      // what every older app produces). 'build_number' identifies which build
-      // made the tour so a tour listed a week later still says so; it is
-      // optional — older tours genuinely have none. See wdvrdaxxmb.
+      // 'track' is one of Config.validTracks ('beta'|'storied'|'subscribed');
+      // missing/unknown ⇒ 'beta', which is also what every older app produces.
+      // 'build_number' identifies which build made the tour so a tour listed a
+      // week later still says so; it is optional — older tours genuinely have
+      // none. See wdvrdaxxmb and LOCAL-737.
       String tourTrack = 'beta';
       int? buildNumber;
       try {
@@ -1090,8 +1092,8 @@ class _TourGeneratorScreenState extends State<TourGeneratorScreen> {
             await DebugLogHelper.addDebugLog('SAVE_TOUR: Found coordinates: $lat, $lng');
           }
           final rawTrack = statusData['track'];
-          if (rawTrack == 'storied' || rawTrack == 'beta') {
-            tourTrack = rawTrack as String;
+          if (rawTrack is String && Config.validTracks.contains(rawTrack)) {
+            tourTrack = rawTrack;
           }
           final rawBuild = statusData['build_number'];
           if (rawBuild is int) {

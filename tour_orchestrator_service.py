@@ -20,6 +20,27 @@ import inspect as _inspect
 _orch_logger = logging.getLogger("tour_orchestrator_service")
 
 
+# [LOCAL-737 / D708] The deployment `track` is per-DEPLOYMENT (Beta, Storied and
+# Subscribed are separate Cloud Run services that SHARE one GCloud Postgres).
+# Each always writes its own value so (name, creator, track) stays unique per
+# track and the same-name collision class (bug 432) cannot return between tracks.
+# Subscribed is now a first-class track alongside Beta and Storied. Any missing
+# or unknown value still normalises to 'beta' (D687 addendum, LOCAL-727 note).
+VALID_TRACKS = ('beta', 'storied', 'subscribed')
+
+
+def normalize_track(value):
+    """Resolve a raw track value to one of VALID_TRACKS, defaulting to 'beta'.
+
+    Accepts None, empty/whitespace, or any case. Anything outside VALID_TRACKS
+    (including missing/unknown) means 'beta', matching the long-standing default.
+    """
+    normalized = (value or 'beta').strip().lower()
+    if normalized not in VALID_TRACKS:
+        normalized = 'beta'
+    return normalized
+
+
 def _compat_send_file(path_or_file, **kwargs):
     """Version-tolerant send_file wrapper.
 
@@ -730,11 +751,11 @@ def store_audio_tour(tour_name, request_string, zip_path, lat, lng, tour_content
     """Store the audio tour in the database with original tour content.
 
     [LOCAL-727 / bug 432] ``track`` is the deployment track that produced this
-    tour ('beta' or 'storied'). It is part of the existing-tour lookup key
-    (alongside creator and name) so a Beta tour and a Storied tour with the same
-    name and creator never collapse into one row on the shared GCloud DB. When
-    None it falls back to the ``TOUR_TRACK`` env var; any other value is
-    normalised to 'beta'.
+    tour ('beta', 'storied' or 'subscribed'). It is part of the existing-tour
+    lookup key (alongside creator and name) so tours with the same name and
+    creator but different tracks never collapse into one row on the shared
+    GCloud DB. When None it falls back to the ``TOUR_TRACK`` env var; any other
+    value is normalised to 'beta' (LOCAL-737).
 
     Returns:
         dict with keys:
@@ -942,11 +963,9 @@ def store_audio_tour(tour_name, request_string, zip_path, lat, lng, tour_content
         # VS_BETA.md), but they SHARE the GCloud DB. The explicit `track=`
         # argument (passed by the serving path) wins; otherwise fall back to the
         # TOUR_TRACK env var, exactly as the INSERT path has always done. Any
-        # value other than 'beta'/'storied' is normalised to 'beta'.
-        _track = (track if track is not None else os.getenv('TOUR_TRACK', 'beta'))
-        _track = (_track or 'beta').strip().lower()
-        if _track not in ('beta', 'storied'):
-            _track = 'beta'
+        # value other than a known track ('beta'/'storied'/'subscribed') is
+        # normalised to 'beta' (LOCAL-737).
+        _track = normalize_track(track if track is not None else os.getenv('TOUR_TRACK', 'beta'))
 
         # [LOCAL-606] Make sure the versioning archive + stale flag exist before
         # we may need them in the existing-row branch. Self-healing, additive.
@@ -1930,9 +1949,7 @@ def orchestrate_tour_async(job_id, location, tour_type, total_stops, user_id=Non
         # store_audio_tour also falls back to TOUR_TRACK when track is None, so
         # this is belt-and-braces; resolving it here keeps the two call paths in
         # lockstep and makes the chosen track visible at the call site.
-        _store_track = (os.getenv('TOUR_TRACK', 'beta') or 'beta').strip().lower()
-        if _store_track not in ('beta', 'storied'):
-            _store_track = 'beta'
+        _store_track = normalize_track(os.getenv('TOUR_TRACK', 'beta'))
         store_result = store_audio_tour(tour_name, request_string or location, zip_path, lat, lng, tour_content, stops_count=ACTIVE_JOBS[job_id].get("actual_stops"), is_test=is_test, tour_kind=ACTIVE_JOBS[job_id].get("tour_kind"), job_id=job_id, user_id=user_id, track=_store_track)
         
         # [LOCAL-156] store_audio_tour now returns a dict:
@@ -2059,9 +2076,7 @@ def orchestrate_tour_async(job_id, location, tour_type, total_stops, user_id=Non
                 try:
                     import psycopg2
                     _creator_lookup = (user_id or '').strip() or None
-                    _track_lookup = (os.getenv('TOUR_TRACK', 'beta') or 'beta').strip().lower()
-                    if _track_lookup not in ('beta', 'storied'):
-                        _track_lookup = 'beta'
+                    _track_lookup = normalize_track(os.getenv('TOUR_TRACK', 'beta'))
                     conn = psycopg2.connect(
                         host=os.getenv('DB_HOST', 'postgres-2'),
                         database=os.getenv('DB_NAME', 'audiotours'),

@@ -107,16 +107,23 @@ class Endpoints {
     return 'http://$ip:${_localPorts[s]}';
   }
 
-  /// The tester's chosen comparison track: 'beta' (default) or 'storied'.
-  /// Only meaningful in cloud mode. See TRACK_B_STORIED_VS_BETA.md.
+  /// The track this build reports for tour provenance.
+  ///
+  /// For the Subscribed build (Config.isSubscribedBuild) this is always
+  /// 'subscribed' — Subscribed is its own stack and track (D708), not a
+  /// Stable/Preview tester toggle. For Beta/Storied builds it is the tester's
+  /// chosen comparison track: 'beta' (default) or 'storied'. Only meaningful in
+  /// cloud mode. See TRACK_B_STORIED_VS_BETA.md and LOCAL-737.
   static Future<String> cloudTrack() async {
+    if (Config.isSubscribedBuild) return 'subscribed';
     final prefs = await SharedPreferences.getInstance();
-    return prefs.getString('cloud_track') ?? 'beta';
+    return Config.normalizeTrack(prefs.getString('cloud_track') ?? 'beta');
   }
 
   /// Sets the tester's chosen comparison track. Does not affect local mode.
+  /// The Subscribed build does not use this selector (its track is fixed).
   static Future<void> setCloudTrack(String track) async {
-    assert(track == 'beta' || track == 'storied');
+    assert(Config.validTracks.contains(track));
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('cloud_track', track);
   }
@@ -124,12 +131,15 @@ class Endpoints {
   /// Human-facing label for a stored tour's track. Michael 2026-09-01:
   /// testers see Stable/Preview, never the internal branch names beta/storied.
   /// A missing or unknown track ⇒ Stable (that is what every older app made).
+  /// Subscribed tours show "Subscribed" (LOCAL-737 / D708).
   /// When [buildNumber] is present it is appended as "(vNNN)" so a tour listed
   /// a week later still identifies the exact build that produced it; when
   /// absent (older tours, or before services populated it) the bare name shows.
   /// Never compute the number in the app — it is read from the tour record.
   static String trackLabel(String? track, {int? buildNumber}) {
-    final name = track == 'storied' ? 'Preview' : 'Stable';
+    final name = track == 'storied'
+        ? 'Preview'
+        : (track == 'subscribed' ? 'Subscribed' : 'Stable');
     return buildNumber != null ? '$name (v$buildNumber)' : name;
   }
 
