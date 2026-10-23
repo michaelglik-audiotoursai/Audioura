@@ -32,7 +32,9 @@ import '../utils/downloaded_message.dart';
 import '../utils/search_dispatch.dart';
 import '../services/deep_link_service.dart';
 import '../services/communities_service.dart';
+import '../services/community_tour_service.dart';
 import 'community_page_screen.dart';
+import 'communities_hub_screen.dart';
 import 'recovery_code_screen.dart';
 // import '../services/credential_storage_service.dart';  // TEMPORARILY DISABLED - CAUSING BUILD ERRORS
 // import '../services/subscription_article_storage.dart';  // TEMPORARILY DISABLED - CAUSING BUILD ERRORS
@@ -59,6 +61,10 @@ class _HomeScreenState extends State<HomeScreen> {
   List<Marker> _tourMarkers = [];
   // [LOCAL-690] Listed-community pins for the Home map (community badge).
   List<Marker> _communityMarkers = [];
+  // [LOCAL-739 §2] True when the user BELONGS TO or ORGANISES ≥ 1 community —
+  // the gate for the Home-map "My communities" chip (members only). A
+  // non-member never sees the chip. Loaded alongside the community pins.
+  bool _isCommunityMember = false;
   bool _isLoading = true;
   bool _connectionError = false;
   String _appMode = 'Tours';
@@ -126,6 +132,7 @@ class _HomeScreenState extends State<HomeScreen> {
     _initializeSecureEncryption();
     _loadAppMode();
     _loadCommunityPins();
+    _loadCommunityMembership();
     // [LOCAL-709 / D671] A share link (cold/warm start) or a deferred link
     // parks its code in PendingShareSearch; Home runs it through the SAME
     // dispatch path a pasted code takes. Listen for later arrivals (warm start
@@ -155,6 +162,29 @@ class _HomeScreenState extends State<HomeScreen> {
   void dispose() {
     PendingShareSearch.instance.code.removeListener(_onPendingShareSearch);
     super.dispose();
+  }
+
+  /// [LOCAL-739 §2] Learn whether the user BELONGS TO or ORGANISES ≥ 1
+  /// community, to decide whether the Home-map "My communities" chip shows (it
+  /// is members-only). Both reads swallow transport errors and return empty
+  /// lists, so an unreachable Communities backend simply hides the chip.
+  Future<void> _loadCommunityMembership() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final userId = prefs.getString('user_id');
+      if (userId == null || userId.isEmpty) return;
+      final joined = await CommunitiesService.mine(userId);
+      final owned = await CommunityTourService.ownedCommunities(userId);
+      if (!mounted) return;
+      setState(() {
+        _isCommunityMember = CommunityRules.hasAnyCommunity(
+          joinedCount: joined.length,
+          ownedCount: owned.length,
+        );
+      });
+    } catch (_) {
+      // Non-fatal: the chip simply stays hidden.
+    }
   }
 
   /// [LOCAL-690] Load Listed communities and render them as map pins with a
@@ -2658,6 +2688,51 @@ class _HomeScreenState extends State<HomeScreen> {
         sourceItem: sourceItem);
   }
 
+  /// [LOCAL-739 §3] The gate shown when a NON-MEMBER taps Download on a
+  /// members-only community tour (found on Home or opened from an emailed
+  /// link): "This tour is for members of <community>", with a Join action that
+  /// opens the community page and its passes. The community name is fetched for
+  /// the message (a generic wording is used if it cannot be resolved). The tour
+  /// id is carried into the community page as `pendingDownloadTourId`, so after
+  /// the pass is granted that tour downloads automatically and Listen opens —
+  /// exactly as after any other download.
+  Future<void> _showMembersOnlyTourGate(int communityId, int tourId) async {
+    // Resolve the community name for the message (null → generic wording).
+    String? name;
+    try {
+      final c = await CommunitiesService.get(communityId);
+      name = c?.name;
+    } catch (_) {}
+    if (!mounted) return;
+    final join = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Members only'),
+        content: Text(CommunityRules.membersOnlyTourGate(name)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Not now'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Join'),
+          ),
+        ],
+      ),
+    );
+    if (join != true || !mounted) return;
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => CommunityPageScreen(
+          communityId: communityId,
+          pendingDownloadTourId: tourId,
+        ),
+      ),
+    );
+  }
+
   Future<void> _downloadSingleTour(int tourId, [List<String>? languages, Map<String, dynamic>? sourceItem]) async {
     final prefs = await SharedPreferences.getInstance();
     
@@ -2718,15 +2793,12 @@ class _HomeScreenState extends State<HomeScreen> {
             }
           } catch (_) {}
           if (_communityId != null) {
-            if (mounted) {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) =>
-                      CommunityPageScreen(communityId: _communityId),
-                ),
-              );
-            }
+            // [LOCAL-739 §3] A members-only community tour. Show the gate
+            // ("This tour is for members of <community>") with a Join action
+            // that opens the community page and its passes — and carry THIS
+            // tour id so that, after the pass is granted, the tour downloads
+            // automatically and Listen opens (handled by CommunityPageScreen).
+            await _showMembersOnlyTourGate(_communityId, tourId);
             return;
           }
           if (mounted) {
@@ -4246,6 +4318,28 @@ class _HomeScreenState extends State<HomeScreen> {
                     color: _isUsingCustomLocation ? Colors.orange.shade800 : Colors.blue.shade800,
                   ),
                 ),
+                // [LOCAL-739 §2] A "My communities" chip on the Home map, shown
+                // ONLY to a user who belongs to or organises ≥ 1 community. A
+                // non-member never sees it. Opens the single Communities page.
+                if (_isCommunityMember) ...[
+                  const SizedBox(height: 8),
+                  Align(
+                    alignment: Alignment.center,
+                    child: ActionChip(
+                      key: const Key('home_my_communities_chip'),
+                      avatar: const Icon(Icons.groups,
+                          size: 18, color: Colors.deepPurple),
+                      label: const Text('My communities'),
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                              builder: (_) => const CommunitiesHubScreen()),
+                        );
+                      },
+                    ),
+                  ),
+                ],
               ],
             ),
           ),

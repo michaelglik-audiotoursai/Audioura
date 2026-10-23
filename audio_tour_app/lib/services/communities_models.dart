@@ -528,6 +528,113 @@ class CommunityRules {
   /// owner-host outage only affects people joining later. Always true for a
   /// community tour.
   static bool downloadByDefault() => true;
+
+  /// [LOCAL-739 §2] Whether this user BELONGS TO or ORGANISES at least one
+  /// community. This is the single gate for the three members-only entry points
+  /// (the Home map chip, the Generate link, the Listen "My communities (N)"
+  /// row): non-members see none of them, members see all three. A user counts
+  /// as a member when the joined list (/communities/mine) is non-empty OR the
+  /// owned list (/communities/mine-owned) is non-empty — an organiser whose own
+  /// community has no membership row still qualifies.
+  static bool hasAnyCommunity({
+    required int joinedCount,
+    required int ownedCount,
+  }) =>
+      joinedCount > 0 || ownedCount > 0;
+
+  /// [LOCAL-739 §3] The gate shown when a NON-MEMBER taps Download on a
+  /// members-only community tour (found on Home or opened from an emailed
+  /// link): "This tour is for members of <community>", with a Join action that
+  /// opens the community page and its passes. Falls back to a generic wording
+  /// when the community name is not known yet.
+  static String membersOnlyTourGate(String? communityName) =>
+      (communityName == null || communityName.isEmpty)
+          ? 'This tour is for members of a community.'
+          : 'This tour is for members of $communityName.';
+
+  /// [LOCAL-739 §2] The count shown in the Listen "My communities (N)" row and
+  /// anywhere a single combined total is needed: the DISTINCT communities a
+  /// user belongs to or organises. An owned community that also has a
+  /// membership row for the same user is counted once.
+  static int yourCommunitiesCount({
+    required Iterable<int> joinedIds,
+    required Iterable<int> ownedIds,
+  }) =>
+      <int>{...joinedIds, ...ownedIds}.length;
+}
+
+/// [LOCAL-739 §1 (1)] One row of the "Your communities" section of the single
+/// Communities page: a community the user BELONGS TO (a [JoinedCommunity] from
+/// /communities/mine) or ORGANISES (an owned community from
+/// /communities/mine-owned), merged so the page shows ONE list with no second
+/// copy. [joined] carries the member status/expiry for a member row; it is null
+/// for an organiser-only row, which shows "You are the organizer" instead.
+class YourCommunity {
+  final int id;
+  final String name;
+
+  /// True when the user organises this community (owns it). An organiser row
+  /// shows "You are the organizer" rather than a membership/expiry line.
+  final bool isOrganiser;
+
+  /// The membership row for a community the user is a member of; null for an
+  /// organiser-only row. When the user both owns AND is a member, the member
+  /// row is kept so the expiry can still show, with [isOrganiser] true.
+  final JoinedCommunity? joined;
+
+  const YourCommunity({
+    required this.id,
+    required this.name,
+    required this.isOrganiser,
+    this.joined,
+  });
+
+  /// [LOCAL-739 §1] Merge the joined list (/communities/mine) and the owned
+  /// list (/communities/mine-owned) into ONE ordered "Your communities" list,
+  /// de-duplicated by community id. Organiser-owned communities come first
+  /// (the user runs them), then the communities they are only a member of; each
+  /// group keeps the input order. A community in BOTH lists appears once, as an
+  /// organiser row that still carries its membership expiry.
+  static List<YourCommunity> merge({
+    required List<JoinedCommunity> joined,
+    required List<OwnedCommunityRef> owned,
+  }) {
+    final joinedById = {for (final j in joined) j.id: j};
+    final ownedIds = {for (final o in owned) o.id};
+    final out = <YourCommunity>[];
+    // Organiser rows first, in the owned-list order.
+    for (final o in owned) {
+      out.add(YourCommunity(
+        id: o.id,
+        name: o.name,
+        isOrganiser: true,
+        joined: joinedById[o.id],
+      ));
+    }
+    // Then member-only rows, in the joined-list order.
+    for (final j in joined) {
+      if (ownedIds.contains(j.id)) continue; // already shown as an organiser row
+      out.add(YourCommunity(
+        id: j.id,
+        name: j.name,
+        isOrganiser: false,
+        joined: j,
+      ));
+    }
+    return out;
+  }
+}
+
+/// [LOCAL-739 §1] The minimal {id, name} an owner's community needs for the
+/// "Your communities" merge. This mirrors the OwnedCommunity model that lives
+/// in community_tour_models.dart, but communities_models.dart stays
+/// dependency-free (it must not import the community-tour layer), so the merge
+/// takes this tiny local shape instead. The screen adapts OwnedCommunity into
+/// this with [OwnedCommunityRef.fromIdName].
+class OwnedCommunityRef {
+  final int id;
+  final String name;
+  const OwnedCommunityRef({required this.id, required this.name});
 }
 
 /// [LOCAL-700] Flutter-free COPY + form helpers for the Communities UI, so the

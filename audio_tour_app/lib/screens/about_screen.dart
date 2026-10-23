@@ -13,7 +13,7 @@ import 'dart:io' show Platform, Directory;
 
 import 'debug_log_viewer_screen.dart';
 import 'plan_screen.dart';
-import 'communities_about_screen.dart';
+import 'communities_hub_screen.dart';
 import 'recovery_code_screen.dart';
 import '../config/endpoints.dart';
 import '../services/error_handler_service.dart';
@@ -565,11 +565,11 @@ class _AboutScreenState extends State<AboutScreen> {
                         Navigator.push(
                           context,
                           MaterialPageRoute(
-                              builder: (context) => const CommunitiesAboutScreen()),
+                              builder: (context) => const CommunitiesHubScreen()),
                         );
                       },
                       icon: const Icon(Icons.groups_outlined),
-                      label: const Text('About Communities'),
+                      label: const Text('Communities'),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.deepPurple,
                         foregroundColor: Colors.white,
