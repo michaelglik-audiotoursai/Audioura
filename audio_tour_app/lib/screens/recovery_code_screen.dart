@@ -18,14 +18,35 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:share_plus/share_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../config/endpoints.dart';
+import '../utils/first_download_offer.dart';
 import '../utils/recovery_code.dart';
 
 /// SharedPreferences key: have we proactively offered the recovery code after
 /// the first purchase yet? Set once so we never nag.
 const String kRecoveryOfferedKey = 'recovery_code_offered';
+
+/// [LOCAL-740 / B5b] SharedPreferences keys for the first-DOWNLOAD offer.
+const String kRecoveryDownloadCountKey = 'recovery_download_count';
+const String kRecoveryDownloadOfferShownKey = 'recovery_download_offer_shown';
+const String kRecoveryDownloadOfferLaterKey = 'recovery_download_offer_later';
+const String kRecoveryDownloadOfferDoneKey = 'recovery_download_offer_done';
+
+/// [LOCAL-740 / B5b] The day ('yyyy-mm-dd') a recovery-code offer (purchase OR
+/// download) was last shown, so the two offers never both appear in one day.
+const String kRecoveryOfferLastDayKey = 'recovery_offer_last_day';
+
+/// Today as 'yyyy-mm-dd' in local time (the grain the "once a day" rule uses).
+String _todayStamp([DateTime? now]) {
+  final d = (now ?? DateTime.now());
+  final m = d.month.toString().padLeft(2, '0');
+  final day = d.day.toString().padLeft(2, '0');
+  return '${d.year}-$m-$day';
+}
 
 /// Call this right after a purchase completes. The FIRST time it is called it
 /// routes the user to the Recovery code screen with a short explanation, then
@@ -35,6 +56,9 @@ Future<bool> maybeOfferRecoveryCode(BuildContext context) async {
   final prefs = await SharedPreferences.getInstance();
   if (prefs.getBool(kRecoveryOfferedKey) == true) return false;
   await prefs.setBool(kRecoveryOfferedKey, true);
+  // [LOCAL-740 / B5b] Stamp the day so the first-DOWNLOAD offer does not also
+  // fire today.
+  await prefs.setString(kRecoveryOfferLastDayKey, _todayStamp());
   if (!context.mounted) return false;
   await Navigator.push(
     context,
@@ -45,11 +69,100 @@ Future<bool> maybeOfferRecoveryCode(BuildContext context) async {
   return true;
 }
 
+/// [LOCAL-740 / B5b] Call this when ANY download (tour or article) finishes.
+/// Counts the download, then — using the pure [decideFirstDownloadOffer] rule —
+/// shows a one-time offer the first time, asks again after the 3rd download if
+/// the listener tapped "Later", and never again after that or once a code is
+/// made. Never the same day as the first-purchase offer. Returns true if it
+/// showed the offer. Fully defensive: a storage hiccup never blocks a download.
+Future<bool> maybeOfferRecoveryCodeAfterDownload(BuildContext context) async {
+  try {
+    final prefs = await SharedPreferences.getInstance();
+
+    // Count this completed download first.
+    final count = (prefs.getInt(kRecoveryDownloadCountKey) ?? 0) + 1;
+    await prefs.setInt(kRecoveryDownloadCountKey, count);
+
+    // A listener who already saved a code never needs this nudge.
+    final alreadyHasCodePath = prefs.getBool(kRecoveryDownloadOfferDoneKey) == true;
+
+    final state = FirstDownloadOfferState(
+      downloadCount: count,
+      timesShown: prefs.getInt(kRecoveryDownloadOfferShownKey) ?? 0,
+      choseLater: prefs.getBool(kRecoveryDownloadOfferLaterKey) == true,
+      done: alreadyHasCodePath,
+      lastOfferDay: prefs.getString(kRecoveryOfferLastDayKey),
+    );
+
+    final decision = decideFirstDownloadOffer(state, today: _todayStamp());
+    if (!decision.show) return false;
+
+    await prefs.setInt(kRecoveryDownloadOfferShownKey, decision.timesShown);
+    if (decision.lastOfferDay != null) {
+      await prefs.setString(kRecoveryOfferLastDayKey, decision.lastOfferDay!);
+    }
+    if (firstDownloadOfferExhausted(decision.timesShown)) {
+      // The budget (first, then once more after the 3rd download) is spent.
+      await prefs.setBool(kRecoveryDownloadOfferDoneKey, true);
+    }
+
+    if (!context.mounted) return false;
+    final create = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Save your recovery code'),
+        content: const Text(
+          "You'll build up tours and articles in your own language on your "
+          'Listen page; if your phone is lost, this code brings them back.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Later'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Create my code'),
+          ),
+        ],
+      ),
+    );
+
+    if (create == true) {
+      // They opted in: this offer is finished for good, and we open the screen.
+      await prefs.setBool(kRecoveryDownloadOfferDoneKey, true);
+      if (!context.mounted) return true;
+      await Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => const RecoveryCodeScreen()),
+      );
+    } else {
+      // "Later": remember it, so we ask exactly once more after the 3rd
+      // download (the pure rule gates that).
+      await prefs.setBool(kRecoveryDownloadOfferLaterKey, true);
+    }
+    return true;
+  } catch (_) {
+    return false;
+  }
+}
+
 class RecoveryCodeScreen extends StatefulWidget {
   /// When true, the screen opens with a short banner explaining why it appeared
   /// (shown once, right after the first purchase).
   final bool offeredAfterPurchase;
-  const RecoveryCodeScreen({super.key, this.offeredAfterPurchase = false});
+
+  /// [LOCAL-740] Test-only seed for the generated-code state, so a widget test
+  /// can exercise the Copy / Email it to myself / Share buttons and the New-code
+  /// explanation without a network call. Null in all real use.
+  @visibleForTesting
+  final String? initialCode;
+
+  const RecoveryCodeScreen({
+    super.key,
+    this.offeredAfterPurchase = false,
+    this.initialCode,
+  });
 
   @override
   State<RecoveryCodeScreen> createState() => _RecoveryCodeScreenState();
@@ -62,6 +175,12 @@ class _RecoveryCodeScreenState extends State<RecoveryCodeScreen> {
   final TextEditingController _restoreController = TextEditingController();
   String? _restoreMessage;
   Color _restoreMessageColor = Colors.black87;
+
+  @override
+  void initState() {
+    super.initState();
+    _code = widget.initialCode;
+  }
 
   Future<String> _userId() async {
     final prefs = await SharedPreferences.getInstance();
@@ -110,6 +229,34 @@ class _RecoveryCodeScreenState extends State<RecoveryCodeScreen> {
     if (_code == null) return;
     await Clipboard.setData(ClipboardData(text: _code!));
     _snack('Recovery code copied. Save it somewhere safe.', Colors.green);
+  }
+
+  /// [LOCAL-740 / B5] Open the device MAIL COMPOSER pre-filled with the code
+  /// (subject "My Audioura recovery code", code in the body). The app only
+  /// OPENS the composer — the listener sends it — so the code never leaves the
+  /// phone through us. If no mail app can handle it, say so calmly.
+  Future<void> _emailToMyself() async {
+    if (_code == null) return;
+    final uri = recoveryEmailUri(_code!);
+    try {
+      final ok = await launchUrl(uri, mode: LaunchMode.externalApplication);
+      if (!ok) _snack('No email app found to open.', Colors.orange);
+    } catch (e) {
+      _snack('Could not open your email app.', Colors.orange);
+    }
+  }
+
+  /// [LOCAL-740 / B5] Hand the code to the OS share sheet (another email, Notes,
+  /// a password manager, …) so the listener can keep it off the phone wherever
+  /// they like.
+  Future<void> _share() async {
+    if (_code == null) return;
+    try {
+      await Share.share(recoveryShareBody(_code!),
+          subject: kRecoveryEmailSubject);
+    } catch (e) {
+      _snack('Could not open the share sheet.', Colors.orange);
+    }
   }
 
   Future<void> _restore() async {
@@ -251,6 +398,17 @@ class _RecoveryCodeScreenState extends State<RecoveryCodeScreen> {
                 'never the code itself.',
                 style: TextStyle(fontSize: 13),
               ),
+              const SizedBox(height: 10),
+              // [LOCAL-740 / B5] The code only helps if it is saved OFF this
+              // phone BEFORE the phone is lost — say so, and say exactly what it
+              // brings back.
+              const Text(
+                'Keep this code outside this phone, for example email it to '
+                'yourself. If this phone is lost, stolen or broken, the code '
+                'restores your Listen page on a new phone: your tours, paid '
+                'tours and articles.',
+                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+              ),
               const SizedBox(height: 12),
               if (_code != null) ...[
                 SelectableText(
@@ -263,25 +421,40 @@ class _RecoveryCodeScreenState extends State<RecoveryCodeScreen> {
                   ),
                 ),
                 const SizedBox(height: 8),
-                Row(
+                // [LOCAL-740 / B5] Copy (existing) + Email it to myself + Share,
+                // so the code can be kept off the phone the moment it is made.
+                Wrap(
+                  spacing: 10,
+                  runSpacing: 8,
                   children: [
                     ElevatedButton.icon(
                       onPressed: _copy,
                       icon: const Icon(Icons.copy),
                       label: const Text('Copy'),
                     ),
-                    const SizedBox(width: 10),
                     OutlinedButton.icon(
-                      onPressed: _generating ? null : _generate,
-                      icon: const Icon(Icons.refresh),
-                      label: const Text('New code'),
+                      onPressed: _emailToMyself,
+                      icon: const Icon(Icons.email_outlined),
+                      label: const Text('Email it to myself'),
+                    ),
+                    OutlinedButton.icon(
+                      onPressed: _share,
+                      icon: const Icon(Icons.ios_share),
+                      label: const Text('Share'),
                     ),
                   ],
                 ),
+                const SizedBox(height: 10),
+                OutlinedButton.icon(
+                  onPressed: _generating ? null : _generate,
+                  icon: const Icon(Icons.refresh),
+                  label: const Text('New code'),
+                ),
                 const SizedBox(height: 6),
+                // [LOCAL-740 / B5] "New code" explanation.
                 const Text(
-                  'Generating a new code replaces the old one — the old code '
-                  'will stop working.',
+                  'Replaces your code. The old code stops working. Use it if '
+                  'someone else saw your code.',
                   style: TextStyle(fontSize: 11, color: Colors.black54),
                 ),
               ] else

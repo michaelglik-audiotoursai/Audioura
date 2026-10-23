@@ -1564,19 +1564,27 @@ class _MyToursScreenState extends State<MyToursScreen> {
   }
   
   Future<void> _deleteAllTours() async {
+    // [LOCAL-740 / B3] The "delete all" path must carry the paid-tour warning
+    // too — before, it showed a plain "Delete all N tours?" with no mention of
+    // re-purchase even when the batch held tours the listener paid for. The
+    // pure decision lives in DeleteTourPrompt (unit-tested).
+    final prompt = DeleteTourPrompt.decideDeleteAll(
+      tours: _tours.map((t) => Map<String, dynamic>.from(t)).toList(),
+    );
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Delete All Tours'),
-        content: Text('Delete all ${_tours.length} tours? This cannot be undone.'),
+        title: Text(prompt.title),
+        content: Text(prompt.body),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
+            child: Text(prompt.cancelLabel),
           ),
           TextButton(
             onPressed: () => Navigator.pop(context, true),
-            child: const Text('Delete All', style: TextStyle(color: Colors.red)),
+            child: Text(prompt.confirmLabel,
+                style: const TextStyle(color: Colors.red)),
           ),
         ],
       ),

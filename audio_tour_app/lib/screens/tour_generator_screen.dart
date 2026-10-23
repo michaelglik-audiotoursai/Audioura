@@ -23,9 +23,11 @@ import '../services/entitlements_service.dart';
 import '../screens/debug_log_viewer_screen.dart';
 import '../screens/tour_player_screen.dart';
 import '../screens/news_player_screen.dart';
+import 'recovery_code_screen.dart';
 import '../widgets/language_selector.dart';
 import '../utils/tour_request_parser.dart';
 import '../utils/tour_error_resolver.dart';
+import '../utils/url_input.dart';
 import '../utils/generation_completion_message.dart';
 import '../utils/plan_left_summary.dart';
 import '../utils/user_stops.dart';
@@ -2520,9 +2522,18 @@ class _TourGeneratorScreenState extends State<TourGeneratorScreen> {
       }
       
       _tourRequestController.clear();
-      
+
+      // [LOCAL-740 / B5b] An article download just finished — offer the recovery
+      // code (first time, then once more after the 3rd download if "Later",
+      // then never; never the same day as the first-purchase offer). When it
+      // shows, skip the auto-open so the two do not fight over the navigator.
+      bool offered = false;
+      if (mounted && successCount > 0) {
+        offered = await maybeOfferRecoveryCodeAfterDownload(context);
+      }
+
       // Auto-navigate to the last successfully saved article
-      if (mounted && lastSuccessfulPath.isNotEmpty) {
+      if (mounted && !offered && lastSuccessfulPath.isNotEmpty) {
         await DebugLogHelper.addDebugLog('NEWS: Auto-opening news article at: $lastSuccessfulPath');
         Navigator.push(
           context,
@@ -2685,8 +2696,13 @@ class _TourGeneratorScreenState extends State<TourGeneratorScreen> {
   Future<void> _processNewsletterUrl(String userId, String serverIp, String inputText) async {
     try {
       // Parse multiple URLs from input (one per line)
+      // [LOCAL-740 / A3b] Normalize each line through the shared helper: a link
+      // typed without a scheme (e.g. `en.wikipedia.org/wiki/Boston`) gets
+      // `https://` added, the way a browser's address bar does; an `http://` /
+      // `https://` link is kept exactly. The old `!url.startsWith('http')` gate
+      // refused bare domains with "invalid URL" — that is the bug this fixes.
       final urls = inputText.split('\n')
-          .map((url) => url.trim())
+          .map((url) => normalizeUrlInput(url))
           .where((url) => url.isNotEmpty)
           .toList();
       
@@ -2698,10 +2714,11 @@ class _TourGeneratorScreenState extends State<TourGeneratorScreen> {
         throw Exception('Maximum 3 URLs allowed. Please remove extra URLs.');
       }
       
-      // Validate URL formats
+      // Validate URL shape (after normalization every kept line has a scheme;
+      // this catches a line that is not a plausible web link at all).
       for (final url in urls) {
-        if (!url.startsWith('http')) {
-          throw Exception('Invalid URL: $url\nPlease use URLs starting with http:// or https://');
+        if (!looksLikeUrl(url)) {
+          throw Exception('Invalid URL: $url\nPlease enter a web address like example.com');
         }
       }
       

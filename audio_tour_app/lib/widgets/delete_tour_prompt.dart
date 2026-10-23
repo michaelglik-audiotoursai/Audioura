@@ -86,4 +86,37 @@ class DeleteTourPrompt {
     final t = tour['price_tier'];
     return t is num && t > 0;
   }
+
+  /// How many of [tours] were paid for (uses [isPaidTour] per tour).
+  static int paidCount(Iterable<Map<String, dynamic>> tours) =>
+      tours.where(isPaidTour).length;
+
+  /// [LOCAL-740 / B3] The prompt for the "Delete all tours" path. When any of
+  /// the tours was paid for, the body carries the SAME calm paid-tour sentence
+  /// as the single-delete warning, so a listener is never surprised into
+  /// re-buying. With no paid tours it stays the plain "Delete All Tours".
+  factory DeleteTourPrompt.decideDeleteAll({
+    required List<Map<String, dynamic>> tours,
+  }) {
+    final paid = paidCount(tours);
+    if (paid > 0) {
+      return DeleteTourPrompt(
+        title: 'Delete all tours?',
+        body: 'Delete all ${tours.length} tours? This cannot be undone. '
+            '$paid of them ${paid == 1 ? 'is a paid tour' : 'are paid tours'} — '
+            'downloading ${paid == 1 ? 'it' : 'them'} again will require another '
+            'purchase.',
+        confirmLabel: 'Delete All',
+        cancelLabel: 'Cancel',
+        isPaidWarning: true,
+      );
+    }
+    return DeleteTourPrompt(
+      title: 'Delete All Tours',
+      body: 'Delete all ${tours.length} tours? This cannot be undone.',
+      confirmLabel: 'Delete All',
+      cancelLabel: 'Cancel',
+      isPaidWarning: false,
+    );
+  }
 }
