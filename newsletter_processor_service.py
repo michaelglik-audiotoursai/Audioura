@@ -294,45 +294,115 @@ def _is_advertising_content(content):
     
     return False
 
+# Non-Latin letter scripts whose heavy presence marks genuinely non-English
+# content. Each is a (name, compiled-regex) pair. We measure how MUCH of the
+# text is in these scripts, not whether a single such character appears — a
+# single CJK/Cyrillic name in an otherwise-English article (e.g. Wikipedia's
+# interlanguage-link sidebar, which lists the article title in dozens of
+# languages) must NOT reject the whole article. (LOCAL-741)
+_NON_LATIN_SCRIPT_PATTERNS = [
+    ('Chinese',  re.compile(r'[\u4e00-\u9fff]')),
+    ('Hiragana', re.compile(r'[\u3040-\u309f]')),
+    ('Katakana', re.compile(r'[\u30a0-\u30ff]')),
+    ('Korean',   re.compile(r'[\uac00-\ud7af]')),
+    ('Cyrillic', re.compile(r'[\u0400-\u04ff]')),
+    ('Hebrew',   re.compile(r'[\u0590-\u05ff]')),
+    ('Arabic',   re.compile(r'[\u0600-\u06ff]')),
+]
+
+# A text is rejected as non-English only when non-Latin script letters make up
+# at least this fraction of ALL letters. A genuinely non-English article (a
+# Russian or Chinese body) is ~100% non-Latin; an English article carrying a
+# sidebar of interlanguage links is only a few percent, well under the floor.
+_NON_LATIN_REJECT_RATIO = 0.25
+
+_LETTER_RE = re.compile(r'[^\W\d_]', re.UNICODE)
+
+
+def _non_latin_letter_ratio(text):
+    """Fraction of LETTER characters that belong to a non-Latin script.
+
+    Denominator is letters only (digits, spaces and punctuation excluded) so a
+    short run of non-Latin names is measured against the real alphabetic body,
+    not against markup/whitespace.
+    """
+    letters = _LETTER_RE.findall(text)
+    total_letters = len(letters)
+    if total_letters == 0:
+        return 0.0
+    non_latin = 0
+    for ch in letters:
+        for _name, pat in _NON_LATIN_SCRIPT_PATTERNS:
+            if pat.match(ch):
+                non_latin += 1
+                break
+    return non_latin / total_letters
+
+
+def _strip_wrapper_prefix(text):
+    """Drop the service's own 'NEWSLETTER:/ARTICLE:/CONTENT:' wrapper labels so
+    the language check judges the article body, not our English boilerplate."""
+    if not text:
+        return text
+    body = text
+    for marker in ('\n\nCONTENT: ', 'CONTENT: '):
+        idx = body.find(marker)
+        if idx != -1:
+            body = body[idx + len(marker):]
+            break
+    return body
+
+
 def is_english_content(text):
-    """Detect if content is primarily English to avoid processing non-English content"""
+    """Detect if content is primarily English, to avoid TTS cost on genuinely
+    non-English articles — WITHOUT rejecting an English article that merely
+    contains a few non-English names. (LOCAL-741)
+
+    Two independent signals, run on the cleaned article BODY (the wrapper labels
+    this service adds are English and would skew a raw check):
+
+      1. Script prevalence — reject when non-Latin-script letters (CJK, Cyrillic,
+         Hebrew, Arabic, …) are at least `_NON_LATIN_REJECT_RATIO` of all letters.
+         A Russian/Chinese body trips this; an English article with an
+         interlanguage-link sidebar does not (a few percent at most).
+      2. Function-word dominance — for Latin-script foreign text (e.g. French),
+         where signal 1 reads ~0, defer to language_guard's stopword-ratio check
+         on a sample of the body. It flags prose whose foreign function words
+         clearly dominate the English ones.
+
+    An article whose body is overwhelmingly English passes both.
+    """
     if not text or len(text) < 50:
         return True  # Allow short content through
-    
+
     try:
-        # Count English characters vs non-English characters
-        english_chars = sum(1 for c in text if ord(c) < 128)  # ASCII range
-        total_chars = len(text)
-        
-        if total_chars == 0:
-            return True
-        
-        english_ratio = english_chars / total_chars
-        
-        # If less than 70% ASCII characters, likely non-English
-        if english_ratio < 0.7:
-            logging.info(f"Non-English content detected: {english_ratio:.2%} ASCII characters")
+        body = _strip_wrapper_prefix(text)
+
+        # Signal 1: how much of the body is written in a non-Latin script.
+        ratio = _non_latin_letter_ratio(body)
+        if ratio >= _NON_LATIN_REJECT_RATIO:
+            logging.info(
+                f"Non-English content detected: {ratio:.1%} of letters are "
+                f"non-Latin script (threshold {_NON_LATIN_REJECT_RATIO:.0%})"
+            )
             return False
-        
-        # Check for common non-English patterns
-        non_english_patterns = [
-            r'[\u4e00-\u9fff]',  # Chinese characters
-            r'[\u3040-\u309f]',  # Hiragana
-            r'[\u30a0-\u30ff]',  # Katakana
-            r'[\uac00-\ud7af]',  # Korean
-            r'[\u0400-\u04ff]',  # Cyrillic
-            r'[\u0590-\u05ff]',  # Hebrew
-            r'[\u0600-\u06ff]',  # Arabic
-        ]
-        
-        import re
-        for pattern in non_english_patterns:
-            if re.search(pattern, text):
-                logging.info(f"Non-English script detected: {pattern}")
+
+        # Signal 2: Latin-script foreign prose (French, etc.). Use the shared
+        # deterministic function-word check on a representative sample of the
+        # body. Conservative by design: it flags only when foreign function
+        # words clearly dominate, so English with loanwords/accented names passes.
+        try:
+            from language_guard import is_in_tour_language
+            sample = body[:2000]
+            if not is_in_tour_language(sample, "en"):
+                logging.info("Non-English content detected: foreign function-word dominance")
                 return False
-        
+        except Exception as guard_err:
+            # language_guard is best-effort; signal 1 already handled scripts.
+            logging.debug(f"language_guard unavailable, relying on script ratio: {guard_err}")
+
         return True
-        
+
     except Exception as e:
         logging.error(f"Error detecting language: {e}")
         return True  # Default to allowing content
@@ -675,6 +745,75 @@ def extract_all_clickable_urls(soup, base_url):
             urls.append(url)
     
     return list(set(urls))  # Remove duplicates
+
+
+# Signals that a URL is a NEWSLETTER / issue / index page — i.e. a page whose
+# job is to point at other articles, so following its links is correct. (LOCAL-741)
+# Host fragments of the email/newsletter platforms this service already handles.
+_NEWSLETTER_HOST_HINTS = (
+    'mailchi.mp', 'view.email.', 'email.', 'newsletter.',
+    'messaging-custom-newsletters', 'campaign-archive', 'list-manage.com',
+    'constantcontact', 'ctctcdn', 'substack.com',
+)
+# Path fragments that mark a newsletter issue / archive / index rather than one
+# article. A single article URL (e.g. /wiki/Boston, /2026/05/01/some-story) has
+# none of these.
+_NEWSLETTER_PATH_HINTS = (
+    '/issue', '/issues/', '/newsletter', '/newsletters', '/archive',
+    '/campaign', '/digest', '/roundup', '/bulletin',
+)
+# Hosts that are encyclopaedic / single-article by nature — one URL is always
+# ONE article, never an index to crawl. Keeps the Wikipedia case unambiguous.
+_SINGLE_ARTICLE_HOST_HINTS = (
+    'wikipedia.org', 'wikisource.org', 'britannica.com',
+)
+
+
+def is_single_article_page(url, soup=None):
+    """Heuristic: is `url` a single ARTICLE page (vs a newsletter/issue/index)?
+
+    Simple and URL-first (LOCAL-741). A listener who pastes one article link
+    wants THAT article — not ten pages linked from it. We treat the page as a
+    newsletter (and so follow its links) ONLY when it clearly looks like one:
+
+      - the host is a known newsletter/email platform, OR
+      - the path contains a newsletter/issue/archive marker, OR
+      - the URL is a bare site root (``/`` or empty path) on an unknown host —
+        a homepage is an index, not an article.
+
+    Anything else — including an encyclopaedic single-article host such as
+    Wikipedia, or a normal ``/section/slug`` story URL — is a single article.
+    Returns True for a single article, False for a newsletter/index.
+    """
+    try:
+        parsed = urlparse(url)
+        host = (parsed.netloc or '').lower().replace('www.', '')
+        path = (parsed.path or '').rstrip('/').lower()
+
+        # Encyclopaedic / inherently single-article hosts: always one article.
+        if any(h in host for h in _SINGLE_ARTICLE_HOST_HINTS):
+            return True
+
+        # Known newsletter/email platforms: treat as a newsletter (crawl links).
+        if any(h in host for h in _NEWSLETTER_HOST_HINTS):
+            return False
+
+        # Newsletter/issue/archive markers in the path: a newsletter index.
+        if any(p in path for p in _NEWSLETTER_PATH_HINTS):
+            return False
+
+        # Bare site root on an unknown host is an index/homepage, not an article.
+        if path in ('', '/'):
+            return False
+
+        # Default: a normal content URL with a real path is a single article.
+        return True
+    except Exception as e:
+        logging.error(f"is_single_article_page failed for {url}: {e}")
+        # Fail safe toward the cheaper behaviour: treat as single article so we
+        # do not crawl a pile of linked pages the listener never asked for.
+        return True
+
 
 @app.route('/health', methods=['GET'])
 def health_check():
@@ -1580,108 +1719,120 @@ def process_newsletter():
             logging.error(f"Error extracting main newsletter content: {e}")
         
         # 2. LINKED ARTICLES - Enhanced Pattern Recognition
-        from newsletter_pattern_detector import detect_newsletter_patterns
-        
-        # Use pattern recognition to find articles - use processing_url for better pattern detection
-        pattern_articles = detect_newsletter_patterns(soup, processing_url)
-        logging.info(f"Pattern recognition found {len(pattern_articles)} articles")
-        
-        # Add pattern-detected articles
-        for article in pattern_articles:
-            article_urls.append({
-                'url': article['url'],
-                'clean_url': clean_url(article['url']),
-                'title': article['title'],
-                'date': datetime.now(),
-                'is_main_article': False,
-                'pattern': article['pattern'],
-                'summary': article.get('summary', '')
-            })
-        
-        # Fallback: Extract URLs from all clickable HTML elements (for missed patterns)
-        all_urls = extract_all_clickable_urls(soup, processing_url)
-        logging.info(f"Fallback extraction found {len(all_urls)} total clickable URLs")
-        
-        # Enhanced URL filtering for PR Newswire and related articles
-        existing_urls = {article['url'] for article in article_urls}
-        for url in all_urls:
-            if url in existing_urls:
-                continue
-                
-            # Skip internal/navigation URLs
-            if any(skip in url.lower() for skip in [
-                '/subscribe', '/login', '/account', '/newsletter', '/events/community/add',
-                'javascript:', 'mailto:', '#', '/search', '/contact', '/about', '/privacy',
-                '/terms', '/cookie', '/rss', '/feed', 'facebook.com', 'twitter.com', 'linkedin.com',
-                '/topics/', '/category/', '/tag/', '/section/', '/authors/', '/columnist/'
-            ]):
-                continue
+        # (LOCAL-741) Only crawl linked pages when the submitted URL is clearly a
+        # NEWSLETTER / issue / index page. When the listener pastes a single
+        # ARTICLE link (e.g. a Wikipedia article), process THAT article and do
+        # not follow its links — a one-article paste must give that one article,
+        # not ten linked pages.
+        single_article = is_single_article_page(processing_url, soup)
+        if single_article:
+            logging.info(
+                f"[SINGLE-ARTICLE] {processing_url} looks like a single article page — "
+                f"skipping linked-page crawl (processing the article itself only)"
+            )
+        else:
+            from newsletter_pattern_detector import detect_newsletter_patterns
             
-            # News article URLs from known domains
-            news_domains = [
-                'bostonglobe.com', 'nytimes.com', 'washingtonpost.com', 'reuters.com', 'ap.org',
-                'newtonbeacon.org', 'boston.com', 'wbur.org', 'wcvb.com', 'nbcboston.com',
-                'bloomberg.com', 'wsj.com', 'cnbc.com', 'marketwatch.com', 'fortune.com'
-            ]
+            # Use pattern recognition to find articles - use processing_url for better pattern detection
+            pattern_articles = detect_newsletter_patterns(soup, processing_url)
+            logging.info(f"Pattern recognition found {len(pattern_articles)} articles")
             
-            # Company/investor URLs that might have valuable content
-            company_domains = [
-                'investor.', 'investors.', 'ir.', '/investor-relations', '/press-release',
-                '/news-release', '/press/', '/news/', '/media/'
-            ]
-            
-            # PR Newswire related content
-            pr_indicators = [
-                'prnewswire.com', 'businesswire.com', 'globenewswire.com', 'marketwatch.com/press-release'
-            ]
-            
-            is_relevant = False
-            article_type = 'News Article'
-            
-            # Check for news domains
-            if any(domain in url for domain in news_domains):
-                is_relevant = True
-                article_type = 'News Article'
-            
-            # Check for company/investor content
-            elif any(indicator in url.lower() for indicator in company_domains):
-                is_relevant = True
-                article_type = 'Company News'
-            
-            # Check for PR/press release content
-            elif any(indicator in url for indicator in pr_indicators):
-                is_relevant = True
-                article_type = 'Press Release'
-            
-            # For PR Newswire pages, also check for related company links
-            elif 'prnewswire.com' in processing_url and len(url) > 50:
-                # Look for substantial URLs that might be company pages or related content
-                parsed_url = urlparse(url)
-                if (parsed_url.netloc and 
-                    not parsed_url.netloc.endswith('.png') and 
-                    not parsed_url.netloc.endswith('.jpg') and
-                    len(parsed_url.path) > 5):
-                    is_relevant = True
-                    article_type = 'Related Content'
-            
-            # Skip non-English URLs to prevent processing costs
-            if '/kr/' in url or '/zh/' in url or '/ja/' in url or '/es/' in url or '/fr/' in url or '/de/' in url:
-                continue
-                
-            if is_relevant:
+            # Add pattern-detected articles
+            for article in pattern_articles:
                 article_urls.append({
-                    'url': url,
-                    'clean_url': clean_url(url),
-                    'title': article_type,
+                    'url': article['url'],
+                    'clean_url': clean_url(article['url']),
+                    'title': article['title'],
                     'date': datetime.now(),
                     'is_main_article': False,
-                    'pattern': 'enhanced_fallback',
-                    'article_type': article_type
+                    'pattern': article['pattern'],
+                    'summary': article.get('summary', '')
                 })
+            
+            # Fallback: Extract URLs from all clickable HTML elements (for missed patterns)
+            all_urls = extract_all_clickable_urls(soup, processing_url)
+            logging.info(f"Fallback extraction found {len(all_urls)} total clickable URLs")
+            
+            # Enhanced URL filtering for PR Newswire and related articles
+            existing_urls = {article['url'] for article in article_urls}
+            for url in all_urls:
+                if url in existing_urls:
+                    continue
+                    
+                # Skip internal/navigation URLs
+                if any(skip in url.lower() for skip in [
+                    '/subscribe', '/login', '/account', '/newsletter', '/events/community/add',
+                    'javascript:', 'mailto:', '#', '/search', '/contact', '/about', '/privacy',
+                    '/terms', '/cookie', '/rss', '/feed', 'facebook.com', 'twitter.com', 'linkedin.com',
+                    '/topics/', '/category/', '/tag/', '/section/', '/authors/', '/columnist/'
+                ]):
+                    continue
                 
-                # Limit to prevent too many articles
-                if len(article_urls) >= max_articles:
-                    break
+                # News article URLs from known domains
+                news_domains = [
+                    'bostonglobe.com', 'nytimes.com', 'washingtonpost.com', 'reuters.com', 'ap.org',
+                    'newtonbeacon.org', 'boston.com', 'wbur.org', 'wcvb.com', 'nbcboston.com',
+                    'bloomberg.com', 'wsj.com', 'cnbc.com', 'marketwatch.com', 'fortune.com'
+                ]
+                
+                # Company/investor URLs that might have valuable content
+                company_domains = [
+                    'investor.', 'investors.', 'ir.', '/investor-relations', '/press-release',
+                    '/news-release', '/press/', '/news/', '/media/'
+                ]
+                
+                # PR Newswire related content
+                pr_indicators = [
+                    'prnewswire.com', 'businesswire.com', 'globenewswire.com', 'marketwatch.com/press-release'
+                ]
+                
+                is_relevant = False
+                article_type = 'News Article'
+            
+            # Check for news domains
+                if any(domain in url for domain in news_domains):
+                    is_relevant = True
+                    article_type = 'News Article'
+                
+                # Check for company/investor content
+                elif any(indicator in url.lower() for indicator in company_domains):
+                    is_relevant = True
+                    article_type = 'Company News'
+                
+                # Check for PR/press release content
+                elif any(indicator in url for indicator in pr_indicators):
+                    is_relevant = True
+                    article_type = 'Press Release'
+                
+                # For PR Newswire pages, also check for related company links
+                elif 'prnewswire.com' in processing_url and len(url) > 50:
+                    # Look for substantial URLs that might be company pages or related content
+                    parsed_url = urlparse(url)
+                    if (parsed_url.netloc and 
+                        not parsed_url.netloc.endswith('.png') and 
+                        not parsed_url.netloc.endswith('.jpg') and
+                        len(parsed_url.path) > 5):
+                        is_relevant = True
+                        article_type = 'Related Content'
+                
+                # Skip non-English URLs to prevent processing costs
+                if '/kr/' in url or '/zh/' in url or '/ja/' in url or '/es/' in url or '/fr/' in url or '/de/' in url:
+                    continue
+                    
+                if is_relevant:
+                    article_urls.append({
+                        'url': url,
+                        'clean_url': clean_url(url),
+                        'title': article_type,
+                        'date': datetime.now(),
+                        'is_main_article': False,
+                        'pattern': 'enhanced_fallback',
+                        'article_type': article_type
+                    })
+                    
+                    # Limit to prevent too many articles
+                    if len(article_urls) >= max_articles:
+                        break
         
         # Limit articles but ensure main article is first
         # GUARDRAIL: Reject articles with garbage titles (>100 chars or chrome keywords)
