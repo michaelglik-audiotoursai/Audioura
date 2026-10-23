@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:shared_preferences/shared_preferences.dart';
 // [LOCAL-713 / D675] Community-tour download foundation — PURE helpers.
 //
@@ -544,3 +546,173 @@ class RefreshPlanner {
 /// unit-tested and comes from a single source.
 String refreshedMessage(String tourName) =>
     '$tourName was updated by the organiser.';
+
+// ─── [LOCAL-748] Community-page download sourceItem + record stamping ────────
+//
+// Michael's test (2026-10-23): the organiser's edit never reached the member
+// because the community-page Download saved the record with NO community_id and
+// NO version — so CommunityToursSync._heldCommunityTourRecords skipped it and
+// RefreshPlanner never saw it. The fix is two parts, both PURE here so they are
+// unit-tested without a running app:
+//   1. communityTourSourceItem — the sourceItem the community-page Download
+//      passes to TourDownloadService.saveTourToMyTours, carrying the row's
+//      community_id/version/updated_at so the saved record is stamped at
+//      download time (saveTourToMyTours already reads these keys).
+//   2. stampCommunityIdOnSavedRecords — repair records ALREADY on phones: when
+//      the community page loads, stamp community_id (and version 1 when missing)
+//      onto saved records whose server_tour_id matches one of that community's
+//      tours. No re-download needed.
+
+/// The sourceItem a community-page Download passes so the saved record carries
+/// the community id, the tour's version and its updated_at (the keys
+/// saveTourToMyTours reads). [version] defaults to 1 for a tour never edited;
+/// [updatedAt] may be null. PURE.
+Map<String, dynamic> communityTourSourceItem({
+  required int communityId,
+  int version = 1,
+  String? updatedAt,
+}) {
+  final m = <String, dynamic>{
+    'community_id': communityId,
+    'version': version,
+  };
+  if (updatedAt != null && updatedAt.isNotEmpty) m['updated_at'] = updatedAt;
+  return m;
+}
+
+/// [LOCAL-748] Repair the saved_tours records already on the phone so a tour
+/// downloaded BEFORE this fix (no community_id, no version) becomes visible to
+/// the held-tour refresh. Given the raw saved_tours JSON strings, the community
+/// id, and the set of that community's server tour ids (as strings), it returns
+/// a NEW list with community_id (and version 1 when missing) stamped onto every
+/// record whose `server_tour_id` or `tour_id` matches one of the community's
+/// tours AND does not already carry a community_id. Returns null when nothing
+/// changed (so the caller can skip the write). PURE (JSON in, JSON out).
+List<String>? stampCommunityIdOnSavedRecords({
+  required List<String> savedToursJson,
+  required int communityId,
+  required Set<String> communityTourIds,
+}) {
+  if (communityTourIds.isEmpty) return null;
+  var changed = false;
+  final out = <String>[];
+  for (final s in savedToursJson) {
+    Map<String, dynamic>? m;
+    try {
+      final decoded = jsonDecode(s);
+      if (decoded is Map<String, dynamic>) m = decoded;
+    } catch (_) {}
+    if (m == null) {
+      out.add(s);
+      continue;
+    }
+    final sid = (m['server_tour_id'] ?? '').toString();
+    final tid = (m['tour_id'] ?? '').toString();
+    final matches = (sid.isNotEmpty && communityTourIds.contains(sid)) ||
+        (tid.isNotEmpty && communityTourIds.contains(tid));
+    // Already carries a (non-zero) community_id → leave it alone.
+    final rawCid = m['community_id'];
+    final hasCid = rawCid is num
+        ? rawCid.toInt() != 0
+        : (rawCid is String && (int.tryParse(rawCid.trim()) ?? 0) != 0);
+    if (matches && !hasCid) {
+      m['community_id'] = communityId;
+      // Stamp version 1 only when the record has no version at all, so the
+      // refresh has a baseline to compare the server version against. Never
+      // overwrite a real version.
+      if (m['version'] == null && m['tour_version'] == null) {
+        m['version'] = 1;
+      }
+      out.add(jsonEncode(m));
+      changed = true;
+    } else {
+      out.add(s);
+    }
+  }
+  return changed ? out : null;
+}
+
+// ─── [LOCAL-748] New-tour announcement policy (member's phone) ───────────────
+//
+// Michael's test: no announcement on the member's phone when the organiser adds
+// a tour. When the sync finds a new tour in a community the user belongs to,
+// show ONE short message. Once per tour; NEVER for the user's own tours (the
+// owner made it). The pure policy here decides WHICH new tours to announce; the
+// sync shell emits the message and records the announced ids.
+
+/// One new-tour announcement the sync should surface: the tour id, its
+/// community name and the tour's display title, plus whether it was
+/// auto-downloaded (so the shell shows "View" vs "Download"). PURE value.
+class NewTourAnnouncement {
+  final int tourId;
+  final String communityName;
+  final String tourName;
+  final bool autoDownloaded;
+
+  const NewTourAnnouncement({
+    required this.tourId,
+    required this.communityName,
+    required this.tourName,
+    required this.autoDownloaded,
+  });
+
+  @override
+  bool operator ==(Object other) =>
+      other is NewTourAnnouncement &&
+      other.tourId == tourId &&
+      other.communityName == communityName &&
+      other.tourName == tourName &&
+      other.autoDownloaded == autoDownloaded;
+
+  @override
+  int get hashCode =>
+      Object.hash(tourId, communityName, tourName, autoDownloaded);
+
+  @override
+  String toString() => 'NewTourAnnouncement(t:$tourId, c:$communityName, '
+      'name:$tourName, auto:$autoDownloaded)';
+}
+
+/// The ONE short message for a new community tour (D675 part 2 §). PURE so the
+/// wording is a single source of truth and unit-tested.
+String newTourMessage(String communityName, String tourName) =>
+    'New tour in $communityName: $tourName';
+
+/// [LOCAL-748] PURE policy: which new tours to ANNOUNCE on the member's phone.
+/// Given the new tours from /communities/new-tours, the ids of communities this
+/// user OWNS (the user's own tours live there — never announced), the set of
+/// ids ALREADY announced (announce once per tour), and the ids that were
+/// auto-downloaded this run (so the message offers View rather than Download),
+/// it returns EXACTLY the announcements to show, in the input order.
+///
+/// Rules, in order, per new tour:
+///   * skip a tour in a community the user OWNS ([ownedCommunityIds]) — the
+///     organiser made it, so the member is never told about their own tour;
+///   * skip a tour already announced ([announcedTourIds]) — once per tour;
+///   * otherwise announce it; autoDownloaded is true when its id is in
+///     [autoDownloadedTourIds].
+List<NewTourAnnouncement> planNewTourAnnouncements({
+  required List<NewCommunityTour> newTours,
+  required Set<int> ownedCommunityIds,
+  required Set<String> announcedTourIds,
+  required Set<int> autoDownloadedTourIds,
+}) {
+  final out = <NewTourAnnouncement>[];
+  for (final t in newTours) {
+    if (ownedCommunityIds.contains(t.communityId)) continue;
+    if (announcedTourIds.contains(t.tourId.toString())) continue;
+    final name =
+        t.shortTitle.trim().isNotEmpty ? t.shortTitle.trim() : 'a new tour';
+    out.add(NewTourAnnouncement(
+      tourId: t.tourId,
+      communityName: t.communityName,
+      tourName: name,
+      autoDownloaded: autoDownloadedTourIds.contains(t.tourId),
+    ));
+  }
+  return out;
+}
+
+/// The SharedPreferences key for the set of new-tour ids already announced to
+/// the member, so each is announced at most once (D675 part 2 §).
+const String kAnnouncedNewTourIdsPrefKey = 'announced_new_tour_ids';

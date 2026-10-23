@@ -103,6 +103,35 @@ class CommunityToursSync {
 
   static void _noopMessage(String _) {}
 
+  /// [LOCAL-748] The community ids the user OWNS — a tour in one of these is the
+  /// user's OWN tour and is NEVER announced to them. Seam for tests; defaults to
+  /// `/communities/mine-owned`. Empty on any failure (so a lookup failure never
+  /// suppresses a legitimate announcement — the owned check simply matches
+  /// nothing).
+  static Future<Set<int>> Function(String userId) fetchOwnedCommunityIds =
+      _defaultOwnedCommunityIds;
+
+  /// [LOCAL-748] Announce ONE new community tour to the member (D675 part 2 §).
+  /// Defaults to a no-op; main wires it to a snackbar/notification. Called once
+  /// per new tour (never for the user's own tours), carrying the message plus
+  /// the tour id + whether it was auto-downloaded (so the UI can offer View vs
+  /// Download).
+  static void Function(NewTourAnnouncement announcement, String message)
+      onNewTourAnnouncement = _noopAnnouncement;
+
+  static void _noopAnnouncement(NewTourAnnouncement _, String __) {}
+
+  static Future<Set<int>> _defaultOwnedCommunityIds(String userId) async {
+    final ids = <int>{};
+    try {
+      final owned = await CommunityTourService.ownedCommunities(userId);
+      for (final c in owned) {
+        if (c.id != 0) ids.add(c.id);
+      }
+    } catch (_) {}
+    return ids;
+  }
+
   static Future<Set<int>> _defaultActiveCommunityIds(String userId) async {
     final ids = <int>{};
     try {
@@ -195,15 +224,28 @@ class CommunityToursSync {
           );
           planned = plan.length;
 
+          final autoDownloadedIds = <int>{};
           for (final d in plan) {
             final r = await download(d.tourId);
             if (r.status == TourDownloadStatus.ok ||
                 r.status == TourDownloadStatus.alreadyOnPhone) {
               ok++;
+              autoDownloadedIds.add(d.tourId);
             } else {
               failed++;
             }
           }
+
+          // [LOCAL-748] Announce the new tours to the member — ONE short message
+          // per tour, once per tour, NEVER for the user's own tours. A tour that
+          // was auto-downloaded this run offers "View"; one that was not (auto-
+          // download off, or on a metered connection) offers "Download".
+          await _announceNewTours(
+            prefs: prefs,
+            userId: userId,
+            newTours: result.tours,
+            autoDownloadedTourIds: autoDownloadedIds,
+          );
 
           // D675 §: advance `since` only after the downloads SUCCEED.
           final haveServerTime =
@@ -242,6 +284,40 @@ class CommunityToursSync {
     } finally {
       _running = false;
     }
+  }
+
+  /// [LOCAL-748] Announce the new community tours to the member. ONE short
+  /// message per NEW tour, at most once per tour, NEVER for a tour in a
+  /// community the user OWNS. The pure [planNewTourAnnouncements] decides which
+  /// tours to announce (skipping owned communities + already-announced ids);
+  /// this shell reads/writes the announced-ids set and emits each message via
+  /// the [onNewTourAnnouncement] seam. [autoDownloadedTourIds] are the ids
+  /// actually downloaded this run (so each message offers View vs Download).
+  Future<void> _announceNewTours({
+    required SharedPreferences prefs,
+    required String userId,
+    required List<NewCommunityTour> newTours,
+    required Set<int> autoDownloadedTourIds,
+  }) async {
+    if (newTours.isEmpty) return;
+    final ownedIds = await fetchOwnedCommunityIds(userId);
+    final announced =
+        (prefs.getStringList(kAnnouncedNewTourIdsPrefKey) ?? const []).toSet();
+
+    final toAnnounce = planNewTourAnnouncements(
+      newTours: newTours,
+      ownedCommunityIds: ownedIds,
+      announcedTourIds: announced,
+      autoDownloadedTourIds: autoDownloadedTourIds,
+    );
+    if (toAnnounce.isEmpty) return;
+
+    for (final a in toAnnounce) {
+      onNewTourAnnouncement(a, newTourMessage(a.communityName, a.tourName));
+      announced.add(a.tourId.toString());
+    }
+    await prefs.setStringList(
+        kAnnouncedNewTourIdsPrefKey, announced.toList());
   }
 
   /// [LOCAL-746] The held-community-tour refresh pass. Gathers the community
