@@ -83,19 +83,7 @@ except Exception:  # pragma: no cover - import shim for isolated tests
         return re.sub(r"\s+", " ", depunct).strip()
 
 
-# [LOCAL-756 B] Pool-logic version. LOCAL-751/756 changed how a NAMED PLACE in
-# the request is delivered (D562: a named place is verified as a stop or
-# announced, never silently dropped). Pooled stops written by the older pipeline
-# predate that rule, so they must be regenerated rather than served verbatim.
-# We bump the pool key by an ADDITIVE pool-logic offset — this retires only the
-# stop_pool rows (it is folded into the pool_key below), leaving the shared tour
-# cache (TOUR_CACHE_VERSION) untouched. Rule: bump _POOL_LOGIC_BUMP whenever a
-# merge changes how a pooled tour is DELIVERED (not just generated). A stored
-# row's pool_version is compared against POOL_VERSION on read so a row under an
-# older value is treated as stale and regenerated.
-_POOL_LOGIC_BUMP = 1  # LOCAL-756: named-place delivery rule on the pool path
-
-POOL_VERSION = _POOL_VERSION + _POOL_LOGIC_BUMP
+POOL_VERSION = _POOL_VERSION
 
 
 # ── [LOCAL-655] news freshness ────────────────────────────────────────────────
@@ -791,7 +779,7 @@ def get_pool_stops(
                        address, coordinates, type_specialty, specific_examples,
                        operational_details, sources_json, story_elements_json,
                        generated_at, hit_count, title_norm, research_cost_usd,
-                       stop_record_json, pool_version
+                       stop_record_json
                 FROM stop_pool
                 WHERE pool_key = ANY(%s)
                   -- [LOCAL-655] A stop carrying a dated news item is reusable only
@@ -873,10 +861,6 @@ def get_pool_stops(
             "research_cost_usd": float(r[15]) if r[15] is not None else 0.0,
             # [LOCAL-644] the structured record this stop renders from on reuse.
             "stop_record": _rec,
-            # [LOCAL-756 B] The pool_version the row was written under, so the
-            # orchestrator can regenerate rows that predate the current delivery
-            # rules instead of serving them verbatim.
-            "pool_version": int(r[17]) if r[17] is not None else 0,
         })
     logger.info(f"[POOL] {len(stops)} pooled stop(s) across keys {keys}")
     return stops

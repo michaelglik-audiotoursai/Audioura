@@ -36,87 +36,6 @@ from typing import Optional, Tuple, List, Dict
 logger = logging.getLogger(__name__)
 
 
-def _pool_covers_named_places(location: str, pooled_rows: List[Dict]) -> bool:
-    """[LOCAL-756 B / D562] True when every place the request NAMES is present
-    among the pooled stops; False when the request names a place the pool does
-    not cover.
-
-    A request like "Walking tour in Danvers, MA including Witchcraft Victims
-    Memorial" NAMES a stop the listener wants. The pool was stored before the
-    named-place policy existed, so serving it verbatim silently drops that stop
-    (D562). This decides whether the pool MAY be served as-is: it may only when
-    it already contains each named place; otherwise the caller regenerates so
-    apply_named_place_policy runs (verify the named place as a new stop, or
-    announce it — never silently drop it).
-
-    Matching reuses the SAME accent-folded / article-stripped landmark matcher
-    the walking path uses, so "the Witch House" matches a pooled "Witch House".
-    Pure and deterministic — no network. Returns True (pool may serve) when the
-    request names nothing, when the helpers are unavailable, or on any error, so
-    a parsing problem never blocks an otherwise-valid pool delivery.
-    """
-    try:
-        from area_resolver import (extract_named_places_from_clause,
-                                   _normalize_landmark_name)
-    except Exception:
-        return True
-    try:
-        named = extract_named_places_from_clause(location or "")
-    except Exception:
-        return True
-    if not named:
-        return True
-
-    _pool_norms = []
-    for r in (pooled_rows or []):
-        try:
-            _pool_norms.append(_normalize_landmark_name(r.get("title", "") or ""))
-        except Exception:
-            continue
-    _pool_norms = [n for n in _pool_norms if n]
-
-    for raw in named:
-        try:
-            nn = _normalize_landmark_name(raw)
-        except Exception:
-            nn = (raw or "").strip().lower()
-        if not nn:
-            continue
-        covered = any(nn == pn or nn in pn or pn in nn for pn in _pool_norms)
-        if not covered:
-            logger.info(f"[LOCAL-756] named place {raw!r} is not among the pooled "
-                        f"stops — pool must not serve as-is")
-            return False
-    return True
-
-
-def _pool_has_stale_rows(pooled_rows: List[Dict]) -> bool:
-    """[LOCAL-756 B] True when any pooled row predates the current pool_version.
-
-    The pool_key already namespaces by POOL_VERSION, so a version bump normally
-    retires older rows. This is a belt-and-braces compare on the row's stored
-    pool_version for the case where a row lives under the current key but was
-    written by an older pipeline (the Danvers pool, tour 736): a row below the
-    current POOL_VERSION is regenerated rather than served verbatim. Returns
-    False (nothing stale) when the version is unavailable, so an isolated test or
-    an older store schema never blocks a valid delivery.
-    """
-    try:
-        from stop_pool_store import POOL_VERSION
-    except Exception:
-        return False
-    for r in (pooled_rows or []):
-        try:
-            v = int(r.get("pool_version", POOL_VERSION))
-        except Exception:
-            v = POOL_VERSION
-        if v < POOL_VERSION:
-            logger.info(f"[LOCAL-756] pooled stop {r.get('title')!r} is "
-                        f"pool_version {v} < current {POOL_VERSION} — stale")
-            return True
-    return False
-
-
 @contextlib.contextmanager
 def _suppress_inline_shortfall():
     """[LOCAL-612] Suppress the main delivery loop's inline D616 shortfall sentence
@@ -343,33 +262,6 @@ def maybe_generate_with_pool(
     header_cat, display_cat = _header_categories(tour_category, tour_type)
     print(f"  [LOCAL-590] pool: venue={identity} type={tour_type} category={tour_category} "
           f"contained={contained} requested={N} pooled={K}")
-
-    # [LOCAL-756 B / D562] NAMED-PLACE RULE ON POOL DELIVERY. A pool stored before
-    # the named-place policy existed (Danvers tour 736, pre-LOCAL-751) serves its
-    # 4 stops verbatim — so neither the area-parse fix nor apply_named_place_policy
-    # ever runs, and a place the listener NAMED ("including Witchcraft Victims
-    # Memorial") is silently missing again. The pool must apply the SAME rule: when
-    # the request NAMES a place (extract_named_places_from_clause) that is not among
-    # the pooled stops, the pool must NOT serve the tour as-is. We fall through to
-    # full generation (return None), which runs apply_named_place_policy — the
-    # named place is generated as a verified stop or ANNOUNCED ("We could not
-    # confirm …"), never silently dropped. Deterministic; no network here.
-    if K > 0 and not _pool_covers_named_places(location, pooled_rows):
-        print(f"  [LOCAL-756] pool NOT served: the request names a place absent "
-              f"from the {K} pooled stop(s) — regenerating so the named-place "
-              f"policy runs (D562)")
-        return None
-
-    # [LOCAL-756 B] STALE-PIPELINE GUARD. Pooled stops written by an older pipeline
-    # must not bypass rules added later. Each row carries pool_version; a row whose
-    # version is below the current POOL_VERSION predates the current delivery rules
-    # and is regenerated rather than reused. Rule: serve from the pool only when
-    # EVERY pooled row is at the current POOL_VERSION; if any row is stale, fall
-    # through to full generation (which re-pools the stops at the current version).
-    if K > 0 and _pool_has_stale_rows(pooled_rows):
-        print(f"  [LOCAL-756] pool NOT served: one or more of the {K} pooled "
-              f"stop(s) predate the current pool_version — regenerating")
-        return None
 
     # Nothing to reuse and a full request.
     if K == 0:

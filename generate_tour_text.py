@@ -11078,10 +11078,11 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
                     # And Discount Partners" in the Salem row); reject_chrome_titles
                     # drops it so it never reaches _museum_verified_reserve and
                     # becomes a stop via the LOCAL-632 replacement-until-N backfill.
-                    _cached_canon = set(_det_cache['canonical_titles'])
+                    _cached_canon = list(_det_cache['canonical_titles'])
                     try:
                         from exhibition_discovery import reject_chrome_titles as _rc_det
-                        _cached_canon = set(_rc_det(_cached_canon, _museum_venue_name))
+                        _kept_canon = set(_rc_det(set(_cached_canon), _museum_venue_name))
+                        _cached_canon = [t for t in _cached_canon if t in _kept_canon]  # keep cache order
                     except Exception:
                         pass
                     for _ct in _cached_canon:
@@ -12316,10 +12317,11 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
                     # they become documented/fill material (Salem "Discounts And
                     # Discount Partners"). Mirrors the filter on the other Source-3
                     # loop so the junk never reaches the reserve on either branch.
-                    _cached_canon = set(_det_cache['canonical_titles'])
+                    _cached_canon = list(_det_cache['canonical_titles'])
                     try:
                         from exhibition_discovery import reject_chrome_titles as _rc_det
-                        _cached_canon = set(_rc_det(_cached_canon, _museum_venue_name))
+                        _kept_canon = set(_rc_det(set(_cached_canon), _museum_venue_name))
+                        _cached_canon = [t for t in _cached_canon if t in _kept_canon]  # keep cache order
                     except Exception:
                         pass
                     for _ct in _cached_canon:
