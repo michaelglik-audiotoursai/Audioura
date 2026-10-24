@@ -44,7 +44,23 @@ class TranslationService {
         return result;
       } else {
         await DebugLogHelper.addDebugLog('Translation: Error ${response.statusCode} - ${response.body}');
-        return {'status': 'error', 'message': 'Translation failed: ${response.statusCode}'};
+        // [LOCAL-760 / D708] Carry the server's error_code (and status) through
+        // so the caller can map a 403 translation_not_offered to the broadcast
+        // D708 message instead of the misleading "older tour" wording. A body
+        // that is not JSON simply yields no error_code.
+        String? errorCode;
+        try {
+          final decoded = jsonDecode(response.body);
+          if (decoded is Map && decoded['error_code'] is String) {
+            errorCode = decoded['error_code'] as String;
+          }
+        } catch (_) {}
+        return {
+          'status': 'error',
+          'message': 'Translation failed: ${response.statusCode}',
+          'status_code': response.statusCode,
+          if (errorCode != null) 'error_code': errorCode,
+        };
       }
     } catch (e) {
       await DebugLogHelper.addDebugLog('Translation: Exception - $e');

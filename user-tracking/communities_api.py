@@ -965,7 +965,7 @@ def _tours_for(cur, community_id):
         """SELECT t.id, t.tour_name, COALESCE(t.stops_count, 0), t.created_at,
                   COALESCE((SELECT MAX(v.version_no) FROM audio_tour_versions v
                              WHERE v.tour_id = t.id), 0) + 1,
-                  t.language
+                  t.language, t.source_kind
              FROM audio_tours t
             WHERE t.community_id = %s
               AND t.original_tour_id IS NULL
@@ -979,7 +979,11 @@ def _tours_for(cur, community_id):
              # [LOCAL-752 A2] The languages the tour is available in (original
              # first, then finished translations), the SAME list the new-tours
              # read returns, so the community page and sync agree.
-             'languages': _tour_languages(cur, r[0], r[5])}
+             'languages': _tour_languages(cur, r[0], r[5]),
+             # [LOCAL-760 / D708] The source marker: 'organiser_audio' for a
+             # broadcast tour (so the owner sees "Edit audio tour" and a member's
+             # download stamps it), None/absent for a generated tour.
+             'source_kind': r[6]}
             for r in cur.fetchall()]
 
 
@@ -2523,6 +2527,73 @@ def build_audio_tour(community_id):
         return jsonify({"tour_id": tour_id, "source_kind": source_kind,
                         "community_id": community_id, "version": 1,
                         "stops_count": stops_count}), 201
+    finally:
+        conn.close()
+
+
+@communities_bp.route('/communities/<int:community_id>/audio-tours/<int:tour_id>',
+                      methods=['GET'])
+def get_audio_tour_detail(community_id, tour_id):
+    """[LOCAL-760 / D709] OWNER-ONLY read of an organiser-audio tour's stops so
+    the organiser can REOPEN it in the builder PREFILLED (Michael, 2026-10-24:
+    "the organiser cannot mark the tour as Modified, so the members can
+    re-download" — the edit path needs the current stops to start from).
+
+    The stops are reconstructed from the stored package (audio_tours.audio_tour:
+    audio_N.txt for name/location/text + remote_audio.json for the audio URL) via
+    organiser_audio_tours.parse_stops_from_package, so no new column is needed.
+    tour_type is derived from the stops (every stop located → 'walking', else
+    'other'); visibility is the stored community_visibility.
+
+    Access:
+      * the OWNER gets 200 {tour_name, tour_type, visibility, stops:[…]};
+      * a MEMBER / non-owner → 403 forbidden (the stops are the organiser's to
+        edit; a member re-downloads the finished tour, it does not edit it);
+      * a tour that is not THIS community's organiser-audio tour → 404/409.
+    """
+    err = _require_api_key()
+    if err:
+        return err
+    user_id = request.args.get('user_id')
+    conn = _get_db()
+    try:
+        cur = conn.cursor()
+        c = _community_row(cur, community_id)
+        if not c or c['disabled']:
+            cur.close()
+            return jsonify({"error": "not_found"}), 404
+        # OWNER ONLY — a member or non-member may not read the editable stops.
+        if c['owner_user_id'] != user_id:
+            cur.close()
+            return jsonify({"error": "forbidden",
+                            "message": "Only the organiser can open this tour "
+                                       "for editing."}), 403
+        cur.execute(
+            "SELECT id, source_kind, tour_name, community_visibility, audio_tour "
+            "FROM audio_tours WHERE id = %s AND community_id = %s",
+            (tour_id, community_id))
+        row = cur.fetchone()
+        cur.close()
+        if not row:
+            return jsonify({"error": "not_found",
+                            "message": "No such tour in this community."}), 404
+        if row[1] != organiser_audio_tours.SOURCE_KIND:
+            return jsonify({"error": "not_organiser_audio",
+                            "message": "That tour is not an organiser-audio "
+                                       "tour."}), 409
+        zip_bytes = bytes(row[4]) if row[4] is not None else b''
+        stops = organiser_audio_tours.parse_stops_from_package(zip_bytes)
+        tour_type = organiser_audio_tours.tour_type_from_stops(stops)
+        visibility = row[3] or 'members'
+        return jsonify({
+            "tour_id": tour_id,
+            "community_id": community_id,
+            "tour_name": row[2],
+            "tour_type": tour_type,
+            "visibility": visibility,
+            "source_kind": row[1],
+            "stops": stops,
+        }), 200
     finally:
         conn.close()
 

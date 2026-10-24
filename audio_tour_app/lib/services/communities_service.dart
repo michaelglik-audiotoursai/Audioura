@@ -282,6 +282,24 @@ class CommunitiesService {
     }
   }
 
+  /// [LOCAL-760 / D709] OWNER-ONLY read of an organiser-audio tour's stops to
+  /// PREFILL the builder when the organiser reopens it. Returns an
+  /// [AudioTourDetail] on 200; null on 403 (a member), 404, or any transport
+  /// error (the caller then opens the builder empty rather than failing).
+  static Future<AudioTourDetail?> audioTourDetail(
+      int communityId, int tourId, {String? userId}) async {
+    try {
+      final q = userId != null ? '?user_id=$userId' : '';
+      final r = await Endpoints.get(Service.userDb,
+          '/communities/$communityId/audio-tours/$tourId$q');
+      final map = Endpoints.tryDecodeMap(r.body);
+      if (r.statusCode == 200 && map != null) {
+        return AudioTourDetail.fromJson(map);
+      }
+    } catch (_) {}
+    return null;
+  }
+
   /// [LOCAL-700 §4] Is a community name free? Calls GET
   /// /communities/name-available?name= (case/space-insensitive, trimmed on the
   /// server). Returns true only on a 200 with available:true; ANY failure
