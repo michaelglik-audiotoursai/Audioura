@@ -19,6 +19,7 @@
 import '../config/endpoints.dart';
 import 'community_tour_models.dart';
 import 'community_downloads.dart';
+import 'device_service.dart';
 
 export 'community_tour_models.dart';
 
@@ -110,8 +111,13 @@ class CommunityTourService {
   static Future<({int version, String? updatedAt})?> serverTourVersion(
       int tourId) async {
     try {
+      // [LOCAL-753 LEAD] /tour-info hides a members-only community tour from a
+      // non-member (D707), so the version read must say who is asking —
+      // without user_id every member's refresh got 404 and never updated.
+      final uid = await DeviceService.getUserId();
+      final q = uid.isNotEmpty ? '?user_id=${Uri.encodeComponent(uid)}' : '';
       final r =
-          await Endpoints.get(Service.mapDelivery, '/tour-info/$tourId');
+          await Endpoints.get(Service.mapDelivery, '/tour-info/$tourId$q');
       final j = Endpoints.tryDecodeMap(r.body);
       if (r.statusCode == 200 && j != null) {
         final raw = j['version'];
