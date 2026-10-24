@@ -44,6 +44,7 @@ import '../widgets/rate_tour_dialog.dart';
 import '../widgets/why_this_score_sheet.dart';
 import '../widgets/reviews_section.dart';
 import '../widgets/price_badge.dart';
+import '../widgets/community_tour_chip.dart';
 import '../widgets/tour_buy_sheet.dart';
 import '../widgets/download_action_plan.dart';
 import '../services/tour_preview_player.dart';
@@ -485,9 +486,15 @@ class _HomeScreenState extends State<HomeScreen> {
         
         setState(() {
           _tourMarkers = clusteredTours.map((cluster) {
-            final isTreat = cluster['tours'][0]['type'] == 'treat';
-            final isMultiple = cluster['tours'].length > 1;
-            
+            final toursList = cluster['tours'] as List;
+            // [LOCAL-757 A] One pure rule decides the marker's look. A cluster
+            // holding a community tour is drawn GREEN with the groups icon so a
+            // community tour is told apart on the map BEFORE the tap; treats and
+            // plain tours keep their pre-LOCAL-757 colour/icon.
+            final markerKind = CommunityRules.homeMarkerKind(toursList);
+            final isMultiple = toursList.length > 1;
+            final isCommunity = markerKind == 'community';
+
             return Marker(
               point: LatLng(cluster['lat'], cluster['lng']),
               width: 40,
@@ -500,19 +507,22 @@ class _HomeScreenState extends State<HomeScreen> {
                   children: [
                     Container(
                       decoration: BoxDecoration(
-                        color: isTreat ? Colors.orange : (isMultiple ? Colors.purple : Colors.blue),
+                        color: homeMarkerColor(markerKind),
                         shape: BoxShape.circle,
                         border: Border.all(color: Colors.white, width: 2),
                       ),
                       child: Icon(
-                        isTreat ? Icons.local_cafe : (isMultiple ? Icons.layers : Icons.directions_walk),
+                        homeMarkerIcon(markerKind),
                         color: Colors.white,
                         size: 20,
                       ),
                     ),
                     // [LOCAL-682] Gold $ badge: this pin holds a paid tour.
                     if (_clusterHasPaid(cluster['tours'] as List)) const _PaidPinBadge(),
-                    if (isMultiple)
+                    // [LOCAL-757 A] The green "apps" multi-tour badge is dropped
+                    // on a community pin — the pin is already green and would
+                    // otherwise be green-on-green; the community look wins.
+                    if (isMultiple && !isCommunity)
                       Positioned(
                         right: -2,
                         top: -2,
@@ -808,8 +818,11 @@ class _HomeScreenState extends State<HomeScreen> {
                 final firstTour = toursList[0] as Map<String, dynamic>?;
                 if (firstTour == null) return null;
                 
-                final isTreat = firstTour['type'] == 'treat';
+                // [LOCAL-757 A] Same pure rule as the cached path: a cluster
+                // with a community tour is drawn GREEN with the groups icon.
+                final markerKind = CommunityRules.homeMarkerKind(toursList);
                 final isMultiple = toursList.length > 1;
+                final isCommunity = markerKind == 'community';
                 
                 return Marker(
                   point: LatLng(cluster['lat'], cluster['lng']),
@@ -823,19 +836,21 @@ class _HomeScreenState extends State<HomeScreen> {
                       children: [
                         Container(
                           decoration: BoxDecoration(
-                            color: isTreat ? Colors.orange : (toursList.length > 1 ? Colors.purple : Colors.blue),
+                            color: homeMarkerColor(markerKind),
                             shape: BoxShape.circle,
                             border: Border.all(color: Colors.white, width: 2),
                           ),
                           child: Icon(
-                            isTreat ? Icons.local_cafe : Icons.directions_walk,
+                            homeMarkerIcon(markerKind),
                             color: Colors.white,
                             size: 20,
                           ),
                         ),
                         // [LOCAL-682] Gold $ badge: this pin holds a paid tour.
                         if (_clusterHasPaid(toursList)) const _PaidPinBadge(),
-                        if (isMultiple)
+                        // [LOCAL-757 A] Multi-tour badge dropped on a community
+                        // pin (already green + groups icon; avoids green-on-green).
+                        if (isMultiple && !isCommunity)
                           Positioned(
                             right: -2,
                             top: -2,
@@ -2113,30 +2128,16 @@ class _HomeScreenState extends State<HomeScreen> {
     return false;
   }
 
-  // [LOCAL-756 C] The COMMUNITY SIGN row — a groups icon + the community name
-  // (via CommunityRules.homeTourCommunitySign) — shown wherever Home surfaces a
-  // tour (map marker sheet, list row, detail sheet). Returns null for a plain
-  // Audioura tour so nothing is shown.
+  // [LOCAL-757 B] The COMMUNITY CHIP for a tour — the single green
+  // CommunityTourChip widget (groups icon + "Members only · <name>" /
+  // "Community tour · <name>") shown wherever Home surfaces a tour (list row,
+  // search result, detail sheet, multi-tour dialog) BEFORE the tap. Returns
+  // null for a plain Audioura tour so nothing is shown (and no membership is
+  // implied). Replaces the small 12-px purple sign LOCAL-756 used — same
+  // single source, now green and eye-catching per Michael 2026-10-24.
   Widget? _communitySign(Map<String, dynamic> tour) {
-    final sign = CommunityRules.homeTourCommunitySign(tour);
-    if (sign.isEmpty) return null;
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(Icons.groups, size: 14, color: Colors.deepPurple.shade400),
-        const SizedBox(width: 4),
-        Flexible(
-          child: Text(
-            sign,
-            style: TextStyle(
-              fontSize: 12,
-              color: Colors.deepPurple.shade400,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ),
-      ],
-    );
+    if (!CommunityRules.isCommunityTour(tour)) return null;
+    return CommunityTourChip(tour: tour);
   }
 
   // [LOCAL-756 C / D706] The PRICE / ACCESS line for a tour on Home. For a
@@ -2144,6 +2145,8 @@ class _HomeScreenState extends State<HomeScreen> {
   // "Members only — join <community>" / "Community tour — join to download"),
   // never "Free"; for a plain Audioura tour, the money price badge is used
   // instead (this returns null so the caller shows the badge).
+  // [LOCAL-757 B] Kept in the GREEN community family (not purple) so the price
+  // line reads as one colour language with the chip above it.
   Widget? _communityPriceLine(Map<String, dynamic> tour) {
     if (!CommunityRules.isCommunityTour(tour)) return null;
     final line = CommunityRules.homeTourPriceLine(
@@ -2153,9 +2156,9 @@ class _HomeScreenState extends State<HomeScreen> {
     );
     return Text(
       line,
-      style: TextStyle(
+      style: const TextStyle(
         fontSize: 12,
-        color: Colors.deepPurple.shade600,
+        color: kCommunityGreen,
         fontWeight: FontWeight.w600,
       ),
     );

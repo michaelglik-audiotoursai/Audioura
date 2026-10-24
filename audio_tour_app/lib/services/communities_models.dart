@@ -663,6 +663,67 @@ class CommunityRules {
     return name.isNotEmpty || (tour['community_id'] != null);
   }
 
+  /// [LOCAL-757 B] Whether a COMMUNITY tour is members-only (vs a public /
+  /// "listed" community tour, D706). A members-only tour needs a membership to
+  /// listen; a public community tour is joinable by anyone. The `/tours-near`
+  /// `community_visibility` field carries this: "members"/"members_only" →
+  /// true, anything else (e.g. "listed"/"public") → false. Only meaningful for
+  /// a community tour; a plain Audioura tour is never members-only.
+  static bool isMembersOnlyTour(Map<String, dynamic> tour) {
+    if (!isCommunityTour(tour)) return false;
+    final visibility =
+        (tour['community_visibility'] as String?)?.trim().toLowerCase() ?? '';
+    return visibility == 'members' || visibility == 'members_only';
+  }
+
+  /// [LOCAL-757 B] The GREEN CHIP label shown before the listener taps, on every
+  /// Home surface that lists a tour (search result, list row, map carousel,
+  /// detail sheet, multi-tour dialog). The groups (👥) icon lives in the
+  /// [CommunityTourChip] widget; this is the text beside it:
+  ///   * members-only community tour → "Members only · <community name>"
+  ///   * public community tour (D706) → "Community tour · <community name>"
+  /// The community name is always appended when known so the listener sees which
+  /// community before tapping (Michael, 2026-10-24: "they may think ALL tours
+  /// are for community"). A plain Audioura tour gets no chip, so this returns an
+  /// empty string — the caller must not render the chip for it. Pure: no
+  /// widgets, no network.
+  static String homeTourChipLabel(Map<String, dynamic> tour) {
+    if (!isCommunityTour(tour)) return '';
+    final name = (tour['community_name'] as String?)?.trim() ?? '';
+    final kind = isMembersOnlyTour(tour) ? 'Members only' : 'Community tour';
+    return name.isEmpty ? kind : '$kind · $name';
+  }
+
+  /// [LOCAL-757 A] True when ANY tour clustered on a single map pin belongs to a
+  /// community. A map marker stands for a cluster of nearby tours; if one of
+  /// them is a community tour the whole pin is drawn in the community style so
+  /// the listener sees it before tapping. Treats and plain Audioura tours in the
+  /// same cluster do not suppress this.
+  static bool clusterHasCommunityTour(List<dynamic> clusterTours) =>
+      clusterTours.any((t) =>
+          t is Map && isCommunityTour(Map<String, dynamic>.from(t)));
+
+  /// [LOCAL-757 A] The VISUAL KIND of a Home map marker, as a Flutter-free
+  /// string so this stays dependency-free and unit-testable; the widget layer
+  /// ([homeMarkerColor]/[homeMarkerIcon] in community_tour_chip.dart) maps it to
+  /// a colour and icon. Precedence, highest first:
+  ///   * 'treat'     — a treat pin (first tour is a treat), unchanged (orange).
+  ///   * 'community' — the cluster holds at least one community tour (green,
+  ///                   groups icon) so a community tour is told apart on the map
+  ///                   BEFORE the tap (the bug Michael reported 2026-10-24).
+  ///   * 'multiple'  — a plain multi-tour cluster (purple, layers), unchanged.
+  ///   * 'single'    — a plain single tour (blue, walk), unchanged.
+  /// Treat wins over community so a cafe pin keeps its cup; a plain tour cluster
+  /// is never drawn green, so nobody thinks every tour needs a membership.
+  static String homeMarkerKind(List<dynamic> clusterTours) {
+    final isTreat = clusterTours.isNotEmpty &&
+        clusterTours.first is Map &&
+        (clusterTours.first as Map)['type'] == 'treat';
+    if (isTreat) return 'treat';
+    if (clusterHasCommunityTour(clusterTours)) return 'community';
+    return clusterTours.length > 1 ? 'multiple' : 'single';
+  }
+
   /// [LOCAL-739 §2] The count shown in the Listen "My communities (N)" row and
   /// anywhere a single combined total is needed: the DISTINCT communities a
   /// user belongs to or organises. An owned community that also has a
