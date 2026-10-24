@@ -61,6 +61,14 @@ class CommunityPass {
 }
 
 /// One episode (a tour stop): owner-hosted audio metadata only.
+///
+/// [LOCAL-758] The organiser-audio builder shows the feed's episodes as a
+/// CHECKLIST before any become stops, so it needs the human-facing metadata a
+/// feed carries: the publish [date], a [duration] ("48 min"), a byte [size],
+/// and the show-notes [description] (seeds a stop's optional text). All four are
+/// OPTIONAL and parsed defensively — the server may omit them (older payload,
+/// or an MP3 link with no feed), and the UI simply shows whatever is present.
+/// No server change is required for this field addition.
 class CommunityEpisode {
   final int position;
   final String title;
@@ -68,21 +76,69 @@ class CommunityEpisode {
   final String? guid;
   final String source; // link | feed
 
+  // [LOCAL-758] Optional feed metadata for the import checklist. Any may be null.
+  final String? date; // human/ISO publish date as the feed gave it
+  final String? duration; // e.g. "48:12" or "48 min"
+  final int? sizeBytes; // enclosure length in bytes, when present
+  final String? description; // show notes / summary (seeds optional stop text)
+
   const CommunityEpisode({
     required this.position,
     required this.title,
     required this.audioUrl,
     this.guid,
     required this.source,
+    this.date,
+    this.duration,
+    this.sizeBytes,
+    this.description,
   });
 
-  factory CommunityEpisode.fromJson(Map<String, dynamic> j) => CommunityEpisode(
-        position: (j['position'] is num) ? (j['position'] as num).toInt() : 0,
-        title: (j['title'] ?? '') as String,
-        audioUrl: (j['audio_url'] ?? '') as String,
-        guid: j['guid'] as String?,
-        source: (j['source'] ?? 'link') as String,
-      );
+  /// A compact "date · duration · size" line for the checklist, built from
+  /// whichever of the three optional fields are present (nulls/blanks dropped).
+  /// Empty string when the feed gave none of them.
+  String get metaLine {
+    final parts = <String>[];
+    final d = date?.trim();
+    if (d != null && d.isNotEmpty) parts.add(d);
+    final dur = duration?.trim();
+    if (dur != null && dur.isNotEmpty) parts.add(dur);
+    if (sizeBytes != null && sizeBytes! > 0) {
+      final mb = sizeBytes! / (1024 * 1024);
+      parts.add(mb >= 1
+          ? '${mb.toStringAsFixed(mb >= 10 ? 0 : 1)} MB'
+          : '${(sizeBytes! / 1024).round()} KB');
+    }
+    return parts.join(' · ');
+  }
+
+  factory CommunityEpisode.fromJson(Map<String, dynamic> j) {
+    String? str(dynamic v) {
+      if (v == null) return null;
+      final s = v.toString().trim();
+      return s.isEmpty ? null : s;
+    }
+
+    int? size() {
+      final raw = j['size'] ?? j['size_bytes'] ?? j['length'] ?? j['bytes'];
+      if (raw is num) return raw.toInt();
+      if (raw is String) return int.tryParse(raw.trim());
+      return null;
+    }
+
+    return CommunityEpisode(
+      position: (j['position'] is num) ? (j['position'] as num).toInt() : 0,
+      title: (j['title'] ?? '') as String,
+      audioUrl: (j['audio_url'] ?? '') as String,
+      guid: j['guid'] as String?,
+      source: (j['source'] ?? 'link') as String,
+      date: str(j['date'] ?? j['published'] ?? j['pub_date'] ?? j['pubDate']),
+      duration: str(j['duration'] ?? j['length_text'] ?? j['itunes_duration']),
+      sizeBytes: size(),
+      description:
+          str(j['description'] ?? j['summary'] ?? j['show_notes'] ?? j['notes']),
+    );
+  }
 }
 
 /// [LOCAL-710B / D672 addendum 1] A tour MADE WITH Audioura for the community
