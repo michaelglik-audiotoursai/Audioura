@@ -64,7 +64,19 @@ class _DraftStop {
 class OrganiserAudioTourScreen extends StatefulWidget {
   final Community community;
 
-  const OrganiserAudioTourScreen({super.key, required this.community});
+  /// [LOCAL-755 / D709] When editing an EXISTING organiser-audio tour, its
+  /// server tour id. On publish the builder sends `tour_id` so the server
+  /// replaces it in place, and shows the "I changed this tour — tell my members"
+  /// checkbox: ticked → the version is bumped and members see "Updated by the
+  /// organiser — Re-download" (opt-in; never pushed); unticked → a silent save
+  /// (typo fix) that leaves the version unchanged. Null for a brand-new tour.
+  final int? editTourId;
+
+  const OrganiserAudioTourScreen({
+    super.key,
+    required this.community,
+    this.editTourId,
+  });
 
   @override
   State<OrganiserAudioTourScreen> createState() =>
@@ -80,6 +92,10 @@ class _OrganiserAudioTourScreenState extends State<OrganiserAudioTourScreen> {
   String _tourType = 'walking';
   String _visibility = 'members';
   bool _rightsAccepted = false;
+  // [LOCAL-755 / D709] EDIT only — "I changed this tour — tell my members".
+  // Ticked → the server bumps the version and members get the opt-in
+  // "Re-download" affordance; unticked → a silent save (version unchanged).
+  bool _notifyMembers = false;
   bool _busy = false;
   String? _error;
   String? _failingStop;
@@ -222,6 +238,13 @@ class _OrganiserAudioTourScreenState extends State<OrganiserAudioTourScreen> {
       'rights_accepted': _rightsAccepted,
       'stops': _stops.map((s) => s.toJson()).toList(),
     };
+    // [LOCAL-755 / D709] Editing an existing organiser-audio tour: send its id
+    // so the server replaces it in place, and the checkbox that gates the
+    // version bump (tell-my-members). A new tour carries neither.
+    if (widget.editTourId != null) {
+      body['tour_id'] = widget.editTourId as Object;
+      body['notify_members'] = _notifyMembers;
+    }
     final result =
         await CommunitiesService.buildAudioTour(widget.community.id, body);
     if (!mounted) return;
@@ -242,7 +265,10 @@ class _OrganiserAudioTourScreenState extends State<OrganiserAudioTourScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Make a tour from your audio')),
+      appBar: AppBar(
+          title: Text(widget.editTourId != null
+              ? 'Edit your audio tour'
+              : 'Make a tour from your audio')),
       body: AbsorbPointer(
         absorbing: _busy,
         child: ListView(
@@ -348,6 +374,21 @@ class _OrganiserAudioTourScreenState extends State<OrganiserAudioTourScreen> {
               title: const Text(
                   'I have the right to publish this audio to my members.'),
             ),
+
+            // [LOCAL-755 / D709] EDIT only — the version bump is opt-in. Ticked
+            // → members see "Updated by the organiser — Re-download" (they are
+            // never pushed it); unticked → a silent save (typo fix) that leaves
+            // the version unchanged.
+            if (widget.editTourId != null)
+              CheckboxListTile(
+                value: _notifyMembers,
+                onChanged: (v) => setState(() => _notifyMembers = v ?? false),
+                controlAffinity: ListTileControlAffinity.leading,
+                title: const Text('I changed this tour — tell my members.'),
+                subtitle: const Text(
+                    'Members will be offered a re-download. Leave unticked for a '
+                    'silent fix (e.g. a typo).'),
+              ),
 
             if (_error != null)
               Padding(

@@ -113,6 +113,44 @@ SnackBar buildCommunityMessageSnackBar(
   );
 }
 
+/// [LOCAL-755 / D709 Rule 3] Build the in-app SnackBar for an ORGANISER-AUDIO
+/// update offer. Unlike a generated tour's "View", this offers a "Re-download"
+/// action (members opt in — organiser-audio updates are never pushed), running
+/// [onReDownload] when tapped. Exposed for the widget test.
+SnackBar buildOrganiserAudioUpdateSnackBar(
+  String message, {
+  required void Function() onReDownload,
+}) {
+  return SnackBar(
+    content: Text(message),
+    duration: const Duration(seconds: 8),
+    action: SnackBarAction(
+      label: 'Re-download',
+      onPressed: onReDownload,
+    ),
+  );
+}
+
+/// [LOCAL-755] Show the organiser-audio update offer IN THE APP, with a
+/// "Re-download" action. Returns true when the SnackBar was shown (a messenger
+/// exists); false otherwise so the caller can fall back to a system
+/// notification. Never throws.
+bool showOrganiserAudioUpdateInApp(
+  String message, {
+  required void Function() onReDownload,
+}) {
+  final messenger = communityScaffoldMessengerKey.currentState;
+  if (messenger == null) return false;
+  try {
+    messenger.showSnackBar(
+      buildOrganiserAudioUpdateSnackBar(message, onReDownload: onReDownload),
+    );
+    return true;
+  } catch (_) {
+    return false;
+  }
+}
+
 /// Route ONE community message to the right place (LOCAL-750 C). Tries the
 /// in-app SnackBar when the app is in the foreground; returns the target that
 /// was actually used so the caller posts the system notification only when the

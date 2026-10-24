@@ -833,6 +833,68 @@ def _community_edit_block(cur, tour_id, user_id):
     })
 
 
+def _organiser_audio_edit_block(cur, tour_id):
+    """[LOCAL-755 / D709] Rule 1 — an organiser-audio tour is NEVER edited through
+    our voice pipeline.
+
+    The organiser edits an organiser-audio tour on their OWN site (new MP3 / new
+    feed episode) and, in the builder, re-publishes it; Audioura never voices or
+    translates it. So the text-to-speech editor (EditTourScreen →
+    /tour/<id>/update-stop|update-multiple-stops|bulk-save) must refuse it: no
+    organiser audio or text ever reaches TTS, translation, or any OpenAI call.
+
+    Given an open cursor and the tour being edited, return:
+      * None                — the edit is allowed (an ordinary/generated tour);
+      * (409, body)         — the tour is organiser-audio (source_kind =
+                              'organiser_audio', LOCAL-754B); error_code
+                              'organiser_audio_not_editable'.
+
+    `tour_id` may be a numeric audio_tours.id OR an edited UUID; a UUID is first
+    resolved to its source numeric id via tour_edit_blobs (as
+    _get_source_content_language does) so an edit of an edited copy is caught
+    too. Never raises — any lookup problem returns None (the edit proceeds as
+    before, exactly like the ordinary-tour default), so this can only ADD a
+    refusal for a genuine organiser-audio tour, never break ordinary editing.
+    """
+    try:
+        from community_tours_service import tour_source_kind
+    except Exception as e:  # noqa: BLE001 — module missing → feature off, allow
+        print(f"[LOCAL-755] community_tours_service unavailable, allowing edit: {e}")
+        return None
+
+    # Resolve a numeric id (an edited UUID maps back to its source via the
+    # edit-blob table). A value that is not resolvable to a numeric id is not an
+    # organiser-audio original → allow.
+    resolved_id = str(tour_id)
+    if not resolved_id.isdigit():
+        try:
+            _blob_uri, mapped_src = _lookup_edit_blob(resolved_id)
+        except Exception:  # noqa: BLE001
+            mapped_src = None
+        if mapped_src and str(mapped_src).isdigit():
+            resolved_id = str(mapped_src)
+    if not resolved_id.isdigit():
+        return None
+
+    try:
+        kind = tour_source_kind(cur, int(resolved_id))
+    except Exception as e:  # noqa: BLE001 — a lookup problem never 500s the edit
+        print(f"[LOCAL-755] source_kind lookup failed for {tour_id} "
+              f"(allowing, ordinary-tour default): {e}")
+        return None
+
+    if kind == 'organiser_audio':
+        return (409, {
+            "status": "error",
+            "error_code": "organiser_audio_not_editable",
+            "message": "This tour is maintained on the organiser's own site. "
+                       "Change the audio there, then tell your members to "
+                       "re-download it — it is not edited through Audioura.",
+            "recoverable": False,
+        })
+    return None
+
+
 def _ensure_version_archive_columns(cur):
     """[LOCAL-745] Make the audio_tour_versions archive exist with the columns we
     write, additively and idempotently — the same self-healing the orchestrator
@@ -1920,6 +1982,31 @@ def _bulk_save_core(tour_id, data):
         _status, _body = _community_block
         print(f"[LOCAL-745] community edit refused ({_status}) for tour "
               f"{tour_id} user={_edit_user_id!r}: {_body.get('error_code')}")
+        return jsonify(_body), _status
+
+    # [LOCAL-755 / D709] Rule 1: an organiser-audio tour is NEVER edited through
+    # our voice pipeline. Checked here — BEFORE any language resolution, metering
+    # or build — so no organiser audio/text ever reaches TTS/translation/OpenAI;
+    # the editor gets a clean 409 organiser_audio_not_editable and nothing is
+    # consumed. An ordinary/generated tour returns None and is unaffected.
+    _oa_conn = None
+    _oa_block = None
+    try:
+        _oa_conn = get_db_connection()
+        _oacur = _oa_conn.cursor()
+        _oa_block = _organiser_audio_edit_block(_oacur, tour_id)
+        _oacur.close()
+    except Exception as _oa_err:  # noqa: BLE001 — never 500 on the gate itself
+        print(f"[LOCAL-755] organiser-audio edit gate error (allowing, "
+              f"ordinary-tour default): {_oa_err}")
+        _oa_block = None
+    finally:
+        if _oa_conn is not None:
+            _oa_conn.close()
+    if _oa_block is not None:
+        _status, _body = _oa_block
+        print(f"[LOCAL-755] organiser-audio edit refused ({_status}) for tour "
+              f"{tour_id}: {_body.get('error_code')}")
         return jsonify(_body), _status
 
     explicit_language = data.get('content_language')

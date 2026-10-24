@@ -116,7 +116,7 @@ void main() {
     });
     CommunityToursSync.fetchActiveCommunityIds = (userId) async => const {10};
     CommunityToursSync.fetchServerVersion =
-        (tourId) async => (version: 2, updatedAt: '2026-10-23');
+        (tourId) async => (version: 2, updatedAt: '2026-10-23', isOrganiserAudio: false);
     final reBefore = <int>[];
     CommunityToursSync.reDownload =
         (tourId, {required newVersion, updatedAt}) async {

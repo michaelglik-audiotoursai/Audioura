@@ -2629,6 +2629,25 @@ def get_tour_info(tour_id):
         _ct_member = _is_active_member(cur, request.args.get('user_id'), _ct_cid) \
             if _ct_cid is not None else False
         _ct_name = _community_name(cur, _ct_cid) if _ct_cid is not None else None
+        # [LOCAL-755 / D709] The tour's source_kind ('organiser_audio' for a tour
+        # the organiser built from their OWN hosted audio, migration 049). Read
+        # with a GUARDED separate SELECT so the positional unpack above is not
+        # disturbed and an older schema without the column simply yields None.
+        # The app keys the member-side "never pushed / opt-in Re-download" rule
+        # off this value (RefreshPlanner skips organiser-audio tours).
+        source_kind = None
+        try:
+            cur.execute("SELECT source_kind FROM audio_tours WHERE id = %s",
+                        (tour_id,))
+            _sk_row = cur.fetchone()
+            if _sk_row and _sk_row[0]:
+                source_kind = str(_sk_row[0]).strip()
+        except Exception as _sk_err:  # noqa: BLE001 — older schema → None
+            print(f"[LOCAL-755] source_kind read skipped for {tour_id}: {_sk_err}")
+            try:
+                conn.rollback()
+            except Exception:
+                pass
         cur.close()
         conn.close()
         
@@ -2685,6 +2704,9 @@ def get_tour_info(tour_id):
             'original_language': original_language,
             'version': version,
             'updated_at': updated_at,
+            # [LOCAL-755 / D709] Lets the app classify a held tour as
+            # organiser-audio (never auto-re-downloaded; opt-in Re-download).
+            'source_kind': source_kind,
             'content_rating': _content_rating_field(content_rating),
             **_ct_fields,
             **_rating_payload(rating_values, verified_values, created_values, is_paid,

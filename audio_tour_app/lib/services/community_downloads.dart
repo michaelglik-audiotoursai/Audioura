@@ -465,6 +465,14 @@ class HeldCommunityTour {
   /// tour is false and is excluded by the planner.
   final bool isCommunityTour;
 
+  /// [LOCAL-755 / D709] Whether this is an ORGANISER-AUDIO tour (source_kind =
+  /// 'organiser_audio', built from the organiser's own hosted audio). A member
+  /// is NEVER pushed an organiser-audio update (even with auto-download on): the
+  /// planner SKIPS it so it is never auto-re-downloaded. Instead the member opts
+  /// in by tapping "Re-download" on the Listen/community row. A generated
+  /// community tour (false) keeps today's auto-refresh behaviour (Rule 4).
+  final bool isOrganiserAudio;
+
   /// The tour's display name, for the "<name> was updated by the organiser."
   /// message after a successful refresh.
   final String name;
@@ -476,6 +484,7 @@ class HeldCommunityTour {
     required this.serverVersion,
     required this.language,
     required this.isCommunityTour,
+    this.isOrganiserAudio = false,
     required this.name,
   });
 }
@@ -557,6 +566,12 @@ class RefreshPlanner {
     for (final t in held) {
       // Only community tours (an ordinary tour is never re-downloaded).
       if (!t.isCommunityTour) continue;
+      // [LOCAL-755 / D709] Rule 3: a member is NEVER pushed an organiser-audio
+      // update (even with auto-download on). Skip organiser-audio tours here —
+      // the member opts in by tapping "Re-download" on the Listen/community row.
+      // A generated community tour (isOrganiserAudio false) keeps today's
+      // auto-refresh (Rule 4).
+      if (t.isOrganiserAudio) continue;
       // The server version must have risen above the saved one.
       if (t.serverVersion <= t.savedVersion) continue;
       // The member must still be active in (or own) the community.
@@ -580,6 +595,115 @@ class RefreshPlanner {
 /// unit-tested and comes from a single source.
 String refreshedMessage(String tourName) =>
     '$tourName was updated by the organiser.';
+
+/// [LOCAL-755 / D709 Rule 3] One organiser-audio update to OFFER the member —
+/// never pushed. The member opts in by tapping "Re-download"; this value feeds
+/// the one in-app message and the row affordance.
+class PlannedOrganiserAudioUpdate {
+  final int tourId;
+  final int communityId;
+  final int serverVersion;
+  final String language;
+  final String name;
+
+  const PlannedOrganiserAudioUpdate({
+    required this.tourId,
+    required this.communityId,
+    required this.serverVersion,
+    required this.language,
+    required this.name,
+  });
+
+  @override
+  bool operator ==(Object other) =>
+      other is PlannedOrganiserAudioUpdate &&
+      other.tourId == tourId &&
+      other.communityId == communityId &&
+      other.serverVersion == serverVersion &&
+      other.language == language &&
+      other.name == name;
+
+  @override
+  int get hashCode =>
+      Object.hash(tourId, communityId, serverVersion, language, name);
+
+  @override
+  String toString() => 'PlannedOrganiserAudioUpdate(t:$tourId, c:$communityId, '
+      'v:$serverVersion, lang:$language, name:$name)';
+}
+
+/// [LOCAL-755 / D709 Rule 3] The PURE policy for ORGANISER-AUDIO updates. A
+/// member is NEVER pushed an organiser-audio update (even with auto-download
+/// on): RefreshPlanner skips these. Instead, for the organiser-audio tours
+/// ALREADY on the phone whose server version rose above the saved one, this
+/// returns the ones to OFFER — one in-app message ("… was updated by the
+/// organiser. Re-download?") and a Listen/community row affordance. The member
+/// taps to re-download (package + MP3s from the organiser host).
+///
+/// Unlike RefreshPlanner there is NO connection gate: nothing is downloaded
+/// here, only offered. The tap performs the download (TourDownloadService), and
+/// that call is where connectivity matters.
+///
+/// Rules, in order, per held tour:
+///   * it must be an organiser-audio COMMUNITY tour (isOrganiserAudio &&
+///     isCommunityTour);
+///   * the server version must be STRICTLY GREATER than the saved one;
+///   * its community must be active/owned ([activeCommunityIds]);
+///   * it must NOT be in [deletedTourIds] (a deleted tour is never resurfaced).
+///
+/// The result preserves the input order of [held].
+class OrganiserAudioUpdatePlanner {
+  static List<PlannedOrganiserAudioUpdate> plan({
+    required List<HeldCommunityTour> held,
+    required Set<int> activeCommunityIds,
+    required Set<String> deletedTourIds,
+  }) {
+    final out = <PlannedOrganiserAudioUpdate>[];
+    for (final t in held) {
+      if (!t.isCommunityTour || !t.isOrganiserAudio) continue;
+      if (t.serverVersion <= t.savedVersion) continue;
+      if (!activeCommunityIds.contains(t.communityId)) continue;
+      if (deletedTourIds.contains(t.tourId.toString())) continue;
+      out.add(PlannedOrganiserAudioUpdate(
+        tourId: t.tourId,
+        communityId: t.communityId,
+        serverVersion: t.serverVersion,
+        language: t.language,
+        name: t.name,
+      ));
+    }
+    return out;
+  }
+}
+
+/// [LOCAL-755 Rule 3] The ONE short in-app message (LOCAL-750 mechanism) shown
+/// when an organiser-audio tour the member holds was updated by the organiser.
+/// PURE so the wording is a single source of truth. Unlike a generated tour
+/// (refreshedMessage, past tense — it already re-downloaded), this ASKS: the
+/// member opts in by tapping Re-download.
+String organiserAudioUpdateMessage(String tourName) =>
+    '$tourName was updated by the organiser. Re-download?';
+
+/// [LOCAL-755 / D709 Rule 3] The Listen/community-page ROW label for an
+/// ORGANISER-AUDIO tour the organiser has updated — a member opts in by tapping
+/// it (members are never pushed an organiser-audio update). PURE so the wording
+/// and the "when to show it" rule are a single source of truth, unit-tested
+/// without a running app.
+///
+/// Returns the label "Updated by the organiser — Re-download" ONLY when the
+/// server version is STRICTLY GREATER than the saved one (the organiser ticked
+/// "I changed this tour — tell my members", bumping the version). Returns null
+/// when the versions match (nothing new) or the server is lower (never a
+/// downgrade) — so the row shows the ordinary version label instead.
+String? organiserAudioUpdateLabel({
+  required int savedVersion,
+  required int serverVersion,
+}) {
+  if (serverVersion > savedVersion) {
+    return 'Updated by the organiser — Re-download';
+  }
+  return null;
+}
 
 // ─── [LOCAL-748] Community-page download sourceItem + record stamping ────────
 //
@@ -750,3 +874,10 @@ List<NewTourAnnouncement> planNewTourAnnouncements({
 /// The SharedPreferences key for the set of new-tour ids already announced to
 /// the member, so each is announced at most once (D675 part 2 §).
 const String kAnnouncedNewTourIdsPrefKey = 'announced_new_tour_ids';
+
+/// [LOCAL-755 / D709 Rule 3] The SharedPreferences key for the set of
+/// organiser-audio updates already OFFERED to the member, keyed "<tourId>:<ver>"
+/// so the one in-app "… was updated by the organiser. Re-download?" message
+/// fires at most once per (tour, server version) — a later sync re-nags only if
+/// a NEWER version appears. A member is never pushed the update, only offered.
+const String kOfferedOrganiserAudioKey = 'offered_organiser_audio_updates';

@@ -52,7 +52,7 @@ void main() {
     final reDownloaded = <int>[];
     final messages = <String>[];
     CommunityToursSync.fetchServerVersion =
-        (tourId) async => (version: 2, updatedAt: '2026-10-23');
+        (tourId) async => (version: 2, updatedAt: '2026-10-23', isOrganiserAudio: false);
     CommunityToursSync.reDownload = (tourId, {required newVersion, updatedAt}) async {
       reDownloaded.add(tourId);
       return const TourDownloadResult(TourDownloadStatus.ok);
@@ -81,7 +81,7 @@ void main() {
     final reDownloaded = <int>[];
     final messages = <String>[];
     CommunityToursSync.fetchServerVersion =
-        (tourId) async => (version: 1, updatedAt: null);
+        (tourId) async => (version: 1, updatedAt: null, isOrganiserAudio: false);
     CommunityToursSync.reDownload = (tourId, {required newVersion, updatedAt}) async {
       reDownloaded.add(tourId);
       return const TourDownloadResult(TourDownloadStatus.ok);
@@ -104,7 +104,7 @@ void main() {
     });
     final reDownloaded = <int>[];
     CommunityToursSync.fetchServerVersion =
-        (tourId) async => (version: 99, updatedAt: null);
+        (tourId) async => (version: 99, updatedAt: null, isOrganiserAudio: false);
     CommunityToursSync.reDownload = (tourId, {required newVersion, updatedAt}) async {
       reDownloaded.add(tourId);
       return const TourDownloadResult(TourDownloadStatus.ok);
@@ -125,7 +125,7 @@ void main() {
     final reDownloaded = <int>[];
     CommunityToursSync.fetchActiveCommunityIds = (userId) async => const {};
     CommunityToursSync.fetchServerVersion =
-        (tourId) async => (version: 2, updatedAt: null);
+        (tourId) async => (version: 2, updatedAt: null, isOrganiserAudio: false);
     CommunityToursSync.reDownload = (tourId, {required newVersion, updatedAt}) async {
       reDownloaded.add(tourId);
       return const TourDownloadResult(TourDownloadStatus.ok);
@@ -146,7 +146,7 @@ void main() {
     });
     final messages = <String>[];
     CommunityToursSync.fetchServerVersion =
-        (tourId) async => (version: 2, updatedAt: null);
+        (tourId) async => (version: 2, updatedAt: null, isOrganiserAudio: false);
     CommunityToursSync.reDownload = (tourId, {required newVersion, updatedAt}) async {
       // The replace-in-place keeps the old copy on failure; here it reports it.
       return const TourDownloadResult(TourDownloadStatus.failed);

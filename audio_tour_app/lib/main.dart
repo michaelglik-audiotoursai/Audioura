@@ -13,6 +13,7 @@ import 'services/community_notifications.dart';
 import 'services/community_tours_sync.dart';
 import 'services/foreground_community_messages.dart';
 import 'services/saved_tours_refresh.dart';
+import 'services/tour_download_service.dart';
 import 'services/deep_link_service.dart';
 import 'package:workmanager/workmanager.dart';
 
@@ -89,6 +90,35 @@ void main() async {
   // to reload so the change shows without leaving and coming back.
   CommunityToursSync.onToursChanged = () {
     SavedToursRefresh.instance.bump();
+  };
+  // [LOCAL-755 / D709 Rule 3] An organiser-audio tour the member holds was
+  // updated by the organiser. Members are NEVER pushed an organiser-audio
+  // update — surface ONE in-app message "<tour> was updated by the organiser.
+  // Re-download?" with a "Re-download" action that OPTS IN (package + MP3s from
+  // the organiser host, old copy replaced only after the new one is complete).
+  // Foreground → in-app SnackBar with the action; background → a quiet system
+  // notification (the member re-downloads from the Listen/community row).
+  CommunityToursSync.onOrganiserAudioUpdate = (message,
+      {required int tourId, required int serverVersion, String? updatedAt}) {
+    final shown = ForegroundCommunityMessages.instance.isForeground &&
+        showOrganiserAudioUpdateInApp(
+          message,
+          onReDownload: () {
+            unawaited(() async {
+              final r = await CommunityToursSync.reDownloadOrganiserAudio(
+                tourId,
+                newVersion: serverVersion,
+                updatedAt: updatedAt,
+              );
+              if (r.status == TourDownloadStatus.ok) {
+                SavedToursRefresh.instance.bump();
+              }
+            }());
+          },
+        );
+    if (!shown) {
+      unawaited(CommunityNotifications.postTourUpdated(message));
+    }
   };
   unawaited(AppSyncCoordinator.instance.start());
 

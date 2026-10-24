@@ -352,9 +352,12 @@ class BuildAudioTourEndpointTest(unittest.TestCase):
         self.assertEqual(j.get('stop_name'), 'Old Mill')
 
     def test_edit_bumps_version(self):
-        """Editing an existing organiser-audio tour archives the old content to
+        """Editing an existing organiser-audio tour WITH the "tell my members"
+        checkbox (notify_members, LOCAL-755/D709) archives the old content to
         audio_tour_versions (version bump) — the same mechanism a generated edit
-        uses so LOCAL-748/750 refresh reaches members."""
+        uses so LOCAL-748/750 refresh reaches members. (Without the checkbox the
+        save is silent and the version stays — see
+        test_local755_organiser_audio_updates.)"""
         def cap_update(params):
             return []
 
@@ -369,12 +372,13 @@ class BuildAudioTourEndpointTest(unittest.TestCase):
         writes = self._install(plan)
         body = self._body(_OWNER)
         body['tour_id'] = 99
+        body['notify_members'] = True  # [LOCAL-755] the version bump is gated on this
         r = self.client.post(f'/communities/{_COMMUNITY_ID}/build-audio-tour',
                              json=body)
         self.assertEqual(r.status_code, 200, r.get_data(as_text=True))
         self.assertTrue(
             any('insert into audio_tour_versions' in w[0] for w in writes),
-            "an edit must archive the old content (version bump)")
+            "an edit WITH notify_members must archive the old content (version bump)")
         j = r.get_json()
         self.assertEqual(j['version'], 2)  # MAX(0)+1 archived → new live is v2
 
