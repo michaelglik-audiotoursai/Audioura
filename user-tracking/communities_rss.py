@@ -65,10 +65,71 @@ def _episode_url_from_item(item):
     return ''
 
 
+# [LOCAL-759 C] The iTunes podcast namespace — where <itunes:duration> lives.
+_ITUNES_NS = '{http://www.itunes.com/dtds/podcast-1.0.dtd}'
+
+
+def _episode_size_from_item(item):
+    """The episode's byte SIZE from the <enclosure length="..."> attribute, or
+    None when the feed omits it (not every feed sets length). Only a positive
+    integer counts — a '0' or non-numeric length is treated as absent so the UI
+    never shows a wrong "0 MB". This is the number the organiser-audio builder
+    sums into "3 episodes · 285 MB" (LOCAL-759 C)."""
+    enclosure = item.find('enclosure')
+    if enclosure is not None:
+        raw = enclosure.attrib.get('length', '').strip()
+        try:
+            n = int(raw)
+            if n > 0:
+                return n
+        except (TypeError, ValueError):
+            pass
+    # Media RSS <media:content fileSize="..."> is the other common carrier.
+    for child in item:
+        if child.tag.endswith('}content') or child.tag == 'content':
+            raw = (child.attrib.get('fileSize')
+                   or child.attrib.get('length') or '').strip()
+            try:
+                n = int(raw)
+                if n > 0:
+                    return n
+            except (TypeError, ValueError):
+                pass
+    return None
+
+
+def _episode_duration_from_item(item):
+    """The episode's DURATION as the feed gave it (e.g. '48:12' or '3600'),
+    from <itunes:duration>, or None. Kept as the raw string — the app formats
+    it; the server never converts (a feed may give HH:MM:SS or seconds)."""
+    for tag in (f'{_ITUNES_NS}duration', 'duration'):
+        el = item.find(tag)
+        if el is not None:
+            d = _text(el)
+            if d:
+                return d
+    return None
+
+
+def _episode_date_from_item(item):
+    """The episode's publish DATE as the feed gave it (<pubDate>), or None.
+    Raw string — the app shows it; the server does not reformat."""
+    for tag in ('pubDate', f'{_ATOM_NS}published', 'published', 'updated'):
+        el = item.find(tag)
+        if el is not None:
+            d = _text(el)
+            if d:
+                return d
+    return None
+
+
 def parse_feed(xml_text):
     """Parse an RSS (or Atom) feed body into a list of episode dicts.
 
-    Each dict: {position (1-based), title, audio_url, guid}. Items appear in
+    Each dict: {position (1-based), title, audio_url, guid, size, duration,
+    date}. `size` is the enclosure byte length (int) or None; `duration` and
+    `date` are the feed's raw strings or None (LOCAL-759 C — the builder
+    checklist shows these and sums `size` into a running total). Items appear in
     FEED ORDER (position 1 = the first item in the document). Items with no
     audio URL are skipped (nothing to play). Items with no title get a stable
     fallback 'Episode N'. METADATA ONLY — no audio is fetched.
@@ -100,6 +161,11 @@ def parse_feed(xml_text):
                 'title': title,
                 'audio_url': url,
                 'guid': guid,
+                # [LOCAL-759 C] Feed metadata for the builder checklist. Any may
+                # be None when the feed omits it; the app's metaLine drops blanks.
+                'size': _episode_size_from_item(item),
+                'duration': _episode_duration_from_item(item),
+                'date': _episode_date_from_item(item),
             })
         return episodes
 
@@ -129,11 +195,28 @@ def parse_feed(xml_text):
                      or _text(entry.find('title')) or f'Episode {idx}')
             guid = (_text(entry.find(f'{_ATOM_NS}id'))
                     or _text(entry.find('id')) or None)
+            # [LOCAL-759 C] Atom carries the byte size on the enclosure link's
+            # `length` attribute; duration/date reuse the shared item helpers
+            # (they also read the Atom <published>/<updated> dates).
+            size = None
+            for link in entry.findall(f'{_ATOM_NS}link') + entry.findall('link'):
+                if link.attrib.get('href', '').strip() == url:
+                    raw = link.attrib.get('length', '').strip()
+                    try:
+                        n = int(raw)
+                        if n > 0:
+                            size = n
+                    except (TypeError, ValueError):
+                        pass
+                    break
             episodes.append({
                 'position': len(episodes) + 1,
                 'title': title,
                 'audio_url': url,
                 'guid': guid,
+                'size': size,
+                'duration': _episode_duration_from_item(entry),
+                'date': _episode_date_from_item(entry),
             })
         return episodes
 

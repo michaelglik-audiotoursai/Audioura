@@ -926,12 +926,18 @@ def _passes_for(cur, community_id):
 
 def _episodes_for(cur, community_id):
     cur.execute(
-        "SELECT position, title, audio_url, guid, source "
+        "SELECT position, title, audio_url, guid, source, "
+        "size_bytes, duration, episode_date "
         "FROM community_episodes WHERE community_id = %s ORDER BY position",
         (community_id,),
     )
+    # [LOCAL-759 C] Carry the feed metadata (size/duration/date) the builder
+    # checklist shows. Any may be NULL (a hand-typed link, or a feed that omits
+    # them); the app's CommunityEpisode.metaLine drops the blanks.
     return [{'position': r[0], 'title': r[1], 'audio_url': r[2],
-             'guid': r[3], 'source': r[4]} for r in cur.fetchall()]
+             'guid': r[3], 'source': r[4],
+             'size': r[5], 'duration': r[6], 'date': r[7]}
+            for r in cur.fetchall()]
 
 
 def _tours_for(cur, community_id):
@@ -2250,6 +2256,11 @@ def _upsert_feed_episodes(cur, community_id, parsed):
         guid = ep.get('guid')
         title = ep.get('title')
         url = ep.get('audio_url')
+        # [LOCAL-759 C] Feed metadata (any may be None) — persisted so the
+        # builder checklist can show size/duration/date and a running total.
+        size = ep.get('size')
+        duration = ep.get('duration')
+        date = ep.get('date')
         if guid:
             # Does this guid already exist for the community?
             cur.execute(
@@ -2259,16 +2270,19 @@ def _upsert_feed_episodes(cur, community_id, parsed):
             existing = cur.fetchone()
             if existing:
                 cur.execute(
-                    "UPDATE community_episodes SET title = %s, audio_url = %s, source = 'feed' "
-                    "WHERE id = %s", (title, url, existing[0]),
+                    "UPDATE community_episodes SET title = %s, audio_url = %s, "
+                    "source = 'feed', size_bytes = %s, duration = %s, "
+                    "episode_date = %s WHERE id = %s",
+                    (title, url, size, duration, date, existing[0]),
                 )
                 count += 1
                 continue
         pos += 1
         cur.execute(
-            "INSERT INTO community_episodes (community_id, position, title, audio_url, guid, source) "
-            "VALUES (%s, %s, %s, %s, %s, 'feed')",
-            (community_id, pos, title, url, guid),
+            "INSERT INTO community_episodes (community_id, position, title, "
+            "audio_url, guid, source, size_bytes, duration, episode_date) "
+            "VALUES (%s, %s, %s, %s, %s, 'feed', %s, %s, %s)",
+            (community_id, pos, title, url, guid, size, duration, date),
         )
         count += 1
     return count

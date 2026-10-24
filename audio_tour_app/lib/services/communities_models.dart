@@ -141,8 +141,33 @@ class CommunityEpisode {
   }
 }
 
-/// [LOCAL-710B / D672 addendum 1] A tour MADE WITH Audioura for the community
-/// (`audio_tours.community_id = <id>`), newest first. These — never owner
+/// [LOCAL-759 C] Format a byte count as a short human size ("285 MB", "812 KB"),
+/// matching CommunityEpisode.metaLine. PURE so the builder's per-episode size
+/// and running total read identically and are unit-tested. 0/negative → ''.
+String formatBytes(int bytes) {
+  if (bytes <= 0) return '';
+  final mb = bytes / (1024 * 1024);
+  if (mb >= 1) {
+    return '${mb.toStringAsFixed(mb >= 10 ? 0 : 1)} MB';
+  }
+  return '${(bytes / 1024).round()} KB';
+}
+
+/// [LOCAL-759 C] The running-total label for the organiser-audio builder's
+/// checklist: "N episodes · X MB" over the TICKED episodes, so the organiser
+/// sees what members will download (Michael's Salem tour: 3 episodes · 285 MB).
+/// PURE. [count] is how many episodes are ticked; [totalBytes] is the sum of
+/// their sizes (ticked episodes with an unknown size contribute 0). When the
+/// total is unknown (0), the size clause is dropped ("3 episodes"). Count 0 →
+/// 'No episodes selected'.
+String tickedEpisodesTotalLabel(int count, int totalBytes) {
+  if (count <= 0) return 'No episodes selected';
+  final plural = count == 1 ? 'episode' : 'episodes';
+  final size = formatBytes(totalBytes);
+  return size.isEmpty ? '$count $plural' : '$count $plural · $size';
+}
+
+
 /// MP3/RSS episodes — fill the invite's optional tour line and the invite
 /// screen's "Tour to include" picker. The share CODE is NOT stored here: it is
 /// fetched on demand via TourShareService.share([id]) (the one share-code
