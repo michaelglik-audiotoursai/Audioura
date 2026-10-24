@@ -13,6 +13,7 @@
 // coupling. The caller owns the dialogs/snackbars.
 
 import 'dart:convert';
+import 'dart:async';
 import 'dart:io';
 
 import 'package:archive/archive.dart';
@@ -25,6 +26,7 @@ import '../config/endpoints.dart';
 import '../screens/debug_log_viewer_screen.dart';
 import 'community_downloads.dart';
 import 'downloaded_tour_meta.dart';
+import 'remote_audio_fetcher.dart';
 import 'tour_pricing_service.dart';
 
 /// The outcome of a community-page download attempt.
@@ -42,6 +44,10 @@ enum TourDownloadStatus {
 
   /// A transport error or a non-200/402 response. The caller shows a retry.
   failed,
+
+  /// [LOCAL-759 A3] The user cancelled the download (via a cancel token). The
+  /// caller clears the progress UI; partial files were already removed.
+  cancelled,
 }
 
 /// The result of a download attempt, with the community id to open on a
@@ -50,10 +56,66 @@ class TourDownloadResult {
   final TourDownloadStatus status;
   final int? communityId;
 
-  const TourDownloadResult(this.status, {this.communityId});
+  /// [LOCAL-759 A5] The user-facing reason for a [TourDownloadStatus.failed],
+  /// when a specific one is known — e.g. the named "Audio for stop 2 'The
+  /// Accusations Begin' could not be downloaded." A null/blank message means
+  /// the caller shows the generic "Download failed. Please try again." (use
+  /// [TourDownloadService.failureMessage] to pick). Null for a non-failed
+  /// result.
+  final String? errorMessage;
+
+  const TourDownloadResult(this.status, {this.communityId, this.errorMessage});
 }
 
 class TourDownloadService {
+  // ─── [LOCAL-759 A] Streaming / size-limit config + message helpers ──────────
+
+  /// The web path cannot stream to a file and must hold the bytes in
+  /// SharedPreferences (base64) — a 70–130 MB episode blows that budget — so it
+  /// refuses any stop over this size with a clear message (A6).
+  static const int webMaxBytesPerStop = 50 * 1024 * 1024;
+
+  /// Injectable factory for the device streaming fetcher, so a test (and
+  /// reDownload/save) can supply a fake http client. Defaults to the real
+  /// 30 s-idle, retry-twice fetcher.
+  static RemoteAudioFetcher Function() deviceFetcherFactory =
+      () => RemoteAudioFetcher();
+
+  /// [LOCAL-759 A5] The SnackBar text for a failed download: the specific
+  /// [named] message when one is known (e.g. "Audio for stop 2 '…' could not be
+  /// downloaded."), else the generic fallback. PURE so the choice is tested and
+  /// used from one place.
+  static String failureMessage(String? named) {
+    final m = (named ?? '').trim();
+    return m.isEmpty ? 'Download failed. Please try again.' : m;
+  }
+
+  /// [LOCAL-759 A6] True when a stop's byte size exceeds the web limit.
+  static bool exceedsWebLimit(int sizeBytes) => sizeBytes > webMaxBytesPerStop;
+
+  /// [LOCAL-759 A6] The message shown when a stop is too big for the web path.
+  static String webSizeLimitMessage(int stopNumber, String stopName) {
+    final name = stopName.trim();
+    final who = name.isEmpty ? 'stop $stopNumber' : "stop $stopNumber '$name'";
+    return 'Audio for $who is over 50 MB — too large for the web app. Open '
+        'this tour in the Audioura phone app to download it.';
+  }
+
+  /// [LOCAL-759 A4] The confirm prompt shown before a big download on MOBILE
+  /// DATA: "This tour is 285 MB. Download on Wi-Fi?" PURE so the wording is one
+  /// source of truth. [totalBytes] is the summed HEAD size (0 → unknown, so the
+  /// size clause is dropped).
+  static String mobileDataSizePrompt(int totalBytes) {
+    final size = totalBytes > 0 ? ' is ${_fmtMb(totalBytes)}' : '';
+    return 'This tour$size. You are on mobile data — download on Wi-Fi instead?';
+  }
+
+  static String _fmtMb(int bytes) {
+    final mb = bytes / (1024 * 1024);
+    if (mb >= 1) return '${mb.toStringAsFixed(mb >= 10 ? 0 : 1)} MB';
+    return '${(bytes / 1024).round()} KB';
+  }
+
   /// Download a tour to the phone and save it to My Tours — the SAME server
   /// path a Home/Listen download uses (GET /download-tour/<tourId> on
   /// map-delivery, then [saveTourToMyTours]). [tourId] is the SERVER tour id of
@@ -69,6 +131,8 @@ class TourDownloadService {
   static Future<TourDownloadResult> downloadAndSave(
     int tourId, {
     Map<String, dynamic>? sourceItem,
+    void Function(RemoteAudioProgress)? onAudioProgress,
+    RemoteAudioCancelToken? cancelToken,
   }) async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -98,7 +162,9 @@ class TourDownloadService {
 
       if (response.statusCode == 200) {
         await saveTourToMyTours(tourId, response.bodyBytes,
-            sourceItem: sourceItem);
+            sourceItem: sourceItem,
+            onAudioProgress: onAudioProgress,
+            cancelToken: cancelToken);
         return const TourDownloadResult(TourDownloadStatus.ok);
       }
       if (response.statusCode == 402) {
@@ -120,10 +186,29 @@ class TourDownloadService {
             communityId: communityId);
       }
       return const TourDownloadResult(TourDownloadStatus.failed);
+    } on RemoteAudioCancelled {
+      await DebugLogHelper.addDebugLog('DOWNLOAD_SVC: download cancelled');
+      return const TourDownloadResult(TourDownloadStatus.cancelled);
     } catch (e) {
       await DebugLogHelper.addDebugLog('DOWNLOAD_SVC: download failed: $e');
-      return const TourDownloadResult(TourDownloadStatus.failed);
+      return TourDownloadResult(TourDownloadStatus.failed,
+          errorMessage: _namedErrorMessage(e));
     }
+  }
+
+  /// [LOCAL-759 A5] Extract the user-facing message from a download error, so
+  /// the named "Audio for stop N '…' could not be downloaded." (or the web
+  /// size-limit message) reaches the SnackBar. Returns null for a generic/
+  /// transport error (the caller then shows the generic fallback). We only
+  /// surface a message we KNOW is user-facing (an "Audio for stop …" or
+  /// "over 50 MB" message) — never a raw stack/socket string.
+  static String? _namedErrorMessage(Object e) {
+    if (e is RemoteAudioError) return e.message;
+    final s = e.toString().replaceFirst(RegExp(r'^Exception:\s*'), '').trim();
+    if (s.startsWith('Audio for stop') || s.contains('over 50 MB')) {
+      return s;
+    }
+    return null;
   }
 
   /// [LOCAL-746] RE-DOWNLOAD a community tour already on the phone and replace
@@ -279,7 +364,8 @@ class TourDownloadService {
       } catch (e) {
         await DebugLogHelper.addDebugLog(
             'DOWNLOAD_SVC: re-download $tourId remote-audio fetch failed ($e)');
-        return const TourDownloadResult(TourDownloadStatus.failed);
+        return TourDownloadResult(TourDownloadStatus.failed,
+            errorMessage: _namedErrorMessage(e));
       }
 
       // 4) Bump the saved record's version/updated_at (and stop count) IN PLACE —
@@ -318,6 +404,8 @@ class TourDownloadService {
     int downloadId,
     List<int> zipBytes, {
     Map<String, dynamic>? sourceItem,
+    void Function(RemoteAudioProgress)? onAudioProgress,
+    RemoteAudioCancelToken? cancelToken,
   }) async {
     final tourId = downloadId;
     try {
@@ -451,7 +539,8 @@ class TourDownloadService {
       // exactly like a generated tour. One failing stop → the whole save fails
       // (no half-saved tour), naming the stop in the thrown message.
       await _fetchRemoteAudioIfPresent(zipBytes, tourDirPath, safeName,
-          editTourId, prefs);
+          editTourId, prefs,
+          onProgress: onAudioProgress, cancelToken: cancelToken);
 
       int actualStops;
       if (backendStopsCount != null && backendStopsCount > 0) {
@@ -612,13 +701,16 @@ class TourDownloadService {
     String tourDirPath,
     String safeName,
     String editTourId,
-    SharedPreferences prefs,
-  ) async {
+    SharedPreferences prefs, {
+    void Function(RemoteAudioProgress)? onProgress,
+    RemoteAudioCancelToken? cancelToken,
+  }) async {
     if (kIsWeb) {
       final dirName = '${safeName}_$editTourId';
       await _fetchRemoteAudioWeb(zipBytes, dirName, prefs);
     } else {
-      await _fetchRemoteAudioDevice(zipBytes, tourDirPath);
+      await _fetchRemoteAudioDevice(zipBytes, tourDirPath,
+          onProgress: onProgress, cancelToken: cancelToken);
     }
   }
 
@@ -646,16 +738,98 @@ class TourDownloadService {
     return const {};
   }
 
-  /// Device: fetch each remote audio URL and write audio_N.mp3 beside
-  /// index.html. Throws (naming the stop) on a URL that will not download, so
-  /// the caller can fail the whole save (no half-saved tour).
+  /// [LOCAL-759 A5] The stop NAME per stop number, read from each `audio_N.txt`
+  /// (its first line is the stop name — the organiser-audio package shape). Used
+  /// so a failed stop names itself: "Audio for stop 2 'The Accusations Begin'
+  /// could not be downloaded." Returns {} when the package has no such files.
+  static Map<int, String> _remoteStopNames(List<int> zipBytes) {
+    final out = <int, String>{};
+    try {
+      final archive = ZipDecoder().decodeBytes(zipBytes);
+      final re = RegExp(r'^audio_(\d+)\.txt$');
+      for (final file in archive) {
+        if (!file.isFile) continue;
+        final m = re.firstMatch(file.name);
+        if (m == null) continue;
+        final n = int.tryParse(m.group(1)!);
+        if (n == null) continue;
+        final text = utf8.decode(file.content as List<int>, allowMalformed: true);
+        final firstLine = text.split('\n').first.trim();
+        if (firstLine.isNotEmpty) out[n] = firstLine;
+      }
+    } catch (_) {}
+    return out;
+  }
+
+  /// Device: stream each remote audio URL to audio_N.mp3 beside index.html
+  /// (via a .part file, following the podtrac/podbean 302 chain, with a 30 s
+  /// idle timeout and two retries). Throws [RemoteAudioError] (naming the stop)
+  /// on a URL that will not download after retries, so the caller can fail the
+  /// whole save (no half-saved tour). Reports progress and honours cancellation.
   static Future<void> _fetchRemoteAudioDevice(
-      List<int> zipBytes, String tourDirPath) async {
+    List<int> zipBytes,
+    String tourDirPath, {
+    void Function(RemoteAudioProgress)? onProgress,
+    RemoteAudioCancelToken? cancelToken,
+  }) async {
     final remote = _remoteAudioMap(zipBytes);
     if (remote.isEmpty) return;
+    final names = _remoteStopNames(zipBytes);
+    final fetcher = deviceFetcherFactory();
     for (final entry in remote.entries) {
       final n = entry.key;
       final url = entry.value;
+      final stopName = names[n] ?? '';
+      try {
+        await fetcher.fetchToFile(
+          url: url,
+          destPath: '$tourDirPath/audio_$n.mp3',
+          stopNumber: n,
+          stopName: stopName,
+          onProgress: onProgress,
+          cancelToken: cancelToken,
+        );
+      } on RemoteAudioCancelled {
+        await DebugLogHelper.addDebugLog(
+            'DOWNLOAD_SVC: remote audio cancelled at stop $n');
+        rethrow;
+      } on RemoteAudioError catch (e) {
+        await DebugLogHelper.addDebugLog(
+            'DOWNLOAD_SVC: remote audio for stop $n failed: ${e.cause ?? e.message}');
+        rethrow; // carries the exact named message to the caller
+      }
+    }
+  }
+
+  /// Web: fetch each remote audio URL and store it in prefs as
+  /// tour_file_<dir>_audio_N.mp3 (+ its mime) so the web player serves it from
+  /// local storage, matching the extracted-file scheme. The web path CANNOT
+  /// stream to a file (prefs/base64 is the only store), so it REFUSES any stop
+  /// over 50 MB with a clear message (A6) rather than blowing the prefs budget.
+  /// Throws (naming the stop) on failure.
+  static Future<void> _fetchRemoteAudioWeb(
+      List<int> zipBytes, String dirName, SharedPreferences prefs) async {
+    final remote = _remoteAudioMap(zipBytes);
+    if (remote.isEmpty) return;
+    final names = _remoteStopNames(zipBytes);
+    for (final entry in remote.entries) {
+      final n = entry.key;
+      final url = entry.value;
+      final stopName = names[n] ?? '';
+      // [LOCAL-759 A6] Pre-check the size with a HEAD so a huge episode is
+      // refused BEFORE the bytes are pulled into memory. A server that omits
+      // Content-Length falls through to the download, which re-checks below.
+      try {
+        final head = await http
+            .head(Uri.parse(url))
+            .timeout(const Duration(seconds: 15));
+        final len = int.tryParse(head.headers['content-length'] ?? '');
+        if (len != null && exceedsWebLimit(len)) {
+          throw Exception(webSizeLimitMessage(n, stopName));
+        }
+      } on TimeoutException {
+        // HEAD not supported/slow — fall through to the GET + post-check.
+      }
       try {
         final resp = await http
             .get(Uri.parse(url))
@@ -663,35 +837,8 @@ class TourDownloadService {
         if (resp.statusCode != 200 || resp.bodyBytes.isEmpty) {
           throw Exception('stop $n: HTTP ${resp.statusCode}');
         }
-        final f = File('$tourDirPath/audio_$n.mp3');
-        await f.create(recursive: true);
-        await f.writeAsBytes(resp.bodyBytes);
-      } catch (e) {
-        await DebugLogHelper.addDebugLog(
-            'DOWNLOAD_SVC: remote audio for stop $n failed: $e');
-        throw Exception('Audio for stop $n could not be downloaded. '
-            'Please retry.');
-      }
-    }
-  }
-
-  /// Web: fetch each remote audio URL and store it in prefs as
-  /// tour_file_<dir>_audio_N.mp3 (+ its mime) so the web player serves it from
-  /// local storage, matching the extracted-file scheme. Throws (naming the
-  /// stop) on failure.
-  static Future<void> _fetchRemoteAudioWeb(
-      List<int> zipBytes, String dirName, SharedPreferences prefs) async {
-    final remote = _remoteAudioMap(zipBytes);
-    if (remote.isEmpty) return;
-    for (final entry in remote.entries) {
-      final n = entry.key;
-      final url = entry.value;
-      try {
-        final resp = await http
-            .get(Uri.parse(url))
-            .timeout(const Duration(seconds: 120));
-        if (resp.statusCode != 200 || resp.bodyBytes.isEmpty) {
-          throw Exception('stop $n: HTTP ${resp.statusCode}');
+        if (exceedsWebLimit(resp.bodyBytes.length)) {
+          throw Exception(webSizeLimitMessage(n, stopName));
         }
         await prefs.setString('tour_file_${dirName}_audio_$n.mp3',
             base64Encode(resp.bodyBytes));
@@ -700,8 +847,13 @@ class TourDownloadService {
       } catch (e) {
         await DebugLogHelper.addDebugLog(
             'DOWNLOAD_SVC: remote audio (web) for stop $n failed: $e');
-        throw Exception('Audio for stop $n could not be downloaded. '
-            'Please retry.');
+        // Keep an explicit size-limit message verbatim; otherwise use the
+        // named generic failure so the SnackBar points at the stop.
+        final s = e.toString();
+        if (s.contains('over 50 MB')) {
+          throw Exception(webSizeLimitMessage(n, stopName));
+        }
+        throw Exception(remoteAudioStopFailureMessage(n, stopName));
       }
     }
   }
