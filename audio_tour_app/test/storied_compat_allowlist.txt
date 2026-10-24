@@ -43,7 +43,6 @@ services/document_acceptance_service.dart | SAFE try/catch -> false/[]; a missin
 services/score_explanation_service.dart | SAFE try/catch -> null/RescoreResult; the screen shows "not available yet".
 services/tour_editing_service.dart | SAFE try/catch -> {success:false,...}; a missing tour-editing service surfaces as a handled error, not a crash.
 services/subscription_service.dart | SAFE try/catch -> error map/false; newsletter credential submit degrades without crashing.
-services/voice_control_service.dart | SAFE try/catch, acts only on 200; a missing voice service simply does nothing (logs only).
 services/navigation_service.dart | SAFE try/catch -> ServiceLookupResult(error); a missing nearby-services route shows "couldn't look up".
 services/api_tester.dart | SAFE diagnostics-only; each probe wrapped in its own try/catch and logs the error, never throws.
 screens/treats_screen.dart | SAFE try/catch, decode only on 200; a missing treats service leaves the list empty (isLoading cleared).
