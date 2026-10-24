@@ -943,24 +943,36 @@ def _tours_for(cur, community_id):
     The app fetches each tour's share CODE on demand via the existing share
     endpoint (TourShareService.share) — the single share-code system (D671) —
     so no code is embedded here. Drafts are excluded (an unfinished tour cannot
-    be shared). Returns id, name, stop_count and created_at per tour."""
+    be shared). Returns id, name, stop_count, created_at, version and (LOCAL-752
+    A2) the tour's `languages` per tour — original language first, then every
+    finished translation — so the community page can show one row per tour with
+    its languages and the Download can offer the member's listening language."""
     cur.execute(
         # [LOCAL-748 LEAD] Also return the tour's version, computed exactly as
         # map-delivery /tour-info does (MAX(audio_tour_versions.version_no) + 1),
         # so a community-page download saves the right version and the refresh
         # does not re-download a tour the phone just got.
+        # [LOCAL-752 A2] Return ORIGINALS only (original_tour_id IS NULL) with the
+        # tour's own `language`: a translation is a LANGUAGE of its original, never
+        # its own community-page row — it is surfaced in the original's `languages`.
         """SELECT t.id, t.tour_name, COALESCE(t.stops_count, 0), t.created_at,
                   COALESCE((SELECT MAX(v.version_no) FROM audio_tour_versions v
-                             WHERE v.tour_id = t.id), 0) + 1
+                             WHERE v.tour_id = t.id), 0) + 1,
+                  t.language
              FROM audio_tours t
             WHERE t.community_id = %s
+              AND t.original_tour_id IS NULL
               AND COALESCE(t.draft, FALSE) = FALSE
             ORDER BY t.created_at DESC, t.id DESC""",
         (community_id,),
     )
     return [{'id': r[0], 'name': r[1], 'stop_count': int(r[2]),
              'created_at': r[3].isoformat() if r[3] else None,
-             'version': int(r[4])}
+             'version': int(r[4]),
+             # [LOCAL-752 A2] The languages the tour is available in (original
+             # first, then finished translations), the SAME list the new-tours
+             # read returns, so the community page and sync agree.
+             'languages': _tour_languages(cur, r[0], r[5])}
             for r in cur.fetchall()]
 
 
@@ -1032,15 +1044,23 @@ def _tour_languages(cur, tour_id, original_language):
     (non-draft) translation row (original_tour_id = tour_id), in a stable order
     (by the translation's id). A language already equal to the original is not
     repeated. v1 lists only languages that already EXIST — the app never
-    requests a new translation automatically (D675 §1)."""
+    requests a new translation automatically (D675 §1).
+
+    [LOCAL-752 A2] The translation's language is read from content_language,
+    falling back to language. Every translation row the service writes stores the
+    TARGET language in audio_tours.content_language (translate_tour_with_audio
+    inserts content_language=target_language); the legacy `language` column stays
+    'en' on those rows, so reading `language` returned 'en' for every translation
+    and the Russian (and every other translation) never appeared in the list.
+    COALESCE(content_language, language) surfaces the real translation language."""
     orig = (original_language or 'en')
     langs = [orig]
     cur.execute(
-        """SELECT language
+        """SELECT COALESCE(content_language, language)
              FROM audio_tours
             WHERE original_tour_id = %s
               AND COALESCE(draft, FALSE) = FALSE
-              AND language IS NOT NULL
+              AND COALESCE(content_language, language) IS NOT NULL
             ORDER BY id""",
         (tour_id,),
     )

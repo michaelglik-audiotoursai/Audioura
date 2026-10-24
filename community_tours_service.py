@@ -154,6 +154,89 @@ def normalise_visibility(visibility):
     return v
 
 
+def _community_visibility_setting(cur, community_id):
+    """[LOCAL-752 B / D706] The community's OWN visibility ('listed' | 'private'),
+    or None when the community is unknown/unreadable. Read from communities.
+    Never raises → None on any error (the caller then uses the safe default)."""
+    try:
+        cur.execute(
+            "SELECT visibility FROM communities WHERE id = %s", (int(community_id),))
+        row = cur.fetchone()
+    except Exception:  # noqa: BLE001
+        return None
+    return row[0] if row else None
+
+
+def default_visibility_for_community(cur, community_id, explicit=None):
+    """[LOCAL-752 B / D706] The visibility a NEW community tour should take.
+
+    DECISION D706 (LEAD 2026-10-23): for a LISTED community the default visibility
+    of a new tour is PUBLIC (it shows on the map/search with the community badge;
+    download still needs an active membership → non-member 402). A PRIVATE
+    community keeps today's members-only default. An EXPLICIT choice from Generate
+    (members/public) always wins — the organiser may still make a listed
+    community's tour members-only.
+
+    Rules, in order:
+      * explicit given ('members'/'public')  → that value (validated/normalised);
+      * explicit absent + community 'listed' → 'public';
+      * otherwise                            → 'members' (safe default — private
+                                               community, or unknown/disabled).
+    """
+    if explicit is not None and str(explicit).strip() != '':
+        return normalise_visibility(explicit)
+    if _community_visibility_setting(cur, community_id) == 'listed':
+        return 'public'
+    return DEFAULT_VISIBILITY
+
+
+def set_tour_visibility(cur, tour_id, community_id, visibility, owner_user_id):
+    """[LOCAL-752 B] Change an existing community tour's visibility — OWNER ONLY,
+    server-enforced. The organiser does this from the community page (one tap:
+    Michael switches his own Danvers tour to public). Cursor form (the route owns
+    the transaction).
+
+    Validations (in order):
+      * columns must exist — else no-op (returns False; feature off on old schema);
+      * visibility must be valid ('members'/'public') — else 'bad_visibility';
+      * the community must exist and not be disabled — else 'unknown_community';
+      * owner_user_id must OWN the community — else 'not_owner' (403);
+      * the tour must exist and belong to this community — else 'unknown_tour';
+      * a PUBLIC visibility needs coordinates — else 'public_needs_location'.
+
+    Writes community_visibility on the ORIGINAL row. Returns True when written.
+    """
+    if not has_community_columns(cur):
+        return False
+
+    vis = normalise_visibility(visibility)
+
+    owner = community_owner(cur, community_id)
+    if owner is None:
+        raise CommunityTourError(
+            'unknown_community', f"No open community with id {community_id}.")
+    if str(owner) != str(owner_user_id):
+        raise CommunityTourError(
+            'not_owner',
+            "Only the community organiser can change a tour's visibility.")
+
+    cur.execute(
+        "SELECT 1 FROM audio_tours WHERE id = %s", (int(tour_id),))
+    if cur.fetchone() is None:
+        raise CommunityTourError('unknown_tour', f"No tour with id {tour_id}.")
+
+    if vis == 'public' and not _tour_has_coordinates(cur, tour_id):
+        raise CommunityTourError(
+            'public_needs_location',
+            "A public community tour needs coordinates to show on the map.")
+
+    cur.execute(
+        "UPDATE audio_tours SET community_visibility = %s WHERE id = %s",
+        (vis, int(tour_id)),
+    )
+    return True
+
+
 def _tour_has_coordinates(cur, tour_id):
     """True iff the tour row carries lat AND lng. A PUBLIC community tour needs
     coordinates (it shows on the map); a members-only one does not."""
@@ -442,6 +525,43 @@ def register_community_tour_routes(app):
             tag = community_tour_tag(cur, tour_id)
             return jsonify({"tour_id": int(tour_id), **tag}), 200
         except Exception as e:  # noqa: BLE001
+            return jsonify({"error": str(e)}), 500
+        finally:
+            conn.close()
+
+    @app.route('/tour/<int:tour_id>/visibility', methods=['POST', 'PATCH'])
+    def api_set_community_tour_visibility(tour_id):
+        """[LOCAL-752 B] Owner-only change of a community tour's visibility from
+        the community page. Body: {user_id, community_id, visibility}. A non-owner
+        is refused 403 not_owner (server-enforced)."""
+        data = request.get_json(silent=True) or {}
+        user_id = data.get('user_id')
+        community_id = data.get('community_id')
+        visibility = data.get('visibility') or data.get('community_visibility')
+        if not user_id:
+            return jsonify({"error": "user_id is required"}), 400
+        if community_id is None:
+            return jsonify({"error": "community_id is required"}), 400
+        conn = get_connection()
+        try:
+            cur = conn.cursor()
+            try:
+                changed = set_tour_visibility(
+                    cur, tour_id, community_id, visibility, owner_user_id=user_id)
+            except CommunityTourError as e:
+                conn.rollback()
+                return jsonify({"error": e.code, "message": e.message}), \
+                    _status_for.get(e.code, 400)
+            if not changed:
+                conn.rollback()
+                return jsonify({"error": "community_tours_unavailable",
+                                "message": "Community tours are not enabled on "
+                                           "this server."}), 503
+            conn.commit()
+            tag = community_tour_tag(cur, tour_id)
+            return jsonify({"status": "ok", "tour_id": int(tour_id), **tag}), 200
+        except Exception as e:  # noqa: BLE001
+            conn.rollback()
             return jsonify({"error": str(e)}), 500
         finally:
             conn.close()

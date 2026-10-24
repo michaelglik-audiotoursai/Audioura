@@ -2561,11 +2561,43 @@ def generate_complete_tour():
         _community_id = int(_community_id) if _community_id not in (None, '') else None
     except (TypeError, ValueError):
         _community_id = None
-    _community_visibility = (data.get('community_visibility')
-                             or data.get('visibility') or 'members')
-    if _community_id is not None and str(_community_visibility).strip().lower() \
-            not in ('members', 'public'):
-        _community_visibility = 'members'
+    # [LOCAL-752 B / D706] Did the app send an EXPLICIT visibility choice? When it
+    # did (members/public from Generate), honour it. When it did NOT, the default
+    # depends on the community: for a LISTED community a new tour defaults to
+    # PUBLIC (D706 — findable on the map/search with the badge, download still
+    # gated on membership); a PRIVATE community keeps members-only. Resolved via
+    # community_tours_service.default_visibility_for_community so the rule lives in
+    # one place. Best-effort: any read failure falls back to members-only.
+    _explicit_visibility = data.get('community_visibility') or data.get('visibility')
+    _community_visibility = 'members'
+    if _community_id is not None:
+        _explicit = (_explicit_visibility
+                     if (_explicit_visibility is not None
+                         and str(_explicit_visibility).strip().lower()
+                         in ('members', 'public'))
+                     else None)
+        try:
+            import psycopg2 as _pg2_vis
+            import community_tours_service as _cts_vis
+            _vis_conn = _pg2_vis.connect(
+                host=os.getenv('DB_HOST', 'postgres-2'),
+                database=os.getenv('DB_NAME', 'audiotours'),
+                user=os.getenv('DB_USER', 'admin'),
+                password=os.getenv('DB_PASSWORD', 'password123'),
+                port=os.getenv('DB_PORT', '5432'),
+            )
+            try:
+                _vis_cur = _vis_conn.cursor()
+                _community_visibility = _cts_vis.default_visibility_for_community(
+                    _vis_cur, _community_id, _explicit)
+            finally:
+                _vis_conn.close()
+        except Exception as _vis_err:  # noqa: BLE001
+            print(f"[LOCAL-752] default visibility resolve failed for community "
+                  f"{_community_id}: {_vis_err}; using {_community_visibility!r}")
+            # Keep any explicit choice if we had one; else members-only.
+            if _explicit in ('members', 'public'):
+                _community_visibility = _explicit
     persona = sanitize_input(data.get('persona'))  # [S81] Direct-pass persona (optional)
 
     # [LOCAL-525] Optional user-chosen stops. Validated/sanitized here; forwarded

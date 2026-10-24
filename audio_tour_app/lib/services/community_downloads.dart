@@ -135,6 +135,40 @@ Future<void> recordDeletedTours(
   await prefs.setStringList(kDeletedTourIdsPrefKey, set.toList());
 }
 
+/// [LOCAL-752 C] PURE: remove the given tour [ids] from a [deleted] set of tour
+/// ids. Returns a NEW set (the input is not mutated). Ids may be int or String —
+/// both are compared as their string form (the deleted set stores strings, the
+/// same way `recordDeletedTours` writes them). Removing an id that was not in the
+/// set is a harmless no-op.
+Set<String> removeFromDeletedTourIds(Set<String> deleted, Iterable<Object> ids) {
+  final out = deleted.toSet();
+  for (final id in ids) {
+    out.remove(id.toString());
+  }
+  return out;
+}
+
+/// [LOCAL-752 C] Clear the given tour [ids] from the persisted `deleted_tour_ids`
+/// so an EXPLICIT download/re-download lets the tour sync again.
+///
+/// Michael's history (2026-10-23): he deleted community tour 716 on the Pixel
+/// (the deleted set held "716"), then re-downloaded it from the community page.
+/// The organiser's edit took the server to v3, but RefreshPlanner skips any id in
+/// `deleted_tour_ids`, so "716" was skipped forever and the edit never arrived.
+/// Any explicit download/re-download (TourDownloadService.saveTourToMyTours /
+/// reDownloadAndReplace) now calls this, removing the id so the next sync refresh
+/// picks up the organiser's version and shows the "… was updated by the
+/// organiser." message. A no-op when the list is absent or the id was not there.
+Future<void> clearDeletedTourIds(
+    SharedPreferences prefs, Iterable<Object> ids) async {
+  final current = prefs.getStringList(kDeletedTourIdsPrefKey);
+  if (current == null || current.isEmpty) return;
+  final after = removeFromDeletedTourIds(current.toSet(), ids);
+  if (after.length != current.toSet().length) {
+    await prefs.setStringList(kDeletedTourIdsPrefKey, after.toList());
+  }
+}
+
 /// Pick the language to download a tour in (D675 §1). The listener's [preferred]
 /// language wins when the tour already HAS it; otherwise the tour's [original]
 /// language is used (v1 never requests a new translation). [available] is the

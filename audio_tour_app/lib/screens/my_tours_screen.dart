@@ -13,6 +13,7 @@ import '../utils/tour_path_healer.dart';
 import '../utils/view_after_download.dart';
 import '../widgets/share_tour_sheet.dart';
 import '../services/community_downloads.dart';
+import '../services/voice_listen_options.dart';
 import '../widgets/rate_tour_dialog.dart';
 import '../widgets/delete_tour_prompt.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -673,15 +674,36 @@ class _MyToursScreenState extends State<MyToursScreen> {
       ),
     );
     
-    await _speechToText.listen(
-      onResult: (result) {
-        if (result.finalResult) {
-          Navigator.pop(context);
-          _handleVoiceSearchCommand(result.recognizedWords);
-        }
-      },
-      listenFor: Duration(seconds: 10),
-    );
+    // [LOCAL-752 D] Prefer ON-DEVICE recognition so voice search works offline,
+    // falling back to the network recogniser if on-device is not supported here.
+    try {
+      await DebugLogHelper.addDebugLog(
+          'MYTOURS VOICE: listen mode=${voiceListenMode(onDeviceSupported: true)}');
+      await _speechToText.listen(
+        onResult: (result) {
+          if (result.finalResult) {
+            Navigator.pop(context);
+            _handleVoiceSearchCommand(result.recognizedWords);
+          }
+        },
+        listenFor: Duration(seconds: 10),
+        listenOptions: buildVoiceListenOptions(onDeviceSupported: true),
+      );
+    } catch (e) {
+      await DebugLogHelper.addDebugLog(
+          'MYTOURS VOICE: on-device listen failed ($e) — falling back to '
+          '${voiceListenMode(onDeviceSupported: false)}');
+      await _speechToText.listen(
+        onResult: (result) {
+          if (result.finalResult) {
+            Navigator.pop(context);
+            _handleVoiceSearchCommand(result.recognizedWords);
+          }
+        },
+        listenFor: Duration(seconds: 10),
+        listenOptions: buildVoiceListenOptions(onDeviceSupported: false),
+      );
+    }
   }
   
   void _stopListening() {

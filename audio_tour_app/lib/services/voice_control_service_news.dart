@@ -7,6 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_volume_controller/flutter_volume_controller.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:speech_to_text/speech_to_text.dart';
+import 'voice_listen_options.dart';
 import '../screens/debug_log_viewer_screen.dart';
 
 class VoiceControlServiceNews {
@@ -71,17 +72,16 @@ class VoiceControlServiceNews {
     try {
       _isListening = true;
       onVoiceCommand?.call('pause_for_listening', null, 'Listening...');
-      
-      await _speechToText.listen(
+
+      // [LOCAL-752 D] Prefer on-device recognition so news voice works offline,
+      // with a one-shot fallback to the network recogniser and a logged mode.
+      await _listenWithOnDevicePreference(
         onResult: (result) async {
           if (result.finalResult) {
             _isListening = false;
             await _processNewsCommand(result.recognizedWords);
           }
         },
-        listenFor: Duration(seconds: 5),
-        partialResults: true,
-        localeId: 'en_US',
       );
       
       Timer(Duration(seconds: 6), () async {
@@ -94,6 +94,34 @@ class VoiceControlServiceNews {
       _isListening = false;
       onVoiceCommand?.call('play', null, 'Speech recognition error');
     }
+  }
+
+  /// [LOCAL-752 D] Prefer ON-DEVICE recognition (offline), falling back to the
+  /// network recogniser if on-device is not supported here. Logs the mode.
+  Future<void> _listenWithOnDevicePreference({
+    required void Function(dynamic result) onResult,
+  }) async {
+    try {
+      await DebugLogHelper.addDebugLog(
+          'VOICE NEWS: listen mode=${voiceListenMode(onDeviceSupported: true)}');
+      await _speechToText.listen(
+        onResult: onResult,
+        listenFor: Duration(seconds: 5),
+        localeId: 'en_US',
+        listenOptions: buildVoiceListenOptions(onDeviceSupported: true),
+      );
+      return;
+    } catch (e) {
+      await DebugLogHelper.addDebugLog(
+          'VOICE NEWS: on-device listen failed ($e) — falling back to '
+          '${voiceListenMode(onDeviceSupported: false)}');
+    }
+    await _speechToText.listen(
+      onResult: onResult,
+      listenFor: Duration(seconds: 5),
+      localeId: 'en_US',
+      listenOptions: buildVoiceListenOptions(onDeviceSupported: false),
+    );
   }
   
   Future<void> _processNewsCommand(String command) async {
