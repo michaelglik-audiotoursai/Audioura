@@ -3435,12 +3435,17 @@ def my_owned_communities():
     conn = _get_db()
     try:
         cur = conn.cursor()
+        # [LOCAL-753 / D706] Also return each community's visibility ('listed' |
+        # 'private') so the Generate "For:" selector can PRESELECT public for a
+        # listed community (members-only stays selectable); private → members.
+        # COALESCE guards an older row with a NULL visibility (treated private).
         cur.execute(
-            "SELECT id, name FROM communities "
+            "SELECT id, name, COALESCE(visibility, 'private') FROM communities "
             "WHERE owner_user_id = %s AND disabled = FALSE ORDER BY name",
             (user_id,),
         )
-        out = [{'id': r[0], 'name': r[1]} for r in cur.fetchall()]
+        out = [{'id': r[0], 'name': r[1], 'visibility': r[2]}
+               for r in cur.fetchall()]
         cur.close()
         return jsonify({"communities": out}), 200
     finally:

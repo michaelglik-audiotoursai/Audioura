@@ -38,6 +38,9 @@ class CommunityTourService {
             .map((m) => OwnedCommunity(
                   id: (m['id'] is num) ? (m['id'] as num).toInt() : 0,
                   name: (m['name'] ?? '') as String,
+                  // [LOCAL-753 / D706] Carry the community's visibility so the
+                  // Generate selector preselects public for a listed community.
+                  visibility: (m['visibility'] ?? 'private') as String,
                 ))
             .where((c) => c.id != 0)
             .toList(growable: false);

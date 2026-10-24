@@ -23,6 +23,7 @@ import '../services/community_downloads.dart';
 import '../services/community_background.dart';
 import '../services/community_notifications.dart';
 import '../services/tour_download_service.dart';
+import '../services/tour_translation_helper.dart';
 import '../services/iap_service.dart';
 import '../services/device_service.dart';
 import '../services/pass_expiry_format.dart';
@@ -545,29 +546,60 @@ class _CommunityPageScreenState extends State<CommunityPageScreen> {
     required int communityId,
     int version = 1,
     String? updatedAt,
+    List<String> availableLanguages = const [],
   }) async {
     if (_downloading.contains(tour.id)) return;
     setState(() => _downloading.add(tour.id));
     try {
-      // The list endpoint does not carry a languages list, so `available` is
-      // empty here and pickDownloadLanguage falls back to the original — the
-      // tour's own row (its id) is downloaded. The sync-on-open path, which DOES
-      // carry languages, picks the per-community language when available.
+      // [LOCAL-753 / D707] The community page row now carries the tour's
+      // `languages` (LOCAL-752 A2). Pick the language the member would hear: the
+      // THIS-community listening language (_resolvedLanguage) when the tour
+      // already has it, else the tour's original. When that picked language is a
+      // translation the tour already has, fetch THAT language via the shared
+      // Translate helper (which reuses an existing translation — no new paid
+      // generation); otherwise download the original row by its own id. v1 never
+      // GENERATES a new language on Download — the Translate action does that.
       // [LOCAL-715 / D675 addendum 1] The preferred language is THIS community's
       // resolved language (languageForCommunity), not a single global one.
-      final _ = pickDownloadLanguage(const [], _resolvedLanguage, '');
+      final original =
+          availableLanguages.isNotEmpty ? availableLanguages.first : 'en';
+      final pickedLang =
+          pickDownloadLanguage(availableLanguages, _resolvedLanguage, original);
+      final wantExistingTranslation = availableLanguages.contains(pickedLang) &&
+          pickedLang != original &&
+          pickedLang != 'en';
       // [LOCAL-748] Pass the tour's row as sourceItem so the saved record is
       // stamped with community_id (and version/updated_at). Without it the
       // record carried no community_id, so CommunityToursSync's held-tour
       // refresh skipped it and the organiser's edit never reached the member.
+      final sourceItem = communityTourSourceItem(
+        communityId: communityId,
+        version: version,
+        updatedAt: updatedAt,
+      );
+      // Download the original row first (it is the sourceItem anchor and the
+      // chain a translation hangs off).
       final result = await TourDownloadService.downloadAndSave(
         tour.id,
-        sourceItem: communityTourSourceItem(
-          communityId: communityId,
-          version: version,
-          updatedAt: updatedAt,
-        ),
+        sourceItem: sourceItem,
       );
+      // When the member's listening language is an EXISTING translation of this
+      // tour, also fetch that language so Listen opens in it. The helper reuses
+      // the server's finished translation (no new generation) and saves it as a
+      // sibling record carrying the same community_id.
+      if (wantExistingTranslation && result.status == TourDownloadStatus.ok) {
+        try {
+          await TourTranslationHelper.downloadTranslatedVersions(
+            tourId: tour.id,
+            languages: [pickedLang],
+            parentEditTourId: tour.id.toString(),
+            sourceItem: sourceItem,
+          );
+        } catch (_) {
+          // A translation fetch failure leaves the original on the phone — the
+          // member still has the tour, just not the extra language this run.
+        }
+      }
       if (!mounted) return;
       switch (result.status) {
         case TourDownloadStatus.ok:
@@ -1138,20 +1170,140 @@ class _CommunityPageScreenState extends State<CommunityPageScreen> {
                     ),
                     communityId: c.id,
                     version: t.version,
-                    updatedAt: t.updatedAt),
+                    updatedAt: t.updatedAt,
+                    // [LOCAL-753 / D707] Pass the tour's languages so Download
+                    // can fetch the member's listening language when present.
+                    availableLanguages: t.languages),
                 icon: const Icon(Icons.download, size: 18),
                 label: const Text('Download'),
               );
         break;
     }
+    // [LOCAL-753 / D707] Members/owners get a Translate action: pick a language
+    // the tour does not yet have and the server generates it (reusing an
+    // existing one if present); the result becomes part of the community so
+    // every member can download it. Hidden from non-members and when every
+    // canonical language is already present.
+    final canTranslate =
+        (c.myStatus.isMember && c.myStatus.active) || c.isOwner;
+    final translateCandidates =
+        CommunityTourRules.translateCandidates(t.languages);
+    Widget? translateButton;
+    if (canTranslate && translateCandidates.isNotEmpty && !isBusy) {
+      translateButton = IconButton(
+        key: Key('translate_tour_${t.id}'),
+        icon: const Icon(Icons.translate, size: 20, color: Colors.teal),
+        tooltip: 'Translate',
+        onPressed: () => _translateCommunityTour(c, t),
+      );
+    }
+    // [LOCAL-753 / D707] Show the tour's languages on the row (original first).
+    final langLine = t.languages.isNotEmpty
+        ? t.languages.map(listeningLanguageName).join(', ')
+        : null;
+    final subtitleParts = <String>[
+      if (t.stopCount > 0) '${t.stopCount} stops',
+      if (langLine != null) langLine,
+    ];
     return ListTile(
       leading: const Icon(Icons.headphones),
       title: Text(title),
-      subtitle: t.stopCount > 0 ? Text('${t.stopCount} stops') : null,
-      trailing: trailing,
+      subtitle: subtitleParts.isNotEmpty ? Text(subtitleParts.join(' · ')) : null,
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (translateButton != null) translateButton,
+          trailing,
+        ],
+      ),
       // [LOCAL-748] Tapping anywhere on an already-downloaded row opens it too.
       onTap: openPlayer,
     );
+  }
+
+  /// [LOCAL-753 / D707] Translate a community tour from its community-page row.
+  /// Offers the SAME canonical language list as Listen → Translate, minus the
+  /// languages the tour already has (translateCandidates). Picking one runs the
+  /// shared TourTranslationHelper (same plan allowance as Listen → Translate);
+  /// the server records the translation as part of the community (A1), so every
+  /// member can then download it without paying again. If the language already
+  /// existed it would not be offered here (it is simply downloadable).
+  Future<void> _translateCommunityTour(
+      Community c, CommunityInviteTourOption t) async {
+    final candidates = CommunityTourRules.translateCandidates(t.languages);
+    if (candidates.isEmpty) return;
+    final selected = <String>{};
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setLocal) => AlertDialog(
+          title: const Text('Translate tour'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Choose a language to add to "${t.name}".',
+                  style: const TextStyle(fontSize: 13)),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 6,
+                runSpacing: 2,
+                children: candidates
+                    .map((code) => FilterChip(
+                          key: Key('translate_lang_${t.id}_$code'),
+                          label: Text(listeningLanguageName(code)),
+                          selected: selected.contains(code),
+                          onSelected: (on) => setLocal(() =>
+                              on ? selected.add(code) : selected.remove(code)),
+                        ))
+                    .toList(),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: const Text('Cancel')),
+            FilledButton(
+                onPressed: selected.isEmpty
+                    ? null
+                    : () => Navigator.pop(ctx, true),
+                child: const Text('Translate')),
+          ],
+        ),
+      ),
+    );
+    if (confirmed != true || selected.isEmpty || !mounted) return;
+    setState(() => _downloading.add(t.id));
+    try {
+      final failures = await TourTranslationHelper.downloadTranslatedVersions(
+        tourId: t.id,
+        languages: selected.toList(),
+        parentEditTourId: t.id.toString(),
+        sourceItem: communityTourSourceItem(
+          communityId: c.id,
+          version: t.version,
+          updatedAt: t.updatedAt,
+        ),
+      );
+      if (!mounted) return;
+      if (failures.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text(
+                'Translated to ${selected.length} language(s). Everyone in the '
+                'community can now download it.'),
+            backgroundColor: Colors.green));
+        await _load(); // refresh so the new languages show on the row
+      } else {
+        final names = failures
+            .map((code) => listeningLanguageName(code))
+            .join(', ');
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text('Could not translate: $names. Please try again.')));
+      }
+    } finally {
+      if (mounted) setState(() => _downloading.remove(t.id));
+    }
   }
 
   // ─── [LOCAL-702 / D663 §1] Hand-over + archived UI builders ─────────────────
