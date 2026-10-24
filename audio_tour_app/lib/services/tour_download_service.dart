@@ -23,6 +23,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../config/endpoints.dart';
 import '../screens/debug_log_viewer_screen.dart';
+import 'community_downloads.dart';
 import 'downloaded_tour_meta.dart';
 import 'tour_pricing_service.dart';
 
@@ -275,6 +276,10 @@ class TourDownloadService {
 
       saved[recordIndex] = json.encode(record);
       await prefs.setStringList('saved_tours', saved);
+      // [LOCAL-752 C] A re-download also un-deletes the tour (same reason as the
+      // initial save): drop its id from `deleted_tour_ids` so the refresh keeps
+      // tracking it.
+      await clearDeletedTourIds(prefs, [tourId]);
       await DebugLogHelper.addDebugLog(
           'DOWNLOAD_SVC: re-download $tourId replaced in place → v$newVersion');
       return const TourDownloadResult(TourDownloadStatus.ok);
@@ -468,6 +473,10 @@ class TourDownloadService {
 
       savedTours.add(json.encode(tourData));
       await prefs.setStringList('saved_tours', savedTours);
+      // [LOCAL-752 C] An explicit download un-deletes the tour: remove its id
+      // from `deleted_tour_ids` so a later sync refresh (RefreshPlanner) no longer
+      // skips it. Covers both the download id and the resolved edit id.
+      await clearDeletedTourIds(prefs, [downloadId, editTourId]);
       await DebugLogHelper.addDebugLog(
           'DOWNLOAD_SVC: SAVE - saved "$finalTourName" at $tourDirPath');
     } catch (e) {

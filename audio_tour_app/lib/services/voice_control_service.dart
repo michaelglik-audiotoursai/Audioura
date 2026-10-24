@@ -1,13 +1,11 @@
 import 'dart:async';
 import 'dart:io';
-import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_volume_controller/flutter_volume_controller.dart';
 import 'package:permission_handler/permission_handler.dart';
-import '../config/endpoints.dart';
 import 'package:speech_to_text/speech_to_text.dart';
+import 'voice_listen_options.dart';
 import '../screens/debug_log_viewer_screen.dart';
 
 class VoiceControlService {
@@ -139,8 +137,13 @@ class VoiceControlService {
       
       // Pause all audio during recognition
       onVoiceCommand?.call('pause_for_listening', null, 'Listening...');
-      
-      await _speechToText.listen(
+
+      // [LOCAL-752 D] Prefer ON-DEVICE recognition so voice works with no
+      // internet (airplane mode). speech_to_text 7.x exposes no per-locale
+      // on-device probe, so we try on-device first and fall back to the previous
+      // (network-capable) behaviour if the platform rejects it — logging which
+      // mode was used so a field run can be verified.
+      await _listenWithOnDevicePreference(
         onResult: (result) async {
           await DebugLogHelper.addDebugLog('VOICE: Speech result received - Final: ${result.finalResult}, Words: "${result.recognizedWords}"');
           if (result.finalResult) {
@@ -149,9 +152,6 @@ class VoiceControlService {
             await _processAdvancedCommand(result.recognizedWords);
           }
         },
-        listenFor: Duration(seconds: 5),
-        partialResults: true,
-        localeId: 'en_US',
       );
       
       // Add timeout fallback
@@ -168,6 +168,39 @@ class VoiceControlService {
       await DebugLogHelper.addDebugLog('VOICE: Speech-to-text available: $_speechEnabled');
       onVoiceCommand?.call('play', null, 'Speech recognition error, playing audio');
     }
+  }
+
+  /// [LOCAL-752 D] Start a listen session preferring ON-DEVICE recognition, with
+  /// a one-shot fallback to the network recogniser if on-device is not supported
+  /// on this device/locale. Logs the mode used ('on-device' / 'network'). The
+  /// command parsing is already local; this makes the audio capture local too so
+  /// the whole path works offline.
+  Future<void> _listenWithOnDevicePreference({
+    required void Function(dynamic result) onResult,
+  }) async {
+    // Try on-device first.
+    try {
+      await DebugLogHelper.addDebugLog(
+          'VOICE: listen mode=${voiceListenMode(onDeviceSupported: true)}');
+      await _speechToText.listen(
+        onResult: onResult,
+        listenFor: Duration(seconds: 5),
+        localeId: 'en_US',
+        listenOptions: buildVoiceListenOptions(onDeviceSupported: true),
+      );
+      return;
+    } catch (e) {
+      // On-device not available here — fall back to the previous behaviour.
+      await DebugLogHelper.addDebugLog(
+          'VOICE: on-device listen failed ($e) — falling back to '
+          '${voiceListenMode(onDeviceSupported: false)}');
+    }
+    await _speechToText.listen(
+      onResult: onResult,
+      listenFor: Duration(seconds: 5),
+      localeId: 'en_US',
+      listenOptions: buildVoiceListenOptions(onDeviceSupported: false),
+    );
   }
   
   Future<void> _processVoiceResult(String result) async {
@@ -190,51 +223,6 @@ class VoiceControlService {
     }
   }
 
-
-
-  Future<void> processVoiceCommand(String voiceText) async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-
-      // Gate off server-side voice processing in cloud mode — not deployed yet.
-      // Voice commands are 100% on-device (speech-to-text → command parsing → execution).
-      // This server call is only for AI-enhanced parsing; fall through to local handling on cloud.
-      if ((prefs.getString('server_mode') ?? 'local') == 'cloud') {
-        await DebugLogHelper.addDebugLog('VOICE: Server-side voice processing not available in cloud mode — using local commands only');
-        return;
-      }
-      
-      // Get current tour state (you'll need to pass this from the audio player)
-      final currentStop = prefs.getInt('current_stop') ?? 0;
-      final totalStops = prefs.getInt('total_stops') ?? 10;
-
-      final response = await http.post(
-        await Endpoints.url(Service.voice, '/process-voice-command'),
-        headers: await Endpoints.apiHeaders(Service.voice),
-        body: json.encode({
-          'text': voiceText,
-          'current_stop': currentStop,
-          'total_stops': totalStops,
-        }),
-      );
-
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        final action = data['action'];
-        final stopNumber = data['stop_number'];
-        final message = data['message'];
-
-        await DebugLogHelper.addDebugLog('VOICE: Command processed - Action: $action, Message: $message');
-        
-        // Callback to audio player
-        onVoiceCommand?.call(action, stopNumber, message);
-      } else {
-        await DebugLogHelper.addDebugLog('VOICE: Server error: ${response.statusCode}');
-      }
-    } catch (e) {
-      await DebugLogHelper.addDebugLog('VOICE: Error processing voice command: $e');
-    }
-  }
 
 
   

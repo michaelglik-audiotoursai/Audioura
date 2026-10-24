@@ -200,6 +200,127 @@ class TranslationService:
             port=os.getenv('DB_PORT', '5432')
         )
     
+    def _append_community_cols(self, cursor, cols, vals, source_tour_id):
+        """[LOCAL-752 A1] A TRANSLATION inherits its SOURCE tour's community_id and
+        community_visibility.
+
+        Michael's retest (2026-10-23): the Russian translation (row 737) of a
+        community tour (row 736, community_id 10, visibility members) got NO
+        community_id/community_visibility, so the community page
+        (communities_api._tours_for, WHERE community_id = %s) never listed it and
+        the Russian appeared nowhere. The two INSERT paths build their column/value
+        lists (schema-guarded, like 'track' and 'source_version'); this appends the
+        community columns to those lists IN PLACE so the translation row carries the
+        same community as its original.
+
+        Behaviour (never raises — a lookup problem degrades to an ordinary row):
+          * the columns must exist (information_schema probe) — else no-op (older
+            schema; the feature is simply off, same as community_tours_service);
+          * read the SOURCE tour's (community_id, community_visibility);
+          * when community_id is NOT NULL, append 'community_id' and
+            'community_visibility' to cols/vals (the translation becomes part of the
+            community);
+          * an ordinary source (community_id NULL) appends nothing.
+        """
+        try:
+            cursor.execute("""
+                SELECT COUNT(*) FROM information_schema.columns
+                WHERE table_name = 'audio_tours'
+                  AND column_name IN ('community_id', 'community_visibility')
+            """)
+            row = cursor.fetchone()
+            if not row or int(row[0]) != 2:
+                return  # older schema — community tours feature off, no-op
+            cursor.execute(
+                "SELECT community_id, community_visibility FROM audio_tours WHERE id = %s",
+                (source_tour_id,),
+            )
+            src = cursor.fetchone()
+            if not src or src[0] is None:
+                return  # ordinary tour — nothing to inherit
+            cols.append("community_id")
+            vals.append(src[0])
+            cols.append("community_visibility")
+            vals.append(src[1])
+            logging.info(
+                f"[LOCAL-752] Translation of tour {source_tour_id} inherits "
+                f"community_id={src[0]}, community_visibility={src[1]!r}")
+        except Exception as e:  # noqa: BLE001
+            # Non-fatal: a translation must still be written even if we cannot read
+            # the source community (the backfill / a later re-tag can repair it).
+            logging.warning(
+                f"[LOCAL-752] Could not inherit community for translation of "
+                f"{source_tour_id} (non-fatal): {e}")
+
+    def _community_translate_block(self, cursor, tour_id, user_id):
+        """[LOCAL-752 A3] Organiser-only gate for TRANSLATING a community tour,
+        mirroring tour_editing_phase2._community_edit_block (LOCAL-745) but
+        self-contained in the translation service (its own schema-guarded DB reads,
+        no cross-container import).
+
+        Returns:
+          * None          — allowed (ordinary tour, or the caller IS the owner);
+          * (403, body)   — a community tour, the user is not its owner
+                            (error_code NOT_COMMUNITY_OWNER);
+          * (401, body)   — a community tour but no user_id (fail closed — a
+                            community tour is never translatable anonymously).
+
+        An ordinary tour (no community_id, or columns absent) returns None: today's
+        rule is unchanged, anyone may translate it. Never raises on an ordinary
+        tour; once a community_id IS known it fails closed with 403.
+        """
+        try:
+            cursor.execute("""
+                SELECT COUNT(*) FROM information_schema.columns
+                WHERE table_name = 'audio_tours' AND column_name = 'community_id'
+            """)
+            row = cursor.fetchone()
+            if not row or int(row[0]) != 1:
+                return None  # older schema — feature off, anyone may translate
+        except Exception as e:  # noqa: BLE001
+            logging.warning(f"[LOCAL-752] community column probe failed: {e}")
+            return None
+
+        try:
+            cursor.execute(
+                "SELECT community_id FROM audio_tours WHERE id = %s", (tour_id,))
+            r = cursor.fetchone()
+        except Exception as e:  # noqa: BLE001
+            logging.warning(f"[LOCAL-752] community_id lookup failed for {tour_id}: {e}")
+            return None
+        community_id = r[0] if r else None
+        if not community_id:
+            return None  # ordinary tour — anyone may translate
+
+        uid = (str(user_id).strip() if user_id is not None else '')
+        if not uid:
+            return (401, {
+                "status": "error",
+                "error_code": "USER_ID_REQUIRED",
+                "message": "Please sign in as the community organiser to translate "
+                           "this community tour.",
+                "community_id": int(community_id),
+            })
+
+        try:
+            cursor.execute(
+                "SELECT owner_user_id, disabled FROM communities WHERE id = %s",
+                (int(community_id),))
+            crow = cursor.fetchone()
+        except Exception as e:  # noqa: BLE001
+            crow = None
+            logging.warning(f"[LOCAL-752] community owner lookup failed for {community_id}: {e}")
+        owner = crow[0] if (crow and not crow[1]) else None
+        if owner is not None and str(owner) == uid:
+            return None  # the organiser — allowed
+
+        return (403, {
+            "status": "error",
+            "error_code": "NOT_COMMUNITY_OWNER",
+            "message": "Only the community organiser can translate this tour.",
+            "community_id": int(community_id),
+        })
+
     def _ensure_source_version_column(self, cursor):
         """[LOCAL-666] Self-heal: make sure audio_tours.source_version exists before we
         write a translation row. Additive and idempotent, mirroring the inline 'track'
@@ -1665,6 +1786,10 @@ class TranslationService:
             if _has_short_title and translated_short_title:
                 _cols.append("short_title")
                 _vals.append(translated_short_title)
+            # [LOCAL-752 A1] A translation of a community tour inherits its source's
+            # community_id + community_visibility, so the community page lists it and
+            # the Download offers it. Schema-guarded; a no-op for an ordinary tour.
+            self._append_community_cols(cursor, _cols, _vals, original_tour_id)
             _placeholders = ", ".join(["%s"] * len(_vals))
             cursor.execute(
                 f"INSERT INTO audio_tours ({', '.join(_cols)}) VALUES ({_placeholders}) RETURNING id",
@@ -3185,6 +3310,10 @@ Say 'What are my options' to hear this help again"""
             if _has_short_title and translated_short_title:
                 _cols.append("short_title")
                 _vals.append(translated_short_title)
+            # [LOCAL-752 A1] Inherit the source tour's community on the ZIP-fallback
+            # path too, so a community tour translated via this path is still part of
+            # the community. Schema-guarded; a no-op for an ordinary tour.
+            self._append_community_cols(cursor, _cols, _vals, original_tour[0])
             _placeholders = ", ".join(["%s"] * len(_vals))
             cursor.execute(
                 f"INSERT INTO audio_tours ({', '.join(_cols)}) VALUES ({_placeholders}) RETURNING id",
@@ -3292,6 +3421,30 @@ def translate_content_with_audio():
     job_id = data.get('job_id')
     user_id = data.get('user_id')
     
+    # [LOCAL-752 A3] Organiser-only rule for a COMMUNITY tour: a member/stranger
+    # may not translate it (the result would become part of the community). The
+    # organiser can (⋮ → Translate from Listen), like editing (LOCAL-745). The
+    # gate is server-enforced here, before any paid translation work runs. An
+    # ordinary tour is unaffected (anyone may translate). Only 'tour' content is
+    # gated; articles have no community.
+    if content_type == 'tour' and any(l != 'en' for l in languages):
+        try:
+            _blk_conn = translation_service.get_db_connection()
+            try:
+                _blk_cur = _blk_conn.cursor()
+                _decision = translation_service._community_translate_block(
+                    _blk_cur, content_id, user_id)
+            finally:
+                _blk_conn.close()
+        except Exception as _blk_err:  # noqa: BLE001 — a gate read failure must
+            # not block a legitimate (ordinary-tour) translation; fail open only
+            # when we could not even read the tag.
+            logging.warning(f"[LOCAL-752] translate gate read failed: {_blk_err}")
+            _decision = None
+        if _decision is not None:
+            _status, _body = _decision
+            return jsonify(_body), _status
+
     results = {}
     had_artifact_failure = False
     for lang in languages:

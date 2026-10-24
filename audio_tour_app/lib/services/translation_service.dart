@@ -11,10 +11,17 @@ class TranslationService {
   }) async {
     try {
       final uri = await Endpoints.url(Service.translation, '/translate-with-audio');
-      final requestBody = {
+      // [LOCAL-752 A3] Send the device user_id so the server can enforce the
+      // organiser-only rule for a COMMUNITY tour (a member translating one is
+      // refused 403). An ordinary tour is unaffected. Absent/empty user_id is
+      // omitted (the server treats a community tour with no user_id as 401).
+      final prefs = await SharedPreferences.getInstance();
+      final userId = prefs.getString('user_id') ?? '';
+      final requestBody = <String, dynamic>{
         'content_id': tourId,
         'content_type': 'tour',
         'languages': languages,
+        if (userId.isNotEmpty) 'user_id': userId,
       };
       final headers = await Endpoints.apiHeaders(Service.translation, requestBody: requestBody);
 
