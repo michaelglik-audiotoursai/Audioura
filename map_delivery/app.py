@@ -108,6 +108,20 @@ def get_tour_by_code(code):
         """, (row[0], row[0]))
         t = cur.fetchone()
         editor = _editor_scores(cur)  # [LOCAL-685]
+        # [LOCAL-701 / D663 §3; LOCAL-753 / D707] The resolved tour's community
+        # tag + the viewer's membership, read while the cursor is open (t[0] is
+        # the tour id). A members-only community tour resolves through a share
+        # code ONLY for an active member/owner — otherwise a clean 404, the same
+        # answer an unknown code gives, so a members-only tour is not leaked by
+        # its code. A public community tour resolves for everyone, with the badge.
+        _ct_cid = _ct_vis = _ct_name = None
+        _ct_member = False
+        if t:
+            _ct_cid, _ct_vis = _community_tag(cur, t[0])
+            if _ct_cid is not None:
+                _ct_member = _is_active_member(
+                    cur, request.args.get('user_id'), _ct_cid)
+                _ct_name = _community_name(cur, _ct_cid)
         cur.close()
         conn.close()
         if not t:
@@ -132,6 +146,12 @@ def get_tour_by_code(code):
             return jsonify({'error': 'tour not found'}), 404
         if _rating == 'mature' and not adult:
             return jsonify({'error': 'age_restricted'}), 403
+        # [LOCAL-753 / D707] Community visibility: a members-only community tour
+        # resolves through its code ONLY for an active member/owner; otherwise a
+        # clean 404 (never leak a members-only tour by code). Public + ordinary
+        # tours pass through.
+        if not _discovery_visible(_ct_cid, _ct_vis, _ct_member):
+            return jsonify({'error': 'tour not found'}), 404
         # [LOCAL-666] A share code can point at a translation row (original_tour_id
         # set, e.g. Russian 615 of 557) as well as an original. For a translation we
         # report the SOURCE tour's version (its pinned source_version, else the
@@ -143,6 +163,17 @@ def get_tour_by_code(code):
             original_id, source_version, source_max_vn, max_vn, last_replaced, created_at)
         original_language = _resolved_original_language(
             own_content_language, original_id, source_content_language)
+        # [LOCAL-701 / D663 §3; LOCAL-753 / D707] Community badge fields when the
+        # resolved tour belongs to a community (public, or members-only shown to
+        # a member/owner — a non-member never reaches here).
+        _ct_fields = {}
+        if _ct_cid is not None:
+            _ct_fields = {
+                'community_id': _ct_cid,
+                'community_name': _ct_name,
+                'community_visibility': _ct_vis,
+                'badge': 'community',
+            }
         # Same keys as a /tours-near element. distance_km is None, not 0: the listener
         # is not near it, and 0 would sort it to the top under false pretences.
         return jsonify({
@@ -165,6 +196,7 @@ def get_tour_by_code(code):
                 'version': version,
                 'updated_at': updated_at,
                 'content_rating': _content_rating_field(content_rating),
+                **_ct_fields,
                 **_rating_payload(rating_values, verified_values, created_values, is_paid,
                                   prior=_prior_for(editor, tour_id, original_id)),
                 **_price_block(price_tier),
@@ -1819,6 +1851,31 @@ def _is_active_member(cur, user_id, community_id, now=None):
         return False
 
 
+def _discovery_visible(community_id, visibility, is_member):
+    """[LOCAL-753 / D707] Whether a tour should appear on the discovery endpoints
+    (/tours-near, /search, /tour-by-code, /tour-info) for THIS viewer.
+
+    DECISION D707 (LEAD 2026-10-23) narrows the blanket D663 §3 rule (which hid
+    members-only community tours from everyone on these endpoints): an ACTIVE
+    member or the OWNER of the community now SEES its members-only tours here,
+    with the community badge; everyone else still never does. A public community
+    tour is unchanged — visible to all with the badge. An ordinary tour (no
+    community) is always visible.
+
+    Pure decision so the four endpoints share one rule; `is_member` is what the
+    caller already computed with _is_active_member(cur, user_id, community_id).
+
+      * community_id is None        → True  (ordinary tour, always shown);
+      * visibility == 'public'      → True  (badge, shown to all);
+      * members-only + is_member    → True  (badge, shown to the member/owner);
+      * members-only + not member   → False (hidden)."""
+    if community_id is None:
+        return True
+    if visibility == 'public':
+        return True
+    return bool(is_member)
+
+
 def _community_download_decision(cur, user_id, tour_id):
     """The community part of the download gate for ONE tour.
 
@@ -2065,9 +2122,24 @@ def get_tours_near_location(lat, lng):
         editor = _editor_scores(cur)  # [LOCAL-685]
         # [LOCAL-701 / D663 §3] Batch the community tags for every fetched tour
         # (one query, no N+1). A members-only community tour is HIDDEN from the
-        # map; a public one is shown WITH a community badge.
+        # map UNLESS the viewer is an active member/owner (LOCAL-753 / D707); a
+        # public one is shown WITH a community badge to everyone.
         _ct_tags = _community_tags_batch(cur, [t[0] for t in tours])
         _ct_names = {}
+        # [LOCAL-753 / D707] The viewer (if signed in) and a per-community
+        # membership cache, so a members-only tour of a community the viewer
+        # belongs to is shown — one _is_active_member read per community, cached.
+        _viewer_id = request.args.get('user_id')
+        _member_of = {}
+
+        def _viewer_is_member(community_id):
+            if community_id is None:
+                return False
+            if community_id not in _member_of:
+                _member_of[community_id] = _is_active_member(
+                    cur, _viewer_id, community_id)
+            return _member_of[community_id]
+
         tours_list = []
         adult = _adult_requested(request.args)  # [LOCAL-687] 18+ confirmed?
         
@@ -2084,11 +2156,12 @@ def get_tours_near_location(lat, lng):
             if not _content_visible(content_rating, content_review_status, adult):
                 continue
 
-            # [LOCAL-701 / D663 §3] Community-tour visibility. A members-only
-            # community tour never appears on the map (community page only); a
-            # public one is shown and will carry a community badge below.
+            # [LOCAL-701 / D663 §3; LOCAL-753 / D707] Community-tour visibility.
+            # A public community tour is shown to everyone (badge below). A
+            # members-only one is shown ONLY to an active member/owner of that
+            # community (D707) — hidden from everyone else.
             _ct_cid, _ct_vis = _ct_tags.get(tour_id, (None, None))
-            if _ct_cid is not None and _ct_vis != 'public':
+            if not _discovery_visible(_ct_cid, _ct_vis, _viewer_is_member(_ct_cid)):
                 continue
             
             if tour_lat and tour_lng:
@@ -2129,9 +2202,10 @@ def get_tours_near_location(lat, lng):
                         **rating_block,
                         **_price_block(price_tier, cur),
                     }
-                    # [LOCAL-701 / D663 §3] A PUBLIC community tour carries the
-                    # community badge (like the gold $ for paid). members-only
-                    # tours were already skipped above, so only public reach here.
+                    # [LOCAL-701 / D663 §3; LOCAL-753 / D707] Any community tour
+                    # that reached here (public, or members-only shown to its
+                    # member/owner) carries the community badge, with its
+                    # visibility so the app can label a members-only one.
                     if _ct_cid is not None:
                         if _ct_cid not in _ct_names:
                             _ct_names[_ct_cid] = _community_name(cur, _ct_cid)
@@ -2546,6 +2620,15 @@ def get_tour_info(tour_id):
          own_content_language, source_content_language,
          content_rating, content_review_status) = _row_with_rating(result, 22)
         editor = _editor_scores(cur)  # [LOCAL-685]
+        # [LOCAL-701 / D663 §3; LOCAL-753 / D707] The tour's community tag + the
+        # viewer's membership, read while the cursor is open. A members-only
+        # community tour is reachable through /tour-info ONLY for an active
+        # member/owner; everyone else gets the same 404 the list gives. A public
+        # one is returned to all, with the community badge.
+        _ct_cid, _ct_vis = _community_tag(cur, tour_id)
+        _ct_member = _is_active_member(cur, request.args.get('user_id'), _ct_cid) \
+            if _ct_cid is not None else False
+        _ct_name = _community_name(cur, _ct_cid) if _ct_cid is not None else None
         cur.close()
         conn.close()
         
@@ -2559,6 +2642,16 @@ def get_tour_info(tour_id):
                   f"({content_rating}/{content_review_status}, adult={adult})")
             sys.stdout.flush()
             return jsonify({'error': 'Tour not found'}), 404
+
+        # [LOCAL-753 / D707] Community visibility gate: a members-only community
+        # tour is a 404 here for anyone who is not an active member/owner (the
+        # same answer the list gives). A public community tour, and any ordinary
+        # tour, pass through.
+        if not _discovery_visible(_ct_cid, _ct_vis, _ct_member):
+            print(f"Tour {tour_id} hidden — members-only community tour, "
+                  f"viewer not a member (community {_ct_cid})")
+            sys.stdout.flush()
+            return jsonify({'error': 'Tour not found'}), 404
         
         is_translation = original_id is not None and (language and language != 'en')
         version, updated_at = _resolved_version_fields(
@@ -2566,6 +2659,16 @@ def get_tour_info(tour_id):
         original_language = _resolved_original_language(
             own_content_language, original_id, source_content_language)
         
+        _ct_fields = {}
+        if _ct_cid is not None:
+            # [LOCAL-701 / D663 §3; LOCAL-753 / D707] Community badge fields on
+            # the detail view, matching the list endpoints' shape.
+            _ct_fields = {
+                'community_id': _ct_cid,
+                'community_name': _ct_name,
+                'community_visibility': _ct_vis,
+                'badge': 'community',
+            }
         return jsonify({
             'id': tour_id,
             'name': tour_name,
@@ -2583,6 +2686,7 @@ def get_tour_info(tour_id):
             'version': version,
             'updated_at': updated_at,
             'content_rating': _content_rating_field(content_rating),
+            **_ct_fields,
             **_rating_payload(rating_values, verified_values, created_values, is_paid,
                               prior=_prior_for(editor, tour_id, original_id)),
             **_price_block(price_tier),
@@ -2654,10 +2758,22 @@ def search_tours():
         
         tours = cur.fetchall()
         editor = _editor_scores(cur)  # [LOCAL-685]
-        # [LOCAL-701 / D663 §3] Batch community tags: hide members-only tours
-        # from search; badge public ones.
+        # [LOCAL-701 / D663 §3; LOCAL-753 / D707] Batch community tags: a
+        # members-only tour is shown only to an active member/owner (D707); a
+        # public one is badged for everyone.
         _ct_tags = _community_tags_batch(cur, [t[0] for t in tours])
         _ct_names = {}
+        _viewer_id = request.args.get('user_id')
+        _member_of = {}
+
+        def _viewer_is_member(community_id):
+            if community_id is None:
+                return False
+            if community_id not in _member_of:
+                _member_of[community_id] = _is_active_member(
+                    cur, _viewer_id, community_id)
+            return _member_of[community_id]
+
         search_results = []
         adult = _adult_requested(request.args)  # [LOCAL-687] 18+ confirmed?
         
@@ -2671,10 +2787,11 @@ def search_tours():
             # hide mature unless adult=1. NULL rating == general.
             if not _content_visible(content_rating, content_review_status, adult):
                 continue
-            # [LOCAL-701 / D663 §3] A members-only community tour never appears in
-            # search (community page only); a public one is badged below.
+            # [LOCAL-701 / D663 §3; LOCAL-753 / D707] A members-only community
+            # tour appears in search only for an active member/owner; a public
+            # one is badged for everyone.
             _ct_cid, _ct_vis = _ct_tags.get(tour_id, (None, None))
-            if _ct_cid is not None and _ct_vis != 'public':
+            if not _discovery_visible(_ct_cid, _ct_vis, _viewer_is_member(_ct_cid)):
                 continue
             version, updated_at = _resolved_version_fields(
                 original_id, source_version, source_max_vn, max_vn, last_replaced, created_at)
@@ -2713,7 +2830,9 @@ def search_tours():
                     **rating_block,
                     **_price_block(price_tier, cur),
                 }
-                # [LOCAL-701 / D663 §3] Public community tour → community badge.
+                # [LOCAL-701 / D663 §3; LOCAL-753 / D707] Any community tour that
+                # reached here (public, or members-only shown to a member/owner)
+                # carries the community badge.
                 if _ct_cid is not None:
                     if _ct_cid not in _ct_names:
                         _ct_names[_ct_cid] = _community_name(cur, _ct_cid)

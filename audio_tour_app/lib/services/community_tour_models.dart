@@ -66,12 +66,26 @@ class CommunityTourList {
 }
 
 /// A community an organiser owns, offered as a target on the Generate tab's
-/// "For:" selector. Minimal shape (id + name) — the selector only needs those.
+/// "For:" selector. Carries the community's own visibility ('listed' |
+/// 'private') so the selector can preselect the right tour visibility (D706).
 class OwnedCommunity {
   final int id;
   final String name;
 
-  const OwnedCommunity({required this.id, required this.name});
+  /// [LOCAL-753 / D706] The community's own visibility: 'listed' (on the map,
+  /// discoverable) or 'private'. Defaults to 'private' (the safe default) when
+  /// the server omits it or on an older payload. Drives the Generate tab's
+  /// preselect: a listed community's new tour defaults to PUBLIC, a private
+  /// community's to members-only.
+  final String visibility;
+
+  const OwnedCommunity({
+    required this.id,
+    required this.name,
+    this.visibility = 'private',
+  });
+
+  bool get isListed => visibility == 'listed';
 }
 
 /// The chosen "For:" target on the Generate tab. Either "Just me / public as
@@ -113,6 +127,37 @@ class CommunityTourRules {
   ///   public  — on the map with the community badge; download needs a pass.
   static const List<String> visibilityChoices = ['members', 'public'];
   static const String defaultVisibility = 'members';
+
+  /// [LOCAL-753 / D706] The visibility a NEW tour should DEFAULT to when a
+  /// community is chosen on the Generate tab: a LISTED community defaults to
+  /// 'public' (it shows on the map with the badge; download still needs a
+  /// membership), a PRIVATE community keeps the members-only default. The
+  /// organiser may still switch it afterwards — members-only stays selectable.
+  /// The server applies the same rule (default_visibility_for_community, D706),
+  /// so the app's preselect only makes the server's default visible up-front.
+  static String initialVisibilityFor(OwnedCommunity community) =>
+      community.isListed ? 'public' : 'members';
+
+  /// [LOCAL-753 / D707] The canonical translation languages, the SAME set the
+  /// Listen → Translate dialog offers (TourTranslationHelper.availableLanguages).
+  /// Kept here so the community page's Translate action and the model layer
+  /// share one list without importing the networked helper (http/io-free).
+  static const List<String> translateLanguageCodes = [
+    'ru', 'zh', 'fr', 'es', 'de', 'ja', 'ko', 'pt', 'it', 'ar',
+  ];
+
+  /// [LOCAL-753 / D707] The translation languages to OFFER for a community tour
+  /// on its community-page Translate action: every canonical language that is
+  /// NOT already present on the tour. `present` is the tour's `languages` list
+  /// (original first, then finished translations) — English/the original is
+  /// never a target, and an existing translation is not re-offered (the app
+  /// simply downloads an existing language, no new generation).
+  static List<String> translateCandidates(List<String> present) {
+    final have = present.map((l) => l.toLowerCase()).toSet();
+    return translateLanguageCodes
+        .where((code) => !have.contains(code))
+        .toList(growable: false);
+  }
 
   /// The label for the "Just me" default option on the selector.
   static const String justMeLabel = 'Just me / public as usual';

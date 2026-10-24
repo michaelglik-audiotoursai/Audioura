@@ -253,15 +253,20 @@ class TranslationService:
                 f"{source_tour_id} (non-fatal): {e}")
 
     def _community_translate_block(self, cursor, tour_id, user_id):
-        """[LOCAL-752 A3] Organiser-only gate for TRANSLATING a community tour,
-        mirroring tour_editing_phase2._community_edit_block (LOCAL-745) but
-        self-contained in the translation service (its own schema-guarded DB reads,
-        no cross-container import).
+        """[LOCAL-752 A3 / LOCAL-753 D707] Membership gate for TRANSLATING a
+        community tour, self-contained in the translation service (its own
+        schema-guarded DB reads, no cross-container import).
+
+        DECISION D707 (LEAD 2026-10-23): a MEMBER may translate a community tour
+        (translation is not an edit — editing stays organiser-only, LOCAL-745).
+        The result becomes part of the community (inherits community_id /
+        community_visibility, LOCAL-752 A1) so every member can download it free.
+        This WIDENS the LOCAL-752 A3 rule, which allowed only the owner.
 
         Returns:
-          * None          — allowed (ordinary tour, or the caller IS the owner);
-          * (403, body)   — a community tour, the user is not its owner
-                            (error_code NOT_COMMUNITY_OWNER);
+          * None          — allowed (ordinary tour, the OWNER, or an ACTIVE MEMBER);
+          * (403, body)   — a community tour, the caller is neither owner nor an
+                            active member (error_code NOT_COMMUNITY_MEMBER);
           * (401, body)   — a community tour but no user_id (fail closed — a
                             community tour is never translatable anonymously).
 
@@ -297,8 +302,7 @@ class TranslationService:
             return (401, {
                 "status": "error",
                 "error_code": "USER_ID_REQUIRED",
-                "message": "Please sign in as the community organiser to translate "
-                           "this community tour.",
+                "message": "Please sign in to translate this community tour.",
                 "community_id": int(community_id),
             })
 
@@ -314,12 +318,49 @@ class TranslationService:
         if owner is not None and str(owner) == uid:
             return None  # the organiser — allowed
 
+        # [LOCAL-753 / D707] An ACTIVE MEMBER may translate too (translation is
+        # not an edit; editing stays organiser-only). Membership is read the same
+        # way map_delivery._is_active_member reads it: a community_memberships row
+        # with NULL (perpetual/free) or a future expires_at. An expired or absent
+        # membership is NOT active → 403. Never raises → treated as non-member on
+        # a read error (fail closed: a lookup problem must not hand out a paid
+        # translation that becomes community content).
+        if self._is_active_community_member(cursor, uid, community_id):
+            return None  # an active member — allowed (D707)
+
         return (403, {
             "status": "error",
-            "error_code": "NOT_COMMUNITY_OWNER",
-            "message": "Only the community organiser can translate this tour.",
+            "error_code": "NOT_COMMUNITY_MEMBER",
+            "message": "Only a member of this community can translate its tour.",
             "community_id": int(community_id),
         })
+
+    def _is_active_community_member(self, cursor, user_id, community_id, now=None):
+        """[LOCAL-753 / D707] True iff user_id holds an ACTIVE membership of the
+        community: a community_memberships row with NULL expires_at (perpetual /
+        free) or a future expires_at. The OWNER is handled by the caller before
+        this (they are always allowed). Never raises → False on any error (fail
+        closed). Mirrors map_delivery._is_active_member's membership read."""
+        if not user_id or community_id is None:
+            return False
+        from datetime import datetime
+        now = now or datetime.utcnow()
+        try:
+            cursor.execute(
+                "SELECT expires_at FROM community_memberships "
+                "WHERE user_id = %s AND community_id = %s",
+                (str(user_id), int(community_id)),
+            )
+            row = cursor.fetchone()
+        except Exception as e:  # noqa: BLE001
+            logging.warning(
+                f"[LOCAL-753] membership lookup failed for "
+                f"{user_id}/{community_id}: {e}")
+            return False
+        if row is None:
+            return False  # not a member at all
+        expires_at = row[0]
+        return expires_at is None or expires_at > now
 
     def _ensure_source_version_column(self, cursor):
         """[LOCAL-666] Self-heal: make sure audio_tours.source_version exists before we
@@ -3421,12 +3462,13 @@ def translate_content_with_audio():
     job_id = data.get('job_id')
     user_id = data.get('user_id')
     
-    # [LOCAL-752 A3] Organiser-only rule for a COMMUNITY tour: a member/stranger
-    # may not translate it (the result would become part of the community). The
-    # organiser can (⋮ → Translate from Listen), like editing (LOCAL-745). The
-    # gate is server-enforced here, before any paid translation work runs. An
-    # ordinary tour is unaffected (anyone may translate). Only 'tour' content is
-    # gated; articles have no community.
+    # [LOCAL-752 A3 / LOCAL-753 D707] Membership rule for a COMMUNITY tour: an
+    # active MEMBER or the owner may translate it (the result becomes part of the
+    # community); a non-member/stranger is refused 403. Translation is not an
+    # edit — editing stays organiser-only (LOCAL-745). The gate is server-enforced
+    # here, before any paid translation work runs. An ordinary tour is unaffected
+    # (anyone may translate). Only 'tour' content is gated; articles have no
+    # community.
     if content_type == 'tour' and any(l != 'en' for l in languages):
         try:
             _blk_conn = translation_service.get_db_connection()

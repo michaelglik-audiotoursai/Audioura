@@ -108,6 +108,13 @@ class CommunityInviteTourOption {
   final int version;
   final String? updatedAt;
 
+  // [LOCAL-753 / D707] The languages this tour is available in (LOCAL-752 A2:
+  // the original's own language first, then every finished translation). The
+  // community page shows these on the row, the Download offers the member's
+  // listening language when present, and Translate offers only the languages
+  // NOT yet here. Empty when the server omits it (older payload).
+  final List<String> languages;
+
   const CommunityInviteTourOption({
     required this.id,
     required this.name,
@@ -116,6 +123,7 @@ class CommunityInviteTourOption {
     this.shortTitle,
     this.version = 1,
     this.updatedAt,
+    this.languages = const [],
   });
 
   factory CommunityInviteTourOption.fromJson(Map<String, dynamic> j) =>
@@ -133,6 +141,12 @@ class CommunityInviteTourOption {
             : (j['short_title'] as String).trim(),
         version: (j['version'] is num) ? (j['version'] as num).toInt() : 1,
         updatedAt: (j['updated_at'] ?? j['updatedAt']) as String?,
+        languages: (j['languages'] is List)
+            ? (j['languages'] as List)
+                .map((e) => e.toString())
+                .where((s) => s.isNotEmpty)
+                .toList(growable: false)
+            : const [],
       );
 }
 

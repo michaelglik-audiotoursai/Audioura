@@ -266,7 +266,10 @@ class _TourGeneratorScreenState extends State<TourGeneratorScreen> {
     if (match.isNotEmpty) {
       _communityTarget = CommunityTourTarget(
           community: match.first,
-          visibility: CommunityTourRules.defaultVisibility);
+          // [LOCAL-753 / D706] Preselect the visibility the server would default
+          // to: a LISTED community → public, a PRIVATE one → members. The
+          // organiser may still switch it in the selector below.
+          visibility: CommunityTourRules.initialVisibilityFor(match.first));
     }
   }
 
@@ -357,7 +360,10 @@ class _TourGeneratorScreenState extends State<TourGeneratorScreen> {
                         _ownedCommunities.firstWhere((e) => e.id == id);
                     _communityTarget = CommunityTourTarget(
                         community: c,
-                        visibility: CommunityTourRules.defaultVisibility);
+                        // [LOCAL-753 / D706] A listed community's tour defaults
+                        // to public (shown on the map with the badge); a private
+                        // one to members-only. Still switchable below.
+                        visibility: CommunityTourRules.initialVisibilityFor(c));
                   }
                 });
               },

@@ -2940,10 +2940,18 @@ class _HomeScreenState extends State<HomeScreen> {
       // [LOCAL-687] Carry the 18+ flag so a mature shared tour resolves for a
       // confirmed-adult listener; without it the server answers 403
       // age_restricted (handled below) and the listener is told how to enable it.
-      final adultParam = _showAdult ? '?adult=1' : '';
+      // [LOCAL-753 / D707] Carry user_id so a MEMBERS-ONLY community tour
+      // resolves through its code for an active member/owner (the server gates
+      // it with _is_active_member); a non-member gets the normal 404.
+      final params = <String, String>{};
+      if (_showAdult) params['adult'] = '1';
+      if (_deviceUserId.isNotEmpty) params['user_id'] = _deviceUserId;
+      final query = params.isEmpty
+          ? ''
+          : '?${params.entries.map((e) => '${e.key}=${Uri.encodeComponent(e.value)}').join('&')}';
       final uri = await Endpoints.url(
           Service.mapDelivery,
-          '/tour-by-code/${Uri.encodeComponent(code.trim())}$adultParam');
+          '/tour-by-code/${Uri.encodeComponent(code.trim())}$query');
       await DebugLogHelper.addDebugLog('HOME: trying share code: $uri');
       final response = await http.get(
         uri,
