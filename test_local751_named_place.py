@@ -105,5 +105,53 @@ class TestNamedPlacePolicy(unittest.TestCase):
         self.assertIn("not part of this tour", joined)
 
 
+class TestNamedPlaceClauseExtraction(unittest.TestCase):
+    """D562 must not depend on the AI intent call. In the field the Danvers live
+    run's intent analysis returned HTTP 429, so `intent.named_places` was [] and
+    the memorial was dropped silently by the existence gate. The deterministic
+    clause parser recovers the named place(s) straight from the request string so
+    the named-place policy still runs. RED on 027584b0:
+    `extract_named_places_from_clause` does not exist (ImportError)."""
+
+    def test_including_clause_yields_the_named_place(self):
+        names = ar.extract_named_places_from_clause(
+            "Walking tour in Danvers, MA including Witchcraft Victims Memorial")
+        self.assertEqual(["Witchcraft Victims Memorial"], names)
+
+    def test_trailing_period_and_leading_article_stripped(self):
+        names = ar.extract_named_places_from_clause(
+            "Walking tour in Salem, MA with the Witch House.")
+        self.assertEqual(["Witch House"], names)
+
+    def test_several_named_places_split_on_and_comma_amp(self):
+        names = ar.extract_named_places_from_clause(
+            "tour in Danvers, MA including the Witchcraft Victims Memorial, "
+            "Rebecca Nurse Homestead & the Old Burying Point")
+        self.assertEqual(
+            ["Witchcraft Victims Memorial", "Rebecca Nurse Homestead",
+             "Old Burying Point"], names)
+
+    def test_no_clause_returns_empty(self):
+        self.assertEqual([], ar.extract_named_places_from_clause(
+            "Walking tour in Boston"))
+
+    def test_clause_names_feed_the_policy_when_intent_is_empty(self):
+        # The field scenario: intent gave nothing, but the request names a place.
+        # The names from the clause drive the policy → announced, never dropped.
+        names = ar.extract_named_places_from_clause(
+            "Walking tour in Danvers, MA including Witchcraft Victims Memorial")
+        out, announcements = ar.apply_named_place_policy(
+            [{"name": "Danvers Town Common"}],
+            named_places=names,
+            area=DANVERS,
+            landmarks=[],  # existence check could not verify it
+            new_poi_fn=_new_poi,
+        )
+        self.assertTrue(
+            any("Witchcraft Victims Memorial" in a for a in announcements),
+            f"clause-named place must be announced when unverified, got {announcements}",
+        )
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

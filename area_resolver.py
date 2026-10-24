@@ -449,6 +449,62 @@ def _parse_location(location_string: str) -> Tuple[str, str]:
         return "", location_string
 
 
+# [LOCAL-751 B2 / D562] The same clause `_parse_location` CUTS off the location
+# ("… including/with/featuring/and visit X") is exactly where the listener names
+# the places they want to VISIT. The named-place policy must run on those names,
+# and it must not depend on the AI intent call succeeding: in the field the
+# Danvers run's intent analysis returned HTTP 429, `named_places` fell back to
+# [], and the memorial the request NAMED was dropped silently by the existence
+# gate — the precise D562 violation this ticket forbids. So we recover the names
+# deterministically from the request string itself as a fallback/union, using the
+# same clause grammar as the cut above.
+_NAMED_PLACE_CLAUSE_RE = re.compile(
+    r'\b(?:including|featuring|and\s+visit(?:ing)?|and\s+see(?:ing)?|'
+    r'with\s+(?:a\s+)?(?:stop|stops|visit)(?:\s+(?:at|to))?|with)\b\s*(.+)$',
+    flags=re.IGNORECASE)
+
+
+def extract_named_places_from_clause(location_string: str) -> List[str]:
+    """Extract the places a request NAMES in its trailing stops clause.
+
+    "Walking tour in Danvers, MA including Witchcraft Victims Memorial"
+        → ["Witchcraft Victims Memorial"]
+    "… including the Witch House and the Old Burying Point"
+        → ["Witch House", "Old Burying Point"]
+
+    Pure and deterministic — no network, no model. Splits the clause on
+    `and` / `&` / `,` so several named stops are each returned, strips a leading
+    article and a trailing period, and drops fragments shorter than 3 chars. The
+    caller unions these with any `intent.named_places` and feeds the result to
+    ``apply_named_place_policy`` so a named place is KEPT when it verifies and
+    ANNOUNCED when it does not, never silently dropped (D562). Returns [] when the
+    request names no stops clause.
+    """
+    m = _NAMED_PLACE_CLAUSE_RE.search(location_string or "")
+    if not m:
+        return []
+    tail = m.group(1).strip().rstrip('.').strip()
+    if not tail:
+        return []
+    # Split on clause separators: comma, ampersand, and the word "and".
+    parts = re.split(r'\s*,\s*|\s*&\s*|\s+\band\b\s+', tail, flags=re.IGNORECASE)
+    out: List[str] = []
+    _seen = set()
+    for p in parts:
+        name = (p or "").strip()
+        # Strip a leading article the listener used ("the Witch House").
+        name = re.sub(r'^(?:the|a|an)\s+', '', name, flags=re.IGNORECASE).strip()
+        name = name.strip().rstrip('.').strip()
+        if len(name) < 3:
+            continue
+        key = name.lower()
+        if key in _seen:
+            continue
+        _seen.add(key)
+        out.append(name)
+    return out
+
+
 def _resolve_city(city: str) -> Tuple[str, Tuple[float, float]]:
     """Resolve a city (or region) name to its Wikidata QID + coordinates.
     

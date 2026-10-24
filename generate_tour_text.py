@@ -14074,18 +14074,51 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
             try:
                 from area_resolver import (resolve_area, discover_landmarks,
                                            verify_landmarks, cache_get_area,
-                                           cache_put_area, apply_named_place_policy)
+                                           cache_put_area, apply_named_place_policy,
+                                           extract_named_places_from_clause)
 
-                # [LOCAL-751 B2 / D562] The places the listener NAMED (intent
-                # named_places) — each must be verified against the resolved area
-                # and KEPT, or ANNOUNCED, never silently dropped. Reset per run.
+                # [LOCAL-751 B2 / D562] The places the listener NAMED — each must be
+                # verified against the resolved area and KEPT, or ANNOUNCED, never
+                # silently dropped. Reset per run. Two sources, UNIONED so the
+                # protection never depends on the AI intent call succeeding:
+                #   1. intent.named_places (the model's structured extraction), and
+                #   2. a DETERMINISTIC parse of the request's "including/with/
+                #      featuring/and visit X" clause (extract_named_places_from_clause).
+                # In the field the Danvers run's intent analysis returned HTTP 429,
+                # so named_places was [] and the memorial was dropped silently by the
+                # existence gate — exactly the D562 violation this ticket forbids.
+                # The deterministic source closes that gap.
                 _J._LAST_NAMED_PLACE_ANNOUNCEMENTS = []
                 _walk_named_places = []
+                _seen_np = set()
+
+                def _add_np(_name):
+                    _n = (_name or "").strip() if isinstance(_name, str) else ""
+                    if len(_n) < 3:
+                        return
+                    _k = _n.lower()
+                    if _k in _seen_np:
+                        return
+                    _seen_np.add(_k)
+                    _walk_named_places.append(_n)
+
                 if intent:
                     _raw_np = intent.get('named_places') or []
                     if isinstance(_raw_np, str):
                         _raw_np = [_raw_np]
-                    _walk_named_places = [n for n in _raw_np if isinstance(n, str) and n.strip()]
+                    for _n in _raw_np:
+                        _add_np(_n)
+                # Deterministic fallback/union from the request string itself.
+                try:
+                    for _n in extract_named_places_from_clause(location):
+                        _add_np(_n)
+                    for _n in extract_named_places_from_clause(_location_normalized):
+                        _add_np(_n)
+                except Exception as _np_ex:
+                    print(f"  [LOCAL-751] named-place clause parse skipped: {_np_ex}")
+                if _walk_named_places:
+                    print(f"  [LOCAL-751] named places to protect (D562): "
+                          f"{_walk_named_places}")
 
                 _area = resolve_area(_location_normalized)
                 if _area and _area.resolved:
