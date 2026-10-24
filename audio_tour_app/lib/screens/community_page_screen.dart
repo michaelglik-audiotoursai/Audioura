@@ -23,6 +23,7 @@ import '../services/community_downloads.dart';
 import '../services/community_background.dart';
 import '../services/community_notifications.dart';
 import '../services/tour_download_service.dart';
+import '../services/remote_audio_fetcher.dart';
 import '../services/tour_translation_helper.dart';
 import '../services/iap_service.dart';
 import '../services/device_service.dart';
@@ -334,8 +335,17 @@ class _CommunityPageScreenState extends State<CommunityPageScreen> {
               content: Text('Join this community to download its tours.')));
           break;
         case TourDownloadStatus.failed:
+          // [LOCAL-759 A5] Show the specific named reason when the download
+          // service knows one ("Audio for stop 2 'The Accusations Begin' could
+          // not be downloaded." / the web size-limit message), else the generic.
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+              content: Text(
+                  TourDownloadService.failureMessage(result.errorMessage))));
+          break;
+        case TourDownloadStatus.cancelled:
+          // [LOCAL-759 A3] The member cancelled; partial files were removed.
           ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-              content: Text('Download failed. Please try again.')));
+              content: Text('Download cancelled.')));
           break;
       }
     } finally {
@@ -658,10 +668,42 @@ class _CommunityPageScreenState extends State<CommunityPageScreen> {
       );
       // Download the original row first (it is the sourceItem anchor and the
       // chain a translation hangs off).
+      // [LOCAL-759 A3] Show live progress ("Downloading audio — stop X of Y ·
+      // a / b MB") with a Cancel that removes partial files. The remote-audio
+      // fetch (organiser-audio tours) reports per-stop progress; a generated
+      // tour simply never calls back, so the sheet is only shown when there is
+      // audio to pull.
+      final cancelToken = RemoteAudioCancelToken();
+      final messenger = ScaffoldMessenger.of(context);
+      var maxStopSeen = 1;
+      var shownProgress = false;
+      void showProgress(RemoteAudioProgress p) {
+        if (!mounted) return;
+        shownProgress = true;
+        if (p.stopNumber > maxStopSeen) maxStopSeen = p.stopNumber;
+        messenger.clearSnackBars();
+        messenger.showSnackBar(SnackBar(
+          duration: const Duration(minutes: 5),
+          content: Text(downloadingAudioLabel(
+            stopIndex: p.stopNumber,
+            stopCount: maxStopSeen,
+            receivedBytes: p.receivedBytes,
+            totalBytes: p.totalBytes,
+          )),
+          action: SnackBarAction(
+            label: 'Cancel',
+            onPressed: cancelToken.cancel,
+          ),
+        ));
+      }
+
       final result = await TourDownloadService.downloadAndSave(
         tour.id,
         sourceItem: sourceItem,
+        onAudioProgress: showProgress,
+        cancelToken: cancelToken,
       );
+      if (shownProgress) messenger.clearSnackBars();
       // When the member's listening language is an EXISTING translation of this
       // tour, also fetch that language so Listen opens in it. The helper reuses
       // the server's finished translation (no new generation) and saves it as a
@@ -712,8 +754,14 @@ class _CommunityPageScreenState extends State<CommunityPageScreen> {
           }
           break;
         case TourDownloadStatus.failed:
+          // [LOCAL-759 A5] Named reason when known, else the generic fallback.
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+              content: Text(
+                  TourDownloadService.failureMessage(result.errorMessage))));
+          break;
+        case TourDownloadStatus.cancelled:
           ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-              content: Text('Download failed. Please try again.')));
+              content: Text('Download cancelled.')));
           break;
       }
     } finally {
@@ -1116,21 +1164,13 @@ class _CommunityPageScreenState extends State<CommunityPageScreen> {
               ),
           ],
 
-          // Episodes — only when the member is active (expiry blocks new
-          // content). An active member/owner sees the list; others see the
-          // count only.
-          _sectionTitle('Episodes (${c.episodeCount})'),
-          if (canListen)
-            ...c.episodes.map((e) => ListTile(
-                  leading: CircleAvatar(child: Text('${e.position}')),
-                  title: Text(e.title),
-                  subtitle: Text(e.source == 'feed' ? 'From feed' : 'Owner link'),
-                ))
-          else
-            const Padding(
-              padding: EdgeInsets.symmetric(vertical: 8),
-              child: Text('Join to listen to the episodes.'),
-            ),
+          // [LOCAL-759 B] The community page shows TOURS only. The feed's raw
+          // imported episodes (c.episodes / community_episodes) are BUILDER
+          // MATERIAL, not tours: they are NOT rendered here anymore (Michael saw
+          // all 42 episodes listed on his community page). The rows stay in the
+          // model — the owner-only organiser-audio builder reads
+          // widget.community.episodes for its checklist, and the Refresh path
+          // keeps them — they are just no longer drawn on the page.
 
           // [LOCAL-701 / D663 §3 + LOCAL-713 / D675 §5] Tours MADE WITH Audioura
           // for this community. Every tour gets a status: a member/owner sees a
