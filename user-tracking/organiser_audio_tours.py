@@ -334,6 +334,112 @@ def tour_content_text(stops):
     return '\n\n'.join(stop_text_block(s) for s in stops)
 
 
+# ── Package → stops (owner reopen / prefill) ──────────────────────────────────
+
+_PARSE_COORDS_RE = re.compile(
+    r'^\s*Coordinates:\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*$',
+    re.IGNORECASE)
+
+
+def _parse_stop_text_block(text):
+    """Reverse stop_text_block: given one audio_N.txt body, return
+    {name, lat, lng, text}. Line 1 is the name; an optional 'Coordinates: lat,
+    lng' line gives the location; a blank line then the body is the text. Missing
+    pieces come back as '' (text) or None (lat/lng). Pure."""
+    lines = (text or '').replace('\r\n', '\n').split('\n')
+    name = lines[0].strip() if lines else ''
+    lat = lng = None
+    idx = 1
+    if idx < len(lines):
+        m = _PARSE_COORDS_RE.match(lines[idx])
+        if m:
+            try:
+                lat = float(m.group(1))
+                lng = float(m.group(2))
+            except ValueError:
+                lat = lng = None
+            idx += 1
+    # Skip exactly one blank separator line, then the rest is the body.
+    if idx < len(lines) and lines[idx].strip() == '':
+        idx += 1
+    body = '\n'.join(lines[idx:]).strip()
+    return {'name': name, 'lat': lat, 'lng': lng, 'text': body}
+
+
+def parse_stops_from_package(zip_bytes):
+    """[LOCAL-760 / D709] The inverse of build_package: read an organiser-audio
+    package's stored ZIP back into the ordered stop list
+    [{name, lat, lng, text, audio_url}], so the owner can REOPEN the tour in the
+    builder prefilled (name/location/text from audio_N.txt; the audio URL from
+    remote_audio.json {N: url}).
+
+    The stop count and order come from remote_audio.json's integer keys. For
+    each stop N the matching audio_N.txt supplies name/Coordinates/body; a
+    missing audio_N.txt yields a bare stop (name 'Stop N'). Empty / non-ZIP /
+    malformed input returns [] (never raises) so the endpoint degrades to "no
+    stops to prefill" rather than erroring. Pure (bytes in, list out)."""
+    if not zip_bytes:
+        return []
+    try:
+        zf = zipfile.ZipFile(io.BytesIO(zip_bytes))
+    except Exception:  # noqa: BLE001 — not a ZIP → nothing to parse
+        return []
+    try:
+        names = set(zf.namelist())
+        if 'remote_audio.json' not in names:
+            return []
+        try:
+            remote = json.loads(zf.read('remote_audio.json').decode('utf-8'))
+        except Exception:  # noqa: BLE001 — corrupt map → nothing to parse
+            return []
+        if not isinstance(remote, dict):
+            return []
+        # Order by the integer stop number (keys are '1','2',… as strings).
+        def _as_int(k):
+            try:
+                return int(k)
+            except (TypeError, ValueError):
+                return 1 << 30
+        stops = []
+        for key in sorted(remote.keys(), key=_as_int):
+            audio_url = (remote.get(key) or '').strip() if isinstance(
+                remote.get(key), str) else ''
+            txt_name = f'audio_{key}.txt'
+            parsed = {'name': f'Stop {key}', 'lat': None, 'lng': None, 'text': ''}
+            if txt_name in names:
+                try:
+                    parsed = _parse_stop_text_block(
+                        zf.read(txt_name).decode('utf-8'))
+                except Exception:  # noqa: BLE001 — unreadable block → bare stop
+                    pass
+            stops.append({
+                'name': parsed.get('name') or f'Stop {key}',
+                'lat': parsed.get('lat'),
+                'lng': parsed.get('lng'),
+                'text': parsed.get('text') or '',
+                'audio_url': audio_url,
+            })
+        return stops
+    finally:
+        try:
+            zf.close()
+        except Exception:  # noqa: BLE001
+            pass
+
+
+def tour_type_from_stops(stops):
+    """[LOCAL-760] Derive a tour_type for the builder prefill from the stops,
+    since audio_tours has no tour_type column: if EVERY stop has a location →
+    'walking' (a map tour); otherwise 'other' (location optional). The owner can
+    change it in the builder. Pure."""
+    if not stops:
+        return 'other'
+    for s in stops:
+        if s.get('lat') is None or s.get('lng') is None:
+            return 'other'
+    return 'walking'
+
+
 # ── Translation gate (D708) ───────────────────────────────────────────────────
 
 def translation_not_offered(source_kind):

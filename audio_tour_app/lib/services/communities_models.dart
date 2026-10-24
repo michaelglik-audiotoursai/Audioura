@@ -196,6 +196,13 @@ class CommunityInviteTourOption {
   // NOT yet here. Empty when the server omits it (older payload).
   final List<String> languages;
 
+  // [LOCAL-760 / D708] The tour's source_kind, when the listing carries one:
+  // 'organiser_audio' marks a BROADCAST tour (the organiser's own hosted audio)
+  // so the community page can show the owner an "Edit audio tour" action and
+  // the member download stamps source_kind on the saved record (disabling Edit/
+  // Translate on Listen). Null for a generated tour.
+  final String? sourceKind;
+
   const CommunityInviteTourOption({
     required this.id,
     required this.name,
@@ -205,7 +212,12 @@ class CommunityInviteTourOption {
     this.version = 1,
     this.updatedAt,
     this.languages = const [],
+    this.sourceKind,
   });
+
+  /// True iff this is an organiser-audio (broadcast) tour.
+  bool get isOrganiserAudio =>
+      (sourceKind ?? '').trim() == 'organiser_audio';
 
   factory CommunityInviteTourOption.fromJson(Map<String, dynamic> j) =>
       CommunityInviteTourOption(
@@ -228,6 +240,9 @@ class CommunityInviteTourOption {
                 .where((s) => s.isNotEmpty)
                 .toList(growable: false)
             : const [],
+        sourceKind: ((j['source_kind'] as String?)?.trim().isEmpty ?? true)
+            ? null
+            : (j['source_kind'] as String).trim(),
       );
 }
 
@@ -550,6 +565,80 @@ class BuildAudioTourResult {
   });
 
   bool get ok => tourId != null;
+}
+
+/// [LOCAL-760 / D709] One stop read back from a stored organiser-audio tour for
+/// the builder prefill (the owner reopening a broadcast tour). name/audioUrl are
+/// always present; lat/lng are null when the stop has no location; text may be
+/// empty.
+class AudioTourStop {
+  final String name;
+  final String audioUrl;
+  final double? lat;
+  final double? lng;
+  final String text;
+
+  const AudioTourStop({
+    required this.name,
+    required this.audioUrl,
+    this.lat,
+    this.lng,
+    this.text = '',
+  });
+
+  factory AudioTourStop.fromJson(Map<String, dynamic> j) {
+    double? asDouble(Object? v) {
+      if (v is double) return v;
+      if (v is num) return v.toDouble();
+      if (v is String) return double.tryParse(v.trim());
+      return null;
+    }
+
+    return AudioTourStop(
+      name: (j['name'] ?? '').toString(),
+      audioUrl: (j['audio_url'] ?? '').toString(),
+      lat: asDouble(j['lat']),
+      lng: asDouble(j['lng']),
+      text: (j['text'] ?? '').toString(),
+    );
+  }
+}
+
+/// [LOCAL-760 / D709] The owner-only read of an organiser-audio tour used to
+/// PREFILL the builder when the organiser reopens it (GET
+/// /communities/<id>/audio-tours/<tour_id>). Null from the service on any
+/// non-200 (403 member / 404 / transport).
+class AudioTourDetail {
+  final int tourId;
+  final int communityId;
+  final String tourName;
+  final String tourType;
+  final String visibility;
+  final List<AudioTourStop> stops;
+
+  const AudioTourDetail({
+    required this.tourId,
+    required this.communityId,
+    required this.tourName,
+    required this.tourType,
+    required this.visibility,
+    required this.stops,
+  });
+
+  factory AudioTourDetail.fromJson(Map<String, dynamic> j) => AudioTourDetail(
+        tourId: (j['tour_id'] is num) ? (j['tour_id'] as num).toInt() : 0,
+        communityId:
+            (j['community_id'] is num) ? (j['community_id'] as num).toInt() : 0,
+        tourName: (j['tour_name'] ?? '').toString(),
+        tourType: (j['tour_type'] ?? 'other').toString(),
+        visibility: (j['visibility'] ?? 'members').toString(),
+        stops: (j['stops'] is List)
+            ? (j['stops'] as List)
+                .whereType<Map<String, dynamic>>()
+                .map(AudioTourStop.fromJson)
+                .toList(growable: false)
+            : const [],
+      );
 }
 
 /// [LOCAL-703 / D664] The outcome of resolving an invite code. Exactly one of

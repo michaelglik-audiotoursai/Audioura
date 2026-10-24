@@ -11,6 +11,7 @@ import '../services/tour_translation_helper.dart';
 import '../config/endpoints.dart';
 import '../utils/tour_path_healer.dart';
 import '../utils/view_after_download.dart';
+import '../utils/organiser_audio_notices.dart';
 import '../widgets/share_tour_sheet.dart';
 import '../services/community_downloads.dart';
 import '../services/voice_listen_options.dart';
@@ -21,6 +22,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'tour_player_screen.dart';
 import 'news_player_screen.dart';
 import 'edit_tour_screen.dart';
+import 'organiser_audio_tour_screen.dart';
 import 'tour_map_screen.dart';
 import 'communities_hub_screen.dart';
 import '../services/communities_service.dart';
@@ -1562,11 +1564,18 @@ class _MyToursScreenState extends State<MyToursScreen> {
         );
       } else {
         final failedNames = failures.map((code) => TourTranslationHelper.availableLanguages[code] ?? code).join(', ');
+        // [LOCAL-760 / D708] A server 403 translation_not_offered (broadcast
+        // tour) shows the D708 reason; an ordinary per-language failure keeps
+        // the "older tour" wording. The title follows the case too.
+        final notOffered = TourTranslationHelper.lastTranslationNotOffered;
         showDialog(
           context: context,
           builder: (context) => AlertDialog(
             title: const Text('Translation Not Available'),
-            content: Text('$failedNames wasn\'t available for this older tour, so the English version was saved.'),
+            content: Text(translationFailureMessage(
+              translationNotOffered: notOffered,
+              failedLanguageNames: failedNames,
+            )),
             actions: [
               TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('OK')),
             ],
@@ -1708,6 +1717,101 @@ class _MyToursScreenState extends State<MyToursScreen> {
               : null,
       shortTitle: serverShortTitle,
     );
+  }
+
+  /// [LOCAL-760 / D708] True iff THIS device organises the community this tour
+  /// belongs to (its community_id is in the owned set). Used to pick the owner
+  /// vs member ⓘ wording and whether to offer "Open in audio-tour builder".
+  bool _ownsTourCommunity(Map<String, dynamic> tour) {
+    final raw = tour['community_id'];
+    int? cid;
+    if (raw is int) {
+      cid = raw;
+    } else if (raw is num) {
+      cid = raw.toInt();
+    } else if (raw is String) {
+      cid = int.tryParse(raw.trim());
+    }
+    return cid != null && _ownedCommunityIds.contains(cid);
+  }
+
+  /// [LOCAL-760 / D708] The ⓘ shown when Edit is tapped on a disabled BROADCAST
+  /// (organiser-audio) tour. The edit screen is NEVER opened. The OWNER is
+  /// pointed at the builder and offered a button to open it prefilled (so they
+  /// can change the tour and tell members); a member just sees why they cannot.
+  Future<void> _showOrganiserAudioEditNotice(Map<String, dynamic> tour) async {
+    final isOwner = _ownsTourCommunity(tour);
+    final offerBuilder = isOwner;
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Editing not available'),
+        content: Text(editDisabledNotice(isOwner: isOwner)),
+        actions: [
+          if (offerBuilder)
+            TextButton(
+              onPressed: () {
+                Navigator.of(ctx).pop();
+                _openAudioTourBuilderForOwner(tour);
+              },
+              child: const Text('Open in audio-tour builder'),
+            ),
+          TextButton(
+              onPressed: () => Navigator.of(ctx).pop(),
+              child: const Text('OK')),
+        ],
+      ),
+    );
+  }
+
+  /// [LOCAL-760 / D708] The ⓘ shown when Translate is tapped on a disabled
+  /// BROADCAST tour: translation is not offered (the audio is the organiser's,
+  /// D708). Translate is never run.
+  Future<void> _showOrganiserAudioTranslateNotice() async {
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Translation not available'),
+        content: Text(translateDisabledNotice()),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.of(ctx).pop(),
+              child: const Text('OK')),
+        ],
+      ),
+    );
+  }
+
+  /// [LOCAL-760 build item 4] The OWNER opens their broadcast tour in the
+  /// audio-tour builder (prefilled) straight from Listen's disabled-Edit ⓘ. The
+  /// builder fetches the stored stops by [editTourId]; the "I changed this tour
+  /// — tell my members" checkbox and the version bump are the LOCAL-755 path.
+  Future<void> _openAudioTourBuilderForOwner(Map<String, dynamic> tour) async {
+    final sid = int.tryParse((tour['server_tour_id'] ?? '').toString());
+    final raw = tour['community_id'];
+    int? cid;
+    if (raw is int) {
+      cid = raw;
+    } else if (raw is num) {
+      cid = raw.toInt();
+    } else if (raw is String) {
+      cid = int.tryParse(raw.trim());
+    }
+    if (sid == null || cid == null) return;
+    final prefs = await SharedPreferences.getInstance();
+    final userId = prefs.getString('user_id');
+    final community = await CommunitiesService.get(cid, userId: userId);
+    if (!mounted || community == null) return;
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => OrganiserAudioTourScreen(
+          community: community,
+          editTourId: sid,
+        ),
+      ),
+    );
+    if (mounted) _loadTours();
   }
 
   void _editTour(Map<String, dynamic> tour) {
@@ -2276,12 +2380,35 @@ class _MyToursScreenState extends State<MyToursScreen> {
                               case 'version': _showVersionDialog(tour); break;
                               case 'price': _showPriceDialog(tour); break;
                               case 'rescore': _requestRescore(tour); break;
+                              // [LOCAL-760 / D708] Tapping the DISABLED Edit/
+                              // Translate on a broadcast tour shows the ⓘ reason
+                              // (it never opens the edit screen / runs translate).
+                              case 'edit_disabled':
+                                _showOrganiserAudioEditNotice(tour); break;
+                              case 'translate_disabled':
+                                _showOrganiserAudioTranslateNotice(); break;
                             }
                           },
                           itemBuilder: (context) => [
                             const PopupMenuItem(value: 'rate', child: ListTile(leading: Icon(Icons.star_outline, color: Color(0xFFE2A400)), title: Text('Rate this tour'), dense: true)),
                             const PopupMenuItem(value: 'share', child: ListTile(leading: Icon(Icons.ios_share, color: Color(0xFF3498db)), title: Text('Share'), dense: true)),
-                            if (!TourTranslationHelper.isTranslation(tour) && !isOrganiserAudioTour(tour))
+                            // [LOCAL-760 / D708] Translate. A BROADCAST
+                            // (organiser-audio) tour shows it DISABLED with an ⓘ
+                            // (never hidden) — tapping explains why (the audio is
+                            // the organiser's; D708). A generated / ordinary tour
+                            // keeps the live Translate. A translation row shows
+                            // nothing (you translate the original).
+                            if (!TourTranslationHelper.isTranslation(tour) && isOrganiserAudioTour(tour))
+                              const PopupMenuItem(
+                                value: 'translate_disabled',
+                                child: ListTile(
+                                  leading: Icon(Icons.translate, color: Colors.grey),
+                                  title: Text('Translate', style: TextStyle(color: Colors.grey)),
+                                  trailing: Icon(Icons.info_outline, size: 18, color: Colors.grey),
+                                  dense: true,
+                                ),
+                              )
+                            else if (!TourTranslationHelper.isTranslation(tour))
                               const PopupMenuItem(value: 'translate', child: ListTile(leading: Icon(Icons.translate, color: Color(0xFF8e44ad)), title: Text('Translate'), dense: true)),
                             // [LOCAL-677] Curator-only Price control (tier picker /
                             // Free). Shown only to a device with can_sell, and only
@@ -2289,11 +2416,25 @@ class _MyToursScreenState extends State<MyToursScreen> {
                             // still enforces ownership.
                             if (_canSell && !TourTranslationHelper.isTranslation(tour) && _numericTourId(tour) != null)
                               const PopupMenuItem(value: 'price', child: ListTile(leading: Icon(Icons.sell, color: Color(0xFF1B6B2E)), title: Text('Price'), dense: true)),
-                            // [LOCAL-745] Edit is organiser-only on a community
-                            // tour: a member never sees it (the server also
-                            // refuses 403). Ordinary tours stay editable by
-                            // anyone.
-                            if (canEditTour(tour, ownedCommunityIds: _ownedCommunityIds))
+                            // [LOCAL-760 / D708] Edit. A BROADCAST tour shows it
+                            // DISABLED with an ⓘ (the audio is maintained on the
+                            // organiser's own site; the owner is pointed at the
+                            // builder). The edit screen is NEVER opened for it —
+                            // Michael's users spent a long time editing then hit
+                            // a Save failure. A generated community tour keeps
+                            // the organiser-only live Edit (LOCAL-745); a member
+                            // never sees it.
+                            if (isOrganiserAudioTour(tour))
+                              const PopupMenuItem(
+                                value: 'edit_disabled',
+                                child: ListTile(
+                                  leading: Icon(Icons.edit, color: Colors.grey),
+                                  title: Text('Edit', style: TextStyle(color: Colors.grey)),
+                                  trailing: Icon(Icons.info_outline, size: 18, color: Colors.grey),
+                                  dense: true,
+                                ),
+                              )
+                            else if (canEditTour(tour, ownedCommunityIds: _ownedCommunityIds))
                               const PopupMenuItem(value: 'edit', child: ListTile(leading: Icon(Icons.edit, color: Colors.orange), title: Text('Edit'), dense: true)),
                             // [LOCAL-688] One free re-score after an edit, on the
                             // guide's OWN original tour (numeric id). The server

@@ -46,12 +46,21 @@ class TourTranslationHelper {
   /// Translates a tour and downloads each translated version as a new entry.
   /// Returns a list of language codes that failed.
   /// The English tour must already be saved before calling this.
+  ///
+  /// [LOCAL-760 / D708] When the server refused the whole request with 403
+  /// translation_not_offered (a broadcast / organiser-audio tour), this is
+  /// recorded in [lastTranslationNotOffered] so the caller shows the D708
+  /// broadcast message rather than the misleading "older tour" wording. The flag
+  /// is reset at the start of every call.
+  static bool lastTranslationNotOffered = false;
+
   static Future<List<String>> downloadTranslatedVersions({
     required int tourId,
     required List<String> languages,
     required String parentEditTourId,
     Map<String, dynamic>? sourceItem,
   }) async {
+    lastTranslationNotOffered = false;
     final failures = <String>[];
     final nonEnglish = languages.where((l) => l != 'en').toList();
     if (nonEnglish.isEmpty) return failures;
@@ -59,6 +68,18 @@ class TourTranslationHelper {
     try {
       await DebugLogHelper.addDebugLog('TRANSLATE: Requesting translation for tourId=$tourId languages: ${nonEnglish.join(", ")}');
       final result = await TranslationService.translateTour(tourId: tourId, languages: nonEnglish);
+
+      // [LOCAL-760 / D708] A broadcast tour is refused 403 translation_not_offered
+      // for the whole request — every requested language failed for the SAME
+      // reason, so record it for the caller's message.
+      if (result['status'] == 'error' &&
+          result['error_code'] == 'translation_not_offered') {
+        lastTranslationNotOffered = true;
+        for (final lang in nonEnglish) failures.add(lang);
+        await DebugLogHelper.addDebugLog(
+            'TRANSLATE: refused translation_not_offered (broadcast tour)');
+        return failures;
+      }
 
       if (result['status'] == 'completed') {
         final translatedIds = _extractTranslatedIds(result);

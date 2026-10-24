@@ -31,6 +31,7 @@ import '../services/pass_expiry_format.dart';
 import '../services/document_acceptance_service.dart';
 import '../services/deep_link_service.dart';
 import '../utils/downloaded_message.dart';
+import '../widgets/download_progress_banner.dart';
 import '../widgets/tour_buy_sheet.dart' show TermsAgreeLine;
 import '../widgets/pass_expiry_display.dart';
 import 'communities_about_screen.dart' show CommunityInviteTools;
@@ -104,6 +105,13 @@ class _CommunityPageScreenState extends State<CommunityPageScreen> {
   // the picker's "Use the default" row to show the inherited value.
   String? _aboutDefaultLanguage;
   final Set<int> _downloading = {};
+  // [LOCAL-760 build item 1] ONE persistent download-progress banner for the
+  // whole download (Michael: the status message must not flash). The banner is
+  // placed at the top of the body and driven from _downloadCommunityTour's
+  // onAudioProgress; the cancel token lets the Cancel button stop the in-flight
+  // fetch. Replaces the per-tick SnackBar that flashed on the iPhone.
+  final DownloadProgressController _progress = DownloadProgressController();
+  RemoteAudioCancelToken? _progressCancelToken;
   // [LOCAL-714 / D675 part 2] The per-community auto-download switch (default
   // OFF) and the app-wide "Also on mobile data" switch (default OFF).
   bool _autoDownload = false;
@@ -115,6 +123,12 @@ class _CommunityPageScreenState extends State<CommunityPageScreen> {
     // [LOCAL-750 C] Opening a community page kicks off a community sync.
     CommunityPageScreen.onOpenSync();
     _load();
+  }
+
+  @override
+  void dispose() {
+    _progress.dispose();
+    super.dispose();
   }
 
   Future<void> _load() async {
@@ -184,6 +198,23 @@ class _CommunityPageScreenState extends State<CommunityPageScreen> {
       );
       if (stamped != null) {
         await prefs.setStringList('saved_tours', stamped);
+      }
+      // [LOCAL-760 / D708] Repair source_kind too: a BROADCAST tour downloaded
+      // before source_kind was stamped (the root cause Michael hit) is still on
+      // the phone with no marker, so Listen kept Edit/Translate enabled. Stamp
+      // source_kind='organiser_audio' onto every saved record that matches one
+      // of THIS community's organiser-audio tours (from the listing's
+      // source_kind). No re-download — the record alone is updated.
+      final organiserAudioIds = c.tours
+          .where((t) => t.isOrganiserAudio)
+          .map((t) => t.id.toString())
+          .toSet();
+      final skStamped = stampSourceKindOnSavedRecords(
+        savedToursJson: prefs.getStringList('saved_tours') ?? const [],
+        organiserAudioTourIds: organiserAudioIds,
+      );
+      if (skStamped != null) {
+        await prefs.setStringList('saved_tours', skStamped);
       }
     }
     // [LOCAL-715 / D675 addendum 1] The per-community listening language: the
@@ -636,6 +667,10 @@ class _CommunityPageScreenState extends State<CommunityPageScreen> {
     int version = 1,
     String? updatedAt,
     List<String> availableLanguages = const [],
+    // [LOCAL-760 / D708] The tour's source_kind from the community row, so a
+    // broadcast tour stamps source_kind='organiser_audio' on the saved record
+    // at download time (Listen then disables Edit/Translate with an ⓘ).
+    String? sourceKind,
   }) async {
     if (_downloading.contains(tour.id)) return;
     setState(() => _downloading.add(tour.id));
@@ -665,36 +700,22 @@ class _CommunityPageScreenState extends State<CommunityPageScreen> {
         communityId: communityId,
         version: version,
         updatedAt: updatedAt,
+        sourceKind: sourceKind,
       );
       // Download the original row first (it is the sourceItem anchor and the
       // chain a translation hangs off).
-      // [LOCAL-759 A3] Show live progress ("Downloading audio — stop X of Y ·
-      // a / b MB") with a Cancel that removes partial files. The remote-audio
-      // fetch (organiser-audio tours) reports per-stop progress; a generated
-      // tour simply never calls back, so the sheet is only shown when there is
-      // audio to pull.
+      // [LOCAL-759 A3 / LOCAL-760 build item 1] Show live progress in ONE
+      // persistent banner ("Downloading audio — stop X of Y · a / b MB") with a
+      // Cancel that removes partial files. Michael (iPhone, 2026-10-24) saw the
+      // old per-tick SnackBar appear and disappear repeatedly — it flashed. The
+      // banner (DownloadProgressBanner, driven by _progress) stays mounted for
+      // the whole download and is dismissed only on success/cancel/failure. A
+      // generated tour never calls back, so the banner never appears for it.
       final cancelToken = RemoteAudioCancelToken();
-      final messenger = ScaffoldMessenger.of(context);
-      var maxStopSeen = 1;
-      var shownProgress = false;
+      _progressCancelToken = cancelToken;
       void showProgress(RemoteAudioProgress p) {
         if (!mounted) return;
-        shownProgress = true;
-        if (p.stopNumber > maxStopSeen) maxStopSeen = p.stopNumber;
-        messenger.clearSnackBars();
-        messenger.showSnackBar(SnackBar(
-          duration: const Duration(minutes: 5),
-          content: Text(downloadingAudioLabel(
-            stopIndex: p.stopNumber,
-            stopCount: maxStopSeen,
-            receivedBytes: p.receivedBytes,
-            totalBytes: p.totalBytes,
-          )),
-          action: SnackBarAction(
-            label: 'Cancel',
-            onPressed: cancelToken.cancel,
-          ),
-        ));
+        _progress.update(p);
       }
 
       final result = await TourDownloadService.downloadAndSave(
@@ -703,7 +724,8 @@ class _CommunityPageScreenState extends State<CommunityPageScreen> {
         onAudioProgress: showProgress,
         cancelToken: cancelToken,
       );
-      if (shownProgress) messenger.clearSnackBars();
+      _progress.finish();
+      _progressCancelToken = null;
       // When the member's listening language is an EXISTING translation of this
       // tour, also fetch that language so Listen opens in it. The helper reuses
       // the server's finished translation (no new generation) and saves it as a
@@ -765,6 +787,8 @@ class _CommunityPageScreenState extends State<CommunityPageScreen> {
           break;
       }
     } finally {
+      _progress.finish();
+      _progressCancelToken = null;
       if (mounted) setState(() => _downloading.remove(tour.id));
     }
   }
@@ -953,7 +977,17 @@ class _CommunityPageScreenState extends State<CommunityPageScreen> {
       // can copy a tour's request words to reuse them. Buttons, switches and the
       // tappable rows still work — SelectionArea only intercepts text drags, not
       // taps on interactive widgets.
-      body: SelectionArea(
+      body: Column(
+        children: [
+          // [LOCAL-760 build item 1] The ONE persistent download banner. It
+          // renders nothing until a download starts, then stays put across every
+          // stop/byte tick (no flashing) with a Cancel.
+          DownloadProgressBanner(
+            controller: _progress,
+            onCancel: () => _progressCancelToken?.cancel(),
+          ),
+          Expanded(
+            child: SelectionArea(
         child: ListView(
         padding: const EdgeInsets.all(16),
         children: [
@@ -1220,6 +1254,9 @@ class _CommunityPageScreenState extends State<CommunityPageScreen> {
         ],
       ),
       ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -1327,7 +1364,9 @@ class _CommunityPageScreenState extends State<CommunityPageScreen> {
                     updatedAt: t.updatedAt,
                     // [LOCAL-753 / D707] Pass the tour's languages so Download
                     // can fetch the member's listening language when present.
-                    availableLanguages: t.languages),
+                    availableLanguages: t.languages,
+                    // [LOCAL-760 / D708] Stamp source_kind on the saved record.
+                    sourceKind: t.sourceKind),
                 icon: const Icon(Icons.download, size: 18),
                 label: const Text('Download'),
               );
@@ -1343,12 +1382,32 @@ class _CommunityPageScreenState extends State<CommunityPageScreen> {
     final translateCandidates =
         CommunityTourRules.translateCandidates(t.languages);
     Widget? translateButton;
-    if (canTranslate && translateCandidates.isNotEmpty && !isBusy) {
+    // [LOCAL-760 / D708] A BROADCAST (organiser-audio) tour is NOT translated —
+    // the audio is the organiser's (the server also refuses 403). No Translate
+    // on its row.
+    if (canTranslate &&
+        translateCandidates.isNotEmpty &&
+        !isBusy &&
+        !t.isOrganiserAudio) {
       translateButton = IconButton(
         key: Key('translate_tour_${t.id}'),
         icon: const Icon(Icons.translate, size: 20, color: Colors.teal),
         tooltip: 'Translate',
         onPressed: () => _translateCommunityTour(c, t),
+      );
+    }
+    // [LOCAL-760 build item 4 / D709] The OWNER of a BROADCAST tour gets an
+    // "Edit audio tour" action that reopens the builder PREFILLED from the
+    // server (name / type / visibility / stops), where the "I changed this tour
+    // — tell my members" checkbox bumps the version so members are offered a
+    // Re-download. Members never see it (they re-download the finished tour).
+    Widget? editAudioButton;
+    if (c.isOwner && t.isOrganiserAudio && !isBusy) {
+      editAudioButton = IconButton(
+        key: Key('edit_audio_tour_${t.id}'),
+        icon: const Icon(Icons.edit, size: 20, color: Color(0xFFd35400)),
+        tooltip: 'Edit audio tour',
+        onPressed: () => _openAudioTourBuilderForEdit(c, t.id),
       );
     }
     // [LOCAL-753 / D707] Show the tour's languages on the row (original first).
@@ -1366,6 +1425,7 @@ class _CommunityPageScreenState extends State<CommunityPageScreen> {
       trailing: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
+          if (editAudioButton != null) editAudioButton,
           if (translateButton != null) translateButton,
           trailing,
         ],
@@ -1662,6 +1722,21 @@ class _CommunityPageScreenState extends State<CommunityPageScreen> {
     await Navigator.of(context).push(
       MaterialPageRoute(
         builder: (_) => OrganiserAudioTourScreen(community: c),
+      ),
+    );
+    if (mounted) await _load();
+  }
+
+  /// [LOCAL-760 build item 4 / D709] The OWNER reopens an EXISTING broadcast
+  /// tour to change it. The builder is opened with [editTourId] so it prefills
+  /// from the server (name/type/visibility/stops) and shows the "I changed this
+  /// tour — tell my members" checkbox; a ticked Save bumps the version so
+  /// members are offered a Re-download. Refresh on return.
+  Future<void> _openAudioTourBuilderForEdit(Community c, int tourId) async {
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) =>
+            OrganiserAudioTourScreen(community: c, editTourId: tourId),
       ),
     );
     if (mounted) await _load();

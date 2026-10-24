@@ -729,12 +729,21 @@ Map<String, dynamic> communityTourSourceItem({
   required int communityId,
   int version = 1,
   String? updatedAt,
+  // [LOCAL-760 build item 2 / D708] The tour's source_kind, when the community
+  // page row carries one ('organiser_audio' for a broadcast tour). Passed
+  // through so TourDownloadService.saveTourToMyTours stamps it on the saved
+  // record at DOWNLOAD time — the root cause Michael hit was a member's
+  // download record with no source_kind, so Listen kept Edit/Translate enabled.
+  String? sourceKind,
 }) {
   final m = <String, dynamic>{
     'community_id': communityId,
     'version': version,
   };
   if (updatedAt != null && updatedAt.isNotEmpty) m['updated_at'] = updatedAt;
+  if (sourceKind != null && sourceKind.trim().isNotEmpty) {
+    m['source_kind'] = sourceKind.trim();
+  }
   return m;
 }
 
@@ -781,6 +790,66 @@ List<String>? stampCommunityIdOnSavedRecords({
       if (m['version'] == null && m['tour_version'] == null) {
         m['version'] = 1;
       }
+      out.add(jsonEncode(m));
+      changed = true;
+    } else {
+      out.add(s);
+    }
+  }
+  return changed ? out : null;
+}
+
+/// [LOCAL-760 build item 2 / D708] True iff a downloaded tour FOLDER is an
+/// organiser-audio tour, judged from its file list: an organiser-audio package
+/// carries a `remote_audio.json` (stop N → the organiser's URL) and NO MP3 in
+/// the ZIP (the phone fetches the audio on download). The repair below is
+/// driven by this: a tour whose folder has remote_audio.json is stamped
+/// source_kind='organiser_audio'. PURE (file names in, bool out).
+bool isOrganiserAudioFromFiles(List<String> fileNames) {
+  for (final f in fileNames) {
+    final name = f.trim();
+    // Match the bare file name whether or not the caller passed a path.
+    final base = name.contains('/') ? name.split('/').last : name;
+    if (base == 'remote_audio.json') return true;
+  }
+  return false;
+}
+
+/// [LOCAL-760 build item 2 / D708] Repair saved_tours records ALREADY on the
+/// phone so a broadcast tour downloaded BEFORE source_kind was stamped (the
+/// root cause Michael hit) becomes recognised — the Listen ⋮ menu then disables
+/// Edit/Translate with an ⓘ. Given the set of this community's ORGANISER-AUDIO
+/// tour ids (as strings — the caller derives them from the server listing's
+/// source_kind, or from a folder's remote_audio.json via
+/// [isOrganiserAudioFromFiles]), it stamps source_kind='organiser_audio' onto
+/// every matching record that does not already carry it. Returns a NEW list, or
+/// null when nothing changed (so the caller can skip the write). PURE.
+List<String>? stampSourceKindOnSavedRecords({
+  required List<String> savedToursJson,
+  required Set<String> organiserAudioTourIds,
+}) {
+  if (organiserAudioTourIds.isEmpty) return null;
+  var changed = false;
+  final out = <String>[];
+  for (final s in savedToursJson) {
+    Map<String, dynamic>? m;
+    try {
+      final decoded = jsonDecode(s);
+      if (decoded is Map<String, dynamic>) m = decoded;
+    } catch (_) {}
+    if (m == null) {
+      out.add(s);
+      continue;
+    }
+    final sid = (m['server_tour_id'] ?? '').toString();
+    final tid = (m['tour_id'] ?? '').toString();
+    final matches = (sid.isNotEmpty && organiserAudioTourIds.contains(sid)) ||
+        (tid.isNotEmpty && organiserAudioTourIds.contains(tid));
+    final already =
+        (m['source_kind'] is String) && (m['source_kind'] as String).trim() ==
+            'organiser_audio';
+    if (matches && !already) {
+      m['source_kind'] = 'organiser_audio';
       out.add(jsonEncode(m));
       changed = true;
     } else {

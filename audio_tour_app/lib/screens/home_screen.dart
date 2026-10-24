@@ -29,6 +29,7 @@ import '../config.dart';
 import '../config/endpoints.dart';
 import '../utils/share_code.dart';
 import '../utils/downloaded_message.dart';
+import '../utils/organiser_audio_notices.dart';
 import '../utils/search_dispatch.dart';
 import '../services/deep_link_service.dart';
 import '../services/communities_service.dart';
@@ -2998,11 +2999,17 @@ class _HomeScreenState extends State<HomeScreen> {
         );
       } else {
         final failedNames = translationFailures.map((l) => TourTranslationHelper.availableLanguages[l] ?? l).join(', ');
+        // [LOCAL-760 / D708] 403 translation_not_offered → the broadcast D708
+        // message; an ordinary per-language failure keeps the "older tour" line.
+        final notOffered = TourTranslationHelper.lastTranslationNotOffered;
         showDialog(
           context: context,
           builder: (context) => AlertDialog(
             title: const Text('Translation Not Available'),
-            content: Text('$failedNames wasn\'t available for this older tour, so the English version was saved.'),
+            content: Text(translationFailureMessage(
+              translationNotOffered: notOffered,
+              failedLanguageNames: failedNames,
+            )),
             actions: [
               TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('OK')),
             ],

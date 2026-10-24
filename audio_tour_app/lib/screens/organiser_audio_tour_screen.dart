@@ -237,6 +237,57 @@ class _OrganiserAudioTourScreenState extends State<OrganiserAudioTourScreen> {
     // Nothing becomes a stop until the organiser ticks it (Michael: "Nothing
     // becomes a stop without being ticked").
     _loadChoices(widget.community.episodes);
+    // [LOCAL-760 build item 4 / D709] EDIT mode: prefill from the server so the
+    // organiser reopens the EXISTING tour (name, type, visibility, stops with
+    // name / audio URL / location / text) rather than a blank builder. The
+    // owner-only GET returns the stored stops; a failure leaves the builder
+    // empty (the organiser can still rebuild).
+    if (widget.editTourId != null) {
+      _prefillFromServer();
+    }
+  }
+
+  Future<void> _prefillFromServer() async {
+    setState(() => _busy = true);
+    final userId = await _userId();
+    final detail = await CommunitiesService.audioTourDetail(
+        widget.community.id, widget.editTourId!,
+        userId: userId);
+    if (!mounted) return;
+    setState(() {
+      _busy = false;
+      if (detail == null) {
+        _error = 'Could not load this tour to edit. You can rebuild it below.';
+        return;
+      }
+      _tourName.text = detail.tourName;
+      if (_tourTypes.contains(detail.tourType)) _tourType = detail.tourType;
+      if (detail.visibility == 'members' || detail.visibility == 'public') {
+        _visibility = detail.visibility;
+      }
+      // Rebuild the draft stops from the server's stops, in order.
+      for (final s in _stops) {
+        s.dispose();
+      }
+      _stops
+        ..clear()
+        ..addAll(detail.stops.map((s) => _DraftStop(
+              name: s.name,
+              audioUrl: s.audioUrl,
+              episodeTitle: s.name,
+              lat: s.lat != null ? s.lat!.toStringAsFixed(6) : '',
+              lng: s.lng != null ? s.lng!.toStringAsFixed(6) : '',
+              text: s.text,
+              expanded: false,
+            )));
+      // Set the place label so a located stop shows "located" rather than
+      // "Location needed" in the collapsed card.
+      for (final ds in _stops) {
+        if (ds.hasLocation) {
+          ds.placeLabel = 'Saved location';
+        }
+      }
+    });
   }
 
   void _loadChoices(List<CommunityEpisode> episodes) {
