@@ -3390,6 +3390,52 @@ def _translation_version_fields(conn, translated_id):
         logging.warning(f"[LOCAL-666] version/updated_at derive failed for {translated_id}: {e}")
         return None, None
 
+
+# [LOCAL-754B / D708] Organiser-audio tours are not translatable. This is the
+# single source of truth in the translation service for "may this tour be
+# translated?" — mirroring user-tracking/organiser_audio_tours.translation_not_
+# offered (the two services cannot share a module — each container is self-
+# contained — so the SOURCE_KIND string 'organiser_audio' is the shared contract).
+ORGANISER_AUDIO_SOURCE_KIND = 'organiser_audio'
+ORGANISER_AUDIO_NOT_OFFERED = 'translation_not_offered'
+
+
+def _is_organiser_audio_tour(content_id):
+    """True iff the tour (or its original, for a translation row) has
+    audio_tours.source_kind = 'organiser_audio'. Best-effort: a schema without
+    the source_kind column, a missing row, or any read error returns False so a
+    genuine generated tour is never blocked (fail open to the normal path)."""
+    if content_id is None:
+        return False
+    try:
+        conn = translation_service.get_db_connection()
+    except Exception:  # noqa: BLE001
+        return False
+    try:
+        cur = conn.cursor()
+        try:
+            cur.execute(
+                "SELECT COALESCE(orig.source_kind, t.source_kind) "
+                "FROM audio_tours t "
+                "LEFT JOIN audio_tours orig ON orig.id = t.original_tour_id "
+                "WHERE t.id = %s",
+                (content_id,))
+            row = cur.fetchone()
+        except Exception:  # noqa: BLE001 — source_kind column absent (old schema)
+            return False
+        finally:
+            try:
+                cur.close()
+            except Exception:  # noqa: BLE001
+                pass
+        return bool(row and row[0] == ORGANISER_AUDIO_SOURCE_KIND)
+    finally:
+        try:
+            conn.close()
+        except Exception:  # noqa: BLE001
+            pass
+
+
 def add_cors_headers(response):
     response.headers['Access-Control-Allow-Origin'] = '*'
     response.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, OPTIONS'
@@ -3420,6 +3466,20 @@ def translate_content_with_audio():
     # generation and the translation wallet charge, so per-tour reports can sum the job.
     job_id = data.get('job_id')
     user_id = data.get('user_id')
+
+    # [LOCAL-754B / D708] Translation of ORGANISER-AUDIO tours is NOT offered.
+    # The organiser links audio Audioura never stored and never had the text
+    # for, so there is nothing to translate. Refuse such a request up front
+    # (403 translation_not_offered) BEFORE any translation runs. A generated
+    # tour (source_kind NULL) passes straight through. Best-effort read: a
+    # schema without source_kind, or any read error, never blocks a legitimate
+    # translation (fail open to the normal path).
+    if content_type == 'tour' and _is_organiser_audio_tour(content_id):
+        return jsonify({
+            'status': 'error',
+            'error_code': ORGANISER_AUDIO_NOT_OFFERED,
+            'message': 'Translation is not offered for organiser-audio tours.',
+        }), 403
     
     # [LOCAL-752 A3] Organiser-only rule for a COMMUNITY tour: a member/stranger
     # may not translate it (the result would become part of the community). The

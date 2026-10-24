@@ -431,6 +431,32 @@ class CreateResult {
   bool get ok => community != null;
 }
 
+/// [LOCAL-754B / D658 addendum 2] The outcome of building an organiser-audio
+/// tour. On success [tourId] + [sourceKind] ('organiser_audio') + [communityId]
+/// are set; on a validation failure [error] (e.g. 'audio_unreachable'),
+/// [message] and [stopName] (the failing stop, when the server named one) carry
+/// the server's own words so the builder screen can point at the exact stop; a
+/// transport failure leaves them null with a short connection [message].
+class BuildAudioTourResult {
+  final int? tourId;
+  final String? sourceKind;
+  final int? communityId;
+  final String? error;
+  final String? stopName;
+  final String? message;
+
+  const BuildAudioTourResult({
+    this.tourId,
+    this.sourceKind,
+    this.communityId,
+    this.error,
+    this.stopName,
+    this.message,
+  });
+
+  bool get ok => tourId != null;
+}
+
 /// [LOCAL-703 / D664] The outcome of resolving an invite code. Exactly one of
 /// three states: a resolved [community] (200), [closed] = true when the code
 /// belongs to an archived community (410 community_closed → "This community has

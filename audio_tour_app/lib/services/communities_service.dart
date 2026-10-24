@@ -238,6 +238,50 @@ class CommunitiesService {
     }
   }
 
+  /// [LOCAL-754B / D658 addendum 2 / D708] Build (or edit) an ORGANISER-AUDIO
+  /// tour from the organiser's own hosted audio (RSS/MP3 links). OWNER ONLY.
+  /// [body] carries {user_id, tour_name, tour_type, visibility, rights_accepted,
+  /// stops:[{name,lat,lng,text,audio_url}], tour_id? (edit)}. The server
+  /// validates every audio URL and names the first failing stop.
+  ///
+  /// Returns [BuildAudioTourResult]: on 201/200 the {tour_id, source_kind,
+  /// community_id, version}; on a 400/422 the server's error + message + the
+  /// failing stop_name; on a transport error a short connection message.
+  static Future<BuildAudioTourResult> buildAudioTour(
+      int communityId, Map<String, dynamic> body) async {
+    try {
+      final r = await Endpoints.post(
+          Service.userDb, '/communities/$communityId/build-audio-tour',
+          body: body);
+      final map = Endpoints.tryDecodeMap(r.body);
+      if ((r.statusCode == 201 || r.statusCode == 200) && map != null) {
+        final rawId = map['tour_id'];
+        int? tourId;
+        if (rawId is int) {
+          tourId = rawId;
+        } else if (rawId is num) {
+          tourId = rawId.toInt();
+        }
+        return BuildAudioTourResult(
+          tourId: tourId,
+          sourceKind: map['source_kind'] as String?,
+          communityId: communityId,
+        );
+      }
+      return BuildAudioTourResult(
+        error: map?['error'] as String?,
+        stopName: map?['stop_name'] as String?,
+        message: (map?['message'] as String?) ??
+            'Could not build the tour (error ${r.statusCode}).',
+      );
+    } catch (_) {
+      return const BuildAudioTourResult(
+        message: 'Could not reach the server. Check your connection and try '
+            'again.',
+      );
+    }
+  }
+
   /// [LOCAL-700 §4] Is a community name free? Calls GET
   /// /communities/name-available?name= (case/space-insensitive, trimmed on the
   /// server). Returns true only on a 200 with available:true; ANY failure

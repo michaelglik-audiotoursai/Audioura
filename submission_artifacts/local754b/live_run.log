@@ -1,0 +1,17 @@
+[feed] serving own RSS + 3 MP3 + 1 PDF at http://127.0.0.1:53783
+[rows] before: {'audio_tours': 0, 'community_episodes': 0, 'communities': 1}
+[community] id=3132 owner=L754B-owner-71052b20 member=L754B-member-71052b20
+[feed] parsed 4 items → kept 3 audio, skipped 1 non-audio ✓
+[owner-only] member build refused 403 ✓
+[build] owner published tour_id=7726 source_kind=organiser_audio stops=3 ✓
+[row] source_kind=organiser_audio community_id=3132 visibility=members stops_count=3 rights_by=L754B-owner-71052b20 ✓
+[package] remote_audio.json present, NO mp3, index.html == generated renderer ✓  files=['audio_1.txt', 'audio_2.txt', 'audio_3.txt', 'index.html', 'manifest.json', 'remote_audio.json', 'service-worker.js', 'tour_content.txt']
+[phone] fetched remote audio → ['audio_1.mp3', 'audio_2.mp3', 'audio_3.mp3'] beside index.html (plays offline) ✓
+[translate] organiser_audio → not offered; generated → offered ✓
+[edit] re-publish bumped version → 2 ✓
+[rows] after: {'audio_tours': 1, 'community_episodes': 0, 'communities': 2}
+[rows] delta: audio_tours +1, communities +1
+[budget] $0.00 — organiser-audio uses NO OpenAI/AI calls ✓
+
+LOCAL-754B LIVE: ALL CHECKS PASSED ✓
+[cleanup] removed this run's test rows → counts back to {'audio_tours': 0, 'community_episodes': 0, 'communities': 1}

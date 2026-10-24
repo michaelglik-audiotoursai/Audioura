@@ -262,6 +262,26 @@ class TourDownloadService {
         }
       }
 
+      // [LOCAL-754B] If the edited tour is organiser-audio, re-fetch the remote
+      // audio into the SAME folder so the replaced copy plays offline too. On
+      // web the files live in prefs keyed by the dir name; on device beside
+      // index.html. A failing stop keeps the (now replaced) files but surfaces
+      // as failed so the member can retry.
+      try {
+        if (kIsWeb) {
+          final dirName = path.startsWith('web_tours/')
+              ? path.substring('web_tours/'.length)
+              : path;
+          await _fetchRemoteAudioWeb(zipBytes, dirName, prefs);
+        } else {
+          await _fetchRemoteAudioDevice(zipBytes, path);
+        }
+      } catch (e) {
+        await DebugLogHelper.addDebugLog(
+            'DOWNLOAD_SVC: re-download $tourId remote-audio fetch failed ($e)');
+        return const TourDownloadResult(TourDownloadStatus.failed);
+      }
+
       // 4) Bump the saved record's version/updated_at (and stop count) IN PLACE —
       // same title, same path, so Listen keeps the one entry and now opens v2.
       record['version'] = newVersion;
@@ -424,6 +444,15 @@ class TourDownloadService {
         }
       }
 
+      // [LOCAL-754B / D658 addendum 2] Organiser-audio tour: the package has NO
+      // MP3, only remote_audio.json ({stop N → the organiser's URL}). Fetch each
+      // URL FROM THE ORGANISER'S HOST and save it as audio_N.mp3 next to
+      // index.html, so the tour plays offline and the map/voice-control behave
+      // exactly like a generated tour. One failing stop → the whole save fails
+      // (no half-saved tour), naming the stop in the thrown message.
+      await _fetchRemoteAudioIfPresent(zipBytes, tourDirPath, safeName,
+          editTourId, prefs);
+
       int actualStops;
       if (backendStopsCount != null && backendStopsCount > 0) {
         actualStops = backendStopsCount;
@@ -455,6 +484,13 @@ class TourDownloadService {
         final updatedAt = sourceItem['updated_at'];
         if (v != null) tourData['version'] = v;
         if (updatedAt != null) tourData['updated_at'] = updatedAt;
+        // [LOCAL-754B / D708] Carry the tour's source_kind onto the saved
+        // record so Listen can hide Translate for an organiser-audio tour (the
+        // server also refuses it 403). An ordinary/generated tour has none.
+        final sk = sourceItem['source_kind'];
+        if (sk is String && sk.trim().isNotEmpty) {
+          tourData['source_kind'] = sk.trim();
+        }
         // [LOCAL-745] Carry the community id onto the saved record so My Tours
         // can show Edit only to the community organiser (canEditTour). A
         // community download's sourceItem (new-tours row / map listing /
@@ -563,6 +599,113 @@ class TourDownloadService {
     }
   }
 
+  /// [LOCAL-754B / D658 addendum 2] Organiser-audio support. If the package
+  /// contains remote_audio.json ({stop N → the organiser's audio URL}), download
+  /// each URL and save it as audio_N.mp3 so the tour plays offline exactly like
+  /// a generated tour. The audio lives on the ORGANISER's host — Audioura never
+  /// stores it — so this is the phone fetching it directly. A package with NO
+  /// remote_audio.json (an ordinary/generated tour that ships its own MP3s) is a
+  /// no-op. One failing stop throws, NAMING the stop, so the caller fails the
+  /// whole save rather than leaving a half-saved tour (D754).
+  static Future<void> _fetchRemoteAudioIfPresent(
+    List<int> zipBytes,
+    String tourDirPath,
+    String safeName,
+    String editTourId,
+    SharedPreferences prefs,
+  ) async {
+    if (kIsWeb) {
+      final dirName = '${safeName}_$editTourId';
+      await _fetchRemoteAudioWeb(zipBytes, dirName, prefs);
+    } else {
+      await _fetchRemoteAudioDevice(zipBytes, tourDirPath);
+    }
+  }
+
+  /// Parse remote_audio.json from the ZIP into an ordered {stopNumber: url} map,
+  /// or an empty map when the tour has no remote audio (an ordinary tour).
+  static Map<int, String> _remoteAudioMap(List<int> zipBytes) {
+    try {
+      final archive = ZipDecoder().decodeBytes(zipBytes);
+      for (final file in archive) {
+        if (file.name == 'remote_audio.json' && file.isFile) {
+          final decoded = json.decode(utf8.decode(file.content as List<int>));
+          if (decoded is Map) {
+            final out = <int, String>{};
+            decoded.forEach((k, v) {
+              final n = int.tryParse('$k');
+              if (n != null && v is String && v.trim().isNotEmpty) {
+                out[n] = v.trim();
+              }
+            });
+            return out;
+          }
+        }
+      }
+    } catch (_) {}
+    return const {};
+  }
+
+  /// Device: fetch each remote audio URL and write audio_N.mp3 beside
+  /// index.html. Throws (naming the stop) on a URL that will not download, so
+  /// the caller can fail the whole save (no half-saved tour).
+  static Future<void> _fetchRemoteAudioDevice(
+      List<int> zipBytes, String tourDirPath) async {
+    final remote = _remoteAudioMap(zipBytes);
+    if (remote.isEmpty) return;
+    for (final entry in remote.entries) {
+      final n = entry.key;
+      final url = entry.value;
+      try {
+        final resp = await http
+            .get(Uri.parse(url))
+            .timeout(const Duration(seconds: 120));
+        if (resp.statusCode != 200 || resp.bodyBytes.isEmpty) {
+          throw Exception('stop $n: HTTP ${resp.statusCode}');
+        }
+        final f = File('$tourDirPath/audio_$n.mp3');
+        await f.create(recursive: true);
+        await f.writeAsBytes(resp.bodyBytes);
+      } catch (e) {
+        await DebugLogHelper.addDebugLog(
+            'DOWNLOAD_SVC: remote audio for stop $n failed: $e');
+        throw Exception('Audio for stop $n could not be downloaded. '
+            'Please retry.');
+      }
+    }
+  }
+
+  /// Web: fetch each remote audio URL and store it in prefs as
+  /// tour_file_<dir>_audio_N.mp3 (+ its mime) so the web player serves it from
+  /// local storage, matching the extracted-file scheme. Throws (naming the
+  /// stop) on failure.
+  static Future<void> _fetchRemoteAudioWeb(
+      List<int> zipBytes, String dirName, SharedPreferences prefs) async {
+    final remote = _remoteAudioMap(zipBytes);
+    if (remote.isEmpty) return;
+    for (final entry in remote.entries) {
+      final n = entry.key;
+      final url = entry.value;
+      try {
+        final resp = await http
+            .get(Uri.parse(url))
+            .timeout(const Duration(seconds: 120));
+        if (resp.statusCode != 200 || resp.bodyBytes.isEmpty) {
+          throw Exception('stop $n: HTTP ${resp.statusCode}');
+        }
+        await prefs.setString('tour_file_${dirName}_audio_$n.mp3',
+            base64Encode(resp.bodyBytes));
+        await prefs.setString(
+            'tour_file_${dirName}_audio_$n.mp3_mime', 'audio/mpeg');
+      } catch (e) {
+        await DebugLogHelper.addDebugLog(
+            'DOWNLOAD_SVC: remote audio (web) for stop $n failed: $e');
+        throw Exception('Audio for stop $n could not be downloaded. '
+            'Please retry.');
+      }
+    }
+  }
+
   /// Count stops in a tour ZIP (lifted from home_screen).
   static Future<int> _countTourStops(List<int> zipBytes) async {
     try {
@@ -589,7 +732,18 @@ class TourDownloadService {
           audioCount++;
         }
       }
-      return audioCount > 0 ? audioCount : 10;
+      if (audioCount > 0) return audioCount;
+      // [LOCAL-754B] An organiser-audio package ships NO mp3 (the audio is
+      // remote); count its remote_audio.json entries instead.
+      for (final file in archive) {
+        if (file.name == 'remote_audio.json' && file.isFile) {
+          try {
+            final decoded = json.decode(utf8.decode(file.content as List<int>));
+            if (decoded is Map && decoded.isNotEmpty) return decoded.length;
+          } catch (_) {}
+        }
+      }
+      return 10;
     } catch (e) {
       await DebugLogHelper.addDebugLog('DOWNLOAD_SVC: Error counting stops: $e');
       return 10;
