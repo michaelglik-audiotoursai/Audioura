@@ -333,6 +333,22 @@ def discover_landmarks(area: AreaResolution) -> List[Landmark]:
 
 def _parse_location(location_string: str) -> Tuple[str, str]:
     """Parse 'Neighborhood, City' or 'City, State/Country' into (neighborhood, city)."""
+    # [LOCAL-751 B1] Cut a trailing "stops/places" clause BEFORE any city/state is
+    # read. The field request "Walking tour in Danvers, MA including Witchcraft
+    # Victims Memorial" parsed as city='MA including Witchcraft Victims Memorial.'
+    # because the "including …" clause rode along in the state segment and defeated
+    # the US-state/ZIP detector, so the whole walking tour ran unverified and the
+    # memorial was dropped. A request names the AREA first ("Danvers, MA") and then
+    # the stops it wants inside it ("including …"/"with …"/"featuring …"/"and
+    # visit …"); only the area belongs to the location. Cutting the clause (and a
+    # trailing period) leaves the clean "Danvers, MA" for the parser. The named
+    # place itself is NOT lost — it is carried as intent `named_places` and goes
+    # through the named-place policy (apply_named_place_policy) so it is kept when
+    # it verifies and announced when it does not (D562), never silently dropped.
+    location_string = re.sub(
+        r'\s*\b(?:including|featuring|and\s+visit(?:ing)?|and\s+see(?:ing)?|'
+        r'with\s+(?:a\s+)?(?:stop|stops|visit)|with)\b.*$',
+        '', location_string or '', flags=re.IGNORECASE).strip().rstrip('.').strip()
     # Remove common tour-type phrases (as standalone phrases, not eating the rest of the string)
     clean = re.sub(r'\b(?:walking tour|biking tour|driving tour|audio tour|guided tour|self[- ]guided tour|tour|historic district)\b', '', location_string, flags=re.IGNORECASE).strip()
     
@@ -1418,6 +1434,107 @@ def _match_stop_to_landmark(stop_name: str, landmarks: List[Landmark]) -> Option
                 return lm
 
     return None
+
+
+# ============================================================
+# [LOCAL-751 B2 / D562] Named-place policy — never silently drop a place the
+# listener named. A user-named place goes through the existence check with the
+# RESOLVED area; if it verifies it is KEPT, and if it cannot be verified it is
+# ANNOUNCED in the Orientation, never swapped out without a word.
+# ============================================================
+
+def build_named_place_announcement(name: str) -> str:
+    """The exact Orientation sentence for a user-named place we could not confirm.
+
+    D562: a place the listener named that cannot be verified is announced, never
+    silently dropped. The wording matches the "we could not confirm …" register
+    used elsewhere (screen_work_tour.py).
+    """
+    return (f"We could not confirm {(name or '').strip()}, "
+            f"so it is not part of this tour.")
+
+
+def apply_named_place_policy(poi_list, named_places, area, landmarks, new_poi_fn):
+    """Keep user-named places that verify; announce the ones that do not (D562).
+
+    For each name in ``named_places`` (intent `named_places` — places the listener
+    asked to VISIT):
+
+      * If it matches a discovered landmark in the resolved ``area`` (via the same
+        accent-folded / article-stripped matcher the walking path uses,
+        ``_match_stop_to_landmark``), it is KEPT: either the existing candidate is
+        flagged, or a new POI is inserted at the FRONT of the list (so the tail
+        trim never drops it), carrying ``user_explicit=True`` and ``verified=True``
+        plus the landmark's Wikidata QID/coordinates. It is NOT announced.
+
+      * If it cannot be verified from the discovered landmarks, it is ANNOUNCED
+        (``build_named_place_announcement``) and NEVER silently removed.
+
+    Pure and deterministic (matching against the passed-in ``landmarks``; no
+    network here — discovery/OSM lookup happens in the caller and is handed in as
+    ``landmarks``). Returns ``(poi_list, announcements)``. Idempotent on the
+    user_explicit flag, so calling it twice changes nothing.
+    """
+    announcements: List[str] = []
+    if not named_places:
+        return poi_list, announcements
+
+    landmarks = landmarks or []
+    for raw in named_places:
+        name = (raw or "").strip() if isinstance(raw, str) else ""
+        if len(name) < 3:
+            continue
+
+        nn = _normalize_landmark_name(name)
+        # Is this named place ALREADY among the candidates (whatever built the list)?
+        already = [p for p in poi_list
+                   if (lambda q: q and (nn == q or nn in q or q in nn))(
+                       _normalize_landmark_name(p.get('name', '')))]
+
+        matched = _match_stop_to_landmark(name, landmarks)
+
+        if matched:
+            # Verified against a discovered landmark → KEEP.
+            if already:
+                for p in already:
+                    p['user_explicit'] = True
+                    p['verified'] = True
+                    if matched.qid:
+                        p['wikidata_qid'] = matched.qid
+                    if matched.lat or matched.lng:
+                        p['wikidata_lat'] = matched.lat
+                        p['wikidata_lng'] = matched.lng
+                    print(f"  [LOCAL-751] Named place '{name}' verified against "
+                          f"discovered landmark '{matched.name}' — marked "
+                          f"user_explicit/verified on '{p.get('name')}'")
+            else:
+                poi = new_poi_fn(name)
+                poi['user_explicit'] = True
+                poi['verified'] = True
+                if matched.qid:
+                    poi['wikidata_qid'] = matched.qid
+                if matched.lat or matched.lng:
+                    poi['wikidata_lat'] = matched.lat
+                    poi['wikidata_lng'] = matched.lng
+                # Front of the list: the tail is what gets trimmed to total_stops,
+                # and a stop the listener asked for must not fall off the end.
+                poi_list.insert(0, poi)
+                print(f"  [LOCAL-751] Named place '{name}' verified against "
+                      f"discovered landmark '{matched.name}' — INSERTED as a "
+                      f"user-explicit, verified stop")
+            continue
+
+        # Could not verify from the discovered landmarks → ANNOUNCE, never drop.
+        # Remove any unverifiable placeholder candidate for the same name (it is
+        # announced, not shipped as a stop), but the LISTENER still hears about it.
+        if already:
+            _keep = [p for p in poi_list if p not in already]
+            poi_list = _keep
+        announcements.append(build_named_place_announcement(name))
+        print(f"  [LOCAL-751] Named place '{name}' could not be confirmed in "
+              f"{area.city_name or 'the area'!r} — ANNOUNCED (not silently dropped)")
+
+    return poi_list, announcements
 
 
 # ============================================================
