@@ -83,6 +83,12 @@ class _CommunityPageScreenState extends State<CommunityPageScreen> {
   // [LOCAL-713 / D675] The server tour ids already on the phone (from the
   // saved_tours records), used to show "On this phone ✓" vs "Download".
   Set<String> _onPhoneTourIds = const {};
+  // [LOCAL-755 / D709 Rule 3] Server tour id (string) → the pending organiser
+  // version stamped on the saved record by the sync, for an ORGANISER-AUDIO
+  // tour the organiser updated. A matching row shows "Updated by the organiser
+  // — Re-download" (members are never pushed it; the tap opts in). Empty when
+  // nothing is pending.
+  Map<String, int> _organiserUpdateByTourId = const {};
   // [LOCAL-715 / D675 addendum 1] The listening language for THIS community's
   // tours. `_communityLanguageChoice` is the explicit per-community choice
   // (`listening_language_<id>`), null when none is set — then the page shows
@@ -135,6 +141,7 @@ class _CommunityPageScreenState extends State<CommunityPageScreen> {
     // [LOCAL-713 / D675] The set of server tour ids already on the phone — for
     // the per-row Download / On this phone status.
     final onPhone = <String>{};
+    final organiserUpdates = <String, int>{};
     for (final s in (prefs.getStringList('saved_tours') ?? const [])) {
       try {
         final m = json.decode(s) as Map<String, dynamic>;
@@ -142,6 +149,22 @@ class _CommunityPageScreenState extends State<CommunityPageScreen> {
         final sid = m['server_tour_id'];
         if (tid is String && tid.isNotEmpty) onPhone.add(tid);
         if (sid is String && sid.isNotEmpty) onPhone.add(sid);
+        // [LOCAL-755] An organiser-audio tour the organiser updated: the sync
+        // stamped `pending_organiser_version` > the saved version. Record it by
+        // server/edit id so the row can offer Re-download.
+        final sk = (m['source_kind'] ?? '').toString().trim();
+        final pending = m['pending_organiser_version'];
+        if (sk == 'organiser_audio' && pending is num) {
+          final pv = pending.toInt();
+          int saved = 1;
+          final rawV = m['version'] ?? m['tour_version'];
+          if (rawV is num) saved = rawV.toInt();
+          if (rawV is String) saved = int.tryParse(rawV) ?? 1;
+          if (pv > saved) {
+            if (sid is String && sid.isNotEmpty) organiserUpdates[sid] = pv;
+            if (tid is String && tid.isNotEmpty) organiserUpdates[tid] = pv;
+          }
+        }
       } catch (_) {}
     }
     // [LOCAL-748] Repair records already on the phone: a tour downloaded BEFORE
@@ -175,6 +198,7 @@ class _CommunityPageScreenState extends State<CommunityPageScreen> {
     setState(() {
       _community = c;
       _onPhoneTourIds = onPhone;
+      _organiserUpdateByTourId = organiserUpdates;
       _communityLanguageChoice = choice;
       _aboutDefaultLanguage = aboutDefault;
       _resolvedLanguage = resolved;
@@ -537,6 +561,61 @@ class _CommunityPageScreenState extends State<CommunityPageScreen> {
   /// path). The pass covers a member, so there is no purchase prompt here; if
   /// the server still refuses with membership_required (e.g. an expired pass),
   /// we open the community page's join/buy flow, exactly as the existing
+  /// [LOCAL-755 / D709 Rule 3] The member tapped "Updated by the organiser —
+  /// Re-download" on a community-page row. Opt-in re-download in place (package
+  /// + MP3s from the organiser host), replacing the old copy only after the new
+  /// one is complete (TourDownloadService.reDownloadAndReplace). On success the
+  /// pending marker is removed so the row returns to "On this phone ✓".
+  Future<void> _reDownloadOrganiserAudioTour(
+      int tourId, int newVersion, String? updatedAt) async {
+    if (_downloading.contains(tourId)) return;
+    setState(() => _downloading.add(tourId));
+    try {
+      final r = await TourDownloadService.reDownloadAndReplace(
+        tourId,
+        newVersion: newVersion,
+        updatedAt: updatedAt,
+      );
+      if (!mounted) return;
+      if (r.status == TourDownloadStatus.ok) {
+        // Clear the pending marker on the saved record and in local state.
+        final prefs = await SharedPreferences.getInstance();
+        final saved = prefs.getStringList('saved_tours') ?? const [];
+        final out = <String>[];
+        for (final s in saved) {
+          try {
+            final m = Map<String, dynamic>.from(json.decode(s) as Map);
+            final sid = (m['server_tour_id'] ?? '').toString();
+            final tid = (m['tour_id'] ?? '').toString();
+            if ((sid == tourId.toString() || tid == tourId.toString()) &&
+                m.containsKey('pending_organiser_version')) {
+              m.remove('pending_organiser_version');
+              out.add(json.encode(m));
+              continue;
+            }
+          } catch (_) {}
+          out.add(s);
+        }
+        await prefs.setStringList('saved_tours', out);
+        if (!mounted) return;
+        setState(() {
+          final next = Map<String, int>.from(_organiserUpdateByTourId);
+          next.remove(tourId.toString());
+          _organiserUpdateByTourId = next;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+            content: Text('Updated to the organiser’s latest.')));
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('Could not re-download. Your current copy is kept.'),
+          backgroundColor: Colors.redAccent,
+        ));
+      }
+    } finally {
+      if (mounted) setState(() => _downloading.remove(tourId));
+    }
+  }
+
   /// community-tour flow does. The language is pickDownloadLanguage over the
   /// tour's available languages, the listener's preferred language and the
   /// tour's original — v1 never requests a new translation.
@@ -1091,11 +1170,46 @@ class _CommunityPageScreenState extends State<CommunityPageScreen> {
     // have to go back, find the Listen tab and open the tour by hand. Opening
     // via PendingListenOpen is the SAME mechanism the download's "View" uses.
     final onPhone = status == CommunityTourRowStatus.onThisPhone;
+    // [LOCAL-755 / D709 Rule 3] This tour is an organiser-audio tour the
+    // organiser updated (a pending version > the saved one). Members are never
+    // pushed it — the row OFFERS a Re-download the member opts into.
+    final int? pendingOrganiserVersion = _organiserUpdateByTourId[t.id.toString()];
     VoidCallback? openPlayer =
         onPhone ? () => PendingListenOpen.instance.offer(t.id.toString()) : null;
     Widget trailing;
     switch (status) {
       case CommunityTourRowStatus.onThisPhone:
+        if (pendingOrganiserVersion != null) {
+          trailing = isBusy
+              ? const SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(strokeWidth: 2))
+              : InkWell(
+                  key: Key('redownload_tour_${t.id}'),
+                  onTap: () => _reDownloadOrganiserAudioTour(
+                      t.id, pendingOrganiserVersion, t.updatedAt),
+                  borderRadius: BorderRadius.circular(6),
+                  child: const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.refresh, size: 16, color: Color(0xFFd35400)),
+                        SizedBox(width: 4),
+                        Flexible(
+                          child: Text('Updated by the organiser — Re-download',
+                              style: TextStyle(
+                                  color: Color(0xFFd35400),
+                                  fontWeight: FontWeight.w700,
+                                  decoration: TextDecoration.underline)),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+          break;
+        }
         trailing = InkWell(
           key: Key('open_tour_${t.id}'),
           onTap: openPlayer,

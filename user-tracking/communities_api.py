@@ -2352,8 +2352,13 @@ def build_audio_tour(community_id):
         audio_tours.audio_tour, tagged community_id + visibility + source_kind;
       * NEW → 201 {tour_id, source_kind, community_id, version:1};
       * EDIT (tour_id given, must be THIS community's organiser-audio tour) →
-        archive the old content to audio_tour_versions (version bump) then
-        replace → 200 {tour_id, source_kind, community_id, version}.
+        replace the content in place. The version bump is GATED on the
+        `notify_members` checkbox (LOCAL-755 / D709 "I changed this tour — tell
+        my members"): true → archive the old content to audio_tour_versions
+        (version rises), so a member's row offers "Updated by the organiser —
+        Re-download" (opt-in; never pushed); false/absent → a SILENT save (typo
+        fix) with NO archive and the version UNCHANGED. →
+        200 {tour_id, source_kind, community_id, notify_members, version}.
 
     No OpenAI cost; does not touch the generation allowance (D754)."""
     err = _require_api_key()
@@ -2442,15 +2447,35 @@ def build_audio_tour(community_id):
                 return jsonify({"error": "not_organiser_audio",
                                 "message": "That tour is not an organiser-audio "
                                            "tour."}), 409
-            # Archive the OLD content (version bump) exactly like a generated
-            # replace-on-change: insert the superseded version first.
-            next_v = _next_version_no(cur, int(edit_tour_id))
-            cur.execute(
-                "INSERT INTO audio_tour_versions "
-                "(tour_id, version_no, tour_content, stops_count, lat, lng, "
-                " replaced_by_job) VALUES (%s, %s, %s, %s, %s, %s, %s)",
-                (int(edit_tour_id), next_v, row[2], None, None, None,
-                 'organiser_audio_edit'))
+            # [LOCAL-755 / D709] Rule 2: the version bump depends on the
+            # "I changed this tour — tell my members" checkbox (notify_members).
+            #   * notify_members (true)  → the organiser changed the AUDIO on
+            #     their own site; archive the old content (version bump) and mark
+            #     the tour updated, so a member's Listen/community row offers
+            #     "Updated by the organiser — Re-download" (members opt in; they
+            #     are never pushed — RefreshPlanner skips organiser-audio).
+            #   * otherwise (default)    → a silent save (typo fix / reorder);
+            #     the details are stored but the version STAYS and no archive row
+            #     is written, so members see no "re-download" prompt.
+            # The current live version is MAX(version_no)+1 (the app's LOCAL-657
+            # rule); _next_version_no returns exactly that.
+            live_version = _next_version_no(cur, int(edit_tour_id))
+            notify_members = bool(data.get('notify_members'))
+            if notify_members:
+                # Archive the OLD content (version bump) exactly like a generated
+                # replace-on-change: insert the superseded version first.
+                cur.execute(
+                    "INSERT INTO audio_tour_versions "
+                    "(tour_id, version_no, tour_content, stops_count, lat, lng, "
+                    " replaced_by_job) VALUES (%s, %s, %s, %s, %s, %s, %s)",
+                    (int(edit_tour_id), live_version, row[2], None, None, None,
+                     'organiser_audio_edit'))
+                # After archiving version_no=live_version, the new live version
+                # is live_version + 1.
+                new_version = live_version + 1
+            else:
+                # Silent save: the version is unchanged (the current live value).
+                new_version = live_version
             cur.execute(
                 "UPDATE audio_tours SET tour_name = %s, request_string = %s, "
                 "audio_tour = %s, tour_content = %s, stops_count = %s, "
@@ -2461,12 +2486,11 @@ def build_audio_tour(community_id):
                  stops_count, lat, lng, visibility, int(edit_tour_id)))
             conn.commit()
             cur.close()
-            # The live version the app sees is the archived count + 1 (the same
-            # MAX(version_no)+1 rule _tours_for returns).
             return jsonify({"tour_id": int(edit_tour_id),
                             "source_kind": source_kind,
                             "community_id": community_id,
-                            "version": next_v + 1}), 200
+                            "notify_members": notify_members,
+                            "version": new_version}), 200
 
         # ── NEW ──────────────────────────────────────────────────────────────
         cur.execute(

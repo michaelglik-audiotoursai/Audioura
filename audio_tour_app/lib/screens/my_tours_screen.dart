@@ -25,6 +25,7 @@ import 'tour_map_screen.dart';
 import 'communities_hub_screen.dart';
 import '../services/communities_service.dart';
 import '../services/community_tour_service.dart';
+import '../services/tour_download_service.dart';
 import '../services/saved_tours_refresh.dart';
 import '../services/tour_pricing_service.dart';
 import '../services/entitlements_service.dart';
@@ -111,6 +112,13 @@ String? tourVersionLabel(Map<String, dynamic> tour) {
 /// never a throw. `community_id` may arrive as an int or a numeric String.
 bool canEditTour(Map<String, dynamic> tour,
     {required Set<int> ownedCommunityIds}) {
+  // [LOCAL-755 / D709] Rule 1: an organiser-audio tour is NEVER edited through
+  // our voice pipeline — not even by the organiser. The organiser changes the
+  // audio on their OWN site and re-publishes in the builder; the Listen ⋮ Edit
+  // (EditTourScreen → tour_editing_phase2, text-to-speech) is hidden and the
+  // edit service also refuses it (409 organiser_audio_not_editable). Checked
+  // first so it overrides the community-owner allowance below.
+  if (isOrganiserAudioTour(tour)) return false;
   final raw = tour['community_id'];
   int? communityId;
   if (raw is int) {
@@ -136,6 +144,28 @@ bool canEditTour(Map<String, dynamic> tour,
 bool isOrganiserAudioTour(Map<String, dynamic> tour) {
   final sk = tour['source_kind'];
   return sk is String && sk.trim() == 'organiser_audio';
+}
+
+/// [LOCAL-755 / D709 Rule 3] The Listen-row "Updated by the organiser —
+/// Re-download" label for an ORGANISER-AUDIO tour whose organiser bumped the
+/// version (the member is never pushed it — this row is the opt-in). Returns the
+/// label only when the tour is organiser-audio AND a pending server version
+/// (stamped by the sync as `pending_organiser_version`) is strictly greater than
+/// the saved `version`; otherwise null (the row shows nothing extra). Kept a
+/// top-level pure function so the rule is unit-testable without the widget;
+/// every read is defensive (int/num/String), never throws.
+String? organiserAudioReDownloadLabel(Map<String, dynamic> tour) {
+  if (!isOrganiserAudioTour(tour)) return null;
+  int parseIntField(Object? raw, int fallback) {
+    if (raw is int) return raw;
+    if (raw is num) return raw.toInt();
+    if (raw is String) return int.tryParse(raw.trim()) ?? fallback;
+    return fallback;
+  }
+
+  final saved = parseIntField(tour['version'] ?? tour['tour_version'], 1);
+  final pending = parseIntField(tour['pending_organiser_version'], saved);
+  return organiserAudioUpdateLabel(savedVersion: saved, serverVersion: pending);
 }
 
 class MyToursScreen extends StatefulWidget {
@@ -1693,6 +1723,79 @@ class _MyToursScreenState extends State<MyToursScreen> {
       _loadTours();
     });
   }
+
+  /// [LOCAL-755 / D709 Rule 3] The member tapped "Updated by the organiser —
+  /// Re-download" on an organiser-audio tour. Opt-in re-download (package + MP3s
+  /// from the organiser host), replacing the old copy only after the new one is
+  /// complete (TourDownloadService.reDownloadAndReplace). On success the pending
+  /// flag is cleared and the list reloads; on failure the old copy is kept and a
+  /// retry is offered.
+  Future<void> _reDownloadOrganiserAudio(Map<String, dynamic> tour) async {
+    final sid = int.tryParse((tour['server_tour_id'] ?? '').toString());
+    if (sid == null) return;
+    int parseIntField(Object? raw, int fallback) {
+      if (raw is int) return raw;
+      if (raw is num) return raw.toInt();
+      if (raw is String) return int.tryParse(raw.trim()) ?? fallback;
+      return fallback;
+    }
+
+    final saved = parseIntField(tour['version'] ?? tour['tour_version'], 1);
+    final pending = parseIntField(tour['pending_organiser_version'], saved);
+    if (pending <= saved) return;
+
+    final messenger = ScaffoldMessenger.of(context);
+    messenger.showSnackBar(
+      const SnackBar(content: Text('Re-downloading the updated tour…')),
+    );
+    final r = await TourDownloadService.reDownloadAndReplace(
+      sid,
+      newVersion: pending,
+      updatedAt: tour['updated_at'] as String?,
+    );
+    if (!mounted) return;
+    if (r.status == TourDownloadStatus.ok) {
+      // Clear the pending marker on the saved record so the row stops offering
+      // it (the re-download already bumped the saved version/updated_at).
+      await _clearPendingOrganiserVersion(sid);
+      messenger.showSnackBar(
+        const SnackBar(content: Text('Updated to the organiser’s latest.')),
+      );
+      _loadTours();
+    } else {
+      messenger.showSnackBar(
+        const SnackBar(
+          content: Text('Could not re-download. Your current copy is kept.'),
+          backgroundColor: Colors.redAccent,
+        ),
+      );
+    }
+  }
+
+  /// Remove the `pending_organiser_version` marker from the saved record for
+  /// [serverTourId] after a successful re-download.
+  Future<void> _clearPendingOrganiserVersion(int serverTourId) async {
+    final prefs = await SharedPreferences.getInstance();
+    final saved = prefs.getStringList('saved_tours') ?? const [];
+    var changed = false;
+    final out = <String>[];
+    for (final s in saved) {
+      try {
+        final m = Map<String, dynamic>.from(json.decode(s) as Map);
+        final sid = int.tryParse((m['server_tour_id'] ?? '').toString());
+        final tid = int.tryParse((m['tour_id'] ?? '').toString());
+        if ((sid == serverTourId || tid == serverTourId) &&
+            m.containsKey('pending_organiser_version')) {
+          m.remove('pending_organiser_version');
+          out.add(json.encode(m));
+          changed = true;
+          continue;
+        }
+      } catch (_) {}
+      out.add(s);
+    }
+    if (changed) await prefs.setStringList('saved_tours', out);
+  }
   
   Future<void> _deleteAllTours() async {
     // [LOCAL-740 / B3] The "delete all" path must carry the paid-tour warning
@@ -2088,6 +2191,38 @@ class _MyToursScreenState extends State<MyToursScreen> {
                               fontSize: 12,
                               color: Colors.blue.shade700,
                               fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        // [LOCAL-755 / D709 Rule 3] An ORGANISER-AUDIO tour the
+                        // organiser updated (a pending server version > the saved
+                        // one). Members are never pushed the update — this row is
+                        // the opt-in: a tap re-downloads (package + MP3s from the
+                        // organiser host), replacing the copy only after the new
+                        // one is complete.
+                        if (organiserAudioReDownloadLabel(tour) != null)
+                          InkWell(
+                            onTap: () => _reDownloadOrganiserAudio(tour),
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 2),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Icon(Icons.refresh,
+                                      size: 14, color: Color(0xFFd35400)),
+                                  const SizedBox(width: 4),
+                                  Flexible(
+                                    child: Text(
+                                      organiserAudioReDownloadLabel(tour)!,
+                                      style: const TextStyle(
+                                        fontSize: 12,
+                                        color: Color(0xFFd35400),
+                                        fontWeight: FontWeight.w700,
+                                        decoration: TextDecoration.underline,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ),
                           ),
                         if (tour['original_request'] != null && tour['original_request'] != tour['title'])

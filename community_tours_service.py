@@ -331,6 +331,66 @@ def community_tour_tag(cur, tour_id):
     return out
 
 
+# ─── Schema probe for source_kind (migration 049) ──────────────────────────────
+_HAS_SOURCE_KIND_COLUMN = None
+
+
+def has_source_kind_column(cur):
+    """True iff audio_tours.source_kind exists (migration 049). Probed once per
+    process and cached. Absent (older schema) → tour_source_kind reads None and
+    the organiser-audio rules fail OFF (a tour is treated as generated/ordinary),
+    never a 500."""
+    global _HAS_SOURCE_KIND_COLUMN
+    if _HAS_SOURCE_KIND_COLUMN is None:
+        try:
+            cur.execute(
+                "SELECT COUNT(*) FROM information_schema.columns "
+                "WHERE table_name = 'audio_tours' AND column_name = 'source_kind'"
+            )
+            _HAS_SOURCE_KIND_COLUMN = (cur.fetchone()[0] == 1)
+        except Exception:  # noqa: BLE001
+            _HAS_SOURCE_KIND_COLUMN = False
+    return _HAS_SOURCE_KIND_COLUMN
+
+
+def tour_source_kind(cur, tour_id):
+    """[LOCAL-755 / D709] audio_tours.source_kind for a tour (resolving a
+    translation to its original, as community_tour_tag does), or None for a
+    generated/ordinary tour / an older schema without the column.
+
+    'organiser_audio' marks a tour the organiser built from their OWN hosted
+    audio (LOCAL-754B). Such a tour is NEVER edited through our voice pipeline
+    (Rule 1): the tour-editing service refuses it (409
+    organiser_audio_not_editable). Defensive: any lookup problem returns None so
+    the edit rule fails OFF (the edit proceeds as before) rather than 500ing — a
+    genuine organiser-audio tour is a clean 'organiser_audio' read.
+
+    `tour_id` may be a numeric id (an audio_tours.id) or a non-numeric edited
+    UUID; a UUID has no audio_tours row, so it reads None (an edited copy is not
+    the organiser-audio original — the guard keys off the original, resolved by
+    the caller before this is reached)."""
+    if not has_source_kind_column(cur):
+        return None
+    try:
+        cur.execute(
+            "SELECT COALESCE(orig.source_kind, t.source_kind) "
+            "FROM audio_tours t "
+            "LEFT JOIN audio_tours orig ON orig.id = t.original_tour_id "
+            "WHERE t.id = %s",
+            (int(tour_id),),
+        )
+        row = cur.fetchone()
+    except Exception:  # noqa: BLE001 — bad id / older schema → not organiser-audio
+        try:
+            cur.connection.rollback()
+        except Exception:
+            pass
+        return None
+    if row and row[0]:
+        return str(row[0]).strip()
+    return None
+
+
 def list_community_tours(cur, community_id):
     """Every tour tagged to a community (both members-only and public), newest
     first, as a list of dicts the community page renders:

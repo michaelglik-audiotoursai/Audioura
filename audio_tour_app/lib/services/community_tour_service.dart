@@ -104,8 +104,13 @@ class CommunityTourService {
   /// of a held community tour (the version rises when the tour is replaced).
   /// Returns null on any failure / a missing version, so the caller simply does
   /// not re-download that tour (never an error, never a spurious re-download).
-  static Future<({int version, String? updatedAt})?> serverTourVersion(
-      int tourId) async {
+  ///
+  /// [LOCAL-755] Also carries `isOrganiserAudio` from the tour-info `source_kind`
+  /// field ('organiser_audio'), so the held-tour refresh can skip an
+  /// organiser-audio tour even when its saved record predates source_kind
+  /// stamping (members are never pushed an organiser-audio update).
+  static Future<({int version, String? updatedAt, bool isOrganiserAudio})?>
+      serverTourVersion(int tourId) async {
     try {
       final r =
           await Endpoints.get(Service.mapDelivery, '/tour-info/$tourId');
@@ -121,7 +126,14 @@ class CommunityTourService {
           v = int.tryParse(raw);
         }
         if (v != null) {
-          return (version: v, updatedAt: j['updated_at'] as String?);
+          final sk = j['source_kind'];
+          final isOrganiserAudio =
+              sk is String && sk.trim() == 'organiser_audio';
+          return (
+            version: v,
+            updatedAt: j['updated_at'] as String?,
+            isOrganiserAudio: isOrganiserAudio,
+          );
         }
       }
     } catch (_) {}

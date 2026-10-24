@@ -80,8 +80,13 @@ class CommunityToursSync {
   /// number the app already shows. Seam for tests; defaults to the real
   /// map-delivery `/tour-info` client. Null on any failure (that tour is simply
   /// not refreshed).
-  static Future<({int version, String? updatedAt})?> Function(int tourId)
-      fetchServerVersion = CommunityTourService.serverTourVersion;
+  ///
+  /// [LOCAL-755] Also carries `isOrganiserAudio` (source_kind='organiser_audio')
+  /// so the refresh pass can SKIP an organiser-audio tour even if its saved
+  /// record predates source_kind stamping (members are never pushed updates).
+  static Future<({int version, String? updatedAt, bool isOrganiserAudio})?>
+      Function(int tourId) fetchServerVersion =
+      CommunityTourService.serverTourVersion;
 
   /// The community ids the member is STILL active in (active membership) PLUS
   /// the ones the member OWNS — the set the refresh planner gates on. Seam for
@@ -107,6 +112,29 @@ class CommunityToursSync {
       _noopMessage;
 
   static void _noopMessage(String _, {int? tourId}) {}
+
+  /// [LOCAL-755 / D709 Rule 3] Emit the ONE short in-app message (LOCAL-750
+  /// mechanism) when a HELD organiser-audio tour was updated by the organiser:
+  /// "<tour> was updated by the organiser. Re-download?" with a Re-download
+  /// action. A member is NEVER pushed the update — this only OFFERS it. Carries
+  /// the tour id + the server version so the foreground wiring can run the tap
+  /// (TourDownloadService.reDownloadAndReplace). Defaults to a no-op; main wires
+  /// it to a snackbar/toast with the action.
+  static void Function(String message,
+          {required int tourId, required int serverVersion, String? updatedAt})
+      onOrganiserAudioUpdate = _noopOrganiserAudioUpdate;
+
+  static void _noopOrganiserAudioUpdate(String _,
+      {required int tourId, required int serverVersion, String? updatedAt}) {}
+
+  /// [LOCAL-755] Re-download an organiser-audio tour the member OPTED IN to (the
+  /// tap on the message/row). Seam for tests; defaults to
+  /// [TourDownloadService.reDownloadAndReplace] — the SAME in-place replace a
+  /// generated refresh uses (package + MP3s from the organiser host, old copy
+  /// replaced only after the new one is complete).
+  static Future<TourDownloadResult> Function(int tourId,
+          {required int newVersion, String? updatedAt}) reDownloadOrganiserAudio =
+      TourDownloadService.reDownloadAndReplace;
 
   /// [LOCAL-748] The community ids the user OWNS — a tour in one of these is the
   /// user's OWN tour and is NEVER announced to them. Seam for tests; defaults to
@@ -377,6 +405,12 @@ class CommunityToursSync {
         serverVersion: serverVer?.version ?? rec.savedVersion,
         language: rec.language,
         isCommunityTour: true,
+        // [LOCAL-755] Organiser-audio tours are never auto-re-downloaded: the
+        // marker comes from the saved record (stamped at download, LOCAL-754B)
+        // and, when a server read carries it, from the server too (so a record
+        // saved before source_kind was stamped is still classified).
+        isOrganiserAudio:
+            rec.isOrganiserAudio || (serverVer?.isOrganiserAudio ?? false),
         name: rec.name,
       ));
       // Stash the server updated_at alongside, keyed by id, for the label.
@@ -384,6 +418,18 @@ class CommunityToursSync {
         _serverUpdatedAt[rec.serverTourId] = serverVer.updatedAt;
       }
     }
+
+    // [LOCAL-755 / D709 Rule 3] OFFER (never push) the organiser-audio updates.
+    // RefreshPlanner (below) SKIPS organiser-audio tours; here we surface ONE
+    // in-app message per organiser-audio tour whose version rose, at most once
+    // per (tour, server version), so the member can opt in by tapping
+    // Re-download. No download happens here — the tap does it.
+    await _offerOrganiserAudioUpdates(
+      prefs: prefs,
+      held: held,
+      activeCommunityIds: activeIds,
+      deletedTourIds: deletedTourIds,
+    );
 
     final plan = RefreshPlanner.plan(
       held: held,
@@ -410,6 +456,73 @@ class CommunityToursSync {
       // touches the files on failure) — nothing to undo here.
     }
     return refreshed;
+  }
+
+  /// [LOCAL-755 / D709 Rule 3] Surface the organiser-audio updates. The pure
+  /// [OrganiserAudioUpdatePlanner] picks the organiser-audio tours whose server
+  /// version rose (still active/owned, not deleted); this shell emits ONE
+  /// in-app message per offer via [onOrganiserAudioUpdate], at most once per
+  /// (tour, server version) — tracked in a persisted set so a later sync does
+  /// not nag again for the same version. A member is NEVER pushed the update;
+  /// the message/row offers a tap that re-downloads it.
+  Future<void> _offerOrganiserAudioUpdates({
+    required SharedPreferences prefs,
+    required List<HeldCommunityTour> held,
+    required Set<int> activeCommunityIds,
+    required Set<String> deletedTourIds,
+  }) async {
+    final offers = OrganiserAudioUpdatePlanner.plan(
+      held: held,
+      activeCommunityIds: activeCommunityIds,
+      deletedTourIds: deletedTourIds,
+    );
+    if (offers.isEmpty) return;
+    final offered =
+        (prefs.getStringList(kOfferedOrganiserAudioKey) ?? const []).toSet();
+    // [LOCAL-755] Stamp the pending server version onto the matching saved
+    // record so the Listen/community row can show the "Updated by the organiser
+    // — Re-download" affordance (organiserAudioUpdateLabel) even between syncs.
+    // This does NOT re-download — it only marks that a newer version exists.
+    final savedRaw = prefs.getStringList('saved_tours') ?? const [];
+    final byTourId = {for (final o in offers) o.tourId: o.serverVersion};
+    var recordsChanged = false;
+    final updatedRecords = <String>[];
+    for (final s in savedRaw) {
+      try {
+        final m = Map<String, dynamic>.from(json.decode(s) as Map);
+        final sid = int.tryParse((m['server_tour_id'] ?? '').toString());
+        final tid = int.tryParse((m['tour_id'] ?? '').toString());
+        final serverVer = byTourId[sid] ?? byTourId[tid];
+        if (serverVer != null && m['pending_organiser_version'] != serverVer) {
+          m['pending_organiser_version'] = serverVer;
+          updatedRecords.add(json.encode(m));
+          recordsChanged = true;
+          continue;
+        }
+      } catch (_) {}
+      updatedRecords.add(s);
+    }
+    if (recordsChanged) {
+      await prefs.setStringList('saved_tours', updatedRecords);
+    }
+    var changed = false;
+    for (final o in offers) {
+      // One offer per (tour id, server version) — re-nag only if a NEWER
+      // version appears.
+      final key = '${o.tourId}:${o.serverVersion}';
+      if (offered.contains(key)) continue;
+      onOrganiserAudioUpdate(
+        organiserAudioUpdateMessage(o.name),
+        tourId: o.tourId,
+        serverVersion: o.serverVersion,
+        updatedAt: _serverUpdatedAt[o.tourId],
+      );
+      offered.add(key);
+      changed = true;
+    }
+    if (changed) {
+      await prefs.setStringList(kOfferedOrganiserAudioKey, offered.toList());
+    }
   }
 
   /// The server updated_at read for each held tour this run (id → ISO date),
@@ -503,12 +616,17 @@ class CommunityToursSync {
         final name = (m['title'] ?? m['original_request'] ?? 'This tour')
             .toString();
 
+        // [LOCAL-755] source_kind stamped at download (LOCAL-754B). An
+        // organiser-audio tour is never auto-re-downloaded (members opt in).
+        final sk = (m['source_kind'] ?? '').toString().trim();
+
         out.add(_HeldRecord(
           serverTourId: sid,
           communityId: cid,
           savedVersion: savedVersion,
           language: language.isEmpty ? 'en' : language,
           name: name,
+          isOrganiserAudio: sk == 'organiser_audio',
         ));
       } catch (_) {}
     }
@@ -525,11 +643,16 @@ class _HeldRecord {
   final String language;
   final String name;
 
+  /// [LOCAL-755] Whether the saved record is an organiser-audio tour
+  /// (source_kind='organiser_audio'). Such a tour is never auto-re-downloaded.
+  final bool isOrganiserAudio;
+
   const _HeldRecord({
     required this.serverTourId,
     required this.communityId,
     required this.savedVersion,
     required this.language,
     required this.name,
+    this.isOrganiserAudio = false,
   });
 }
