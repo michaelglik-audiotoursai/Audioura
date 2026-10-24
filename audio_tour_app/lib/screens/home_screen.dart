@@ -65,6 +65,11 @@ class _HomeScreenState extends State<HomeScreen> {
   // the gate for the Home-map "My communities" chip (members only). A
   // non-member never sees the chip. Loaded alongside the community pins.
   bool _isCommunityMember = false;
+  // [LOCAL-756 C] The community IDs this user BELONGS TO (from /communities/mine).
+  // Used to decide the Home price line per community tour: a member sees
+  // "Included with membership"; a non-member sees the join framing. Separate
+  // from the any-community boolean above, which only gates the map chip.
+  final Set<int> _joinedCommunityIds = <int>{};
   bool _isLoading = true;
   bool _connectionError = false;
   String _appMode = 'Tours';
@@ -181,6 +186,11 @@ class _HomeScreenState extends State<HomeScreen> {
           joinedCount: joined.length,
           ownedCount: owned.length,
         );
+        // [LOCAL-756 C] Remember the joined community IDs so a community tour's
+        // price line can read "Included with membership" for this user.
+        _joinedCommunityIds
+          ..clear()
+          ..addAll(joined.map((c) => c.id));
       });
     } catch (_) {
       // Non-fatal: the chip simply stays hidden.
@@ -686,13 +696,23 @@ class _HomeScreenState extends State<HomeScreen> {
                                                 context,
                                                 tourId: '${t['id']}',
                                                 tour: t)),
-                                        TourPriceBadge.fromTour(t),
+                                        // [LOCAL-756 C] Community tour → membership
+                                        // price line, not the money "Free" badge.
+                                        if (CommunityRules.isCommunityTour(t))
+                                          _communityPriceLine(t)!
+                                        else
+                                          TourPriceBadge.fromTour(t),
                                         if (_isMatureTour(t)) _adultChip(),
                                         if (km != null)
                                           Text('${(km / 1.609344).toStringAsFixed(1)} mi',
                                               style: const TextStyle(fontSize: 12)),
                                       ],
                                     ),
+                                    // [LOCAL-756 C] Community sign under the badges.
+                                    if (_communitySign(t) != null) ...[
+                                      const SizedBox(height: 4),
+                                      _communitySign(t)!,
+                                    ],
                                     // [LOCAL-689] The two reason phrases (or the
                                     // "swipe a few stops" cold-start line).
                                     if (_matchReasonsLine(t) != null) ...[
@@ -1609,13 +1629,25 @@ class _HomeScreenState extends State<HomeScreen> {
                         onTap: () => showWhyThisScoreSheet(context,
                             tourId: '${item['id']}', tour: item)),
                     const SizedBox(width: 8),
-                    TourPriceBadge.fromTour(item),
+                    // [LOCAL-756 C] A community tour shows its membership price
+                    // line here instead of the money "Free"/"$4.99" badge.
+                    if (CommunityRules.isCommunityTour(item))
+                      _communityPriceLine(item)!
+                    else
+                      TourPriceBadge.fromTour(item),
                     if (_isMatureTour(item)) ...[
                       const SizedBox(width: 8),
                       _adultChip(),
                     ],
                   ],
                 ),
+                // [LOCAL-756 C] The community sign (name) under the badges, so
+                // the detail sheet shows the listener which community the tour
+                // belongs to. Null (nothing shown) for a plain Audioura tour.
+                if (_communitySign(item) != null) ...[
+                  const SizedBox(height: 4),
+                  _communitySign(item)!,
+                ],
                 // [LOCAL-689] The two reason phrases ("strong on history, which
                 // you like; light on people stories") or the cold-start line.
                 if (_matchReasonsLine(item) != null) ...[
@@ -2066,7 +2098,69 @@ class _HomeScreenState extends State<HomeScreen> {
     }
     return label;
   }
-  
+
+  // [LOCAL-756 C] Whether THIS user belongs to the tour's community. A tour map
+  // from /tours-near carries `community_id`; membership is the joined-ID set
+  // loaded in _loadCommunityMembership. A non-community tour is never "a member
+  // tour" and returns false.
+  bool _isMemberOfTour(Map<String, dynamic> tour) {
+    final cid = tour['community_id'];
+    if (cid is num) return _joinedCommunityIds.contains(cid.toInt());
+    if (cid is String) {
+      final parsed = int.tryParse(cid);
+      return parsed != null && _joinedCommunityIds.contains(parsed);
+    }
+    return false;
+  }
+
+  // [LOCAL-756 C] The COMMUNITY SIGN row — a groups icon + the community name
+  // (via CommunityRules.homeTourCommunitySign) — shown wherever Home surfaces a
+  // tour (map marker sheet, list row, detail sheet). Returns null for a plain
+  // Audioura tour so nothing is shown.
+  Widget? _communitySign(Map<String, dynamic> tour) {
+    final sign = CommunityRules.homeTourCommunitySign(tour);
+    if (sign.isEmpty) return null;
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(Icons.groups, size: 14, color: Colors.deepPurple.shade400),
+        const SizedBox(width: 4),
+        Flexible(
+          child: Text(
+            sign,
+            style: TextStyle(
+              fontSize: 12,
+              color: Colors.deepPurple.shade400,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  // [LOCAL-756 C / D706] The PRICE / ACCESS line for a tour on Home. For a
+  // community tour this is the membership framing ("Included with membership" /
+  // "Members only — join <community>" / "Community tour — join to download"),
+  // never "Free"; for a plain Audioura tour, the money price badge is used
+  // instead (this returns null so the caller shows the badge).
+  Widget? _communityPriceLine(Map<String, dynamic> tour) {
+    if (!CommunityRules.isCommunityTour(tour)) return null;
+    final line = CommunityRules.homeTourPriceLine(
+      tour,
+      isMember: _isMemberOfTour(tour),
+      moneyPriceLabel: tour['price_label'] as String?,
+    );
+    return Text(
+      line,
+      style: TextStyle(
+        fontSize: 12,
+        color: Colors.deepPurple.shade600,
+        fontWeight: FontWeight.w600,
+      ),
+    );
+  }
+
   String _getLanguageName(String? language) {
     switch (language) {
       case 'en': return 'English';
@@ -2224,11 +2318,26 @@ class _HomeScreenState extends State<HomeScreen> {
                               ],
                             ),
                             // [LOCAL-677] Price badge in the list row ("$4.99"/"Free").
+                            // [LOCAL-756 C] A community tour shows its community
+                            // sign + the membership price line instead of "Free".
                             const SizedBox(height: 4),
-                            Align(
-                              alignment: Alignment.centerLeft,
-                              child: TourPriceBadge.fromTour(tour, compact: true),
-                            ),
+                            if (CommunityRules.isCommunityTour(tour)) ...[
+                              if (_communitySign(tour) != null) ...[
+                                Align(
+                                  alignment: Alignment.centerLeft,
+                                  child: _communitySign(tour)!,
+                                ),
+                                const SizedBox(height: 2),
+                              ],
+                              Align(
+                                alignment: Alignment.centerLeft,
+                                child: _communityPriceLine(tour)!,
+                              ),
+                            ] else
+                              Align(
+                                alignment: Alignment.centerLeft,
+                                child: TourPriceBadge.fromTour(tour, compact: true),
+                              ),
                             if (_tourVersionLabel(tour) != null) ...[
                               SizedBox(height: 2),
                               Text(

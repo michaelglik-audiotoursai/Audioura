@@ -604,6 +604,65 @@ class CommunityRules {
           ? 'This tour is for members of a community.'
           : 'This tour is for members of $communityName.';
 
+  /// [LOCAL-756 C] The COMMUNITY SIGN shown wherever Home surfaces a tour (map
+  /// marker sheet, list row, search result, detail sheet): the community name
+  /// for a community tour, empty for a plain Audioura tour. Reuses
+  /// [originLabel] so the sign reads identically to the Listen tab — the
+  /// community name, with the organiser appended when known. A tour map from
+  /// /tours-near carries `community_id` + `community_name`; a non-community tour
+  /// has neither and gets no sign.
+  static String homeTourCommunitySign(Map<String, dynamic> tour) {
+    final name = (tour['community_name'] as String?)?.trim() ?? '';
+    final hasCommunity =
+        name.isNotEmpty || (tour['community_id'] != null);
+    if (!hasCommunity || name.isEmpty) return '';
+    final organiser = (tour['community_organiser_name'] as String?)?.trim();
+    return originLabel(communityName: name, organiserName: organiser);
+  }
+
+  /// [LOCAL-756 C / D706] The PRICE LINE shown for a tour on Home. A plain
+  /// Audioura tour keeps its money price ("Free" / "\$4.99"); a COMMUNITY tour
+  /// never says "Free" — the listener reaches it through membership, not a
+  /// one-off price:
+  ///   * member of the community            → "Included with membership"
+  ///   * non-member, members-only community → "Members only — join <community>"
+  ///   * public community tour (D706)       → "Community tour — join to download"
+  ///
+  /// [isMember] is whether THIS user belongs to the tour's community.
+  /// [moneyPriceLabel] is the fallback money label for a non-community tour
+  /// ("Free" when null/empty). Pure — no widgets, no network.
+  static String homeTourPriceLine(
+    Map<String, dynamic> tour, {
+    required bool isMember,
+    String? moneyPriceLabel,
+  }) {
+    final name = (tour['community_name'] as String?)?.trim() ?? '';
+    final isCommunity =
+        name.isNotEmpty || (tour['community_id'] != null);
+    if (!isCommunity) {
+      final l = (moneyPriceLabel ?? '').trim();
+      return l.isEmpty ? 'Free' : l;
+    }
+    if (isMember) return 'Included with membership';
+    final visibility =
+        (tour['community_visibility'] as String?)?.trim().toLowerCase() ?? '';
+    if (visibility == 'members' || visibility == 'members_only') {
+      return name.isEmpty
+          ? 'Members only — join to listen'
+          : 'Members only — join $name';
+    }
+    // Public / listed community tour (D706): join to download, never "Free".
+    return 'Community tour — join to download';
+  }
+
+  /// [LOCAL-756 C] True when a tour surfaced on Home belongs to a community
+  /// (so Home must show the community sign and the membership price line
+  /// instead of a money price). A plain Audioura tour returns false.
+  static bool isCommunityTour(Map<String, dynamic> tour) {
+    final name = (tour['community_name'] as String?)?.trim() ?? '';
+    return name.isNotEmpty || (tour['community_id'] != null);
+  }
+
   /// [LOCAL-739 §2] The count shown in the Listen "My communities (N)" row and
   /// anywhere a single combined total is needed: the DISTINCT communities a
   /// user belongs to or organises. An owned community that also has a

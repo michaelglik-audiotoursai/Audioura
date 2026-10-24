@@ -6651,8 +6651,16 @@ def _verify_works_v2(poi_list, venue_name, exhibition_scope=None):
             _ev = evidence_log.get(_wn)
             # Only reconsider candidates the normal loop DROPPED for a title
             # mismatch — never REJECTED (positive evidence elsewhere) or VERIFIED.
+            # [LOCAL-756 A2] For an exhibit museum, ALSO reconsider a candidate the
+            # loop dropped as a 'theme word': a witch museum's exhibits literally
+            # contain the word "witch" (the field drops "The Witch Trials of 1692"
+            # and "The Salem Witch Trials Exhibit" on the theme word 'witch'),
+            # which is exactly the exhibit material that IS the tour here. The
+            # theme-word drop is correct for an ART museum and fatal for this one.
             if not (isinstance(_ev, dict) and _ev.get('status') == 'DROPPED'
-                    and _ev.get('reason') == 'no canonical match'):
+                    and _ev.get('reason') in ('no canonical match',)
+                    or (isinstance(_ev, dict) and _ev.get('status') == 'DROPPED'
+                        and str(_ev.get('reason', '')).startswith('theme word'))):
                 continue
             _wn_norm = _norm_exhibit(_wn)
             if _wn_norm in _already_verified_names:
@@ -6693,6 +6701,63 @@ def _verify_works_v2(poi_list, venue_name, exhibition_scope=None):
         if _exhibit_added:
             print(f"  [LOCAL-751] Exhibit-museum second chance re-admitted "
                   f"{_exhibit_added} exhibit stop(s) from the venue's own site")
+
+        # [LOCAL-756 A1] CANDIDATE LIST FROM THE SOURCED EXHIBIT NAMES. The field
+        # regression (Salem, 2026-10-24, cache HIT) showed the LLM candidates can
+        # match NONE of the venue's real exhibit names: the cache row's exhibit
+        # names were "The Trial of George Jacobs", "City on a Hill", "Martha Corey
+        # and her Persecutors", … but the LLM proposed "The Trial of Rebecca
+        # Nurse", "The Witch's Curse", … The second-chance pass above only re-admits
+        # a CANDIDATE that happens to match; when none do, there is nothing to
+        # admit and the venue clean-fails despite a cache full of real exhibits.
+        # So when fewer than 2 exhibit stops verified, BUILD the stops directly
+        # FROM the sourced exhibit names themselves (after junk/chrome filtering —
+        # "Discounts And Discount Partners" is site chrome and must go), verify
+        # those, and take them until the tour has >= 2. Fail-closed is preserved:
+        # the names are the venue's OWN sourced exhibits (nothing invented); a junk
+        # title is filtered out and never becomes a stop; < 2 still refuses.
+        _exhibit_verified_so_far = sum(
+            1 for v in evidence_log.values()
+            if isinstance(v, dict) and v.get('status') == 'VERIFIED'
+            and v.get('method') in ('exhibit_name_on_site', 'sourced_subject_on_site',
+                                     'sourced_exhibit_name'))
+        if _exhibit_verified_so_far < 2 and _exhibit_names:
+            # Junk/chrome-filter the sourced exhibit names before they can become
+            # stops. reject_chrome_titles drops site chrome ("Discounts And
+            # Discount Partners", "Our Team"); the room/space names are KEPT (they
+            # are the exhibits for this venue).
+            _src_names = sorted({e for e in _exhibit_names if e and len(e.strip()) >= 3})
+            try:
+                from exhibition_discovery import reject_chrome_titles as _reject_chrome_src
+                _src_kept = set(_reject_chrome_src(set(_src_names), venue_name))
+                _src_dropped = sorted(set(_src_names) - _src_kept)
+                if _src_dropped:
+                    print(f"  [LOCAL-756] exhibit-name junk/chrome dropped before "
+                          f"becoming stops: {_src_dropped}")
+                _src_names = [n for n in _src_names if n in _src_kept]
+            except Exception as _src_chrome_err:
+                print(f"  [LOCAL-756] exhibit-name chrome filter skipped ({_src_chrome_err})")
+            # Add sourced exhibit names as verified stops until we reach >= 2 (we
+            # fill up to the full candidate count so the degradation ladder can
+            # take as many as the venue genuinely has).
+            for _src in _src_names:
+                _src_norm = _norm_exhibit(_src)
+                if _src_norm in _already_verified_names:
+                    continue
+                _p = _new_poi(_src) if '_new_poi' in dir() else {'name': _src}
+                _p['verified'] = True
+                verified_pois.append(_p)
+                _already_verified_names.add(_src_norm)
+                evidence_log[_src] = {
+                    "status": "VERIFIED",
+                    "canonical_title": _src,
+                    "snippet": "",
+                    "method": "sourced_exhibit_name",
+                }
+                _exhibit_added += 1
+                print(f"  [LOCAL-756] EXHIBIT VERIFIED (from sourced name) '{_src}'")
+            print(f"  [LOCAL-756] Built exhibit stops from {len(_src_names)} sourced "
+                  f"exhibit name(s) when LLM candidates matched none")
 
     # Degradation ladder: compute tier based on verified count
     # 0 verified = unresolvable, 1-2 = thin, 3-7 = medium, 8+ = rich
@@ -6780,7 +6845,8 @@ def _verify_works_v2(poi_list, venue_name, exhibition_scope=None):
     _exhibit_verified_count = sum(
         1 for v in evidence_log.values()
         if isinstance(v, dict) and v.get('status') == 'VERIFIED'
-        and v.get('method') in ('exhibit_name_on_site', 'sourced_subject_on_site')
+        and v.get('method') in ('exhibit_name_on_site', 'sourced_subject_on_site',
+                                 'sourced_exhibit_name')
     )
     _is_exhibit_museum = (
         _venue_entity and _venue_entity.qid and
@@ -11006,7 +11072,19 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
                 
                 # Source 3: Cached canonical titles that survived LOCAL-24 filter
                 if _det_cache and _det_cache.get('canonical_titles'):
-                    for _ct in _det_cache['canonical_titles']:
+                    # [LOCAL-756 A] Chrome-filter the cached canonical titles before
+                    # they become documented/fill material. A cache row written by
+                    # an earlier pipeline can still carry site chrome ("Discounts
+                    # And Discount Partners" in the Salem row); reject_chrome_titles
+                    # drops it so it never reaches _museum_verified_reserve and
+                    # becomes a stop via the LOCAL-632 replacement-until-N backfill.
+                    _cached_canon = set(_det_cache['canonical_titles'])
+                    try:
+                        from exhibition_discovery import reject_chrome_titles as _rc_det
+                        _cached_canon = set(_rc_det(_cached_canon, _museum_venue_name))
+                    except Exception:
+                        pass
+                    for _ct in _cached_canon:
                         _tn = _det_norm(_ct)
                         if _ct and _tn not in _det_seen_titles_norm:
                             _det_documented.append({'title': _ct, 'source': 'canonical'})
@@ -11064,6 +11142,20 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
                     else:
                         _museum_site_first_eligible = True
                         _museum_site_url = getattr(_det_entity, 'official_url', '') or ''
+                        # [LOCAL-756 A3] The resolver can return an entity with an
+                        # EMPTY official_url even though the venue_cache row for the
+                        # same QID has one (Salem field run: site='' on this path
+                        # although the cache row carried
+                        # official_url=https://salemwitchmuseum.com/). Fall back to
+                        # the cached official_url so the site-first path runs
+                        # against the real site instead of '' (which always returns
+                        # no_listing_found).
+                        if not _museum_site_url and _det_cache:
+                            _cached_url = (_det_cache.get('official_url') or '').strip()
+                            if _cached_url:
+                                _museum_site_url = _cached_url
+                                print(f"  [LOCAL-756] site-first URL recovered from "
+                                      f"cache row: {_museum_site_url}")
                         _museum_site_language = getattr(_det_entity, 'language', 'en') or 'en'
                         # [LOCAL-580 D4] Remember the locality (city hint from the
                         # request tail) so a clean fail can suggest a locality-based
@@ -12220,7 +12312,17 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
                 
                 # Source 3: Cached canonical titles that survived LOCAL-24 filter
                 if _det_cache and _det_cache.get('canonical_titles'):
-                    for _ct in _det_cache['canonical_titles']:
+                    # [LOCAL-756 A] Chrome-filter the cached canonical titles before
+                    # they become documented/fill material (Salem "Discounts And
+                    # Discount Partners"). Mirrors the filter on the other Source-3
+                    # loop so the junk never reaches the reserve on either branch.
+                    _cached_canon = set(_det_cache['canonical_titles'])
+                    try:
+                        from exhibition_discovery import reject_chrome_titles as _rc_det
+                        _cached_canon = set(_rc_det(_cached_canon, _museum_venue_name))
+                    except Exception:
+                        pass
+                    for _ct in _cached_canon:
                         _tn = _det_norm(_ct)
                         if _ct and _tn not in _det_seen_titles_norm:
                             _det_documented.append({'title': _ct, 'source': 'canonical'})

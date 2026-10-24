@@ -184,6 +184,11 @@ _CHROME_TOKENS = frozenset({
     'contact', 'about', 'press', 'media', 'careers', 'jobs', 'support',
     'sponsor', 'sponsors', 'sponsorship', 'cart', 'checkout', 'shop', 'store',
     'tickets', 'admission', 'hours', 'directions', 'parking', 'accessibility',
+    # [LOCAL-756 A] Commerce / partner-program furniture. The Salem Witch Museum
+    # cache row stored "Discounts And Discount Partners" among its exhibit names;
+    # it is a discount-partners page, not an exhibit, and must never become a
+    # stop. (A real show title is distinctive beyond these commerce words.)
+    'discount', 'discounts', 'partner', 'partners',
     'calls', 'entry', 'entries', 'submission', 'submissions', 'review',
     'reviews', 'scheduled', 'bulletin', 'salon', 'travel', 'archive',
     'governance', 'bylaws', 'rentals',
