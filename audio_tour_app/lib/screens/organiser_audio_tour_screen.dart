@@ -164,6 +164,9 @@ class _EpisodeChoice {
   final String audioUrl;
   final String meta; // "date · duration · size"
   final String? description;
+  // [LOCAL-759 C] The episode's byte size (0 when the feed omits it), summed
+  // into the checklist's running total of ticked episodes.
+  final int sizeBytes;
   bool selected = false;
 
   _EpisodeChoice({
@@ -171,6 +174,7 @@ class _EpisodeChoice {
     required this.audioUrl,
     this.meta = '',
     this.description,
+    this.sizeBytes = 0,
   });
 }
 
@@ -244,6 +248,7 @@ class _OrganiserAudioTourScreenState extends State<OrganiserAudioTourScreen> {
         audioUrl: e.audioUrl,
         meta: e.metaLine,
         description: e.description,
+        sizeBytes: e.sizeBytes ?? 0,
       ));
       seen.add(e.audioUrl);
     }
@@ -716,6 +721,22 @@ class _OrganiserAudioTourScreenState extends State<OrganiserAudioTourScreen> {
             );
           }),
           const SizedBox(height: 8),
+          // [LOCAL-759 C] The running total of the TICKED episodes, so the
+          // organiser sees what members will download ("3 episodes · 285 MB").
+          Builder(builder: (context) {
+            final ticked = _choices.where((c) => c.selected).toList();
+            final totalBytes =
+                ticked.fold<int>(0, (a, c) => a + c.sizeBytes);
+            return Padding(
+              key: const Key('checklist_total'),
+              padding: const EdgeInsets.only(bottom: 4),
+              child: Text(
+                tickedEpisodesTotalLabel(ticked.length, totalBytes),
+                style: const TextStyle(
+                    fontWeight: FontWeight.w600, color: Colors.black87),
+              ),
+            );
+          }),
           Align(
             alignment: Alignment.centerLeft,
             child: ElevatedButton.icon(
