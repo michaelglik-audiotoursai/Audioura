@@ -4843,6 +4843,14 @@ _J = _jss.attach_to_module(__name__, {
     # Empty string for a plain place tour (no work named) — no disclosure, no
     # false positive. Set once per generation in the impl; read by the guard.
     "_LAST_SCREEN_WORK_DISCLOSURE": lambda: "",
+    # [LOCAL-751 B2 / D562] Orientation announcements for user-named places that
+    # could not be confirmed ("We could not confirm X, so it is not part of this
+    # tour."). A place the listener named is NEVER silently dropped: it is kept
+    # when it verifies and announced here when it does not. Spliced into the
+    # Orientation at the single every-path delivery choke point
+    # (_apply_delivery_hours_guard). Empty list when every named place verified or
+    # none was named → no-op. Set once per generation (walking path).
+    "_LAST_NAMED_PLACE_ANNOUNCEMENTS": list,
 })
 
 # [LOCAL-582] Module-level: how the LAST generation was delivered.
@@ -6036,8 +6044,15 @@ def _verify_works_v2(poi_list, venue_name, exhibition_scope=None):
         cycle_names = corpus_result['cycle_names']
         print(f"  [D1v2] Cache HIT: {len(canonical_titles)} canonical titles (tier={_cache_hit['tier']})"
               f", {len(_cache_catalogue_works)} catalogue works, combined_text={len(combined_text)} chars")
+        # [LOCAL-751 A] Remember when the cached venue was an exhibit museum, so the
+        # exhibit second-chance pass can treat the cached (already-cleaned) titles
+        # as exhibit names on a cache HIT — the room/space titles were stripped
+        # before the original cache write, so without this the hit path would
+        # clean-fail a venue the fresh path generated (Salem, cache round-trip).
+        _cached_exhibit_tier = (_cache_hit.get('tier') == 'exhibit_museum')
     else:
         # Cache miss — fresh mining (existing code below)
+        _cached_exhibit_tier = False
         pass
 
     # --- SPARQL works (source 1 of 3 for canonical titles) ---
@@ -6182,6 +6197,28 @@ def _verify_works_v2(poi_list, venue_name, exhibition_scope=None):
         # Preserve set type (downstream does set algebra on canonical_titles).
         canonical_titles = set(_canonical_kept)
 
+    # [LOCAL-751 A] EXHIBIT MUSEUM detection. A museum whose stops are EXHIBITS /
+    # ROOMS / PRESENTATIONS, not catalogued artworks (the Salem Witch Museum's
+    # dioramas, a torture museum's rooms), has 0 SPARQL works but a reachable site
+    # that NAMES its exhibits. On such a venue the guards below (LOCAL-625 room/
+    # space, LOCAL-653 site-junk) would strip exactly the material that IS the
+    # tour, leaving nothing to match and a false 'unresolvable' clean-fail (Salem,
+    # 2026-10-23). So when there are 0 SPARQL works we REMEMBER the titles those
+    # guards drop as `_exhibit_names`, and give DROPPED candidates a second-chance
+    # match against them (and against sourced subjects in the site text) after the
+    # normal loop. Fail-closed is preserved: nothing is invented, and ≥2 verified
+    # exhibits are still required (below that the venue still refuses).
+    _exhibit_museum_src = not (sparql_works or [])
+    _exhibit_names = set()
+    # [LOCAL-751 A] On a cache HIT whose stored tier was exhibit_museum, the
+    # already-cleaned cached titles ARE the venue's exhibit names (the room/space
+    # titles were stripped before the original cache write). Seed them so the
+    # second-chance pass can re-admit an exhibit candidate on the cache path too,
+    # instead of clean-failing a venue the fresh path generated.
+    if _cached_exhibit_tier:
+        _exhibit_museum_src = True
+        _exhibit_names.update(t for t in (canonical_titles or set()) if t)
+
     # [LOCAL-625 item 3] Reject room/gallery/wing/floor/building titles from the
     # canonical SET at this single chokepoint — it covers the fresh build, the
     # 30-day venue_cache HIT, AND the corpus-mined titles. The Alte Pinakothek's
@@ -6197,6 +6234,11 @@ def _verify_works_v2(poi_list, venue_name, exhibition_scope=None):
             if _rooms_dropped:
                 canonical_titles = set(t for t in canonical_titles
                                        if t not in _rooms_dropped)
+                # [LOCAL-751 A] For an exhibit museum these ROOM/SPACE titles are
+                # the exhibits the listener walks through — keep them as exhibit
+                # names so a candidate stop can still verify against them.
+                if _exhibit_museum_src:
+                    _exhibit_names.update(_rooms_dropped)
                 print(f"  [LOCAL-625] rejected room/space titles from canonical SET: "
                       f"{_room_before} → {len(canonical_titles)} — dropped {_rooms_dropped}")
         except Exception as _rg_err:
@@ -6255,6 +6297,14 @@ def _verify_works_v2(poi_list, venue_name, exhibition_scope=None):
                 allow_shape_fallback=True)
             if _lc653_dropped:
                 canonical_titles = set(_lc653_kept)
+                # [LOCAL-751 A] Site-listed titles the junk/sibling/artist guard
+                # drops are, for a 0-SPARQL exhibit museum, candidate exhibit names
+                # — remember them so an exhibit candidate can still verify.
+                if _exhibit_museum_src:
+                    for _d in _lc653_dropped:
+                        _dt = _d if isinstance(_d, str) else (_d.get('title') if isinstance(_d, dict) else '')
+                        if _dt:
+                            _exhibit_names.add(_dt)
                 print(f"  [LOCAL-653] rejected site-listed junk/sibling/artist "
                       f"title(s) from canonical SET for '{venue_name}': "
                       f"{[(d, '') if isinstance(d, str) else (d.get('title'), d.get('_reject_reason')) for d in _lc653_dropped]}")
@@ -6272,7 +6322,7 @@ def _verify_works_v2(poi_list, venue_name, exhibition_scope=None):
     print(f"  [D1v2-LOCAL24] After filter: {len(canonical_titles)} works, "
           f"{len(_gallery_titles)} galleries, {len(_excluded_titles)} excluded")
 
-    if not canonical_titles:
+    if not canonical_titles and not (_exhibit_museum_src and _exhibit_names):
         print(f"  [D1v2] No canonical titles discovered — tier: unresolvable")
         _has_site = len(corpus_result.get('combined_text', '')) > 1000 if 'corpus_result' in dir() and corpus_result else False
         _has_wiki = bool(corpus_result.get('pages')) if 'corpus_result' in dir() and corpus_result else False
@@ -6576,6 +6626,74 @@ def _verify_works_v2(poi_list, venue_name, exhibition_scope=None):
         print(f"  [D1v2] DROPPED '{work_name}' — no canonical title match")
         evidence_log[work_name] = {"status": "DROPPED", "reason": "no canonical match"}
 
+    # [LOCAL-751 A] EXHIBIT-MUSEUM SECOND CHANCE. A museum with 0 SPARQL works but
+    # a reachable site that NAMES its exhibits is an exhibit museum: the stops are
+    # presentations/rooms/exhibits, not catalogued artworks. The guards above
+    # stripped those exhibit names from the canonical SET (correct for an ART
+    # museum, fatal for this one), so every candidate was DROPPED 'no canonical
+    # match' and the venue clean-failed (Salem, 2026-10-23). Re-admit a DROPPED
+    # candidate when it matches one of the SOURCED exhibit names those guards
+    # removed (`_exhibit_names`) OR is a SOURCED SUBJECT the venue's own site text
+    # presents (a case-folded phrase match in `combined_text`, ≥ 2 significant
+    # words so a short common word cannot false-match). Fail-closed is preserved:
+    # the evidence is the venue's OWN site, nothing is invented, and ≥ 2 verified
+    # exhibits are still required below (otherwise the venue refuses).
+    if _exhibit_museum_src and (_exhibit_names or combined_text):
+        from story_miner import _normalize as _norm_exhibit
+        _exhibit_norm = {_norm_exhibit(e): e for e in _exhibit_names if e}
+        _combined_lower = (combined_text or "").lower()
+        _already_verified_names = {_norm_exhibit(p.get('name', '')) for p in verified_pois}
+        _exhibit_added = 0
+        for poi in poi_list:
+            _wn = poi.get('name', '')
+            if not _wn:
+                continue
+            _ev = evidence_log.get(_wn)
+            # Only reconsider candidates the normal loop DROPPED for a title
+            # mismatch — never REJECTED (positive evidence elsewhere) or VERIFIED.
+            if not (isinstance(_ev, dict) and _ev.get('status') == 'DROPPED'
+                    and _ev.get('reason') == 'no canonical match'):
+                continue
+            _wn_norm = _norm_exhibit(_wn)
+            if _wn_norm in _already_verified_names:
+                continue
+            _matched_exhibit = None
+            _method = ''
+            # (a) matches a sourced exhibit name the guards removed
+            if _wn_norm and _wn_norm in _exhibit_norm:
+                _matched_exhibit = _exhibit_norm[_wn_norm]
+                _method = 'exhibit_name_on_site'
+            else:
+                for _en_norm, _en in _exhibit_norm.items():
+                    if _en_norm and _wn_norm and (_wn_norm in _en_norm or _en_norm in _wn_norm) \
+                            and min(len(_wn_norm), len(_en_norm)) >= 4:
+                        _matched_exhibit = _en
+                        _method = 'exhibit_name_on_site'
+                        break
+            # (b) a sourced subject the site presents: the candidate phrase occurs
+            # verbatim in the venue's own site text (≥ 2 significant words).
+            if not _matched_exhibit and _wn and len(_wn.split()) >= 2:
+                if _wn.lower() in _combined_lower:
+                    _matched_exhibit = _wn
+                    _method = 'sourced_subject_on_site'
+            if _matched_exhibit:
+                _p = dict(poi)
+                _p['verified'] = True
+                verified_pois.append(_p)
+                _already_verified_names.add(_wn_norm)
+                evidence_log[_wn] = {
+                    "status": "VERIFIED",
+                    "canonical_title": _matched_exhibit,
+                    "snippet": "",
+                    "method": _method,
+                }
+                _exhibit_added += 1
+                print(f"  [LOCAL-751] EXHIBIT VERIFIED '{_wn}' → "
+                      f"'{_matched_exhibit}' ({_method})")
+        if _exhibit_added:
+            print(f"  [LOCAL-751] Exhibit-museum second chance re-admitted "
+                  f"{_exhibit_added} exhibit stop(s) from the venue's own site")
+
     # Degradation ladder: compute tier based on verified count
     # 0 verified = unresolvable, 1-2 = thin, 3-7 = medium, 8+ = rich
     # For thin tier (1-2 works): return them — caller decides behavior
@@ -6655,17 +6773,28 @@ def _verify_works_v2(poi_list, venue_name, exhibition_scope=None):
     
     # Detect exhibit_museum tier: entity resolved + SPARQL works scarce (< 5)
     # but we still verified candidates against exhibit-name corpus (sections/quotes)
+    # [LOCAL-751 A] An exhibit museum (0 SPARQL works + a reachable site that names
+    # its exhibits) is also detected when exhibit stops were re-admitted from the
+    # venue's own site by the second-chance pass. Per the ticket, ≥ 2 verified
+    # exhibits are required to generate — below that the venue still refuses.
+    _exhibit_verified_count = sum(
+        1 for v in evidence_log.values()
+        if isinstance(v, dict) and v.get('status') == 'VERIFIED'
+        and v.get('method') in ('exhibit_name_on_site', 'sourced_subject_on_site')
+    )
     _is_exhibit_museum = (
         _venue_entity and _venue_entity.qid and
         _evidence_strength < 5 and
         _n_verified >= 1 and
-        len(canonical_titles) > len(sparql_titles)  # More titles from site/wiki than SPARQL
+        (len(canonical_titles) > len(sparql_titles)  # more site/wiki titles than SPARQL
+         or (_exhibit_museum_src and _exhibit_verified_count >= 2))
     )
     
     if _is_exhibit_museum:
         _tier = 'exhibit_museum'
         print(f"  [D1v2] Exhibit museum detected: {_evidence_strength} SPARQL QIDs, "
-              f"{len(canonical_titles)} total titles (mostly from site/wiki sections)")
+              f"{len(canonical_titles)} canonical + {_exhibit_verified_count} exhibit "
+              f"stop(s) from the venue's own site")
     else:
         _tier = compute_tier(_n_verified, _evidence_strength)
     
@@ -9151,6 +9280,25 @@ def _apply_delivery_hours_guard(result):
                           "into the Orientation opening.", flush=True)
         except Exception as _swe:  # pragma: no cover
             _import_logger.error(f"[LOCAL-744] disclosure injection skipped: {_swe}")
+        # [LOCAL-751 B2 / D562] NAMED-PLACE ANNOUNCEMENTS. A place the listener
+        # named that could not be confirmed is announced in the Orientation on
+        # EVERY delivery path, never silently dropped. The walking path stashed the
+        # sentences on _J._LAST_NAMED_PLACE_ANNOUNCEMENTS (empty → no-op). Reuse the
+        # same idempotent Orientation splice as the filming disclosure.
+        try:
+            _np_ann = list(getattr(_J, "_LAST_NAMED_PLACE_ANNOUNCEMENTS", []) or [])
+            if _np_ann and final:
+                import screen_work_tour as _swt_np
+                _np_text = " ".join(s.strip() for s in _np_ann if s and s.strip()).strip()
+                if _np_text:
+                    _before_np = final
+                    final = _swt_np.inject_orientation_disclosure(final, _np_text)
+                    if final != _before_np:
+                        print("  [LOCAL-751] spliced named-place announcement(s) into "
+                              "the Orientation opening (D562 — never silently dropped).",
+                              flush=True)
+        except Exception as _npe:  # pragma: no cover
+            _import_logger.error(f"[LOCAL-751] named-place announcement injection skipped: {_npe}")
         if final != text and out_file:
             # Rewrite the delivered file so the service (which reads the file,
             # not the return value) ships the cleaned text on every path.
@@ -9939,6 +10087,10 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
     _J._LAST_TOUR_KIND = 'full'
     _J._LAST_TOUR_SUGGESTION = {}
     _J._LAST_OVERVIEW_SOURCES = []
+    # [LOCAL-751 B2] Reset the named-place announcements for THIS generation so a
+    # place a PREVIOUS tour (same long-lived process) could not confirm does not
+    # bleed into this tour's Orientation. Only the walking path repopulates it.
+    _J._LAST_NAMED_PLACE_ANNOUNCEMENTS = []
 
     # [LOCAL-533] Zero the grounded-request counter for this generation. Grounding
     # (Gemini + Google Search) bills per request and was absent from the printed
@@ -13920,8 +14072,54 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
         # -------- [WALK-D1] Landmark verification for walking tours (Phase 3) --------
         elif tour_category == 'walking':
             try:
-                from area_resolver import resolve_area, discover_landmarks, verify_landmarks, cache_get_area, cache_put_area
-                
+                from area_resolver import (resolve_area, discover_landmarks,
+                                           verify_landmarks, cache_get_area,
+                                           cache_put_area, apply_named_place_policy,
+                                           extract_named_places_from_clause)
+
+                # [LOCAL-751 B2 / D562] The places the listener NAMED — each must be
+                # verified against the resolved area and KEPT, or ANNOUNCED, never
+                # silently dropped. Reset per run. Two sources, UNIONED so the
+                # protection never depends on the AI intent call succeeding:
+                #   1. intent.named_places (the model's structured extraction), and
+                #   2. a DETERMINISTIC parse of the request's "including/with/
+                #      featuring/and visit X" clause (extract_named_places_from_clause).
+                # In the field the Danvers run's intent analysis returned HTTP 429,
+                # so named_places was [] and the memorial was dropped silently by the
+                # existence gate — exactly the D562 violation this ticket forbids.
+                # The deterministic source closes that gap.
+                _J._LAST_NAMED_PLACE_ANNOUNCEMENTS = []
+                _walk_named_places = []
+                _seen_np = set()
+
+                def _add_np(_name):
+                    _n = (_name or "").strip() if isinstance(_name, str) else ""
+                    if len(_n) < 3:
+                        return
+                    _k = _n.lower()
+                    if _k in _seen_np:
+                        return
+                    _seen_np.add(_k)
+                    _walk_named_places.append(_n)
+
+                if intent:
+                    _raw_np = intent.get('named_places') or []
+                    if isinstance(_raw_np, str):
+                        _raw_np = [_raw_np]
+                    for _n in _raw_np:
+                        _add_np(_n)
+                # Deterministic fallback/union from the request string itself.
+                try:
+                    for _n in extract_named_places_from_clause(location):
+                        _add_np(_n)
+                    for _n in extract_named_places_from_clause(_location_normalized):
+                        _add_np(_n)
+                except Exception as _np_ex:
+                    print(f"  [LOCAL-751] named-place clause parse skipped: {_np_ex}")
+                if _walk_named_places:
+                    print(f"  [LOCAL-751] named places to protect (D562): "
+                          f"{_walk_named_places}")
+
                 _area = resolve_area(_location_normalized)
                 if _area and _area.resolved:
                     # Check cache first
@@ -13947,12 +14145,39 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
                                 poi['longitude'] = poi['wikidata_lng']
                         
                         poi_list = _walk_result['pois']
+
+                        # [LOCAL-751 B2 / D562] A place the listener NAMED is kept
+                        # when it verifies against the discovered landmarks, and
+                        # announced (never silently dropped) when it does not.
+                        if _walk_named_places:
+                            poi_list, _np_announce = apply_named_place_policy(
+                                poi_list, _walk_named_places, _area, _landmarks, _new_poi)
+                            if _np_announce:
+                                _J._LAST_NAMED_PLACE_ANNOUNCEMENTS = list(_np_announce)
+
                         _pre_d1v2_candidates = list(poi_list)  # For unified fill compatibility
                         
                         print(f"  [WALK-D1] Verified {sum(1 for p in poi_list if p.get('verified'))} stops, "
                               f"tier={_verification_tier}")
+                    elif _walk_named_places:
+                        # Area resolved but no landmarks discovered: a named place
+                        # still must not vanish silently — announce it (D562).
+                        poi_list, _np_announce = apply_named_place_policy(
+                            poi_list, _walk_named_places, _area, [], _new_poi)
+                        if _np_announce:
+                            _J._LAST_NAMED_PLACE_ANNOUNCEMENTS = list(_np_announce)
                 else:
                     print(f"  [WALK-D1] Area resolution failed for '{_location_normalized}' — proceeding unverified")
+                    # [LOCAL-751 B2 / D562] Even when the area will not resolve, a
+                    # place the listener named is not silently dropped. With no
+                    # resolved area to verify against, it is announced — the honest
+                    # "we could not confirm" — rather than quietly removed.
+                    if _walk_named_places:
+                        from area_resolver import AreaResolution as _AR751
+                        poi_list, _np_announce = apply_named_place_policy(
+                            poi_list, _walk_named_places, _AR751(resolved=False), [], _new_poi)
+                        if _np_announce:
+                            _J._LAST_NAMED_PLACE_ANNOUNCEMENTS = list(_np_announce)
             except Exception as e:
                 print(f"  [WALK-D1] Error in walking-tour verification (non-fatal): {e}")
 
