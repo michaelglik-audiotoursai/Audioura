@@ -56,6 +56,7 @@ import psycopg2
 from flask import Blueprint, request, jsonify
 
 import communities_rss
+import organiser_audio_tours
 
 logger = logging.getLogger(__name__)
 
@@ -2251,6 +2252,221 @@ def _upsert_feed_episodes(cur, community_id, parsed):
         )
         count += 1
     return count
+
+
+# ───────────────────────────────────────────────────────────────────────────
+# Organiser-audio tours (LOCAL-754B, D658 addendum 2 / D708)
+# ───────────────────────────────────────────────────────────────────────────
+# The organiser builds a REAL tour from their OWN hosted audio (RSS/MP3 links).
+# The server validates every audio URL, builds the SAME package a generated
+# community tour has — EXCEPT the audio is remote (remote_audio.json, no MP3) —
+# stores it in audio_tours.audio_tour (BYTEA) exactly like a generated tour, and
+# tags it to the community (community_id + visibility) with the source marker
+# source_kind='organiser_audio' and the per-tour rights acceptance. On Listen it
+# is indistinguishable: the community page tour list (_tours_for), the map/search
+# listing and the download gate all treat it as any community tour. NO OpenAI
+# cost; it does not use the generation allowance (D754). Editing archives the old
+# content to audio_tour_versions (version bump), the same mechanism a generated
+# edit uses so LOCAL-748/750 refresh reaches members.
+
+
+def _default_audio_url_check(url, timeout=10):
+    """Default audio-URL probe: a HEAD, falling back to a ranged GET, returning
+    (ok, content_type, size_bytes). Only the stdlib is used (the self-contained
+    user-api container). A test injects a mock via `_audio_url_check` so no real
+    request is ever made. Any transport error → ok=False (the stop is reported
+    unreachable by name)."""
+    from urllib.request import Request, urlopen
+    headers = {'User-Agent': 'Audioura-Communities/1.0'}
+
+    def _probe(method, extra=None):
+        h = dict(headers)
+        if extra:
+            h.update(extra)
+        req = Request(url, headers=h, method=method)
+        with urlopen(req, timeout=timeout) as resp:  # noqa: S310 — owner URL by design
+            ct = resp.headers.get('Content-Type', '')
+            cl = resp.headers.get('Content-Length')
+            size = int(cl) if cl and str(cl).isdigit() else None
+            return True, ct, size
+
+    try:
+        return _probe('HEAD')
+    except Exception:  # noqa: BLE001 — some hosts refuse HEAD; try a 1-byte GET
+        try:
+            return _probe('GET', {'Range': 'bytes=0-0'})
+        except Exception:  # noqa: BLE001 — genuinely unreachable
+            return False, None, None
+
+
+# Injectable hook — a test replaces this with a mock so no real request is made.
+_audio_url_check = _default_audio_url_check
+
+
+def _next_version_no(cur, tour_id):
+    """The next archive version_no for a tour (MAX(version_no)+1 over
+    audio_tour_versions), so a bump never collides. Starts at 1."""
+    cur.execute(
+        "SELECT COALESCE(MAX(version_no), 0) FROM audio_tour_versions "
+        "WHERE tour_id = %s", (tour_id,))
+    return int(cur.fetchone()[0]) + 1
+
+
+@communities_bp.route('/communities/<int:community_id>/build-audio-tour',
+                      methods=['POST'])
+def build_audio_tour(community_id):
+    """[LOCAL-754B / D658 addendum 2 / D708] OWNER-ONLY. Build (or edit) an
+    organiser-audio tour from the organiser's hosted audio.
+
+    Body:
+      {user_id, tour_name, tour_type, language?, short_description?,
+       rights_accepted (bool, required), visibility ('members'|'public'),
+       stops: [{name, lat?, lng?, text?, audio_url}], tour_id? (edit)}
+
+    Flow:
+      * owner check (a member/non-owner → 403 forbidden);
+      * rights must be accepted (400 rights_required) — stored WHO/WHEN;
+      * structural validation (400 with the offending stop named);
+      * every audio URL validated (422 audio_* with the failing stop named);
+      * build the package (remote_audio.json, NO MP3) and store it in
+        audio_tours.audio_tour, tagged community_id + visibility + source_kind;
+      * NEW → 201 {tour_id, source_kind, community_id, version:1};
+      * EDIT (tour_id given, must be THIS community's organiser-audio tour) →
+        archive the old content to audio_tour_versions (version bump) then
+        replace → 200 {tour_id, source_kind, community_id, version}.
+
+    No OpenAI cost; does not touch the generation allowance (D754)."""
+    err = _require_api_key()
+    if err:
+        return err
+    data = request.get_json(silent=True) or {}
+    user_id = data.get('user_id') or data.get('owner_user_id')
+    if not user_id:
+        return jsonify({"error": "missing_fields",
+                        "message": "user_id is required."}), 400
+    tour_name = (data.get('tour_name') or '').strip()
+    if not tour_name:
+        return jsonify({"error": "missing_fields",
+                        "message": "tour_name is required."}), 400
+    tour_type = (data.get('tour_type') or 'other').strip().lower()
+    visibility = (data.get('visibility') or 'members').strip().lower()
+    if visibility not in ('members', 'public'):
+        return jsonify({"error": "bad_visibility",
+                        "message": "visibility must be 'members' or 'public'."}), 400
+    if not data.get('rights_accepted'):
+        return jsonify({
+            "error": "rights_required",
+            "message": "You must confirm you have the right to publish this "
+                       "audio to your members.",
+        }), 400
+    stops = data.get('stops') or []
+    edit_tour_id = data.get('tour_id')
+
+    conn = _get_db()
+    try:
+        cur = conn.cursor()
+        c = _community_row(cur, community_id)
+        if not c or c['disabled']:
+            cur.close()
+            return jsonify({"error": "not_found"}), 404
+        # OWNER ONLY (D754 / LOCAL-745): a member or non-member may not build.
+        if c['owner_user_id'] != user_id:
+            cur.close()
+            return jsonify({"error": "forbidden",
+                            "message": "Only the organiser can build a tour."}), 403
+
+        # Structural validation (names the offending stop).
+        try:
+            organiser_audio_tours.validate_stops(stops, tour_type)
+        except organiser_audio_tours.StopValidationError as e:
+            cur.close()
+            return jsonify({"error": e.code, "message": e.message,
+                            "stop_name": e.stop_name}), 400
+
+        # Every audio URL must be reachable, audio, and within the size cap.
+        try:
+            organiser_audio_tours.validate_audio_urls(stops, _audio_url_check)
+        except organiser_audio_tours.StopValidationError as e:
+            cur.close()
+            return jsonify({"error": e.code, "message": e.message,
+                            "stop_name": e.stop_name}), 422
+
+        # Build the package (remote_audio.json, NO MP3) and the stored fields.
+        zip_bytes = organiser_audio_tours.build_package(tour_name, stops, tour_type)
+        tour_content = organiser_audio_tours.tour_content_text(stops)
+        stops_count = len(stops)
+        # First stop with a location gives the tour's lat/lng (like a generated
+        # community tour); None when no stop has coordinates (an 'other' tour).
+        lat = lng = None
+        for s in stops:
+            if s.get('lat') is not None and s.get('lng') is not None:
+                lat, lng = s['lat'], s['lng']
+                break
+        now = datetime.utcnow()
+        source_kind = organiser_audio_tours.SOURCE_KIND
+
+        if edit_tour_id:
+            # ── EDIT ─────────────────────────────────────────────────────────
+            # The target must be THIS community's organiser-audio tour.
+            cur.execute(
+                "SELECT id, source_kind, tour_content FROM audio_tours "
+                "WHERE id = %s AND community_id = %s",
+                (int(edit_tour_id), community_id))
+            row = cur.fetchone()
+            if not row:
+                cur.close()
+                return jsonify({"error": "not_found",
+                                "message": "No such tour in this community."}), 404
+            if row[1] != source_kind:
+                cur.close()
+                return jsonify({"error": "not_organiser_audio",
+                                "message": "That tour is not an organiser-audio "
+                                           "tour."}), 409
+            # Archive the OLD content (version bump) exactly like a generated
+            # replace-on-change: insert the superseded version first.
+            next_v = _next_version_no(cur, int(edit_tour_id))
+            cur.execute(
+                "INSERT INTO audio_tour_versions "
+                "(tour_id, version_no, tour_content, stops_count, lat, lng, "
+                " replaced_by_job) VALUES (%s, %s, %s, %s, %s, %s, %s)",
+                (int(edit_tour_id), next_v, row[2], None, None, None,
+                 'organiser_audio_edit'))
+            cur.execute(
+                "UPDATE audio_tours SET tour_name = %s, request_string = %s, "
+                "audio_tour = %s, tour_content = %s, stops_count = %s, "
+                "lat = COALESCE(%s, lat), lng = COALESCE(%s, lng), "
+                "community_visibility = %s "
+                "WHERE id = %s",
+                (tour_name, tour_name, psycopg2.Binary(zip_bytes), tour_content,
+                 stops_count, lat, lng, visibility, int(edit_tour_id)))
+            conn.commit()
+            cur.close()
+            # The live version the app sees is the archived count + 1 (the same
+            # MAX(version_no)+1 rule _tours_for returns).
+            return jsonify({"tour_id": int(edit_tour_id),
+                            "source_kind": source_kind,
+                            "community_id": community_id,
+                            "version": next_v + 1}), 200
+
+        # ── NEW ──────────────────────────────────────────────────────────────
+        cur.execute(
+            "INSERT INTO audio_tours "
+            "(tour_name, request_string, audio_tour, number_requested, lat, lng, "
+            " community_id, community_visibility, stops_count, tour_content, "
+            " source_kind, rights_accepted_by, rights_accepted_at) "
+            "VALUES (%s, %s, %s, 0, %s, %s, %s, %s, %s, %s, %s, %s, %s) "
+            "RETURNING id",
+            (tour_name, tour_name, psycopg2.Binary(zip_bytes), lat, lng,
+             community_id, visibility, stops_count, tour_content,
+             source_kind, user_id, now))
+        tour_id = cur.fetchone()[0]
+        conn.commit()
+        cur.close()
+        return jsonify({"tour_id": tour_id, "source_kind": source_kind,
+                        "community_id": community_id, "version": 1,
+                        "stops_count": stops_count}), 201
+    finally:
+        conn.close()
 
 
 @communities_bp.route('/communities/<int:community_id>/episodes', methods=['GET'])

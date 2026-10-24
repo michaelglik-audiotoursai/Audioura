@@ -125,6 +125,18 @@ bool canEditTour(Map<String, dynamic> tour,
   return ownedCommunityIds.contains(communityId);
 }
 
+/// [LOCAL-754B / D708] Is [tour] an ORGANISER-AUDIO tour (built from the
+/// organiser's own hosted RSS/MP3 audio)? Such a tour carries source_kind =
+/// 'organiser_audio' on its saved record (stamped at download time from the
+/// server tour row). Translation of organiser audio is NOT offered (D708): the
+/// Listen ⋮ menu hides Translate and the server also refuses it (403
+/// translation_not_offered). Defensive: a missing/!=string source_kind reads as
+/// "not organiser-audio" (Translate stays shown), never a throw.
+bool isOrganiserAudioTour(Map<String, dynamic> tour) {
+  final sk = tour['source_kind'];
+  return sk is String && sk.trim() == 'organiser_audio';
+}
+
 class MyToursScreen extends StatefulWidget {
   const MyToursScreen({super.key});
 
@@ -2112,7 +2124,7 @@ class _MyToursScreenState extends State<MyToursScreen> {
                           itemBuilder: (context) => [
                             const PopupMenuItem(value: 'rate', child: ListTile(leading: Icon(Icons.star_outline, color: Color(0xFFE2A400)), title: Text('Rate this tour'), dense: true)),
                             const PopupMenuItem(value: 'share', child: ListTile(leading: Icon(Icons.ios_share, color: Color(0xFF3498db)), title: Text('Share'), dense: true)),
-                            if (!TourTranslationHelper.isTranslation(tour))
+                            if (!TourTranslationHelper.isTranslation(tour) && !isOrganiserAudioTour(tour))
                               const PopupMenuItem(value: 'translate', child: ListTile(leading: Icon(Icons.translate, color: Color(0xFF8e44ad)), title: Text('Translate'), dense: true)),
                             // [LOCAL-677] Curator-only Price control (tier picker /
                             // Free). Shown only to a device with can_sell, and only

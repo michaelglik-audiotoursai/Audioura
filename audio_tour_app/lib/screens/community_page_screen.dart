@@ -33,6 +33,7 @@ import '../widgets/tour_buy_sheet.dart' show TermsAgreeLine;
 import '../widgets/pass_expiry_display.dart';
 import 'communities_about_screen.dart' show CommunityInviteTools;
 import 'tour_generator_screen.dart';
+import 'organiser_audio_tour_screen.dart';
 
 class CommunityPageScreen extends StatefulWidget {
   /// Open by community id (from a map pin or the Listen tab) …
@@ -874,6 +875,22 @@ class _CommunityPageScreenState extends State<CommunityPageScreen> {
               ),
             ),
 
+          // [LOCAL-754B / D658 addendum 2] Owner-only: build a REAL tour from
+          // the organiser's OWN hosted audio (RSS feed and/or MP3 links). No
+          // OpenAI cost; does not use the generation allowance. On Listen the
+          // built tour is indistinguishable from a generated one. Members/
+          // visitors never see this.
+          if (c.isOwner)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 4),
+              child: OutlinedButton.icon(
+                key: const Key('make_audio_tour_button'),
+                onPressed: () => _openAudioTourBuilder(c),
+                icon: const Icon(Icons.podcasts),
+                label: const Text('Make a tour from your own audio'),
+              ),
+            ),
+
           // Organiser card.
           _section('Organiser', [
             if (c.organiser.name != null) Text(c.organiser.name!,
@@ -1330,6 +1347,17 @@ class _CommunityPageScreenState extends State<CommunityPageScreen> {
       ),
     );
     // Refresh so a tour just generated for this community shows in the list.
+    if (mounted) await _load();
+  }
+
+  /// [LOCAL-754B] Open the organiser-audio tour builder for this community and
+  /// refresh the page afterwards so a tour just published shows in the list.
+  Future<void> _openAudioTourBuilder(Community c) async {
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => OrganiserAudioTourScreen(community: c),
+      ),
+    );
     if (mounted) await _load();
   }
 
