@@ -3,7 +3,7 @@
 **Agent:** Mac Mini Kiro
 **Branch:** `LOCAL-759-organiser-audio-download`
 **Base:** `subscribed` @ `d816a251` (contains LOCAL-758; verified `git merge-base --is-ancestor d816a251 HEAD` exits 0)
-**code_sha:** see the branch tip after push (`git rev-parse HEAD` on `LOCAL-759-organiser-audio-download`)
+**code_sha:** `12fe7609` (branch tip at submission; this doc-sha update sits one commit above it)
 
 ---
 
