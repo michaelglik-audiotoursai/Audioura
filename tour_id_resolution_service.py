@@ -160,6 +160,49 @@ def _resolve_from_filesystem(download_id, tour_name, tours_dir):
         }
 
 
+
+def _organiser_audio_resolution(download_id, tour_name, conn=None):
+    """[LOCAL-759 LEAD] Resolution for an organiser-audio tour, or None.
+
+    Such a tour has no ZIP on disk: map-delivery serves audio_tours.audio_tour and
+    the phone fetches each stop's audio from the organiser's host. The phone only
+    needs a stable folder id; it never edits these tours (LOCAL-755: 409
+    organiser_audio_not_editable)."""
+    own = conn is None
+    try:
+        if own:
+            conn = get_db_connection()
+        cur = conn.cursor()
+        cur.execute("SELECT source_kind, stops_count FROM audio_tours WHERE id = %s",
+                    (int(download_id),))
+        row = cur.fetchone()
+        cur.close()
+    except Exception as e:
+        logger.warning("organiser-audio check failed for %s: %s", download_id, e)
+        return None
+    finally:
+        if own and conn:
+            try:
+                conn.close()
+            except Exception:
+                pass
+    if not row or (row[0] or '') != 'organiser_audio':
+        return None
+    out = {
+        "status": "success",
+        "download_id": int(download_id),
+        "edit_tour_id": f"organiser{int(download_id)}",
+        "tour_name": tour_name,
+        "editable": False,
+        "has_separate_audio_files": False,
+        "download_url": f"/tour/{download_id}/download",
+        "directory_name": f"organiser{int(download_id)}",
+        "resolution_method": "organiser_audio",
+    }
+    if row[1]:
+        out["stops_count"] = int(row[1])
+    return out
+
 def find_edit_tour_id(download_id):
     """Find UUID-based edit tour ID from numeric download ID.
 
@@ -272,6 +315,15 @@ def resolve_tour_id(download_id):
             }), 404
 
         tour_name = result[0]
+
+        # [LOCAL-759 LEAD] An organiser-audio tour (LOCAL-754B) lives only in
+        # audio_tours.audio_tour (no ZIP in the tour store, no zip_filename), so the
+        # filesystem fallback below must never run for it: it guessed by name and
+        # matched other tours' ZIPs ("Salem Witch Trial" -> two Salem Witch Museum
+        # ZIPs, 409 AMBIGUOUS, tour 750, 2026-10-24). Answer deterministically.
+        organiser = _organiser_audio_resolution(download_id, tour_name)
+        if organiser is not None:
+            return jsonify(organiser)
 
         # Find corresponding edit tour ID
         edit_info = find_edit_tour_id(download_id)
