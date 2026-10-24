@@ -3,7 +3,7 @@
 **Agent:** Mac Mini Kiro
 **Branch:** `LOCAL-756-retest-round5`
 **Base:** subscribed @ `aeaae8f9` (`git merge-base --is-ancestor aeaae8f9 HEAD` → 0)
-**code_sha:** _stamped at commit time_ (branch tip of `LOCAL-756-retest-round5`)
+**code_sha:** `eb0af70b4c70d6e1202b303e334c23ccb939598d` (the LOCAL-756 fix commit; this submission note is the follow-up commit on top of it)
 
 Three field regressions from Michael's 2026-10-24 retest are fixed, each with a
 red test that fails on `aeaae8f9` and passes after the fix.
