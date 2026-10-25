@@ -226,6 +226,7 @@ class _MyToursScreenState extends State<MyToursScreen> {
   // role line reads correctly. A null entry means "not loaded / unknown" and
   // the menu falls back to the safe reading (no Price/Re-score).
   final Map<String, TourRole> _roleByTour = {};
+  final Set<String> _roleLoading = {};
 
   // [LOCAL-762] The current device user id, cached for the role line. Loaded
   // alongside the community count; empty until then (the role line still works —
@@ -389,7 +390,8 @@ class _MyToursScreenState extends State<MyToursScreen> {
   void _ensureRoleLoaded(Map<String, dynamic> tour) {
     final tourId = _numericTourId(tour);
     if (tourId == null || _roleByTour.containsKey(tourId)) return;
-    _loadRole(tourId, tour);
+    if (!_roleLoading.add(tourId)) return; // one request per tour at a time
+    _loadRole(tourId, tour).whenComplete(() => _roleLoading.remove(tourId));
   }
 
   /// [LOCAL-677] The curator's price + Sales line for a sellable tour. Triggers
@@ -2366,6 +2368,12 @@ class _MyToursScreenState extends State<MyToursScreen> {
               itemCount: _tours.length,
               itemBuilder: (context, index) {
                 final tour = _tours[index];
+                // [LOCAL-762 LEAD] Load the role when the row is built, not only
+                // when the ⋮ opens: the menu's items are built on open, so a
+                // load started there arrives too late for the first open.
+                WidgetsBinding.instance.addPostFrameCallback((_) {
+                  if (mounted) _ensureRoleLoaded(tour);
+                });
                 // [LOCAL-716B] A freshly-downloaded tour flashes briefly after
                 // "View" (the highlight path). The colour clears itself after
                 // ~2s via _highlightTimer.
