@@ -105,6 +105,112 @@ def is_tour_owner(cur, user_id, original_id):
     return creator is not None and str(creator) == str(user_id)
 
 
+# ─── Tour role / ownership context (LOCAL-762 / D711 §1–§2) ───────────────────
+
+# source_kind value that marks an organiser-audio (BROADCAST) tour: the
+# organiser's own hosted audio, maintained off-app. Mirrors the app's
+# isOrganiserAudioTour and organiser_audio_tours.SOURCE_KIND.
+ORGANISER_AUDIO_SOURCE_KIND = 'organiser_audio'
+
+
+def _tour_community_context(cur, original_id):
+    """The community facts the Listen ⋮ menu + role line need for a tour, read
+    off the ORIGINAL audio_tours row and its community (if any). Never raises —
+    an absent column / row degrades to Nones. Returns:
+        {source_kind, community_id, community_name, community_visibility,
+         organiser_user_id}
+    community_visibility is the TOUR's visibility inside the community
+    ('members' | 'public'); organiser_user_id is the community OWNER.
+    """
+    ctx = {
+        "source_kind": None,
+        "community_id": None,
+        "community_name": None,
+        "community_visibility": None,
+        "organiser_user_id": None,
+    }
+    try:
+        cur.execute(
+            "SELECT source_kind, community_id, community_visibility "
+            "FROM audio_tours WHERE id = %s",
+            (int(original_id),),
+        )
+        row = cur.fetchone()
+        if row:
+            ctx["source_kind"] = row[0]
+            ctx["community_id"] = int(row[1]) if row[1] is not None else None
+            ctx["community_visibility"] = row[2]
+    except Exception:  # noqa: BLE001 — a missing column must not 500 a read
+        return ctx
+
+    if ctx["community_id"] is not None:
+        try:
+            cur.execute(
+                "SELECT name, owner_user_id FROM communities WHERE id = %s",
+                (ctx["community_id"],),
+            )
+            crow = cur.fetchone()
+            if crow:
+                ctx["community_name"] = crow[0]
+                ctx["organiser_user_id"] = (
+                    str(crow[1]) if crow[1] is not None else None
+                )
+        except Exception:  # noqa: BLE001
+            pass
+    return ctx
+
+
+def tour_role(user_id, tour_id):
+    """Per-tour ownership/role context for THIS viewer, for the Listen ⋮ menu and
+    the role line (LOCAL-762 / D711). Resolves a translation to its original so
+    a translation reports the same role as its source.
+
+    Returns:
+        {
+          tour_id,                 # the original id the role is computed on
+          is_owner,                # creator == this user
+          is_curator,              # this user's level has plans.can_sell
+          source_kind,             # e.g. 'organiser_audio' (broadcast) or None
+          is_broadcast,            # source_kind == 'organiser_audio'
+          community_id,            # int or None
+          community_name,          # str or None
+          community_visibility,    # 'members' | 'public' | None  (TOUR's)
+          is_community,            # belongs to a community
+          is_organiser,            # this user OWNS that community
+        }
+    Never raises — every lookup fails closed to the safe (least-privileged)
+    value, so a transient error never grants Price/Re-score the user shouldn't
+    see.
+    """
+    conn = get_connection()
+    try:
+        cur = conn.cursor()
+        original_id = rating_svc.resolve_original_id(cur, tour_id)
+        ctx = _tour_community_context(cur, original_id)
+        is_owner = is_tour_owner(cur, user_id, original_id)
+        curator = is_curator(cur, user_id)
+        community_id = ctx["community_id"]
+        is_organiser = bool(
+            user_id
+            and ctx["organiser_user_id"] is not None
+            and str(ctx["organiser_user_id"]) == str(user_id)
+        )
+        return {
+            "tour_id": int(original_id),
+            "is_owner": bool(is_owner),
+            "is_curator": bool(curator),
+            "source_kind": ctx["source_kind"],
+            "is_broadcast": ctx["source_kind"] == ORGANISER_AUDIO_SOURCE_KIND,
+            "community_id": community_id,
+            "community_name": ctx["community_name"],
+            "community_visibility": ctx["community_visibility"],
+            "is_community": community_id is not None,
+            "is_organiser": is_organiser,
+        }
+    finally:
+        conn.close()
+
+
 # ─── Price read ───────────────────────────────────────────────────────────────
 
 def _price_payload(cur, original_id):
@@ -161,7 +267,7 @@ class PricingError(Exception):
     """Raised with a stable `code` so the route maps it to the right HTTP status.
 
     code ∈ 'not_curator' (403) | 'not_owner' (403) | 'invalid_tier' (400) |
-           'unknown_tour' (404).
+           'unknown_tour' (404) | 'members_only_no_price' (400).
     """
 
     def __init__(self, code, message):
@@ -210,6 +316,22 @@ def set_price(user_id, tour_id, tier):
                 "not_owner",
                 "You can only set the price on a tour you created.",
             )
+
+        # [LOCAL-762 / D711 §3] A members-only community tour cannot be priced:
+        # it is already covered by the membership dues. Only a NON-None tier
+        # (actually setting a price) is refused — CLEARING a price (tier=None)
+        # on such a tour is always allowed. Members get the tour "Included with
+        # membership"; a public community tour (community_visibility='public')
+        # may be priced for non-members.
+        if tier is not None:
+            ctx = _tour_community_context(cur, original_id)
+            if ctx["community_id"] is not None and \
+                    ctx["community_visibility"] == 'members':
+                raise PricingError(
+                    "members_only_no_price",
+                    "Members-only tours are covered by the membership dues "
+                    "and cannot be priced.",
+                )
 
         # Validate the tier (None = clear; any other value must be a valid tier).
         if tier is not None and not price_tiers_cfg.is_valid_tier(tier, cur):
@@ -476,11 +598,23 @@ def register_pricing_routes(app):
     Endpoints:
         POST /tour/<tour_id>/price      {user_id, tier}   → set/clear price (curator)
         GET  /tour/<tour_id>/price                        → price block
+        GET  /tour/<tour_id>/role?user_id=...             → ownership/role context
         GET  /tour/<tour_id>/unlock-state?user_id=...     → preview/lock state
         GET  /tour/<tour_id>/sales                        → unlock (sales) count
         GET  /price-tiers                                 → the tier config
     """
     from flask import request, jsonify
+
+    @app.route('/tour/<tour_id>/role', methods=['GET'])
+    def api_tour_role(tour_id):
+        # [LOCAL-762 / D711] Per-tour ownership/role for the Listen ⋮ menu + role
+        # line. user_id is optional (an anonymous viewer is never owner/organiser).
+        user_id = request.args.get("user_id")
+        try:
+            result = tour_role(user_id, tour_id)
+        except Exception as e:  # noqa: BLE001
+            return jsonify({"error": str(e)}), 500
+        return jsonify(result), 200
 
     @app.route('/tour/<tour_id>/price', methods=['POST'])
     def api_set_price(tour_id):
@@ -502,6 +636,7 @@ def register_pricing_routes(app):
                 "not_owner": 403,
                 "invalid_tier": 400,
                 "unknown_tour": 404,
+                "members_only_no_price": 400,
             }.get(pe.code, 400)
             return jsonify({"error": pe.code, "message": pe.message}), status
         except Exception as e:  # noqa: BLE001

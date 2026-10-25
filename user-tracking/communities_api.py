@@ -2405,6 +2405,24 @@ def build_audio_tour(community_id):
     stops = data.get('stops') or []
     edit_tour_id = data.get('tour_id')
 
+    # [LOCAL-762 / D711 §4] Optional non-member price (tier) set at creation. It
+    # is honoured ONLY for a PUBLIC tour; a members-only tour is covered by the
+    # dues, so a price on it is refused members_only_no_price (400). A None /
+    # absent tier leaves the tour Free. Only applied on the NEW path.
+    price_tier = data.get('price_tier')
+    if price_tier is not None:
+        try:
+            price_tier = int(price_tier)
+        except (TypeError, ValueError):
+            return jsonify({"error": "invalid_tier",
+                            "message": "price_tier must be a number."}), 400
+        if visibility != 'public':
+            return jsonify({
+                "error": "members_only_no_price",
+                "message": "Members-only tours are covered by the membership "
+                           "dues and cannot be priced.",
+            }), 400
+
     conn = _get_db()
     try:
         cur = conn.cursor()
@@ -2511,16 +2529,24 @@ def build_audio_tour(community_id):
                             "version": new_version}), 200
 
         # ── NEW ──────────────────────────────────────────────────────────────
+        # [LOCAL-762 / D711 §2] Stamp the CREATOR = the organiser who published.
+        # Without this, audio_tours.creator_user_id stays NULL and ownership can
+        # never be resolved for an organiser-audio tour (there is no
+        # tour_requests row to fall back on, unlike a generated tour) — which is
+        # why pricing/re-score refused the organiser on his own tour and the LEAD
+        # had to backfill tour 750 by hand. creator_user_id == owner here because
+        # only the organiser may build (the OWNER-ONLY gate above).
         cur.execute(
             "INSERT INTO audio_tours "
             "(tour_name, request_string, audio_tour, number_requested, lat, lng, "
             " community_id, community_visibility, stops_count, tour_content, "
-            " source_kind, rights_accepted_by, rights_accepted_at) "
-            "VALUES (%s, %s, %s, 0, %s, %s, %s, %s, %s, %s, %s, %s, %s) "
+            " source_kind, rights_accepted_by, rights_accepted_at, creator_user_id, "
+            " price_tier) "
+            "VALUES (%s, %s, %s, 0, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s) "
             "RETURNING id",
             (tour_name, tour_name, psycopg2.Binary(zip_bytes), lat, lng,
              community_id, visibility, stops_count, tour_content,
-             source_kind, user_id, now))
+             source_kind, user_id, now, user_id, price_tier))
         tour_id = cur.fetchone()[0]
         conn.commit()
         cur.close()
