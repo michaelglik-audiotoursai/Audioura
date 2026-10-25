@@ -255,6 +255,25 @@ def maybe_generate_with_pool(
     qid = identity[4:] if identity.startswith("qid:") else None
 
     pooled_rows = pool.get_pool_stops(location, tour_type, db_url, qid=qid)
+    # [LOCAL-766 / D713] Provenance gate. A pooled stop whose source tour(s)
+    # include a community (community_id IS NOT NULL) or priced (price_tier > 0)
+    # tour is NOT reusable by anyone except that tour's creator — otherwise an
+    # identical request by another user would be a free rebuild of a paid/
+    # community tour (whole-tour reuse is already creator-scoped, LOCAL-727/D678;
+    # the pool was the remaining bypass). Checked HERE, at delivery, so pricing a
+    # tour or attaching it to a community LATER protects it from then on. The
+    # protected stops are REMOVED from pooled_rows before K is counted, so they
+    # are generated fresh (N > remaining pool) exactly as if they had never been
+    # pooled. Free, non-community tours keep sharing as today. A stop with
+    # unproven provenance (no stop_pool_sources row) stays shareable. Best-effort:
+    # if provenance is unavailable the pool is served unfiltered (pre-LOCAL-766).
+    try:
+        import stop_pool_sources as provenance
+        pooled_rows = provenance.filter_protected_titles(
+            pooled_rows, location, tour_type, db_url, qid=qid, user_id=user_id)
+    except Exception as _prov_err:
+        logger.warning(f"[LOCAL-766] provenance filter skipped ({_prov_err}); "
+                       f"serving pool unfiltered")
     K = len(pooled_rows)
     N = int(total_stops)
     tour_category = _classify(location, tour_type)
