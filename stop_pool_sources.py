@@ -187,13 +187,13 @@ def record_pool_sources(
 
 # ── Delivery rule ─────────────────────────────────────────────────────────────
 
-def _protected_titles_for_key(
+def _protected_titles_for_keys(
     conn,
-    pool_key: str,
+    pool_keys: List[str],
     requester_user_id: Optional[str],
 ) -> Dict[str, Tuple[int, str]]:
-    """Return {title_norm: (tour_id, reason)} for pooled stops under ``pool_key``
-    that are PROTECTED for ``requester_user_id``.
+    """Return {title_norm: (tour_id, reason)} for pooled stops under ANY of
+    ``pool_keys`` that are PROTECTED for ``requester_user_id``.
 
     A stop is protected when it has a source tour that is community
     (community_id IS NOT NULL) or priced (price_tier > 0) AND the requester is NOT
@@ -202,14 +202,24 @@ def _protected_titles_for_key(
     tours protect the same stop, the FIRST (lowest id) protecting tour is reported
     for the log line; 'community' is preferred over 'paid' when a tour is both.
 
-    Reads only audio_tours columns that may be absent on an old schema via
-    to_regclass / information_schema-free COALESCE: the query references
-    community_id and price_tier directly, which both exist from migrations 035/022;
-    on a schema without them the caller catches the error and treats every stop as
-    unproven (shareable) — the safe, backward-compatible default.
+    Dual-key (D582 class). ``get_pool_stops`` reads a venue's stops under BOTH the
+    ``qid:`` pool key and the ``loc:`` pool key (resolver flakiness can split one
+    venue's pool across the two), and the live recording path records under the
+    ``loc:`` key while a delivery that resolves a QID reads under the ``qid:`` key.
+    So the protection lookup must span BOTH keys too, keyed only by ``title_norm``
+    (which is identical across the two keys for the same stop) — otherwise a stop
+    recorded under one key would never be found when read under the other, and a
+    priced/community tour's stop would leak. ``pool_key = ANY(%s)`` unions them.
+
+    Reads audio_tours.community_id / price_tier / creator_user_id directly (all
+    present from migrations 035/022/041); on a schema without them the caller
+    catches the error and treats every stop as unproven (shareable) — the safe,
+    backward-compatible default.
     """
     protected: Dict[str, Tuple[int, str]] = {}
     norm = (requester_user_id or "").strip() or None
+    if not pool_keys:
+        return protected
     with conn.cursor() as cur:
         # Join provenance to its source tours; keep only PROTECTED source tours the
         # requester does not own. ORDER BY id so the lowest-id protecting tour is
@@ -222,12 +232,12 @@ def _protected_titles_for_key(
                    (COALESCE(at.price_tier, 0) > 0) AS is_paid
             FROM stop_pool_sources sps
             JOIN audio_tours at ON at.id = sps.audio_tour_id
-            WHERE sps.pool_key = %s
+            WHERE sps.pool_key = ANY(%s)
               AND (at.community_id IS NOT NULL OR COALESCE(at.price_tier, 0) > 0)
               AND (%s IS NULL OR at.creator_user_id IS DISTINCT FROM %s)
             ORDER BY at.id ASC
             """,
-            (pool_key, norm, norm),
+            (list(pool_keys), norm, norm),
         )
         for tnorm, tour_id, is_community, is_paid in cur.fetchall():
             if tnorm in protected:
@@ -235,6 +245,20 @@ def _protected_titles_for_key(
             reason = "community" if is_community else "paid"
             protected[tnorm] = (int(tour_id), reason)
     return protected
+
+
+def _candidate_pool_keys(location: str, tour_type: str, qid: Optional[str]) -> List[str]:
+    """Both pool keys a venue's stops may live under: the ``qid:`` key (when a QID
+    is supplied) and the ``loc:`` key — mirroring ``get_pool_stops``. Deduped,
+    order stable (qid first when present)."""
+    import stop_pool_store as pool
+    keys: List[str] = []
+    if qid:
+        keys.append(pool._pool_key(pool.venue_identity(location, qid), tour_type))
+    loc_key = pool._pool_key(pool.venue_identity(location), tour_type)
+    if loc_key not in keys:
+        keys.append(loc_key)
+    return keys
 
 
 def partition_pool_rows(
@@ -262,11 +286,11 @@ def partition_pool_rows(
         return [], []
     try:
         import stop_pool_store as pool
-        pool_key, _ = _pool_identity(location, tour_type, qid)
+        pool_keys = _candidate_pool_keys(location, tour_type, qid)
         conn = psycopg2.connect(db_url)
         ensure_table(conn)
         try:
-            protected = _protected_titles_for_key(conn, pool_key, user_id)
+            protected = _protected_titles_for_keys(conn, pool_keys, user_id)
         finally:
             conn.close()
     except Exception as e:

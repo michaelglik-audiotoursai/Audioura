@@ -238,6 +238,38 @@ class TestProvenanceDeliveryRule(unittest.TestCase):
         self.assertEqual(allowed_titles, {"Gamma", "Delta", "Epsilon"},
                          "stops only a free tour delivered stay shareable")
 
+    def test_7_provenance_recorded_under_loc_key_is_found_under_qid_key(self):
+        # Regression (D582 dual-key): the live record path stores provenance under
+        # the loc: pool key (qid=None), but a delivery that resolves a Wikidata QID
+        # reads/filters under the qid: key. The two keys share the same title_norm,
+        # so the protection must still be found. Seed the pool under BOTH keys for
+        # one venue (as resolver flakiness would), record provenance for a PRICED
+        # tour under the loc key only, then filter as a qid-resolving delivery.
+        qid = "Q" + uuid.uuid4().hex[:6].upper()
+        # Store the same stops under the qid identity too, so the qid: pool key
+        # holds the rows a qid-resolving get_pool_stops would return.
+        pool.store_delivered_tour(self.venue, self.ttype, self.content, DB_URL, qid=qid)
+        tid = _insert_tour(DB_URL, f"{self.venue} - Museum Tour", self.venue,
+                           self.content, price_tier=2, creator_user_id="creatorA")
+        # Record provenance exactly as the live store path does: qid defaulted to
+        # None → loc: key only.
+        provenance.record_pool_sources(DB_URL, self.venue, self.ttype, tid, self.content)
+
+        # Delivery resolves the qid: get_pool_stops + partition both pass qid.
+        rows = pool.get_pool_stops(self.venue, self.ttype, DB_URL, qid=qid)
+        self.assertTrue(len(rows) >= 5, "qid-key pool holds the venue's stops")
+        allowed, skipped = provenance.partition_pool_rows(
+            rows, self.venue, self.ttype, DB_URL, qid=qid, user_id="someoneElse")
+        self.assertEqual(len(allowed), 0,
+                         "loc-recorded protection must apply when read under the qid key")
+        self.assertTrue(len(skipped) >= 5)
+        self.assertTrue(all(reason == "paid" for _r, _t, reason in skipped))
+        # The creator still reuses under the qid-key delivery.
+        allowed_c, skipped_c = provenance.partition_pool_rows(
+            rows, self.venue, self.ttype, DB_URL, qid=qid, user_id="creatorA")
+        self.assertEqual(len(skipped_c), 0,
+                         "the creator keeps reuse regardless of which key is read")
+
 
 @unittest.skipUnless(_db_up(), "dev Postgres not reachable")
 class TestOrchestratorEndToEnd(unittest.TestCase):
