@@ -13,7 +13,134 @@ has lapsed twice and Michael has had to ask twice.
 
 ---
 
-# ✅ CURRENT STATE — 2026-10-14 01:10 EDT. READ THIS FIRST; IT SUPERSEDES EVERY DATED SECTION BELOW.
+# ✅ CURRENT STATE — 2026-10-20. READ THIS FIRST; IT SUPERSEDES EVERY DATED SECTION BELOW, INCLUDING THE 2026-10-14 BLOCK.
+
+Written at Michael's request at the end of the 2026-10-16 session so a fresh session can
+continue without re-deriving anything. Where this disagrees with anything below, **this is
+right**. Verify live state rather than trusting it — it is point-in-time.
+
+## Both exposed API keys are rotated. This is finished, not in progress.
+
+| key | what happened |
+|---|---|
+| **OpenAI** | Michael created `gcloud-2026-10` and pasted it as **`openai-api-key` version 5** (last 4 **`…fIoA`**, 164 chars, sha256 `a3d2145ec91f`). Six services rolled onto it, both tracks proved a real tour, then Michael **revoked the old `…Nw8A`** (`MyFirstOpenAPI_Key`, created Oct 2024, last used Oct 4 2026). Secret versions **4, 3 and 2 are DISABLED** — all three held that same key (v3 and v2 are v4 with `sk-proj-` stripped). Version 1 is a 26-char placeholder, left enabled. **Review and destroy 4/3/2 on or after 2026-10-19.** |
+| **Gemini** | **No GCloud service has ever read `GEMINI_API_KEY`** — zero references across every service, job and function. Michael deleted the AI Studio key `…bGMw` (uid `9f2aeb5d…`, the credential behind the runaway spend in wdvrdayyqd); **`GEMINI_API_KEY:1` is DISABLED** in Secret Manager so the dead value cannot be wired into a future deploy. Two keys remain in the project: `mac-mini-2026-10` (…1Qfg, live on the Mac) and `Windows-Laptop` (…HX4Q, this machine). |
+
+**The lesson that made the OpenAI half safe: match a key by its LAST FOUR characters, never by prefix.** Every project key starts `sk-proj-`. Task wdvrdaxaw9's Part 2 told us to revoke "the `sk-proj-wpIW…` key" but not "`…Nw8A`" — the same key. Acting on it would have taken down all tour generation on both tracks. Michael's own screenshot settled the remaining doubt: `Last used Oct 4` proved no machine anywhere, including the Mac, was still on it.
+
+## The OpenAI key now sits on THREE services, down from six
+
+`tour-generator` · `tour-generator-storied` · `news-generator` — all via `openai-api-key:latest`.
+
+Removed as vestigial, each proven by effect afterwards with a real tour: **`tour-orchestrator`** and **`tour-orchestrator-storied`** (`tour_orchestrator_service.py` has never contained `openai` or `OPENAI_API_KEY` in *any* commit on *any* branch — `git log --all -S` is empty — and none of the ten local modules it imports reads it either), and **`coordinates`**, which was then deleted outright.
+
+## What is live right now
+
+| track | service | revision | image |
+|---|---|---|---|
+| Preview | `tour-orchestrator-storied` | `00008-j6t` | **`audioura-storied:v5`** (commit `3ab1e566`, tag **`v2t3`**) |
+| Preview | `tour-generator-storied` | `00007-twm` | `audioura-storied:v4` (commit `d25454a`, tag `v2t2`) |
+| Preview | `tour-modernized-storied` | `00004-ssx` | `audioura-storied:v4` |
+| Beta | `tour-orchestrator` | `00029-f9x` | **`audioura:v23`** (commit `056529c1`, tag **`v1t1`**) |
+| Beta | `tour-generator` | `00025-wqg` | `audioura:v36-local474` |
+| Beta | `news-generator` | `00010-486` | `audioura:v16` |
+
+**Beta is no longer an untouched control.** Michael explicitly authorised a `main` change and a Beta deploy on 2026-10-16. Note the Preview generator is still on **v4**, so the LOCAL-593/D612 work merged at `354da34` is **still not deployed** — rolling `audioura-storied:v5` onto `tour-generator-storied` would ship it, which is task wdvrdayu7q and needs its own verification.
+
+**19 Cloud Run services now; `coordinates` was deleted.** Its spec was saved to the session
+scratchpad as `coordinates_service_spec_20261016.yaml` (image `audioura:v5`, 256Mi,
+concurrency 80, maxScale 2, timeout 240s, compute SA) and `audioura:v5` is still in
+Artifact Registry, so it can be recreated from `gcloud run services replace`.
+`COORDINATES_URL` is still set on both orchestrators and now points at nothing — harmless,
+since the code reaches it only after Nominatim fails, but worth removing one day.
+
+## GCS-C1 — a tour can no longer be stored unreachable
+
+`tours-near` filters on `audio_tours.lat`/`lng`, so a row with NULL coordinates or `0,0`
+can never be returned to any listener **while the app reports success**. Two holes did
+exactly that, caught live on Preview job `36b13113`:
+
+```
+19:13:02  ==== COORDINATES CHECK IN ORCHESTRATE_TOUR_ASYNC ====
+19:13:02  Coordinates from modernized service: [None, None]
+```
+
+…and no `No coordinates received` line after it. **That absence was the bug.** `[None, None]`
+is a list of length 2, so it passed `len(coordinates) < 2`, the fallback never ran, and the
+row was written with NULL coordinates. Separately, every failure branch of
+`get_coordinates_direct()` returned `(0, 0)` and stored it verbatim — the Gulf of Guinea —
+and the `coordinates` service it called had returned **500 on every request** since it was
+built against `openai<1.0.0`, so `(0, 0)` was the only value it could ever produce.
+
+Fixed on **`storied` `3ab1e566`** and **`main` `056529c1`** (identical change), both pushed
+and deployed. `subscribed` is ClickUp wdvrdaz10j, assigned to the Mac Mini.
+
+- `_usable_coordinates()` — two finite, non-null, in-range numbers, and not `(0,0)`. A point on the equator **or** the prime meridian alone still passes; only the intersection is refused.
+- The fallback asks **Nominatim first, in-process**, via `geocode_stops.geocode()`: free, no API key, stdlib-only, already in the image. Using the LLM HTTP service as the safety net meant the net was made of the material `geocode_stops.py` exists to replace (model coordinates measured 1.0–2.4 km wrong — Yury's BETA-4).
+- Total failure stores **NULL, never `0,0`**, logged at ERROR with the job id.
+- Same treatment in `tour_worker_service.py`. **The deployed `tour-worker` image (`audioura:v19`) does NOT have the fix** — it is out of the request path (`GENERATION_MODE` defaults to `thread`), so it needs a rebuild before `cloud_tasks` mode is ever switched on.
+
+**Proven in production, same input, after the fix and after the service was deleted:**
+
+```
+20:03:28  Coordinates from modernized service: [None, None]
+20:03:28  No USABLE coordinates from modernized service ([None, None]) — resolving for: Fenway Park, Boston, MA
+20:03:28  [GCS-C1] Nominatim for 'Fenway Park, Boston, MA': (42.3464614, -71.0970999)
+20:03:28  Using coordinates: [42.3464614, -71.0970999]
+```
+
+51 ms. `tests/test_gcs_c1_coordinate_guard.py` has 40 assertions including a **red test**
+that reproduces the original predicate and asserts it accepted `[None, None]` and `[0, 0]`
+— so a revert to a length check keeps that test passing while the rest fail.
+
+## ⚠️ THE LIVE DB WAS DELETED FROM, ON MICHAEL'S EXPLICIT INSTRUCTION
+
+D141 says **no task may `DELETE FROM audio_tours`**. On 2026-10-16 Michael said *"get rid
+off them compeltely and everythign connected to them"* about the 11 unreachable tours, and
+it was done. **This does not repeal D141** — it was an owner override of it, made
+reversible first. Do not treat it as precedent.
+
+| | |
+|---|---|
+| deleted | 11 unreachable tours (121, 124, 125, 140, 141, 142, 368, 378, 424, 425, 426) + **this session's own 4 verification rows** (432–435) |
+| row counts | `audio_tours` **345 → 330**, `stop_metrics` **17 → 12** (cascade). `tour_requests`, `tour_scores`, `custom_tours`, `user_stop_feedback`, `shared_tours`, `users` all unchanged |
+| R2 | 6 objects `tours/{121,124,125,140,141,142}.zip` deleted, each confirmed 404 |
+| backup | **`C:\Users\micha\AudiouraBackups\unreachable_tours_20261016\`** — all 25 columns of all 11 rows, a `restore.sql` with full INSERTs + a `setval`, the 6 zips size-matched before deletion, and the 432–435 rows |
+| safety | 5 of the 11 were **translations** of live tours. The transaction asserted parents 107 (Waban, Newton), 120, 144, 207, 284 were still present **with coordinates** before committing, and would have rolled back otherwise |
+
+**Final DB state: 330 rows, 0 with a NULL coordinate, 0 at `0,0`.** No audio was lost —
+`audio_tour` was NULL on all 11 and the R2 zips were ~2 KB each, i.e. failed generations.
+
+## Tooling this session had to work out — do not rediscover it
+
+- **Docker Desktop is not running and has not been since 2026-10-13.** Build on **Cloud Build** instead; it needs no local Docker and keeps Michael's untracked root files (`audioura_books.py`, the Chase/Schwab CSVs, the LLC agreement) out of the build context, which `COPY *.py` from this dirty tree would otherwise ship. Recipe: copy the tracked build inputs from a **clean worktree** into a scratch dir, write a `cloudbuild.yaml` whose single docker step passes `-f Dockerfile.cloudrun` and the `RELEASE_TAG`/`GIT_SHA` build args, then `gcloud builds submit --config cloudbuild.yaml --substitutions=_IMAGE=…,_RELEASE_TAG=…,_GIT_SHA=…`. Storied's Dockerfile also needs `tests/db_connection.py`, `tests/stop_anchor_detector_v2.py`, `story_type_taxonomy.json` and `templates/`; `main`'s needs only root `*.py`.
+- **Cloud SQL access: the proxy binary is gone from this machine and ADC is not configured.** Download `cloud-sql-proxy.x64.exe` from `storage.googleapis.com/cloud-sql-connectors/cloud-sql-proxy/v<ver>/` into a scratch dir and run it with **`--token "$(gcloud auth print-access-token)"`** plus `--port 544x audiotours-migration:us-central1:audioura-db`. Then `psycopg2` (installed in user site-packages, so **run plain `python`, not `python -I`**) to `127.0.0.1:<port>`, db `audiotours`, user `admin`, password from `gcloud secrets versions access latest --secret=db-password`. The instance has **no authorized networks**, so never consider connecting directly. Kill the proxy when done.
+- **R2** is `v1-audiotours-r2-bucket` at `https://4b4aa47cda0cc65f20b20fac0b363ac7.r2.cloudflarestorage.com`, reachable with boto3 and the `r2-access-key-id` / `r2-secret-access-key` secrets, `region_name='auto'`.
+- **`gcloud` inside a bash `for` loop eats the loop's input.** Every `gcloud` call in a loop needs `< /dev/null`, or the loop runs once and the rest silently vanish.
+- Console encoding is cp1252: printing non-Latin tour names crashes with `UnicodeEncodeError`. Use `PYTHONIOENCODING=utf-8`, or `.encode('ascii','replace')`.
+
+## Open, and what the next session should pick up
+
+1. **ClickUp wdvrdaz108 — two concurrent tours collapse into one `audio_tours` row.** Not a race: `store_audio_tour()` dedupes on `lower(tour_name)` and the unique index `uq_audio_tours_original_name` **ignores `track`**, so the first track to generate a place owns that name forever. Worse, `origin/main` still carries the **pre-LOCAL-156 destructive `UPDATE`** that overwrites the existing row's `audio_tour`, `lat`, `lng` and `tour_content`; `55c9a83b` fixed it on 2026-08-02 and `7963e3a5` ported it to `storied` on 08-03, but **it never reached `main`**. On 2026-10-16 Beta overwrote a Preview row's audio. The task carries the full fix: cherry-pick `55c9a83b` to `main`, add `track` to the dedupe key and to a new `CONCURRENTLY`-built partial unique index (checked: zero conflicting groups), and make the insert `ON CONFLICT … DO NOTHING` + re-select. `tour_worker_service.py` has the same destructive UPDATE.
+2. **ClickUp wdvrdaz10j** — the `subscribed` third of GCS-C1, for the Mac Mini.
+3. **ClickUp wdvrdayu7q** — deploy `354da34` (LOCAL-593/D612) to the Preview **generator**. Supersedes wdvrdayruf (`690d6ba`) and wdvrdayrhj (`ef8fda6`); one deploy covers all three. `audioura-storied:v5` already contains it.
+4. **`SERP_API_KEY` is wired to nothing.** `tour-generator-storied` logs `[INTERPRETIVE] No SERP_API_KEY — cannot search` on every stop, while a `serp-api-key` secret sits unused in Secret Manager. Same shape as the Gemini gap. Costs money per search, so it is Michael's decision, not a bug fix.
+5. **Daily tour quota may not be enforced on GCloud at all.** Two full tours wrote **no** `tour_requests` row, yet `entitlements.get_tours_used_today()` counts that table, and `USER_API_URL` points at `http://user-api-2:5000`, which is not a deployed service. If nothing writes the meter, the per-plan limit is decorative. Unfiled; it is a cost-control question.
+6. Older and still open: wdvrdayrh7 (`_geo_vocab` docstring states the wrong safe direction), wdvrdayrhc (Palais Lascaris delivered 3 of 4 stops — the production face of LOCAL-19), wdvrdayqp3 (the dispatcher claims the Mac's `LOCAL-*` files — 3rd occurrence), wdvrdayj16 (Beta cost baseline), wdvrdaye2a, wdvrdayced, and the Play upload of +26 blocked on the Play Console invite for `play-publisher@audiotours-migration.iam.gserviceaccount.com`.
+7. **wdvrdaxaw9 still is not closed.** Its step 4 (Mac `.env` + restart) is the Mac's and unknown from here; step 7 (old AWS key Inactive → Delete) is Michael's in the AWS console and unreadable from here (`polly-tts-user`, account 437474201737, lacks `iam:ListAccessKeys`); **its Part 2 text is still wrong and must be rewritten before anyone acts on it.**
+8. Michael still has to field-test on Preview: Newton church, Logan, a large museum (the hang fix), and **user-chosen stops from the phone** — confirm `user_explicit` in the generator logs when he does.
+
+## Still true, still suspended
+
+**Kiro CLI is still gone** (re-checked 2026-10-20: not on PATH, `AppData\Local\Kiro-Cli\kiro-cli.exe` absent). **RULE ONE remains suspended** and this session keeps writing shipping code directly, as Michael instructed on 2026-10-04, 10-13 and 10-16. When Kiro returns, RULE ONE resumes.
+
+---
+
+# CURRENT STATE — 2026-10-14 01:10 EDT ‹SUPERSEDED by the 2026-10-20 block above›
+
+> Kept for its reasoning and evidence. Where it disagrees with the 2026-10-20 block,
+> the newer block wins. Much of it is now history: the keys it describes have been
+> rotated and the Preview orchestrator has moved on.
 
 Every `## STATE …` section further down is September history. Where they disagree with
 this block, **this block is right**. Written at Michael's request so a restart can continue.
