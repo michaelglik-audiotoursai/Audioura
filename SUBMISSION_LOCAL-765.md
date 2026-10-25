@@ -71,7 +71,7 @@ query, keeping the caller's transaction usable and consuming exactly one `fetcho
 | `tour_editing_phase2.py` | `_exclude_subscribed_sql()` helper; applied to the read paths |
 | `tour_id_resolution_service.py` | `_resolve_from_column` + **filesystem fallback + `/tour/<id>/resolve` (2 gaps fixed)**; `_fetchone_excluding_subscribed` helper |
 | `translation-service/translation_service.py` | excludes subscribed originals; **translations inherit the original's track** |
-| `migration/sql/043_tour_track.sql` | adds `idx_audio_tours_name_track` on `(lower(tour_name), track)` (LEAD applies at merge) |
+| `migration/sql/043s_storied_name_track_index.sql` | adds `idx_audio_tours_name_track` on `(lower(tour_name), track)` (LEAD applies at merge) |
 | `tests/test_local765_subscribed_isolation.py` | red/green + unchanged-behaviour guards |
 | `SUBMISSION_LOCAL-765.md` | this file |
 
@@ -143,7 +143,7 @@ is deployed via `docker-compose-beta-local.yml:197` (`build ./map_delivery`) and
 
 ## 4. Migration 043 — KEEP (and why)
 
-`migration/sql/043_tour_track.sql` is kept for storied. Reasoning:
+`migration/sql/043s_storied_name_track_index.sql` is kept for storied. Reasoning:
 
 - The orchestrator **self-heals** the `track` column, so the code is correct **without** the
   migration — the migration only makes the new lookup key
