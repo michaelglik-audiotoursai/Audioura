@@ -57,6 +57,19 @@ COPY tour_short_title.py /app/
 # this. Copy it so `python -c "import tour_content_rating"` works in-container.
 COPY tour_content_rating.py /app/
 
+# [LOCAL-766 / D713] store_audio_tour records stop-pool PROVENANCE after the
+# audio_tours row is INSERTed (which pooled stops this tour delivered), so the
+# delivery rule can later skip a priced/community tour's pooled stops for a
+# non-creator. `_record_pool_provenance` does `import stop_pool_sources`, which in
+# turn `import stop_pool_store` to reproduce the pool's own (pool_key, title_norm)
+# keying. This Dockerfile COPYies sources one-by-one, so BOTH modules must be
+# present or the import raises and provenance is silently never recorded (the
+# LOCAL-724B lesson: the host import hid a missing in-image module). stop_pool_
+# store falls back to an internal shim when tour_cache_layer1 is absent, so these
+# two files are all the orchestrator image needs.
+COPY stop_pool_sources.py /app/
+COPY stop_pool_store.py /app/
+
 # Build-time manifest: record checksums of all Python sources + git SHA
 ARG GIT_SHA=unknown
 RUN echo "${GIT_SHA}" > /app/.git_sha

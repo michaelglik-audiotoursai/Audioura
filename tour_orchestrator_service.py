@@ -747,7 +747,55 @@ def _rename_superseded_zip(old_zip_filename, version_no):
     return archived
 
 
-def store_audio_tour(tour_name, request_string, zip_path, lat, lng, tour_content=None, stops_count=None, is_test=None, tour_kind=None, job_id=None, user_id=None, track=None):
+def _pool_db_url():
+    """Build a postgresql:// URL from this service's DB env vars.
+
+    tour_orchestrator_service connects via discrete DB_HOST/DB_NAME/… env vars,
+    but the stop-pool modules (stop_pool_store, stop_pool_sources) take a
+    connection URL. Compose one from the same env the INSERT uses, so provenance
+    is recorded against the SAME database the tour row was written to.
+    """
+    host = os.getenv('DB_HOST', 'postgres-2')
+    name = os.getenv('DB_NAME', 'audiotours')
+    user = os.getenv('DB_USER', 'admin')
+    pwd = os.getenv('DB_PASSWORD', 'password123')
+    port = os.getenv('DB_PORT', '5432')
+    return f"postgresql://{user}:{pwd}@{host}:{port}/{name}"
+
+
+def _record_pool_provenance(audio_tour_id, location, request_string, tour_name,
+                            tour_type, tour_content, is_test):
+    """[LOCAL-766 / D713] Link the pooled stops this tour delivered to its id.
+
+    Called after the audio_tours row exists (new-insert and replacement paths),
+    where the id, creator, location and tour_type are known. The stop pool store
+    runs INSIDE generate_tour_text BEFORE this row exists, so provenance cannot be
+    recorded there; here is the one point with both the pooled stops (parsed from
+    tour_content) and the tour id. Best-effort and strictly non-fatal: a failure
+    must never fail a tour that is already stored. Test rows are recorded too —
+    the live test proves the rule end-to-end on is_test rows — but a NULL/empty
+    content simply records nothing.
+    """
+    try:
+        if not tour_content or not audio_tour_id:
+            return
+        import stop_pool_sources as provenance
+        _loc = location or request_string or tour_name or ""
+        # tour_type passed through from the serving path; fall back to the
+        # tour_name's "- <Category> Tour" suffix so the pool_key matches the row
+        # the pool stored under (the store keys on tour_type.lower()).
+        _ttype = tour_type
+        if not _ttype:
+            _ttype = provenance._tour_type_from_tour(tour_name, tour_content)
+        n = provenance.record_pool_sources(
+            _pool_db_url(), _loc, _ttype or "", int(audio_tour_id), tour_content)
+        print(f"  [LOCAL-766] provenance: linked {n} pooled stop(s) to tour "
+              f"{audio_tour_id} (type={_ttype!r}, is_test={is_test})")
+    except Exception as _prov_err:
+        print(f"  [LOCAL-766] provenance record skipped (non-fatal): {_prov_err}")
+
+
+def store_audio_tour(tour_name, request_string, zip_path, lat, lng, tour_content=None, stops_count=None, is_test=None, tour_kind=None, job_id=None, user_id=None, track=None, tour_type=None, location=None):
     """Store the audio tour in the database with original tour content.
 
     [LOCAL-727 / bug 432] ``track`` is the deployment track that produced this
@@ -1186,6 +1234,12 @@ def store_audio_tour(tour_name, request_string, zip_path, lat, lng, tour_content
                 cur.close()
                 conn.close()
                 print(f"==== AUDIO TOUR CONTENT REPLACED — id={existing_id} ====")
+                # [LOCAL-766 / D713] Record which pooled stops this (replaced)
+                # tour delivered, so the delivery rule can protect them if this
+                # tour is community/priced. After the row is committed/closed;
+                # non-fatal.
+                _record_pool_provenance(existing_id, location, request_string,
+                                        tour_name, tour_type, tour_content, is_test)
                 # [LOCAL-717] live row is version next_version + 1; [LOCAL-718] the
                 # archived (old) content is version next_version.
                 return _result(success=True, action="replaced",
@@ -1343,6 +1397,11 @@ def store_audio_tour(tour_name, request_string, zip_path, lat, lng, tour_content
         print(f"Database connection closed")
         
         print(f"==== AUDIO TOUR STORED SUCCESSFULLY ====")
+        # [LOCAL-766 / D713] Record which pooled stops this new tour delivered,
+        # so the delivery rule can protect them when this tour is community or
+        # priced (now or later). After commit + close; strictly non-fatal.
+        _record_pool_provenance(_new_tour_id, location, request_string, tour_name,
+                                tour_type, tour_content, is_test)
         # [LOCAL-717 / D677 §2] A brand-new tour is version 1.
         return _result(success=True, action="inserted", version_no=1)
         
@@ -1950,7 +2009,7 @@ def orchestrate_tour_async(job_id, location, tour_type, total_stops, user_id=Non
         # this is belt-and-braces; resolving it here keeps the two call paths in
         # lockstep and makes the chosen track visible at the call site.
         _store_track = normalize_track(os.getenv('TOUR_TRACK', 'beta'))
-        store_result = store_audio_tour(tour_name, request_string or location, zip_path, lat, lng, tour_content, stops_count=ACTIVE_JOBS[job_id].get("actual_stops"), is_test=is_test, tour_kind=ACTIVE_JOBS[job_id].get("tour_kind"), job_id=job_id, user_id=user_id, track=_store_track)
+        store_result = store_audio_tour(tour_name, request_string or location, zip_path, lat, lng, tour_content, stops_count=ACTIVE_JOBS[job_id].get("actual_stops"), is_test=is_test, tour_kind=ACTIVE_JOBS[job_id].get("tour_kind"), job_id=job_id, user_id=user_id, track=_store_track, tour_type=tour_type, location=location)
         
         # [LOCAL-156] store_audio_tour now returns a dict:
         #   {"success": bool, "action": str, "existing_tour_id": int|None, "error": str|None}
