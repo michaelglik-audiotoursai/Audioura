@@ -3619,7 +3619,8 @@ def nearest_treat_to_any_stop(treat_rows, stop_points, radius_km):
     return best
 
 
-def _build_closing_offer(poi_list, tour_category, transport_mode, location, sentence_budget=3):
+def _build_closing_offer(poi_list, tour_category, transport_mode, location,
+                         sentence_budget=3, venue_parts_used=False, tour_type=""):
     """[LOCAL-273/275] Build a ≤3 sentence closing offer from verified data.
 
     Three sentences (Michael's spec, LOCAL-275 addendum):
@@ -4014,7 +4015,7 @@ def _build_closing_offer(poi_list, tour_category, transport_mode, location, sent
         if os.path.exists(_news_path):
             sentences.append(
                 ("We can also generate news articles for you to listen to on the way back."
-                 if not _venue_parts_used else
+                 if not venue_parts_used else
                  # [Michael 2026-09-21] "back where?" — a building tour has no return
                  # journey to fill. Inside a church or a terminal the listener is not
                  # travelling home; they are standing in a room.
@@ -4040,7 +4041,7 @@ def _build_closing_offer(poi_list, tour_category, transport_mode, location, sent
         if _treat_clause:
             _more = ("Keep an eye on the Treats tab — there is something nearby you "
                      "can claim at a discount.")
-        elif not _venue_parts_used:
+        elif not venue_parts_used:
             _more = ("We can also generate news articles for you to listen to on the "
                      "way back.")
         else:
@@ -4058,7 +4059,7 @@ def _build_closing_offer(poi_list, tour_category, transport_mode, location, sent
         if _category_offer:
             sentences.append(_category_offer)
         print(f"  [LOCAL-275] Part 2 (more): treat={bool(_treat_clause)} "
-              f"building={_venue_parts_used} class={_venue_class!r}")
+              f"building={venue_parts_used} class={_venue_class!r}")
 
     except Exception as e:
         print(f"  [LOCAL-275] Part 2 error: {e}")
@@ -10026,6 +10027,15 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
             _pool_exclude_norm = set()
     if _pool_exclude_norm:
         print(f"  [LOCAL-590] pool exclusion active: {len(_pool_exclude_norm)} pooled title(s) will not be re-selected")
+    # [LOCAL-767] Say, once per generation and at the top, whether a Gemini key is
+    # even present — NEVER the value. The whole venue-parts hard-fail (and every
+    # "Gemini silently did nothing" bug before it, D549/D582) was invisible because
+    # nothing stated the one fact that explains them: no key means every grounded
+    # ask degrades. A present=False here next to a later "[LOCAL-767] venue-parts
+    # unavailable" line reads the outage off in one glance.
+    _gemini_key_present = bool(os.environ.get('GEMINI_API_KEY')
+                               or os.environ.get('GOOGLE_API_KEY'))
+    print(f"  [LOCAL-767] GEMINI key present={_gemini_key_present}")
 
     # [LOCAL-230] Reset per-run network failure counter
     try:
@@ -11427,15 +11437,36 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
                 print(f"  [D571] VENUE-PARTS rejected the venue kind "
                       f"({_venue_parts_evidence['rejected']}) — falling through")
         except _vp.ServiceUnavailable as _vp_dead:
-            # [2026-09-23] Do NOT fall through. A dead paid service must look like an
-            # outage, not like a venue with nothing to describe. Falling through
-            # produced a tour that looked fine, scored clean, and had quietly
-            # reverted to the old path.
-            print(f"\n  [D571] *** SERVICE UNAVAILABLE — ABORTING ***\n  {_vp_dead}\n"
-                  f"  Not degrading to the generic path. Check the provider's billing.")
-            raise
+            # [LOCAL-767] A dead Gemini (no key, exhausted prepay balance, 429,
+            # quota, timeout) must NOT take out a whole class of tours. Beta had no
+            # venue-parts path and generated these venues fine; so when venue-parts
+            # cannot run we fall back to that same standard (non-venue-parts) stop
+            # path, leaving `_venue_parts_used` False so every downstream branch
+            # takes its ordinary route.
+            #
+            # D577/D582 are BOTH honoured, not overridden. D582's rule is that an
+            # outage must not be SILENT — "we could not ask" must never masquerade
+            # as "this venue has nothing to describe", scored clean, with nobody the
+            # wiser. That is exactly why `build_tour_stops` still RAISES here rather
+            # than returning []: the outage stays distinguishable. We satisfy D582
+            # by logging it LOUDLY and by reason, and we satisfy D577 + LOCAL-767 by
+            # not converting the outage into a dead tour — a thin standard tour
+            # beats no tour. The honest-refusal exception keeps the case it was
+            # written for (a reported, inspectable outage); only the caller's
+            # response changes from "abort the tour" to "log it and degrade".
+            print(f"\n  [LOCAL-767] venue-parts unavailable (reason={_vp_dead}) — "
+                  f"falling back to standard stops\n"
+                  f"  (Gemini/grounded service is down or keyless; this is a LOUD "
+                  f"degrade, not a silent one — check the provider's billing/key.)")
+            _venue_parts_used = False
+            _venue_parts_evidence = {'service_unavailable': str(_vp_dead)}
         except Exception as _vp_err:
-            print(f"  [D571] venue-parts unavailable ({_vp_err}) — falling through")
+            # [LOCAL-767] Any other venue-parts failure (import error, bad data,
+            # unexpected exception) also degrades to the standard path rather than
+            # aborting — same principle, logged with its reason.
+            print(f"  [LOCAL-767] venue-parts unavailable (reason={_vp_err}) — "
+                  f"falling back to standard stops")
+            _venue_parts_used = False
 
     if (tour_category == 'facility' and not _forced_stops_active
             and not _venue_parts_used):   # [D574] need-spine parked behind venue-parts
@@ -26392,7 +26423,9 @@ RULES:
                 # When no recap: 3 sentences (original budget).
                 _closing_offer = _build_closing_offer(
                     poi_list, tour_category, transport_mode, location,
-                    sentence_budget=_offer_budget
+                    sentence_budget=_offer_budget,
+                    venue_parts_used=_venue_parts_used,
+                    tour_type=tour_type,
                 )
                 if _closing_offer:
                     # [D521] The "Closing:" label is GONE. Michael, 2026-08-24:
