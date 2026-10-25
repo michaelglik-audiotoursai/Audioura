@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart' show ScrollDirection;
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -19,17 +20,68 @@ import '../services/pass_expiry_warning.dart';
 import '../widgets/pass_expiry_warning_dialog.dart';
 import 'community_page_screen.dart';
 
+/// [LOCAL-761 / D710 as amended] Keys on the persistent bottom bar and the
+/// animated wrapper that slides it away while the user scrolls content down.
+/// Exposed so widget tests can assert the bar stays visible on pushed screens
+/// and that the slide wrapper exists.
+const Key kMainBottomBarKey = Key('main_bottom_bar');
+const Key kMainBottomBarSlideKey = Key('main_bottom_bar_slide');
+
+/// The five tabs, in order. Unchanged by D710 (amended): no Communities tab,
+/// no Settings move. Community pages open INSIDE the current tab.
+const int kHomeTab = 0;
+const int kGenerateTab = 1;
+const int kListenTab = 2;
+const int kTreatsTab = 3;
+const int kAboutTab = 4;
+const int kTabCount = 5;
+
 class MainScreen extends StatefulWidget {
   final int initialTab;
   const MainScreen({super.key, this.initialTab = 0});
 
   @override
-  State<MainScreen> createState() => _MainScreenState();
+  MainScreenState createState() => MainScreenState();
 }
 
-class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
+/// Public so widget tests can reach the per-tab Navigator keys, the current
+/// index, the Android-back handler and the auto-hide state. Nothing outside
+/// tests needs these; they carry the `...ForTest` suffix to make that clear.
+class MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
   late int _selectedIndex;
   int _listenTabVersion = 0;
+
+  // [LOCAL-761] Tabs the user has actually visited. A tab's heavy root is only
+  // built once it is in this set (the initial tab is added in initState). This
+  // defers constructing the other four screens until they are needed.
+  final Set<int> _visitedTabs = {};
+
+  // [LOCAL-761] One Navigator per tab. A screen pushed inside a tab pushes into
+  // that tab's Navigator (the pushing context lives below it), so the bottom
+  // bar — which is OUTSIDE the IndexedStack — stays visible. The IndexedStack
+  // keeps every tab's Navigator mounted, so each tab keeps its own navigation
+  // stack, scroll position, map position and search text when you switch away
+  // and back.
+  final List<GlobalKey<NavigatorState>> _tabNavigatorKeys =
+      List.generate(kTabCount, (_) => GlobalKey<NavigatorState>());
+
+  // [LOCAL-761] app_mode preservation. Pre-761, switching tabs disposed and
+  // rebuilt each screen, so HomeScreen / TourGeneratorScreen / MyToursScreen
+  // re-read 'app_mode' in initState — that fresh initState is THE mechanism the
+  // Tours<->Audio switch (set on the About tab) relied on. With persistent
+  // Navigators the roots stay mounted, so we reproduce the contract explicitly:
+  // we remember the app_mode each content tab's root was built under, and when
+  // the user switches INTO a content tab whose root is now stale we reset that
+  // tab's Navigator to a fresh root (a fresh initState, exactly as before).
+  static const Set<int> _modeSensitiveTabs = {kHomeTab, kGenerateTab, kListenTab};
+  final Map<int, String?> _tabBuiltUnderMode = {};
+  // Bumped per content tab to force its root widget to rebuild from scratch.
+  final Map<int, int> _tabRootVersion = {kHomeTab: 0, kGenerateTab: 0, kListenTab: 0};
+
+  // [LOCAL-761] Auto-hide-on-scroll. The bar is visible unless the user is
+  // actively scrolling content downward. It returns on scroll up, at the top of
+  // a list, and on any screen that does not scroll.
+  bool _barVisible = true;
 
   // [LOCAL-732] When the app last went to the background. A resume is only a
   // fresh "entry" (that re-checks pass expiry) when it has been more than an
@@ -44,6 +96,7 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
   void initState() {
     super.initState();
     _selectedIndex = widget.initialTab;
+    _visitedTabs.add(_selectedIndex);
     WidgetsBinding.instance.addObserver(this);
     _initializeNotifications();
     BackgroundService.startBackgroundMonitoring();
@@ -56,7 +109,7 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
     // Search and run it. Home itself consumes the code via the same notifier.
     PendingShareSearch.instance.code.addListener(_onShareCodeArrived);
     // [LOCAL-716] A download snackbar's "View" asks to go to the Listen tab
-    // (optionally opening one tour). Switch to index 2 exactly as a
+    // (optionally opening one tour). Switch to the Listen tab exactly as a
     // notification tap does; MyToursScreen consumes the tour id itself.
     PendingListenOpen.instance.request.addListener(_onListenOpenRequested);
     // The one-shot deferred-link check (Android Install Referrer; iOS clipboard
@@ -75,8 +128,8 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
   /// listener runs the search. If already on Home, Home handles it directly.
   void _onShareCodeArrived() {
     if (PendingShareSearch.instance.code.value == null) return;
-    if (_selectedIndex != 0 && mounted) {
-      setState(() => _selectedIndex = 0);
+    if (_selectedIndex != kHomeTab && mounted) {
+      _switchToTab(kHomeTab);
     }
   }
 
@@ -91,8 +144,13 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
     if (!mounted) return;
     setState(() {
       _listenTabVersion++;
-      _selectedIndex = 2;
+      _tabRootVersion[kListenTab] = (_tabRootVersion[kListenTab] ?? 0) + 1;
+      _selectedIndex = kListenTab;
+      _visitedTabs.add(kListenTab);
+      _barVisible = true; // a tab switch always reveals the bar.
     });
+    // The Listen root is rebuilt fresh, so it is now built under the live mode.
+    _resetTabToRoot(kListenTab);
   }
 
   /// [LOCAL-709 / D671 §4] The deferred-link one-shot: on the FIRST launch only,
@@ -192,7 +250,7 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
   Future<void> _maybeWarnPassExpiry() async {
     if (_passWarnInFlight) return;
     // Only on the Home tab.
-    if (_selectedIndex != 0) return;
+    if (_selectedIndex != kHomeTab) return;
     _passWarnInFlight = true;
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -213,7 +271,7 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
       if (toShow.isEmpty) return;
 
       // Re-check we are still on Home and mounted before putting up a dialog.
-      if (!mounted || _selectedIndex != 0) return;
+      if (!mounted || _selectedIndex != kHomeTab) return;
 
       await showDialog<void>(
         context: context,
@@ -269,67 +327,274 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
         _maybeWarnPassExpiry();
       }
       _lastPausedAt = null;
-      // Refresh Home, My Tours, or Treats screen when app is resumed
-      if (_selectedIndex == 0 || _selectedIndex == 2 || _selectedIndex == 3) {
-        if (_selectedIndex == 2) _listenTabVersion++; // NF10: force Listen reload on resume
-        setState(() {});
+      // Refresh Home, My Tours, or Treats when the app is resumed. Pre-761 this
+      // relied on a full rebuild; now we reset the tab's root to a fresh route
+      // so its initState runs again (re-reading app_mode and reloading data).
+      if (_selectedIndex == kHomeTab ||
+          _selectedIndex == kListenTab ||
+          _selectedIndex == kTreatsTab) {
+        if (_selectedIndex == kListenTab) {
+          _listenTabVersion++; // NF10: force Listen reload on resume
+        }
+        setState(() {
+          final v = _tabRootVersion[_selectedIndex];
+          if (v != null) _tabRootVersion[_selectedIndex] = v + 1;
+        });
+        _resetTabToRoot(_selectedIndex);
       }
     }
   }
 
   Future<void> _initializeNotifications() async {
     await NotificationService.initialize((NotificationResponse response) {
-      // Navigate to My Tours tab when a notification is tapped
+      // Navigate to the Listen tab when a notification is tapped.
+      if (!mounted) return;
       setState(() {
         _listenTabVersion++; // NF11: force Listen reload (background-generated tour)
-        _selectedIndex = 2;
+        _tabRootVersion[kListenTab] = (_tabRootVersion[kListenTab] ?? 0) + 1;
+        _selectedIndex = kListenTab;
+        _visitedTabs.add(kListenTab);
+        _barVisible = true;
       });
+      _resetTabToRoot(kListenTab);
     });
   }
 
-  // Returns a FRESH widget on every build. Switching tabs swaps the body child
-  // to a different widget type, so Flutter disposes the outgoing screen's State
-  // and runs the incoming screen's initState. That re-run of initState is THE
-  // mechanism that makes Tours <-> Audio mode switching work: HomeScreen,
-  // TourGeneratorScreen, and MyToursScreen all re-read 'app_mode' from
-  // SharedPreferences in their initState/_loadAppMode.
-  //
-  // DO NOT wrap this in IndexedStack. IndexedStack keeps every screen mounted
-  // permanently, initState runs only once at launch, and a mode change made in
-  // the About tab is never picked up. That was the v1.2.9+59/+60 regression.
-  Widget _buildBody() {
-    switch (_selectedIndex) {
-      case 1:
-        return const TourGeneratorScreen();
-      case 2:
-        return MyToursScreen(key: ValueKey(_listenTabVersion));
-      case 3:
+  // ---------------------------------------------------------------------------
+  // Tab roots. Returns a FRESH root widget whenever the per-tab root version is
+  // bumped (notification / resume / Listen-open / stale app_mode). Each root
+  // carries a ValueKey so bumping the version forces a new State and a new
+  // initState — the pre-761 Tours<->Audio pickup, preserved.
+  // ---------------------------------------------------------------------------
+  Widget _buildTabRoot(int index) {
+    switch (index) {
+      case kGenerateTab:
+        return TourGeneratorScreen(
+            key: ValueKey('gen_${_tabRootVersion[kGenerateTab]}'));
+      case kListenTab:
+        return MyToursScreen(key: ValueKey('listen_$_listenTabVersion'));
+      case kTreatsTab:
         return const TreatsScreen();
-      case 4:
+      case kAboutTab:
         return const AboutScreen();
+      case kHomeTab:
       default:
-        return const HomeScreen();
+        return HomeScreen(key: ValueKey('home_${_tabRootVersion[kHomeTab]}'));
     }
+  }
+
+  /// Reset one tab's Navigator to a single fresh root route. Used when we need a
+  /// content tab to re-run its root initState (notification, resume, stale
+  /// app_mode). Safe before the Navigator mounts (no-op until it exists).
+  void _resetTabToRoot(int index) {
+    final nav = _tabNavigatorKeys[index].currentState;
+    if (nav == null) return; // not mounted yet; the IndexedStack will build it.
+    nav.popUntil((r) => r.isFirst);
+  }
+
+  /// Read the live app_mode and, if a content tab's root was built under a
+  /// different mode, bump that tab's root version and reset its Navigator so the
+  /// root rebuilds from scratch. Called when switching INTO a content tab.
+  Future<void> _refreshModeForTab(int index) async {
+    if (!_modeSensitiveTabs.contains(index)) return;
+    final prefs = await SharedPreferences.getInstance();
+    final mode = prefs.getString('app_mode') ?? 'Tours';
+    final builtUnder = _tabBuiltUnderMode[index];
+    if (builtUnder == mode) return; // already fresh for this mode.
+    _tabBuiltUnderMode[index] = mode;
+    if (!mounted) return;
+    setState(() {
+      final v = _tabRootVersion[index];
+      if (v != null) _tabRootVersion[index] = v + 1;
+      if (index == kListenTab) _listenTabVersion++;
+    });
+    _resetTabToRoot(index);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Tab selection + re-tap-to-root.
+  // ---------------------------------------------------------------------------
+  void _onTabTapped(int index) {
+    if (index == _selectedIndex) {
+      // D710: re-tapping the active tab pops it back to its first screen.
+      final nav = _tabNavigatorKeys[index].currentState;
+      if (nav != null && nav.canPop()) {
+        nav.popUntil((r) => r.isFirst);
+      }
+      // A re-tap of the Listen tab also bumps its version (pre-761 behaviour).
+      if (index == kListenTab) {
+        setState(() => _listenTabVersion++);
+        _resetTabToRoot(kListenTab);
+      }
+      setState(() => _barVisible = true);
+      return;
+    }
+    _switchToTab(index);
+  }
+
+  void _switchToTab(int index) {
+    setState(() {
+      _selectedIndex = index;
+      _visitedTabs.add(index);
+      _barVisible = true; // any tab switch reveals the bar.
+    });
+    // Picking up a mode change made on the About tab (Tours<->Audio).
+    _refreshModeForTab(index);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Android Back.
+  //   * If the current tab can pop, pop it (stay in the app).
+  //   * Else if we are not on Home, switch to Home.
+  //   * Else (Home root) do not consume — let the system background/exit.
+  // Returns true when the back was handled inside the app.
+  // ---------------------------------------------------------------------------
+  Future<bool> _handleBack() async {
+    final nav = _tabNavigatorKeys[_selectedIndex].currentState;
+    if (nav != null && nav.canPop()) {
+      nav.pop();
+      return true;
+    }
+    if (_selectedIndex != kHomeTab) {
+      _switchToTab(kHomeTab);
+      return true;
+    }
+    return false; // Home root → allow the system to handle it.
+  }
+
+  // ---------------------------------------------------------------------------
+  // Auto-hide on scroll. A reverse scroll (content moving up, finger up) hides
+  // the bar; a forward scroll (content moving down) or reaching the top shows
+  // it. Idle / non-scrolling screens keep it visible.
+  // ---------------------------------------------------------------------------
+  bool _onScrollNotification(ScrollNotification notification) {
+    if (notification is ScrollUpdateNotification) {
+      final delta = notification.scrollDelta ?? 0;
+      if (delta > 2 && _barVisible) {
+        setState(() => _barVisible = false); // scrolling down → hide.
+      } else if (delta < -2 && !_barVisible) {
+        setState(() => _barVisible = true); // scrolling up → show.
+      }
+      // At the very top of the list, always show.
+      if (notification.metrics.pixels <= notification.metrics.minScrollExtent &&
+          !_barVisible) {
+        setState(() => _barVisible = true);
+      }
+    } else if (notification is UserScrollNotification) {
+      _applyScrollDirection(notification.direction);
+    } else if (notification is ScrollEndNotification) {
+      // At rest at the top → reveal.
+      if (notification.metrics.pixels <=
+              notification.metrics.minScrollExtent &&
+          !_barVisible) {
+        setState(() => _barVisible = true);
+      }
+    }
+    return false; // let the notification keep bubbling.
+  }
+
+  void _applyScrollDirection(ScrollDirection direction) {
+    if (direction == ScrollDirection.reverse && _barVisible) {
+      setState(() => _barVisible = false);
+    } else if (direction == ScrollDirection.forward && !_barVisible) {
+      setState(() => _barVisible = true);
+    } else if (direction == ScrollDirection.idle && !_barVisible) {
+      // Idle does not force the bar back; it returns on scroll up or at top.
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Testing hooks (used by test/persistent_tabs_local761_test.dart).
+  // ---------------------------------------------------------------------------
+  GlobalKey<NavigatorState> tabNavigatorKeyForTest(int index) =>
+      _tabNavigatorKeys[index];
+  int get currentIndexForTest => _selectedIndex;
+  bool get barVisibleForTest => _barVisible;
+  Future<bool> handleBackForTest() => _handleBack();
+  void onScrollForTest(ScrollDirection direction) =>
+      _applyScrollDirection(direction);
+
+  // ---------------------------------------------------------------------------
+  // Build.
+  // ---------------------------------------------------------------------------
+  // [LOCAL-761] Lazy tab content. Every tab's Navigator is created eagerly (so
+  // its GlobalKey, navigation stack, scroll position and map survive switching
+  // away once the tab has been visited), but a tab's heavy root screen is not
+  // built until the tab is first selected. This keeps the pre-761 contract that
+  // a content screen's initState runs on tab entry, avoids constructing all
+  // five screens at launch, and means the initial tab is the only screen built
+  // up front (exactly as before: production always starts on Home).
+  Widget _buildTabNavigator(int index) {
+    if (!_visitedTabs.contains(index)) {
+      // Not visited yet: an empty placeholder. The Navigator still mounts so
+      // its key is live; the real root is generated on first visit.
+      return const SizedBox.shrink();
+    }
+    return Navigator(
+      key: _tabNavigatorKeys[index],
+      onGenerateRoute: (settings) => MaterialPageRoute(
+        settings: settings,
+        builder: (_) => _buildTabRoot(index),
+      ),
+    );
+  }
+
+  /// True only when a system Back should be allowed to leave the app: we are on
+  /// the Home tab and its Navigator has nothing to pop. In every other case we
+  /// intercept Back and handle it in-app (pop the tab, or switch to Home).
+  bool get _canPopApp {
+    if (_selectedIndex != kHomeTab) return false;
+    final nav = _tabNavigatorKeys[kHomeTab].currentState;
+    return nav == null || !nav.canPop();
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: _buildBody(),
-      bottomNavigationBar: BottomNavigationBar(
-        type: BottomNavigationBarType.fixed,
-        currentIndex: _selectedIndex,
-        onTap: (index) {
-          if (index == 2) _listenTabVersion++;
-          setState(() => _selectedIndex = index);
-        },
-        items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home'),
-          BottomNavigationBarItem(icon: Icon(Icons.add), label: 'Generate Tour'),
-          BottomNavigationBarItem(icon: Icon(Icons.library_music), label: 'Listen'),
-          BottomNavigationBarItem(icon: Icon(Icons.local_cafe), label: 'Treats'),
-          BottomNavigationBarItem(icon: Icon(Icons.info), label: 'About'),
-        ],
+    return PopScope(
+      canPop: _canPopApp,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) return; // the system already popped (Home root → exit).
+        // Intercepted: handle Back inside the app (pop the tab, or go Home).
+        _handleBack();
+      },
+      child: Scaffold(
+        // The body is an IndexedStack of per-tab Navigators. The bar sits in
+        // bottomNavigationBar, OUTSIDE the stack, so any screen pushed inside a
+        // tab keeps it visible. A single NotificationListener drives auto-hide
+        // for whatever scrollable is on top in any tab.
+        body: NotificationListener<ScrollNotification>(
+          onNotification: _onScrollNotification,
+          child: IndexedStack(
+            index: _selectedIndex,
+            children: List.generate(kTabCount, _buildTabNavigator),
+          ),
+        ),
+        bottomNavigationBar: AnimatedSlide(
+          key: kMainBottomBarSlideKey,
+          duration: const Duration(milliseconds: 200),
+          curve: Curves.easeInOut,
+          offset: _barVisible ? Offset.zero : const Offset(0, 1),
+          child: AnimatedOpacity(
+            duration: const Duration(milliseconds: 200),
+            opacity: _barVisible ? 1 : 0,
+            child: BottomNavigationBar(
+              key: kMainBottomBarKey,
+              type: BottomNavigationBarType.fixed,
+              currentIndex: _selectedIndex,
+              onTap: _onTabTapped,
+              items: const [
+                BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home'),
+                BottomNavigationBarItem(
+                    icon: Icon(Icons.add), label: 'Generate Tour'),
+                BottomNavigationBarItem(
+                    icon: Icon(Icons.library_music), label: 'Listen'),
+                BottomNavigationBarItem(
+                    icon: Icon(Icons.local_cafe), label: 'Treats'),
+                BottomNavigationBarItem(icon: Icon(Icons.info), label: 'About'),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }
