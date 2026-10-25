@@ -16,12 +16,12 @@ It proves the server contract Michael needs (D711):
   2. GET /tour/<id>/role for the OWNER → is_owner, is_organiser, is_broadcast;
      for a MEMBER → NOT owner, NOT organiser (so the app hides Price/Re-score —
      the Pixel-4 member can no longer reach Set Price).
-  3. set_price on a MEMBERS-ONLY tour → 400 members_only_no_price (covered by
-     the dues); clearing (tier=null) is allowed.
-  4. The owner publishes a PUBLIC organiser-audio tour WITH a price_tier → the
-     row stores the tier; GET /tour/<id>/price reports is_paid.
-  5. Publishing a MEMBERS-ONLY tour WITH a price_tier → 400 members_only_no_price
-     (before any row is created).
+  3. set_price on a COMMUNITY tour → 400 community_tour_no_price (included with
+     membership, D711 addendum 1); clearing (tier=null) is allowed.
+  4. Publishing a PUBLIC community tour WITH a price_tier → 400
+     community_tour_no_price (no row); without a price it publishes Free.
+  5. Publishing a MEMBERS-ONLY tour WITH a price_tier → 400
+     community_tour_no_price (before any row is created).
   6. A MEMBER setting a price on the owner's tour → 403 not_owner.
   7. Row counts (audio_tours, communities) before/after; every row is_test=true;
      cleanup removes ONLY this run's is_test rows (D141); budget $0.00 (no AI).
@@ -185,24 +185,36 @@ def main():
         print(f'[role member] is_owner={rm["is_owner"]} is_organiser='
               f'{rm["is_organiser"]} (member cannot reach Price/Re-score) ✓')
 
-        # 3) set_price on a MEMBERS-ONLY tour → 400 members_only_no_price.
+        # 3) set_price on a COMMUNITY tour → 400 community_tour_no_price.
         r = client.post(f'/tour/{members_tour}/price',
                         json={'user_id': owner, 'tier': 3})
         assert r.status_code == 400, (r.status_code, r.get_data(as_text=True))
-        assert r.get_json()['error'] == 'members_only_no_price', r.get_json()
-        print('[price members-only] owner refused members_only_no_price (400) ✓')
+        assert r.get_json()['error'] == 'community_tour_no_price', r.get_json()
+        print('[price community] owner refused community_tour_no_price (400) ✓')
         # Clearing is allowed.
         r = client.post(f'/tour/{members_tour}/price',
                         json={'user_id': owner, 'tier': None})
         assert r.status_code == 200, r.get_data(as_text=True)
-        print('[price members-only] clearing (tier=null) allowed ✓')
+        print('[price community] clearing (tier=null) allowed ✓')
 
-        # 4) Owner builds a PUBLIC tour WITH a price at creation.
+        # 4) [LOCAL-763 / D711 addendum 1] A PUBLIC community tour WITH a price
+        #    is NOW refused too (a community tour of any visibility carries no
+        #    per-tour price) — 400 before any row is created.
+        mid_before4 = _counts(cur)['audio_tours']
         r = client.post(f'/communities/{community_id}/build-audio-tour',
                         json={'user_id': owner, 'tour_name': f'Public Walk {RUN}',
                               'tour_type': 'walking', 'visibility': 'public',
                               'rights_accepted': True, 'stops': stops,
                               'price_tier': 3})
+        assert r.status_code == 400, (r.status_code, r.get_data(as_text=True))
+        assert r.get_json()['error'] == 'community_tour_no_price', r.get_json()
+        assert _counts(cur)['audio_tours'] == mid_before4, 'no row on refusal'
+        print('[build public+price] refused community_tour_no_price, no row ✓')
+        # A PUBLIC community tour WITHOUT a price still publishes Free.
+        r = client.post(f'/communities/{community_id}/build-audio-tour',
+                        json={'user_id': owner, 'tour_name': f'Public Free {RUN}',
+                              'tour_type': 'walking', 'visibility': 'public',
+                              'rights_accepted': True, 'stops': stops})
         assert r.status_code == 201, (r.status_code, r.get_data(as_text=True))
         public_tour = r.get_json()['tour_id']
         created_tour_ids.append(public_tour)
@@ -210,9 +222,9 @@ def main():
                     (public_tour,))
         r = client.get(f'/tour/{public_tour}/price')
         pj = r.get_json()
-        assert pj['is_paid'] and pj['price_tier'] == 3, pj
-        print(f'[build public+price] id={public_tour} price_tier='
-              f'{pj["price_tier"]} is_paid={pj["is_paid"]} ✓')
+        assert not pj['is_paid'] and pj['price_tier'] is None, pj
+        print(f'[build public free] id={public_tour} is Free (no per-tour '
+              f'price) ✓')
 
         # 5) Publishing a MEMBERS-ONLY tour WITH a price → 400 before any row.
         mid_before = _counts(cur)['audio_tours']
@@ -222,18 +234,21 @@ def main():
                               'rights_accepted': True, 'stops': stops,
                               'price_tier': 3})
         assert r.status_code == 400, (r.status_code, r.get_data(as_text=True))
-        assert r.get_json()['error'] == 'members_only_no_price', r.get_json()
+        assert r.get_json()['error'] == 'community_tour_no_price', r.get_json()
         assert _counts(cur)['audio_tours'] == mid_before, 'no row on refusal'
-        print('[build members+price] refused members_only_no_price, no row ✓')
+        print('[build members+price] refused community_tour_no_price, no row ✓')
 
         # 6) A MEMBER pricing the owner's public tour → 403 (refused). The
         # member is neither the owner nor a curator, so set_price refuses with
         # not_curator (checked first) — either way the member cannot price it.
         r = client.post(f'/tour/{public_tour}/price',
                         json={'user_id': member, 'tier': 5})
-        assert r.status_code == 403, (r.status_code, r.get_data(as_text=True))
-        assert r.get_json()['error'] in ('not_owner', 'not_curator'), r.get_json()
-        print(f'[price by member] refused {r.get_json()["error"]} (403) ✓')
+        assert r.status_code in (400, 403), (r.status_code,
+                                             r.get_data(as_text=True))
+        assert r.get_json()['error'] in (
+            'not_owner', 'not_curator', 'community_tour_no_price'), r.get_json()
+        print(f'[price by member] refused {r.get_json()["error"]} '
+              f'({r.status_code}) ✓')
 
         after = _counts(cur)
         print(f'[rows] after: {after}')

@@ -22,21 +22,45 @@
 /// without re-deriving the case. Kept alongside the label as a small enum.
 enum TourRoleIcon { person, group, broadcast, audioura }
 
-/// The role line result: the [text] to show and an [icon] hint.
+/// [LOCAL-763 / D711 §2] Colour family for the role line's bright chip. One per
+/// relationship so the ⋮ menu's first line reads its meaning by colour at a
+/// glance (Michael 2026-10-25: "make it in colour and bright; colours may
+/// depend on what it says"). The widget maps each kind to a fill/text/border
+/// that passes contrast in BOTH light and dark mode:
+///   * ownBlue        — your own (non-community) tour: brand blue, filled.
+///   * organiserGreen — your community tour, you are the organiser: the
+///                      LOCAL-757 community green, filled.
+///   * communityGreen — a community tour you did NOT create: green OUTLINE.
+///   * broadcastPurple— a broadcast (organiser-audio/podcast) tour: purple.
+///   * audiouraGrey   — a plain Audioura tour: neutral blue-grey.
+enum TourRoleKind {
+  ownBlue,
+  organiserGreen,
+  communityGreen,
+  broadcastPurple,
+  audiouraGrey,
+}
+
+/// The role line result: the [text] to show, an [icon] hint and a colour
+/// [kind] for the bright chip.
 class TourRoleLine {
   final String text;
   final TourRoleIcon icon;
-  const TourRoleLine(this.text, this.icon);
+  final TourRoleKind kind;
+  const TourRoleLine(this.text, this.icon, this.kind);
 
   @override
   bool operator ==(Object other) =>
-      other is TourRoleLine && other.text == text && other.icon == icon;
+      other is TourRoleLine &&
+      other.text == text &&
+      other.icon == icon &&
+      other.kind == kind;
 
   @override
-  int get hashCode => Object.hash(text, icon);
+  int get hashCode => Object.hash(text, icon, kind);
 
   @override
-  String toString() => 'TourRoleLine($text, $icon)';
+  String toString() => 'TourRoleLine($text, $icon, $kind)';
 }
 
 bool _b(dynamic v) => v == true;
@@ -72,6 +96,7 @@ TourRoleLine tourRoleLabel(Map<String, dynamic> record, String? userId) {
     return TourRoleLine(
       isOrganiser ? '$base — you are the organiser' : base,
       TourRoleIcon.broadcast,
+      TourRoleKind.broadcastPurple,
     );
   }
 
@@ -81,14 +106,17 @@ TourRoleLine tourRoleLabel(Map<String, dynamic> record, String? userId) {
       return const TourRoleLine(
         'Your community tour — you are the organiser',
         TourRoleIcon.group,
+        TourRoleKind.organiserGreen,
       );
     }
     // Your own community tour where you are NOT the organiser is still "your
     // tour" from your side (you created it); name the community so it is clear.
     if (isCommunity && communityName != null) {
-      return TourRoleLine('Your tour · $communityName', TourRoleIcon.group);
+      return TourRoleLine('Your tour · $communityName', TourRoleIcon.group,
+          TourRoleKind.communityGreen);
     }
-    return const TourRoleLine('Your tour', TourRoleIcon.person);
+    return const TourRoleLine(
+        'Your tour', TourRoleIcon.person, TourRoleKind.ownBlue);
   }
 
   // A generated community tour you did not create.
@@ -99,9 +127,12 @@ TourRoleLine tourRoleLabel(Map<String, dynamic> record, String? userId) {
     return TourRoleLine(
       isOrganiser ? '$base — you are the organiser' : base,
       TourRoleIcon.group,
+      // Organiser of a community tour → filled green; a plain member → outline.
+      isOrganiser ? TourRoleKind.organiserGreen : TourRoleKind.communityGreen,
     );
   }
 
   // Anything else: a plain Audioura tour.
-  return const TourRoleLine('Audioura tour', TourRoleIcon.audioura);
+  return const TourRoleLine(
+      'Audioura tour', TourRoleIcon.audioura, TourRoleKind.audiouraGrey);
 }

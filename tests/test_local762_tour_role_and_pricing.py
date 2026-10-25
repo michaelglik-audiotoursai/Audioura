@@ -16,9 +16,9 @@ PART B — DB-backed (own is_test rows, TEST-762- prefix, prefix-scoped cleanup,
 D141-safe — mirrors test_local677_paid_tours):
   * tour_role reports is_owner / is_broadcast / is_community / is_organiser /
     community_visibility for every case the role line distinguishes;
-  * set_price by the organiser on a PUBLIC community tour succeeds;
-  * set_price on a MEMBERS-ONLY community tour is refused members_only_no_price
-    (mapped to HTTP 400 by the route);
+  * [LOCAL-763 / D711 addendum 1] set_price on ANY community tour (members-only
+    OR public) is refused community_tour_no_price (mapped to HTTP 400 by the
+    route); clearing (tier=None) is still allowed;
   * GET /tour/<id>/role returns the role block.
 
 Run: python3 -m pytest tests/test_local762_tour_role_and_pricing.py -q
@@ -167,28 +167,26 @@ class OrganiserAudioStampsCreatorTest(unittest.TestCase):
         self.assertIn(_OWNER, list(params),
                       "creator_user_id must be bound to the organiser's id")
 
-    def test_public_publish_with_price_tier_is_stored(self):
-        # [LOCAL-762 / D711 §4] A PUBLIC organiser-audio tour may carry a price.
+    def test_public_publish_with_price_tier_is_refused_400(self):
+        # [LOCAL-763 / D711 addendum 1] A community tour of ANY visibility
+        # carries no per-tour price, so a PUBLIC build with a price_tier is now
+        # refused community_tour_no_price (400) before any row is created.
         plan = [
             ("from communities where id", _community_row_rows(_OWNER)),
-            ("insert into audio_tours", lambda params: [(99,)]),
-            ("max(version_no)", [(None,)]),
         ]
         writes = self._install(plan)
         r = self.client.post(
             f'/communities/{_COMMUNITY_ID}/build-audio-tour',
             json=self._body(visibility='public', price_tier=3))
-        self.assertEqual(r.status_code, 201, r.get_data(as_text=True))
-        insert_write = next(
-            w for w in writes if 'insert into audio_tours' in w[0])
-        sql, params = insert_write
-        self.assertIn('price_tier', sql,
-                      "a public tour's INSERT must carry price_tier")
-        self.assertIn(3, list(params),
-                      "the chosen tier must be bound on the INSERT")
+        self.assertEqual(r.status_code, 400, r.get_data(as_text=True))
+        self.assertEqual(r.get_json()['error'], 'community_tour_no_price')
+        self.assertFalse(
+            any('insert into audio_tours' in w[0] for w in writes),
+            "a refused price must not create a tour")
 
     def test_members_only_publish_with_price_tier_is_refused_400(self):
-        # [LOCAL-762 / D711 §3/§4] A members-only tour cannot be priced.
+        # [LOCAL-763 / D711 addendum 1] A members-only community tour cannot be
+        # priced either — refused community_tour_no_price.
         plan = [
             ("from communities where id", _community_row_rows(_OWNER)),
         ]
@@ -197,7 +195,7 @@ class OrganiserAudioStampsCreatorTest(unittest.TestCase):
             f'/communities/{_COMMUNITY_ID}/build-audio-tour',
             json=self._body(visibility='members', price_tier=3))
         self.assertEqual(r.status_code, 400)
-        self.assertEqual(r.get_json()['error'], 'members_only_no_price')
+        self.assertEqual(r.get_json()['error'], 'community_tour_no_price')
         self.assertFalse(
             any('insert into audio_tours' in w[0] for w in writes),
             "a refused price must not create a tour")
@@ -414,15 +412,18 @@ def test_members_only_community_tour_cannot_be_priced(db):
                          community_visibility='members')
         with pytest.raises(pricing_svc.PricingError) as ei:
             pricing_svc.set_price(organiser, tid, 3)
-        assert ei.value.code == "members_only_no_price"
-        # Clearing (tier=None) is still allowed on a members-only tour.
+        # [LOCAL-763 / D711 addendum 1] renamed error code.
+        assert ei.value.code == "community_tour_no_price"
+        # Clearing (tier=None) is still allowed on a community tour.
         cleared = pricing_svc.set_price(organiser, tid, None)
         assert cleared["is_paid"] is False
     finally:
         _cleanup(db)
 
 
-def test_public_community_tour_may_be_priced_by_organiser(db):
+def test_public_community_tour_cannot_be_priced_either(db):
+    # [LOCAL-763 / D711 addendum 1] A PUBLIC community tour is also refused — a
+    # community tour of any visibility is included with membership.
     _cleanup(db)
     try:
         organiser = f"{TEST_PREFIX}price-org2"
@@ -431,9 +432,12 @@ def test_public_community_tour_may_be_priced_by_organiser(db):
         tid = _seed_tour(db, f"{TEST_PREFIX}public tour",
                          creator_user_id=organiser, community_id=cid,
                          community_visibility='public')
-        result = pricing_svc.set_price(organiser, tid, 3)
-        assert result["is_paid"] is True
-        assert result["price_tier"] == 3
+        with pytest.raises(pricing_svc.PricingError) as ei:
+            pricing_svc.set_price(organiser, tid, 3)
+        assert ei.value.code == "community_tour_no_price"
+        # Clearing (tier=None) is still allowed.
+        cleared = pricing_svc.set_price(organiser, tid, None)
+        assert cleared["is_paid"] is False
     finally:
         _cleanup(db)
 
@@ -462,7 +466,7 @@ def test_role_endpoint_returns_block(db):
         _cleanup(db)
 
 
-def test_set_price_route_maps_members_only_to_400(db):
+def test_set_price_route_maps_community_tour_to_400(db):
     _cleanup(db)
     try:
         from flask import Flask
@@ -477,7 +481,7 @@ def test_set_price_route_maps_members_only_to_400(db):
         r = client.post(f'/tour/{tid}/price',
                         json={'user_id': organiser, 'tier': 3})
         assert r.status_code == 400
-        assert r.get_json()["error"] == "members_only_no_price"
+        assert r.get_json()["error"] == "community_tour_no_price"
     finally:
         _cleanup(db)
 

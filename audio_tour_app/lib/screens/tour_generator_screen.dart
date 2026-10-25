@@ -433,13 +433,17 @@ class _TourGeneratorScreenState extends State<TourGeneratorScreen> {
   }
 
   /// [LOCAL-762 / D711 §4] The optional non-member price picker for a curator.
-  /// Hidden to non-curators, and to a members-only community target (the dues
-  /// cover it). Default Free. Choosing a paid tier records Guide Terms
-  /// acceptance (LOCAL-691) before it is applied (on generate).
+  /// Hidden to non-curators, and to ANY community target (a community tour is
+  /// included with membership and carries no per-tour price — D711 addendum 1).
+  /// It still shows for a curator's own "Just me" tour. Default Free. Choosing
+  /// a paid tier records Guide Terms acceptance (LOCAL-691) before it is applied
+  /// (on generate).
   Widget _buildGenPricePicker() {
-    final membersOnlyCommunity = _communityTarget.isCommunity &&
-        _communityTarget.visibility == 'members';
-    if (!_canSell || membersOnlyCommunity) return const SizedBox.shrink();
+    // [LOCAL-763 / D711 addendum 1] No per-tour price on a community tour of any
+    // visibility, so the picker is hidden whenever the target is a community.
+    if (!_canSell || _communityTarget.isCommunity) {
+      return const SizedBox.shrink();
+    }
     return Card(
       margin: const EdgeInsets.only(top: 8, bottom: 8),
       child: Padding(
@@ -1120,16 +1124,16 @@ class _TourGeneratorScreenState extends State<TourGeneratorScreen> {
       
       await DebugLogHelper.addDebugLog('TOUR: Using final_tour_id: $finalTourId (not job_id: $jobId)');
 
-      // [LOCAL-762 / D711 §4] A curator who chose a non-member price in the
-      // options applies it now, to the freshly-created numeric tour id, via the
-      // same setPrice path (the server enforces curator + ownership, and refuses
-      // a members-only community tour). Best-effort: a pricing failure never
-      // blocks the download. Skipped for a members-only community target.
+      // [LOCAL-763 / D711 addendum 1] A curator who chose a non-member price in
+      // the options applies it now, to the freshly-created numeric tour id, via
+      // the same setPrice path (the server enforces curator + ownership, and
+      // refuses ANY community tour). Best-effort: a pricing failure never blocks
+      // the download. Skipped entirely for a community target — a community tour
+      // carries no per-tour price (the picker is hidden for it anyway).
       if (_canSell &&
           _genPriceTier != null &&
           finalTourIdInt != null &&
-          !(_communityTarget.isCommunity &&
-              _communityTarget.visibility == 'members')) {
+          !_communityTarget.isCommunity) {
         final res =
             await TourPricingService.setPrice('$finalTourIdInt', _genPriceTier);
         await DebugLogHelper.addDebugLog(

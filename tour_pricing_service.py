@@ -267,7 +267,7 @@ class PricingError(Exception):
     """Raised with a stable `code` so the route maps it to the right HTTP status.
 
     code ∈ 'not_curator' (403) | 'not_owner' (403) | 'invalid_tier' (400) |
-           'unknown_tour' (404) | 'members_only_no_price' (400).
+           'unknown_tour' (404) | 'community_tour_no_price' (400).
     """
 
     def __init__(self, code, message):
@@ -317,20 +317,19 @@ def set_price(user_id, tour_id, tier):
                 "You can only set the price on a tour you created.",
             )
 
-        # [LOCAL-762 / D711 §3] A members-only community tour cannot be priced:
-        # it is already covered by the membership dues. Only a NON-None tier
-        # (actually setting a price) is refused — CLEARING a price (tier=None)
-        # on such a tour is always allowed. Members get the tour "Included with
-        # membership"; a public community tour (community_visibility='public')
-        # may be priced for non-members.
+        # [LOCAL-763 / D711 addendum 1] A COMMUNITY tour cannot be priced — of
+        # any visibility (members-only OR public), generated OR broadcast. A
+        # community tour is included with membership: anyone can find it, but
+        # they join the community to listen, so there is no per-tour price.
+        # Only a NON-None tier (actually setting a price) is refused — CLEARING a
+        # price (tier=None) on such a tour is always allowed.
         if tier is not None:
             ctx = _tour_community_context(cur, original_id)
-            if ctx["community_id"] is not None and \
-                    ctx["community_visibility"] == 'members':
+            if ctx["community_id"] is not None:
                 raise PricingError(
-                    "members_only_no_price",
-                    "Members-only tours are covered by the membership dues "
-                    "and cannot be priced.",
+                    "community_tour_no_price",
+                    "Community tours are included with membership and cannot "
+                    "be priced separately.",
                 )
 
         # Validate the tier (None = clear; any other value must be a valid tier).
@@ -636,7 +635,7 @@ def register_pricing_routes(app):
                 "not_owner": 403,
                 "invalid_tier": 400,
                 "unknown_tour": 404,
-                "members_only_no_price": 400,
+                "community_tour_no_price": 400,
             }.get(pe.code, 400)
             return jsonify({"error": pe.code, "message": pe.message}), status
         except Exception as e:  # noqa: BLE001
