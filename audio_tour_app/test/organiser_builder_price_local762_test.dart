@@ -1,10 +1,10 @@
-// [LOCAL-762 / D711 §4] The organiser-audio builder's optional "Price for
-// non-members" field is shown ONLY when the tour's visibility is Public (a
-// members-only tour is covered by the dues and cannot be priced).
+// [LOCAL-763 / D711 addendum 1] The organiser-audio builder has NO per-tour
+// price: a community tour (members-only OR public) is included with membership,
+// so the old "Price for non-members" field is gone for every visibility.
 //
-// Drives the REAL OrganiserAudioTourScreen with a MockClient (so the /price-
-// tiers ladder call and the community GET resolve offline) and a Fake location
-// provider, with the map tiles stubbed transparent.
+// Drives the REAL OrganiserAudioTourScreen with a MockClient (so the community
+// GET resolves offline) and a Fake location provider, with the map tiles
+// stubbed transparent.
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -73,17 +73,18 @@ void main() {
     debugBuilderTileProviderOverride = null;
   });
 
-  testWidgets('the Price field is HIDDEN for a members-only tour (default)',
+  testWidgets('the Price field is NOT shown for a members-only tour (default)',
       (tester) async {
     await http.runWithClient(() async {
       await tester.pumpWidget(_host());
       await _pump(tester);
-      // Default visibility is Members → no price field.
+      // D711 addendum 1: no per-tour price on a community tour, ever.
       expect(find.text('Price for non-members: '), findsNothing);
+      expect(find.widgetWithText(ChoiceChip, 'Free'), findsNothing);
     }, _client);
   });
 
-  testWidgets('switching visibility to Public SHOWS the Price field',
+  testWidgets('switching visibility to Public STILL shows no Price field',
       (tester) async {
     await http.runWithClient(() async {
       await tester.pumpWidget(_host());
@@ -95,9 +96,9 @@ void main() {
       await tester.tap(find.text('Public').last);
       await _pump(tester);
 
-      // The price field and a default "Free" chip appear.
-      expect(find.text('Price for non-members: '), findsOneWidget);
-      expect(find.widgetWithText(ChoiceChip, 'Free'), findsOneWidget);
+      // A public community tour is still included with membership — no price.
+      expect(find.text('Price for non-members: '), findsNothing);
+      expect(find.widgetWithText(ChoiceChip, 'Free'), findsNothing);
     }, _client);
   });
 }

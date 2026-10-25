@@ -13,6 +13,7 @@ import '../utils/tour_path_healer.dart';
 import '../utils/view_after_download.dart';
 import '../utils/organiser_audio_notices.dart';
 import '../utils/tour_role_label.dart';
+import '../widgets/role_line_menu_entry.dart';
 import '../widgets/share_tour_sheet.dart';
 import '../services/community_downloads.dart';
 import '../services/voice_listen_options.dart';
@@ -1854,17 +1855,19 @@ class _MyToursScreenState extends State<MyToursScreen> {
     );
   }
 
-  /// [LOCAL-762 / D711 §1] The ⓘ shown when the owner taps the DISABLED Price on
-  /// a members-only community tour: the dues already cover it.
+  /// [LOCAL-763 / D711 addendum 1] The ⓘ shown when the owner taps the DISABLED
+  /// Price on ANY community tour (members-only OR public): a community tour is
+  /// included with membership and cannot be priced per-tour. Michael: a public
+  /// community tour is still "join first, then listen" — the join is the price.
   Future<void> _showMembersOnlyPriceNotice() async {
     await showDialog<void>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Price not available'),
         content: const Text(
-          'Members-only tours are covered by the membership dues, so they '
-          'cannot be priced separately. Make the tour public (for non-members) '
-          'if you want to charge for it.',
+          'Community tours are included with membership, so they cannot be '
+          'priced separately. Anyone can find the tour, but they join the '
+          'community to listen.',
         ),
         actions: [
           TextButton(
@@ -1887,6 +1890,26 @@ class _MyToursScreenState extends State<MyToursScreen> {
       case TourRoleIcon.audioura:
         return Icons.headphones_outlined;
     }
+  }
+
+  /// [LOCAL-763 / D711] A ⋮-menu row that LOOKS disabled (grey leading icon and
+  /// grey title) but whose trailing ⓘ is in the PRIMARY colour and is tappable.
+  ///
+  /// Michael 2026-10-25: "The (i) mark is grey as an option one cannot click —
+  /// confusing. If (i) is clickable it should NOT be greyed out." So the action
+  /// (Edit / Translate / Price) reads as unavailable (grey), while the ⓘ —
+  /// which IS tappable, it shows the reason — is bright. The row still carries a
+  /// [value] so the whole row (and especially the ⓘ) is selectable; tapping it
+  /// fires the same notice. The ⓘ sits in a button-sized tap target.
+  PopupMenuItem<String> _disabledInfoRow({
+    required String value,
+    required IconData icon,
+    required String title,
+  }) {
+    return PopupMenuItem<String>(
+      value: value,
+      child: disabledMenuInfoChild(context, icon: icon, title: title),
+    );
   }
 
   /// [LOCAL-760 build item 4] The OWNER opens their broadcast tour in the
@@ -2526,79 +2549,60 @@ class _MyToursScreenState extends State<MyToursScreen> {
                                 !TourTranslationHelper.isTranslation(tour) &&
                                 _numericTourId(tour) != null;
                             return [
-                            // [LOCAL-762 / D711 §2] The role line — the FIRST,
-                            // non-tappable entry: small grey text with an icon.
-                            PopupMenuItem(
-                              value: 'role_line',
-                              enabled: false,
-                              height: 32,
-                              child: ListTile(
-                                leading: Icon(_roleLineIcon(roleLine.icon),
-                                    size: 16, color: Colors.grey),
-                                title: Text(roleLine.text,
-                                    style: const TextStyle(
-                                        fontSize: 12, color: Colors.grey)),
-                                dense: true,
-                                contentPadding: EdgeInsets.zero,
-                              ),
+                            // [LOCAL-763 / D711 §2] The role line — the FIRST
+                            // entry: a BRIGHT coloured strip (colour by role),
+                            // readable in light & dark, that wraps to fit its
+                            // text and carries a ✕ that closes the menu. It is
+                            // non-selectable (RoleLineMenuEntry.represents=false).
+                            RoleLineMenuEntry<String>(
+                              line: roleLine,
+                              icon: _roleLineIcon(roleLine.icon),
+                              onClose: () => Navigator.of(context).pop(),
                             ),
                             const PopupMenuItem(value: 'rate', child: ListTile(leading: Icon(Icons.star_outline, color: Color(0xFFE2A400)), title: Text('Rate this tour'), dense: true)),
                             const PopupMenuItem(value: 'share', child: ListTile(leading: Icon(Icons.ios_share, color: Color(0xFF3498db)), title: Text('Share'), dense: true)),
                             // [LOCAL-760 / D708] Translate. A BROADCAST
-                            // (organiser-audio) tour shows it DISABLED with an ⓘ
-                            // (never hidden) — tapping explains why (the audio is
-                            // the organiser's; D708). A generated / ordinary tour
-                            // keeps the live Translate. A translation row shows
-                            // nothing (you translate the original).
+                            // (organiser-audio) tour shows it DISABLED with a
+                            // bright, tappable ⓘ (never hidden) — tapping
+                            // explains why (the audio is the organiser's; D708).
+                            // A generated / ordinary tour keeps the live
+                            // Translate. A translation row shows nothing.
                             if (!TourTranslationHelper.isTranslation(tour) && isOrganiserAudioTour(tour))
-                              const PopupMenuItem(
+                              _disabledInfoRow(
                                 value: 'translate_disabled',
-                                child: ListTile(
-                                  leading: Icon(Icons.translate, color: Colors.grey),
-                                  title: Text('Translate', style: TextStyle(color: Colors.grey)),
-                                  trailing: Icon(Icons.info_outline, size: 18, color: Colors.grey),
-                                  dense: true,
-                                ),
+                                icon: Icons.translate,
+                                title: 'Translate',
                               )
                             else if (!TourTranslationHelper.isTranslation(tour))
                               const PopupMenuItem(value: 'translate', child: ListTile(leading: Icon(Icons.translate, color: Color(0xFF8e44ad)), title: Text('Translate'), dense: true)),
-                            // [LOCAL-762 / D711 §1] Price — only when the device
-                            // is a curator (_canSell) AND the OWNER of this tour
-                            // (the server resolves ownership; the menu no longer
-                            // shows Price to a non-owner, which is why a member
-                            // could reach Set Price before). A members-only
-                            // community tour shows Price DISABLED with an ⓘ (the
-                            // dues cover it); a public community tour / a plain
-                            // owned tour keeps the live Price.
-                            if (canShowPrice && role.isMembersOnly)
-                              const PopupMenuItem(
+                            // [LOCAL-763 / D711 addendum 1] Price — only when the
+                            // device is a curator (_canSell) AND the OWNER of
+                            // this tour. ANY community tour (members-only OR
+                            // public, generated OR broadcast) shows Price DISABLED
+                            // with a bright, tappable ⓘ: a community tour is
+                            // included with membership and cannot be priced
+                            // per-tour (Michael: joining is the price). A plain
+                            // owned (non-community) tour keeps the live Price.
+                            if (canShowPrice && role.isCommunity)
+                              _disabledInfoRow(
                                 value: 'price_disabled',
-                                child: ListTile(
-                                  leading: Icon(Icons.sell, color: Colors.grey),
-                                  title: Text('Price', style: TextStyle(color: Colors.grey)),
-                                  trailing: Icon(Icons.info_outline, size: 18, color: Colors.grey),
-                                  dense: true,
-                                ),
+                                icon: Icons.sell,
+                                title: 'Price',
                               )
                             else if (canShowPrice)
                               const PopupMenuItem(value: 'price', child: ListTile(leading: Icon(Icons.sell, color: Color(0xFF1B6B2E)), title: Text('Price'), dense: true)),
                             // [LOCAL-760 / D708] Edit. A BROADCAST tour shows it
-                            // DISABLED with an ⓘ (the audio is maintained on the
-                            // organiser's own site; the owner is pointed at the
-                            // builder). The edit screen is NEVER opened for it —
-                            // Michael's users spent a long time editing then hit
-                            // a Save failure. A generated community tour keeps
-                            // the organiser-only live Edit (LOCAL-745); a member
-                            // never sees it.
+                            // DISABLED with a bright, tappable ⓘ (the audio is
+                            // maintained on the organiser's own site; the owner
+                            // is pointed at the builder). The edit screen is
+                            // NEVER opened for it. A generated community tour
+                            // keeps the organiser-only live Edit (LOCAL-745); a
+                            // member never sees it.
                             if (isOrganiserAudioTour(tour))
-                              const PopupMenuItem(
+                              _disabledInfoRow(
                                 value: 'edit_disabled',
-                                child: ListTile(
-                                  leading: Icon(Icons.edit, color: Colors.grey),
-                                  title: Text('Edit', style: TextStyle(color: Colors.grey)),
-                                  trailing: Icon(Icons.info_outline, size: 18, color: Colors.grey),
-                                  dense: true,
-                                ),
+                                icon: Icons.edit,
+                                title: 'Edit',
                               )
                             else if (canEditTour(tour, ownedCommunityIds: _ownedCommunityIds))
                               const PopupMenuItem(value: 'edit', child: ListTile(leading: Icon(Icons.edit, color: Colors.orange), title: Text('Edit'), dense: true)),

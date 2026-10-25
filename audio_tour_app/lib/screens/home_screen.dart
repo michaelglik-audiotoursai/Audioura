@@ -46,6 +46,7 @@ import '../widgets/why_this_score_sheet.dart';
 import '../widgets/reviews_section.dart';
 import '../widgets/price_badge.dart';
 import '../widgets/community_tour_chip.dart';
+import '../widgets/first_layout_tile_layer.dart';
 import '../widgets/tour_buy_sheet.dart';
 import '../widgets/download_action_plan.dart';
 import '../services/tour_preview_player.dart';
@@ -4498,9 +4499,17 @@ class _HomeScreenState extends State<HomeScreen> {
                 },
               ),
               children: [
-                TileLayer(
-                  urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                  userAgentPackageName: 'com.example.audiotours',
+                // [LOCAL-763] The OSM tile layer, wrapped so it reloads its
+                // tiles the instant the map's layout size is known. Fixes the
+                // blank-map-until-zoom bug on the Home map now that it lives in
+                // the LOCAL-761 IndexedStack + nested-Navigator tab shell (see
+                // first_layout_tile_layer.dart for the full root-cause note).
+                FirstLayoutTileLayer(
+                  builder: (reset) => TileLayer(
+                    urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                    userAgentPackageName: 'com.example.audiotours',
+                    reset: reset,
+                  ),
                 ),
                 
                 MarkerLayer(markers: _tourMarkers),
