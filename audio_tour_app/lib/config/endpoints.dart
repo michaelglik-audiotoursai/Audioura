@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'package:flutter/foundation.dart' show visibleForTesting;
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../config.dart';
@@ -77,6 +78,18 @@ class Endpoints {
   /// for. Note the order: storied-api, not api-storied.
   static const _storiedCloudBaseUrl = 'https://storied-api.audioura.com';
 
+  /// Subscribed cloud base URL — the Subscribed build's OWN gateway/stack
+  /// (D708). Subscribed is a separate deployment with its own services
+  /// (user-api, communities, IAP verify, recovery, pricing/role, reports,
+  /// moderation) that Beta's gateway (`_defaultCloudBaseUrl`) does not route; a
+  /// Subscribed build must therefore NEVER fall through to Beta in cloud mode.
+  /// Same host shape and network path as the other tracks
+  /// (client → Cloudflare → GCP LB → gateway); only the hostname differs.
+  /// Note the order: subscribed-api, not api-subscribed. Selected whenever the
+  /// resolved track is 'subscribed' (i.e. Config.isSubscribedBuild). See
+  /// LOCAL-764 / LOCAL-737.
+  static const _subscribedCloudBaseUrl = 'https://subscribed-api.audioura.com';
+
   /// Gateway API key — injected at build time via --dart-define=GATEWAY_API_KEY=...
   /// NEVER hardcode the actual key in source.
   static const _builtInApiKey = String.fromEnvironment('GATEWAY_API_KEY');
@@ -100,11 +113,32 @@ class Endpoints {
       // Baked-in defaults only — never read stored URL overrides in cloud
       // mode. This ensures a dev device behaves identically to a real new
       // user. cloud_track is the one exception: it's a deliberate, visible
-      // tester choice (Storied vs Beta), not a debug override.
-      return await cloudTrack() == 'storied' ? _storiedCloudBaseUrl : _defaultCloudBaseUrl;
+      // tester choice (Storied vs Beta), not a debug override. The Subscribed
+      // build resolves to the 'subscribed' track (D708) and its own host.
+      return baseForTrack(s, await cloudTrack());
     }
     final ip = prefs.getString('server_ip') ?? Config.defaultServerIp;
     return 'http://$ip:${_localPorts[s]}';
+  }
+
+  /// The cloud base URL for [s] given an already-resolved [track]. Pure (no I/O)
+  /// so host selection can be tested for every track in one process without
+  /// recompiling for each — the real [base] calls this after resolving
+  /// [cloudTrack]. [s] is accepted for forward-compatibility with per-service
+  /// hosts/prefixes but every current track uses a single host for all
+  /// services. Beta/Storied mappings are unchanged (Track B byte-for-byte
+  /// promise); 'subscribed' is the only addition. Any unknown track ⇒ Beta,
+  /// matching the pre-Subscribed default.
+  @visibleForTesting
+  static String baseForTrack(Service s, String track) {
+    switch (track) {
+      case 'subscribed':
+        return _subscribedCloudBaseUrl;
+      case 'storied':
+        return _storiedCloudBaseUrl;
+      default:
+        return _defaultCloudBaseUrl;
+    }
   }
 
   /// The track this build reports for tour provenance.

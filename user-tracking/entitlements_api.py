@@ -72,6 +72,15 @@ APPLE_ROOT_CA_PATH = os.getenv(
 # check (we pass None), which keeps older stub tests working.
 APPLE_IAP_ENVIRONMENT = os.getenv('APPLE_IAP_ENVIRONMENT', '')
 
+# [LOCAL-764] APPLE_IAP_ENVIRONMENT may be a single value ('Production') or a
+# comma-separated list ('Production,Sandbox') for the Production-with-Sandbox
+# fallback TestFlight needs (TestFlight purchases are signed 'Sandbox' even
+# against Production). Parse once into the list the verifier accepts; None when
+# unset (check disabled — keeps older stub tests working).
+_APPLE_IAP_ENV_EXPECTED = (
+    [e.strip() for e in APPLE_IAP_ENVIRONMENT.split(',') if e.strip()] or None
+)
+
 # [LOCAL-696] Google Play verification config. The Play package the purchase
 # tokens belong to (same bundle as Apple — ClickUp wdvrdayx33), and the PATH to
 # the service-account JSON used to call the Google Play Developer API. The key
@@ -812,7 +821,7 @@ def verify_purchase(store, transaction_id, product, signed_transaction=None):
                 expected_bundle_id=APPLE_BUNDLE_ID,
                 expected_product_id=expected_store_product,
                 required_type='Consumable',
-                expected_environment=(APPLE_IAP_ENVIRONMENT or None),
+                expected_environment=_APPLE_IAP_ENV_EXPECTED,
             )
         except JwsVerificationError as e:
             logger.warning(f"[LOCAL-598] apple verify failed: {e.code}")
@@ -1167,7 +1176,7 @@ def _verify_tour_signed(store, transaction_id, product, signed_transaction):
                 expected_bundle_id=APPLE_BUNDLE_ID,
                 expected_product_id=product,  # the tour store product id itself
                 required_type='Consumable',
-                expected_environment=(APPLE_IAP_ENVIRONMENT or None),
+                expected_environment=_APPLE_IAP_ENV_EXPECTED,
             )
         except JwsVerificationError as e:
             logger.warning(f"[LOCAL-677] apple verify failed: {e.code}")
