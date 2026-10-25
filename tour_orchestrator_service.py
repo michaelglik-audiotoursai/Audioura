@@ -2069,8 +2069,20 @@ def download_tour(job_id):
         cur = conn.cursor()
         
         # Get tour from database
+        # [LOCAL-765] Never serve a Subscribed tour by id on storied-side code.
+        # After the Subscribed → GCloud move (D708) this DB is shared and
+        # Subscribed rows carry track='subscribed'; a download by id of such a
+        # row must find nothing -> the 404 below. Guarded on the track column
+        # existing (self-heal pattern used across this service): absent column =>
+        # no Subscribed rows => no-op, so this never 500s a DB without the column.
+        cur.execute("""
+            SELECT 1 FROM information_schema.columns
+            WHERE table_name = 'audio_tours' AND column_name = 'track'
+        """)
+        _excl = (" AND (track IS NULL OR track <> 'subscribed')"
+                 if cur.fetchone() is not None else "")
         cur.execute(
-            "SELECT tour_name, audio_tour FROM audio_tours WHERE id = %s",
+            "SELECT tour_name, audio_tour FROM audio_tours WHERE id = %s" + _excl,
             (tour_id,)
         )
         result = cur.fetchone()

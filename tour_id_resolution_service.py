@@ -58,6 +58,34 @@ def _extract_uuid_from_zip_stem(stem):
     return None
 
 
+def _fetchone_excluding_subscribed(cur, base_sql, params):
+    """[LOCAL-765] Run ``base_sql`` (a SELECT ... WHERE id = %s on audio_tours)
+    with ``AND (track IS NULL OR track <> 'subscribed')`` appended, and return
+    the single row (or None).
+
+    Storied-side code must never resolve/serve a Subscribed tour: after the
+    Subscribed → GCloud move (D708) this DB is shared and Subscribed rows carry
+    track='subscribed'. If the ``track`` column does not exist yet (a DB that has
+    never had Subscribed rows) the scoped query raises UndefinedColumn; we roll
+    back to a SAVEPOINT and re-run the ORIGINAL unscoped query, so the caller's
+    transaction stays usable and behaviour is unchanged on such a DB. This
+    mirrors ``_resolve_from_column`` and consumes exactly ONE ``fetchone()`` — no
+    extra catalog probe — so it adds no round trip and does not disturb callers
+    that count queries. ``base_sql`` must end right after its WHERE clause.
+    """
+    import psycopg2 as _pg
+    try:
+        cur.execute("SAVEPOINT local765_excl")
+        cur.execute(base_sql + " AND (track IS NULL OR track <> 'subscribed')", params)
+        row = cur.fetchone()
+        cur.execute("RELEASE SAVEPOINT local765_excl")
+    except _pg.errors.UndefinedColumn:
+        cur.execute("ROLLBACK TO SAVEPOINT local765_excl")
+        cur.execute(base_sql, params)
+        row = cur.fetchone()
+    return row
+
+
 def _resolve_from_column(download_id, conn):
     """Primary path: look up zip_filename stored on the row.
 
@@ -197,8 +225,10 @@ def find_edit_tour_id(download_id):
 
         # Need tour_name for fallback
         cur = conn.cursor()
-        cur.execute("SELECT tour_name FROM audio_tours WHERE id = %s", (int(download_id),))
-        row = cur.fetchone()
+        # [LOCAL-765] exclude track='subscribed' — the fallback must not resolve
+        # a Subscribed row either (the primary path already excludes it).
+        row = _fetchone_excluding_subscribed(
+            cur, "SELECT tour_name FROM audio_tours WHERE id = %s", (int(download_id),))
         cur.close()
 
         if not row:
@@ -277,8 +307,10 @@ def resolve_tour_id(download_id):
         # Get tour info from database
         conn = get_db_connection()
         cur = conn.cursor()
-        cur.execute("SELECT tour_name FROM audio_tours WHERE id = %s", (int(download_id),))
-        result = cur.fetchone()
+        # [LOCAL-765] exclude track='subscribed' so resolving a Subscribed id
+        # returns no row -> the 404 below (never resolve a Subscribed tour).
+        result = _fetchone_excluding_subscribed(
+            cur, "SELECT tour_name FROM audio_tours WHERE id = %s", (int(download_id),))
         cur.close()
         conn.close()
 
