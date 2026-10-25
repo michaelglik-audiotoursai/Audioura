@@ -70,12 +70,16 @@ def get_tour_by_code(code):
             conn.close()
             return jsonify({'error': 'tour not found'}), 404
 
+        # [LOCAL-765] exclude track='subscribed': a share code that points at a
+        # Subscribed tour must resolve to nothing (→404), never hand a
+        # members-only/paid Subscribed tour to a Storied listener.
+        _excl = _exclude_subscribed_sql(cur)
         cur.execute("""
             SELECT id, tour_name, request_string, lat, lng, number_requested,
                    language, original_tour_id
             FROM audio_tours
             WHERE id = %s
-        """, (row[0],))
+            """ + (" AND " + _excl if _excl else ""), (row[0],))
         t = cur.fetchone()
         cur.close()
         conn.close()
@@ -137,6 +141,37 @@ def get_db_connection():
         password="password123"
     )
 
+
+# [LOCAL-765] Subscribed isolation helpers (mirrors map_delivery_service.py).
+# Storied/Beta code must never serve or list a Subscribed tour; after the
+# Subscribed → GCloud move (D708) they share this DB and Subscribed writes
+# track='subscribed'.
+_TRACK_COLUMN = None
+
+
+def _has_track_column(cur):
+    """True if audio_tours.track exists. Cached once. A real catalog read, not a
+    guess: this service is shared by Beta and Storied, so a wrong guess is an
+    outage for both."""
+    global _TRACK_COLUMN
+    if _TRACK_COLUMN is None:
+        cur.execute("""
+            SELECT 1 FROM information_schema.columns
+            WHERE table_name = 'audio_tours' AND column_name = 'track'
+        """)
+        _TRACK_COLUMN = cur.fetchone() is not None
+    return _TRACK_COLUMN
+
+
+def _exclude_subscribed_sql(cur, column="track"):
+    """SQL fragment dropping track='subscribed' rows; '' when the column is
+    absent (no Subscribed rows exist on such a DB, and an unguarded reference
+    would 500 both tracks). Caller prefixes ' AND '."""
+    if not _has_track_column(cur):
+        return ""
+    return f"({column} IS NULL OR {column} <> 'subscribed')"
+
+
 def calculate_distance(lat1, lng1, lat2, lng2):
     """Calculate distance between two points in kilometers"""
     R = 6371
@@ -178,6 +213,8 @@ def get_tours_near_location(lat, lng):
         
         # Get only English/original tours for map display (no translations)
         # Exclude test-generated tours (is_test flag set by test-mode generation)
+        # [LOCAL-765] exclude track='subscribed' from the map list.
+        _excl = _exclude_subscribed_sql(cur)
         cur.execute("""
             SELECT id, tour_name, request_string, lat, lng, number_requested, content_language, original_tour_id
             FROM audio_tours 
@@ -185,7 +222,7 @@ def get_tours_near_location(lat, lng):
             AND (content_language = 'en' OR content_language IS NULL)
             AND original_tour_id IS NULL
             AND (is_test IS NOT TRUE)
-        """)
+            """ + (" AND " + _excl if _excl else ""))
         
         tours = cur.fetchall()
         tours_list = []
@@ -245,11 +282,13 @@ def download_tour(tour_id):
         conn = get_db_connection()
         cur = conn.cursor()
         
+        # [LOCAL-765] exclude track='subscribed' (never serve a Subscribed tour).
+        _excl = _exclude_subscribed_sql(cur)
         cur.execute("""
             SELECT tour_name, audio_tour, request_string
             FROM audio_tours 
             WHERE id = %s AND audio_tour IS NOT NULL
-        """, (tour_id,))
+            """ + (" AND " + _excl if _excl else ""), (tour_id,))
         
         result = cur.fetchone()
         
@@ -316,11 +355,13 @@ def get_tour_info(tour_id):
         conn = get_db_connection()
         cur = conn.cursor()
         
+        # [LOCAL-765] exclude track='subscribed' (tour-info of a Subscribed id -> 404).
+        _excl = _exclude_subscribed_sql(cur)
         cur.execute("""
             SELECT id, tour_name, request_string, lat, lng, number_requested, content_language, original_tour_id
             FROM audio_tours 
             WHERE id = %s
-        """, (tour_id,))
+            """ + (" AND " + _excl if _excl else ""), (tour_id,))
         
         result = cur.fetchone()
         
@@ -371,12 +412,15 @@ def search_tours():
         # Convert regex pattern back to SQL LIKE pattern
         sql_pattern = pattern.replace('.*', '%')
         
+        # [LOCAL-765] exclude track='subscribed' from search results.
+        _excl = _exclude_subscribed_sql(cur)
         cur.execute("""
             SELECT id, tour_name, request_string, lat, lng, number_requested, content_language, original_tour_id
             FROM audio_tours 
             WHERE (tour_name ILIKE %s OR request_string ILIKE %s)
             AND lat IS NOT NULL AND lng IS NOT NULL
             AND (is_test IS NOT TRUE)
+            """ + (" AND " + _excl if _excl else "") + """
             ORDER BY number_requested DESC
             LIMIT 50
         """, (f'%{sql_pattern}%', f'%{sql_pattern}%'))
