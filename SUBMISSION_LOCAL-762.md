@@ -5,7 +5,7 @@ the Share spinner that never closed.**
 
 - **Branch:** `LOCAL-762-listen-menu-roles`
 - **Base:** `subscribed` @ `bc5577d7` (verified `git merge-base --is-ancestor bc5577d7 HEAD` → exit 0)
-- **code_sha:** `d2ae9478bd6652a03cc41a464725a9baacc8d61b`
+- **code_sha:** `e3acea7f3d91b1b7ccaf43d16add285ed9f67cfb`
 - **Ruling:** D711 (§1 menu, §2 role line, §3 members-only pricing, §4 price at creation)
 - **Agent:** Mac Mini Kiro
 - **Budget:** $0.00 (no OpenAI / no AI calls anywhere in build or live test)
