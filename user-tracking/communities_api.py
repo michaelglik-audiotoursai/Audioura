@@ -72,6 +72,14 @@ APPLE_ROOT_CA_PATH = os.getenv(
 )
 APPLE_IAP_ENVIRONMENT = os.getenv('APPLE_IAP_ENVIRONMENT', '')
 
+# [LOCAL-764] APPLE_IAP_ENVIRONMENT may be a single value ('Production') or a
+# comma-separated list ('Production,Sandbox') for the Production-with-Sandbox
+# fallback TestFlight needs. Parse once into the list the verifier accepts;
+# None when unset (check disabled).
+_APPLE_IAP_ENV_EXPECTED = (
+    [e.strip() for e in APPLE_IAP_ENVIRONMENT.split(',') if e.strip()] or None
+)
+
 # [LOCAL-696] Google Play config (mirror of entitlements_api). The pass products
 # are one-time products on Play too (D658: our server enforces pass length), so
 # a pass verifies through the SAME Google product path as a tour. The SA JSON
@@ -1391,7 +1399,7 @@ def _verify_pass_signed(store, transaction_id, product, signed_transaction):
                 expected_bundle_id=APPLE_BUNDLE_ID,
                 expected_product_id=product,
                 required_type='Consumable',
-                expected_environment=(APPLE_IAP_ENVIRONMENT or None),
+                expected_environment=_APPLE_IAP_ENV_EXPECTED,
             )
         except JwsVerificationError as e:
             logger.warning(f"[LOCAL-690] apple pass verify failed: {e.code}")

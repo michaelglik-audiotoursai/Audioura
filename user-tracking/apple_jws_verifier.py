@@ -279,7 +279,7 @@ def verify_signed_transaction(
     expected_bundle_id: str,
     expected_product_id: Optional[str] = None,
     required_type: str = 'Consumable',
-    expected_environment: Optional[str] = None,
+    expected_environment=None,
 ) -> VerifiedTransaction:
     """Verify a StoreKit 2 JWS signed transaction offline.
 
@@ -289,8 +289,14 @@ def verify_signed_transaction(
         expected_bundle_id: the app's bundle id (e.g. com.audioura.audiotours).
         expected_product_id: if given, the payload productId must equal it.
         required_type: the payload `type` must equal this (default Consumable).
-        expected_environment: if given (e.g. 'Sandbox' locally, 'Production' in
-            prod), the payload `environment` must equal it (environment_mismatch).
+        expected_environment: if given, the payload `environment` must be one of
+            the accepted environments (environment_mismatch otherwise). Accepts
+            either a single string (a strict pin, e.g. 'Sandbox' locally) OR an
+            iterable of strings for a Production-with-Sandbox fallback
+            (e.g. ('Production', 'Sandbox')): TestFlight purchases are signed as
+            'Sandbox' even against the Production App Store Server environment,
+            so a Production deployment that also tests via TestFlight must accept
+            both (LOCAL-764). None disables the check.
 
     Returns a VerifiedTransaction on success. Raises JwsVerificationError with a
     stable `.code` on any failure. Performs NO network and NO DB access.
@@ -367,15 +373,23 @@ def verify_signed_transaction(
             'type_not_consumable',
             f"type '{tx_type}' is not '{required_type}'.")
 
-    # [LOCAL-598B] Environment pin. A Sandbox transaction must never grant on a
-    # Production server and vice-versa. Only enforced when the caller supplies
-    # an expectation (env APPLE_IAP_ENVIRONMENT at the HTTP layer).
+    # [LOCAL-598B / LOCAL-764] Environment pin. A Sandbox transaction must never
+    # grant on a Production-only server and vice-versa. `expected_environment`
+    # is either a single string (strict pin) or an iterable of accepted values
+    # (Production-with-Sandbox fallback for TestFlight). Only enforced when the
+    # caller supplies an expectation (env APPLE_IAP_ENVIRONMENT at the HTTP
+    # layer, which may be a comma-separated list).
     environment = payload.get('environment')
-    if expected_environment is not None and environment != expected_environment:
-        raise JwsVerificationError(
-            'environment_mismatch',
-            f"environment '{environment}' does not match expected "
-            f"'{expected_environment}'.")
+    if expected_environment is not None:
+        if isinstance(expected_environment, str):
+            accepted = {expected_environment}
+        else:
+            accepted = {e for e in expected_environment if e}
+        if accepted and environment not in accepted:
+            raise JwsVerificationError(
+                'environment_mismatch',
+                f"environment '{environment}' does not match expected "
+                f"{sorted(accepted)}.")
 
     # [LOCAL-598B] Revocation. A refunded/revoked transaction carries a
     # revocationDate; it must never grant.

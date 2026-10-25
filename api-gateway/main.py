@@ -27,7 +27,19 @@ app = Flask(__name__)
 # ---------------------------------------------------------------------------
 # Load route manifest
 # ---------------------------------------------------------------------------
-MANIFEST_PATH = os.path.join(os.path.dirname(__file__), 'gateway_routes.yaml')
+# The manifest path is configurable via GATEWAY_ROUTES_FILE so the SAME gateway
+# image can serve the Beta/Storied manifest (the default, unchanged) or the
+# Subscribed manifest (gateway_routes.subscribed.yaml) depending on the
+# deployment (LOCAL-764 / D708). When unset, behaviour is byte-for-byte the
+# previous default: gateway_routes.yaml next to this file. A relative value is
+# resolved against this file's directory; an absolute path is used as-is.
+_DEFAULT_MANIFEST = os.path.join(os.path.dirname(__file__), 'gateway_routes.yaml')
+_routes_file = os.getenv('GATEWAY_ROUTES_FILE', '').strip()
+if _routes_file:
+    MANIFEST_PATH = _routes_file if os.path.isabs(_routes_file) else os.path.join(
+        os.path.dirname(__file__), _routes_file)
+else:
+    MANIFEST_PATH = _DEFAULT_MANIFEST
 
 def _load_manifest():
     with open(MANIFEST_PATH, 'r', encoding='utf-8') as f:

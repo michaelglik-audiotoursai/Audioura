@@ -1,0 +1,722 @@
+##############################################################################
+# Audioura API Gateway Route Manifest — SUBSCRIBED TRACK
+# ======================================================
+# The route manifest the Subscribed gateway loads (GATEWAY_ROUTES_FILE). Same
+# format as gateway_routes.yaml (the Beta/Storied manifest, which this file does
+# NOT touch). Selected at deploy time by pointing GATEWAY_ROUTES_FILE at this
+# file:
+#
+#     GATEWAY_ROUTES_FILE=/app/api-gateway/gateway_routes.subscribed.yaml
+#
+# Why a separate manifest (LOCAL-764 / D708): Subscribed is its own stack with
+# its own services (user-api, pricing/wallet, recovery, communities, IAP verify,
+# custom audio, voice, tour-id-resolution). Beta's gateway hosts NONE of those,
+# so a Subscribed build pointed at Beta's gateway 404s every community /
+# entitlement / purchase / recovery / pricing call. This manifest routes EVERY
+# call the Subscribed app makes to the matching `-subscribed` backend.
+#
+# Coverage is enforced by api-gateway/test_subscribed_route_coverage.py, which
+# scans audio_tour_app/lib for Endpoints.*(Service.x, '<path>') (and the
+# news-status/news-download cloud paths) and fails if any app path lacks a route
+# here.
+#
+# Fields:
+#   public_path  - the path exposed on subscribed-api.audioura.com
+#   backend      - key from 'backends' map
+#   upstream     - the path sent to the backend service
+#   methods      - list of HTTP methods
+#   auth         - 'api_key' (requires X-API-Key) or 'none' (public)
+#   timeout      - request timeout in seconds (default 60)
+#
+# Auth policy (LOCAL-764): every app-facing route is 'api_key' — the Subscribed
+# app always sends the baked-in X-API-Key in cloud mode (Endpoints.apiHeaders),
+# and the Beta manifest has no 'none' routes either, so there is nothing to
+# expose publicly. Admin routes (ADMIN_API_KEY, which the app never carries) are
+# NOT exposed by the gateway at all — see 'internal_only' at the bottom.
+##############################################################################
+
+backends:
+  # Each is an env placeholder resolved at startup (${VAR:-default}); the Cloud
+  # Run default URLs are placeholders for the Subscribed deployment and are
+  # overridden by SUBSCRIBED_GCLOUD_ENV.md's *_URL values at deploy time.
+  map-delivery:        ${MAP_DELIVERY_URL:-https://map-delivery-subscribed-60899077572.us-central1.run.app}
+  orchestrator:        ${ORCHESTRATOR_URL:-https://tour-orchestrator-subscribed-60899077572.us-central1.run.app}
+  user-api:            ${USER_API_URL:-https://user-api-subscribed-60899077572.us-central1.run.app}
+  translation:         ${TRANSLATION_URL:-https://translation-subscribed-60899077572.us-central1.run.app}
+  news-orchestrator:   ${NEWS_ORCHESTRATOR_URL:-https://news-orchestrator-subscribed-60899077572.us-central1.run.app}
+  newsletter:          ${NEWSLETTER_URL:-https://newsletter-subscribed-60899077572.us-central1.run.app}
+  treats:              ${TREATS_URL:-https://treats-subscribed-60899077572.us-central1.run.app}
+  tour-editing:        ${TOUR_EDITING_URL:-https://tour-editing-subscribed-60899077572.us-central1.run.app}
+  tour-id-resolution:  ${TOUR_ID_RESOLUTION_URL:-https://tour-id-resolution-subscribed-60899077572.us-central1.run.app}
+  generator:           ${GENERATOR_URL:-https://tour-generator-subscribed-60899077572.us-central1.run.app}
+  voice:               ${VOICE_URL:-https://voice-subscribed-60899077572.us-central1.run.app}
+  custom-audio:        ${CUSTOM_AUDIO_URL:-https://custom-audio-subscribed-60899077572.us-central1.run.app}
+
+routes:
+  # ========================================================================
+  # MAP DELIVERY  (map-delivery-subscribed)  — inventory rows 24-31, 48
+  # ========================================================================
+  - public_path: /tours-near/<path:subpath>
+    backend: map-delivery
+    upstream: /tours-near/{subpath}
+    methods: [GET]
+    auth: api_key
+
+  - public_path: /download-tour/<tour_id>
+    backend: map-delivery
+    upstream: /download-tour/{tour_id}
+    methods: [GET]
+    auth: api_key
+    timeout: 30
+
+  - public_path: /search-tours
+    backend: map-delivery
+    upstream: /search-tours
+    methods: [GET, POST]
+    auth: api_key
+
+  - public_path: /tour-by-code/<code>
+    backend: map-delivery
+    upstream: /tour-by-code/{code}
+    methods: [GET]
+    auth: api_key
+
+  - public_path: /tour-info/<tour_id>
+    backend: map-delivery
+    upstream: /tour-info/{tour_id}
+    methods: [GET]
+    auth: api_key
+
+  - public_path: /report-tour
+    backend: map-delivery
+    upstream: /report-tour
+    methods: [POST]
+    auth: api_key
+
+  - public_path: /how-we-score
+    backend: map-delivery
+    upstream: /how-we-score
+    methods: [GET]
+    auth: api_key
+
+  - public_path: /tour/<tour_id>/preview-audio
+    backend: map-delivery
+    upstream: /tour/{tour_id}/preview-audio
+    methods: [GET]
+    auth: api_key
+    timeout: 30
+
+  - public_path: /tour/<tour_id>/score-explanation
+    backend: map-delivery
+    upstream: /tour/{tour_id}/score-explanation
+    methods: [GET]
+    auth: api_key
+
+  - public_path: /tour/<tour_id>/rescore-request
+    backend: map-delivery
+    upstream: /tour/{tour_id}/rescore-request
+    methods: [POST]
+    auth: api_key
+
+  - public_path: /tour/<tour_id>/download-failed
+    backend: map-delivery
+    upstream: /tour/{tour_id}/download-failed
+    methods: [POST]
+    auth: api_key
+
+  # ========================================================================
+  # TOUR ORCHESTRATOR  (tour-orchestrator-subscribed) — rows 1-23, 70, 71, 83, 84
+  # ========================================================================
+  - public_path: /generate-complete-tour
+    backend: orchestrator
+    upstream: /generate-complete-tour
+    methods: [POST]
+    auth: api_key
+    timeout: 600
+
+  - public_path: /status/<job_id>
+    backend: orchestrator
+    upstream: /status/{job_id}
+    methods: [GET]
+    auth: api_key
+
+  - public_path: /download/<job_id>
+    backend: orchestrator
+    upstream: /download/{job_id}
+    methods: [GET]
+    auth: api_key
+    timeout: 120
+
+  - public_path: /tour-status
+    backend: orchestrator
+    upstream: /tour-status
+    methods: [POST]
+    auth: api_key
+
+  # NOTE: /sync is NOT routed here. Like the Beta/Storied gateway, the gateway's
+  # own intrinsic /sync handler (main.py) answers it; adding a manifest route
+  # would collide with that endpoint. outbox_service degrades safely either way.
+
+  - public_path: /delete-account/<secret_id>
+    backend: orchestrator
+    upstream: /delete-account/{secret_id}
+    methods: [DELETE]
+    auth: api_key
+
+  # --- curator pricing / wallet (Subscribed-only features) ---
+  - public_path: /tour/<tour_id>/unlock-state
+    backend: orchestrator
+    upstream: /tour/{tour_id}/unlock-state
+    methods: [GET]
+    auth: api_key
+
+  - public_path: /tour/<tour_id>/price
+    backend: orchestrator
+    upstream: /tour/{tour_id}/price
+    methods: [GET, POST]
+    auth: api_key
+
+  - public_path: /tour/<tour_id>/sales
+    backend: orchestrator
+    upstream: /tour/{tour_id}/sales
+    methods: [GET]
+    auth: api_key
+
+  - public_path: /price-tiers
+    backend: orchestrator
+    upstream: /price-tiers
+    methods: [GET]
+    auth: api_key
+
+  - public_path: /plans/available
+    backend: orchestrator
+    upstream: /plans/available
+    methods: [GET]
+    auth: api_key
+
+  - public_path: /wallet/<user_id>
+    backend: orchestrator
+    upstream: /wallet/{user_id}
+    methods: [GET]
+    auth: api_key
+
+  - public_path: /wallet/<user_id>/transactions
+    backend: orchestrator
+    upstream: /wallet/{user_id}/transactions
+    methods: [GET]
+    auth: api_key
+
+  - public_path: /wallet/<user_id>/topup
+    backend: orchestrator
+    upstream: /wallet/{user_id}/topup
+    methods: [POST]
+    auth: api_key
+
+  # --- reviews ---
+  - public_path: /tour/<tour_id>/reviews
+    backend: orchestrator
+    upstream: /tour/{tour_id}/reviews
+    methods: [GET]
+    auth: api_key
+
+  - public_path: /tour/<tour_id>/distribution
+    backend: orchestrator
+    upstream: /tour/{tour_id}/distribution
+    methods: [GET]
+    auth: api_key
+
+  - public_path: /tour/<tour_id>/review
+    backend: orchestrator
+    upstream: /tour/{tour_id}/review
+    methods: [POST]
+    auth: api_key
+
+  - public_path: /review/<review_id>/helpful
+    backend: orchestrator
+    upstream: /review/{review_id}/helpful
+    methods: [POST]
+    auth: api_key
+
+  - public_path: /review/<review_id>/reply
+    backend: orchestrator
+    upstream: /review/{review_id}/reply
+    methods: [POST]
+    auth: api_key
+
+  # --- ratings (CORE) ---
+  - public_path: /tour/<tour_id>/rating
+    backend: orchestrator
+    upstream: /tour/{tour_id}/rating
+    methods: [GET, POST]
+    auth: api_key
+
+  # --- ownership/role (LOCAL-762 / D711): drives the owner-only Listen menu ---
+  - public_path: /tour/<tour_id>/role
+    backend: orchestrator
+    upstream: /tour/{tour_id}/role
+    methods: [GET]
+    auth: api_key
+
+  # --- recovery code ---
+  - public_path: /recovery-code/generate
+    backend: orchestrator
+    upstream: /recovery-code/generate
+    methods: [POST]
+    auth: api_key
+
+  - public_path: /recovery-code/restore
+    backend: orchestrator
+    upstream: /recovery-code/restore
+    methods: [POST]
+    auth: api_key
+
+  # --- community tours (served by orchestrator, not user-api) ---
+  - public_path: /communities/<community_id>/tours
+    backend: orchestrator
+    upstream: /communities/{community_id}/tours
+    methods: [GET]
+    auth: api_key
+
+  - public_path: /tour/<tour_id>/community
+    backend: orchestrator
+    upstream: /tour/{tour_id}/community
+    methods: [GET]
+    auth: api_key
+
+  # NOTE: the app's two /health diagnostics probes (Service.userDb and
+  # Service.orchestrator, about_screen) are intentionally NOT routed to a
+  # backend. Exactly as on the Beta/Storied gateway, a public GET /health is
+  # answered by the gateway's OWN intrinsic /health handler (main.py), so both
+  # probes report the gateway is up. The about_screen calls are diagnostics-only
+  # and degrade safely (storied_compat_allowlist). A per-backend health route
+  # would collide with that intrinsic endpoint and buys nothing.
+
+  # ========================================================================
+  # USER API  (user-api-subscribed) — rows 33-47, 68, 69, 72-81, 82, 34
+  # Communities, entitlements, L2 seats, purchases/IAP verify, legal,
+  # user registration, support id.
+  # ========================================================================
+  - public_path: /user
+    backend: user-api
+    upstream: /user
+    methods: [GET, POST, PUT]
+    auth: api_key
+
+  - public_path: /user/<secret_id>
+    backend: user-api
+    upstream: /user/{secret_id}
+    methods: [GET, PUT]
+    auth: api_key
+
+  - public_path: /support-id
+    backend: user-api
+    upstream: /support-id
+    methods: [GET]
+    auth: api_key
+
+  # --- entitlements ---
+  - public_path: /entitlements/me
+    backend: user-api
+    upstream: /entitlements/me
+    methods: [GET]
+    auth: api_key
+
+  - public_path: /entitlements/app-open
+    backend: user-api
+    upstream: /entitlements/app-open
+    methods: [POST]
+    auth: api_key
+
+  - public_path: /entitlements/lapse
+    backend: user-api
+    upstream: /entitlements/lapse
+    methods: [POST]
+    auth: api_key
+
+  # --- L2 seats ---
+  - public_path: /l2/queue/join
+    backend: user-api
+    upstream: /l2/queue/join
+    methods: [POST]
+    auth: api_key
+
+  - public_path: /l2/claim
+    backend: user-api
+    upstream: /l2/claim
+    methods: [POST]
+    auth: api_key
+
+  # --- purchases / IAP verify ---
+  - public_path: /purchases/verify
+    backend: user-api
+    upstream: /purchases/verify
+    methods: [POST]
+    auth: api_key
+
+  - public_path: /purchases/mode
+    backend: user-api
+    upstream: /purchases/mode
+    methods: [GET]
+    auth: api_key
+
+  # --- legal / document acceptance ---
+  - public_path: /document-acceptance
+    backend: user-api
+    upstream: /document-acceptance
+    methods: [GET, POST]
+    auth: api_key
+
+  # --- communities ---
+  - public_path: /communities
+    backend: user-api
+    upstream: /communities
+    methods: [POST]
+    auth: api_key
+
+  - public_path: /communities/map
+    backend: user-api
+    upstream: /communities/map
+    methods: [GET]
+    auth: api_key
+
+  - public_path: /communities/mine
+    backend: user-api
+    upstream: /communities/mine
+    methods: [GET]
+    auth: api_key
+
+  - public_path: /communities/mine-owned
+    backend: user-api
+    upstream: /communities/mine-owned
+    methods: [GET]
+    auth: api_key
+
+  - public_path: /communities/new-tours
+    backend: user-api
+    upstream: /communities/new-tours
+    methods: [GET]
+    auth: api_key
+
+  - public_path: /communities/pass-prices
+    backend: user-api
+    upstream: /communities/pass-prices
+    methods: [GET]
+    auth: api_key
+
+  - public_path: /communities/name-available
+    backend: user-api
+    upstream: /communities/name-available
+    methods: [GET]
+    auth: api_key
+
+  - public_path: /communities/by-code/<code>
+    backend: user-api
+    upstream: /communities/by-code/{code}
+    methods: [GET]
+    auth: api_key
+
+  # /communities/<id> and its sub-routes. The bare id route is placed AFTER the
+  # fixed-name routes above so Flask's static-segment preference is irrelevant;
+  # <community_id> only matches a single segment, never /map or /mine.
+  - public_path: /communities/<community_id>
+    backend: user-api
+    upstream: /communities/{community_id}
+    methods: [GET, DELETE]
+    auth: api_key
+
+  - public_path: /communities/<community_id>/join
+    backend: user-api
+    upstream: /communities/{community_id}/join
+    methods: [POST]
+    auth: api_key
+
+  - public_path: /communities/<community_id>/report
+    backend: user-api
+    upstream: /communities/{community_id}/report
+    methods: [POST]
+    auth: api_key
+
+  - public_path: /communities/<community_id>/episodes
+    backend: user-api
+    upstream: /communities/{community_id}/episodes
+    methods: [GET, POST]
+    auth: api_key
+
+  - public_path: /communities/<community_id>/import-feed
+    backend: user-api
+    upstream: /communities/{community_id}/import-feed
+    methods: [POST]
+    auth: api_key
+
+  - public_path: /communities/<community_id>/build-audio-tour
+    backend: user-api
+    upstream: /communities/{community_id}/build-audio-tour
+    methods: [POST]
+    auth: api_key
+    timeout: 600
+
+  - public_path: /communities/<community_id>/audio-tours/<tour_id>
+    backend: user-api
+    upstream: /communities/{community_id}/audio-tours/{tour_id}
+    methods: [GET, DELETE]
+    auth: api_key
+
+  - public_path: /communities/<community_id>/regenerate-code
+    backend: user-api
+    upstream: /communities/{community_id}/regenerate-code
+    methods: [POST]
+    auth: api_key
+
+  - public_path: /communities/<community_id>/step-down
+    backend: user-api
+    upstream: /communities/{community_id}/step-down
+    methods: [POST]
+    auth: api_key
+
+  - public_path: /communities/<community_id>/offer-organiser
+    backend: user-api
+    upstream: /communities/{community_id}/offer-organiser
+    methods: [POST]
+    auth: api_key
+
+  - public_path: /communities/<community_id>/withdraw-offer
+    backend: user-api
+    upstream: /communities/{community_id}/withdraw-offer
+    methods: [POST]
+    auth: api_key
+
+  - public_path: /communities/<community_id>/pick-organiser
+    backend: user-api
+    upstream: /communities/{community_id}/pick-organiser
+    methods: [POST]
+    auth: api_key
+
+  - public_path: /communities/<community_id>/accept-organiser
+    backend: user-api
+    upstream: /communities/{community_id}/accept-organiser
+    methods: [POST]
+    auth: api_key
+
+  # ========================================================================
+  # TRANSLATION  (translation-subscribed) — row 52
+  # ========================================================================
+  - public_path: /translate-with-audio
+    backend: translation
+    upstream: /translate-with-audio
+    methods: [POST]
+    auth: api_key
+    timeout: 300
+
+  # ========================================================================
+  # NEWS ORCHESTRATOR  (news-orchestrator-subscribed) — rows 54-56
+  # The app's cloud calls use /news-status/<id> and /news-download/<id>
+  # (Endpoints.newsStatusUrl / newsDownloadUrl), proxied to the service's own
+  # /status/<id> and /download/<id>.
+  # ========================================================================
+  - public_path: /generate-news
+    backend: news-orchestrator
+    upstream: /generate-news
+    methods: [POST]
+    auth: api_key
+    timeout: 600
+
+  - public_path: /news-status/<article_id>
+    backend: news-orchestrator
+    upstream: /status/{article_id}
+    methods: [GET]
+    auth: api_key
+
+  - public_path: /news-download/<article_id>
+    backend: news-orchestrator
+    upstream: /download/{article_id}
+    methods: [GET]
+    auth: api_key
+    timeout: 120
+
+  # ========================================================================
+  # NEWSLETTER PROCESSOR  (newsletter-subscribed) — rows 57-60
+  # ========================================================================
+  - public_path: /newsletters_v2
+    backend: newsletter
+    upstream: /newsletters_v2
+    methods: [GET]
+    auth: api_key
+
+  - public_path: /process_newsletter
+    backend: newsletter
+    upstream: /process_newsletter
+    methods: [POST]
+    auth: api_key
+    timeout: 120
+
+  - public_path: /get_articles_by_newsletter_id
+    backend: newsletter
+    upstream: /get_articles_by_newsletter_id
+    methods: [POST]
+    auth: api_key
+
+  - public_path: /submit_credentials
+    backend: newsletter
+    upstream: /submit_credentials
+    methods: [POST]
+    auth: api_key
+    timeout: 30
+
+  - public_path: /key_exchange
+    backend: newsletter
+    upstream: /key_exchange
+    methods: [POST]
+    auth: api_key
+    timeout: 30
+
+  # ========================================================================
+  # TREATS  (treats-subscribed) — rows 48, 49
+  # ========================================================================
+  - public_path: /treats-near/<path:subpath>
+    backend: treats
+    upstream: /treats-near/{subpath}
+    methods: [GET]
+    auth: api_key
+
+  - public_path: /treats-near-places
+    backend: treats
+    upstream: /treats-near-places
+    methods: [GET, POST]
+    auth: api_key
+
+  # ========================================================================
+  # TOUR EDITING  (tour-editing-subscribed) — rows 61-63
+  # Save routes trigger Polly TTS (cost-bearing); api_key + 300s timeout.
+  # ========================================================================
+  - public_path: /tour/<tour_id>/update-multiple-stops
+    backend: tour-editing
+    upstream: /tour/{tour_id}/update-multiple-stops
+    methods: [POST]
+    auth: api_key
+    timeout: 300
+
+  - public_path: /tour/<tour_id>/update-stop
+    backend: tour-editing
+    upstream: /tour/{tour_id}/update-stop
+    methods: [POST]
+    auth: api_key
+    timeout: 300
+
+  - public_path: /tour/<tour_id>/job-status/<job_id>
+    backend: tour-editing
+    upstream: /tour/{tour_id}/job-status/{job_id}
+    methods: [GET]
+    auth: api_key
+
+  # ========================================================================
+  # TOUR ID RESOLUTION  (tour-id-resolution-subscribed) — row 32
+  # ========================================================================
+  - public_path: /tour/<tour_id>/resolve
+    backend: tour-id-resolution
+    upstream: /tour/{tour_id}/resolve
+    methods: [GET]
+    auth: api_key
+
+  # ========================================================================
+  # GENERATOR  (tour-generator-subscribed) — row 53
+  # ========================================================================
+  - public_path: /tour/share
+    backend: generator
+    upstream: /tour/share
+    methods: [POST]
+    auth: api_key
+
+  # ========================================================================
+  # VOICE  (voice-subscribed) — rows 50, 51
+  # ========================================================================
+  - public_path: /parse_voice_search
+    backend: voice
+    upstream: /parse_voice_search
+    methods: [POST]
+    auth: api_key
+
+  - public_path: /process-voice-command
+    backend: voice
+    upstream: /process-voice-command
+    methods: [POST]
+    auth: api_key
+
+  # ========================================================================
+  # CUSTOM AUDIO  (custom-audio-subscribed) — rows 64-67
+  # ========================================================================
+  - public_path: /tour/<tour_id>/stop/<stop_index>/custom-audio
+    backend: custom-audio
+    upstream: /tour/{tour_id}/stop/{stop_index}/custom-audio
+    methods: [POST, DELETE]
+    auth: api_key
+    timeout: 300
+
+  - public_path: /tour/<tour_id>/stop/<stop_index>/audio-versions
+    backend: custom-audio
+    upstream: /tour/{tour_id}/stop/{stop_index}/audio-versions
+    methods: [GET]
+    auth: api_key
+
+  - public_path: /tour/<tour_id>/audio-metadata
+    backend: custom-audio
+    upstream: /tour/{tour_id}/audio-metadata
+    methods: [GET]
+    auth: api_key
+
+internal_only:
+  # Admin moderation / billing surface. These require the DISTINCT ADMIN_API_KEY
+  # (user-tracking/communities_api.py: _require_admin_key), which the app NEVER
+  # carries. They must NOT be reachable from the public gateway — operators call
+  # them service-to-service (OIDC) or via an internal tool. Listing them here
+  # documents that their omission from `routes` is deliberate, not an oversight.
+  - backend: user-api
+    path: /communities/admin/reports
+    reason: "Admin-only moderation queue (ADMIN_API_KEY); never exposed publicly."
+  - backend: user-api
+    path: /communities/admin/actions
+    reason: "Admin-only moderation audit log (ADMIN_API_KEY)."
+  - backend: user-api
+    path: /communities/admin/ban
+    reason: "Admin-only user ban (ADMIN_API_KEY)."
+  - backend: user-api
+    path: /communities/admin/unban
+    reason: "Admin-only user unban (ADMIN_API_KEY)."
+  - backend: user-api
+    path: /communities/<id>/admin/bar
+    reason: "Admin-only bar a member from a community (ADMIN_API_KEY)."
+  - backend: user-api
+    path: /communities/<id>/admin/unbar
+    reason: "Admin-only unbar (ADMIN_API_KEY)."
+  - backend: user-api
+    path: /communities/<id>/admin/disable
+    reason: "Admin-only disable a community (ADMIN_API_KEY)."
+  - backend: user-api
+    path: /communities/admin/support-id
+    reason: "Admin-only reverse support-id lookup (ADMIN_API_KEY); handles PII."
+  - backend: user-api
+    path: /communities/admin/grant-tour
+    reason: "Admin-only comp a tour to a user (ADMIN_API_KEY)."
+  - backend: user-api
+    path: /communities/<id>/admin/extend-pass
+    reason: "Admin-only extend a community pass (ADMIN_API_KEY)."
+  - backend: user-api
+    path: /communities/<id>/admin/grant-pass
+    reason: "Admin-only grant a community pass (ADMIN_API_KEY)."
+  - backend: user-api
+    path: /communities/admin/add-plan-units
+    reason: "Admin-only top up plan units (ADMIN_API_KEY); billing-sensitive."
+  - backend: user-api
+    path: /communities/admin/extend-plan
+    reason: "Admin-only extend a plan (ADMIN_API_KEY); billing-sensitive."
+  - backend: user-api
+    path: /communities/admin/refund-google
+    reason: "Admin-only Google Play refund (ADMIN_API_KEY); money movement."
+  - backend: user-api
+    path: /communities/admin/apple-refund-message
+    reason: "Admin-only Apple refund note (ADMIN_API_KEY); money movement."
+  - backend: user-api
+    path: /communities/admin/ledger
+    reason: "Admin-only wallet/plan ledger export (ADMIN_API_KEY); financial data."
+  - backend: newsletter
+    path: /decrypt_credentials
+    reason: "Handles raw credentials; service-to-service only (OIDC-authenticated inter-service calls)."
