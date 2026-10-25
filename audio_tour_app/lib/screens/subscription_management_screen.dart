@@ -71,7 +71,7 @@ class _SubscriptionManagementScreenState extends State<SubscriptionManagementScr
       );
 
       final cleanupResults = await SubscriptionService.performCleanup();
-      Navigator.pop(context);
+      Navigator.of(context, rootNavigator: true).pop(); // [LOCAL-762] dismiss root-pushed progress dialog
 
       final expiredArticles = cleanupResults['expired_articles_removed'] ?? 0;
       
@@ -85,7 +85,7 @@ class _SubscriptionManagementScreenState extends State<SubscriptionManagementScr
       // Reload data
       await _loadSubscriptionData();
     } catch (e) {
-      Navigator.pop(context);
+      Navigator.of(context, rootNavigator: true).pop(); // [LOCAL-762] dismiss root-pushed progress dialog
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Cleanup failed: $e'),
@@ -187,7 +187,7 @@ class _SubscriptionManagementScreenState extends State<SubscriptionManagementScr
         await CredentialStorageService.clearAllCredentials();
         await SubscriptionArticleStorage.clearAllArticles();
         
-        Navigator.pop(context);
+        Navigator.of(context, rootNavigator: true).pop(); // [LOCAL-762] dismiss root-pushed progress dialog
         
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -200,7 +200,7 @@ class _SubscriptionManagementScreenState extends State<SubscriptionManagementScr
         await _loadSubscriptionData();
       }
     } catch (e) {
-      Navigator.pop(context);
+      Navigator.of(context, rootNavigator: true).pop(); // [LOCAL-762] dismiss root-pushed progress dialog
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Error clearing data: $e'),

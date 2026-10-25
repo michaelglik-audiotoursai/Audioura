@@ -38,6 +38,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../services/communities_service.dart';
 import '../services/builder_location_provider.dart';
+import '../services/tour_pricing_service.dart';
 
 /// [LOCAL-758] The tile provider used by the builder's maps. Production uses the
 /// real network tiles (OpenStreetMap). Widget tests swap in
@@ -215,6 +216,13 @@ class _OrganiserAudioTourScreenState extends State<OrganiserAudioTourScreen> {
   String _tourType = 'walking';
   String _visibility = 'members';
   bool _rightsAccepted = false;
+  // [LOCAL-762 / D711 §4] Optional "Price for non-members", enabled ONLY when
+  // visibility is public (a members-only tour is covered by the dues and cannot
+  // be priced). null = Free. The chosen tier is sent with the publish and the
+  // server applies it via the same pricing code. _priceLadder is the picker's
+  // round-dollar steps, loaded once.
+  int? _priceTier;
+  List<PriceTier> _priceLadder = const [];
   // [LOCAL-755 / D709] EDIT only — "I changed this tour — tell my members".
   bool _notifyMembers = false;
   bool _busy = false;
@@ -237,6 +245,9 @@ class _OrganiserAudioTourScreenState extends State<OrganiserAudioTourScreen> {
     // Nothing becomes a stop until the organiser ticks it (Michael: "Nothing
     // becomes a stop without being ticked").
     _loadChoices(widget.community.episodes);
+    // [LOCAL-762 / D711 §4] Load the price-picker ladder (round-dollar steps)
+    // so the optional "Price for non-members" field can offer them. Best-effort.
+    _loadPriceLadder();
     // [LOCAL-760 build item 4 / D709] EDIT mode: prefill from the server so the
     // organiser reopens the EXISTING tour (name, type, visibility, stops with
     // name / audio URL / location / text) rather than a blank builder. The
@@ -500,6 +511,14 @@ class _OrganiserAudioTourScreenState extends State<OrganiserAudioTourScreen> {
     return null;
   }
 
+  /// [LOCAL-762 / D711 §4] Load the round-dollar price ladder for the optional
+  /// "Price for non-members" picker. Best-effort; an empty ladder hides the
+  /// quick-pick chips (the organiser can still publish Free).
+  Future<void> _loadPriceLadder() async {
+    final ladder = await TourPricingService.pickerLadder();
+    if (mounted) setState(() => _priceLadder = ladder);
+  }
+
   Future<void> _publish() async {
     setState(() {
       _error = null;
@@ -527,6 +546,13 @@ class _OrganiserAudioTourScreenState extends State<OrganiserAudioTourScreen> {
       'rights_accepted': _rightsAccepted,
       'stops': _stops.map((s) => s.toJson()).toList(),
     };
+    // [LOCAL-762 / D711 §4] Send the chosen non-member price ONLY for a PUBLIC
+    // tour (a members-only tour is covered by the dues; the server would refuse
+    // members_only_no_price). The server applies the tier via the same pricing
+    // code after the tour row is created. null/members-only → the tour is Free.
+    if (_visibility == 'public' && _priceTier != null) {
+      body['price_tier'] = _priceTier as Object;
+    }
     if (widget.editTourId != null) {
       body['tour_id'] = widget.editTourId as Object;
       body['notify_members'] = _notifyMembers;
@@ -592,6 +618,49 @@ class _OrganiserAudioTourScreenState extends State<OrganiserAudioTourScreen> {
                 ),
               ],
             ),
+            // [LOCAL-762 / D711 §4] Optional "Price for non-members" — shown and
+            // enabled ONLY when the tour is PUBLIC. A members-only tour is
+            // covered by the dues and cannot be priced, so the picker is hidden.
+            if (_visibility == 'public') ...[
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  const Text('Price for non-members: ',
+                      style: TextStyle(fontWeight: FontWeight.w600)),
+                  Flexible(
+                    child: Wrap(
+                      spacing: 8,
+                      runSpacing: 4,
+                      children: [
+                        ChoiceChip(
+                          label: const Text('Free'),
+                          selected: _priceTier == null,
+                          onSelected: (_) => setState(() => _priceTier = null),
+                        ),
+                        for (final usd in const [3.0, 5.0, 10.0, 20.0])
+                          ...(_priceLadder
+                              .where((t) => t.priceUsd == usd)
+                              .take(1)
+                              .map((t) => ChoiceChip(
+                                    label: Text(t.label),
+                                    selected: _priceTier == t.tier,
+                                    onSelected: (_) =>
+                                        setState(() => _priceTier = t.tier),
+                                  ))),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const Padding(
+                padding: EdgeInsets.only(top: 4),
+                child: Text(
+                  'Members get it included; non-members pay this price. People '
+                  'who already downloaded it keep it.',
+                  style: TextStyle(fontSize: 12, color: Colors.black54),
+                ),
+              ),
+            ],
             const Divider(height: 28),
 
             // Audio sources.

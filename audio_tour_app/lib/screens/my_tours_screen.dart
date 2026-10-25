@@ -12,6 +12,7 @@ import '../config/endpoints.dart';
 import '../utils/tour_path_healer.dart';
 import '../utils/view_after_download.dart';
 import '../utils/organiser_audio_notices.dart';
+import '../utils/tour_role_label.dart';
 import '../widgets/share_tour_sheet.dart';
 import '../services/community_downloads.dart';
 import '../services/voice_listen_options.dart';
@@ -219,6 +220,18 @@ class _MyToursScreenState extends State<MyToursScreen> {
   final Map<String, TourPrice> _priceByTour = {};
   final Map<String, int> _salesByTour = {};
 
+  // [LOCAL-762 / D711] Per-tour ownership/role, keyed by the numeric id string.
+  // Cached lazily and refreshed when a row's ⋮ menu is about to open, so the
+  // menu shows only the items that apply (owner-only Price/Re-score) and the
+  // role line reads correctly. A null entry means "not loaded / unknown" and
+  // the menu falls back to the safe reading (no Price/Re-score).
+  final Map<String, TourRole> _roleByTour = {};
+
+  // [LOCAL-762] The current device user id, cached for the role line. Loaded
+  // alongside the community count; empty until then (the role line still works —
+  // owner/organiser flags are server-resolved, not derived from this id).
+  String _currentUserId = '';
+
   final ScrollController _scrollController = ScrollController();
 
   // [LOCAL-716B / D358] The displayed index of a tour to briefly highlight
@@ -294,6 +307,7 @@ class _MyToursScreenState extends State<MyToursScreen> {
     try {
       final prefs = await SharedPreferences.getInstance();
       final userId = prefs.getString('user_id');
+      if (mounted && userId != null) _currentUserId = userId;
       if (userId == null || userId.isEmpty) {
         if (mounted) setState(() => _communityCountLoaded = true);
         return;
@@ -341,6 +355,41 @@ class _MyToursScreenState extends State<MyToursScreen> {
       _priceByTour[tourId] = price;
       _salesByTour[tourId] = sales;
     });
+  }
+
+  /// [LOCAL-762 / D711] Load (and cache on the record) the ownership/role for a
+  /// tour, so the ⋮ menu shows only the items that apply and the role line reads
+  /// correctly. Also stamps the compact role fields onto the [tour] record map
+  /// so tourRoleLabel can read them synchronously while the menu builds. Fails
+  /// safe: on any error the role is left unknown (menu hides Price/Re-score).
+  Future<void> _loadRole(String tourId, Map<String, dynamic> tour) async {
+    final role = await TourPricingService.fetchRole(tourId);
+    if (role == null) return;
+    if (!mounted) return;
+    setState(() {
+      _roleByTour[tourId] = role;
+      // Cache onto the record so the pure tourRoleLabel can read it.
+      tour.addAll(role.toRecordJson());
+    });
+  }
+
+  /// [LOCAL-762] The cached role for a tour, or an empty (safe) role when not
+  /// loaded yet. Never null so the menu logic stays simple.
+  TourRole _roleFor(Map<String, dynamic> tour) {
+    final tourId = _numericTourId(tour);
+    if (tourId != null) {
+      final cached = _roleByTour[tourId];
+      if (cached != null) return cached;
+    }
+    return const TourRole();
+  }
+
+  /// [LOCAL-762] Ensure the role for a row is loaded before its ⋮ menu opens.
+  /// Called from the row's menu open callback; a no-op once cached.
+  void _ensureRoleLoaded(Map<String, dynamic> tour) {
+    final tourId = _numericTourId(tour);
+    if (tourId == null || _roleByTour.containsKey(tourId)) return;
+    _loadRole(tourId, tour);
   }
 
   /// [LOCAL-677] The curator's price + Sales line for a sellable tour. Triggers
@@ -517,6 +566,24 @@ class _MyToursScreenState extends State<MyToursScreen> {
                       style: TextStyle(fontSize: 12, color: Colors.black54),
                     ),
                   ),
+                  // [LOCAL-762 / D711 §1] Every Price dialog states the
+                  // grandfather rule, and a PUBLIC community tour adds the
+                  // members-included line.
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: Text(
+                      _roleFor(tour).isCommunity &&
+                              (_roleFor(tour).communityVisibility ?? '') ==
+                                  'public'
+                          ? 'Members get it included; non-members pay this '
+                              'price. People who already downloaded this tour '
+                              'keep it; the price applies to new downloads.'
+                          : 'People who already downloaded this tour keep it; '
+                              'the price applies to new downloads.',
+                      style: const TextStyle(
+                          fontSize: 12, color: Colors.black54),
+                    ),
+                  ),
                   // Quick picks + Free as chips at the top of the control.
                   Wrap(
                     spacing: 8,
@@ -628,7 +695,10 @@ class _MyToursScreenState extends State<MyToursScreen> {
                         ? 'You can only price a tour you created.'
                         : res.code == 'not_curator'
                             ? 'Only a Curator can set a price.'
-                            : (res.message ?? 'Could not set the price.');
+                            : res.code == 'members_only_no_price'
+                                ? 'Members-only tours are covered by the '
+                                    'membership dues and cannot be priced.'
+                                : (res.message ?? 'Could not set the price.');
                     ScaffoldMessenger.of(context)
                         .showSnackBar(SnackBar(content: Text(msg)));
                   }
@@ -726,7 +796,7 @@ class _MyToursScreenState extends State<MyToursScreen> {
       await _speechToText.listen(
         onResult: (result) {
           if (result.finalResult) {
-            Navigator.pop(context);
+            Navigator.of(context, rootNavigator: true).pop(); // [LOCAL-762] dismiss root-pushed listening dialog
             _handleVoiceSearchCommand(result.recognizedWords);
           }
         },
@@ -740,7 +810,7 @@ class _MyToursScreenState extends State<MyToursScreen> {
       await _speechToText.listen(
         onResult: (result) {
           if (result.finalResult) {
-            Navigator.pop(context);
+            Navigator.of(context, rootNavigator: true).pop(); // [LOCAL-762] dismiss root-pushed listening dialog
             _handleVoiceSearchCommand(result.recognizedWords);
           }
         },
@@ -1555,7 +1625,7 @@ class _MyToursScreenState extends State<MyToursScreen> {
       parentEditTourId: parentEditTourId,
     );
 
-    if (mounted) Navigator.of(context).pop(); // dismiss progress
+    if (mounted) Navigator.of(context, rootNavigator: true).pop(); // [LOCAL-762] dismiss root-pushed progress dialog
 
     if (mounted) {
       if (failures.isEmpty) {
@@ -1780,6 +1850,41 @@ class _MyToursScreenState extends State<MyToursScreen> {
         ],
       ),
     );
+  }
+
+  /// [LOCAL-762 / D711 §1] The ⓘ shown when the owner taps the DISABLED Price on
+  /// a members-only community tour: the dues already cover it.
+  Future<void> _showMembersOnlyPriceNotice() async {
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Price not available'),
+        content: const Text(
+          'Members-only tours are covered by the membership dues, so they '
+          'cannot be priced separately. Make the tour public (for non-members) '
+          'if you want to charge for it.',
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.of(ctx).pop(),
+              child: const Text('OK')),
+        ],
+      ),
+    );
+  }
+
+  /// [LOCAL-762 / D711 §2] Map a role-line icon hint to a Material icon.
+  IconData _roleLineIcon(TourRoleIcon icon) {
+    switch (icon) {
+      case TourRoleIcon.person:
+        return Icons.person_outline;
+      case TourRoleIcon.group:
+        return Icons.groups_outlined;
+      case TourRoleIcon.broadcast:
+        return Icons.podcasts;
+      case TourRoleIcon.audioura:
+        return Icons.headphones_outlined;
+    }
   }
 
   /// [LOCAL-760 build item 4] The OWNER opens their broadcast tour in the
@@ -2369,6 +2474,10 @@ class _MyToursScreenState extends State<MyToursScreen> {
                         PopupMenuButton<String>(
                           icon: const Icon(Icons.more_vert, size: 20),
                           constraints: const BoxConstraints(minWidth: 36),
+                          // [LOCAL-762 / D711] Refresh this tour's ownership/role
+                          // the moment the ⋮ menu opens, so Price/Re-score and
+                          // the role line reflect the latest server truth.
+                          onOpened: () => _ensureRoleLoaded(tour),
                           onSelected: (value) {
                             switch (value) {
                               case 'rate': _showRateDialog(tour); break;
@@ -2380,6 +2489,14 @@ class _MyToursScreenState extends State<MyToursScreen> {
                               case 'version': _showVersionDialog(tour); break;
                               case 'price': _showPriceDialog(tour); break;
                               case 'rescore': _requestRescore(tour); break;
+                              // [LOCAL-762 / D711 §1] Tapping the DISABLED Price
+                              // on a members-only community tour explains why
+                              // (the dues cover it); it never opens the picker.
+                              case 'price_disabled':
+                                _showMembersOnlyPriceNotice(); break;
+                              // The role line is non-tappable; selecting it is a
+                              // no-op (kept harmless if a platform taps it).
+                              case 'role_line': break;
                               // [LOCAL-760 / D708] Tapping the DISABLED Edit/
                               // Translate on a broadcast tour shows the ⓘ reason
                               // (it never opens the edit screen / runs translate).
@@ -2389,7 +2506,34 @@ class _MyToursScreenState extends State<MyToursScreen> {
                                 _showOrganiserAudioTranslateNotice(); break;
                             }
                           },
-                          itemBuilder: (context) => [
+                          itemBuilder: (context) {
+                            // [LOCAL-762 / D711] Resolve this tour's role once
+                            // per build so the role line + Price/Re-score gating
+                            // agree. _roleFor returns a safe empty role until the
+                            // server answer is cached (onOpened kicks the load).
+                            final role = _roleFor(tour);
+                            final roleLine = tourRoleLabel(tour, _currentUserId);
+                            final canShowPrice = _canSell &&
+                                role.isOwner &&
+                                !TourTranslationHelper.isTranslation(tour) &&
+                                _numericTourId(tour) != null;
+                            return [
+                            // [LOCAL-762 / D711 §2] The role line — the FIRST,
+                            // non-tappable entry: small grey text with an icon.
+                            PopupMenuItem(
+                              value: 'role_line',
+                              enabled: false,
+                              height: 32,
+                              child: ListTile(
+                                leading: Icon(_roleLineIcon(roleLine.icon),
+                                    size: 16, color: Colors.grey),
+                                title: Text(roleLine.text,
+                                    style: const TextStyle(
+                                        fontSize: 12, color: Colors.grey)),
+                                dense: true,
+                                contentPadding: EdgeInsets.zero,
+                              ),
+                            ),
                             const PopupMenuItem(value: 'rate', child: ListTile(leading: Icon(Icons.star_outline, color: Color(0xFFE2A400)), title: Text('Rate this tour'), dense: true)),
                             const PopupMenuItem(value: 'share', child: ListTile(leading: Icon(Icons.ios_share, color: Color(0xFF3498db)), title: Text('Share'), dense: true)),
                             // [LOCAL-760 / D708] Translate. A BROADCAST
@@ -2410,11 +2554,25 @@ class _MyToursScreenState extends State<MyToursScreen> {
                               )
                             else if (!TourTranslationHelper.isTranslation(tour))
                               const PopupMenuItem(value: 'translate', child: ListTile(leading: Icon(Icons.translate, color: Color(0xFF8e44ad)), title: Text('Translate'), dense: true)),
-                            // [LOCAL-677] Curator-only Price control (tier picker /
-                            // Free). Shown only to a device with can_sell, and only
-                            // for a tour with a numeric id (sellable). The server
-                            // still enforces ownership.
-                            if (_canSell && !TourTranslationHelper.isTranslation(tour) && _numericTourId(tour) != null)
+                            // [LOCAL-762 / D711 §1] Price — only when the device
+                            // is a curator (_canSell) AND the OWNER of this tour
+                            // (the server resolves ownership; the menu no longer
+                            // shows Price to a non-owner, which is why a member
+                            // could reach Set Price before). A members-only
+                            // community tour shows Price DISABLED with an ⓘ (the
+                            // dues cover it); a public community tour / a plain
+                            // owned tour keeps the live Price.
+                            if (canShowPrice && role.isMembersOnly)
+                              const PopupMenuItem(
+                                value: 'price_disabled',
+                                child: ListTile(
+                                  leading: Icon(Icons.sell, color: Colors.grey),
+                                  title: Text('Price', style: TextStyle(color: Colors.grey)),
+                                  trailing: Icon(Icons.info_outline, size: 18, color: Colors.grey),
+                                  dense: true,
+                                ),
+                              )
+                            else if (canShowPrice)
                               const PopupMenuItem(value: 'price', child: ListTile(leading: Icon(Icons.sell, color: Color(0xFF1B6B2E)), title: Text('Price'), dense: true)),
                             // [LOCAL-760 / D708] Edit. A BROADCAST tour shows it
                             // DISABLED with an ⓘ (the audio is maintained on the
@@ -2436,15 +2594,23 @@ class _MyToursScreenState extends State<MyToursScreen> {
                               )
                             else if (canEditTour(tour, ownedCommunityIds: _ownedCommunityIds))
                               const PopupMenuItem(value: 'edit', child: ListTile(leading: Icon(Icons.edit, color: Colors.orange), title: Text('Edit'), dense: true)),
-                            // [LOCAL-688] One free re-score after an edit, on the
-                            // guide's OWN original tour (numeric id). The server
-                            // enforces ownership and the one-per-version limit.
-                            if (!TourTranslationHelper.isTranslation(tour) && _numericTourId(tour) != null)
+                            // [LOCAL-762 / D711 §1] Request re-score — only on
+                            // the OWNER's own original tour (numeric id) and NOT
+                            // a broadcast (organiser-audio) tour (its audio is
+                            // the organiser's own; a re-score cannot regrade it).
+                            // Previously shown to any viewer, so a member saw an
+                            // option they could never use (server 403).
+                            if (role.isOwner &&
+                                !role.isBroadcast &&
+                                !isOrganiserAudioTour(tour) &&
+                                !TourTranslationHelper.isTranslation(tour) &&
+                                _numericTourId(tour) != null)
                               const PopupMenuItem(value: 'rescore', child: ListTile(leading: Icon(Icons.refresh, color: Color(0xFFE2A400)), title: Text('Request re-score'), dense: true)),
                             const PopupMenuItem(value: 'delete', child: ListTile(leading: Icon(Icons.delete, color: Colors.red), title: Text('Delete'), dense: true)),
                             const PopupMenuItem(value: 'report', child: ListTile(leading: Icon(Icons.flag_outlined, color: Colors.grey), title: Text('Report'), dense: true)),
                             const PopupMenuItem(value: 'version', child: ListTile(leading: Icon(Icons.info_outline, color: Colors.blueGrey), title: Text('Version'), dense: true)),
-                          ],
+                          ];
+                          },
                         ),
                         const Icon(Icons.play_arrow, color: Color(0xFF3498db)),
                       ],

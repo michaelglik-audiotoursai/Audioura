@@ -119,6 +119,69 @@ class PriceTier {
       );
 }
 
+/// [LOCAL-762 / D711] A tour's ownership/role context for THIS device, as
+/// returned by GET /tour/<id>/role?user_id=. Drives the Listen ⋮ menu (owner-
+/// only Price/Re-score) and the role line. Every field is defensive so an older
+/// server (no /role) or a partial payload degrades to the least-privileged
+/// reading (not owner, not organiser) — the menu then hides Price/Re-score.
+class TourRole {
+  final bool isOwner;
+  final bool isCurator;
+  final String? sourceKind;
+  final bool isBroadcast; // source_kind == 'organiser_audio'
+  final int? communityId;
+  final String? communityName;
+  final String? communityVisibility; // 'members' | 'public' | null
+  final bool isCommunity;
+  final bool isOrganiser; // this device owns that community
+
+  const TourRole({
+    this.isOwner = false,
+    this.isCurator = false,
+    this.sourceKind,
+    this.isBroadcast = false,
+    this.communityId,
+    this.communityName,
+    this.communityVisibility,
+    this.isCommunity = false,
+    this.isOrganiser = false,
+  });
+
+  /// A members-only community tour cannot be priced (covered by the dues).
+  bool get isMembersOnly =>
+      isCommunity && (communityVisibility ?? '').trim() == 'members';
+
+  factory TourRole.fromJson(Map<String, dynamic> j) => TourRole(
+        isOwner: j['is_owner'] == true,
+        isCurator: j['is_curator'] == true,
+        sourceKind: (j['source_kind'] as String?),
+        isBroadcast: j['is_broadcast'] == true ||
+            ((j['source_kind'] as String?)?.trim() == 'organiser_audio'),
+        communityId: (j['community_id'] as num?)?.toInt(),
+        communityName: ((j['community_name'] as String?)?.trim().isEmpty ?? true)
+            ? null
+            : (j['community_name'] as String).trim(),
+        communityVisibility: (j['community_visibility'] as String?),
+        isCommunity:
+            j['is_community'] == true || (j['community_id'] != null),
+        isOrganiser: j['is_organiser'] == true,
+      );
+
+  /// Serialise to the compact map we cache on a Listen record (snake_case keys
+  /// so a re-parse via fromJson round-trips).
+  Map<String, dynamic> toRecordJson() => {
+        'is_owner': isOwner,
+        'is_curator': isCurator,
+        'source_kind': sourceKind,
+        'is_broadcast': isBroadcast,
+        'community_id': communityId,
+        'community_name': communityName,
+        'community_visibility': communityVisibility,
+        'is_community': isCommunity,
+        'is_organiser': isOrganiser,
+      };
+}
+
 class TourPricingService {
   TourPricingService._();
 
@@ -126,6 +189,26 @@ class TourPricingService {
   static Future<String> _userId() async {
     final prefs = await SharedPreferences.getInstance();
     return prefs.getString('user_id') ?? '';
+  }
+
+  /// [LOCAL-762 / D711] The ownership/role context for a tour on THIS device.
+  /// Returns null on any error / non-200 (an older server without /role, or a
+  /// network failure) — the caller then falls back to the safe reading (hide
+  /// Price/Re-score). Never throws.
+  static Future<TourRole?> fetchRole(String tourId) async {
+    try {
+      final userId = await _userId();
+      final resp = await Endpoints.get(
+        Service.orchestrator,
+        '/tour/$tourId/role?user_id=${Uri.encodeComponent(userId)}',
+        timeout: const Duration(seconds: 10),
+      );
+      if (resp.statusCode == 200) {
+        return TourRole.fromJson(
+            json.decode(resp.body) as Map<String, dynamic>);
+      }
+    } catch (_) {}
+    return null;
   }
 
   /// The unlock/preview state of a tour for this device. Falls back to a

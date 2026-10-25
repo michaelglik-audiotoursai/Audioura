@@ -1372,7 +1372,7 @@ class _EditStopScreenState extends State<EditStopScreen> {
         final copiedPath = await _copyAudioFileToCache(file, fileName);
         
         // Close processing dialog
-        Navigator.pop(context);
+        Navigator.of(context, rootNavigator: true).pop(); // [LOCAL-762] dismiss root-pushed progress dialog
         
         if (copiedPath != null) {
           // Add to recording parts
@@ -1410,8 +1410,8 @@ class _EditStopScreenState extends State<EditStopScreen> {
       await DebugLogHelper.addDebugLog('UPLOAD: File picker error - $e');
       
       // Close processing dialog if open
-      if (Navigator.canPop(context)) {
-        Navigator.pop(context);
+      if (Navigator.of(context, rootNavigator: true).canPop()) {
+        Navigator.of(context, rootNavigator: true).pop(); // [LOCAL-762] dismiss root-pushed progress dialog
       }
       
       ScaffoldMessenger.of(context).showSnackBar(

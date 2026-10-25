@@ -59,7 +59,13 @@ Future<void> shareTour(
   final firstStop = await _readFirstStop(tourPath);
 
   if (!context.mounted) return;
-  Navigator.of(context).pop(); // dismiss progress
+  // [LOCAL-762] The progress dialog was pushed with showDialog's default
+  // useRootNavigator: true, so it lives on the ROOT navigator. Since LOCAL-761
+  // put every tab inside its own nested Navigator (IndexedStack of Navigators),
+  // a plain Navigator.of(context).pop() resolves to the TAB's navigator and
+  // pops a tab page instead — leaving the "Creating share code…" dialog up
+  // forever. Pop the root navigator explicitly to dismiss the dialog.
+  Navigator.of(context, rootNavigator: true).pop(); // dismiss progress
 
   if (!result.ok) {
     ScaffoldMessenger.of(context).showSnackBar(

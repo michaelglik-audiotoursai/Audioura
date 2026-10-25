@@ -1951,7 +1951,7 @@ class _HomeScreenState extends State<HomeScreen> {
     }
 
     if (!context.mounted) return false;
-    Navigator.pop(context); // close the download dialog
+    Navigator.of(context, rootNavigator: true).pop(); // [LOCAL-762] close root-pushed download dialog
     // Now download only the bought language. 'en' in the list means "the
     // tapped row itself" (_downloadSingleTour's convention); a translation is
     // fetched by the translation path, which now gets 200 because it is unlocked.
@@ -2512,7 +2512,9 @@ class _HomeScreenState extends State<HomeScreen> {
     }
 
     if (!mounted) return;
-    if (Navigator.canPop(context)) Navigator.pop(context);
+    if (Navigator.of(context, rootNavigator: true).canPop()) {
+      Navigator.of(context, rootNavigator: true).pop(); // [LOCAL-762] dismiss root-pushed progress dialog
+    }
 
     // [LOCAL-716] One helper builds the text, with correct singular/plural
     // agreement for every count (tours, translations, already-downloaded).
@@ -2675,7 +2677,7 @@ class _HomeScreenState extends State<HomeScreen> {
         try {
           if (mounted) {
             await DebugLogHelper.addDebugLog('HOME: MAIN - Widget is mounted, dismissing dialog');
-            Navigator.pop(context);
+            Navigator.of(context, rootNavigator: true).pop(); // [LOCAL-762] dismiss root-pushed progress dialog
             await DebugLogHelper.addDebugLog('HOME: MAIN - Dialog dismissed successfully');
           } else {
             await DebugLogHelper.addDebugLog('HOME: MAIN - Widget NOT mounted, trying to find context');
@@ -2725,7 +2727,7 @@ class _HomeScreenState extends State<HomeScreen> {
       
       if (mounted) {
         try {
-          Navigator.pop(context);
+          Navigator.of(context, rootNavigator: true).pop(); // [LOCAL-762] dismiss root-pushed progress dialog
           await DebugLogHelper.addDebugLog('HOME: MAIN - Error dialog dismissed');
         } catch (navError) {
           await DebugLogHelper.addDebugLog('HOME: MAIN - Error dialog dismiss failed: $navError');
@@ -2895,7 +2897,9 @@ class _HomeScreenState extends State<HomeScreen> {
           // {"error":"membership_required","community_id":…} instead. The pass
           // is bought on the community page (join / buy pass), the same flow as
           // a paid tour — so open that page rather than the Buy dialog.
-          if (mounted && Navigator.canPop(context)) Navigator.pop(context);
+          if (mounted && Navigator.of(context, rootNavigator: true).canPop()) {
+            Navigator.of(context, rootNavigator: true).pop(); // [LOCAL-762] dismiss root-pushed progress dialog
+          }
           int? _communityId;
           try {
             final body = json.decode(response.body);
@@ -2935,7 +2939,9 @@ class _HomeScreenState extends State<HomeScreen> {
       if (languages != null && languages.isNotEmpty) {
         final nonEnglishLanguages = languages.where((lang) => lang != 'en').toList();
         if (nonEnglishLanguages.isNotEmpty) {
-          if (Navigator.canPop(context)) Navigator.pop(context); // Close download dialog
+          if (Navigator.of(context, rootNavigator: true).canPop()) {
+            Navigator.of(context, rootNavigator: true).pop(); // [LOCAL-762] Close root-pushed download dialog
+          }
           showDialog(
             context: context,
             barrierDismissible: false,
@@ -2959,12 +2965,18 @@ class _HomeScreenState extends State<HomeScreen> {
           translationFailures.addAll(failures);
 
           if (!mounted) return;
-          if (Navigator.canPop(context)) Navigator.pop(context); // Close translation dialog
+          if (Navigator.of(context, rootNavigator: true).canPop()) {
+            Navigator.of(context, rootNavigator: true).pop(); // [LOCAL-762] Close root-pushed translation dialog
+          }
         } else {
-          if (Navigator.canPop(context)) Navigator.pop(context); // Close download dialog
+          if (Navigator.of(context, rootNavigator: true).canPop()) {
+            Navigator.of(context, rootNavigator: true).pop(); // [LOCAL-762] Close root-pushed download dialog
+          }
         }
       } else {
-        if (Navigator.canPop(context)) Navigator.pop(context); // Close download dialog
+        if (Navigator.of(context, rootNavigator: true).canPop()) {
+          Navigator.of(context, rootNavigator: true).pop(); // [LOCAL-762] Close root-pushed download dialog
+        }
       }
 
       if (!mounted) return;
@@ -3018,7 +3030,9 @@ class _HomeScreenState extends State<HomeScreen> {
       }
     } catch (e) {
       if (!mounted) return;
-      if (Navigator.canPop(context)) Navigator.pop(context);
+      if (Navigator.of(context, rootNavigator: true).canPop()) {
+        Navigator.of(context, rootNavigator: true).pop(); // [LOCAL-762] dismiss root-pushed progress dialog
+      }
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Error downloading tour: $e'),
@@ -3354,7 +3368,7 @@ class _HomeScreenState extends State<HomeScreen> {
           body: json.encode(requestBody),
         ).timeout(Duration(seconds: 60));
         
-        Navigator.pop(context);
+        Navigator.of(context, rootNavigator: true).pop(); // [LOCAL-762] dismiss root-pushed progress dialog
         
         if (response.statusCode == 200) {
           final data = json.decode(response.body);
@@ -3422,7 +3436,7 @@ class _HomeScreenState extends State<HomeScreen> {
       await DebugLogHelper.addDebugLog('NEWSLETTER: Response status: ${response.statusCode}');
       await DebugLogHelper.addDebugLog('NEWSLETTER: Response body: ${response.body}');
       
-      Navigator.pop(context);
+      Navigator.of(context, rootNavigator: true).pop(); // [LOCAL-762] dismiss root-pushed progress dialog
       
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
@@ -3486,7 +3500,7 @@ class _HomeScreenState extends State<HomeScreen> {
     } catch (e) {
       await DebugLogHelper.addDebugLog('NEWSLETTER: Exception in _processNewsletterUrl: $e');
       
-      Navigator.pop(context);
+      Navigator.of(context, rootNavigator: true).pop(); // [LOCAL-762] dismiss root-pushed progress dialog
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Error processing newsletter: $e'),
@@ -3530,7 +3544,7 @@ class _HomeScreenState extends State<HomeScreen> {
       await DebugLogHelper.addDebugLog('NEWSLETTER: Response status: ${response.statusCode}');
       await DebugLogHelper.addDebugLog('NEWSLETTER: Response body: ${response.body}');
       
-      Navigator.pop(context);
+      Navigator.of(context, rootNavigator: true).pop(); // [LOCAL-762] dismiss root-pushed progress dialog
       
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
@@ -3597,7 +3611,7 @@ class _HomeScreenState extends State<HomeScreen> {
       await DebugLogHelper.addDebugLog('NEWSLETTER: Exception in _processNewsletter: $e');
       await DebugLogHelper.addDebugLog('NEWSLETTER: Exception type: ${e.runtimeType}');
       
-      Navigator.pop(context);
+      Navigator.of(context, rootNavigator: true).pop(); // [LOCAL-762] dismiss root-pushed progress dialog
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Error loading articles: $e'),
@@ -3686,7 +3700,7 @@ class _HomeScreenState extends State<HomeScreen> {
       final finalSavedNews = prefs.getStringList('saved_news') ?? [];
       await DebugLogHelper.addDebugLog('ARTICLE_PROCESS: Completed with ${finalSavedNews.length} total articles in storage');
       
-      Navigator.pop(context);
+      Navigator.of(context, rootNavigator: true).pop(); // [LOCAL-762] dismiss root-pushed progress dialog
       
       // Show detailed results with error handling
       final totalDownloads = addedCount * (languages?.length ?? 1);
@@ -3738,7 +3752,7 @@ class _HomeScreenState extends State<HomeScreen> {
       // Refresh newsletters to show the new one
       await _loadNewsletters();
     } catch (e) {
-      Navigator.pop(context);
+      Navigator.of(context, rootNavigator: true).pop(); // [LOCAL-762] dismiss root-pushed progress dialog
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Error processing articles: $e'),

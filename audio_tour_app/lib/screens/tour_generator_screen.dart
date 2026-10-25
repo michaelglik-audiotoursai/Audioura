@@ -20,6 +20,9 @@ import '../services/error_handler_service.dart';
 import '../services/community_tour_service.dart';
 import '../services/communities_service.dart';
 import '../services/entitlements_service.dart';
+import '../services/tour_pricing_service.dart';
+import '../services/device_service.dart';
+import '../services/document_acceptance_service.dart';
 
 import '../screens/debug_log_viewer_screen.dart';
 import '../screens/tour_player_screen.dart';
@@ -99,6 +102,16 @@ class _TourGeneratorScreenState extends State<TourGeneratorScreen> {
   // charges this organiser's plan allowance as for any tour.
   List<OwnedCommunity> _ownedCommunities = const [];
   CommunityTourTarget _communityTarget = CommunityTourTarget.justMe;
+
+  // [LOCAL-762 / D711 §4] An optional price picker in the generate options, for
+  // a CURATOR (plans.can_sell). The chosen tier is applied to the tour via
+  // setPrice once the server has created it (and given it a numeric id). Default
+  // Free. A members-only community target hides the picker (the dues cover it);
+  // "Just me / public" and a PUBLIC community target may price. Guide Terms are
+  // accepted before a paid tier is applied (LOCAL-691).
+  bool _canSell = false;
+  int? _genPriceTier;
+  List<PriceTier> _genPriceLadder = const [];
 
   // [LOCAL-739 §2] True when the user BELONGS TO or ORGANISES at least one
   // community — the gate for the Generate "My communities" link (members only).
@@ -199,12 +212,28 @@ class _TourGeneratorScreenState extends State<TourGeneratorScreen> {
   Future<void> _loadEntitlements() async {
     final seed = widget.initialEntitlements;
     if (seed != null) {
-      setState(() => _entitlements = seed);
+      setState(() {
+        _entitlements = seed;
+        _canSell = seed.canSell;
+      });
+      // [LOCAL-762] A curator can set a price — load the picker ladder.
+      if (seed.canSell) _loadGenPriceLadder();
       return;
     }
     final ent = await EntitlementsService.me();
     if (!mounted) return;
-    setState(() => _entitlements = ent);
+    setState(() {
+      _entitlements = ent;
+      _canSell = ent.canSell;
+    });
+    if (ent.canSell) _loadGenPriceLadder();
+  }
+
+  /// [LOCAL-762 / D711 §4] Load the round-dollar price ladder for the optional
+  /// generate-options price picker (curators only). Best-effort.
+  Future<void> _loadGenPriceLadder() async {
+    final ladder = await TourPricingService.pickerLadder();
+    if (mounted) setState(() => _genPriceLadder = ladder);
   }
 
   Map<String, dynamic> _parseTourRequest(String request) {
@@ -401,6 +430,98 @@ class _TourGeneratorScreenState extends State<TourGeneratorScreen> {
         ),
       ),
     );
+  }
+
+  /// [LOCAL-762 / D711 §4] The optional non-member price picker for a curator.
+  /// Hidden to non-curators, and to a members-only community target (the dues
+  /// cover it). Default Free. Choosing a paid tier records Guide Terms
+  /// acceptance (LOCAL-691) before it is applied (on generate).
+  Widget _buildGenPricePicker() {
+    final membersOnlyCommunity = _communityTarget.isCommunity &&
+        _communityTarget.visibility == 'members';
+    if (!_canSell || membersOnlyCommunity) return const SizedBox.shrink();
+    return Card(
+      margin: const EdgeInsets.only(top: 8, bottom: 8),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Price for non-members',
+                style: TextStyle(fontWeight: FontWeight.bold)),
+            const SizedBox(height: 6),
+            Wrap(
+              spacing: 8,
+              runSpacing: 4,
+              children: [
+                ChoiceChip(
+                  label: const Text('Free'),
+                  selected: _genPriceTier == null,
+                  onSelected: (_) => setState(() => _genPriceTier = null),
+                ),
+                for (final usd in const [3.0, 5.0, 10.0, 20.0])
+                  ...(_genPriceLadder
+                      .where((t) => t.priceUsd == usd)
+                      .take(1)
+                      .map((t) => ChoiceChip(
+                            label: Text(t.label),
+                            selected: _genPriceTier == t.tier,
+                            onSelected: (_) async {
+                              // [LOCAL-691] A paid tier requires Guide Terms.
+                              final uid = await DeviceService.getUserId();
+                              final accepted =
+                                  await DocumentAcceptanceService.hasAccepted(
+                                      uid, LegalDoc.guideTerms);
+                              if (!mounted) return;
+                              if (!accepted) {
+                                final ok = await _promptGuideTerms(uid);
+                                if (!ok) return;
+                              }
+                              setState(() => _genPriceTier = t.tier);
+                            },
+                          ))),
+              ],
+            ),
+            const Padding(
+              padding: EdgeInsets.only(top: 4),
+              child: Text(
+                'Applied once the tour is created. Stop 1 is a free preview; '
+                'the rest unlocks on purchase.',
+                style: TextStyle(fontSize: 12, color: Colors.grey),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// [LOCAL-691] Prompt the guide to accept the Guide Terms before pricing.
+  /// Returns true if accepted (and records it), false if declined.
+  Future<bool> _promptGuideTerms(String userId) async {
+    final accept = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Guide Terms'),
+        content: const Text(
+          'To charge for a tour you must accept the Guide Terms. By continuing '
+          'you confirm you have read and agree to them.',
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Cancel')),
+          ElevatedButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('I agree')),
+        ],
+      ),
+    );
+    if (accept == true) {
+      await DocumentAcceptanceService.record(userId, LegalDoc.guideTerms);
+      return true;
+    }
+    return false;
   }
 
   String _sanitizeInput(String input) {
@@ -998,6 +1119,22 @@ class _TourGeneratorScreenState extends State<TourGeneratorScreen> {
       final finalTourIdInt = int.tryParse(finalTourId.toString());
       
       await DebugLogHelper.addDebugLog('TOUR: Using final_tour_id: $finalTourId (not job_id: $jobId)');
+
+      // [LOCAL-762 / D711 §4] A curator who chose a non-member price in the
+      // options applies it now, to the freshly-created numeric tour id, via the
+      // same setPrice path (the server enforces curator + ownership, and refuses
+      // a members-only community tour). Best-effort: a pricing failure never
+      // blocks the download. Skipped for a members-only community target.
+      if (_canSell &&
+          _genPriceTier != null &&
+          finalTourIdInt != null &&
+          !(_communityTarget.isCommunity &&
+              _communityTarget.visibility == 'members')) {
+        final res =
+            await TourPricingService.setPrice('$finalTourIdInt', _genPriceTier);
+        await DebugLogHelper.addDebugLog(
+            'TOUR: setPrice tier=$_genPriceTier ok=${res.ok} code=${res.code}');
+      }
       
       // Download using final_tour_id (CRITICAL FIX)
       setState(() {
@@ -1890,6 +2027,9 @@ class _TourGeneratorScreenState extends State<TourGeneratorScreen> {
             // only, Tours mode only (not News/Audio). Default is "Just me".
             if (_appMode != 'Audio') _buildMyCommunitiesLink(),
             if (_appMode != 'Audio') _buildCommunitySelector(),
+            // [LOCAL-762 / D711 §4] A curator may set an optional non-member
+            // price on the tour they are about to generate (Tours mode only).
+            if (_appMode != 'Audio') _buildGenPricePicker(),
 
             // [LOCAL-733 / D703] One short grey line telling the member how many
             // tours are left, e.g. "3 new tours left in your pack" (paid) or
