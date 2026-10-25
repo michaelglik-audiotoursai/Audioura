@@ -653,10 +653,14 @@ def store_audio_tour(tour_name, request_string, zip_path, lat, lng, tour_content
             _lookup_track = 'beta'
         print(f"Checking if tour already exists (case-insensitive, track-scoped, "
               f"track={_lookup_track!r}, matching unique index)...")
+        # [LEAD 2026-10-25, D714] Reuse ANY Beta/Storied (or legacy NULL-track) original
+        # with this name — today's free reuse, which Michael wants kept — and NEVER a
+        # Subscribed row. A same-track-only key (LOCAL-765 first cut) made every Beta
+        # name a full-cost miss that then hit the global unique index on Cloud SQL.
         cur.execute(
             "SELECT id FROM audio_tours WHERE lower(tour_name) = lower(%s) "
-            "AND track = %s AND original_tour_id IS NULL",
-            (tour_name, _lookup_track)
+            "AND (track IS NULL OR track <> 'subscribed') AND original_tour_id IS NULL",
+            (tour_name,)
         )
         existing_tour = cur.fetchone()
         print(f"Existing tour (track-scoped check, track={_lookup_track!r}): {existing_tour}")
@@ -1350,10 +1354,12 @@ def orchestrate_tour_async(job_id, location, tour_type, total_stops, user_id=Non
                 _reread_track = os.getenv('TOUR_TRACK', 'beta').lower()
                 if _reread_track not in ('beta', 'storied'):
                     _reread_track = 'beta'
+                # [D714] Same scope as the store lookup: any non-Subscribed original.
                 cur.execute(
                     "SELECT id FROM audio_tours WHERE lower(tour_name) = lower(%s) "
-                    "AND track = %s AND original_tour_id IS NULL ORDER BY id DESC LIMIT 1",
-                    (tour_name, _reread_track)
+                    "AND (track IS NULL OR track <> 'subscribed') AND original_tour_id IS NULL "
+                    "ORDER BY id DESC LIMIT 1",
+                    (tour_name,)
                 )
                 result = cur.fetchone()
                 if result:

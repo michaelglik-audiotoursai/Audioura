@@ -123,7 +123,14 @@ CREATE TABLE shared_tours (
     tour_id VARCHAR(16) PRIMARY KEY,
     audio_tour_id INTEGER
 );
+-- [D714] Cloud SQL carries this global index today (GCloud_Storied, 2026-10-25).
+CREATE UNIQUE INDEX uq_audio_tours_original_name
+    ON audio_tours (lower(tour_name)) WHERE original_tour_id IS NULL;
 """
+
+_MIGRATION_043S = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+    "migration", "sql", "043s_storied_name_track_index.sql")
 
 
 def _seed_three_same_name(cur, name, with_audio=True):
@@ -144,7 +151,9 @@ def _seed_three_same_name(cur, name, with_audio=True):
             "(tour_name, request_string, audio_tour, number_requested, lat, lng, "
             " tour_content, content_language, is_test, original_tour_id, track) "
             "VALUES (%s, %s, %s, 1, %s, %s, %s, 'en', FALSE, NULL, %s) RETURNING id",
-            (name, name, blob, 42.0, -71.0, f"content for {track}", track),
+            # [D714] Beta/Storied names are unique together; Storied gets a suffix.
+            ((name + " Storied") if track == "storied" else name,
+             name, blob, 42.0, -71.0, f"content for {track}", track),
         )
         ids[track] = cur.fetchone()[0]
     return ids
@@ -156,6 +165,9 @@ def setUpModule():
     conn.autocommit = True
     cur = conn.cursor()
     cur.execute(_DDL.format(schema=_SCHEMA))
+    # [D714] Apply 043s exactly as Cloud SQL will get it.
+    cur.execute(f"SET search_path TO {_SCHEMA}")
+    cur.execute(open(_MIGRATION_043S).read())
     # Make the throwaway schema the DEFAULT search_path for EVERY connection to
     # this scratch DB (role-scoped), so the service code — which opens its own
     # connections and never sees our SET — still lands in the throwaway schema.
@@ -418,18 +430,45 @@ class TestOrchestratorReuse(_ScratchCase):
         rows = self._rows(name)
         self.assertEqual(len(rows), 1, "same-track regeneration must not create a second row")
 
-    def test_beta_and_storied_same_name_are_separate_rows(self):
+    def test_storied_reuses_beta_same_name_for_free(self):
+        """[D714] A Storied request for a name only Beta has reuses that row
+        (today's free reuse) — never a full-cost miss that hits the index."""
         name = "Dual Track Tour"
         r_beta = self._store(name, track_env="beta")
         r_storied = self._store(name, track_env="storied")
-        print(f"\n  [LOCAL-765] beta then storied → {r_beta.get('action')}, {r_storied.get('action')}")
+        print(f"\n  [D714] beta then storied → {r_beta.get('action')}, {r_storied.get('action')}")
         self.assertEqual(r_beta.get("action"), "inserted")
-        self.assertEqual(r_storied.get("action"), "inserted",
-                         "A storied store must not collapse into the beta row")
-        rows = self._rows(name)
-        tracks = sorted(t for _, t in rows)
-        self.assertEqual(tracks, ["beta", "storied"])
+        self.assertEqual(r_storied.get("action"), "already_exists")
+        self.assertEqual(r_storied.get("existing_tour_id"), r_beta.get("tour_id") or self._rows(name)[0][0])
+        self.assertEqual([t for _, t in self._rows(name)], ["beta"])
 
+    def test_043s_lets_subscribed_share_a_beta_name(self):
+        """[D714] Under the OLD global index a Subscribed row with a Beta name is
+        refused; after 043s it is allowed, and Beta/Storied stay unique."""
+        import psycopg2
+        name = "Index Probe Tour"
+        self.cur.execute(
+            "INSERT INTO audio_tours (tour_name, original_tour_id, track) VALUES (%s, NULL, 'beta')", (name,))
+        self.cur.execute(
+            "INSERT INTO audio_tours (tour_name, original_tour_id, track) VALUES (%s, NULL, 'subscribed')", (name,))
+        with self.assertRaises(psycopg2.errors.UniqueViolation):  # autocommit: no txn to repair
+            self.cur.execute(
+                "INSERT INTO audio_tours (tour_name, original_tour_id, track) VALUES (%s, NULL, 'storied')", (name,))
+
+    def test_old_global_index_blocks_without_043s(self):
+        """RED evidence: on a schema WITHOUT 043s (Cloud SQL today) a Subscribed
+        row with a Beta name violates uq_audio_tours_original_name."""
+        import psycopg2
+        conn = _connect(); conn.autocommit = True; cur = conn.cursor()
+        sch = _SCHEMA + "_old"
+        try:
+            cur.execute(_DDL.format(schema=sch))
+            cur.execute(f"SET search_path TO {sch}")
+            cur.execute("INSERT INTO audio_tours (tour_name, original_tour_id, track) VALUES ('X', NULL, 'beta')")
+            with self.assertRaises(psycopg2.errors.UniqueViolation):
+                cur.execute("INSERT INTO audio_tours (tour_name, original_tour_id, track) VALUES ('X', NULL, 'subscribed')")
+        finally:
+            cur.execute(f"DROP SCHEMA IF EXISTS {sch} CASCADE"); cur.close(); conn.close()
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
