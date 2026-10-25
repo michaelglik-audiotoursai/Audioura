@@ -2,7 +2,7 @@
 
 **Branch:** `LOCAL-763-map-tiles-menu-polish`
 **Base:** `subscribed` @ `1e740b0a` (contains LOCAL-762). `git merge-base --is-ancestor 1e740b0a HEAD` → 0.
-**code_sha:** `__FILL_AFTER_COMMIT__`
+**code_sha:** `1f6611d94ca64cbc4ba160df75f5a67f20a06436` (implementation commit; this submission sha-record follows it).
 **Ruling:** D711 + D711 addendum 1.
 **Budget:** $0.00 (no AI / third-party calls; live test served its own MP3s on localhost).
 
