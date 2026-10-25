@@ -24488,3 +24488,1300 @@ building) opens Stop 1 with a section carrying the About content (history, archi
 facts: opening hours, admission, closed days** ("very important… but it has to be the first section of Stop 1"),
 then Stop 1's own narration. LOCAL-585's extra "About" stop (5 asked → 6) was wrong; LEAD had chosen it and
 offered it as an option. Fix: LOCAL-592. Restaurant tours keep per-restaurant practicals in each stop (D538).
+
+## D612 — 2026-10-06: the single-venue check is reworked, not extended (regression from D611)
+The July single-venue check (content_qa_runner check 9) began scanning the new "About the venue"
+history section in Stop 1 (LOCAL-592, D611). A museum's history names its predecessor and its
+constituent museums, so the first two museum tours afterwards were both blocked: Harvard (Sackler,
+Busch-Reisinger) and McMullen (Devlin Gallery, plus the fragments "Art Gallery" and "College Museum
+of Art"). McMullen cost $0.62 for nothing. Without Stop 1's section both are under the limit.
+Michael: rework the check, don't add code. So check 9 skips the opening section and exempts the
+venue's own name and aliases; there is no new Wikidata mechanism. LOCAL-593B.
+
+## D613 — Subscription levels replace the wallet model; LEAD's calls on the spec's open items (2026-10-06)
+Michael's spec (ClickUp wdvrdayu5a) defines L1, L2, L3 ($10 consumable), L4 ($25 consumable) and
+Tester, to cap free-generation exposure. The design of record is `SUBSCRIPTION_LEVELS.md` on
+subscribed @ b87b93a. The wallet/PPU/Unlimited model of 2026-07-31 is superseded; its tables stay,
+read-only. Open items, decided:
+(1) **No email:** a freed L2 seat becomes a server-side claim offer, shown on the next app open
+    (push later). It expires after 72 h and passes to the next device.
+(2) **Month arithmetic:** anniversary = payment date + 1 calendar month, clamped to the month's
+    last day. Paying early resets it and replaces the allowance; unused units don't carry over.
+(3) **L2 is by reference only,** with zero grounding and zero SERP. With nothing to reuse, the
+    listener gets an actionable refusal, never a fresh generation.
+(4) **Existing local users:** unlimited, ppu and Michael's device → tester; free → L2,
+    grandfathered within the cap.
+(5) **IAP is verified server-side by transaction id;** a replay never grants twice.
+Tasks: 595 (schema/enforcement/API), 596 (seats/queue), 597 (by-reference path, after 594),
+598 (app + real IAP). Michael creates the store products when 598 is ready.
+**D613 addendum (15:4x):** An allowance is consumed only when a tour is **delivered**. A failed
+generation never costs the listener a tour. A cache or stop-pool hit is not "fresh" and doesn't
+consume an L3 fresh allowance, but it counts toward the L2/Tester daily and monthly volume caps.
+An add-stops edit with no device id is refused (fail-closed). Bounce: LOCAL-595B.
+**D613 addendum 2 (16:2x):** LOCAL-595 is merged (subscribed 04eee1d) and the local orchestrator
+rebuilt. Additions:
+- An **admin** level (migration 014, plans row) for Michael's own device. The spec's Tester
+  (≤ 5 stops, 10/day) would block his 7-stop field tests. It's data only; drop the row to undo.
+- `subscription_levels.py` is COPYed into every image that copies `entitlements.py`. Without it the
+  import fails and the orchestrator refuses every tour with 503 (the 2026-10-04 crash-loop class).
+- Known gap until LOCAL-598 ships: the current app (2.4.2+28) sends no device id on edits, so
+  add-stops edits are refused with 401. The editing service is not rebuilt yet, so nothing
+  changes for Michael until the app is updated.
+- Next: 596 (seats/queue) and 598 (app, consumable IAP with offline StoreKit 2 JWS verification,
+  2.4.3+29) are dispatched.
+
+## D614 — LOCAL-594 merged: grounding metered by billed query, cut to 1 grounded request per stop (2026-10-06)
+The A/B with Gemini live: McMullen went from 42→14 grounded requests, grounding $0.53→$0.15 and
+tour total $1.83→$1.47, with gate-cleared stories 2→1 of 7 (within the ≥ BEFORE−1 rule). Freedom
+Trail was neutral. LEAD reverted r2's raise of `_FRESH_COST_SANITY_CEILING[tour_generate]` from
+0.25 to 3.00. That ceiling bounds what a CACHE HIT charges, and raising it would bill listeners up
+to $3 for a ~$0 cache hit (the "single worst bug" in SUBSCRIBED_DESIGN.md). Note: a museum tour
+is still ~$1.5. The levels model, not the meter, is what caps exposure. LOCAL-597 (L2 by-reference,
+zero grounding) is dispatched.
+
+## D615 — An in-person museum tour never uses past exhibitions as stops (2026-10-06, LEAD; reverses LEAD's own 599B instruction)
+MassArt r2 filled 7 stops as 3 on-view shows plus 4 past ones. A listener standing in the museum
+cannot see a past show. The fill order is: works or rooms within current shows → the museum's own
+spaces and building → at most one upcoming show (labelled as upcoming). Never past. An honest
+shortfall is logged and escalated, never padded. Also: the About text skips land
+acknowledgments and boilerplate. LOCAL-599C.
+Tests that write `is_test=FALSE` geolocated tours into the production DB are a bounce, even when
+they clean up (D141). LOCAL-597B.
+
+## D616 — Exhibition museums: an honest shortfall is delivered and told to the listener (2026-10-06, LEAD)
+LOCAL-599 r3 delivered MassArt with 5 verified on-view stops for 7 requested: 3 shows plus 2 named
+works, all from the museum's own site, 0 factual failures, $0.63, 7 min. Padding with past shows
+is forbidden (D615), and refusing would waste a good tour. So the site-first path delivers the
+verified stops and Stop 1's opening says plainly why there are fewer ("currently has 3
+exhibitions on view…"). This is the only exception to D611's exact N. Merged as subscribed
+b8738d1; grouping and the sentence follow in LOCAL-600. Also merged: LOCAL-597 (L2
+by-reference, subscribed 9b83c11).
+
+## D617 — Listeners never hear a URL or a sources list; facts are spoken, not pointed to (2026-10-06, Michael via tour 397)
+Tour 397 (WNDR) read six https:// lines aloud, told the listener twice to "check wndrmuseum.com",
+and its "story of the museum" was the founder's biography. Rule: narration/TTS text holds no URLs
+and no "Sources" block. Sources live only in the text view, as one short line. Hours and admission
+are stated whenever they are published; "check the website" appears once, and only when they
+truly aren't. The About text describes the museum, not its founder. LOCAL-602 items 9–12.
+
+## D618 — Venue preflight: one grounded Gemini question before every single-venue tour (2026-10-06, Michael's request)
+We generated tour 397 for WNDR Museum Boston, permanently closed since 2026-08-30; Gemini knew it
+in one question. Every named-venue request now starts with one grounded Gemini call (~$0.02–0.05,
+measured in LOCAL-603): open/closed, address, hours, admission, what's on, each with sources.
+A sourced closure stops the build with `venue_closed` before any further spend. When our own
+sources are empty, the preflight's sourced facts are Plan B, spoken per D617. L2 by-reference
+builds skip it (zero grounding). Cached for 7 days per venue.
+
+## D619 — Plan page per Michael (2026-10-06): names, email queue codes (10 min), Curator sells, hidden levels, level codes
+L1 is "Introduction", L4 is "Curator" (its headline is creating tours for sale), and Tester/Admin
+are hidden. **D613's "no email" is reversed by Michael:** queue offers go by email and expire after
+10 minutes. The email is stored only while queued or holding an unclaimed offer, then nulled.
+EMAIL_MODE=log until a provider is chosen. One code box takes queue codes, friend invitations and
+**level codes**. Level codes are stored as sha256 hashes only and are revocable, so Michael can
+switch his device to any level for testing. The Pack and Curator cards show "send free-subscription
+invitations". LOCAL-604; app 2.4.4+30.
+
+## D620 — Reused museum tours were refused or wrong; LEAD fixes on subscribed (2026-10-06 21:xx)
+Validation runs (Harvard, McMullen, on Michael's account) showed every reused delivery (cache hit or
+stop pool) failing G4: there was no story-elements file, then the orientation re-narrated true but
+unsourced history. Fixes:
+- `0ad682d`: G4 loads the venue's elements from venue_corpus.
+- `ba5afb9`: Stop 1's sourced opening section counts as elements.
+- `2649a3e`: G4 corrective action. Remove only the ungrounded prolog/epilog sentences and re-check
+  (the LOCAL-423 rule), and write the corrected text back. Before this, QA-loop corrections were
+  never delivered.
+- `2f58299`: cache and pool version 2→3, so tours and stops made before today's selection changes
+  (Harvard's alphabetical works) aren't re-served.
+Rejected texts are now saved to `tours/qa_failed/`. Reused tours have NULL lat/lng: LOCAL-605.
+
+## D621 — Batch merge 602/603/604/605 to subscribed (2026-10-06 21:5x)
+subscribed ecf1c27. LOCAL-603 venue preflight: measured $0.042/call (1 grounded request, 3
+queries); WNDR → venue_closed with $0 further spend. LOCAL-605: tour-level coordinates on every
+path, fail-closed. LOCAL-604: plan display names/hidden, email queue (EMAIL_MODE=log), 10-min
+offers, hashed level codes; migration 016 applied; legacy free/ppu/unlimited rows hidden. LOCAL-602
+was merged for its infrastructure; its junk stops, wrong geocode and skipped D617 items are bounced
+to 602B. Michael's six level codes were created (hashes only in the DB) and given to him in chat:
+they are local test codes, revocable with `level_codes.py revoke`.
+
+## D622 — A regenerated tour replaces the stale one of the same name, keeping a reversible version (2026-10-06)
+The LOCAL-156 dedupe on lower(tour_name) silently discarded Harvard's fixed regeneration and
+re-served #400, the pre-fix alphabetical stops. Every content fix was invisible for any venue asked
+about before. New rule: different text replaces the row's content, ZIP and stops; the old version
+goes to `audio_tour_versions`, and the old ZIP is renamed, never deleted. Identical cache hits only
+increment. The tour id and share codes are kept. LOCAL-606.
+
+## D623 — LOCAL-607 merged; LOCAL-602C NOT merged, chain/SPA work parked (2026-10-06 23:1x)
+607 (subscribed 33606ec, conflict resolved by LEAD): no old epilogs in pooled stops, a real
+conclusion, cross-stop fact dedupe and a QA check, work/artist-first narration, Stop 1 hours from
+the preflight. 602C r3 still produced 2 of 5 stops for Meow Wolf, one of them "Portal Pass" (a
+membership product), plus an address from another branch. This is the third round on a niche
+class (chain venues with JavaScript-only sites). It is parked: such venues now get the LOCAL-603
+preflight (closure gate plus sourced highlights). The branch stays on origin; revisit with a
+preflight-highlights-first design.
+
+## D624 — Curator marketplace design (2026-10-07, LEAD; numbers are Michael's to overturn)
+CURATOR_MARKETPLACE.md (subscribed): Apple/Google IAP is mandatory for in-app digital content
+(Guideline 3.1.1). Tours are sold through 5 consumable price-tier products ($1.99–$9.99); the server
+maps each verified transaction to the tour it unlocks. Stop 1 is a free preview. Split: store 15%
+(Small Business Program), then Audioura 30% of the remainder, so a curator gets ≈ 59.5% of the
+list price. Payouts via Stripe Connect Express, monthly, $25 minimum, 30-day refund hold; Audioura
+stores only the Stripe account id. Not built until Michael confirms the split. LOCAL-610 (plan page
+r2) is dispatched.
+**D624 update (Michael, 2026-10-07 00:2x):** Audioura takes **10%**, applied after the store's
+15%, so a curator gets ≈ 76.5% of the list price ($4.99 → $3.82). Still pending from Michael: the
+five tiers, the Stop 1 preview, and payout terms.
+
+## D625 — No rollback; instead a canary gate before Michael tests (2026-10-07)
+Michael (after Vietnam National Museum of Fine Arts failed): "seriously considering… get back to
+the time when tours succeeded". LEAD's assessment: the recurring killer (G4 failing closed when a
+venue has no mined story elements) dates from July, not today. Rolling back would bring back every
+fixed defect and still fail Vietnam. Fixed instead (5772bc6): with no elements, G4 removes the
+unverifiable prolog/epilog sentences rather than refusing the tour. **New gate:** before LEAD tells
+Michael to test, a canary set must pass end-to-end on the live local stack, run by LEAD: Vietnam
+(5), Harvard (7), McMullen (7), MassArt (7), and one walking tour (Freedom Trail, 5). A merge that
+breaks a canary is reverted. Also: Audioura's 10% split is confirmed by Michael.
+**D625 addendum (Michael, 10:5x):** every canary run adds **3 never-tried venues**, randomly picked
+across strata (famous / obscure / non-English or no-site or walking route) from a Wikidata pool of
+≥ 20k venues. Tried venues are never repeated, and the budget is $3 per run; 2 stops each, one rotating known venue at 5 stops. LOCAL-611.
+
+## D626 — Measure Gemini's true cost per NEW stop by calibration against Google's own numbers (2026-10-07, Michael)
+Michael: "I'm not concerned about the price of testing; I'm concerned that we don't know what a
+tour costs us, so we can't price it." Our meter (≈ $0.20 of Gemini per fresh 7-stop tour, i.e.
+≈ $0.03 per new stop) cannot explain $14 burned overnight by ~25–35 test tours; that implies
+≈ $0.08 per new stop if ~180 new stops were made. So the meter under-counts. Likely causes:
+- Flash token cost is not metered at all;
+- failed or retried grounded calls still bill;
+- the true number of queries per request is unknown.
+
+Gemini is used only (a) once per venue per week (the preflight) and (b) when NEW stops are
+researched (1 grounded request per new stop since LOCAL-594, plus the leads call). Reused stops use
+no Gemini.
+
+**Calibration (Michael's method):**
+1. Pause the Kiro dispatcher (`.continuous_dev/PAUSE`) so nothing else touches the key. GCloud
+   is idle per Michael.
+2. Record the AI Studio balance (Michael's screenshot).
+3. LEAD runs a fixed batch on the live stack: **10 never-seen museums × 5 stops = 50 new stops**,
+   with the preflight active.
+4. Record the balance again, plus Google's per-SKU counts the next day (Cloud Billing → Reports →
+   SKU): search queries, Flash input and output tokens.
+5. Gemini $ per new stop = spend ÷ new stops, compared against our meter → a correction factor
+   for the meter.
+
+Auto-reload is **withdrawn** (Michael: never auto-fill expenses). Top-ups are manual, and LEAD
+relays the credit probe's alerts immediately. Michael's earlier ruling not to replace Gemini
+because it was "too cheap to bother" is **re-opened** pending the calibration result. LOCAL-609 /
+613 add per-call metering from Google's `usageMetadata` and `webSearchQueries`.
+
+## D627 — Independent critique (Amazon Q via kiro-cli) is part of the quality loop (Michael, 2026-10-07)
+`.continuous_dev/calib/critique.sh <tour_id>` runs a read-only listener critique against Michael's
+criteria: work/artist/emotion first, no repeats, spoken hours, no URLs, no leftovers, a real
+conclusion, an explained shortfall, factual red flags. It returns a score, a defect table and code
+fixes. McMullen #399 scored 3.5/10. The verified defects (sentence splitting at initials, a pooled
+opening leftover, scraped degree-program text, a spoken domain, reworded history repeats) →
+LOCAL-614, target ≥ 7/10. Each calibration-batch tour is critiqued too. The dispatcher is
+unpaused: test runs are metered since LOCAL-613, so they no longer corrupt the day reconciliation.
+
+## D628 — Fabricated authorship removed; first calibration readings (2026-10-07 13:1x)
+The Amazon Q critique of calibration tours 403 (Lyon, 4/10) and 405 (Bilbao, 2.5/10) found
+"authored by Noah", "Bakenkhonsu authored a text…" and "the Scribe… authored". The source was
+`story_beat_injector`'s LOCAL-383 possessive rule ("X's TITLE" → "X authored the text that was
+illustrated"), written for one artist-book exhibition. Removed in ba78372 (it is not rebuilt until
+the batch ends, to keep cost comparability).
+
+First Gemini readings, per 5-new-stop fresh museum tour:
+| Provider | Lyon | Bilbao |
+|---|---|---|
+| Gemini grounding | $0.126 (10 requests, 9 queries) | $0.112 |
+| Gemini Flash tokens | $0.044 | $0.049 |
+| Gemini total | **≈ $0.17** (≈ $0.034/new stop) | ≈ $0.16 |
+| Serper | $0.061 (61 queries) | $0.076 (76 queries) |
+| OpenAI | ≈ $0.52 | ≈ $0.51 |
+| **Tour** | **≈ $0.75** | ≈ $0.75 |
+| Time | 12.8 min | 13.1 min |
+Our ledger total wrongly records OpenAI only, and the preflight is not metered → LOCAL-615.
+Google's day total is still the arbiter.
+
+## D629 — Story-beat injection (LOCAL-383) is off by default (2026-10-07 13:5x)
+Calibration critiques: Bremen 3/10 ("named for Print, whose patronage…", "Tate… was a Print", an
+invented Dackel theme) and Helsinki 4/10 ("Gogh authored the text that was illustrated"). All of it
+comes from story_beat_injector's regex roles (author, gallery_patron, illustrator), built in August
+for one artist-book exhibition. Gated behind STORY_BEATS=1 in 4d…, so the downstream beat stages go
+inert. It takes effect at the post-batch rebuild. The critique script now judges the SPOKEN text
+(sources stripped), and the final restaurant offer is declared intentional.
+
+## D630 — OpenAI is metered and reconciled like Gemini; pool v4 (2026-10-07 16:4x)
+OpenAI usage, last 7 days: $67.99 / 23,809 requests, of which key **MacMini_1 = $67.30** and
+MyFirstOpenAPI_Key = $0.69. So the Mac Mini key is the spender, not GCloud. Our ledger recorded
+≈ $10 for the same days, a gap of ~85%. Main suspects: Kiro isolated test runs (unmetered until
+LOCAL-613), live-calling test suites, and unwrapped calls inside generation. Next: a per-key and
+per-day comparison of OpenAI's usage page against the ledger, plus an OpenAI Admin key for
+automatic nightly reconciliation (Michael's option). Calibration distinguishes **fresh** (never-
+seen venue: the precise per-new-stop cost) from **reuse** (pooled stops: ≈ $0 plus the preflight).
+Cache and pool version → 4 (fd1db56), because stops pooled before D628/D629 contain invented
+authors.
+
+## D631 — The canary overwrote Michael's McMullen #399; restored, and tests can no longer touch real tours (2026-10-07 17:3x)
+LOCAL-611's live canary submitted McMullen (is_test) at 18:38 UTC. The LOCAL-606 replace-on-change
+branch matched Michael's real tour 399 by name, replaced its 7-stop content with a 2-stop test
+version, and nulled its coordinates. Detected in LEAD's review of the 611 submission. Restored with
+`restore_tour_version.py 399 2 --apply` (the replaced content is kept as version 3); the share code
+TB5GCRDV is unchanged. Fix 987b7a4: when a test request matches a real tour, it is stored as a
+separate "[TEST …]" row and never replaces or increments the real one. No other real tour was
+affected (audio_tour_versions shows only 399 replaced by a test job). LOCAL-611 is merged
+(e04a71a). Its first run failed 7/8 only because OpenAI was empty.
+
+## D632 — OpenAI metering verified within ~15% (2026-10-07 18:5x)
+A balance-delta reconciliation over a 2 h 11 min window: OpenAI charged $1.89; our ledger says $2.21
+(live stack + metered test runs). We now slightly over-count, plausibly by ignoring the
+cached-input discount. That is acceptable for pricing (conservative). Follow-up: apply cached-token
+pricing from `usage.prompt_tokens_details.cached_tokens`.
+
+## D633 — LOCAL-617 merged although its ≥6/10 acceptance wasn't met (2026-10-07 21:1x)
+Merged because its target defect (criterion 1, institutional content) is measurably fixed
+(10–16% → 0–4%), and the critic confirms work-first stops. The 6/10 bar is blocked by other systems,
+each now a ticket: orientation pre-tell, garbled clauses, sub-entity venue resolution (Boijmans),
+missing spoken hours → LOCAL-618.
+**D633 addendum (22:4x):** LOCAL-618 merged (992ef90). Boijmans now delivers (Q679527), with a
+short orientation, a grammar/splice lint and an honest no-hours line. Critic: 3 / 4 / 4.5. The next
+blocker is the fresh-path recap stub ("That's N stops —", wrong counts) → LOCAL-619.
+
+## D634 — Michael's corrections (2026-10-07 22:5x): balance and diversity, not suppression; a thematic conclusion
+1. **Don't eliminate museum and donor stories.** They are better than nothing when the work's own
+   material is thin, and story **variety** is needed to learn each listener's taste from stop
+   likes and dislikes. Policy replacing LOCAL-617's hard cap:
+   - each stop LEADS with the work, artist and meaning when material exists;
+   - collector, museum and provenance stories are a legitimate **story type**: kept when they are
+     real stories (people, motive, conflict), in a minority share, and used to fill when the
+     work's material is thin;
+   - every story segment is **tagged with its type** (work / artist / historical-cultural /
+     collector-museum / social), so stop-level likes and dislikes (stop_metrics class_* and
+     user_class_prefs) train each listener's mix, and the next tour is tuned to them.
+   → LOCAL-620.
+2. **The conclusion is about the TOUR,** not a list of stops: what the stops had in common, the
+   theme, and one line of meaning. The correct count may be stated; individual stops are not
+   enumerated (at most one named example). The restaurant offer is last. LOCAL-619 was dispatched
+   with "recap up to 3 stops", so it is corrected in 619B.
+
+## D635 — Network-level paid-API meter; first measured E2E tour costs (2026-10-08 01:1x)
+`_meter/paid_api_meter.py` is loaded by sitecustomize in every service and baked into the images,
+so isolated test containers are metered too. It logs every OpenAI/Gemini/Serper/Polly call (usage,
+$, caller file:line) to `meterlogs/paid_api_calls.jsonl` and the `paid_api_calls` table.
+
+Kunsthaus Zürich, 5 stops, English, fresh research, both runs:
+| | OpenAI | Gemini (13–14 searches, ~30k/11k tokens) | Serper (~90) | Voice (Kokoro) | Total metered | Ledger |
+|---|---|---|---|---|---|---|
+| Run 1 | $0.21 | $0.25 | $0.09 | $0 | $0.55 | $0.60 |
+| Run 2 | $0.26 | $0.28 | $0.09 | $0 | $0.62 | $0.73 |
+Run 1's tour was finished but discarded by the orchestrator's 20-minute ceiling (external lookups
+663 s, OSM 504s) → LOCAL-622. The verification against the OpenAI/Gemini balances is pending
+Michael's morning screenshots: OpenAI $11.23, Gemini $9.41 at 00:30 EDT; since then only these
+two runs plus the killed 619 tail.
+
+## D636 — Cross-stop callbacks are continuity, not a defect, in moderation (Michael, 2026-10-08)
+Michael: "If reference to the previous stops becomes too often, it becomes annoying, but if it is done in a couple of instances in a tour, it provides continuity to the tour."
+Rule: about 1 callback per 3 stops, at least 1 in a tour of 3 or more stops when a real link exists. Each one names a genuine connection in varied wording, never the stock "you stopped at a moment ago", and never re-tells the earlier stop's facts. The Uffizi 488 defect was the frequency (every stop) and the stock phrasing, not the callbacks themselves. critique.sh criterion 5 has been updated to match. This supersedes LOCAL-627 item 9's original "at most ONE".
+
+## D637 — A final per-stop LLM editor pass, fact-locked (LEAD, 2026-10-08)
+Four rounds of point fixes (LOCAL-623 to 627) each cleared their own defects, yet every new venue (Uffizi 488/489, KHM 490) showed new variants of the same class: scrambled order, dangling connectors, orphan fragments, glosses jammed into names, dropped words. All of them are produced by the deterministic splice and removal passes that run after narration. Decision: one gpt-4.1 copy-edit per stop, run last. It may reorder and repair, and may add nothing; it is validated by claim/G4 against the original stop, and any rejection keeps the original. Cost is about one call per stop, accepted under Michael's "quality first, price later" (2026-10-08). The price-reduction round will measure whether the editor can replace some of the upstream passes.
+
+## D638 — A benchmark, not anecdotes: 6 venues concurrently, a defect-class tally, automatic detectors, parallel fixes (LEAD with Michael, 2026-10-08)
+Michael: "Are you fixing anything after each run, or you just hope for a luck?" and "If on any iteration you get different bugs, why not run more concurrently?"
+- Every round: `.continuous_dev/bench/run_bench.sh <round> <3 new venues>` generates 6 venues at the SAME time on the shared stack: the Courtauld, Uffizi and National Gallery as fixed repeats, plus 3 never-seen. It then runs `detectors.py` (a deterministic gate covering every defect class fixed so far) and the Kiro critic on each, also concurrently. Output: `bench/<round>/SUMMARY.md`.
+- The defects from all 6 tours are tallied by class. Fixes are dispatched as 2–3 PARALLEL Kiro tasks with disjoint file ownership (selection and venue truth / practical facts / prose and assembly), merged in order.
+- Pass: all 6 at ≥7 by LEAD and by Kiro, and zero detector failures. Then Michael gets the tour IDs.
+
+## D639 — Bump the cache/pool version on every merge that changes delivered stop text (LEAD, 2026-10-08)
+Bench R0 replayed already-fixed defects (the Uffizi "Wrestlers (sculpture, 2021)" cast, the doubled admission) because repeat venues were assembled 100% from the stop pool (`reused=3 new=0`). The pool held stops written by older code. TOUR_CACHE_VERSION / _POOL_VERSION are now 5. Rule for LEAD at merge time: if the merge changes what a stop says, bump the version. Price-reduction work will later decide how much reuse is worth keeping.
+
+## D640 — Calibrate on the listener: Michael's first evaluation (2026-10-08)
+Frick 523: Michael **8/10** (stops 7 / 8 / 9), Kiro 7.5, LEAD 6.5. LEAD over-penalised blemishes a listener does not hear (a stray quote mark, a slightly clumsy appositive) and missed what he did hear:
+1. practical facts (location, price, hours) belong in the opening general description, never in the middle of a stop's narration;
+2. a stop must never end on a teaser ("deeper stories beneath the calm") without telling the story;
+3. a pivotal decision or event (More's refusal) should carry its consequence and how the work reflects it, when the sources have it;
+4. every stop except the last needs directions to the next one.
+New acceptance rule: a tour is listenable when Kiro ≥ 7 AND LEAD finds no factual error and none of D640 items 1–4. A tour ID goes to Michael on that basis. The six-venue benchmark stays the stability measure.
+
+## D641 — Overnight continuous development to the quality target (Michael, 2026-10-08 21:45)
+Michael: "continue working improving the tours to be above 6 and with average 7 … continue continuous development over night unless you run out of your own tokens. I am ready to increase more money."
+Target: every benchmark tour ≥ 6 by Kiro, six-venue average ≥ 7, plus the D640 listener rules. Overnight paid cap $35 from 2026-10-09 01:45Z, replacing the $14. Stop paid work when the target is met, the cap is reached, or either balance is < $1.50. Quiet hours 23:00–07:30: notify only for something serious. Credit exhaustion alone is not serious; work stops safely and resumes after a top-up.
+
+## D642 — On success: wake Michael, tag the commit, then start cost reduction (Michael, 2026-10-08 21:50)
+"If you achieve the desired results, push the info into my phone even at quiet hours! … make a GitHub label so we can always return to this successful point. Then I expect you to start working on making the tours cheaper … suggestions in the morning. If we still do not improve the tours, figure out the strategy of how to move forward."
+- Success = D641 target on one benchmark round: every tour ≥ 6, average ≥ 7, no detector fail, no FAILED run, LEAD factual read clean. On success: annotated git tag `quality-pass-<date>-R<n>` on that `subscribed` commit, pushed to origin (reversible); PushNotification even in quiet hours; record the round in STATUS.
+- After success: cost-reduction work. Every cut is measured on the same benchmark venues, quality before and after, against the price card. A written proposal goes to Michael in the morning.
+- No success by morning: a written strategy proposal on how to move forward, not more of the same.
+
+## D643 — Strategy A: structured stops end to end (LEAD, 2026-10-09 01:15)
+13 overnight benchmark rounds: averages plateau at about 6.2 while good stops score 8+. The critic is reliable (±0.5). Most low scores are text-surgery accidents in about 100 late passes over the assembled string. Decision: carry stops as records until a single final render (LOCAL-643, flag `STRUCTURED_STOPS`, default OFF). The flag flips only when a benchmark round with it ON beats OFF. Reversible; the old path is kept. Then an approved-stop pool (quality and cost synergy), regenerate-a-stop repair, best-of-2 for weak stops.
+
+## D644 — Russian audio stays on AWS Polly; weekly TTS watch (Michael, 2026-10-09)
+Michael: "Let's keep Russian translation with AWS Polly as 0.06. But look around once per week to see if something better comes up with the similar pricing." Translation text stays on the LLM (D595). Polly ru-RU has only standard voices, which explains the stress and name errors. Weekly check procedure and log: `.continuous_dev/TTS_WATCH.md`. `restart.sh` flags it when due. No switch without a blind listen by Michael.
+
+## D645 — Cheap arm ON for the local Subscribed stack: gpt-4.1-mini narration + Serper research (LEAD, 2026-10-09 20:30)
+Evidence (`COST_TIME_RESULTS_2026-10-09.md`, AB5 + AB6, same image, OFF/ON generated concurrently, fresh): 5 museum pairs. Kiro OFF 7.5/6.5/4.0/6.5/6.5 against ON 7.0/6.5/6.5/6.5/2.5. The ON 2.5 is the Frick, where a Wikimedia 429 under 6-way concurrency flipped the museum onto the exhibition path (2 of 3 stops). That is a robustness bug in both arms (LOCAL-661), not a Serper effect. Without it, ON 6.63 ≥ OFF 6.13. Metered cost ON $0.20–0.34 against OFF $0.48–0.53 per 3-stop tour (−36%); time −5%. PARALLEL_STOPS is dropped: no time win, and forward callbacks (AB4 AIC).
+Michael's condition is "the only thing is not to lose quality". The switch is local-only and reversible (delete two env lines in `docker-compose.subscribed-local.yml` and recreate tour-generator). The code defaults stay OFF. Re-check on the next bench; revert if ON trails OFF by more than 0.3 over 5 or more pairs.
+**D645 PAUSED 2026-10-09 20:55 (LEAD).** The first walking tour on the cheap arm (Boston 557 v8) scored Kiro 5.5, against 8.5 for LOCAL-660's run on the normal arm. Part of that was a LEAD bug (the practical-facts relocation ran on walking tours, now museum-only), but the museum A/B says nothing about walking tours. The cheap arm is OFF again until a walking A/B (AB7) is in.
+
+## D646 — FAST_PIPELINE=1 on the local Subscribed stack (LEAD, 2026-10-10 12:45)
+LOCAL-651 (OSM facts, the D533 knowledge fallback and the per-stop editor overlapped) and LOCAL-656/656B (venue resolved once per tour, preflight overlapped with resolution). Same calls (±4%), same stops, same critic scores in the LOCAL-651 A/B. Expected −15 to −30 s per tour. Code default stays OFF. Rollback: delete the line in `docker-compose.subscribed-local.yml` and recreate tour-generator.
+
+## D647 — Tour ratings: 1–10 per tour with a 7.5 prior, the median after 3 ratings, a home-page badge and filter; per-stop thumbs kept (Michael 2026-10-10, LEAD's reading)
+Michael: start at 7.5; with ≤ 3 ratings show the average INCLUDING the 7.5; with more than 3, drop the 7.5 and show "the mean". LEAD reads "mean" (in contrast to "average") as the **median** of the real ratings: robust to one hostile or one fake score. It is reversible to the arithmetic mean by a single function. The score is always shown with its count ("7.5 · New", "8.3 · 2"). Translations share the source tour's ratings. Only listeners who downloaded the tour may rate it. Built as LOCAL-670.
+**D647 confirmed by Michael (2026-10-10 20:56):** "agree with your 1 and 2". The count is always shown next to the score, and the median is used after 3 ratings.
+
+## D648 — Paid-tour display shows no language list, only the ORIGINAL language (Michael, 2026-10-10 21:0x)
+"No languages. User should choose and we should translate. But it is a good idea to indicate the original language." The detail view shows "Original: English" (from `content_language` of the source row). Translation into any supported language stays on demand at the listener's choice, as today. This applies to the paid-tour display design (after D624's open numbers) and to the free tours' dialogs as well.
+
+## D649 — Verified-listener reviews (Michael, 2026-10-10: "terrific idea: live it!")
+Ratings from buyers are marked "Verified listener". On paid tours only verified ratings count; on free tours download-gated ratings count, with verified ones marked. Optional ≤ 500-character text reviews are auto-checked (profanity, URL, contact info → pending), and the curator may reply once. A "Top rated" order uses a Bayesian score (prior 7.5, C = 3). Creators cannot rate their own tours, and a refund un-verifies the rating. Built as LOCAL-672 after LOCAL-670.
+**D649 addendum (Michael 21:1x, "similar mechanism as Amazon"):** a 5-band rating distribution, "Helpful" votes on reviews, review sorting (Top / Most recent / Critical) and a band filter. The list-order weight halves unverified ratings, ratings older than 12 months, and ratings of an older tour version. The shown score stays D647.
+**D647 addendum (Michael 2026-10-10 21:1x):** a tour can be rated only after listening to ≥ 2 stops (a stop counts at 80% played or at its end). The app politely says "Listen to at least 2 stops to rate this tour. You've heard <n> so far." Per-stop thumbs are unaffected. LOCAL-670B.
+**D647 addendum 2 (Michael 21:2x):** offline-first. "Listened" is measured on the phone (actual playback time ≥ 80%; seeking does not count) and stored locally. The rating gate is local, and ratings, reviews, listens and stop thumbs go to an outbox synced when a connection returns (batched, idempotent, listens before ratings). LOCAL-670C, after 670B.
+
+## D650 — Per-stop thumbs are an internal learning signal only (Michael, 2026-10-10 21:3x)
+"The stop ratings are only for us to learn what the listener likes, not the tour ratings." Per-stop thumbs feed personalization (class_details/historic/social) and our stop-quality and pool decisions. They are never shown to other listeners, never part of a tour's score or ranking, and not shown to curators (LEAD's earlier curator-dashboard idea of per-stop thumb percentages is withdrawn). The tour score is D647 only.
+
+## D651 — Walking tours research with serper_plus instead of Gemini (LEAD, 2026-10-11 00:4x)
+LOCAL-674 measured research-only evidence on 15 walking stops (3 tours). Mean evidence score: gemini 5.67, serper 6.20, gemini_per_venue 6.07, **serper_plus 7.87**. Dated and named facts: 3.67 against **5.87** per stop. Cost per stop: $0.054 against **$0.0038**. Live Boston A/B, same moment: Kiro **6.5 = 6.5**, $0.65 against **$0.31**, 401 s against **322 s**. Switched on locally (`WALKING_RESEARCH=serper_plus`); the code default stays gemini. Revert if the next walking listens or benches trail by more than 0.3. One live pair only, so Michael's next walking listen is the confirmation.
+
+## D652 — Curator paid tours are built now on LEAD's proposed numbers, as config (2026-10-13)
+Michael expects paid curator tours in the app. D624's open numbers (tiers, preview, payouts) are still unconfirmed, so LOCAL-677 builds them as config with the proposed defaults: tiers $1.99 / $2.99 / $4.99 / $7.99 / $9.99, Stop 1 free as a preview, payouts out of scope. Purchases run in stub mode on the local stack until the Apple and Google products exist. Changing a tier later is a config edit, not a rebuild of the logic.
+
+## D653 — Language-agnostic purchases: each language copy is bought separately; only the chosen languages are downloaded (Michael, 2026-10-13)
+"If English is deselected, it should not be downloaded at all. And every downloaded tour should carry the price of $4.99, no matter what language. So if the listener wants to listen and compare two languages he will need to pay 2 × $4.99 = $9.98. We want to promote language-agnostic behaviour." A translation inherits the source's price, not its unlock; unlocks are per language row. Ratings and reviews still pool across languages (D647), and a purchase of any language makes the listener Verified for that tour. Built in LOCAL-677B.
+
+## D654 — Paid tours: pay BEFORE download; Stop 1 previews by streaming; bought tours play fully offline (Michael, 2026-10-13)
+Listeners are often offline. A paid tour is bought (per language, D653) before it downloads, and Stop 1 streams as a preview while online. The server refuses to download an unbought paid row (402). Once downloaded, the tour is owned and plays offline with no lock; rating, reviews and sharing sync later (D647 addendum 2). A refund is caught at the next online re-check. This replaces LOCAL-677's in-player lock.
+
+## D655 — Every tour gets an evaluated starting score, 5.0–8.0, instead of a flat 7.5 (LEAD, 2026-10-14)
+Michael: identical 7.5 scores "look very artificial — that it is". LOCAL-685: `tour_editor_score.py` grades each visible original tour's text on five criteria (story, specificity, place, flow, accuracy; evidence first, gpt-4.1, ~1 cent a tour) and maps the average to 5.0–8.0. That number replaces 7.5 everywhere the prior was used: shown while unrated, blended with the first 1–3 ratings, and the Bayesian rank prior. From 4 ratings on, listeners alone decide (D647 unchanged). Translations show their original's score. A replaced tour is cleared and re-scored by the 5-minute tick. **The unrated label is "Audioura score", not "New"**: a computed number shown as if listeners gave it would mislead. 9–10 are reserved for listeners; below 5 would bury a tour nobody has heard. gpt-4o-mini was tried first and gave nearly every tour 8/7/9/8/9 (flat again), so it was rejected. Known limit: a re-run moves a score by up to ±0.4, so scores are frozen until the content changes. Initial backfill: 27 tours, 5.0–8.0, mean 6.2, $0.22.
+
+## D656 — Trust & safety: free score explanations, content ratings, no adult tours in the app, Community-only (Michael, 2026-10-14)
+Michael agreed to LEAD's proposal: (1) a public "How Audioura scores tours" page and per-tour "Why this score" are FREE for guides and listeners, and are a differentiator to promote (ClickUp wdvrdayzew, list 📣 Differentiators to promote). (2) The evaluator assigns a content rating — General / Mature (18+ gate: strong language, alcohol-focused, crime, gambling) / Not allowed (sexual services, explicit sex, hate, encouraging illegal acts); anything not clearly General waits for human review before public listing; model classification, not a bad-word list. (3) No sexual or adult-entertainment tours in the app at all; nightlife, bars, wine, casinos allowed behind an 18+/21+ gate; adult content, if ever wanted, only in a separate web-only section. Reason: Apple and Google rate the whole app by its most mature content. (4) "Community only" tours: unlisted, share-code access, listener accepts the guide's terms/waiver before download — for physical-risk and private-group tours, never as a way around store rules. Build order after the price ladder: content rating + review queue → Why this score → Match % → Community-only.
+
+## D657 — Communities: in-app memberships (Route A); free and paid communities; paid ones pay the owner (Michael, 2026-10-14)
+Michael agreed: community memberships are sold INSIDE the app through Apple/Google (Route A). Communities may be free (e.g. a book club) or paid; a paid community's subscription goes to the community OWNER and is separate from any Audioura subscription. Consequences LEAD recorded: Audioura is the merchant of record (Apple pays us, we pay owners — payouts, owner tax forms, statements needed); store products are a price ladder of NON-RENEWING passes (one-time / 7-day / 30-day), mapped to a community by our server — a non-renewing product can be bought again and again, so one $4.99 product serves every community at that price, and it matches D613 (nothing renews automatically). Auto-renewing subscriptions would allow only ONE active subscription per subscription group, which breaks "member of several communities". Michael's "no responsibility, never stored" RSS model: see STORIED_COMMUNICATION_04 2026-10-14 12:4x — workable only with the community owner as the responsible publisher and Audioura as a generation tool under an acceptable-use policy; "nobody responsible" is not achievable.
+**D657 addendum (Michael, 2026-10-14 13:1x):** owner-supplied audio gets NO check from Audioura: the community owner provides the MP3s (their own feed), Audioura only plays them to the community, stores nothing, and keeps report-to-owner + a feed off-switch. LEAD's note: this is the private-podcast-player model, the strongest position (third-party content we neither create nor store). Tours that Audioura's own generator writes for an owner are a different case and keep the generation-time check (D656), because there we are the author.
+
+## D658 — Communities: content, offline, passes, placement (Michael + LEAD, 2026-10-14)
+Michael: tours Audioura's generator writes for an owner stay in Audioura (no easy export) and get the D656 checks; owner-supplied MP3 sets get none (D657 addendum). An owner's community holds MP3 sets with titles that Audioura shows and plays as tour stops, plus episode names to choose from; or the owner shares one tour by share code. Memberships are non-renewing passes whose length (1 day, 7 days, 30 days…) the OWNER sets; Apple's non-renewing product carries no duration, so one price-ladder product serves any length and our server enforces expiry. At expiry the member is told and can renew by buying again; nobody is charged automatically (Michael: "I am okay with people being forced to renew on their own accord after we remind them"). LEAD calls: (a) members may keep community audio on the phone for offline listening; access is checked whenever online and locks after expiry plus a short offline grace (3 days) — community content is rented, unlike a bought tour, which is owned (D654); (b) Communities becomes a bottom tab replacing Treats (Apple advises at most five tabs; treats already show as orange pins on the Home map); (c) a community page shows the organiser (name, photo, bio, contact), description, rules/waiver, membership options (price + length), the episodes/tours, and the member's own status and expiry.
+**D658 addendum (Michael + LEAD, 2026-10-14 15:0x):** (1) Pass lengths are exactly four: day, week, month, year. (2) Replaces LEAD's lock-after-expiry: audio already on a member's phone STAYS playable after the pass expires; expiry only blocks NEW content — the community's share-code field and new episodes require an active membership, checked by the server. Owners are told this in the terms. (3) Treats stays a tab (ad revenue). No Communities tab for now: organisers bring their own members (Audioura is small), so members arrive by invite link/code that opens the community page; joined communities live in the Listen tab beside My tours; organisers create communities from the Generate tab ("Tour | Community"); About carries a Communities button. A community can also be advertised as a Treat card ("membership with discount"), not merged with Treats. Revisit a dedicated tab when Audioura itself starts promoting communities.
+**D658 addendum 2 (Michael + LEAD, 2026-10-14 15:3x):** (1) Organisers tell members that downloaded audio stays with them (terms). (2) Organisers do NOT upload MP3s to Audioura: they give links or an RSS feed to MP3s they host; the app streams/downloads straight from the owner's host, so Audioura never holds the files. (3) No separate join screen and no split of the Listen page: a community share/invite code goes into the same Home search box; for a non-member it answers like a paid tour does — "This tour belongs to <Community>. Join to listen" → the community page with its passes. On the Listen page every tour carries its origin: a small community label on the row, and a "Origin" item in the ⋯ menu ("Audioura" for our own, else the community name and organiser). (4) Community tours on the Home map: per community, the organiser chooses "Listed" (shown with a community badge, like the gold $ for paid) or "Private" (invite only, never on the map). Waiver/"qualified members" communities are always Private (D656).
+
+## D659 — Cheaper research/writing stays ON; museum tours need people-stories research, not Wikipedia prose (Michael's listening verdict, 2026-10-14)
+Michael graded the two pairs: Boston walk normal (Gemini) **8**, cheaper (serper_plus) **7** — "only because it is a bit shorter; the stories are good, the stops are great"; HCMC Fine Arts normal **5**, cheaper **6** — both weak: "practically not even informative, never mind interesting stories", artist names "hugely misinterpreted", "the listener is ready to fall asleep listening about endurance and women's roles". Ruling (LEAD): the cheaper settings (D645 museums: Serper + gpt-4.1-mini; D651 walking: serper_plus) STAY ON — they cost about half and were not worse overall; the one loss was length, which is fixable. D651's revert condition (trail by > 0.3) is not met on the museum pair and is met on Boston only through length → LOCAL-692 fixes length. Michael's direction for museum stories: who are the artists, where did they live, where did they learn, what changed their life, why art, what are the exhibits, why were they acquired and what was not; "using Wikipedia is a great mistake as it is too formal for interesting stories" → Wikipedia is demoted to fact-checking; story material comes from interviews, profiles, museum and gallery pages, news features and local-language sources (LOCAL-692).
+**D659 addendum (Michael, 2026-10-14 21:4x):** Gemini → cheaper research is confirmed ("not much lost"). Story source ORDER for museum stops: **exhibit stories > the artist > the museum > the culture/country**. A stop must not settle for "nothing human found": the research keeps searching DOWN that ladder until it finds an interesting, emotionally charged story, and only then writes. Length: LEAD's "bring the cheaper Boston walk back to normal length" is WITHDRAWN — Michael: the short stories "feel of the right size"; what was missing was ONE MORE STORY. So: never pad a story to hit a length; add another short story (another stop, or a second story at a stop, or a story on the way between stops) when research has one.
+
+## D660 — Every download of a paid tour is paid; what is on the phone is the listener's forever (Michael, 2026-10-14 21:5x)  **[Superseded by D686 on 2026-10-20; REINSTATED by D688, 2026-10-21 — Michael: re-download is paid]**
+"For paid tours every download no matter what language needs to be paid. The tour downloaded into the Listen page can be listened to as many times
+as the listener wants for free: he bought it; it's his." This OVERRULES LEAD's recommendation (buy once, free re-download). Consequences:
+a purchase is consumed by ONE successful download to one phone; deleting the tour, a new phone or a reinstall means buying again; each language is
+its own purchase (D653 unchanged); listening on the phone is unlimited and offline (D654 unchanged). Store type: consumable fits exactly.
+LEAD's guards so it is never a surprise: the Buy dialog says "Downloads to this phone. Deleting it or changing phones means buying again"; deleting
+a paid tour asks for confirmation with the same sentence; app updates install in place so a tour is never lost by an update; a download that FAILS
+does not consume the purchase. The Terms draft (LOCAL-691) said re-download is free — corrected by LOCAL-693. Apple's "Restore Purchases"
+expectation does not apply to consumables.
+
+## D661 — When Subscribed goes to GCloud (Michael, 2026-10-14 22:0x)
+Subscribed moves to GCloud as soon as (1) the Subscribed app (2.4.15+50 or later) is shown to work against the Storied backend — features the
+Storied server lacks may be unavailable, but the app must NOT crash and must say so meaningfully (e.g. "This feature is available in Preview only");
+(2) Michael approves that version for Subscribed; and (3) **the updated policies are published first** (Terms, Privacy, Refunds, Content policy —
+ClickUp wdvrdayzq5). Payments need not work yet. Deployment itself is the Windows session's job (GCloud_Storied), via a ClickUp task naming the exact
+commit, after a push (CLAUDE.md "WHERE NEW WORK GOES").
+**D660 addendum (Michael, 2026-10-14 22:1x) — wording and a lost phone.** No warning at purchase time: a bought tour is like a bought bag — losing it
+is not the store's problem, and buyers understand that without being warned. The confirmation belongs at DELETION, in a calm voice:
+"Are you sure you want to delete this paid tour? Downloading it again will require another purchase." (LEAD's "Delete and lose it?" and the Buy-dialog
+line are withdrawn.) **A lost or replaced phone is different from deleting:** the listener should be able to restore their Listen page — paid tours
+(without paying again), free tours and news articles — on the new phone. Built as a recovery code (the June 2026 portability design: an anonymous
+code the listener saves; entering it on a new phone moves the profile there; the old phone is unlinked so one purchase never lives on two phones).
+
+## D662 — Home search: a found place relocates the map (Michael, 2026-10-15)
+Searching a place ("Nice, France") must move Home to that place, as before LOCAL-665 — no "Select tours" dialog and no "relocate?" question.
+The tours dialog appears only when no place is found and tour names match; when both match, a snackbar offers the matching tours. LOCAL-697.
+Also from Michael's Pixel-4 review (LOCAL-698/699/700): two stops must never play at once (regression of BETA-1); Your plan gets working Buy
+buttons on every platform (TEST PURCHASE on a stub server); Communities: describe both content kinds (owner audio unchecked, Audioura-generated
+tours checked), join-by-code on the Communities screen, creating a community requires the free plan or above, Create form with required fields,
+playful unique pre-fill, no RSS field, invite code with copy/share/email/regenerate, warning that a community with members cannot be closed.
+
+## D663 — Communities: stepping down, who may charge, public community tours (Michael, 2026-10-15)
+(1) **Organiser steps down** (LEAD's proposal, agreed): the community stays open for existing members (they keep everything), stops taking new
+members and selling passes; the organiser can hand it over to a member who accepts; with no new organiser within 30 days it is archived.
+(2) **Who may create and who may charge:** creating a community needs the Free plan (l2) or above. **Everyone who can create tours may charge**
+for tours and community passes — not only Curator: `plans.can_sell = true` for l2 (Free), l3 ($10 Pack), l4 (Curator) and tester; l1
+(Introduction) cannot. "We all get a cut." Overrules the Curator-only selling of D652/LOCAL-677. Safeguards unchanged: content rating + review
+queue on every paid tour (D656); payouts require tax details (to be built).
+(3) **Tours made with Audioura for a community:** generated on the Generate tab, paid from the organiser's plan allowance, checked like every
+generated tour. Members-only by default. If the organiser gives coordinates and marks a community tour **Public**, it shows on the map like any
+tour (with the community badge), but downloading it requires joining the community and buying its pass — enriching the organiser and Audioura.
+
+## D664 — A new community must win its first two members within a week, with a visible countdown (Michael, 2026-10-15)
+"Unless more than two people join and pay to be community members during the first week of community creation, the community gets archived and
+invites become invalid… the timer [counts] backwards from the number of hours the community is required to be built — getting the first two paid
+members — so the organiser can see how much time he has." LEAD's reading (recorded so Michael can overrule): the bar is **2 paying members**
+("the first two paid members"); the window is **168 hours (7 days)** from creation, configurable (`COMMUNITY_LAUNCH_HOURS`). **Free communities**
+have no payment, so their bar is **2 joined members** in the same window. The organiser does not count. Miss the bar → status `archived`
+(LOCAL-702 state), invite code stops working ("This community has closed"), nothing new; anyone who joined keeps downloaded audio (D658). Meet the
+bar → `launched`, the countdown disappears for good. The organiser sees a live countdown on the community page and in the creation confirmation:
+"152 h left to get 2 paid members — 1 of 2 so far". Reminder to the organiser at 48 h and 12 h left. Communities created before this rule
+(the two demo communities) get the full window from the moment the rule ships.
+
+## D665 — Every community member pays at least $1; every community shows its member count (Michael, 2026-10-15)
+"Every community member must pay at least $1.00 to join. And every community must show the number of members." Overrules the free communities of
+D657 (the "book club" example) and simplifies D664: the launch bar is always 2 PAYING members. LEAD's implementation calls: a **$1 pass** is added to
+the pass catalogue (`audioura.pass.usd1`, non-renewing; Apple/Google $0.99–$1.00 price point) and the community pass picker's minimum becomes $1
+(tour prices keep the $2 floor of D-ladder); the Create form has no "Free" option; existing free communities (the demo book club) become $1/month,
+current members keep membership until their next renewal would be due (none are paid, so they are grandfathered for 30 days); the member count
+(owner excluded, active members only) is shown on the community page, in My communities, in search/code results, on the map pin sheet, and in the
+invite email ("12 members").
+**D665 addendum (Michael, 2026-10-15 17:5x):** the $1 minimum is a **commitment fee** — its purpose is to keep only communities people actually
+commit to, not income. **The organiser is not a community member:** never counted in member_count or toward the launch bar, cannot buy a pass for
+their own community (409 `owner_cannot_join`), and has full owner access to all its content without one.
+
+## D666 — After launch: weekly warnings below 2 members; dissolve only after a week at 0 (Michael, 2026-10-15)
+Once a community has launched (D664), an **active member** is one with an unexpired paid pass (the organiser never counts, D665). If active members
+fall **below 2**, the organiser AND the remaining members get a **weekly** warning: "<community> needs at least 2 members to keep going — invite
+friends" (first warning the day the count drops, then every 7 days while it stays below 2; it stops as soon as the count is back to 2). The
+community is **archived only after 7 consecutive days at 0 active members** (same archived state as D663/D664: code says "This community has
+closed", nobody loses downloaded audio). Between 1 and 2 members it keeps running, with warnings.
+
+## D667 — Michael prefers the free Kokoro voice; name pronunciation must work in the Kokoro path (2026-10-15)
+Michael's listen: HCMC museum with the story ladder **7/10** (was 6, "significantly better"; Vietnamese names "much better"); Boston walk with one more
+story **8.5/10** (was 7). He found the Boston voice (Kokoro "Joanna", free, local) better than the HCMC voice (Amazon Polly Joanna neural, used by
+LOCAL-692B's test script). LEAD found: the Mac stack runs `TTS_ENGINE=kokoro`, and English tours are rendered whole on the Kokoro host — the
+LOCAL-692B Vietnamese-name SSML aid exists only in the Polly path, so real app tours would NOT get the pronunciation fix Michael heard. Ruling:
+Kokoro stays the English voice; the name-pronunciation aid must also work for Kokoro (LOCAL-706). Kokoro is not yet available on GCloud (it runs on
+the Mac host) — moving it there is a later cost decision.
+
+## D668 — The OpenAI key leaked in sk.py IS the live GCloud production key …Nw8A; rotate, don't revoke (LEAD correction, 2026-10-15)
+LEAD's ClickUp wdvrdaxaw9 Part 2 said to revoke the leaked "sk-proj-wpIW…" key and keep "…Nw8A". GCloud_Storied found they are the same key; LEAD
+confirmed by reconstructing the sk.py literal from git history (len 164, sk-proj-wpIW… …Nw8A). Revoking it would have stopped all GCloud tour
+generation. Rule: identify keys by their LAST 4 characters, never the prefix (every project key starts sk-proj-). Plan: rotate …Nw8A (new key →
+Secret Manager new version → redeploy + verify → revoke old), revoke the Mac's retired …VCEA, delete the old Gemini key, set the old AWS key
+AKIAWLW36SCEWGWIQ26O inactive now (Mac verified with Polly + Translate on the new key, GCloud verified by GCloud_Storied) and delete after Oct 19.
+
+## D669 — Key rotation status; Gemini stays off on GCloud; GCloud must enforce daily tour limits (LEAD, 2026-10-17)
+GCloud_Storied completed the OpenAI rotation (new …fIoA on six services; …Nw8A revoked 2026-10-16 15:28; tours proven on Beta and Preview).
+GCloud never read GEMINI_API_KEY: …bGMw was the Mac's pre-Oct-14 key and the Gemini spend LEAD attributed to GCloud was Mac development testing —
+LEAD's error, corrected. …bGMw is unused (Mac containers all on …1Qfg) → delete. Gemini stays OFF on GCloud for now (no wiring); Serper is the
+cheap research path. GCloud does not write tour_requests (USER_API_URL points at a service that is not deployed) → the per-plan daily tour limit is
+not enforced in production: a cost-control hole that must be fixed before Subscribed goes to GCloud.
+**D669 addendum (Michael's correction, 2026-10-17):** the per-plan daily tour limit is a Subscribed feature (D613) that exists only on the Mac's
+local stack; Beta/Storied on GCloud have no plans, so "not enforced on GCloud" is expected, not a bug. It ships with Subscribed's GCloud
+deployment (user-api, plans tables, USER_API_URL). Gemini …bGMw confirmed deleted (Google returns 401).
+
+## D670 — Article length per plan; Administrator gets ~5 pages (Michael, 2026-10-18)
+Michael: "Can the Administrator plan allow listening to articles as long as 5 pages?" Today every article's AUDIO is capped at 5,000 characters
+(clean_text_for_polly) and the TEXT limit (article_truncation.py) still keys on the retired wallet tiers (free 5,000 / ppu-unlimited 15,000), so no
+current plan gets more than ~1.5–2 pages of audio. LEAD's ruling: a per-plan `article_char_limit` (plans table, editable by SQL) applied to BOTH
+text and audio — l1 Introduction 5,000 (~1.5 pages), l2 Free 5,000, l3 $10 Pack 10,000 (~3 pages), l4 Curator 15,000 (~5 pages), admin and tester
+15,000. Longer audio is synthesised in chunks (the voice service already splits). Cost: free on the Mac (Kokoro); on GCloud with Polly ~6¢ (standard)
+per 15,000-character article until Kokoro moves there.
+**D670 addendum (Michael, 2026-10-18):** when an article is shortened by the plan, the listener must be told that a better plan gives longer articles —
+for listening AND translation. LEAD's wording rules (D58 still holds: name plans, never prices): on screen under the article, e.g. "Shortened to about
+1½ pages on the Introduction plan. The $10 Pack plays articles up to about 3 pages, Curator up to 5 — See plans" (button to Your plan); on the top
+plans, only "Shortened to about 5 pages, the maximum." The same notice appears on a translated article ("…listened to and translated"). The audio of a
+shortened article ends with one short spoken sentence: "This article was shortened for your plan; a larger plan plays it in full." Not repeated
+for articles that fit.
+**D670 addendum 2 (Michael, 2026-10-18):** the spoken notice must NAME the plans, not say "a larger plan": e.g. "This article was shortened to about
+one and a half pages on your Introduction plan. The ten-dollar Pack plays articles up to about three pages, and the Curator plan up to five."
+Replaces the generic sentence in addendum 1.
+
+## D671 — Tour share links: https://audioura.com/t/<CODE> opens the app's Search, else the store (2026-10-18)
+
+**Michael:** tour ids in the emails we generate should be links: a recipient with Audioura lands on Search with the search already
+run; without it, on the Google Play / App Store page with an appeal to download.
+
+**Ruling (LEAD):**
+1. **The link carries the 8-char share code, never the numeric tour id.** The code is already what Search resolves (map-delivery
+   `via_share_code`), is not enumerable, and works for paid tours (D660: opening a link never grants a download).
+   Format: `https://audioura.com/t/<CODE>?n=<url-encoded tour name>` — `n` is only for the landing page's headline; the app ignores it.
+2. **App opens it directly:** Android App Links (`autoVerify` intent-filter, host audioura.com, path prefix /t/) and iOS Universal
+   Links (`applinks:audioura.com`, team 4HGRU6TKGQ, bundle com.audioura.audiotours). Cold and warm start → Home, Search field
+   filled with the code, search started — the same path as pasting the code today (`extractShareCode` already reads a URL's last segment).
+3. **No app → the landing page** (static, on audioura.com — Cloudflare, same host as the home page): tour name, one line on what
+   Audioura is, the store button for the visitor's platform (both on desktop), and the code with a Copy button.
+   **Before the public store listings exist** (Play and App Store both 404 on 2026-10-18), the button reads "Coming soon to
+   Google Play / the App Store" and the store URLs live in ONE constant block to fill in at release.
+4. **After install (deferred link):** Android — the Play URL carries `&referrer=audioura_code%3D<CODE>`; on first launch the app
+   reads the Install Referrer once and runs that search. iOS has no referrer: the landing page's store button copies the code to
+   the clipboard first, and on first launch the app offers "Open the tour you were sent?" only if the clipboard holds a
+   code-shaped string (one paste prompt, once, never again).
+5. **Share message** now leads with the link and keeps the code as a fallback:
+   `Listen to my Audioura tour "<name>": https://audioura.com/t/<CODE>  (or open Audioura, tap Search and paste <CODE>)`.
+   Every generated email that names a tour uses the same builder.
+6. **Website files live in the repo** (`website/`: `.well-known/apple-app-site-association`, `.well-known/assetlinks.json`,
+   `t/index.html`, `_redirects`, `_headers`). **Publishing them to audioura.com is outward-facing → Michael's step**, as is pasting
+   the Play App Signing SHA-256 from Play Console into assetlinks.json (the debug/upload fingerprints are filled in by the task).
+**Why not a third-party deep-link service** (Branch, Firebase Dynamic Links — the latter shut down 2025): another account, another
+privacy-policy processor, and the domain we already own does the job.
+
+## D672 — Share email wording (Michael's review of the generated emails, 2026-10-18)
+
+**Michael:** (1) "Welcome to my free tour" instead of "Listen to"; (2) a short link, not the long one; (3) never list the stops —
+the number of stops plus the first stop's name and location; (4) a paid tour ends with "The tour price is $4.99."; (5) all of LEAD's
+suggestions are accepted.
+
+**Ruling (LEAD fills the gaps):**
+- **Link = `https://audioura.com/t/<CODE>` and nothing else.** Michael offered a second short id (`?n=f33321G`). It isn't needed: the
+  8-char code already identifies the tour, and `n` only carried the name for the landing page. The landing page now shows
+  "An Audioura tour for you". A second id would only earn its place for tracking who shared, which we don't do.
+- **Short title:** the tour's display title without the "with a stop at …" clauses and without the place repeated
+  (e.g. "Faneuil Hall Marketplace — Walking Tour"). Also used in the subject line.
+- **Opening line by kind:**
+  - free → `Welcome to my free tour "<title>" on Audioura.`
+  - paid → `Welcome to my tour "<title>" on Audioura.`
+  - community → `Welcome to my tour "<title>" from the <community> community on Audioura.`
+- **Body order:**
+  1. the opening line;
+  2. `Hands-free audio: press play and walk.`;
+  3. `<N> stops, starting at <first stop> (<its location>).`;
+  4. the link;
+  5. `(Or open Audioura, tap Search and paste <CODE>.)`;
+  6. community only: `Join the <community> community in Audioura to download it.`;
+  7. paid only, last: `The tour price is $<price>.`
+- **Subject:** `A <city> <type> tour for you` (e.g. "A Boston walking tour for you"); falls back to "An Audioura tour for you".
+- **Community invite:** the member count is shown only at 2 or more; the "How to get Audioura" and "(links coming soon)" lines are dropped,
+  because the join link already leads to the store.
+
+**D672 addendum 1 — the community invite explains itself (Michael, 2026-10-18):** "I do not like 'A demo PAID community:'. Instead put a
+couple of sentences explaining what a community is and the restrictions if any, and a link to the latest tour, unless the organiser sends the tour."
+- The organiser's own description no longer opens the invite. Audioura's standard text replaces it:
+  `A community on Audioura is a group that listens together: the organiser publishes tours for its members, and each new one appears in their Listen page.`
+- Then the restrictions, generated from the community's real settings. Every line that applies, and none that don't:
+  - paid → `Membership is paid: a pass starts at $<cheapest pass> for <its length>, bought in the app.`
+  - free → `Joining is free.`
+  - private → `It is private: only people with an invite can join.`
+  - listed → `Anyone can find it in Audioura's Search.`
+  - waiver → `Members accept the organiser's waiver when they join.`
+  - rules text → `Rules: <rules_text>`
+  - `Community tours download only for members.` (D663), always.
+- Then the tour, exactly one:
+  - **If the organiser picked a tour to send**, that tour.
+  - **Otherwise the community's latest tour**, as `Latest tour: "<short title>", <N> stops: https://audioura.com/t/<tour code>`.
+  - With no tours yet, the line is left out.
+  - Owner MP3/RSS episodes are not tours and never fill this line.
+- Then the join link and code, as in D672.
+**D672 addendum 2 (Michael, same evening):** "I did not realize that this is the community's own description — we should print it also."
+The organiser's description STAYS in the invite as its own paragraph, `About this community: <description>`, right after the
+standard explanation sentence and before the restriction lines. Addendum 1's "no longer appears" is withdrawn; everything else in it stands.
+
+## D673 — Short tour titles written by the server, and the share email offers translation (Michael, 2026-10-18)
+
+**Michael:** "This is an excellent idea because some people can be very deliberate in the title; having the title summary would be
+good. We also should advertise our translation capabilities: listen in the language of your preference, or something like that,
+where we say the user can just listen."
+
+**Ruling (LEAD):**
+1. **`audio_tours.short_title`** is a new, additive column: a 2–6 word summary of what the tour IS, plus the type.
+   E.g. "Massachusetts Politics — Walking Tour", "Faneuil Hall Marketplace — Walking Tour".
+   - Written once, when an original tour is created, by one cheap LLM call (gpt-4o-mini class, ~$0.0001 per tour).
+   - Uses the same pattern as `tour_editor_score.py`: a module plus a `--backfill` run from the autonomy tick for existing tours.
+   - Translations get the short title translated by translation-service, the same way tour_name is.
+   - It is never invented beyond what the name/request says. On any failure the column stays NULL and the app falls back to
+     `shortTourTitle()`.
+   - The `tour_name` the user typed is never changed.
+2. **Where it shows:** the share email (title and subject) now; the landing page stays generic (D672). Lists and cards in the app keep
+   `tour_name` for now. Whether lists switch to short titles is a separate decision after Michael has seen them in emails.
+3. **Translation line in every share email and community invite**, right after "Hands-free audio: press play and walk.":
+   `Prefer another language? Audioura plays it in yours: just pick your language and listen.`
+   - It stays true for paid tours, because each language is bought separately (D660): the email doesn't promise it is free.
+
+## D674 — Try Claude as the tour writer (Michael's son's idea, 2026-10-18)
+
+**Michael:** "Substitute OpenAI and/or Gemini with Amazon Q or Claude. Can you experiment and tell me if the quality of the tour,
+generation time and price would increase?"
+
+**Ruling (LEAD):**
+- **Amazon Q is not a candidate.** It is an assistant product (coding help, business Q&A), not an API for writing text in a
+  pipeline. Amazon's route to such models is **Bedrock**, which hosts Claude and Amazon's own Nova models. Bedrock is a later option
+  only if Claude wins and we want AWS billing. It needs Bedrock model access plus a separate IAM user; never widen polly-tts-user.
+- **Claude is a candidate**, through the Anthropic API. "Claude, you": this coding session cannot be the engine listeners' tours run
+  on, but the same models can, through an API key.
+- **Method:** the LOCAL-647 harness. The same 12 stored stops and identical inputs go through every arm, followed by 3 full live tours
+  per arm for end-to-end time and $.
+  - Arms: today's `gpt-4.1-mini` (narration) / `gpt-4.1` (story pass); `claude-haiku-4-5`; `claude-sonnet-5`.
+  - **Judge bias guard:** Kiro itself runs on Claude, so the scoring is blind (arms relabelled) and done twice, once by the usual
+    Kiro rubric and once by a gpt-4.1 judge. Both are reported; a "win" must hold under both.
+  - The remembered noise floor: the same code scores up to 2 points apart on one tour (COST_TIME_RESULTS_2026-10-09), so the
+    12-stop replay decides, not single tours.
+- **Michael's step (outward, billing):** an Anthropic API account with **$10 prepaid, no auto-recharge**. He puts
+  `ANTHROPIC_API_KEY=` into `~/Audioura/.env` himself (never in chat). Experiment budget ≤ $3.
+- Nothing changes in production without Michael seeing the table.
+**D674 addendum 1 — the by-hand preview (2026-10-18, Michael: "why can't you use yourself for one tour?").** LEAD (Claude Opus 5.5)
+wrote the 3 Courtauld stops from the identical LOCAL-647 prompts, then scored them with the same Kiro judge and blind with gpt-4.1:
+- Kiro judge: Opus 9.00, Gemini Flash 8.50, gpt-4.1-mini (today) 8.33, gpt-4.1 7.50.
+- Blind GPT judge: Opus 9.07, Gemini Flash 8.97, gpt-4.1-mini 8.73, gpt-4.1 8.73.
+- **Reading:** Claude ranks first under both judges, but under the neutral judge the margin is small (+0.34 over today). n=3.
+- **Biased upward:** LEAD fact-checked its own draft twice. The first draft added 9 true-but-unsourced details (top hat, chandeliers,
+  "textile industrialist", age at death…), exactly the failure the pipeline's rules forbid. A one-shot API call gets no such pass.
+- It measures neither time nor price (no API was involved); LOCAL-712 does.
+- Files: `.continuous_dev/bench/claude_by_hand_2026-10-18/`.
+**D673 addendum 1 (LEAD, merge of LOCAL-711):** the orchestrator container has no OpenAI key and is not given one, to keep keys in
+fewer places. Its at-creation short-title call therefore leaves NULL, and the autonomy tick's `tour_short_title.py --backfill` fills it
+within 5 minutes; until then the app falls back to `shortTourTitle()`. Migration 040 applied 2026-10-18 (tours 493 → 493);
+the first backfill titled 33 originals for $0.002.
+
+**D672 addendum 3 (Michael, 2026-10-18 22:0x):** one line replaces the two ("Hands-free audio: press play and walk." + "Prefer
+another language?…") in EVERY email, tour shares and community invites alike:
+`Hands-free audio: press Play and listen to your tour in the language of your choice while walking, running, biking or exercising.`
+(LEAD corrected "Listen your tour" → "listen to your tour" and the spelling of "exercising"). Done by LEAD @ e51247b4.
+
+## D675 — Community tours download themselves for members (Michael, 2026-10-18)
+
+**Michael:** "'…each new one appears in their Listen page' — this is actually a great feature: auto download in the background for
+community members. Do we actually do that? If not, can it be done? If so, let's do it… when (1) there is Internet, (2) the user gave us
+permission, (3) the device is not too busy… in the language of the user's choice… maybe start with English. (4) We now have to display
+all tours on the Community page, so a user can download those not yet on the phone."
+
+**Fact (LEAD, 2026-10-18):** we did NOT do it. The community page lists the tours with no Download button, nothing runs in the
+background, and the app has no saved listening language. So the invite sentence promised more than the app does.
+
+**Ruling (LEAD):**
+1. **Listening language** becomes a saved setting (About → Listening language). The default is the phone's language when Audioura
+   supports it, otherwise English.
+   - An auto-download takes that language if the tour already has it, otherwise the tour's original language.
+   - v1 never requests a new translation automatically: that spends money and, on paid tours, is a purchase (D660). The listener can
+     still translate by hand.
+2. **Permission is asked once, at join,** with a real question:
+   "Download this community's new tours automatically? Only on Wi-Fi, when your phone isn't busy."
+   - Yes / Not now; it can be changed on the community page.
+   - It is per community and per device. Mobile data is off unless the member turns it on.
+3. **When it runs.** Android uses WorkManager every ~6 h, with these constraints:
+   - network connected (unmetered unless allowed);
+   - battery not low;
+   - storage not low (also skip when less than 1 GB is free).
+
+   iOS cannot be trusted to finish a large download in its background window. So iOS uses a background-refresh *check* plus a quiet
+   local notification ("2 new tours from Demo Boston Walkers"), and downloads at the next app open.
+
+   **Both platforms also sync whenever the app opens.** That is the baseline that always works.
+4. **Server:** one call returns the new tours across the device's ACTIVE memberships since the last sync, with the languages each has.
+   - An expired pass returns nothing (D664/D665: passes are non-renewing).
+   - These downloads count under membership, never as a purchase.
+5. **Community page:** every community tour gets a status, either Download or "On this phone ✓". Non-members see "Join to download"
+   (D663).
+6. **Never auto-delete** anything. A tour the member deleted is not downloaded again automatically.
+7. Until this ships, the invite sentence stays: it becomes true with LOCAL-714.
+Work: LOCAL-713 (server endpoint, listening language, community-page Download), then LOCAL-714 (background download, permission,
+iOS notification), which is parked until 713 merges.
+
+**D674 addendum 2 — the arms to test are the CURRENT models (LEAD, 2026-10-18).** Anthropic's pricing page (read 2026-10-18) lists:
+- Haiku 5.5 at **$0.10 / $0.50** per M tokens (under 100k-token prompts): cheaper than our gpt-4.1-mini at $0.40 / $1.60;
+- Sonnet 5.5 at $2 / $10;
+- Opus 5.5 at $4 / $20.
+
+LOCAL-712 tested the older Haiku 4.5 / Sonnet 5. LOCAL-712B adds Haiku 5.5, Sonnet 5.5 and Opus 5.5 as arms.
+- The same models are resold on Amazon Bedrock, Google Cloud and "Claude Platform on AWS" at their own published prices. A direct
+  Anthropic key is the simplest way to test.
+- The Batch API (half price) does not fit, because tours are made while the listener waits.
+
+**D675 addendum 1 — language per community (Michael, 2026-10-19):** "Listening language is on the About page. But shouldn't it be on
+the Community page, so a community member can choose which community's tours to hear in which language? Defaulting to the phone
+language, and English if we don't support it, is fine."
+- Each community page gets **"Language for this community's tours"** (`listening_language_<community_id>`). The sync, the background
+  worker and the page's Download button use it.
+- When it isn't set, the page falls back to About's Listening language, which keeps its role as the default for every community:
+  the phone's language, else English.
+- So a member can hear the Book Club in Russian and the Boston Walkers in English. Done in LOCAL-715.
+**D671 addendum 1 — the website is live (2026-10-19 00:4x).** audioura.com is served by the assets-only Cloudflare Worker
+`lucky-bush-72cd` in the **audio.tours.ai@gmail.com** Cloudflare account (not Pages).
+- Deploy command: `wrangler@4 deploy --name lucky-bush-72cd --assets <dir>`. Auto mode refuses it for LEAD, so Michael runs it with
+  `!`. Version f99e2add.
+- Verified: home and /privacy are byte-identical to before; both .well-known files are served as application/json; /t/<CODE> serves
+  the landing page.
+- `_redirects` rewrites to `/t/` (not `/t/index.html`), because Workers' html handling would turn the latter into a 307 that drops
+  the code.
+- The bundle carries an `.assetsignore` (the first deploy published wrangler's own .wrangler/tmp no-op files).
+- Still to do: the Play App Signing SHA-256 in assetlinks.json, then redeploy.
+**D675 addendum 2 (Michael, 2026-10-19 00:5x: "Upgrade the demo organiser to tester level"):** device_entitlement USER-41659366
+(the owner of the demo communities) changed from l1 to tester (76 → 76 rows), so the demo organiser can generate community tours.
+Revert with: `UPDATE device_entitlement SET level='l1' WHERE user_id='USER-41659366'`. The first community tour, "Beacon Hill history
+walk" (3 stops, community 2, members), is job 578922f0.
+
+## D676 — The Pixel-7 stays on the official Google Play build (2026-10-19, Michael + LEAD)
+- The Pixel-7 runs ONLY the Google Play (testing-track) version of Audioura. It is the check on what testers actually get, and it talks
+  to GCloud, so it works from anywhere without Tailscale.
+- It is Michael's travel phone for Vietnam: it still gets Android security updates, the Pixel-4 does not.
+- On it: Audioura from Play (opt-in at https://play.google.com/apps/testing/com.audioura.audiotours with a tester-list Google account),
+  plus the Claude app.
+- Never: a Mac/sideloaded build, an `adb install`, or a task touching it (memory: tasks-never-install-on-michaels-phones).
+- New Subscribed features are tested on the Pixel-4 (Mac builds) until Subscribed reaches GCloud.
+
+## D677 — Michael's restaurant-tour test, 2026-10-19: four findings
+1. **The split tour store (LEAD's fault, fixed).** LEAD had been running the subscribed-local compose command from
+   `~/audioura-subscribed-local`, so `./tours` resolved there. Tours generated since then were written to a second folder that
+   tour-id-resolution never read. Tour 370 v2 downloaded as a file but failed `/resolve` (409, 19 ambiguous candidates), and the
+   app dropped it silently.
+   - Fix: the 21 files that existed only there were copied, no-clobber, into `~/Audioura/tours` (1,511 → 1,532), and every tour
+     service is pinned in the override to the absolute `/Users/micha/Audioura/tours` (@ 72561445 + follow-up). The four services
+     were recreated.
+   - The old copy stays in `~/audioura-subscribed-local/tours` untouched.
+2. **The same request string → the same tour, new version (by design).** "restaurant tour, Boston, MA" regenerated tour 370 as
+   version 2 (5 stops; v1 archived); it did not create a second tour.
+   - Michael expected two, so the app must SAY so: "Updated your tour '<short title>' — now version 2."
+3. **A trailing `*` means "tour names", never a place.** "restaurant*" geocoded to a far-away place (D662: a place wins). The `*` is
+   the user's explicit tour-name signal (the "Boston*" starts-with rule), so it skips the geocoder.
+4. **A batch download never drops a tour silently.** A tour that downloads but fails to resolve or save is reported:
+   "2 tours downloaded; 1 couldn't be downloaded: <name>". It is logged, and the count reflects reality.
+Work: LOCAL-717 (2–4).
+
+## D678 — A tour belongs to its creator; same name ≠ same tour (Michael, 2026-10-19)
+**Michael:** "Multiple people may name tours similarly or the same; we should not hide some tours. That is why we created a special
+icon for multiple tours with the same name, with a list, so people can pick the tour they want."
+**Fact (LEAD):**
+- `audio_tours` has a UNIQUE index on `lower(tour_name)` for originals (`uq_audio_tours_original_name`).
+- The orchestrator's save path matches an "existing tour" by name only and REPLACES it as a new version (LOCAL-606/611). So ANY user
+  generating an identical name overwrites the first creator's tour, a paid tour included.
+- The table records no creator.
+
+**Ruling:**
+1. **Record the creator.** A new additive column `audio_tours.creator_user_id` is set at INSERT from the request's user_id.
+   - Backfill is NOT guessed: existing rows stay NULL, meaning "unknown creator".
+2. **New version only for the same creator.** Same creator + same name (case-insensitive) → a new version of that tour (D606 keeps
+   share codes/curator links).
+3. **Otherwise a new, separate tour.** A different creator, or an existing row with a NULL creator, gives a NEW tour row (new id, own
+   share code). The map shows same-place tours under the green group marker with its list. Nothing is ever replaced across creators.
+4. The unique index is replaced by a non-unique index on `(lower(tour_name), creator_user_id)`. The DROP is reversible
+   (`CREATE UNIQUE INDEX` again), and LEAD applies it after the code is merged.
+5. **Paid tours** are never replaced by anyone but their creator (they come under rule 2), and a paid tour's new version keeps its
+   price and purchases.
+6. **The app says what happened:** "Updated your tour … — now version N" (D677) only in case 2. In case 3 it's an ordinary new tour.
+Work: LOCAL-718.
+
+**D677 addendum 1 — View is consistent (Michael):** "If we start playing when one tour is downloaded with a translation, we should
+start playing when multiple tours are downloaded too, maybe the first one. In any case the behaviour should be consistent."
+- View ALWAYS opens a player. Several tours → the FIRST tour of the batch, in the order the user selected them (in the language just
+  downloaded, as in 716B).
+- The other new tours stay highlighted in Listen when the user goes back.
+- Done in LOCAL-719, after 717 merges (same files).
+
+## D679 — First self-recovery test (Michael's planned restart, 2026-10-19 19:50)
+- ✅ FileVault off and auto-login: the Mac logged in as micha by itself (19:50:47).
+- ✅ `revive_lead.sh` ran from launchd at 19:51: Docker came up at 19:51:12, and a background Storied_Tours session started at 19:51:14.
+- ❌ **The containers did not come back.** Docker Desktop stops containers cleanly at shutdown, and a cleanly stopped container counts
+  as "stopped on purpose", so `unless-stopped` never restarted any of them, not even Postgres. Michael's phones had no server for
+  2 hours.
+  - Fix: `revive_lead.sh` now starts Postgres, then every container of the audioura/development compose projects whose restart policy
+    isn't "no" (21 containers; old task leftovers stay off).
+- ❌ **The revived session stalled.** At 19:53 it noticed the stopped containers, then went silent and never sent the push
+  notification. The cause is unknown; its transcript ends on an API request.
+  - It was stopped at 21:5x, because a second LEAD ran alongside the session Michael was using.
+  - The stack no longer depends on that session.
+- **Next test:** at a quiet moment, restart once more and check `revive_lead.log` for "stack started: 21 containers running", with no
+  manual step.
+
+## D680 — Recovery and remote access are done (2026-10-20)
+- ✅ **Second restart test passed** (ClickUp wdvrdaz1jr closed): 21 containers up, no data loss, no manual step.
+- ❌→✅ **The revived LEAD ran as `--bg` and could not edit the shared checkout** (CLAUDE.md, DECISIONS.md, MICHAEL_TODO.md).
+  Fix: `revive_lead.sh` now opens a Terminal window running `.continuous_dev/lead_foreground.sh` (foreground, same Remote
+  Control name, same post-restart prompt). Proven from a launchd job: osascript opened Terminal with no permission prompt.
+  The `claude_restart` alias (attach to the --bg job) is retired. Backup: `revive_lead.sh.bak-20261020`.
+- ✅ **Tailscale** (wdvrdaz1ju closed): Mac + iPhone + Pixel-7, one account; a Subscribed tour was downloaded over mobile data.
+  Tailscale is in Login Items (its own "Start on login" checkbox fails to register) — confirm it reconnects on the next restart.
+- ✅ Windows Remote Control (wdvrdaz1jt), keys (wdvrdaxaw9; AWS …WIQ26O deleted), Anthropic key (wdvrdaz1jv): all closed.
+- **Travel split for Vietnam (Michael agreed):** Pixel-7 = official Play app against GCloud; iPhone = Subscribed against the
+  Mac via Tailscale.
+
+## D681 — If Claude writes better but costs more: where to use it (LEAD, 2026-10-20; conditional on LOCAL-720)
+Michael: "in case Claude is better than others but more expensive 1) should we use it for demo tours, 2) should we enable it for Curator plan?"
+Frame: the writer is a small share of a tour's cost (today ≈ $0.02 of ≈ $0.34). Estimated extra per 8-stop tour: Haiku 5.5 ≈ $0,
+Sonnet 5.5 ≈ +$0.18, Opus 5.5 ≈ +$0.37.
+- **"Better" means:** ahead under BOTH judges, by more than the 0.3 noise band on the 12-stop replay, with no more factual errors
+  (detector fails) than today. Otherwise nothing changes.
+- **Demo tours: yes**, with the best model that wins. Few tours, generated once, heard by many; they are the first impression.
+  Speed doesn't matter (made in advance). Cost is cents per demo.
+- **Curator: yes, as the default writer for L4**, if the extra cost stays ≤ about $0.40 a tour. Curator tours are sold, so quality is
+  revenue: one sale at $4.99 pays Audioura ≈ $0.45 (10% after the store) — roughly the extra cost of the tour. Not an option toggle
+  (one more thing to explain); just the Curator writer. Generation time must not grow more than ~30%, or the wait gets worse.
+- **Everyone else:** only if Haiku 5.5 wins — it costs about the same as today, so it would replace gpt-4.1-mini for all plans.
+- If only Opus wins and Sonnet doesn't: Opus for demo tours only; Curator stays on today's writer until a cheaper winner exists.
+- All of this is local (Subscribed) until Michael sees the LOCAL-720 table. Reversible: one env route (`narration_model_route`).
+
+## D682 — The "cheap writer" never ran; live stops are written by gpt-4.1 (LEAD finding, 2026-10-20 16:1x)
+`NARRATION_MODEL=gpt-4.1-mini` (D645/D664, in docker-compose.subscribed-local.yml) has had **no effect on live tours**:
+`narration_model_route()` is defined in generate_tour_text.py but only the replay harness calls it. The story pass
+(`description_data["model"] = story_pass_model()`) reads `TOUR_STORY_MODEL=gpt-4.1`. Meter confirms: every
+`generate_tour_text.py:19882` call is `gpt-4.1-2025-04-14`. So the D645 museum "cheap arm" changed research only (Serper),
+and every replay bake-off baseline (gpt-4.1-mini) is NOT what listeners get. Consequence for D674: the fair baseline is
+gpt-4.1 ($2/$8 per M) — Sonnet 5.5 ($2/$10) costs about the same.
+**Branch `LEAD-claude-live`** (from subscribed d4e7855b): the story pass now uses `narration_model_route()` and a provider
+adapter `_story_pass_post` (OpenAI default byte-for-byte; Anthropic with no temperature on 5.5, thinking minimised,
+max_tokens 2500). **Not merged:** merging it would switch museum stops to gpt-4.1-mini, because NARRATION_MODEL is set in the
+override. Before any merge, delete that line or decide the model deliberately.
+Michael (16:1x): run whole tours per model one after another, report each; budget may be raised. LEAD runs them in a private
+container (claude-live-<arm>, port 5099, cache + stop pool off, no audio_tours writes): gpt-4.1, Haiku 5.5, Sonnet 5.5, Opus 5.5.
+
+## D683 — Fair replay result (LOCAL-720B, merged @ 7a5c411f, 2026-10-20 16:5x)
+12 stored stops, max_tokens 2500 for every arm, **0 truncations** (all end_turn/stop), meter $0.778, audio_tours 498→498.
+| arm | Kiro | gpt-4.1 judge | $/stop | median s/stop | chars |
+|---|---|---|---|---|---|
+| gpt-4.1-mini | 6.83 | 7.92 | $0.0014 | 4.1 | 2868 |
+| Haiku 5.5 | 6.33 | 7.35 | $0.0008 | 5.6 | 2555 |
+| Sonnet 5.5 | 6.94 | 7.62 | $0.0173 | 10.6 | 3122 |
+| Opus 5.5 | **7.88** | **8.47** | $0.0454 | 18.4 | 3378 |
+- **Only Opus wins under both judges** (+1.05 / +0.55 over mini). Sonnet ≈ mini (mixed), Haiku below.
+- Haiku/Sonnet's lows are refusals on the three Walters stops with empty/wrong sources ("I have no verified source…"), where
+  gpt-4.1-mini writes generic filler. Honest behaviour, scored 0 by the judges; in the live pipeline it costs retries.
+- Opus sometimes emits markdown headers ("# Audio Description", "A Note Before the Script") — needs stripping before live use.
+- Caveat: the baseline is gpt-4.1-mini, but live tours use gpt-4.1 (D682), ~5× its price. Live tours (claude-live-*) settle this.
+- D681 applied: only Opus wins → Opus is a candidate for **demo tours only**; Curator stays on today's writer (Opus's extra
+  cost is above the ~$0.40/tour limit once retries are counted). Final after the live Opus tour.
+**D683 addendum 1 — live tours (LEAD, 17:0x).** One fresh Courtauld 6-stop tour per writer, private container, Subscribed settings:
+| writer | result | time | total $ | writer $ | writer calls | gpt-4.1 judge (6 stops) |
+|---|---|---|---|---|---|---|
+| gpt-4.1 (today) | ✅ | 9:55 | 0.62 | ≈0.27 | 19 | 6.50 |
+| Haiku 5.5 | ❌ fact check | 11:05 | 0.41 | ≈0.08 | 35 | — |
+| Sonnet 5.5 | ❌ fact check | 10:45 | 1.31 | ≈0.99 | 29 | — |
+| Opus 5.5 | ✅ | 10:45 | 2.64 | ≈2.32 | 29 | 5.42 |
+Opus lost on every stop (−1.0 on 4 of 6), and delivered 10.5k chars vs 13.7k: the pipeline's gates and rewrites are tuned to
+GPT's output and cut Claude's. n=1 per arm and only the GPT judge, but it reverses the replay. **Ruling: no Claude writer for
+demo tours or Curator now.** The replay says Opus writes better in isolation; the live pipeline doesn't get that benefit at 4×
+the cost. Revisit only if the pipeline is retuned for a second writer. Branch `LEAD-claude-live` stays unmerged.
+Side finding: all 4 tours had two stops titled "Explore this painting/sculpture in our virtual tour" (site link text) → LOCAL-721.
+Spend today on D674: LOCAL-720 $3.72 + 720B $0.78 + live $4.98 + judge ≈ $0.05 ≈ $9.5 (OpenAI + Anthropic).
+
+## D684 — Listener-only daily limit (LOCAL-723, 2026-10-20 18:4x)
+Merged @ b649586e + LEAD fix 7f4e360d. `paid_api_calls.role` (additive; 54,741 rows kept, audio_tours 498). A container counts as
+listener only if `METER_ROLE=listener` AND `METER_ROLE_TOKEN` (in ~/Audioura/.env) equals the file `~/Audioura/listener_role.token`,
+which is mounted read-only at `/run/meter_role_token` into the four listener services only (generator, orchestrator, polly-tts,
+translation). Test containers that copy the env lack the file → role NULL → never counted. Limit back to $8, now listener-only.
+Token file is git-excluded (.git/info/exclude); never print it.
+**Incident (18:45:25–18:45:43, ~20 s):** the task mounted the token at `/opt/meter/role_token`, inside the read-only `_meter`
+mount, so all four listener containers failed to start. Its live proof ran in a container without that mount and could not catch
+it. LEAD moved the target to `/run/`. **Rule: a compose change to listener services must be proven by starting a copy of the
+service with the exact compose file (separate project, `-p <task>`) before LEAD recreates the shared containers.**
+
+## D656 addendum 2 — Content Policy text APPROVED, not published (Michael, 2026-10-20)
+Michael approved **draft 2** on ClickUp wdvrdayzt1 (closed complete 2026-10-20): the layered document ("In short" + "The detail",
+lawyer's body, merged by GCloud_Storied with Storied_Tours' code review) plus a separate App Store Connect review note.
+- **Approval is of the TEXT, not permission to publish.** Publication gate (Michael's to lift): Subscribed reaches GCloud with the
+  rater in the serving path. Today nothing on GCloud rates or filters: map-delivery rev 00015 (image v40, 2026-09-14) predates
+  LOCAL-687; `storied`/`main` have no content_rating and no 18+ toggle.
+- **Approve/reject in review_queue.py stays with Michael personally.** The text says a person reviews anything not clearly
+  General; LEAD is a Claude session, so LEAD must not approve or reject held tours. If that ever changes, the policy text changes first.
+- Code gaps → ClickUp wdvrdaz2ye (Mac Mini Kiro) = **LOCAL-724**: rate before listing; rater out of the launchd tick; whole text
+  (not first 24k chars); re-rate on edit; server-side report endpoint (may be deferred, explicitly).
+
+## D685 — The orchestrator gets the OpenAI key, for the content rater only (LEAD, 2026-10-20)
+D673 kept OPENAI_API_KEY out of the orchestrator (fewer places holding keys). LOCAL-724 rates each new original inside the
+orchestrator's store transaction (the approved Content Policy: nothing lists before it is rated), which needs the key. Rating at
+store time beats the alternatives: rating in the generator misses edits and stores done elsewhere; "NULL = held" leaves every new
+tour invisible for up to 5 minutes and on GCloud forever until a job exists. So the orchestrator gets the key (env locally; Secret
+Manager by name on GCloud). A tour that still cannot be rated is HELD (pending), never listed. LOCAL-724 bounced as 724B: the rater
+was missing from Dockerfile.orchestrator and a failed rating still listed the tour.
+
+## D686 — D660 superseded: one purchase = free re-download on the same store account (Terms approved 2026-10-20)  **[REVERSED by D688, 2026-10-21]**
+Source: ClickUp wdvrdayztb (Terms of Service, closed complete 2026-10-20; approved text = "DRAFT 5" in the approval comment,
+version 2026-10-20-draft5) and wdvrdayztc (Refunds, closed complete). Relayed by GCloud_Storied. **Provenance caveat:** every
+ClickUp comment posts under Michael's login, and the approval comment was written by GCloud_Storied; LEAD asked Michael to confirm
+in chat (pending at writing). Code that reverses D660 is not dispatched from the Mac until he confirms.
+- **Terms §2(a):** a tour purchase is a non-consumable licence for the buyer's Apple ID / Google Play account; download, delete and
+  re-download at no extra charge on any device on that store account via Restore Purchases. Recovery code = backup (§2(e)).
+- **D660** ("every download of a paid tour is paid", Michael 2026-10-14) is **superseded**. Basis: two independent lawyer reviews
+  (App Store Guideline 3.1.1/3.1.2 rejection; MA 93A exposure), and StoreKit never returns Consumables in entitlements, so
+  Restore Purchases cannot work while the 43 `audioura.tour.*` products are Consumable. Nothing was earned under D660 (payouts unbuilt).
+- **Unchanged:** D653 (each language is a separate product and purchase — tour_pricing_service.py:249-250 is live) and D654
+  (unlimited offline listening).
+- **Migration 031's header** ("overrules the buy-once model") is now historical: 031/032 stay as history; a forward migration stops
+  enforcing `consumed_at` (columns kept). Code: ClickUp wdvrdaz2z0 (Mac Mini Kiro, urgent). Product type cannot change after creation in
+  App Store Connect → the task must ask Michael before inventing new product IDs.
+- **Refund → verified rating (LEAD decision, asked by wdvrdaz2zf):** a voided/refunded purchase clears `tour_ratings.verified`
+  (the rating stays, unverified); it is not deleted. Matches Terms §8 "verified rating … may be removed" and avoids looking punitive
+  (lawyer's 93A note). Apple out-of-band refunds (ASSN v2 REFUND) normalise into the existing `reconcile_voided_purchases()`.
+- Approved ≠ published. Publication waits on the code (§2(a)) and DMCA agent registration (§15-16).
+**D686 addendum 1 — provenance (GCloud_Storied, 20:1x).** Michael's words to GCloud_Storied before it closed the tasks, verbatim:
+Terms — "I think https://app.clickup.com/t/90131825480/wdvrdayztb is ready? If you know what to do, do it and then close it to 'Complete'
+status." Refunds — "I hope we are ready with … wdvrdayztc in he same manner." Content Policy — "Yes, I approve. Feel free to close."
+So the approvals and closes were his instruction. The INFERENCE that approving the Terms chose option (A) (drop D660) is
+GCloud_Storied's: Michael did not answer (A)/(B) in words. That inference is what Michael is asked to confirm; dispatch of
+wdvrdaz2z0/wdvrdaz2zf waits on it. From now on approval comments quote Michael verbatim instead of "APPROVED by Michael".
+
+## D687 — Subscribed release plan: order, and Nov 1 is met with Storied (2026-10-21)
+**Context.** Michael asked for a plan, most urgent first, to take Subscribed to Preview and then to the first official
+public release. Plan: `RELEASE_CHECKLIST_SUBSCRIBED.md` (rewritten from the gate table). Conversation volume
+`SUBSCRIBED_COMMUNICATION_01.MD` opened; `STORIED_COMMUNICATION_04.MD` closed at 148 KB.
+**Rulings (LEAD, reversible):**
+1. **The Google Play API-36 deadline (Nov 1, wdvrday53b) is met by promoting Storied to Production, not Subscribed.**
+   Subscribed still needs products, a verified Google payments profile, the GCloud move and testers; none of that fits
+   11 days. Missing the date means no app updates at all, which is worse than temporary free-tier cost exposure. That
+   was the fallback written into wdvrday53b on 2026-09-02. Precondition: Michael's Pixel-7 test passes, and GCloud
+   has a cost guard (budget alert + a daily limit) before promotion. The promotion is outward-facing, so Michael says "go".
+2. **D660 A/B comes before creating store products.** Option A makes tours Non-Consumable, and a product's type cannot be
+   changed after creation in App Store Connect.
+3. **Everything that needs Michael at a console or a phone goes before ~Oct 28 (Vietnam).**
+4. **wdvrdaz108 (same-name collision across tracks) must be proven fixed on `subscribed` before the GCloud move.**
+   Migration 041 keys on the creator but not on the track.
+**D687 addendum 1 (Michael's corrections, 2026-10-21 10:5x) — rulings 1 and 3 withdrawn.**
+(a) "Google Play needs a Production release by Nov 1" was LEAD's error, copied from wdvrday53b's premise. Our builds already
+target the accepted SDK (API 36), and Michael found no warning in Play Console. There is no Nov 1 target.
+(b) **Storied (and Beta) never go to Play Production:** no user limit and no payment plans, so a public launch could bankrupt
+Audioura LLC. **Only Subscribed goes public**, with Free seats capped at 100 and paid plans. Goal: public release and revenue ASAP.
+(c) Pixel-7 quick test of the official Storied app PASSED (download, generate, news articles on GCloud).
+Plan rewritten accordingly in RELEASE_CHECKLIST_SUBSCRIBED.md; review steps in SUBSCRIBED_REVIEW_PLAN.md.
+
+## D688 — D660 stands: every download of a paid tour is paid; D686 is reversed (Michael, 2026-10-21 10:5x)
+Michael, verbatim: "If you are talking about purchasing a tour then deleting it and then re-downloading it, then re-downloading it
+should be paid. I already had the example I thought you agreed to: if someone bought a red bag, then lost it or threw it away,
+another red bag is never free from any store." So option **(B)**: D660 and its addendum stand as written. Deleting means buying
+again. A lost or replaced phone restores the Listen page, paid tours included, with the recovery code at no charge. No warning at
+purchase time; the calm confirmation at deletion. D686's premise (that approving Terms draft 5 meant choosing (A)) was
+GCloud_Storied's inference and is withdrawn.
+**Consequences:**
+- ClickUp wdvrdaz2z0 (reverse D660) is cancelled: migrations 031/032 and the 43 Consumable `audioura.tour.*` products are correct.
+- wdvrdaz2zf keeps only the refund part: an Apple/Google refund removes access to that purchase, and the verified rating is cleared, not deleted.
+- **Every legal draft is rewritten to B before publication:**
+  - Terms §2(a): drop "non-consumable licence … re-download at no extra charge via Restore Purchases";
+  - Guide Terms: delete §1(c);
+  - Organiser Terms: §5 and §10(c) say passes and community audio follow their own rules; tours follow the per-download rule;
+  - Privacy, purchase records: "…so that we can unlock your download and record which purchases you have made.";
+  - Refunds: match.
+- Store description for tours: "One download of one tour in one language."
+**Risk on record (stated once, Michael has decided):** two lawyer reviews said Apple may reject a durable download sold as a
+Consumable with no Restore Purchases (Guideline 3.1.1), and flagged MA 93A. Mitigations within D660:
+- the recovery code restores purchases on a new phone;
+- the deletion confirmation;
+- the store description above;
+- clear Terms §2.
+If App Review rejects, the fallback is to make tours Non-Consumable under new product IDs. That is a code + product change,
+decided then.
+
+## D689 — LOCAL-727 + LOCAL-725 merged; Subscribed will need its own track value on GCloud (LEAD, 2026-10-21 11:3x)
+- **LOCAL-727 @ aa4a46a0:** the audio_tours lookup is keyed on (name, creator, track) with FOR UPDATE; the re-read is track-scoped.
+  Red test verified by LEAD on the base code. Migration 043 applied (498→498). The orchestrator was rebuilt after a standalone
+  image test (D684); all ports return 200; key 164; tours mount OK. The 4 failures in test_local606 are pre-existing (identical on base).
+- **Open for the GCloud move (L5):** `track` accepts only beta/storied; anything else is normalised to beta. When Subscribed shares
+  the GCloud DB with Beta/Storied, it must write its own value ('subscribed') everywhere `track` is read or written (orchestrator,
+  translation-service, map-delivery filters); otherwise the 432 collision class returns between Subscribed and Beta.
+- **LOCAL-725 @ bf5ff0b8:** six final legal texts on the D688 rule. LEAD removed three "new phone = buy again" sentences, which
+  contradicted the free recovery-code restore, and the stale "listed briefly before rated" line. Posted on wdvrdayzq5 for Michael's last read.
+  Publication waits on "publish" + DMCA agent registration + LOCAL-726 (block + first-run notice, which the Terms describe).
+
+## D690 — LOCAL-726 merged: App Store must-haves; a bar never deletes a purchase record (LEAD, 2026-10-21 12:2x)
+Merged @ 09564687:
+- community block (member_block / organiser_bar, migration 044);
+- first-run informational notice (`info_notice_ack_v1`);
+- rater: history of crime vs instructions for committing one.
+
+**LEAD changed the organiser bar** from `DELETE FROM community_memberships` to expiring the row (`expires_at = NOW()`). The membership
+row carries transaction_id/store/price; it is the purchase record. Rule for all future tasks: **purchase-bearing rows
+(community_memberships, tour_unlocks, plan purchases) are never deleted; access ends by expiry/flag.**
+
+Deploy:
+- 044 applied (audio_tours 498→498, memberships 0→0, community_blocks 0);
+- user-api-2, orchestrator, generator and tour-editing were rebuilt, each image tested standalone first;
+- all 7 ports 200, keys 164, role=listener intact, Boston 11 tours.
+
+Test env note: audiotours_test lacks `short_title`, so one new_tours test fails there (identical on the task's code).
+Docker: `credsStore: desktop` had returned to ~/.docker/config.json and stalled base-image pulls (DeadlineExceeded); removed
+again (backup config.json.bak-20261021). Docker Desktop re-adds it; check this first when a build times out.
+
+## D691 — No user-to-user blocking; Audioura alone moderates and reimburses (Michael, 2026-10-21 12:3x)
+Michael: "We should not allow members blocking an organisers, and niether shoudl we allow organisers remove bar a members. They can
+only complain to us and we shoudl be able to do this with the administrator privilledges. We should have an ability to reimburse a
+member or a purchaser of the tour or subscription (only us, but still). It needs to be designed how."
+- Supersedes LOCAL-726's member_block / organiser_bar UI. LOCAL-728 removes them. Members and organisers **report to Audioura**.
+  Admin-only tools: bar a user from a community (by expiry, never delete), ban from the service, disable a community, lift any of these,
+  all written to an `admin_actions` ledger. Legal texts follow (Terms §5, Organiser §8, Privacy).
+- Why this still meets Apple 1.2: members post no content (organisers host the audio; members only listen), so the abusive party is
+  an organiser or a tour, and "the ability to block abusive users from the service" is met by our admin ban plus report and
+  timely response. **Risk on record:** if App Review insists on in-app user blocking, the minimal answer is a member-side
+  "hide this organiser", decided then.
+- First-run notice: shown ONCE per device at first launch (and once to existing installs after the update), never per tour or per
+  community. Wording fixed: tours are created with AI **and by guides and curators**. The community join keeps its own rules +
+  waiver accept, which Michael reviewed.
+- **Reimbursement: a proposal, awaiting Michael** (ClickUp, "Design for your review: how Audioura reimburses…"):
+  - Google money refunds by admin;
+  - Apple refunds only by Apple, which we support through the consumption answer;
+  - make-good in kind (re-grant a download, extend a pass, add plan units);
+  - one ledger;
+  - a Support ID in About;
+  - a default policy of when we reimburse.
+
+## D692 — Reimbursement design approved; first-run notice wording (Michael, 2026-10-21 13:2x)
+- **Reimbursement approved** as written in ClickUp wdvrdaz3tb (D691 proposal):
+  - Google money refunds by admin;
+  - Apple refunds stay Apple's, supported by our consumption answer;
+  - make-good in kind;
+  - one `admin_actions` ledger;
+  - Support ID in About;
+  - the default policy of when we reimburse.
+  Build: LOCAL-729, dispatched after LOCAL-728 merges.
+- **First-run notice, first point, Michael's exact text:** "Audioura tours are created with AI and by guides and curators to be
+  helpful and accurate, but they may contain mistakes. Follow local signs and rules, and enjoy them as stories, not as official
+  guidance." LEAD applies it at the LOCAL-728 merge. Since it now carries "follow local signs and rules", the separate signs point
+  keeps only the risk part ("walk, ride or drive at your own risk"), to avoid saying it twice.
+
+## D693 — LOCAL-728 merged: admin-only moderation live on the Mac (LEAD, 2026-10-21 14:0x)
+Merged @ 0b398c40:
+- user block/bar UI and endpoints removed (the old route returns 404);
+- one "Report to Audioura" (community_reports + status triage);
+- admin-only bar (by expiry), service ban, disable/enable, all in the `admin_actions` ledger;
+- `moderation.py` CLI.
+**ADMIN_API_KEY** is a new random secret, only in ~/Audioura/.env (never printed), wired into user-api-2 by the override. The admin
+endpoints fail closed: 401 without the key, 503 if unset. Verified: no key 401, with key 200. On GCloud it must come from Secret Manager by name.
+Notice: Michael's exact D692 text, ack key v2 (existing installs see it once more). Migrations 045/046 applied: audio_tours 498→498,
+community_* 0→0, service_bans/admin_actions created empty. user-api-2 rebuilt (standalone image check first); 7 ports 200.
+Obsolete LOCAL-726 block tests deleted with the feature. LOCAL-729 (reimbursement) dispatched.
+
+## D694 — Treats use the tour's places, never the phone's location; phone-location Treats only as a future opt-in (Michael + LEAD, 2026-10-21 14:3x)
+Michael (after asking Meta about the Privacy draft): "We do not use the user's location (but I want to keep this option in case
+there is a demand), but we do use the tour stops locations."
+**LEAD finding:** the code did the opposite. `treats_screen.dart:37-58` sends the phone's GPS (or the typed Home place) to
+`/treats-near/<lat>/<lng>`. There is no device ID in the request, and `treats_service.py` stores nothing but prints the coordinates.
+**Ruling:** the code is changed to Michael's intent (LOCAL-730). Treats source order: the open tour's stops → the stops of the
+Listen-page tours → the place typed on Home → nothing. Never Geolocator. Phone-location Treats only behind an opt-in that is
+off by default, with a policy update first. Privacy "Location and places" rewritten on subscribed @ 936f1e97 (Meta's two-part
+structure, adjusted to the facts). Publication gate: LOCAL-730 merged.
+
+## D695 — LOCAL-729 merged: reimbursement tools live on the Mac (LEAD, 2026-10-21 14:3x)
+Merged @ 41b0c212. Commands (moderation.py, plus the admin-key endpoints), each writing one `admin_actions` row:
+grant-tour, extend-pass, grant-pass, add-plan-units, extend-plan, refund-google (full = revoke via the void path; partial = money
+only), apple-refund-message, support-id, ledger. Support ID `AU-XXXX` (no O/I/L/0/1) shown in About with Copy; it never exposes the
+secret id. Migration 047 applied: audio_tours 498→498, tour_unlocks 3→3, device_entitlement 77→77, admin_actions 0→0.
+user-api-2 rebuilt after a standalone image check. Verified live: ledger 401 without the admin key, 200 with it;
+refund-google 503 `refund_not_configured` until the Play service account (wdvrdayzyj) exists. 55 server + 15 app tests pass on the
+LEAD run. LOCAL-730 (Treats from tour places) dispatched.
+
+## D696 — LOCAL-730 merged: Treats from tour places, never GPS; the Privacy "Location and places" text is now true locally (LEAD, 2026-10-21 14:5x)
+Merged @ 4b4f1e6e.
+- **App:** `treats_source_resolver.dart` source order: open tour stops → Listen-page tour stops → typed Home place → empty state.
+  The Treats screen does not import Geolocator. The phone-location opt-in exists only behind a build-time flag, OFF; the switch is
+  invisible and no GPS is read.
+- **Server:** POST `/treats-near-places` `{points:[…]}` (≤10, merged + de-duplicated). Legacy GET kept for old apps. Our log lines
+  are rounded to 2 decimals. Caveat: werkzeug's access line still shows a legacy GET's URL path; it carries only tour/typed places,
+  never GPS, from the new app.
+- **Tests (LEAD run):** 11 app + 14 server pass, including the red test (a GPS fallback breaks the guard).
+- **Deploy:** the treats container is now built from `~/audioura-subscribed-local` with the override. It was previously built from the
+  ~/Audioura checkout. Old GET 200, POST 200, all 8 ports 200. No DB writes.
+- Phones see the change with the next Subscribed app install (with the review build).
+
+## D697 — Legal pages PUBLISHED on audioura.com (Michael's "publish", 2026-10-21 15:0x)
+Michael: "wdvrdaz3pt: complete and paid. I am okay to 'Publish' on the Legal task." DMCA agent registered: DMCA-1083696, active
+2026-10-21, renew ~Oct 2029; alternate names Audioura, Audioura App, audioura.com, www.audioura.com.
+- Live, effective 21 October 2026: /terms /privacy /refunds /content-policy /guide-terms /organiser-terms. Source: subscribed @ 16f2020d.
+  `legal/build_html.py --publish` drops the banner and noindex.
+- Deployed by LEAD (`npx wrangler@4 deploy --name lucky-bush-72cd --assets . --compatibility-date 2026-10-19` from
+  ~/Desktop/audioura-site-2026-10-21); Worker version aa11602b. Rollback bundle: ~/Desktop/audioura-site-upload (the previous site).
+  Verified: all 6 pages 200; home, /t/<code> and .well-known unchanged.
+- **D661 gate (3) is met:** the policies are published. Remaining for Michael: paste the Privacy URL (and optionally Terms as EULA)
+  into App Store Connect and Play Console.
+- Note: the policies describe Subscribed (plans, communities, Treats from tour places), which so far runs only locally. That is
+  intended (D661: policies before GCloud).
+- **Changing a published policy from now on:** edit legal/*.md on subscribed → `build_html.py --publish` → redeploy, and bump the
+  version/effective date. A material change gets in-app notice (Terms §14).
+
+## D698 — Play Billing Library 8 on subscribed; Play build numbers start at 76 (2026-10-21)
+Play Console refused build 75 (Billing Library 7.1.1, pulled in by in_app_purchase 3.2.x). GCloud_Storied's fix, merged by LEAD as
+subscribed @ 742d980e: `dependency_overrides: in_app_purchase_android: 0.5.0` (Billing 8.0.0; the last version that builds on Flutter 3.41.6),
+plus version 2.4.30+76. iOS StoreKit is unchanged. The app calls no Android-only IAP API, so 0.5.0's one break (queryPurchaseHistory removed)
+does not reach it. LEAD checked: no analyzer errors in IAP code (77 pre-existing errors are all in orphan files such as audio_handler.dart and
+subscription_management_screen.dart), and the plan_screen purchase tests pass (24/24). Build 76 went to Play Internal testing as a draft so that
+one-time products can be created (wdvrdaz41q). **Rule: every Play build number from now on is ≥ 77; 75 and 76 are used.** Drop the override once
+the toolchain is on Flutter ≥ 3.44 and in_app_purchase ≥ 3.3.0.
+
+## D699 — No $4.99 tour product on Google; the only $4.99 tour re-priced to $5 (2026-10-21)
+Michael asked why both "Tour $4.99" (audioura.tour.tier3) and "Tour $5" exist. tier3 is a legacy .99 tier (D652), hidden from the guide's price
+picker since LOCAL-686 (in_picker FALSE) and kept only for tours already priced with it. On the local DB exactly one tour used it: 557 (a Boston
+politics walking tour, beta track; 2 earlier stub unlock rows, which are unaffected). LEAD re-priced it: `UPDATE audio_tours SET price_tier=11
+WHERE id=557 AND price_tier=3` (to $5; reverse by setting 3). audio_tours count 498 before and after. No tours are priced on GCloud yet. So the
+Google list drops #4 (tier3): **11 Google products**. Apple (wdvrdayuf3) should skip tier3 as well. The tier3 row stays active in price_tiers,
+harmlessly, for history.
+Addendum: Michael had already created tier3 on Google before reading this. It stays (harmless): no tour is priced at tier3, so the app never offers it. If ever wanted: open the product, then the purchase option ⋮ menu → Deactivate (reversible). Google total: 12 products.
+
+## D700 — On Apple, every product is Consumable, including the community passes (2026-10-22)
+The Apple task (wdvrdayuf3, written Oct 14) said passes should be "Non-Renewing Subscription", but the code verifies a pass with
+`required_type='Consumable'` (communities_api.py `_verify_pass_signed`, LOCAL-690), and the app buys passes with `buyConsumable`. A
+Non-Renewing pass would fail verification as `apple_type_not_consumable` and nobody could join a paid community. Decision: create all 11 Apple
+products as **Consumable**. The pass length stays enforced by our server (D658), so behaviour is unchanged. Risk: if App Review insists that
+time-limited access must be a Non-Renewing Subscription, the fallback is to let `_verify_pass_signed` accept both types (a one-line change plus a
+test) and then add new Non-Renewing products under new IDs.
+
+## D701 — Buying a pass while one is active adds the days; nothing is lost (2026-10-22)
+Michael asked how a member can buy when a community offers several passes (the review screenshot shows $5/week and $20/month). Answer: the
+organiser offers the lengths and the member picks one; there is always one membership per member per community. LEAD found that buying again while
+a pass was still active REPLACED the expiry with now + length (D657's "fresh expiry"), so a member with 25 days left who bought a week lost 18
+paid days. Fixed (subscribed @ 306c2899): the new length is added to the remaining time; a lapsed or first pass starts now; an already-processed
+transaction never stacks. Each purchase is still recorded in `purchases` (D690). Tests: 52/52 community tests pass on audiotours_test; red test
+confirmed. user-api-2 rebuilt and healthy (15:16Z). The admin extend/grant tools already worked this way (GREATEST).
+
+## D702 — Pass-ending warning: once, on opening the app, 3 days before (2026-10-22)
+Michael: warn a member that a community pass is about to end, about 3 days before, and only once, when they open Audioura. The server already
+flags a 3-day reminder (run_reminders, D657/D658), but nothing delivered it. Built app-side (LOCAL-732): on start or resume, active memberships
+ending within 72 h get one combined dialog with a Renew link per community. "Once" is keyed by community + expires_at, so a renewal (D701)
+re-arms it. No server change. LOCAL-732 is queued after LOCAL-731 (it shares the expiry formatter).
+
+## D703 — Packs carry over: buying while active adds to what's left; members see what's left (2026-10-22)
+Michael agreed to LEAD's proposal (after D701): "unused tours carry over and add to the new pack. Then we also have to tell them how much is left."
+Today a pack purchase resets the used counters (entitlements_api.py), and the plan screen says early buying "replaces what's left". LOCAL-733:
+the same level adds (3 left + a 5-tour pack = 8); a level change converts what's left one for one into the new level's units; an expired pack or a
+first purchase starts fresh; the new month starts at the purchase. The app shows what's left plus the end date on the plan card, after purchase,
+and as one line on Generate Tour. Rules text: "Buying another pack adds it to what's left and starts a new month." No legal text mentions
+replacement. Queued after LOCAL-732 (one Flutter build at a time).
+
+## D704 — Apple products done; "per_store" purchase checking so the iPhone and the Pixel can both test on one server (2026-10-22)
+Michael created all 11 Apple products (Consumable drafts, not added for review: the first in-app purchases go to review with the Subscribed
+app version) and the sandbox tester glikfamily+sandbox1@gmail.com. M1 and M2 are both done. For L4 the local server must check real Apple sandbox
+purchases, but IAP_VERIFY_MODE is one global value, and `apple` would break the Pixel's TEST PURCHASE (a sideloaded debug build cannot use Play
+billing; no Play service account yet). LOCAL-734 adds `per_store`: Apple purchases are checked by the Apple verifier, Google by the Google one
+when configured, and `store=stub` only when IAP_ALLOW_STUB_STORE=true (never on GCloud). /purchases/mode reports a per-platform answer the
+app uses. It also limits the price pickers to the products that exist. Queued after LOCAL-733 (same file).
+**D704 addendum (2026-10-22, LEAD):** LOCAL-734 merged (subscribed @ 157688f7) after LEAD took over: Kiro's route test hung three times because
+`tests/conftest.py` `_GuardedConnection` dropped attribute writes (`conn.autocommit = True` never reached psycopg2). Fixed with `__setattr__`
+forwarding. LEAD also routed the tour buy sheet and the community pass purchase through the server's per-platform answer, not the device's
+"local" flag (otherwise the iPhone would have kept using TEST PURCHASE). The live user-api-2 now reports mode per_store with platforms
+ios=apple, android=stub. Price pickers offer only the products that exist in the stores.
+
+## D705 — "Your plan" screen order: current plan → Upgrade your plan (code) → Apply for the Free plan (Introduction only) → packs → plans (2026-10-22)
+Michael's layout. The code box gets its own "Upgrade your plan" card on every level. The queue becomes "Apply for the Free plan", shown only on
+Introduction and explaining that Free lets you generate your own tours (1 a day, 3 a month, up to 5 stops, from the plan data). LEAD added:
+a level code redeemed while a pack is active follows the D703 carry-over, instead of resetting what is left as level_codes.py does today. LOCAL-735.
+**D705 addendum (2026-10-22, LEAD):** LOCAL-735 merged (subscribed @ c320f6c1). Its new tests pass. Three tour-generation tests fail on the base
+as well, so they are not caused by this change. LEAD also replaced "there are no refunds" (plan screen, renewal sheet) with "Refunds are handled
+by Apple or Google." (6338ab4f): the old line contradicted the published Refunds policy and is an App Review risk. The Pixel-4 is updated. New
+Apple review screenshots for the $10 Pack and Curator are on the Desktop.
+
+**D706 (LEAD, 2026-10-22 20:3x) — iOS purchases: StoreKit plugin 0.4.13, StoreKit 2 enabled at app start.** First real Apple sandbox
+purchase proven: $1 pass, Book Club, iPhone USER-41659366, purchases row 34 `apple_verified:2000001255858810`, membership to 2026-11-22.
+Three causes found on the way: (1) `in_app_purchase_storekit` 0.3.22+1 sends an EMPTY serverVerificationData under StoreKit 2, so the
+server refused with `apple_missing_signed_transaction`; 0.4.2+ sends the JWS. Pinned 0.4.13 + in_app_purchase 3.2.4 (Android stays on the
+0.5.0 override, D698). (2) `enableStoreKit2()` ran on the first Buy tap, after InAppPurchase was in use; the plugin requires it before, so
+it now runs in main() with the purchase listener. (3) The first tap hung in a store call with no timeout, and an unanswered purchase blocked
+every later tap; both bounded. subscribed @ 58782f8f. Still open → LOCAL-736: a paid transaction redelivered after a restart was finished
+without a grant (lost), and the organiser's status reads "Not a member".
+Also today: demo communities 1 and 2 had been auto-archived (launch_window_missed, 18:04); set active with launch_deadline +30 days.
+Community 1's owner moved to placeholder `USER-DEMO-ORGANISER` so Michael's iPhone can buy as a listener
+(revert: `UPDATE communities SET owner_user_id='USER-41659366' WHERE id=1`).
+
+**D707 (LEAD, 2026-10-22 21:1x) — Play service account wired, Android stays on TEST PURCHASE until Google grants it.**
+Michael created `audioura-play-verify@audiotours-migration.iam.gserviceaccount.com` (no Cloud role), the JSON key at
+`~/AudiouraSecrets/google_play_sa.json` (chmod 600, never committed), enabled the Google Play Android Developer API, and invited the account
+in Play Console with View financial data + Manage orders (status Active). The key mounts read-only into user-api-2 at
+/run/secrets/google_play_sa.json (local override). Probe 21:10: auth works, Play answers 401 "insufficient permissions" (new Play
+permissions can take up to ~24 h). So `GOOGLE_PLAY_SA_JSON` is commented out and /purchases/mode keeps android='stub'; turning it on flips
+android to 'google', after which the Pixel needs real Play billing (license tester michael.glik@gmail.com). A background probe re-checks
+every 20 min.
+
+**D708 (LEAD, 2026-10-22 21:2x) — Subscribed gets its own track, 'subscribed'.** On GCloud it shares one DB with Beta and Storied; it
+lists, generates, translates and downloads only its own tours, the same separation Beta/Storied already have. Missing/unknown stays 'beta'.
+Local rows currently 'storied' move to 'subscribed' via a LEAD-applied local migration. Reversible; overturn if Subscribed should also show
+Storied tours. Task LOCAL-737 (first piece of L5).
+
+**D709 (LEAD, 2026-10-22 23:1x) — overnight run after the M4 review stopped at C4.** Michael: fix overnight. Merged LOCAL-736 (9d6358f0:
+a paid pass/tour context persisted, never finished without it; organiser sees "You are the organizer") and LOCAL-737 (98cc6dc6: 'subscribed'
+track; LEAD added `DELIVERY_TRACK_FILTER` so the Subscribed map-delivery lists only its own tours; not TOUR_TRACK, so Beta/Storied lists stay
+as they are). Local DB is all 'beta' (498) and no track env is set locally, so the Mac Mini behaves as before; the task's local relabel SQL
+matches 0 rows and is not applied. Rebuilt orchestrator, translation, map-delivery (health 200, tours-near 11, tours mount OK). Added
+`newsletter-processor` (:5017) to the local override (it was never local). Dispatched LOCAL-738 (create form), LOCAL-740 (URL scheme,
+paid-delete warning, recovery code), LOCAL-741 (English Wikipedia rejected as non-English); LOCAL-739 (communities hub) parked until 738.
+Known follow-up for LOCAL-736: a pass/tour transaction the server refuses definitively stays unfinished, and StoreKit then refuses a second
+purchase of that product on that phone; acceptable for now (money is never lost), revisit if seen.
+
+**D710 (LEAD, 2026-10-23 00:0x) — overnight merges.** LOCAL-740 @ 26905362 (links get https:// when missing; the paid-delete warning never
+showed because the download stamp judged "paid" by is_paid only, ignoring price_tier; now also asks the server; delete-all warns too;
+recovery code: keep-off-phone text, Email to myself, offered after the first download). LOCAL-738 @ 54cb87c7 (one price per length;
+prices from `GET /communities/pass-prices` = APPLE_LIVE_PASS_PRODUCTS; real error text; `communities.release_cadence` migration 048 applied
+locally 2→2 rows, both 'week'; Use my location; Generate → Create). LOCAL-741 @ ab8319d5 (language check judged the whole text and rejected
+on ONE non-Latin character, which Wikipedia's language sidebar always has; now script share ≥25% of letters + stopwords. LEAD changed its
+single-article default: an unknown host stays a newsletter unless the page declares og:type=article or has one <article>, so real
+newsletters on unknown hosts keep their crawl). user-api-2 and newsletter-processor rebuilt. Google Play probe 00:01 still 401.
+LOCAL-739 (communities hub) dispatched on 54cb87c7.
+
+**D711 (LEAD, 2026-10-23 00:3x) — LOCAL-739 merged (b6427bba); overnight run closed.** One Communities page (CommunitiesHubScreen):
+About → "Communities" for everyone; Home chip, Generate link and Listen "My communities (N)" row only when the user belongs to or organises one
+(`CommunityRules.hasAnyCommunity`, /communities/mine + /mine-owned); members-only tour download 402 → "This tour is for members of X" →
+Join → after the grant the tour downloads and Listen opens. Flutter: same 7 pre-existing failures. Both phones installed 00:30.
+Google Play probe 00:30 still 401; GOOGLE_PLAY_SA_JSON stays commented (D707).
+
+## D706 — A listed community's new tours default to public (LEAD, 2026-10-23)
+Michael searched "*Danvers*" and the map for his listed community's tours and found nothing: every community tour defaulted to `members` (D663 §3), which hides it from map/search. Ruling: when the community is `listed`, Generate defaults new community tours to `public` (on map/search with the community badge; download still needs membership → join flow). Members-only stays a choice; the organiser can switch an existing tour (owner-only). Existing rows are not changed automatically. Reversible; implemented in LOCAL-752 B.
+
+## D707 — Members see their community's members-only tours; members may translate (LEAD, 2026-10-23, Michael's ask)
+Michael: the Pixel is a member, so why can it not find the tour? Ruling: members-only community tours stay hidden from non-members, but an active member or the owner sees them on the map and in search with the community badge (amends D663 §3). Translation is not an edit: members may translate a community tour (from Listen or the community page); the translation joins the community so other members get it without paying again. Editing stays organiser-only (LOCAL-745). Implemented in LOCAL-753.
+
+## D708 — Organiser-audio tours: full tours, no translation in v1 (LEAD, 2026-10-23, Michael asked for a view)
+Design (Michael): a tour built from the organiser's own RSS/MP3 audio has a name, named stops with coordinates and works with voice control, so on Listen it is indistinguishable from an Audioura tour. The audio stays on the organiser's host (D658 add. 2): the package carries remote URLs, the phone fetches the MP3s directly. LOCAL-754B.
+Translation: NOT offered for organiser-audio tours in v1. Reasons: (1) a translation is a derivative work of someone's recording; the organiser may be linking a podcast they do not own, and the voice is a real person's; (2) Audioura would transcribe, translate and re-voice it, then host the result — contradicting "Audioura never holds the files" and making us the publisher of the derivative; (3) speech-to-text errors would be presented in the organiser's name. Later option, if wanted: organiser-only opt-in per tour ("I own the rights and allow translation") with the translation clearly labelled machine-translated. Not legal advice — confirm with a lawyer before enabling. Reversible.
+
+## D709 — Organiser-audio tours: edits stay on the organiser's side; members re-download by choice (Michael + LEAD, 2026-10-23)
+Michael: organiser-audio (RSS) tours must never go through our edit/voice pipeline; the organiser edits on their own site and ticks "the tour was edited"; members are not pushed the update even with auto-download on. LEAD agrees: the audio comes from someone else's host, can be large, and the member cannot see what changed. Listen-page Edit is hidden and the edit service refuses organiser-audio tours (409); the builder's "I changed this tour — tell my members" checkbox bumps the version; members see "Updated by the organiser — Re-download". Generated community tours keep auto re-download. D708 confirmed by Michael: no translation of organiser audio. LOCAL-755 (after LOCAL-754B).
+
+## D710 — Navigation: the tab bar is always visible; no swipe between tabs; Communities gets a tab, About becomes Settings (LEAD, 2026-10-24, Michael asked)
+**Michael:** users go deep into screens and must back out to reach the tabs; should swipes move between tabs, or a menu always be visible; About could become Settings and Communities get its own page.
+**Decision:**
+1. **Persistent tab bar** — every tab keeps its own navigation stack (nested Navigator per tab), so the bar stays visible on every screen inside a tab. Tapping the current tab again returns to its first screen; Android Back goes back within the tab first.
+2. **No swipe between tabs.** Horizontal swipes are already taken: the map pans, the swipe-to-sway stop feature (LOCAL-109), carousels, sliders. A tab swipe would fire by accident and fight them. The always-visible bar solves the same problem.
+3. ~~Tabs: Home · Generate · Listen · Communities · Treats; About → ⚙ Settings.~~ **Overturned by Michael 2026-10-24 19:5x:** About/Settings matters more than a Communities tab — tabs stay as they are (Home · Generate · Listen · Treats · About); Communities stays where it is.
+4. **Bar, not a menu (Michael asked why):** a visible bar is one tap and shows where you are; a hidden menu is two taps and its items get used far less. To save screen space the bar **slides away while scrolling down and returns on scroll up or at the top** (and stays hidden in the full-screen player).
+Full-screen players and modal flows (purchase, join) may still hide the bar; they always have a close/back control.
+**Reversible:** app-only; Michael can overturn any part.
+
+## D711 — Listen ⋮ menu: show only what this user can do with this tour; say who they are; community tour prices (LEAD, 2026-10-25, Michael's retest)
+**Evidence.** Michael's retest 2026-10-25 ~00:0x: (a) the Pixel-4 (a member, not the creator) is offered **Price** on a community tour — `_canSell` is a device-level curator flag, the menu never checks ownership; (b) the organiser's own broadcast tour 750 was refused "You can only price a tour you created" — the organiser-audio publish (`communities_api.py` ~2515) never wrote `audio_tours.creator_user_id`, and `is_tour_owner` falls back to `tour_requests`, which a broadcast tour has none of (LEAD backfilled 750 → USER-41659366); (c) **Request re-score** is offered on a broadcast tour, then refused; (d) Share leaves "Creating share code…" spinning forever — since LOCAL-761 each tab has its own Navigator, `showDialog` pushes on the ROOT navigator but `Navigator.of(context).pop()` pops the TAB navigator, so the dialog never closes (regression from D710/LOCAL-761; same pattern at `my_tours_screen.dart` ~1558, audit all).
+**Rulings.**
+1. **Hide what can never apply; disable-with-ⓘ only what the user would reasonably expect.** Price and Re-score are owner tools: shown only to the tour's creator (server-proven). Re-score never on a broadcast tour (nothing is scored). Edit/Translate stay disabled-with-ⓘ (D708).
+2. **A role line heads the ⋮ menu** (non-tappable): "Your tour" · "Your community tour — you are the organiser" · "Community tour · <community>" · "Broadcast tour · <community>" (+ "you are the organiser" for the owner) · "Audioura tour". Fewer "why can't I…" questions.
+3. **Prices for community tours.** Members never pay per tour — a membership-covered tour is "Included with membership". An organiser may price a **public** community tour; the price applies to non-members only. A **members-only** tour has no price (Price disabled with ⓘ "Members-only tours are covered by the membership dues").
+4. **Where the price is set.** At creation — Generate (curators) and the audio-tour builder (organisers) get an optional price — **and** the owner can still change it from Listen (Michael: "maybe we should keep it for the tour owners").
+5. **A price change never touches past downloads.** A tour downloaded while free stays the downloader's; the new price applies to future downloads only (the existing entitlement model). The Price dialog says so.
+**Reversible.** All app/menu policy; Michael overturns what he dislikes.
+
+### D711 addendum 1 — community tours never carry a per-tour price (Michael, 2026-10-25 11:2x; LEAD agrees)
+Michael: "public" on a community tour means everyone can SEE it on Home and ask to download it, but must become a member first
+(D706 "Community tour — join to download"). So a public community tour is not for sale to non-members. **§3 is replaced:** no
+community tour (members-only or public) has a per-tour price; Price on any community tour is disabled with ⓘ "Community tours are
+included with membership"; the builder's "Price for non-members" field is removed; the server refuses a price on any community
+tour (`community_tour_no_price`, 400). Price stays for a creator's own non-community tours. LEAD's §3 contradicted D706 — an error.
+
+## D712 — What "Storied → Stable" and "Subscribed → Preview" mean on GCloud (LEAD, 2026-10-25, Michael: "ASAP")
+**Found 2026-10-25:** the Subscribed build in cloud mode calls `https://api.audioura.com` — the **Beta** gateway (`endpoints.dart`
+`base()`: track 'subscribed' is not 'storied' → default URL). The gateway manifest (`api-gateway/gateway_routes.yaml`) has no
+route for Subscribed's user-api calls (communities, entitlements, IAP verify, recovery, pricing role). So Subscribed cannot reach
+GCloud today however it is deployed.
+**Rulings.**
+1. **Storied → Stable:** `api.audioura.com` (the Stable gateway) is pointed at the `-storied` Cloud Run services (the backends in
+   its manifest), Beta's services stay deployed but unrouted for one week (rollback = repoint), then retire. `storied-api.audioura.com`
+   keeps serving Storied, so the Preview toggle in the Storied app shows the same thing — no app release needed. Tours keep their
+   `track` value; Stable's map-delivery lists beta+storied tours (no tester loses a tour). Gate: Michael's "Storied → Stable go".
+2. **Subscribed → Preview:** its own stack and hostname, **`subscribed-api.audioura.com`** (Cloudflare → LB → `api-gateway-subscribed`),
+   `-subscribed` Cloud Run services built from `subscribed`, the shared Cloud SQL with track='subscribed' (D708). Testers get it
+   only through the Subscribed builds (TestFlight, Play internal). The Storied app's Preview toggle never points at Subscribed (the
+   old app was never proven against Subscribed's server). Gate: Michael's "Subscribed approved for Preview".
+3. GCloud differs from the Mac: Polly voice (Kokoro later, cost first); Apple IAP verify Production with Sandbox fallback (TestFlight
+   receipts are sandbox); no stub store; no unauthenticated entitlements; daily paid limit on; Google budget alert before deploy;
+   Cloud SQL backup before migrations 010–050.
+
+### D712 addendum 1 — LOCAL-764 merged; Storied must be track-isolated before Subscribed shares the DB (LEAD, 2026-10-25 14:1x)
+LOCAL-764 merged @ 1a750d43: app host `subscribed-api.audioura.com`; `gateway_routes.subscribed.yaml` (12 backends, a gate proves all 77
+app call paths routed, admin routes internal-only); `SUBSCRIBED_GCLOUD_ENV.md` (secret names only); `SUBSCRIBED_MIGRATION_RUNBOOK.md`
+(010→050 forward-only, applied twice on scratch; 024 not re-runnable after 026; 041/043 code-first); Apple verify accepts
+`Production,Sandbox`. LEAD checked: Beta/Storied code does not depend on the index 041 drops (pre-check by name, no ON CONFLICT).
+**But** that pre-check matches any track: Storied would hand a Subscribed (members-only/paid) tour to a Storied listener. LOCAL-765
+backports LOCAL-727's track-scoped lookup to `storied` and excludes `track='subscribed'` from every Storied read path. Order on GCloud:
+deploy storied+765 → Storied → Stable → migrations 010–050 → Subscribed services.
+
+## D713 — Reuse saves money for everyone, but never hands out a paid or community tour (Michael, 2026-10-25 14:0x)
+Michael: "Subscribed should [reuse same-name tours], unless it is a community or paid tour; make sure paid tours are treated in the same
+manner: users should not bypass payment by naming their tour the same way."
+**How reuse works on Subscribed today:** (a) whole-tour reuse is scoped to (name, creator, track) — only your own tour is ever reused
+for you (LOCAL-727), so nobody receives another person's tour by naming theirs the same; (b) the cost saving across users is the
+**stop pool** (LOCAL-590): stops researched once are reused for an identical request. The pool has no idea which tour a stop came from,
+so an identical request can rebuild a paid or community tour's stops for free.
+**Ruling:** a pooled stop that came from a community tour or a priced tour is served only to that tour's creator; everyone else gets a
+fresh stop (and pays their own plan usage). Free, non-community tours keep sharing as today. Applies when a tour is priced or attached to
+a community after generation too. Task LOCAL-766.
+**Also recorded:** Michael gave "Storied → Stable go" and "Subscribed approved for Preview" at 14:0x (in that order: Stable first, after
+LOCAL-765 merges; Preview after Stable is verified).
+
+## D714 — Storied reuses any Beta/Storied tour by name, never a Subscribed one; the unique name index exempts Subscribed (LEAD, 2026-10-25 16:5x)
+**Evidence (GCloud_Storied, blocked wdvrdaz5vd before step 0):** Cloud SQL still has `uq_audio_tours_original_name` (UNIQUE
+lower(tour_name) WHERE original_tour_id IS NULL, no track); 199 Beta names have no Storied row. LOCAL-765's same-track key made a
+Storied request for any of them a full-cost miss whose INSERT then violated that index — every Stable user would hit it after the
+switch. LOCAL-765's scratch schema lacked the index. LEAD's task spec ("scoped to this deployment's own track") was the error, and it
+also contradicted Michael's rule that reuse should save money (D713).
+**Ruling.** Storied's store lookup and re-read reuse any original whose track is beta/storied/NULL, never 'subscribed'.
+Migration `043s` creates `uq_audio_tours_original_name_nonsub` (UNIQUE lower(tour_name) WHERE original_tour_id IS NULL AND track is
+not 'subscribed') FIRST, then drops the global index — Beta/Storied keep one row per name with race protection; Subscribed (per-creator
+names, D678) sits outside it. Red test on a schema that has the real index: fails on 90efddfb with the same violation, passes now.
+Also: tour-id-resolution is not a Cloud Run service — skip it (GCloud_Storied's proposal accepted). map-delivery/translation/tour-editing
+are shared with Beta; the only change on Beta's path is hiding 'subscribed' rows — accepted.
