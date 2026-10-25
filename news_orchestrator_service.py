@@ -13,6 +13,20 @@ import logging
 import requests
 
 
+
+def _news_db_url():
+    """[LEAD 2026-10-25, wdvrdaz5vr] libpq URL that also works when DB_HOST is a Cloud SQL
+    unix-socket directory (/cloudsql/...): the socket goes in ?host=, not the netloc."""
+    from urllib.parse import quote
+    user = quote(os.getenv('DB_USER', 'admin'), safe='')
+    pw = quote(os.getenv('DB_PASSWORD', 'password123'), safe='')
+    host = os.getenv('DB_HOST', 'localhost')
+    port = os.getenv('DB_PORT', '5433')
+    name = os.getenv('DB_NAME', 'audiotours')
+    if host.startswith('/'):
+        return f"postgresql://{user}:{pw}@/{name}?host={quote(host, safe='/')}&port={port}"
+    return f"postgresql://{user}:{pw}@{host}:{port}/{name}"
+
 def _compat_send_file(path_or_file, **kwargs):
     """Version-tolerant send_file wrapper.
 
@@ -268,7 +282,7 @@ def generate_news():
         _cache_hit = False
         _cached_article_id = None
         try:
-            _db_url = f"postgresql://{os.getenv('DB_USER', 'admin')}:{os.getenv('DB_PASSWORD', 'password123')}@{os.getenv('DB_HOST', 'localhost')}:{os.getenv('DB_PORT', '5433')}/{os.getenv('DB_NAME', 'audiotours')}"
+            _db_url = _news_db_url()
             from news_cache_layer1 import get_cached_news
             _cache_result = get_cached_news(article_text, major_points_count, _db_url)
             if _cache_result is not None:
@@ -430,7 +444,7 @@ def generate_news():
         # ── CACHE STORE ──────────────────────────────────────────────────────
         # Store the freshly generated article in the cache for future hits.
         try:
-            _db_url = f"postgresql://{os.getenv('DB_USER', 'admin')}:{os.getenv('DB_PASSWORD', 'password123')}@{os.getenv('DB_HOST', 'localhost')}:{os.getenv('DB_PORT', '5433')}/{os.getenv('DB_NAME', 'audiotours')}"
+            _db_url = _news_db_url()
             from news_cache_layer1 import store_news
             store_news(
                 article_text=article_text,

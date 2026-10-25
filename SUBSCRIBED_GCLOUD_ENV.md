@@ -91,7 +91,7 @@ DB_USER GCP_PROJECT_ID PORT`, plus:
 | `USER_API_URL` | `https://user-api-subscribed-<proj>.run.app` | internal |
 | `TOUR_UPDATE_URL` / `TOUR_WORKER_URL` | internal URLs | if worker split is used |
 | `COORDINATES_URL` | internal URL | optional |
-| `JOB_STORE_MODE` | `db` (cloud) | not in-memory on Cloud Run |
+| `JOB_STORE_MODE` | `database` (cloud; job_store.py accepts only 'database'/'memory') | not in-memory on Cloud Run |
 | `GENERATION_MODE` | as storied | — |
 | `CLOUD_TASKS_QUEUE` / `CLOUD_TASKS_LOCATION` / `WORKER_SERVICE_ACCOUNT` | if Cloud Tasks worker split enabled | optional |
 | **`L2_SEAT_JOB_ENABLED`** | `true` | **Required for L2 seats.** Enables the in-process L2 seat offer loop (`l2_seat_job.py`). When off, seats are never offered. |

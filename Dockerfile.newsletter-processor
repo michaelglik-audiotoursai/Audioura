@@ -4,7 +4,7 @@ WORKDIR /app
 
 # cryptography: /submit_credentials decryption imports it lazily, so omitting it gives
 # a container that starts cleanly and fails only at request time (ClickUp wdvrday52p).
-RUN pip install flask psycopg2-binary requests beautifulsoup4 'cryptography>=41.0.0'
+RUN pip install flask psycopg2-binary requests beautifulsoup4 'cryptography>=41.0.0' google-cloud-kms
 
 # newsletter_processor_service.py imports seven sibling modules (apple_podcasts_processor,
 # spotify_processor, subscription_detector, dh_service_simple, user_consolidation_service,
@@ -12,7 +12,7 @@ RUN pip install flask psycopg2-binary requests beautifulsoup4 'cryptography>=41.
 # crash-loops on ModuleNotFoundError. An explicit list drifts every time an import is added,
 # which is how this broke — so copy them all, as Dockerfile.cloudrun already does.
 # .dockerignore keeps tests and one-off scripts out of the context.
-COPY *.py .
+COPY *.py ./
 
 EXPOSE 5017
 

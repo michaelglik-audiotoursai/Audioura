@@ -232,12 +232,14 @@ def log_request():
     sys.stdout.flush()
 
 def get_db_connection():
-    """Get database connection"""
+    """Get database connection. [LEAD 2026-10-25, wdvrdaz5vr] Read the DB from env
+    like map_delivery_service.py — the hard-coded Mac host broke /tours-near on GCloud."""
     return psycopg2.connect(
-        host="postgres-2",
-        database="audiotours", 
-        user="admin",
-        password="password123"
+        host=os.getenv('DB_HOST', 'postgres-2'),
+        database=os.getenv('DB_NAME', 'audiotours'),
+        user=os.getenv('DB_USER', 'admin'),
+        password=os.getenv('DB_PASSWORD', 'password123'),
+        port=os.getenv('DB_PORT', '5432')
     )
 
 def _ensure_tour_reports_table(cur):
