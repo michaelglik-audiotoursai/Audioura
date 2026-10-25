@@ -90,9 +90,20 @@ def share_tour():
             import psycopg2 as _pg
             _conn = _pg.connect(DATABASE_URL)
             with _conn.cursor() as _cur:
+                # [LOCAL-765] Never build a share from a Subscribed tour on
+                # storied-side code: after the Subscribed → GCloud move (D708)
+                # this DB is shared and Subscribed rows carry track='subscribed'.
+                # Guard on the column existing (self-heal pattern): absent column
+                # => no Subscribed rows => no-op.
+                _cur.execute("""
+                    SELECT 1 FROM information_schema.columns
+                    WHERE table_name = 'audio_tours' AND column_name = 'track'
+                """)
+                _excl = (" AND (track IS NULL OR track <> 'subscribed')"
+                         if _cur.fetchone() is not None else "")
                 _cur.execute(
                     "SELECT tour_name, request_string, stops_count, tour_content "
-                    "FROM audio_tours WHERE id = %s", (int(audio_tour_id),))
+                    "FROM audio_tours WHERE id = %s" + _excl, (int(audio_tour_id),))
                 _row = _cur.fetchone()
             _conn.close()
             if not _row:

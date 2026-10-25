@@ -110,6 +110,25 @@ def _has_track_column(cur):
     return _TRACK_COLUMN
 
 
+def _exclude_subscribed_sql(cur, column="track"):
+    """[LOCAL-765] SQL fragment that drops track='subscribed' rows.
+
+    Storied/Beta code must NEVER serve or list a Subscribed tour: after the
+    Subscribed → GCloud move (D708), Subscribed shares this database and writes
+    track='subscribed'. Every storied-side read on audio_tours ANDs this in.
+
+    Returns an empty string when the track column does not exist — on such a DB
+    nothing subscribed has ever been written, so there is nothing to exclude,
+    and an unguarded reference would 500 the endpoint for Beta and Storied
+    alike (same reasoning as _has_track_column). Otherwise returns a predicate
+    that keeps NULL (legacy, pre-track rows = Beta) and any non-'subscribed'
+    track, and drops 'subscribed'. Caller must prefix with ' AND '.
+    """
+    if not _has_track_column(cur):
+        return ""
+    return f"({column} IS NULL OR {column} <> 'subscribed')"
+
+
 def calculate_distance(lat1, lng1, lat2, lng2):
     """Calculate distance between two points in kilometers"""
     R = 6371
@@ -175,13 +194,20 @@ def get_tours_near_location(lat, lng):
             -- The is_test / original_tour_id filters are STORIED-ONLY and are kept
             -- deliberately: main has never had them, and dropping them here would
             -- make Storied start listing translations and test tours.
+            --
+            -- [LOCAL-765] The track exclusion below drops track='subscribed' rows:
+            -- Storied/Beta must never LIST a Subscribed tour on the shared DB.
             SELECT id, tour_name, request_string, lat, lng, number_requested,
-                   %s AS track
+                   {track_col} AS track
             FROM audio_tours 
             WHERE lat IS NOT NULL AND lng IS NOT NULL
               AND (is_test IS NOT TRUE)
               AND original_tour_id IS NULL
-        """ % ("COALESCE(track, 'beta')" if _has_track_column(cur) else "'beta'"))
+              {exclude_subscribed}
+        """.format(
+            track_col=("COALESCE(track, 'beta')" if _has_track_column(cur) else "'beta'"),
+            exclude_subscribed=(("AND " + _exclude_subscribed_sql(cur)) if _has_track_column(cur) else ""),
+        ))
         
         tours = cur.fetchall()
         nearby_tours = []
@@ -267,7 +293,14 @@ def resolve_tour_id(download_id):
         
         conn = get_db_connection()
         cur = conn.cursor()
-        cur.execute("SELECT id, tour_name, tour_blob_uri FROM audio_tours WHERE id = %s AND (audio_tour IS NOT NULL OR tour_blob_uri IS NOT NULL)", (int(download_id),))
+        # [LOCAL-765] exclude track='subscribed' so resolving a Subscribed id
+        # returns no row -> the 404 below.
+        _excl = _exclude_subscribed_sql(cur)
+        cur.execute(
+            "SELECT id, tour_name, tour_blob_uri FROM audio_tours "
+            "WHERE id = %s AND (audio_tour IS NOT NULL OR tour_blob_uri IS NOT NULL)"
+            + (" AND " + _excl if _excl else ""),
+            (int(download_id),))
         result = cur.fetchone()
         cur.close()
         conn.close()
@@ -323,11 +356,14 @@ def download_tour(tour_id):
                 return jsonify({'error': 'Custom tour not found'}), 404
         else:
             # Regular tour — dual-read: R2 if tour_blob_uri set, else BYTEA
+            # [LOCAL-765] exclude track='subscribed' so downloading a Subscribed
+            # id finds no row -> the 404 below (never serve a Subscribed tour).
+            _excl = _exclude_subscribed_sql(cur)
             cur.execute("""
                 SELECT tour_name, audio_tour, request_string, tour_blob_uri
                 FROM audio_tours 
                 WHERE id = %s AND (audio_tour IS NOT NULL OR tour_blob_uri IS NOT NULL)
-            """, (int(tour_id),))
+                """ + (" AND " + _excl if _excl else ""), (int(tour_id),))
             
             result = cur.fetchone()
             
@@ -412,13 +448,16 @@ def search_tours():
         
         if query:
             # Search original tours
+            # [LOCAL-765] exclude track='subscribed': search must never return a
+            # Subscribed tour on the shared DB.
+            _excl = _exclude_subscribed_sql(cur)
             cur.execute("""
                 SELECT id, tour_name, request_string, lat, lng, number_requested
                 FROM audio_tours 
                 WHERE (LOWER(tour_name) LIKE LOWER(%s) OR LOWER(request_string) LIKE LOWER(%s))
                 AND lat IS NOT NULL AND lng IS NOT NULL
                 AND (is_test IS NOT TRUE)
-            """, (f'%{query}%', f'%{query}%'))
+                """ + (" AND " + _excl if _excl else ""), (f'%{query}%', f'%{query}%'))
             
             tours = cur.fetchall()
             
@@ -491,10 +530,12 @@ def get_tour_version(tour_id):
         conn = get_db_connection()
         cur = conn.cursor()
         
+        # [LOCAL-765] exclude track='subscribed' (version-check of a Subscribed id -> 404).
+        _excl = _exclude_subscribed_sql(cur)
         cur.execute("""
             SELECT id, tour_name FROM audio_tours 
             WHERE id = %s AND (audio_tour IS NOT NULL OR tour_blob_uri IS NOT NULL)
-        """, (int(tour_id),))
+            """ + (" AND " + _excl if _excl else ""), (int(tour_id),))
         
         result = cur.fetchone()
         if not result:
@@ -533,6 +574,8 @@ def check_multiple_versions():
     try:
         conn = get_db_connection()
         cur = conn.cursor()
+        # [LOCAL-765] exclude track='subscribed' from bulk version checks.
+        _excl = _exclude_subscribed_sql(cur)
         
         for item in data:
             tour_id = item.get('tour_id')
@@ -544,7 +587,7 @@ def check_multiple_versions():
             cur.execute("""
                 SELECT id FROM audio_tours 
                 WHERE id = %s AND (audio_tour IS NOT NULL OR tour_blob_uri IS NOT NULL)
-            """, (int(tour_id),))
+                """ + (" AND " + _excl if _excl else ""), (int(tour_id),))
             
             if cur.fetchone():
                 import time
@@ -578,11 +621,13 @@ def get_tour_info(tour_id):
         conn = get_db_connection()
         cur = conn.cursor()
         
+        # [LOCAL-765] exclude track='subscribed' (tour-info of a Subscribed id -> 404).
+        _excl = _exclude_subscribed_sql(cur)
         cur.execute("""
             SELECT id, tour_name, request_string, lat, lng, number_requested
             FROM audio_tours 
             WHERE id = %s
-        """, (tour_id,))
+            """ + (" AND " + _excl if _excl else ""), (tour_id,))
         
         result = cur.fetchone()
         
@@ -662,10 +707,12 @@ def extract_tour_stops(tour_id):
             WHERE custom_tour_id = %s AND audio_tour IS NOT NULL
         """, (tour_id,))
     else:
+        # [LOCAL-765] exclude track='subscribed' (never extract/edit a Subscribed tour).
+        _excl = _exclude_subscribed_sql(cur)
         cur.execute("""
             SELECT audio_tour, tour_name, tour_blob_uri FROM audio_tours 
             WHERE id = %s AND (audio_tour IS NOT NULL OR tour_blob_uri IS NOT NULL)
-        """, (tour_id,))
+            """ + (" AND " + _excl if _excl else ""), (tour_id,))
     
     result = cur.fetchone()
     if not result:
@@ -766,10 +813,12 @@ def get_tour_edit_info(tour_id):
                 WHERE custom_tour_id = %s AND audio_tour IS NOT NULL
             """, (tour_id,))
         else:
+            # [LOCAL-765] exclude track='subscribed' (edit-info of a Subscribed id -> 404).
+            _excl = _exclude_subscribed_sql(cur)
             cur.execute("""
                 SELECT id, tour_name FROM audio_tours 
                 WHERE id = %s AND (audio_tour IS NOT NULL OR tour_blob_uri IS NOT NULL)
-            """, (int(tour_id),))
+                """ + (" AND " + _excl if _excl else ""), (int(tour_id),))
         
         result = cur.fetchone()
         if not result:
@@ -886,11 +935,13 @@ def create_custom_tour(tour_id):
                 conn.close()
                 return jsonify({'error': 'Original tour not found'}), 404
         else:
+            # [LOCAL-765] exclude track='subscribed' (never clone a Subscribed original).
+            _excl = _exclude_subscribed_sql(cur)
             cur.execute("""
                 SELECT tour_name, request_string, audio_tour, lat, lng, tour_blob_uri
                 FROM audio_tours 
                 WHERE id = %s AND (audio_tour IS NOT NULL OR tour_blob_uri IS NOT NULL)
-            """, (int(tour_id),))
+                """ + (" AND " + _excl if _excl else ""), (int(tour_id),))
             result = cur.fetchone()
             if result:
                 tour_name, request_string, audio_tour, lat, lng, tour_blob_uri = result

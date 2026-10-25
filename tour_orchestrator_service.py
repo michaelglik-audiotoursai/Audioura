@@ -596,13 +596,35 @@ def store_audio_tour(tour_name, request_string, zip_path, lat, lng, tour_content
         # lower(tour_name) WHERE original_tour_id IS NULL.
         # Previously this checked (tour_name, request_string) with case-sensitive match,
         # which diverged from the partial unique index uq_audio_tours_original_name.
-        print(f"Checking if tour already exists (case-insensitive, matching unique index)...")
+        #
+        # [LOCAL-765 / backport of LOCAL-727] NOW ALSO scoped by `track`. `track`
+        # is per-DEPLOYMENT (Beta/Storied/Subscribed are separate services that
+        # each always write their own value) and, after the Subscribed → GCloud
+        # move (D708), all three SHARE one database. Without the track in the key
+        # this lookup reused ANY same-name original — so a Storied store could
+        # match and REPLACE a Subscribed row (collapsing it), and a Storied
+        # listener could be handed a members-only/paid Subscribed tour for free.
+        # Resolve this deployment's own track FIRST (the same TOUR_TRACK value the
+        # INSERT below uses — see the _track block there), normalised to
+        # 'beta'/'storied', and add `AND track = %s`. A different track (notably
+        # 'subscribed') now always falls through to the INSERT = a NEW, separate
+        # row; Storied never reuses it. NOTE (deviation from LOCAL-727 on the
+        # `subscribed` branch): that branch also scoped by creator_user_id (D678);
+        # `storied` has no creator_user_id column in this path, so track is the
+        # only scoping dimension available here. The `track` column is guaranteed
+        # present: it was self-healed above.
+        _lookup_track = os.getenv('TOUR_TRACK', 'beta').lower()
+        if _lookup_track not in ('beta', 'storied'):
+            _lookup_track = 'beta'
+        print(f"Checking if tour already exists (case-insensitive, track-scoped, "
+              f"track={_lookup_track!r}, matching unique index)...")
         cur.execute(
-            "SELECT id FROM audio_tours WHERE lower(tour_name) = lower(%s) AND original_tour_id IS NULL",
-            (tour_name,)
+            "SELECT id FROM audio_tours WHERE lower(tour_name) = lower(%s) "
+            "AND track = %s AND original_tour_id IS NULL",
+            (tour_name, _lookup_track)
         )
         existing_tour = cur.fetchone()
-        print(f"Existing tour (unique-index-aware check): {existing_tour}")
+        print(f"Existing tour (track-scoped check, track={_lookup_track!r}): {existing_tour}")
 
         # [LOCAL-156] If an original tour with this name already exists, reuse it.
         # Increment number_requested and return the existing ID.
@@ -1257,9 +1279,19 @@ def orchestrate_tour_async(job_id, location, tour_type, total_stops, user_id=Non
                     port=os.getenv('DB_PORT', '5432')
                 )
                 cur = conn.cursor()
+                # [LOCAL-765 / backport of LOCAL-727] The re-read MUST be
+                # track-scoped for the same reason the store lookup is: on the
+                # shared GCloud DB (D708) a Beta/Storied/Subscribed row can share
+                # this name, so an unscoped "ORDER BY id DESC LIMIT 1" could pick
+                # the WRONG track's row (e.g. a Subscribed tour) as this job's
+                # english_tour_id. Resolve the same track the store used.
+                _reread_track = os.getenv('TOUR_TRACK', 'beta').lower()
+                if _reread_track not in ('beta', 'storied'):
+                    _reread_track = 'beta'
                 cur.execute(
-                    "SELECT id FROM audio_tours WHERE lower(tour_name) = lower(%s) AND original_tour_id IS NULL ORDER BY id DESC LIMIT 1",
-                    (tour_name,)
+                    "SELECT id FROM audio_tours WHERE lower(tour_name) = lower(%s) "
+                    "AND track = %s AND original_tour_id IS NULL ORDER BY id DESC LIMIT 1",
+                    (tour_name, _reread_track)
                 )
                 result = cur.fetchone()
                 if result:

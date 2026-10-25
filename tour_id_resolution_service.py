@@ -64,15 +64,34 @@ def _resolve_from_column(download_id, conn):
     Returns a result dict or None if column is NULL/missing.
     """
     cur = conn.cursor()
-    cur.execute(
-        "SELECT tour_name, zip_filename FROM audio_tours WHERE id = %s",
-        (int(download_id),)
-    )
-    result = cur.fetchone()
+    # [LOCAL-765] Never resolve a Subscribed tour on storied-side code. After the
+    # Subscribed → GCloud move (D708) this DB is shared and Subscribed rows carry
+    # track='subscribed'. Add the exclusion to the SAME query (no extra round
+    # trip, so a single fetchone() still returns the row) and fall back to the
+    # unscoped query only if the `track` column does not exist yet — on such a DB
+    # nothing Subscribed has ever been written, so there is nothing to exclude.
+    # A SAVEPOINT keeps the caller's transaction usable if the column is absent.
+    import psycopg2 as _pg
+    try:
+        cur.execute("SAVEPOINT local765_track")
+        cur.execute(
+            "SELECT tour_name, zip_filename FROM audio_tours "
+            "WHERE id = %s AND (track IS NULL OR track <> 'subscribed')",
+            (int(download_id),)
+        )
+        result = cur.fetchone()
+        cur.execute("RELEASE SAVEPOINT local765_track")
+    except _pg.errors.UndefinedColumn:
+        cur.execute("ROLLBACK TO SAVEPOINT local765_track")
+        cur.execute(
+            "SELECT tour_name, zip_filename FROM audio_tours WHERE id = %s",
+            (int(download_id),)
+        )
+        result = cur.fetchone()
     cur.close()
 
     if not result:
-        return None  # row does not exist
+        return None  # row does not exist (or is a Subscribed row we must not serve)
 
     tour_name, zip_filename = result
 

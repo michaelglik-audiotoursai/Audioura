@@ -406,8 +406,21 @@ def get_db_connection():
     )
 
 
-# ---------------------------------------------------------------------------
-# Durable edit-blob mapping (GCS-5 gap 4)
+def _exclude_subscribed_sql(cur, column="track"):
+    """[LOCAL-765] ' ...' SQL fragment dropping track='subscribed' rows, or ''
+    when the track column is absent. Storied-side editing must never read a
+    Subscribed tour on the shared GCloud DB (D708). Guarded on the column
+    existing (self-heal pattern): no column => no Subscribed rows => no-op.
+    Returns a fragment that already starts with ' AND ' (empty if no column)."""
+    cur.execute("""
+        SELECT 1 FROM information_schema.columns
+        WHERE table_name = 'audio_tours' AND column_name = 'track'
+    """)
+    if cur.fetchone() is None:
+        return ""
+    return f" AND ({column} IS NULL OR {column} <> 'subscribed')"
+
+
 # ---------------------------------------------------------------------------
 # The save creates a brand-new UUID tour and returns /tour/<new_uuid>/download.
 # In cloud mode the new ZIP lives only in this instance's /tmp and the numeric
@@ -504,7 +517,8 @@ def _get_source_content_language(source_tour_id):
     try:
         cur = conn.cursor()
         cur.execute(
-            "SELECT content_language FROM audio_tours WHERE id = %s",
+            "SELECT content_language FROM audio_tours WHERE id = %s"
+            + _exclude_subscribed_sql(cur),
             (int(resolved_id),))
         row = cur.fetchone()
         cur.close()
@@ -564,13 +578,15 @@ def _resolve_tour_from_db(tour_identifier):
         if tour_identifier.isdigit():
             cur.execute(
                 "SELECT id, tour_name, audio_tour, tour_blob_uri FROM audio_tours "
-                "WHERE id = %s AND (audio_tour IS NOT NULL OR tour_blob_uri IS NOT NULL)",
+                "WHERE id = %s AND (audio_tour IS NOT NULL OR tour_blob_uri IS NOT NULL)"
+                + _exclude_subscribed_sql(cur),
                 (int(tour_identifier),))
         else:
             cur.execute(
                 "SELECT id, tour_name, audio_tour, tour_blob_uri FROM audio_tours "
-                "WHERE tour_name ILIKE %s AND (audio_tour IS NOT NULL OR tour_blob_uri IS NOT NULL) "
-                "ORDER BY id DESC LIMIT 1",
+                "WHERE tour_name ILIKE %s AND (audio_tour IS NOT NULL OR tour_blob_uri IS NOT NULL)"
+                + _exclude_subscribed_sql(cur) +
+                " ORDER BY id DESC LIMIT 1",
                 (f'%{tour_identifier}%',))
 
         result = cur.fetchone()
@@ -633,7 +649,8 @@ def resolve_numeric_to_uuid_directory(tour_id):
     try:
         conn = get_db_connection()
         cur = conn.cursor()
-        cur.execute("SELECT tour_name FROM audio_tours WHERE id = %s", (int(tour_id),))
+        cur.execute("SELECT tour_name FROM audio_tours WHERE id = %s"
+                    + _exclude_subscribed_sql(cur), (int(tour_id),))
         result = cur.fetchone()
         cur.close()
         conn.close()
@@ -2346,8 +2363,11 @@ def promote_custom_tour(tour_id):
                 ensure_tour_scores_table()
 
                 # Fetch original tour_content for delta comparison
+                # [LOCAL-765] exclude track='subscribed' defensively — a
+                # Subscribed original must never be read even for scoring.
                 cur.execute(
-                    "SELECT tour_content, stops_count FROM audio_tours WHERE id = %s",
+                    "SELECT tour_content, stops_count FROM audio_tours WHERE id = %s"
+                    + _exclude_subscribed_sql(cur),
                     (derived_from_tour_id,)
                 )
                 orig_row = cur.fetchone()

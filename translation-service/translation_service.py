@@ -219,13 +219,30 @@ class TranslationService:
             cursor = conn.cursor()
             
             # Get original tour with tour_content
+            # [LOCAL-765] Add `track` (index 11) and EXCLUDE track='subscribed':
+            # a storied/beta translation service must never translate a
+            # Subscribed tour on the shared GCloud DB (D708). The exclusion is
+            # guarded on the column existing (self-heal pattern) so it is a
+            # no-op on a DB that has never had the track column. The selected
+            # track is used below so the TRANSLATION INHERITS THE ORIGINAL'S
+            # TRACK instead of this deployment's env track.
+            cursor.execute("""
+                SELECT 1 FROM information_schema.columns
+                WHERE table_name = 'audio_tours' AND column_name = 'track'
+            """)
+            _has_track = cursor.fetchone() is not None
+            _track_select = "track" if _has_track else "'beta' AS track"
+            _excl = " AND (track IS NULL OR track <> 'subscribed')" if _has_track else ""
             cursor.execute(
-                "SELECT id, tour_name, request_string, audio_tour, number_requested, lat, lng, tour_content, content_language, tour_blob_uri, stops_count FROM audio_tours WHERE id = %s", 
+                "SELECT id, tour_name, request_string, audio_tour, number_requested, lat, lng, "
+                "tour_content, content_language, tour_blob_uri, stops_count, " + _track_select +
+                " FROM audio_tours WHERE id = %s" + _excl,
                 (original_tour_id,)
             )
             original_tour = cursor.fetchone()
             if not original_tour:
-                logging.error(f"Original tour {original_tour_id} not found")
+                logging.error(f"Original tour {original_tour_id} not found "
+                              f"(or is a Subscribed tour, which storied must not translate)")
                 return None, False
             
             tour_content = original_tour[7]  # tour_content column
@@ -344,10 +361,14 @@ class TranslationService:
             
             # Create new tour record
             _original_stops_count = original_tour[10] if len(original_tour) > 10 else None
-            # Track B: this deployment's own track (each of Beta/Storied is a
-            # separate service instance, so a translation always belongs to
-            # whichever track produced it — see tour_orchestrator_service.py).
-            _track = os.getenv('TOUR_TRACK', 'beta').lower()
+            # [LOCAL-765] A translation INHERITS THE ORIGINAL'S TRACK (index 11),
+            # not this deployment's env track: a translation of a Beta tour is a
+            # Beta tour, of a Storied tour a Storied tour. (A Subscribed original
+            # was already refused above, so this is only ever 'beta'/'storied'.)
+            # Normalise defensively; fall back to the env track only if the
+            # original somehow carried no track.
+            _orig_track = original_tour[11] if len(original_tour) > 11 else None
+            _track = (_orig_track or os.getenv('TOUR_TRACK', 'beta') or 'beta').strip().lower()
             if _track not in ('beta', 'storied'):
                 _track = 'beta'
             cursor.execute("""
@@ -1719,7 +1740,12 @@ Say 'What are my options' to hear this help again"""
         try:
             cursor = conn.cursor()
             _fallback_stops_count = original_tour[10] if len(original_tour) > 10 else None
-            _track = os.getenv('TOUR_TRACK', 'beta').lower()
+            # [LOCAL-765] Inherit the original's track (index 11) — same rule as
+            # the main path. original_tour comes from the track-scoped SELECT in
+            # translate_tour_with_audio, so a Subscribed original never reaches
+            # here; fall back to the env track only if track is somehow unset.
+            _orig_track = original_tour[11] if len(original_tour) > 11 else None
+            _track = (_orig_track or os.getenv('TOUR_TRACK', 'beta') or 'beta').strip().lower()
             if _track not in ('beta', 'storied'):
                 _track = 'beta'
             cursor.execute("""
