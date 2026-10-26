@@ -2,6 +2,13 @@ FROM python:3.9-slim
 
 WORKDIR /app
 
+# [wdvrdaz5yt] Paid-API meter + DAILY_PAID_LIMIT_USD, baked in (same as Dockerfile.generator).
+# On the Mac the meter was bind-mounted at /opt/meter, so the missing COPY never showed;
+# on Cloud Run translation ran unmetered and uncapped. The build context is
+# ./translation-service, so a copy of ../_meter lives here; a test keeps them identical.
+COPY _meter/ /opt/meter/
+ENV PYTHONPATH=/opt/meter
+
 # Install system dependencies
 RUN apt-get update && apt-get install -y \
     gcc \
