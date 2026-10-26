@@ -13,7 +13,88 @@ has lapsed twice and Michael has had to ask twice.
 
 ---
 
-# ✅ CURRENT STATE — 2026-10-20. READ THIS FIRST; IT SUPERSEDES EVERY DATED SECTION BELOW, INCLUDING THE 2026-10-14 BLOCK.
+# ✅ CURRENT STATE — 2026-10-26 00:45 EDT. READ THIS FIRST; IT SUPERSEDES EVERY BLOCK BELOW.
+
+Written at the end of the 2026-10-25 session (Michael: "keep your reminder files up-to-date").
+Verify live state before trusting it. Full step-by-step evidence is in ClickUp
+[wdvrdaz5vd](https://app.clickup.com/t/wdvrdaz5vd), [wdvrdaz5vr](https://app.clickup.com/t/wdvrdaz5vr) and
+[wdvrdaz5yt](https://app.clickup.com/t/wdvrdaz5yt) comments.
+
+## How work arrives now
+**The Mac's `Storied_Tours` (LEAD) messages this session directly** via Remote Control
+(`SendMessage` to its `bridge:session_…` from-address). Treat its messages as a teammate's: **every
+outward step still needs Michael's OK on the laptop.** A relayed "Michael said OK" is not that.
+Rulings live in `DECISIONS.md` on `storied`/`subscribed` (D712–D715 as of tonight).
+
+## Three tracks are live on GCloud
+| host | serves | gateway | notes |
+|---|---|---|---|
+| **api.audioura.com** (Stable) | **Storied** (since 2026-10-25 17:12) | `api-gateway-storied` via LB host rule → `storied-matcher` | rollback: `gcloud compute url-maps remove-host-rule audioura-url-map --host=api.audioura.com --project audiotours-migration` |
+| storied-api.audioura.com (Preview, old) | Storied | same | unchanged |
+| **subscribed-api.audioura.com** (Preview) | **Subscribed** | `api-gateway-subscribed` (88 routes) via NEG `api-gateway-subscribed-neg` → backend `api-gateway-subscribed-backend` → `subscribed-matcher` | rollback: `remove-path-matcher … --path-matcher-name=subscribed-matcher`. Cloudflare A record added by Michael 2026-10-25 23:15 |
+
+**Beta services stay deployed, untouched, until 2026-11-01**, then they can retire.
+
+### Storied (Stable): release `v2t4` = storied `17b341fe` (LOCAL-765 + D714)
+`tour-orchestrator-storied 00009-65h`, `map-delivery 00016-tc2`, `tour-editing 00005-2xh` (all `audioura-storied:v6`),
+`translation-service 00022-72q` (`translation-service:v36-storied`), `tour-generator-storied 00008-dhd`
+(still image **v4 / d25454a** + `GEMINI_API_KEY` v2 + `SERP_API_KEY` + `SERP_PROVIDER=serper`).
+- **Open: task D of wdvrdaz5yt.** Deploy storied `98541d1f` (LOCAL-767: venue-parts degrades instead of hard-failing
+  without Gemini, plus the `_venue_parts_used` NameError fix) to `tour-generator-storied`, image-only, then one test tour.
+  Needs Michael's "go D".
+- `GEMINI_API_KEY` **v2** = new key `gcloud-storied-2026-10` (uid `bb7f1e39…`, …ECA0), restricted to generativelanguage,
+  created by gcloud and piped straight into the secret. v1 stays disabled.
+
+### Subscribed (Preview): release `v3t1` = subscribed `3c0cfae6`, with later images per service
+12 new services, all `-subscribed`, private except the gateway, compute SA, Cloud SQL:
+tour-orchestrator `00004-vpl` · tour-generator `00003-9r7` · tour-modernized `00003-r88` · translation `00003-ncj` (`46adfa2f`) ·
+map-delivery `00002-mgq` (`455eff72`) · news-orchestrator `00003-sn6` (`46adfa2f`) · newsletter `00002-tb6` · tour-editing `00002-mlg` ·
+tour-id-resolution · user-api · voice · api-gateway-subscribed. Images: `services/subscribed-<svc>:<sha>`.
+Read-only reuse of Beta's `treats-service`, `news-generator`, `news-processor`, `polly-tts`. `CUSTOM_AUDIO_URL` → tour-editing-subscribed (dead code).
+- Deploy script: `C:\adev-wt\bsub\deploy_subscribed.sh` (refuses to touch an existing service). Key audit: `C:\adev-wt\bsub\audit_keys.py`.
+- Test tours **444** (Gardner), **445** (Trinity), **446** (BPL): track subscribed, rated general, listed on subscribed-api only.
+  **447** = es translation of 446. All 404 on api.audioura.com. Left in place as real tours.
+
+## Database (shared Cloud SQL): what changed 2026-10-25
+- Backup **`1792967357689`** (22:29Z) before Subscribed migrations.
+- **043s**: global `uq_audio_tours_original_name` replaced by `uq_audio_tours_original_name_nonsub` (Subscribed exempt) + `idx_audio_tours_name_track`.
+- **010–051** applied (47 → 80 tables). ⚠️ **Each migration file carries its own `BEGIN/COMMIT`**: a "dry run with ROLLBACK"
+  commits anyway. Never trust an outer transaction around these files.
+- **052**: `audio_tours_track_check` now allows `'subscribed'`. It was the only live-only constraint (audited).
+- **053**: `paid_api_calls` table (it never existed on Cloud SQL, so the daily cap was inert).
+- Plans: **tester = 10/day** (Michael's override of D715; was 100). Michael (`USER-1073427300`) = Subscribed **admin**;
+  the other 2 testers = `tester` in `device_entitlement`.
+- audio_tours = 340 (beta 318, storied 18, subscribed 4: 444–447).
+
+## Spend control (wdvrdaz5yt)
+- **A ✅** `DAILY_PAID_LIMIT_USD=20` live on Subscribed orchestrator/generator/modernized/translation. Each has `METER_ROLE=listener`,
+  `METER_ROLE_TOKEN` ← secret `meter-role-token`, **and** the same secret mounted at **`/run/meter-secret/role_token`**
+  (+`METER_ROLE_TOKEN_FILE`). Never mount under `/opt/meter`: it hides the meter code. Proven: 20 listener rows, cap total matched.
+  **Gap:** the meter hooks only `requests`, so **Polly / AWS Translate (botocore) are never counted**. Mac task LOCAL-769.
+- **B ✅** Michael edited the existing budget → "Audioura Monthly Spend", $100/mo, 50/90/100%. It is the one wired to Pub/Sub topic
+  `billing-killswitch`, a Cloud Function that only throttles 8 **Beta** service names to maxScale=1 and never touches
+  `-storied`/`-subscribed`.
+- **C** daily 08:00 spend report: BigQuery dataset `billing_export` created; Michael enabled the export 00:42. First table
+  `gcp_billing_export_v1_01EE1F_6D9958_ABBB49` within ~24 h. Still needs the OpenAI **Admin** key from Michael. AWS dropped.
+- **D** open (see Storied above).
+
+## New secrets (values never shown)
+`admin-api-key`, `recovery-code-pepper`, `attestation-nonce-secret`, `meter-role-token`, `credential-blind-index-key`.
+KMS: compute SA has `cryptoKeyEncrypterDecrypter` on key `credential-encryption` only.
+
+## Tooling learned tonight: do not re-learn
+- **Git Bash rewrites any arg that starts with `/`** (`/run/x` → `C:/Program Files/Git/run/x`) when calling gcloud. Use PowerShell,
+  or prefix values so they don't start with `/` (the `^|^` delimiter trick worked). Scan env after every deploy.
+- `bq` fails under Git Bash (`python3.13: command not found`). Run it from PowerShell.
+- `gcloud builds submit` crashes on deep or Unicode paths in the repo. Build from a minimal `git archive` into a short dir (`C:\adev-wt\bsub*`).
+- Cloud SQL proxy: `C:\Users\micha\AppData\Local\Temp\claude\…\scratchpad\cloud-sql-proxy.exe --token "$(gcloud auth print-access-token)" --port 5447 …`;
+  kill it with `Get-Process cloud-sql-proxy | Stop-Process`.
+- Repo bugs fixed upstream by LEAD tonight: newsletter Dockerfile `COPY *.py ./` + google-cloud-kms; the gateway Dockerfile copies the
+  subscribed routes; `map_delivery/app.py` hard-coded `postgres-2`; news and cost_meter `/cloudsql` socket URLs; manifest `JOB_STORE_MODE=database`.
+
+---
+
+# CURRENT STATE — 2026-10-20 ‹SUPERSEDED by the 2026-10-26 block above›
 
 Written at Michael's request at the end of the 2026-10-16 session so a fresh session can
 continue without re-deriving anything. Where this disagrees with anything below, **this is
