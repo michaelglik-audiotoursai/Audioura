@@ -212,6 +212,107 @@ def _anthropic_cost(model, usage):
     cached = usage.get("cache_read_input_tokens") or 0
     return (pt * i + cached * c + ct * o) / 1e6, key
 
+# --------------------------------------------------------------------------- #
+# botocore (AWS Polly, AWS Translate)  [LOCAL-769]
+#
+# WHY A SEPARATE PATH: the requests/urllib/httpx/aiohttp patches in install()
+# never see a boto3 call — botocore ships its own vendored urllib3 and does not
+# go through any of those clients. So Polly SynthesizeSpeech /
+# StartSpeechSynthesisTask and Translate TranslateText wrote ZERO paid_api_calls
+# rows on every service (GCloud_Storied wdvrdaz5yt, tour 446 -> es).
+# check_daily_limit() already ran before these calls (LOCAL-673) so the cap could
+# STOP them, but their cost never counted toward it and Michael's spend report
+# missed them. This closes the gap.
+#
+# WHERE WE PATCH: botocore.client.BaseClient._make_api_call (see install()). That
+# is the ONE choke point every operation of every boto3 client passes through —
+# sync, retried or not — so a single patch covers Polly, its async long-form
+# StartSpeechSynthesisTask, and Translate, on every client created before or after
+# install(), with the request params AND the parsed response in hand. Registering
+# per-service `after-call` event handlers would instead need hooking each client's
+# event system via create_client, missing clients already built — _make_api_call
+# is simpler and strictly more robust.
+#
+# BILLED CHARACTERS: AWS bills Polly and Translate per CHARACTER of the input text
+# (Polly counts SSML tags too, and reports the exact figure as RequestCharacters
+# in the response — we prefer it and fall back to len(Text)). Translate bills the
+# source characters, len(Text). A non-200 / exception costs $0 (we were not
+# billed) but still writes a row so failures are visible.
+# --------------------------------------------------------------------------- #
+def _polly_engine(params):
+    """Lowercase Polly Engine from the request params; defaults to 'neural' (the
+    deployed English voices). Never raises."""
+    try:
+        return ((params or {}).get("Engine") or "neural").strip().lower()
+    except Exception:
+        return "neural"
+
+
+def _boto_billed_chars(kind, params, response):
+    """Characters AWS bills for this call. Polly reports the exact figure as
+    RequestCharacters (SSML tags included); we prefer it and fall back to the
+    input Text length. Translate bills the source Text length. Never raises."""
+    try:
+        if kind == "polly":
+            rc = (response or {}).get("RequestCharacters")
+            if isinstance(rc, (int, float)) and rc >= 0:
+                return int(rc)
+            return len((params or {}).get("Text") or "")
+        if kind == "aws_translate":
+            return len((params or {}).get("Text") or "")
+    except Exception:
+        pass
+    return 0
+
+
+def _boto_cost(kind, chars, params):
+    """USD for `chars` billed characters of a Polly / Translate call, priced from
+    cost_rates (imported softly so a missing rate table never breaks TTS). Polly
+    is priced by its Engine; Translate at the per-character rate. Returns
+    (usd, model_str). Never raises -> (None, model)."""
+    model = ""
+    try:
+        if kind == "polly":
+            engine = _polly_engine(params)
+            voice = (params or {}).get("VoiceId") or ""
+            model = "%s/%s" % (engine, voice) if voice else engine
+            import cost_rates
+            return cost_rates.tts_cost(chars, engine=engine), model
+        if kind == "aws_translate":
+            model = "translate"
+            import cost_rates
+            return chars * cost_rates.AWS_TRANSLATE_COST_PER_CHAR, model
+    except Exception:
+        pass
+    return None, model
+
+
+def _record_boto(url, kind, status, operation, params, response):
+    """[LOCAL-769] Write exactly one paid_api_calls row for a boto3 Polly/Translate
+    call. Mirrors _record's row shape (ts, kind, status, service, caller, role,
+    url, job, usd) plus model and billed `chars`, and reuses the same JSONL log
+    and _db_write. Fail-open throughout: any error is captured on the row, never
+    raised into the caller."""
+    rec = {"ts": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()), "kind": kind,
+           "status": status, "rate_tag": RATE_TAG, "service": SERVICE,
+           "caller": _caller(), "url": (url or "").split("?")[0][-120:],
+           "operation": operation, "job": os.environ.get("METER_JOB", ""),
+           "role": _meter_role(), "usd": None}
+    try:
+        chars = _boto_billed_chars(kind, params, response)
+        usd, model = _boto_cost(kind, chars, params)
+        rec.update(model=model, chars=chars, usd=usd if status == 200 else 0.0)
+    except Exception as e:
+        rec["meter_error"] = str(e)[:120]
+    try:
+        os.makedirs(os.path.dirname(LOG), exist_ok=True)
+        with _lock, open(LOG, "a") as f:
+            f.write(json.dumps(rec, default=str) + "\n")
+    except Exception:
+        pass
+    _db_write(rec)
+
+
 def _record(url, status, body, req_body=None):
     kind = _host_kind(url)
     if not kind: return
@@ -650,5 +751,92 @@ def install():
                 pass
             return resp
         aiohttp.ClientSession._request = _aiohttp_request
+    except Exception:
+        pass
+    # ----------------------------------------------------------------------- #
+    # botocore (AWS Polly, AWS Translate)  [LOCAL-769]
+    #
+    # boto3 does NOT use requests/urllib/httpx/aiohttp — botocore has its own
+    # vendored urllib3 stack, so none of the patches above ever saw a Polly or
+    # Translate call. We patch botocore.client.BaseClient._make_api_call, the one
+    # choke point every operation of every client passes through (see the block
+    # comment on _record_boto for the full rationale and why this beats per-service
+    # after-call event handlers).
+    #
+    # The operation name is PascalCase (SynthesizeSpeech, StartSpeechSynthesisTask,
+    # TranslateText); `api_params` holds the input (Text, Engine, VoiceId, …) and
+    # the return value is the parsed response dict (with RequestCharacters for
+    # Polly and ResponseMetadata.HTTPStatusCode when a real HTTP layer ran). We
+    # derive kind from the client's endpoint host via the existing _host_kind, so
+    # only Polly / Translate are metered and every other AWS service is ignored.
+    #
+    # Fail-open and non-blocking exactly like the other clients: check_daily_limit()
+    # runs BEFORE the call (it may raise DailyPaidLimitExceeded, the intended STOP,
+    # or fail open), the call itself is never altered, and recording never raises.
+    # The response's AudioStream is NEVER read (that would consume the caller's
+    # stream) — chars come from RequestCharacters or len(Text).
+    # ----------------------------------------------------------------------- #
+    try:
+        import botocore.client as _bcli
+
+        def _boto_kind(client):
+            """'polly' / 'aws_translate' / None for a boto3 client, via the same
+            _host_kind the network patches use (endpoint host), with a service-name
+            fallback. Never raises."""
+            try:
+                url = getattr(getattr(client, "meta", None), "endpoint_url", "") or ""
+                k = _host_kind(url)
+                if k:
+                    return k
+            except Exception:
+                pass
+            try:
+                svc = client._service_model.service_name
+                if svc == "polly":
+                    return "polly"
+                if svc == "translate":
+                    return "aws_translate"
+            except Exception:
+                pass
+            return None
+
+        _orig_make_api_call = _bcli.BaseClient._make_api_call
+
+        def _make_api_call(self, operation_name, api_params):
+            kind = _boto_kind(self)
+            # Enforce the daily limit BEFORE the paid call (may raise the STOP, or
+            # fail open). Non-paid AWS services are never checked or recorded.
+            if kind:
+                check_daily_limit()
+            try:
+                response = _orig_make_api_call(self, operation_name, api_params)
+            except Exception as e:
+                # Record a failed paid call at $0 so it is still visible, then
+                # re-raise unchanged — the meter must never swallow a boto error.
+                if kind:
+                    try:
+                        code = 0
+                        resp = getattr(e, "response", None)
+                        if isinstance(resp, dict):
+                            code = (resp.get("ResponseMetadata") or {}).get(
+                                "HTTPStatusCode", 0) or 0
+                        url = getattr(getattr(self, "meta", None), "endpoint_url", "")
+                        _record_boto(url, kind, code, operation_name, api_params, None)
+                    except Exception:
+                        pass
+                raise
+            if kind:
+                try:
+                    status = (response.get("ResponseMetadata") or {}).get(
+                        "HTTPStatusCode", 200) if isinstance(response, dict) else 200
+                    # A stubbed/successful response with no ResponseMetadata is a
+                    # 200 (the call returned normally).
+                    status = status or 200
+                    url = getattr(getattr(self, "meta", None), "endpoint_url", "")
+                    _record_boto(url, kind, status, operation_name, api_params, response)
+                except Exception:
+                    pass
+            return response
+        _bcli.BaseClient._make_api_call = _make_api_call
     except Exception:
         pass
