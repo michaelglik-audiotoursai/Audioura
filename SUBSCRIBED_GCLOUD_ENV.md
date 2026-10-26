@@ -45,7 +45,7 @@ the **Secret Manager secret NAME** (never a secret value).
 | `DB_HOST=postgres-2`, `DB_PASSWORD=password123` (compose default) | Docker-network host + throwaway dev password | Cloud SQL via `--add-cloudsql-instances`; `DB_PASSWORD` from Secret Manager |
 | `*_URL=http://subscribed-…-204:50xx` / `http://host.docker.internal:…` | Docker-network / host-loopback names | Private Cloud Run `https://…-subscribed-<proj>.run.app` URLs |
 | `PAID_API_LOG=/meterlogs/paid_api_calls.jsonl` (`_meter/paid_api_meter.py:10`) | `/meterlogs` is a host bind-mount | Leave unset → the meter logs to the default path in the container's ephemeral FS, or point at a mounted volume; the DB ledger is the source of truth, not this file |
-| `METER_ROLE_TOKEN_FILE=/…/token` bind-mount | Host file bind-mount | `--update-secrets METER_ROLE_TOKEN_FILE=meter-role-token:latest` mounted as a secret file, OR set `METER_ROLE_TOKEN` from a secret |
+| `METER_ROLE_TOKEN_FILE=/…/token` bind-mount | Host file bind-mount | BOTH are required (the code compares them): `METER_ROLE_TOKEN` env from secret `meter-role-token`, AND the same secret mounted as a file `--update-secrets /opt/meter/role_token=meter-role-token:latest` with `METER_ROLE_TOKEN_FILE=/opt/meter/role_token`. Without both, no row is 'listener' and DAILY_PAID_LIMIT_USD counts nothing. Table `paid_api_calls` comes from migration 053. |
 | `ATTESTATION_NONCE_SECRET=default-nonce-hmac-key-change-in-prod` (gateway default) | Dev placeholder | MUST be a real secret in prod (`attestation-nonce-secret`) |
 | `GATEWAY_API_KEY=test-api-key` (compose default) | Dev placeholder | Secret `gateway-api-key` |
 | `AWS_ACCESS_KEY_ID=test` / `…=test` (compose) | Fake AWS creds for local Polly stub | Real AWS creds from secrets (Polly/Comprehend) |
