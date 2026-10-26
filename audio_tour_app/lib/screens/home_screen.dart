@@ -1978,15 +1978,10 @@ class _HomeScreenState extends State<HomeScreen> {
   /// [LOCAL-677C / D654] The /download-tour URL carrying the device user_id so
   /// the server can decide the pay-before-download gate (unlock / grandfather /
   /// curator). Without this the server would treat the request as anonymous and
-  /// 402 even a tour the device already owns.
-  Future<Uri> _downloadTourUri(int tourId) async {
-    final prefs = await SharedPreferences.getInstance();
-    final userId = prefs.getString('user_id') ?? '';
-    final uri = await Endpoints.url(Service.mapDelivery, '/download-tour/$tourId');
-    final params = Map<String, String>.from(uri.queryParameters);
-    if (userId.isNotEmpty) params['user_id'] = userId;
-    return uri.replace(queryParameters: params.isEmpty ? null : params);
-  }
+  /// 402 even a tour the device already owns. [LOCAL-780] Delegates to the ONE
+  /// shared builder so Home and the Generate screen attach user_id identically.
+  Future<Uri> _downloadTourUri(int tourId) async =>
+      Endpoints.downloadTourUrl(tourId);
 
   /// [LOCAL-693B / D660 LEAD] Report a FAILED paid download so the server
   /// RESTORES the purchase once. Consumption is decided SERVER-SIDE now (the

@@ -31,6 +31,17 @@ class TourTranslationHelper {
     return val == true || val == 'true';
   }
 
+  /// [LOCAL-780] The message shown when the non-English download failed on the
+  /// Generate screen and the app falls back to playing the English copy, so the
+  /// listener is never left with silence and no explanation. Names the language
+  /// in full (e.g. "Russian") from [TourTranslationHelper.availableLanguages],
+  /// falling back to the upper-cased code for an unknown one. PURE so the one
+  /// wording is asserted in a test and reused from the screen.
+  static String translationFallbackMessage(String langCode) {
+    final name = availableLanguages[langCode] ?? langCode.toUpperCase();
+    return "Couldn't download the $name version — showing English.";
+  }
+
   /// [LOCAL-677B / D653] Should the ENGLISH tour be pulled to the phone?
   /// English is downloaded only when it is a selected language. A null
   /// selection means the default (English only). The server may still use
@@ -102,14 +113,12 @@ class TourTranslationHelper {
               // [LOCAL-677C / D654] Carry user_id so the server gate decides
               // the PER-LANGUAGE pay-before-download (D653): a paid translation
               // the device has not unlocked is refused here with 402 and the
-              // language is reported as a failure (never a crash).
+              // language is reported as a failure (never a crash). [LOCAL-780]
+              // Built by the ONE shared helper so the user_id is always
+              // attached (the same fix the Generate screen needed).
               final tprefs = await SharedPreferences.getInstance();
               final tUserId = tprefs.getString('user_id') ?? '';
-              final baseTranslatedUri = await Endpoints.url(Service.mapDelivery, '/download-tour/$translatedId');
-              final tParams = Map<String, String>.from(baseTranslatedUri.queryParameters);
-              if (tUserId.isNotEmpty) tParams['user_id'] = tUserId;
-              final translatedUri = baseTranslatedUri.replace(
-                  queryParameters: tParams.isEmpty ? null : tParams);
+              final translatedUri = await Endpoints.downloadTourUrl(translatedId);
               final translatedResponse = await http.get(translatedUri, headers: await Endpoints.apiHeaders(Service.mapDelivery)).timeout(const Duration(seconds: 120));
               if (translatedResponse.statusCode == 200) {
                 final prefs = await SharedPreferences.getInstance();
