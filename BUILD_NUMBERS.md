@@ -44,7 +44,9 @@ top of +21 on either system."*
 | 77 | Android | 2.4.31 | `6d6aeed7` (subscribed; `APP_TRACK=subscribed`, host subscribed-api.audioura.com) | **LIVE on Play Internal testing**, released 2026-10-26 11:24 EDT, for Michael's Pixel-7 run-through (wdvrdaz64g). Billing 8.0.0. Known first-launch setState crash → LOCAL-773; testers get the next build | 2026-10-26 |
 | 78 | Android | 2.4.32 | `d27d06e4` (subscribed; `APP_TRACK=subscribed`, host subscribed-api.audioura.com) | **LIVE on Play Internal testing** 2026-10-26 14:00 EDT, installed on Michael's Pixel-7 from the Play Store (wdvrdaz67k). Billing 8.0.0, upload key B3:AB:E5…3A:64. Emulator fresh install: banner `AUDIOURA v2.4.32+78`, 0 `Null check operator`, app traffic only to api-gateway-subscribed | 2026-10-26 |
 | 79 | iOS | 2.4.32 | `d27d06e4` (subscribed; `APP_TRACK=subscribed`, GATEWAY_API_KEY) | **uploaded to TestFlight** 2026-10-26 13:38 by LEAD on the Mac. First Subscribed TestFlight build. Signed manually with the new App Store profile `Audioura AppStore 2026-10-26 assoc-domains` (uuid 4d428427…, created via the ASC API; the old profile lacked Associated Domains and Xcode has no signed-in account) | 2026-10-26 |
-| 80 | — | — | — | **NEXT** | — |
+| 80 | iOS | 2.4.33 | `b2d1242e` (subscribed; APP_TRACK=subscribed) | **uploaded to TestFlight** 2026-10-26 by LEAD: LOCAL-774 Free refusal dialog, LOCAL-780 download user_id + instant play of the translated copy (plus 773 from 79). Same manual profile as 79 | 2026-10-26 |
+| 81 | Android | 2.4.33 | `b2d1242e` (subscribed) | **RESERVED** for GCloud_Storied (wdvrdaz6cz) | 2026-10-26 |
+| 82 | — | — | — | **NEXT** | — |
 
 ## Why 20 and 21 differ across platforms
 
