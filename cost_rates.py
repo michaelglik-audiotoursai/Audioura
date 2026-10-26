@@ -231,14 +231,42 @@ def preflight_cost(num_queries: int = 0, input_tokens: int = 0,
 
 # --- TTS (AWS Polly) ---
 # Source: https://aws.amazon.com/polly/pricing/
-# Read: 2026-08-06
-# Standard voices: $4.00 per 1M characters
-# Neural voices: $16.00 per 1M characters
+# Read: 2026-08-06 (standard/neural); re-verified 2026-10-26 (LOCAL-769) and
+# extended with the Long-Form and Generative engines, which the price page lists
+# alongside Standard/Neural:
+#   Standard  voices: $4.00   per 1M characters
+#   Neural    voices: $16.00  per 1M characters
+#   Long-Form voices: $100.00 per 1M characters
+#   Generative voices: $30.00 per 1M characters
+# (page text 2026-10-26: "Standard voices are priced at $4.00 per 1 million
+# characters … Neural voices … $16.00 … Long-Form voices … $100.00 … Generative
+# voices … $30 per 1 million characters".)
 # Neural voices used: Joanna, Matthew, Amy, Brian (see polly_tts_service.py:124,136)
 POLLY_STANDARD_COST_PER_1M_CHARS = 4.00
 POLLY_NEURAL_COST_PER_1M_CHARS = 16.00
+# [LOCAL-769] Long-form and generative engines. The deployed path uses neural /
+# standard today, but the botocore meter (_meter/paid_api_meter.py) prices a call
+# by its Engine, so every engine Polly can bill must have a rate here — otherwise
+# a long-form or generative call would be metered at $0 and silently escape the
+# daily cap and Michael's spend report (the exact gap LOCAL-769 closes).
+POLLY_LONGFORM_COST_PER_1M_CHARS = 100.00
+POLLY_GENERATIVE_COST_PER_1M_CHARS = 30.00
 POLLY_STANDARD_COST_PER_CHAR = POLLY_STANDARD_COST_PER_1M_CHARS / 1_000_000  # $0.000004
 POLLY_NEURAL_COST_PER_CHAR = POLLY_NEURAL_COST_PER_1M_CHARS / 1_000_000  # $0.000016
+POLLY_LONGFORM_COST_PER_CHAR = POLLY_LONGFORM_COST_PER_1M_CHARS / 1_000_000  # $0.0001
+POLLY_GENERATIVE_COST_PER_CHAR = POLLY_GENERATIVE_COST_PER_1M_CHARS / 1_000_000  # $0.00003
+
+# [LOCAL-769] Polly Engine name (lowercase, as the SynthesizeSpeech `Engine`
+# param / the meter passes) -> $ per character. The meter looks a call's Engine up
+# here; an unknown/absent engine falls back to the neural rate (the common
+# deployed voice), which never under-bills standard.
+POLLY_COST_PER_CHAR_BY_ENGINE = {
+    "standard": POLLY_STANDARD_COST_PER_CHAR,
+    "neural": POLLY_NEURAL_COST_PER_CHAR,
+    "long-form": POLLY_LONGFORM_COST_PER_CHAR,
+    "longform": POLLY_LONGFORM_COST_PER_CHAR,
+    "generative": POLLY_GENERATIVE_COST_PER_CHAR,
+}
 
 # Legacy single-rate constant — kept for existing callers (uses standard rate)
 POLLY_COST_PER_1M_CHARS = 4.00
@@ -335,14 +363,17 @@ def tts_cost(char_count: int, engine: str = "standard") -> float:
 
     Args:
         char_count: Number of characters submitted to Polly.
-        engine: 'neural' or 'standard'. Defaults to 'standard'.
+        engine: Polly engine name. One of 'standard', 'neural', 'long-form'
+            (alias 'longform'), or 'generative'. Defaults to 'standard'.
+            [LOCAL-769] An unrecognised engine falls back to the neural rate
+            (the common deployed voice); this never under-bills a standard call.
 
     Returns:
         Cost in USD.
     """
-    if engine == "neural":
-        return char_count * POLLY_NEURAL_COST_PER_CHAR
-    return char_count * POLLY_STANDARD_COST_PER_CHAR
+    per_char = POLLY_COST_PER_CHAR_BY_ENGINE.get(
+        (engine or "").strip().lower(), POLLY_NEURAL_COST_PER_CHAR)
+    return char_count * per_char
 
 
 DEPLOYED_TRANSLATION_PASSES = 1
