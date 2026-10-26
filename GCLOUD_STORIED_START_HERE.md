@@ -45,7 +45,7 @@ tour-generator-storied --to-revisions=tour-generator-storied-00008-dhd=100 --reg
   track storied, $0.0428): venue-parts ran with `GEMINI key present=True`, LOCAL-275 closing offer ran, 0 tracebacks; download 200
   with `audio_1.mp3`; listed on api.audioura.com. Left in place as a real tour.
 - **wdvrdaz64g (Subscribed AAB for Play Internal testing): BUILT 2026-10-26 10:43, waiting for Michael to upload by hand.**
-  `C:dev-wtab77udioura-subscribed-2.4.31+77.aab` (sha256 56f803d0…), from a detached worktree `C:dev-wt\GCS-PLAY77` @ subscribed
+  `C:\adev-wt\aab77\audioura-subscribed-2.4.31+77.aab` (sha256 56f803d0…), from a detached worktree `C:\adev-wt\GCS-PLAY77` @ subscribed
   `6d6aeed7`, `--build-name=2.4.31 --build-number=77 --dart-define=APP_TRACK=subscribed` + GATEWAY_API_KEY from build_secrets.env.
   Billing 8.0.0, upload key B3:AB:E5…3A:64. Host proven on the API-36 emulator: only api-gateway-subscribed got requests.
   After the upload: record 77 in BUILD_NUMBERS (on `subscribed`) and comment the opt-in link + "Available" time on wdvrdaz64g.
