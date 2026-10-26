@@ -164,7 +164,7 @@ Reads: `DB_* OPENAI_API_KEY PORT TOUR_TRACK TRANSLATION_ENGINE TRANSLATION_LLM_M
 |---|---|---|
 | `TOUR_TRACK` | `subscribed` | track stamp on translated tours |
 | `OPENAI_API_KEY` | secret `openai-api-key` | shared with storied (see §12) |
-| `TTS_ENGINE` | `polly` | **No Kokoro on GCloud** (§8). |
+| `TTS_ENGINE` | `polly` | Inline default for this service only; translation does not HTTP-call the voice service for tour audio. The English voice a listener hears is Kokoro via `polly-tts-subscribed` (§8b). |
 | AWS (Polly/Translate) | secrets `aws-access-key-id`, `aws-secret-access-key` | region us-east-1 |
 | `DB_PASSWORD` | secret `db-password` | — |
 
@@ -206,13 +206,90 @@ Reads: `DB_* BLOB_STORAGE_TYPE CUSTOM_AUDIO_MAX_SIZE_MB LOCAL_IDENTITY_TOKEN LOC
 
 | Env var | GCloud value / secret | Notes |
 |---|---|---|
-| `TTS_ENGINE` | `polly` | **Polly only on GCloud.** `polly_tts_service.py` defaults to `polly`; `kokoro` requires the Kokoro model and is not deployed to Cloud Run. |
+| `TTS_ENGINE` | `polly` | Inline default for this service only (tour-editing's own save-path TTS). The Subscribed English voice is Kokoro via `polly-tts-subscribed` (§8b), reached over `POLLY_TTS_URL` below — not this inline engine. |
 | AWS Polly + Comprehend | secrets `aws-access-key-id`, `aws-secret-access-key` | region us-east-1; save routes do TTS (cost-bearing). |
 | `BLOB_STORAGE_TYPE` | `r2` | R2 read/persist (§12). |
 | `R2_*` | as §4 | — |
-| `POLLY_TTS_URL` | internal polly-tts URL (if split) or inline | — |
+| `POLLY_TTS_URL` | `https://polly-tts-subscribed-<proj>.run.app` (§8b) | **Re-point at `polly-tts-subscribed`** (Kokoro), NOT Beta's `polly-tts`. Raise this service's TTS HTTP read timeout to ≥ 300 s (a Kokoro render takes ~150 s). |
 | `LOCAL_IDENTITY_TOKEN` / `LOCAL_LANGUAGE_STUB_URL` | **leave UNSET in prod** | local-dev stubs only. |
 | `DB_PASSWORD` | secret `db-password` | — |
+
+---
+
+## 8b. polly-tts-subscribed (private) — image `Dockerfile.polly-tts-kokoro` (CMD `polly_tts_service.py`), port 5018
+
+**NEW (LOCAL-768, D667).** The voice (TTS) service with **Kokoro-82M baked in for
+IN-PROCESS English rendering**. D667: Michael rated Kokoro better than Polly
+neural, and it is cheaper per stop on Cloud Run (see the cost note below). LEAD
+ruling: **NO separate Kokoro service** — Kokoro runs in-process inside
+`polly_tts_service` (the r1 mode the code already has), so this is the SAME
+service/port/endpoints as the plain Polly image, only with the model + engine
+deps added and the weights/voice packs baked into the image layer (no cold-start
+download).
+
+> **The plain Polly image `Dockerfile.polly-tts` is UNCHANGED and stays
+> Polly-only** — it is used by **Beta**, which must keep speaking with Polly.
+> Subscribed currently reuses Beta's `polly-tts` read-only; **only Subscribed's
+> consumers are re-pointed at `polly-tts-subscribed`** (table at the end of this
+> section). Beta's `POLLY_TTS_URL` must NOT change.
+
+Reads (`polly_tts_service.py`): `TTS_ENGINE KOKORO_URL PORT AWS_* PAID_API_LOG`
+(+ the `_meter/` role vars when listener-scoped).
+
+| Env var | GCloud value / secret | Notes |
+|---|---|---|
+| `TTS_ENGINE` | `kokoro` | **Required.** Turns on the Kokoro path. English Polly voices (Joanna/Matthew/Amy/Brian/…) render with Kokoro (`af_heart` female / `am_michael` male); every non-English voice (Tatyana, …) stays Polly. |
+| `KOKORO_URL` | **empty string** (`''`) | **Required — must be empty.** Empty ⇒ IN-PROCESS render (the baked model). A non-empty value means "call a host Kokoro service" (the Mac's `:5181`), which does not exist on Cloud Run — leaving it set would make every English request fail the host call and fall back to Polly. Set it explicitly empty (don't just unset, to be unambiguous). |
+| AWS (Polly) | secrets `aws-access-key-id`, `aws-secret-access-key` | region us-east-1. Still needed: non-English voices and any Kokoro failure fall back to Polly so a tour never loses audio. |
+| `PORT` | `5018` (or Cloud Run's injected `$PORT`) | same port as the plain image. |
+| `METER_ROLE` / `METER_ROLE_TOKEN` / `METER_ROLE_TOKEN_FILE` | `listener` + secret `meter-role-token` | listener-facing (same as the other listener services); Kokoro renders meter at $0, Polly fallbacks at the Polly rate. |
+| `DAILY_PAID_LIMIT_USD` | e.g. `50` (or unset) | only Polly fallbacks are billed; Kokoro is free. |
+
+**Cloud Run resources (measured — see SUBMISSION_LOCAL-768.md):**
+
+| Setting | Value | Why |
+|---|---|---|
+| CPU | **2 vCPU** (start here) | Kokoro is CPU torch on Cloud Run (no GPU). 2 vCPU renders a 2,300-char stop in ~150 s (measured, native-arch proxy). More vCPU would cut latency ~linearly if the budget allows; 2 is the floor that keeps the 4 GiB/2 vCPU ratio Cloud Run requires. |
+| Memory | **4 GiB** | torch + the 82M model + ffmpeg buffers. 4 GiB is the minimum stable; the model baked + warmed sits comfortably under it. |
+| `--concurrency` | **1** | A render pins the CPU for the whole ~150 s; a second concurrent request would double the time for both and risk the request timeout. One request per instance, scale out with instances. |
+| Request timeout | **≥ 300 s** (set 300) | A single 2,300-char stop takes ~150 s on 2 vCPU (cold ~160 s); a longer stop needs more. 300 s gives headroom; the default 60 s / 120 s would kill every real render. |
+| `--min-instances` | **0** | Scale to zero when idle (cost). Cold start to `/health` ready is **~5 s** (weights are baked — no download), so a cold hit adds only ~5 s before the ~150 s render. If p50 latency matters, set `--min-instances 1` to keep one warm (the model loads at start). |
+| `--max-instances` | size to expected concurrent tours | each instance = one in-flight render (concurrency 1). |
+
+**Cost per stop (Cloud Run Tier-1 request-based pricing, 2 vCPU + 4 GiB):**
+at the measured ~155 s/stop, cpu `2 × $0.000024 × 155 = $0.00744` + mem
+`4 × $0.0000025 × 155 = $0.00155` + request `~$0` ≈ **$0.0090/stop**, vs Polly
+**neural** for the same 2,300 chars `2300 × $16/1M = $0.0368/stop`. In-process
+Kokoro is **~4× cheaper per stop** than Polly neural (and stays cheaper until a
+render exceeds ~630 s). The real trade-off is **latency** (~150 s vs sub-second),
+hence `--concurrency 1`, timeout ≥ 300 s, and warm-instance options above.
+
+**`/health`** reports `tts_engine`, `kokoro_mode` (`in_process` here),
+`model_loaded`, and `ffmpeg_present` — so "healthy" means "this instance can
+actually render Kokoro MP3", not merely "Polly reachable". Treat
+`model_loaded == true && ffmpeg_present == true` as the readiness gate.
+
+### Subscribed services that must point at `polly-tts-subscribed` (not Beta's `polly-tts`)
+
+Every Subscribed service that calls the voice service reads **`POLLY_TTS_URL`**
+(default `http://polly-tts-1:5018`, `tts_timeout.py` sizes the read timeout to
+text length). On GCloud, set `POLLY_TTS_URL` on each of these to the private
+`polly-tts-subscribed` URL — and raise their TTS HTTP read timeout to ≥ 300 s
+because a Kokoro render takes ~150 s (a 60–120 s client timeout would abort it):
+
+| Subscribed service | Var to set | Set to |
+|---|---|---|
+| tour-editing-subscribed (§8) | `POLLY_TTS_URL` | `https://polly-tts-subscribed-<proj>.run.app` |
+| tour-generator-subscribed (§11, via `tour_generation_modernized.py`) | `POLLY_TTS_URL` | same |
+| custom-audio-subscribed (§11) | `POLLY_TTS_URL` | same |
+| news-processor-subscribed (`news_processor_service.py`) | `POLLY_TTS_URL` | same (if the subscribed news path is stood up) |
+
+> These are the services whose **own `TTS_ENGINE` env is irrelevant** — they do
+> not run `polly_tts_service` inline, they HTTP-call it. The engine choice
+> (Kokoro vs Polly) lives entirely in `polly-tts-subscribed`'s env above. The
+> `TTS_ENGINE=polly` rows in §5 and §8 describe only each service's own inline
+> default; the English voice actually heard by a Subscribed listener is decided
+> by `polly-tts-subscribed`.
 
 ---
 
