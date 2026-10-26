@@ -29,7 +29,13 @@ Usage:
     python3 tour_editor_score.py --tour 557            # score one, print, save
     python3 tour_editor_score.py --backfill            # every visible original with no score
     python3 tour_editor_score.py --backfill --rescore  # every visible original
+    python3 tour_editor_score.py --backfill --track beta,storied   # only those tracks
     add --dry-run to print without writing.
+
+    # Read-only (no model call, no write) — how many visible originals already
+    # score >= a threshold, e.g. the SUBSCRIBED_STABLE_MIN_SCORE gate (LOCAL-770):
+    python3 tour_editor_score.py --count-min-score 7.2
+    python3 tour_editor_score.py --count-min-score 7.2 --track beta,storied
 
 Writes audio_tours.editor_score / editor_score_detail / editor_scored_at
 (migration 025). Translations are not scored: they show their original's score.
@@ -195,18 +201,85 @@ def _conn():
         'DATABASE_URL', 'postgresql://admin:password123@localhost:5433/audiotours'))
 
 
+def _parse_tracks(raw):
+    """Parse a --track value ('beta,storied') into a clean lowercase list, or
+    None when unset. Unknown names are kept as-is (the caller's responsibility);
+    we only split/trim/lowercase so the SQL scope matches audio_tours.track."""
+    if not raw:
+        return None
+    tracks = [t.strip().lower() for t in raw.split(',') if t.strip()]
+    return tracks or None
+
+
+def _track_scope_sql(tracks):
+    """(sql_fragment, params) scoping a backfill/count to specific tracks, via
+    the SAME COALESCE(track,'beta') the map-delivery filter uses so a NULL-track
+    row counts as 'beta'. Empty (no scope) when tracks is None."""
+    if not tracks:
+        return "", []
+    placeholders = ', '.join(['%s'] * len(tracks))
+    return f" AND COALESCE(track, 'beta') IN ({placeholders})", list(tracks)
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('--tour', type=int)
     ap.add_argument('--backfill', action='store_true')
     ap.add_argument('--rescore', action='store_true')
     ap.add_argument('--dry-run', action='store_true')
+    # [LOCAL-770] Limit the backfill / count to specific deployment tracks, e.g.
+    # --track beta,storied to score only the Stable tours a Subscribed listing
+    # would surface. Unset = every track (unchanged default).
+    ap.add_argument('--track', help="comma-separated tracks to scope to, e.g. 'beta,storied'")
+    # [LOCAL-770] Read-only: count how many visible originals ALREADY score at or
+    # above a threshold (the SUBSCRIBED_STABLE_MIN_SCORE gate). No model call, no
+    # write — a safe dry-run count before turning the feature on.
+    ap.add_argument('--count-min-score', type=float,
+                    help='READ-ONLY count of visible originals with editor_score >= N (no scoring)')
     a = ap.parse_args()
-    if not (a.tour or a.backfill):
-        ap.error('--tour ID or --backfill')
+    if not (a.tour or a.backfill or a.count_min_score is not None):
+        ap.error('--tour ID, --backfill, or --count-min-score N')
+
+    tracks = _parse_tracks(a.track)
+    scope_sql, scope_params = _track_scope_sql(tracks)
 
     conn = _conn()
     cur = conn.cursor()
+
+    # [LOCAL-770] Read-only count path: how many visible originals would qualify
+    # at >= the threshold. Same visibility predicate as the backfill (original,
+    # not test, located, has text) PLUS the score bar. Writes nothing.
+    if a.count_min_score is not None:
+        cur.execute(f"""
+            SELECT COUNT(*) FROM audio_tours
+            WHERE original_tour_id IS NULL AND is_test IS NOT TRUE
+              AND lat IS NOT NULL AND COALESCE(length(tour_content), 0) > 200
+              AND editor_score IS NOT NULL AND editor_score >= %s
+              {scope_sql}
+        """, [a.count_min_score] + scope_params)
+        qualifying = cur.fetchone()[0]
+        cur.execute(f"""
+            SELECT COUNT(*) FROM audio_tours
+            WHERE original_tour_id IS NULL AND is_test IS NOT TRUE
+              AND lat IS NOT NULL AND COALESCE(length(tour_content), 0) > 200
+              {scope_sql}
+        """, scope_params)
+        total_visible = cur.fetchone()[0]
+        cur.execute(f"""
+            SELECT COUNT(*) FROM audio_tours
+            WHERE original_tour_id IS NULL AND is_test IS NOT TRUE
+              AND lat IS NOT NULL AND COALESCE(length(tour_content), 0) > 200
+              AND editor_score IS NULL
+              {scope_sql}
+        """, scope_params)
+        unscored = cur.fetchone()[0]
+        scope_label = f" track={','.join(tracks)}" if tracks else ""
+        print(f"[count-min-score{scope_label}] visible originals: {total_visible}; "
+              f"scored >= {a.count_min_score}: {qualifying}; "
+              f"still unscored: {unscored} (read-only, nothing written)")
+        conn.close()
+        return 0
+
     if a.tour:
         cur.execute("SELECT id, tour_name, tour_content, stops_count FROM audio_tours WHERE id = %s", (a.tour,))
     else:
@@ -215,7 +288,8 @@ def main():
             WHERE original_tour_id IS NULL AND is_test IS NOT TRUE
               AND lat IS NOT NULL AND COALESCE(length(tour_content), 0) > 200
               {'' if a.rescore else 'AND editor_score IS NULL'}
-            ORDER BY id""")
+              {scope_sql}
+            ORDER BY id""", scope_params)
     rows = cur.fetchall()
     tin = tout = 0
     for tid, name, text, stops in rows:
