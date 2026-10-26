@@ -1,0 +1,90 @@
+# syntax=docker/dockerfile:1
+# ============================================================================
+# [LOCAL-768] Dockerfile.kokoro — Kokoro-82M TTS as a private Cloud Run service.
+# ============================================================================
+# Packages kokoro_host_service.py + kokoro_engine.py so GCloud Subscribed speaks
+# English with Kokoro (D667: Michael rated it better than Polly neural) instead
+# of falling back to Polly. The service is PRIVATE on Cloud Run (IAM); the
+# polly-tts-subscribed service calls it over KOKORO_URL with a Bearer identity
+# token (KOKORO_AUDIENCE, see polly_tts_service._kokoro_auth_headers).
+#
+# Listens on $PORT (Cloud Run injects it; kokoro_host_service reads $PORT with
+# precedence over KOKORO_PORT, default 5181 locally). GET /health reports model
+# loaded + ffmpeg present (so "healthy" == "can render an MP3").
+#
+# linux/amd64 is the Cloud Run architecture; build with:
+#   docker build --platform linux/amd64 -f Dockerfile.kokoro -t kokoro-subscribed .
+#
+# ── Version pinning (read from the Mac host venv, then made installable) ─────
+# The Mac host (~/kokoro-venv) runs kokoro 0.9.4 / misaki 0.9.4 / numpy 2.5.3 on
+# torch 2.14.1. torch 2.14.1 is an Apple-silicon-only build that is NOT published
+# on PyPI or the CPU wheel index, so it cannot be installed for linux/amd64. We
+# therefore pin the newest CPU wheel that exists for cp311/linux —
+# torch 2.8.0+cpu (download.pytorch.org/whl/cpu) — and keep kokoro/misaki at the
+# host's exact versions. numpy 2.5.3 (the host's version) requires Python >=3.12
+# and cannot install on 3.11 either, so numpy is pinned to 2.2.6 — the newest
+# numpy 2.x that ships a cp311 wheel — which torch 2.8.0 and kokoro both accept.
+# kokoro 0.9.4 declares torch without an upper bound, so 2.8.0 satisfies it; the
+# MP3 output shape (24 kHz/22050 Hz, mono, 48k/32k) is set by kokoro_engine's
+# ffmpeg encode, not by the torch/numpy version, so the container's audio matches
+# the Mac's.
+# ============================================================================
+FROM python:3.11-slim
+
+# System deps: espeak-ng (misaki/phonemizer G2P backend) + ffmpeg (WAV->MP3
+# encode in kokoro_engine). libsndfile1 backs soundfile. Clean apt lists to keep
+# the layer small.
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        espeak-ng \
+        ffmpeg \
+        libsndfile1 \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# Install the CPU torch wheel first from the PyTorch CPU index (keeps the giant
+# CUDA wheels out of the image), then the rest from PyPI at the host-pinned
+# versions.
+RUN pip install --no-cache-dir \
+        --index-url https://download.pytorch.org/whl/cpu \
+        torch==2.8.0
+
+RUN pip install --no-cache-dir \
+        numpy==2.2.6 \
+        kokoro==0.9.4 \
+        "misaki[en]==0.9.4" \
+        phonemizer-fork==3.3.2 \
+        espeakng-loader==0.2.4 \
+        soundfile==0.14.0
+
+# Service code. kokoro_host_service imports only kokoro_engine; both are copied
+# one file at a time (project rule: every Dockerfile that copies files one by one
+# must list each new module). build_manifest records checksums + git SHA.
+COPY kokoro_engine.py .
+COPY kokoro_host_service.py .
+COPY build_manifest.py .
+COPY download_kokoro_weights.py .
+
+# ── Bake the model weights + the two voice packs into the image ──────────────
+# download_kokoro_weights.py loads KPipeline(lang_code='a') and forces a tiny
+# render for af_heart (female) and am_michael (male), so the Kokoro-82M snapshot,
+# both voice tensors and the espeak/misaki data are present in the image layer —
+# no network download on cold start. HF_HOME points the cache into /app so it is
+# captured in this layer. The build FAILS LOUDLY if the bake fails (better than
+# shipping an image that silently falls back to Polly on every English request).
+ENV HF_HOME=/app/.cache/huggingface
+RUN python download_kokoro_weights.py
+
+# Build-time manifest: checksums of all Python sources + git SHA.
+ARG GIT_SHA=unknown
+RUN echo "${GIT_SHA}" > /app/.git_sha
+RUN python build_manifest.py /app /app/.build_manifest.json
+
+# Cloud Run sends requests to $PORT; the host service reads it (default 5181
+# locally). EXPOSE is documentation only — the real port comes from $PORT.
+EXPOSE 5181
+
+# The service warms the pipeline once at start (kokoro_engine.warmup via
+# _warm_pipeline) so the first real request is not the slow cold one; because the
+# weights are already baked, warm-up is model load only (no download).
+CMD ["python", "kokoro_host_service.py"]

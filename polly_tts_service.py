@@ -137,6 +137,80 @@ if KOKORO_URL is not None:
     KOKORO_URL = KOKORO_URL.strip()
 logging.info(f"[LOCAL-573] KOKORO_URL={KOKORO_URL or '(unset — in-process fallback)'}")
 
+# [LOCAL-768] On Cloud Run the Kokoro service is PRIVATE (Cloud Run IAM), so the
+# /render call must carry a Google-signed OIDC identity token. When
+# KOKORO_AUDIENCE is set (to the Kokoro service's base URL), we fetch that token
+# from the GCE/Cloud Run metadata server and attach `Authorization: Bearer
+# <id-token>`, cached ~50 min. When KOKORO_AUDIENCE is UNSET (the Mac host, local
+# dev), no token is fetched and no header is sent — today's behaviour exactly.
+# Any token error logs '[LOCAL-768]' and returns no header; the /render call then
+# gets a 401/403 (or already failed) and the existing Polly fallback ships audio.
+KOKORO_AUDIENCE = os.getenv('KOKORO_AUDIENCE', '').strip()
+logging.info(
+    f"[LOCAL-768] KOKORO_AUDIENCE={KOKORO_AUDIENCE or '(unset — no inter-service auth)'}"
+)
+
+# Metadata identity endpoint (GCE/Cloud Run). Mirrors the pattern already used by
+# news_processor_service._get_auth_headers / tour_editing_phase2._get_identity_token.
+_KOKORO_METADATA_IDENTITY_URL = (
+    "http://metadata.google.internal/computeMetadata/v1/"
+    "instance/service-accounts/default/identity"
+)
+# Cache: {audience: {"token": str, "expires": epoch_seconds}}. ~50 min TTL.
+_kokoro_token_cache = {}
+# Test seam: a callable(audience)->token injected by tests to exercise the token
+# path without a metadata server. Production leaves this None.
+_kokoro_identity_token_fn = None
+
+
+def _kokoro_auth_headers():
+    """[LOCAL-768] Return {'Authorization': 'Bearer <id-token>'} for the Kokoro
+    /render call when KOKORO_AUDIENCE is set, else {} (today's host behaviour).
+
+    The token is fetched from the metadata server (or the injected test seam)
+    and cached ~50 min per audience. ANY failure (no metadata server, network
+    error, non-200, empty token) logs '[LOCAL-768]' and returns {} — the caller
+    then falls back to Polly so a tour never loses its audio.
+    """
+    if not KOKORO_AUDIENCE:
+        return {}
+    audience = KOKORO_AUDIENCE.rstrip('/')
+    import time as _time
+    cached = _kokoro_token_cache.get(audience)
+    if cached and cached.get('expires', 0) > _time.time():
+        return {'Authorization': f"Bearer {cached['token']}"}
+    token = None
+    try:
+        if _kokoro_identity_token_fn is not None:
+            token = _kokoro_identity_token_fn(audience)
+        elif _requests is not None:
+            resp = _requests.get(
+                _KOKORO_METADATA_IDENTITY_URL,
+                params={"audience": audience},
+                headers={"Metadata-Flavor": "Google"},
+                timeout=5,
+            )
+            if resp.status_code == 200:
+                token = (resp.text or "").strip()
+            else:
+                logging.warning(
+                    f"[LOCAL-768] metadata identity returned {resp.status_code} "
+                    f"for {audience} — falling back to Polly"
+                )
+    except Exception as _tok_err:  # noqa: BLE001
+        logging.warning(
+            f"[LOCAL-768] identity token fetch failed for {audience} "
+            f"({_tok_err}) — falling back to Polly"
+        )
+        return {}
+    if not token:
+        logging.warning(
+            f"[LOCAL-768] no identity token for {audience} — falling back to Polly"
+        )
+        return {}
+    _kokoro_token_cache[audience] = {'token': token, 'expires': _time.time() + 3000}
+    return {'Authorization': f"Bearer {token}"}
+
 # requests is used to call the host service. It is a dep of the callers and is
 # available in the container; import softly so the Polly default never breaks.
 try:
@@ -188,6 +262,7 @@ def health_check():
         "polly_available": polly_client is not None,
         "tts_engine": TTS_ENGINE,
         "kokoro_url": (KOKORO_URL or None) if TTS_ENGINE == 'kokoro' else None,
+        "kokoro_audience_set": bool(KOKORO_AUDIENCE) if TTS_ENGINE == 'kokoro' else None,
     })
 
 @app.route('/synthesize', methods=['POST'])
@@ -261,10 +336,21 @@ def synthesize_speech():
         # tour text is unchanged; only this host request string is annotated.
         # Fail-open: _maybe_kokoro_markup returns the original text on any issue.
         host_text = _maybe_kokoro_markup(full_text)
+        # [LOCAL-768] Private Cloud Run auth: attach a Bearer identity token when
+        # KOKORO_AUDIENCE is set. If the audience is configured but no token can
+        # be obtained, do NOT make an unauthenticated call (it would 401/403);
+        # return None so the caller falls back to Polly and the tour keeps audio.
+        _auth_headers = _kokoro_auth_headers()
+        if KOKORO_AUDIENCE and not _auth_headers:
+            logging.warning(
+                "[LOCAL-768] kokoro host unavailable — Polly (no identity token)"
+            )
+            return None
         try:
             resp = _requests.post(
                 KOKORO_URL,
                 json={'text': host_text, 'voice': voice_id},
+                headers=_auth_headers or None,
                 timeout=_render_text_timeout(len(host_text)),
             )
             if resp.status_code == 200 and resp.content:

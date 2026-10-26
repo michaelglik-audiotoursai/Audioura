@@ -54,10 +54,17 @@ logging.basicConfig(
 )
 _log = logging.getLogger("kokoro_host")
 
-PORT = int(os.getenv("KOKORO_PORT", "5181"))
+# [LOCAL-768] Port selection. Cloud Run injects $PORT and the container MUST
+# listen on it; on the Mac host (launchd) only KOKORO_PORT is set. Precedence:
+# $PORT (Cloud Run) > KOKORO_PORT (host launchd) > 5181 (local default). This
+# keeps the host launchd agent on 5181 unchanged while letting the same code
+# serve Cloud Run's $PORT (usually 8080).
+PORT = int(os.getenv("PORT") or os.getenv("KOKORO_PORT") or "5181")
 # Bind both loopback and the Docker bridge. 0.0.0.0 is the simplest way to be
 # reachable as host.docker.internal from the container while the Mac itself is
-# not internet-exposed (local-only Subscribed box). Override with KOKORO_BIND.
+# not internet-exposed (local-only Subscribed box); on Cloud Run 0.0.0.0 is
+# required so the platform can route requests to the instance. Override with
+# KOKORO_BIND.
 BIND = os.getenv("KOKORO_BIND", "0.0.0.0")
 
 # One render at a time: Kokoro is CPU-bound, concurrency only slows each render.
