@@ -66,7 +66,7 @@ tour-generator-storied --to-revisions=tour-generator-storied-00008-dhd=100 --reg
   caps unchanged 1/day, 3/month, 5 stops). Stable never reads it. The plan-screen counter bug (counts failed/started rows) is fixed in code by
   LOCAL-777; do NOT sweep stale 'started' rows. D718: until LOCAL-775 ships, deploy a generator only when paid_api_calls shows no activity for ~5 min.
 - **RU translation report (16:35):** server side OK (tour 453 = ru of 452, Polly Tatyana). The app's translated download got **402 purchase_required**
-  because `tour_generator_screen._processAdditionalLanguages` omits `?user_id=` (creator exemption). New tours are auto-priced (452/453 = tier 9, $3). Handed to LEAD.
+  because `tour_generator_screen._processAdditionalLanguages` omits `?user_id=` (creator exemption). The $3 (tier 9) was set by Michael in Generate; the creator exemption is correct. Fix = LOCAL-780 (one download helper adds user_id).
 - **Laptop remote access (for Vietnam, from 10-28):** Tailscale "mercury" 100.68.122.8 (expiry off, unattended). Exit node = mikhails-mac-mini
   (`tailscale set --exit-node=100.106.181.69 --exit-node-allow-lan-access=true`; `--exit-node=` to turn it off; keep it OFF by default).
   Screen: TigerVNC 1.15 → 100.106.181.69, user `micha`; menu = **Ctrl+Alt+M**; "Full screen on all monitors" (the Mac has 2 screens).
