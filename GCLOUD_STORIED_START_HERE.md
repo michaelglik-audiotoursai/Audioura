@@ -53,8 +53,10 @@ tour-generator-storied --to-revisions=tour-generator-storied-00008-dhd=100 --reg
 - **2026-10-26 afternoon:** build **77** live on Internal testing 11:24, but the Pixel kept getting 2.3.2+20 (Closed). Build **78**
   (2.4.32, subscribed `d27d06e4`, LOCAL-773 fix, `C:\adev-wt\aab78\…`) live 14:00 and **installed on the Pixel-7 from the Play Store**.
   Internal opt-in link: https://play.google.com/apps/internaltest/4701219869553974677 (the `/apps/testing/<pkg>` link opts into CLOSED).
-  Waiting on Michael's OK: **wdvrdaz660** (storied `3122cd71` → tour-generator-storied) and **wdvrdaz66n** (subscribed `85af16c4` →
-  tour-generator-subscribed), the gpt-3.5 → gpt-4o-mini fix (LOCAL-771/772, D716), image-only, with one ≤ $0.10 test tour each.
+  **wdvrdaz660 DONE 14:45:** tour-generator-storied **00010-ldx** (`audioura-storied:v8` = storied `3122cd71`, rollback 00009-mlg),
+  test tour **449** $0.026, fact sheets 1/1. **wdvrdaz66n DONE:** tour-generator-subscribed **00004-x42** (`subscribed-generator:85af16c4`,
+  rollback 00003-9r7), test tour **450** OK. Subscribed has STORIED_MODE=false (no fact sheets) and grounding/news on: ~$0.58/tour.
+  Open: `voice-subscribed` still on 3c0cfae6 (gpt-3.5), needs its own task.
 - **Laptop remote access (for Vietnam, from 10-28):** Tailscale "mercury" 100.68.122.8 (expiry off, unattended). Exit node = mikhails-mac-mini
   (`tailscale set --exit-node=100.106.181.69 --exit-node-allow-lan-access=true`; `--exit-node=` to turn it off; keep it OFF by default).
   Screen: TigerVNC 1.15 → 100.106.181.69, user `micha`; menu = **Ctrl+Alt+M**; "Full screen on all monitors" (the Mac has 2 screens).
