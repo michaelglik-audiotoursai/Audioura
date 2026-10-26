@@ -14,6 +14,8 @@ from pathlib import Path
 import zipfile
 import openai
 import argparse
+# [LOCAL-772] gpt-3.5-turbo retired (D716) — fall back to a live model.
+from llm_fallback import live_model, DEFAULT_FALLBACK
 
 # Database connection parameters
 DB_PARAMS = {
@@ -58,7 +60,7 @@ def get_geo_coordinates(location_name, api_key):
         prompt = f"What are the latitude and longitude coordinates for {location_name}? Please respond with only the decimal coordinates in the format: latitude,longitude"
         
         response = openai.ChatCompletion.create(
-            model="gpt-3.5-turbo",
+            model=live_model(os.environ.get("TOUR_LLM_MODEL", DEFAULT_FALLBACK)),
             messages=[
                 {"role": "system", "content": "You are a helpful assistant that provides geographic coordinates."},
                 {"role": "user", "content": prompt}

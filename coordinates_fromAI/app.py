@@ -9,6 +9,22 @@ import os
 import re
 import logging
 
+# [LOCAL-772] gpt-3.5-turbo retired (D716) — fall back to a live model. Separate
+# microservice container; import the repo-root module if present, else use an
+# equivalent inline definition. Either way no runtime call sends a retired model.
+try:
+    import sys as _sys
+    _ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    if _ROOT not in _sys.path:
+        _sys.path.insert(0, _ROOT)
+    from llm_fallback import live_model, DEFAULT_FALLBACK
+except Exception:  # pragma: no cover - container without the root module
+    DEFAULT_FALLBACK = "gpt-4o-mini"
+
+    def live_model(name, fallback=DEFAULT_FALLBACK):
+        # A retired model (the gpt-3.5 family) or an empty value -> live fallback.
+        return fallback if (not name or name.startswith("gpt-3.5")) else name
+
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,
@@ -51,7 +67,7 @@ def get_coordinates(location):
         # Use the OpenAI API to get coordinates
         logging.info(f"Sending request to OpenAI API for location: {location}")
         response = openai.ChatCompletion.create(
-            model="gpt-3.5-turbo",
+            model=live_model(os.environ.get("TOUR_LLM_MODEL", DEFAULT_FALLBACK)),
             messages=[
                 {"role": "system", "content": "You are a helpful assistant that provides precise geographic coordinates."},
                 {"role": "user", "content": prompt}

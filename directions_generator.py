@@ -5,7 +5,7 @@ Generates contextual directions between stops in a tour.
 - Museum tours: room-to-room guidance referencing stop names.
 - Outdoor tours: mode-aware directions (cycling, walking, driving, animal).
 
-Uses GPT-3.5-turbo with explicit constraints against fabricating distances
+Uses a chat model with explicit constraints against fabricating distances
 or compass bearings inside buildings.
 
 [LOCAL-253] Transport-mode awareness: directions now respect the tour's

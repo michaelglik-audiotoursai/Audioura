@@ -14,6 +14,9 @@ from cost_rates import llm_cost as _llm_cost
 # Add current directory to Python path for imports
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
+# [LOCAL-772] gpt-3.5-turbo retired (D716) — fall back to a live model.
+from llm_fallback import live_model, DEFAULT_FALLBACK
+
 try:
     from describe_point_of_interest import describe_point_of_interest
 except ImportError:
@@ -22,7 +25,7 @@ except ImportError:
     print("Using fallback POI description function.")
     
     def describe_point_of_interest(poi_name, artist="", year="", location="", tour_type="", 
-                                 word_count=300, api_key=None, model="gpt-3.5-turbo"):
+                                 word_count=300, api_key=None, model=DEFAULT_FALLBACK):
         """Fallback POI description function."""
         if not api_key:
             api_key = os.environ.get("OPENAI_API_KEY")
@@ -70,7 +73,7 @@ DO NOT include directions to the next stop - these will be added separately.
         }
         
         data = {
-            "model": model,
+            "model": live_model(model),
             "messages": [
                 {"role": "system", "content": "You are a knowledgeable museum guide with expertise in art, architecture, and history."},
                 {"role": "user", "content": prompt}
@@ -203,7 +206,7 @@ Keep the directions concise but clear (2-3 sentences maximum)."""
     }
     
     data = {
-        "model": "gpt-3.5-turbo",
+        "model": live_model(os.environ.get("TOUR_LLM_MODEL", DEFAULT_FALLBACK)),
         "messages": [
             {"role": "system", "content": "You are a knowledgeable tour guide providing walking directions."},
             {"role": "user", "content": prompt}
@@ -308,7 +311,7 @@ Include only real, significant exhibits or artworks that would be featured in a 
         }
         
         data = {
-            "model": "gpt-3.5-turbo",
+            "model": live_model(os.environ.get("TOUR_LLM_MODEL", DEFAULT_FALLBACK)),
             "messages": [
                 {"role": "system", "content": "You are a knowledgeable museum guide."},
                 {"role": "user", "content": poi_info_prompt}

@@ -31,6 +31,17 @@ Switch policy (from the recording replay, see SUBMISSION_LOCAL-560.md §4):
 """
 import os
 
+# [LOCAL-772] OpenAI retired gpt-3.5-turbo (D716). Every resolver below returns
+# its result through live_model(), so a site default or an env var still naming
+# a retired model (e.g. the held checker pins below, or an operator's stale
+# *_MODEL / CHECK_LLM_MODEL / WRITE_LLM_MODEL) is mapped to a model OpenAI still
+# serves instead of 404-ing at the call site. live_model() returns any live
+# model name unchanged, so a genuine override still wins. Checker/writer sites
+# fall back to gpt-4o-mini (DEFAULT_FALLBACK); the recall-pinned scope/verify
+# gates (held_model) fall back to gpt-4.1-mini (SCOPE_GATE_FALLBACK), matching
+# LOCAL-771 / D716 on storied.
+from llm_fallback import live_model, DEFAULT_FALLBACK, SCOPE_GATE_FALLBACK
+
 CHECK_LLM_MODEL_DEFAULT = "gpt-4o-mini"
 WRITE_LLM_MODEL_DEFAULT = "gpt-4o"
 
@@ -46,16 +57,21 @@ def check_model(site_default: str = None, site_env: str = None) -> str:
          the two gpt-3.5-turbo checker sites that failed recall and must keep
          their current model).
       4. the central default, gpt-4o-mini.
+
+    [LOCAL-772] The resolved value is passed through live_model() so an env var
+    or site default naming a retired model (e.g. a stale CHECK_LLM_MODEL=
+    gpt-3.5-turbo) is mapped to gpt-4o-mini rather than 404-ing; a live model
+    name is returned unchanged, so a genuine override still wins.
     """
     if site_env:
         v = os.environ.get(site_env)
         if v:
-            return v
+            return live_model(v, DEFAULT_FALLBACK)
     v = os.environ.get("CHECK_LLM_MODEL")
     if v:
-        return v
+        return live_model(v, DEFAULT_FALLBACK)
     if site_default:
-        return site_default
+        return live_model(site_default, DEFAULT_FALLBACK)
     return CHECK_LLM_MODEL_DEFAULT
 
 
@@ -66,16 +82,21 @@ def write_model(site_default: str = None, site_env: str = None) -> str:
     knob and the gpt-4o default. Writer models are NOT reduced in LOCAL-560, so
     gpt-3.5-turbo writer fallbacks pass site_default="gpt-3.5-turbo" to keep
     today's behaviour when neither env var is set.
+
+    [LOCAL-772] The resolved value is passed through live_model() so those
+    site_default="gpt-3.5-turbo" writer fallbacks (and any stale WRITE_LLM_MODEL
+    override) map to gpt-4o-mini rather than 404-ing on the retired model; a
+    live model name is returned unchanged, so a genuine override still wins.
     """
     if site_env:
         v = os.environ.get(site_env)
         if v:
-            return v
+            return live_model(v, DEFAULT_FALLBACK)
     v = os.environ.get("WRITE_LLM_MODEL")
     if v:
-        return v
+        return live_model(v, DEFAULT_FALLBACK)
     if site_default:
-        return site_default
+        return live_model(site_default, DEFAULT_FALLBACK)
     return WRITE_LLM_MODEL_DEFAULT
 
 
@@ -89,9 +110,16 @@ def held_model(pinned: str, site_env: str = None) -> str:
     (``site_env``). The central knob is deliberately bypassed so a global
     CHECK_LLM_MODEL=gpt-4o-mini does not silently degrade them below the
     recall bar Michael's rule requires.
+
+    [LOCAL-772] OpenAI retired gpt-3.5-turbo (the pinned value here), so the
+    result is passed through live_model() with SCOPE_GATE_FALLBACK: a retired
+    pin (or a stale site_env override still naming gpt-3.5-turbo) maps to
+    gpt-4.1-mini — the stronger narration-tier model LOCAL-560/D716 keeps these
+    recall-sensitive gates on — rather than 404-ing. A live model name is
+    returned unchanged, so a genuine operator override still wins.
     """
     if site_env:
         v = os.environ.get(site_env)
         if v:
-            return v
-    return pinned
+            return live_model(v, SCOPE_GATE_FALLBACK)
+    return live_model(pinned, SCOPE_GATE_FALLBACK)
