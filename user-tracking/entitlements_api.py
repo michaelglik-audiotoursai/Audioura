@@ -446,15 +446,26 @@ def _allowances_left(cur, state, plan):
     if plan is None:
         return out
     # Period caps (count tour_requests written by the orchestrator).
+    #
+    # [LOCAL-777] Count only DELIVERED tours: status='completed'. This is the
+    # SAME predicate the real gate uses — subscription_levels._count_fresh_
+    # generations = "source='orchestrator' AND status='completed' AND {scope}"
+    # (LOCAL-595B defect 2). A request that is still in flight ('started') or
+    # that was refused/failed ('failed') must NOT reduce "tours left": before
+    # this fix the display counted every row, so one refused request read "0 new
+    # tours left today" while the gate would still let the user generate — the
+    # screen told them they couldn't when they could. Display and gate must agree.
     if plan['tours_per_day'] is not None and plan['tours_per_day'] < 999:
         cur.execute("""SELECT COUNT(*) FROM tour_requests
                        WHERE secret_id=%s AND source='orchestrator'
+                         AND status='completed'
                          AND started_at::date = CURRENT_DATE""", (state['user_id'],))
         used_day = cur.fetchone()[0]
         out['tours_today_left'] = max(0, plan['tours_per_day'] - used_day)
     if plan['tours_per_month'] is not None:
         cur.execute("""SELECT COUNT(*) FROM tour_requests
                        WHERE secret_id=%s AND source='orchestrator'
+                         AND status='completed'
                          AND started_at >= date_trunc('month', CURRENT_DATE)""",
                     (state['user_id'],))
         used_month = cur.fetchone()[0]

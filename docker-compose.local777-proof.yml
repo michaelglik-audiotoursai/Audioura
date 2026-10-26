@@ -1,0 +1,39 @@
+# docker-compose.local777-proof.yml — LOCAL-777 OWN isolated stack for the live proof.
+# Separate project (-p local777), OWN postgres volume, spare ports (55434 / 55003).
+# Never touches the shared audioura-* containers or Michael's development-postgres-2-1.
+#
+# UP:   docker compose -p local777 -f docker-compose.local777-proof.yml up -d --build
+# DOWN: docker compose -p local777 -f docker-compose.local777-proof.yml down -v
+#
+# The user-api is built from ./user-tracking (the self-contained build context that
+# carries the edited entitlements_api.py), serves /entitlements/me on 55003, and
+# talks to this stack's OWN postgres. GATEWAY_API_KEY is empty + the LOCAL-only
+# ALLOW_UNAUTHENTICATED_ENTITLEMENTS bypass is on so the proof can call /me with no
+# X-API-Key. The DB is seeded from migrations 010 + 012 at first init.
+services:
+  postgres-2:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: audiotours_test
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: password123
+    ports:
+      - "55434:5432"
+    volumes:
+      - local777_pg:/var/lib/postgresql/data
+      - ./local777-initdb:/docker-entrypoint-initdb.d:ro
+
+  user-api:
+    build:
+      context: ./user-tracking
+    ports:
+      - "55003:5000"
+    depends_on:
+      - postgres-2
+    environment:
+      DATABASE_URL: postgresql://admin:password123@postgres-2:5432/audiotours_test
+      GATEWAY_API_KEY: ""
+      ALLOW_UNAUTHENTICATED_ENTITLEMENTS: "true"
+
+volumes:
+  local777_pg:

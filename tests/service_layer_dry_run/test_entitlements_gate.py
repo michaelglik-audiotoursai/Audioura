@@ -36,12 +36,16 @@ class TestEntitlementsGateFreeUser:
         """
         from entitlements import check_tour_quota
 
-        # Seed a tour_request so the user appears to have used their quota
+        # Seed a DELIVERED tour_request so the user appears to have used their
+        # quota. [LOCAL-777] The quota counters count only status='completed'
+        # (the same predicate the levels gate uses), so a tour that counts must
+        # be a completed one — the DB default 'started' is an in-flight row and
+        # no longer spends the allowance.
         conn = _get_conn()
         cur = conn.cursor()
         cur.execute("""
-            INSERT INTO tour_requests (secret_id, request_string, started_at, source)
-            VALUES (%s, 'Test Tour', NOW(), 'orchestrator')
+            INSERT INTO tour_requests (secret_id, request_string, status, started_at, source)
+            VALUES (%s, 'Test Tour', 'completed', NOW(), 'orchestrator')
         """, (test_user_id,))
         conn.commit()
         cur.close()
@@ -161,8 +165,8 @@ class TestEntitlementsGateFreeUser:
         conn = _get_conn()
         cur = conn.cursor()
         cur.execute("""
-            INSERT INTO tour_requests (secret_id, request_string, started_at, source)
-            VALUES (%s, 'Test Tour HTTP', NOW(), 'orchestrator')
+            INSERT INTO tour_requests (secret_id, request_string, status, started_at, source)
+            VALUES (%s, 'Test Tour HTTP', 'completed', NOW(), 'orchestrator')
         """, (test_user_id,))
         conn.commit()
         cur.close()
@@ -319,15 +323,16 @@ class TestEntitlementsGateFreeUser:
     def test_tour_quota_healthy_returns_exact_count(self, test_user_id):
         """Verify get_tours_used_today returns the exact seeded count, not 9999.
 
-        Seed 1 tour request, assert used==1.
+        Seed 1 DELIVERED (completed) tour request, assert used==1. [LOCAL-777]
+        get_tours_used_today counts only status='completed'.
         """
         from entitlements import get_tours_used_today
 
         conn = _get_conn()
         cur = conn.cursor()
         cur.execute("""
-            INSERT INTO tour_requests (secret_id, request_string, started_at, source)
-            VALUES (%s, 'Test Exact Tour', NOW(), 'orchestrator')
+            INSERT INTO tour_requests (secret_id, request_string, status, started_at, source)
+            VALUES (%s, 'Test Exact Tour', 'completed', NOW(), 'orchestrator')
         """, (test_user_id,))
         conn.commit()
         cur.close()
