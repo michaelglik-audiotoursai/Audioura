@@ -12,7 +12,7 @@ def get_coordinates(location):
         
         # Use the OpenAI API to get coordinates
         response = openai.ChatCompletion.create(
-            model="gpt-3.5-turbo",
+            model="gpt-4o-mini",  # [LOCAL-772] gpt-3.5-turbo retired (D716)
             messages=[
                 {"role": "system", "content": "You are a helpful assistant that provides precise geographic coordinates."},
                 {"role": "user", "content": prompt}

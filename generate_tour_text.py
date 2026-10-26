@@ -5,6 +5,11 @@ import os
 from cost_rates import llm_cost as _llm_cost
 # [LOCAL-560] central checker/writer model settings (CHECK_LLM_MODEL / WRITE_LLM_MODEL)
 from llm_models import check_model as _check_model, write_model as _write_model, held_model as _held_model
+# [LOCAL-772] OpenAI retired gpt-3.5-turbo (D716). live_model() maps any retired
+# model name to a live fallback (gpt-4o-mini by default). The llm_models
+# resolvers above already route through it; this import also rescues the cost
+# fallback below, so a retired-model string is never used to price a call.
+from llm_fallback import live_model, DEFAULT_FALLBACK
 
 # Sixth "built and inert" defect (D131): a rule implemented, wired, and then
 # skipped at runtime because the root module was not importable from whatever
@@ -291,7 +296,7 @@ def _tour_llm_cost(tokens: int, model: str = None) -> float:
     of the pipeline, so its caller must pass the model it actually called.
     """
     return _llm_cost(total_tokens=tokens,
-                     model=model or os.environ.get("TOUR_LLM_MODEL", "gpt-3.5-turbo"))
+                     model=live_model(model or os.environ.get("TOUR_LLM_MODEL", DEFAULT_FALLBACK)))
 
 
 def build_museum_stop_prompt(
@@ -2814,7 +2819,7 @@ def _geocode_missing_coordinates(poi_list, location, headers,
                   "Only coordinates, nothing else."
             )
             data = {
-                "model": os.environ.get("TOUR_LLM_MODEL", "gpt-3.5-turbo"),
+                "model": live_model(os.environ.get("TOUR_LLM_MODEL", DEFAULT_FALLBACK)),
                 "messages": [
                     {"role": "system", "content": "You provide accurate GPS coordinates. "
                      "Respond only with Latitude and Longitude lines."},

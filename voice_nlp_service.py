@@ -6,6 +6,8 @@ import os
 from flask import Flask, request, jsonify
 import requests
 import logging
+# [LOCAL-772] gpt-3.5-turbo retired (D716) — fall back to a live model.
+from llm_fallback import live_model, DEFAULT_FALLBACK
 
 app = Flask(__name__)
 logging.basicConfig(level=logging.INFO)
@@ -119,7 +121,7 @@ Search pattern:"""
                 'Content-Type': 'application/json'
             },
             json={
-                'model': 'gpt-3.5-turbo',
+                'model': live_model(os.environ.get("TOUR_LLM_MODEL", DEFAULT_FALLBACK)),
                 'messages': [{'role': 'user', 'content': prompt}],
                 'max_tokens': 50,
                 'temperature': 0.1
@@ -161,7 +163,7 @@ Short title (max {max_words} words):"""
                 'Content-Type': 'application/json'
             },
             json={
-                'model': 'gpt-3.5-turbo',
+                'model': live_model(os.environ.get("TOUR_LLM_MODEL", DEFAULT_FALLBACK)),
                 'messages': [{'role': 'user', 'content': prompt}],
                 'max_tokens': 60,
                 'temperature': 0.3

@@ -5,8 +5,11 @@ Task [S37]: generate_tour_hook_audio(tour_hook, api_key) → 40-60 word
 compelling introduction paragraph in second-person present tense.
 """
 import logging
+import os
 import requests
 from cost_rates import llm_cost as _llm_cost
+# [LOCAL-772] gpt-3.5-turbo retired (D716) — fall back to a live model.
+from llm_fallback import live_model, DEFAULT_FALLBACK
 
 logger = logging.getLogger(__name__)
 
@@ -47,7 +50,7 @@ Return ONLY the paragraph, no quotes or commentary."""
                 "Content-Type": "application/json",
             },
             json={
-                "model": "gpt-3.5-turbo",
+                "model": live_model(os.environ.get("TOUR_LLM_MODEL", DEFAULT_FALLBACK)),
                 "messages": [
                     {"role": "system", "content": "You write vivid, immersive audio tour introductions."},
                     {"role": "user", "content": prompt},

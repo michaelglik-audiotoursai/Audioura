@@ -9,6 +9,23 @@ import logging
 from flask import Flask, jsonify, request
 from flask_cors import CORS
 
+# [LOCAL-772] gpt-3.5-turbo retired (D716) — fall back to a live model. This is a
+# separate microservice container that may not ship the repo-root module, so
+# import it if present (adding the repo root to sys.path) and otherwise use an
+# equivalent inline definition. Either way no runtime call sends a retired model.
+try:
+    import sys as _sys
+    _ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    if _ROOT not in _sys.path:
+        _sys.path.insert(0, _ROOT)
+    from llm_fallback import live_model, DEFAULT_FALLBACK
+except Exception:  # pragma: no cover - container without the root module
+    DEFAULT_FALLBACK = "gpt-4o-mini"
+
+    def live_model(name, fallback=DEFAULT_FALLBACK):
+        # A retired model (the gpt-3.5 family) or an empty value -> live fallback.
+        return fallback if (not name or name.startswith("gpt-3.5")) else name
+
 app = Flask(__name__)
 CORS(app)
 logging.basicConfig(level=logging.INFO)
@@ -192,7 +209,7 @@ Short title (max {max_words} words):"""
                 'Content-Type': 'application/json'
             },
             json={
-                'model': 'gpt-3.5-turbo',
+                'model': live_model(os.environ.get("TOUR_LLM_MODEL", DEFAULT_FALLBACK)),
                 'messages': [{'role': 'user', 'content': prompt}],
                 'max_tokens': 60,
                 'temperature': 0.3
@@ -244,7 +261,7 @@ Search pattern:"""
                 'Content-Type': 'application/json'
             },
             json={
-                'model': 'gpt-3.5-turbo',
+                'model': live_model(os.environ.get("TOUR_LLM_MODEL", DEFAULT_FALLBACK)),
                 'messages': [{'role': 'user', 'content': prompt}],
                 'max_tokens': 50,
                 'temperature': 0.1
