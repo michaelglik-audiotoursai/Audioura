@@ -69,6 +69,13 @@ def _get_db_url() -> Optional[str]:
     dbname = os.environ.get("DB_NAME", "audiotours")
     user = os.environ.get("DB_USER", "admin")
     password = os.environ.get("DB_PASSWORD", "password123")
+    # [wdvrdaz5yt] On Cloud Run DB_HOST is a Cloud SQL unix-socket directory
+    # (/cloudsql/...). A socket path cannot go in the netloc (libpq then fell back
+    # to /var/run/postgresql and every cost_ledger write was lost); it goes in ?host=.
+    from urllib.parse import quote
+    if host.startswith("/"):
+        return (f"postgresql://{quote(user, safe='')}:{quote(password, safe='')}@/{dbname}"
+                f"?host={quote(host, safe='/')}&port={port}")
     return f"postgresql://{user}:{password}@{host}:{port}/{dbname}"
 
 
