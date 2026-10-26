@@ -141,6 +141,27 @@ def warmup():
         return False
 
 
+def model_loaded():
+    """[LOCAL-768] True iff the in-process Kokoro pipeline is loaded in THIS
+    process right now.
+
+    Read-only: it reports the cached singleton's state (set by warmup() at
+    service start or by the first render) and never triggers a load itself, so
+    calling it from /health is cheap and side-effect free. On the GCloud image
+    the weights are baked in, so after warmup() this is True without any network
+    download — that is the signal that "healthy" means "can render Kokoro".
+    """
+    return _pipeline is not None
+
+
+def ffmpeg_present():
+    """[LOCAL-768] True iff an ``ffmpeg`` binary is on PATH. Kokoro's WAV->MP3
+    encode (and the LOCAL-575 PCM combine) shell out to ffmpeg, so without it the
+    in-process path cannot produce an MP3 and would fall back to Polly. /health
+    surfaces this so a misbuilt image is caught before it silently bills Polly."""
+    return shutil.which("ffmpeg") is not None
+
+
 def _float_to_wav(samples, sample_rate, path):
     """Write a float32 [-1,1] numpy/array of mono samples to a 16-bit PCM WAV."""
     import numpy as np  # local import: only needed on the Kokoro path

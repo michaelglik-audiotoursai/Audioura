@@ -182,12 +182,40 @@ except Exception as e:
 
 @app.route('/health', methods=['GET'])
 def health_check():
+    # [LOCAL-768] Report enough for GCloud to know an instance can actually
+    # render Kokoro, not just reach Polly. kokoro_mode is 'in_process' when
+    # TTS_ENGINE=kokoro and KOKORO_URL is empty (the GCloud image baked with the
+    # model), 'host' when a KOKORO_URL points at the Mac host service, and None
+    # when the engine is Polly. model_loaded/ffmpeg_present are read-only probes
+    # (they never trigger a model load) and are only meaningful in-process; in
+    # host mode this instance does not load the model, so model_loaded is False.
+    # All kokoro_engine access is soft so a missing module can never break the
+    # Polly default health report.
+    kokoro_mode = None
+    model_loaded = False
+    ffmpeg_present = False
+    if TTS_ENGINE == 'kokoro':
+        kokoro_mode = 'host' if KOKORO_URL else 'in_process'
+        try:
+            ffmpeg_present = bool(kokoro_engine.ffmpeg_present())
+        except Exception:  # noqa: BLE001 - never break /health
+            ffmpeg_present = False
+        if kokoro_mode == 'in_process':
+            try:
+                model_loaded = bool(kokoro_engine.model_loaded())
+            except Exception:  # noqa: BLE001
+                model_loaded = False
+
     return jsonify({
         "status": "healthy" if polly_client else "unhealthy",
         "service": "polly_tts",
         "polly_available": polly_client is not None,
         "tts_engine": TTS_ENGINE,
         "kokoro_url": (KOKORO_URL or None) if TTS_ENGINE == 'kokoro' else None,
+        # [LOCAL-768] new fields
+        "kokoro_mode": kokoro_mode,
+        "model_loaded": model_loaded,
+        "ffmpeg_present": ffmpeg_present,
     })
 
 @app.route('/synthesize', methods=['POST'])

@@ -1,0 +1,120 @@
+# syntax=docker/dockerfile:1
+# ============================================================================
+# [LOCAL-768] Dockerfile.polly-tts-kokoro — the voice (polly-tts) service with
+# Kokoro-82M baked IN for IN-PROCESS English rendering on GCloud.
+# ============================================================================
+# D667 (LEAD ruling): NO separate Kokoro service. Kokoro runs in-process inside
+# polly_tts_service — the r1 mode the code already has: TTS_ENGINE=kokoro with
+# KOKORO_URL='' (empty) loads kokoro_engine in-process, warms it at start, renders
+# English there, and falls back to Polly on any error; non-English stays Polly.
+#
+# This is the SAME service as the plain Polly image (same polly_tts_service.py,
+# same port 5018, same /meter, same cost modules, same pronunciation aid) — only
+# the engine deps + the baked model are added. The plain Polly image
+# (Dockerfile.polly-tts) is used by Beta and MUST stay Polly-only and small; it
+# is NOT edited by this task.
+#
+# Run it with: TTS_ENGINE=kokoro  KOKORO_URL=  (empty)
+#   so the service renders English in-process (never a host HTTP call) and MP3s
+#   match the Mac's Kokoro shape (af_heart/am_michael, 24 kHz neural / 22050 Hz
+#   standard, set by kokoro_engine's ffmpeg encode — not by torch/numpy version).
+#
+# Cloud Run is amd64; build with:
+#   docker build --platform linux/amd64 -f Dockerfile.polly-tts-kokoro \
+#       --build-arg GIT_SHA=$(git rev-parse HEAD) -t polly-tts-kokoro .
+#
+# ── Version pinning (from the Mac host venv, made installable for linux/amd64) ─
+# The Mac host (~/kokoro-venv) runs kokoro 0.9.4 / misaki 0.9.4 on torch 2.14.1
+# (an Apple-silicon-only build not published for linux/amd64). We pin the newest
+# CPU wheel that exists for cp311/linux — torch 2.8.0+cpu — and keep kokoro/misaki
+# at the host's exact versions. numpy is pinned to 2.2.6 (newest numpy 2.x with a
+# cp311 wheel; torch 2.8.0 and kokoro both accept it). kokoro 0.9.4 declares torch
+# without an upper bound, so 2.8.0 satisfies it. These mirror the (abandoned)
+# separate-service WIP's Dockerfile.kokoro so the audio is identical.
+# ============================================================================
+FROM python:3.11-slim
+
+# System deps for in-process Kokoro:
+#   espeak-ng  — misaki/phonemizer G2P backend
+#   ffmpeg     — WAV->MP3 encode + the LOCAL-575 PCM combine in kokoro_engine
+#   libsndfile1 — backs soundfile
+# Clean apt lists to keep the layer small.
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        espeak-ng \
+        ffmpeg \
+        libsndfile1 \
+    && rm -rf /var/lib/apt/lists/*
+
+# [D635] network-level paid-API meter in every process (sitecustomize) — same as
+# the plain Polly image, so the LOCAL-673 daily-spend STOP still applies here.
+COPY _meter/ /opt/meter/
+ENV PYTHONPATH=/opt/meter
+WORKDIR /app
+
+# Flask/boto3/requests/psycopg2 — identical to the plain Polly image so the
+# Polly path and the LOCAL-323 metering ledger behave exactly the same.
+RUN pip install --no-cache-dir flask boto3 requests psycopg2-binary
+
+# Install the CPU torch wheel first from the PyTorch CPU index (keeps the giant
+# CUDA wheels out of the image), then kokoro + its deps at the host-pinned
+# versions.
+RUN pip install --no-cache-dir \
+        --index-url https://download.pytorch.org/whl/cpu \
+        torch==2.8.0
+
+RUN pip install --no-cache-dir \
+        numpy==2.2.6 \
+        kokoro==0.9.4 \
+        "misaki[en]==0.9.4" \
+        phonemizer-fork==3.3.2 \
+        espeakng-loader==0.2.4 \
+        soundfile==0.14.0
+
+# ── Service code — copied one file at a time (project rule: every Dockerfile
+# that copies files one by one must list each new module). Same set as the plain
+# Polly image PLUS download_kokoro_weights.py (used only at build time to bake
+# the model). kokoro_engine imports numpy/kokoro lazily inside functions, so the
+# module import stays cheap.
+COPY polly_tts_service.py .
+# [LOCAL-692B/706, LEAD] the name-pronunciation aid; without these the import
+# fails open and NO pronunciation fix runs.
+COPY vietnamese_name_aid.py .
+COPY pronunciation_lexicon.json .
+# kokoro_engine.py: English-voice routing predicate (should_use_kokoro), the
+# in-process encoder (synthesize_to_mp3), the LOCAL-575 single-header combine,
+# and the LOCAL-768 model_loaded()/ffmpeg_present() probes used by /health.
+COPY kokoro_engine.py .
+# cost_meter.py / cost_rates.py: so the LOCAL-323 TTS metering row records
+# (engine=kokoro/$0, Polly cost on fallback). psycopg2-binary writes the ledger.
+COPY cost_meter.py .
+COPY cost_rates.py .
+COPY build_manifest.py .
+COPY download_kokoro_weights.py .
+
+# ── Bake the Kokoro-82M weights + the two voice packs into the image ─────────
+# download_kokoro_weights.py loads KPipeline(lang_code='a') and forces a tiny
+# render for af_heart (female) and am_michael (male), so the model snapshot, both
+# voice tensors and the espeak/misaki data live in this image layer — NO network
+# download on cold start. HF_HOME points the cache into /app so it is captured in
+# the layer. The build FAILS LOUDLY if the bake fails (better than shipping an
+# image that silently falls back to Polly on every English request).
+ENV HF_HOME=/app/.cache/huggingface
+RUN python download_kokoro_weights.py
+
+# Build-time manifest: checksums of all Python sources + git SHA.
+ARG GIT_SHA=unknown
+RUN echo "${GIT_SHA}" > /app/.git_sha
+RUN python build_manifest.py /app /app/.build_manifest.json
+
+# Default this image to in-process Kokoro so a bare `docker run` renders English
+# with Kokoro. Both can still be overridden at deploy time; GCloud sets
+# TTS_ENGINE=kokoro and KOKORO_URL='' explicitly (SUBSCRIBED_GCLOUD_ENV.md §8b).
+ENV TTS_ENGINE=kokoro
+ENV KOKORO_URL=
+
+EXPOSE 5018
+
+# polly_tts_service.warmup()s the pipeline at import when TTS_ENGINE=kokoro and
+# KOKORO_URL is empty; because the weights are baked, warm-up is a model load
+# only (no download), so the first real request is not the slow cold one.
+CMD ["python", "polly_tts_service.py"]
