@@ -3,6 +3,7 @@
 **Agent:** Mac Mini Kiro
 **Branch:** `LOCAL-769-meter-boto3`
 **Base:** `subscribed` @ `c6a0879c` (`git merge-base --is-ancestor c6a0879c HEAD` → exit 0)
+**code_sha (fix commit):** `a0efba7f224f1e3bdf818470c1303b5f9f2710fe`
 
 ## Problem (GCloud_Storied wdvrdaz5yt, 2026-10-25, proven on Cloud Run)
 
