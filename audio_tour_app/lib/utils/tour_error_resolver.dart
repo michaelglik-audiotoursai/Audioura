@@ -61,6 +61,10 @@ const Map<String, TourRefusalAction> kRefusalActions = {
   'plan_limit_monthly': TourRefusalAction.buyPack,
   'pack_exhausted': TourRefusalAction.buyPack,
   'level_cannot_generate': TourRefusalAction.buyPack,
+  // [LOCAL-774] A Free (L2) venue with no reusable material: the by_reference
+  // path refused because reusing already-researched stops is all L2 gets, and
+  // this place has none. A pack buys a freshly researched tour -> Buy a pack.
+  'by_reference_no_material': TourRefusalAction.buyPack,
   // Request itself is the problem -> edit it.
   'stops_over_plan': TourRefusalAction.editRequest,
   'by_reference_unavailable': TourRefusalAction.editRequest,
@@ -148,6 +152,18 @@ class ResolvedTourError {
   /// "Edit request" and returns the user to the form instead of re-submitting.
   final bool canRetry;
 
+  /// [LOCAL-774] The server's `suggestion` when it is a PLAIN STRING (the
+  /// L2 by_reference refusal sends "Buy a $10 pack … or pick one of these
+  /// nearby tours: …"). Null when the server sent no string suggestion (or sent
+  /// the structured {label,request,tour_type} map instead — that is in
+  /// [suggestion]). Shown as a line under [message].
+  final String? suggestionText;
+
+  /// [LOCAL-774] The up-to-three existing tours the L2 by_reference refusal
+  /// offers so a Free listener whose venue has no reusable material can open one
+  /// instead. Empty when the server offered none.
+  final List<NearbyTour> nearbyTours;
+
   const ResolvedTourError({
     required this.message,
     required this.isServerMessage,
@@ -155,7 +171,37 @@ class ResolvedTourError {
     required this.suggestion,
     required this.errorCode,
     required this.canRetry,
+    this.suggestionText,
+    this.nearbyTours = const [],
   });
+}
+
+/// [LOCAL-774] One entry in a by_reference refusal's `nearby_tours` list: an
+/// existing tour the listener can open (id + display name). Tolerant parse: a
+/// missing/blank name or id yields null (the entry is dropped, never a crash).
+class NearbyTour {
+  final String id;
+  final String name;
+
+  const NearbyTour({required this.id, required this.name});
+
+  static NearbyTour? tryParse(dynamic raw) {
+    if (raw is! Map) return null;
+    final id = _nonEmpty(raw['id']);
+    final name = _nonEmpty(raw['name']);
+    if (id == null || name == null) return null;
+    return NearbyTour(id: id, name: name);
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      other is NearbyTour && other.id == id && other.name == name;
+
+  @override
+  int get hashCode => Object.hash(id, name);
+
+  @override
+  String toString() => 'NearbyTour(id: $id, name: $name)';
 }
 
 /// Resolve a job-status map (the body of GET /status/:id when status is
@@ -193,6 +239,18 @@ ResolvedTourError resolveTourError(Map<String, dynamic> status) {
     message = rawUserMessage;
   }
 
+  // [LOCAL-774] For a STRUCTURED refusal (the server sent an error_code AND a
+  // clean `message`), prefer `message` over `error`. The orchestrator keeps the
+  // human string "Error in tour text generation: …" in `error` for pre-LOCAL-581
+  // clients, but that prefix is exactly what fooled Michael (a Free
+  // by_reference_no_material refusal showed as a generic red error). The clean
+  // server `message` is the copy to display; `error` stays available verbatim for
+  // the legacy/no-message case handled by the precedence above.
+  final structuredCode = _nonEmpty(status['error_code']);
+  if (structuredCode != null && rawMessage != null) {
+    message = rawMessage;
+  }
+
   final isServerMessage = message != null;
 
   // --- legacy suggestion lines (user_error.suggestions) ---
@@ -207,6 +265,23 @@ ResolvedTourError resolveTourError(Map<String, dynamic> status) {
   // --- one-tap suggestion (LOCAL-580 contract) ---
   final suggestion = _parseSuggestion(status['suggestion']);
 
+  // [LOCAL-774] The server's `suggestion` as a PLAIN STRING (the by_reference
+  // refusal copy). Only a String counts here; the structured map is handled by
+  // _parseSuggestion above.
+  final rawSuggestion = status['suggestion'];
+  final suggestionText =
+      rawSuggestion is String ? _nonEmpty(rawSuggestion) : null;
+
+  // [LOCAL-774] nearby_tours: up to three existing tours the refusal offers.
+  final nearbyTours = <NearbyTour>[];
+  final rawNearby = status['nearby_tours'];
+  if (rawNearby is List) {
+    for (final t in rawNearby) {
+      final parsed = NearbyTour.tryParse(t);
+      if (parsed != null) nearbyTours.add(parsed);
+    }
+  }
+
   // --- error_code / retryability ---
   final errorCode = _nonEmpty(status['error_code']);
   final canRetry =
@@ -219,6 +294,8 @@ ResolvedTourError resolveTourError(Map<String, dynamic> status) {
     suggestion: suggestion,
     errorCode: errorCode,
     canRetry: canRetry,
+    suggestionText: suggestionText,
+    nearbyTours: nearbyTours,
   );
 }
 
