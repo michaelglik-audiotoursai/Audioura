@@ -185,6 +185,30 @@ class Endpoints {
   static Future<Uri> url(Service s, String path) async =>
       Uri.parse('${await base(s)}$path');
 
+  /// [LOCAL-780 / D654] The ONE place that builds a map-delivery
+  /// `/download-tour/<tourId>` URL carrying the device `user_id`.
+  ///
+  /// The map-delivery pay-before-download gate (`_download_gate`) decides
+  /// unlock / grandfather / curator-exemption from `?user_id=`; without it the
+  /// server treats the request as anonymous and returns 402 even for a tour the
+  /// device already owns — or, as in LOCAL-780, for the creator's OWN priced
+  /// tour whose translated copy the Generate screen was downloading with no
+  /// user_id (so "Russian only" ended on English with nothing playing).
+  ///
+  /// Every app call to `/download-tour/` MUST go through this helper so the
+  /// device identifies itself exactly once, in one place. The id is read from
+  /// SharedPreferences (`user_id`), the same key tour_download_service.dart and
+  /// home_screen use; a blank/absent id yields the bare URL (unchanged for an
+  /// anonymous device). Do not hand-build this URL anywhere else.
+  static Future<Uri> downloadTourUrl(Object tourId) async {
+    final prefs = await SharedPreferences.getInstance();
+    final userId = prefs.getString('user_id') ?? '';
+    final uri = await url(Service.mapDelivery, '/download-tour/$tourId');
+    final params = Map<String, String>.from(uri.queryParameters);
+    if (userId.isNotEmpty) params['user_id'] = userId;
+    return uri.replace(queryParameters: params.isEmpty ? null : params);
+  }
+
   /// Convenience GET with apiHeaders included automatically.
   static Future<http.Response> get(Service s, String path, {Duration? timeout}) async {
     final uri = await url(s, path);

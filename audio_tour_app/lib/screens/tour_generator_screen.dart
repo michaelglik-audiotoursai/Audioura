@@ -16,6 +16,7 @@ import '../services/background_tour_monitor.dart';
 import '../config.dart';
 import '../config/endpoints.dart';
 import '../services/translation_service.dart';
+import '../services/tour_translation_helper.dart';
 import '../services/error_handler_service.dart';
 import '../services/community_tour_service.dart';
 import '../services/communities_service.dart';
@@ -791,7 +792,7 @@ class _TourGeneratorScreenState extends State<TourGeneratorScreen> {
 
               // Process additional languages if requested
               if (finalTourId != null && nonEnglish.isNotEmpty) {
-                final translatedPath = await _processAdditionalLanguages(finalTourId, languages!);
+                final translatedPath = await _processAdditionalLanguages(finalTourId, languages!, wantsEnglish: wantsEnglish);
                 // Remove English fallback if user didn't want it and translation succeeded
                 if (!wantsEnglish && translatedPath != null) {
                   await _removeTourFromSavedTours(finalTourId);
@@ -809,9 +810,46 @@ class _TourGeneratorScreenState extends State<TourGeneratorScreen> {
                     );
                   }
                 }
-                // C2: clear progress label if translation failed and user didn't want English
+                // [LOCAL-780] Translation requested but FAILED and the user did
+                // not ask for English. Previously this cleared the progress
+                // label and left the listener with the English copy saved but
+                // NOTHING playing and no explanation (the creator's priced tour:
+                // the translated download 402'd for want of user_id). Now the
+                // English copy IS played — it is already downloaded and
+                // extracted at tours/<finalTourId> — and a clear message says
+                // the non-English version couldn't be downloaded. The fallback
+                // English entry is kept (it is the one actually playing).
                 else if (!wantsEnglish && translatedPath == null) {
-                  if (mounted) setState(() { _isGenerating = false; _progress = ''; });
+                  if (mounted) {
+                    setState(() { _isGenerating = false; _progress = ''; });
+                    final failedLang = nonEnglish.first;
+                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                      content: Text(
+                          TourTranslationHelper.translationFallbackMessage(failedLang)),
+                      backgroundColor: Colors.orange,
+                      duration: const Duration(seconds: 6),
+                    ));
+                    try {
+                      final docDir = await getApplicationDocumentsDirectory();
+                      final englishPath = '${docDir.path}/tours/$finalTourId';
+                      final englishExists =
+                          await File('$englishPath/index.html').exists();
+                      if (mounted && englishExists) {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => TourPlayerScreen(
+                              tourPath: englishPath,
+                              tourTitle: location,
+                            ),
+                          ),
+                        );
+                      }
+                    } catch (e) {
+                      await DebugLogHelper.addDebugLog(
+                          'TOUR: English fallback play failed: $e');
+                    }
+                  }
                 }
               }
 
@@ -957,7 +995,7 @@ class _TourGeneratorScreenState extends State<TourGeneratorScreen> {
     }));
   }
 
-  Future<String?> _processAdditionalLanguages(int finalTourId, List<String> languages) async {
+  Future<String?> _processAdditionalLanguages(int finalTourId, List<String> languages, {bool wantsEnglish = true}) async {
     final nonEnglish = languages.where((l) => l != 'en').toList();
     if (nonEnglish.isEmpty) return null;
 
@@ -998,8 +1036,14 @@ class _TourGeneratorScreenState extends State<TourGeneratorScreen> {
           continue;
         }
         try {
+          // [LOCAL-780] Build the download URL via the ONE shared helper so the
+          // device user_id is attached. Without it map-delivery's
+          // pay-before-download gate refused the creator's OWN priced tour 402
+          // (the translated copy), so "Russian only" ended on English with
+          // nothing playing. Home/Listen already attach it; the Generate screen
+          // did not — this closes that gap.
           final resp = await http.get(
-            await Endpoints.url(Service.mapDelivery, '/download-tour/$translatedId'),
+            await Endpoints.downloadTourUrl(translatedId),
             headers: await Endpoints.apiHeaders(Service.mapDelivery),
           ).timeout(const Duration(seconds: 120));
           if (resp.statusCode == 200) {
@@ -1027,7 +1071,12 @@ class _TourGeneratorScreenState extends State<TourGeneratorScreen> {
         if (!saved.contains(lang) && !failed.contains(lang)) failed.add(lang);
       }
     } finally {
-      if (mounted) {
+      // [LOCAL-780] When the user did NOT ask for English, the caller owns the
+      // messaging and playback: on success it opens the translated tour; on
+      // failure it shows the "showing English" fallback message and plays the
+      // English copy. Showing a snackbar here too would double up, so the
+      // finally-block messages are only for the English-included path.
+      if (mounted && wantsEnglish) {
         if (failed.isEmpty && saved.isNotEmpty) {
           ScaffoldMessenger.of(context).showSnackBar(SnackBar(
             content: Text('${saved.map((l) => l.toUpperCase()).join(", ")} version added to My Tours.'),

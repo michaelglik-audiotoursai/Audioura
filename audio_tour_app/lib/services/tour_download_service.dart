@@ -149,12 +149,7 @@ class TourDownloadService {
         } catch (_) {}
       }
 
-      final userId = prefs.getString('user_id') ?? '';
-      final base =
-          await Endpoints.url(Service.mapDelivery, '/download-tour/$tourId');
-      final params = Map<String, String>.from(base.queryParameters);
-      if (userId.isNotEmpty) params['user_id'] = userId;
-      final uri = base.replace(queryParameters: params.isEmpty ? null : params);
+      final uri = await Endpoints.downloadTourUrl(tourId);
 
       final response = await http
           .get(uri, headers: await Endpoints.apiHeaders(Service.mapDelivery))
@@ -261,12 +256,7 @@ class TourDownloadService {
       }
 
       // 1) Fetch the NEW content first. Any non-200 keeps the old copy.
-      final userId = prefs.getString('user_id') ?? '';
-      final base =
-          await Endpoints.url(Service.mapDelivery, '/download-tour/$tourId');
-      final params = Map<String, String>.from(base.queryParameters);
-      if (userId.isNotEmpty) params['user_id'] = userId;
-      final uri = base.replace(queryParameters: params.isEmpty ? null : params);
+      final uri = await Endpoints.downloadTourUrl(tourId);
 
       final response = await http
           .get(uri, headers: await Endpoints.apiHeaders(Service.mapDelivery))
