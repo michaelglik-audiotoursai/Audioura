@@ -299,7 +299,15 @@ def get_tours_used_today(user_id):
     """Count tours generated today by this user. 
     Raises on DB connection errors (caller returns 503).
     Returns 9999 only on unexpected query errors (last-resort backstop).
-    Only counts orchestrator-written rows (source='orchestrator') — the single authoritative writer."""
+    Only counts orchestrator-written rows (source='orchestrator') — the single authoritative writer.
+
+    [LOCAL-777] Count only DELIVERED tours: status='completed'. This is the SAME
+    predicate the real levels gate uses — subscription_levels._count_fresh_
+    generations = "source='orchestrator' AND status='completed' AND {scope}"
+    (LOCAL-595B defect 2). A request still in flight ('started') or refused/
+    failed ('failed') must NOT spend the free-plan daily allowance (this value
+    gates _check_tour_quota_free): a listener who hit a refusal keeps their tour,
+    and the "tours left" the Plan screen shows agrees with what the gate allows."""
     try:
         conn = _get_conn()
     except Exception as e:
@@ -313,6 +321,7 @@ def get_tours_used_today(user_id):
             SELECT COUNT(*) FROM tour_requests 
             WHERE secret_id = %s AND started_at::date = CURRENT_DATE
             AND source = 'orchestrator'
+            AND status = 'completed'
         """, (user_id,))
         count = cur.fetchone()[0]
         cur.close()
