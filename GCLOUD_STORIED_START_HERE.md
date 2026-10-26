@@ -62,7 +62,7 @@ tour-generator-storied --to-revisions=tour-generator-storied-00008-dhd=100 --reg
   (seen at 19:48 despite maxScale=1) the orchestrator gets "Job not found" while the job keeps running and spending. Waiting on LEAD.
   Evidence without logs: `paid_api_calls` (cols ts, service, kind, model, usd) and Cloud Monitoring `run.googleapis.com/container/instance_count`.
 - **DB writes 2026-10-26 16:24 EDT (Michael's "Go A and B" on the laptop):** (A) `level_codes` 0 → 1, admin code hash a582f5e3…8127
-  (Michael has the plaintext; enter it via Your plan → Use code). (B) `plans` l2 `by_reference_only` true → **false, permanent** (D719 as amended;
+  (redeemed by USER-41659366, now admin; then **revoked** 20:28Z at Michael's request: 1 code, 0 active). (B) `plans` l2 `by_reference_only` true → **false, permanent** (D719 as amended;
   caps unchanged 1/day, 3/month, 5 stops). Stable never reads it. The plan-screen counter bug (counts failed/started rows) is fixed in code by
   LOCAL-777; do NOT sweep stale 'started' rows. D718: until LOCAL-775 ships, deploy a generator only when paid_api_calls shows no activity for ~5 min.
 - **Laptop remote access (for Vietnam, from 10-28):** Tailscale "mercury" 100.68.122.8 (expiry off, unattended). Exit node = mikhails-mac-mini
