@@ -37,11 +37,15 @@ Rulings live in `DECISIONS.md` on `storied`/`subscribed` (D712–D715 as of toni
 
 ### Storied (Stable): release `v2t4` = storied `17b341fe` (LOCAL-765 + D714)
 `tour-orchestrator-storied 00009-65h`, `map-delivery 00016-tc2`, `tour-editing 00005-2xh` (all `audioura-storied:v6`),
-`translation-service 00022-72q` (`translation-service:v36-storied`), `tour-generator-storied 00008-dhd`
-(still image **v4 / d25454a** + `GEMINI_API_KEY` v2 + `SERP_API_KEY` + `SERP_PROVIDER=serper`).
-- **Open: task D of wdvrdaz5yt.** Deploy storied `98541d1f` (LOCAL-767: venue-parts degrades instead of hard-failing
-  without Gemini, plus the `_venue_parts_used` NameError fix) to `tour-generator-storied`, image-only, then one test tour.
-  Needs Michael's "go D".
+`translation-service 00022-72q` (`translation-service:v36-storied`), `tour-generator-storied` **`00009-mlg`**
+(image **`audioura-storied:v7`** = storied `98541d1f`, release tag `v2t5`, Cloud Build `9fc0a4a1`, digest `sha256:d2b438d8…35ad`;
+env/secrets unchanged: `GEMINI_API_KEY` v2 + `SERP_API_KEY` + `SERP_PROVIDER=serper`). Rollback: `gcloud run services update-traffic
+tour-generator-storied --to-revisions=tour-generator-storied-00008-dhd=100 --region us-central1 --project audiotours-migration`.
+- **Task D of wdvrdaz5yt DONE 2026-10-26 10:40 EDT** (Michael's "go D"). Test tour **448** Watertown City Hall (1 stop, landmark,
+  track storied, $0.0428): venue-parts ran with `GEMINI key present=True`, LOCAL-275 closing offer ran, 0 tracebacks; download 200
+  with `audio_1.mp3`; listed on api.audioura.com. Left in place as a real tour.
+- **Found, not fixed (pre-existing, handed to the Mac):** `fact_extractor.py` and the LOCAL-192 style retry call `gpt-3.5-turbo`,
+  which OpenAI now answers with **404**, so fact sheets are 0/N and style retries keep the original. 95 references across the code.
 - `GEMINI_API_KEY` **v2** = new key `gcloud-storied-2026-10` (uid `bb7f1e39…`, …ECA0), restricted to generativelanguage,
   created by gcloud and piped straight into the secret. v1 stays disabled.
 
