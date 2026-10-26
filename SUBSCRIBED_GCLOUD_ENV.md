@@ -249,12 +249,12 @@ Reads (`polly_tts_service.py`): `TTS_ENGINE KOKORO_URL PORT AWS_* PAID_API_LOG`
 
 | Setting | Value | Why |
 |---|---|---|
-| CPU | **2 vCPU minimum; 4 vCPU recommended** | Kokoro is CPU torch on Cloud Run (no GPU). Measured warm 2,300-char stop: **2 vCPU ≈ 147 s, 4 vCPU ≈ 70 s, 8 vCPU ≈ 45 s** (native-arch proxy). Cost/stop is ~flat across these (more vCPU finishes proportionally faster), so **4 vCPU is both the cheapest and ~2× faster than 2** — prefer it. 2 vCPU is the floor that keeps Cloud Run's 2 vCPU : 4 GiB minimum ratio. |
+| CPU | **4 vCPU / 4 GiB — REQUIRED (LEAD 2026-10-26)**. 2 vCPU is NOT allowed: callers time out at `tts_timeout.synthesize_timeout` = 30 + 0.05×chars s (145 s for a 2,300-char stop), and 2 vCPU needs ~147 s, so stops would be lost to the timeout and fall back to Polly. | Kokoro is CPU torch on Cloud Run (no GPU). Measured warm 2,300-char stop: **2 vCPU ≈ 147 s, 4 vCPU ≈ 70 s, 8 vCPU ≈ 45 s** (native-arch proxy). Cost/stop is ~flat across these (more vCPU finishes proportionally faster), so **4 vCPU is both the cheapest and ~2× faster than 2** — prefer it. 2 vCPU is the floor that keeps Cloud Run's 2 vCPU : 4 GiB minimum ratio. |
 | Memory | **4 GiB** | torch + the 82M model + ffmpeg buffers. 4 GiB is the minimum stable; the model baked + warmed sits comfortably under it. |
 | `--concurrency` | **1** | A render pins the CPU for the whole ~150 s; a second concurrent request would double the time for both and risk the request timeout. One request per instance, scale out with instances. |
 | Request timeout | **≥ 300 s** (set 300) | A single 2,300-char stop takes ~150 s on 2 vCPU (cold ~160 s); a longer stop needs more. 300 s gives headroom; the default 60 s / 120 s would kill every real render. |
 | `--min-instances` | **0** | Scale to zero when idle (cost). Cold start to `/health` ready is **~5 s** (weights are baked — no download), so a cold hit adds only ~5 s before the ~150 s render. If p50 latency matters, set `--min-instances 1` to keep one warm (the model loads at start). |
-| `--max-instances` | size to expected concurrent tours | each instance = one in-flight render (concurrency 1). |
+| `--max-instances` | **10** to start (a tour's stops render in parallel; each instance = one render) | each instance = one in-flight render (concurrency 1). |
 
 **Cost per stop (Cloud Run Tier-1 request-based pricing, 2 vCPU + 4 GiB):**
 at the measured ~155 s/stop, cpu `2 × $0.000024 × 155 = $0.00744` + mem
