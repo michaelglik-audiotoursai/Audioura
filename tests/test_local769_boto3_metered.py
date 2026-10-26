@@ -42,7 +42,10 @@ _ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(_ROOT, "_meter"))
 sys.path.insert(0, _ROOT)
 
-boto3 = pytest.importorskip("boto3")
+pytest.importorskip("botocore")
+# Clients come from botocore directly: other suites (LOCAL-578) replace
+# sys.modules["boto3"] with a MagicMock, which would hand these tests fake clients.
+import botocore.session  # noqa: E402
 from botocore.stub import Stubber  # noqa: E402
 
 
@@ -72,13 +75,13 @@ def _rows_of_kind(m, kind):
 
 
 def _polly_client():
-    return boto3.client(
+    return botocore.session.get_session().create_client(
         "polly", region_name="us-east-1",
         aws_access_key_id="x", aws_secret_access_key="y")
 
 
 def _translate_client():
-    return boto3.client(
+    return botocore.session.get_session().create_client(
         "translate", region_name="us-east-1",
         aws_access_key_id="x", aws_secret_access_key="y")
 
@@ -247,3 +250,14 @@ def test_db_write_targets_paid_api_calls(monkeypatch, tmp_path):
 
 if __name__ == "__main__":
     sys.exit(pytest.main([__file__, "-v"]))
+
+
+# ── 7. a second copy / reload of the meter never stacks a second botocore layer ──
+def test_reinstall_never_stacks(meter):
+    import importlib, sys
+    import botocore.client as bc
+    importlib.reload(sys.modules[meter.__name__])
+    sys.modules[meter.__name__].install()
+    fn = bc.BaseClient._make_api_call
+    assert getattr(fn, "_paid_meter_orig", None) is not None
+    assert not hasattr(fn._paid_meter_orig, "_paid_meter_orig"), "meter wrapped botocore twice"

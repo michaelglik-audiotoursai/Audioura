@@ -801,6 +801,11 @@ def install():
             return None
 
         _orig_make_api_call = _bcli.BaseClient._make_api_call
+        # botocore outlives this module: a reloaded or second copy of the meter
+        # would wrap it again and write N rows per call. Mark the wrapper and
+        # unwrap any earlier one so there is only ever ONE meter layer.
+        _orig_make_api_call = getattr(_orig_make_api_call, "_paid_meter_orig",
+                                      _orig_make_api_call)
 
         def _make_api_call(self, operation_name, api_params):
             kind = _boto_kind(self)
@@ -837,6 +842,7 @@ def install():
                 except Exception:
                     pass
             return response
+        _make_api_call._paid_meter_orig = _orig_make_api_call
         _bcli.BaseClient._make_api_call = _make_api_call
     except Exception:
         pass
