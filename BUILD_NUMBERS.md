@@ -41,7 +41,8 @@ top of +21 on either system."*
 | 19 | Android | 2.3.1 | — | **uploaded to Play on 2026-09-02** (Play's App bundle explorer shows it, Inactive). Missing from this ledger until 2026-10-21 | 2026-09-02 |
 | 75 | Android | 2.4.30 | `16f2020d` (subscribed) | **uploaded to Play Internal testing, never served**: Billing Library 7.1.1, which Play refuses for monetization. Number consumed | 2026-10-21 |
 | 76 | Android | 2.4.30 | `0131079e` (subscribed, merged `742d980e`) | **LIVE on Play Internal testing**, Michael only. Billing Library 8.0.0. Uploaded only to unlock one-time products (wdvrdaz41q) | 2026-10-21 |
-| 77 | — | — | — | **NEXT** (D698: every Play build from now on is ≥ 77) | — |
+| 77 | Android | 2.4.31 | `6d6aeed7` (subscribed; `APP_TRACK=subscribed`, host subscribed-api.audioura.com) | **LIVE on Play Internal testing**, released 2026-10-26 11:24 EDT, for Michael's Pixel-7 run-through (wdvrdaz64g). Billing 8.0.0. Known first-launch setState crash → LOCAL-773; testers get the next build | 2026-10-26 |
+| 78 | — | — | — | **NEXT** | — |
 
 ## Why 20 and 21 differ across platforms
 
