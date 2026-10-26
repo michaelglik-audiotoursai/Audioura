@@ -50,6 +50,14 @@ tour-generator-storied --to-revisions=tour-generator-storied-00008-dhd=100 --reg
   Billing 8.0.0, upload key B3:AB:E5…3A:64. Host proven on the API-36 emulator: only api-gateway-subscribed got requests.
   After the upload: record 77 in BUILD_NUMBERS (on `subscribed`) and comment the opt-in link + "Available" time on wdvrdaz64g.
   First-launch setState crash = LOCAL-773; testers get the later build, not 77.
+- **2026-10-26 afternoon:** build **77** live on Internal testing 11:24, but the Pixel kept getting 2.3.2+20 (Closed). Build **78**
+  (2.4.32, subscribed `d27d06e4`, LOCAL-773 fix, `C:\adev-wt\aab78\…`) live 14:00 and **installed on the Pixel-7 from the Play Store**.
+  Internal opt-in link: https://play.google.com/apps/internaltest/4701219869553974677 (the `/apps/testing/<pkg>` link opts into CLOSED).
+  Waiting on Michael's OK: **wdvrdaz660** (storied `3122cd71` → tour-generator-storied) and **wdvrdaz66n** (subscribed `85af16c4` →
+  tour-generator-subscribed), the gpt-3.5 → gpt-4o-mini fix (LOCAL-771/772, D716), image-only, with one ≤ $0.10 test tour each.
+- **Laptop remote access (for Vietnam, from 10-28):** Tailscale "mercury" 100.68.122.8 (expiry off, unattended). Exit node = mikhails-mac-mini
+  (`tailscale set --exit-node=100.106.181.69 --exit-node-allow-lan-access=true`; `--exit-node=` to turn it off; keep it OFF by default).
+  Screen: TigerVNC 1.15 → 100.106.181.69, user `micha`; menu = **Ctrl+Alt+M**; "Full screen on all monitors" (the Mac has 2 screens).
 - **Found, not fixed (pre-existing, handed to the Mac):** `fact_extractor.py` and the LOCAL-192 style retry call `gpt-3.5-turbo`,
   which OpenAI now answers with **404**, so fact sheets are 0/N and style retries keep the original. 95 references across the code.
 - `GEMINI_API_KEY` **v2** = new key `gcloud-storied-2026-10` (uid `bb7f1e39…`, …ECA0), restricted to generativelanguage,
