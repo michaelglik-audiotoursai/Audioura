@@ -150,9 +150,45 @@ Reads: `DB_HOST DB_NAME DB_PASSWORD DB_PORT DB_USER PORT BLOB_STORAGE_TYPE`, plu
 | Env var | GCloud value / secret | Notes |
 |---|---|---|
 | `DELIVERY_TRACK_FILTER` | `subscribed` | **Required.** `app.py:548` filters served tours to this track so Subscribed shows only subscribed tours. |
+| `SUBSCRIBED_STABLE_MIN_SCORE` | `7.2` (or **unset**) | **NEW (LOCAL-770, Michael 2026-10-26).** When set AND `DELIVERY_TRACK_FILTER=subscribed`, Subscribed's list endpoints (`/tours-near`, `/search-tours`) ADDITIONALLY surface an ORIGINAL Stable (`track IN ('beta','storied')` or NULL) tour whose `editor_score >= this value`, plus that original's translations (a translation follows its original's score via `COALESCE(orig.editor_score, t.editor_score)`). **A listing filter, never a copy** — no row is copied, moved or deleted (`app.py` `_track_filter_clause`). **Unset = feature OFF = today's subscribed-only behaviour.** Paid Stable rows are excluded (free only). All other gates still apply (content rating / review_status, community visibility, Free/Paid filter). Stable is unaffected — its map-delivery never reads `editor_score`. Requires the one-time scoring step below so Stable originals HAVE a score. Only `/tours-near` and `/search-tours` apply the track filter; the by-id serving paths (`/download-tour`, `/tour-info`, `/tour-by-code`) are track-agnostic, so a listed Stable tour is already downloadable. |
 | `BLOB_STORAGE_TYPE` | `r2` | Tour ZIPs live in Cloudflare R2 (S3-compatible), NOT GCS (see §12). |
 | `R2_BUCKET` / `R2_ENDPOINT` / `R2_ACCESS_KEY_ID` / `R2_SECRET_ACCESS_KEY` | bucket name + secrets `r2-access-key-id`, `r2-secret-access-key` | Read path for stored tours. |
 | `DB_PASSWORD` | secret `db-password` | — |
+
+### One-time scoring step for `SUBSCRIBED_STABLE_MIN_SCORE` (LOCAL-770)
+
+`SUBSCRIBED_STABLE_MIN_SCORE` gates on `editor_score`, so a Stable original with
+**no score is never surfaced**. Give every visible Stable original a score ONCE
+against Cloud SQL with `tour_editor_score.py` (migration 025 must be applied):
+
+```bash
+# 1. DRY-RUN COUNT FIRST (read-only, no model call, no write): how many Stable
+#    originals already qualify at >= 7.2, and how many are still unscored.
+python3 tour_editor_score.py --count-min-score 7.2 --track beta,storied
+#   → "[count-min-score track=beta,storied] visible originals: N; scored >= 7.2: M; still unscored: U (read-only, nothing written)"
+
+# 2. BACKFILL the unscored ones (scores ONLY rows with no score; --track limits
+#    scope to the Stable tracks a Subscribed listing would surface).
+python3 tour_editor_score.py --backfill --track beta,storied
+#   add --dry-run to print the scores + total cost without writing.
+```
+
+- **Scope:** `--backfill` already scores only visible ORIGINALS with no score
+  (`original_tour_id IS NULL AND is_test IS NOT TRUE AND lat IS NOT NULL AND
+  length(tour_content) > 200 AND editor_score IS NULL`); `--track beta,storied`
+  (LOCAL-770) further limits it to the Stable tracks via
+  `COALESCE(track,'beta') IN (...)` so Subscribed rows are left alone.
+- **Writes ONLY `editor_score*`:** `editor_score`, `editor_score_detail`,
+  `editor_scored_at` (migration 025). No other column, and never a tour's text,
+  audio, price or track — it cannot change what a tour IS, only its starting
+  score. Translations are never scored (they show their original's score).
+- **Cost (measured, gpt-4.1, 3 runs/tour — SUBMISSION_LOCAL-688.md):** tour 557
+  = 7,821 in + 943 out tokens = **~$0.0232 per tour**. For **~300 originals**
+  that is **~$6.96** total (≈300 × $0.0232; cheaper if many are already scored —
+  the dry-run count in step 1 tells you how many actually need it). A smaller
+  model via `EDITOR_SCORE_MODEL=gpt-4o-mini` is ~40× cheaper if cost matters.
+- **Safe to re-run:** without `--rescore`, a second backfill scores only rows
+  that are still unscored, so interrupting and resuming is harmless.
 
 ---
 

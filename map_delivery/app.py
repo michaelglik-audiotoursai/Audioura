@@ -553,16 +553,95 @@ def _requested_track(req):
     return normalize_track(raw)
 
 
+# [LOCAL-770 / Michael 2026-10-26] Subscribed ALSO lists the best Stable tours.
+# A listing filter, NEVER a copy (LEAD ruling): no row is copied, moved or
+# deleted. When the Subscribed map-delivery (DELIVERY_TRACK_FILTER=subscribed)
+# has SUBSCRIBED_STABLE_MIN_SCORE set (e.g. 7.2), its lists additionally surface
+# an ORIGINAL beta/storied (or NULL-track) tour whose evaluated editor_score is
+# >= that threshold — and, through the `orig` self-join the endpoints already
+# have, that original's translations (a translation follows its ORIGINAL's
+# score, exactly as price_tier / is_paid / content_rating already do). The env
+# UNSET = feature off = today's behaviour (subscribed-only). Scoring a Stable
+# row never changes Stable: Stable's map_delivery does not read editor_score.
+#
+# A Stable row that is PAID is never listed here (Michael: free tours only; a
+# Stable row is never paid, but we assert it so a mis-priced row can never leak
+# as a free Subscribed listing). All the other gates still apply downstream
+# (content rating / review_status, community visibility, the Free/Paid filter).
+_HAS_EDITOR_SCORE_COLUMN = None
+
+
+def _has_editor_score_column(cur):
+    """True if audio_tours.editor_score exists (migration 025). Probed once +
+    cached. Absent (older schema) → the LOCAL-770 Stable branch is skipped and
+    the query is byte-for-byte the historic subscribed-only filter, never a 500."""
+    global _HAS_EDITOR_SCORE_COLUMN
+    if _HAS_EDITOR_SCORE_COLUMN is None:
+        try:
+            cur.execute("""
+                SELECT 1 FROM information_schema.columns
+                WHERE table_name = 'audio_tours' AND column_name = 'editor_score'
+            """)
+            _HAS_EDITOR_SCORE_COLUMN = cur.fetchone() is not None
+        except Exception:
+            _HAS_EDITOR_SCORE_COLUMN = False
+    return _HAS_EDITOR_SCORE_COLUMN
+
+
+def _subscribed_stable_min_score():
+    """The SUBSCRIBED_STABLE_MIN_SCORE threshold as a float, or None when the
+    feature is OFF. Unset / blank / non-numeric → None → today's behaviour
+    (Subscribed lists only its own track). Set (e.g. '7.2') → the Stable listing
+    branch turns on for the subscribed track filter."""
+    raw = (os.getenv('SUBSCRIBED_STABLE_MIN_SCORE') or '').strip()
+    if not raw:
+        return None
+    try:
+        return float(raw)
+    except (TypeError, ValueError):
+        return None
+
+
 def _track_filter_clause(cur, req):
     """Build the (sql_fragment, params) for an optional track filter.
 
     Returns ('', []) when no ?track= is sent or the column is absent, so the
     historic queries are byte-for-byte unchanged for Beta and Storied.
+
+    [LOCAL-770] When the active track filter is 'subscribed' AND
+    SUBSCRIBED_STABLE_MIN_SCORE is set, the clause widens to ALSO admit an
+    ORIGINAL Stable (beta/storied/NULL-track) tour scored >= the threshold (its
+    translations follow via COALESCE(orig.editor_score, t.editor_score)), with
+    paid Stable rows excluded. Any other track filter, or the env unset, is
+    unchanged.
     """
     trk = _requested_track(req)
     if trk is None or not _has_track_column(cur):
         return "", []
-    return " AND COALESCE(t.track, 'beta') = %s", [trk]
+
+    base = " AND COALESCE(t.track, 'beta') = %s"
+    min_score = _subscribed_stable_min_score()
+    if trk != 'subscribed' or min_score is None or not _has_editor_score_column(cur):
+        # Historic single-track filter (and every non-subscribed deployment).
+        return base, [trk]
+
+    # Subscribed + feature on: its own track OR a well-scored, free Stable
+    # original (translations inherit the original's score through `orig`). The
+    # score uses the SAME COALESCE(orig.*, t.*) self-join as the rating gate so a
+    # translation is judged by its original's score, not its own (always NULL).
+    stable_score = "COALESCE(orig.editor_score, t.editor_score)"
+    stable = (
+        " AND ("
+        "COALESCE(t.track, 'beta') = %s"
+        " OR ("
+        "COALESCE(t.track, 'beta') IN ('beta', 'storied')"
+        f" AND {stable_score} IS NOT NULL"
+        f" AND {stable_score} >= %s"
+        f" AND COALESCE({_is_paid_select(cur)}, FALSE) = FALSE"
+        ")"
+        ")"
+    )
+    return stable, [trk, min_score]
 
 
 _HAS_CONTENT_RATING_COLUMN = None
