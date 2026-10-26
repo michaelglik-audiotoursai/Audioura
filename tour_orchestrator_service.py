@@ -1605,10 +1605,13 @@ def orchestrate_tour_async(job_id, location, tour_type, total_stops, user_id=Non
                 elif status_data["status"] == "error":
                     error_msg = f"Error in tour text generation: {status_data.get('error', 'Unknown error')}"
                     print(f"ERROR: {error_msg}")
-                    # [LOCAL-580] Pass the generator's structured failure through to the app's /status
-                    # poll (LOCAL-581 reads message > error and shows suggestion as a button). Without
-                    # this the app only ever saw the prefixed string above, and no suggestion.
-                    for _k in ("error_code", "message", "suggestion"):
+                    # [LOCAL-580 / LOCAL-774] Pass the generator's structured failure through to the
+                    # app's /status poll (LOCAL-581 reads message > error and shows suggestion as a
+                    # button). Without this the app only ever saw the prefixed string above, and no
+                    # suggestion. [LOCAL-774] nearby_tours was being dropped here, so the L2
+                    # by_reference refusal reached the app with no tappable existing tours — add it to
+                    # the forwarded keys so the whole structured refusal survives (D613).
+                    for _k in ("error_code", "message", "suggestion", "nearby_tours"):
                         if status_data.get(_k) is not None:
                             ACTIVE_JOBS[job_id][_k] = status_data[_k]
                     raise Exception(error_msg)
@@ -2996,7 +2999,15 @@ def get_job_status(job_id):
                 response["share_url"] = job.get("share_url", "")
         elif job["status"] == "error":
             response["error"] = job.get("error", "Unknown error")
-        
+            # [LOCAL-774] Forward the generator's structured refusal fields so the
+            # app can show the plan/pack dialog (LOCAL-597 by_reference_no_material)
+            # instead of the generic "Tour Generation Failed". `message` is the
+            # CLEAN server copy — never the "Error in tour text generation:" wrapper
+            # kept verbatim in `error` for pre-LOCAL-581 clients. nearby_tours lets
+            # the app offer existing tours when a Free venue has no reusable material.
+            for _k in ("error_code", "message", "suggestion", "nearby_tours"):
+                if job.get(_k) is not None:
+                    response[_k] = job[_k]
         print(f"Returning status (memory): {response}")
         return jsonify(response)
     
@@ -3041,7 +3052,15 @@ def get_job_status(job_id):
                     response["expected_stops"] = db_job["expected_stops"]
             elif db_job["status"] == "error":
                 response["error"] = db_job.get("error", "Unknown error")
-            
+                # [LOCAL-774] Background / cloud_tasks path: the worker wrote the
+                # structured refusal fields into job_status.output_data, which
+                # _read_job_from_db merged into db_job. Forward them so "Generate in
+                # Background" reaches the app with the same plan/pack dialog as
+                # "Generate Now" (D613). `message` is the clean copy; `error` keeps
+                # the legacy prefixed string for pre-LOCAL-581 clients.
+                for _k in ("error_code", "message", "suggestion", "nearby_tours"):
+                    if db_job.get(_k) is not None:
+                        response[_k] = db_job[_k]
             print(f"Returning status (database): {response}")
             return jsonify(response)
     

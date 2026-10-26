@@ -44,6 +44,24 @@ from user_stops_flag import neutralize_if_disabled as _neutralize_user_stops
 # get_coordinates_direct() returns (0, 0). Both produce a tour that tours-near
 # can never return, while the app reports success. Deliberately duplicated rather
 # than shared, so neither service gains a new import to deploy.
+
+
+# [LOCAL-774] A structured refusal from the tour generator (e.g. the L2
+# by_reference "no reusable material" refusal, error_code=by_reference_no_material)
+# must survive the worker's re-raise so run_job can write error_code / message /
+# suggestion / nearby_tours into job_status.output_data. A plain Exception drops
+# them, which is why "Generate in Background" reached the app as a bare prefixed
+# string and showed the generic "Tour Generation Failed" dialog (Michael, D613).
+class TextGenRefusal(Exception):
+    """A terminal, structured text-generation failure. `structured` carries the
+    generator's refusal fields (error_code, message, suggestion, nearby_tours)
+    that must be forwarded to the app's /status unchanged."""
+
+    def __init__(self, message, structured=None):
+        super().__init__(message)
+        self.structured = structured or {}
+
+
 def _usable_coordinates(c):
     """True only for a pair of finite, non-null, in-range, non-(0,0) numbers."""
     if not isinstance(c, (list, tuple)) or len(c) < 2:
@@ -317,7 +335,20 @@ def run_generation(job_id, location, tour_type, total_stops, user_id=None, reque
                 coordinates = sdata.get("coordinates")
                 break
             elif sdata["status"] == "error":
-                raise Exception(f"Text generation error: {sdata.get('error', 'Unknown')}")
+                # [LOCAL-774] Preserve the generator's structured refusal (the
+                # tour-generator /status already forwards error_code / message /
+                # suggestion / nearby_tours for the L2 by_reference refusal). Carry
+                # them on the raised exception so run_job writes them into
+                # job_status.output_data and /status can forward them to the app —
+                # rather than collapsing the refusal to a bare prefixed string.
+                _structured = {
+                    _k: sdata[_k]
+                    for _k in ("error_code", "message", "suggestion", "nearby_tours")
+                    if sdata.get(_k) is not None
+                }
+                raise TextGenRefusal(
+                    f"Text generation error: {sdata.get('error', 'Unknown')}",
+                    structured=_structured)
             else:
                 progress = sdata.get('progress', 'Processing...')
                 update_job_status(job_id, 'processing', f'Text generation: {progress}')
@@ -564,9 +595,15 @@ def run_job():
             return jsonify({"status": "error", "job_id": job_id}), 500
     except Exception as e:
         error_msg = str(e)
+        # [LOCAL-774] If the failure is a structured refusal (e.g. the L2
+        # by_reference "no reusable material" refusal), carry its fields through to
+        # job_status.output_data so the orchestrator's /status forwards them to the
+        # app and it shows the plan/pack dialog — same as "Generate Now".
+        _structured = getattr(e, "structured", None) or {}
         if is_final_attempt:
             # Final attempt — mark the job as permanently failed
-            update_job_status(job_id, 'error', error_msg, error=error_msg)
+            update_job_status(job_id, 'error', error_msg, error=error_msg,
+                               **_structured)
             print(f"[RUN-JOB] FINAL attempt failed for {job_id}: {error_msg}")
             
             # Rollback usage row so a failed tour doesn't permanently consume quota

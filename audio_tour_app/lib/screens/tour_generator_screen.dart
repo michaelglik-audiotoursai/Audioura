@@ -875,7 +875,16 @@ class _TourGeneratorScreenState extends State<TourGeneratorScreen> {
 
               if (mounted) {
                 setState(() { _isGenerating = false; _progress = ''; });
-                _showTourErrorDialog(resolved);
+                // [LOCAL-774] A Free-level by_reference refusal (the venue has no
+                // reusable material) must show the plan/pack dialog with the
+                // server message + suggestion and the tappable nearby tours —
+                // never the generic red "Tour Generation Failed". Every other
+                // failure keeps the long-standing error dialog.
+                if (resolved.errorCode == 'by_reference_no_material') {
+                  _showByReferenceRefusalDialog(resolved);
+                } else {
+                  _showTourErrorDialog(resolved);
+                }
               }
               return;
 
@@ -1515,6 +1524,90 @@ class _TourGeneratorScreenState extends State<TourGeneratorScreen> {
             ),
         ],
       ),
+    );
+  }
+
+  /// [LOCAL-774] Show the Free-level by_reference refusal: the venue has no
+  /// reusable material, so an L2 tour cannot be built. Title "Not available on
+  /// the Free level yet" (no red error icon — this is a plan state, not a
+  /// failure). Body = the server's clean message + its suggestion string. Each
+  /// nearby tour the server offered is tappable and opens that tour. A "Buy a
+  /// pack" button leads to PlanScreen. NEVER the prefixed "Error in tour text
+  /// generation:" string (that is why Michael saw a generic red dialog).
+  void _showByReferenceRefusalDialog(ResolvedTourError resolved) {
+    showDialog(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: const Row(
+            children: [
+              Icon(Icons.info_outline, color: Colors.indigo, size: 28),
+              SizedBox(width: 8),
+              Expanded(child: Text('Not available on the Free level yet')),
+            ],
+          ),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(resolved.message, style: const TextStyle(fontSize: 16)),
+                if (resolved.suggestionText != null) ...[
+                  const SizedBox(height: 12),
+                  Text(resolved.suggestionText!,
+                      style: const TextStyle(
+                          fontSize: 14, color: Colors.black54)),
+                ],
+                if (resolved.nearbyTours.isNotEmpty) ...[
+                  const SizedBox(height: 16),
+                  const Text('Nearby tours you can open now:',
+                      style: TextStyle(
+                          fontWeight: FontWeight.bold, color: Colors.indigo)),
+                  const SizedBox(height: 4),
+                  ...resolved.nearbyTours.map((t) => ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        dense: true,
+                        leading: const Icon(Icons.place_outlined,
+                            color: Colors.indigo),
+                        title: Text(t.name),
+                        onTap: () {
+                          Navigator.pop(dialogContext);
+                          // Reuse the existing download-by-id path (orchestrator
+                          // /download/<id>); {id,title} is the shape it expects.
+                          _downloadBackgroundTour({'id': t.id, 'title': t.name});
+                        },
+                      )),
+                ],
+                const SizedBox(height: 20),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    onPressed: () {
+                      Navigator.pop(dialogContext);
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (_) => const PlanScreen()),
+                      );
+                    },
+                    icon: const Icon(Icons.workspace_premium_outlined),
+                    label: Text(refusalActionLabel(TourRefusalAction.buyPack)),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.indigo,
+                      foregroundColor: Colors.white,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('Dismiss'),
+            ),
+          ],
+        );
+      },
     );
   }
 

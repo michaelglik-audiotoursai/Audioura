@@ -1,0 +1,26 @@
+===== LOCAL-774 LIVE ORCHESTRATOR /status JSON =====
+{
+  "created_at": "2026-10-26T16:07:00",
+  "error": "Error in tour text generation: This place hasn't been researched yet on the free level.",
+  "error_code": "by_reference_no_material",
+  "job_id": "local774-live-proof",
+  "location": "Gyms near me, West Roxbury, MA",
+  "message": "This place hasn't been researched yet on the free level.",
+  "nearby_tours": [
+    {
+      "id": 123,
+      "name": "West Roxbury Walk"
+    },
+    {
+      "id": 124,
+      "name": "Roslindale Square"
+    }
+  ],
+  "progress": "Text generation: Starting tour text generation...",
+  "status": "error",
+  "suggestion": "Buy a $10 pack for a freshly researched tour, or pick one of these nearby tours: West Roxbury Walk (#123); Roslindale Square (#124).",
+  "total_stops": 2,
+  "tour_type": ""
+}
+
+ALL FOUR STRUCTURED FIELDS PRESENT; message is the clean copy. PASS.
