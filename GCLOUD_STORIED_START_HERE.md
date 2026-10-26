@@ -56,7 +56,11 @@ tour-generator-storied --to-revisions=tour-generator-storied-00008-dhd=100 --reg
   **wdvrdaz660 DONE 14:45:** tour-generator-storied **00010-ldx** (`audioura-storied:v8` = storied `3122cd71`, rollback 00009-mlg),
   test tour **449** $0.026, fact sheets 1/1. **wdvrdaz66n DONE:** tour-generator-subscribed **00004-x42** (`subscribed-generator:85af16c4`,
   rollback 00003-9r7), test tour **450** OK. Subscribed has STORIED_MODE=false (no fact sheets) and grounding/news on: ~$0.58/tour.
-  Open: `voice-subscribed` still on 3c0cfae6 (gpt-3.5), needs its own task.
+  **wdvrdaz6a7 DONE 16:20 EDT:** tour-generator-subscribed **00005-67j** = env-only `STORIED_MODE=true` (D717; rollback 00004-x42);
+  voice-subscribed **00002-xz5** (85af16c4, rollback 00001-jf9). Test tour **451** (1 stop, thin). UNVERIFIED: the fact-sheet log lines,
+  because Cloud Logging reads returned 500 or empty from ~19:48Z; re-check later. **Bug:** generators keep jobs in memory, and with 2 instances
+  (seen at 19:48 despite maxScale=1) the orchestrator gets "Job not found" while the job keeps running and spending. Waiting on LEAD.
+  Evidence without logs: `paid_api_calls` (cols ts, service, kind, model, usd) and Cloud Monitoring `run.googleapis.com/container/instance_count`.
 - **Laptop remote access (for Vietnam, from 10-28):** Tailscale "mercury" 100.68.122.8 (expiry off, unattended). Exit node = mikhails-mac-mini
   (`tailscale set --exit-node=100.106.181.69 --exit-node-allow-lan-access=true`; `--exit-node=` to turn it off; keep it OFF by default).
   Screen: TigerVNC 1.15 → 100.106.181.69, user `micha`; menu = **Ctrl+Alt+M**; "Full screen on all monitors" (the Mac has 2 screens).
