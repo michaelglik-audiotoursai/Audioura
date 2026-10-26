@@ -133,6 +133,87 @@ def _nominatim_request(params: dict, context: str = "") -> "requests.Response":
 # ──── END LOCAL-320 ───────────────────────────────────────────────────────────
 
 
+# ──── [LOCAL-779] BUSINESS POI CLASSIFICATION ─────────────────────────────────
+# Gyms, cafés, shops, bakeries, bars, spas, climbing walls … are BUSINESSES. Like
+# restaurants (LOCAL-281/313) they are rarely on Wikipedia/Wikidata, so the
+# existence gate's Wikidata-P625/OSM landmark path (_check_walking_stop_existence)
+# cannot vouch for them and DROPS every stop — the LOCAL-779 bug. They DO exist as
+# named POIs in OpenStreetMap with an address and coordinates, so they verify the
+# SAME way a restaurant does: a maps/places result whose name matches and whose
+# address lies inside the toured scope. This keyword list (plus the existing
+# dining keywords, plus the LLM intent when unsure) routes such a request to the
+# generalized OSM business-existence path. Dining stays its own kind so the
+# restaurant canary (LOCAL-281/313/557) is byte-for-byte unchanged.
+_BUSINESS_KEYWORDS = (
+    'gym', 'gyms', 'fitness', 'crossfit', 'yoga', 'pilates', 'climbing',
+    'bouldering', 'spa', 'spas', 'salon', 'barber', 'barbershop',
+    'cafe', 'cafes', 'café', 'cafés', 'coffee', 'coffeehouse', 'coffeeshop',
+    'bakery', 'bakeries', 'patisserie', 'pâtisserie',
+    'bar', 'bars', 'pub', 'pubs', 'brewery', 'breweries', 'brewpub', 'taproom',
+    'winery', 'wineries', 'distillery', 'cidery',
+    'shop', 'shops', 'store', 'stores', 'boutique', 'boutiques',
+    'bookstore', 'bookshop', 'bookshops', 'bookstores',
+    'market', 'grocery', 'deli', 'delis', 'creamery',
+    'studio', 'studios',
+)
+
+# OSM category / type tokens that mark a BUSINESS. Broader than dining — it must
+# accept amenity=gym/cafe/bar, leisure=fitness_centre/sports_centre, shop=* of any
+# kind, and tourism=... when the name is a strong match. Kept deliberately wide:
+# a business is "a commercial POI with a name and an address", and OSM tags these
+# under amenity/leisure/shop/craft/office.
+_BUSINESS_OSM_TYPES = (
+    'gym', 'fitness_centre', 'fitness_center', 'sports_centre', 'sports_center',
+    'climbing', 'dojo', 'yoga', 'pilates',
+    'cafe', 'bar', 'pub', 'biergarten', 'nightclub', 'restaurant', 'fast_food',
+    'bakery', 'pastry', 'confectionery', 'deli', 'butcher', 'greengrocer',
+    'supermarket', 'convenience', 'books', 'clothes', 'shoes', 'gift',
+    'hairdresser', 'beauty', 'spa', 'massage', 'cosmetics',
+    'brewery', 'winery', 'distillery', 'alcohol', 'wine', 'coffee',
+)
+_BUSINESS_OSM_CATEGORIES = (
+    'amenity', 'leisure', 'shop', 'craft', 'office', 'sport',
+)
+
+
+def classify_business_vs_landmark(poi_type: Optional[str]) -> str:
+    """[LOCAL-779] Deterministic first pass: is this poi_type a BUSINESS or a LANDMARK?
+
+    Returns 'business', 'dining', or 'landmark'.
+
+      * 'dining'   — a food/restaurant poi_type (kept separate so the restaurant
+                     canary stays unchanged; dining is a business but routes to the
+                     dining path).
+      * 'business' — gyms, cafés, shops, bakeries, bars, spas, climbing walls, …
+                     a commercial POI class that lives on maps, not Wikipedia.
+      * 'landmark' — anything else (monuments, historic sites, parks, museums,
+                     filming locations, generic 'landmarks'): the default, so a
+                     landmark tour's behaviour is untouched.
+
+    Pure and deterministic — a keyword fact about the poi_type string. The caller
+    layers the existing restaurant classification and an LLM intent fallback on
+    top when this returns 'landmark' but the request is ambiguous.
+    """
+    if not poi_type:
+        return 'landmark'
+    raw = poi_type if isinstance(poi_type, str) else ' or '.join(poi_type)
+    tl = _strip_accents(raw).lower()
+    _DINING = ('restaurant', 'dining', 'food', 'culinary', 'eatery', 'bistro', 'brasserie')
+    if any(kw in tl for kw in _DINING):
+        return 'dining'
+    toks = set(re.findall(r"[a-zà-ÿ]+", tl))
+    for kw in _BUSINESS_KEYWORDS:
+        k = _strip_accents(kw)
+        # Whole-word for short tokens (bar, gym, spa) to avoid 'bar' in 'barn';
+        # substring for longer ones so 'coffee shops' and 'climbing gym' both hit.
+        if len(k) <= 4:
+            if k in toks:
+                return 'business'
+        elif k in tl:
+            return 'business'
+    return 'landmark'
+
+
 def _strip_accents(text: str) -> str:
     """Remove accents for matching (é→e, ô→o, etc.)."""
     nfkd = unicodedata.normalize('NFKD', text)
@@ -444,8 +525,9 @@ def _check_stop_corpus(
         return False, ""
 
 
-def _classify_venue_kind(venue_name: str, db_conn, tour_type: Optional[str] = None) -> Tuple[str, str]:
-    """Classify a venue as 'institution', 'geographic_area', or 'dining'.
+def _classify_venue_kind(venue_name: str, db_conn, tour_type: Optional[str] = None,
+                         poi_type: Optional[str] = None) -> Tuple[str, str]:
+    """Classify a venue as 'institution', 'geographic_area', 'dining', or 'business'.
 
     LOCAL-239: An institution (museum, palace, named building) and a geographic
     area (walking route, region, coastal path) need different confirmation logic.
@@ -454,15 +536,26 @@ def _classify_venue_kind(venue_name: str, db_conn, tour_type: Optional[str] = No
     restaurant is "does Le Chantecler exist in Nice?" — not "does a source tie
     Le Chantecler to 'restaurant tour in Nice, France'" (our internal label).
 
+    LOCAL-779: A BUSINESS tour (gyms, cafés, shops, bakeries, bars, spas,
+    climbing walls) needs the same kind of answer as dining — "does a place with
+    this name exist at an address inside the scope?" — but its signal is the
+    intent's poi_type, NOT the tour_category (a "walking tour: gyms near me"
+    arrives with tour_category='walking'). So the poi_type is classified via
+    classify_business_vs_landmark and, when it says 'business', this returns the
+    'business' kind so verify_stop_existence routes to the maps/places path.
+
     Classification priority:
       1. Explicit tour_type signal (or EXISTENCE_GATE_TOUR_TYPE env var):
          - restaurant/food/dining → 'dining'
-      2. venue_corpus.sparql_works_json presence:
+      2. poi_type (or EXISTENCE_GATE_POI_TYPE env var) → 'dining'/'business' via
+         classify_business_vs_landmark.
+      3. venue_corpus.sparql_works_json presence:
          - Institution: has sparql_works_json (a list of held works from Wikidata)
          - Geographic area: no sparql_works_json (canonical_titles are POIs/sections)
 
     Returns:
-        (kind: 'institution' | 'geographic_area' | 'dining' | 'unknown', evidence: str)
+        (kind: 'institution' | 'geographic_area' | 'dining' | 'business' | 'unknown',
+         evidence: str)
     """
     # LOCAL-281: Check tour_type signal first (explicit kwarg or env fallback)
     _effective_tour_type = tour_type or os.environ.get('EXISTENCE_GATE_TOUR_TYPE', '')
@@ -471,6 +564,17 @@ def _classify_venue_kind(venue_name: str, db_conn, tour_type: Optional[str] = No
         _DINING_KEYWORDS = ('restaurant', 'food', 'dining', 'culinary', 'bistro', 'cafe', 'eatery')
         if any(kw in _tt_lower for kw in _DINING_KEYWORDS):
             return 'dining', f'tour_type={_effective_tour_type!r} signals dining'
+
+    # LOCAL-779: poi_type signal — a gym/café/shop poi_type is a BUSINESS even when
+    # the tour_category is 'walking'. Dining poi_types still route to 'dining' so
+    # the restaurant canary is unchanged.
+    _effective_poi_type = poi_type or os.environ.get('EXISTENCE_GATE_POI_TYPE', '')
+    if _effective_poi_type:
+        _biz_kind = classify_business_vs_landmark(_effective_poi_type)
+        if _biz_kind == 'dining':
+            return 'dining', f'poi_type={_effective_poi_type!r} signals dining'
+        if _biz_kind == 'business':
+            return 'business', f'poi_type={_effective_poi_type!r} signals business'
 
     try:
         rows = _find_venue_corpus_rows(venue_name, db_conn)
@@ -1485,6 +1589,258 @@ def _check_dining_nominatim(
     return False, ""
 
 
+def _check_business_existence(
+    stop_title: str, venue_name: str, city_signals: Set[str]
+) -> Tuple[bool, str, Optional[Tuple[float, float]]]:
+    """[LOCAL-779] Existence check for a BUSINESS stop via a maps/places lookup.
+
+    This is the restaurant maps/places path (``_check_dining_nominatim``)
+    generalized to any commercial POI — gyms, cafés, shops, bakeries, bars, spas,
+    climbing walls. The question is the same one the restaurant path asks: "does a
+    place with THIS name exist at an address INSIDE this scope?" A listing that
+    matches by name and sits in the toured city is the evidence; its coordinates
+    come straight from the result so the stop lands on the map at a real address.
+
+    A fabricated branch (a name with no listing anywhere, or a listing in the
+    wrong city) returns ``(False, "", None)`` and is dropped by ENFORCE, exactly
+    as a fabricated landmark is.
+
+    LOCAL-320 contract: all OSM calls go through ``_nominatim_request`` which
+    raises RuntimeError on a throttled/failed lookup; that propagates so the gate
+    classifies the stop as UNKNOWN (kept, retried) rather than searched-and-absent.
+
+    Returns ``(verified, evidence, coords)`` where coords is ``(lat, lng)`` from
+    the matched listing, or None when unverified.
+    """
+    # City hint for the search query — same extraction the dining path uses.
+    _venue_cleaned = re.sub(r'\([^)]*\)', ' ', venue_name or '')
+    city_hint = ""
+    _NOISE_WORDS = {
+        'france', 'italy', 'spain', 'usa', 'uk', 'the', 'tour', 'tours',
+        'walking', 'cycling', 'biking', 'driving', 'near', 'me', 'in', 'of',
+        'gym', 'gyms', 'cafe', 'cafes', 'coffee', 'shop', 'shops', 'store',
+        'stores', 'bakery', 'bar', 'bars', 'fitness', 'stop', 'stops',
+    }
+    for part in re.split(r'[,\s]+', _venue_cleaned):
+        part_alpha = re.sub(r'[^a-zA-ZÀ-ÿ]', '', part.strip())
+        if len(part_alpha) >= 3 and part_alpha.lower() not in _NOISE_WORDS:
+            if part_alpha[0].isupper():
+                city_hint = part_alpha
+                break
+    if not city_hint and city_signals:
+        city_hint = next(iter(city_signals))
+    if not city_hint:
+        return False, "", None
+
+    params = {
+        "q": f"{stop_title}, {city_hint}",
+        "format": "jsonv2",
+        "addressdetails": "1",
+        "limit": "5",
+        "accept-language": "en,fr",
+    }
+    resp = _nominatim_request(params, context=stop_title)
+    results = resp.json()
+    if not results:
+        return False, "", None
+
+    norm_stop = _strip_accents(stop_title).lower()
+    _stop_words = [w for w in re.split(r"[\s'\u2019-]+", norm_stop)
+                   if len(w) >= 3 and w not in ('the', 'les', 'des', 'une', 'la', 'le', 'du')]
+
+    for result in results:
+        display_name = result.get("display_name", "")
+        name = result.get("name", "")
+        category = result.get("category", "")
+        osm_type = result.get("type", "")
+        address = result.get("address", {})
+
+        # --- Name match ---
+        norm_name = _strip_accents(name).lower() if name else ""
+        norm_display = _strip_accents(display_name).lower()
+        name_words_hit = sum(1 for w in _stop_words if w in norm_name or w in norm_display)
+        if _stop_words and name_words_hit < max(1, len(_stop_words) * 0.5):
+            continue
+
+        # --- City/scope match: proximity MUST bind (a Dallas gym must not pass
+        #     for a West Roxbury tour). Structured address fields first. ---
+        result_city = _strip_accents(
+            address.get("city", "") or address.get("town", "") or
+            address.get("municipality", "") or address.get("village", "") or
+            address.get("suburb", "") or address.get("neighbourhood", "")
+        ).lower()
+        result_state = _strip_accents(address.get("state", "")).lower()
+        result_county = _strip_accents(address.get("county", "")).lower()
+        city_match = False
+        for sig in city_signals:
+            if sig and (sig in result_city or sig in result_state or sig in result_county):
+                city_match = True
+                break
+        if not city_match:
+            for sig in city_signals:
+                if sig and sig in norm_display:
+                    city_match = True
+                    break
+        if not city_match:
+            logger.debug(f"[EXISTENCE-GATE] Business result '{name}' in "
+                         f"'{result_city}' rejected — not in {city_signals}")
+            continue
+
+        # --- Category match: is this a commercial/business POI? ---
+        is_business = (
+            osm_type in _BUSINESS_OSM_TYPES or
+            category in _BUSINESS_OSM_CATEGORIES or
+            any(sig in osm_type for sig in _BUSINESS_OSM_TYPES)
+        )
+        strong_name_match = (
+            _stop_words and
+            name_words_hit >= max(1, len(_stop_words) * 0.75)
+        )
+        if is_business or strong_name_match:
+            # Coordinates from the matched listing.
+            coords = None
+            try:
+                coords = (float(result["lat"]), float(result["lon"]))
+            except (KeyError, ValueError, TypeError):
+                coords = None
+            street = address.get("road", "")
+            house = address.get("house_number", "")
+            if street:
+                addr_str = f" ({house} {street}, {result_city})".strip() if house else f" ({street}, {result_city})"
+            else:
+                addr_str = f" ({result_city})" if result_city else ""
+            evidence = (f"nominatim_osm: '{name}' found in {result_city or city_hint}"
+                        f"{addr_str} [category={category}/{osm_type}]")
+            return True, evidence, coords
+
+    return False, "", None
+
+
+def business_replenish_candidates(
+    poi_type: str,
+    scope: str,
+    needed: int,
+    exclude: Optional[Set[str]] = None,
+    device_coords: Optional[Tuple[float, float]] = None,
+) -> List[Dict]:
+    """[LOCAL-779] Replenish a BUSINESS tour from a maps/places search directly.
+
+    When the existence gate drops business stops and the tour is short, the right
+    refill is NOT to ask an LLM for more names (it invents branches) — it is to ask
+    the MAP for "<poi_type> in <scope>" and take the real listings it returns. Each
+    candidate is already verified by construction (it came from the maps provider),
+    carries a real address and coordinates, and is ranked by distance to the device
+    (when the request said "near me" and the app sent coordinates) or to the scope
+    centre otherwise.
+
+    Pure w.r.t. the network seam: all OSM calls go through ``_nominatim_request``,
+    which the tests monkeypatch. Raises nothing — a failed search yields [].
+
+    Returns a list of ``{"name", "address", "coordinates", "lat", "lng",
+    "evidence", "verified": True}`` dicts, at most ``needed`` long, nearest first.
+    """
+    exclude = {e.lower() for e in (exclude or set())}
+    _pt = (poi_type or '').strip() or 'places'
+    _scope = (scope or '').strip()
+    if not _scope:
+        return []
+
+    # Rank origin: device coords when provided ("near me"), else the scope centre.
+    origin = device_coords
+    if origin is None:
+        try:
+            origin = _geocode_city_center(_scope, _city_signals_from_venue(_scope))
+        except RuntimeError:
+            origin = None
+
+    params = {
+        "q": f"{_pt} in {_scope}",
+        "format": "jsonv2",
+        "addressdetails": "1",
+        "limit": "20",
+        "accept-language": "en",
+    }
+    try:
+        resp = _nominatim_request(params, context=f"replenish:{_pt}@{_scope}")
+        results = resp.json() or []
+    except RuntimeError as e:
+        logger.warning(f"[LOCAL-779] business replenish search failed: {e}")
+        return []
+
+    _scope_signals = _city_signals_from_venue(_scope)
+    out = []
+    for r in results:
+        name = (r.get("name") or "").strip()
+        if not name or name.lower() in exclude:
+            continue
+        category = r.get("category", "")
+        osm_type = r.get("type", "")
+        is_business = (
+            osm_type in _BUSINESS_OSM_TYPES or
+            category in _BUSINESS_OSM_CATEGORIES or
+            any(sig in osm_type for sig in _BUSINESS_OSM_TYPES)
+        )
+        if not is_business:
+            continue
+        address = r.get("address", {})
+        result_city = _strip_accents(
+            address.get("city", "") or address.get("town", "") or
+            address.get("municipality", "") or address.get("village", "") or
+            address.get("suburb", "") or address.get("neighbourhood", "")
+        ).lower()
+        result_state = _strip_accents(address.get("state", "")).lower()
+        # Scope proximity must bind — reject a same-named place elsewhere.
+        if _scope_signals:
+            if not any(sig and (sig in result_city or sig in result_state)
+                       for sig in _scope_signals):
+                _disp = _strip_accents(r.get("display_name", "")).lower()
+                if not any(sig and sig in _disp for sig in _scope_signals):
+                    continue
+        try:
+            lat, lng = float(r["lat"]), float(r["lon"])
+        except (KeyError, ValueError, TypeError):
+            continue
+        street = address.get("road", "")
+        house = address.get("house_number", "")
+        if street:
+            addr_str = f"{house} {street}, {result_city}".strip() if house else f"{street}, {result_city}"
+        else:
+            addr_str = r.get("display_name", "")
+        out.append({
+            "name": name,
+            "address": addr_str,
+            "coordinates": f"{lat},{lng}",
+            "lat": lat,
+            "lng": lng,
+            "evidence": (f"nominatim_osm (replenish): '{name}' in "
+                         f"{result_city or _scope} [category={category}/{osm_type}]"),
+            "verified": True,
+            "_dist": (_haversine_km_local(origin, (lat, lng)) if origin else 0.0),
+        })
+        exclude.add(name.lower())
+
+    # Rank by distance (nearest first) when we have an origin; stable otherwise.
+    out.sort(key=lambda d: d["_dist"])
+    for d in out:
+        d.pop("_dist", None)
+    return out[:max(0, needed)]
+
+
+def _haversine_km_local(a, b) -> float:
+    """Great-circle distance in km between two (lat, lng) pairs; inf if either None."""
+    import math as _m
+    if not a or not b:
+        return float('inf')
+    lat1, lon1 = a
+    lat2, lon2 = b
+    r = 6371.0
+    p1, p2 = _m.radians(lat1), _m.radians(lat2)
+    dphi = _m.radians(lat2 - lat1)
+    dlmb = _m.radians(lon2 - lon1)
+    h = _m.sin(dphi / 2) ** 2 + _m.cos(p1) * _m.cos(p2) * _m.sin(dlmb / 2) ** 2
+    return 2 * r * _m.asin(min(1.0, _m.sqrt(h)))
+
+
 # ──── [LOCAL-662B] WALKING-STOP EXISTENCE CHECK ───────────────────────────────
 # A city walking tour's venue (e.g. "Walking tour in Boston …, Boston, MA") has
 # NO venue_corpus row, so _classify_venue_kind returns 'unknown' and the stop
@@ -1770,6 +2126,7 @@ def verify_stop_existence(
     venue_name: str,
     db_conn,
     tour_type: Optional[str] = None,
+    poi_type: Optional[str] = None,
 ) -> Dict:
     """Verify whether a stop actually exists at the claimed venue.
 
@@ -1779,19 +2136,24 @@ def verify_stop_existence(
     LOCAL-281: Added 'dining' kind for restaurant tours.
       - dining: establishment must have external evidence of existence at the
         location (Wikipedia, Wikidata, or authoritative culinary source).
+    LOCAL-779: Added 'business' kind for gym/café/shop/bar/spa tours.
+      - business: a maps/places listing (OSM) whose name matches and whose
+        address lies inside the scope; coordinates come from the listing.
 
     Returns:
         {
             'stop_title': str,
             'venue_name': str,
-            'venue_kind': 'institution' | 'geographic_area' | 'dining' | 'unknown',
+            'venue_kind': 'institution' | 'geographic_area' | 'dining' | 'business' | 'unknown',
             'verified': bool,
             'evidence': str (what confirmed it, or '' if unverified),
-            'source': 'venue_corpus' | 'stop_corpus' | 'stop_corpus_geographic' | 'dining_external' | '',
+            'source': 'venue_corpus' | 'stop_corpus' | 'stop_corpus_geographic' | 'dining_external' | 'business_maps' | '',
+            'coords': (lat, lng) | None,  # LOCAL-779: from a business maps listing
         }
     """
-    # Classify venue kind first (with tour_type for dining detection)
-    venue_kind, kind_evidence = _classify_venue_kind(venue_name, db_conn, tour_type=tour_type)
+    # Classify venue kind first (tour_type for dining, poi_type for business)
+    venue_kind, kind_evidence = _classify_venue_kind(
+        venue_name, db_conn, tour_type=tour_type, poi_type=poi_type)
 
     result = {
         'stop_title': stop_title,
@@ -1800,6 +2162,7 @@ def verify_stop_existence(
         'verified': False,
         'evidence': '',
         'source': '',
+        'coords': None,
     }
 
     # Check 1: venue_corpus (canonical titles, SPARQL works)
@@ -1830,6 +2193,34 @@ def verify_stop_existence(
             result['verified'] = True
             result['evidence'] = evidence
             result['source'] = 'geographic_tier1_wikipedia'
+            return result
+    elif venue_kind == 'business':
+        # LOCAL-779: Gym/café/shop/bar/spa verification via a maps/places lookup.
+        # The question is "does a place with this name exist at an address inside
+        # the scope?" — the same question the dining path asks, generalized to any
+        # commercial POI. A match supplies the stop's coordinates straight from the
+        # listing; a fabricated name with no listing (or one in the wrong city) is
+        # dropped by ENFORCE exactly as a fabricated landmark is.
+        #
+        # LOCAL-320: RuntimeError from the OSM lookup means the search FAILED
+        # (throttle/timeout/connection). That is UNKNOWN (keep, retry), never
+        # searched-and-absent — D162.
+        _biz_city_signals = _city_signals_from_venue(venue_name)
+        try:
+            verified, evidence, coords = _check_business_existence(
+                stop_title, venue_name, _biz_city_signals)
+            if verified:
+                result['verified'] = True
+                result['evidence'] = evidence
+                result['source'] = 'business_maps'
+                result['coords'] = coords
+                return result
+        except RuntimeError as e:
+            result['evidence'] = f'search_failed: {e}'
+            result['source'] = 'search_failed'
+            result['search_failed'] = True
+            logger.warning(f"[EXISTENCE-GATE] Business maps search failed for "
+                           f"{stop_title!r}: {e}")
             return result
     elif venue_kind == 'dining':
         # LOCAL-281: Restaurant/dining verification via external sources.
@@ -1997,6 +2388,7 @@ def run_existence_gate(
     venue_name: str,
     db_conn,
     tour_type: Optional[str] = None,
+    poi_type: Optional[str] = None,
 ) -> Dict:
     """Run the stop-existence gate over a list of candidate stops.
 
@@ -2044,7 +2436,7 @@ def run_existence_gate(
     inconclusive_stops = []  # LOCAL-320 bounce: third state — kept but NOT verified
 
     for stop_title in poi_list:
-        verdict = verify_stop_existence(stop_title, venue_name, db_conn, tour_type=tour_type)
+        verdict = verify_stop_existence(stop_title, venue_name, db_conn, tour_type=tour_type, poi_type=poi_type)
         verdicts.append(verdict)
         if verdict['verified']:
             verified_stops.append(stop_title)
@@ -2064,7 +2456,7 @@ def run_existence_gate(
               f"retrying after pause")
         time.sleep(_NOMINATIM_MIN_INTERVAL * 2)  # Extra breathing room
         for i, stop_title in enumerate(_failed_stops):
-            retry_verdict = verify_stop_existence(stop_title, venue_name, db_conn, tour_type=tour_type)
+            retry_verdict = verify_stop_existence(stop_title, venue_name, db_conn, tour_type=tour_type, poi_type=poi_type)
             # Replace the failed verdict
             for j, v in enumerate(verdicts):
                 if v['stop_title'] == stop_title and v.get('search_failed'):

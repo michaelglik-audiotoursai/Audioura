@@ -1237,6 +1237,57 @@ def _compute_route_order(poi_list):
     return reordered
 
 
+def _scope_from_request(location, intent=None):
+    """[LOCAL-779] Best-effort clean geographic scope from a tour request string.
+
+    The PHASE 3C address guard needs the PLACE the tour is bounded to — "West
+    Roxbury, MA" — not the whole request "middle eastern restaurants near me, west
+    Roxbury, MA". Prefer the intent's geographic_scope when the caller has it; this
+    function is the deterministic fallback when it is empty (e.g. intent HTTP 429).
+
+    Strategy: strip a leading "<tour type>:" label, then split on commas and drop
+    leading segments that are ENTIRELY poi/activity/filler words ("gyms near me",
+    "middle eastern restaurants near me"), stopping at the first segment that names
+    a place. A stray "near me" inside the surviving segment is removed. Never
+    returns empty — falls back to the original string so the guard still runs.
+    """
+    if intent and (intent.get('geographic_scope') or '').strip():
+        return intent['geographic_scope'].strip()
+    s = (location or '').strip()
+    if not s:
+        return s
+    s = re.sub(r'^\s*[\w\s-]*?tour\s*:\s*', '', s, flags=re.IGNORECASE).strip()
+    parts = [p.strip() for p in s.split(',') if p.strip()]
+    if not parts:
+        return s
+    _POI_FILLER = {
+        'restaurant', 'restaurants', 'gym', 'gyms', 'cafe', 'cafes', 'café',
+        'cafés', 'coffee', 'coffeehouse', 'coffeeshop', 'shop', 'shops', 'store',
+        'stores', 'bakery', 'bakeries', 'bar', 'bars', 'pub', 'pubs', 'brewery',
+        'breweries', 'spa', 'spas', 'yoga', 'pilates', 'climbing', 'bouldering',
+        'fitness', 'crossfit', 'salon', 'barber', 'deli', 'market', 'studio',
+        'boutique', 'tour', 'tours', 'walking', 'biking', 'cycling', 'driving',
+        'self', 'guided', 'near', 'me', 'in', 'of', 'around', 'the', 'a', 'best',
+        'top', 'good', 'great', 'some', 'few', 'eastern', 'western', 'northern',
+        'southern', 'italian', 'chinese', 'thai', 'mexican', 'indian', 'japanese',
+        'korean', 'french', 'greek', 'spanish', 'middle', 'american',
+        'vietnamese', 'mediterranean', 'halal', 'kosher', 'vegan', 'vegetarian',
+    }
+    while len(parts) > 1:
+        words = re.findall(r"[a-zà-ÿ]+", parts[0].lower())
+        if words and all(w in _POI_FILLER for w in words) and not re.search(r'\d', parts[0]):
+            parts.pop(0)
+        else:
+            break
+    parts[0] = re.sub(r'\bnear\s+me\b', '', parts[0], flags=re.IGNORECASE).strip(' ,:;')
+    toks = parts[0].split()
+    while len(toks) > 1 and toks[0].lower().strip(',') in _POI_FILLER:
+        toks.pop(0)
+    parts[0] = ' '.join(toks)
+    out = ', '.join([p for p in parts if p]).strip(' ,:;')
+    return out if out else (location or '')
+
+
 def _address_matches_location(address, loc):
     """Return True if any address token (after postcode stripping, short-token filtering,
     and neighborhood aliasing) appears in the location string, or if we cannot determine
@@ -1261,6 +1312,15 @@ def _address_matches_location(address, loc):
         and not re.match(r'^[a-z]{2}\s+\d{4,6}', p)                 # state+zip: 'ma 01901'
     ]
     for token in text_parts:
+        # [LOCAL-779] Check the RAW token against the location first. The scope may
+        # itself be the neighbourhood ("West Roxbury, MA"), in which case the direct
+        # match must win BEFORE the neighbourhood→city alias (which would rewrite
+        # 'west roxbury' to 'boston' and then fail against a "West Roxbury" scope —
+        # the restaurant containment bug). The alias stays as a fallback so an
+        # address in "West Roxbury" still matches a request phrased "Boston".
+        token_words = set(re.findall(r'[a-z]+', token))
+        if token_words and token_words.issubset(loc_words):
+            return True
         effective = _NEIGHBORHOOD_TO_CITY.get(token, token)
         # Word-set subset check: all words in effective must appear as whole words in loc.
         # Prevents 'lynn' matching 'lynnfield', 'york' matching 'new york' (reverse).
@@ -1791,8 +1851,22 @@ def verify_poi_matches_type(poi_name, poi_type, api_key):
     """
     Verify each POI matches the requested type.
     Cost: ~$0.0004 per POI
+
+    [LOCAL-779] When the poi_type carries a CUISINE or sub-type qualifier ("middle
+    eastern restaurants", "vegan cafés"), the match must honour it. The field bug:
+    PHASE 4 accepted "Mamma Maria" (an Italian restaurant) for a "middle eastern
+    restaurants" request because the prompt only asked the broad class ("is it a
+    restaurant?"). The prompt below asks the full qualified type and tells the model
+    that a wrong cuisine/sub-type is a NON-match, with a worked cuisine example.
     """
-    verification_prompt = f"""Is "{poi_name}" actually a {poi_type.rstrip('s')}?
+    _pt = (poi_type or '').strip()
+    _pt_singular = _pt.rstrip('s') if _pt else _pt
+    verification_prompt = f"""Is "{poi_name}" actually a {_pt_singular}?
+
+The type may carry a CUISINE or sub-type qualifier (e.g. "middle eastern
+restaurant", "vegan cafe", "climbing gym"). The qualifier MUST match: a place of
+the right broad class but the WRONG cuisine/sub-type is NOT a match. If you are
+not confident the place matches the FULL qualified type, answer false.
 
 Respond with ONLY a JSON object:
 {{
@@ -1801,8 +1875,11 @@ Respond with ONLY a JSON object:
     "confidence": "high/medium/low"
 }}
 
-Example: For "Paul Revere House" and poi_type "restaurant":
-{{"matches": false, "reason": "Paul Revere House is a historic museum, not a restaurant", "confidence": "high"}}
+Examples:
+- For "Paul Revere House" and poi_type "restaurant":
+  {{"matches": false, "reason": "Paul Revere House is a historic museum, not a restaurant", "confidence": "high"}}
+- For "Mamma Maria" and poi_type "middle eastern restaurant":
+  {{"matches": false, "reason": "Mamma Maria is an Italian restaurant, not a Middle Eastern one", "confidence": "high"}}
 """
 
     headers = {
@@ -12750,7 +12827,27 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
                 reason = (c.get("reason") or "").strip()
                 if reason and tour_category in ('restaurant', 'walking'):
                     from selection_reason_filter import reason_has_substance
-                    if reason_has_substance(reason):
+                    # [LOCAL-779] A BUSINESS stop (gym, café, shop, bar, spa …) is
+                    # NOT a landmark: it rarely has a "specific date, person, or
+                    # event" reason, and demanding one wipes out every real gym at
+                    # PHASE 3A before the existence gate can verify it on the map
+                    # (the LOCAL-779 clean-fail — "no usable POIs after parsing").
+                    # Existence for a business is proven by a maps/places listing
+                    # downstream, not by a notable-reason sentence, so businesses
+                    # are exempt from the hollow-reason substance filter.
+                    _is_business_poi = False
+                    try:
+                        from stop_existence_gate import classify_business_vs_landmark as _cbl
+                        _pt_for_cls = ''
+                        if intent and intent.get('poi_type'):
+                            _ptr = intent['poi_type']
+                            _pt_for_cls = " or ".join(_ptr) if isinstance(_ptr, list) else _ptr
+                        _is_business_poi = _cbl(_pt_for_cls) == 'business'
+                    except Exception:
+                        _is_business_poi = False
+                    if _is_business_poi:
+                        _selection_reasons[name.lower()] = reason  # keep as-is
+                    elif reason_has_substance(reason):
                         _selection_reasons[name.lower()] = reason
                     else:
                         # Hollow reason — the venue may still be real, but the LLM
@@ -14260,7 +14357,17 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
                     print(f"  [LOCAL-751] named places to protect (D562): "
                           f"{_walk_named_places}")
 
-                _area = resolve_area(_location_normalized)
+                # [LOCAL-779] Resolve the AREA off the clean geographic scope, not
+                # the raw request. "walking tour: gyms near me, west Roxbury, MA"
+                # normalises to "gyms near me, west Roxbury, MA", which made the
+                # parser read neighborhood=': gyms near me' and ignore the phone's
+                # location. The scope ("West Roxbury, MA" — from intent or the
+                # deterministic clause stripper) is the place the resolver needs.
+                _area_input = _scope_from_request(_location_normalized, intent)
+                if _area_input and _area_input != _location_normalized:
+                    print(f"  [LOCAL-779] area resolver input: {_area_input!r} "
+                          f"(stripped poi/near-me from {_location_normalized!r})")
+                _area = resolve_area(_area_input or _location_normalized)
                 if _area and _area.resolved:
                     # Check cache first
                     _cached_landmarks = cache_get_area(_area)
@@ -14406,6 +14513,22 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
         if tour_category == 'walking':
             print(f"   PHASE 3C: skipped for walking tours (GEO-CHECK handles proximity)")
         elif tour_category != 'museum' or not _museum_venue_name:
+            # [LOCAL-779] Compare the address against the RESOLVED SCOPE, not the
+            # whole request string. The old code passed `location` — the entire
+            # request, e.g. "middle eastern restaurants near me, west Roxbury, MA".
+            # That let the poi_type words ("restaurants", "near", "me") count as
+            # location tokens, and for some phrasings the real place token was lost
+            # among them, so EVERY stop was removed ("REMOVED 'Al Wadi' … not in
+            # 'middle eastern restaurants near me, west Roxbury, MA'"). The scope is
+            # the intent's geographic_scope ("west Roxbury, MA") when present, else
+            # the request with the poi_type/"near me" clause stripped.
+            _p3c_scope = ''
+            if intent and (intent.get('geographic_scope') or '').strip():
+                _p3c_scope = intent['geographic_scope'].strip()
+            if not _p3c_scope:
+                _p3c_scope = _scope_from_request(location, intent)
+            print(f"   PHASE 3C: scope for address guard = {_p3c_scope!r} "
+                  f"(was whole request {location!r})")
             location_rejects = []
             for p in poi_list:
                 p_norm = _normalize_name(p['name'])
@@ -14419,11 +14542,11 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
                     _why = 'anchor' if p.get('_anchor') else 'user-explicit'
                     print(f"   PHASE 3C: KEPT '{p['name']}' ({_why} stop, address check bypassed)")
                     continue
-                if not _address_matches_location(p.get('address', ''), location):
+                if not _address_matches_location(p.get('address', ''), _p3c_scope):
                     location_rejects.append(p)
             if location_rejects:
                 for p in location_rejects:
-                    print(f"   PHASE 3C: REMOVED '{p['name']}' -- address '{p['address']}' not in '{location}'")
+                    print(f"   PHASE 3C: REMOVED '{p['name']}' -- address '{p['address']}' not in scope {_p3c_scope!r}")
                     forbidden_norms.add(_normalize_name(p['name']))
                 poi_list = [p for p in poi_list if p not in location_rejects]
                 print(f"   PHASE 3C: {len(location_rejects)} out-of-area stop(s) removed; {len(poi_list)} remain")
@@ -14516,7 +14639,10 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
                 if tour_category == 'walking':
                     pass  # GEO-CHECK handles proximity for walking tours
                 elif tour_category != 'museum' or not _museum_venue_name:
-                    survived = [p for p in survived if _address_matches_location(p.get('address', ''), location)]
+                    # [LOCAL-779] Same resolved-scope guard as PHASE 3C above —
+                    # never the whole request string.
+                    _rep_scope = _p3c_scope if '_p3c_scope' in dir() and _p3c_scope else location
+                    survived = [p for p in survived if _address_matches_location(p.get('address', ''), _rep_scope)]
                 
                 # [TRANSPORT-VERIFY] Also verify Part C replacements for transport accessibility
                 if survived:
@@ -14947,11 +15073,42 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
                     _seg_stop_names = [p['name'] for p in _seg_checked_pois]
                     # LOCAL-313: pass tour_category so dining tours use the correct
                     # verification path (Nominatim/OSM) instead of museum-shaped checks
+                    # LOCAL-779: pass the intent poi_type so a BUSINESS tour (gyms,
+                    # cafés, shops …) routes to the maps/places existence path even
+                    # when tour_category is 'walking'. A gym is not on Wikidata; the
+                    # landmark path would drop every stop (the LOCAL-779 bug).
+                    _seg_poi_type = ''
+                    if intent and intent.get('poi_type'):
+                        _rawpt = intent['poi_type']
+                        _seg_poi_type = " or ".join(_rawpt) if isinstance(_rawpt, list) else _rawpt
                     _seg_result = (run_existence_gate(_seg_stop_names, _seg_venue, _seg_conn,
-                                                     tour_type=tour_category)
+                                                     tour_type=tour_category,
+                                                     poi_type=_seg_poi_type)
                                    if _seg_stop_names
-                                   else {'unverified_stops': [], 'inconclusive_stops': []})
+                                   else {'unverified_stops': [], 'inconclusive_stops': [],
+                                         'verdicts': []})
                     _seg_conn.close()
+
+                    # [LOCAL-779] Attach coordinates discovered by the BUSINESS maps
+                    # path to the matching stop. The listing that proved a gym/café
+                    # exists also gives its real address coordinates, so the stop
+                    # lands on the map at a verified location rather than a geocode
+                    # of its name later. Only fills coords that are still missing.
+                    try:
+                        for _v in _seg_result.get('verdicts', []):
+                            if _v.get('verified') and _v.get('coords') and _v.get('source') == 'business_maps':
+                                for _p in poi_list:
+                                    if _p['name'] == _v['stop_title'] and not _poi_has_coordinates(_p):
+                                        _blat, _blng = _v['coords']
+                                        _p['coordinates'] = f"{_blat},{_blng}"
+                                        _p['latitude'] = _blat
+                                        _p['longitude'] = _blng
+                                        _p['coords_source'] = 'business_maps'
+                                        print(f"    [LOCAL-779] coords for {_p['name']!r} "
+                                              f"from maps listing: {_v['coords']}")
+                                        break
+                    except Exception as _coord_err:
+                        print(f"    [LOCAL-779] coord attach error (non-fatal): {_coord_err}")
 
                     if _seg_mode == 'enforce' and _seg_result['unverified_stops']:
                         _seg_unverified_set = set(_seg_result['unverified_stops'])
@@ -15000,6 +15157,52 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
             # Also exclude all names we already tried (including dropped ones)
             _rep_tried.update(n.lower() for n in (_seg_result.get('unverified_stops', [])
                                                   if '_seg_result' in dir() else []))
+
+            # ──── [LOCAL-779] BUSINESS REPLENISHMENT (maps/places first) ──────
+            # For a BUSINESS tour, refill from the maps provider directly —
+            # "<poi_type> in <scope>" — not from an LLM (which invents branches).
+            # Each listing is verified by construction, carries a real address and
+            # coordinates, and is ranked by distance. Device coords are not threaded
+            # through generate_tour_text yet, so "near me" ranks to the scope centre
+            # (the task's stated fallback). Falls through to the GPT→gate loop below
+            # if the maps refill cannot fill the count.
+            try:
+                _seg_poi_type_rep = ''
+                if intent and intent.get('poi_type'):
+                    _rpt = intent['poi_type']
+                    _seg_poi_type_rep = " or ".join(_rpt) if isinstance(_rpt, list) else _rpt
+                from stop_existence_gate import (classify_business_vs_landmark as _cls_biz,
+                                                 business_replenish_candidates as _biz_replenish)
+                if _cls_biz(_seg_poi_type_rep) == 'business':
+                    _biz_scope = _scope_from_request(location, intent)
+                    print(f"  [LOCAL-779] BUSINESS replenishment: maps search "
+                          f"{_seg_poi_type_rep!r} in {_biz_scope!r} (need {_rep_needed})")
+                    _biz_cands = _biz_replenish(_seg_poi_type_rep, _biz_scope,
+                                                _rep_needed, exclude=_rep_tried)
+                    for _bc in _biz_cands:
+                        if len(poi_list) >= _seg_requested_stops:
+                            break
+                        if _bc['name'].lower() in _rep_tried:
+                            continue
+                        _bp = _new_poi(_bc['name'], _bc.get('address', ''))
+                        _bp['coordinates'] = _bc['coordinates']
+                        _bp['latitude'] = _bc['lat']
+                        _bp['longitude'] = _bc['lng']
+                        _bp['coords_source'] = 'business_maps'
+                        _bp['confirmation'] = 'knowledge'
+                        poi_list.append(_bp)
+                        _rep_tried.add(_bc['name'].lower())
+                        forbidden_norms.add(_normalize_name(_bc['name']))
+                        print(f"    [LOCAL-779] replenished business stop: {_bc['name']!r} "
+                              f"-- {_bc.get('address','')} -- {_bc['evidence']}")
+                    if len(poi_list) >= _seg_requested_stops:
+                        print(f"  [LOCAL-779] BUSINESS replenishment filled the count "
+                              f"({len(poi_list)}/{_seg_requested_stops})")
+            except Exception as _biz_rep_err:
+                print(f"  [LOCAL-779] business replenishment skipped (non-fatal): {_biz_rep_err}")
+            # ──── END [LOCAL-779] ──────────────────────────────────────────────
+
+            _rep_needed = _seg_requested_stops - len(poi_list)
             _REP_MAX_ROUNDS = 2
             _rep_round = 0
 
