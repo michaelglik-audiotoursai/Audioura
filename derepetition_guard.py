@@ -4,9 +4,12 @@ Derepetition Guard — catches overused/cliché phrases in tour narration.
 Compiled from analysis of chagall_current_tour.txt and common GPT-isms.
 Use scan_for_repetition() to check generated text before committing it.
 """
+import os
 import re
 from typing import List
 from cost_rates import llm_cost as _llm_cost
+# [LOCAL-771] gpt-3.5-turbo retired (D716) — fall back to a live model.
+from llm_fallback import live_model, DEFAULT_FALLBACK
 
 try:  # [2026-09-18] abbreviation-safe sentence splitting — a bare
     # (?<=[.!?])\s+ cuts 'St. Mary' in two, and a gate then drops one half:
@@ -286,7 +289,7 @@ def rewrite_repeated_sentence(
                 "Content-Type": "application/json",
             },
             json={
-                "model": "gpt-3.5-turbo",
+                "model": live_model(os.environ.get("TOUR_LLM_MODEL", DEFAULT_FALLBACK)),
                 "messages": [
                     {"role": "system", "content": "You are a creative writing editor. Return only the rewritten text."},
                     {"role": "user", "content": prompt},

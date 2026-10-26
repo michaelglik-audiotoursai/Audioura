@@ -6,10 +6,14 @@ Used by the spine generator to ground narrative in reality.
 """
 import json
 import logging
+import os
 import re
 from typing import Optional
 
 import requests
+
+# [LOCAL-771] gpt-3.5-turbo retired (D716) — fall back to a live model.
+from llm_fallback import live_model, DEFAULT_FALLBACK
 
 logger = logging.getLogger(__name__)
 
@@ -80,7 +84,7 @@ def generate_fact_sheet(
                 "Content-Type": "application/json",
             },
             json={
-                "model": "gpt-3.5-turbo",
+                "model": live_model(os.environ.get("TOUR_LLM_MODEL", DEFAULT_FALLBACK)),
                 "messages": [
                     {"role": "system", "content": "You return ONLY valid JSON. No markdown, no commentary."},
                     {"role": "user", "content": prompt},

@@ -5,7 +5,7 @@ Generates contextual directions between stops in a tour.
 - Museum tours: room-to-room guidance referencing stop names.
 - Outdoor tours: mode-aware directions (cycling, walking, driving, animal).
 
-Uses GPT-3.5-turbo with explicit constraints against fabricating distances
+Uses a chat model with explicit constraints against fabricating distances
 or compass bearings inside buildings.
 
 [LOCAL-253] Transport-mode awareness: directions now respect the tour's
@@ -15,8 +15,11 @@ public transport suggestions, wrong-mode verbs).
 """
 import json
 import logging
+import os
 import re
 import requests
+# [LOCAL-771] gpt-3.5-turbo retired (D716) — fall back to a live model.
+from llm_fallback import live_model, DEFAULT_FALLBACK
 
 logger = logging.getLogger(__name__)
 
@@ -183,7 +186,7 @@ def generate_real_directions(
                 "Content-Type": "application/json",
             },
             json={
-                "model": "gpt-3.5-turbo",
+                "model": live_model(os.environ.get("TOUR_LLM_MODEL", DEFAULT_FALLBACK)),
                 "messages": [
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": user_prompt},
@@ -335,7 +338,7 @@ def generate_walking_directions(
                 "Content-Type": "application/json",
             },
             json={
-                "model": "gpt-3.5-turbo",
+                "model": live_model(os.environ.get("TOUR_LLM_MODEL", DEFAULT_FALLBACK)),
                 "messages": [
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": user_prompt},
