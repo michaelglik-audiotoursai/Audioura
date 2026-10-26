@@ -5,10 +5,12 @@ Extracted from generate_tour_text.py for modular use.
 import os
 import json
 import requests
+# [LOCAL-771] gpt-3.5-turbo retired (D716) — fall back to a live model.
+from llm_fallback import live_model, DEFAULT_FALLBACK
 
 
 def describe_point_of_interest(poi_name, artist="", year="", location="", tour_type="", 
-                             word_count=300, api_key=None, model="gpt-3.5-turbo"):
+                             word_count=300, api_key=None, model=DEFAULT_FALLBACK):
     """
     Generate a detailed description for a Point of Interest using OpenAI API.
     
@@ -20,7 +22,7 @@ def describe_point_of_interest(poi_name, artist="", year="", location="", tour_t
         tour_type (str, optional): Type of tour (e.g., "sculpture", "architecture")
         word_count (int, optional): Target word count for description (default: 300)
         api_key (str, optional): OpenAI API key. If None, will try environment variable
-        model (str, optional): OpenAI model to use (default: "gpt-3.5-turbo")
+        model (str, optional): OpenAI model to use (default: gpt-4o-mini)
     
     Returns:
         dict: Contains 'orientation', 'description', 'word_count', 'cost', 'tokens_used'
@@ -90,7 +92,7 @@ DO NOT include directions to the next stop - these will be added separately.
     }
     
     description_data = {
-        "model": model,
+        "model": live_model(model),
         "messages": [
             {"role": "system", "content": "You are a knowledgeable museum guide with expertise in art, architecture, and history."},
             {"role": "user", "content": description_prompt}
@@ -153,7 +155,7 @@ DO NOT include directions to the next stop - these will be added separately.
 
 
 def describe_multiple_pois(poi_list, location="", tour_type="", word_count=300, 
-                          api_key=None, model="gpt-3.5-turbo", delay=1):
+                          api_key=None, model=DEFAULT_FALLBACK, delay=1):
     """
     Generate descriptions for multiple POIs with cost tracking.
     

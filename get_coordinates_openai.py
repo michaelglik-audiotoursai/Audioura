@@ -1,5 +1,8 @@
 import requests
 import sys
+import os
+# [LOCAL-771] gpt-3.5-turbo retired (D716) — fall back to a live model.
+from llm_fallback import live_model, DEFAULT_FALLBACK
 
 def get_coordinates_from_openai(location, api_key):
     """Get coordinates for a location using OpenAI API."""
@@ -14,7 +17,7 @@ def get_coordinates_from_openai(location, api_key):
     prompt = f"What are the latitude and longitude coordinates for {location}? Please respond with only the decimal coordinates in the format 'latitude, longitude' without any other text."
     
     data = {
-        "model": "gpt-3.5-turbo",
+        "model": live_model(os.environ.get("TOUR_LLM_MODEL", DEFAULT_FALLBACK)),
         "messages": [
             {"role": "system", "content": "You are a helpful assistant that provides precise geographic coordinates."},
             {"role": "user", "content": prompt}

@@ -13,6 +13,11 @@ _MODULE_DIR = _os.path.dirname(_os.path.abspath(__file__))
 if _MODULE_DIR not in _sys.path:
     _sys.path.insert(0, _MODULE_DIR)
 
+# [LOCAL-771] OpenAI retired gpt-3.5-turbo (D716). live_model() maps any retired
+# model name to a live fallback (gpt-4o-mini by default; gpt-4.1-mini for the two
+# LOCAL-560 scope/verify gates). A genuine TOUR_LLM_MODEL override still wins.
+from llm_fallback import live_model, DEFAULT_FALLBACK, SCOPE_GATE_FALLBACK
+
 
 # ──── [LOCAL-437] MODULE-SCOPE PREDICATE: checklist exemption from existence gate ────
 # This predicate is the SINGLE source of truth for whether exhibition-sourced
@@ -206,7 +211,7 @@ def _tour_llm_cost(tokens: int, model: str = None) -> float:
     of the pipeline, so its caller must pass the model it actually called.
     """
     return _llm_cost(total_tokens=tokens,
-                     model=model or os.environ.get("TOUR_LLM_MODEL", "gpt-3.5-turbo"))
+                     model=live_model(model or os.environ.get("TOUR_LLM_MODEL", DEFAULT_FALLBACK)))
 
 import sys
 import json
@@ -811,7 +816,7 @@ def _verify_transport_accessibility(poi_list, transport_mode, location, api_key)
             "https://api.openai.com/v1/chat/completions",
             headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
             json={
-                "model": os.environ.get("TOUR_LLM_MODEL", "gpt-3.5-turbo"),
+                "model": live_model(os.environ.get("TOUR_LLM_MODEL", DEFAULT_FALLBACK)),
                 "messages": [
                     {"role": "system", "content": "You return ONLY a valid JSON array. No markdown, no commentary."},
                     {"role": "user", "content": prompt},
@@ -1169,7 +1174,7 @@ Examples:
     }
     
     data = {
-        "model": os.environ.get("TOUR_LLM_MODEL", "gpt-3.5-turbo"),
+        "model": live_model(os.environ.get("TOUR_LLM_MODEL", DEFAULT_FALLBACK)),
         "messages": [
             {"role": "system", "content": "You are a tour planning assistant. Respond only with valid JSON."},
             {"role": "user", "content": intent_prompt}
@@ -1254,7 +1259,7 @@ Example: For "Paul Revere House" and poi_type "restaurant":
     }
     
     data = {
-        "model": os.environ.get("TOUR_LLM_MODEL", "gpt-3.5-turbo"),
+        "model": live_model(os.environ.get("TOUR_LLM_MODEL", SCOPE_GATE_FALLBACK), SCOPE_GATE_FALLBACK),
         "messages": [
             {"role": "system", "content": "You are a location verification assistant. Respond only with valid JSON."},
             {"role": "user", "content": verification_prompt}
@@ -2223,7 +2228,7 @@ def _geocode_missing_coordinates(poi_list, location, headers,
                   "Only coordinates, nothing else."
             )
             data = {
-                "model": os.environ.get("TOUR_LLM_MODEL", "gpt-3.5-turbo"),
+                "model": live_model(os.environ.get("TOUR_LLM_MODEL", DEFAULT_FALLBACK)),
                 "messages": [
                     {"role": "system", "content": "You provide accurate GPS coordinates. "
                      "Respond only with Latitude and Longitude lines."},
@@ -2399,7 +2404,7 @@ def _validate_stops_within_scope(poi_list, scope_name, headers, max_check=12,
             '{"inside_scope": true/false, "confidence": "high/medium/low", "reason": "<brief>"}'
         )
         data = {
-            "model": os.environ.get("TOUR_LLM_MODEL", "gpt-3.5-turbo"),
+            "model": live_model(os.environ.get("TOUR_LLM_MODEL", SCOPE_GATE_FALLBACK), SCOPE_GATE_FALLBACK),
             "messages": [
                 {"role": "system", "content": "You are a geography fact-checker. Respond only with valid JSON."},
                 {"role": "user", "content": prompt},
@@ -2900,7 +2905,7 @@ OUTPUT: Return one clause per line (no numbering, no bullet points, no periods).
             "https://api.openai.com/v1/chat/completions",
             headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
             json={
-                "model": os.environ.get("TOUR_LLM_MODEL", "gpt-3.5-turbo"),
+                "model": live_model(os.environ.get("TOUR_LLM_MODEL", DEFAULT_FALLBACK)),
                 "messages": [
                     {"role": "system", "content": "You rephrase facts into short clauses. You never invent. You return plain text, one clause per line."},
                     {"role": "user", "content": _compose_prompt},
@@ -3933,7 +3938,7 @@ def _validate_museum_stop_descriptions(poi_list, venue_name, headers):
             '{"inside_venue": true/false, "confidence": "high/medium/low", "reason": "<brief>"}'
         )
         data = {
-            "model": os.environ.get("TOUR_LLM_MODEL", "gpt-3.5-turbo"),
+            "model": live_model(os.environ.get("TOUR_LLM_MODEL", SCOPE_GATE_FALLBACK), SCOPE_GATE_FALLBACK),
             "messages": [
                 {"role": "system", "content": "You are a fact-checker. Respond only with valid JSON."},
                 {"role": "user", "content": prompt}
@@ -9164,7 +9169,7 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
             + _phase3a_json_hint
         )
         phase_3a_data = {
-            "model": os.environ.get("TOUR_LLM_MODEL", "gpt-3.5-turbo"),
+            "model": live_model(os.environ.get("TOUR_LLM_MODEL", DEFAULT_FALLBACK)),
             "messages": [
                 {"role": "system", "content": "You return ONLY a valid JSON array. No markdown, no commentary."},
                 {"role": "user", "content": phase_3a_prompt}
@@ -9769,7 +9774,7 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                         _r4_prompt += "You may include works from this list AND other works you know are there.\n"
                 _r4_prompt += f"Return ONLY a JSON array: [{{\"name\": \"...\", \"address\": \"...\"}}]"
                 _r4_data = {
-                    "model": os.environ.get("TOUR_LLM_MODEL", "gpt-3.5-turbo"),
+                    "model": live_model(os.environ.get("TOUR_LLM_MODEL", DEFAULT_FALLBACK)),
                     "messages": [
                         {"role": "system", "content": "Return ONLY valid JSON arrays."},
                         {"role": "user", "content": _r4_prompt}
@@ -10301,7 +10306,7 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                 '[{"name": "...", "address": "..."}, ...]'
             )
             replacement_data = {
-                "model": os.environ.get("TOUR_LLM_MODEL", "gpt-3.5-turbo"),
+                "model": live_model(os.environ.get("TOUR_LLM_MODEL", DEFAULT_FALLBACK)),
                 "messages": [
                     {"role": "system", "content": "You return ONLY a valid JSON array. No markdown, no commentary."},
                     {"role": "user", "content": replacement_prompt}
@@ -10812,7 +10817,7 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                     '\nReturn ONLY a JSON array: [{"name": "...", "address": "..."}]'
                 )
                 _rep_data = {
-                    "model": os.environ.get("TOUR_LLM_MODEL", "gpt-3.5-turbo"),
+                    "model": live_model(os.environ.get("TOUR_LLM_MODEL", DEFAULT_FALLBACK)),
                     "messages": [
                         {"role": "system", "content": "Return ONLY valid JSON arrays."},
                         {"role": "user", "content": _rep_prompt}
@@ -10942,7 +10947,7 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                 '\nReturn ONLY a JSON array: [{"name": "...", "address": "..."}]'
             )
             _inc_data = {
-                "model": os.environ.get("TOUR_LLM_MODEL", "gpt-3.5-turbo"),
+                "model": live_model(os.environ.get("TOUR_LLM_MODEL", DEFAULT_FALLBACK)),
                 "messages": [
                     {"role": "system", "content": "Return ONLY valid JSON arrays."},
                     {"role": "user", "content": _inc_prompt}
@@ -11115,7 +11120,7 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                 + _json_schema_block
             )
             req_data = {
-                "model": os.environ.get("TOUR_LLM_MODEL", "gpt-3.5-turbo"),
+                "model": live_model(os.environ.get("TOUR_LLM_MODEL", DEFAULT_FALLBACK)),
                 "messages": [
                     {"role": "system", "content": "You return ONLY a valid JSON array. No markdown, no commentary."},
                     {"role": "user", "content": prompt}
@@ -11577,7 +11582,7 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                 + ".\nFormat: Latitude: [number]\nLongitude: [number]\nOnly coordinates, nothing else."
             )
             data = {
-                "model": os.environ.get("TOUR_LLM_MODEL", "gpt-3.5-turbo"),
+                "model": live_model(os.environ.get("TOUR_LLM_MODEL", DEFAULT_FALLBACK)),
                 "messages": [
                     {"role": "system", "content": "You provide accurate GPS coordinates. Respond only with Latitude and Longitude lines."},
                     {"role": "user", "content": prompt}
@@ -11699,7 +11704,7 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                             '[{"name": "...", "address": "..."}, ...]'
                         )
                         rep_data = {
-                            "model": os.environ.get("TOUR_LLM_MODEL", "gpt-3.5-turbo"),
+                            "model": live_model(os.environ.get("TOUR_LLM_MODEL", DEFAULT_FALLBACK)),
                             "messages": [
                                 {"role": "system", "content": "You return ONLY a valid JSON array. No markdown, no commentary."},
                                 {"role": "user", "content": rep_prompt}
@@ -17118,7 +17123,7 @@ REWRITE RULES (all mandatory):
                     # the same model as the writer, or a model A/B silently compares
                     # new-model prose against old-model repairs.
                     _retry_data = {
-                        "model": os.environ.get("TOUR_LLM_MODEL", "gpt-3.5-turbo"),
+                        "model": live_model(os.environ.get("TOUR_LLM_MODEL", DEFAULT_FALLBACK)),
                         "messages": [
                             {"role": "system", "content": "You are a copy editor fixing style violations in audio tour narration. You rewrite only — never add new information."},
                             {"role": "user", "content": _retry_prompt}
@@ -19779,7 +19784,7 @@ NARRATIVE THREAD (weave into Part 3 as the central intrigue):
                         "https://api.openai.com/v1/chat/completions",
                         headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
                         json={
-                            "model": os.environ.get("TOUR_LLM_MODEL", "gpt-3.5-turbo"),
+                            "model": live_model(os.environ.get("TOUR_LLM_MODEL", DEFAULT_FALLBACK)),
                             "messages": [
                                 {"role": "system", "content": "You write immersive, literary audio tour introductions."},
                                 {"role": "user", "content": _prolog_prompt},
@@ -20314,7 +20319,7 @@ Return ONLY the JSON array. Do not alter the fact text — copy it exactly as pr
                         "https://api.openai.com/v1/chat/completions",
                         headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
                         json={
-                            "model": os.environ.get("TOUR_LLM_MODEL", "gpt-3.5-turbo"),
+                            "model": live_model(os.environ.get("TOUR_LLM_MODEL", DEFAULT_FALLBACK)),
                             "messages": [
                                 {"role": "system", "content": "You rank facts by narrative interest. You never invent facts. You return valid JSON only."},
                                 {"role": "user", "content": _rank_prompt},
@@ -20457,7 +20462,7 @@ RULES:
                             "https://api.openai.com/v1/chat/completions",
                             headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
                             json={
-                                "model": os.environ.get("TOUR_LLM_MODEL", "gpt-3.5-turbo"),
+                                "model": live_model(os.environ.get("TOUR_LLM_MODEL", DEFAULT_FALLBACK)),
                                 "messages": [
                                     {"role": "system", "content": "You write concise, factual tour preview sentences. Use ONLY facts from the provided content."},
                                     {"role": "user", "content": _p4_prompt},
