@@ -44,6 +44,12 @@ tour-generator-storied --to-revisions=tour-generator-storied-00008-dhd=100 --reg
 - **Task D of wdvrdaz5yt DONE 2026-10-26 10:40 EDT** (Michael's "go D"). Test tour **448** Watertown City Hall (1 stop, landmark,
   track storied, $0.0428): venue-parts ran with `GEMINI key present=True`, LOCAL-275 closing offer ran, 0 tracebacks; download 200
   with `audio_1.mp3`; listed on api.audioura.com. Left in place as a real tour.
+- **wdvrdaz64g (Subscribed AAB for Play Internal testing): BUILT 2026-10-26 10:43, waiting for Michael to upload by hand.**
+  `C:\adev-wt\aab77\audioura-subscribed-2.4.31+77.aab` (sha256 56f803d0…), from a detached worktree `C:\adev-wt\GCS-PLAY77` @ subscribed
+  `6d6aeed7`, `--build-name=2.4.31 --build-number=77 --dart-define=APP_TRACK=subscribed` + GATEWAY_API_KEY from build_secrets.env.
+  Billing 8.0.0, upload key B3:AB:E5…3A:64. Host proven on the API-36 emulator: only api-gateway-subscribed got requests.
+  After the upload: record 77 in BUILD_NUMBERS (on `subscribed`) and comment the opt-in link + "Available" time on wdvrdaz64g.
+  First-launch setState crash = LOCAL-773; testers get the later build, not 77.
 - **Found, not fixed (pre-existing, handed to the Mac):** `fact_extractor.py` and the LOCAL-192 style retry call `gpt-3.5-turbo`,
   which OpenAI now answers with **404**, so fact sheets are 0/N and style retries keep the original. 95 references across the code.
 - `GEMINI_API_KEY` **v2** = new key `gcloud-storied-2026-10` (uid `bb7f1e39…`, …ECA0), restricted to generativelanguage,
