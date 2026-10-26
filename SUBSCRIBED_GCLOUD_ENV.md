@@ -249,7 +249,7 @@ Reads (`polly_tts_service.py`): `TTS_ENGINE KOKORO_URL PORT AWS_* PAID_API_LOG`
 
 | Setting | Value | Why |
 |---|---|---|
-| CPU | **2 vCPU** (start here) | Kokoro is CPU torch on Cloud Run (no GPU). 2 vCPU renders a 2,300-char stop in ~150 s (measured, native-arch proxy). More vCPU would cut latency ~linearly if the budget allows; 2 is the floor that keeps the 4 GiB/2 vCPU ratio Cloud Run requires. |
+| CPU | **2 vCPU minimum; 4 vCPU recommended** | Kokoro is CPU torch on Cloud Run (no GPU). Measured warm 2,300-char stop: **2 vCPU ≈ 147 s, 4 vCPU ≈ 70 s, 8 vCPU ≈ 45 s** (native-arch proxy). Cost/stop is ~flat across these (more vCPU finishes proportionally faster), so **4 vCPU is both the cheapest and ~2× faster than 2** — prefer it. 2 vCPU is the floor that keeps Cloud Run's 2 vCPU : 4 GiB minimum ratio. |
 | Memory | **4 GiB** | torch + the 82M model + ffmpeg buffers. 4 GiB is the minimum stable; the model baked + warmed sits comfortably under it. |
 | `--concurrency` | **1** | A render pins the CPU for the whole ~150 s; a second concurrent request would double the time for both and risk the request timeout. One request per instance, scale out with instances. |
 | Request timeout | **≥ 300 s** (set 300) | A single 2,300-char stop takes ~150 s on 2 vCPU (cold ~160 s); a longer stop needs more. 300 s gives headroom; the default 60 s / 120 s would kill every real render. |

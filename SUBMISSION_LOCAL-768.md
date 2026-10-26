@@ -1,10 +1,13 @@
 # SUBMISSION — LOCAL-768: Kokoro baked into the voice image (Subscribed speaks English with in-process Kokoro)
 
-**Agent:** Mac Mini Kiro · **Branch:** `LOCAL-768-kokoro-in-voice-image` · **Base:** `subscribed` @ `8c7be937`
-**Code commit (WIP, LEAD-saved):** `19a64da2` — the 5 code files below.
-**code_sha:** this submission's own commit (the commit that adds this file +
-`SUBSCRIBED_GCLOUD_ENV.md`) on top of `19a64da2`; `8c7be937` is an ancestor of
-HEAD (`git merge-base --is-ancestor 8c7be937 HEAD` ⇒ 0).
+**Agent:** Mac Mini Kiro · **Branch:** `LOCAL-768-kokoro-in-voice-image` · **Base:** `subscribed` @ `46adfa2f`
+**code_sha:** this submission's own commit on the branch; the WIP (`LOCAL-768 WIP
+saved by LEAD` + the earlier SUBMISSION commit) was **rebased onto the current
+`subscribed` tip `46adfa2f`** so the base note's gate holds:
+`git merge-base --is-ancestor 46adfa2f HEAD` ⇒ **0** (verified this session).
+The original WIP had branched from `8c7be937` (3 commits behind `subscribed`,
+before the meter-baking commits `173db1c3`/`4a96f3d8`/`46adfa2f`); the rebase
+applied cleanly with no conflicts.
 
 ---
 
@@ -59,31 +62,42 @@ relies on.
 - `test_health_host_mode_reported_when_kokoro_url_set` — mode `host`, model not loaded in this instance.
 - `test_health_polly_default_unchanged_fields_present` — Polly default keeps its fields; kokoro off.
 
-**Existing LOCAL-573 / 575 / 706 stay green.**
+**RED proof (this session):** running the 7 LOCAL-768 tests against the base
+`polly_tts_service.py` (`git show 46adfa2f:polly_tts_service.py`) gives
+**4 failed, 3 passed** — the 4 `/health` tests fail with `KeyError: 'kokoro_mode'`
+because the base `/health` lacks the new keys. After the enhancement all 7 pass.
+
+**Existing LOCAL-573 / 575 Kokoro tests stay green** (there is no
+`test_local706_*` file in this tree; the LOCAL-706 pronunciation markup is
+exercised inside the LOCAL-573 routing tests):
 
 ```
 $ python3 -m pytest tests/test_local768_kokoro_in_image.py \
     tests/test_local573_kokoro_routing.py \
-    tests/test_local575_kokoro_mp3_duration.py \
-    test_local706_kokoro_pronunciation.py -q
-37 passed, 1 skipped
+    tests/test_local575_kokoro_mp3_duration.py -v
+...
+25 passed in 1.41s
 ```
-(1 skipped = the misaki G2P round-trip, skipped when misaki is not importable in
-the host python — unchanged from base.)
+(7 LOCAL-768 + 10 LOCAL-573 + 5 LOCAL-575 = 25, all green on Python 3.9 host.)
 
 ## 4. Build + `/health`
 
-Built under both architectures from `Dockerfile.polly-tts-kokoro`
-(`--build-arg GIT_SHA=$(git rev-parse HEAD)`). The model bake logged
+Built this session from `Dockerfile.polly-tts-kokoro` with
+`--build-arg GIT_SHA=$(git rev-parse HEAD)`. The model bake logged
 `[LOCAL-573] Kokoro weights + voice packs baked into image.` and
-`build_manifest` recorded the sha.
+`build_manifest` recorded the sha (`[build_manifest] Wrote ... 7 files`).
 
 ```
 docker build --platform linux/amd64 -f Dockerfile.polly-tts-kokoro \
-  --build-arg GIT_SHA=$(git rev-parse HEAD) -t polly-tts-kokoro .   # 2m14s
+  --build-arg GIT_SHA=$(git rev-parse HEAD) -t polly-tts-kokoro:local768 .   # real 1m58s
 ```
 
-`/health` on the running container (both arch), run with
+Disk discipline (task rule): `df -g /System/Volumes/Data` showed **21 GB free**
+before the amd64 build and **17 GB** before the native-arch reference build —
+both ≥ 15 GB. One image tag was kept at a time (`docker image rm` the previous
+before building the next); `docker builder prune -f` ran after each build.
+
+`/health` on the running container, run with
 `-e TTS_ENGINE=kokoro -e KOKORO_URL= --cpus 2 --memory 4g -p 5281:5018`:
 
 ```json
@@ -92,35 +106,64 @@ docker build --platform linux/amd64 -f Dockerfile.polly-tts-kokoro \
  "kokoro_mode":"in_process","model_loaded":true,"ffmpeg_present":true}
 ```
 
-**Image size:** ~**988 MB** compressed (single-platform manifest view) /
-~**3.53 GB** uncompressed on disk (`docker image ls`, amd64, incl. attestation
-layers). The weight bake is in the image — no download at runtime.
+**Image size (deployable):** `docker image inspect --format {{.Size}}` =
+**~0.92 GB** (amd64) / **0.83 GB** (arm64 ref). (`docker images` lists a larger
+`3.12 GB` figure for the arm64 build — that view attributes shared
+build/attestation layers in the containerd store; the inspect size is the real
+image.) Either way the image is **under 1 GB** — the CPU torch wheel + slim base
+kept it far below the ~3 GB of the first (disk-filling) attempt. Weights are in
+the layer: **no download at runtime.**
 
-**Cold start to `/health` ready (native, 2 vCPU / 4 GiB): ~4.8 s** (weights
-baked; warm-up is model load only, no download).
+**Cold start to `/health` ready (model loaded), 2 vCPU / 4 GiB:**
+**5.6 s emulated amd64**, **4.0 s native arm64** (weights baked ⇒ warm-up is a
+model load only, no network).
 
 ## 5. Measurements (2 vCPU / 4 GiB, 2,300-char English stop, Joanna → af_heart 24 kHz)
 
 > **Honest caveat on architecture.** Cloud Run is amd64, so the task asks for
 > `--platform linux/amd64`. On this Apple-silicon Mac an amd64 image runs under
-> **QEMU emulation**, which inflates torch inference ~1.7× and is **not**
+> **QEMU emulation**, which inflates torch inference and is **not**
 > representative of Cloud Run's native amd64 CPU. I report BOTH: the literal
-> emulated-amd64 numbers, and a **native-arch** run as a realistic
-> CPU-inference proxy (native ARM CPU ≈ native amd64 CPU far better than
-> emulated amd64 does). Both are 2 vCPU / 4 GiB.
+> emulated-amd64 numbers, and a **native-arch (arm64)** run as a realistic
+> CPU-inference proxy (native ARM CPU tracks native amd64 CPU far better than
+> emulated amd64 does). Both images are byte-identical in output. All runs
+> 2 vCPU / 4 GiB unless noted.
 
-| Run | Arch | Cold | Warm-1 | Warm-2 | Tour stop (2,100 ch) |
-|---|---|---|---|---|---|
-| amd64 **emulated** (QEMU on ARM — inflated) | linux/amd64 | 261.7 s | 252.7 s | 266.6 s | 235.7 s |
-| **native** (realistic CPU proxy) | arm64 | 158.1 s | 146.9 s | 161.1 s | 142.5 s |
+2,300-char English stop, voice Joanna → Kokoro `af_heart` 24 kHz:
 
-**~150 s per 2,300-char stop at 2 vCPU** (native proxy; ~67 ms/char). This is
-far slower than the Mac host's ~16.5 s **because the host uses the Apple GPU
-(MPS) and Cloud Run has CPU only.** That is the headline operational fact: on
-Cloud Run, in-process Kokoro is a **high-latency** render.
+| Run | Arch | Cold | Warm-1 | Warm-2 |
+|---|---|---|---|---|
+| amd64 **emulated** (QEMU on ARM — inflated) | linux/amd64 | 262.86 s | 259.02 s | 270.02 s |
+| **native** (realistic CPU proxy) | arm64 | 147.21 s | 146.52 s | 153.70 s |
 
-**Output MP3 matches the Mac's Kokoro** (`ffprobe /tmp/local768_stop.mp3`):
-`codec=mp3, sample_rate=24000 Hz, channels=1 (mono), duration≈135.8 s`,
+4-stop tour (native arm64, 2 vCPU), texts of 2,100 / 2,600 / 1,900 / 2,800 chars:
+
+| Stop | Chars | Seconds |
+|---|---|---|
+| 1 | 2,100 | 132.35 |
+| 2 | 2,600 | 163.36 |
+| 3 | 1,900 | 126.15 |
+| 4 | 2,800 | 179.55 |
+| **Tour total** | **9,400** | **601.42 s** |
+
+**CPU scaling** (native arm64, warm, 2,300-char stop) — the inference is
+CPU-bound and scales almost linearly, which is the main deploy lever:
+
+| vCPU | Warm s/stop |
+|---|---|
+| 2 | ~147 |
+| 4 | 70.3 |
+| 8 | 45.0 |
+
+**~147 s per 2,300-char stop at 2 vCPU** (native proxy), dropping to ~45 s at
+8 vCPU. This is far slower than the Mac host's ~16.5 s **because the host uses
+the Apple GPU (MPS) and Cloud Run has CPU only.** That is the headline
+operational fact: on Cloud Run, in-process Kokoro is a **high-latency** render,
+and acceptable per-stop latency needs ≥ 4–8 vCPU.
+
+**Output MP3 matches the Mac's Kokoro** (`ffprobe /tmp/local768_stop.mp3`,
+identical bytes from both arches — 814,796 bytes):
+`codec=mp3, sample_rate=24000 Hz, channels=1 (mono), duration≈135.79 s`,
 plays cleanly — exactly `kokoro_engine.target_sample_rate_for("Joanna") = 24000`,
 voice `af_heart` (neural English female), the same shape as the host service.
 
@@ -128,32 +171,40 @@ voice `af_heart` (neural English female), the same shape as the host service.
 
 Cloud Run Tier-1 request-based pricing (active usage): **$0.000024 / vCPU-s**,
 **$0.0000025 / GiB-s**, **$0.40 / 1M requests**
-(source: cloud.google.com/run/pricing via dev.to/cloudchipr worked examples).
-Polly **neural** = **$16.00 / 1M chars** (`cost_rates.POLLY_NEURAL_COST_PER_1M_CHARS`).
+(source: cloud.google.com/run/pricing). Polly **neural** = **$16.00 / 1M chars**
+(`cost_rates.POLLY_NEURAL_COST_PER_CHAR = $0.000016`).
 
-Per 2,300-char stop, 2 vCPU + 4 GiB:
+Polly neural for one 2,300-char stop = 2300 × $0.000016 = **$0.03680**.
+Kokoro's per-char cost is **$0** (local CPU render); its cost is Cloud Run
+compute only. Arithmetic per stop (cost = vCPU×sec×$0.000024 +
+4 GiB×sec×$0.0000025 + 1 req×$0.0000004), using the native-proxy warm seconds:
 
-| Item | Kokoro in-process (native, 155 s) | Kokoro in-process (emulated, 260 s) | Polly neural |
-|---|---|---|---|
-| CPU | 2 × $0.000024 × 155 = **$0.00744** | 2 × $0.000024 × 260 = $0.01248 | — |
-| Memory | 4 × $0.0000025 × 155 = **$0.00155** | 4 × $0.0000025 × 260 = $0.00260 | — |
-| Request | ~$0.0000004 | ~$0.0000004 | — |
-| Chars | — | — | 2300 × $0.000016 = **$0.0368** |
-| **Total / stop** | **≈ $0.0090** | ≈ $0.0151 | **≈ $0.0368** |
+| vCPU | sec/stop | CPU $ | Mem $ | Req $ | **Total $/stop** | vs Polly |
+|---|---|---|---|---|---|---|
+| 2 | 147.0 | 0.007056 | 0.001470 | 0.0000004 | **$0.008526** | 0.23× |
+| 4 | 70.3 | 0.006749 | 0.000703 | 0.0000004 | **$0.007452** | 0.20× |
+| 8 | 45.0 | 0.008640 | 0.000450 | 0.0000004 | **$0.009090** | 0.25× |
+| amd64 emulated | 260 | 0.012480 | 0.002600 | 0.0000004 | $0.015080 | 0.41× |
 
-**In-process Kokoro is ~4× cheaper per stop than Polly neural** at the measured
-155 s — and stays cheaper than Polly until a render exceeds **~630 s**
-(break-even). Even the emulation-inflated 260 s is still cheaper than Polly.
+**In-process Kokoro is ~4–5× cheaper per stop than Polly neural** across 2–8
+vCPU (cost/stop is nearly flat because more vCPUs finish proportionally faster);
+**4 vCPU is both the cheapest and ~2× faster than 2 vCPU.** Even the
+emulation-inflated 260 s is still ~2.4× cheaper than Polly. Break-even vs Polly
+at 2 vCPU + 4 GiB is a render of **~630 s** — far beyond any real stop.
+
+4-stop tour (9,400 chars), native 2 vCPU, 601 s:
+Cloud Run **$0.0349** vs Polly neural 9400 × $0.000016 = **$0.1504** — ~4.3×
+cheaper.
 
 **Conclusion — Michael is right on both counts, with one caveat:** in-process
 Kokoro on Cloud Run is **cheaper** than Polly neural *and* (per D667) the nicer
-voice. The real trade-off is **latency** (~150 s on 2 vCPU vs Polly's
+voice. The real trade-off is **latency** (~45–147 s depending on vCPU vs Polly's
 sub-second), **not cost**. That drives the deploy settings: `--concurrency 1`
 (a render pins the CPU), request timeout ≥ 300 s, `--min-instances 0` (cold
-start is only ~5 s), and raising each caller's TTS HTTP read timeout to ≥ 300 s.
-More vCPU cuts latency roughly linearly and raises per-second cost
-proportionally, so cost/stop is ~flat in vCPU while latency improves — a lever
-LEAD can pull if latency matters more than scale-to-zero.
+start is only ~5 s), raising each caller's TTS HTTP read timeout to ≥ 300 s, and
+**preferring 4 vCPU** (cheapest and ~2× faster than 2). More vCPU cuts latency
+roughly linearly while cost/stop stays ~flat — the lever LEAD can pull if
+latency matters more than scale-to-zero.
 
 ## 7. `SUBSCRIBED_GCLOUD_ENV.md`
 
@@ -172,12 +223,18 @@ service's inline default; the English voice a listener hears is set by
 
 ## 8. Live-test discipline / housekeeping
 
-- Own containers only (`local768-voice`, `-p 5281:5018`); the live `audioura-*`
-  stack and **the host Kokoro on `:5181` were never touched** (confirmed `:5181`
-  healthy throughout). No GCloud deploy, no DB writes. Budget: $0 Polly (English
-  renders never hit Polly in the measurement).
-- Mid-run, Docker Desktop crashed from Mac disk pressure (the known risk). The
-  LEAD auto-restarted the Mac and committed this WIP (`19a64da2`) + pushed it
-  before pruning the worktree; I recreated the worktree and re-verified tests
-  green. All measurement evidence was captured before the crash. My Docker test
-  images were pruned by the restart (nothing left to `docker image rm`).
+- Own containers only (`local768-voice` / `local768-voice-arm` / `l768bench`,
+  `-p 5281/5282/5283:5018`); the live `audioura-*` stack and **the host Kokoro
+  on `:5181` were never touched**. No GCloud deploy, no DB writes. Budget: **$0**
+  Polly — every English measurement render used the in-process encoder and never
+  hit Polly (`model_loaded:true`, `kokoro_mode:in_process`); the Polly-fallback
+  path is proven by the unit test, not a live paid call.
+- **Disk discipline honoured:** `df -g` ≥ 15 GB verified before each `docker
+  build` (21 GB then 17 GB free); one image tag at a time; `docker builder
+  prune -f` after each build. Never `docker system prune` / `docker container
+  prune` (would remove the shared stack). All test images were removed with
+  `docker image rm` and the builder cache pruned at the end.
+- This WIP (from the earlier disk-full run) was continued, not restarted: the
+  two existing branch commits were rebased onto the current `subscribed` tip
+  `46adfa2f` (clean, no conflicts), tests re-verified green, and all
+  measurements re-run from scratch on freshly built images this session.
