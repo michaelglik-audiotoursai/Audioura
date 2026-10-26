@@ -42,6 +42,11 @@ ERROR_CODES = {
     # the same rejection); they get a stable code + a plain WHY + a next step.
     'factual_integrity': 'factual_integrity',
     'generation_failed': 'generation_failed',
+    # [LOCAL-779B] A business/restaurant tour found no in-scope (and, for a
+    # restaurant, cuisine-matching) place on the map. The listener is not told to
+    # "try again" (the same request finds the same nothing); they get a stable
+    # code plus a ready-to-fire request that WIDENS the search area.
+    'no_matching_places_in_area': 'no_matching_places_in_area',
 }
 
 _US_STATES = frozenset({
@@ -155,6 +160,58 @@ def _fewer_stops_suggestion(request: str, evidence: Optional[Dict]) -> Optional[
     }
 
 
+# [LOCAL-779B] Adjacent-area hints for the "widen the area" suggestion. Keyed by
+# the lowercased locality leaf (city/neighbourhood). A hit adds the neighbour(s)
+# so the suggestion reads "West Roxbury and Roslindale". Absent a hit, the
+# suggestion falls back to widening to the surrounding city/region generically.
+_ADJACENT_AREAS = {
+    'west roxbury': ['Roslindale', 'Jamaica Plain'],
+    'roslindale': ['West Roxbury', 'Jamaica Plain'],
+    'jamaica plain': ['Roslindale', 'Roxbury'],
+    'north end': ['Beacon Hill', 'the West End'],
+    'beacon hill': ['the North End', 'Back Bay'],
+    'back bay': ['Beacon Hill', 'the South End'],
+    'south end': ['Back Bay', 'the South End'],
+    'cambridge': ['Somerville', 'Boston'],
+    'somerville': ['Cambridge', 'Boston'],
+    'brookline': ['Boston', 'Newton'],
+    'newton': ['Brookline', 'Watertown'],
+}
+
+
+def _widen_area_suggestion(locality: str, poi_type: str,
+                           cuisine: str = '') -> Optional[Dict]:
+    """[LOCAL-779B] A ready-to-fire request that WIDENS the search area.
+
+    "middle eastern restaurants near me, west Roxbury, MA" with no match in West
+    Roxbury → suggest "middle eastern restaurants in West Roxbury and Roslindale".
+    Pure: locality + poi_type (+ optional cuisine) in, a {label, request,
+    tour_type} dict out, or None when there is no usable locality.
+    """
+    if not locality:
+        return None
+    _pt = (poi_type or 'restaurants').strip() or 'restaurants'
+    # Locality leaf (strip a trailing state/region) for the adjacency lookup.
+    leaf = locality.split(',')[0].strip()
+    neighbours = _ADJACENT_AREAS.get(leaf.lower())
+    if neighbours:
+        widened_area = f"{leaf} and {neighbours[0]}"
+    else:
+        # No curated neighbour — widen to the city/region tail if present, else
+        # phrase it as a broader search around the locality.
+        tail = locality.split(',', 1)[1].strip() if ',' in locality else ''
+        widened_area = f"the area around {locality}" if not tail else f"{leaf} and nearby {tail}"
+    _req = f"{_pt} in {widened_area}"
+    _is_dining = any(k in _pt.lower() for k in
+                     ('restaurant', 'dining', 'food', 'eatery', 'cafe', 'café', 'bistro'))
+    return {
+        'label': f"Search a wider area: {widened_area}",
+        'request': _req,
+        'tour_type': 'walking',
+        'widened_area': widened_area,
+    }
+
+
 def build_actionable_failure(evidence: Optional[Dict], request: str,
                              legacy_message: str) -> Dict:
     """Return the structured fields to attach to a clean-fail job.
@@ -189,6 +246,12 @@ def build_actionable_failure(evidence: Optional[Dict], request: str,
         # has no usable stop count at all.
         suggestion = (_fewer_stops_suggestion(request, evidence)
                       or _walking_suggestion(locality))
+
+    elif error_code == 'no_matching_places_in_area':
+        # [LOCAL-779B] No in-scope (cuisine-matching) place was found. The next
+        # step is to WIDEN the area, not retry the same empty search.
+        suggestion = _widen_area_suggestion(
+            locality, evidence.get('poi_type', ''), evidence.get('cuisine', ''))
 
     return {
         'error': legacy_message,          # unchanged for pre-LOCAL-581 builds

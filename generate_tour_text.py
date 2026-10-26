@@ -1237,6 +1237,13 @@ def _compute_route_order(poi_list):
     return reordered
 
 
+# [LOCAL-779B] Set once the dining maps-refill wiring is present in this module
+# (restaurants refill from stop_existence_gate.dining_replenish_candidates when
+# PHASE 3C / the existence gate leaves the list short). Asserted by the test
+# suite so the wiring cannot silently regress.
+_LOCAL779B_DINING_REPLENISH_MARKER = True
+
+
 def _scope_from_request(location, intent=None):
     """[LOCAL-779] Best-effort clean geographic scope from a tour request string.
 
@@ -14553,13 +14560,165 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
             else:
                 print(f"   PHASE 3C: all {len(poi_list)} stops pass location guard")
 
+            # [LOCAL-779B] MAPS-FIRST top-up (restaurants/business). The LOCAL-779
+            # LEAD bounce: PHASE 3C removed the out-of-town LLM restaurant stops and
+            # either emptied the list (→ "PHASE 3C rejected all stops") or left it
+            # short, after which the LLM Part C loop below refilled with MORE
+            # wrong-town / wrong-cuisine names. For a business/restaurant poi_type
+            # the candidates must come from the MAP: "<poi_type> in <scope>",
+            # in-scope + (for a restaurant) cuisine-matched, ranked by distance.
+            # This runs BEFORE Part C so the LLM is only ever an extra source, and
+            # it covers both the emptied list and a short one. If the map finds
+            # nothing AND the list is empty, we refuse cleanly with a widen-the-area
+            # suggestion rather than raising a bare error.
+            _p3c_poi_type = ''
+            if intent and intent.get('poi_type'):
+                _p3cpt = intent['poi_type']
+                _p3c_poi_type = " or ".join(_p3cpt) if isinstance(_p3cpt, list) else _p3cpt
+            # [LOCAL-779B] CUISINE-VERIFY the LLM survivors. A PHASE-3C survivor is
+            # in scope by address, but the ticket's rule is that an LLM candidate
+            # counts only if its listing ALSO matches the requested cuisine
+            # ("Mamma Maria is Italian, not Middle Eastern"). Look each survivor up
+            # on the map and drop a confirmed cuisine mismatch. A lookup that found
+            # no listing or failed is UNKNOWN (kept — D162, never dropped on a
+            # non-answer). Only runs for a dining request that carries a cuisine.
+            try:
+                from stop_existence_gate import (classify_business_vs_landmark as _cv_cls,
+                                                 _extract_cuisine_qualifier as _cv_ecq,
+                                                 _cuisine_from_request as _cv_cfr,
+                                                 verify_listing_cuisine as _cv_vlc,
+                                                 verify_listing_in_scope as _cv_vis)
+                if _cv_cls(_p3c_poi_type) == 'dining':
+                    _cv_cuisine = (_cv_ecq(_p3c_poi_type)
+                                   or _cv_cfr(user_request) or _cv_cfr(location))
+                    if _cv_cuisine:
+                        _cv_keep, _cv_drop = [], []
+                        for _cvp in poi_list:
+                            if _cvp.get('user_explicit') or _cvp.get('_anchor') or _cvp.get('_maps_verified'):
+                                _cv_keep.append(_cvp)
+                                continue
+                            # [LOCAL-779B] An LLM survivor counts ONLY if its listing
+                            # verifies inside the scope (the ticket's rule). Two
+                            # drops: (a) the place does not EXIST in scope on the map
+                            # (an invented "Mamma Maria's" in West Roxbury — False),
+                            # or (b) it exists but is a POSITIVELY different cuisine
+                            # (verify_listing_cuisine is False). A lookup that FAILED
+                            # (None from either) is UNKNOWN → kept (D162). The removed
+                            # slots are refilled from the maps-first search below, so
+                            # the delivered stops are map-verified in-scope places.
+                            _cv_exists = _cv_vis(_cvp['name'], _p3c_scope)
+                            if _cv_exists is False:
+                                _cv_drop.append((_cvp, 'not found in scope on the map'))
+                                continue
+                            _cv_ok = _cv_vlc(_cvp['name'], _p3c_scope, _cv_cuisine)
+                            if _cv_ok is False:
+                                _cv_drop.append((_cvp, f'listing cuisine does not match {_cv_cuisine!r}'))
+                            else:
+                                _cv_keep.append(_cvp)
+                        if _cv_drop:
+                            for _cvp, _why in _cv_drop:
+                                forbidden_norms.add(_normalize_name(_cvp['name']))
+                                print(f"   [LOCAL-779B] CUISINE-VERIFY: dropped "
+                                      f"{_cvp['name']!r} — {_why}")
+                            poi_list = _cv_keep
+                            print(f"   [LOCAL-779B] CUISINE-VERIFY: {len(_cv_drop)} "
+                                  f"unverified LLM survivor(s) dropped; {len(poi_list)} remain")
+            except Exception as _cv_err:
+                print(f"   [LOCAL-779B] cuisine-verify skipped (non-fatal): {_cv_err}")
+            _p3c_kind = 'landmark'
+            if len(poi_list) < total_stops:
+                try:
+                    from stop_existence_gate import (
+                        classify_business_vs_landmark as _p3c_cls,
+                        business_replenish_candidates as _p3c_biz,
+                        dining_replenish_candidates as _p3c_din,
+                        _extract_cuisine_qualifier as _p3c_ecq,
+                        _cuisine_from_request as _p3c_cfr)
+                    _p3c_kind = _p3c_cls(_p3c_poi_type)
+                    if _p3c_kind in ('business', 'dining'):
+                        _p3c_need = total_stops - len(poi_list)
+                        _p3c_exclude = set(_normalize_name(p['name']).lower() for p in poi_list)
+                        _p3c_exclude |= set(n.lower() for n in forbidden_norms)
+                        _p3c_exclude |= set(p['name'].lower() for p in poi_list)
+                        # Recover the cuisine the LLM intent may have dropped: the
+                        # poi_type qualifier, else a scan of the raw request string.
+                        _p3c_cuisine = _p3c_ecq(_p3c_poi_type) or _p3c_cfr(user_request) or _p3c_cfr(location)
+                        print(f"   [LOCAL-779B] MAPS-FIRST top-up ({_p3c_kind}): "
+                              f"maps search {_p3c_poi_type!r} cuisine={_p3c_cuisine!r} "
+                              f"in {_p3c_scope!r} (have {len(poi_list)}/{total_stops})")
+                        if _p3c_kind == 'dining':
+                            _p3c_cands = _p3c_din(_p3c_poi_type, _p3c_scope,
+                                                  _p3c_need, exclude=_p3c_exclude,
+                                                  cuisine=_p3c_cuisine)
+                            _p3c_src = 'dining_maps'
+                        else:
+                            _p3c_cands = _p3c_biz(_p3c_poi_type, _p3c_scope,
+                                                  _p3c_need, exclude=_p3c_exclude)
+                            _p3c_src = 'business_maps'
+                        for _p3cc in _p3c_cands:
+                            if len(poi_list) >= total_stops:
+                                break
+                            if _p3cc['name'].lower() in (p['name'].lower() for p in poi_list):
+                                continue
+                            _p3cp = _new_poi(_p3cc['name'], _p3cc.get('address', ''))
+                            _p3cp['coordinates'] = _p3cc['coordinates']
+                            _p3cp['latitude'] = _p3cc['lat']
+                            _p3cp['longitude'] = _p3cc['lng']
+                            _p3cp['coords_source'] = _p3c_src
+                            _p3cp['confirmation'] = 'knowledge'
+                            _p3cp['_maps_verified'] = True
+                            poi_list.append(_p3cp)
+                            forbidden_norms.add(_normalize_name(_p3cc['name']))
+                            print(f"     [LOCAL-779B] maps stop: {_p3cc['name']!r} "
+                                  f"-- {_p3cc.get('address','')} -- {_p3cc['evidence']}")
+                        print(f"   [LOCAL-779B] after maps top-up: "
+                              f"{len(poi_list)}/{total_stops} in-scope stop(s)")
+                except Exception as _p3c_err:
+                    print(f"   [LOCAL-779B] PHASE 3C maps top-up skipped (non-fatal): {_p3c_err}")
+
             if len(poi_list) == 0:
+                # No in-scope stop and the map found nothing either. For a
+                # business/restaurant request, record a structured refusal with a
+                # WIDEN-THE-AREA suggestion so the listener gets a real next step.
+                if _p3c_kind in ('business', 'dining'):
+                    try:
+                        from stop_existence_gate import (_extract_cuisine_qualifier as _p3c_ecq2,
+                                                         _cuisine_from_request as _p3c_cfr2)
+                        _p3c_cuisine = (_p3c_ecq2(_p3c_poi_type)
+                                        or _p3c_cfr2(user_request) or _p3c_cfr2(location))
+                    except Exception:
+                        _p3c_cuisine = ''
+                    _J._LAST_CLEAN_FAIL_EVIDENCE.clear()
+                    _J._LAST_CLEAN_FAIL_EVIDENCE.update({
+                        "error_type": "no_matching_places_in_area",
+                        "poi_type": _p3c_poi_type,
+                        "cuisine": _p3c_cuisine,
+                        "locality": _p3c_scope,
+                        "kind": _p3c_kind,
+                    })
+                    print(f"   [LOCAL-779B] no in-scope "
+                          f"{'cuisine-matching ' if _p3c_kind == 'dining' else ''}"
+                          f"places in {_p3c_scope!r} — clean refusal (widen the area)")
                 raise ValueError(f"PHASE 3C rejected all stops for location '{location}'")
 
         # -------- Part C: replacement loop (bounded) --------
         attempts = 0
 
-        while len(poi_list) < total_stops and attempts < MAX_REPLACEMENT_ATTEMPTS:
+        # [LOCAL-779B] For a business/restaurant poi_type the candidates come from
+        # the MAP (the maps top-up above), never the LLM — the LLM Part C loop is
+        # exactly what re-introduced the wrong-town / wrong-cuisine stops the
+        # LOCAL-779 LEAD bounce flagged. If the map could not fill N, deliver the K
+        # in-scope places honestly (the opening says "We found K …") rather than
+        # padding with invented names. So Part C is skipped for business/dining.
+        _partc_skip_maps_sourced = (_p3c_kind in ('business', 'dining')
+                                    if '_p3c_kind' in dir() else False)
+        if _partc_skip_maps_sourced and len(poi_list) < total_stops:
+            print(f"   [LOCAL-779B] Part C (LLM refill) SKIPPED for {_p3c_kind} "
+                  f"poi_type — delivering {len(poi_list)}/{total_stops} map-sourced "
+                  f"in-scope stop(s) (honest partial, no invented names)")
+
+        while (len(poi_list) < total_stops and attempts < MAX_REPLACEMENT_ATTEMPTS
+               and not _partc_skip_maps_sourced):
             attempts += 1
             needed = total_stops - len(poi_list)
             print(f"\nPart C: Fetching {needed} replacement POI(s), attempt {attempts}/{MAX_REPLACEMENT_ATTEMPTS}...")
@@ -15065,11 +15224,20 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
                     # the gate — the venue naming them on its own page is the stronger
                     # evidence, and independent web evidence for a temporary loan does
                     # not exist. Only knowledge-proposed stops are checked.
-                    _seg_exempt_pois = [p for p in poi_list if p.get('page_sourced')]
-                    _seg_checked_pois = [p for p in poi_list if not p.get('page_sourced')]
+                    # [LOCAL-779B] A maps-sourced business/restaurant stop is ALSO
+                    # exempt: it came straight from the maps/places existence check
+                    # (a named OSM listing inside the scope), which IS the evidence
+                    # the gate's business path would re-derive — re-checking it via
+                    # the Wikipedia-based dining path would wrongly drop a real
+                    # restaurant that has no Wikipedia article (the whole point of
+                    # sourcing it from the map).
+                    _seg_exempt_pois = [p for p in poi_list
+                                        if p.get('page_sourced') or p.get('_maps_verified')]
+                    _seg_checked_pois = [p for p in poi_list
+                                         if not (p.get('page_sourced') or p.get('_maps_verified'))]
                     if _seg_exempt_pois:
-                        print(f"  [D532] EXISTENCE-GATE: {len(_seg_exempt_pois)} page-sourced stop(s) "
-                              f"exempt, {len(_seg_checked_pois)} checked")
+                        print(f"  [D532] EXISTENCE-GATE: {len(_seg_exempt_pois)} page-sourced/maps-verified "
+                              f"stop(s) exempt, {len(_seg_checked_pois)} checked")
                     _seg_stop_names = [p['name'] for p in _seg_checked_pois]
                     # LOCAL-313: pass tour_category so dining tours use the correct
                     # verification path (Nominatim/OSM) instead of museum-shaped checks
@@ -15145,6 +15313,87 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
             print(f"  [LOCAL-245] EXISTENCE-GATE error (non-fatal): {_seg_err}")
         # ──── END [LOCAL-245] STOP-EXISTENCE GATE ─────────────────────────────
 
+        # ──── [LOCAL-779B] MAPS-FIRST REFILL WHEN THE LIST IS EMPTY ───────────
+        # The LOCAL-779 LEAD bounce: PHASE 3C removed EVERY LLM restaurant stop
+        # (all in the wrong town), leaving poi_list empty — and the LOCAL-290 block
+        # below only runs when len(poi_list) > 0, so nothing ever refilled from the
+        # map and the tour clean-failed with "PHASE 3C rejected all stops". The
+        # right refill for a business/restaurant tour is the MAP, and it must run
+        # even from zero: "<poi_type> in <scope>", in-scope + cuisine-matched,
+        # ranked by distance. If this fills >=1 stop the normal LOCAL-290 top-up
+        # still runs; if the area has no match, poi_list stays empty and the honest
+        # refusal is produced downstream (never an out-of-scope or wrong-cuisine
+        # stop).
+        if (tour_category != 'museum' and len(poi_list) < _seg_requested_stops
+                and len(poi_list) == 0):
+            try:
+                _empty_poi_type = ''
+                if intent and intent.get('poi_type'):
+                    _ept = intent['poi_type']
+                    _empty_poi_type = " or ".join(_ept) if isinstance(_ept, list) else _ept
+                from stop_existence_gate import (classify_business_vs_landmark as _cls_empty,
+                                                 business_replenish_candidates as _biz_rep_empty,
+                                                 dining_replenish_candidates as _din_rep_empty,
+                                                 _extract_cuisine_qualifier as _ecq_empty,
+                                                 _cuisine_from_request as _cfr_empty)
+                _empty_kind = _cls_empty(_empty_poi_type)
+                if _empty_kind in ('business', 'dining'):
+                    _empty_scope = _scope_from_request(location, intent)
+                    _empty_tried = set(n.lower() for n in (_seg_result.get('unverified_stops', [])
+                                                           if '_seg_result' in dir() else []))
+                    _empty_cuisine = (_ecq_empty(_empty_poi_type)
+                                      or _cfr_empty(user_request) or _cfr_empty(location))
+                    print(f"  [LOCAL-779B] MAPS-FIRST refill (list emptied by PHASE 3C/gate): "
+                          f"{_empty_kind} maps search {_empty_poi_type!r} cuisine={_empty_cuisine!r} "
+                          f"in {_empty_scope!r} (need {_seg_requested_stops})")
+                    if _empty_kind == 'dining':
+                        _empty_cands = _din_rep_empty(_empty_poi_type, _empty_scope,
+                                                      _seg_requested_stops, exclude=_empty_tried,
+                                                      cuisine=_empty_cuisine)
+                        _empty_src = 'dining_maps'
+                    else:
+                        _empty_cands = _biz_rep_empty(_empty_poi_type, _empty_scope,
+                                                      _seg_requested_stops, exclude=_empty_tried)
+                        _empty_src = 'business_maps'
+                    for _ec in _empty_cands:
+                        if len(poi_list) >= _seg_requested_stops:
+                            break
+                        _ep = _new_poi(_ec['name'], _ec.get('address', ''))
+                        _ep['coordinates'] = _ec['coordinates']
+                        _ep['latitude'] = _ec['lat']
+                        _ep['longitude'] = _ec['lng']
+                        _ep['coords_source'] = _empty_src
+                        _ep['confirmation'] = 'knowledge'
+                        _ep['_maps_verified'] = True
+                        poi_list.append(_ep)
+                        forbidden_norms.add(_normalize_name(_ec['name']))
+                        print(f"    [LOCAL-779B] maps-first stop: {_ec['name']!r} "
+                              f"-- {_ec.get('address','')} -- {_ec['evidence']}")
+                    if not _empty_cands:
+                        print(f"  [LOCAL-779B] MAPS-FIRST: no in-scope "
+                              f"{'cuisine-matching ' if _empty_kind == 'dining' else ''}places "
+                              f"in {_empty_scope!r} — honest refusal will follow")
+                        # Structured clean-fail with a WIDEN-THE-AREA suggestion.
+                        try:
+                            from stop_existence_gate import _extract_cuisine_qualifier as _ecq
+                            _empty_cuisine = _ecq(_empty_poi_type)
+                        except Exception:
+                            _empty_cuisine = ''
+                        try:
+                            _J._LAST_CLEAN_FAIL_EVIDENCE.clear()
+                            _J._LAST_CLEAN_FAIL_EVIDENCE.update({
+                                "error_type": "no_matching_places_in_area",
+                                "poi_type": _empty_poi_type,
+                                "cuisine": _empty_cuisine,
+                                "locality": _empty_scope,
+                                "kind": _empty_kind,
+                            })
+                        except Exception:
+                            pass
+            except Exception as _empty_err:
+                print(f"  [LOCAL-779B] maps-first refill skipped (non-fatal): {_empty_err}")
+        # ──── END [LOCAL-779B] ─────────────────────────────────────────────────
+
         # ──── [LOCAL-290 Fault 4] GEOGRAPHIC REPLENISHMENT ────────────────────
         # When the existence gate drops stops from a non-museum tour, replenish
         # by asking GPT for fresh candidates and verifying them through the same
@@ -15190,6 +15439,7 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
                         _bp['longitude'] = _bc['lng']
                         _bp['coords_source'] = 'business_maps'
                         _bp['confirmation'] = 'knowledge'
+                        _bp['_maps_verified'] = True
                         poi_list.append(_bp)
                         _rep_tried.add(_bc['name'].lower())
                         forbidden_norms.add(_normalize_name(_bc['name']))
@@ -15201,6 +15451,63 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
             except Exception as _biz_rep_err:
                 print(f"  [LOCAL-779] business replenishment skipped (non-fatal): {_biz_rep_err}")
             # ──── END [LOCAL-779] ──────────────────────────────────────────────
+
+            # ──── [LOCAL-779B] DINING REPLENISHMENT (maps/places, cuisine-matched)
+            # The LOCAL-779 LEAD bounce: a restaurant tour took its candidates ONLY
+            # from the LLM (wrong town), and when PHASE 3C emptied the list nothing
+            # refilled from the map. A restaurant poi_type classifies as 'dining',
+            # so the BUSINESS block above never fired for it. Mirror it here: refill
+            # from "<cuisine> restaurants in <scope>" directly, keep only in-scope
+            # listings whose CUISINE matches (Dumpling House is not Middle Eastern),
+            # ranked by distance. If the maps refill cannot fill the count the
+            # GPT→gate loop below still runs; a zero-match area ships the honest
+            # shortfall (and, at N==0, the clean refusal downstream).
+            try:
+                _seg_poi_type_din = ''
+                if intent and intent.get('poi_type'):
+                    _dpt = intent['poi_type']
+                    _seg_poi_type_din = " or ".join(_dpt) if isinstance(_dpt, list) else _dpt
+                from stop_existence_gate import (classify_business_vs_landmark as _cls_din,
+                                                 dining_replenish_candidates as _din_replenish,
+                                                 _extract_cuisine_qualifier as _ecq_din,
+                                                 _cuisine_from_request as _cfr_din)
+                if _cls_din(_seg_poi_type_din) == 'dining' and len(poi_list) < _seg_requested_stops:
+                    _din_scope = _scope_from_request(location, intent)
+                    _din_needed = _seg_requested_stops - len(poi_list)
+                    _din_cuisine = (_ecq_din(_seg_poi_type_din)
+                                    or _cfr_din(user_request) or _cfr_din(location))
+                    print(f"  [LOCAL-779B] DINING replenishment: maps search "
+                          f"{_seg_poi_type_din!r} cuisine={_din_cuisine!r} in {_din_scope!r} "
+                          f"(need {_din_needed})")
+                    _din_cands = _din_replenish(_seg_poi_type_din, _din_scope,
+                                                _din_needed, exclude=_rep_tried,
+                                                cuisine=_din_cuisine)
+                    for _dc in _din_cands:
+                        if len(poi_list) >= _seg_requested_stops:
+                            break
+                        if _dc['name'].lower() in _rep_tried:
+                            continue
+                        _dp = _new_poi(_dc['name'], _dc.get('address', ''))
+                        _dp['coordinates'] = _dc['coordinates']
+                        _dp['latitude'] = _dc['lat']
+                        _dp['longitude'] = _dc['lng']
+                        _dp['coords_source'] = 'dining_maps'
+                        _dp['confirmation'] = 'knowledge'
+                        _dp['_maps_verified'] = True
+                        poi_list.append(_dp)
+                        _rep_tried.add(_dc['name'].lower())
+                        forbidden_norms.add(_normalize_name(_dc['name']))
+                        print(f"    [LOCAL-779B] replenished dining stop: {_dc['name']!r} "
+                              f"-- {_dc.get('address','')} -- {_dc['evidence']}")
+                    if len(poi_list) >= _seg_requested_stops:
+                        print(f"  [LOCAL-779B] DINING replenishment filled the count "
+                              f"({len(poi_list)}/{_seg_requested_stops})")
+                    elif not _din_cands:
+                        print(f"  [LOCAL-779B] DINING replenishment: no in-scope "
+                              f"cuisine-matching places found in {_din_scope!r}")
+            except Exception as _din_rep_err:
+                print(f"  [LOCAL-779B] dining replenishment skipped (non-fatal): {_din_rep_err}")
+            # ──── END [LOCAL-779B] ─────────────────────────────────────────────
 
             _rep_needed = _seg_requested_stops - len(poi_list)
             _REP_MAX_ROUNDS = 2
