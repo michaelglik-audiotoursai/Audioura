@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'services/iap_service.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import 'dart:async';
 
 import 'screens/main_screen.dart';
@@ -28,7 +29,20 @@ class MainScreenWithTreatsTab extends StatelessWidget {
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  print('=== AUDIOTOURS DEV v1.2.9+61 STARTING ===');
+  // [LOCAL-773] The startup banner must report the REAL running version, never
+  // a hard-coded string. The old `=== AUDIOTOURS DEV v1.2.9+61 STARTING ===`
+  // line was stale and misled testers reading logcat. Read name+build from the
+  // platform (package_info_plus) so the banner always matches the installed
+  // build; fall back to a version-less banner if the lookup ever fails so
+  // startup is never blocked.
+  String versionTag;
+  try {
+    final info = await PackageInfo.fromPlatform();
+    versionTag = 'v${info.version}+${info.buildNumber}';
+  } catch (e) {
+    versionTag = '(version unavailable)';
+  }
+  print('=== AUDIOURA $versionTag STARTING ===');
   
   // Clear old article cache to fix 404 errors
   try {
