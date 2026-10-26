@@ -321,7 +321,13 @@ class _HomeScreenState extends State<HomeScreen> {
     }
     await _loadLocationHistory();
     await _loadCustomLocation();
-    
+
+    // [LOCAL-773] Home is disposed during first launch (onboarding/plan
+    // screens replace it before this async chain returns). Without this guard
+    // the setState below throws "Null check operator used on a null value" in
+    // State.setState and the rest of the load (_loadNewsletters /
+    // _initializeMap) is skipped. Bail out quietly if we are no longer mounted.
+    if (!mounted) return;
     setState(() {
       _appMode = mode;
     });
@@ -340,6 +346,7 @@ class _HomeScreenState extends State<HomeScreen> {
     final customName = prefs.getString('custom_location_name');
     
     if (customLat != null && customLng != null && customName != null) {
+      if (!mounted) return; // [LOCAL-773] setState after await: Home may be gone.
       setState(() {
         _displayLocation = LatLng(customLat, customLng);
         _isUsingCustomLocation = true;
@@ -406,6 +413,7 @@ class _HomeScreenState extends State<HomeScreen> {
     await _getCurrentLocation();
     await _loadNearbyTours();
     
+    if (!mounted) return; // [LOCAL-773] setState after await: Home may be gone.
     setState(() {
       _isLoading = false;
     });
@@ -424,6 +432,7 @@ class _HomeScreenState extends State<HomeScreen> {
         permission = await Geolocator.requestPermission();
         if (permission == LocationPermission.denied) {
           await DebugLogHelper.addDebugLog('HOME: Location permission denied');
+          if (!mounted) return; // [LOCAL-773] setState after await.
           setState(() {
             _userLocation = LatLng(42.3601, -71.0589);
           });
@@ -433,6 +442,7 @@ class _HomeScreenState extends State<HomeScreen> {
       
       if (permission == LocationPermission.deniedForever) {
         await DebugLogHelper.addDebugLog('HOME: Location permission denied forever');
+        if (!mounted) return; // [LOCAL-773] setState after await.
         setState(() {
           _userLocation = LatLng(42.3601, -71.0589);
         });
@@ -468,6 +478,7 @@ class _HomeScreenState extends State<HomeScreen> {
       }
     } catch (e) {
       await DebugLogHelper.addDebugLog('HOME: Error getting location: $e');
+      if (!mounted) return; // [LOCAL-773] setState after await.
       setState(() {
         _userLocation = LatLng(42.3601, -71.0589);
       });
@@ -486,6 +497,7 @@ class _HomeScreenState extends State<HomeScreen> {
         // Apply clustering to cached tours too
         final clusteredTours = _clusterTours(tours);
         
+        if (!mounted) return; // [LOCAL-773] setState after await.
         setState(() {
           _tourMarkers = clusteredTours.map((cluster) {
             final toursList = cluster['tours'] as List;
@@ -888,6 +900,7 @@ class _HomeScreenState extends State<HomeScreen> {
         if (mounted && response.statusCode == 401) {
           ErrorHandlerService.showError(context, statusCode: 401, endpoint: '/tours-near');
         }
+        if (!mounted) return; // [LOCAL-773] setState after await.
         setState(() { _connectionError = true; });
       }
     } catch (e) {
@@ -1525,6 +1538,7 @@ class _HomeScreenState extends State<HomeScreen> {
     // Load tours for new location
     await _loadNearbyTours();
     
+    if (!mounted) return; // [LOCAL-773] setState after await.
     setState(() {
       _isLoading = false;
     });
@@ -1546,6 +1560,7 @@ class _HomeScreenState extends State<HomeScreen> {
       await _loadNearbyTours();
     }
     
+    if (!mounted) return; // [LOCAL-773] setState after await.
     setState(() {
       _isLoading = false;
     });
@@ -3267,6 +3282,7 @@ class _HomeScreenState extends State<HomeScreen> {
         await prefs.setString('cached_newsletters', json.encode(newsletters));
         await DebugLogHelper.addDebugLog('HOME: Cached ${newsletters.length} newsletters');
         
+        if (!mounted) return; // [LOCAL-773] setState after await.
         setState(() {
           _newsletters = newsletters;
           _isLoading = false;
@@ -3274,6 +3290,7 @@ class _HomeScreenState extends State<HomeScreen> {
       } else {
         await DebugLogHelper.addDebugLog('HOME: Newsletter server error: ${response.statusCode}');
         
+        if (!mounted) return; // [LOCAL-773] context + setState after await.
         // Only show error if no cached data is available
         if (_newsletters.isEmpty) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -3291,6 +3308,7 @@ class _HomeScreenState extends State<HomeScreen> {
     } catch (e) {
       await DebugLogHelper.addDebugLog('HOME: Newsletter loading error: $e');
       
+      if (!mounted) return; // [LOCAL-773] context + setState after await.
       // Only show error if no cached data is available
       if (_newsletters.isEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -3316,6 +3334,7 @@ class _HomeScreenState extends State<HomeScreen> {
         await DebugLogHelper.addDebugLog('HOME: Loading cached newsletters');
         final newsletters = List<Map<String, dynamic>>.from(json.decode(cachedNewsletters));
         
+        if (!mounted) return; // [LOCAL-773] setState after await.
         setState(() {
           _newsletters = newsletters;
         });
@@ -4591,6 +4610,7 @@ class _HomeScreenState extends State<HomeScreen> {
           } else {
             final position = await Geolocator.getCurrentPosition();
             final newLocation = LatLng(position.latitude, position.longitude);
+            if (!mounted) return; // [LOCAL-773] setState after await.
             _mapController.move(newLocation, 15.0);
             setState(() {
               _userLocation = newLocation;
