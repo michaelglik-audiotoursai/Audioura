@@ -83,7 +83,7 @@ DB_USER GCP_PROJECT_ID PORT`, plus:
 | Env var | GCloud value / secret | Notes |
 |---|---|---|
 | `TOUR_TRACK` | `subscribed` | **Required.** Stamps every tour row with the subscribed track (D708). Default `beta` — MUST be overridden. |
-| `STORIED_MODE` | `false` | Subscribed is not the storied flag. |
+| `STORIED_MODE` | **`true`** | **D717 (2026-10-26):** this flag is the story pipeline (spine, fact sheets, story types, museum features, I-CON evaluation), not a track label. The local Subscribed stack Michael reviewed runs `true` (docker-compose-master.yml); `false` on GCloud made Preview tours skip it. |
 | `DB_PASSWORD` | secret `db-password` | — |
 | `TOUR_GENERATOR_URL` | `https://tour-generator-subscribed-<proj>.run.app` | internal |
 | `MODERNIZED_URL` | modernizer URL if used | optional |
@@ -347,7 +347,7 @@ Reads: `DB_* PORT`. `DB_PASSWORD` secret. Serves `/treats-near/*` and
 
 | Service | Port | Image | Required env |
 |---|---|---|---|
-| tour-generator-subscribed | 5000 | `Dockerfile.generator` | `DATABASE_URL`/`DB_*` (+ `DB_PASSWORD` secret), `OPENAI_API_KEY` (secret `openai-api-key`), `GEMINI_API_KEY` (secret `GEMINI_API_KEY` — **UPPERCASE name**, note), `SERP_API_KEY` (secret `serp-api-key`) + `SERP_PROVIDER=serper`, `STORIED_MODE=false`, `GATEWAY_API_KEY` (secret). Hosts `/tour/share`. Only the generator reads SERP/Gemini. |
+| tour-generator-subscribed | 5000 | `Dockerfile.generator` | `DATABASE_URL`/`DB_*` (+ `DB_PASSWORD` secret), `OPENAI_API_KEY` (secret `openai-api-key`), `GEMINI_API_KEY` (secret `GEMINI_API_KEY` — **UPPERCASE name**, note), `SERP_API_KEY` (secret `serp-api-key`) + `SERP_PROVIDER=serper`, `STORIED_MODE=true` (D717), `GATEWAY_API_KEY` (secret). Hosts `/tour/share`. Only the generator reads SERP/Gemini. |
 | voice-subscribed | 5008 | voice image (`voice_control/app.py`) | `OPENAI_API_KEY` (secret). Hosts `/parse_voice_search`, `/process-voice-command`. |
 | custom-audio-subscribed | 5023 | custom-audio image | `DB_*` (+ `DB_PASSWORD` secret), `BLOB_STORAGE_TYPE=r2` + `R2_*`, AWS Polly secrets. Hosts `/tour/<id>/stop/<n>/custom-audio`, `/audio-versions`, `/audio-metadata`. |
 
