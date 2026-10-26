@@ -61,6 +61,10 @@ tour-generator-storied --to-revisions=tour-generator-storied-00008-dhd=100 --reg
   because Cloud Logging reads returned 500 or empty from ~19:48Z; re-check later. **Bug:** generators keep jobs in memory, and with 2 instances
   (seen at 19:48 despite maxScale=1) the orchestrator gets "Job not found" while the job keeps running and spending. Waiting on LEAD.
   Evidence without logs: `paid_api_calls` (cols ts, service, kind, model, usd) and Cloud Monitoring `run.googleapis.com/container/instance_count`.
+- **DB writes 2026-10-26 16:24 EDT (Michael's "Go A and B" on the laptop):** (A) `level_codes` 0 → 1, admin code hash a582f5e3…8127
+  (Michael has the plaintext; enter it via Your plan → Use code). (B) `plans` l2 `by_reference_only` true → **false, permanent** (D719 as amended;
+  caps unchanged 1/day, 3/month, 5 stops). Stable never reads it. The plan-screen counter bug (counts failed/started rows) is fixed in code by
+  LOCAL-777; do NOT sweep stale 'started' rows. D718: until LOCAL-775 ships, deploy a generator only when paid_api_calls shows no activity for ~5 min.
 - **Laptop remote access (for Vietnam, from 10-28):** Tailscale "mercury" 100.68.122.8 (expiry off, unattended). Exit node = mikhails-mac-mini
   (`tailscale set --exit-node=100.106.181.69 --exit-node-allow-lan-access=true`; `--exit-node=` to turn it off; keep it OFF by default).
   Screen: TigerVNC 1.15 → 100.106.181.69, user `micha`; menu = **Ctrl+Alt+M**; "Full screen on all monitors" (the Mac has 2 screens).
