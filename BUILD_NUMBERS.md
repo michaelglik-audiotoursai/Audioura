@@ -47,7 +47,8 @@ top of +21 on either system."*
 | 80 | iOS | 2.4.33 | `b2d1242e` (subscribed; APP_TRACK=subscribed) | **uploaded to TestFlight** 2026-10-26 by LEAD: LOCAL-774 Free refusal dialog, LOCAL-780 download user_id + instant play of the translated copy (plus 773 from 79). Same manual profile as 79 | 2026-10-26 |
 | 81 | Android | 2.4.33 | `b2d1242e` (subscribed) | **RESERVED** for GCloud_Storied (wdvrdaz6cz) | 2026-10-26 |
 | 82 | iOS | 2.4.34 | `0fdbffd5` (subscribed) | **uploaded to TestFlight** 2026-10-26 ~21:4x by LEAD: + LOCAL-781 named save error, LOCAL-779/779B server-side only | 2026-10-26 |
-| 83 | — | — | — | **NEXT** | — |
+| 83 | iOS | 2.4.35 | `200839ac` (subscribed) | **uploaded to TestFlight** 2026-10-26 ~21:5x by LEAD: + LOCAL-785 FailureReporter (app), 783 server-side | 2026-10-26 |
+| 84 | — | — | — | **NEXT** | — |
 
 ## Why 20 and 21 differ across platforms
 
