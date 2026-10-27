@@ -46,7 +46,8 @@ top of +21 on either system."*
 | 79 | iOS | 2.4.32 | `d27d06e4` (subscribed; `APP_TRACK=subscribed`, GATEWAY_API_KEY) | **uploaded to TestFlight** 2026-10-26 13:38 by LEAD on the Mac. First Subscribed TestFlight build. Signed manually with the new App Store profile `Audioura AppStore 2026-10-26 assoc-domains` (uuid 4d428427…, created via the ASC API; the old profile lacked Associated Domains and Xcode has no signed-in account) | 2026-10-26 |
 | 80 | iOS | 2.4.33 | `b2d1242e` (subscribed; APP_TRACK=subscribed) | **uploaded to TestFlight** 2026-10-26 by LEAD: LOCAL-774 Free refusal dialog, LOCAL-780 download user_id + instant play of the translated copy (plus 773 from 79). Same manual profile as 79 | 2026-10-26 |
 | 81 | Android | 2.4.33 | `b2d1242e` (subscribed) | **RESERVED** for GCloud_Storied (wdvrdaz6cz) | 2026-10-26 |
-| 82 | — | — | — | **NEXT** | — |
+| 82 | iOS | 2.4.34 | `0fdbffd5` (subscribed) | **uploaded to TestFlight** 2026-10-26 ~21:4x by LEAD: + LOCAL-781 named save error, LOCAL-779/779B server-side only | 2026-10-26 |
+| 83 | — | — | — | **NEXT** | — |
 
 ## Why 20 and 21 differ across platforms
 
