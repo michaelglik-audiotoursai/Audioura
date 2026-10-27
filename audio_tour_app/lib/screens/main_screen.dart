@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../services/saved_tours_refresh.dart';
 import 'package:flutter/rendering.dart' show ScrollDirection;
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -437,17 +438,14 @@ class MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
       _selectedIndex = index;
       _visitedTabs.add(index);
       _barVisible = true; // any tab switch reveals the bar.
-      // [LOCAL-787] When the Listen tab becomes selected, force its root to
-      // rebuild so _loadTours runs and (after prefs.reload()) picks up a tour
-      // saved by any writer — including a background isolate whose write could
-      // not bump SavedToursRefresh across isolates. This is why Michael saw the
-      // Listen page empty for ~30 s after a download; switching in now shows it.
-      if (index == kListenTab) {
-        _listenTabVersion++;
-      }
     });
+    // [LOCAL-787] When the Listen tab becomes selected, reload its list IN PLACE
+    // (MyToursScreen._loadTours does prefs.reload() first, so a background-isolate
+    // write shows). LEAD review: do NOT bump _listenTabVersion / reset to root here —
+    // that would throw away where the user was inside the Listen tab (LOCAL-761 keeps
+    // per-tab navigation; only a re-tap of the current tab returns to its root).
     if (index == kListenTab) {
-      _resetTabToRoot(kListenTab);
+      SavedToursRefresh.instance.bump();
     }
     // Picking up a mode change made on the About tab (Tours<->Audio).
     _refreshModeForTab(index);
