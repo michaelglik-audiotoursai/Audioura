@@ -90,6 +90,31 @@ class TourDownloadService {
     return m.isEmpty ? 'Download failed. Please try again.' : m;
   }
 
+  /// [LOCAL-781] The user-facing message when the tour was downloaded (the ZIP
+  /// bytes arrived) but /tour/<id>/resolve then FAILED, so the tour could not be
+  /// saved to My Tours. It NAMES the tour so the listener (and support) knows
+  /// exactly which one dropped — the old wording hard-coded "Downloaded Tour"
+  /// because `baseTourName` is only filled on a SUCCESSFUL resolve, so a failed
+  /// resolve always showed the placeholder (LOCAL-781, Michael TestFlight 79:
+  /// trinity 445 / BPL 446 "silently failed"). PURE so the wording is tested in
+  /// one place and reused by every download path.
+  ///
+  /// [tourName] is the best name we have for the tour (from the Home/search row
+  /// that was tapped), [serverMessage] the server's own reason when it gave one.
+  static String resolveFailureMessage(
+      String? tourName, int tourId, int statusCode, String? serverMessage) {
+    final name = (tourName ?? '').trim();
+    final who = name.isEmpty ? 'Tour (ID: $tourId)' : 'Tour "$name" (ID: $tourId)';
+    final reason = (serverMessage ?? '').trim();
+    final detail = reason.isEmpty
+        ? 'Server returned error $statusCode.'
+        : 'Error: $reason';
+    return '$who could not be downloaded.\n\n$detail\n\n'
+        'The download is kept, so you can try again without re-downloading. '
+        'If it keeps failing, please contact your administrator with this '
+        'information.';
+  }
+
   /// [LOCAL-759 A6] True when a stop's byte size exceeds the web limit.
   static bool exceedsWebLimit(int sizeBytes) => sizeBytes > webMaxBytesPerStop;
 
@@ -114,6 +139,39 @@ class TourDownloadService {
     final mb = bytes / (1024 * 1024);
     if (mb >= 1) return '${mb.toStringAsFixed(mb >= 10 ? 0 : 1)} MB';
     return '${(bytes / 1024).round()} KB';
+  }
+
+  // ─── [LOCAL-781] Keep a downloaded ZIP so a retry doesn't re-download ────────
+  //
+  // When the ZIP bytes arrived (map-delivery 200) but the save failed at
+  // /resolve (the cloud bug this task fixes, but ALSO any future transient save
+  // failure), we must NOT throw the bytes away: the server already streamed them
+  // (and may have spent the purchase), so a blind retry re-downloads the whole
+  // tour. Hold the last failed tour's bytes in memory, keyed by SERVER tour id,
+  // so the very next download attempt for the same id reuses them instead of
+  // hitting map-delivery again. In memory only (not persisted): a retry within
+  // the same session is the common case; a cold restart falls back to a normal
+  // download, which is correct. Pure/static so a test can drive it directly.
+  static final Map<int, List<int>> _retryZipCache = <int, List<int>>{};
+
+  /// Remember [zipBytes] for [tourId] so the next [downloadAndSave]/Home retry
+  /// can reuse them. A null/empty list is ignored (nothing to keep).
+  static void cacheZipForRetry(int tourId, List<int>? zipBytes) {
+    if (zipBytes == null || zipBytes.isEmpty) return;
+    _retryZipCache[tourId] = zipBytes;
+  }
+
+  /// True when a kept ZIP is available for [tourId].
+  static bool hasCachedZip(int tourId) => _retryZipCache.containsKey(tourId);
+
+  /// Return the kept ZIP for [tourId] WITHOUT removing it (so a save that fails
+  /// again keeps the bytes for the following retry), or null if none is held.
+  static List<int>? peekCachedZip(int tourId) => _retryZipCache[tourId];
+
+  /// Drop the kept ZIP for [tourId] — call after a SUCCESSFUL save so the bytes
+  /// are freed and a later re-download is genuinely fresh.
+  static void clearCachedZip(int tourId) {
+    _retryZipCache.remove(tourId);
   }
 
   /// Download a tour to the phone and save it to My Tours — the SAME server
@@ -422,6 +480,14 @@ class TourDownloadService {
       bool isEditable = false;
       int? backendStopsCount;
 
+      // [LOCAL-781] The best name we have for the tour BEFORE resolve answers —
+      // the Home/search row that was tapped carries it. Used to NAME the tour in
+      // a resolve-failure message (resolve never ran, so `baseTourName` is still
+      // the "Downloaded Tour" placeholder on the failure path).
+      final String? sourceName = (sourceItem != null)
+          ? ((sourceItem['name'] ?? sourceItem['title'])?.toString())
+          : null;
+
       if (resolutionResponse.statusCode == 200) {
         try {
           final resolutionData = json.decode(resolutionResponse.body);
@@ -446,18 +512,21 @@ class TourDownloadService {
         await DebugLogHelper.addDebugLog(
             'DOWNLOAD_SVC: /tour/$tourId/resolve FAILED '
             'status=${resolutionResponse.statusCode} body=${resolutionResponse.body}');
-        String errorMessage;
+        // [LOCAL-781] Name the tour from the source row (not the "Downloaded
+        // Tour" placeholder) and tell the user the download is kept for retry.
+        String? serverMessage;
         try {
           final errorData = json.decode(resolutionResponse.body);
-          errorMessage = 'Tour "$baseTourName" (ID: $tourId) could not be '
-              'downloaded.\n\nError: ${errorData['message'] ?? 'Unknown error'}'
-              '\n\nPlease contact your administrator with this information.';
+          serverMessage = errorData['message']?.toString();
         } catch (_) {
-          errorMessage = 'Tour download failed (ID: $tourId).\n\nServer returned '
-              'error ${resolutionResponse.statusCode}.\n\nPlease contact your '
-              'administrator with this information.';
+          serverMessage = null;
         }
-        throw Exception(errorMessage);
+        throw Exception(resolveFailureMessage(
+          sourceName,
+          tourId,
+          resolutionResponse.statusCode,
+          serverMessage,
+        ));
       }
 
       final savedTours = prefs.getStringList('saved_tours') ?? [];

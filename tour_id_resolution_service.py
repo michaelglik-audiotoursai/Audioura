@@ -34,6 +34,32 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname)s] %(me
 logger = logging.getLogger(__name__)
 
 
+# [LOCAL-781] On Cloud Run the tour ZIPs live in Cloudflare R2, not on local
+# disk — /app/tours is empty. Resolution must therefore check the ZIP's
+# existence in the SAME blob layer map_delivery_service.py reads from, driven by
+# the SAME BLOB_STORAGE_TYPE/R2_* env. When BLOB_STORAGE_TYPE is unset (the Mac
+# stack) this returns None and the disk stays the source of truth — behaviour is
+# exactly as before this task. Lazily constructed and cached, like map-delivery.
+_blob_storage = None
+
+
+def _get_blob_storage():
+    """Return the R2 blob storage when BLOB_STORAGE_TYPE=r2, else None (disk mode).
+
+    Mirrors map_delivery_service._get_blob_storage so both services agree on when
+    the cloud object store is authoritative and when the local disk is.
+    """
+    global _blob_storage
+    if _blob_storage is None:
+        blob_type = os.getenv('BLOB_STORAGE_TYPE', 'database')
+        if blob_type == 'r2':
+            from blobstorage import R2BlobStorage
+            _blob_storage = R2BlobStorage()
+        else:
+            _blob_storage = None
+    return _blob_storage
+
+
 def get_db_connection():
     return psycopg2.connect(
         host=os.getenv('DB_HOST', 'postgres-2'),
@@ -62,8 +88,69 @@ def _resolve_from_column(download_id, conn):
     """Primary path: look up zip_filename stored on the row.
 
     Returns a result dict or None if column is NULL/missing.
+
+    [LOCAL-50] The deterministic edit id always comes from the stored
+    zip_filename column, never from a filesystem guess.
+
+    [LOCAL-781] The existence check is backend-aware:
+      - Blob mode (BLOB_STORAGE_TYPE=r2, Cloud Run): the ZIP lives in R2, so
+        existence is `blobstorage.exists(tour_blob_uri)`. /app/tours is empty and
+        is never touched. stops_count/editability come from the DB row, not a ZIP
+        read, so no object download is needed just to answer /resolve.
+      - Disk mode (no BLOB env, the Mac stack): unchanged — the ZIP must be on
+        local disk at TOURS_DIR/zip_filename.
     """
+    blob = _get_blob_storage()
+
     cur = conn.cursor()
+    if blob is not None:
+        # Cloud: also fetch the R2 key (tour_blob_uri) and stops_count from the DB.
+        cur.execute(
+            "SELECT tour_name, zip_filename, tour_blob_uri, stops_count "
+            "FROM audio_tours WHERE id = %s",
+            (int(download_id),)
+        )
+        result = cur.fetchone()
+        cur.close()
+
+        if not result:
+            return None  # row does not exist
+
+        tour_name, zip_filename, tour_blob_uri, stops_count = result
+
+        if not zip_filename:
+            return None  # column not populated (legacy row) -> fallback
+
+        # The R2 key normally comes from tour_blob_uri (map_delivery's read key).
+        # If the row predates the blob migration, fall back to the conventional
+        # key 'tours/<id>.zip' so an existing object is still found.
+        blob_key = tour_blob_uri or f"tours/{int(download_id)}.zip"
+
+        if not blob.exists(blob_key):
+            logger.warning(
+                "LOCAL-781: blob object missing for tour id=%s (key=%s, "
+                "zip_filename=%s). Not falling back to a name scan.",
+                download_id, blob_key, zip_filename
+            )
+            return None
+
+        stem = Path(zip_filename).stem
+        uuid_part = _extract_uuid_from_zip_stem(stem)
+
+        return {
+            'edit_tour_id': uuid_part or stem,
+            'directory_name': stem,
+            'full_path': blob_key,          # R2 key, not a disk path
+            'resolution_method': 'column_blob',
+            'blob_backed': True,
+            'stops_count': int(stops_count) if stops_count else 0,
+            # In blob mode editability is decided from the DB: a modern tour with
+            # separate audio files has stops_count > 0 (same signal the old
+            # ZIP-size heuristic approximated, but authoritative and free).
+            'editable': bool(stops_count and int(stops_count) > 0),
+        }
+
+    # ---- Disk mode (unchanged pre-LOCAL-781 behaviour) ----
     cur.execute(
         "SELECT tour_name, zip_filename FROM audio_tours WHERE id = %s",
         (int(download_id),)
@@ -95,6 +182,7 @@ def _resolve_from_column(download_id, conn):
         'directory_name': stem,
         'full_path': str(zip_path),
         'resolution_method': 'column',
+        'blob_backed': False,
     }
 
 
@@ -219,6 +307,19 @@ def find_edit_tour_id(download_id):
         if result:
             return result
 
+        # [LOCAL-781] In blob mode the ZIP is in R2 and /app/tours is empty, so
+        # the filesystem fallback can only ever scan an empty directory. Skip it:
+        # if the column path did not resolve (missing object or NULL column), the
+        # answer is a clean "not found" (404), NOT a misleading legacy name-scan
+        # warning. The deterministic LOCAL-50 rule still governs the id.
+        if _get_blob_storage() is not None:
+            logger.warning(
+                "LOCAL-781: blob-mode resolution did not find tour id=%s via the "
+                "zip_filename column; returning not-found (no filesystem scan).",
+                download_id
+            )
+            return None
+
         # Need tour_name for fallback
         cur = conn.cursor()
         cur.execute("SELECT tour_name FROM audio_tours WHERE id = %s", (int(download_id),))
@@ -230,7 +331,7 @@ def find_edit_tour_id(download_id):
 
         tour_name = row[0]
 
-        # Fallback: filesystem scan
+        # Fallback: filesystem scan (disk/Mac mode only)
         return _resolve_from_filesystem(download_id, tour_name, TOURS_DIR)
 
     except Exception as e:
@@ -348,7 +449,29 @@ def resolve_tour_id(download_id):
                 "candidate_zips": edit_info.get('matches', []),
             }), 409  # Conflict
 
-        # Check editability
+        # Check editability.
+        # [LOCAL-781] In blob mode the ZIP is in R2, not on disk, so editability
+        # and stop count are taken from the DB row (carried on edit_info) rather
+        # than by reading the object — no download just to answer /resolve. In
+        # disk mode the behaviour is unchanged (inspect the ZIP on disk).
+        if edit_info.get('blob_backed'):
+            is_editable = bool(edit_info.get('editable'))
+            response_data = {
+                "status": "success",
+                "download_id": int(download_id),
+                "edit_tour_id": edit_info['edit_tour_id'],
+                "tour_name": tour_name,
+                "editable": is_editable,
+                "has_separate_audio_files": is_editable,
+                "download_url": f"/tour/{download_id}/download",
+                "directory_name": edit_info['directory_name'],
+                "resolution_method": edit_info.get('resolution_method', 'unknown'),
+            }
+            stops_count = edit_info.get('stops_count') or 0
+            if stops_count > 0:
+                response_data["stops_count"] = stops_count
+            return jsonify(response_data)
+
         is_editable = check_tour_editability(edit_info['full_path'])
 
         # Build response
