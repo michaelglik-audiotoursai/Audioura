@@ -93,6 +93,108 @@ def _looks_contained_request(location: str) -> bool:
     return any(w in _CONTAINED_VENUE_TAIL for w in words)
 
 
+# [LOCAL-788] "near me" request detection (text-only; device coords are not
+# available at this layer, so a near-me reuse is still bounded by the scope
+# centre radius below — the tighter device 3 km radius is applied where device
+# coords ARE known, via places_search.row_in_scope(near=...)).
+_NEAR_ME_RE = re.compile(r'\bnear\s+me\b', re.IGNORECASE)
+
+
+def _geocode_scope(location: str):
+    """[LOCAL-788] Geocode the request scope to (center, bbox), reusing the SAME
+    geocoder the LOCAL-786 new-lookup path uses (stop_existence_gate's scope
+    geocoders, which route through the Serper/Nominatim seam). Returns
+    ``(center_or_None, bbox_or_None)``; never raises — a failed geocode yields
+    (None, None) and the reuse re-validation then relies on whatever signal it
+    has (town-name mismatch still works with no centre)."""
+    center = bbox = None
+    try:
+        import stop_existence_gate as _gate
+        try:
+            center = _gate._geocode_scope_center(location)
+        except Exception:
+            center = None
+        try:
+            bbox = _gate._geocode_scope_bbox(location)
+        except Exception:
+            bbox = None
+    except Exception as e:  # pragma: no cover - gate import failure
+        logger.info(f"[LOCAL-788] scope geocode unavailable ({e})")
+    return center, bbox
+
+
+def _revalidate_pooled_scope(rows, location, tour_type, contained):
+    """[LOCAL-788] Re-run the LOCAL-786 scope test on every REUSED (pooled/mined)
+    stop that is a PLACE (has coordinates), BEFORE it is counted toward K.
+
+    A reused stop was researched for an EARLIER request and carried forward by the
+    pool / LOCAL-778 mining. LOCAL-786's ``_bind_in_scope`` only runs on NEW place
+    lookups, so a pooled place outside the current (tighter) scope was accepted
+    unchecked — tour 454 reused Byblos in Norwood (~10 km) for a West Roxbury
+    request. Here each pooled place is passed through the SAME gate
+    (``places_search.row_in_scope``): radius by scope precision, bbox + 500 m,
+    near-me 3 km, and the town-name mismatch reject.
+
+    Only OUTDOOR / place-type tours (dining, business, near-me) are re-validated.
+    A CONTAINED venue (museum / facility) has no stop-by-stop scope — its stops are
+    artworks inside one building and share the venue's coordinates — so it is left
+    untouched (mirrors LOCAL-591's one-scope-per-tour rule).
+
+    Rejected rows are dropped from THIS tour only and logged
+    ``[LOCAL-788] pool reject <title> <km> <reason>``. Nothing is deleted from the
+    pool (no DELETE). Returns ``(kept_rows, rejected_count)``; on any error returns
+    the input rows unchanged (a re-validation bug must never empty a tour).
+    """
+    if contained or not rows:
+        return list(rows), 0
+    try:
+        import places_search as _ps
+    except Exception as e:  # pragma: no cover
+        logger.info(f"[LOCAL-788] places_search unavailable for reuse re-validation ({e})")
+        return list(rows), 0
+
+    near_me = bool(_NEAR_ME_RE.search(location or "")) or \
+        bool(_NEAR_ME_RE.search(tour_type or ""))
+    center, bbox = _geocode_scope(location)
+    # With no centre AND no bbox AND no scope town, there is nothing to test
+    # against — keep everything (we cannot prove any stop is out of scope).
+    scope_town = ""
+    try:
+        scope_town = _ps._scope_town(location)
+    except Exception:
+        scope_town = ""
+    if center is None and bbox is None and not scope_town:
+        logger.info("[LOCAL-788] reuse re-validation: no scope centre/bbox/town; "
+                    "keeping all pooled rows")
+        return list(rows), 0
+
+    kept = []
+    rejected = 0
+    for r in rows:
+        coords = r.get("coordinates", "")
+        address = r.get("address", "") or ""
+        try:
+            keep, reason, dist_km = _ps.row_in_scope(
+                coords, address, location,
+                scope_center=center, scope_bbox=bbox,
+                near=None)  # device coords not available at this layer
+        except Exception as e:
+            logger.info(f"[LOCAL-788] row_in_scope error for "
+                        f"{r.get('title')!r} ({e}); keeping")
+            kept.append(r)
+            continue
+        if keep:
+            kept.append(r)
+        else:
+            rejected += 1
+            _km = "?" if dist_km == float("inf") else f"{dist_km:.1f}km"
+            print(f"  [LOCAL-788] pool reject {r.get('title','')!r} {_km} {reason}")
+    if rejected:
+        print(f"  [LOCAL-788] reuse re-validation dropped {rejected} out-of-scope "
+              f"pooled/mined stop(s) from this tour (pool unchanged)")
+    return kept, rejected
+
+
 def _classify(location: str, tour_type: str) -> str:
     """Classify via the generator's own classifier; fall back to tour_type.
 
@@ -311,8 +413,21 @@ def maybe_generate_with_pool(
     tour_category = _classify(location, tour_type)
     contained = _is_contained(tour_category)
     header_cat, display_cat = _header_categories(tour_category, tour_type)
+
+    # [LOCAL-788] Reuse re-validation. Every pooled/mined stop that is a PLACE
+    # (has coordinates) must pass the SAME LOCAL-786 scope test as a new lookup
+    # BEFORE it is counted toward K — otherwise a place researched for an earlier,
+    # wider request (tour 454: Byblos, Norwood, ~10 km) is reused for a tighter
+    # scope it does not belong to, because _bind_in_scope only runs on NEW
+    # lookups. Rejected rows are dropped from THIS tour only (logged) and never
+    # deleted from the pool; if K then falls below N, the existing N>K path
+    # researches the remainder exactly as if those stops had never been pooled.
+    pooled_rows, _pool_rejected = _revalidate_pooled_scope(
+        pooled_rows, location, tour_type, contained)
+    K = len(pooled_rows)
     print(f"  [LOCAL-590] pool: venue={identity} type={tour_type} category={tour_category} "
-          f"contained={contained} requested={N} pooled={K} reuse_first={reuse_first}")
+          f"contained={contained} requested={N} pooled={K} reuse_first={reuse_first}"
+          f"{(' rejected=' + str(_pool_rejected)) if _pool_rejected else ''}")
 
     # Nothing to reuse and a full request.
     if K == 0:

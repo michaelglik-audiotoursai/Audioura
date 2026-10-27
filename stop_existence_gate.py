@@ -1059,6 +1059,70 @@ def _fetch_wikidata_coords(qid: str, headers: dict) -> Optional[Tuple[float, flo
     return None
 
 
+def _text_contradicts_scope(text: str, city_signals: Set[str]) -> bool:
+    """[LOCAL-788 item 5] Does an evidence snippet/page positively name a place
+    that CONTRADICTS the tour's scope?
+
+    Existence verification must match the PLACE, not the NAME. The tour-460 defect
+    verified "Kebab House, West Roxbury" with a Wikipedia snippet about Bitterne
+    Park (Southampton, UK) — same words, wrong country. A snippet counts only if
+    its location matches the scope; a same-named place in another country/state is
+    a reject.
+
+    This returns True when the text names a COUNTRY, a US state, or a well-known
+    town that is NOT one of the scope's ``city_signals`` AND the scope's own
+    signals are ABSENT from the text — i.e. the evidence is clearly about a
+    different place. It reuses ``restaurant_practicals._geo_vocab`` (pycountry
+    states + countries) when available, plus a small built-in set of foreign
+    place markers for the common UK/Canada/Australia homonym case. Conservative by
+    design: when the scope's OWN signal is present in the text it never flags
+    (that is a genuine match, possibly alongside a mention of another place), and
+    an empty/with-no-geo text is not a contradiction (absence is not evidence —
+    the positive scope-match check handles that separately)."""
+    if not text:
+        return False
+    s = _strip_accents(text).lower()
+    sigs = {sig for sig in (city_signals or set()) if sig}
+    # If the scope's own town/region is named in the text, it is a match, never a
+    # contradiction — an article may mention several places.
+    if sigs and any(re.search(r'(?<![a-z])' + re.escape(sig) + r'(?![a-z])', s)
+                    for sig in sigs):
+        return False
+
+    # Foreign/other-region place markers that commonly collide by name. A hit on
+    # any of these, with no scope signal present, means the evidence is about a
+    # different place. Kept small and surgical (the Bitterne Park / Southampton,
+    # UK case and its obvious siblings); the pycountry vocab below covers states
+    # and countries generally.
+    _FOREIGN_MARKERS = (
+        'bitterne', 'southampton', 'united kingdom', 'england', 'scotland', 'wales',
+        'australia', 'canada', 'new zealand', 'ireland', 'hampshire',
+    )
+    for m in _FOREIGN_MARKERS:
+        if m in sigs:
+            continue
+        if re.search(r'(?<![a-z])' + re.escape(m) + r'(?![a-z])', s):
+            return True
+
+    # pycountry-backed states + countries (via restaurant_practicals), when present.
+    try:
+        import restaurant_practicals as _rp
+        states, countries = _rp._geo_vocab()
+    except Exception:
+        states, countries = {}, {}
+    for vocab in (countries, states):
+        for surface in vocab:
+            if not surface or len(surface) < 4:
+                continue
+            if surface in sigs:
+                continue
+            if re.search(r'(?<![a-z])' + re.escape(surface) + r'(?![a-z])', s):
+                # A country/state named, none of the scope signals present → the
+                # evidence is about a different place.
+                return True
+    return False
+
+
 def _check_dining_existence(
     stop_title: str, venue_name: str, db_conn
 ) -> Tuple[bool, str]:
@@ -1126,6 +1190,10 @@ def _check_dining_existence(
         has_city = any(sig in s for sig in _city_signals) if _city_signals else False
         if not has_city:
             return False
+        # [LOCAL-788 item 5] Reject a snippet that positively names a contradicting
+        # place (a same-named establishment in another country/state).
+        if _text_contradicts_scope(s, _city_signals):
+            return False
         # Require a dining signal in the snippet
         _dining_snippet_signals = ('restaurant', 'chef', 'michelin', 'cuisine', 'bistro',
                                    'brasserie', 'gastronomic', 'dining', 'starred',
@@ -1173,13 +1241,20 @@ def _check_dining_existence(
                                    'culinary', 'menu', 'kitchen', 'cook', 'dine', 'meal')
             is_dining = any(sig in full_text for sig in _restaurant_signals)
             has_city = _city_signals and any(sig in full_text_normalized for sig in _city_signals)
+            # [LOCAL-788 item 5] Reject a same-named place in another country/state:
+            # the summary must not positively name a location that contradicts the
+            # scope (Bitterne Park, Southampton, UK for a West Roxbury request).
+            _contradicts = _text_contradicts_scope(full_text_normalized, _city_signals)
 
-            if has_city and is_dining:
+            if has_city and is_dining and not _contradicts:
                 return True, f"wikipedia_summary: '{title_returned}' is dining+city"
-            # If it's clearly about a restaurant (even without explicit city in summary)
-            # but title matches exactly, accept it
-            if is_dining and _title_match(stop_title, title_returned):
-                return True, f"wikipedia_summary: '{title_returned}' is a restaurant"
+            # [LOCAL-788 item 5] A title match alone is NOT enough — it matches the
+            # NAME, not the PLACE. A standalone article accepted on name only is how
+            # a UK "Kebab House" verified a West Roxbury stop. Require the scope's
+            # own location in the text AND no contradicting place.
+            if (is_dining and _title_match(stop_title, title_returned)
+                    and has_city and not _contradicts):
+                return True, f"wikipedia_summary: '{title_returned}' is a restaurant in scope"
     except Exception as e:
         logger.debug(f"[EXISTENCE-GATE] Wikipedia summary check failed for {stop_title!r}: {e}")
 
@@ -1309,12 +1384,16 @@ def _check_dining_existence(
                                       'gastronomique', 'bistrot', 'brasserie', 'table', 'cuisinier')
             has_city_fr = _city_signals and any(sig in full_text_fr_normalized for sig in _city_signals)
             is_dining_fr = any(sig in full_text_fr_normalized for sig in _restaurant_signals_fr)
+            # [LOCAL-788 item 5] Same place-not-name rule on fr.wiki.
+            _contradicts_fr = _text_contradicts_scope(full_text_fr_normalized, _city_signals)
 
-            if has_city_fr and is_dining_fr:
+            if has_city_fr and is_dining_fr and not _contradicts_fr:
                 return True, f"wikipedia_fr_summary: '{title_fr}' is dining+city (fr.wiki)"
-            # If title matches exactly and it's clearly a restaurant, accept
-            if is_dining_fr and _title_match(stop_title, title_fr):
-                return True, f"wikipedia_fr_summary: '{title_fr}' is a restaurant (fr.wiki)"
+            # A title match alone is NOT enough (it matches the name, not the place):
+            # require the scope's location in the text and no contradiction.
+            if (is_dining_fr and _title_match(stop_title, title_fr)
+                    and has_city_fr and not _contradicts_fr):
+                return True, f"wikipedia_fr_summary: '{title_fr}' is a restaurant in scope (fr.wiki)"
 
         # French Wikipedia search (snippet-based)
         _search_variants_fr = [

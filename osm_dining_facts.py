@@ -131,7 +131,24 @@ def _overpass_request(query: str, context: str = "") -> Optional[dict]:
 
     Returns parsed JSON or None on failure.
     Raises RuntimeError on persistent failure (for gate to classify as unknown).
+
+    [LOCAL-788] Delegates to the SHARED Overpass client
+    (``osm_venue_facts._overpass_request``), which on a 5xx / timeout retries once
+    on a public mirror (overpass.kumi.systems / overpass.private.coffee) before
+    giving up — so a dining-facts lookup inherits the same outage resilience and
+    there is no second Overpass client with divergent behaviour. Falls back to the
+    local request loop only if the shared client cannot be imported.
     """
+    try:
+        from osm_venue_facts import _overpass_request as _shared
+        return _shared(query, context=context)
+    except ImportError:
+        return _overpass_request_local(query, context)
+
+
+def _overpass_request_local(query: str, context: str = "") -> Optional[dict]:
+    """Fallback single-endpoint Overpass request (pre-LOCAL-788 behaviour), used
+    only when the shared mirror-aware client is unavailable."""
     import requests as _http
 
     global _overpass_last_request_time

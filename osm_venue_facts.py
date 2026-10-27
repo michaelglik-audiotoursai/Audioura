@@ -30,6 +30,7 @@ Returns:
 """
 
 import logging
+import os
 import re
 import time
 import threading
@@ -47,7 +48,35 @@ except Exception:  # pragma: no cover
 
 logger = logging.getLogger(__name__)
 
-_OVERPASS_URL = "https://overpass-api.de/api/interpreter"
+# [LOCAL-788] The primary Overpass endpoint is env-overridable so a live test can
+# force an outage (point OVERPASS_URL at a dead host and watch the mirror + Serper
+# fallback engage). On a 5xx / timeout / connection error the request RETRIES ONCE
+# on a second public mirror before giving up — an Overpass outage must never
+# silently shrink the candidate list (a dropped Overpass answer costs real places).
+_OVERPASS_URL = os.environ.get(
+    "OVERPASS_URL", "https://overpass-api.de/api/interpreter").strip() \
+    or "https://overpass-api.de/api/interpreter"
+# Public mirrors, tried in order after the primary fails. Overridable via
+# OVERPASS_MIRRORS (comma-separated) so a test can pin or disable them.
+_OVERPASS_MIRRORS = [
+    m.strip() for m in os.environ.get(
+        "OVERPASS_MIRRORS",
+        "https://overpass.kumi.systems/api/interpreter,"
+        "https://overpass.private.coffee/api/interpreter",
+    ).split(",") if m.strip()
+]
+# The full endpoint ladder: primary first, then each mirror. De-duplicated so a
+# mirror that equals the primary is not tried twice.
+def _overpass_endpoints():
+    seen = set()
+    out = []
+    for ep in [_OVERPASS_URL] + _OVERPASS_MIRRORS:
+        if ep and ep not in seen:
+            seen.add(ep)
+            out.append(ep)
+    return out
+
+
 _OVERPASS_HEADERS = {
     "User-Agent": "Audioura/2.2 (tour-generation; contact: support@audioura.com)",
 }
@@ -262,11 +291,18 @@ def _overpass_request(query: str, context: str = "", budget=None) -> Optional[di
     Returns parsed JSON or None on failure.
 
     [LOCAL-622] Each HTTP attempt uses a short hard timeout (``_OVERPASS_CALL_TIMEOUT``,
-    clamped by the remaining tour ``budget`` when one is supplied). At most one
-    retry is made, and the retry is skipped if the per-tour budget has run out —
-    an optional enrichment must never stall the tour. The wall time of the whole
-    request (including the rate-limit sleep and any retry) is charged to the
-    budget so the phase total stays bounded.
+    clamped by the remaining tour ``budget`` when one is supplied). The wall time of
+    the whole request (including the rate-limit sleep and any retry) is charged to
+    the budget so the phase total stays bounded.
+
+    [LOCAL-788] An Overpass outage must never silently shrink the candidate list.
+    On a 5xx / timeout / connection error the request RETRIES ONCE on the next
+    public mirror (``_OVERPASS_MIRRORS``) before giving up, logging
+    ``[LOCAL-788] overpass fallback <endpoint> <status>`` for each failed endpoint.
+    A 429 (rate limit) is NOT a mirror trigger — it is handled per-endpoint with a
+    single budget-aware back-off, as before. Returns the first endpoint's parsed
+    JSON, or None only when every endpoint failed (the caller then falls back to
+    Serper Places — see facility_spine / the replenish path).
     """
     import requests as _http
 
@@ -278,6 +314,7 @@ def _overpass_request(query: str, context: str = "", budget=None) -> Optional[di
     if budget is not None:
         _call_timeout = min(_call_timeout, max(1.0, budget.effective_timeout()))
 
+    endpoints = _overpass_endpoints()
     _req_start = time.monotonic()
     try:
         with _overpass_lock:
@@ -287,37 +324,56 @@ def _overpass_request(query: str, context: str = "", budget=None) -> Optional[di
                 time.sleep(_OVERPASS_MIN_INTERVAL - elapsed)
             _overpass_last_request_time = time.time()
 
-        for attempt in range(2):
+        for _idx, _endpoint in enumerate(endpoints):
+            # The per-tour budget still bounds the whole call: once exhausted,
+            # stop trying further mirrors (an optional enrichment never stalls).
+            if _idx > 0 and budget is not None and budget.is_exhausted():
+                logger.warning(f"[OSM-VENUE] Overpass budget exhausted; "
+                               f"not trying further mirrors for {context!r}")
+                break
             try:
                 resp = _http.post(
-                    _OVERPASS_URL,
+                    _endpoint,
                     data={"data": query},
                     headers=_OVERPASS_HEADERS,
                     timeout=_call_timeout,
                 )
                 if resp.status_code == 200:
+                    if _idx > 0:
+                        print(f"  [LOCAL-788] overpass fallback {_endpoint} 200 "
+                              f"(mirror served {context!r})")
                     return resp.json()
                 elif resp.status_code == 429:
                     logger.warning(f"[OSM-VENUE] Overpass 429 for {context!r} "
-                                   f"(attempt {attempt + 1}/2)")
-                    # [LOCAL-622] Only back off and retry if the tour still has
-                    # budget AND this is the first attempt. Otherwise give up now.
-                    if attempt == 0 and (budget is None or not budget.is_exhausted()):
+                                   f"on {_endpoint}")
+                    # A single budget-aware back-off + one re-try on the SAME
+                    # endpoint for a transient rate-limit, then move to the mirror.
+                    if budget is None or not budget.is_exhausted():
                         time.sleep(min(5, _call_timeout))
-                        continue
-                    return None
+                        try:
+                            resp2 = _http.post(
+                                _endpoint, data={"data": query},
+                                headers=_OVERPASS_HEADERS, timeout=_call_timeout)
+                            if resp2.status_code == 200:
+                                return resp2.json()
+                        except (_http.exceptions.Timeout,
+                                _http.exceptions.ConnectionError):
+                            pass
+                    print(f"  [LOCAL-788] overpass fallback {_endpoint} 429")
+                    continue
                 else:
+                    # 5xx (502/503/504) or any other non-200 → try the next mirror.
                     logger.warning(f"[OSM-VENUE] Overpass HTTP {resp.status_code} "
-                                   f"for {context!r}")
-                    return None
+                                   f"for {context!r} on {_endpoint}")
+                    print(f"  [LOCAL-788] overpass fallback {_endpoint} "
+                          f"{resp.status_code}")
+                    continue
             except (_http.exceptions.Timeout, _http.exceptions.ConnectionError) as e:
                 logger.warning(f"[OSM-VENUE] Overpass {type(e).__name__} for "
-                               f"{context!r} (attempt {attempt + 1}/2)")
-                # [LOCAL-622] At most one retry, and only while budget remains.
-                if attempt == 0 and (budget is None or not budget.is_exhausted()):
-                    time.sleep(min(2, _call_timeout))
-                    continue
-                return None
+                               f"{context!r} on {_endpoint}")
+                print(f"  [LOCAL-788] overpass fallback {_endpoint} "
+                      f"{type(e).__name__}")
+                continue
 
         return None
     finally:

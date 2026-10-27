@@ -586,6 +586,117 @@ def _bind_in_scope(results: List[Dict], scope: str,
     return out
 
 
+def _parse_coords(value) -> Optional[Tuple[float, float]]:
+    """[LOCAL-788] Parse a stored coordinate value into (lat, lon), or None.
+
+    Accepts a "lat, lon" / "lat,lon" string (how the stop pool stores it) or a
+    (lat, lon) tuple/list. Returns None when the value is empty, malformed, or
+    out of range — a row with no usable coordinates is NOT a place we can
+    geographically test (the caller keeps it; see ``row_in_scope``)."""
+    if value is None or value == "":
+        return None
+    try:
+        if isinstance(value, (tuple, list)):
+            lat, lon = float(value[0]), float(value[1])
+        else:
+            parts = [p.strip() for p in str(value).split(",")]
+            if len(parts) < 2:
+                return None
+            lat, lon = float(parts[0]), float(parts[1])
+    except (TypeError, ValueError, IndexError):
+        return None
+    if not (-90.0 <= lat <= 90.0 and -180.0 <= lon <= 180.0):
+        return None
+    return (lat, lon)
+
+
+def row_in_scope(coordinates, address: str, scope: str,
+                 scope_center: Optional[Tuple[float, float]] = None,
+                 scope_bbox=None,
+                 near: Optional[Tuple[float, float]] = None) -> Tuple[bool, str, float]:
+    """[LOCAL-788] Does a single already-known place lie inside ``scope``?
+
+    This is the SAME scope test LOCAL-786's ``_bind_in_scope`` applies to a fresh
+    Serper lookup — radius by scope precision, bbox + 500 m margin, near-me 3 km,
+    and the town-name mismatch reject — reused for a REUSED (pooled or mined) stop
+    so a place that was researched for one request cannot be silently carried into
+    a tighter-scoped request it does not belong to (tour 454: Byblos, Norwood, on a
+    West Roxbury request). It re-runs the geographic gate ONLY; it never sources or
+    bills.
+
+    Args:
+        coordinates: the stop's coordinates, as a "lat, lon" string (pool shape),
+            a (lat, lon) pair, or "" when the stop has none.
+        address: the stop's free-text address (used for the town-name mismatch).
+        scope: the request's scope string (the tour's venue/area, e.g.
+            "West Roxbury, MA").
+        scope_center: the scope's geocoded centre (lat, lon), for the radius test.
+        scope_bbox: the scope's geocoded bounding box [south, north, west, east],
+            preferred over the radius when present.
+        near: device coordinates (lat, lon) for a "near me" request — binds the
+            3 km near-me radius to the device rather than the scope centre.
+
+    Returns ``(keep, reason, distance_km)``:
+        keep         — True when the stop is in scope (or cannot be proven out of
+                       scope because it has no coordinates and there is nothing to
+                       test against — LOCAL-786's "no coords" rule).
+        reason       — "" when kept; otherwise one of "town-name mismatch (<town>)",
+                       "outside bbox", or "<km> km > <radius> km radius".
+        distance_km  — distance to the scope centre / device in km (inf when it
+                       cannot be computed). For the reject log line.
+
+    A stop with NO coordinates is kept (we cannot prove it is outside), matching
+    ``_bind_in_scope``'s treatment of a coordinate-less record.
+    """
+    coords = _parse_coords(coordinates)
+    near_me = near is not None
+    if near_me:
+        try:
+            center = (float(near[0]), float(near[1]))
+        except (TypeError, ValueError, IndexError):
+            center = None
+        radius = _NEAR_ME_RADIUS_KM
+        parsed_bbox = None  # near-me binds to the device, not the scope's bbox
+    else:
+        center = None
+        if scope_center is not None:
+            try:
+                center = (float(scope_center[0]), float(scope_center[1]))
+            except (TypeError, ValueError, IndexError):
+                center = None
+        radius = _radius_for_precision(_scope_precision(scope), scope)
+        parsed_bbox = _parse_bbox(scope_bbox)
+
+    # No coordinates: nothing to test against → keep (cannot prove it is outside).
+    if coords is None:
+        return True, "", float("inf")
+    rlat, rlon = coords
+
+    dist = _haversine_km(center, (rlat, rlon)) if center is not None else float("inf")
+    in_bbox = (parsed_bbox is not None and _inside_bbox(rlat, rlon, parsed_bbox))
+
+    # 1) Town-name mismatch: a different town AND outside the bbox → reject.
+    scope_town = _scope_town(scope)
+    rec_town = _address_town({"_serper_address": address or "",
+                              "display_name": address or ""})
+    if (scope_town and rec_town and rec_town != scope_town and
+            scope_town not in rec_town and rec_town not in scope_town and
+            not in_bbox):
+        return False, f"town-name mismatch ({rec_town})", dist
+
+    # 2) Bounding box preference.
+    if parsed_bbox is not None:
+        if not in_bbox:
+            return False, "outside bbox", dist
+        return True, "", dist
+
+    # 3) Radius fallback.
+    if center is not None and dist > radius:
+        return False, f"{dist:.1f} km > {radius:.1f} km radius", dist
+
+    return True, "", dist
+
+
 def places_search(query: str, scope: str,
                   near: Optional[Tuple[float, float]] = None,
                   limit: int = 10,
