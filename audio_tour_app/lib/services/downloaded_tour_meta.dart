@@ -28,6 +28,8 @@ import 'dart:convert';
 
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'saved_tours_store.dart';
+
 /// The paid-tour snapshot stamped onto a downloaded tour's saved_tours record.
 ///
 /// Keys used inside the saved_tours JSON map:
@@ -209,7 +211,7 @@ class DownloadedTourStore {
         }
       } catch (_) {}
     }
-    if (changed) await prefs.setStringList('saved_tours', raw);
+    if (changed) await SavedToursStore.save(prefs, raw);
     return changed;
   }
 

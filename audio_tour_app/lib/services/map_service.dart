@@ -2,6 +2,8 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'saved_tours_store.dart';
+
 class MapService {
   static const String baseUrl = 'http://map_delivery:5005';
   
@@ -45,7 +47,7 @@ class MapService {
       
       // Add to saved tours
       savedTours.add(json.encode(newTour));
-      await prefs.setStringList('saved_tours', savedTours);
+      await SavedToursStore.save(prefs, savedTours);
       
       return true;
     } catch (e) {

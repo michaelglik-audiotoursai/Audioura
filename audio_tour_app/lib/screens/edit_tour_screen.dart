@@ -6,6 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:path_provider/path_provider.dart';
 import '../screens/debug_log_viewer_screen.dart';
 import '../services/tour_editing_service.dart';
+import '../services/saved_tours_store.dart';
 import '../utils/tour_error_resolver.dart';
 import 'edit_stop_screen.dart';
 import 'plan_screen.dart';
@@ -831,7 +832,7 @@ class _EditTourScreenState extends State<EditTourScreen> {
         newVersion: newVersion,
       );
 
-      await prefs.setStringList('saved_tours', updated);
+      await SavedToursStore.save(prefs, updated);
       await DebugLogHelper.addDebugLog('DEBUG_UPDATE_ID: Local tour updated with new ID reference and stop count $stopCount');
     } catch (e) {
       await DebugLogHelper.addDebugLog('DEBUG_UPDATE_ID: ERROR in _updateLocalTourId: $e');

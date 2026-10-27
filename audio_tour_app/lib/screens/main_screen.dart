@@ -437,7 +437,18 @@ class MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
       _selectedIndex = index;
       _visitedTabs.add(index);
       _barVisible = true; // any tab switch reveals the bar.
+      // [LOCAL-787] When the Listen tab becomes selected, force its root to
+      // rebuild so _loadTours runs and (after prefs.reload()) picks up a tour
+      // saved by any writer — including a background isolate whose write could
+      // not bump SavedToursRefresh across isolates. This is why Michael saw the
+      // Listen page empty for ~30 s after a download; switching in now shows it.
+      if (index == kListenTab) {
+        _listenTabVersion++;
+      }
     });
+    if (index == kListenTab) {
+      _resetTabToRoot(kListenTab);
+    }
     // Picking up a mode change made on the About tab (Tours<->Audio).
     _refreshModeForTab(index);
   }

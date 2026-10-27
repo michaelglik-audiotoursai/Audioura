@@ -10,6 +10,7 @@ import '../screens/debug_log_viewer_screen.dart';
 import '../config/endpoints.dart';
 import 'notification_service.dart';
 import 'tour_status_service.dart';
+import 'saved_tours_store.dart';
 
 class BackgroundService {
   static Timer? _backgroundTimer;
@@ -170,7 +171,7 @@ class BackgroundService {
             'lat': lat,
             'lng': lng,
           }));
-          await prefs.setStringList('saved_tours', tours);
+          await SavedToursStore.save(prefs, tours, bumpRefresh: false);
           
           // Remove from background tours list
           final backgroundTours = prefs.getStringList('background_tours') ?? [];

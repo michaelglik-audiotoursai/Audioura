@@ -21,6 +21,7 @@ import 'communities_service.dart';
 import 'community_downloads.dart';
 import 'community_tour_service.dart';
 import 'tour_download_service.dart';
+import 'saved_tours_store.dart';
 
 /// The outcome of one sync run (for logging/tests).
 class CommunityToursSyncResult {
@@ -503,7 +504,7 @@ class CommunityToursSync {
       updatedRecords.add(s);
     }
     if (recordsChanged) {
-      await prefs.setStringList('saved_tours', updatedRecords);
+      await SavedToursStore.save(prefs, updatedRecords);
     }
     var changed = false;
     for (final o in offers) {

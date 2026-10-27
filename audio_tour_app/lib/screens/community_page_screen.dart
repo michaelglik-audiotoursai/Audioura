@@ -19,6 +19,7 @@ import 'dart:convert';
 import '../services/communities_service.dart';
 import '../services/community_tour_service.dart';
 import '../services/app_sync_coordinator.dart';
+import '../services/saved_tours_store.dart';
 import '../services/community_downloads.dart';
 import '../services/community_background.dart';
 import '../services/community_notifications.dart';
@@ -197,7 +198,7 @@ class _CommunityPageScreenState extends State<CommunityPageScreen> {
         communityTourIds: communityTourIds,
       );
       if (stamped != null) {
-        await prefs.setStringList('saved_tours', stamped);
+        await SavedToursStore.save(prefs, stamped);
       }
       // [LOCAL-760 / D708] Repair source_kind too: a BROADCAST tour downloaded
       // before source_kind was stamped (the root cause Michael hit) is still on
@@ -214,7 +215,7 @@ class _CommunityPageScreenState extends State<CommunityPageScreen> {
         organiserAudioTourIds: organiserAudioIds,
       );
       if (skStamped != null) {
-        await prefs.setStringList('saved_tours', skStamped);
+        await SavedToursStore.save(prefs, skStamped);
       }
     }
     // [LOCAL-715 / D675 addendum 1] The per-community listening language: the
@@ -638,7 +639,7 @@ class _CommunityPageScreenState extends State<CommunityPageScreen> {
           } catch (_) {}
           out.add(s);
         }
-        await prefs.setStringList('saved_tours', out);
+        await SavedToursStore.save(prefs, out);
         if (!mounted) return;
         setState(() {
           final next = Map<String, int>.from(_organiserUpdateByTourId);

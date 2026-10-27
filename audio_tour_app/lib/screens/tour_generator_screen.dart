@@ -13,6 +13,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../services/tour_status_service.dart';
 import '../services/background_tour_monitor.dart';
+import '../services/saved_tours_store.dart';
 import '../config.dart';
 import '../config/endpoints.dart';
 import '../services/translation_service.dart';
@@ -1152,7 +1153,7 @@ class _TourGeneratorScreenState extends State<TourGeneratorScreen> {
       'parent_tour_id': null,
       'track': translationTrack,
     }));
-    await prefs.setStringList('saved_tours', savedTours);
+    await SavedToursStore.save(prefs, savedTours);
     await DebugLogHelper.addDebugLog('TOUR: Saved translated tour $tourId ($lang) as: $tourName');
   }
 
@@ -1330,7 +1331,7 @@ class _TourGeneratorScreenState extends State<TourGeneratorScreen> {
     tours.removeWhere((t) {
       try { return jsonDecode(t)['tour_id'] == tourId.toString(); } catch (_) { return false; }
     });
-    await prefs.setStringList('saved_tours', tours);
+    await SavedToursStore.save(prefs, tours);
     await DebugLogHelper.addDebugLog('TOUR: Removed English fallback (tour_id $tourId) — ${before - tours.length} entry pruned');
   }
 
@@ -1434,7 +1435,7 @@ class _TourGeneratorScreenState extends State<TourGeneratorScreen> {
       
       // Add to saved tours list
       tours.add(jsonEncode(tourInfo));
-      await prefs.setStringList('saved_tours', tours);
+      await SavedToursStore.save(prefs, tours);
       
       // Update available tours list for voice navigation
       final tourInfoList = tours.map((tourJson) {
@@ -2613,7 +2614,7 @@ class _TourGeneratorScreenState extends State<TourGeneratorScreen> {
           'lat': lat,
           'lng': lng,
         }));
-        await prefs.setStringList('saved_tours', tours);
+        await SavedToursStore.save(prefs, tours);
         
         // Remove from background tours
         final backgroundTours = prefs.getStringList('background_tours') ?? [];
