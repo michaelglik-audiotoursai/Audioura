@@ -145,6 +145,12 @@ def _no_rate_limit(monkeypatch):
     """Remove the 5s inter-request sleep so tests are fast and deterministic."""
     monkeypatch.setattr(osm_venue_facts, "_OVERPASS_MIN_INTERVAL", 0.0)
     monkeypatch.setattr(osm_venue_facts, "_overpass_last_request_time", 0.0)
+    # [LOCAL-788] These tests exercise the BUDGET / per-call timeout contract on
+    # the primary endpoint only. The mirror fallback (primary → public mirror on
+    # 5xx/timeout) is covered by tests/test_local788_overpass_fallback.py; pin the
+    # mirror list empty here so a 504 is bounded to the primary's own attempts and
+    # the historical post-call counts (<= 2) still describe the budget behaviour.
+    monkeypatch.setattr(osm_venue_facts, "_OVERPASS_MIRRORS", [])
 
 
 def _install_fake_requests(monkeypatch, fake):

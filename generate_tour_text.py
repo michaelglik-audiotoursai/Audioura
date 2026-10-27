@@ -1393,6 +1393,72 @@ def strip_llm_json_fences(text: str) -> str:
     return stripped
 
 
+# [LOCAL-788 item 2/B] "near me" detection for the precision correction below.
+_NEAR_ME_PRECISION_RE = re.compile(r'\bnear\s+me\b', re.IGNORECASE)
+
+
+def _correct_scope_precision(intent, user_request):
+    """[LOCAL-788 item 2/B] Deterministically correct a CITY precision that should
+    be tighter, so a neighbourhood or "near me" request never loses its stop-by-
+    stop containment check.
+
+    ROOT CAUSE (tour 460, GCloud, 2026-10-27): the request named a neighbourhood
+    ("West Roxbury, MA") but the LLM intent came back ``scope_precision = CITY``
+    (the Mac, same code, returned the correct DISTRICT — the LLM output is not
+    deterministic, and an Overpass 502 on GCloud coincided). ``CITY`` precision
+    makes ``_assert_one_scope_per_tour`` DROP the containment scope entirely
+    ("too wide for a stop-by-stop check"), so a stop up to city-wide is accepted —
+    which is how a West Roxbury tour admitted an out-of-neighbourhood place.
+
+    This correction is INDEPENDENT of the LLM and of Overpass: it reuses the
+    LOCAL-786 scope classifier (``places_search._scope_precision``), which already
+    recognises "West Roxbury, MA" / "Jamaica Plain" / "North End" as a
+    NEIGHBOURHOOD by marker or by a multi-word locality head, and the request's
+    own "near me" phrasing. When the LLM said CITY but the scope text classifies
+    tighter (or the request is "near me"), the precision is upgraded to DISTRICT
+    (the intent taxonomy's neighbourhood value). It only ever TIGHTENS a CITY
+    verdict; it never loosens a BUILDING / CORRIDOR / DISTRICT one, and it never
+    touches a genuine whole-city request ("walking tour in Newton, MA" stays CITY).
+
+    Mutates and returns ``intent`` (a dict); a non-dict intent is returned as-is.
+    """
+    if not isinstance(intent, dict):
+        return intent
+    current = (intent.get('scope_precision') or '').strip().upper()
+    # Only a CITY (or an empty/unknown) verdict is a candidate for tightening.
+    if current not in ('', 'CITY'):
+        return intent
+
+    scope_text = (intent.get('geographic_scope') or '').strip()
+    loc_text = (intent.get('location') or '').strip()
+    req_text = (user_request or '')
+
+    near_me = bool(_NEAR_ME_PRECISION_RE.search(req_text))
+
+    # Reuse the LOCAL-786 scope classifier on the most specific scope text we have.
+    tighter = False
+    try:
+        import places_search as _ps
+        for _cand in (scope_text, loc_text):
+            if _cand and _ps._scope_precision(_cand) == 'NEIGHBOURHOOD':
+                tighter = True
+                break
+    except Exception:
+        tighter = False
+
+    if not (near_me or tighter):
+        return intent
+
+    # A "near me" request with only a city-level scope still deserves a tight
+    # stop-by-stop check (the device radius binds elsewhere); and a scope that the
+    # classifier reads as a neighbourhood is a DISTRICT, not a CITY.
+    _reason = "near me" if (near_me and not tighter) else "neighbourhood scope"
+    print(f"  [LOCAL-788] precision correction: scope_precision {current or 'UNSET'!s}"
+          f" -> DISTRICT ({_reason}: scope={scope_text or loc_text!r})")
+    intent['scope_precision'] = 'DISTRICT'
+    return intent
+
+
 def analyze_tour_intent(user_request, api_key):
     """
     Enhanced AI-based intent analysis to detect specialized themes like books, movies, products.
@@ -1503,6 +1569,11 @@ Examples:
                           f"(attempt {_intent_attempt + 1}/{_MAX_INTENT_RETRIES}) — retrying")
                     continue  # Retry
                 
+                # [LOCAL-788 item 2/B] Deterministically correct a CITY precision
+                # that should be a neighbourhood (DISTRICT), so a West Roxbury /
+                # "near me" request never loses its stop-by-stop containment check
+                # to a non-deterministic LLM verdict or an Overpass outage.
+                parsed = _correct_scope_precision(parsed, user_request)
                 return parsed
             else:
                 print(f"Intent analysis failed: {response.status_code}")
@@ -17107,6 +17178,79 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
             _rp_round = 0
             _rp_seen = {(_p.get('name') or '').lower() for _p in poi_list}
             _rp_seen |= {d.lower() for d in _rp_dropped}
+
+            # [LOCAL-788 item 4] PLACES-FIRST D545 replenish. The addendum (tour 460
+            # trace) showed the D545 replenish asking the LLM directly — Fairouz,
+            # Byblos, Dino's, … all rejected, none of them the real Stardust /
+            # Bread Thyme — with NO bbox / places_search / Serper query ever logged.
+            # A dropped place-type stop must be replaced from the MAP first: Serper
+            # Places with `ll` at the scope centre + the LOCAL-786 bbox, then the
+            # LOCAL-784 escalation ladder, and only its LAST tier is an LLM name —
+            # each one geo-verified on the map. We route through
+            # replenish_with_escalation (that exact ladder), then STILL pass each
+            # candidate through fetch_practicals (the same closure check that
+            # dropped the original), so a dead venue can never be smuggled back in.
+            # The LLM propose_replacements loop below runs only for any remainder
+            # the map could not fill.
+            try:
+                from stop_existence_gate import replenish_with_escalation as _d545_escalate
+                _d545_scope = _scope_from_request(location, intent)
+                _d545_cuisine = ''
+                try:
+                    from stop_existence_gate import (_extract_cuisine_qualifier as _d545_ecq,
+                                                     _cuisine_from_request as _d545_cfr)
+                    _d545_pt = ''
+                    if intent and intent.get('poi_type'):
+                        _d545_rpt = intent['poi_type']
+                        _d545_pt = (" or ".join(_d545_rpt)
+                                    if isinstance(_d545_rpt, list) else _d545_rpt)
+                    _d545_cuisine = (_d545_ecq(_d545_pt) or _d545_cfr(user_request)
+                                     or _d545_cfr(location) or '')
+                except Exception:
+                    _d545_cuisine = ''
+                _d545_need = _rp_want - len(poi_list)
+                if _d545_need > 0 and _d545_scope:
+                    print(f"  [LOCAL-788] D545 places-first replenish: escalation "
+                          f"ladder (Serper Places + bbox FIRST) for "
+                          f"cuisine={_d545_cuisine!r} in {_d545_scope!r} (need {_d545_need})")
+                    _d545_cands = _d545_escalate(
+                        'dining', (_d545_pt or 'restaurants'), _d545_scope,
+                        _d545_need, exclude=set(_rp_seen), cuisine=_d545_cuisine,
+                        user_id=user_id, request_text=user_request)
+                    for _mc in _d545_cands:
+                        if len(poi_list) >= _rp_want:
+                            break
+                        _mcn = (_mc.get('name') or '').strip()
+                        if not _mcn or _mcn.lower() in _rp_seen:
+                            continue
+                        _rp_seen.add(_mcn.lower())
+                        # Geo-verified by construction (it came from the map); still
+                        # apply the D538 closure check before accepting.
+                        _mcp = fetch_practicals(_mcn, _rp_city, api_key)
+                        if not _mcp['deliverable']:
+                            print(f"  [LOCAL-788]   D545 map candidate rejected "
+                                  f"'{_mcn[:40]}' — {_mcp['reason'][:70]}")
+                            continue
+                        _mnew = _new_poi(_mcn, _mc.get('address', ''))
+                        _mnew['_practicals'] = _mcp
+                        if _mc.get('coordinates'):
+                            _mnew['coordinates'] = _mc['coordinates']
+                        if _mc.get('lat') is not None:
+                            _mnew['latitude'] = _mc.get('lat')
+                        if _mc.get('lng') is not None:
+                            _mnew['longitude'] = _mc.get('lng')
+                        _mnew['coords_source'] = 'dining_maps'
+                        _mnew['_maps_verified'] = True
+                        poi_list.append(_mnew)
+                        print(f"  [LOCAL-788]   D545 ADDED (map) '{_mcn[:44]}' — "
+                              f"{_mc.get('evidence', _mc.get('address',''))[:70]}")
+                    print(f"  [LOCAL-788] D545 places-first replenish: "
+                          f"{len(poi_list)}/{_rp_want} after the ladder"
+                          f"{' (full)' if len(poi_list) >= _rp_want else ''}")
+            except Exception as _d545_map_err:
+                print(f"  [LOCAL-788] D545 places-first replenish skipped "
+                      f"(non-fatal, LLM loop still runs): {_d545_map_err}")
+
             while len(poi_list) < _rp_want and _rp_round < 2:
                 _rp_round += 1
                 _need = _rp_want - len(poi_list)
