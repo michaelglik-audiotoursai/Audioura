@@ -140,6 +140,13 @@ OPENAI = {  # longest key wins
     "text-embedding-ada-002": (0.10, 0.0, 0.10),
 }
 GEMINI_IN, GEMINI_OUT, GROUNDING_PER_QUERY, SERPER_PER_QUERY = 0.75, 3.75, 0.014, 0.001
+# [LOCAL-783] Serper Places (https://google.serper.dev/places) returns the full
+# page (~20 businesses), which the Serper credit rule prices at 2 credits
+# ($0.002) — "> 10 results = 2 credits" (serper.dev credit model + Scrapingdog/
+# Medium benchmark, read 2026-10-26; base $0.001/credit at the $50/50k tier).
+# A /places call bills twice a /search call; priced separately so the ledger
+# never under-counts the bulk place search / refill that LOCAL-783 added.
+SERPER_PLACES_PER_QUERY = 0.002
 # [LOCAL-712 / D674] Anthropic (Claude) $ per 1M tokens: (input, output, cache_read).
 # Base-token list prices, standard tier. Source:
 # https://docs.anthropic.com/en/docs/about-claude/pricing (read 2026-10-18).
@@ -363,7 +370,11 @@ def _record(url, status, body, req_body=None):
             rec.update(model=url.split("/models/")[-1].split(":")[0] if "/models/" in url else "",
                        tokens_in=pin, tokens_out=pout, search_queries=q, usd=usd if status == 200 else 0.0)
         elif kind == "serper":
-            rec.update(usd=SERPER_PER_QUERY if status == 200 else 0.0)
+            # [LOCAL-783] The Places endpoint bills 2 credits ($0.002); every other
+            # Serper endpoint (search, news, scholar) bills 1 credit ($0.001).
+            _is_places = "/places" in (url or "")
+            _rate = SERPER_PLACES_PER_QUERY if _is_places else SERPER_PER_QUERY
+            rec.update(usd=_rate if status == 200 else 0.0)
     except Exception as e:
         rec["meter_error"] = str(e)[:120]
     try:

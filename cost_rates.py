@@ -119,6 +119,19 @@ GPT4O_MINI_COST_PER_1K_TOKENS = 0.000285  # ~($0.15*0.7 + $0.60*0.3) / 1000
 # --- Search (Serper) ---
 SERPER_COST_PER_QUERY = 0.001
 
+# --- Places (Serper Google Places / Maps) ---
+# [LOCAL-783]
+# Source: Serper credit model — base rate $0.001 / credit at the $50 / 50,000
+# entry tier (serper.dev homepage + apis.io/plans/serper, read 2026-10-26:
+# "$50 for 50,000 credits … $1.00 per 1,000 queries"). The documented credit
+# rule is "> 10 results = 2 credits" (Scrapingdog/Medium benchmark of Serper,
+# read 2026-10-26: "Serper … $0.001→$0.00075; >10 results = 2 credits"). The
+# Places endpoint (https://google.serper.dev/places) returns up to ~20 businesses
+# per call, so a Places call bills 2 credits = $0.002. We price the worst case
+# (the full page) so the ledger never under-counts; a call capped at ≤10 results
+# would be 1 credit, but we ask for the full page to feed the refill, so 2.
+SERPER_PLACES_COST_PER_QUERY = 0.002
+
 # --- Grounding (Gemini + Grounding with Google Search) ---
 # [LOCAL-533 / LOCAL-594]
 # Source: https://ai.google.dev/gemini-api/docs/pricing
@@ -356,6 +369,13 @@ def llm_cost(
 
 def search_cost(num_queries: int) -> float:
     return num_queries * SERPER_COST_PER_QUERY
+
+
+def places_cost(num_queries: int) -> float:
+    """[LOCAL-783] Cost in USD of `num_queries` Serper Places (Google Maps/Places)
+    calls. A Places call returns the full page (~20 businesses), which the Serper
+    credit rule prices at 2 credits = $0.002. See SERPER_PLACES_COST_PER_QUERY."""
+    return max(0, int(num_queries)) * SERPER_PLACES_COST_PER_QUERY
 
 
 def tts_cost(char_count: int, engine: str = "standard") -> float:
