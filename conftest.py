@@ -31,3 +31,25 @@ def _reset_fast_pipeline_tour_memo():
         fast_pipeline.reset_tour_memo()
     except Exception:
         pass
+
+
+@pytest.fixture(autouse=True)
+def _disable_live_serper_places(monkeypatch):
+    """[LOCAL-783] Keep the test suite OFFLINE.
+
+    places_search routes business/restaurant lookups to Serper's Places endpoint
+    whenever SERP_API_KEY is set and SERP_PROVIDER=serper. The developer `.env`
+    sets both, so without this the many fixture-only suites that monkeypatch
+    stop_existence_gate._nominatim_request would be bypassed and would attempt
+    LIVE Serper calls. We force the provider OFF for every test by default, so the
+    Nominatim seam the suites already patch stays the seam under test.
+
+    A test that specifically exercises the Serper Places path opts back in by
+    monkeypatching places_search._serper_post with a recorded fixture (which does
+    not need the env), so this never blocks the LOCAL-783 Serper tests — they set
+    their own fake transport rather than relying on the real key.
+    """
+    monkeypatch.delenv("SERP_API_KEY", raising=False)
+    monkeypatch.delenv("SERPER_API_KEY", raising=False)
+    monkeypatch.setenv("SERP_PROVIDER", "nominatim")
+    yield

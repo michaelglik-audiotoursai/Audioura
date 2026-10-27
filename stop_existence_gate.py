@@ -133,6 +133,38 @@ def _nominatim_request(params: dict, context: str = "") -> "requests.Response":
 # ──── END LOCAL-320 ───────────────────────────────────────────────────────────
 
 
+# ──── [LOCAL-783] PLACE-SEARCH PROVIDER ROUTING ───────────────────────────────
+# The business/restaurant bulk search + refill and the per-name verification have
+# always gone to the FREE Nominatim endpoint, which returned 0 live for both West
+# Roxbury and the North End (LOCAL-779B, "Known limitation"). We already pay for
+# Serper (SERP_PROVIDER=serper, SERP_API_KEY on the generator). places_search.py
+# answers the SAME Nominatim-style query with Serper's Places endpoint when the key
+# is set, and normalises the result to the OSM jsonv2 shape every function below
+# already consumes — so the scope/cuisine/distance logic is unchanged. When Serper
+# is NOT configured, these fall straight through to _nominatim_request (today's
+# behaviour). A Serper call is metered once per uncached query and cached 24 h.
+def _places_lookup(params: dict, context: str = "",
+                   scope_center=None, near=None) -> "requests.Response":
+    """Route a place lookup to Serper Places when enabled, else Nominatim.
+
+    `scope_center` / `near` are the (lat, lng) the caller already computed (the
+    scope geocode, or device coords for "near me"); they build the Serper `ll` so
+    the town in the query is HONOURED (Serper Places ignores the town written in
+    `q` — LEAD probe). Returns a response-shaped object with .json(); raises
+    RuntimeError only on the Nominatim fallback path (LOCAL-320 contract: a failed
+    lookup is UNKNOWN, never searched-and-absent)."""
+    try:
+        import places_search as _ps
+        resp = _ps.map_lookup(params, context=context,
+                              scope_center=scope_center, near=near)
+        if resp is not None:
+            return resp
+    except Exception as e:  # fail open to Nominatim — a provider bug never blocks
+        logger.warning(f"[LOCAL-783] places provider error ({context!r}): {e}; "
+                       f"falling back to Nominatim")
+    return _nominatim_request(params, context=context)
+
+
 # ──── [LOCAL-779] BUSINESS POI CLASSIFICATION ─────────────────────────────────
 # Gyms, cafés, shops, bakeries, bars, spas, climbing walls … are BUSINESSES. Like
 # restaurants (LOCAL-281/313) they are rarely on Wikipedia/Wikidata, so the
@@ -1761,7 +1793,10 @@ def business_replenish_candidates(
         "accept-language": "en",
     }
     try:
-        resp = _nominatim_request(params, context=f"replenish:{_pt}@{_scope}")
+        resp = _places_lookup(params, context=f"replenish:{_pt}@{_scope}",
+                              scope_center=(None if device_coords
+                                            else _geocode_scope_center(_scope)),
+                              near=device_coords)
         results = resp.json() or []
     except RuntimeError as e:
         logger.warning(f"[LOCAL-779] business replenish search failed: {e}")
@@ -2076,7 +2111,10 @@ def dining_replenish_candidates(
         "accept-language": "en",
     }
     try:
-        resp = _nominatim_request(params, context=f"dining-replenish:{_q_pt}@{_scope}")
+        resp = _places_lookup(params, context=f"dining-replenish:{_q_pt}@{_scope}",
+                              scope_center=(None if device_coords
+                                            else _geocode_scope_center(_scope)),
+                              near=device_coords)
         results = resp.json() or []
     except RuntimeError as e:
         logger.warning(f"[LOCAL-779B] dining replenish search failed: {e}")
@@ -2183,7 +2221,13 @@ def verify_listing_cuisine(name: str, scope: str, cuisine: str) -> Optional[bool
         "accept-language": "en",
     }
     try:
-        resp = _nominatim_request(params, context=f"cuisine-verify:{name}@{_scope}")
+        _ctr = None
+        try:
+            _ctr = _geocode_scope_center(_scope)
+        except RuntimeError:
+            _ctr = None
+        resp = _places_lookup(params, context=f"cuisine-verify:{name}@{_scope}",
+                              scope_center=_ctr)
         results = resp.json() or []
     except RuntimeError:
         return None
@@ -2245,7 +2289,13 @@ def verify_listing_in_scope(name: str, scope: str) -> Optional[bool]:
         "accept-language": "en",
     }
     try:
-        resp = _nominatim_request(params, context=f"exists-verify:{name}@{_scope}")
+        _ctr = None
+        try:
+            _ctr = _geocode_scope_center(_scope)
+        except RuntimeError:
+            _ctr = None
+        resp = _places_lookup(params, context=f"exists-verify:{name}@{_scope}",
+                              scope_center=_ctr)
         results = resp.json() or []
     except RuntimeError:
         return None
@@ -2377,6 +2427,39 @@ def _geocode_city_center(venue_name: str, city_signals: Set[str]):
     try:
         return (float(results[0]["lat"]), float(results[0]["lon"]))
     except (KeyError, ValueError, IndexError):
+        return None
+
+
+def _geocode_scope_center(scope: str):
+    """[LOCAL-783] Geocode the FULL scope string to a precise (lat, lng) centre.
+
+    Unlike ``_geocode_city_center`` (which extracts a single capitalised token and
+    so resolves "West Roxbury, MA" to the wrong place via the bare word "West"),
+    this geocodes the scope string verbatim — "West Roxbury, MA", "Jamaica Plain,
+    Boston", "North End, Boston" — which Nominatim resolves correctly. The precise
+    centre is what feeds the Serper Places `ll` (the town is only honoured when a
+    correct `ll` is sent — LEAD probe). Returns None when the scope is empty or
+    unresolvable; raises nothing (a failed geocode just yields None, and the
+    provider then relies on the query text / falls back)."""
+    _scope = (scope or "").strip()
+    if not _scope:
+        return None
+    params = {
+        "q": _scope,
+        "format": "jsonv2",
+        "limit": "1",
+        "accept-language": "en",
+    }
+    try:
+        resp = _nominatim_request(params, context=f"scope:{_scope}")
+        results = resp.json() or []
+    except RuntimeError:
+        return None
+    if not results:
+        return None
+    try:
+        return (float(results[0]["lat"]), float(results[0]["lon"]))
+    except (KeyError, ValueError, IndexError, TypeError):
         return None
 
 
