@@ -314,6 +314,16 @@ routes:
     methods: [GET]
     auth: api_key
 
+  # [LOCAL-785 / D723] The app's FailureReporter POSTs every failure it shows
+  # (and the known silent ones) here. user-api stores it in failure_events via
+  # failure_log.record. Rate-limited (20/hour per user) and size-capped (<= 8 KB)
+  # in the service itself; api_key like every other app-facing route.
+  - public_path: /client-failure
+    backend: user-api
+    upstream: /client-failure
+    methods: [POST]
+    auth: api_key
+
   # --- entitlements ---
   - public_path: /entitlements/me
     backend: user-api

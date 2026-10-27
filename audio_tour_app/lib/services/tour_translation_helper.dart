@@ -7,6 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../config/endpoints.dart';
 import '../screens/debug_log_viewer_screen.dart';
 import 'translation_service.dart';
+import 'failure_reporter.dart';
 
 /// Shared translation-download logic used by both HomeScreen (at download time)
 /// and MyToursScreen (translate existing tours on Listen page).
@@ -138,6 +139,15 @@ class TourTranslationHelper {
                   await DebugLogHelper.addDebugLog(
                       'TRANSLATE: save/validate failed ($lang) after bytes — '
                       'reporting download-failed: $saveError');
+                  // [LOCAL-785 / D723] This save/validate-after-download failure
+                  // was SILENT (only a debug log). Record it so it is counted.
+                  FailureReporter.instance.report(
+                    surface: 'translate',
+                    errorCode: 'translation_save_or_validate_failed',
+                    exceptionType: saveError.runtimeType.toString(),
+                    message: 'save/validate failed ($lang) after bytes: $saveError',
+                    tourId: translatedId.toString(),
+                  );
                   final consumes =
                       translatedResponse.headers['x-download-consumes-unlock'];
                   if (consumes == '1') {

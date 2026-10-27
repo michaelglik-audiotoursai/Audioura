@@ -73,6 +73,49 @@ except Exception:  # pragma: no cover - meter ships via PYTHONPATH=/opt/meter (s
 app = Flask(__name__)
 logging.basicConfig(level=logging.INFO)
 
+# --- Failure recorder (LOCAL-785 / D723) ---
+# Translation-service failures (unhandled 500s) are recorded to failure_events.
+# Guarded import that also tries the repo root (the module ships beside the
+# service in the image via COPY, and lives at repo root in local tests).
+try:
+    import failure_log as _failure_log
+except Exception:
+    try:
+        import os as _os_fl, sys as _sys_fl
+        _sys_fl.path.insert(0, _os_fl.path.dirname(_os_fl.path.dirname(_os_fl.path.abspath(__file__))))
+        import failure_log as _failure_log
+    except Exception as _fl_err:  # pragma: no cover
+        _failure_log = None
+        logging.getLogger("translation_service").error(
+            f"[LOCAL-785] failure_log unavailable: {_fl_err}")
+
+
+def _record_failure(**kw):
+    if _failure_log is None:
+        return None
+    try:
+        import os as _os_fl2
+        kw.setdefault("service", "translation")
+        kw.setdefault("track", _os_fl2.getenv("TOUR_TRACK"))
+        return _failure_log.record(**kw)
+    except Exception:
+        return None
+
+
+@app.errorhandler(Exception)
+def _record_unhandled_exception(e):
+    """[LOCAL-785] Record every unhandled exception then re-raise the SAME 500."""
+    from werkzeug.exceptions import HTTPException as _HTTPException
+    if isinstance(e, _HTTPException):
+        return e
+    try:
+        _record_failure(surface="translate", exc=e, http_status=500,
+                        message=str(e), exception_type=type(e).__name__)
+    except Exception:
+        pass
+    raise e
+
+
 
 class TranslationArtifactError(Exception):
     """Raised when a translation cannot produce a valid downloadable artifact.

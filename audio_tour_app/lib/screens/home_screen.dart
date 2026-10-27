@@ -21,6 +21,7 @@ import '../services/device_service.dart';
 import '../services/translation_service.dart';
 import '../services/tour_translation_helper.dart';
 import '../services/error_handler_service.dart';
+import '../services/failure_reporter.dart';
 import '../services/tour_pricing_service.dart';
 import '../services/downloaded_tour_meta.dart';
 import '../services/tour_download_service.dart';
@@ -2519,6 +2520,16 @@ class _HomeScreenState extends State<HomeScreen> {
         downloadFailures.add(shortTitle);
         await DebugLogHelper.addDebugLog(
             'HOME: DOWNLOAD FAILED for "$shortTitle" (id=${tour['id']}): $e');
+        // [LOCAL-785 / D723] Record the download/save/resolve failure to the
+        // server (this is the 445/446-class silent failure — a tour that
+        // vanished from a batch with only a local log). Background, never throws.
+        FailureReporter.instance.report(
+          surface: 'download',
+          errorCode: 'tour_download_save_failed',
+          exceptionType: e.runtimeType.toString(),
+          message: 'download/save/resolve failed for "$shortTitle": $e',
+          tourId: tour['id'].toString(),
+        );
       }
     }
 

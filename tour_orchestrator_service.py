@@ -207,6 +207,61 @@ sys.stdout.reconfigure(line_buffering=True)
 
 app = Flask(__name__)
 
+# --- Failure recorder (LOCAL-785 / D723) ---
+# Every orchestrator failure is recorded to failure_events via failure_log.record
+# (never raises; 1s DB timeout; stdout JSON fallback). Imported guarded so a
+# missing module can never break startup or a request. _record_failure is the
+# one call site this service uses; it defaults service='orchestrator'.
+try:
+    import failure_log as _failure_log
+except Exception as _fl_err:  # pragma: no cover - import-time safety
+    _failure_log = None
+    print(f"[ORCHESTRATOR] WARNING: failure_log unavailable: {_fl_err}")
+
+
+def _record_failure(**kw):
+    """Best-effort failure record. Never raises. kw are failure_log.record args."""
+    if _failure_log is None:
+        return None
+    try:
+        kw.setdefault("service", "orchestrator")
+        kw.setdefault("track", os.getenv("TOUR_TRACK"))
+        return _failure_log.record(**kw)
+    except Exception:
+        return None
+
+
+@app.errorhandler(Exception)
+def _record_unhandled_exception(e):
+    """[LOCAL-785] Record every unhandled exception, then re-raise so Flask
+    returns the SAME 500 as before — this is observation only, not a behaviour
+    change. HTTPException (abort(404)/(402)/...) is left untouched: those are
+    deliberate responses, recorded at their own sites when they are failures."""
+    from werkzeug.exceptions import HTTPException as _HTTPException
+    if isinstance(e, _HTTPException):
+        return e
+    try:
+        _record_failure(surface="http", exc=e, http_status=500,
+                        message=str(e), exception_type=type(e).__name__)
+    except Exception:
+        pass
+    raise e
+
+
+# [LOCAL-785] Test-only forced exception. A request carrying
+# X-Force-Failure: 1 (or ?force_failure=1) raises inside the request so the live
+# test can prove the errorhandler records a row WITHOUT any real failure or
+# spend. Gated behind FAILURE_LOG_TEST_HOOK=1 so it is inert in production.
+@app.before_request
+def _failure_test_hook():
+    if os.getenv("FAILURE_LOG_TEST_HOOK") != "1":
+        return None
+    from flask import request as _rq
+    if _rq.headers.get("X-Force-Failure") == "1" or _rq.args.get("force_failure") == "1":
+        raise RuntimeError("LOCAL-785 forced test failure (FAILURE_LOG_TEST_HOOK)")
+    return None
+
+
 # --- Wallet API Blueprint (LOCAL-68 / LOCAL-154) ---
 # The Dart client calls GET /wallet/<id>, GET /wallet/<id>/transactions,
 # GET /plans/available, POST /wallet/<id>/topup on this service (port 5002).
@@ -1853,6 +1908,12 @@ def orchestrate_tour_async(job_id, location, tour_type, total_stops, user_id=Non
             # [LOCAL-595B defect 2] No tour was delivered — mark 'failed' and give
             # back the reserved pack unit so the listener's allowance is intact.
             _set_tour_request_status(job_id, 'failed')
+            # [LOCAL-785] Record the no-audio-files failure (our pipeline produced
+            # nothing) so it is counted, not silently swallowed.
+            _record_failure(surface="generate", error_code="generation_failed",
+                            message=error_msg, job_id=job_id, tour_id=job_id,
+                            user_id=user_id,
+                            request_text=ACTIVE_JOBS.get(job_id, {}).get("request_string"))
             _release_generation_reservation(user_id, job_id, reason='no_audio_files')
             try:
                 os.remove(zip_path)
@@ -2105,6 +2166,12 @@ def orchestrate_tour_async(job_id, location, tour_type, total_stops, user_id=Non
             # (so it never counts toward L2/Tester caps) and release the reserved
             # L3/L4 pack unit. The listener keeps their allowance.
             _set_tour_request_status(job_id, 'failed')
+            # [LOCAL-785] Record the store-failed failure (delivery produced a tour
+            # but the DB write failed — our bug) so it is counted.
+            _record_failure(surface="store", error_code="generation_failed",
+                            message=f"Tour storage failed: {store_error}",
+                            exception_type="store_failed",
+                            job_id=job_id, tour_id=job_id, user_id=user_id)
             _release_generation_reservation(user_id, job_id, reason='store_failed')
             print(f"Keeping extraction directory due to database storage failure: {extract_path}")
             return  # Do NOT fall through to "completed"
@@ -2496,7 +2563,24 @@ def orchestrate_tour_async(job_id, location, tour_type, total_stops, user_id=Non
         print(f"Traceback: {traceback.format_exc()}")
         ACTIVE_JOBS[job_id]["status"] = "error"
         ACTIVE_JOBS[job_id]["error"] = str(e)
-        
+
+        # [LOCAL-785] Record the Generate-Now job failure. The generator's
+        # structured refusal fields (error_code/message/suggestion/nearby_tours)
+        # were forwarded into ACTIVE_JOBS[job_id] just above when present, so a
+        # by_reference/clean refusal is recorded with its stable error_code (and
+        # auto-triaged ux/absence), while a true crash carries the exception and
+        # is triaged our_bug. Best-effort; never blocks the failure path.
+        _aj = ACTIVE_JOBS.get(job_id, {}) if isinstance(ACTIVE_JOBS, dict) else {}
+        _record_failure(
+            surface="generate",
+            error_code=_aj.get("error_code"),
+            message=_aj.get("message") or str(e),
+            exception_type=type(e).__name__,
+            exc=e,
+            job_id=job_id, tour_id=job_id, user_id=user_id,
+            request_text=_aj.get("request_string"),
+        )
+
         # [LOCAL-595B defect 2] A failed generation must not consume the device's
         # allowance. Mark the orchestrator's tour_requests row 'failed' (L2/Tester
         # caps count only 'completed' rows) and release the reserved L3/L4 pack
