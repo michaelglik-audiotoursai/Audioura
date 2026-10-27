@@ -349,6 +349,15 @@ def _parse_location(location_string: str) -> Tuple[str, str]:
         r'\s*\b(?:including|featuring|and\s+visit(?:ing)?|and\s+see(?:ing)?|'
         r'with\s+(?:a\s+)?(?:stop|stops|visit)|with)\b.*$',
         '', location_string or '', flags=re.IGNORECASE).strip().rstrip('.').strip()
+    # [LOCAL-779] Strip a "near me" phrase and a leading "<type>:" label before
+    # parsing. "walking tour: gyms near me, west Roxbury, MA" was parsed with
+    # neighborhood=': gyms near me'; "near me" is never a place and the colon label
+    # is a type, not an area. The poi noun ("gyms") is handled by the generic
+    # tour-type / leading-segment logic below and the caller's scope stripper.
+    location_string = re.sub(r'^\s*[\w\s-]*?:\s*', '', location_string or '',
+                             count=1).strip()
+    location_string = re.sub(r'[\s,:;]*\bnear\s+me\b[\s,:;]*', ', ',
+                             location_string, flags=re.IGNORECASE).strip(' ,:;')
     # Remove common tour-type phrases (as standalone phrases, not eating the rest of the string)
     clean = re.sub(r'\b(?:walking tour|biking tour|driving tour|audio tour|guided tour|self[- ]guided tour|tour|historic district)\b', '', location_string, flags=re.IGNORECASE).strip()
     
