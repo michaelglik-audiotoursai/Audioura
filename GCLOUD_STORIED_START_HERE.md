@@ -79,6 +79,10 @@ tour-generator-storied --to-revisions=tour-generator-storied-00008-dhd=100 --reg
   Migration 054 `failure_events` applied (audio_tours 346 unchanged). Android **81** (2.4.33, 200839ac) staged at `C:\adev-wt\aab81\`, waiting for Michael's upload.
   Subscribed + Storied tour ZIPs live in `audio_tours.audio_tour` (bytea), NOT R2. Only Beta has tour_blob_uri.
   Lesson: in PowerShell `$R` and `$r` are the SAME variable, so use distinct names in deploy loops.
+- **wdvrdaz6ht DONE 10-27 13:16 EDT** (subscribed `2dde77dc`: LOCAL-778/784/786). Backup `1793121045171`; migration **055** (lookup_escalations,
+  lookup_routing; audio_tours 351 unchanged). generator **00007-d7v** (rollback 00006-qbx), orchestrator **00006-c7d** (rollback 00005-bm2), image-only.
+  Proof: tour 459 (JP coffee) OK; tour 460 (West Roxbury) 1/2 stops (Al Wadi via escalation tier b). The exact old request text reused **pooled**
+  Stardust + Byblos and overwrote 454, so **pooled stops skip the 786 scope check** (handed to LEAD). Spend $1.64. Build dir `C:\adev-wt\bsub11`.
 - **Laptop remote access (for Vietnam, from 10-28):** Tailscale "mercury" 100.68.122.8 (expiry off, unattended). Exit node = mikhails-mac-mini
   (`tailscale set --exit-node=100.106.181.69 --exit-node-allow-lan-access=true`; `--exit-node=` to turn it off; keep it OFF by default).
   Screen: TigerVNC 1.15 → 100.106.181.69, user `micha`; menu = **Ctrl+Alt+M**; "Full screen on all monitors" (the Mac has 2 screens).
