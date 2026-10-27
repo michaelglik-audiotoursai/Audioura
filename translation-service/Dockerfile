@@ -23,7 +23,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 # rows (translation_generate + per-stop tts_generate). The COPY list is explicit —
 # a module missing from it is absent in the image and import fails at runtime
 # (this trap bit twice this week), so new runtime deps MUST be added here.
-COPY translation_service.py blobstorage.py build_manifest.py cost_rates.py cost_meter.py ./
+COPY translation_service.py blobstorage.py build_manifest.py cost_rates.py cost_meter.py failure_log.py ./
 # [LOCAL-708B / D670] Per-plan article length + the plan-aware truncation notice
 # (names the plans, page lengths, "See plans") for TRANSLATED articles. These two
 # modules live at the repo root; a copy is kept here (same convention as
