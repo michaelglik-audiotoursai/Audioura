@@ -466,6 +466,28 @@ def build_by_reference_tour(
             nearby = _nearby_existing_tours(location, db_url, limit=3)
             refusal = _refusal(nearby)
             refusal["grounding"] = check_zero_grounding()
+            # [LOCAL-784/D722] Record this "no material" case through the escalation
+            # ladder so a named-place request that found nothing is VISIBLE in
+            # lookup_escalations (tier_found='none') — the same honest-absence
+            # record the business/dining paths write. The L2 build is zero
+            # grounding and zero SERP (D613), so the ladder runs with NO tier b and
+            # allow_grounding=False: tier a (the reusable-material lookup, already
+            # known empty here) is the only tier, and it records the absence
+            # without any spend. Fail-open — a logging hiccup never changes the
+            # refusal.
+            try:
+                import escalating_lookup as _esc
+                _esc.escalating_lookup(
+                    "by_reference", location, location, max(1, N),
+                    tier_a=lambda: [],           # reusable material already < N
+                    tier_b=None,                 # no SERP during an L2 build
+                    verify=None,                 # no grounding during an L2 build
+                    category=(tour_type or "by_reference"),
+                    scope_center=None,
+                    request_text=location,
+                    allow_grounding=False)
+            except Exception as _e:
+                logger.info(f"[D722] by-reference escalation record skipped: {_e}")
             logger.info(f"[LOCAL-597] by-reference REFUSED ({K} reusable < {N} "
                         f"requested); offering {len(refusal['nearby_tours'])} nearby")
             return refusal
