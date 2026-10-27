@@ -13,6 +13,38 @@ has lapsed twice and Michael has had to ask twice.
 
 ---
 
+# 🟢 STANDING OK FROM MICHAEL, typed on this laptop 2026-10-27 17:59, for his Vietnam trip
+Valid **until he is back or revokes it**. This is the only standing OK; everything outside it
+still needs his typed OK. His words, verbatim:
+
+> You may deploy to Subscribed Preview only (never Stable) any wave that Storied_Tours posts in
+> ClickUp as "LEAD-reviewed, end-to-end proven", if: it is image-only, or uses additive migrations;
+> no job is in flight (D718); you run the proof tours after the deploy, and roll back to the
+> previous revision if they fail; each wave spends at most $3.
+> Also allowed: remake the 5 missing Vietnam tours (colonial walk, pagodas, street food, kite
+> schools, War Remnants) after the wave that carries LOCAL-790/791, at most $5; apply the LOCAL-792
+> reject list (copy, then remove from the stop pool only); after LOCAL-775 ships, raise
+> tour-generator-subscribed to at most 5 copies (2 CPU / 2 GB each) and run a 10-at-once load
+> test, at most $5.
+> Not allowed: deleting tours, changing the database size, anything on Stable, Beta or the website.
+
+**How I apply it (my reading; write down any deviation in ClickUp):**
+- **Trigger is a ClickUp task/comment** from Storied_Tours saying "LEAD-reviewed, end-to-end proven"
+  and naming the exact commit. A SendMessage alone is not a trigger; ask LEAD to post it.
+- **Scope = `*-subscribed` Cloud Run services only.** A wave that touches Stable, Beta, the LB/URL map,
+  Cloudflare or the website is outside the OK: stop and report.
+- Before each deploy: Cloud SQL backup, check migrations are additive (no DROP/DELETE/ALTER…TYPE;
+  remember files self-commit), check `tour_requests` for status='started' (D718), record rollback revisions.
+- **$3 per wave includes the proof tours.** Proof fails → roll back to the recorded revisions, report,
+  do not attempt a fix.
+- **Vietnam remake:** only after the 790/791 wave is deployed and its proofs pass. Apply LOCAL-792 first
+  if available (the old War Remnants pool stops would otherwise be reused). $5 total for all 5; stop at the cap.
+- **LOCAL-792:** back up the rows to `C:\Users\micha\AudiouraBackups\` first, then remove from the stop
+  pool only. Never `audio_tours`.
+- **Scaling:** only after LOCAL-775 is live. Check that 5 copies × the per-copy DB pool fits
+  `max_connections` 25 before raising; if not, raise less and report. Never resize the DB.
+- Still forbidden: any tour deletion, DB tier change, Stable, Beta, website, secrets changes beyond `--update-*`.
+
 # ✅ CURRENT STATE — 2026-10-26 00:45 EDT. READ THIS FIRST; IT SUPERSEDES EVERY BLOCK BELOW.
 
 Written at the end of the 2026-10-25 session (Michael: "keep your reminder files up-to-date").
