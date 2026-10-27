@@ -144,7 +144,7 @@ def _nominatim_request(params: dict, context: str = "") -> "requests.Response":
 # is NOT configured, these fall straight through to _nominatim_request (today's
 # behaviour). A Serper call is metered once per uncached query and cached 24 h.
 def _places_lookup(params: dict, context: str = "",
-                   scope_center=None, near=None) -> "requests.Response":
+                   scope_center=None, near=None, scope_bbox=None) -> "requests.Response":
     """Route a place lookup to Serper Places when enabled, else Nominatim.
 
     `scope_center` / `near` are the (lat, lng) the caller already computed (the
@@ -156,7 +156,8 @@ def _places_lookup(params: dict, context: str = "",
     try:
         import places_search as _ps
         resp = _ps.map_lookup(params, context=context,
-                              scope_center=scope_center, near=near)
+                              scope_center=scope_center, near=near,
+                              scope_bbox=scope_bbox)
         if resp is not None:
             return resp
     except Exception as e:  # fail open to Nominatim — a provider bug never blocks
@@ -1796,7 +1797,9 @@ def business_replenish_candidates(
         resp = _places_lookup(params, context=f"replenish:{_pt}@{_scope}",
                               scope_center=(None if device_coords
                                             else _geocode_scope_center(_scope)),
-                              near=device_coords)
+                              near=device_coords,
+                              scope_bbox=(None if device_coords
+                                          else _geocode_scope_bbox(_scope)))
         results = resp.json() or []
     except RuntimeError as e:
         logger.warning(f"[LOCAL-779] business replenish search failed: {e}")
@@ -2114,7 +2117,9 @@ def dining_replenish_candidates(
         resp = _places_lookup(params, context=f"dining-replenish:{_q_pt}@{_scope}",
                               scope_center=(None if device_coords
                                             else _geocode_scope_center(_scope)),
-                              near=device_coords)
+                              near=device_coords,
+                              scope_bbox=(None if device_coords
+                                          else _geocode_scope_bbox(_scope)))
         results = resp.json() or []
     except RuntimeError as e:
         logger.warning(f"[LOCAL-779B] dining replenish search failed: {e}")
@@ -2222,12 +2227,14 @@ def verify_listing_cuisine(name: str, scope: str, cuisine: str) -> Optional[bool
     }
     try:
         _ctr = None
+        _bbx = None
         try:
             _ctr = _geocode_scope_center(_scope)
+            _bbx = _geocode_scope_bbox(_scope)
         except RuntimeError:
             _ctr = None
         resp = _places_lookup(params, context=f"cuisine-verify:{name}@{_scope}",
-                              scope_center=_ctr)
+                              scope_center=_ctr, scope_bbox=_bbx)
         results = resp.json() or []
     except RuntimeError:
         return None
@@ -2290,12 +2297,14 @@ def verify_listing_in_scope(name: str, scope: str) -> Optional[bool]:
     }
     try:
         _ctr = None
+        _bbx = None
         try:
             _ctr = _geocode_scope_center(_scope)
+            _bbx = _geocode_scope_bbox(_scope)
         except RuntimeError:
             _ctr = None
         resp = _places_lookup(params, context=f"exists-verify:{name}@{_scope}",
-                              scope_center=_ctr)
+                              scope_center=_ctr, scope_bbox=_bbx)
         results = resp.json() or []
     except RuntimeError:
         return None
@@ -2461,6 +2470,36 @@ def _geocode_scope_center(scope: str):
         return (float(results[0]["lat"]), float(results[0]["lon"]))
     except (KeyError, ValueError, IndexError, TypeError):
         return None
+
+
+def _geocode_scope_bbox(scope: str):
+    """[LOCAL-786] Geocode the FULL scope string and return its bounding box as
+    ``[south, north, west, east]`` (Nominatim jsonv2 ``boundingbox``), or None.
+
+    The bbox is the geocoder's own extent for the named area — tighter and truer
+    than any fixed radius — so a West Roxbury request can drop a Norwood place that
+    a radius might allow. Returns None when the scope is empty, unresolvable, or the
+    provider omits a boundingbox; the caller then falls back to the radius."""
+    _scope = (scope or "").strip()
+    if not _scope:
+        return None
+    params = {
+        "q": _scope,
+        "format": "jsonv2",
+        "limit": "1",
+        "accept-language": "en",
+    }
+    try:
+        resp = _nominatim_request(params, context=f"scope-bbox:{_scope}")
+        results = resp.json() or []
+    except RuntimeError:
+        return None
+    if not results:
+        return None
+    bbox = results[0].get("boundingbox") if isinstance(results[0], dict) else None
+    if not bbox or len(bbox) < 4:
+        return None
+    return bbox
 
 
 def _check_walking_stop_existence(

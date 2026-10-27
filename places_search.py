@@ -191,6 +191,10 @@ def _normalize_serper_place(p: Dict) -> Optional[Dict]:
         "_serper_cid": p.get("cid"),
         "_serper_rating": p.get("rating"),
         "_serper_category": p.get("category") or p.get("type"),
+        # [LOCAL-786] Carry the raw formatted address so the town-mismatch guard can
+        # read the town Serper gave ("…, Norwood, MA 02062") even when the structured
+        # address parse left `city` blank.
+        "_serper_address": address_str,
     }
     return rec
 
@@ -349,7 +353,143 @@ def _haversine_km(a, b) -> float:
 # within ~4 km of the centre; a city (12z) within ~10 km. Serper's `ll` already
 # biases to the centre, so this is a backstop that drops a spillover result from
 # a neighbouring town when Serper reaches past the scope.
-_SCOPE_RADIUS_KM = {"14z": 4.0, "13z": 7.0, "12z": 12.0}
+#
+# [LOCAL-786] The radius is no longer a fixed per-zoom value. Tour 454 shipped
+# Byblos in Norwood (~10 km) on a West Roxbury request because the old 14z radius
+# (4 km) was both too loose for a neighbourhood AND silently skipped when no centre
+# was geocoded. The radius now follows the SCOPE PRECISION, and the geocoder's
+# bounding box (when present) is preferred over any fixed radius.
+#   NEIGHBOURHOOD (West Roxbury, North End, Jamaica Plain): ~2.5 km
+#   CITY: ~8 km for a small city, up to ~15 km for a large one
+#   REGION/COUNTRY: wide (unchanged) — no tightening.
+#   "near me" (device coordinates): 3 km of the device by default.
+_NEIGHBOURHOOD_RADIUS_KM = 2.5
+_CITY_RADIUS_SMALL_KM = 8.0
+_CITY_RADIUS_LARGE_KM = 15.0
+_REGION_RADIUS_KM = 60.0
+_NEAR_ME_RADIUS_KM = 3.0
+# How far outside the bbox a record may sit and still be kept (the geocoder's bbox
+# is tight to the named area; a 500 m margin forgives a border address).
+_BBOX_MARGIN_KM = 0.5
+
+# A scope whose locality token matches one of these (or whose head is two or more
+# words, the classic "West Roxbury" / "North End" / "Jamaica Plain" shape) is a
+# NEIGHBOURHOOD. A single-word locality ("Brookline", "Boston") is a CITY.
+_NEIGHBOURHOOD_MARKERS = (
+    "west roxbury", "north end", "jamaica plain", "east boston", "south boston",
+    "hyde park", "roslindale", "dorchester", "roxbury", "mattapan", "brighton",
+    "allston", "charlestown", "beacon hill", "back bay", "south end", "fenway",
+    "downtown", "chinatown", "seaport", "mission hill", "west end",
+)
+# Large cities whose metropolitan reach justifies the wider CITY radius (~15 km).
+_LARGE_CITY_MARKERS = (
+    "new york", "los angeles", "chicago", "houston", "phoenix", "philadelphia",
+    "san antonio", "san diego", "dallas", "san jose", "london", "paris", "tokyo",
+    "toronto", "atlanta", "miami", "seattle", "boston", "san francisco",
+)
+# Region/state-level scope words — these skip the tight radius entirely.
+_REGION_MARKERS = (
+    "county", "state", "province", "region", "riviera", "cape cod", "the berkshires",
+    "new england", "bay area", "metro",
+)
+
+
+def _scope_precision(scope: str) -> str:
+    """Classify a scope string into NEIGHBOURHOOD / CITY / REGION.
+
+    NEIGHBOURHOOD: a named city sub-area (West Roxbury, North End, Jamaica Plain) —
+    detected by a known neighbourhood marker OR a multi-word locality head.
+    CITY: a single-word locality (Brookline, Boston).
+    REGION: a county/state/region word, which skips the tight radius.
+    """
+    s = (scope or "").strip().lower()
+    if not s:
+        return "CITY"
+    for marker in _REGION_MARKERS:
+        if marker in s:
+            return "REGION"
+    head = s.split(",")[0].strip()
+    for marker in _NEIGHBOURHOOD_MARKERS:
+        if marker == head or marker in head:
+            return "NEIGHBOURHOOD"
+    words = [w for w in head.split() if w]
+    if len(words) >= 2:
+        return "NEIGHBOURHOOD"
+    return "CITY"
+
+
+def _radius_for_precision(precision: str, scope: str = "") -> float:
+    """Scope radius (km) for a precision level. CITY widens for a large city."""
+    p = (precision or "").upper()
+    if p == "NEIGHBOURHOOD":
+        return _NEIGHBOURHOOD_RADIUS_KM
+    if p == "REGION":
+        return _REGION_RADIUS_KM
+    # CITY: small by default, wider for a recognised large city.
+    s = (scope or "").strip().lower()
+    for marker in _LARGE_CITY_MARKERS:
+        if marker in s:
+            return _CITY_RADIUS_LARGE_KM
+    return _CITY_RADIUS_SMALL_KM
+
+
+def _parse_bbox(bbox) -> Optional[Tuple[float, float, float, float]]:
+    """Parse a Nominatim jsonv2 boundingbox [south, north, west, east] (strings or
+    floats) into a (south, north, west, east) float tuple, or None if unusable."""
+    if not bbox:
+        return None
+    try:
+        south, north, west, east = (float(bbox[0]), float(bbox[1]),
+                                    float(bbox[2]), float(bbox[3]))
+    except (TypeError, ValueError, IndexError):
+        return None
+    if south > north:
+        south, north = north, south
+    if west > east:
+        west, east = east, west
+    return (south, north, west, east)
+
+
+def _inside_bbox(lat: float, lon: float,
+                 bbox: Tuple[float, float, float, float],
+                 margin_km: float = _BBOX_MARGIN_KM) -> bool:
+    """True when (lat, lon) is inside `bbox` expanded by `margin_km` on every side.
+    The latitude margin is a fixed km→deg; the longitude margin widens with
+    latitude (deg per km grows toward the poles)."""
+    import math
+    south, north, west, east = bbox
+    dlat = margin_km / 111.0
+    coslat = max(0.01, math.cos(math.radians((south + north) / 2.0)))
+    dlon = margin_km / (111.0 * coslat)
+    return (south - dlat) <= lat <= (north + dlat) and \
+           (west - dlon) <= lon <= (east + dlon)
+
+
+def _scope_town(scope: str) -> str:
+    """The scope's town token, normalised (accent-stripped, lowercase). "West
+    Roxbury, MA" → "west roxbury"; "North End, Boston" → "north end"."""
+    locality, _ = _scope_tokens(scope)
+    return _strip_accents(locality).lower().strip()
+
+
+def _address_town(rec: Dict) -> str:
+    """The town named in a record's address, normalised. Reads the OSM-shaped
+    address sub-dict first (city/town/suburb), then falls back to parsing the
+    display_name / raw Serper address string. "" when no town is discernible."""
+    addr = rec.get("address") or {}
+    for key in ("city", "town", "municipality", "village"):
+        v = addr.get(key)
+        if v:
+            return _strip_accents(v).lower().strip()
+    # Serper's raw address ("678 Washington St, Norwood, MA 02062"): the town is the
+    # second comma-part. Use display_name if the structured address had nothing.
+    raw = rec.get("_serper_address") or rec.get("display_name") or ""
+    parts = [p.strip() for p in str(raw).split(",") if p.strip()]
+    if len(parts) >= 2:
+        # Skip a leading street part; the town is the part before the state/zip.
+        cand = parts[1]
+        return _strip_accents(cand).lower().strip()
+    return ""
 
 
 def _scope_tokens(scope: str):
@@ -366,28 +506,66 @@ def _scope_tokens(scope: str):
 
 
 def _bind_in_scope(results: List[Dict], scope: str,
-                   center: Optional[Tuple[float, float]], zoom: str) -> List[Dict]:
-    """Keep only Serper records within the scope radius of `center` and stamp the
-    scope's locality/state into each surviving record's address.
+                   center: Optional[Tuple[float, float]], zoom: str,
+                   bbox=None, near_me: bool = False) -> List[Dict]:
+    """Keep only Serper records that lie inside the scope, then stamp the scope's
+    locality/state onto each survivor so the gate's string signal check binds.
+
+    [LOCAL-786] "Inside the scope" is decided by, in order:
+      1. TOWN-NAME MISMATCH — a record whose address names a town DIFFERENT from the
+         scope's town AND which also falls outside the bbox is rejected, even if a
+         radius would allow it (Byblos "Norwood, MA" on a West Roxbury request).
+      2. BOUNDING BOX — when the geocoder gave a bbox, a record must sit inside it
+         (plus a 500 m margin). The bbox is tighter and truer than any fixed radius.
+      3. RADIUS — otherwise the record must be within the scope-precision radius of
+         `center`: NEIGHBOURHOOD ~2.5 km, CITY ~8/15 km, "near me" 3 km.
 
     Serper's `address` is often just the street ("1249 VFW Pkwy") with no city, so
-    the gate's city/state signal check cannot bind on its own. Because the records
-    were fetched with the scope's `ll`, a record within the scope radius IS in the
-    scope — we record that by writing the scope's own locality/state onto it, which
-    is honest: we only stamp records that passed the distance test. Without a
-    `center` (no geocode) we keep all records and stamp the locality, trusting
-    Serper's `ll` scoping (still the correct town per the LEAD probe)."""
+    we stamp the scope's own locality/state onto every survivor — honest, because a
+    record only survives once it has passed the geographic test above. A record with
+    NO coordinates is kept only when there is no bbox and no centre to test against
+    (we cannot prove it is outside).
+    """
     locality, state = _scope_tokens(scope)
-    radius = _SCOPE_RADIUS_KM.get(zoom, 8.0)
+    scope_town = _scope_town(scope)
+    parsed_bbox = _parse_bbox(bbox)
+    if near_me:
+        radius = _NEAR_ME_RADIUS_KM
+    else:
+        radius = _radius_for_precision(_scope_precision(scope), scope)
+
     out = []
     for r in results:
-        if center is not None:
-            try:
-                d = _haversine_km(center, (float(r["lat"]), float(r["lon"])))
-            except (KeyError, ValueError, TypeError):
-                d = float("inf")
+        # Record coordinates (may be missing).
+        try:
+            rlat = float(r["lat"])
+            rlon = float(r["lon"])
+            have_coords = True
+        except (KeyError, ValueError, TypeError):
+            rlat = rlon = None
+            have_coords = False
+
+        in_bbox = (parsed_bbox is not None and have_coords and
+                   _inside_bbox(rlat, rlon, parsed_bbox))
+
+        # 1) Town-name mismatch: a different town AND outside the bbox → reject.
+        rec_town = _address_town(r)
+        if (scope_town and rec_town and rec_town != scope_town and
+                scope_town not in rec_town and rec_town not in scope_town and
+                not in_bbox):
+            continue
+
+        # 2) Bounding box preference: when a bbox exists and the record has coords,
+        #    it must be inside it (margin included).
+        if parsed_bbox is not None and have_coords:
+            if not in_bbox:
+                continue
+        # 3) Radius fallback (no usable bbox, or a near-me search): distance test.
+        elif center is not None and have_coords:
+            d = _haversine_km(center, (rlat, rlon))
             if d > radius:
                 continue
+
         addr = dict(r.get("address") or {})
         # Stamp scope locality/state only where Serper left them blank, so a real
         # city/state Serper did provide is never overwritten.
@@ -411,7 +589,8 @@ def _bind_in_scope(results: List[Dict], scope: str,
 def places_search(query: str, scope: str,
                   near: Optional[Tuple[float, float]] = None,
                   limit: int = 10,
-                  scope_center: Optional[Tuple[float, float]] = None) -> List[Dict]:
+                  scope_center: Optional[Tuple[float, float]] = None,
+                  scope_bbox=None) -> List[Dict]:
     """Search for places matching `query` within `scope`.
 
     Uses Serper Places when SERP_API_KEY is set and SERP_PROVIDER=serper; otherwise
@@ -420,9 +599,13 @@ def places_search(query: str, scope: str,
     else the `scope_center` the caller geocoded — with a zoom matching the scope,
     because Serper Places IGNORES the town written in the query (LEAD probe).
 
-    Results are bound to the scope: a record beyond the scope radius of the centre
-    is dropped, and each surviving record is stamped with the scope's locality/state
-    (only where Serper left them blank) so the gate's in-scope signal check binds.
+    Results are bound to the scope ([LOCAL-786]): the geocoder's bounding box
+    (`scope_bbox`, when given) is preferred over a fixed radius; otherwise a
+    scope-PRECISION radius binds (NEIGHBOURHOOD ~2.5 km, CITY ~8/15 km, "near me"
+    3 km). A record whose address names a different town and which falls outside the
+    bbox is rejected outright. Each survivor is stamped with the scope's
+    locality/state (only where Serper left them blank) so the gate's in-scope signal
+    check binds.
 
     Returns at most `limit` normalised OSM-shaped place dicts. Identical
     (query, ll) within 24 h reuse the cached result, so a repeated tour does not
@@ -437,10 +620,12 @@ def places_search(query: str, scope: str,
         return []
     zoom = _zoom_for_scope(scope)
     center = None
+    near_me = False
     ll = _ll_from_near(near, scope)
     if near:
         try:
             center = (float(near[0]), float(near[1]))
+            near_me = True
         except (TypeError, ValueError, IndexError):
             center = None
     if ll is None and scope_center:
@@ -455,7 +640,10 @@ def places_search(query: str, scope: str,
     if cached is not None:
         return cached[:max(0, limit)]
     raw = _serper_places_call(q, ll)
-    results = _bind_in_scope(raw, scope, center, zoom)
+    # Near-me binds to the device radius (bbox is the scope's, not the device's).
+    results = _bind_in_scope(raw, scope, center, zoom,
+                             bbox=(None if near_me else scope_bbox),
+                             near_me=near_me)
     _cache_put(cache_key, results)
     return results[:max(0, limit)]
 
@@ -473,13 +661,19 @@ class _Resp:
 
 def map_lookup(params: dict, context: str = "",
                scope_center: Optional[Tuple[float, float]] = None,
-               near: Optional[Tuple[float, float]] = None):
+               near: Optional[Tuple[float, float]] = None,
+               scope_bbox=None):
     """Drop-in for stop_existence_gate._nominatim_request.
 
     Takes the SAME Nominatim-style `params` (notably `q`), and when Serper Places
     is enabled, answers it with Serper Places (sending `ll` so the town is honoured)
     returning a response whose .json() yields OSM-shaped records. When Serper is NOT
     enabled, returns None so the caller falls back to the real Nominatim request.
+
+    `scope_bbox` ([LOCAL-786]) is the scope's geocoded bounding box
+    ([south, north, west, east]); when present it is preferred over the fixed radius
+    in the scope-binding step, so a place in a neighbouring town is dropped even when
+    it would fall inside a radius.
 
     The caller is responsible for the in-scope filter (it already is — the gate's
     scope-signal/distance checks run on whatever records come back), so map_lookup
@@ -491,7 +685,8 @@ def map_lookup(params: dict, context: str = "",
         return None
     q = (params or {}).get("q") or ""
     results = places_search(q, scope=_scope_from_query(q), near=near,
-                            limit=25, scope_center=scope_center)
+                            limit=25, scope_center=scope_center,
+                            scope_bbox=scope_bbox)
     return _Resp(results)
 
 

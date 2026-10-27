@@ -1,0 +1,109 @@
+# docker-compose.local786-proof.yml — LOCAL-786 OWN isolated generation stack.
+#
+# Separate project (-p local786-tg), OWN postgres volume, spare ports (56xxx).
+# Never touches the shared audioura-* containers, Michael's development-postgres-2-1,
+# or the LOCAL-778 stack (55xxx). Every service builds from THIS worktree so the
+# live run measures the LOCAL-786 scope-radius code (reuse-first), not a stale image.
+#
+# UP:   docker compose -p local786-tg -f docker-compose.local786-proof.yml up -d --build
+# DOWN: docker compose -p local786-tg -f docker-compose.local786-proof.yml down -v
+#
+# The postgres is seeded at first init from ./local786-initdb (schema + plans +
+# an L2 test device), in this stack's OWN volume, invisible to the shared dev DB.
+services:
+  postgres-2:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: audiotours
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: password123
+      # The orchestrator/generator images ship an older libpq that cannot do
+      # SCRAM; initialise this stack's OWN volume with md5 so those clients connect.
+      POSTGRES_INITDB_ARGS: "--auth-host=md5 --auth-local=md5"
+      POSTGRES_HOST_AUTH_METHOD: md5
+    ports:
+      - "57433:5432"
+    volumes:
+      - local786_pg:/var/lib/postgresql/data
+      - ./local786-initdb:/docker-entrypoint-initdb.d:ro
+
+  tour-generator:
+    build:
+      context: .
+      dockerfile: Dockerfile.generator
+    ports:
+      - "57000:5000"
+    environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - SERP_API_KEY=${SERP_API_KEY}
+      - SERP_PROVIDER=${SERP_PROVIDER:-serper}
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - STORIED_MODE=true
+      - ATTESTATION_MODE=log_only
+      - DATABASE_URL=postgresql://admin:password123@postgres-2:5432/audiotours
+      - DB_HOST=postgres-2
+      - DB_PORT=5432
+      - DB_NAME=audiotours
+      - DB_USER=admin
+      - DB_PASSWORD=password123
+      - PYTHONUNBUFFERED=1
+    volumes:
+      - ./tours:/app/tours
+    depends_on:
+      - postgres-2
+
+  tour-generation-modernized-1:
+    build:
+      context: .
+      dockerfile: Dockerfile.modernized
+    ports:
+      - "57021:5021"
+    volumes:
+      - ./tours:/app/tours
+
+  coordinates-fromai:
+    build:
+      context: ./coordinates_fromAI
+    ports:
+      - "57006:5004"
+    environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+
+  user-api-2:
+    build:
+      context: ./user-tracking
+    ports:
+      - "57003:5000"
+    depends_on:
+      - postgres-2
+    environment:
+      DATABASE_URL: postgresql://admin:password123@postgres-2:5432/audiotours
+      GATEWAY_API_KEY: ""
+      ALLOW_UNAUTHENTICATED_ENTITLEMENTS: "true"
+
+  tour-orchestrator:
+    build:
+      context: .
+      dockerfile: Dockerfile.orchestrator
+    ports:
+      - "57002:5002"
+    environment:
+      - TOUR_GENERATOR_URL=http://tour-generator:5000
+      - MODERNIZED_URL=http://tour-generation-modernized-1:5021
+      - USER_API_URL=http://user-api-2:5000
+      - DB_HOST=postgres-2
+      - DB_NAME=audiotours
+      - DB_USER=admin
+      - DB_PASSWORD=password123
+      - DB_PORT=5432
+      - TOUR_TEST_MODE_ALLOW_REQUEST=true
+    volumes:
+      - ./tours:/app/tours
+    depends_on:
+      - tour-generator
+      - tour-generation-modernized-1
+      - user-api-2
+      - coordinates-fromai
+
+volumes:
+  local786_pg:
