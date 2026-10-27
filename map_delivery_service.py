@@ -28,6 +28,18 @@ from flask import Flask, request, jsonify, send_file as _send_file
 from flask_cors import CORS
 import inspect as _inspect
 
+# [LOCAL-782] Redact secrets (X-Api-Key, Authorization, Cookie, tokens) before
+# logging request headers. Shared module shipped in the image; inline fallback
+# keeps the service safe even if the file is missing from a build.
+try:
+    from safe_headers import safe_headers
+except Exception:  # pragma: no cover - image without the shared module
+    def safe_headers(headers):
+        _h = dict(headers) if headers is not None else {}
+        _bad = ("token", "secret", "key", "x-goog-", "password", "auth", "cookie")
+        return {k: ("…" + str(v)[-4:] if len(str(v)) > 4 else "…redacted")
+                if any(m in k.lower() for m in _bad) else v for k, v in _h.items()}
+
 
 def _compat_send_file(path_or_file, **kwargs):
     """Version-tolerant send_file wrapper.
@@ -84,7 +96,7 @@ def log_request():
     print(f"Remote Address: {request.remote_addr}")
     print(f"User Agent: {request.headers.get('User-Agent', 'Unknown')}")
     print(f"Content Type: {request.headers.get('Content-Type', 'Unknown')}")
-    print(f"Headers: {dict(request.headers)}")
+    print(f"Headers: {safe_headers(request.headers)}")
     sys.stdout.flush()
 
 def get_db_connection():

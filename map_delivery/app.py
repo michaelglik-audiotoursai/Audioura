@@ -18,6 +18,23 @@ from flask import Flask, request, jsonify, send_file, make_response
 # in personal_match.py (copied into this image by the Dockerfile's COPY . .).
 import personal_match
 
+# [LOCAL-782] Redact secrets (X-Api-Key, Authorization, Cookie, tokens) before
+# logging request headers. This image is built from the map_delivery/ context
+# (COPY . .), which does not include the repo-root shared module, so the inline
+# equivalent below is what runs here; the import is kept for host/test parity.
+try:
+    import sys as _sys
+    _ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    if _ROOT not in _sys.path:
+        _sys.path.insert(0, _ROOT)
+    from safe_headers import safe_headers
+except Exception:  # pragma: no cover - container without the root module
+    def safe_headers(headers):
+        _h = dict(headers) if headers is not None else {}
+        _bad = ("token", "secret", "key", "x-goog-", "password", "auth", "cookie")
+        return {k: ("…" + str(v)[-4:] if len(str(v)) > 4 else "…redacted")
+                if any(m in k.lower() for m in _bad) else v for k, v in _h.items()}
+
 # Configure unbuffered logging
 sys.stdout.reconfigure(line_buffering=True)
 print(f"\n==== MAP DELIVERY SERVICE STARTING: {datetime.now().isoformat()} ====")
@@ -228,7 +245,7 @@ def log_request():
     print(f"Remote Address: {request.remote_addr}")
     print(f"User Agent: {request.headers.get('User-Agent', 'Unknown')}")
     print(f"Content Type: {request.headers.get('Content-Type', 'Unknown')}")
-    print(f"Headers: {dict(request.headers)}")
+    print(f"Headers: {safe_headers(request.headers)}")
     sys.stdout.flush()
 
 def get_db_connection():

@@ -17,6 +17,18 @@ import flask
 from flask import Flask, request, jsonify, send_file as _send_file, make_response
 import inspect as _inspect
 
+# [LOCAL-782] Redact secrets (X-Api-Key, Authorization, Cookie, tokens) before
+# logging request headers. Shared module copied into this image by
+# Dockerfile.orchestrator; inline fallback keeps the service safe if missing.
+try:
+    from safe_headers import safe_headers
+except Exception:  # pragma: no cover - image without the shared module
+    def safe_headers(headers):
+        _h = dict(headers) if headers is not None else {}
+        _bad = ("token", "secret", "key", "x-goog-", "password", "auth", "cookie")
+        return {k: ("…" + str(v)[-4:] if len(str(v)) > 4 else "…redacted")
+                if any(m in k.lower() for m in _bad) else v for k, v in _h.items()}
+
 _orch_logger = logging.getLogger("tour_orchestrator_service")
 
 
@@ -2596,7 +2608,7 @@ def generate_complete_tour():
     print(f"\n==== INCOMING REQUEST: {datetime.now().isoformat()} ====")
     sys.stdout.flush()
     print(f"Request method: {request.method}")
-    print(f"Request headers: {dict(request.headers)}")
+    print(f"Request headers: {safe_headers(request.headers)}")
     print(f"Request data: {request.get_data(as_text=True)}")
     print(f"Request JSON: {request.json if request.is_json else None}")
     
