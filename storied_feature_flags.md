@@ -18,7 +18,7 @@ All environment variables controlling Storied behavior. This document is the sin
 | `GATEWAY_API_KEY` | (required) | api-gateway, tour-generator | Shared secret for API key authentication on cost-bearing endpoints. |
 | `PLAY_INTEGRITY_API_KEY` | (empty) | api-gateway | Google Cloud API key for Play Integrity verification. Only needed when `ATTESTATION_MODE=log_only` or `enforce`. |
 | `APP_PACKAGE_NAME` | `com.audioura.audiotours` | api-gateway | Android package name for Play Integrity API calls. |
-| `APP_BUNDLE_ID` | `com.glikfamily.audioura` | api-gateway | iOS bundle ID for App Attest verification. |
+| `APP_BUNDLE_ID` | `com.audioura.audiotours` | api-gateway | iOS bundle ID for App Attest verification. |
 | `QUALITY_GUARDRAILS_ENABLED` | `false` | tour-orchestrator | Master switch for quality guardrails (LOCAL-307). When `true`: retries PIPELINE_LOST tours once, emits user messages for UNAVAILABLE. When `false`: logs what it would do, takes no action. |
 | `QUALITY_RETRY_THRESHOLD` | `55.0` | tour-orchestrator | Score below which a PIPELINE_LOST tour is retried. P25 of corpus distribution. |
 | `QUALITY_MESSAGE_THRESHOLD` | `50.0` | tour-orchestrator | Score below which an UNAVAILABLE tour gets a user-facing message. Set per Michael (LOCAL-312); env-overridable. |

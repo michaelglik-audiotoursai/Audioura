@@ -66,7 +66,7 @@ The ONE public service. Reads (main.py):
 | `ATTESTATION_NONCE_SECRET` | secret `attestation-nonce-secret` | **Must be a real secret in prod** — the dev default is a placeholder. |
 | `PLAY_INTEGRITY_API_KEY` | secret `play-integrity-api-key` (optional) | Only used when attestation verifies Android. |
 | `APP_PACKAGE_NAME` | `com.audioura.audiotours` | Android package. |
-| `APP_BUNDLE_ID` | `com.glikfamily.audioura` | iOS bundle (attestation). |
+| `APP_BUNDLE_ID` | `com.audioura.audiotours` | iOS bundle (attestation). |
 | Backend URLs | `MAP_DELIVERY_URL`, `ORCHESTRATOR_URL`, `USER_API_URL`, `TRANSLATION_URL`, `NEWS_ORCHESTRATOR_URL`, `NEWSLETTER_URL`, `TREATS_URL`, `TOUR_EDITING_URL`, `TOUR_ID_RESOLUTION_URL`, `GENERATOR_URL`, `VOICE_URL`, `CUSTOM_AUDIO_URL` | Private Cloud Run URLs of the 12 `-subscribed` backends. Each has a `${VAR:-default}` placeholder in the subscribed manifest; set the real URL as an env var. |
 
 Gateway host: Subscribed app points at `https://subscribed-api.audioura.com`
@@ -119,7 +119,7 @@ user registration, support-id. Reads (`user-tracking/communities_api.py`,
 | `IAP_VERIFY_MODE` | `apple` or `per_store` | `per_store` = Apple on iOS + Google on Android. `stub` only for tests. |
 | `IAP_ALLOW_STUB_STORE` | **unset** (⇒ false) | **Fail-closed.** `entitlements_api.py:59` treats unset/anything-not-true as false, so a `store: "stub"` purchase is REFUSED in prod. Only ON for the Android TEST PURCHASE path in dev. |
 | `ALLOW_UNAUTHENTICATED_ENTITLEMENTS` | **unset** (⇒ false) | **Fail-closed.** `entitlements_api.py:292` returns false unless explicitly `true/1/yes`; unset means an unauthenticated entitlement request is rejected. Leave unset in prod. |
-| `APPLE_BUNDLE_ID` | `com.glikfamily.audioura` | StoreKit 2 JWS `bundleId` pin. |
+| `APPLE_BUNDLE_ID` | `com.audioura.audiotours` | StoreKit 2 JWS `bundleId` pin. |
 | **`APPLE_IAP_ENVIRONMENT`** | **`Production,Sandbox`** | **Production-with-Sandbox fallback (LOCAL-764).** TestFlight purchases are signed `Sandbox` even against Production, so a Production-only pin would REJECT every TestFlight buy. The verifier now accepts a comma-separated list (`apple_jws_verifier.py` + both callers). Set `Production,Sandbox` for the TestFlight launch; narrow to `Production` only after TestFlight ends. Unset = check disabled (not recommended in prod). |
 | `GOOGLE_PLAY_SA_JSON` | **secret file** `google-play-sa-json` mounted at a path; set the var to that path | Google Play service account for Android IAP verify. Absent ⇒ Google verify unconfigured (returns a handled "unconfigured", not a crash). |
 | `GOOGLE_PACKAGE_NAME` | `com.audioura.audiotours` | Play package. |
