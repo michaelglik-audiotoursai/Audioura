@@ -22,6 +22,9 @@ COPY pricing.py /app/
 COPY cost_meter.py /app/
 COPY cost_rates.py /app/
 COPY build_manifest.py /app/
+# [LOCAL-782] Shared header-redaction helper; tour_orchestrator_service.py imports
+# it to redact X-Api-Key/Authorization/Cookie/tokens before logging headers.
+COPY safe_headers.py /app/
 # Every local module tour_orchestrator_service.py imports (LEAD 2026-10-04: user_stops_flag was
 # missing, so any rebuild crash-looped; the others degraded silently).
 COPY quality_guardrails.py /app/

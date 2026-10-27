@@ -25,6 +25,18 @@ except Exception:  # pragma: no cover - container without the root module
         # A retired model (the gpt-3.5 family) or an empty value -> live fallback.
         return fallback if (not name or name.startswith("gpt-3.5")) else name
 
+# [LOCAL-782] Redact secrets (X-Api-Key, Authorization, Cookie, tokens) before
+# logging request headers. Import the repo-root shared module if present, else
+# use the inline equivalent (this microservice image copies only app.py).
+try:
+    from safe_headers import safe_headers
+except Exception:  # pragma: no cover - container without the root module
+    def safe_headers(headers):
+        _h = dict(headers) if headers is not None else {}
+        _bad = ("token", "secret", "key", "x-goog-", "password", "auth", "cookie")
+        return {k: ("…" + str(v)[-4:] if len(str(v)) > 4 else "…redacted")
+                if any(m in k.lower() for m in _bad) else v for k, v in _h.items()}
+
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,
@@ -54,7 +66,7 @@ def get_coordinates(location):
     """Get coordinates for a location using OpenAI API."""
     print("\n==== COORDINATES REQUEST RECEIVED ====")
     print(f"Location: {location}")
-    print(f"Request headers: {dict(request.headers)}")
+    print(f"Request headers: {safe_headers(request.headers)}")
     print(f"Request method: {request.method}")
     print(f"Request remote addr: {request.remote_addr}")
     """Get coordinates for a location using OpenAI API."""
