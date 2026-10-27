@@ -131,7 +131,7 @@ def test_blob_resolution_empty_toursdir():
     conns = _conn_queue([
         [("Trinity Church",)],                                    # 1) tour_name
         [(None, 7)],                                              # 2) organiser check (not organiser)
-        [("Trinity Church", zip_name, "tours/445.zip", 7)],       # 3) _resolve_from_column (blob)
+        [("Trinity Church", zip_name, "tours/445.zip", 7, 0)],       # 3) _resolve_from_column (blob)
     ])
 
     with tempfile.TemporaryDirectory() as empty_dir, _blob_env():
@@ -163,7 +163,7 @@ def test_blob_resolution_missing_object_404():
     conns = _conn_queue([
         [("Trinity Church",)],                                    # 1) tour_name
         [(None, 7)],                                              # 2) organiser check
-        [("Trinity Church", zip_name, "tours/445.zip", 7)],       # 3) _resolve_from_column (blob)
+        [("Trinity Church", zip_name, "tours/445.zip", 7, 0)],       # 3) _resolve_from_column (blob)
     ])
 
     with tempfile.TemporaryDirectory() as empty_dir, _blob_env():
@@ -225,7 +225,7 @@ def test_blob_mode_stops_and_editable_from_db():
     conns = _conn_queue([
         [("Boston Public Library",)],                                # 1) tour_name
         [(None, 9)],                                                 # 2) organiser check
-        [("Boston Public Library", zip_name, "tours/446.zip", 9)],   # 3) column row w/ stops_count=9
+        [("Boston Public Library", zip_name, "tours/446.zip", 9, 0)],   # 3) column row w/ stops_count=9
     ])
 
     with tempfile.TemporaryDirectory() as empty_dir, _blob_env():
@@ -275,3 +275,27 @@ def run_all_tests():
 
 if __name__ == '__main__':
     sys.exit(run_all_tests())
+
+
+def test_db_zip_present_no_r2_object_resolves():
+    """2026-10-26 fix: Subscribed/Storied ZIPs live in audio_tours.audio_tour (bytea),
+    not R2 (Cloud SQL: subscribed 8/8 and storied 20/20 rows have a DB ZIP and NO
+    tour_blob_uri). Blob mode must resolve such a row without touching R2."""
+    zip_name = "trinity_church_boston_ma_landmark_a956ce11.zip"
+    fake = FakeBlobStorage(keys=set())  # nothing in R2
+    import tour_id_resolution_service as svc
+    _reset_blob_cache(svc)
+    conns = _conn_queue([
+        [("Trinity Church",)],
+        [(None, 7)],
+        [("Trinity Church", zip_name, None, 7, 326420)],   # DB holds the ZIP
+    ])
+    with tempfile.TemporaryDirectory() as empty_dir, _blob_env():
+        with patch.object(svc, 'get_db_connection', side_effect=conns):
+            with patch.object(svc, 'TOURS_DIR', empty_dir):
+                with patch.object(svc, '_get_blob_storage', return_value=fake):
+                    resp = svc.app.test_client().get('/tour/445/resolve')
+    data = resp.get_json()
+    assert resp.status_code == 200, f"Expected 200, got {resp.status_code}: {data}"
+    assert data['edit_tour_id'] == 'a956ce11'
+    assert fake.exists_calls == [], "a DB-held ZIP must not need an R2 lookup"

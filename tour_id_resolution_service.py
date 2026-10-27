@@ -141,7 +141,8 @@ def _resolve_from_column(download_id, conn):
     if blob is not None:
         # Cloud: also fetch the R2 key (tour_blob_uri) and stops_count from the DB.
         cur.execute(
-            "SELECT tour_name, zip_filename, tour_blob_uri, stops_count "
+            "SELECT tour_name, zip_filename, tour_blob_uri, stops_count, "
+            "COALESCE(octet_length(audio_tour), 0) "
             "FROM audio_tours WHERE id = %s",
             (int(download_id),)
         )
@@ -151,7 +152,7 @@ def _resolve_from_column(download_id, conn):
         if not result:
             return None  # row does not exist
 
-        tour_name, zip_filename, tour_blob_uri, stops_count = result
+        tour_name, zip_filename, tour_blob_uri, stops_count, db_zip_bytes = result
 
         if not zip_filename:
             return None  # column not populated (legacy row) -> fallback
@@ -161,7 +162,13 @@ def _resolve_from_column(download_id, conn):
         # key 'tours/<id>.zip' so an existing object is still found.
         blob_key = tour_blob_uri or f"tours/{int(download_id)}.zip"
 
-        if not blob.exists(blob_key):
+        # [LOCAL-781 fix, 2026-10-26] Subscribed and Storied ZIPs live in the DB column
+        # audio_tours.audio_tour (bytea) -- that is what map-delivery /download-tour
+        # streams. Only some Beta rows are in R2. The tour is PRESENT when the DB
+        # holds its ZIP, or when its R2 object exists; 404 only when neither.
+        if db_zip_bytes and int(db_zip_bytes) > 0:
+            blob_key = f"db:audio_tours.audio_tour#{int(download_id)}"
+        elif not blob.exists(blob_key):
             logger.warning(
                 "LOCAL-781: blob object missing for tour id=%s (key=%s, "
                 "zip_filename=%s). Not falling back to a name scan.",
