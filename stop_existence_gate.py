@@ -2322,6 +2322,216 @@ def verify_listing_in_scope(name: str, scope: str) -> Optional[bool]:
     return False
 
 
+# ──── [LOCAL-784 / D722] ESCALATION LADDER WRAPPER ────────────────────────────
+# The single escalation entry the generator (and the by-reference path) call
+# instead of the raw replenish. It feeds escalating_lookup three tiers built from
+# the EXISTING functions above, so the behaviour of each tier is byte-for-byte the
+# LOCAL-779/779B/783 behaviour — the ladder only adds the "try the next tier
+# before refusing" step, the log and the learned routing (D722).
+#
+#   tier a — the CHEAP path: the same replenish function with the Serper Places
+#            provider forced OFF, so it resolves to the free Nominatim endpoint
+#            (today's "nothing found" for West Roxbury). This is the tier the
+#            escalation exists to escape.
+#   tier b — the same replenish function with Serper Places ON (LOCAL-783): the
+#            tier that actually returns Al Wadi / Stardust / Bread Thyme.
+#   verify — re-verify ONE Gemini (tier c) name on Places/geocode inside the
+#            scope, returning a candidate dict when it checks out (else None so
+#            the ladder drops it). Dining re-verifies cuisine too.
+#
+# Found candidates are returned to the caller, which appends them to poi_list /
+# the stop pool exactly as the maps-first stops are today, so a repeat is served
+# from the LOCAL-783 24 h places cache cheaply.
+
+def _run_with_serper(enabled: bool, fn):
+    """Run `fn` with the Serper Places provider forced ON (enabled=True) or OFF
+    (enabled=False) for the duration, restoring the prior env after. Forcing OFF
+    gives the ladder its free tier-a cheap path; forcing ON gives tier b. The env
+    is the only switch places_search.serper_places_enabled() reads, so this is the
+    minimal, reversible way to select a provider per tier without touching the
+    replenish functions."""
+    prev_provider = os.environ.get("SERP_PROVIDER")
+    try:
+        if enabled:
+            os.environ["SERP_PROVIDER"] = "serper"
+        else:
+            os.environ["SERP_PROVIDER"] = "nominatim"
+        return list(fn() or [])
+    finally:
+        if prev_provider is None:
+            os.environ.pop("SERP_PROVIDER", None)
+        else:
+            os.environ["SERP_PROVIDER"] = prev_provider
+
+
+def _verified_candidate(name: str, scope: str, kind: str, cuisine: str,
+                        device_coords=None) -> Optional[Dict]:
+    """Re-verify a single tier-c (Gemini) place NAME on the map inside the scope,
+    returning a candidate dict in the SAME shape the replenish functions return
+    (so the caller treats a tier-c stop identically), or None when it does not
+    verify. Dining also requires the cuisine to not conflict. A verified place is
+    looked up once more to recover its real coordinates; without coordinates it is
+    dropped (a stop needs a point on the map)."""
+    _scope = (scope or "").strip()
+    if not name or not _scope:
+        return None
+    # Existence inside the scope (and cuisine for dining). Serper ON for the
+    # verification lookups — they are the dearer, accurate provider.
+    def _exist():
+        return verify_listing_in_scope(name, _scope)
+    exists = _run_with_serper(True, lambda: [_exist()])  # wrap to reuse env guard
+    exists = exists[0] if exists else None
+    if exists is not True:
+        return None
+    if kind == "dining" and cuisine:
+        def _cu():
+            return verify_listing_cuisine(name, _scope, cuisine)
+        cu = _run_with_serper(True, lambda: [_cu()])
+        cu = cu[0] if cu else None
+        if cu is False:
+            return None
+    # Recover coordinates via one more Serper Places lookup (name, scope).
+    coords = None
+    addr_str = ""
+    listing_cuisine = ""
+    try:
+        import places_search as _ps
+        prev = os.environ.get("SERP_PROVIDER")
+        os.environ["SERP_PROVIDER"] = "serper"
+        try:
+            ctr = None
+            try:
+                ctr = _geocode_scope_center(_scope)
+            except RuntimeError:
+                ctr = None
+            recs = _ps.places_search(f"{name} {_scope}", scope=_scope, near=device_coords,
+                                     limit=5, scope_center=ctr)
+        finally:
+            if prev is None:
+                os.environ.pop("SERP_PROVIDER", None)
+            else:
+                os.environ["SERP_PROVIDER"] = prev
+        norm = _strip_accents(name).lower()
+        nw = [w for w in re.split(r"[\s'\u2019-]+", norm) if len(w) >= 3]
+        for r in recs or []:
+            rn = _strip_accents(r.get("name", "") or r.get("display_name", "")).lower()
+            if nw and sum(1 for w in nw if w in rn) < max(1, len(nw) * 0.5):
+                continue
+            try:
+                lat, lng = float(r["lat"]), float(r["lon"])
+            except (KeyError, ValueError, TypeError):
+                continue
+            coords = (lat, lng)
+            addr_str = r.get("display_name", "") or ""
+            _et = r.get("extratags") or {}
+            if isinstance(_et, dict):
+                listing_cuisine = _et.get("cuisine") or ""
+            break
+    except Exception as e:
+        logger.info(f"[D722] tier-c coordinate recovery failed for {name!r}: {e}")
+    if coords is None:
+        # Verified to exist but no coordinates — cannot place a stop. Drop it.
+        return None
+    lat, lng = coords
+    return {
+        "name": name,
+        "address": addr_str,
+        "coordinates": f"{lat},{lng}",
+        "lat": lat,
+        "lng": lng,
+        "cuisine": listing_cuisine,
+        "evidence": (f"gemini_grounded (tier c), re-verified on Places in "
+                     f"{_scope}: '{name}'"),
+        "verified": True,
+    }
+
+
+def replenish_with_escalation(
+    kind: str,
+    poi_type: str,
+    scope: str,
+    needed: int,
+    *,
+    exclude: Optional[Set[str]] = None,
+    device_coords: Optional[Tuple[float, float]] = None,
+    cuisine: Optional[str] = None,
+    user_id: Optional[str] = None,
+    request_text: Optional[str] = None,
+    allow_grounding: bool = True,
+) -> List[Dict]:
+    """[LOCAL-784/D722] Replenish a business/dining tour via the escalation ladder.
+
+    Drop-in for ``dining_replenish_candidates`` / ``business_replenish_candidates``
+    at the generator's maps-first call sites: same arguments, same return shape
+    (a list of verified candidate dicts, at most ``needed`` long). The difference
+    is that when the cheap provider finds fewer than ``needed`` it does NOT give up
+    — it escalates to Serper Places, then to grounded Gemini (each result
+    re-verified on the map), stopping at the first tier that satisfies, under the
+    $0.10 per-request escalation budget, and records the escalation.
+
+    kind is 'dining' or 'business'. allow_grounding=False (or an active L2
+    by-reference grounding guard) keeps the ladder to tiers a/b only.
+    """
+    _pt = (poi_type or "").strip() or ("restaurants" if kind == "dining" else "places")
+    _scope = (scope or "").strip()
+    if not _scope:
+        return []
+    _cuisine = (cuisine or "").strip().lower()
+    if kind == "dining" and not _cuisine:
+        _cuisine = _extract_cuisine_qualifier(_pt) or ""
+    _excl = set(exclude or set())
+
+    try:
+        import escalating_lookup as _esc
+    except Exception as e:
+        # The ladder module is unavailable — fall straight through to today's
+        # cheap+Serper behaviour (the replenish function already routes to Serper
+        # when enabled). Never block a tour on the escalation module.
+        logger.warning(f"[D722] escalating_lookup unavailable ({e}); using plain "
+                       f"replenish")
+        if kind == "dining":
+            return dining_replenish_candidates(_pt, _scope, needed, exclude=_excl,
+                                               device_coords=device_coords,
+                                               cuisine=_cuisine)
+        return business_replenish_candidates(_pt, _scope, needed, exclude=_excl,
+                                             device_coords=device_coords)
+
+    def _replenish(serper_on: bool) -> List[Dict]:
+        if kind == "dining":
+            fn = lambda: dining_replenish_candidates(
+                _pt, _scope, needed, exclude=set(_excl),
+                device_coords=device_coords, cuisine=_cuisine)
+        else:
+            fn = lambda: business_replenish_candidates(
+                _pt, _scope, needed, exclude=set(_excl), device_coords=device_coords)
+        return _run_with_serper(serper_on, fn)
+
+    scope_center = None
+    if device_coords is None:
+        try:
+            scope_center = _geocode_scope_center(_scope)
+        except RuntimeError:
+            scope_center = None
+    else:
+        scope_center = device_coords
+
+    category = (_cuisine or _pt).strip().lower()
+
+    result = _esc.escalating_lookup(
+        kind, _pt, _scope, max(1, int(needed or 1)),
+        tier_a=lambda: _replenish(False),
+        tier_b=lambda: _replenish(True),
+        verify=lambda nm: _verified_candidate(nm, _scope, kind, _cuisine,
+                                               device_coords=device_coords),
+        category=category,
+        scope_center=scope_center,
+        user_id=user_id,
+        request_text=request_text,
+        allow_grounding=allow_grounding,
+    )
+    return result.results
+
+
 def _haversine_km_local(a, b) -> float:
     """Great-circle distance in km between two (lat, lng) pairs; inf if either None."""
     import math as _m

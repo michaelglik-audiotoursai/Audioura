@@ -14632,6 +14632,7 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
                         classify_business_vs_landmark as _p3c_cls,
                         business_replenish_candidates as _p3c_biz,
                         dining_replenish_candidates as _p3c_din,
+                        replenish_with_escalation as _p3c_escalate,
                         _extract_cuisine_qualifier as _p3c_ecq,
                         _cuisine_from_request as _p3c_cfr)
                     _p3c_kind = _p3c_cls(_p3c_poi_type)
@@ -14643,18 +14644,19 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
                         # Recover the cuisine the LLM intent may have dropped: the
                         # poi_type qualifier, else a scan of the raw request string.
                         _p3c_cuisine = _p3c_ecq(_p3c_poi_type) or _p3c_cfr(user_request) or _p3c_cfr(location)
-                        print(f"   [LOCAL-779B] MAPS-FIRST top-up ({_p3c_kind}): "
-                              f"maps search {_p3c_poi_type!r} cuisine={_p3c_cuisine!r} "
+                        print(f"   [LOCAL-779B/D722] MAPS-FIRST top-up ({_p3c_kind}): "
+                              f"escalating maps search {_p3c_poi_type!r} cuisine={_p3c_cuisine!r} "
                               f"in {_p3c_scope!r} (have {len(poi_list)}/{total_stops})")
-                        if _p3c_kind == 'dining':
-                            _p3c_cands = _p3c_din(_p3c_poi_type, _p3c_scope,
-                                                  _p3c_need, exclude=_p3c_exclude,
-                                                  cuisine=_p3c_cuisine)
-                            _p3c_src = 'dining_maps'
-                        else:
-                            _p3c_cands = _p3c_biz(_p3c_poi_type, _p3c_scope,
-                                                  _p3c_need, exclude=_p3c_exclude)
-                            _p3c_src = 'business_maps'
+                        # [LOCAL-784/D722] Escalation ladder: cheap -> Serper Places
+                        # -> grounded Gemini (re-verified) before giving up. Found
+                        # results are appended below exactly as the maps-first stops
+                        # were, and go into the LOCAL-783 24 h places cache.
+                        _p3c_cands = _p3c_escalate(
+                            _p3c_kind, _p3c_poi_type, _p3c_scope, _p3c_need,
+                            exclude=_p3c_exclude, cuisine=_p3c_cuisine,
+                            user_id=(user_id if 'user_id' in dir() else None),
+                            request_text=(user_request if 'user_request' in dir() else location))
+                        _p3c_src = 'dining_maps' if _p3c_kind == 'dining' else 'business_maps'
                         for _p3cc in _p3c_cands:
                             if len(poi_list) >= total_stops:
                                 break
@@ -15334,6 +15336,7 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
                 from stop_existence_gate import (classify_business_vs_landmark as _cls_empty,
                                                  business_replenish_candidates as _biz_rep_empty,
                                                  dining_replenish_candidates as _din_rep_empty,
+                                                 replenish_with_escalation as _escalate_empty,
                                                  _extract_cuisine_qualifier as _ecq_empty,
                                                  _cuisine_from_request as _cfr_empty)
                 _empty_kind = _cls_empty(_empty_poi_type)
@@ -15343,18 +15346,16 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
                                                            if '_seg_result' in dir() else []))
                     _empty_cuisine = (_ecq_empty(_empty_poi_type)
                                       or _cfr_empty(user_request) or _cfr_empty(location))
-                    print(f"  [LOCAL-779B] MAPS-FIRST refill (list emptied by PHASE 3C/gate): "
-                          f"{_empty_kind} maps search {_empty_poi_type!r} cuisine={_empty_cuisine!r} "
+                    print(f"  [LOCAL-779B/D722] MAPS-FIRST refill (list emptied by PHASE 3C/gate): "
+                          f"{_empty_kind} escalating maps search {_empty_poi_type!r} cuisine={_empty_cuisine!r} "
                           f"in {_empty_scope!r} (need {_seg_requested_stops})")
-                    if _empty_kind == 'dining':
-                        _empty_cands = _din_rep_empty(_empty_poi_type, _empty_scope,
-                                                      _seg_requested_stops, exclude=_empty_tried,
-                                                      cuisine=_empty_cuisine)
-                        _empty_src = 'dining_maps'
-                    else:
-                        _empty_cands = _biz_rep_empty(_empty_poi_type, _empty_scope,
-                                                      _seg_requested_stops, exclude=_empty_tried)
-                        _empty_src = 'business_maps'
+                    # [LOCAL-784/D722] Escalation ladder before the honest refusal.
+                    _empty_cands = _escalate_empty(
+                        _empty_kind, _empty_poi_type, _empty_scope, _seg_requested_stops,
+                        exclude=_empty_tried, cuisine=_empty_cuisine,
+                        user_id=(user_id if 'user_id' in dir() else None),
+                        request_text=(user_request if 'user_request' in dir() else location))
+                    _empty_src = 'dining_maps' if _empty_kind == 'dining' else 'business_maps'
                     for _ec in _empty_cands:
                         if len(poi_list) >= _seg_requested_stops:
                             break
