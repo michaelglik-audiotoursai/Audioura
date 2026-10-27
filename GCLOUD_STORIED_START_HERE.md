@@ -83,6 +83,10 @@ tour-generator-storied --to-revisions=tour-generator-storied-00008-dhd=100 --reg
   lookup_routing; audio_tours 351 unchanged). generator **00007-d7v** (rollback 00006-qbx), orchestrator **00006-c7d** (rollback 00005-bm2), image-only.
   Proof: tour 459 (JP coffee) OK; tour 460 (West Roxbury) 1/2 stops (Al Wadi via escalation tier b). The exact old request text reused **pooled**
   Stardust + Byblos and overwrote 454, so **pooled stops skip the 786 scope check** (handed to LEAD). Spend $1.64. Build dir `C:\adev-wt\bsub11`.
+- **wdvrdaz6u5 DONE 10-27 ~15:30 EDT** (Vietnam, Michael's "Go 6u5"): 8 of 12 tours **461–468**, $7.66, audio_tours 353 → 361.
+  Failed ×2: French colonial walk, pagodas, street food, kite schools. 463 (War Remnants) is wrong (pooled bad stops survived the retry).
+  Runner: `scratchpad\run6u5.py`. Python urllib needs `User-Agent: curl/...`, since the gateway gives 403 to Python's default UA.
+  Scaling facts (posted on 6ht): Cloud SQL db-f1-micro, max_connections 25; generator max 1 instance.
 - **Laptop remote access (for Vietnam, from 10-28):** Tailscale "mercury" 100.68.122.8 (expiry off, unattended). Exit node = mikhails-mac-mini
   (`tailscale set --exit-node=100.106.181.69 --exit-node-allow-lan-access=true`; `--exit-node=` to turn it off; keep it OFF by default).
   Screen: TigerVNC 1.15 → 100.106.181.69, user `micha`; menu = **Ctrl+Alt+M**; "Full screen on all monitors" (the Mac has 2 screens).
