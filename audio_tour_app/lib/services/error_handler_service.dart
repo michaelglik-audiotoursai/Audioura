@@ -4,6 +4,7 @@ import 'package:package_info_plus/package_info_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../screens/debug_log_viewer_screen.dart';
+import 'failure_reporter.dart';
 
 /// Central error handler — translates HTTP status codes into user-friendly messages
 /// and offers optional "Report this problem" via prefilled mailto.
@@ -41,6 +42,16 @@ class ErrorHandlerService {
     String? serverMessage,
   }) {
     final message = friendlyMessage(statusCode, serverMessage: serverMessage);
+    // [LOCAL-785 / D723] Record every error we show the user. Background,
+    // non-blocking, never throws. A 402 purchase gate is a normal paywall and
+    // is NOT recorded (it is the subscription working as designed).
+    if (statusCode != 402) {
+      FailureReporter.instance.report(
+        surface: endpoint ?? 'ui',
+        httpStatus: statusCode,
+        message: serverMessage ?? message,
+      );
+    }
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(message),

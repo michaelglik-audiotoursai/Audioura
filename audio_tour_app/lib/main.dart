@@ -16,6 +16,7 @@ import 'services/foreground_community_messages.dart';
 import 'services/saved_tours_refresh.dart';
 import 'services/tour_download_service.dart';
 import 'services/deep_link_service.dart';
+import 'services/failure_reporter.dart';
 import 'package:workmanager/workmanager.dart';
 
 class MainScreenWithTreatsTab extends StatelessWidget {
@@ -29,6 +30,14 @@ class MainScreenWithTreatsTab extends StatelessWidget {
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // [LOCAL-785 / D723] Record every failure. Install the global uncaught-error
+  // hooks (FlutterError.onError + PlatformDispatcher.onError, throttled 5/min)
+  // as early as possible so a crash during startup is still reported, and flush
+  // any failures queued offline on the last run. Never blocks startup.
+  FailureReporter.instance.installGlobalHandlers();
+  unawaited(FailureReporter.instance.flush());
+
   // [LOCAL-773] The startup banner must report the REAL running version, never
   // a hard-coded string. The old `=== AUDIOTOURS DEV v1.2.9+61 STARTING ===`
   // line was stale and misled testers reading logcat. Read name+build from the

@@ -30,6 +30,41 @@ app.register_blueprint(deeplink_bp)
 
 TOURS_DIR = "/app/tours"
 
+# --- Failure recorder (LOCAL-785 / D723) ---
+# tour-id-resolution records its 404 (tour/edit-id not found) and 5xx failures to
+# failure_events. Guarded import; never raises; 1s DB timeout; stdout fallback.
+try:
+    import failure_log as _failure_log
+except Exception:
+    _failure_log = None
+
+
+def _record_failure(**kw):
+    if _failure_log is None:
+        return None
+    try:
+        kw.setdefault("service", "tour-id-resolution")
+        kw.setdefault("surface", "resolve")
+        kw.setdefault("track", os.getenv("TOUR_TRACK"))
+        return _failure_log.record(**kw)
+    except Exception:
+        return None
+
+
+@app.errorhandler(Exception)
+def _record_unhandled_exception(e):
+    """[LOCAL-785] Record every unhandled exception then re-raise the SAME 500."""
+    from werkzeug.exceptions import HTTPException as _HTTPException
+    if isinstance(e, _HTTPException):
+        return e
+    try:
+        _record_failure(surface="resolve", exc=e, http_status=500,
+                        message=str(e), exception_type=type(e).__name__)
+    except Exception:
+        pass
+    raise e
+
+
 logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname)s] %(message)s')
 logger = logging.getLogger(__name__)
 
@@ -307,6 +342,9 @@ def resolve_tour_id(download_id):
         conn.close()
 
         if not result:
+            _record_failure(error_code="TOUR_NOT_FOUND", http_status=404,
+                            message=f"Tour with download ID not found",
+                            tour_id=download_id)
             return jsonify({
                 "status": "error",
                 "error_code": "TOUR_NOT_FOUND",
@@ -329,6 +367,9 @@ def resolve_tour_id(download_id):
         edit_info = find_edit_tour_id(download_id)
 
         if not edit_info:
+            _record_failure(error_code="EDIT_ID_NOT_FOUND", http_status=404,
+                            message="No edit-compatible tour found for download ID",
+                            tour_id=download_id)
             return jsonify({
                 "status": "error",
                 "error_code": "EDIT_ID_NOT_FOUND",
@@ -380,6 +421,10 @@ def resolve_tour_id(download_id):
         }), 400
 
     except Exception as e:
+        _record_failure(error_code="INTERNAL_ERROR", http_status=500,
+                        message=f"Failed to resolve tour ID: {str(e)}",
+                        exception_type=type(e).__name__, exc=e,
+                        tour_id=download_id)
         return jsonify({
             "status": "error",
             "error_code": "INTERNAL_ERROR",

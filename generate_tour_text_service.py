@@ -121,7 +121,44 @@ app.register_blueprint(persona_bp)
 TOURS_DIR = "/app/tours"
 ACTIVE_JOBS = get_job_store('tour-generator')
 
-# TODO(S94): remove in-code password fallback; prod must use DATABASE_URL/DB_PASSWORD env only
+# --- Failure recorder (LOCAL-785 / D723) ---
+# The generator records its clean-fail evidence (existence-gate "0 remain",
+# PHASE 3C "rejected all", thin_evidence, no_matching_places_in_area, …) and any
+# unhandled 500 to failure_events. Guarded import; never raises; 1s DB timeout;
+# stdout JSON fallback.
+try:
+    import failure_log as _failure_log
+except Exception as _fl_err:  # pragma: no cover - import-time safety
+    _failure_log = None
+    _svc_logger.error(f"[LOCAL-785] failure_log unavailable: {_fl_err}")
+
+
+def _record_failure(**kw):
+    if _failure_log is None:
+        return None
+    try:
+        kw.setdefault("service", "generator")
+        kw.setdefault("track", os.getenv("TOUR_TRACK"))
+        return _failure_log.record(**kw)
+    except Exception:
+        return None
+
+
+@app.errorhandler(Exception)
+def _record_unhandled_exception(e):
+    """[LOCAL-785] Record every unhandled exception then re-raise the SAME 500.
+    Deliberate HTTP responses (abort) are left untouched."""
+    from werkzeug.exceptions import HTTPException as _HTTPException
+    if isinstance(e, _HTTPException):
+        return e
+    try:
+        _record_failure(surface="http", exc=e, http_status=500,
+                        message=str(e), exception_type=type(e).__name__)
+    except Exception:
+        pass
+    raise e
+
+
 def _persist_icon_metrics(icon_result, job_id):
     """Persist I-CON results to stop_metrics table (non-blocking)."""
     import json as _json
@@ -406,6 +443,17 @@ def generate_tour_async(job_id, location, tour_type, total_stops=10, user_id=Non
                         f"suggestion={_af['suggestion']}")
             except Exception as _af_err:
                 _svc_logger.error(f"[LOCAL-580] actionable-failure build failed (non-fatal): {_af_err}")
+            # [LOCAL-785] Record the clean-fail (existence-gate "0 remain", PHASE
+            # 3C "rejected all", thin_evidence, no_matching_places_in_area, …). The
+            # stable error_code from the degradation ladder is carried through so
+            # the failure is auto-triaged ux/absence and grouped by the report.
+            _record_failure(
+                surface="generate",
+                error_code=_error_extra.get("error_code"),
+                message=_error_msg,
+                job_id=job_id, tour_id=job_id, user_id=user_id,
+                request_text=location,
+            )
             ACTIVE_JOBS.update(job_id, status="error", error=_error_msg, **_error_extra)
             if os.path.exists(temp_path):
                 os.unlink(temp_path)

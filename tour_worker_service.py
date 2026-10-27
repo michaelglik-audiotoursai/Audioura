@@ -98,6 +98,30 @@ MAX_TASK_ATTEMPTS = int(os.getenv('MAX_TASK_ATTEMPTS', '3'))
 app = Flask(__name__)
 
 
+# --- Failure recorder (LOCAL-785 / D723) ---
+# The Background/worker path's terminal failure is recorded to failure_events
+# with the same structured error_code the "Generate Now" path records, so a
+# refusal or crash is counted whichever path produced it. Guarded import; never
+# raises; 1s DB timeout; stdout JSON fallback.
+try:
+    import failure_log as _failure_log
+except Exception as _fl_err:  # pragma: no cover - import-time safety
+    _failure_log = None
+    print(f"[WORKER] WARNING: failure_log unavailable: {_fl_err}")
+
+
+def _record_failure(**kw):
+    if _failure_log is None:
+        return None
+    try:
+        kw.setdefault("service", "orchestrator")  # same logical service as Generate Now
+        kw.setdefault("surface", "generate")
+        kw.setdefault("track", os.getenv("TOUR_TRACK"))
+        return _failure_log.record(**kw)
+    except Exception:
+        return None
+
+
 # === Auth helpers (same pattern as orchestrator) ===
 
 def _get_auth_headers(target_url):
@@ -605,6 +629,15 @@ def run_job():
             update_job_status(job_id, 'error', error_msg, error=error_msg,
                                **_structured)
             print(f"[RUN-JOB] FINAL attempt failed for {job_id}: {error_msg}")
+            # [LOCAL-785] Record the Background-path terminal failure. A structured
+            # refusal carries its stable error_code (auto-triaged ux/absence); a
+            # true crash carries the exception (triaged our_bug).
+            _record_failure(
+                error_code=_structured.get("error_code"),
+                message=_structured.get("message") or error_msg,
+                exception_type=type(e).__name__,
+                exc=e, job_id=job_id, tour_id=job_id,
+            )
             
             # Rollback usage row so a failed tour doesn't permanently consume quota
             try:

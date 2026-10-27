@@ -402,3 +402,88 @@ prefix) for Subscribed; functionally the shared bucket is safe.
 | `APPLE_IAP_ENVIRONMENT` | env check disabled (any environment accepted) | set `Production,Sandbox` for TestFlight launch |
 | `DAILY_PAID_LIMIT_USD` | no spend ceiling (tours never blocked) | set a ceiling for cost safety |
 | `GOOGLE_PLAY_SA_JSON` | Google verify unconfigured (handled, not a crash) | mount secret file for Android IAP |
+
+
+---
+
+## 14. failure_events recorder (LOCAL-785 / D723)
+
+Every server failure and every app failure is recorded to one Cloud SQL table,
+`failure_events` (migration **054**), by the shared recorder `failure_log.py`.
+`failure_report.py --since 24h|7d` reads it for LEAD. Nothing new to deploy
+beyond **applying migration 054** and **one gateway route** — the recorder
+writes to the DB each service ALREADY connects to.
+
+### What each service needs
+
+The recorder reuses each service's existing DB connection, so **no new env var
+is required**. It reads `DATABASE_URL` if set, else the same
+`DB_HOST/DB_NAME/DB_USER/DB_PASSWORD/DB_PORT` the service already uses — exactly
+the vars listed per service above. If the DB is unreachable the recorder falls
+back to a `FAILURE_EVENT {json}` line on stdout (visible in Cloud Logging), so a
+failure is never lost even during a DB outage.
+
+| Service | Records via | DB env it already has |
+|---|---|---|
+| tour-orchestrator-subscribed (§2) | `failure_log` + `@errorhandler` + job-failure/refusal sites (Generate Now + worker) | `DB_*` (§2) — already present |
+| tour-generator-subscribed (§11) | clean-fail evidence (existence-gate / PHASE 3C / thin_evidence / no_matching_places) + `@errorhandler` | `DATABASE_URL`/`DB_*` (§11) — already present |
+| translation-subscribed (§5) | `@errorhandler(Exception)` | `DB_*` (§5) — already present |
+| tour-id-resolution-subscribed (§9) | 404 (tour/edit-id not found) + 5xx + `@errorhandler` | `DB_*` (§9) — already present |
+| map-delivery-subscribed (§4) | download 5xx + `@errorhandler` (a NORMAL 402 purchase gate is NOT recorded) | `DB_*` (§4) — already present |
+| user-api-subscribed (§3) | hosts **POST `/client-failure`** (the app's sink) + `@errorhandler` | `DATABASE_URL`/`DB_*` (§3) — already present |
+
+> `failure_log.py` is COPY'd into the user-api image (it lives beside `app.py`
+> in `user-tracking/`) and sits at the repo root for every other image's
+> `COPY . .`. No extra build step.
+
+Optional tunable (all services): **`FAILURE_LOG_DB_TIMEOUT`** — the recorder's
+connect+statement timeout in seconds (default **1**). Leave at the default; the
+point is that a slow/down DB never stalls a request.
+
+Test-only (orchestrator): **`FAILURE_LOG_TEST_HOOK=1`** turns on a request hook
+that raises on `X-Force-Failure: 1` (or `?force_failure=1`) so a live test can
+prove the recorder writes a row without a real failure or any spend. **Leave
+UNSET in production.**
+
+### The one new gateway route (subscribed manifest only)
+
+`api-gateway/gateway_routes.subscribed.yaml` gains:
+
+```yaml
+  - public_path: /client-failure
+    backend: user-api
+    upstream: /client-failure
+    methods: [POST]
+    auth: api_key
+```
+
+The app's `FailureReporter` POSTs here (via `Endpoints.post(Service.userDb,
+'/client-failure', …)`); user-api rate-limits it to 20/hour per user and caps
+the body at 8 KB before storing. It is NOT added to the Beta/Storied manifest
+(`gateway_routes.yaml`): that stack routes `/user` to news-orchestrator and has
+no user-api backend, so there is nothing there to receive it. Subscribed is the
+authoritative stack for this feature (D708).
+
+### Auto-triage (seeded; LEAD overrides with `failure_report.py --mark`)
+
+`failure_log.auto_triage()` seeds `triage` (`triage_source='auto'`); the first
+matching rule wins:
+
+| Rule | → triage |
+|---|---|
+| error_code ∈ {venue_no_verifiable_content, venue_misread, stops_not_colocated, request_unclassifiable, no_matching_places_in_area, content_quality_insufficient, factual_integrity, venue_closed, exhibition_closed} | `ux` |
+| error_code ∈ {exhibition_not_found, by_reference_no_material} | `absence` |
+| error_code == generation_failed (or purchase_required_for_creator) | `our_bug` |
+| else http_status is 5xx | `our_bug` |
+| else exception_type is network/timeout-ish (timeout, connection*, socket, ssl, clientexception, oserror, …) | `external` |
+| else any other exception_type (a real crash) | `our_bug` |
+| else | `unknown` |
+
+Severity for the priority score: our_bug=3 (blocking), external/absence=2
+(degraded), ux/unknown=1 (cosmetic). Score = distinct_users × severity ×
+recency_weight (≤1d 1.0, ≤7d 0.6, else 0.3).
+
+### 90-day retention
+
+OUT of scope for LOCAL-785 (D723). This feature only writes and reads the table;
+a retention/cleanup job is a separate ticket.

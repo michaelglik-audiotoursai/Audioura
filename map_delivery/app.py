@@ -25,7 +25,50 @@ sys.stdout.flush()
 
 app = Flask(__name__)
 
-# CORS headers for web platform support
+# --- Failure recorder (LOCAL-785 / D723) ---
+# map-delivery records its 5xx failures to failure_events. A NORMAL 402 purchase
+# gate is NOT recorded (it is the paywall working as designed); only genuine
+# server errors are. Guarded import that also tries the repo root (the module is
+# COPY'd into the image beside app.py, and lives at repo root in local tests).
+try:
+    import failure_log as _failure_log
+except Exception:
+    try:
+        _sys_parent = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        if _sys_parent not in sys.path:
+            sys.path.insert(0, _sys_parent)
+        import failure_log as _failure_log
+    except Exception:
+        _failure_log = None
+
+
+def _record_failure(**kw):
+    if _failure_log is None:
+        return None
+    try:
+        kw.setdefault("service", "map-delivery")
+        kw.setdefault("surface", "download")
+        kw.setdefault("track", os.getenv("DELIVERY_TRACK_FILTER"))
+        return _failure_log.record(**kw)
+    except Exception:
+        return None
+
+
+@app.errorhandler(Exception)
+def _record_unhandled_exception(e):
+    """[LOCAL-785] Record every unhandled exception then re-raise the SAME 500.
+    Deliberate HTTP responses (abort/402 gate) are left untouched."""
+    from werkzeug.exceptions import HTTPException as _HTTPException
+    if isinstance(e, _HTTPException):
+        return e
+    try:
+        _record_failure(surface="http", exc=e, http_status=500,
+                        message=str(e), exception_type=type(e).__name__)
+    except Exception:
+        pass
+    raise e
+
+
 def add_cors_headers(response):
     response.headers['Access-Control-Allow-Origin'] = '*'
     response.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, OPTIONS'
@@ -2492,6 +2535,13 @@ def download_tour(tour_id):
     except Exception as e:
         print(f"ERROR in download_tour: {e}")
         sys.stdout.flush()
+        # [LOCAL-785] Record the download 5xx (this is the silent-445/446 class of
+        # failure — a server error on a download the listener never saw explained).
+        _record_failure(surface="download", http_status=500, exc=e,
+                        message=f"download_tour failed: {str(e)}",
+                        exception_type=type(e).__name__,
+                        tour_id=tour_id,
+                        user_id=request.args.get('user_id'))
         return jsonify({'error': str(e)}), 500
 
 

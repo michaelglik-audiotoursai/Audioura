@@ -6,6 +6,7 @@ import 'package:flutter_tts/flutter_tts.dart';
 import 'dart:async';
 import '../services/voice_control_service.dart';
 import '../services/navigation_service.dart';
+import '../services/failure_reporter.dart';
 import 'debug_log_viewer_screen.dart';
 import 'tour_player_screen.dart';
 
@@ -122,6 +123,14 @@ mixin VoiceMethods<T extends StatefulWidget> on State<T> {
             await DebugLogHelper.addDebugLog('VOICE: Successfully auto-played first stop');
           } catch (e) {
             await DebugLogHelper.addDebugLog('VOICE: Auto-play error: $e');
+            // [LOCAL-785 / D723] Auto-play not starting was a known SILENT
+            // failure (only a debug log). Record it so it is counted.
+            FailureReporter.instance.report(
+              surface: 'play',
+              errorCode: 'auto_play_failed',
+              exceptionType: e.runtimeType.toString(),
+              message: 'auto-play first stop failed: $e',
+            );
           }
         }
       }
