@@ -67,6 +67,9 @@ tour-generator-storied --to-revisions=tour-generator-storied-00008-dhd=100 --reg
   LOCAL-777; do NOT sweep stale 'started' rows. D718: until LOCAL-775 ships, deploy a generator only when paid_api_calls shows no activity for ~5 min.
 - **RU translation report (16:35):** server side OK (tour 453 = ru of 452, Polly Tatyana). The app's translated download got **402 purchase_required**
   because `tour_generator_screen._processAdditionalLanguages` omits `?user_id=` (creator exemption). The $3 (tier 9) was set by Michael in Generate; the creator exemption is correct. Fix = LOCAL-780 (one download helper adds user_id).
+- **Home downloads fail on Subscribed (10-26 20:16 EDT, iPhone):** map-delivery serves the ZIP (200), but `tour-id-resolution-subscribed`
+  (00001-qq4, 3c0cfae6) returns 404 because it checks a local `/app/tours` file that doesn't exist on Cloud Run (ZIPs are in R2; it has no R2 env).
+  Handed to LEAD. Also: map-delivery logs full request headers **including X-Api-Key** in Cloud Logging, so redact it.
 - **Laptop remote access (for Vietnam, from 10-28):** Tailscale "mercury" 100.68.122.8 (expiry off, unattended). Exit node = mikhails-mac-mini
   (`tailscale set --exit-node=100.106.181.69 --exit-node-allow-lan-access=true`; `--exit-node=` to turn it off; keep it OFF by default).
   Screen: TigerVNC 1.15 → 100.106.181.69, user `micha`; menu = **Ctrl+Alt+M**; "Full screen on all monitors" (the Mac has 2 screens).
