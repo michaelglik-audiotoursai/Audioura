@@ -319,6 +319,44 @@ def _count_fresh_generations(cur, user_id, scope):
     return cur.fetchone()[0]
 
 
+# [LOCAL-778] Concurrency guard for the volume-counted levels (L2 / Tester).
+_STARTED_STALE_MINUTES = 30
+
+
+def _count_active_generations(cur, user_id, scope):
+    """Count this device's generations that consume the L2/Tester volume cap when
+    deciding whether a NEW request may start — the concurrency-aware figure.
+
+    [LOCAL-595B] delivered tours (status='completed') always count. [LOCAL-777 /
+    LOCAL-778] now that L2 researches (D719), several fresh requests fired at once
+    would each read only 'completed' rows and all pass the 1/day cap before any of
+    them finished. So the GATE (not the display) also counts this user's IN-FLIGHT
+    requests — status='started' rows younger than %(stale)s minutes. An older
+    'started' row is treated as stale (a crashed/abandoned request that never
+    reached 'completed' or 'failed') and is IGNORED, exactly as LOCAL-595B left it.
+
+    This is deliberately scoped to the cap DECISION. The user-facing "tours used"
+    display still counts only delivered ('completed') tours via
+    _count_fresh_generations — an in-flight tour is not yet a used tour, it is a
+    reservation that prevents a second concurrent start.
+    """ % {"stale": _STARTED_STALE_MINUTES}
+    if scope == 'day':
+        where = "started_at::date = CURRENT_DATE"
+    else:  # month
+        where = "started_at >= date_trunc('month', CURRENT_DATE)"
+    cur.execute(f"""
+        SELECT COUNT(*) FROM tour_requests
+        WHERE secret_id = %s AND source = 'orchestrator'
+          AND {where}
+          AND (
+                status = 'completed'
+             OR (status = 'started'
+                 AND started_at >= NOW() - INTERVAL '{_STARTED_STALE_MINUTES} minutes')
+          )
+    """, (user_id,))
+    return cur.fetchone()[0]
+
+
 # ───────────────────────────────────────────────────────────────────────────
 # Structured refusal helpers (LOCAL-580 contract)
 # ───────────────────────────────────────────────────────────────────────────
@@ -497,11 +535,24 @@ def _check_generate(cur, user_id, level, plan, requested_stops):
     # tour counts (D613), so these count completed tour_requests rows. If there is
     # no reusable material, the by-reference path itself returns the actionable
     # by_reference_no_material refusal; this gate does not pre-judge material.
-    if plan['by_reference_only']:
+    #
+    # [LOCAL-778 / D719 amended] When the L2 plan has by_reference_only = FALSE,
+    # the mode is REUSE-FIRST instead: reuse whatever matching material exists and
+    # research only the missing stops. The caps below are identical either way
+    # (one delivered tour counts once, whatever the reuse/research mix); only the
+    # mode string the orchestrator routes on differs. Paid levels never reach this
+    # block (they have by_reference_only = FALSE but also non-NULL pack pools and
+    # are L3/L4/Tester, handled below), so reuse-first stays L2-only.
+    _l2_free = (level == 'l2')
+    if plan['by_reference_only'] or _l2_free:
+        _mode = 'by_reference' if plan['by_reference_only'] else 'reuse_first'
         daily_cap = plan['tours_per_day']
         monthly_cap = plan['tours_per_month']
+        # [LOCAL-778] Concurrency guard: count in-flight ('started', <30 min) plus
+        # delivered ('completed') requests so two parallel requests at a cap of 1
+        # cannot both pass. Stale started rows are ignored.
         if daily_cap is not None:
-            used_today = _count_fresh_generations(cur, user_id, 'day')
+            used_today = _count_active_generations(cur, user_id, 'day')
             if used_today >= daily_cap:
                 return _refuse(
                     'plan_limit_daily',
@@ -510,7 +561,7 @@ def _check_generate(cur, user_id, level, plan, requested_stops):
                     level=level, used=used_today, max=daily_cap,
                 )
         if monthly_cap is not None:
-            used_month = _count_fresh_generations(cur, user_id, 'month')
+            used_month = _count_active_generations(cur, user_id, 'month')
             if used_month >= monthly_cap:
                 return _refuse(
                     'plan_limit_monthly',
@@ -518,14 +569,16 @@ def _check_generate(cur, user_id, level, plan, requested_stops):
                     "Buy a $10 pack for 5 new tours.",
                     level=level, used=used_month, max=monthly_cap,
                 )
-        return _allow(level=level, clamped_stops=clamped, mode='by_reference')
+        return _allow(level=level, clamped_stops=clamped, mode=_mode)
 
     # Tester: daily + monthly fresh-generation caps.
     if plan['tours_per_day'] is not None or plan['tours_per_month'] is not None:
         daily_cap = plan['tours_per_day']
         monthly_cap = plan['tours_per_month']
+        # [LOCAL-778] Same concurrency guard as L2: count recent in-flight starts
+        # alongside completed tours so parallel starts cannot all pass the cap.
         if daily_cap is not None and daily_cap < 999:
-            used_today = _count_fresh_generations(cur, user_id, 'day')
+            used_today = _count_active_generations(cur, user_id, 'day')
             if used_today >= daily_cap:
                 return _refuse(
                     'plan_limit_daily',
@@ -534,7 +587,7 @@ def _check_generate(cur, user_id, level, plan, requested_stops):
                     level=level, used=used_today, max=daily_cap,
                 )
         if monthly_cap is not None:
-            used_month = _count_fresh_generations(cur, user_id, 'month')
+            used_month = _count_active_generations(cur, user_id, 'month')
             if used_month >= monthly_cap:
                 return _refuse(
                     'plan_limit_monthly',

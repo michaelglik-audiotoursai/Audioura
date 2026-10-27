@@ -225,6 +225,7 @@ def maybe_generate_with_pool(
     user_id: Optional[str] = None,
     job_id: Optional[str] = None,
     api_key: str = "",
+    reuse_first: bool = False,
 ) -> Optional[dict]:
     """Try to satisfy the request from the pool + only the new stops.
 
@@ -233,13 +234,27 @@ def maybe_generate_with_pool(
             generate_fn(location, tour_type, output_file, total_stops,
                         user_id=..., job_id=..., exclude_titles=[...]).
         db_url: Postgres URL for the pool store.
+        reuse_first: [LOCAL-778 / D719 amended] when True, this is a Free (L2)
+            REUSE-FIRST build. It broadens the reusable material beyond the stop
+            pool to ALSO include the stops of existing non-test tours of the same
+            venue (the LOCAL-597 finder's second source), so a venue that has a
+            delivered tour but no pooled stops still reuses it. The D713 provenance
+            rule is applied to BOTH sources (a priced/community source stop is
+            never reused for another user). The reuse/research split, route
+            coherence, shortfall handling and metering are otherwise identical to
+            the LOCAL-590 pool path. Returns None (so the caller researches the
+            whole tour fresh) only when NOTHING is reusable — the reuse-first
+            equivalent of the normal empty-pool fallthrough.
 
     Returns a dict:
         {text, reused_stops, new_stops, rewritten_transitions, pooled_before,
          served_from_pool_only, new_cost}
     or None when pooling does not apply and the caller should generate normally.
     """
-    if os.environ.get("DISABLE_STOP_POOL", "").strip() == "1":
+    if os.environ.get("DISABLE_STOP_POOL", "").strip() == "1" and not reuse_first:
+        # [LOCAL-778] A reuse-first build is the L2 delivery path itself, not the
+        # opt-in storied fast path, so DISABLE_STOP_POOL (set by legitimate direct
+        # runners and the nested first-tour generation) must not switch it off.
         return None
     if not db_url or not total_stops:
         return None
@@ -274,16 +289,41 @@ def maybe_generate_with_pool(
     except Exception as _prov_err:
         logger.warning(f"[LOCAL-766] provenance filter skipped ({_prov_err}); "
                        f"serving pool unfiltered")
+
+    # [LOCAL-778] Reuse-first: broaden the reusable material with the stops of
+    # existing non-test tours of the same venue (the LOCAL-597 finder's second
+    # source), D713-filtered the same way, appended after the pooled rows and
+    # deduped by normalised title. This is what lets a venue that has a delivered
+    # tour but an empty pool still substitute its already-researched stops.
+    if reuse_first:
+        try:
+            _extra = _reuse_first_existing_tour_rows(
+                location, tour_type, db_url, pooled_rows, user_id=user_id)
+            if _extra:
+                pooled_rows = list(pooled_rows) + _extra
+                print(f"  [LOCAL-778] reuse-first: +{len(_extra)} stop(s) mined from "
+                      f"existing non-test tours of this venue")
+        except Exception as _rf_err:
+            logger.warning(f"[LOCAL-778] existing-tour mining skipped ({_rf_err})")
+
     K = len(pooled_rows)
     N = int(total_stops)
     tour_category = _classify(location, tour_type)
     contained = _is_contained(tour_category)
     header_cat, display_cat = _header_categories(tour_category, tour_type)
     print(f"  [LOCAL-590] pool: venue={identity} type={tour_type} category={tour_category} "
-          f"contained={contained} requested={N} pooled={K}")
+          f"contained={contained} requested={N} pooled={K} reuse_first={reuse_first}")
 
     # Nothing to reuse and a full request.
     if K == 0:
+        # [LOCAL-778] A reuse-first build with nothing reusable is exactly the
+        # normal fresh path: return None so the caller researches the whole tour
+        # (the fresh generator handles the first-tour opening itself). Do NOT run
+        # the storied first-tour opening fold below (that is the LOCAL-590 pool
+        # fast path's behaviour, not the L2 delivery path).
+        if reuse_first:
+            logger.info("[LOCAL-778] reuse-first: nothing reusable; caller researches fresh")
+            return None
         # [LOCAL-585] First-ever tour of a CONTAINED venue (museum/facility): there
         # is nothing pooled to reuse, but the tour should still OPEN with the
         # museum's own story. Generate the N exhibition stops normally (so every
@@ -487,10 +527,16 @@ def maybe_generate_with_pool(
         # pooled — a genuine shortfall, NOT a reason to abandon the pool and re-run
         # the whole pipeline. Serve the K pooled stops and announce the honest
         # shortfall in Stop 1. (Outdoor/other venues keep the normal fallback.)
-        if not contained or K == 0:
+        #
+        # [LOCAL-778] A reuse-first (L2) build degrades the same way for ANY venue:
+        # when the fresh part fails but K >= 1 stops are reusable, deliver those K
+        # with an honest "we could only cover K of N" opening rather than refuse
+        # or re-run the whole pipeline. K == 0 still falls through (nothing to
+        # serve → the caller's fresh path handles the refusal).
+        if K == 0 or (not contained and not reuse_first):
             logger.info("[POOL] new-stop generation returned no text; normal fallback")
             return None
-        print(f"  [LOCAL-600] N>K: no new on-view stops beyond the {K} pooled — "
+        print(f"  [LOCAL-600/778] N>K: no new stops beyond the {K} reusable — "
               f"serving {K} with the honest shortfall (requested {N})")
         pooled_units = _regroup_pooled_units(
             [_pooled_unit_from_row(r) for r in pooled_rows])
@@ -512,14 +558,34 @@ def maybe_generate_with_pool(
         if _shortfall_sentence:
             print(f"  [LOCAL-600] D616 shortfall sentence folded into Stop 1 "
                   f"(pool-only shortfall): {_shortfall_sentence!r}")
-        result = asm.assemble_building_tour(
-            location, tour_type, tour_category, header_cat, display_cat,
-            venue_name=_venue_name(location),
-            new_stops=[], pooled_stops=pooled_units,
-            overall_orientation=None, sources_block=sources_block,
-            opening_section=opening_section or "",
-            venue_address=_resolve_venue_address(location),
-        )
+        if contained:
+            result = asm.assemble_building_tour(
+                location, tour_type, tour_category, header_cat, display_cat,
+                venue_name=_venue_name(location),
+                new_stops=[], pooled_stops=pooled_units,
+                overall_orientation=None, sources_block=sources_block,
+                opening_section=opening_section or "",
+                venue_address=_resolve_venue_address(location),
+            )
+        else:
+            # [LOCAL-778] Outdoor reuse-first degrade: serve the K reusable stops
+            # with the outdoor shortfall phrasing (no museum vocabulary).
+            _outdoor_shortfall = ""
+            try:
+                from about_museum_stop import build_shortfall_sentence
+                _outdoor_shortfall = build_shortfall_sentence(
+                    venue_name=location or "", exhibitions_on_view=0,
+                    delivered_stops=len(pooled_units), requested_stops=N,
+                    mode='outdoor')
+            except Exception:
+                _outdoor_shortfall = ""
+            result = asm.assemble_outdoor_tour(
+                location, tour_type, tour_category, header_cat, display_cat,
+                new_stops=[], pooled_stops=pooled_units,
+                transport_mode=_transport_mode(tour_type),
+                sources_block=sources_block,
+                shortfall_sentence=_outdoor_shortfall,
+            )
         _emit_result(output_file, result)
         pool.bump_hit_counts(location, tour_type,
                              [u["title"] for u in pooled_units], db_url, qid=qid)
@@ -669,6 +735,121 @@ def maybe_generate_with_pool(
         "research_cost_reused": _sum_research_cost(pooled_rows),
         "new_breakdown": _new_breakdown,
     }
+
+
+# ── [LOCAL-778] reuse-first: mine existing non-test tours of the venue ─────────
+
+def _reuse_first_existing_tour_rows(location, tour_type, db_url, already_rows,
+                                    user_id=None):
+    """Return pool-row-shaped reusable stops mined from existing NON-TEST tours of
+    the same venue, for a reuse-first (L2) build — the LOCAL-597 finder's second
+    source, but carried as the same row shape the pool path consumes.
+
+    Mirrors l2_by_reference._existing_tour_stops' venue-identity match and
+    parse_delivered_stops parsing, with two LOCAL-778 additions:
+
+      * D713: each mined stop is tagged with its SOURCE tour id, and a stop whose
+        source tour is community (community_id IS NOT NULL) or priced
+        (price_tier > 0) is DROPPED unless ``user_id`` is that tour's
+        creator_user_id. This closes the gap that _existing_tour_stops never
+        applied the provenance rule — a priced/community tour's stop must never be
+        reused for another user, whether it came from the pool or a delivered tour.
+      * Dedup against the stops already gathered (the pool rows), by normalised
+        title, so the pool's copy of a stop wins and a venue's stop is never
+        reused twice.
+
+    No network, no LLM — pure DB read + text parse. Returns [] on any error.
+    """
+    import psycopg2
+    try:
+        import stop_pool_store as pool
+    except Exception as e:
+        logger.info(f"[LOCAL-778] pool store unavailable for mining: {e}")
+        return []
+
+    loc_identity = pool.venue_identity(location or "")
+    seen = {pool._title_norm(r.get("title") or "") for r in (already_rows or [])}
+    requester = (user_id or "").strip() or None
+
+    try:
+        conn = psycopg2.connect(db_url)
+    except Exception as e:
+        logger.info(f"[LOCAL-778] mining DB connect failed: {e}")
+        return []
+    try:
+        with conn.cursor() as cur:
+            # Originals of real (non-test) tours only; translations excluded.
+            # Carry the D713 protection columns so provenance is decided per tour
+            # without a second round-trip. COALESCE guards an old schema.
+            cur.execute(
+                """
+                SELECT id, tour_name, request_string, tour_content,
+                       community_id, COALESCE(price_tier, 0), creator_user_id
+                FROM audio_tours
+                WHERE tour_content IS NOT NULL
+                  AND (is_test IS NOT TRUE)
+                  AND original_tour_id IS NULL
+                """
+            )
+            rows = cur.fetchall()
+    except Exception as e:
+        logger.info(f"[LOCAL-778] existing-tour read error: {e}")
+        return []
+    finally:
+        try:
+            conn.close()
+        except Exception:
+            pass
+
+    out = []
+    for (_id, tour_name, request_string, tour_content,
+         community_id, price_tier, creator_user_id) in rows:
+        rs_identity = pool.venue_identity(request_string or "")
+        tn_identity = pool.venue_identity(tour_name or "")
+        if loc_identity not in (rs_identity, tn_identity):
+            continue
+        # [D713] A community/priced source tour's stops are protected from reuse by
+        # anyone but the creator. Skip the whole tour's mined stops when protected.
+        _is_protected = (community_id is not None) or (int(price_tier or 0) > 0)
+        if _is_protected:
+            _owned = requester is not None and (str(creator_user_id or "") == requester)
+            if not _owned:
+                _reason = "community" if community_id is not None else "paid"
+                print(f"  [LOCAL-778] MINE SKIP protected source tour={_id} "
+                      f"reason={_reason}")
+                continue
+        for u in pool.parse_delivered_stops(tour_content or ""):
+            tnorm = pool._title_norm(u.get("title") or "")
+            if not tnorm or tnorm in seen:
+                continue
+            seen.add(tnorm)
+            # Shape the parsed unit like a get_pool_stops row so the pool path's
+            # _pooled_unit_from_row / _sum_research_cost / assembly all accept it.
+            out.append({
+                "title": u.get("title", ""),
+                "artist": u.get("artist", ""),
+                "year": u.get("year", ""),
+                "narration": u.get("narration", ""),
+                "raw_block": u.get("raw_block", ""),
+                "address": u.get("address", ""),
+                "coordinates": u.get("coordinates", ""),
+                "type_specialty": u.get("type_specialty", ""),
+                "specific_examples": u.get("specific_examples", ""),
+                "operational_details": u.get("operational_details", ""),
+                "sources": u.get("sources", []) or [],
+                "story_elements": u.get("story_elements"),
+                "generated_at": None,
+                "hit_count": 0,
+                # A mined stop's one-time research cost is not individually stored;
+                # it was already paid on the source tour. Report 0 saved here so the
+                # ledger never double-counts a cost the pool rows already carry.
+                "research_cost_usd": 0.0,
+                "stop_record": None,
+                "_mined_source_tour_id": _id,
+            })
+    logger.info(f"[LOCAL-778] mined {len(out)} reusable stop(s) from existing "
+                f"non-test tours for {loc_identity}")
+    return out
 
 
 # ── small helpers ────────────────────────────────────────────────────────────

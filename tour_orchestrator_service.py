@@ -1549,9 +1549,10 @@ def orchestrate_tour_async(job_id, location, tour_type, total_stops, user_id=Non
         # as forced_stops. Absent → omitted → normal generation, unchanged.
         if stops:
             generate_data["stops"] = stops
-        # [LOCAL-597] Forward the generation mode. 'by_reference' makes the
-        # generator reuse already-researched stops only (zero grounding, zero
-        # SERP). Absent/None → normal generation.
+        # [LOCAL-597 / LOCAL-778] Forward the generation mode. 'by_reference' makes
+        # the generator reuse already-researched stops only (zero grounding, zero
+        # SERP). 'reuse_first' (D719 amended) reuses whatever matches and researches
+        # only the missing stops. Absent/None → normal fresh generation.
         if mode:
             generate_data["mode"] = mode
         
@@ -2886,9 +2887,13 @@ def generate_complete_tour():
         return jsonify(quota), 429
     # Clamp stops to the level maximum (max_stops column).
     total_stops = quota['clamped_stops']
-    # [LOCAL-597] Generation mode from the levels check. L2 free tours come back
-    # allowed with mode='by_reference' — the orchestrator forwards it so the
-    # generator reuses already-researched stops only (zero grounding, zero SERP).
+    # [LOCAL-597 / LOCAL-778] Generation mode from the levels check. L2 free tours
+    # come back allowed with a mode the orchestrator forwards unchanged:
+    #   'by_reference' (plan.by_reference_only=TRUE)  — reuse already-researched
+    #       stops ONLY (zero grounding, zero SERP), refuse if short; or
+    #   'reuse_first' (plan.by_reference_only=FALSE, D719 amended) — reuse whatever
+    #       matching material exists and research only the missing stops.
+    # Paid levels carry no mode (None → normal fresh generation).
     generation_mode = quota.get('mode')
     print(f"[QUOTA] Allowed for {user_id}: level={quota.get('level')}, "
           f"stops_clamped={total_stops}, mode={generation_mode}")
@@ -2970,7 +2975,7 @@ def generate_complete_tour():
         "persona": persona,  # [S81] Pass persona for downstream generation
         "is_test": is_test_override,  # [LOCAL-103] Track test flag
         "stops": stops,  # [LOCAL-525] User-chosen stops (None → normal generation)
-        "mode": generation_mode,  # [LOCAL-597] 'by_reference' for L2 free tours, else None
+        "mode": generation_mode,  # [LOCAL-597/778] 'by_reference' or 'reuse_first' for L2 free tours, else None
         "community_id": _community_id,  # [LOCAL-701] generate FOR a community (None = ordinary)
         "community_visibility": _community_visibility,  # [LOCAL-701] 'members' | 'public'
         "created_at": datetime.now().isoformat()

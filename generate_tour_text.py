@@ -9535,6 +9535,87 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
     except Exception:
         _set_current_affairs_context(wanted=False, request='', tour_category='')
 
+    # [LOCAL-778 / D719 amended] L2 reuse-first path. A Free request whose plan
+    # has by_reference_only=FALSE reuses whatever matching material exists and
+    # researches ONLY the missing stops. It routes through the SAME hybrid
+    # assembly the stop pool uses (maybe_generate_with_pool), with reuse_first=True
+    # so the reusable material is broadened to the LOCAL-597 finder's second source
+    # (stops of existing non-test tours of the venue) and D713 is applied to both.
+    #
+    #   * N fully covered  → zero grounding, nothing researched (served_from_pool_only).
+    #   * K of N covered   → keep the K, research only the N-K (exclude_titles),
+    #                        route/order kept coherent by the assembler.
+    #   * nothing reusable → maybe_generate_with_pool returns None and we FALL
+    #                        THROUGH to the normal fresh pipeline — reuse-first
+    #                        with no material is identical to the fresh path (iv).
+    #
+    # One delivered tour counts once against the L2 caps whatever the mix; the cost
+    # record carries reused_stops / researched_stops for the ledger. The fresh part
+    # runs the full gate chain on the NEW stops (it is the normal generator); if it
+    # fails, the assembler's contained-venue degrade serves the K reused stops with
+    # an honest shortfall opening (K>=1), else we fall through to the fresh path's
+    # own structured refusal.
+    if (mode or "").strip().lower() == "reuse_first":
+        _pool_db = os.environ.get("DATABASE_URL")
+        if _pool_db and total_stops:
+            try:
+                from stop_pool_orchestrator import maybe_generate_with_pool as _rf_pool
+                _rf_out = _rf_pool(
+                    location, tour_type, total_stops, _pool_db,
+                    generate_fn=generate_tour_text,
+                    output_file=output_file, user_id=user_id, job_id=job_id,
+                    api_key=os.environ.get("OPENAI_API_KEY", ""),
+                    reuse_first=True,
+                )
+            except Exception as _rf_err:
+                # The fresh sub-generation (or assembly) raised. Reuse-first never
+                # crashes the request on this: log it with its traceback for
+                # diagnosis and fall through to the normal fresh pipeline below.
+                import traceback as _rf_tb
+                print(f"  [LOCAL-778] reuse-first path error (falling back to fresh): {_rf_err}")
+                print("  [LOCAL-778] " + _rf_tb.format_exc().replace("\n", "\n  [LOCAL-778] "))
+                _rf_out = None
+            if _rf_out is not None:
+                _rf_new_cost = _rf_out.get("new_cost", 0.0) or 0.0
+                _rf_reused = _rf_out.get("reused_stops", 0)
+                _rf_new = _rf_out.get("new_stops", 0)
+                _rf_breakdown = _rf_out.get("new_breakdown") or {}
+                if not _rf_breakdown:
+                    _rf_breakdown = _provider_breakdown_skeleton()
+                    if _rf_new_cost and isinstance(_rf_breakdown.get("openai"), dict):
+                        _rf_breakdown["openai"]["usd"] = _rf_new_cost
+                _J._LAST_GENERATION_COST = {
+                    "total_cost": _rf_new_cost,
+                    "total_tokens": 0,
+                    "cache_hit": False,
+                    "pool_reuse": True,
+                    "reuse_first": True,
+                    "tour_total_cost": _rf_new_cost,
+                    "research_cost_reused": _rf_out.get("research_cost_reused", 0.0) or 0.0,
+                    # [LOCAL-778] meter the reuse/research split on the tour's record
+                    "reused_stops": _rf_reused,
+                    "researched_stops": _rf_new,
+                    "new_stops": _rf_new,
+                    "rewritten_transitions": _rf_out.get("rewritten_transitions", 0),
+                    "about_stops": _rf_out.get("about_stops", 0),
+                    "breakdown": _rf_breakdown,
+                }
+                print(f"  [LOCAL-778] REUSE-FIRST DELIVERY: reused={_rf_reused} "
+                      f"researched={_rf_new} "
+                      f"rewritten_transitions={_rf_out.get('rewritten_transitions')} "
+                      f"research_reused=${_rf_out.get('research_cost_reused', 0.0):.4f} "
+                      f"new_cost=${_rf_new_cost:.4f}")
+                _J._LAST_DELIVERY_PATH = 'reuse_first'
+                return _apply_delivery_hours_guard(
+                    (_rf_out["text"], output_file, (None, None)))
+            print("  [LOCAL-778] reuse-first: no reusable material; researching the "
+                  "whole tour fresh (identical to the fresh path)")
+        else:
+            print("  [LOCAL-778] reuse-first requested but no DATABASE_URL/total_stops "
+                  "— researching fresh")
+        # Fall through to the normal fresh pipeline below. Reuse-first never
+        # refuses on its own: with nothing to reuse it IS the fresh path.
+
     # [LOCAL-597] L2 by-reference path. Terminal: it either delivers a tour built
     # entirely from reused material (zero grounding / zero SERP, enforced by the
     # guard inside build_by_reference_tour) or returns a structured refusal. It

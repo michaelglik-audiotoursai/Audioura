@@ -280,20 +280,36 @@ class TestRenewalGate(LevelsTestBase):
 
 class TestDefect2CompletedOnlyCounting(LevelsTestBase):
     """[LOCAL-595B defect 2] L2/Tester daily & monthly caps count only DELIVERED
-    (status='completed') tours. A 'started' (in-flight) or 'failed' row must not
-    spend the allowance."""
+    (status='completed') tours — a 'failed' row never spends the allowance, and a
+    STALE (>30 min) 'started' row is still ignored.
+
+    [LOCAL-778 / D719 amended] The GATE now ALSO counts a RECENT (<30 min)
+    in-flight 'started' row, so that now L2 researches (D719) two parallel
+    requests at a cap of 1 cannot both pass. The display still counts only
+    completed tours; this amendment is scoped to the cap decision."""
 
     def setUp(self):
         super().setUp()
         self._set_level('l2')  # tours_per_day = 1
 
-    def test_started_row_does_not_count(self):
-        # One in-flight ('started') request today — the daily cap of 1 is NOT hit.
+    def test_recent_started_row_counts_in_gate(self):
+        # [LOCAL-778] One in-flight ('started', just now) request consumes the
+        # daily cap of 1 in the GATE — the concurrency guard against parallel
+        # starts. (Pre-778 this was allowed; D719 made researching Free tours a
+        # reason to guard.)
         self._add_tour_requests(1, status='started')
         r = sl.check_operation(self.uid, 'generate', requested_stops=3)
-        # [LOCAL-597] L2 generate is now ALLOWED (by_reference); the point is it is
-        # NOT plan_limit_daily — the allowance was not consumed by an in-flight row.
+        self.assertStructuredRefusal(r, 'plan_limit_daily')
+
+    def test_stale_started_row_does_not_count(self):
+        # [LOCAL-778] A 'started' row older than 30 minutes is stale (an abandoned
+        # request that never reached completed/failed) and is IGNORED — the cap is
+        # NOT hit, exactly as LOCAL-595B left an in-flight row.
+        self._add_tour_requests(1, status='started',
+                                when_sql="NOW() - INTERVAL '45 minutes'")
+        r = sl.check_operation(self.uid, 'generate', requested_stops=3)
         self.assertTrue(r['allowed'])
+        # L2 in this file's DB (migration 012) is by_reference_only=TRUE → by_reference.
         self.assertEqual('by_reference', r.get('mode'))
 
     def test_failed_row_does_not_count(self):
@@ -308,15 +324,18 @@ class TestDefect2CompletedOnlyCounting(LevelsTestBase):
         r = sl.check_operation(self.uid, 'generate', requested_stops=3)
         self.assertStructuredRefusal(r, 'plan_limit_daily')
 
-    def test_tester_mixed_statuses_only_completed_count(self):
-        # Tester: tours_per_day = 10. 9 completed + several started/failed today.
+    def test_tester_mixed_statuses_count_completed_and_recent_started(self):
+        # Tester: tours_per_day = 10. [LOCAL-778] completed + RECENT started count
+        # toward the gate; failed and STALE started do not.
         self._set_level('tester')
-        self._add_tour_requests(9, status='completed')
-        self._add_tour_requests(5, status='started')  # in-flight, must not count
-        self._add_tour_requests(3, status='failed')   # failed, must not count
-        # 9 completed -> 10th allowed.
+        self._add_tour_requests(8, status='completed')
+        self._add_tour_requests(1, status='started')   # recent in-flight -> counts
+        self._add_tour_requests(1, status='started',
+                                when_sql="NOW() - INTERVAL '45 minutes'")  # stale -> ignored
+        self._add_tour_requests(3, status='failed')    # failed -> ignored
+        # 8 completed + 1 recent started = 9 active -> 10th allowed.
         self.assertTrue(sl.check_operation(self.uid, 'generate', requested_stops=5)['allowed'])
-        # Add the 10th completed -> 11th refused daily.
+        # Add the 10th completed -> now 10 active -> 11th refused daily.
         self._add_tour_requests(1, status='completed')
         self.assertStructuredRefusal(
             sl.check_operation(self.uid, 'generate', requested_stops=5), 'plan_limit_daily')
