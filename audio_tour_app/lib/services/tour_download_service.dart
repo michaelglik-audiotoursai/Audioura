@@ -28,6 +28,7 @@ import 'community_downloads.dart';
 import 'downloaded_tour_meta.dart';
 import 'remote_audio_fetcher.dart';
 import 'tour_pricing_service.dart';
+import 'saved_tours_store.dart';
 
 /// The outcome of a community-page download attempt.
 enum TourDownloadStatus {
@@ -429,7 +430,7 @@ class TourDownloadService {
       } catch (_) {}
 
       saved[recordIndex] = json.encode(record);
-      await prefs.setStringList('saved_tours', saved);
+      await SavedToursStore.save(prefs, saved);
       // [LOCAL-752 C] A re-download also un-deletes the tour (same reason as the
       // initial save): drop its id from `deleted_tour_ids` so the refresh keeps
       // tracking it.
@@ -656,7 +657,7 @@ class TourDownloadService {
       await _stampPaidSnapshot(tourData, tourId, sourceItem);
 
       savedTours.add(json.encode(tourData));
-      await prefs.setStringList('saved_tours', savedTours);
+      await SavedToursStore.save(prefs, savedTours);
       // [LOCAL-752 C] An explicit download un-deletes the tour: remove its id
       // from `deleted_tour_ids` so a later sync refresh (RefreshPlanner) no longer
       // skips it. Covers both the download id and the resolved edit id.

@@ -8,6 +8,7 @@ import '../config/endpoints.dart';
 import '../screens/debug_log_viewer_screen.dart';
 import 'translation_service.dart';
 import 'failure_reporter.dart';
+import 'saved_tours_store.dart';
 
 /// Shared translation-download logic used by both HomeScreen (at download time)
 /// and MyToursScreen (translate existing tours on Listen page).
@@ -316,7 +317,7 @@ class TourTranslationHelper {
     }
 
     savedTours.add(json.encode(tourData));
-    await prefs.setStringList('saved_tours', savedTours);
+    await SavedToursStore.save(prefs, savedTours);
   }
 
   /// Count stops from an already-decoded archive by checking tour.json or counting MP3s.

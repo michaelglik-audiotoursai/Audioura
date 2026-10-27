@@ -18,6 +18,7 @@ import '../screens/debug_log_viewer_screen.dart';
 import '../services/subscription_service.dart';
 import '../services/subscription_encryption_service.dart';
 import '../services/device_service.dart';
+import '../services/saved_tours_store.dart';
 import '../services/translation_service.dart';
 import '../services/tour_translation_helper.dart';
 import '../services/error_handler_service.dart';
@@ -3273,7 +3274,7 @@ class _HomeScreenState extends State<HomeScreen> {
       'language': lang,
     };
     savedTours.add(json.encode(tourData));
-    await prefs.setStringList('saved_tours', savedTours);
+    await SavedToursStore.save(prefs, savedTours);
     await DebugLogHelper.addDebugLog('HOME: Saved translated tour $tourId as: $tourName');
   }
 

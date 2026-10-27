@@ -31,6 +31,7 @@ import '../services/communities_service.dart';
 import '../services/community_tour_service.dart';
 import '../services/tour_download_service.dart';
 import '../services/saved_tours_refresh.dart';
+import '../services/saved_tours_store.dart';
 import '../services/tour_pricing_service.dart';
 import '../services/entitlements_service.dart';
 import '../services/device_service.dart';
@@ -179,7 +180,8 @@ class MyToursScreen extends StatefulWidget {
   State<MyToursScreen> createState() => _MyToursScreenState();
 }
 
-class _MyToursScreenState extends State<MyToursScreen> {
+class _MyToursScreenState extends State<MyToursScreen>
+    with WidgetsBindingObserver {
   List<Map<String, dynamic>> _tours = [];
   List<Map<String, dynamic>> _news = [];
   List<Map<String, dynamic>> _filteredNews = [];
@@ -268,6 +270,19 @@ class _MyToursScreenState extends State<MyToursScreen> {
     // [LOCAL-750 C] Reload when a community sync downloads/refreshes a tour, so
     // the new/updated tour appears on the Listen page without leaving it.
     SavedToursRefresh.instance.tick.addListener(_onSavedToursChanged);
+    // [LOCAL-787] A write from a background isolate (background download/monitor)
+    // cannot bump SavedToursRefresh across isolates. Reload on resume so a tour
+    // saved while the app was backgrounded shows at once, not ~30 s later.
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  /// [LOCAL-787] On resume, re-read the current list in place. `_loadTours`
+  /// calls `prefs.reload()` first, so a background-isolate write is picked up.
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _onSavedToursChanged();
+    }
   }
 
   /// [LOCAL-750 C] A community sync changed saved_tours — reload the current
@@ -286,6 +301,7 @@ class _MyToursScreenState extends State<MyToursScreen> {
     // [LOCAL-716B] Cancel the highlight flash timer and release the scroll
     // controller so the newest-tour highlight path leaves nothing running.
     SavedToursRefresh.instance.tick.removeListener(_onSavedToursChanged);
+    WidgetsBinding.instance.removeObserver(this);
     _highlightTimer?.cancel();
     _scrollController.dispose();
     super.dispose();
@@ -1279,6 +1295,11 @@ class _MyToursScreenState extends State<MyToursScreen> {
 
   Future<void> _loadTours() async {
     final prefs = await SharedPreferences.getInstance();
+    // [LOCAL-787] SharedPreferences caches per isolate. A background isolate
+    // (background_service / background_tour_monitor) can write saved_tours
+    // without the main isolate's cache knowing, so reload before reading or the
+    // Listen page shows a stale list (Michael's ~30 s empty page).
+    await prefs.reload();
     final tours = prefs.getStringList('saved_tours') ?? [];
 
     await DebugLogHelper.addDebugLog('LISTEN: Loading ${tours.length} tours from storage');
@@ -1300,7 +1321,7 @@ class _MyToursScreenState extends State<MyToursScreen> {
     await DebugLogHelper.addDebugLog('LISTEN: Loaded ${parsed.length} valid tours (${tours.length - parsed.length} skipped)');
 
     if (parsed.length != tours.length) {
-      await prefs.setStringList('saved_tours', parsed.map((t) => json.encode(t)).toList());
+      await SavedToursStore.save(prefs, parsed.map((t) => json.encode(t)).toList(), bumpRefresh: false);
       await DebugLogHelper.addDebugLog('LISTEN: Pruned ${tours.length - parsed.length} corrupt entries from saved_tours');
     }
 
@@ -1346,7 +1367,7 @@ class _MyToursScreenState extends State<MyToursScreen> {
       }
     }
     if (anyHealed) {
-      await prefs.setStringList('saved_tours', healedRaw);
+      await SavedToursStore.save(prefs, healedRaw, bumpRefresh: false);
       await DebugLogHelper.addDebugLog('LISTEN: Healed stale container paths in saved_tours');
     }
   }
@@ -1480,7 +1501,7 @@ class _MyToursScreenState extends State<MyToursScreen> {
       final reversedIndex = tours.length - 1 - index;
       if (reversedIndex >= 0 && reversedIndex < tours.length) {
         tours.removeAt(reversedIndex);
-        await prefs.setStringList('saved_tours', tours);
+        await SavedToursStore.save(prefs, tours, bumpRefresh: false);
         
         // Update available tours list for voice navigation
         final tourInfoList = tours.map((tourJson) {
@@ -2028,7 +2049,7 @@ class _MyToursScreenState extends State<MyToursScreen> {
       } catch (_) {}
       out.add(s);
     }
-    if (changed) await prefs.setStringList('saved_tours', out);
+    if (changed) await SavedToursStore.save(prefs, out, bumpRefresh: false);
   }
   
   Future<void> _deleteAllTours() async {

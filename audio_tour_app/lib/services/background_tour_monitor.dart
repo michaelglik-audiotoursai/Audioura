@@ -9,6 +9,7 @@ import 'tour_status_service.dart';
 import 'notification_service.dart';
 import '../config/endpoints.dart';
 import '../screens/debug_log_viewer_screen.dart';
+import 'saved_tours_store.dart';
 
 /// Service to monitor background tours and update their status
 class BackgroundTourMonitor {
@@ -207,7 +208,7 @@ class BackgroundTourMonitor {
             'lat': lat,
             'lng': lng,
           }));
-          await prefs.setStringList('saved_tours', tours);
+          await SavedToursStore.save(prefs, tours, bumpRefresh: false);
           
           await DebugLogHelper.addDebugLog('Tour auto-downloaded and added to My Tours: $location');
         } else {
