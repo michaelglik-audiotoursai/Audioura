@@ -44,6 +44,13 @@ still needs his typed OK. His words, verbatim:
 - **Scaling:** only after LOCAL-775 is live. Check that 5 copies × the per-copy DB pool fits
   `max_connections` 25 before raising; if not, raise less and report. Never resize the DB.
 - Still forbidden: any tour deletion, DB tier change, Stable, Beta, website, secrets changes beyond `--update-*`.
+- **Two more answers from Michael, the same evening:** (1) pushing **notes-only** commits
+  (this file, nothing else) to origin/storied is allowed; code pushes still need his OK.
+  (2) Check ClickUp for wave tasks **every 3 h** via CronCreate. The cron lives only in this
+  session and expires after 7 days, so re-arm it.
+- LEAD recorded the OK on the Mac as **D728**. LEAD's first wave comes after LOCAL-788B and
+  LOCAL-792 pass. 788 alone is NOT deployable: at acc75176, West Roxbury shipped two fabricated
+  restaurants.
 
 # ✅ CURRENT STATE — 2026-10-26 00:45 EDT. READ THIS FIRST; IT SUPERSEDES EVERY BLOCK BELOW.
 
