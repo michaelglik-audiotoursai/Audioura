@@ -2648,13 +2648,24 @@ class _HomeScreenState extends State<HomeScreen> {
     try {
       final downloadUri = await _downloadTourUri(tourId);
       final url = downloadUri.toString();
-      
-      await DebugLogHelper.addDebugLog('HOME: Downloading from: $url');
-      
-      final response = await http.get(
-        downloadUri,
-        headers: await Endpoints.apiHeaders(Service.mapDelivery),
-      ).timeout(Duration(seconds: 120));
+
+      // [LOCAL-781] If a previous attempt downloaded the ZIP but the save failed
+      // at /resolve, the bytes were kept — reuse them instead of re-downloading
+      // the whole tour from map-delivery (which may re-spend the purchase).
+      final List<int>? keptZip = TourDownloadService.peekCachedZip(tourId);
+      final http.Response response;
+      if (keptZip != null) {
+        await DebugLogHelper.addDebugLog(
+            'HOME: reusing kept ZIP for $tourId (${keptZip.length} bytes) — '
+            'no re-download');
+        response = http.Response.bytes(keptZip, 200);
+      } else {
+        await DebugLogHelper.addDebugLog('HOME: Downloading from: $url');
+        response = await http.get(
+          downloadUri,
+          headers: await Endpoints.apiHeaders(Service.mapDelivery),
+        ).timeout(Duration(seconds: 120));
+      }
 
       await DebugLogHelper.addDebugLog('HOME: Download response: ${response.statusCode}');
       
@@ -2669,10 +2680,15 @@ class _HomeScreenState extends State<HomeScreen> {
         // nothing — there is no confirm call any more.
         try {
           await _saveTourToMyTours(tourId, response.bodyBytes);
+          // [LOCAL-781] Saved — drop any kept ZIP so a later re-download is fresh.
+          TourDownloadService.clearCachedZip(tourId);
         } catch (saveError) {
           await DebugLogHelper.addDebugLog(
               'HOME: save/validate failed after bytes received — reporting '
               'download-failed for $tourId: $saveError');
+          // [LOCAL-781] Keep the downloaded ZIP so the retry reuses it rather
+          // than downloading the whole tour again.
+          TourDownloadService.cacheZipForRetry(tourId, response.bodyBytes);
           await _reportDownloadFailed(
               tourId,
               response.headers['x-download-consumes-unlock'],
@@ -2749,12 +2765,23 @@ class _HomeScreenState extends State<HomeScreen> {
           errorMessage = 'Download interrupted - please try again';
         } else if (e.toString().contains('timeout')) {
           errorMessage = 'Download timed out - please check connection';
+        } else {
+          // [LOCAL-781] A save/resolve failure throws a rich, tour-NAMING
+          // message (TourDownloadService.resolveFailureMessage). The old code
+          // collapsed every non-network error to the generic "Error downloading
+          // tour", so the cloud /resolve 404 never reached the screen (Michael,
+          // TestFlight 79: "silently failed"). Surface the real reason now,
+          // stripping Dart's "Exception: " prefix.
+          final raw = e.toString();
+          errorMessage = raw.startsWith('Exception: ')
+              ? raw.substring('Exception: '.length)
+              : raw;
         }
-        
+
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(errorMessage),
-            duration: Duration(seconds: 5),
+            duration: Duration(seconds: 8),
           ),
         );
       }

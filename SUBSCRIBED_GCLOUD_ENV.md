@@ -331,8 +331,30 @@ because a Kokoro render takes ~150 s (a 60–120 s client timeout would abort it
 
 ## 9. tour-id-resolution-subscribed (private) — image for `tour_id_resolution_service.py`, port 5025
 
-Reads: `DB_HOST DB_NAME DB_PASSWORD DB_PORT DB_USER`. Only the DB + `DB_PASSWORD`
-secret. Resolves `/tour/<id>/resolve` (deep-link id → tour).
+Resolves `/tour/<id>/resolve` (download id → edit id + tour metadata). The app's
+`saveTourToMyTours` calls it after every download of an EXISTING tour.
+
+Reads: `DB_HOST DB_NAME DB_PASSWORD DB_PORT DB_USER`, plus — **NEW (LOCAL-781)** —
+the SAME blob-storage env map-delivery (§4) reads, because resolution now checks
+the ZIP's existence in **R2** instead of on local disk:
+
+| Env var | GCloud value / secret | Notes |
+|---|---|---|
+| `DB_PASSWORD` | secret `db-password` | shared Cloud SQL (as all DB services). |
+| `BLOB_STORAGE_TYPE` | **`r2`** | **Required on Cloud Run (LOCAL-781).** Tells resolution the tour ZIPs live in Cloudflare R2, not on local disk — Cloud Run mounts an EMPTY `/app/tours`. When set, existence is `blobstorage.exists(tour_blob_uri)` (the key map-delivery stored, falling back to `tours/<id>.zip`), and stops/editability come from the DB row (`stops_count`), so NO ZIP download is needed to answer `/resolve`. **Unset = the Mac/local behaviour** (the ZIP must be on local disk) — do NOT set it on the Mac stack. |
+| `R2_BUCKET` / `R2_ENDPOINT` / `R2_ACCESS_KEY_ID` / `R2_SECRET_ACCESS_KEY` | bucket name + secrets `r2-access-key-id`, `r2-secret-access-key` | **Required when `BLOB_STORAGE_TYPE=r2`.** The SAME bucket/endpoint/keys as map-delivery (§4) and tour-editing (§8) — resolution only ever calls `exists()` (a cheap HEAD), never `download()`. Grant this service's runtime SA `roles/secretmanager.secretAccessor` on the two R2 secrets. |
+
+> **Why this changed (LOCAL-781, Michael TestFlight 79, 2026-10-27):** before this
+> fix the service only knew the local-disk path (`TOURS_DIR=/app/tours`), which is
+> empty on Cloud Run, so EVERY download of an existing Subscribed tour 404'd at
+> `/resolve` (trinity 445, BPL 446). Deploying the new image WITHOUT setting
+> `BLOB_STORAGE_TYPE=r2` + `R2_*` leaves the bug in place — the service would still
+> look on disk. The redeploy is otherwise mechanical: add the four R2 vars/secrets
+> exactly as map-delivery-subscribed has them.
+
+> The LOCAL-50 rule is unchanged: the edit id is still derived deterministically
+> from the stored `zip_filename` column, never guessed by name. Blob mode only
+> changes WHERE existence is checked (R2 vs disk); it never scans for a name.
 
 ---
 
@@ -375,7 +397,7 @@ Per `GCLOUD_STORIED_START_HERE.md` (read-only reference; not edited here):
 | Attestation nonce | `attestation-nonce-secret` | gateway |
 | Internal service | `internal-service-secret` | news-orchestrator, newsletter |
 | Google Play SA | `google-play-sa-json` (file mount) | user-api (Android IAP) |
-| Cloudflare R2 | `r2-access-key-id`, `r2-secret-access-key` | map-delivery, tour-editing, custom-audio |
+| Cloudflare R2 | `r2-access-key-id`, `r2-secret-access-key` | map-delivery, tour-editing, custom-audio, tour-id-resolution (LOCAL-781) |
 
 ### Tour storage on GCloud
 
