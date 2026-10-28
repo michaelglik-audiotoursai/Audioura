@@ -141,7 +141,21 @@ def _get_db_connection():
         db_url = db_url.replace('@localhost:', '@postgres-2:')
     if 'admin:admin@' in db_url and 'postgres-2' in db_url:
         db_url = db_url.replace('admin:admin@', 'admin:password123@')
-    conn = psycopg2.connect(db_url, connect_timeout=5)
+    conn = psycopg2.connect(
+        db_url,
+        connect_timeout=5,
+        # [LOCAL-797] Same hazard as venue_resolver: a forgotten read transaction
+        # on this connection must never hold a lock for minutes. 60s server-side
+        # cap + a 3s lock_timeout so any stray DDL fails fast.
+        options='-c idle_in_transaction_session_timeout=60000 -c lock_timeout=3000',
+    )
+    # [LOCAL-797] work_stories_get is a pure read and work_stories_put is an
+    # INSERT ... ON CONFLICT; under autocommit a SELECT never leaves an open
+    # transaction holding a lock, and the explicit commit() in put is a no-op.
+    try:
+        conn.autocommit = True
+    except Exception:
+        pass
     return conn
 
 
@@ -1218,6 +1232,7 @@ def _ensure_work_stories_table(conn):
     if _WORK_STORIES_TABLE_ENSURED:
         return
     try:
+        # CREATE TABLE IF NOT EXISTS takes no lock on an existing relation.
         with conn.cursor() as cur:
             cur.execute("""
                 CREATE TABLE IF NOT EXISTS work_stories (
@@ -1237,13 +1252,48 @@ def _ensure_work_stories_table(conn):
                     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
             """)
-            cur.execute("CREATE INDEX IF NOT EXISTS idx_work_stories_qid ON work_stories(work_qid) WHERE work_qid IS NOT NULL")
-            cur.execute("CREATE INDEX IF NOT EXISTS idx_work_stories_expires ON work_stories(elements_expires_at)")
             conn.commit()
+
+        # [LOCAL-797] CREATE INDEX on an existing table can wait on an
+        # AccessExclusive-blocking lock and then block readers queued behind it.
+        # Route both through safe_ddl: own short txn, SET LOCAL lock_timeout,
+        # skip when the index already exists, never block a tour.
+        try:
+            from db_safe_ddl import safe_ddl
+        except Exception:
+            safe_ddl = None
+
+        if safe_ddl is not None:
+            safe_ddl(
+                conn,
+                "CREATE INDEX IF NOT EXISTS idx_work_stories_qid "
+                "ON work_stories(work_qid) WHERE work_qid IS NOT NULL",
+                needed_check_sql=(
+                    "SELECT 1 WHERE NOT EXISTS (SELECT 1 FROM pg_indexes "
+                    "WHERE tablename = 'work_stories' "
+                    "AND indexname = 'idx_work_stories_qid')"
+                ),
+                label="LOCAL-797",
+            )
+            safe_ddl(
+                conn,
+                "CREATE INDEX IF NOT EXISTS idx_work_stories_expires "
+                "ON work_stories(elements_expires_at)",
+                needed_check_sql=(
+                    "SELECT 1 WHERE NOT EXISTS (SELECT 1 FROM pg_indexes "
+                    "WHERE tablename = 'work_stories' "
+                    "AND indexname = 'idx_work_stories_expires')"
+                ),
+                label="LOCAL-797",
+            )
+
         _WORK_STORIES_TABLE_ENSURED = True
     except Exception as e:
         print(f"  [work_stories] Table creation failed: {e}")
-        conn.rollback()
+        try:
+            conn.rollback()
+        except Exception:
+            pass
 
 
 def work_stories_get(work_key: str) -> Optional[Dict]:

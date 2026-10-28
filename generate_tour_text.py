@@ -3913,7 +3913,18 @@ def _build_closing_offer(poi_list, tour_category, transport_mode, location,
             _co_user = os.environ.get('DB_USER', 'admin')
             _co_password = os.environ.get('DB_PASSWORD', 'password123')
             _co_db_url = f"postgresql://{_co_user}:{_co_password}@{_co_host}:{_co_port}/{_co_dbname}"
-        _co_conn = psycopg2.connect(_co_db_url, connect_timeout=5)
+        # [LOCAL-797] idle-in-transaction + lock_timeout guard; autocommit so this
+        # read connection never leaves an open transaction holding a lock.
+        try:
+            from db_safe_ddl import CONNECT_OPTIONS as _co_opts, harden_read_connection as _co_harden
+            _co_conn = psycopg2.connect(_co_db_url, connect_timeout=5, options=_co_opts)
+            _co_harden(_co_conn)
+        except ImportError:
+            _co_conn = psycopg2.connect(_co_db_url, connect_timeout=5)
+            try:
+                _co_conn.autocommit = True
+            except Exception:
+                pass
     except Exception as _co_err:
         print(f"  [LOCAL-273] DB connection failed: {_co_err} — closing offer skipped")
         return ""
@@ -15297,7 +15308,17 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
                             'DATABASE_URL',
                             'postgresql://admin:password123@localhost:5433/audiotours'
                         )
-                        _cs_conn = psycopg2.connect(_cs_db_url, connect_timeout=5)
+                        # [LOCAL-797] idle/lock guard + autocommit (pure read).
+                        try:
+                            from db_safe_ddl import CONNECT_OPTIONS as _cs_opts, harden_read_connection as _cs_harden
+                            _cs_conn = psycopg2.connect(_cs_db_url, connect_timeout=5, options=_cs_opts)
+                            _cs_harden(_cs_conn)
+                        except ImportError:
+                            _cs_conn = psycopg2.connect(_cs_db_url, connect_timeout=5)
+                            try:
+                                _cs_conn.autocommit = True
+                            except Exception:
+                                pass
                     except Exception as _cs_err2:
                         print(f"  [LOCAL-230] ERROR: Coverage selection DB connect failed (direct): {type(_cs_err2).__name__}: {_cs_err2}")
                         _cs_db_failure = True
@@ -15614,7 +15635,17 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
                         import psycopg2
                         _seg_db_url = os.environ.get('DATABASE_URL')
                         if _seg_db_url:
-                            _seg_conn = psycopg2.connect(_seg_db_url, connect_timeout=5)
+                            # [LOCAL-797] idle/lock guard + autocommit (pure read).
+                            try:
+                                from db_safe_ddl import CONNECT_OPTIONS as _seg_opts, harden_read_connection as _seg_harden
+                                _seg_conn = psycopg2.connect(_seg_db_url, connect_timeout=5, options=_seg_opts)
+                                _seg_harden(_seg_conn)
+                            except ImportError:
+                                _seg_conn = psycopg2.connect(_seg_db_url, connect_timeout=5)
+                                try:
+                                    _seg_conn.autocommit = True
+                                except Exception:
+                                    pass
                     except Exception:
                         pass
 
@@ -16027,7 +16058,17 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
                             import psycopg2
                             _rep_db_url = os.environ.get('DATABASE_URL')
                             if _rep_db_url:
-                                _rep_conn = psycopg2.connect(_rep_db_url, connect_timeout=5)
+                                # [LOCAL-797] idle/lock guard + autocommit (pure read).
+                                try:
+                                    from db_safe_ddl import CONNECT_OPTIONS as _rep_opts, harden_read_connection as _rep_harden
+                                    _rep_conn = psycopg2.connect(_rep_db_url, connect_timeout=5, options=_rep_opts)
+                                    _rep_harden(_rep_conn)
+                                except ImportError:
+                                    _rep_conn = psycopg2.connect(_rep_db_url, connect_timeout=5)
+                                    try:
+                                        _rep_conn.autocommit = True
+                                    except Exception:
+                                        pass
                         except Exception:
                             pass
 
@@ -16147,7 +16188,17 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
                                 import psycopg2
                                 _inc_db_url = os.environ.get('DATABASE_URL')
                                 if _inc_db_url:
-                                    _inc_conn = psycopg2.connect(_inc_db_url, connect_timeout=5)
+                                    # [LOCAL-797] idle/lock guard + autocommit (pure read).
+                                    try:
+                                        from db_safe_ddl import CONNECT_OPTIONS as _inc_opts, harden_read_connection as _inc_harden
+                                        _inc_conn = psycopg2.connect(_inc_db_url, connect_timeout=5, options=_inc_opts)
+                                        _inc_harden(_inc_conn)
+                                    except ImportError:
+                                        _inc_conn = psycopg2.connect(_inc_db_url, connect_timeout=5)
+                                        try:
+                                            _inc_conn.autocommit = True
+                                        except Exception:
+                                            pass
                             except Exception:
                                 pass
 
@@ -18400,7 +18451,17 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
                                 'DATABASE_URL',
                                 'postgresql://admin:password123@localhost:5433/audiotours'
                             )
-                            _sc_conn = psycopg2.connect(_sc_db_url, connect_timeout=5)
+                            # [LOCAL-797] idle/lock guard + autocommit (pure read).
+                            try:
+                                from db_safe_ddl import CONNECT_OPTIONS as _sc_opts, harden_read_connection as _sc_harden
+                                _sc_conn = psycopg2.connect(_sc_db_url, connect_timeout=5, options=_sc_opts)
+                                _sc_harden(_sc_conn)
+                            except ImportError:
+                                _sc_conn = psycopg2.connect(_sc_db_url, connect_timeout=5)
+                                try:
+                                    _sc_conn.autocommit = True
+                                except Exception:
+                                    pass
                         except Exception:
                             pass
                     if _sc_conn:

@@ -986,7 +986,19 @@ def _reuse_first_existing_tour_rows(location, tour_type, db_url, already_rows,
     requester = (user_id or "").strip() or None
 
     try:
-        conn = psycopg2.connect(db_url)
+        # [LOCAL-797] This miner does a read-only SELECT over audio_tours then
+        # closes. Make it autocommit with the idle/lock guard so the SELECT never
+        # opens a transaction that idles (holding locks) between fetch and close.
+        try:
+            from db_safe_ddl import CONNECT_OPTIONS as _mine_opts, harden_read_connection as _mine_harden
+            conn = psycopg2.connect(db_url, options=_mine_opts)
+            _mine_harden(conn)
+        except ImportError:
+            conn = psycopg2.connect(db_url)
+            try:
+                conn.autocommit = True
+            except Exception:
+                pass
     except Exception as e:
         logger.info(f"[LOCAL-778] mining DB connect failed: {e}")
         return []

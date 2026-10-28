@@ -487,19 +487,43 @@ def tag_all_passages(verbose: bool = True) -> Dict:
     conn = get_connection()
     cur = conn.cursor()
 
-    # Ensure the passage_roles column exists
-    cur.execute("""
-        SELECT column_name FROM information_schema.columns
-        WHERE table_name = 'stop_corpus' AND column_name = 'passage_roles'
-    """)
-    if not cur.fetchone():
-        cur.execute("""
-            ALTER TABLE stop_corpus
-            ADD COLUMN passage_roles JSONB
-        """)
-        conn.commit()
+    # Ensure the passage_roles column exists.
+    # [LOCAL-797] ALTER TABLE on the EXISTING stop_corpus takes an AccessExclusive
+    # lock. stop_corpus is read by the live existence gate, so a batch tag run must
+    # never queue this ALTER behind an idle reader and freeze tours. Route it
+    # through safe_ddl (own short txn, SET LOCAL lock_timeout, skip when the column
+    # already exists, continue on a busy lock).
+    try:
+        from db_safe_ddl import safe_ddl
+    except Exception:
+        safe_ddl = None
+
+    if safe_ddl is not None:
+        safe_ddl(
+            conn,
+            "ALTER TABLE stop_corpus ADD COLUMN passage_roles JSONB",
+            needed_check_sql=(
+                "SELECT 1 WHERE NOT EXISTS (SELECT 1 FROM information_schema.columns "
+                "WHERE table_name = 'stop_corpus' AND column_name = 'passage_roles')"
+            ),
+            label="LOCAL-797",
+        )
         if verbose:
-            print("Added passage_roles column to stop_corpus")
+            print("Ensured passage_roles column on stop_corpus (lock-guarded)")
+    else:
+        # Fallback: original conditional ALTER (helper unavailable).
+        cur.execute("""
+            SELECT column_name FROM information_schema.columns
+            WHERE table_name = 'stop_corpus' AND column_name = 'passage_roles'
+        """)
+        if not cur.fetchone():
+            cur.execute("""
+                ALTER TABLE stop_corpus
+                ADD COLUMN passage_roles JSONB
+            """)
+            conn.commit()
+            if verbose:
+                print("Added passage_roles column to stop_corpus")
 
     # Fetch all rows
     cur.execute("""
