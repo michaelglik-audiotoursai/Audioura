@@ -1,0 +1,18 @@
+[
+ {"id":"m1","cat":"museum","location":"Isabella Stewart Gardner Museum, Boston, MA","stops":4},
+ {"id":"m2","cat":"museum","location":"Museum of Fine Arts, Boston, MA","stops":5},
+ {"id":"m3","cat":"museum","location":"Peabody Essex Museum, Salem, MA","stops":4},
+ {"id":"m4","cat":"museum","location":"Musée Matisse, Nice, France","stops":4},
+ {"id":"w1","cat":"walking","location":"Freedom Trail walking tour, Boston, MA","stops":5},
+ {"id":"w2","cat":"walking","location":"Old Town walking tour, Nice, France","stops":5},
+ {"id":"w3","cat":"walking","location":"Salem witch trials walking tour, Salem, MA","stops":4},
+ {"id":"w4","cat":"walking","location":"Old Saigon walking tour, District 1, Ho Chi Minh City","stops":5},
+ {"id":"n1","cat":"neighbourhood","location":"History of Jamaica Plain, Boston","stops":4},
+ {"id":"n2","cat":"neighbourhood","location":"Beacon Hill architecture walk, Boston","stops":4},
+ {"id":"d1","cat":"dining","location":"coffee shops in Jamaica Plain, Boston","stops":3},
+ {"id":"d2","cat":"dining","location":"Italian restaurants in the North End, Boston","stops":3},
+ {"id":"d3","cat":"dining","location":"Seafood restaurants in Mui Ne, Vietnam","stops":3},
+ {"id":"b1","cat":"business","location":"Massage and spa near Ben Thanh Market, Ho Chi Minh City","stops":3},
+ {"id":"r1","cat":"driving","location":"Scenic drive along Cape Ann, Massachusetts, by car","stops":4},
+ {"id":"r2","cat":"nature","location":"Arnold Arboretum, Boston","stops":4}
+]
