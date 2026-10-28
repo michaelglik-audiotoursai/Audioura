@@ -245,3 +245,78 @@ List<GeoCandidate> parseNominatim(List<dynamic> raw) {
   }
   return out;
 }
+
+/// [LOCAL-789 ADDENDUM / LOCAL-793] Historic / colonial place names that
+/// Nominatim's free text search does NOT resolve to the modern city: a bare
+/// "Saigon Vietnam" returns only POIs literally named "Saigon" (Michael's live
+/// run ended on "Nothing found"), never Ho Chi Minh City. Each key is the old
+/// name; the value is today's name Nominatim indexes. Keys are stored folded
+/// (lower-case, diacritics stripped) for a case/diacritic-insensitive match.
+///
+/// Scope is deliberately tiny and well-known so it can never mangle an
+/// unrelated query — only these exact whole words are rewritten. (NB: "Canton"
+/// is mapped to Guangzhou per the LEAD's list; US towns named Canton are
+/// searched with their state, which keeps the state token and still finds them.)
+const Map<String, String> kHistoricPlaceAliases = <String, String>{
+  'saigon': 'Ho Chi Minh City',
+  'bombay': 'Mumbai',
+  'peking': 'Beijing',
+  'calcutta': 'Kolkata',
+  'madras': 'Chennai',
+  'rangoon': 'Yangon',
+  'canton': 'Guangzhou',
+};
+
+/// Lower-case and strip the Latin diacritics we care about, so "Sài Gòn" folds
+/// to "sai gon" and matches the alias key "saigon" after whitespace is dropped
+/// on a per-token basis. Mirrors the private folder used by the ranker; kept
+/// separate and public-via-[applyPlaceAliases] so the alias step needs no other
+/// export.
+String _foldForAlias(String s) {
+  final lower = s.toLowerCase();
+  const map = {
+    'à': 'a', 'á': 'a', 'ả': 'a', 'ã': 'a', 'ạ': 'a',
+    'ă': 'a', 'ằ': 'a', 'ắ': 'a', 'ẳ': 'a', 'ẵ': 'a', 'ặ': 'a',
+    'â': 'a', 'ầ': 'a', 'ấ': 'a', 'ẩ': 'a', 'ẫ': 'a', 'ậ': 'a',
+    'è': 'e', 'é': 'e', 'ẻ': 'e', 'ẽ': 'e', 'ẹ': 'e',
+    'ê': 'e', 'ề': 'e', 'ế': 'e', 'ể': 'e', 'ễ': 'e', 'ệ': 'e',
+    'ì': 'i', 'í': 'i', 'ỉ': 'i', 'ĩ': 'i', 'ị': 'i',
+    'ò': 'o', 'ó': 'o', 'ỏ': 'o', 'õ': 'o', 'ọ': 'o',
+    'ô': 'o', 'ồ': 'o', 'ố': 'o', 'ổ': 'o', 'ỗ': 'o', 'ộ': 'o',
+    'ơ': 'o', 'ờ': 'o', 'ớ': 'o', 'ở': 'o', 'ỡ': 'o', 'ợ': 'o',
+    'ù': 'u', 'ú': 'u', 'ủ': 'u', 'ũ': 'u', 'ụ': 'u',
+    'ư': 'u', 'ừ': 'u', 'ứ': 'u', 'ử': 'u', 'ữ': 'u', 'ự': 'u',
+    'ỳ': 'y', 'ý': 'y', 'ỷ': 'y', 'ỹ': 'y', 'ỵ': 'y',
+    'đ': 'd', 'ñ': 'n', 'ç': 'c',
+  };
+  final sb = StringBuffer();
+  for (final ch in lower.split('')) {
+    sb.write(map[ch] ?? ch);
+  }
+  return sb.toString();
+}
+
+/// [LOCAL-789 ADDENDUM] Rewrite any historic place name in [query] to its
+/// modern name BEFORE geocoding, so "Saigon Vietnam" is sent as "Ho Chi Minh
+/// City Vietnam" and Nominatim actually finds the city (with the server
+/// `/geocode` not deployed, the old name dead-ends at "Nothing found").
+///
+/// Matching is WHOLE-WORD and case/diacritic-insensitive: each run of letters
+/// in the query is folded and looked up in [kHistoricPlaceAliases]; only an
+/// exact whole-token hit is replaced, so "Saigons Bar" or "New Bombayville"
+/// are left untouched. Surrounding words, punctuation and spacing are
+/// preserved (", Vietnam" stays), and a query with no historic token is
+/// returned unchanged (same string instance semantics are not relied upon).
+String applyPlaceAliases(String query) {
+  if (query.isEmpty) return query;
+  // Split into word / non-word runs so separators (space, comma) are kept
+  // verbatim and only whole words are candidates for replacement.
+  final tokens = query.split(RegExp(r'(?<=[^A-Za-zÀ-ỹ])|(?=[^A-Za-zÀ-ỹ])'));
+  final out = StringBuffer();
+  for (final tok in tokens) {
+    final folded = _foldForAlias(tok);
+    final alias = kHistoricPlaceAliases[folded];
+    out.write(alias ?? tok);
+  }
+  return out.toString();
+}

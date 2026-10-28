@@ -83,6 +83,17 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   MapController _mapController = MapController();
+  // [LOCAL-789] Fires when the FlutterMap's laid-out size changes because the
+  // header above it changed height (the orange "Showing tours near: …" banner
+  // appearing on a place search, or the LOCAL-761 hide-on-scroll bar) — a
+  // layout change flutter_map may not emit a size event for in time, which left
+  // the map's TOP band grey until the next camera event ~30 s later
+  // (Michael, TestFlight 83). A LayoutBuilder around the map pushes the new
+  // height here; FirstLayoutTileLayer coalesces it to one tile reload per
+  // frame. Broadcast so a late listener still works.
+  final StreamController<void> _mapSizeReset =
+      StreamController<void>.broadcast();
+  double? _lastMapHeight;
   LatLng? _userLocation;
   LatLng? _displayLocation; // Location being displayed (may differ from user location)
   List<Marker> _tourMarkers = [];
@@ -193,6 +204,7 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void dispose() {
     PendingShareSearch.instance.code.removeListener(_onPendingShareSearch);
+    _mapSizeReset.close(); // [LOCAL-789]
     super.dispose();
   }
 
@@ -422,10 +434,20 @@ class _HomeScreenState extends State<HomeScreen> {
   /// Returns the resolved [GeoResult] (coordinate + display name for the Home
   /// banner), or null when nothing resolves.
   Future<GeoResult?> _geocodeLocation(String query) async {
-    final nominatim = await _geocodeViaNominatim(query);
+    // [LOCAL-789 ADDENDUM] Rewrite a historic place name to its modern one
+    // before any geocoding — "Saigon Vietnam" → "Ho Chi Minh City Vietnam" —
+    // so Nominatim resolves the city instead of dead-ending on POIs literally
+    // named "Saigon" (with the server /geocode not deployed, the old name ends
+    // at "Nothing found"). Whole-word, case/diacritic-insensitive.
+    final aliased = applyPlaceAliases(query);
+    if (aliased != query) {
+      await DebugLogHelper.addDebugLog(
+          'HOME: place alias "$query" → "$aliased"');
+    }
+    final nominatim = await _geocodeViaNominatim(aliased);
     if (nominatim != null) return nominatim;
     // No usable PLACE from Nominatim — try the typo-tolerant server geocoder.
-    final server = await _geocodeViaServer(query);
+    final server = await _geocodeViaServer(aliased);
     if (server != null) return server;
     return null;
   }
@@ -4700,7 +4722,29 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           ),
           Expanded(
-            child: FlutterMap(
+            child: LayoutBuilder(
+              // [LOCAL-789] The map sits in a Column under a variable-height
+              // header (the orange "Showing tours near: …" banner appears the
+              // moment a place search sets _isUsingCustomLocation, and the
+              // LOCAL-761 hide-on-scroll bar comes and goes). When the header
+              // grows AFTER the first layout the Expanded map SHRINKS, but on a
+              // real device the flutter_map size event could lag — so the tile
+              // range stayed computed for the old, taller viewport and the
+              // newly-exposed TOP band drew grey until the next camera event
+              // ~30 s later. Here we detect the laid-out HEIGHT changing and
+              // push onto _mapSizeReset; FirstLayoutTileLayer turns that into a
+              // single post-frame tile reload against the now-correct size. No
+              // timers — the trigger is the layout itself.
+              builder: (context, constraints) {
+                final h = constraints.maxHeight;
+                if (_lastMapHeight != null &&
+                    h.isFinite &&
+                    (h - _lastMapHeight!).abs() > 0.5 &&
+                    !_mapSizeReset.isClosed) {
+                  _mapSizeReset.add(null);
+                }
+                if (h.isFinite) _lastMapHeight = h;
+                return FlutterMap(
               mapController: _mapController,
               options: MapOptions(
                 initialCenter: _displayLocation ?? _userLocation ?? LatLng(42.3601, -71.0589),
@@ -4718,10 +4762,15 @@ class _HomeScreenState extends State<HomeScreen> {
                 // blank-map-until-zoom bug on the Home map now that it lives in
                 // the LOCAL-761 IndexedStack + nested-Navigator tab shell (see
                 // first_layout_tile_layer.dart for the full root-cause note).
+                // [LOCAL-789] externalReset reloads the tiles again whenever the
+                // map's laid-out height changes (banner/scroll-bar), so the top
+                // never stays grey; user agent is the real app id (OSM throttles
+                // generic com.example agents, slowing tiles).
                 FirstLayoutTileLayer(
+                  externalReset: _mapSizeReset.stream,
                   builder: (reset) => TileLayer(
                     urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                    userAgentPackageName: 'com.example.audiotours',
+                    userAgentPackageName: 'com.audioura.audiotours',
                     reset: reset,
                   ),
                 ),
@@ -4781,6 +4830,8 @@ class _HomeScreenState extends State<HomeScreen> {
                     ],
                   ),
               ],
+                );
+              },
             ),
           ),
         ],
