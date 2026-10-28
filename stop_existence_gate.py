@@ -143,6 +143,18 @@ def _nominatim_request(params: dict, context: str = "") -> "requests.Response":
 # already consumes — so the scope/cuisine/distance logic is unchanged. When Serper
 # is NOT configured, these fall straight through to _nominatim_request (today's
 # behaviour). A Serper call is metered once per uncached query and cached 24 h.
+def _serper_enabled() -> bool:
+    """[LOCAL-790] True when Serper Places is configured (places_search owns the
+    switch). Defensive: any import/attr error means 'not enabled', so the walking
+    gate just labels its evidence as the Nominatim fallback — it never crashes the
+    verdict on a missing symbol."""
+    try:
+        import places_search as _ps
+        return bool(_ps.serper_places_enabled())
+    except Exception:
+        return False
+
+
 def _places_lookup(params: dict, context: str = "",
                    scope_center=None, near=None, scope_bbox=None) -> "requests.Response":
     """Route a place lookup to Serper Places when enabled, else Nominatim.
@@ -2965,22 +2977,34 @@ def _geocode_scope_bbox(scope: str):
 
 
 def _check_walking_stop_existence(
-    stop_title: str, venue_name: str
+    stop_title: str, venue_name: str, scope: Optional[str] = None
 ) -> Tuple[bool, str]:
-    """[LOCAL-662B] Existence check for a WALKING-tour stop (unknown/institution).
+    """[LOCAL-662B / LOCAL-790] Existence check for a WALKING-tour stop.
 
-    Verified when EITHER:
+    Verified when ANY of these holds (whichever comes FIRST):
       (A) A Wikidata item whose label OR alias matches the stop title has P625
-          coordinates within the toured-city metro radius, OR
-      (B) An OSM named feature (Nominatim) matching the stop title is in the
-          toured city.
+          coordinates within the toured-area metro radius.
+      (B) A places_search (Serper Places) hit — or, when Serper is not
+          configured, an OSM/Nominatim named feature — whose name matches the
+          stop title and whose coordinates/address lie in the toured area.
 
-    Proximity binds to the toured CITY (the gate has no per-stop coordinates yet
-    — it runs before geocoding). Metro radius is generous on purpose: this is an
-    EXISTENCE test ("is this a real place in this city?"), not a walkability test
-    (GEO-CHECK / LOCAL-658 enforces the walking distance limit downstream). A
-    place in the wrong city (e.g. a Boston-named landmark that only exists in
-    another state) still fails.
+    [LOCAL-790] The field defect: OUTSIDE the US/Europe, Wikidata gave 0 in-area
+    hits and the OSM lookup went STRAIGHT to Nominatim — places_search / Serper
+    was never called — so Notre-Dame Cathedral Basilica of Saigon and Ben Thanh
+    Market, both real with addresses, were rejected as "no evidence". Two fixes:
+      1. The map lookup now routes through ``_places_lookup`` (Serper Places when
+         ``serper_places_enabled()``, else Nominatim), the same seam the business
+         path uses, with an ``ll`` centre and the LOCAL-786 bbox so the town is
+         honoured.
+      2. The proximity anchor is the FULL scope geocode (``_geocode_scope_center``
+         / LOCAL-783), not ``_geocode_city_center`` (which picked the first
+         capitalised token — "Ho" of "Ho Chi Minh City", "District" of "District 1
+         and 3"). When scope resolution fails we geocode the scope string and use
+         that; we never return "no evidence" merely because ONE source is empty.
+
+    Proximity binds to the toured AREA (the gate runs before per-stop geocoding).
+    Metro radius is generous on purpose: this is an EXISTENCE test, not a
+    walkability test (GEO-CHECK / LOCAL-658 enforces distance downstream).
 
     Raises RuntimeError on a Wikimedia/OSM search failure (429/timeout/
     connection) so the caller keeps the stop as UNKNOWN (LOCAL-661 / D162) — a
@@ -2994,11 +3018,27 @@ def _check_walking_stop_existence(
     }
     _METRO_RADIUS_KM = 35.0  # generous metro reach; walkability is GEO-CHECK's job
 
+    # [LOCAL-790] The scope the tour is bounded to (the full "District 1 and 3,
+    # Ho Chi Minh City" / "Ho Chi Minh City" string). Default to the venue label.
+    _scope = (scope or venue_name or "").strip()
     city_signals = _city_signals_from_venue(venue_name)
+    if _scope and _scope != venue_name:
+        city_signals |= _city_signals_from_venue(_scope)
 
-    # City center for the proximity check. A failed geocode is a SEARCH FAILURE
-    # (not "no evidence") — propagate so the stop is kept as UNKNOWN.
-    city_center = _geocode_city_center(venue_name, city_signals)
+    # [LOCAL-790] Proximity anchor + bbox for the Serper `ll` and the in-area
+    # test. Prefer the FULL-scope geocode (LOCAL-783/786); only if that is empty
+    # fall back to the old first-capitalised-token city geocode. A geocode that
+    # THROWS is a search failure → propagate (UNKNOWN, keep).
+    scope_center = None
+    scope_bbox = None
+    try:
+        scope_center = _geocode_scope_center(_scope) if _scope else None
+        scope_bbox = _geocode_scope_bbox(_scope) if _scope else None
+    except RuntimeError:
+        raise
+    city_center = scope_center
+    if city_center is None:
+        city_center = _geocode_city_center(venue_name, city_signals)
 
     def _haversine_km_local(a, b) -> float:
         import math
@@ -3012,14 +3052,32 @@ def _check_walking_stop_existence(
              + math.cos(p1) * math.cos(p2) * math.sin(dl / 2) ** 2)
         return 2 * r * math.asin(min(1.0, math.sqrt(h)))
 
+    def _in_bbox(lat: float, lng: float) -> bool:
+        if not scope_bbox or len(scope_bbox) < 4:
+            return False
+        s, n, w, e = scope_bbox[0], scope_bbox[1], scope_bbox[2], scope_bbox[3]
+        return (s <= lat <= n) and (w <= lng <= e)
+
     def _in_metro(lat: float, lng: float) -> bool:
+        # In-bbox (the geocoder's own extent for the area) is the tightest, truest
+        # signal; the metro radius is the fallback when there is no bbox.
+        if _in_bbox(lat, lng):
+            return True
         if not city_center:
-            # No city anchor resolved but no error either — accept proximity on
+            # No area anchor resolved but no error either — accept proximity on
             # the city-signal text match alone (handled by caller paths below).
             return True
         return _haversine_km_local(city_center, (lat, lng)) <= _METRO_RADIUS_KM
 
-    # ---- (A) Wikidata: label/alias match + P625 near the city ----
+    def _km_from_anchor(lat, lng):
+        if not city_center:
+            return float('nan')
+        try:
+            return _haversine_km_local(city_center, (float(lat), float(lng)))
+        except (TypeError, ValueError):
+            return float('nan')
+
+    # ---- (A) Wikidata: label/alias match + P625 near the area ----
     # A Wikimedia error here is a SEARCH FAILURE → raise (UNKNOWN, keep stop).
     try:
         wd_url = "https://www.wikidata.org/w/api.php"
@@ -3047,15 +3105,21 @@ def _check_walking_stop_existence(
                     continue
                 coords = _fetch_wikidata_coords(qid, _HEADERS)
                 if coords and _in_metro(coords[0], coords[1]):
+                    _km = _km_from_anchor(coords[0], coords[1])
+                    print(f"  [LOCAL-790] evidence {stop_title!r} wikidata_{lang} "
+                          f"{(f'{_km:.1f}km' if _km == _km else 'in-area')}")
                     return True, (f"wikidata_{lang}: '{wd_label or wd_match}' "
                                   f"(QID:{qid}) at {coords[0]:.4f},{coords[1]:.4f} "
-                                  f"within {('metro' if city_center else 'city')} of "
-                                  f"{venue_name[:40]!r}")
+                                  f"within {('metro' if city_center else 'area')} of "
+                                  f"{_scope[:40]!r}")
     except (_http.exceptions.Timeout, _http.exceptions.ConnectionError) as e:
         raise RuntimeError(f"Wikidata connection failed for {stop_title!r}: {e}")
 
-    # ---- (B) OSM named feature (Nominatim) in the toured city ----
-    # _nominatim_request raises RuntimeError on 429/timeout → UNKNOWN (keep).
+    # ---- (B) places_search (Serper Places when enabled) / OSM named feature ----
+    # [LOCAL-790] Route through _places_lookup so Serper Places is actually called
+    # (sending the scope `ll` + LOCAL-786 bbox). _places_lookup falls back to
+    # Nominatim when Serper is not configured; the Nominatim path raises
+    # RuntimeError on 429/timeout → UNKNOWN (keep).
     city_hint = ""
     _cleaned = re.sub(r'\([^)]*\)', ' ', venue_name or '')
     _NOISE2 = {'walking', 'cycling', 'biking', 'driving', 'tour', 'tours', 'in',
@@ -3067,6 +3131,10 @@ def _check_walking_stop_existence(
             break
     if not city_hint and city_signals:
         city_hint = next(iter(city_signals))
+    # [LOCAL-790] Prefer the clean scope string as the query locality (the full
+    # "District 1 and 3, Ho Chi Minh City"), not a single token, so Serper's `ll`
+    # and Nominatim's text both bind to the real area.
+    _query_locality = _scope or city_hint
 
     norm_stop = _strip_accents(stop_title).lower()
     _stop_words = [w for w in re.split(r"[\s'\u2019-]+", norm_stop)
@@ -3082,7 +3150,7 @@ def _check_walking_stop_existence(
         _title_variants.append(_no_article)
 
     for _tv in _title_variants:
-        search_query = f"{_tv}, {city_hint}" if city_hint else _tv
+        search_query = f"{_tv}, {_query_locality}" if _query_locality else _tv
         params = {
             "q": search_query,
             "format": "jsonv2",
@@ -3090,19 +3158,22 @@ def _check_walking_stop_existence(
             "limit": "5",
             "accept-language": "en",
         }
-        resp = _nominatim_request(params, context=_tv)  # raises → UNKNOWN
+        # [LOCAL-790] Serper Places first (via _places_lookup), Nominatim fallback.
+        resp = _places_lookup(params, context=_tv,
+                              scope_center=scope_center,
+                              scope_bbox=scope_bbox)  # Nominatim path raises → UNKNOWN
         results = resp.json()
         for result in results or []:
             display_name = _strip_accents(result.get("display_name", "")).lower()
             name = _strip_accents(result.get("name", "") or "").lower()
             address = result.get("address", {})
 
-            # Name match: the OSM feature's OWN name must match the stop title —
-            # token overlap against the result name (NOT the broad display_name,
-            # which carries street/city context and would let "State House Park"
-            # match a different "… Park" whose address happens to sit on a
-            # "State House" street, D-false-positive). A bare generic place-type
-            # word ("park", "square", "hall") alone is never a match.
+            # Name match: the feature's OWN name must match the stop title — token
+            # overlap against the result name (NOT the broad display_name, which
+            # carries street/city context and would let "State House Park" match a
+            # different "… Park" whose address happens to sit on a "State House"
+            # street, D-false-positive). A bare generic place-type word ("park",
+            # "square", "hall") alone is never a match.
             if not name:
                 continue
             _name_match = _title_match(_tv, name) or _title_match(stop_title, name)
@@ -3111,7 +3182,8 @@ def _check_walking_stop_existence(
                 # (drop the generic place-type tail word so "… Park" ≠ "… Park").
                 _generic = {'park', 'square', 'hall', 'house', 'building',
                             'street', 'avenue', 'garden', 'gardens', 'bridge',
-                            'library', 'museum', 'church', 'cemetery', 'common'}
+                            'library', 'museum', 'church', 'cemetery', 'common',
+                            'market', 'pagoda', 'temple', 'cathedral', 'basilica'}
                 _distinct = [w for w in _stop_words if w not in _generic]
                 if not _distinct:
                     continue
@@ -3119,22 +3191,24 @@ def _check_walking_stop_existence(
                 if _name_hits < max(1, (len(_distinct) + 1) // 2):
                     continue
 
-            # City/proximity match. Prefer structured address fields; fall back
-            # to a metro-radius coordinate check against the city center.
+            # Area/proximity match. Prefer structured address fields; fall back to
+            # the bbox / metro-radius coordinate check against the area anchor.
             result_city = _strip_accents(
                 address.get("city", "") or address.get("town", "")
                 or address.get("municipality", "") or address.get("village", "")
-                or address.get("county", "")).lower()
+                or address.get("county", "") or address.get("suburb", "")
+                or address.get("state_district", "")).lower()
             result_state = _strip_accents(address.get("state", "")).lower()
             city_ok = False
             for sig in city_signals:
                 if sig in result_city or sig in result_state or sig in display_name:
                     city_ok = True
                     break
-            if not city_ok and city_center:
+            _rlat = result.get("lat")
+            _rlng = result.get("lon")
+            if not city_ok and (city_center or scope_bbox):
                 try:
-                    city_ok = _in_metro(float(result.get("lat")),
-                                        float(result.get("lon")))
+                    city_ok = _in_metro(float(_rlat), float(_rlng))
                 except (TypeError, ValueError):
                     city_ok = False
             if not city_ok:
@@ -3142,9 +3216,16 @@ def _check_walking_stop_existence(
             _osm_name = result.get("name") or result.get("display_name", "")[:60]
             _cat = result.get("category", "")
             _typ = result.get("type", "")
-            return True, (f"nominatim_osm: '{_osm_name}' in "
-                          f"{result_city or city_hint} [category={_cat}/{_typ}]")
+            _src = "serper_places" if _serper_enabled() else "nominatim_osm"
+            _km = _km_from_anchor(_rlat, _rlng)
+            print(f"  [LOCAL-790] evidence {stop_title!r} {_src} "
+                  f"{(f'{_km:.1f}km' if _km == _km else 'in-area')}")
+            return True, (f"{_src}: '{_osm_name}' in "
+                          f"{result_city or _query_locality} [category={_cat}/{_typ}]")
 
+    print(f"  [LOCAL-790] no evidence {stop_title!r} "
+          f"(wikidata + {'serper' if _serper_enabled() else 'nominatim'} searched, "
+          f"none in area {_scope[:40]!r})")
     return False, ""
 
 
@@ -3157,6 +3238,7 @@ def verify_stop_existence(
     db_conn,
     tour_type: Optional[str] = None,
     poi_type: Optional[str] = None,
+    scope: Optional[str] = None,
 ) -> Dict:
     """Verify whether a stop actually exists at the claimed venue.
 
@@ -3319,7 +3401,8 @@ def verify_stop_existence(
                           'animal', 'country_scale')
         if _tt in _WALKING_KINDS:
             try:
-                verified, evidence = _check_walking_stop_existence(stop_title, venue_name)
+                verified, evidence = _check_walking_stop_existence(
+                    stop_title, venue_name, scope=scope)
                 if verified:
                     result['verified'] = True
                     result['evidence'] = evidence
@@ -3436,6 +3519,7 @@ def run_existence_gate(
     db_conn,
     tour_type: Optional[str] = None,
     poi_type: Optional[str] = None,
+    scope: Optional[str] = None,
 ) -> Dict:
     """Run the stop-existence gate over a list of candidate stops.
 
@@ -3483,7 +3567,7 @@ def run_existence_gate(
     inconclusive_stops = []  # LOCAL-320 bounce: third state — kept but NOT verified
 
     for stop_title in poi_list:
-        verdict = verify_stop_existence(stop_title, venue_name, db_conn, tour_type=tour_type, poi_type=poi_type)
+        verdict = verify_stop_existence(stop_title, venue_name, db_conn, tour_type=tour_type, poi_type=poi_type, scope=scope)
         verdicts.append(verdict)
         if verdict['verified']:
             verified_stops.append(stop_title)
@@ -3503,7 +3587,7 @@ def run_existence_gate(
               f"retrying after pause")
         time.sleep(_NOMINATIM_MIN_INTERVAL * 2)  # Extra breathing room
         for i, stop_title in enumerate(_failed_stops):
-            retry_verdict = verify_stop_existence(stop_title, venue_name, db_conn, tour_type=tour_type, poi_type=poi_type)
+            retry_verdict = verify_stop_existence(stop_title, venue_name, db_conn, tour_type=tour_type, poi_type=poi_type, scope=scope)
             # Replace the failed verdict
             for j, v in enumerate(verdicts):
                 if v['stop_title'] == stop_title and v.get('search_failed'):

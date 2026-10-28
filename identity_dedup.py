@@ -649,3 +649,122 @@ def final_identity_gate(
 
     return GateResult(poi_list=deduped, collapses=collapses, refilled=refilled,
                       stamped_qids=stamped, decision_log=decision)
+
+
+# ── LOCAL-790: dedupe a PLACE/WALKING candidate pool by location or QID ───────
+# The museum final_identity_gate above collapses by QID / bilingual title, but it
+# runs ONLY on the museum path. A walking/place tour's pool is deduped by TITLE
+# only (stop_title_dedup), and a title compare cannot see that "Ngoc Hoang Pagoda"
+# (the Vietnamese name) and "Jade Emperor Pagoda" (its English name) are the SAME
+# place — they share no tokens — so both shipped in the HCMC field run. Two places
+# are the same when they carry the same Wikidata QID, OR when their geocoded points
+# are within ~60 m of each other (one building cannot be two stops). This is the
+# place-tour analogue of the museum QID/bilingual collapse, keyed on geography.
+
+def _coords_of(cand: Dict) -> Optional[Tuple[float, float]]:
+    """Best-effort (lat, lng) for a candidate: explicit lat/lng, else a
+    "lat,lng" coordinates string. None when no usable point is present."""
+    if not isinstance(cand, dict):
+        return None
+    lat = cand.get("latitude")
+    lng = cand.get("longitude")
+    try:
+        if lat is not None and lng is not None:
+            return (float(lat), float(lng))
+    except (TypeError, ValueError):
+        pass
+    coord = cand.get("coordinates") or cand.get("coords")
+    if isinstance(coord, str) and "," in coord:
+        try:
+            a, b = coord.split(",", 1)
+            return (float(a.strip()), float(b.strip()))
+        except (TypeError, ValueError):
+            return None
+    if isinstance(coord, (list, tuple)) and len(coord) == 2:
+        try:
+            return (float(coord[0]), float(coord[1]))
+        except (TypeError, ValueError):
+            return None
+    return None
+
+
+def _haversine_m(a: Tuple[float, float], b: Tuple[float, float]) -> float:
+    """Great-circle distance in METRES between two (lat, lng) points."""
+    import math
+    lat1, lon1 = a
+    lat2, lon2 = b
+    r = 6371000.0
+    p1, p2 = math.radians(lat1), math.radians(lat2)
+    dp = math.radians(lat2 - lat1)
+    dl = math.radians(lon2 - lon1)
+    h = (math.sin(dp / 2) ** 2
+         + math.cos(p1) * math.cos(p2) * math.sin(dl / 2) ** 2)
+    return 2 * r * math.asin(min(1.0, math.sqrt(h)))
+
+
+def dedupe_by_location_or_qid(
+    poi_list: Sequence[Dict],
+    radius_m: float = 60.0,
+) -> Tuple[List[Dict], List[Tuple[str, str]]]:
+    """[LOCAL-790] Collapse a place/walking candidate pool by identity:
+
+      (a) same Wikidata QID (on either side) → same place, OR
+      (b) geocoded points within ``radius_m`` metres of each other → same place
+          (a single building cannot be two stops), OR
+      (c) same normalised TITLE (the stop_title_dedup fallback, so a plain repeat
+          still collapses even without coordinates or a QID).
+
+    Keeps the FIRST occurrence of each place in order. Returns
+    ``(deduped_list, dropped)`` where ``dropped`` is ``[(dup_name, kept_name), …]``
+    in pool order. Pure — no network, no mutation of the inputs. A candidate with
+    neither a QID nor coordinates falls back to title identity, so this never
+    merges two genuinely different places that happen to lack coordinates.
+    """
+    kept: List[Dict] = []
+    kept_meta: List[Dict] = []  # parallel: {'qid','coords','norm'}
+    dropped: List[Tuple[str, str]] = []
+
+    for cand in poi_list or []:
+        if not isinstance(cand, dict):
+            kept.append(cand)
+            kept_meta.append({"qid": "", "coords": None, "norm": ""})
+            continue
+        qid = _norm_qid(cand.get("qid", "") or cand.get("wikidata_qid", ""))
+        coords = _coords_of(cand)
+        name = (cand.get("name") or cand.get("title") or "").strip()
+        norm = " ".join(sorted(_tokens(name))) if name else ""
+
+        match_idx = None
+        for i, meta in enumerate(kept_meta):
+            # (a) QID — strongest, language-agnostic.
+            if qid and meta["qid"] and qid == meta["qid"]:
+                match_idx = i
+                break
+            # (b) proximity — one building is one stop.
+            if coords and meta["coords"]:
+                if _haversine_m(coords, meta["coords"]) <= radius_m:
+                    match_idx = i
+                    break
+            # (c) title fallback (only when neither side had a QID/coords match).
+            if norm and meta["norm"] and norm == meta["norm"]:
+                match_idx = i
+                break
+
+        if match_idx is not None:
+            kept_name = (kept[match_idx].get("name")
+                         or kept[match_idx].get("title") or "").strip()
+            dropped.append((name, kept_name))
+            # Enrich the keeper with a QID/coords the duplicate carried but it did
+            # not (so the surviving stop lands on the map / keeps its identity).
+            _km = kept_meta[match_idx]
+            if qid and not _km["qid"]:
+                _km["qid"] = qid
+                kept[match_idx].setdefault("qid", qid)
+            if coords and not _km["coords"]:
+                _km["coords"] = coords
+            continue
+
+        kept.append(cand)
+        kept_meta.append({"qid": qid, "coords": coords, "norm": norm})
+
+    return kept, dropped

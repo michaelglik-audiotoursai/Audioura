@@ -167,6 +167,12 @@ class AreaResolution:
     language: str = "en"
     country_qid: str = ""
     resolved: bool = False
+    # [LOCAL-790] When the request named several numbered districts ("District 1
+    # and 3, Ho Chi Minh City"), this is the UNION bounding box over all of them
+    # as [south, north, west, east] — a place inside ANY requested district is in
+    # scope. Empty when the request named no multi-district clause.
+    district_names: List[str] = field(default_factory=list)
+    union_bbox: Optional[List[float]] = None
 
 
 @dataclass
@@ -254,7 +260,43 @@ def resolve_area(location_string: str) -> Optional[AreaResolution]:
     # Detect language from country
     language = _detect_language(city_qid)
     country_qid = _get_country(city_qid)
-    
+
+    # [LOCAL-790] Multi-district request ("District 1 and 3, Ho Chi Minh City").
+    # Resolve each numbered district's bounding box via Nominatim and UNION them so
+    # a place inside ANY requested district is in scope (and center on the union's
+    # midpoint). Each district label is kept verbatim ("District N" / "Quận N") so
+    # the geocoder finds it inside the resolved city.
+    _district_names: List[str] = []
+    _union_bbox = None
+    try:
+        _districts = parse_districts(neighborhood, city)
+        if len(_districts) >= 2:
+            _boxes = []
+            for _d in _districts:
+                _bb = _nominatim_bbox(_d)
+                if _bb:
+                    _boxes.append(_bb)
+                    _district_names.append(_d)
+            if _boxes:
+                south = min(b[0] for b in _boxes)
+                north = max(b[1] for b in _boxes)
+                west = min(b[2] for b in _boxes)
+                east = max(b[3] for b in _boxes)
+                _union_bbox = [south, north, west, east]
+                center_lat = (south + north) / 2.0
+                center_lng = (west + east) / 2.0
+                # Radius that covers the union (half the diagonal), capped generous.
+                try:
+                    diag = _haversine_km((south, west), (north, east))
+                    radius_km = max(radius_km, min(diag / 2.0, 25.0))
+                except Exception:
+                    pass
+                print(f"  [LOCAL-790] union of {len(_boxes)} district(s) "
+                      f"{_district_names} → bbox={_union_bbox}, "
+                      f"center=({center_lat:.4f},{center_lng:.4f}), radius={radius_km:.1f}km")
+    except Exception as _de:
+        print(f"  [LOCAL-790] district union skipped (non-fatal): {_de}")
+
     result = AreaResolution(
         city_qid=city_qid,
         city_name=city,
@@ -266,6 +308,8 @@ def resolve_area(location_string: str) -> Optional[AreaResolution]:
         language=language,
         country_qid=country_qid,
         resolved=True,
+        district_names=_district_names,
+        union_bbox=_union_bbox,
     )
     print(f"  [area_resolver] Resolved: center=({center_lat:.4f}, {center_lng:.4f}), "
           f"radius={radius_km}km, lang={language}")
@@ -331,6 +375,114 @@ def discover_landmarks(area: AreaResolution) -> List[Landmark]:
 # Internal helpers
 # ============================================================
 
+# [LOCAL-790] A leading PLURAL-CATEGORY clause ("Pagodas and temples of <area>",
+# "churches of <area>", "museums in <area>") names a THEME across an area, not the
+# area itself. `_parse_location` strips it down to the <area> that follows
+# of/in/around/… so the request resolves to the city, not the whole phrase.
+_PLURAL_CATEGORY_PREFIX_RE = re.compile(
+    r'^\s*(?:the\s+)?'
+    r'(?:pagodas|temples|churches|cathedrals|basilicas|chapels|abbeys|mosques'
+    r'|masjids|synagogues|shrines|monasteries|convents|museums|galleries'
+    r'|palaces|castles|mansions|libraries|markets|parks|gardens|monuments'
+    r'|memorials|fountains|squares|bridges|towers|landmarks|sights|sites'
+    r'|attractions|buildings|houses|villas)'
+    r'(?:\s+(?:and|&|,)\s+'
+    r'(?:pagodas|temples|churches|cathedrals|basilicas|chapels|abbeys|mosques'
+    r'|masjids|synagogues|shrines|monasteries|convents|museums|galleries'
+    r'|palaces|castles|mansions|libraries|markets|parks|gardens|monuments'
+    r'|memorials|fountains|squares|bridges|towers|landmarks|sights|sites'
+    r'|attractions|buildings|houses|villas))*'
+    r'\s+(?:of|in|around|near|throughout|across|within)\s+(?P<area>.+)$',
+    re.IGNORECASE,
+)
+
+# [LOCAL-790] A numbered-district clause: "District 1 and 3", "Districts 1, 3 and 5",
+# "Quận 1 và 3" (Vietnamese). HCMC and many Asian cities name their areas by number,
+# and a request can list several ("District 1 and 3, Ho Chi Minh City"). Each number
+# is a SEPARATE district that must be resolved and UNIONED, not treated as one area
+# named "District 1 and 3" (which resolves to nothing).
+_DISTRICT_CLAUSE_RE = re.compile(
+    r'^\s*(?:districts?|qu\u1eadn|quan|arrondissements?|wards?)\s+'
+    r'(?P<nums>\d+(?:\s*(?:,|&|and|v\u00e0)\s*\d+)*)\s*$',
+    re.IGNORECASE,
+)
+
+
+def parse_districts(neighborhood: str, city: str) -> List[str]:
+    """[LOCAL-790] Expand a numbered-district neighbourhood into per-district area
+    strings for a union bbox.
+
+    "District 1 and 3" + city "Ho Chi Minh City"
+        → ["District 1, Ho Chi Minh City", "District 3, Ho Chi Minh City"]
+    "Quận 1 và 3"      + city "Ho Chi Minh City"
+        → ["Quận 1, Ho Chi Minh City", "Quận 3, Ho Chi Minh City"]
+
+    Returns [] when the neighbourhood is not a numbered-district clause (so the
+    caller keeps its normal single-neighbourhood handling). The district label is
+    preserved verbatim (English "District" or Vietnamese "Quận") so Nominatim can
+    geocode each one inside the named city."""
+    nb = (neighborhood or "").strip()
+    if not nb:
+        return []
+    m = _DISTRICT_CLAUSE_RE.match(nb)
+    if not m:
+        return []
+    nums = re.findall(r'\d+', m.group('nums'))
+    if not nums:
+        return []
+    low = nb.lower()
+    if low.startswith(('qu\u1ead', 'quan')):
+        label = 'Qu\u1eadn'
+    elif low.startswith('arrond'):
+        label = 'Arrondissement'
+    elif low.startswith('ward'):
+        label = 'Ward'
+    else:
+        label = 'District'
+    city = (city or "").strip()
+    out = []
+    seen = set()
+    for n in nums:
+        if n in seen:
+            continue
+        seen.add(n)
+        out.append(f"{label} {n}, {city}" if city else f"{label} {n}")
+    return out
+
+
+def _nominatim_bbox(query: str) -> Optional[List[float]]:
+    """[LOCAL-790] Geocode a query via Nominatim and return its bounding box as
+    [south, north, west, east], or None. Used to union several numbered districts
+    into one scope. Best-effort — a throttled/failed lookup yields None (the caller
+    falls back to the city center)."""
+    q = (query or "").strip()
+    if not q:
+        return None
+    try:
+        resp = requests.get(
+            "https://nominatim.openstreetmap.org/search",
+            params={"q": q, "format": "jsonv2", "limit": "1",
+                    "accept-language": "en"},
+            headers={"User-Agent": _USER_AGENT},
+            timeout=8,
+        )
+        if resp.status_code != 200:
+            return None
+        results = resp.json() or []
+    except Exception:
+        return None
+    if not results or not isinstance(results[0], dict):
+        return None
+    bbox = results[0].get("boundingbox")
+    if not bbox or len(bbox) < 4:
+        return None
+    try:
+        # Nominatim boundingbox order is [south, north, west, east] as strings.
+        return [float(bbox[0]), float(bbox[1]), float(bbox[2]), float(bbox[3])]
+    except (ValueError, TypeError):
+        return None
+
+
 def _parse_location(location_string: str) -> Tuple[str, str]:
     """Parse 'Neighborhood, City' or 'City, State/Country' into (neighborhood, city)."""
     # [LOCAL-751 B1] Cut a trailing "stops/places" clause BEFORE any city/state is
@@ -358,6 +510,17 @@ def _parse_location(location_string: str) -> Tuple[str, str]:
                              count=1).strip()
     location_string = re.sub(r'[\s,:;]*\bnear\s+me\b[\s,:;]*', ', ',
                              location_string, flags=re.IGNORECASE).strip(' ,:;')
+    # [LOCAL-790] Strip a leading PLURAL-CATEGORY clause ("Pagodas and temples of
+    # Ho Chi Minh City", "churches of Rome", "museums in Paris") down to the area.
+    # Without this the whole phrase became the "city" ("Pagodas and temples of Ho
+    # Chi Minh City") and never resolved. The category nouns are a multi-venue
+    # theme, not part of the place name; what follows "of/in/around/…" is the area.
+    # A parenthetical anchor list is removed first so "(Jade Emperor Pagoda, …)"
+    # does not leak into the area string.
+    _pc_cleaned = re.sub(r'\([^)]*\)', ' ', location_string or '')
+    _pc_m = _PLURAL_CATEGORY_PREFIX_RE.match(_pc_cleaned.strip())
+    if _pc_m and _pc_m.group('area').strip():
+        location_string = _pc_m.group('area').strip()
     # Remove common tour-type phrases (as standalone phrases, not eating the rest of the string)
     clean = re.sub(r'\b(?:walking tour|biking tour|driving tour|audio tour|guided tour|self[- ]guided tour|tour|historic district)\b', '', location_string, flags=re.IGNORECASE).strip()
     
@@ -389,7 +552,21 @@ def _parse_location(location_string: str) -> Tuple[str, str]:
     
     # Collapse multiple spaces left by stripped words
     clean = re.sub(r'\s{2,}', ' ', clean).strip()
-    
+
+    # [LOCAL-790] A numbered-district list may carry INTERNAL commas ("Districts 1,
+    # 3 and 5, Ho Chi Minh City"). The generic comma split would tear "Districts 1"
+    # / "3 and 5" / "Ho Chi Minh City" into three segments and lose the clause. Join
+    # the numbers inside a leading "Districts <n>, <n> and <n>" prefix with " and "
+    # BEFORE the split, so the clause survives as one neighbourhood segment and the
+    # real area (what follows the LAST number) stays the city.
+    _dm = re.match(
+        r'^\s*((?:districts?|qu\u1eadn|quan|arrondissements?|wards?)\s+'
+        r'\d+(?:\s*(?:,|&|and|v\u00e0)\s*\d+)+)\s*,\s*(.+)$',
+        clean, flags=re.IGNORECASE)
+    if _dm:
+        _dclause = re.sub(r'\s*,\s*', ' and ', _dm.group(1))
+        clean = f"{_dclause}, {_dm.group(2)}"
+
     parts = [p.strip() for p in clean.split(',')]
     
     # [LOCAL-3] Also strip filler words from individual segments after split —
