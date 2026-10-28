@@ -10,6 +10,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:archive/archive.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:flutter/foundation.dart';
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
@@ -26,12 +27,12 @@ import '../services/failure_reporter.dart';
 import '../services/tour_pricing_service.dart';
 import '../services/downloaded_tour_meta.dart';
 import '../services/tour_download_service.dart';
+import '../services/translate_download_manager.dart';
 import '../utils/tour_display.dart';
 import '../config.dart';
 import '../config/endpoints.dart';
 import '../utils/share_code.dart';
 import '../utils/downloaded_message.dart';
-import '../utils/organiser_audio_notices.dart';
 import '../utils/search_dispatch.dart';
 import '../utils/place_geocoder.dart';
 import '../utils/map_zoom.dart';
@@ -3124,31 +3125,29 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _downloadSingleTour(int tourId, [List<String>? languages, Map<String, dynamic>? sourceItem]) async {
+    // [LOCAL-794] No app-blocking modal spinner. The English copy (when
+    // selected) is small and fast (Michael's log: 0.33 s, 2 MB), and its 402
+    // pay/members-only gate needs the screen's context for the Buy prompt /
+    // community-page hop — so it is pulled inline here WITHOUT a barrier
+    // dialog. The SLOW part (translate + per-language ZIP + save — the 2.5-min
+    // gap and the never-ending spinner in the LOCAL-794 reports) is handed to
+    // TranslateDownloadManager, which shows the app-wide progress row and lets
+    // the user keep using every tab. On completion the manager shows
+    // "<Language> version ready — Play" and the Listen page updates itself
+    // (SavedToursStore bump), with no modal to get stuck.
     final prefs = await SharedPreferences.getInstance();
-    
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => AlertDialog(
-        content: Row(
-          children: [
-            CircularProgressIndicator(),
-            SizedBox(width: 20),
-            Expanded(child: Text('Downloading tour...')),
-          ],
-        ),
-      ),
-    );
-    
-    try {
-      // [LOCAL-677B / D653] Download ONLY the selected languages. If English is
-      // deselected, do NOT pull the English tour to the phone — the server may
-      // still use English as the internal translation template, but the listener
-      // does not receive it. A null `languages` means the default (English only).
     final bool wantEnglish = TourTranslationHelper.shouldDownloadEnglish(languages);
-      if (wantEnglish) {
+    final List<String> nonEnglishLanguages =
+        (languages ?? const <String>[]).where((lang) => lang != 'en').toList();
+
+    // 1) English copy inline (fast; its 402 gate needs UI). On any failure the
+    // user is told and nothing is backgrounded.
+    if (wantEnglish) {
+      try {
         final dlUri = await _downloadTourUri(tourId);
-        final response = await http.get(dlUri, headers: await Endpoints.apiHeaders(Service.mapDelivery)).timeout(Duration(seconds: 120));
+        final response = await http
+            .get(dlUri, headers: await Endpoints.apiHeaders(Service.mapDelivery))
+            .timeout(const Duration(seconds: 120));
         if (response.statusCode == 200) {
           // [LOCAL-693B / D660 LEAD] Server-side consumption; the app reports
           // only failure. On save/validate failure, report download-failed so
@@ -3163,34 +3162,24 @@ class _HomeScreenState extends State<HomeScreen> {
             rethrow;
           }
         } else if (response.statusCode == 402) {
-          // [LOCAL-677C / D654] Pay before download: the server refused because
-          // this paid tour is not unlocked for this device. Never crash — close
-          // the progress dialog and tell the listener to buy. The download
-          // dialog's "Buy & Download" is the path that unlocks first.
-          //
-          // [LOCAL-701 / D663 §3] A COMMUNITY tour refuses with
-          // {"error":"membership_required","community_id":…} instead. The pass
-          // is bought on the community page (join / buy pass), the same flow as
-          // a paid tour — so open that page rather than the Buy dialog.
-          if (mounted && Navigator.of(context, rootNavigator: true).canPop()) {
-            Navigator.of(context, rootNavigator: true).pop(); // [LOCAL-762] dismiss root-pushed progress dialog
-          }
-          int? _communityId;
+          // [LOCAL-677C / D654] Pay before download. [LOCAL-701 / D663 §3] A
+          // COMMUNITY tour refuses membership_required → open the community
+          // page (join / buy pass). Both need the screen context, so they stay
+          // on this (inline) path, never in the background job.
+          int? communityId;
           try {
             final body = json.decode(response.body);
             if (body is Map && body['error'] == 'membership_required') {
               final cid = body['community_id'];
-              if (cid is int) _communityId = cid;
-              else if (cid is num) _communityId = cid.toInt();
+              if (cid is int) {
+                communityId = cid;
+              } else if (cid is num) {
+                communityId = cid.toInt();
+              }
             }
           } catch (_) {}
-          if (_communityId != null) {
-            // [LOCAL-739 §3] A members-only community tour. Show the gate
-            // ("This tour is for members of <community>") with a Join action
-            // that opens the community page and its passes — and carry THIS
-            // tour id so that, after the pass is granted, the tour downloads
-            // automatically and Listen opens (handled by CommunityPageScreen).
-            await _showMembersOnlyTourGate(_communityId, tourId);
+          if (communityId != null) {
+            await _showMembersOnlyTourGate(communityId, tourId);
             return;
           }
           if (mounted) {
@@ -3205,116 +3194,63 @@ class _HomeScreenState extends State<HomeScreen> {
         } else {
           throw Exception('Failed to download tour: ${response.statusCode}');
         }
-      }
-
-      if (!mounted) return;
-
-      // If languages specified, request translation from Services
-      final List<String> translationFailures = [];
-      if (languages != null && languages.isNotEmpty) {
-        final nonEnglishLanguages = languages.where((lang) => lang != 'en').toList();
-        if (nonEnglishLanguages.isNotEmpty) {
-          if (Navigator.of(context, rootNavigator: true).canPop()) {
-            Navigator.of(context, rootNavigator: true).pop(); // [LOCAL-762] Close root-pushed download dialog
-          }
-          showDialog(
-            context: context,
-            barrierDismissible: false,
-            builder: (context) => AlertDialog(
-              content: Row(
-                children: [
-                  CircularProgressIndicator(),
-                  SizedBox(width: 20),
-                  Expanded(child: Text('Requesting translation to ${nonEnglishLanguages.join(", ")}...')),
-                ],
-              ),
-            ),
-          );
-
-          final parentEditTourId = await _resolveParentEditTourId(tourId, prefs);
-          final failures = await TourTranslationHelper.downloadTranslatedVersions(
-              tourId: tourId,
-              languages: nonEnglishLanguages,
-              parentEditTourId: parentEditTourId,
-              sourceItem: sourceItem);
-          translationFailures.addAll(failures);
-
-          if (!mounted) return;
-          if (Navigator.of(context, rootNavigator: true).canPop()) {
-            Navigator.of(context, rootNavigator: true).pop(); // [LOCAL-762] Close root-pushed translation dialog
-          }
-        } else {
-          if (Navigator.of(context, rootNavigator: true).canPop()) {
-            Navigator.of(context, rootNavigator: true).pop(); // [LOCAL-762] Close root-pushed download dialog
-          }
-        }
-      } else {
-        if (Navigator.of(context, rootNavigator: true).canPop()) {
-          Navigator.of(context, rootNavigator: true).pop(); // [LOCAL-762] Close root-pushed download dialog
-        }
-      }
-
-      if (!mounted) return;
-      if (translationFailures.isEmpty) {
-        final selected = languages ?? const ['en'];
-        final nonEnglish = selected.where((l) => l != 'en').toList();
-        final String msg;
-        if (!wantEnglish && nonEnglish.isNotEmpty) {
-          // English deselected: only translations were saved.
-          msg = 'Tour downloaded in ${nonEnglish.join(", ")}';
-        } else {
-          // [LOCAL-716] Same wording helper as the other download sites, with
-          // correct singular/plural agreement. Exactly one tour here, so
-          // "1 tour downloaded and is now on your Listen page" (plus the
-          // "with N translation(s)" clause when extra languages were saved).
-          msg = downloadedMessage(
-            downloaded: 1,
-            translations: nonEnglish.length,
-          );
-        }
+      } catch (e) {
+        if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(msg),
-            backgroundColor: Colors.green,
-            // [LOCAL-716] View goes to the Listen tab and opens this one tour.
-            action: SnackBarAction(
-              label: 'View',
-              onPressed: () =>
-                  PendingListenOpen.instance.offer(tourId.toString()),
-            ),
+            content: Text('Error downloading tour: $e'),
+            backgroundColor: Colors.red,
           ),
         );
-      } else {
-        final failedNames = translationFailures.map((l) => TourTranslationHelper.availableLanguages[l] ?? l).join(', ');
-        // [LOCAL-760 / D708] 403 translation_not_offered → the broadcast D708
-        // message; an ordinary per-language failure keeps the "older tour" line.
-        final notOffered = TourTranslationHelper.lastTranslationNotOffered;
-        showDialog(
-          context: context,
-          builder: (context) => AlertDialog(
-            title: const Text('Translation Not Available'),
-            content: Text(translationFailureMessage(
-              translationNotOffered: notOffered,
-              failedLanguageNames: failedNames,
-            )),
-            actions: [
-              TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('OK')),
-            ],
-          ),
-        );
+        return;
       }
-    } catch (e) {
+    }
+
+    // 2) No translations requested → the English-only download is done. Show
+    // the snackbar with View and let Listen refresh itself (already saved).
+    if (nonEnglishLanguages.isEmpty) {
       if (!mounted) return;
-      if (Navigator.of(context, rootNavigator: true).canPop()) {
-        Navigator.of(context, rootNavigator: true).pop(); // [LOCAL-762] dismiss root-pushed progress dialog
-      }
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Error downloading tour: $e'),
-          backgroundColor: Colors.red,
+          content: Text(downloadedMessage(downloaded: 1, translations: 0)),
+          backgroundColor: Colors.green,
+          action: SnackBarAction(
+            label: 'View',
+            onPressed: () => PendingListenOpen.instance.offer(tourId.toString()),
+          ),
         ),
       );
+      return;
     }
+
+    // 3) Translations → background. One job at a time; the manager owns the
+    // progress row, the timeouts on every await, every exit path clearing the
+    // row, and the completion "<Language> version ready — Play" SnackBar. We do
+    // NOT await it: the user is free to switch tabs immediately.
+    final tourName = (sourceItem?['name'] ?? sourceItem?['title'])?.toString();
+    final job = TranslateDownloadJob(
+      tourId: tourId,
+      tourName: tourName,
+      languages: nonEnglishLanguages,
+      // English was pulled inline above; the job starts at the translate phase.
+      phase: TranslateDownloadPhase.translating,
+    );
+    // Fire-and-forget: the manager drives the UI through the global controller
+    // and messenger, so it needs no BuildContext and cannot be orphaned when
+    // this screen is disposed (a cause of the never-ending spinner).
+    unawaited(TranslateDownloadManager.instance.run(
+      job: job,
+      downloadEnglish: false, // already done inline
+      downloadEnglishStep: () async {},
+      resolveParentEditTourId: () => _resolveParentEditTourId(tourId, prefs),
+      translate: (parentEditTourId) =>
+          TourTranslationHelper.downloadTranslatedVersions(
+        tourId: tourId,
+        languages: nonEnglishLanguages,
+        parentEditTourId: parentEditTourId,
+        sourceItem: sourceItem,
+      ),
+    ));
   }
   
   /// [ST-3] Does this look like a share code rather than a place?

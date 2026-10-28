@@ -120,8 +120,23 @@ class TourTranslationHelper {
               // attached (the same fix the Generate screen needed).
               final tprefs = await SharedPreferences.getInstance();
               final tUserId = tprefs.getString('user_id') ?? '';
+              // [LOCAL-794] Timestamped markers around every await on the path
+              // from "translate completed" to "download-tour returns", so a
+              // live run shows exactly which await ate Michael's 2.5-min gap
+              // (DebugLogHelper itself is capped at 75 lines, so it is cheap).
+              final tDlStart = DateTime.now();
+              await DebugLogHelper.addDebugLog('TRANSLATE/MEASURE: ($lang) building download-tour URL');
               final translatedUri = await Endpoints.downloadTourUrl(translatedId);
-              final translatedResponse = await http.get(translatedUri, headers: await Endpoints.apiHeaders(Service.mapDelivery)).timeout(const Duration(seconds: 120));
+              final tHeaders = await Endpoints.apiHeaders(Service.mapDelivery);
+              await DebugLogHelper.addDebugLog(
+                  'TRANSLATE/MEASURE: ($lang) URL+headers ready in '
+                  '${DateTime.now().difference(tDlStart).inMilliseconds}ms — GET download-tour/$translatedId');
+              final tGetStart = DateTime.now();
+              final translatedResponse = await http.get(translatedUri, headers: tHeaders).timeout(const Duration(seconds: 120));
+              await DebugLogHelper.addDebugLog(
+                  'TRANSLATE/MEASURE: ($lang) download-tour HTTP ${translatedResponse.statusCode} in '
+                  '${DateTime.now().difference(tGetStart).inMilliseconds}ms '
+                  '(${translatedResponse.bodyBytes.length} bytes)');
               if (translatedResponse.statusCode == 200) {
                 final prefs = await SharedPreferences.getInstance();
                 final appDir = await getApplicationDocumentsDirectory();
@@ -133,8 +148,13 @@ class TourTranslationHelper {
                 // server restores that purchase once (within 24h). No confirm on
                 // success.
                 try {
+                  final tSaveStart = DateTime.now();
+                  await DebugLogHelper.addDebugLog('TRANSLATE/MEASURE: ($lang) saving translated tour $translatedId');
                   await _saveTranslatedTour(translatedId, translatedResponse.bodyBytes, appDir.path, prefs, parentEditTourId, lang,
                       version: version, updatedAt: updatedAt, sourceItem: sourceItem, parentServerTourId: tourId);
+                  await DebugLogHelper.addDebugLog(
+                      'TRANSLATE/MEASURE: ($lang) save complete in '
+                      '${DateTime.now().difference(tSaveStart).inMilliseconds}ms');
                 } catch (saveError) {
                   failures.add(lang);
                   await DebugLogHelper.addDebugLog(
