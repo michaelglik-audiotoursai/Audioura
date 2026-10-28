@@ -455,7 +455,7 @@ class _HomeScreenState extends State<HomeScreen> {
           // A PLACE is required here; if the only matches are POIs, return null
           // so the server geocoder gets a chance (it handles "Saigon"/typos).
           final hasPlace = candidates.any(isPlace);
-          final best = pickBestPlace(candidates);
+          final best = pickBestPlace(candidates, query: query);
           if (best != null && hasPlace) {
             await DebugLogHelper.addDebugLog(
                 'HOME: Nominatim place "${best.displayName}" '
@@ -1623,6 +1623,30 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
   
+  /// [LOCAL-793 live fix] Move the map safely.
+  ///
+  /// During a relocation the Home screen briefly shows a full-screen loading
+  /// spinner (`_isLoading == true`), so `build()` does NOT render the
+  /// `FlutterMap` and flutter_map disposes the `MapController`'s internal
+  /// controller. A `_mapController.move()` in that window throws
+  /// "A FlutterMapInternalController was used after being disposed", which on
+  /// the iOS simulator aborted `_useCustomLocation` before it could load the
+  /// area's tours or clear `_isLoading` — leaving the map stuck on the spinner
+  /// and NO tours shown (surfaced live, 2026-10-28, searching "Ho Chi Minh
+  /// City"). The move is in any case redundant while unmounted: when the map
+  /// remounts it is recreated with `initialCenter: _displayLocation`, i.e. the
+  /// new location. So swallow exactly that transient "disposed" error and let
+  /// the flow continue; any other error still surfaces in the debug log.
+  void _safeMapMove(LatLng location, double zoom) {
+    try {
+      _mapController.move(location, zoom);
+    } catch (e) {
+      // The controller is detached (map not mounted during the loading
+      // spinner); the map will re-center via initialCenter on remount.
+      DebugLogHelper.addDebugLog('HOME: map move skipped (controller not ready): $e');
+    }
+  }
+
   Future<void> _useCustomLocation(LatLng location, String name) async {
     setState(() {
       _displayLocation = location;
@@ -1650,7 +1674,7 @@ class _HomeScreenState extends State<HomeScreen> {
     await DebugLogHelper.addDebugLog('HOME: Using custom location: $name');
     
     // Move map to new location
-    _mapController.move(location, 13.0);
+    _safeMapMove(location, 13.0);
     
     // Load tours for new location
     await _loadNearbyTours();
@@ -1686,7 +1710,7 @@ class _HomeScreenState extends State<HomeScreen> {
       case ZoomOutAction.zoomToShow:
         // Zoom out so the nearby tour is on screen, then reload the view's
         // tours so the pins and the List reflect the wider area.
-        _mapController.move(center, decision.zoom!);
+        _safeMapMove(center, decision.zoom!);
         await _loadNearbyTours();
         return;
       case ZoomOutAction.announceDistance:
@@ -1700,7 +1724,7 @@ class _HomeScreenState extends State<HomeScreen> {
               onPressed: () {
                 final lat = (tour['lat'] as num).toDouble();
                 final lng = (tour['lng'] as num).toDouble();
-                _mapController.move(LatLng(lat, lng), 13.0);
+                _safeMapMove(LatLng(lat, lng), 13.0);
                 _loadNearbyTours();
               },
             ),
@@ -1759,7 +1783,7 @@ class _HomeScreenState extends State<HomeScreen> {
     await DebugLogHelper.addDebugLog('HOME: Reset to current location');
     
     if (_userLocation != null) {
-      _mapController.move(_userLocation!, 13.0);
+      _safeMapMove(_userLocation!, 13.0);
       await _loadNearbyTours();
     }
     

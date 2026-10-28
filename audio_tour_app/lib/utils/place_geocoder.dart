@@ -121,25 +121,94 @@ int _typePriority(GeoCandidate c) {
   return i < 0 ? _placeTypes.length : i;
 }
 
+/// Lower-case and strip diacritics so a query like "Mui Ne" matches a
+/// display_name of "Phường Mũi Né" (and "Ho Chi Minh" matches "Hồ Chí Minh").
+/// Only the Latin accents that appear in place names we care about are mapped;
+/// anything unmapped is kept as-is, so this never throws and never over-reaches.
+String _foldAccents(String s) {
+  final lower = s.toLowerCase();
+  const map = {
+    'à': 'a', 'á': 'a', 'ả': 'a', 'ã': 'a', 'ạ': 'a',
+    'ă': 'a', 'ằ': 'a', 'ắ': 'a', 'ẳ': 'a', 'ẵ': 'a', 'ặ': 'a',
+    'â': 'a', 'ầ': 'a', 'ấ': 'a', 'ẩ': 'a', 'ẫ': 'a', 'ậ': 'a',
+    'è': 'e', 'é': 'e', 'ẻ': 'e', 'ẽ': 'e', 'ẹ': 'e',
+    'ê': 'e', 'ề': 'e', 'ế': 'e', 'ể': 'e', 'ễ': 'e', 'ệ': 'e',
+    'ì': 'i', 'í': 'i', 'ỉ': 'i', 'ĩ': 'i', 'ị': 'i',
+    'ò': 'o', 'ó': 'o', 'ỏ': 'o', 'õ': 'o', 'ọ': 'o',
+    'ô': 'o', 'ồ': 'o', 'ố': 'o', 'ổ': 'o', 'ỗ': 'o', 'ộ': 'o',
+    'ơ': 'o', 'ờ': 'o', 'ớ': 'o', 'ở': 'o', 'ỡ': 'o', 'ợ': 'o',
+    'ù': 'u', 'ú': 'u', 'ủ': 'u', 'ũ': 'u', 'ụ': 'u',
+    'ư': 'u', 'ừ': 'u', 'ứ': 'u', 'ử': 'u', 'ữ': 'u', 'ự': 'u',
+    'ỳ': 'y', 'ý': 'y', 'ỷ': 'y', 'ỹ': 'y', 'ỵ': 'y',
+    'đ': 'd', 'ñ': 'n', 'ç': 'c',
+  };
+  final sb = StringBuffer();
+  for (final ch in lower.split('')) {
+    sb.write(map[ch] ?? ch);
+  }
+  return sb.toString();
+}
+
+/// How well [c]'s display name matches the search [query], diacritic- and
+/// case-insensitively. Higher is a better match. 0 when there is no query or no
+/// overlap. This is what keeps "Mui Ne" on **Mũi Né, Vietnam** instead of the
+/// globally-more-"important" **Meizhou, China** that Nominatim also returns:
+/// query relevance is a stronger signal than raw global importance for a place
+/// the user actually typed. The query's leading token (usually the place name,
+/// e.g. "mui ne" from "Mui Ne" or "mui ne" before the comma in "Mui Ne,
+/// Vietnam") must appear in the name to score; a bare country word alone does
+/// not (so it never drags an unrelated place up).
+int _queryRelevance(GeoCandidate c, String query) {
+  final q = _foldAccents(query).trim();
+  if (q.isEmpty) return 0;
+  final name = _foldAccents(c.displayName);
+  if (name.isEmpty) return 0;
+  // The part before any comma is the place the user named ("Mui Ne" from
+  // "Mui Ne, Vietnam"); fall back to the whole query when there is no comma.
+  final head = (q.contains(',') ? q.split(',').first : q).trim();
+  int score = 0;
+  // Strongest: the whole named place appears verbatim in the display name.
+  if (head.isNotEmpty && name.contains(head)) score += 100;
+  // Otherwise reward each query token found in the name, so a partial match
+  // ("mui" and "ne") still beats a zero-overlap candidate.
+  for (final tok in q.split(RegExp(r'[\s,]+'))) {
+    if (tok.length >= 2 && name.contains(tok)) score += 10;
+  }
+  return score;
+}
+
 /// Pick the best candidate from a parsed Nominatim result list.
 ///
 /// Rules (LOCAL-793):
-///   1. If ANY candidate is a PLACE, return the best place — the most prominent
-///      administrative area. Prominence is: higher `importance` first; then a
-///      smaller `place_rank` (larger area); then the earlier entry in
-///      [_placeTypes] (country before city before suburb). A POI can NEVER win
-///      when a place exists, so "Saigon Vietnam" resolves to Ho Chi Minh City,
-///      not to the Paris restaurant.
+///   1. If ANY candidate is a PLACE, return the best place. When a [query] is
+///      given, a place whose name MATCHES what the user typed wins first
+///      ([_queryRelevance]) — this keeps "Mui Ne" on Mũi Né, Vietnam rather
+///      than the globally-more-important Meizhou, China that Nominatim also
+///      returns. Ties (and the no-query case) fall back to the original order:
+///      higher `importance`, then a smaller `place_rank` (larger area), then
+///      the type-preference order (country → city → suburb). A POI can NEVER
+///      win when a place exists, so "Saigon Vietnam" resolves to Ho Chi Minh
+///      City, not to the Paris restaurant.
 ///   2. If NO candidate is a place, return the best POI by `importance` (then
 ///      the first entry), so a genuine POI-only search still resolves. The
 ///      widget may still prefer the server geocoder in this case.
 ///   3. Empty list → null.
-GeoCandidate? pickBestPlace(List<GeoCandidate> candidates) {
+///
+/// [query] is the raw text the user typed; when null/empty the ranking is
+/// exactly the pre-relevance behaviour (so callers and tests that pass no query
+/// are unaffected).
+GeoCandidate? pickBestPlace(List<GeoCandidate> candidates, {String? query}) {
   if (candidates.isEmpty) return null;
 
+  final q = query ?? '';
   final places = candidates.where(isPlace).toList();
   if (places.isNotEmpty) {
     places.sort((a, b) {
+      // Query relevance first (0 for both when no query → no effect).
+      if (q.isNotEmpty) {
+        final rel = _queryRelevance(b, q).compareTo(_queryRelevance(a, q));
+        if (rel != 0) return rel;
+      }
       // Higher importance first.
       final imp = b.importance.compareTo(a.importance);
       if (imp != 0) return imp;

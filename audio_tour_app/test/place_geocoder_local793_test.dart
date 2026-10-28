@@ -153,4 +153,66 @@ void main() {
       expect(parsed.first.displayName, 'Has coords');
     });
   });
+
+  group('pickBestPlace — "Mui Ne": the named place wins over a more-important '
+      'place in another country (LOCAL-793 live fix)', () {
+    // The REAL limit=8 Nominatim payload for "Mui Ne" (captured live
+    // 2026-10-28). Mũi Né, Vietnam is result[0] but has a LOWER global
+    // importance (0.387) than Meizhou, Guangdong, China (0.561) — so the old
+    // importance-only ranking picked Meizhou, China, stranding the user a
+    // continent away with none of Mui Ne's 3 tours. With the query passed,
+    // name relevance must put Mũi Né first.
+    final payload = <Map<String, dynamic>>[
+      {
+        'lat': '10.9356073', 'lon': '108.2863836',
+        'class': 'boundary', 'type': 'administrative',
+        'place_rank': '12', 'importance': '0.3874552331902155',
+        'display_name': 'Phường Mũi Né, Lâm Đồng Province, Vietnam',
+      },
+      {
+        'lat': '24.2918414', 'lon': '116.1171428',
+        'class': 'boundary', 'type': 'administrative',
+        'place_rank': '10', 'importance': '0.5608534632193285',
+        'display_name': 'Meizhou, Guangdong, China',
+      },
+      {
+        'lat': '24.4146228', 'lon': '116.2342558',
+        'class': 'boundary', 'type': 'administrative',
+        'place_rank': '12', 'importance': '0.4645508578551237',
+        'display_name': 'Meixian District, Meizhou, Guangdong, China',
+      },
+      {
+        'lat': '24.2694484', 'lon': '116.0761056',
+        'class': 'place', 'type': 'city',
+        'place_rank': '16', 'importance': '0.4645508578551237',
+        'display_name': 'Meixian, Meizhou, Guangdong, 514021, China',
+      },
+    ];
+
+    test('with the query, resolves to Mũi Né, Vietnam — never China', () {
+      final best = pickBestPlace(parseNominatim(payload), query: 'Mui Ne');
+      expect(best, isNotNull);
+      expect(best!.displayName, contains('Mũi Né'));
+      expect(best.displayName, contains('Vietnam'));
+      expect(best.displayName, isNot(contains('China')));
+      // Mui Ne, Vietnam coordinates (not Meizhou ~24.29,116.12).
+      expect(best.lat, closeTo(10.9356, 0.5));
+      expect(best.lon, closeTo(108.2864, 0.5));
+    });
+
+    test('"Mui Ne, Vietnam" (with country) also resolves to Vietnam', () {
+      final best =
+          pickBestPlace(parseNominatim(payload), query: 'Mui Ne, Vietnam');
+      expect(best!.displayName, contains('Mũi Né'));
+      expect(best.displayName, contains('Vietnam'));
+    });
+
+    test('without a query, the legacy importance-only order is unchanged', () {
+      // Documents that the fix is opt-in via [query]: with no query the old
+      // behaviour (Meizhou by importance) still stands, so every existing
+      // query-less caller/test is unaffected.
+      final best = pickBestPlace(parseNominatim(payload));
+      expect(best!.displayName, contains('Meizhou'));
+    });
+  });
 }

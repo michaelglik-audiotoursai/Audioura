@@ -89,10 +89,64 @@ Full suite vs baseline:
 `python3 -m py_compile map_delivery_service.py`: OK. Both gateway YAMLs parse.
 
 ## Live test
-Not run in this session (no simulator/emulator launched; one-heavy-build rule). The fix is validated by
-the unit + widget tests above, which encode the exact LEAD-reproduced Nominatim payloads and the 12 km
-zoom-out case. A live pass would search "Saigon Vietnam", "Hi Chi Minh, Vietnam", "Mui Ne" on the iOS
-simulator / Android emulator and screenshot Vietnam with the HCMC / Mui Ne tours.
+Run on the **iOS simulator** (iPhone 17 Pro, iOS 26.4) on **2026-10-28**, from this branch, debug build,
+`server_mode` cloud → **Subscribed Preview** (`--dart-define=APP_TRACK=subscribed`, built-in
+`GATEWAY_API_KEY`). Logs confirm every call went to `https://subscribed-api.audioura.com`. No Android run
+(time). No physical devices. Screenshots in `docs/local793/`.
+
+Backend state at test time (direct gateway probes, read-only, $0):
+`/tours-near/10.7769/106.7009?radius=50` → **4** HCMC tours; `/tours-near/10.9333/108.2875?radius=50` →
+**3** Mui Ne tours; `/geocode?q=…` → **HTTP 404** (the server-side typo geocoder is **not deployed on
+Preview yet**, as the task stated), so the typo cases exercise the client's place-only Nominatim path.
+
+| Query | Result (observed) | Expected? |
+|---|---|---|
+| **Saigon Vietnam** | Nominatim returned only POIs → client returns null → server `/geocode` 404 → snackbar **"Nothing found for 'Saigon Vietnam'"**; map stayed put (San Francisco), **never Paris**. `docs/local793/01`. | ✅ sane — never the Paris restaurant |
+| **Hi Chi Minh, Vietnam** (typo) | POI-only → `/geocode` 404 → snackbar **"Nothing found for 'Hi Chi Minh, Vietnam'"**; **not** a bus stop, **not** "0 tours". `docs/local793/02`. | ✅ sane — clear "not found", never a bus stop / false 0-tours |
+| **Ho Chi Minh City** | Nominatim place `Ho Chi Minh City, Vietnam` (boundary/administrative). Banner: **"Showing tours near: Ho Chi Minh City, Vietnam"**; map on Vietnam with tour pins; List shows **3 tours** at the default radius (**4** within 50 km). `docs/local793/03,04`. | ✅ Vietnam; resolved name in banner; HCMC tours visible |
+| **Mui Ne** | Resolves to **`Phường Mũi Né, Lâm Đồng Province, Vietnam`**. Banner confirms **Vietnam**; snackbar + **"Select Tours (3 available)"** incl. "Massage and spa in Mui Ne, Vietnam". `docs/local793/05,06`. | ✅ Vietnam (never China); Mui Ne's 3 tours shown |
+
+### Two bugs the live run surfaced — both fixed on this branch
+
+**1. Relocation crash → map stuck on spinner, no tours (the HCMC failure on first run).**
+`_useCustomLocation` set `_isLoading = true` (so `build()` returns a bare `CircularProgressIndicator`
+Scaffold, which unmounts the `FlutterMap` and disposes its `MapController`) and then called
+`_mapController.move()`, which threw *"A FlutterMapInternalController was used after being disposed"*.
+That exception aborted the method before it loaded the area's tours or cleared `_isLoading`, leaving the
+map stuck on the spinner with **no tours** — the same class of failure the ticket is about. The flaw is
+present at the base commit but lives on the LOCAL-793 relocation path. **Fix:** a small `_safeMapMove()`
+helper swallows exactly that transient "disposed" error (the map re-centers via `initialCenter:
+_displayLocation` when it remounts, so the move was redundant in that window anyway); the four
+relocation-path `move()` calls (`_useCustomLocation`, `_showNearestToursIfAny` ×2, `_resetToCurrentLocation`)
+now go through it. After the fix, "Ho Chi Minh City" lands on Vietnam with its tours, as shown.
+
+**2. "Mui Ne" resolved to the wrong country (Meizhou, China).** The live `limit=8` Nominatim payload for
+"Mui Ne" returns `Phường Mũi Né, Vietnam` as result[0] but with a **lower** global `importance` (0.387)
+than `Meizhou, Guangdong, China` (0.561). `pickBestPlace` ranked places by `importance` alone, so it
+picked **Meizhou, China** — wrong country, and none of Mui Ne's 3 tours. **Fix:** `pickBestPlace` takes an
+optional `query` and, among places, ranks a candidate whose name matches what the user typed first
+(diacritic-insensitive, so "Mui Ne" matches "Mũi Né"), with importance / place_rank / type as tie-breakers.
+Query-less callers and the earlier tests are unchanged (the relevance step is skipped without a query).
+
+### Regression
+- New unit tests: a **"Mui Ne"** group (3 tests) on the real Nominatim payload asserting Vietnam wins over
+  China (and documenting the unchanged query-less behaviour), added to `place_geocoder_local793_test.dart`.
+- `flutter test` (full suite): **+1167 / −8** — the 8 are the pre-existing `SocketException: Connection
+  refused` live-server tests (local109_swipe_e2e, storied_compat_*); **no new failures** (+3 vs the prior
+  +1164 baseline for the three new tests).
+- `flutter analyze` on the changed files: **0 errors** (only pre-existing style `info`/`warning`).
+
+### Files changed by the live-test fixes
+- `audio_tour_app/lib/screens/home_screen.dart` — `_safeMapMove()` + routing the relocation moves through it;
+  pass the query to `pickBestPlace`.
+- `audio_tour_app/lib/utils/place_geocoder.dart` — optional `query` + diacritic-insensitive name-relevance
+  ranking in `pickBestPlace`.
+- `audio_tour_app/test/place_geocoder_local793_test.dart` — "Mui Ne" regression group.
+- `docs/local793/` — the six live screenshots referenced above.
+
+### Cost
+$0 paid APIs. The only network calls were free Nominatim geocodes (the app's own path) and read-only
+gateway `/tours-near` + `/geocode` probes. No server deploys, no installs on physical phones.
 
 ## Cost
 Server geocoder makes at most **one** Serper Places query per lookup, via the metered door; no live
