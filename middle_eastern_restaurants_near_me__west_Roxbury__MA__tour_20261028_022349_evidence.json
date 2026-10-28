@@ -1,0 +1,125 @@
+{
+  "landmarks": {},
+  "claim_provenance": {
+    "counts": {
+      "sourced": 0,
+      "unsourced": 14,
+      "total": 14,
+      "corpus": 0,
+      "grounded": 0,
+      "parametric": 14
+    },
+    "per_stop": {
+      "Stardust: Inspired Mediterranean , Persian": {
+        "sourced": 0,
+        "unsourced": 2,
+        "total": 2
+      },
+      "Bread Thyme": {
+        "sourced": 0,
+        "unsourced": 12,
+        "total": 12
+      }
+    },
+    "claims": [
+      {
+        "stop": "Stardust: Inspired Mediterranean , Persian",
+        "text": "Inside, you'll find shelves lined with specialty Persian and Middle Eastern market goods.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Stardust: Inspired Mediterranean , Persian",
+        "text": "Here, the rice plates, priced at $15.99, are culinary narratives meticulously crafted.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Bread Thyme",
+        "text": "Arriving at Bread Thyme, nestled at 1866 Centre Street in West Roxbury, you stand before a space that has seen the culinary world transform.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Bread Thyme",
+        "text": "Once home to the River Grille, a Brazilian/Italian eatery that made its mark before moving on, Bread Thyme now brings the vibrant rhythms of Middle Eastern gastronomy to this corner of Boston.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Bread Thyme",
+        "text": "This family-run bakery, opened in late summer 2024, has swiftly become a beloved staple in the community, offering a menu rich with tradition and flavor.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Bread Thyme",
+        "text": "On the shelves, you’ll find an array of Persian sweets and saffron-infused pastries, each telling a story of culinary heritage and craftsmanship passed down through generations.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Bread Thyme",
+        "text": "Bread Thyme stands apart with its focus on authentic Middle Eastern fare.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Bread Thyme",
+        "text": "Its menu celebrates the region's agricultural heritage—ingredients like lentils, pistachios, and dates, first cultivated in the ancient Fertile Crescent, find their way into each dish.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Bread Thyme",
+        "text": "Fermentation, discovered in Mesopotamia and Ancient Egypt, continues to influence the bakery's approach to bread-making, creating textures and flavors that resonate with time-honored techniques.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Bread Thyme",
+        "text": "The location itself carries echoes of past enterprises, such as the River Grille, which offered a fusion of Brazilian and Italian flavors before its closure.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Bread Thyme",
+        "text": "In one notable episode, the owner of Sofia Italian Steakhouse on VFW Parkway pleaded guilty to a substantial 'under-the-table' cash wage scheme in 2024, evading over $500,000 in taxes—a stark reminder of the challenges faced in the food industry.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Bread Thyme",
+        "text": "Open from Monday to Saturday, 9:00 am to 7:00 pm, Bread Thyme invites you to savor its culinary offerings, priced in the mid-range.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Bread Thyme",
+        "text": "Together, these stops highlight the rich culinary traditions of the Middle East, showcasing how local businesses like Stardust and Bread Thyme honor their heritage while adapting to contemporary tastes.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Bread Thyme",
+        "text": "That's 2 stops in all.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      }
+    ]
+  }
+}

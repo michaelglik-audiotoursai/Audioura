@@ -46,9 +46,15 @@ class TestContradictionGuard:
 
 
 # ──────────── integration: _check_dining_existence end-to-end ────────────────
+# [LOCAL-788B] These integration cases use a DISTINCTIVELY-named place
+# ("Sultan's Kebab", distinctive token "sultan") rather than the wholly generic
+# "Kebab House". Under LOCAL-788B item 2 a generic-name place ("Kebab House") can
+# NEVER be verified by a Wikipedia snippet/article — it must be found on the map —
+# so the contradiction guard (item 5) is exercised here on a name that CAN carry
+# Wikipedia evidence, keeping both rules co-tested.
 _BITTERNE_SUMMARY = {
-    "title": "Kebab House",
-    "extract": ("Kebab House is a restaurant in Bitterne Park, a suburb of "
+    "title": "Sultan's Kebab",
+    "extract": ("Sultan's Kebab is a restaurant in Bitterne Park, a suburb of "
                 "Southampton, Hampshire, England. It serves Middle Eastern food."),
     "description": "restaurant in Southampton, England",
 }
@@ -57,14 +63,14 @@ _WR_SUMMARY_MISS = {"type": "https://mediawiki.org/wiki/HyperSwitch/errors/not_f
 _WR_SEARCH_HIT = {
     "query": {"search": [{
         "title": "Centre Street, West Roxbury",
-        "snippet": ("Kebab House is a Middle Eastern restaurant on Centre Street "
+        "snippet": ("Sultan's Kebab is a Middle Eastern restaurant on Centre Street "
                     "in West Roxbury, Boston, Massachusetts."),
     }]}
 }
 _BITTERNE_SEARCH_HIT = {
     "query": {"search": [{
         "title": "Bitterne Park",
-        "snippet": ("Kebab House is a restaurant in Bitterne Park, Southampton, "
+        "snippet": ("Sultan's Kebab is a restaurant in Bitterne Park, Southampton, "
                     "Hampshire, England, serving Middle Eastern cuisine."),
     }]}
 }
@@ -114,22 +120,22 @@ class TestDiningExistenceMatchesPlace:
         monkeypatch.setitem(sys.modules, "requests",
                             _make_fake_requests(_BITTERNE_SUMMARY, _EMPTY_SEARCH))
         ok, evidence = gate._check_dining_existence(
-            "Kebab House", "West Roxbury, MA", None)
+            "Sultan's Kebab", "West Roxbury, MA", None)
         assert ok is False, f"a UK Bitterne Park article must NOT verify a West Roxbury stop (got {evidence})"
 
     def test_bitterne_park_snippet_does_not_verify(self, monkeypatch):
         monkeypatch.setitem(sys.modules, "requests",
                             _make_fake_requests(None, _BITTERNE_SEARCH_HIT))
         ok, evidence = gate._check_dining_existence(
-            "Kebab House", "West Roxbury, MA", None)
+            "Sultan's Kebab", "West Roxbury, MA", None)
         assert ok is False, f"a Southampton/England snippet must not verify (got {evidence})"
 
     def test_real_west_roxbury_snippet_verifies(self, monkeypatch):
         monkeypatch.setitem(sys.modules, "requests",
                             _make_fake_requests(None, _WR_SEARCH_HIT))
         ok, evidence = gate._check_dining_existence(
-            "Kebab House", "West Roxbury, MA", None)
-        assert ok is True, "a genuine West Roxbury snippet must still verify"
+            "Sultan's Kebab", "West Roxbury, MA", None)
+        assert ok is True, "a genuine West Roxbury snippet (distinctive token) must still verify"
 
 
 if __name__ == "__main__":

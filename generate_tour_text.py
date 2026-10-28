@@ -10936,6 +10936,40 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
                     print(f"   OK Included {poi['name']} (verification failed, low confidence)")
             else:
                 poi_desc = poi.get("description", "") or ""
+                # [LOCAL-788B] The LLM "is this really a <type>?" exclusion must NOT
+                # drop a place the MAP confirms exists in scope. The field defect:
+                # the LLM EXCLUDED Al Wadi ("a common name … cannot be verified as
+                # such") — a REAL West Roxbury restaurant — while "verifying" two
+                # fabricated ones. places_search is the authority on existence; a
+                # map hit in scope overrides the LLM's low-confidence doubt. Only
+                # for place-type tours (dining/business/near-me), and only when the
+                # map positively returns the place (None=unknown falls through to
+                # the existing LLM-judgment path, never fabricates a keep).
+                _p4_map_saved = False
+                try:
+                    from stop_existence_gate import (is_place_type_tour as _p4_is_place,
+                                                     verify_listing_in_scope as _p4_vis)
+                    _p4_pt = intent.get('poi_type')
+                    if isinstance(_p4_pt, (list, tuple)):
+                        _p4_pt = ' or '.join(str(x) for x in _p4_pt)
+                    if _p4_is_place(tour_category=tour_category, poi_type=_p4_pt,
+                                    request_text=(user_request if 'user_request' in dir() else location)):
+                        _p4_scope = ''
+                        if intent and (intent.get('geographic_scope') or '').strip():
+                            _p4_scope = intent['geographic_scope'].strip()
+                        if not _p4_scope:
+                            _p4_scope = _scope_from_request(location, intent)
+                        if _p4_vis(poi["name"], _p4_scope) is True:
+                            poi['_maps_verified'] = True
+                            survivors.append(poi)
+                            _p4_map_saved = True
+                            print(f"   OK Kept {poi['name']} — [LOCAL-788B] "
+                                  f"places_search confirms it in {_p4_scope!r} "
+                                  f"(LLM exclusion overridden: {verification['reason']})")
+                except Exception as _p4_err:
+                    print(f"   [LOCAL-788B] PHASE 4 map override skipped (non-fatal): {_p4_err}")
+                if _p4_map_saved:
+                    continue
                 if "restaurant" in intent["poi_type"].lower() or "food" in intent["poi_type"].lower():
                     should, reason = should_include_in_restaurant_tour(poi["name"], poi_desc, verification["reason"])
                 else:
@@ -14739,44 +14773,67 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
                                                  _extract_cuisine_qualifier as _cv_ecq,
                                                  _cuisine_from_request as _cv_cfr,
                                                  verify_listing_cuisine as _cv_vlc,
-                                                 verify_listing_in_scope as _cv_vis)
-                if _cv_cls(_p3c_poi_type) == 'dining':
-                    _cv_cuisine = (_cv_ecq(_p3c_poi_type)
-                                   or _cv_cfr(user_request) or _cv_cfr(location))
-                    if _cv_cuisine:
-                        _cv_keep, _cv_drop = [], []
-                        for _cvp in poi_list:
-                            if _cvp.get('user_explicit') or _cvp.get('_anchor') or _cvp.get('_maps_verified'):
-                                _cv_keep.append(_cvp)
-                                continue
-                            # [LOCAL-779B] An LLM survivor counts ONLY if its listing
-                            # verifies inside the scope (the ticket's rule). Two
-                            # drops: (a) the place does not EXIST in scope on the map
-                            # (an invented "Mamma Maria's" in West Roxbury — False),
-                            # or (b) it exists but is a POSITIVELY different cuisine
-                            # (verify_listing_cuisine is False). A lookup that FAILED
-                            # (None from either) is UNKNOWN → kept (D162). The removed
-                            # slots are refilled from the maps-first search below, so
-                            # the delivered stops are map-verified in-scope places.
-                            _cv_exists = _cv_vis(_cvp['name'], _p3c_scope)
-                            if _cv_exists is False:
-                                _cv_drop.append((_cvp, 'not found in scope on the map'))
-                                continue
+                                                 verify_listing_in_scope as _cv_vis,
+                                                 is_place_type_tour as _cv_is_place)
+                # [LOCAL-788B] PLACES-FIRST: for a PLACE-TYPE tour (dining, business,
+                # "near me", "<things> in/near <area>"), an LLM-proposed name counts
+                # ONLY if places_search returns it within scope. The LOCAL-779B block
+                # did this for a dining request that carried a cuisine; LOCAL-788B
+                # makes the EXISTENCE check unconditional for every place-type tour
+                # (the field defect shipped two fabricated restaurants whose invented
+                # addresses passed the PHASE 3C string guard and were never looked up
+                # on the map). A name the map does not carry in scope is dropped and
+                # logged '[LOCAL-788B] llm name not on map <name>'; the freed slots
+                # are refilled from the maps-first search below, so every delivered
+                # stop is a map-verified in-scope place.
+                _cv_place_type = _cv_is_place(
+                    tour_category=tour_category, poi_type=_p3c_poi_type,
+                    request_text=(user_request if 'user_request' in dir() else location))
+                _cv_is_dining = _cv_cls(_p3c_poi_type) == 'dining'
+                if _cv_place_type:
+                    _cv_cuisine = ''
+                    if _cv_is_dining:
+                        _cv_cuisine = (_cv_ecq(_p3c_poi_type)
+                                       or _cv_cfr(user_request) or _cv_cfr(location))
+                    _cv_keep, _cv_drop = [], []
+                    for _cvp in poi_list:
+                        # Map-sourced, user-named and route-anchor stops are already
+                        # on the map (or sacrosanct) — never re-dropped here.
+                        if _cvp.get('user_explicit') or _cvp.get('_anchor') or _cvp.get('_maps_verified'):
+                            _cv_keep.append(_cvp)
+                            continue
+                        # (a) EXISTENCE on the map in scope. False = the provider
+                        # answered and the named place is NOT there (a fabricated
+                        # Sultan's Kebab / Cafe Jaffa). None = the lookup FAILED
+                        # (UNKNOWN -> kept, D162; the gate downstream still guards it).
+                        _cv_exists = _cv_vis(_cvp['name'], _p3c_scope)
+                        if _cv_exists is False:
+                            _cv_drop.append((_cvp, 'llm name not on map'))
+                            continue
+                        # (b) For a dining request with a cuisine, a positively
+                        # different cuisine is also a drop (Mamma Maria for Middle
+                        # Eastern). Absent/unknown cuisine tag is kept (OSM is sparse).
+                        if _cv_is_dining and _cv_cuisine:
                             _cv_ok = _cv_vlc(_cvp['name'], _p3c_scope, _cv_cuisine)
                             if _cv_ok is False:
                                 _cv_drop.append((_cvp, f'listing cuisine does not match {_cv_cuisine!r}'))
+                                continue
+                        _cv_keep.append(_cvp)
+                    if _cv_drop:
+                        for _cvp, _why in _cv_drop:
+                            forbidden_norms.add(_normalize_name(_cvp['name']))
+                            if _why == 'llm name not on map':
+                                # [LOCAL-788B] the exact ticket log line.
+                                print(f"   [LOCAL-788B] llm name not on map {_cvp['name']}")
                             else:
-                                _cv_keep.append(_cvp)
-                        if _cv_drop:
-                            for _cvp, _why in _cv_drop:
-                                forbidden_norms.add(_normalize_name(_cvp['name']))
                                 print(f"   [LOCAL-779B] CUISINE-VERIFY: dropped "
                                       f"{_cvp['name']!r} — {_why}")
-                            poi_list = _cv_keep
-                            print(f"   [LOCAL-779B] CUISINE-VERIFY: {len(_cv_drop)} "
-                                  f"unverified LLM survivor(s) dropped; {len(poi_list)} remain")
+                        poi_list = _cv_keep
+                        print(f"   [LOCAL-788B] PLACES-FIRST: {len(_cv_drop)} "
+                              f"unverified LLM name(s) dropped (not on the map in "
+                              f"scope); {len(poi_list)} map-verified remain")
             except Exception as _cv_err:
-                print(f"   [LOCAL-779B] cuisine-verify skipped (non-fatal): {_cv_err}")
+                print(f"   [LOCAL-788B] places-first verify skipped (non-fatal): {_cv_err}")
             _p3c_kind = 'landmark'
             if len(poi_list) < total_stops:
                 try:
@@ -15347,7 +15404,18 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
             # N−1 with the honest shortfall — never an unverified stop.
             try:
                 from stop_existence_gate import get_gate_mode_for_category as _eg_cat_mode
-                _seg_mode = _eg_cat_mode(tour_category)
+                # [LOCAL-788B] Pass poi_type + request text so a PLACE-TYPE tour
+                # (dining/business/near-me) forces ENFORCE even when the app sent
+                # tour_type "" — the category alone ('restaurant') covers the dining
+                # case, poi_type/request covers business and "near me".
+                _seg_gate_poi_type = ''
+                if intent and intent.get('poi_type'):
+                    _rawpt_m = intent['poi_type']
+                    _seg_gate_poi_type = (" or ".join(_rawpt_m)
+                                          if isinstance(_rawpt_m, list) else _rawpt_m)
+                _seg_mode = _eg_cat_mode(
+                    tour_category, poi_type=_seg_gate_poi_type,
+                    request_text=(user_request if 'user_request' in dir() else location))
             except Exception:
                 _seg_mode = get_gate_mode()
             if _seg_mode == 'enforce' and get_gate_mode() != 'enforce':

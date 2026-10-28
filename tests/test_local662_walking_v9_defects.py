@@ -75,10 +75,20 @@ class TestDefect1WalkingEnforce(unittest.TestCase):
         self.assertEqual(self._mode("walking"), "enforce")
         self.assertEqual(self._mode("specialized"), "enforce")
 
-    def test_museum_and_dining_keep_global_mode(self):
+    def test_museum_keeps_global_mode(self):
+        # Museum tours ground on their own corpus / venue page, so they keep the
+        # shared-stack mode (the museum canary stays byte-for-byte identical).
         os.environ["STOP_EXISTENCE_GATE_MODE"] = "log_only"
         self.assertEqual(self._mode("museum"), "log_only")
-        self.assertEqual(self._mode("restaurant"), "log_only")
+
+    def test_dining_forces_enforce_local788b(self):
+        # [LOCAL-788B] A dining/restaurant tour is a PLACE-TYPE tour: its stops
+        # must come from the map and an unverified stop must never ship. The
+        # LOCAL-788B field defect shipped two fabricated restaurants under
+        # log_only, so dining now joins walking in forcing ENFORCE (superseding the
+        # old LOCAL-662 "dining keeps global mode" assertion).
+        os.environ["STOP_EXISTENCE_GATE_MODE"] = "log_only"
+        self.assertEqual(self._mode("restaurant"), "enforce")
 
     def test_explicit_off_wins_even_for_walking(self):
         os.environ["STOP_EXISTENCE_GATE_MODE"] = "off"

@@ -1,0 +1,207 @@
+{
+  "landmarks": {
+    "Jamaica Plain Coffee": {
+      "status": "VERIFIED",
+      "canonical_name": "Jamaica Plain",
+      "qid": "Q985993",
+      "type": "",
+      "coordinates": "42.307500, -71.113056"
+    },
+    "Tres Gatos": {
+      "status": "UNVERIFIED",
+      "reason": "not in discovered landmarks"
+    },
+    "The Coffee Shop": {
+      "status": "UNVERIFIED",
+      "reason": "not in discovered landmarks"
+    },
+    "Ula Cafe": {
+      "status": "UNVERIFIED",
+      "reason": "not in discovered landmarks"
+    },
+    "Dorado": {
+      "status": "UNVERIFIED",
+      "reason": "not in discovered landmarks"
+    },
+    "Blue Frog Bakery": {
+      "status": "UNVERIFIED",
+      "reason": "not in discovered landmarks"
+    }
+  },
+  "claim_provenance": {
+    "counts": {
+      "sourced": 4,
+      "unsourced": 17,
+      "total": 21,
+      "corpus": 4,
+      "grounded": 0,
+      "parametric": 17
+    },
+    "per_stop": {
+      "Jamaica Plain Coffee": {
+        "sourced": 1,
+        "unsourced": 5,
+        "total": 6
+      },
+      "Ula Cafe": {
+        "sourced": 1,
+        "unsourced": 7,
+        "total": 8
+      },
+      "Tres Gatos": {
+        "sourced": 2,
+        "unsourced": 5,
+        "total": 7
+      }
+    },
+    "claims": [
+      {
+        "stop": "Jamaica Plain Coffee",
+        "text": "Jamaica Plain Coffee offers a glimpse into the community’s vibrant tapestry.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Jamaica Plain Coffee",
+        "text": "In 2022, just around the corner at City Feed and Supply, a significant labor movement unfolded.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Jamaica Plain Coffee",
+        "text": "The workers formed City Feed Unite, demanding higher wages, healthcare, and COVID safety protections after their management cut pandemic hazard pay.",
+        "class": "corpus",
+        "source": "knowledge_fallback:gemini",
+        "evidence": "In spring 2022, workers at City Feed and Supply formed City Feed Unite to demand higher wages, healthcare, and COVID safety protections after management cut pandemic hazard pay."
+      },
+      {
+        "stop": "Jamaica Plain Coffee",
+        "text": "David Warner and Kristine Cortese, the owners, refused to recognize the union voluntarily, which led to public protests and filings with the National Labor Relations Board (NLRB).",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Jamaica Plain Coffee",
+        "text": "A year later, in 2023, another chapter unfolded nearby at 182 Hyde Park Avenue with the opening of Public Coffee Initially welcomed as a new addition to the local coffee scene, it was soon discovered to be affiliated with a plant for the Wesleyan Church.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Jamaica Plain Coffee",
+        "text": "These episodes paint a picture of Jamaica Plain as a community deeply engaged in social issues, where coffee shops are not just places to enjoy a brew but also arenas for activism and change.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Ula Cafe",
+        "text": "Ula Cafe is a vibrant gathering place in Boston’s Jamaica Plain, weaving together the community’s past and present.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Ula Cafe",
+        "text": "The nearby Haffenreffer Brewery, established in 1870 by German immigrant Rudolph Frederick Haffenreffer, was a cornerstone of Jamaica Plain and remained in the Haffenreffer family for generations until the mid-20th century.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Ula Cafe",
+        "text": "This legacy of enterprise and community spirit continues at Ula Cafe, which reflects the neighborhood’s enduring values.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Ula Cafe",
+        "text": "In November 2022, the café’s commitment to being a safe and inclusive space was tested when a transgender barista was targeted with a transphobic tirade.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Ula Cafe",
+        "text": "In response, co-owners Marvin Mathelier and Beth Santos made a public commitment to protect their space, sending a community bulletin that announced immediate ejections for anyone threatening the safe environment they had cultivated.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Ula Cafe",
+        "text": "This challenging event reinforced Ula Cafe’s role as a bastion of community values.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Ula Cafe",
+        "text": "Another testament to this spirit is the 'Pay-It-Forward' wall, where customers can purchase meals or coffee in advance for those in need.",
+        "class": "corpus",
+        "source": "knowledge_fallback:gemini",
+        "evidence": "Ula Cafe introduced a 'Pay-It-Forward' wall where customers can buy food or coffee in advance for strangers in need."
+      },
+      {
+        "stop": "Ula Cafe",
+        "text": "Ula Cafe stands not just as a place to savor coffee, but as a living narrative of Jamaica Plain’s commitment to inclusivity and community.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Tres Gatos",
+        "text": "Tres Gatos is not just a café; it is a living narrative of Jamaica Plain's vibrant community spirit.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Tres Gatos",
+        "text": "In 2015, Tres Gatos became one of the first establishments in Massachusetts to introduce a mandatory 'Hospitality Administrative Fee' added directly to checks.",
+        "class": "corpus",
+        "source": "knowledge_fallback:gemini",
+        "evidence": "In 2015, Tres Gatos became one of the very first restaurants in Massachusetts to introduce a mandatory 'Hospitality Administrative Fee' added directly to checks."
+      },
+      {
+        "stop": "Tres Gatos",
+        "text": "By shifting part of the cost burden to patrons, Tres Gatos aimed to ensure equitable pay for its staff and sparked conversations across the local restaurant scene.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Tres Gatos",
+        "text": "Doyle and his team later sought to expand their presence by acquiring the Centre Street Cafe.",
+        "class": "corpus",
+        "source": "knowledge_fallback:gemini",
+        "evidence": "Doyle and the team behind Tres Gatos tried to expand their local footprint by taking over Centre Street Cafe, which turned into a prolonged process over liquor license transfers and community board ap"
+      },
+      {
+        "stop": "Tres Gatos",
+        "text": "As you take in the atmosphere, consider how Tres Gatos, much like the Ula Cafe you visited earlier, captures the essence of Jamaica Plain.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Tres Gatos",
+        "text": "Together, these stops illustrate Jamaica Plain's ongoing commitment to community advocacy, inclusivity, and social justice, as seen through the narratives of local cafés.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Tres Gatos",
+        "text": "That's 3 stops in all.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      }
+    ]
+  }
+}
