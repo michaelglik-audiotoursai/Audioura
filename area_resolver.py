@@ -1951,12 +1951,31 @@ def apply_named_place_policy(poi_list, named_places, area, landmarks, new_poi_fn
                       f"user-explicit, verified stop")
             continue
 
-        # Could not verify from the discovered landmarks → ANNOUNCE, never drop.
-        # Remove any unverifiable placeholder candidate for the same name (it is
-        # announced, not shipped as a stop), but the LISTENER still hears about it.
+        # Could not match a DISCOVERED landmark. Two cases:
+        #
+        #   (a) The named place is ALREADY a candidate — the model proposed it and
+        #       the stop_corpus/knowledge path already stands behind it. [LOCAL-791C
+        #       item 1] A place the listener NAMED that exists in the tour IS a stop:
+        #       keep it, flag it user_explicit so the tail trim and the scope/off-
+        #       category gates cannot drop it. Landmark discovery is a POSITIVE
+        #       signal, never a gate — OSM/Wikidata discovery for an abbreviated
+        #       scope ("HCMC") routinely fails to surface a real pagoda, and the
+        #       791B live run dropped BOTH user anchors (Jade Emperor Pagoda, Thien
+        #       Hau Temple) here precisely because discovery did not list them. Do
+        #       NOT announce "not part of this tour" for a place that IS part of it.
+        #
+        #   (b) The named place is NOT a candidate at all → it genuinely is not in
+        #       the tour: ANNOUNCE it (D562 — never silently dropped), do not insert
+        #       an unverifiable placeholder.
         if already:
-            _keep = [p for p in poi_list if p not in already]
-            poi_list = _keep
+            for p in already:
+                p['user_explicit'] = True
+                p['_anchor'] = True
+            print(f"  [LOCAL-751] Named place '{name}' not in discovered landmarks "
+                  f"for {area.city_name or 'the area'!r} but IS a candidate — KEPT "
+                  f"as a user-explicit stop (LOCAL-791C: a named place that exists "
+                  f"is a stop)")
+            continue
         announcements.append(build_named_place_announcement(name))
         print(f"  [LOCAL-751] Named place '{name}' could not be confirmed in "
               f"{area.city_name or 'the area'!r} — ANNOUNCED (not silently dropped)")

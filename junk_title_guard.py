@@ -232,6 +232,11 @@ _GENERIC_WORD_TITLES = frozenset({
     "modern", "old", "new", "scenic", "various", "miscellaneous", "other",
     "others", "more", "misc", "general", "overview", "introduction", "intro",
     "untitled", "unknown", "none", "test", "sample", "example", "placeholder",
+    # [LOCAL-791E defect 4] bare architectural QUALIFIERS the Old Saigon venue-parts
+    # path shipped as one-word "stops" ("Grand" — left after a "Grand foyer" split).
+    # An adjective-qualifier alone names no place.
+    "grand", "main", "great", "upper", "lower", "inner", "outer", "front",
+    "rear", "central", "northern", "southern", "eastern", "western", "royal",
 })
 
 # Words that make a title read as a sentence/clause rather than a proper name:
