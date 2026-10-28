@@ -1965,6 +1965,222 @@ def apply_named_place_policy(poi_list, named_places, area, landmarks, new_poi_fn
 
 
 # ============================================================
+# [LOCAL-799 / D562] Reconcile the named-place announcement against the FINAL
+# stop list — the list after replenish / dedup / renaming, not the intermediate
+# candidate pool apply_named_place_policy saw.
+#
+# Field evidence (tour 467, "Mui Ne sights: Fairy Stream, Red Sand Dunes, White
+# Sand Dunes, fishing village (by car)"): the tour SHIPPED Red Canyon, Red Sand
+# Dunes, Mui Ne Fishing Village, Mui Ne Market, Fairy Stream — yet Stop 1's
+# Orientation announced "We could not confirm Fairy Stream … Red Sand Dunes …
+# White Sand Dunes … fishing village …". Three of those four ARE stops; only
+# White Sand Dunes was really missing. The announcement was decided too early
+# (against the discovered-landmark set, before the pool was renamed/replenished
+# into the final stops) and one sentence was emitted per name, in the stop's
+# Orientation line. This reconciler fixes all three: it is called with the FINAL
+# stops, folds a named place to a stop by normalized token containment or a 300 m
+# geocode, tries places_search once for a name no stop covers (so a transient
+# Overpass/Wikidata failure does not produce a false "could not confirm",
+# LOCAL-790/788B), and leaves exactly the genuinely-uncovered names to announce
+# in ONE intro sentence.
+# ============================================================
+
+# A named place counts as COVERED by a final stop when the two points are within
+# this distance — the same "same place" tolerance band the tour uses elsewhere,
+# widened to 300 m because a user-named place and the discovered stop can geocode
+# to opposite ends of a dune field / market / village (ticket: "geocode within
+# 300 m").
+_NAMED_PLACE_COVER_METERS = 300.0
+
+
+def _haversine_m(a, b) -> float:
+    """Great-circle distance in metres between two (lat, lng) pairs; inf if either
+    is missing/unparseable (so a missing coordinate never falsely 'covers')."""
+    try:
+        import math
+        lat1, lng1 = float(a[0]), float(a[1])
+        lat2, lng2 = float(b[0]), float(b[1])
+    except (TypeError, ValueError, IndexError):
+        return float('inf')
+    if (lat1 == 0.0 and lng1 == 0.0) or (lat2 == 0.0 and lng2 == 0.0):
+        return float('inf')
+    R = 6371000.0
+    p1, p2 = math.radians(lat1), math.radians(lat2)
+    dphi = math.radians(lat2 - lat1)
+    dlmb = math.radians(lng2 - lng1)
+    h = (math.sin(dphi / 2) ** 2
+         + math.cos(p1) * math.cos(p2) * math.sin(dlmb / 2) ** 2)
+    return 2 * R * math.asin(min(1.0, math.sqrt(h)))
+
+
+def _poi_latlng(poi: dict):
+    """Best (lat, lng) for a final stop, trying the several coordinate keys the
+    pipeline stamps (wikidata P625, then the delivered latitude/longitude)."""
+    if not isinstance(poi, dict):
+        return None
+    for lat_k, lng_k in (('wikidata_lat', 'wikidata_lng'),
+                         ('latitude', 'longitude'),
+                         ('lat', 'lng'), ('lat', 'lon')):
+        lat, lng = poi.get(lat_k), poi.get(lng_k)
+        if lat is None or lng is None:
+            continue
+        try:
+            flat, flng = float(lat), float(lng)
+        except (TypeError, ValueError):
+            continue
+        if flat == 0.0 and flng == 0.0:
+            continue
+        return (flat, flng)
+    return None
+
+
+def _named_place_is_covered(name: str, final_pois, name_coord=None) -> bool:
+    """True when a FINAL stop covers the user-named place ``name``.
+
+    Two independent signals, either sufficient (ticket point 1):
+
+      * Normalized / diacritic-folded TOKEN match. A named place is covered when
+        every content token of its normalized name appears in a stop's normalized
+        name (so "fishing village" ⊂ "Mui Ne Fishing Village", "Red Sand Dunes" =
+        "Red Sand Dunes"), or vice-versa for the rare case the stop name is the
+        shorter one. Reuses ``_normalize_landmark_name`` so it behaves exactly
+        like the walking-path matcher.
+      * GEOCODE within ``_NAMED_PLACE_COVER_METERS`` — when the named place has a
+        coordinate (resolved upstream) and a stop carries one.
+    """
+    nn = _normalize_landmark_name(name)
+    if not nn:
+        return False
+    n_tokens = set(nn.split())
+    if not n_tokens:
+        return False
+
+    for poi in final_pois or []:
+        stop_name = poi.get('name', '') if isinstance(poi, dict) else str(poi)
+        sn = _normalize_landmark_name(stop_name)
+        if sn:
+            s_tokens = set(sn.split())
+            if s_tokens:
+                # Every token of the shorter name present in the longer → same place.
+                if n_tokens <= s_tokens or s_tokens <= n_tokens:
+                    return True
+                # Substring containment on the joined normalized forms catches
+                # token-order / glued cases ("oldtown" vs "old town") the set test
+                # misses, but only when both are non-trivial (len>=4) to avoid a
+                # 2-letter coincidence.
+                if len(nn) >= 4 and len(sn) >= 4 and (nn in sn or sn in nn):
+                    return True
+        if name_coord:
+            pc = _poi_latlng(poi)
+            if pc and _haversine_m(name_coord, pc) <= _NAMED_PLACE_COVER_METERS:
+                return True
+    return False
+
+
+def reconcile_named_place_announcement(named_places, final_pois,
+                                       name_coords=None,
+                                       places_search_fn=None,
+                                       scope=None, scope_center=None,
+                                       scope_bbox=None):
+    """Decide which user-named places to announce, AGAINST THE FINAL STOP LIST.
+
+    LOCAL-799 / D562. Called once, LATE — after replenish / dedup / renaming have
+    settled ``final_pois`` — so a place the listener named that actually SHIPPED
+    as a stop (possibly under a renamed title, e.g. "fishing village" →
+    "Mui Ne Fishing Village") is never announced as missing.
+
+    For every name in ``named_places``:
+      1. If a FINAL stop covers it (``_named_place_is_covered`` — normalized token
+         match or a 300 m geocode using ``name_coords[name]`` when present), it is
+         COVERED → not announced.
+      2. Else, if ``places_search_fn`` is given, try the map ONCE (the
+         LOCAL-790/788B rescue): a name that was only "unconfirmed" because a
+         source (Overpass / Wikidata) failed is on the map, so we do NOT announce a
+         false "could not confirm". Any non-empty result suppresses the
+         announcement. Exceptions and empty results fall through to announce.
+      3. Else the name is genuinely uncovered → it is announced.
+
+    Pure except for the injected ``places_search_fn`` (no import here), so the
+    unit tests run offline. Returns the list of uncovered names, de-duplicated,
+    in the order the listener gave them. ``build_named_place_intro_sentence``
+    turns that list into the single intro sentence.
+    """
+    name_coords = name_coords or {}
+    uncovered = []
+    seen = set()
+    for raw in named_places or []:
+        name = (raw or "").strip() if isinstance(raw, str) else ""
+        if len(name) < 3:
+            continue
+        key = name.lower()
+        if key in seen:
+            continue
+        seen.add(key)
+
+        coord = name_coords.get(name) or name_coords.get(key)
+        if _named_place_is_covered(name, final_pois, name_coord=coord):
+            continue
+
+        # Not a final stop. Before announcing a false negative, try the map once.
+        if places_search_fn is not None:
+            try:
+                hits = places_search_fn(
+                    name, scope=scope or "", scope_center=scope_center,
+                    scope_bbox=scope_bbox)
+            except TypeError:
+                # A caller may inject a 1-arg fake / a differently-signed fn.
+                try:
+                    hits = places_search_fn(name)
+                except Exception:
+                    hits = None
+            except Exception:
+                hits = None
+            if hits:
+                # On the map in scope → exists; do not announce "could not confirm".
+                continue
+
+        uncovered.append(name)
+    return uncovered
+
+
+def build_named_place_intro_sentence(uncovered_names) -> str:
+    """ONE natural sentence for the user-named places no final stop covers.
+
+    LOCAL-799. Replaces the LOCAL-751 one-sentence-PER-name wording (and its
+    placement inside a stop's Orientation line). Placed AFTER the welcome by the
+    caller. Examples:
+
+      []                               → ""   (no announcement)
+      ["White Sand Dunes"]             → "One place you asked for, White Sand
+                                          Dunes, could not be confirmed, so it
+                                          isn't included."
+      ["White Sand Dunes", "X Cave"]   → "A couple of places you asked for, White
+                                          Sand Dunes and X Cave, could not be
+                                          confirmed, so they aren't included."
+      [a, b, c, …]                     → "Some places you asked for, a, b and c,
+                                          could not be confirmed, so they aren't
+                                          included."
+    """
+    names = [n.strip() for n in (uncovered_names or []) if n and n.strip()]
+    if not names:
+        return ""
+
+    if len(names) == 1:
+        joined = names[0]
+        lead = "One place you asked for"
+        tail = "could not be confirmed, so it isn't included."
+    else:
+        if len(names) == 2:
+            joined = f"{names[0]} and {names[1]}"
+            lead = "A couple of places you asked for"
+        else:
+            joined = ", ".join(names[:-1]) + f" and {names[-1]}"
+            lead = "Some places you asked for"
+        tail = "could not be confirmed, so they aren't included."
+    return f"{lead}, {joined}, {tail}"
+
+
+# ============================================================
 # Cache integration (A6: key by area QID, store radius)
 # ============================================================
 

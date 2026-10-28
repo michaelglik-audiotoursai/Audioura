@@ -363,3 +363,62 @@ def inject_orientation_disclosure(final_text: str, disclosure: str) -> str:
 
     # No stop structure found at all — open the whole text with the disclosure.
     return disclosure + '\n\n' + final_text
+
+
+def inject_named_place_after_welcome(final_text: str, sentence: str) -> str:
+    """Place the LOCAL-799 named-place sentence AFTER the welcome, as its OWN
+    paragraph — never inside a stop's Orientation line.
+
+    The "welcome" is the tour-level prolog ("You are about to embark on a journey
+    …") that opens Stop 1. On tour 467 the LOCAL-751 code spliced the announcement
+    into the Orientation LINE, so the listener heard "We could not confirm …" as
+    the first thing on the route. The ticket wants one natural sentence that reads
+    after the welcome, e.g. "One place you asked for, White Sand Dunes, could not
+    be confirmed, so it isn't included."
+
+    Placement, in order of preference:
+      1. Right after the prolog/welcome paragraph (located structurally via
+         prolog_structure_validator.extract_prolog_from_tour_content), as a new
+         paragraph.
+      2. If no prolog is found, after the Stop 1 Orientation PARAGRAPH (the block
+         ending at the blank line after "Orientation:"), as a new paragraph —
+         still outside the Orientation line itself.
+      3. If no stop structure is found, open the whole text with the sentence.
+
+    Idempotent: if the sentence already appears verbatim, the text is returned
+    unchanged (never doubled).
+    """
+    if not final_text or not sentence:
+        return final_text
+    sentence = sentence.strip()
+    if not sentence or sentence in final_text:
+        return final_text
+
+    # 1) After the welcome/prolog paragraph.
+    try:
+        from prolog_structure_validator import extract_prolog_from_tour_content
+        prolog = (extract_prolog_from_tour_content(final_text) or "").strip()
+    except Exception:
+        prolog = ""
+    if prolog:
+        # The prolog may be stored as one or more paragraphs; anchor on its LAST
+        # paragraph so we land immediately after the whole welcome.
+        last_para = prolog.split('\n\n')[-1].strip()
+        idx = final_text.find(last_para)
+        if idx != -1:
+            insert_at = idx + len(last_para)
+            return (final_text[:insert_at] + '\n\n' + sentence
+                    + final_text[insert_at:])
+
+    # 2) After the Stop 1 Orientation PARAGRAPH (not inside the line).
+    m = re.search(r'Orientation:\s*.+?(?:\n\n|\Z)', final_text, re.DOTALL)
+    if m:
+        insert_at = m.end()
+        sep = '' if final_text[:insert_at].endswith('\n\n') else '\n\n'
+        return (final_text[:insert_at].rstrip('\n') + '\n\n' + sentence
+                + '\n\n' + final_text[insert_at:].lstrip('\n')) \
+            if final_text[insert_at:].strip() else \
+            (final_text[:insert_at].rstrip('\n') + '\n\n' + sentence + '\n')
+
+    # 3) No stop structure — open the text with the sentence.
+    return sentence + '\n\n' + final_text
