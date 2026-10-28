@@ -43,6 +43,39 @@ from typing import Dict, List, Optional, Set, Tuple
 logger = logging.getLogger(__name__)
 
 
+def _end_read_txn(db_conn) -> None:
+    """[LOCAL-797] End any transaction opened by this gate's read-only SELECTs.
+
+    The gate NEVER writes — it only runs SELECTs against venue_corpus/stop_corpus
+    on a connection owned by the caller. On a non-autocommit connection each
+    SELECT silently opens a transaction that stays "idle in transaction" (holding
+    an AccessShare lock) until the caller eventually closes the connection. Live
+    on 2026-10-28 that window was 17 minutes and it queued a venue_corpus ALTER
+    behind it, freezing every tour (LOCAL-797).
+
+    Calling this after the gate's reads finish releases those locks immediately.
+    It is a safe no-op when the connection is already autocommit (the generator's
+    hardened connections are) or cannot be committed.
+    """
+    if db_conn is None:
+        return
+    try:
+        if getattr(db_conn, "autocommit", False):
+            return
+    except Exception:
+        return
+    # Read-only work: commit and rollback are equivalent here; commit avoids a
+    # spurious "transaction rolled back" note in some drivers' logs.
+    try:
+        db_conn.commit()
+    except Exception:
+        try:
+            db_conn.rollback()
+        except Exception:
+            pass
+
+
+
 # ──── LOCAL-320: Nominatim shared throttle ────────────────────────────────────
 # Nominatim usage policy: max 1 request/second, descriptive User-Agent required.
 # A throttled (429) or failed lookup must classify as "unknown" (retry), NEVER as
@@ -3594,6 +3627,10 @@ def run_existence_gate(
             pass  # Will be retried below
         else:
             unverified_stops.append(stop_title)
+        # [LOCAL-797] Release the AccessShare lock this stop's venue_corpus/
+        # stop_corpus SELECTs took, so a non-autocommit caller connection does
+        # not idle in transaction holding locks across the whole gate run.
+        _end_read_txn(db_conn)
 
     # LOCAL-320: Retry any search_failed stops after a pause (the throttle likely
     # just needed more time between requests). One retry per stop, max.
@@ -3634,6 +3671,8 @@ def run_existence_gate(
             else:
                 unverified_stops.append(stop_title)
                 print(f"    [RETRY] {stop_title!r} — genuinely unverified")
+            # [LOCAL-797] release locks after each retry verify as well
+            _end_read_txn(db_conn)
 
     # Log results — report inconclusive as its own count (never claim verified)
     n_ver = len(verified_stops)

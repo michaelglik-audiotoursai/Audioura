@@ -2609,8 +2609,29 @@ def _get_db_connection():
             db_url = db_url.replace('admin:admin@', 'admin:password123@')
 
     try:
-        conn = psycopg2.connect(db_url, connect_timeout=5)
-        # Auto-create venue_corpus table if not exists (idempotent)
+        # [LOCAL-797] Belt-and-braces against the "idle in transaction" freeze:
+        #   * idle_in_transaction_session_timeout = 60s — the server itself kills
+        #     any transaction left idle for a minute, so a forgotten read can
+        #     never hold a lock for the 17 minutes we saw live (works on Cloud
+        #     Run cold starts too, where we cannot see the process).
+        #   * lock_timeout = 3s — a stray DDL on this connection gives up fast
+        #     instead of queueing behind a reader.
+        conn = psycopg2.connect(
+            db_url,
+            connect_timeout=5,
+            options='-c idle_in_transaction_session_timeout=60000 -c lock_timeout=3000',
+        )
+        # [LOCAL-797] This factory is the generator's main read path (cache_get,
+        # the existence gate's venue_corpus/stop_corpus SELECTs). Autocommit means
+        # a pure SELECT never leaves an open transaction holding an AccessShare
+        # lock — the exact condition that queued the venue_corpus ALTER behind it.
+        # cache_put's INSERT ... ON CONFLICT commits per-statement under
+        # autocommit; its explicit conn.commit() becomes a harmless no-op.
+        try:
+            conn.autocommit = True
+        except Exception:
+            pass
+        # Auto-create venue_corpus table if not exists (idempotent, lock-guarded)
         _ensure_table(conn)
         return conn
     except Exception as e:
@@ -2633,6 +2654,9 @@ def _ensure_table(conn):
     if _TABLE_ENSURED:
         return
     try:
+        # CREATE TABLE IF NOT EXISTS is safe: it takes no lock on an existing
+        # relation (nothing to rewrite), so it cannot queue behind an idle
+        # reader. Keep it in its own committed transaction.
         with conn.cursor() as cur:
             cur.execute("""
                 CREATE TABLE IF NOT EXISTS venue_corpus (
@@ -2650,14 +2674,58 @@ def _ensure_table(conn):
                     expires_at TIMESTAMP NOT NULL
                 )
             """)
-            # Ensure tier column is wide enough for 'exhibit_museum' (14 chars)
-            cur.execute("ALTER TABLE venue_corpus ALTER COLUMN tier TYPE VARCHAR(20)")
-            cur.execute("CREATE INDEX IF NOT EXISTS idx_venue_corpus_expires ON venue_corpus(expires_at)")
             conn.commit()
+
+        # [LOCAL-797] The two statements below are runtime DDL that takes an
+        # AccessExclusive lock (ALTER) or can wait on one (CREATE INDEX). Running
+        # them unconditionally once per process is exactly what froze every tour
+        # on 2026-10-28: the ALTER queued behind an idle-in-transaction reader and
+        # every venue_corpus SELECT queued behind the ALTER. Route both through
+        # safe_ddl: own short transaction, SET LOCAL lock_timeout, skip when not
+        # needed, and never block a tour on a lock.
+        try:
+            from db_safe_ddl import safe_ddl
+        except Exception as _ddl_imp:
+            safe_ddl = None
+            print(f"  [venue_cache] [LOCAL-797] safe_ddl unavailable ({_ddl_imp}); "
+                  f"skipping optional schema touch-ups")
+
+        if safe_ddl is not None:
+            # Widen tier only when it is actually narrower than 20 chars (fresh
+            # tables already come from the CREATE above at VARCHAR(20), so this
+            # is a no-op on them and issues NO ALTER).
+            safe_ddl(
+                conn,
+                "ALTER TABLE venue_corpus ALTER COLUMN tier TYPE VARCHAR(20)",
+                needed_check_sql=(
+                    "SELECT 1 FROM information_schema.columns "
+                    "WHERE table_name = 'venue_corpus' AND column_name = 'tier' "
+                    "AND (character_maximum_length IS NULL "
+                    "     OR character_maximum_length < 20)"
+                ),
+                label="LOCAL-797",
+            )
+            # Create the expiry index only when it is missing.
+            safe_ddl(
+                conn,
+                "CREATE INDEX IF NOT EXISTS idx_venue_corpus_expires "
+                "ON venue_corpus(expires_at)",
+                needed_check_sql=(
+                    "SELECT 1 WHERE NOT EXISTS ("
+                    "  SELECT 1 FROM pg_indexes "
+                    "  WHERE tablename = 'venue_corpus' "
+                    "    AND indexname = 'idx_venue_corpus_expires')"
+                ),
+                label="LOCAL-797",
+            )
+
         _TABLE_ENSURED = True
     except Exception as e:
         print(f"  [venue_cache] Table creation failed: {e}")
-        conn.rollback()
+        try:
+            conn.rollback()
+        except Exception:
+            pass
 
 
 def cache_get(qid: str) -> Optional[Dict]:
