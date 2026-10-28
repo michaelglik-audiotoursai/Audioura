@@ -13,6 +13,58 @@ has lapsed twice and Michael has had to ask twice.
 
 ---
 
+# ▶️ RESUME HERE — written 2026-10-27 23:15 ET, before the laptop goes off ~48 h for the Vietnam trip
+The laptop travels with Michael and works off his **phone hotspot**. Do these in order:
+
+1. **`date`**, then reply prefixed `[GCloud_Storied]@MM/DD/YYYY|HH:MM`. The time zone may now be
+   Vietnam (UTC+7): say which zone you're giving, and convert log times (UTC) for Michael.
+2. **Check ClickUp list 🟦 Services — Kiro (`1000410000000733`) first** (LEAD's request), most
+   recently updated first. Look for a wave task from Storied_Tours saying "LEAD-reviewed, end-to-end
+   proven", and for new comments on [wdvrdaz6u5](https://app.clickup.com/t/wdvrdaz6u5) and
+   [wdvrdaz6ht](https://app.clickup.com/t/wdvrdaz6ht).
+3. **Re-arm the 3-hour watch** (it died with the old session): `CronCreate`, cron `17 */3 * * *`, prompt
+   = "[GCloud_Storied watch tick] check list 1000410000000733 for an un-acted LEAD-reviewed wave;
+   follow the STANDING OK block; one line if none". It expires after 7 days; re-arm before then.
+4. **The STANDING OK below is still in force** until Michael revokes it. Re-read it before any deploy.
+5. **Tell LEAD you're back** (`SendMessage` to `bridge:session_0162Qu7k54NgjdiBu8pVkpwb`, or whatever
+   `ListAgents` shows as Storied_Tours). The bridge address may change after a restart.
+6. If gcloud or ClickUp calls fail with auth errors, ask Michael to run `! gcloud auth login`
+   (account michael.glik@gmail.com) or to re-authorise ClickUp in Claude. Don't work around it.
+
+**State at shutdown (verify live before trusting):**
+- Subscribed Preview: generator `tour-generator-subscribed-00007-d7v`, orchestrator
+  `tour-orchestrator-subscribed-00006-c7d` (image tag `2dde77dc`). Rollbacks: 00006-qbx / 00005-bm2.
+- `audio_tours` 360 rows after tour 463 was deleted (backup `C:\Users\micha\AudiouraBackups\tour463_20261027\`),
+  plus Russian translation **469** of tour 465, created by Michael's phone 2026-10-27 19:45 ET → **361 expected**.
+- No wave is waiting. LEAD's next wave = LOCAL-788B + LOCAL-792 (788 alone fabricated two West Roxbury
+  restaurants, so it's not deployable). Then 790/791 → Vietnam remake; 775 → scaling and load test.
+- Open trace: the 465 Russian download took 2 min 47 s; the server did it in 17 s, and the app waited
+  2.5 min before downloading (comment on wdvrdaz6u5). Idea for Michael: `min-instances=1` on
+  translation-subscribed and tour-id-resolution-subscribed. Not done; it's spend.
+- Notes-only pushes of this file to origin/storied are allowed. Every other push needs Michael.
+
+**🔶 HOTSPOT RULE (LEAD's request): build images in the cloud, never on the laptop. Also keep the upload tiny.**
+The old recipe (`git archive` → `gcloud builds submit <dir>`) uploads **~370 MB** (APKs, `migration/`,
+the app), which is too much for a phone hotspot. Instead submit a dir holding only `cloudbuild.yaml`,
+and make its **first step clone the public repo inside Cloud Build**:
+```yaml
+steps:
+- name: gcr.io/cloud-builders/git
+  args: ['clone', '--branch', 'subscribed', 'https://github.com/michaelglik-audiotoursai/Audioura.git', 'src']
+- name: gcr.io/cloud-builders/git
+  dir: src
+  args: ['checkout', '<EXACT_SHA_FROM_LEAD>']
+# …then the same docker build/push + in-image import-check steps as C:\adev-wt\bsub11\cloudbuild.yaml,
+#    with dir: src
+```
+Then run `gcloud builds submit <that tiny dir> --config cloudbuild.yaml --project audiotours-migration`.
+The upload is a few KB, Google's network does the clone, and the build still pins the exact SHA LEAD
+named. Verify that `git rev-parse HEAD` in the build log equals that SHA. Deploys remain image-only
+`gcloud run services update --image`, which needs only small API calls. Cloud SQL proxy queries are
+fine over a hotspot. Never download tour ZIPs in bulk.
+
+---
+
 # 🟢 STANDING OK FROM MICHAEL, typed on this laptop 2026-10-27 17:59, for his Vietnam trip
 Valid **until he is back or revokes it**. This is the only standing OK; everything outside it
 still needs his typed OK. His words, verbatim:
