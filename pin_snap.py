@@ -110,6 +110,59 @@ def _default_reference(name: str, scope: str,
         return None
 
 
+def _landmark_reference(name: str
+                        ) -> Optional[Tuple[float, float, str]]:
+    """[LOCAL-791E items 1 & 5] A Wikidata-P625 landmark-table reference, consulted
+    BEFORE the generic geocoders. Returns (lat, lng, source) or None. The table
+    name-matches strongly (the place's own distinctive tokens, local name
+    included), so "City Hall" → the People's Committee Building and "Thien Hau
+    Temple" → the Cholon temple, both by authority rather than a bare-name geocode.
+    """
+    try:
+        from landmark_reference import lookup as _lm_lookup
+        hit = _lm_lookup(name)
+        if hit:
+            return (float(hit[0]), float(hit[1]), str(hit[2]))
+    except Exception:
+        return None
+    return None
+
+
+def _name_distinctive_tokens(name: str):
+    """Distinctive (proper-noun) tokens of a place name, class-folded, honorifics /
+    city-district qualifiers dropped — the shared identity core for a name match.
+    Delegates to identity_dedup when available."""
+    try:
+        from identity_dedup import _distinctive_tokens as _dt
+        core = set(_dt(name))
+    except Exception:
+        import re as _re
+        import unicodedata as _ud
+        nfkd = _ud.normalize("NFKD", (name or "").lower())
+        s = "".join(c for c in nfkd if not _ud.combining(c))
+        s = _re.sub(r"[^\w\s]", " ", s)
+        core = {w for w in s.split() if len(w) >= 2}
+    _drop = {"saigon", "hcmc", "ho", "chi", "minh", "city", "vietnam", "old",
+             "new", "central", "district", "downtown", "sai", "gon", "the", "of"}
+    return {t for t in core if t not in _drop}
+
+
+def _name_matches_reference(title: str, ref_name: str) -> bool:
+    """[LOCAL-791E item 1] True when a reference NAME strongly matches the stop
+    title — they share the distinctive proper-noun core (one token-set is a subset
+    of the other, both non-empty). A generic "City Hall" vs a reference listing
+    named for a DIFFERENT building shares no distinctive core and is rejected, so a
+    wrong same-class snap (the 4.8 km City Hall bug) is refused. When the reference
+    carries no usable name we cannot verify a match → treated as NOT matched (the
+    caller only requires a match for generic geocoder references, not for the
+    authority table / Wikidata)."""
+    a = _name_distinctive_tokens(title)
+    b = _name_distinctive_tokens(ref_name)
+    if not a or not b:
+        return False
+    return a <= b or b <= a
+
+
 def snap_pin(title: str,
              coordinate: Optional[Tuple[float, float]],
              scope: str = "",
@@ -118,6 +171,10 @@ def snap_pin(title: str,
              threshold_m: float = SNAP_THRESHOLD_M,
              reference_fn: Optional[Callable] = None,
              max_snap_km: float = 15.0,
+             stops_centroid: Optional[Tuple[float, float]] = None,
+             max_centroid_km: float = 2.0,
+             require_name_match: bool = True,
+             use_landmark_table: bool = True,
              ) -> Dict:
     """Decide the snap for ONE stop.
 
@@ -152,31 +209,85 @@ def snap_pin(title: str,
 
     ref_pt: Optional[Tuple[float, float]] = None
     source: Optional[str] = None
+    ref_name: str = ""
+    # "authority" references (the stop's own Wikidata P625, or the P625 landmark
+    # table) are the place's own identity, not a bare-name geocode — they are
+    # exempt from the name-match requirement and the off-scope / centroid bounds.
+    authority = False
 
     wd = wikidata_coord
     if wd:
-        ref_pt, source = wd, "wikidata"
+        ref_pt, source, authority = wd, "wikidata", True
     else:
-        rfn = reference_fn or (lambda n: _default_reference(n, scope, scope_center))
-        try:
-            ref = rfn(title)
-        except Exception:
-            ref = None
-        if ref:
+        # [LOCAL-791E items 1 & 5] Consult the Wikidata-P625 landmark table FIRST
+        # on the LIVE path (no injected reference_fn). It resolves "City Hall" to
+        # the real People's Committee Building and "Thien Hau Temple" to the Cholon
+        # temple (by the place's own name / local-language name), where the generic
+        # geocoder returned a wrong same-class place (item 1) or nothing (item 5).
+        # An injected reference_fn (unit tests / offline replays) is a vouched-for
+        # door and takes precedence, so the table is skipped for it.
+        if use_landmark_table and reference_fn is None:
+            lm = _landmark_reference(title)
+            if lm:
+                ref_pt = (float(lm[0]), float(lm[1]))
+                source = lm[2] if len(lm) > 2 else "wikidata_p625"
+                authority = True
+        if ref_pt is None:
+            rfn = reference_fn or (
+                lambda n: _default_reference(n, scope, scope_center))
             try:
-                ref_pt = (float(ref[0]), float(ref[1]))
-                source = ref[2] if len(ref) > 2 else "reference"
-            except (TypeError, ValueError, IndexError):
-                ref_pt = None
+                ref = rfn(title)
+            except Exception:
+                ref = None
+            if ref:
+                try:
+                    ref_pt = (float(ref[0]), float(ref[1]))
+                    source = ref[2] if len(ref) > 2 else "reference"
+                    ref_name = ref[3] if len(ref) > 3 else ""
+                except (TypeError, ValueError, IndexError):
+                    ref_pt = None
 
     if not ref_pt:
         out["reason"] = "no in-scope reference — left unsnapped"
         return out
 
+    # [LOCAL-791E item 1] NAME-MATCH REQUIREMENT for a GENERIC geocoder reference.
+    # A bare-name geocode ("City Hall") can land on a DIFFERENT same-class building
+    # anywhere in the city — a wrong snap is worse than none. When the generic
+    # reference carries a NAME, snap only if it strongly matches the stop (shared
+    # distinctive proper-noun core); a mismatch is refused (kept pin). Authority
+    # references (Wikidata P625 / the landmark table) are the place's own identity
+    # and skip this check. When no name is available we cannot verify by name and
+    # defer to the stops-centroid bound below.
+    if require_name_match and not authority and ref_name:
+        if not _name_matches_reference(title, ref_name):
+            out["reference"] = ref_pt
+            out["source"] = source
+            out["reason"] = (
+                f"reference name {ref_name!r} does not match stop — refused "
+                f"(generic same-name/same-class match)")
+            return out
+
+    # [LOCAL-791E item 1] STOPS-CENTROID BOUND. The reference must sit within
+    # ``max_centroid_km`` of the OTHER stops' centroid (not just the city centre):
+    # the Old Saigon landmarks cluster in District 1, so a "City Hall" reference
+    # 4.8 km south of that cluster is a wrong building — refuse and keep the pin.
+    # Authority references are trusted (the place's own P625). Disabled when no
+    # stops_centroid is supplied (unit tests that exercise only scope_center).
+    if (not authority and stops_centroid and max_centroid_km):
+        _cd = _haversine_m(ref_pt, stops_centroid) / 1000.0
+        if _cd > max_centroid_km:
+            out["reference"] = ref_pt
+            out["source"] = source
+            out["reason"] = (
+                f"reference {_cd:.1f} km from stops' centroid "
+                f"> {max_centroid_km:.1f} km — refused (wrong same-name place)")
+            return out
+
     # SCOPE SANITY: refuse a reference implausibly far from the tour's centre — a
-    # bare-name geocode that resolved to another city. Wikidata P625 on the stop
-    # is trusted as-is (it is the place's own authority, not a name search).
-    if (source != "wikidata" and scope_center and max_snap_km
+    # bare-name geocode that resolved to another city. Wikidata P625 / the landmark
+    # table are trusted as-is (the place's own authority, not a name search).
+    if (not authority and scope_center and max_snap_km
             and _haversine_m(ref_pt, scope_center) / 1000.0 > max_snap_km):
         out["reason"] = (f"reference {_haversine_m(ref_pt, scope_center)/1000.0:.0f} km "
                          f"from centre > {max_snap_km:.0f} km — left unsnapped "
@@ -205,8 +316,9 @@ def snap_pin(title: str,
     # would replace: if the shipped pin is itself in-scope (close to centre) AND
     # the reference is markedly farther from centre than the shipped pin, the
     # reference is a wrong same-name place in another district/city — keep the
-    # shipped pin. Wikidata P625 (the place's own authority) is exempt.
-    if (source != "wikidata" and scope_center and coordinate):
+    # shipped pin. Wikidata P625 / the landmark table (the place's own authority)
+    # are exempt.
+    if (not authority and scope_center and coordinate):
         _ship_km = _haversine_m(coordinate, scope_center) / 1000.0
         _ref_km = _haversine_m(ref_pt, scope_center) / 1000.0
         if _ship_km <= 10.0 and _ref_km > _ship_km + 5.0:
@@ -231,23 +343,76 @@ def snap_poi_coordinates(poi_list: List[Dict],
                          threshold_m: float = SNAP_THRESHOLD_M,
                          reference_fn: Optional[Callable] = None,
                          log: Optional[Callable[[str], None]] = None,
+                         max_centroid_km: float = 2.0,
+                         require_name_match: bool = True,
                          ) -> Tuple[List[Dict], List[Dict]]:
-    """Snap every stop in ``poi_list`` to its in-scope reference when the shipped
-    pin is more than ``threshold_m`` away. Mutates each poi's ``coordinates`` (and
-    latitude/longitude when present) in place and returns ``(poi_list, rows)`` where
-    ``rows`` is the per-stop decision from ``snap_pin``.
+    """Snap every stop in ``poi_list`` to its reference when the shipped pin is
+    more than ``threshold_m`` away AND the reference is trustworthy. Mutates each
+    poi's ``coordinates`` (and latitude/longitude when present) in place and
+    returns ``(poi_list, rows)`` where ``rows`` is the per-stop ``snap_pin``
+    decision.
 
-    Logs ``[LOCAL-791C] pin snap <title> <m>`` for each snapped stop and a
-    ``left unsnapped`` line for each stop with no in-scope reference."""
+    [LOCAL-791E] A snap is only applied when the reference is the place's own
+    authority (Wikidata P625 / the landmark table) OR a generic geocode whose NAME
+    strongly matches the stop AND that sits within ``max_centroid_km`` of the OTHER
+    stops' centroid. A reference that fails either test is REFUSED — the shipped
+    pin is kept and ``[LOCAL-791E] snap refused <title> <reason>`` is logged — so a
+    wrong same-name/same-class snap (the City Hall 4.8 km bug) never ships.
+
+    Logs ``[LOCAL-791C] pin snap <title> <m>`` for each snapped stop, a
+    ``[LOCAL-791E] snap refused …`` line for a reference rejected by the name /
+    centroid guards, and a ``left unsnapped`` line for a stop with no reference."""
     emit = log or (lambda _m: None)
     rows: List[Dict] = []
-    for poi in poi_list:
+
+    # An INJECTED reference_fn is a vouched-for reference (unit tests / offline
+    # replays supply the KNOWN-correct door), so the name-match and stops-centroid
+    # guards — which defend against the LIVE geocoder's wrong same-name matches —
+    # are not applied to it. The guards are active only on the live default path.
+    _injected = reference_fn is not None
+    _rnm = require_name_match and not _injected
+    _max_centroid = None if _injected else max_centroid_km
+
+    # Precompute each stop's current coordinate so the stops-centroid is the
+    # LEAVE-ONE-OUT centroid of the OTHER stops (a stop is never bounded against
+    # its own pin, and one wrong pin does not pull its own bound).
+    coords_all: List[Optional[Tuple[float, float]]] = [_poi_coord(p) for p in poi_list]
+
+    def _centroid_excluding(idx: int) -> Optional[Tuple[float, float]]:
+        pts = [c for j, c in enumerate(coords_all) if j != idx and c]
+        if not pts:
+            return None
+        return (sum(p[0] for p in pts) / len(pts),
+                sum(p[1] for p in pts) / len(pts))
+
+    # The centroid bound is ADAPTIVE to how spread the stops already are. For a
+    # TIGHT cluster (an Old Saigon walking tour in District 1) it stays at
+    # ``max_centroid_km`` (2 km), so a City Hall reference 4.8 km outside the
+    # cluster is refused. For a city-SPANNING tour (pagodas across HCMC — the
+    # named anchors alone are ~5 km apart) it widens to the stops' own radius + a
+    # margin, so a genuinely far pagoda's correct reference is not refused. The
+    # reference must still be no farther from the centroid than the stops
+    # themselves reach, plus the base bound.
+    def _adaptive_bound(idx: int, centroid: Optional[Tuple[float, float]]) -> float:
+        if not centroid:
+            return _max_centroid or 0.0
+        other = [c for j, c in enumerate(coords_all) if j != idx and c]
+        spread = max((_haversine_m(c, centroid) / 1000.0 for c in other),
+                     default=0.0)
+        return max(_max_centroid or 0.0, spread + (_max_centroid or 0.0))
+
+    for i, poi in enumerate(poi_list):
         title = poi.get("name", "")
-        coord = _poi_coord(poi)
+        coord = coords_all[i]
         wd = _wikidata_coord(poi)
+        _centroid_i = None if _injected else _centroid_excluding(i)
+        _bound_i = 0.0 if _injected else _adaptive_bound(i, _centroid_i)
         row = snap_pin(title, coord, scope=scope, scope_center=scope_center,
                        wikidata_coord=wd, threshold_m=threshold_m,
-                       reference_fn=reference_fn)
+                       reference_fn=reference_fn,
+                       stops_centroid=_centroid_i,
+                       max_centroid_km=_bound_i,
+                       require_name_match=_rnm)
         rows.append(row)
         if row["snapped"] and row["new_coordinate"]:
             lat, lng = row["new_coordinate"]
@@ -264,6 +429,9 @@ def snap_poi_coordinates(poi_list: List[Dict],
         elif row["reference"] is None:
             emit(f"[LOCAL-791C] pin snap {title} left unsnapped "
                  f"({row.get('reason') or 'no in-scope reference'})")
+        elif "refused" in (row.get("reason") or ""):
+            # A reference WAS found but the name-match / centroid guard rejected it.
+            emit(f"[LOCAL-791E] snap refused {title} {row.get('reason')}")
         else:
             d = row["distance_m"]
             emit(f"[LOCAL-791C] pin ok {title} "

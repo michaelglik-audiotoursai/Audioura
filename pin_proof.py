@@ -119,7 +119,8 @@ def _default_serper(name: str, scope: str,
         if raw:
             r = raw[0]
             try:
-                return (float(r.get("lat")), float(r.get("lon")))
+                return (float(r.get("lat")), float(r.get("lon")),
+                        str(r.get("title") or r.get("name") or ""))
             except (TypeError, ValueError):
                 pass
         # Last resort: the scope-bound search (may drop an out-of-radius hit).
@@ -130,7 +131,8 @@ def _default_serper(name: str, scope: str,
         return None
     r = recs[0]
     try:
-        return (float(r.get("lat")), float(r.get("lon")))
+        return (float(r.get("lat")), float(r.get("lon")),
+                str(r.get("title") or r.get("name") or ""))
     except (TypeError, ValueError):
         return None
 
@@ -197,13 +199,20 @@ def reference_for_name(name: str,
     except Exception:
         s = None
     if s and _in_scope((float(s[0]), float(s[1]))):
-        return (float(s[0]), float(s[1]), "serper")
+        # _default_serper returns (lat, lng, title); an injected serper_fn may
+        # return (lat, lng) — then no name is available. Append the name only when
+        # present so the legacy 3-tuple (lat, lng, source) shape is preserved.
+        _sname = s[2] if (isinstance(s, (tuple, list)) and len(s) > 2) else ""
+        return ((float(s[0]), float(s[1]), "serper", _sname) if _sname
+                else (float(s[0]), float(s[1]), "serper"))
     try:
         n = nfn(lookup_name)
     except Exception:
         n = None
     if n and _in_scope((float(n[0]), float(n[1]))):
-        return (float(n[0]), float(n[1]), "nominatim")
+        _nname = n[2] if (isinstance(n, (tuple, list)) and len(n) > 2) else ""
+        return ((float(n[0]), float(n[1]), "nominatim", _nname) if _nname
+                else (float(n[0]), float(n[1]), "nominatim"))
     return None
 
 

@@ -14925,6 +14925,20 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
                         print(f"  [LOCAL-791C] reject feature-only stop "
                               f"'{_orig_name_791c}'")
                         continue
+                    # [LOCAL-791E item 4] Reject a one-word non-name / junk title on
+                    # the walking path too (the venue-parts path shipped a bare
+                    # "Grand"). junk_title_guard.is_junk_page_title is the project's
+                    # authority for a generic one-word / page-chrome title; apply it
+                    # here so the walking path gets the same reject the museum paths
+                    # already have. Anchors are exempt (handled above).
+                    try:
+                        from junk_title_guard import is_junk_page_title as _ijpt791e
+                        if _ijpt791e(_orig_name_791c):
+                            print(f"  [LOCAL-791E] reject junk one-word/non-name stop "
+                                  f"'{_orig_name_791c}'")
+                            continue
+                    except Exception:
+                        pass
                     _stripped_791c = _sfw791c(_orig_name_791c)
                     if _stripped_791c and _stripped_791c != _orig_name_791c:
                         print(f"  [LOCAL-791C] feature-word strip "
