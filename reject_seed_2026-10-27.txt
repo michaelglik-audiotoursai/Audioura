@@ -1,0 +1,64 @@
+# reject_seed_2026-10-27.txt — LOCAL-792 / D726 (amended, Michael 2026-10-27)
+#
+# The specific stops that surfaced the defect, and the ACTION for each under the
+# three-case ruling. This file is applied LATER by GCloud_Storied, with Michael's
+# OK, against the live Subscribed database — it is NOT run by the build. Each
+# REJECT / FIX line gives the exact command; RE-FILE and NOTHING lines explain the
+# non-reject actions. Run each command as a DRY RUN first (omit --apply), confirm
+# the before/after counts, then re-run with --apply.
+#
+# Cases (D726 amended):
+#   REJECT   — incorrect content (not a place / not this venue / wrong facts):
+#              move OUT of stop_pool into stop_pool_rejected (reject_stops.py --apply).
+#   FIX      — wrong pin (real place, wrong coordinates): correct in place
+#              (fix_stop_coords.py --apply). Stop STAYS in the pool.
+#   RE-FILE  — filed under the wrong venue but resolves to one real place: re-file
+#              under its own venue identity; if it does not resolve, treat as REJECT.
+#   NOTHING  — out of scope for THIS tour only (real place, too far): keep it in the
+#              pool; it was already skip-only (LOCAL-788). No command.
+#
+# Tour 463 = War Remnants Museum, Subscribed Preview.
+# Tour 461 = (Ho Chi Minh City venue; Opera House / Ben Thanh / War Remnants stops).
+# Confirm the exact --stop K index against each tour's delivered content before
+# applying (the K below is the stop as numbered in that tour).
+
+# ─── Tour 463 — REJECT (incorrect content) ───────────────────────────────────
+# "Khai mạc Hội thảo Quốc tế …" is a NEWS HEADLINE, not a place. "Interesting" is
+# a fabricated non-place. Both are incorrect content → move out of the pool.
+REJECT  tour=463  stop="Khai mạc Hội thảo Quốc tế …"  reason="news headline, not a place"       by=GCloud_Storied
+REJECT  tour=463  stop="Interesting"                   reason="fabricated non-place entry"        by=GCloud_Storied
+#   reject_stops.py --tour-id 463 --stop <K_khai_mac> --stop <K_interesting> \
+#       --reason "news headline / fabricated non-place entry" --by GCloud_Storied --apply
+
+# ─── Tour 463 — RE-FILE (filed under the wrong venue) ─────────────────────────
+# "Independence Palace" is a REAL place with valid research, but it was filed
+# INSIDE a War Remnants Museum tour. It resolves to its own venue (Independence
+# Palace / Reunification Palace, Ho Chi Minh City), so RE-FILE it under that venue
+# identity rather than rejecting it. If it cannot be re-filed cleanly, treat as
+# REJECT (incorrect content for THIS venue).
+RE-FILE tour=463  stop="Independence Palace"  to_venue="Independence Palace, Ho Chi Minh City"
+#   (re-file is a human step: move the row to the Independence Palace venue
+#    identity's pool_key; it is NOT a reject. Do NOT quarantine a valid place.)
+
+# ─── Tour 461 — REJECT (incorrect content) ────────────────────────────────────
+# "Balcony" is not a place / not this venue — incorrect content → move out.
+REJECT  tour=461  stop="Balcony"  reason="not a place / not this venue"  by=GCloud_Storied
+#   reject_stops.py --tour-id 461 --stop <K_balcony> \
+#       --reason "not a place / not this venue" --by GCloud_Storied --apply
+
+# ─── Tour 461 — FIX (wrong pin; real place, wrong coordinates) ────────────────
+# Opera House (~0.7 km off), Ben Thanh, War Remnants: real places with good
+# research but wrong coordinates → correct the pin in place, keep the stop.
+FIX     tour=461  stop="Opera House"      note="~0.7 km off; re-geocode in place"
+FIX     tour=461  stop="Ben Thanh"        note="re-geocode in place"
+FIX     tour=461  stop="War Remnants"     note="re-geocode in place"
+#   fix_stop_coords.py --tour-id 461 --stop <K_opera_house> --apply
+#   fix_stop_coords.py --tour-id 461 --stop <K_ben_thanh>   --apply
+#   fix_stop_coords.py --tour-id 461 --stop <K_war_remnants> --apply
+
+# ─── Byblos — NOTHING (out of scope only; valid Norwood stop) ─────────────────
+# Byblos is a real place, correctly researched, just OUT OF SCOPE for a West
+# Roxbury tour (~10 km, Norwood). It is good material for a Norwood tour, so it
+# STAYS in the pool and is only SKIPPED per tour by LOCAL-788. No command — do
+# NOT reject it.
+NOTHING byblos  reason="out of scope for THIS tour only; valid Norwood stop (LOCAL-788 skip-only)"
