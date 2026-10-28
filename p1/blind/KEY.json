@@ -1,0 +1,178 @@
+{
+  "m1": {
+    "cat": "museum",
+    "location": "Isabella Stewart Gardner Museum, Boston, MA",
+    "stops": 4,
+    "X": "B",
+    "Y": "A",
+    "A_usd": 0.8683,
+    "A_seconds": 436,
+    "B_usd": 0.3916,
+    "B_seconds": 375
+  },
+  "m2": {
+    "cat": "museum",
+    "location": "Museum of Fine Arts, Boston, MA",
+    "stops": 5,
+    "X": "B",
+    "Y": "A",
+    "A_usd": 1.1549,
+    "A_seconds": 666,
+    "B_usd": 0.5814,
+    "B_seconds": 606
+  },
+  "m3": {
+    "cat": "museum",
+    "location": "Peabody Essex Museum, Salem, MA",
+    "stops": 4,
+    "X": "B",
+    "Y": "A",
+    "A_usd": 0.8794,
+    "A_seconds": 550,
+    "B_usd": 0.4496,
+    "B_seconds": 576
+  },
+  "m4": {
+    "cat": "museum",
+    "location": "Musée Matisse, Nice, France",
+    "stops": 4,
+    "X": "B",
+    "Y": "A",
+    "A_usd": 0.8658,
+    "A_seconds": 526,
+    "B_usd": 0.4501,
+    "B_seconds": 496
+  },
+  "w1": {
+    "cat": "walking",
+    "location": "Freedom Trail walking tour, Boston, MA",
+    "stops": 5,
+    "X": "B",
+    "Y": "A",
+    "A_usd": 0.5639,
+    "A_seconds": 396,
+    "B_usd": 0.2124,
+    "B_seconds": 275
+  },
+  "w2": {
+    "cat": "walking",
+    "location": "Old Town walking tour, Nice, France",
+    "stops": 5,
+    "X": "A",
+    "Y": "B",
+    "A_usd": 0.4909,
+    "A_seconds": 426,
+    "B_usd": 0.2012,
+    "B_seconds": 286
+  },
+  "w3": {
+    "cat": "walking",
+    "location": "Salem witch trials walking tour, Salem, MA",
+    "stops": 4,
+    "X": "A",
+    "Y": "B",
+    "A_usd": 0.3969,
+    "A_seconds": 325,
+    "B_usd": 0.1544,
+    "B_seconds": 265
+  },
+  "w4": {
+    "cat": "walking",
+    "location": "Old Saigon walking tour, District 1, Ho Chi Minh City",
+    "stops": 5,
+    "X": "A",
+    "Y": "B",
+    "A_usd": 0.4953,
+    "A_seconds": 446,
+    "B_usd": 0.1904,
+    "B_seconds": 255
+  },
+  "n1": {
+    "cat": "neighbourhood",
+    "location": "History of Jamaica Plain, Boston",
+    "stops": 4,
+    "X": "A",
+    "Y": "B",
+    "A_usd": 0.406,
+    "A_seconds": 335,
+    "B_usd": 0.1755,
+    "B_seconds": 275
+  },
+  "n2": {
+    "cat": "neighbourhood",
+    "location": "Beacon Hill architecture walk, Boston",
+    "stops": 4,
+    "X": "A",
+    "Y": "B",
+    "A_usd": 0.4034,
+    "A_seconds": 396,
+    "B_usd": 0.1741,
+    "B_seconds": 285
+  },
+  "d1": {
+    "cat": "dining",
+    "location": "coffee shops in Jamaica Plain, Boston",
+    "stops": 3,
+    "X": "A",
+    "Y": "B",
+    "A_usd": 0.6412,
+    "A_seconds": 386,
+    "B_usd": 0.4955,
+    "B_seconds": 386
+  },
+  "d2": {
+    "cat": "dining",
+    "location": "Italian restaurants in the North End, Boston",
+    "stops": 3,
+    "X": "B",
+    "Y": "A",
+    "A_usd": 0.6722,
+    "A_seconds": 446,
+    "B_usd": 0.5103,
+    "B_seconds": 396
+  },
+  "d3": {
+    "cat": "dining",
+    "location": "Seafood restaurants in Mui Ne, Vietnam",
+    "stops": 3,
+    "X": "B",
+    "Y": "A",
+    "A_usd": 0.751,
+    "A_seconds": 456,
+    "B_usd": 0.6025,
+    "B_seconds": 446
+  },
+  "b1": {
+    "cat": "business",
+    "location": "Massage and spa near Ben Thanh Market, Ho Chi Minh City",
+    "stops": 3,
+    "X": "B",
+    "Y": "A",
+    "A_usd": 0.3171,
+    "A_seconds": 335,
+    "B_usd": 0.0649,
+    "B_seconds": 185
+  },
+  "r1": {
+    "cat": "driving",
+    "location": "Scenic drive along Cape Ann, Massachusetts, by car",
+    "stops": 4,
+    "X": "B",
+    "Y": "A",
+    "A_usd": 0.41,
+    "A_seconds": 376,
+    "B_usd": 0.1402,
+    "B_seconds": 1218
+  },
+  "r2": {
+    "cat": "nature",
+    "location": "Arnold Arboretum, Boston",
+    "stops": 4,
+    "X": "A",
+    "Y": "B",
+    "A_usd": 0.3998,
+    "A_seconds": 436,
+    "B_usd": 0.1685,
+    "B_seconds": 336
+  }
+}

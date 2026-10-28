@@ -1,0 +1,58 @@
+# d2_X  (cat=dining, location=Italian restaurants in the North End, Boston, stops=3)
+
+Step-by-Step Audio Guided Tour: Italian restaurants in the North End, Boston
+Tour-Category: restaurant
+
+Stop 1: Pizzeria Regina
+
+Address: 11 1/2 Thacher St, Boston, MA 02113
+
+Coordinates: 42.364347, -71.054705
+
+Type/Specialty: Pizza
+
+Specific Examples: Classic Margherita pizza, fresh mozzarella, and homemade tomato sauce.
+
+Orientation: You are about to embark on a walking journey through Italian restaurants in the North End, Boston. As you explore these restaurants, you will discover how passionate individuals have preserved and reinvented traditional techniques and regional delicacies, enriching the community’s gastronomic story over generations. Your first stop is Pizzeria Regina. From Haymarket T station, walk south on Blackstone St toward Hanover St, then turn right onto Hanover St and continue to Thacher St, where you'll find Pizzeria Regina on the left. You might notice the vibrant street life as you approach. The building’s red neon sign winks above you, promising a slice of something both familiar and storied in this corner of Boston’s North End.
+
+Step inside and you’ll see what makes Pizzeria Regina feel different from the parade of Italian spots all around. There’s a particular warmth—a kind of lived-in glow on the old wooden booths and the brick walls that have absorbed nearly a century’s worth of laughter, arguments, and the sizzle of pizzas sliding in and out of the oven. Regina Pizzeria specializes in Italian food, with a focus on brick-oven, thin-crust pizzas that pull regulars and newcomers alike. Each pie is still hand-tossed, each crust still blistered in that same oven.
+
+Regina has been shaping Boston’s pizza scene since before most locals’ grandparents were born. By the 1950s, the North End was changing, but Regina’s brick oven stayed hot. The Polcari family took over in 1956, bringing new energy and recipes. Since then, Regina’s has remained family-run, and their stewardship turned this single shop into the best-known outpost of New England’s own pizza chain. The Polcaris didn’t just keep the place running; they held tight to tradition while letting the menu evolve ever so slightly.
+
+You don’t need a reservation, and prices are as approachable as the staff—just a single dollar sign here—so you can wander in for lunch or dinner without a second thought. It’s open Monday through Saturday, 11:00 to 22:00, and Sundays 11:00 to 21:00.
+
+Directions: From Pizzeria Regina, stroll down Thatcher Street and take a left onto Hanover Street. As you walk, soak in the vibrant atmosphere of the North End, filled with charming shops and cafes. Continue on Hanover for a few blocks, and you'll spot Giacomo's Ristorante on your left, just past the bustling intersection with Cross Street. Enjoy the delicious aromas wafting from the restaurant as you approach! It is about a minute's walk away.
+
+Stop 2: Giacomo's Ristorante
+
+Address: 355 Hanover St, Boston, MA 02113
+
+Coordinates: 42.365076, -71.054060
+
+Type/Specialty: Italian Seafood
+
+Specific Examples: Linguine with clam sauce, veal piccata, and homemade tiramisu.
+
+Orientation: Stand on Hanover Street, just outside number 355, where the sidewalk hums with foot traffic and the windows of Giacomo’s Ristorante glow gold in the early evening. The tight row of tables inside, always filled, offers glimpses of steaming plates and armfuls of fresh pasta whisked from kitchen to table.
+
+Giacomo’s is open Mondays and Tuesdays from noon until 10:00 pm, serving traditional Italian cuisine with main courses in the $22 to $29 range. Reservations are accepted, but the anticipation on the sidewalk is part of the ritual. The story goes that Giacomo’s insistence on keeping the dining room small wasn’t just about space, but about preserving a sense of community and sharing.
+
+Directions: As you stroll, keep an eye out for the iconic Paul Revere House on your left. Continue walking until you reach the intersection with Cross Street, where you'll find Bricco right there, inviting you in for a delicious meal. Enjoy the sights and smells along the way! It is about a minute's walk away.
+
+Stop 3: Bricco
+
+Address: 241 Hanover St, Boston, MA 02113
+
+Coordinates: 42.364960, -71.054310
+
+Type/Specialty: Italian Fine Dining
+
+Specific Examples: Homemade pasta dishes, extensive wine list, and artisanal desserts.
+
+Orientation: There’s a hum in the air—kitchen clatter, the faintest glow of olive oil in the window, and the sharp, savory scent that lets you know you’re somewhere Italian, but not following anyone’s grandmother’s recipes to the letter.
+
+Here’s the secret that locals might murmur over a second espresso: Bricco owes its personality to Frank DePasquale, a Boston native whose name means something in this neighborhood. Bricco is part of a broader culinary network, including the Bricco Salumeria & Pasta Shop and Bricco Panetteria. That’s not just a business move—it’s a personal signature, stitched right into the neighborhood’s fabric. What’s especially sly about Bricco is how Frank DePasquale took the regional Italian dishes of his heritage and gave them a modern twist. The menu, reimagined under his direction, isn’t a nostalgia act. Instead, each plate is a conversation between old and new—think of it as a dialogue between the past you just tasted at Giacomo’s and a future that’s still being written. You’ll find this especially true if you slip in on a Friday or Saturday night, when the kitchen stays open until two in the morning and the prosciutto-topped pizzas draw a crowd that lingers for just one more slice. The North End, after all, has been a distinct community since 1646, and by 1649 it was populous enough to support the North Meeting House—making these streets some of the oldest continually inhabited in Boston. Now, they’re home to nearly a hundred restaurants, each a different note in the city’s culinary symphony, but Bricco’s is a voice you won’t mistake once you’ve heard Bricco opens its doors Monday through Wednesday from 4:00 pm to 11:00 pm, and on Fridays and Saturdays, it stays lively until 2:00 Main courses range from 38 to 58 dollars, and the kitchen spins regional Italian classics into something sharper and more surprising. Reservations are recommended—this is not the kind of place where you just walk in off the street without a bit of anticipation. The blend of old and new techniques will linger on your palate as we conclude...
+
+This tour highlights the rich tradition and evolving character of Italian cuisine in the North End, showcasing how each establishment contributes to the neighborhood's culinary narrative. As you savor these flavors, remember that each bite reflects a dialogue between history and innovation, making every meal a unique experience. That's 3 stops in all.
+
+If you would like to eat nearby we can build you a restaurant tour.

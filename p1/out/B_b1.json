@@ -1,0 +1,14 @@
+{
+ "arm": "B",
+ "id": "b1",
+ "cat": "business",
+ "location": "Massage and spa near Ben Thanh Market, Ho Chi Minh City",
+ "stops": 3,
+ "status": "completed",
+ "seconds": 185,
+ "usd": 0.0649,
+ "status_detail": {
+  "progress": "Tour text generation completed successfully!"
+ },
+ "text": "Step-by-Step Audio Guided Tour: Massage and spa near Ben Thanh Market, Ho Chi Minh City\nTour-Category: walking\n\nStop 1: Saigon Heritage Spa\n\nAddress:\n\nCoordinates: 10.7761, 106.6952\n\nType/Specialty: Spa and Massage\n\nSpecific Examples: Traditional Vietnamese massages, herbal steam baths, and luxurious skincare treatments.\n\nOrientation: We could confirm 1 stop along this route, so this tour has 1 stop rather than the 3 you asked for. At the Saigon Heritage Spa, you will experience a sanctuary of relaxation, where ancient practices intertwine with modern wellness, inviting you to unwind amidst the lively atmosphere of the nearby market. From Ben Thanh Market, head north on Le Loi Street, then turn right onto Le Thanh Ton Street. The spa will be on your left after a short walk. You might notice the vibrant street life and local shops along the way. A faint trace of lemongrass drifts out from a doorway shaded by old stucco arches; the sound of street vendors calling out mingles with the calm hush inside. Approaching Saigon Heritage Spa, watch for traces of French colonial brickwork along the edge and the polished wooden sign at eye level, only a short walk from the crowds of Ben Thanh Market.\n\nThis stop blends the daily rhythms of central Ho Chi Minh City with the careful preservation of an older era. The use of a historic building anchors the experience, allowing today’s spa rituals to unfold within walls shaped by French influence—a pattern echoed throughout the maze of central District 1. The internal atmosphere carries both local and historical elements, from the movement of staff trained in inherited Vietnamese techniques to the imported quiet that stands in contrast to the sounds outside. The tactile presence of tiled floors and high ceilings speaks to more than comfort; it grounds each visitor in a place where relaxation itself is a continuing practice, passed on and reimagined. Just as The Race in the 2009 season brought teams through Vietnam as part of its 42,000-kilometre journey across three continents and seven countries, the Spa’s daily rhythm places it within international flows.\n\nThis tour highlights the blend of local and historical elements that define the spa experience in central Ho Chi Minh City. Emphasizing relaxation as a continuing practice, it invites visitors to appreciate the rich cultural tapestry that shapes their journey.\n\nIf you would like to eat nearby we can build you a restaurant tour.\n"
+}
