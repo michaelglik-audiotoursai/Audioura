@@ -297,6 +297,41 @@ def resolve_area(location_string: str) -> Optional[AreaResolution]:
     except Exception as _de:
         print(f"  [LOCAL-790] district union skipped (non-fatal): {_de}")
 
+    # [LOCAL-791 defect 9 addendum] COASTAL-STRIP / long-town bbox. A town that is a
+    # long coastal strip (Mui Ne / Hàm Tiến: the kite schools lie along ~5 km of
+    # the Hàm Tiến beachfront, roughly 10.95, 108.21–108.26) is NOT covered by a
+    # 2 km circle around the Wikidata town point (10.982, 108.2512) — the field run
+    # centred there with r=2 km and missed every kite school. When there is NO
+    # multi-district union bbox, fetch the geocoder's own bounding box for the
+    # resolved area and PREFER it over the fixed circle whenever it is materially
+    # larger than the circle (a long/large area). The bbox is tight and true to the
+    # named place; places_search already prefers a bbox over a radius (LOCAL-786).
+    if _union_bbox is None:
+        try:
+            _bbox_query = f"{neighborhood}, {city}" if neighborhood else city
+            _geo_bbox = _nominatim_bbox(_bbox_query)
+            if not _geo_bbox and neighborhood:
+                _geo_bbox = _nominatim_bbox(city)
+            if _geo_bbox:
+                _bs, _bn, _bw, _be = _geo_bbox
+                # Half-diagonal of the bbox, in km, as its effective radius.
+                _bbox_diag_km = _haversine_km(_bs, _bw, _bn, _be)
+                _bbox_radius_km = _bbox_diag_km / 2.0
+                # Only adopt the bbox when it is a LONG/large area — materially
+                # bigger than the circle we already have — so a compact town keeps
+                # its tuned centre/radius and only a strip/large area switches.
+                if _bbox_radius_km > radius_km * 1.5 and _bbox_radius_km <= 30.0:
+                    _union_bbox = [_bs, _bn, _bw, _be]
+                    center_lat = (_bs + _bn) / 2.0
+                    center_lng = (_bw + _be) / 2.0
+                    radius_km = min(max(radius_km, _bbox_radius_km), 25.0)
+                    print(f"  [LOCAL-791] long/coastal area {_bbox_query!r}: using "
+                          f"geocoder bbox={_union_bbox}, center=({center_lat:.4f},"
+                          f"{center_lng:.4f}), radius={radius_km:.1f}km (circle was "
+                          f"too small)")
+        except Exception as _be_err:
+            print(f"  [LOCAL-791] coastal-strip bbox skipped (non-fatal): {_be_err}")
+
     result = AreaResolution(
         city_qid=city_qid,
         city_name=city,
@@ -407,6 +442,76 @@ _DISTRICT_CLAUSE_RE = re.compile(
     re.IGNORECASE,
 )
 
+# [LOCAL-791 defect 1] A SINGLE numbered-district segment ("District 1", "Quận 1",
+# "Ward 5", "Arrondissement 3"). A district is a SUB-AREA of its city, so when the
+# location is "District 1, Ho Chi Minh City" the district is the neighbourhood and
+# the city MUST be kept — never dropped because a third segment "looks too long".
+_SINGLE_DISTRICT_RE = re.compile(
+    r'^\s*(?:districts?|qu\u1eadn|quan|arrondissements?|wards?)\s+\d+\s*$',
+    re.IGNORECASE,
+)
+
+# [LOCAL-791 defect 1] A leading DINING / POI CATEGORY clause ("Vietnamese
+# restaurants and street food", "kitesurfing schools", "coffee shops and cafes").
+# This names WHAT the tour is about, not WHERE — so it is stripped down to the
+# area that follows. The field request "Vietnamese restaurants and street food,
+# District 1, Ho Chi Minh City" lost its city because the whole dining clause rode
+# into parts[0] as the "neighbourhood" and shoved "District 1" into the city slot,
+# dropping "Ho Chi Minh City". "street food" is a FOOD STYLE, never a place, so it
+# must never be read as a locality. The clause is a run of dining/POI/category/
+# cuisine words joined only by "and"/"&"/"," — a segment that contains a real place
+# name (a proper noun that is not a category word) is left untouched.
+_DINING_POI_CATEGORY_WORDS = frozenset({
+    # dining venues / food styles
+    'restaurant', 'restaurants', 'dining', 'food', 'foods', 'eatery', 'eateries',
+    'street', 'streetfood', 'cuisine', 'cafe', 'cafes', 'coffee', 'coffeehouse',
+    'coffeeshop', 'bakery', 'bakeries', 'bar', 'bars', 'pub', 'pubs', 'brewery',
+    'breweries', 'bistro', 'bistros', 'brasserie', 'diner', 'diners', 'grill',
+    'grills', 'steakhouse', 'pizzeria', 'pizzerias', 'noodle', 'noodles',
+    # business / activity providers
+    'shop', 'shops', 'store', 'stores', 'boutique', 'boutiques', 'market',
+    'markets', 'gym', 'gyms', 'spa', 'spas', 'salon', 'salons', 'barber',
+    'studio', 'studios', 'school', 'schools', 'rental', 'rentals', 'centre',
+    'centres', 'center', 'centers', 'club', 'clubs',
+    # activities (the subject of a business/activity request)
+    'kitesurfing', 'kitesurf', 'kiteboarding', 'surfing', 'surf', 'diving',
+    'dive', 'scuba', 'yoga', 'pilates', 'climbing', 'bouldering', 'fitness',
+    'crossfit', 'cycling', 'biking', 'cooking', 'dance', 'dancing', 'music',
+    # cuisine adjectives (nationalities) — common dining qualifiers
+    'vietnamese', 'italian', 'chinese', 'thai', 'mexican', 'indian', 'japanese',
+    'korean', 'french', 'greek', 'spanish', 'middle', 'eastern', 'american',
+    'mediterranean', 'halal', 'kosher', 'vegan', 'vegetarian', 'western',
+    'northern', 'southern', 'lebanese', 'turkish', 'persian', 'asian',
+    # glue
+    'and', '&', 'or', 'the', 'of', 'in', 'near', 'me', 'best', 'top', 'good',
+    'great', 'local', 'authentic', 'traditional', 'popular', 'famous',
+})
+
+# [LOCAL-791 defect 1] A spelled-out state/country tail that should be APPENDED to
+# the place before it, not read as the city itself ("west Roxbury, MA" → one
+# area). Short codes (<=3 chars like "MA"/"UK") are handled by length; these are
+# the common spelled-out tails a request's last segment may carry.
+_COUNTRYISH_TAILS = frozenset({
+    'vietnam', 'viet nam', 'usa', 'u.s.a.', 'united states', 'uk',
+    'massachusetts', 'california', 'new york', 'texas', 'florida',
+})
+
+
+def _is_dining_poi_category_segment(segment: str) -> bool:
+    """True when ``segment`` is ENTIRELY dining/POI/category/cuisine/glue words
+    (e.g. "Vietnamese restaurants and street food", "kitesurfing schools") and so
+    names what the tour is ABOUT, not a place. A segment with a numeric token
+    (e.g. "District 1") or any non-category word (a proper place name) is False."""
+    s = (segment or "").strip()
+    if not s:
+        return False
+    if re.search(r'\d', s):
+        return False
+    words = re.findall(r"[a-z\u00e0-\u1ef9&]+", s.lower())
+    if not words:
+        return False
+    return all(w in _DINING_POI_CATEGORY_WORDS for w in words)
+
 
 def parse_districts(neighborhood: str, city: str) -> List[str]:
     """[LOCAL-790] Expand a numbered-district neighbourhood into per-district area
@@ -498,9 +603,23 @@ def _parse_location(location_string: str) -> Tuple[str, str]:
     # through the named-place policy (apply_named_place_policy) so it is kept when
     # it verifies and announced when it does not (D562), never silently dropped.
     location_string = re.sub(
-        r'\s*\b(?:including|featuring|and\s+visit(?:ing)?|and\s+see(?:ing)?|'
+        r'\s*\b(?:including|featuring|visiting|and\s+visit(?:ing)?|'
+        r'and\s+see(?:ing)?|seeing|stopping\s+(?:at|by)|stop(?:ping)?\s+(?:at|by)|'
+        r'taking\s+in|and\s+take\s+in|such\s+as|'
         r'with\s+(?:a\s+)?(?:stop|stops|visit)|with)\b.*$',
         '', location_string or '', flags=re.IGNORECASE).strip().rstrip('.').strip()
+    # [LOCAL-791 defect 8] Strip a PARENTHETICAL ANCHOR LIST before any comma
+    # split. "Old Saigon walking tour, District 1, Ho Chi Minh City (Notre-Dame
+    # Cathedral, Central Post Office, Opera House, City Hall)" has four stop names
+    # inside "(...)" whose INTERNAL commas tore the comma split apart — the city
+    # was read as "City Hall)" and area resolution failed, running the whole tour
+    # unverified. The names in the parenthesis are the stops the listener wants;
+    # they are captured separately as named_places (intent + the clause parser) and
+    # protected by apply_named_place_policy, so dropping them from the AREA string
+    # here loses nothing. An UNBALANCED trailing "(" is also cut.
+    location_string = re.sub(r'\s*\([^)]*\)', ' ', location_string or '')
+    location_string = re.sub(r'\s*\([^)]*$', ' ', location_string)  # unbalanced tail
+    location_string = re.sub(r'\s{2,}', ' ', location_string).strip().rstrip('.').strip()
     # [LOCAL-779] Strip a "near me" phrase and a leading "<type>:" label before
     # parsing. "walking tour: gyms near me, west Roxbury, MA" was parsed with
     # neighborhood=': gyms near me'; "near me" is never a place and the colon label
@@ -576,7 +695,37 @@ def _parse_location(location_string: str) -> Tuple[str, str]:
     parts = [_SEGMENT_FILLER_RE.sub('', p).strip() for p in parts]
     # Remove empty segments that result from stripping
     parts = [p for p in parts if p]
-    
+
+    # [LOCAL-791 defect 1] Strip a LEADING dining/POI/activity category segment so
+    # the area is read from the segments that name a PLACE. "Vietnamese restaurants
+    # and street food, District 1, Ho Chi Minh City" had the whole dining clause in
+    # parts[0], which pushed "District 1" into the city slot and dropped "Ho Chi
+    # Minh City". Only drop a leading category segment while at least two segments
+    # remain, so a request that is nothing but a category never loses its only
+    # segment. "street food" is a food style and is in the category set, so it is
+    # never mistaken for a locality.
+    _stripped_leading_category = False
+    while len(parts) > 1 and _is_dining_poi_category_segment(parts[0]):
+        parts.pop(0)
+        _stripped_leading_category = True
+
+    # [LOCAL-791 defect 1/2] Strip a leading dining/POI/activity prefix that sits in
+    # the SAME segment as the place, joined by "in"/"of"/"at"/"around"/"near"
+    # ("Kitesurfing schools in Mui Ne" → "Mui Ne"). The prefix (up to the LAST such
+    # connective) must be ENTIRELY category/glue words; the tail after it is the
+    # place. Applied to every segment so parts[0] carries only the place name.
+    _CATEGORY_IN_PLACE_RE = re.compile(
+        r'^(?P<prefix>.+?)\s+(?:in|of|at|around|near|throughout|across|within)\s+(?P<place>.+)$',
+        re.IGNORECASE)
+    _np = []
+    for _seg in parts:
+        _m = _CATEGORY_IN_PLACE_RE.match(_seg)
+        if _m and _is_dining_poi_category_segment(_m.group('prefix')) and _m.group('place').strip():
+            _np.append(_m.group('place').strip())
+        else:
+            _np.append(_seg)
+    parts = _np
+
     # [LOCAL-351] Detect US-format addresses by structural signals.
     # A 2-letter uppercase token followed by a 5-digit ZIP (e.g. "MA 02062") or
     # a bare 2-letter uppercase token that is NOT a plausible city name (when
@@ -617,6 +766,40 @@ def _parse_location(location_string: str) -> Tuple[str, str]:
         # First part is neighborhood/area, second is city
         neighborhood = parts[0]
         city = parts[1]
+        # [LOCAL-791 defect 1] A numbered DISTRICT appearing as a MIDDLE segment is
+        # the real sub-area, and the city is what FOLLOWS it. "Old Saigon, District
+        # 1, Ho Chi Minh City" → neighborhood "District 1", city "Ho Chi Minh City"
+        # (not neighbourhood "Old Saigon", city "District 1" with HCMC dropped). A
+        # leading descriptor ("Old Saigon") is not the area; the district is.
+        for _di in range(1, len(parts) - 1):
+            if _SINGLE_DISTRICT_RE.match(parts[_di]):
+                neighborhood = parts[_di]
+                city = parts[_di + 1]
+                if (_di + 2 < len(parts)
+                        and (len(parts[_di + 2]) <= 3
+                             or parts[_di + 2].lower() in _COUNTRYISH_TAILS)):
+                    city = f"{parts[_di + 1]}, {parts[_di + 2]}"
+                return neighborhood, city
+        # [LOCAL-791 defect 1] After stripping a leading dining/POI category
+        # ("gyms near me, west Roxbury, MA" → ["west Roxbury", "MA"]), a 2-part
+        # remainder whose SECOND part is a short state/country code is a single
+        # "place, CODE" area — not a neighbourhood ("west Roxbury") in a city
+        # ("MA"). Combine them so the parent place is never lost (LOCAL-779 kept
+        # "west Roxbury, MA" together; this preserves that after the strip).
+        if (_stripped_leading_category and len(parts) == 2
+                and (len(parts[1]) <= 3 or parts[1].lower() in _COUNTRYISH_TAILS)):
+            return "", f"{parts[0]}, {parts[1]}"
+        # [LOCAL-791 defect 1] A numbered DISTRICT is a SUB-AREA of its city, so the
+        # city that follows it must never be dropped. "District 1, Ho Chi Minh City"
+        # → neighborhood "District 1", city "Ho Chi Minh City" (not city "District
+        # 1" with the real city lost). When a district leads, the city is the NEXT
+        # segment regardless of its length, and a trailing country/state is appended.
+        if _SINGLE_DISTRICT_RE.match(parts[0]) and len(parts) >= 3:
+            neighborhood = parts[0]
+            city = parts[1]
+            if len(parts[2]) <= 3 or parts[2].lower() in ('vietnam', 'viet nam'):
+                city = f"{parts[1]}, {parts[2]}"
+            return neighborhood, city
         # If third part looks like a state/country, append to city
         if len(parts) >= 3 and len(parts[2]) <= 3:
             city = f"{parts[1]}, {parts[2]}"
@@ -645,7 +828,9 @@ def _parse_location(location_string: str) -> Tuple[str, str]:
 # deterministically from the request string itself as a fallback/union, using the
 # same clause grammar as the cut above.
 _NAMED_PLACE_CLAUSE_RE = re.compile(
-    r'\b(?:including|featuring|and\s+visit(?:ing)?|and\s+see(?:ing)?|'
+    r'\b(?:including|featuring|visiting|and\s+visit(?:ing)?|and\s+see(?:ing)?|'
+    r'seeing|stopping\s+(?:at|by)|stop(?:ping)?\s+(?:at|by)|taking\s+in|'
+    r'and\s+take\s+in|such\s+as|'
     r'with\s+(?:a\s+)?(?:stop|stops|visit)(?:\s+(?:at|to))?|with)\b\s*(.+)$',
     flags=re.IGNORECASE)
 

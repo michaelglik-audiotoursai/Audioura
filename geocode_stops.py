@@ -1178,3 +1178,162 @@ def repair_centroid_collapse(poi_list, tour_location, category=None,
                         "after re-resolution — caller should drop and replenish",
                         len(rec["still_colliding"]))
     return rec
+
+
+# --- inherited / clustered coordinates (LOCAL-791 defect 3) ------------------
+#
+# Tour 461 (HCMC walking tour) shipped every pin clustered around the first stop:
+# the Opera House ~0.7 km W of the real one, Ben Thanh ~0.6 km off, the War
+# Remnants Museum at 10.7764,106.6930 (real ≈ 10.7795,106.6921). The stops were
+# REAL places with good research — only their COORDINATES were wrong: each had
+# inherited a neighbour's (or the area centre's) point instead of being geocoded
+# from its own name/address.
+#
+# `find_centroid_collapse` catches the EXACT-shared-axis artifact (same latitude
+# to 4 dp while longitude jitters). This is the softer cousin: two stops land
+# within ~50 m of each other (near-identical, an inherited point) but the stop's
+# OWN geocode is far away (> 200 m). A stop's coordinate must come from a geocode
+# of THAT place, so when a stop sits on top of another AND its own geocode proves
+# it belongs elsewhere, we take the geocode.
+#
+# The rule (the ticket's unit-test shape): a stop whose coordinate equals another
+# stop's within CLUSTER_RADIUS_M (50 m) AND whose own geocode is more than
+# GEOCODE_AWAY_M (200 m) from that clustered point → replace with the geocode.
+# Conservative: a stop whose geocode agrees with its current point (two places
+# that genuinely sit close together) is left untouched, and a stop that does not
+# geocode is never moved (nothing is invented).
+
+# Two stops within this distance are suspected to share an INHERITED point.
+CLUSTER_RADIUS_M = float(os.getenv("GEOCODE_CLUSTER_RADIUS_M", "50"))
+# The stop's own geocode must be at least this far from the clustered point before
+# we believe the point was inherited from a neighbour and re-geocode.
+GEOCODE_AWAY_M = float(os.getenv("GEOCODE_AWAY_M", "200"))
+
+
+def _coords_of_poi(poi):
+    """(lat, lng) for a POI dict (via its 'coordinates' string), or None."""
+    if not isinstance(poi, dict):
+        return None
+    return _parse_coords_pair(poi.get("coordinates", ""))
+
+
+def find_inherited_coordinates(poi_list,
+                               cluster_radius_m=CLUSTER_RADIUS_M):
+    """[LOCAL-791 defect 3] Indices of stops whose coordinate is within
+    ``cluster_radius_m`` of an EARLIER stop's coordinate — a suspected inherited /
+    clustered point (every pin landing on the first stop). Deterministic, no
+    network. Returns ``{index: clustered_with_index}`` for each later member of a
+    cluster (the first occurrence of a cluster is the anchor and is not flagged).
+    """
+    pts = []  # (index, (lat, lng))
+    for i, poi in enumerate(poi_list):
+        c = _coords_of_poi(poi)
+        if c:
+            pts.append((i, c))
+    flagged = {}
+    for a in range(len(pts)):
+        for b in range(a + 1, len(pts)):
+            ia, ca = pts[a]
+            ib, cb = pts[b]
+            if ib in flagged:
+                continue
+            if haversine_m(ca, cb) <= cluster_radius_m:
+                flagged[ib] = ia
+    return flagged
+
+
+def repair_inherited_coordinates(poi_list, tour_location,
+                                 tour_anchor=None,
+                                 cluster_radius_m=CLUSTER_RADIUS_M,
+                                 geocode_away_m=GEOCODE_AWAY_M,
+                                 geocoder=None):
+    """[LOCAL-791 defect 3] Re-geocode stops whose coordinate was inherited from a
+    neighbour (clustered within ``cluster_radius_m``) when the stop's OWN geocode
+    proves it belongs more than ``geocode_away_m`` away. Mutates ``poi_list`` in
+    place; returns a record.
+
+    For each flagged stop:
+      * geocode the stop's own name (qualified by the tour locality) and address;
+      * if the geocode is further than ``geocode_away_m`` from the stop's current
+        (clustered) point → REPLACE the coordinate with the geocode (the pin was
+        inherited and is wrong);
+      * otherwise leave it (the two places genuinely sit close together, or the
+        place did not geocode — nothing is invented).
+
+    ``geocoder(query) -> (lat,lng)|None`` is injectable for offline tests; it
+    defaults to this module's ``geocode`` (Nominatim). Best-effort and non-fatal.
+    """
+    if geocoder is None:
+        geocoder = geocode
+    rec = {"action": "none", "reason": "", "checked": len(poi_list),
+           "flagged": [], "corrected": []}
+    if not GEOCODE_ENABLED:
+        rec["reason"] = "geocoding disabled"
+        return rec
+
+    flagged = find_inherited_coordinates(poi_list, cluster_radius_m)
+    rec["flagged"] = sorted(flagged.keys())
+    if not flagged:
+        rec["reason"] = "no clustered/inherited coordinates found"
+        return rec
+
+    # [LOCAL-791] Always have a tour anchor for the "near the tour" guard — if the
+    # caller passed none (area resolution failed), take the MEDIAN of the stops'
+    # current coordinates. Without an anchor a same-name geocode elsewhere on Earth
+    # ("Vestibule" → Zurich) would be accepted and make the pin far worse; the
+    # anchor is exactly what rejects that.
+    if tour_anchor is None:
+        _pts = [c for c in (_coords_of_poi(p) for p in poi_list) if c]
+        if len(_pts) >= 2:
+            _lats = sorted(p[0] for p in _pts)
+            _lngs = sorted(p[1] for p in _pts)
+            tour_anchor = (_lats[len(_pts) // 2], _lngs[len(_pts) // 2])
+
+    for idx in sorted(flagged.keys()):
+        poi = poi_list[idx]
+        if not isinstance(poi, dict):
+            continue
+        cur = _coords_of_poi(poi)
+        if not cur:
+            continue
+        name = (poi.get("name") or poi.get("title") or "").strip()
+        address = (poi.get("address") or "").strip()
+        # Geocode the stop's OWN place: try the measured query shapes.
+        geo = None
+        for q in _queries_for(name, address, tour_location):
+            try:
+                geo = geocoder(q)
+            except Exception:
+                geo = None
+            if geo:
+                break
+        if not geo:
+            continue
+        # The geocode must be near the tour (reject a same-name match elsewhere on
+        # Earth). With an anchor this is the MAX_TOUR_RADIUS_KM test; it is the
+        # guard that stops a generic stop name ("Vestibule", "State rooms") from
+        # being "corrected" to a far-away namesake.
+        if tour_anchor and haversine_m(geo, tour_anchor) / 1000.0 > MAX_TOUR_RADIUS_KM:
+            continue
+        away = haversine_m(cur, geo)
+        if away > geocode_away_m:
+            before = poi.get("coordinates", "")
+            poi["coordinates"] = f"{geo[0]:.6f}, {geo[1]:.6f}"
+            rec["corrected"].append({
+                "index": idx, "name": name,
+                "before": before, "after": poi["coordinates"],
+                "moved_m": round(away),
+                "clustered_with": flagged[idx],
+            })
+            logging.warning("[GEOCODE] LOCAL-791 inherited-pin: stop %r was clustered "
+                            "with stop %d but geocodes %.0f m away — corrected to %s",
+                            name, flagged[idx], away, poi["coordinates"])
+
+    if rec["corrected"]:
+        rec["action"] = "corrected"
+        rec["reason"] = (f"{len(rec['corrected'])} inherited pin(s) re-geocoded to "
+                         f"the stop's own place")
+    else:
+        rec["reason"] = ("clustered stops found but each geocodes within "
+                         f"{geocode_away_m:.0f} m (or did not geocode) — left as-is")
+    return rec
