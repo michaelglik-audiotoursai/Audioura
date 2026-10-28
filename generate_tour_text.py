@@ -733,6 +733,12 @@ def _should_force_museum(location, tour_type, intent, transport_mode='on_foot'):
         return False
     if _detect_worship_civic_class(location, tour_type):
         return False
+    # [LOCAL-790] A plural category bound to an area ("Pagodas and temples of
+    # <city>", "museums in <city>") is a multi-venue walking tour even if PHASE 1
+    # echoed the whole phrase back as a venue_name. Never flip it to a single-venue
+    # museum/building tour.
+    if _is_plural_category_area_request(location, tour_type):
+        return False
     if _MULTI_BUILDING_INSTITUTION_RE.search(location or ''):
         return False
     if _is_contained_venue_request(location, intent):
@@ -1259,7 +1265,24 @@ def _scope_from_request(location, intent=None):
     returns empty — falls back to the original string so the guard still runs.
     """
     if intent and (intent.get('geographic_scope') or '').strip():
-        return intent['geographic_scope'].strip()
+        _gs = intent['geographic_scope'].strip()
+        # [LOCAL-790] PHASE 1 sometimes returns a bare numbered-district scope
+        # ("District 1 and 3") with NO city, so resolve_area reads "District 1 and
+        # 3" as a city and fails (the HCMC colonial-architecture field case). When
+        # the scope is a district clause lacking a city token, append the city from
+        # the request's last comma-segment so the area resolver and the district
+        # union bbox engage on "District 1 and 3, Ho Chi Minh City".
+        if re.match(r'^\s*(?:districts?|qu\u1eadn|quan|arrondissements?|wards?)\s+\d',
+                    _gs, flags=re.IGNORECASE) and ',' not in _gs:
+            _loc_parts = [p.strip() for p in (location or '').split(',') if p.strip()]
+            _city_tail = _loc_parts[-1] if _loc_parts else ''
+            # Only append a tail that looks like a place (not a filler/poi word) and
+            # is not itself the district clause.
+            if (_city_tail and _city_tail.lower() != _gs.lower()
+                    and not re.match(r'^\s*(?:districts?|qu\u1eadn|quan)\b',
+                                     _city_tail, flags=re.IGNORECASE)):
+                return f"{_gs}, {_city_tail}"
+        return _gs
     s = (location or '').strip()
     if not s:
         return s
@@ -2518,6 +2541,29 @@ def named_anchors(request_text):
             continue
         seen.add(key)
         anchors.append(a)
+
+    # [LOCAL-790] PARENTHETICAL NAMED ANCHORS. A place-category request names its
+    # example stops in parentheses: "Pagodas and temples of Ho Chi Minh City
+    # (Jade Emperor Pagoda, Thien Hau Temple)". Each parenthesised name is a place
+    # the listener explicitly asked for — an anchor (a stop if it exists), not a
+    # route via-point and not a "part" of one venue. Without this they were never
+    # inserted and a named pagoda (Thien Hau) was dropped. Split each parenthetical
+    # group on commas / "and" / "&" / ";" / "/", keep order, skip anything that is
+    # clearly not a place name (digits-only, a lone short token). Route-grammar
+    # anchors (from/to/via) come first; parenthetical anchors append after, deduped.
+    for _pg in re.findall(r'\(([^)]*)\)', text):
+        for _part in re.split(r'\s*(?:,|;|/|&|\band\b)\s*', _pg, flags=re.IGNORECASE):
+            _nm = (_part or '').strip(' ,.;\u2019\'"')
+            if len(_nm) < 3:
+                continue
+            # A place name carries at least one letter; skip bare numbers / codes.
+            if not re.search(r'[A-Za-z\u00C0-\u1EF9]', _nm):
+                continue
+            key = _norm_place(_nm)
+            if not key or key in seen:
+                continue
+            seen.add(key)
+            anchors.append(_nm)
 
     return {'anchors': anchors, 'start': start, 'end': end, 'is_loop': is_loop}
 
@@ -4312,6 +4358,47 @@ _WORSHIP_CIVIC_WORD_RE = _venue_class_re.compile(
 )
 
 
+# [LOCAL-790] A PLURAL CATEGORY + AREA request ("Pagodas and temples of Ho Chi
+# Minh City", "Churches of Rome", "museums in Paris", "temples in Kyoto") names a
+# CLASS of places spread across an area — a multi-venue walking tour — NOT one
+# building. The D571 venue-parts path treated "Pagodas and temples of HCMC" as a
+# single venue and asked for its parts (Courtyard, Altar …) with anchor=None,
+# which is exactly backwards: a plural worship/civic noun bound to a place by
+# "of/in/around <area>" is a category tour whose stops are the individual pagodas
+# and temples. Named examples in parentheses ("(Jade Emperor Pagoda, Thien Hau
+# Temple)") are ANCHORS (each a stop if it exists), not parts. This matches a
+# plural worship/civic/collection noun — optionally joined to a sibling by "and"
+# ("pagodas and temples") — followed by "of/in/around/near/throughout <place>".
+_PLURAL_CATEGORY_NOUN = (
+    r'(?:pagodas|temples|churches|cathedrals|basilicas|chapels|abbeys|mosques'
+    r'|masjids|synagogues|shrines|monasteries|convents|museums|galleries'
+    r'|palaces|castles|mansions|libraries|markets|parks|gardens|monuments'
+    r'|memorials|fountains|squares|bridges|towers|landmarks|sights|sites'
+    r'|attractions|buildings|houses|villas)'
+)
+_PLURAL_CATEGORY_IN_AREA_RE = _venue_class_re.compile(
+    r'\b' + _PLURAL_CATEGORY_NOUN +
+    r'(?:\s+(?:and|&|,)\s+' + _PLURAL_CATEGORY_NOUN + r')*'
+    r'\s+(?:of|in|around|near|throughout|across|within)\s+\S',
+    _venue_class_re.IGNORECASE,
+)
+
+
+def _is_plural_category_area_request(location, tour_type=""):
+    """[LOCAL-790] True when the request names a PLURAL CATEGORY of places bound to
+    an area ("Pagodas and temples of <city>", "<category>s in/of <area>").
+
+    Such a request is a MULTI-VENUE walking tour — its stops are the individual
+    places of that class across the area — so it must NOT be routed to the D571
+    single-venue venue-parts path. The parenthetical named examples
+    ("(Jade Emperor Pagoda, Thien Hau Temple)") are anchors, not parts, so they
+    are stripped before matching (a '(' never ends a one-venue name)."""
+    text = f"{location or ''} {tour_type or ''}"
+    # Drop any parenthetical anchor list before matching the category/area shape.
+    text = _venue_class_re.sub(r'\([^)]*\)', ' ', text)
+    return bool(_PLURAL_CATEGORY_IN_AREA_RE.search(text))
+
+
 def _detect_venue_class(location, tour_type=""):
     """Return the venue CLASS named by the request, or None.
 
@@ -4343,7 +4430,13 @@ def _detect_venue_class(location, tour_type=""):
         return 'facility'
 
     # --- worship / civic place signals (LOCAL-485).
+    # [LOCAL-790] …but a PLURAL CATEGORY bound to an area ("Pagodas and temples of
+    # Ho Chi Minh City", "churches of Rome") is a MULTI-VENUE walking tour, not one
+    # building — its stops are the individual places of that class. Do not route it
+    # to the single-venue worship_civic / D571 venue-parts path.
     if _WORSHIP_CIVIC_WORD_RE.search(text):
+        if _is_plural_category_area_request(location, tour_type):
+            return None
         return 'worship_civic'
 
     return None
@@ -14586,6 +14679,21 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
                         
                         poi_list = _walk_result['pois']
 
+                        # [LOCAL-790] Collapse the pool by LOCATION or QID now that
+                        # verified stops carry Wikidata coordinates. Title-only dedup
+                        # cannot see that "Ngoc Hoang Pagoda" (Vietnamese) is the
+                        # "Jade Emperor Pagoda" (English) — no shared tokens — so both
+                        # shipped in the field. Same QID, or points within ~60 m, is
+                        # the same place.
+                        try:
+                            import identity_dedup as _idd790
+                            poi_list, _dd790 = _idd790.dedupe_by_location_or_qid(poi_list)
+                            for _dn, _kn in _dd790:
+                                print(f"  [LOCAL-790] same place collapsed: "
+                                      f"{_dn!r} = {_kn!r} (QID or <=60m)")
+                        except Exception as _dd_err:
+                            print(f"  [LOCAL-790] location/QID dedupe skipped (non-fatal): {_dd_err}")
+
                         # [LOCAL-751 B2 / D562] A place the listener NAMED is kept
                         # when it verifies against the discovered landmarks, and
                         # announced (never silently dropped) when it does not.
@@ -15471,9 +15579,15 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
                     if intent and intent.get('poi_type'):
                         _rawpt = intent['poi_type']
                         _seg_poi_type = " or ".join(_rawpt) if isinstance(_rawpt, list) else _rawpt
+                    # [LOCAL-790] The CLEAN scope the walking existence check geocodes
+                    # for its `ll` + bbox — "District 1 and 3, Ho Chi Minh City", not
+                    # the whole themed request. Prefer the intent's geographic_scope,
+                    # else the deterministic scope stripper.
+                    _seg_scope = _scope_from_request(location, intent)
                     _seg_result = (run_existence_gate(_seg_stop_names, _seg_venue, _seg_conn,
                                                      tour_type=tour_category,
-                                                     poi_type=_seg_poi_type)
+                                                     poi_type=_seg_poi_type,
+                                                     scope=_seg_scope)
                                    if _seg_stop_names
                                    else {'unverified_stops': [], 'inconclusive_stops': [],
                                          'verdicts': []})
@@ -15620,8 +15734,39 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
         # by asking GPT for fresh candidates and verifying them through the same
         # gate. A replenished stop must pass the same verification as an original.
         # This mirrors R4 for museum tours but uses the existence gate (not D1v2).
+        # [LOCAL-790] Replenishment must run FROM ZERO for a place-based/walking
+        # LANDMARK tour, not only when ≥1 survived. The field defect: a Ho Chi Minh
+        # City pagodas/architecture walk had EVERY candidate dropped by the gate
+        # (Wikidata 0-in-area, places_search never called), poi_list hit 0, the
+        # LOCAL-779B empty-refill only covers business/dining ('landmark' is
+        # skipped), and the LOCAL-290 loop below was gated `len(poi_list) > 0` — so
+        # nothing replenished and the tour clean-failed "All POIs were filtered
+        # out". Now that the gate's walking path calls places_search (LOCAL-790
+        # cause 1), the GPT→gate loop can refill from 0: ask for N+margin, verify
+        # each through the SAME gate, up to the existing round limit. Business and
+        # dining keep their maps-first empty-refill above; this from-0 allowance is
+        # for the landmark/walking class that had no from-0 path at all.
+        _rep_allow_from_zero = False
+        try:
+            if len(poi_list) == 0 and tour_category not in ('museum', 'restaurant'):
+                from stop_existence_gate import classify_business_vs_landmark as _cbl_z
+                _z_poi_type = ''
+                if intent and intent.get('poi_type'):
+                    _zpt = intent['poi_type']
+                    _z_poi_type = " or ".join(_zpt) if isinstance(_zpt, list) else _zpt
+                _rep_allow_from_zero = (_cbl_z(_z_poi_type) == 'landmark')
+        except Exception:
+            # If classification is unavailable, a place-based walking tour at 0
+            # still deserves a refill attempt — default to allowing it for the
+            # non-museum/non-restaurant walking classes.
+            _rep_allow_from_zero = (len(poi_list) == 0
+                                    and tour_category in ('walking', 'specialized'))
         if (tour_category != 'museum' and len(poi_list) < _seg_requested_stops
-                and len(poi_list) > 0):
+                and (len(poi_list) > 0 or _rep_allow_from_zero)):
+            if _rep_allow_from_zero:
+                print(f"  [LOCAL-790] replenishment running FROM ZERO for a place-based "
+                      f"landmark/walking tour (gate dropped all candidates; places-first "
+                      f"gate now re-verifies refills)")
             _rep_needed = _seg_requested_stops - len(poi_list)
             _rep_tried = set(p['name'].lower() for p in poi_list)
             # Also exclude all names we already tried (including dropped ones)
@@ -15821,7 +15966,8 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
                         _rep_name_list = [n for n, _ in _rep_new_names]
                         # LOCAL-313: pass tour_category for dining verification
                         _rep_gate_result = run_existence_gate(
-                            _rep_name_list, _rep_venue, _rep_conn, tour_type=tour_category)
+                            _rep_name_list, _rep_venue, _rep_conn, tour_type=tour_category,
+                            scope=(_scope_from_request(location, intent)))
                         _rep_conn.close()
 
                         _rep_verified_names = set(_rep_gate_result.get('verified_stops', []))
@@ -15938,7 +16084,8 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
                         if _inc_conn:
                             _inc_name_list = [n for n, _ in _inc_new_names]
                             _inc_gate_result = run_existence_gate(
-                                _inc_name_list, location, _inc_conn, tour_type=tour_category)
+                                _inc_name_list, location, _inc_conn, tour_type=tour_category,
+                                scope=(_scope_from_request(location, intent)))
                             _inc_conn.close()
 
                             _inc_verified_names = set(_inc_gate_result.get('verified_stops', []))
