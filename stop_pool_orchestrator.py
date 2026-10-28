@@ -195,6 +195,93 @@ def _revalidate_pooled_scope(rows, location, tour_type, contained):
     return kept, rejected
 
 
+# ── [LOCAL-792 / D726] Automatic incorrect-content reject (no human) ─────────
+
+def _auto_reject_junk_titles(rows, location, tour_type, db_url, qid=None):
+    """[LOCAL-792] Split reuse candidates on the junk-title / other-venue check and
+    MOVE the failures out of the pool (incorrect content, D726).
+
+    A candidate whose TITLE is page chrome, a navigation/section label, a website
+    call-to-action, a news headline, a fabricated non-place ("Interesting",
+    "Balcony"), or names the venue itself / another venue is not a thing a listener
+    looks at — it is INCORRECT CONTENT. Such a stop is dropped from THIS tour AND
+    quarantined: its pool row is copied to ``stop_pool_rejected`` and removed from
+    ``stop_pool`` (``stop_pool_rejected.auto_reject_rows``, one verified
+    transaction). A row that is only MINED (from a delivered tour, not in the pool)
+    is simply dropped from this tour — the move is idempotent and touches only rows
+    actually in the pool.
+
+    Distance/scope is NOT judged here (that is LOCAL-788 skip-only), so a far-away
+    but otherwise-correct place is never moved by this function. Returns the kept
+    rows. Best-effort: any guard/DB failure returns the rows unchanged and leaves
+    the pool untouched.
+
+    The junk predicate is ``junk_title_guard.is_junk_page_title`` — the project's
+    single authority for "this title is a web-page / CMS / navigation / CTA /
+    venue-itself title, never a stop" (the LOCAL-632/721 rule set the ticket calls
+    the LOCAL-791 junk-title / other-venue check).
+    """
+    if not rows:
+        return rows
+    try:
+        from junk_title_guard import is_junk_page_title
+    except Exception as e:
+        logger.info(f"[LOCAL-792] junk-title guard unavailable ({e}); no auto-reject")
+        return list(rows)
+
+    venue = _venue_name(location)
+    kept = []
+    junk = []
+    for r in rows:
+        title = (r.get("title") or "").strip()
+        try:
+            is_junk = is_junk_page_title(title, venue)
+        except Exception:
+            is_junk = False
+        if is_junk:
+            junk.append(r)
+        else:
+            kept.append(r)
+
+    if not junk:
+        return kept
+
+    for r in junk:
+        _src = r.get("_mined_source_tour_id")
+        print(f"  [LOCAL-792] AUTO-REJECT incorrect-content stop {r.get('title','')!r} "
+              f"(junk-title/other-venue) — moving out of pool")
+
+    # Quarantine the failing rows: copy to stop_pool_rejected, then remove from
+    # stop_pool (verified, one transaction). A mined-only row (not in the pool)
+    # contributes 0 to the move but is still dropped from this tour.
+    try:
+        import stop_pool_rejected as _rej
+        # A mined row carries its source tour id; a pooled row has none. Group the
+        # reason/source per row by moving each individually so a mined row records
+        # its source_tour_id while a pooled row records none.
+        _pooled_junk = [r for r in junk if not r.get("_mined_source_tour_id")]
+        if _pooled_junk:
+            _rej.auto_reject_rows(
+                db_url, _pooled_junk, location, tour_type,
+                reason="auto:junk_title_or_other_venue",
+                rejected_by="auto:junk_title_guard",
+                qid=qid, source_tour_id=None)
+        for r in junk:
+            _src = r.get("_mined_source_tour_id")
+            if _src:
+                _rej.auto_reject_rows(
+                    db_url, [r], location, tour_type,
+                    reason="auto:junk_title_or_other_venue",
+                    rejected_by="auto:junk_title_guard",
+                    qid=qid, source_tour_id=int(_src))
+    except Exception as e:
+        logger.warning(f"[LOCAL-792] auto-reject quarantine skipped ({e})")
+
+    print(f"  [LOCAL-792] auto-rejected {len(junk)} incorrect-content stop(s) "
+          f"from this tour ({len(kept)} kept)")
+    return kept
+
+
 def _classify(location: str, tour_type: str) -> str:
     """Classify via the generator's own classifier; fall back to tour_type.
 
@@ -407,6 +494,18 @@ def maybe_generate_with_pool(
                       f"existing non-test tours of this venue")
         except Exception as _rf_err:
             logger.warning(f"[LOCAL-778] existing-tour mining skipped ({_rf_err})")
+
+    # [LOCAL-792/D726] Automatic, no human: a reuse candidate whose TITLE fails the
+    # junk-title / other-venue check (a news headline, a page/CTA title, a
+    # fabricated "Interesting"/"Balcony", or a title that names another venue —
+    # tour 463's War Remnants Museum defect) is INCORRECT CONTENT. It is MOVED out
+    # of the pool (copied to stop_pool_rejected, then removed) and dropped from
+    # THIS tour. A SCOPE/distance failure is NOT handled here — that is skip-only
+    # (LOCAL-788 `_revalidate_pooled_scope` below), because a far-away stop is good
+    # material for the tour it belongs to. Best-effort: any failure leaves the pool
+    # unchanged and keeps the rows (never empties a tour over a guard bug).
+    pooled_rows = _auto_reject_junk_titles(
+        pooled_rows, location, tour_type, db_url, qid=qid)
 
     K = len(pooled_rows)
     N = int(total_stops)
@@ -907,6 +1006,18 @@ def _reuse_first_existing_tour_rows(location, tour_type, db_url, already_rows,
                 """
             )
             rows = cur.fetchall()
+        # [LOCAL-792/D726] The miner must NOT re-mine a stop that has been
+        # QUARANTINED as incorrect content (moved to stop_pool_rejected): a bad
+        # stop removed from the pool would otherwise walk straight back in from the
+        # delivered tour it was first seen in. Read the quarantined title_norms for
+        # THIS venue identity (any tour_type / version) and skip them below. Empty
+        # set on a pre-056 DB (table absent) → behaviour unchanged.
+        _rejected_norms = set()
+        try:
+            import stop_pool_rejected as _rej
+            _rejected_norms = _rej.rejected_norms_by_identity(conn, loc_identity)
+        except Exception as _re:
+            logger.info(f"[LOCAL-792] miner reject-skip lookup unavailable ({_re})")
     except Exception as e:
         logger.info(f"[LOCAL-778] existing-tour read error: {e}")
         return []
@@ -936,6 +1047,12 @@ def _reuse_first_existing_tour_rows(location, tour_type, db_url, already_rows,
         for u in pool.parse_delivered_stops(tour_content or ""):
             tnorm = pool._title_norm(u.get("title") or "")
             if not tnorm or tnorm in seen:
+                continue
+            # [LOCAL-792/D726] Never re-mine a quarantined (rejected) stop.
+            if tnorm in _rejected_norms:
+                print(f"  [LOCAL-792] MINE SKIP rejected stop {u.get('title','')!r} "
+                      f"(in stop_pool_rejected)")
+                seen.add(tnorm)
                 continue
             seen.add(tnorm)
             # Shape the parsed unit like a get_pool_stops row so the pool path's

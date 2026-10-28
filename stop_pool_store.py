@@ -554,42 +554,70 @@ def _ensure_table(conn) -> None:
                 PRIMARY KEY (pool_key, title_norm)
             )
         """)
-        # Migration path for a table created before order_seq existed.
-        cur.execute("""
-            ALTER TABLE stop_pool ADD COLUMN IF NOT EXISTS order_seq INTEGER DEFAULT 0
-        """)
-        # [LOCAL-609] Additive migration: per-stop research cost, stored when a
-        # stop is first pooled. Lets a pool/cache delivery report
-        # `research_cost_reused` (the sum over the reused stops) so a listener's
-        # price can be shown as "this delivery" plus "share of research". Additive
-        # only — never DELETE/DROP (ticket LOCAL-609).
-        cur.execute("""
-            ALTER TABLE stop_pool ADD COLUMN IF NOT EXISTS research_cost_usd NUMERIC(12, 6) DEFAULT 0
-        """)
-        # [LOCAL-644] Additive migration: the generator's structured Stop record
-        # (title/artist/orientation/narration paragraphs/directions/fields) as
-        # JSON, stored when a stop is pooled from a STRUCTURED_STOPS delivery. On
-        # reuse the pool renders FROM this record (one renderer for every path),
-        # so STRUCTURED_STOPS=1 reaches pooled/reuse tours too. A row stored before
-        # this change has NULL here; the reader parses it once into a record for
-        # back-compat (never DELETE/DROP — ticket LOCAL-644).
-        cur.execute("""
-            ALTER TABLE stop_pool ADD COLUMN IF NOT EXISTS stop_record_json TEXT
-        """)
-        # [LOCAL-655] Additive migration: when a pooled stop carries a dated NEWS
-        # item (the delivery-time current-affairs pass injected "In recent news:"
-        # into its narration), stamp the time it was generated. A stop with a news
-        # item is reused only while it is FRESH (< CA_NEWS_FRESH_DAYS, default 7);
-        # the reader excludes a stale news-bearing row. A history-only stop has
-        # news_generated_at = NULL and is never excluded — today's behaviour is
-        # unchanged for it. Never DELETE/DROP (ticket LOCAL-655).
-        cur.execute("""
-            ALTER TABLE stop_pool ADD COLUMN IF NOT EXISTS news_generated_at TIMESTAMPTZ
-        """)
-        cur.execute("""
-            CREATE INDEX IF NOT EXISTS idx_stop_pool_key
-            ON stop_pool (pool_key)
-        """)
+        # [LOCAL-792 / LEAD 18:5x] The ALTER TABLE … ADD COLUMN / CREATE INDEX
+        # statements below take an ACCESS EXCLUSIVE lock on the EXISTING stop_pool.
+        # If ANY other connection idles in a transaction holding a lock on the
+        # table, the ALTER waits indefinitely (a 2 h hang was observed) AND its
+        # queued ACCESS EXCLUSIVE request blocks every reader behind it, stalling
+        # every generator. Two guards:
+        #   (1) SET LOCAL lock_timeout = 3s — the DDL FAILS FAST instead of waiting
+        #       forever (reverts at commit; never leaks to the caller's other work).
+        #   (2) a SAVEPOINT around the lock-taking DDL — on a lock_timeout we roll
+        #       back ONLY the DDL to the savepoint and carry on, because the columns
+        #       already exist on any migrated DB (authoritative schema is migration
+        #       056 + the earlier 0xx files); this self-healing block is a
+        #       dev-convenience fallback, not the source of truth. A read path
+        #       (get_pool_stops) therefore still runs even if it could not take the
+        #       DDL lock, instead of failing the whole tour.
+        try:
+            cur.execute("SAVEPOINT stop_pool_ddl")
+            cur.execute("SET LOCAL lock_timeout = '3s'")
+            # Migration path for a table created before order_seq existed.
+            cur.execute("""
+                ALTER TABLE stop_pool ADD COLUMN IF NOT EXISTS order_seq INTEGER DEFAULT 0
+            """)
+            # [LOCAL-609] Additive migration: per-stop research cost, stored when a
+            # stop is first pooled. Lets a pool/cache delivery report
+            # `research_cost_reused` (the sum over the reused stops) so a listener's
+            # price can be shown as "this delivery" plus "share of research".
+            # Additive only — never DELETE/DROP (ticket LOCAL-609).
+            cur.execute("""
+                ALTER TABLE stop_pool ADD COLUMN IF NOT EXISTS research_cost_usd NUMERIC(12, 6) DEFAULT 0
+            """)
+            # [LOCAL-644] Additive migration: the generator's structured Stop record
+            # (title/artist/orientation/narration paragraphs/directions/fields) as
+            # JSON, stored when a stop is pooled from a STRUCTURED_STOPS delivery. On
+            # reuse the pool renders FROM this record (one renderer for every path),
+            # so STRUCTURED_STOPS=1 reaches pooled/reuse tours too. A row stored
+            # before this change has NULL here; the reader parses it once into a
+            # record for back-compat (never DELETE/DROP — ticket LOCAL-644).
+            cur.execute("""
+                ALTER TABLE stop_pool ADD COLUMN IF NOT EXISTS stop_record_json TEXT
+            """)
+            # [LOCAL-655] Additive migration: when a pooled stop carries a dated NEWS
+            # item (the delivery-time current-affairs pass injected "In recent news:"
+            # into its narration), stamp the time it was generated. A stop with a
+            # news item is reused only while it is FRESH (< CA_NEWS_FRESH_DAYS,
+            # default 7); the reader excludes a stale news-bearing row. A
+            # history-only stop has news_generated_at = NULL and is never excluded —
+            # today's behaviour is unchanged for it. Never DELETE/DROP (LOCAL-655).
+            cur.execute("""
+                ALTER TABLE stop_pool ADD COLUMN IF NOT EXISTS news_generated_at TIMESTAMPTZ
+            """)
+            cur.execute("""
+                CREATE INDEX IF NOT EXISTS idx_stop_pool_key
+                ON stop_pool (pool_key)
+            """)
+            cur.execute("RELEASE SAVEPOINT stop_pool_ddl")
+        except psycopg2.Error as _ddl_err:
+            # Could not take the DDL lock in time (or another DDL-only error): the
+            # columns already exist on a migrated DB, so roll back to the savepoint
+            # and continue rather than stall/crash the caller. Migration 056 (and
+            # the 0xx files) remain the authoritative schema.
+            cur.execute("ROLLBACK TO SAVEPOINT stop_pool_ddl")
+            logger.warning(
+                "[LOCAL-792] stop_pool self-healing DDL skipped (%s); relying on "
+                "migration 056 / 0xx for the schema", _ddl_err)
     conn.commit()
 
 
@@ -773,6 +801,33 @@ def get_pool_stops(
         conn = psycopg2.connect(db_url)
         _ensure_table(conn)
         with conn.cursor() as cur:
+            # [LOCAL-792/D726] A stop QUARANTINED as incorrect content (moved to
+            # stop_pool_rejected) is never returned to a reuse. The move already
+            # DELETEs the row from stop_pool, so excluding it here is belt-and-
+            # braces: it also excludes a row matched only by title_norm under the
+            # OTHER pool key (the D582 dual-key case) and guards the window between
+            # an automatic reject and the delete landing.
+            #
+            # The exclusion clause is added ONLY when stop_pool_rejected actually
+            # exists. A runtime `to_regclass(...) IS NULL OR NOT EXISTS (SELECT …
+            # FROM stop_pool_rejected)` guard is NOT enough: Postgres resolves every
+            # relation named in a statement at PARSE time, before any runtime
+            # short-circuit, so merely NAMING the table in the SQL raises
+            # "relation stop_pool_rejected does not exist" on a pre-056 DB. Probing
+            # with a separate to_regclass query first keeps the main query free of
+            # the name whenever the table is absent — unchanged behaviour pre-056.
+            cur.execute("SELECT to_regclass('stop_pool_rejected')")
+            _has_rejected = cur.fetchone()[0] is not None
+            _reject_clause = ""
+            _params = [keys, str(NEWS_FRESH_DAYS)]
+            if _has_rejected:
+                _reject_clause = (
+                    "\n                  AND NOT EXISTS ("
+                    "\n                      SELECT 1 FROM stop_pool_rejected r"
+                    "\n                      WHERE r.title_norm = stop_pool.title_norm"
+                    "\n                        AND r.pool_key = ANY(%s))"
+                )
+                _params.append(keys)
             cur.execute(
                 """
                 SELECT title, artist, year, narration, raw_block,
@@ -788,10 +843,12 @@ def get_pool_stops(
                   -- history-only stop has news_generated_at IS NULL and is always
                   -- kept — its behaviour is unchanged.
                   AND (news_generated_at IS NULL
-                       OR news_generated_at >= NOW() - (%s || ' days')::interval)
+                       OR news_generated_at >= NOW() - (%s || ' days')::interval)"""
+                + _reject_clause
+                + """
                 ORDER BY order_seq ASC, generated_at ASC, title_norm ASC
                 """,
-                (keys, str(NEWS_FRESH_DAYS)),
+                tuple(_params),
             )
             rows = cur.fetchall()
         conn.close()
