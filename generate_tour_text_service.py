@@ -119,7 +119,15 @@ app.register_blueprint(persona_bp)
 
 # Global variables
 TOURS_DIR = "/app/tours"
-ACTIVE_JOBS = get_job_store('tour-generator')
+# [LOCAL-775 / D718] Job status is now DB-backed with an in-memory cache. The
+# generator defaults to the 'layered' store (memory cache + generator_jobs
+# table) so a second Cloud Run instance can answer the orchestrator's /status
+# poll instead of returning "Job not found" and losing a paid-for tour. An
+# explicit JOB_STORE_MODE env still wins (e.g. 'memory' for a pure-local run
+# with no database). The layered store degrades to memory behaviour on its own
+# if the DB is unreachable, so this never breaks generation.
+_JOB_STORE_MODE = os.getenv('JOB_STORE_MODE') or 'layered'
+ACTIVE_JOBS = get_job_store('tour-generator', mode=_JOB_STORE_MODE)
 
 # --- Failure recorder (LOCAL-785 / D723) ---
 # The generator records its clean-fail evidence (existence-gate "0 remain",
@@ -1323,19 +1331,27 @@ JOB_THREADS = {}  # job_id -> worker thread (liveness for /status heartbeat_at)
 
 @app.route('/status/<job_id>', methods=['GET'])
 def get_job_status(job_id):
-    """Get job status."""
-    if job_id not in ACTIVE_JOBS:
+    """Get job status.
+
+    [LOCAL-775 / D718] Read the in-memory cache FIRST, then fall back to the
+    generator_jobs table (ACTIVE_JOBS.get does both). A job the table knows
+    about is NEVER "Job not found", so a second Cloud Run instance that did not
+    own the job still answers the orchestrator's poll with the real status (and,
+    once finished, the tour itself via tour_content) instead of a 404 that would
+    throw away an already paid-for tour.
+    """
+    job = ACTIVE_JOBS.get(job_id)
+    if job is None:
         return jsonify({"error": "Job not found"}), 404
-    
-    job = ACTIVE_JOBS[job_id]
+
     response = {
         "job_id": job_id,
-        "status": job["status"],
-        "progress": job["progress"],
-        "location": job["location"],
-        "tour_type": job["tour_type"],
-        "total_stops": job["total_stops"],
-        "created_at": job["created_at"]
+        "status": job.get("status"),
+        "progress": job.get("progress"),
+        "location": job.get("location"),
+        "tour_type": job.get("tour_type"),
+        "total_stops": job.get("total_stops"),
+        "created_at": job.get("created_at")
     }
 
     # [LOCAL-622] Expose a last-update timestamp and the cancel flag so the
@@ -1355,14 +1371,14 @@ def get_job_status(job_id):
     if job.get("cancel_requested"):
         response["cancel_requested"] = True
     
-    if job["status"] == "completed":
-        response["output_file"] = job["output_file"]
+    if job.get("status") == "completed":
+        response["output_file"] = job.get("output_file")
         if "coordinates" in job:
             response["coordinates"] = job["coordinates"]
         if "tour_content" in job:
             response["tour_content"] = job["tour_content"]
-    elif job["status"] == "error":
-        response["error"] = job["error"]
+    elif job.get("status") == "error":
+        response["error"] = job.get("error")
         # Phase 2: structured clean-fail fields (if present)
         if "error_type" in job:
             response["error_type"] = job["error_type"]
@@ -1382,11 +1398,11 @@ def get_job_status(job_id):
 @app.route('/download/<job_id>', methods=['GET'])
 def download_tour(job_id):
     """Download the generated tour text."""
-    if job_id not in ACTIVE_JOBS:
+    job = ACTIVE_JOBS.get(job_id)
+    if job is None:
         return jsonify({"error": "Job not found"}), 404
-    
-    job = ACTIVE_JOBS[job_id]
-    if job["status"] != "completed":
+
+    if job.get("status") != "completed":
         return jsonify({"error": "Job not completed"}), 400
     
     output_path = os.path.join(TOURS_DIR, job["output_file"])

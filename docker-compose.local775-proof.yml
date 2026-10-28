@@ -1,0 +1,118 @@
+# docker-compose.local775-proof.yml  (LOCAL-775 / D718)
+#
+# Own-stack for the LOCAL-775 live proof. NEVER brought up as -p audioura and
+# never replaces/renames any audioura-* container. Spare host ports and its own
+# throwaway Postgres (dropped with `down -v`).
+#
+#   docker compose -p local775 -f docker-compose.local775-proof.yml up -d --build
+#   ... run tests/test_local775_generator_job_store.py against :55775 ...
+#   ... 2-instance 404 proof + one real 1-stop tour end to end ...
+#   docker compose -p local775 -f docker-compose.local775-proof.yml down -v
+#
+# D718 shape: TWO tour-generator instances (generator-a, generator-b) behind ONE
+# orchestrator, sharing ONE Postgres. The orchestrator talks to a tiny nginx
+# (gen-lb) that round-robins the two generators, so a poll can land on the
+# instance that did not own the job — exactly the overlap that returned 404 and
+# lost the tour. With the generator_jobs table that poll now gets the real
+# status, and after the owner is killed mid-poll the other instance still
+# returns the finished tour.
+
+services:
+  postgres-2:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: audiotours
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: password123
+      POSTGRES_INITDB_ARGS: "--auth-host=md5 --auth-local=md5"
+      POSTGRES_HOST_AUTH_METHOD: md5
+    command: ["postgres", "-c", "password_encryption=md5"]
+    ports:
+      - "55775:5432"
+    restart: unless-stopped
+
+  # Two independent generator instances sharing the DB above. Same image, same
+  # env; their in-memory caches are separate (two containers) so a job created
+  # on one is only visible to the other through generator_jobs.
+  generator-a:
+    build:
+      context: .
+      dockerfile: Dockerfile.generator
+    environment:
+      - JOB_STORE_MODE=layered
+      - DB_HOST=postgres-2
+      - DB_NAME=audiotours
+      - DB_USER=admin
+      - DB_PASSWORD=password123
+      - DB_PORT=5432
+      - INSTANCE_ID=generator-a
+      # STORIED_MODE off by default keeps the pure job-store crossing proof free
+      # of QA/paid calls. For the one real 1-stop tour, override with
+      # STORIED_MODE=true and supply the research keys below.
+      - STORIED_MODE=${LOCAL775_STORIED_MODE:-false}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
+      - SERPER_API_KEY=${SERPER_API_KEY:-}
+      - RESEARCH_BACKEND=${RESEARCH_BACKEND:-}
+      - WALKING_RESEARCH=${WALKING_RESEARCH:-}
+    ports:
+      - "55701:5000"
+    depends_on:
+      - postgres-2
+    restart: unless-stopped
+
+  generator-b:
+    build:
+      context: .
+      dockerfile: Dockerfile.generator
+    environment:
+      - JOB_STORE_MODE=layered
+      - DB_HOST=postgres-2
+      - DB_NAME=audiotours
+      - DB_USER=admin
+      - DB_PASSWORD=password123
+      - DB_PORT=5432
+      - INSTANCE_ID=generator-b
+      - STORIED_MODE=${LOCAL775_STORIED_MODE:-false}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
+      - SERPER_API_KEY=${SERPER_API_KEY:-}
+      - RESEARCH_BACKEND=${RESEARCH_BACKEND:-}
+      - WALKING_RESEARCH=${WALKING_RESEARCH:-}
+    ports:
+      - "55702:5000"
+    depends_on:
+      - postgres-2
+    restart: unless-stopped
+
+  # Round-robin in front of the two generators so the orchestrator's poll can
+  # hit either instance (reproduces the 2-instance overlap).
+  gen-lb:
+    image: nginx:alpine
+    ports:
+      - "55700:80"
+    volumes:
+      - ./local775-gen-lb.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - generator-a
+      - generator-b
+    restart: unless-stopped
+
+  tour-orchestrator:
+    build:
+      context: .
+      dockerfile: Dockerfile.orchestrator
+    ports:
+      - "50775:5002"
+    environment:
+      - DB_HOST=postgres-2
+      - DB_NAME=audiotours
+      - DB_USER=admin
+      - DB_PASSWORD=password123
+      - DB_PORT=5432
+      - TOUR_GENERATOR_URL=http://gen-lb:80
+      - TOUR_TEST_MODE_ALLOW_REQUEST=true
+    depends_on:
+      - postgres-2
+      - gen-lb
+    restart: unless-stopped
