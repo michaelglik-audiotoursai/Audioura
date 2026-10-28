@@ -1,27 +1,36 @@
-// [LOCAL-789] Red/guard test for the Home-map "top ~60% grey for ~30 s after
-// entering Home" bug (Michael, iPhone TestFlight 83, 2026-10-27).
+// [LOCAL-789 / LOCAL-789B] Guard test for the Home-map grey-on-entry bug.
 //
-// THE BUG: the Home map lives in a Column under a VARIABLE-height header — the
-// orange "Showing tours near: …" banner appears the instant a place search sets
+// THE BUG (LOCAL-789, iPhone TestFlight 83, 2026-10-27): the Home map's top
+// ~60% stayed plain grey for ~30 s after entering Home; the bottom ~40% had
+// tiles. The map lives in a Column under a VARIABLE-height header — the orange
+// "Showing tours near: …" banner appears the instant a place search sets
 // _isUsingCustomLocation, and the LOCAL-761 hide-on-scroll bar comes and goes.
-// When that header GROWS after the first layout, the Expanded map SHRINKS from
-// the top; on the device, flutter_map's size event lagged the layout, so the
-// TileLayer kept the tile range it had computed for the OLD (taller) viewport.
-// LOCAL-763's FirstLayoutTileLayer reset only on MapEventNonRotatedSizeChange +
-// one post-frame, so the newly-exposed TOP band had NO tiles (grey) until the
-// next camera/location event ~30 s later.
+// When the header GROWS after the first layout the Expanded map SHRINKS from
+// the top; flutter_map's size event lagged, so the TileLayer kept its old
+// (taller) tile range and the newly-exposed TOP band had no tiles until the
+// next camera event.
 //
-// THE FIX: a LayoutBuilder around the map fires an EXTERNAL reset whenever the
-// map's laid-out height changes; FirstLayoutTileLayer forwards that to the
-// TileLayer's `reset` (coalesced to one per frame). These tests pin the two
-// observable guarantees of that mechanism with a counting, offline tile
-// provider — exactly the harness LOCAL-763 established:
+// LOCAL-789B (iPhone TestFlight 84, 2026-10-28): LOCAL-789's fix rebuilt the
+// TileLayer with a new ValueKey on every size change. In flutter_map 6.2.1 that
+// DISPOSES the TileLayer's default NetworkTileProvider, whose dispose() closes
+// its RetryClient and ABORTS every in-flight tile request ("Connection attempt
+// cancelled"). Over the several frames a real device takes to settle, the
+// repeated rebuilds formed a RESET STORM that cancelled tiles faster than they
+// loaded — leaving the map ENTIRELY grey until a pinch stopped the storm.
 //
-//   1. Firing the externalReset stream reloads the tiles (the heal path that
-//      covers the top band when the banner grows).
-//   2. Growing a banner ABOVE the map — the real trigger — shrinks the map and
-//      drives a reload through the LayoutBuilder→externalReset path, so the new
-//      (shifted) viewport gets its tiles. No gesture, no timer.
+// THE LOCAL-789B FIX: keep ONE stable TileLayer (never disposed mid-load) and
+// reload after the size settles with an imperceptible camera NUDGE on the
+// shared MapController (zoom ± 1e-4) — the pinch-equivalent. These tests pin the
+// observable guarantees with a counting, offline tile provider:
+//
+//   1. After a size change, the heal path (external size signal) reloads tiles
+//      for the new viewport.
+//   2. A banner appearing ABOVE the map shrinks it and drives a reload through
+//      the LayoutBuilder→externalReset→nudge path, so the new (shifted)
+//      viewport gets its tiles — no gesture, no timer.
+//
+// The no-reset-storm / no-dispose-loop guarantee is proven separately in
+// home_map_no_reset_storm_local789b_test.dart.
 
 import 'dart:async';
 import 'dart:ui' as ui;
@@ -84,23 +93,27 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   testWidgets(
-    '[LOCAL-789] firing externalReset reloads tiles (the top-band heal path)',
+    '[LOCAL-789B] a size change reloads tiles via the camera nudge (the '
+    'top-band heal path)',
     (tester) async {
       addTearDown(() => tester.binding.setSurfaceSize(null));
       await tester.binding.setSurfaceSize(const Size(400, 800));
       final provider = _CountingTileProvider();
       final external = StreamController<void>.broadcast();
       addTearDown(external.close);
+      final controller = MapController();
 
       await tester.pumpWidget(MaterialApp(
         home: Scaffold(
           body: FlutterMap(
+            mapController: controller,
             options: const MapOptions(
               initialCenter: LatLng(42.3601, -71.0589),
               initialZoom: 13.0,
             ),
             children: [
               FirstLayoutTileLayer(
+                mapController: controller,
                 externalReset: external.stream,
                 builder: (reset) => TileLayer(
                   urlTemplate: 'https://tile.example/{z}/{x}/{y}.png',
@@ -117,24 +130,42 @@ void main() {
       final afterFirstLayout = provider.requests;
       expect(afterFirstLayout, greaterThan(0));
 
-      // The parent fires the external reset (as the LayoutBuilder does when the
-      // banner changes the map's height). The TileLayer must reload.
+      // Count camera moves sourced from the controller (our nudges) from here
+      // on — the observable that proves the heal path ran. (In a widget test
+      // the viewport tile SET is unchanged by a sub-pixel nudge, so the raw
+      // getImage count can plateau; the nudge itself is the mechanism that, on
+      // a real surface with a lagged size event, recomputes the grid for the
+      // new viewport. The no-storm test asserts tiles are never cancelled.)
+      var nudges = 0;
+      final sub = controller.mapEventStream.listen((e) {
+        if (e is MapEventMove && e.source == MapEventSource.mapController) {
+          nudges++;
+        }
+      });
+      addTearDown(sub.cancel);
+
+      // The map shrinks (the banner-grow case): the camera's nonRotatedSize
+      // changes, so FirstLayoutTileLayer nudges the camera and the TileLayer
+      // reloads tiles for the new viewport. The external signal is also fired
+      // (as the LayoutBuilder does) to prove both paths coalesce to a reload.
+      await tester.binding.setSurfaceSize(const Size(400, 560));
       external.add(null);
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 50));
+      await tester.pump(const Duration(milliseconds: 50));
 
       expect(
-        provider.requests,
-        greaterThan(afterFirstLayout),
+        nudges,
+        greaterThan(0),
         reason:
-            'externalReset must drive a tile reload so the top band gets tiles '
-            'when the banner changes the map size (LOCAL-789).',
+            'A size change must drive a camera nudge so the TileLayer reloads '
+            'its grid for the new viewport (the top-band heal path, LOCAL-789B).',
       );
     },
   );
 
   testWidgets(
-    '[LOCAL-789] a banner appearing ABOVE the map shrinks it and reloads tiles '
+    '[LOCAL-789B] a banner appearing ABOVE the map shrinks it and reloads tiles '
     'for the new viewport (no gesture, no timer)',
     (tester) async {
       addTearDown(() => tester.binding.setSurfaceSize(null));
@@ -143,6 +174,7 @@ void main() {
       final provider = _CountingTileProvider();
       final sizeReset = StreamController<void>.broadcast();
       addTearDown(sizeReset.close);
+      final controller = MapController();
 
       // A miniature of the Home body: a variable-height header above an
       // Expanded map, wrapped in the LayoutBuilder that fires sizeReset when the
@@ -151,44 +183,63 @@ void main() {
       // out (as setState on _HomeScreenState does when _isUsingCustomLocation
       // flips), re-invoking the LayoutBuilder with the new constraints.
       await tester.pumpWidget(MaterialApp(
-        home: _BannerHarness(provider: provider, sizeReset: sizeReset),
+        home: _BannerHarness(
+          provider: provider,
+          sizeReset: sizeReset,
+          controller: controller,
+        ),
       ));
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 50));
       final afterFirstLayout = provider.requests;
       expect(afterFirstLayout, greaterThan(0));
 
+      // Count camera nudges from here on.
+      var nudges = 0;
+      final sub = controller.mapEventStream.listen((e) {
+        if (e is MapEventMove && e.source == MapEventSource.mapController) {
+          nudges++;
+        }
+      });
+      addTearDown(sub.cancel);
+
       // Show the banner: the header grows, the Expanded map shrinks from the
-      // top. The LayoutBuilder sees a new maxHeight → fires sizeReset → the
-      // FirstLayoutTileLayer rebuilds the TileLayer, which re-requests the
-      // tiles for the new viewport (so the newly-exposed top is not left grey).
+      // top. The LayoutBuilder sees a new maxHeight → fires sizeReset, and the
+      // map's nonRotatedSize changes → FirstLayoutTileLayer nudges the camera,
+      // which recomputes the grid for the new viewport (so the newly-exposed
+      // top is not left grey).
       _BannerHarness.showBanner();
       await tester.pump(); // flip banner → relayout → LayoutBuilder fires reset
-      await tester.pump(const Duration(milliseconds: 50)); // post-frame epoch++
-      await tester.pump(const Duration(milliseconds: 50)); // rebuild + requests
+      await tester.pump(const Duration(milliseconds: 50)); // post-frame nudge
+      await tester.pump(const Duration(milliseconds: 50)); // reload + requests
       await tester.pump(const Duration(milliseconds: 50)); // tiles resolve
 
       expect(
-        provider.requests,
-        greaterThan(afterFirstLayout),
+        nudges,
+        greaterThan(0),
         reason:
-            'When the banner grows and the map shrinks, the LayoutBuilder must '
-            'drive a tile reload so the newly-exposed top is not left grey '
-            '(LOCAL-789).',
+            'When the banner grows and the map shrinks, a camera nudge must heal '
+            'the grid so the newly-exposed top is not left grey (LOCAL-789B).',
       );
     },
   );
 }
 
 /// A tiny stand-in for the Home body: a variable-height banner above an
-/// Expanded map, with the LOCAL-789 LayoutBuilder→sizeReset wiring. Exposes a
-/// static [showBanner] so the test can flip the banner via a real top-level
-/// setState (the whole column re-lays out, exactly as the Home screen does).
+/// Expanded map, with the LOCAL-789 LayoutBuilder→sizeReset wiring and the
+/// LOCAL-789B MapController. Exposes a static [showBanner] so the test can flip
+/// the banner via a real top-level setState (the whole column re-lays out,
+/// exactly as the Home screen does).
 class _BannerHarness extends StatefulWidget {
-  const _BannerHarness({required this.provider, required this.sizeReset});
+  const _BannerHarness({
+    required this.provider,
+    required this.sizeReset,
+    required this.controller,
+  });
 
   final TileProvider provider;
   final StreamController<void> sizeReset;
+  final MapController controller;
 
   static late void Function() showBanner;
 
@@ -227,12 +278,14 @@ class _BannerHarnessState extends State<_BannerHarness> {
               }
               if (h.isFinite) _lastHeight = h;
               return FlutterMap(
+                mapController: widget.controller,
                 options: const MapOptions(
                   initialCenter: LatLng(42.3601, -71.0589),
                   initialZoom: 13.0,
                 ),
                 children: [
                   FirstLayoutTileLayer(
+                    mapController: widget.controller,
                     externalReset: widget.sizeReset.stream,
                     builder: (reset) => TileLayer(
                       urlTemplate: 'https://tile.example/{z}/{x}/{y}.png',

@@ -14,10 +14,18 @@
 //
 //   1. A FirstLayoutTileLayer in the IndexedStack+Navigator shell requests OSM
 //      tiles on the FIRST settled layout with NO gesture.
-//   2. When the map's layout size changes (a MapEventNonRotatedSizeChange — the
-//      event that was being missed), FirstLayoutTileLayer fires its reset so
-//      the TileLayer reloads against the new size. This is the mechanism that
-//      heals the blank map once the deferred layout settles.
+//   2. When the map's layout size changes, FirstLayoutTileLayer reloads the
+//      tiles so the TileLayer draws against the new size. This is the mechanism
+//      that heals the blank map once the deferred layout settles.
+//
+// [LOCAL-789B] The reload mechanism CHANGED: instead of rebuilding the TileLayer
+// with a new key (which disposed its network client and cancelled every
+// in-flight tile — the fully-grey-on-entry bug), FirstLayoutTileLayer now keeps
+// ONE stable TileLayer and reloads it with an imperceptible camera NUDGE on the
+// shared MapController (the pinch-equivalent). So the size-change test passes a
+// MapController, and the heal is observed as new tile requests for the new
+// viewport. See home_map_no_reset_storm_local789b_test.dart for the regression
+// proof that nothing is disposed in a storm.
 //
 // The fake TileProvider COUNTS getImage calls (one per tile request) and
 // returns a 1x1 transparent image, so the tests are deterministic and offline.
@@ -33,20 +41,26 @@ import 'package:latlong2/latlong.dart';
 import 'package:audio_tour_app_dev/widgets/first_layout_tile_layer.dart';
 
 /// A TileProvider that counts every tile request and returns a tiny
-/// transparent image, so the map never touches the network.
+/// transparent image, so the map never touches the network. Each request gets a
+/// UNIQUE image key so a reload is never hidden by the image cache.
 class _CountingTileProvider extends TileProvider {
   int requests = 0;
 
   @override
   ImageProvider getImage(TileCoordinates coordinates, TileLayer options) {
     requests++;
-    return _TransparentImageProvider();
+    return _TransparentImageProvider(requests);
   }
 }
 
 /// A 1x1 fully-transparent ImageProvider so loaded tiles resolve instantly in
-/// the test VM without any asset or network.
+/// the test VM without any asset or network. [id] makes every key unique so a
+/// reload really re-calls getImage (defeats the image cache).
 class _TransparentImageProvider extends ImageProvider<_TransparentImageProvider> {
+  _TransparentImageProvider(this.id);
+
+  final int id;
+
   @override
   Future<_TransparentImageProvider> obtainKey(ImageConfiguration configuration) =>
       SynchronousFuture<_TransparentImageProvider>(this);
@@ -65,19 +79,24 @@ class _TransparentImageProvider extends ImageProvider<_TransparentImageProvider>
   }
 
   @override
-  bool operator ==(Object other) => other is _TransparentImageProvider;
+  bool operator ==(Object other) =>
+      other is _TransparentImageProvider && other.id == id;
   @override
-  int get hashCode => 0;
+  int get hashCode => id.hashCode;
 }
 
 /// Build a map inside an IndexedStack + Navigator whose real constraints arrive
 /// only on a later frame — the LOCAL-761 tab shell in miniature. [useFix]
 /// chooses between the plain TileLayer (bug) and FirstLayoutTileLayer (fix).
+/// [controller], when given, is passed to both the FlutterMap and the
+/// FirstLayoutTileLayer so the LOCAL-789B camera nudge can run.
 Widget _mapInTabShell({
   required _CountingTileProvider provider,
   required bool useFix,
+  MapController? controller,
 }) {
   final map = FlutterMap(
+    mapController: controller,
     options: const MapOptions(
       initialCenter: LatLng(42.3601, -71.0589),
       initialZoom: 13.0,
@@ -85,6 +104,7 @@ Widget _mapInTabShell({
     children: [
       if (useFix)
         FirstLayoutTileLayer(
+          mapController: controller,
           builder: (reset) => TileLayer(
             urlTemplate: 'https://tile.example/{z}/{x}/{y}.png',
             tileProvider: provider,
@@ -126,8 +146,10 @@ void main() {
     'layout with no gesture',
     (tester) async {
       final provider = _CountingTileProvider();
-      await tester.pumpWidget(_mapInTabShell(provider: provider, useFix: true));
-      // Let the post-frame size-settle + reset run (no user gesture at all).
+      final controller = MapController();
+      await tester.pumpWidget(
+          _mapInTabShell(provider: provider, useFix: true, controller: controller));
+      // Let the post-frame size-settle + nudge run (no user gesture at all).
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 50));
 
@@ -142,31 +164,35 @@ void main() {
   );
 
   testWidgets(
-    '[LOCAL-763] FIX: a layout-size change reloads tiles (the heal path)',
+    '[LOCAL-763/789B] FIX: a layout-size change reloads tiles (the heal path) '
+    'via the camera nudge',
     (tester) async {
       addTearDown(() => tester.binding.setSurfaceSize(null));
       await tester.binding.setSurfaceSize(const Size(300, 300));
       final provider = _CountingTileProvider();
-      await tester.pumpWidget(_mapInTabShell(provider: provider, useFix: true));
+      final controller = MapController();
+      await tester.pumpWidget(
+          _mapInTabShell(provider: provider, useFix: true, controller: controller));
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 50));
       final afterFirstLayout = provider.requests;
       expect(afterFirstLayout, greaterThan(0));
 
-      // A real size settle (the MapEventNonRotatedSizeChange that was being
-      // missed) must drive FirstLayoutTileLayer's reset, so the TileLayer
-      // removes all tiles and reloads against the new size — more requests.
+      // A real size settle changes the map camera's nonRotatedSize, so
+      // FirstLayoutTileLayer nudges the camera (zoom ± 1e-4); the live TileLayer
+      // recomputes its visible range and loads tiles for the new size.
       await tester.binding.setSurfaceSize(const Size(600, 600));
       await tester.pump();
+      await tester.pump(const Duration(milliseconds: 50));
       await tester.pump(const Duration(milliseconds: 50));
 
       expect(
         provider.requests,
         greaterThan(afterFirstLayout),
         reason:
-            'A layout-size change must trigger a tile reload via the reset '
-            'stream — this is what heals the blank map once the deferred '
-            'IndexedStack layout settles.',
+            'A layout-size change must trigger a tile reload via the camera '
+            'nudge — this is what heals the blank map once the deferred '
+            'IndexedStack layout settles (LOCAL-789B).',
       );
     },
   );
