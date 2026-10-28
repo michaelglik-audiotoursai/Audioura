@@ -1966,6 +1966,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 ReviewsSection(
                   tourId: '${item['id']}',
                   initialCount: (item['rating_count'] as num?)?.toInt() ?? 0,
+                  tourTitle: item['name']?.toString() ?? 'this tour',
                 ),
                 SizedBox(height: 16),
                 Text(singleLanguage ? 'Choose a language:' : 'Select Languages:',

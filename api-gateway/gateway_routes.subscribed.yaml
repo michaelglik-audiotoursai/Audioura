@@ -239,6 +239,13 @@ routes:
     methods: [POST]
     auth: api_key
 
+  # [LOCAL-795] per-stop "Tell us about this place" note (stored, not public). Needs migration 057.
+  - public_path: /tour/<tour_id>/stop/<stop_index>/note
+    backend: orchestrator
+    upstream: /tour/{tour_id}/stop/{stop_index}/note
+    methods: [POST]
+    auth: api_key
+
   - public_path: /review/<review_id>/helpful
     backend: orchestrator
     upstream: /review/{review_id}/helpful

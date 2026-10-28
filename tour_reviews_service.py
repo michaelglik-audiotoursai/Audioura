@@ -67,6 +67,14 @@ import tour_rating_service as rating_svc  # noqa: E402
 REVIEW_MAX_CHARS = 500          # a short review, per the ticket
 REPLY_MAX_CHARS = 300           # a short curator reply
 
+# [LOCAL-795] Per-stop free-form note ("Tell us about this place").
+NOTE_MAX_CHARS = 500            # a short per-stop note, per the ticket
+# Rate limit: at most this many notes per user per rolling 24 h window. Keeps a
+# single device from flooding the table (the notes are not shown publicly, so
+# the limit is the only abuse control they need). Enforced in submit_stop_note.
+NOTE_RATE_LIMIT = 10
+NOTE_RATE_WINDOW_HOURS = 24
+
 # Bayesian ranking prior (item 4/11). C=3 so one 10 does not top the list.
 RANK_PRIOR_COUNT = 3
 RANK_PRIOR_SCORE = 7.5
@@ -119,6 +127,34 @@ _REVIEW_VOTES_DDL = """
     )
 """
 
+# [LOCAL-795] Per-stop free-form notes. Identical to migration/sql/057_stop_notes.sql
+# so the endpoint works whether or not the migration was run, exactly like the
+# reviews/votes DDL above.
+_STOP_NOTES_DDL = """
+    CREATE TABLE IF NOT EXISTS stop_notes (
+        id              SERIAL PRIMARY KEY,
+        tour_id         INTEGER NOT NULL,
+        stop_index      INTEGER NOT NULL,
+        stop_title      TEXT,
+        user_id         VARCHAR(255) NOT NULL,
+        note_text       TEXT NOT NULL CHECK (char_length(note_text) <= 500),
+        language        VARCHAR(16),
+        note_status     VARCHAR(16) NOT NULL DEFAULT 'pending'
+                        CHECK (note_status IN ('pending', 'approved', 'rejected')),
+        status_reason   TEXT,
+        created_at      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )
+"""
+
+_STOP_NOTES_IDX_TOUR_STOP_DDL = (
+    "CREATE INDEX IF NOT EXISTS idx_stop_notes_tour_stop "
+    "ON stop_notes(tour_id, stop_index)"
+)
+_STOP_NOTES_IDX_USER_CREATED_DDL = (
+    "CREATE INDEX IF NOT EXISTS idx_stop_notes_user_created "
+    "ON stop_notes(user_id, created_at)"
+)
+
 
 def _ensure_schema(cur):
     """Create the reviews objects + the verified column if absent. Idempotent;
@@ -126,6 +162,15 @@ def _ensure_schema(cur):
     cur.execute(_VERIFIED_COLUMN_DDL)
     cur.execute(_TOUR_REVIEWS_DDL)
     cur.execute(_REVIEW_VOTES_DDL)
+
+
+def _ensure_stop_notes_schema(cur):
+    """[LOCAL-795] Create the stop_notes table + its indexes if absent.
+    Idempotent; safe to call on every note write (self-healing, like the reviews
+    DDL above)."""
+    cur.execute(_STOP_NOTES_DDL)
+    cur.execute(_STOP_NOTES_IDX_TOUR_STOP_DDL)
+    cur.execute(_STOP_NOTES_IDX_USER_CREATED_DDL)
 
 
 # ─── Moderation auto-check (profanity / URL / contact info) ───────────────────
@@ -579,6 +624,121 @@ def set_review_status(review_id, status):
         conn.close()
 
 
+# ─── Per-stop notes (LOCAL-795) ───────────────────────────────────────────────
+
+def _validate_note_text(text):
+    if text is None:
+        raise ValueError("note_text is required")
+    t = str(text).strip()
+    if not t:
+        raise ValueError("note_text must not be empty")
+    if len(t) > NOTE_MAX_CHARS:
+        raise ValueError(f"note_text must be <= {NOTE_MAX_CHARS} characters")
+    return t
+
+
+def _validate_stop_index(stop_index):
+    try:
+        idx = int(stop_index)
+    except (TypeError, ValueError):
+        raise ValueError(f"stop_index must be an integer, got {stop_index!r}")
+    if idx < 0:
+        raise ValueError(f"stop_index must be >= 0, got {idx}")
+    return idx
+
+
+def _tour_exists(cur, original_id):
+    """True if an audio_tours row with this id exists. Used to reject a note on
+    an unknown tour (ticket §7). Best-effort: a DB error here is treated as
+    'exists' so a transient failure never wrongly rejects a legitimate note (the
+    insert's own FK-free write then simply proceeds)."""
+    try:
+        cur.execute("SELECT 1 FROM audio_tours WHERE id = %s", (int(original_id),))
+        return cur.fetchone() is not None
+    except Exception:  # noqa: BLE001
+        return True
+
+
+def _count_recent_notes(cur, user_id, window_hours=NOTE_RATE_WINDOW_HOURS):
+    """How many notes this user has left in the last [window_hours]. Drives the
+    rate limit (ticket §7: 10/day/user)."""
+    cur.execute(
+        "SELECT COUNT(*) FROM stop_notes "
+        "WHERE user_id = %s AND created_at >= CURRENT_TIMESTAMP - make_interval(hours => %s)",
+        (user_id, int(window_hours)),
+    )
+    row = cur.fetchone()
+    return int(row[0]) if row and row[0] is not None else 0
+
+
+def submit_stop_note(user_id, tour_id, stop_index, note_text,
+                     stop_title=None, language=None):
+    """[LOCAL-795] Store a free-form per-stop note ("Tell us about this place").
+
+    Unlike a review, a note is NOT attached to a rating and needs no prior
+    rating — any listener may leave one for any stop. The text runs through the
+    SAME auto-check as reviews (profanity / url / contact → `pending`, else
+    `approved`). A rate limit of NOTE_RATE_LIMIT per user per NOTE_RATE_WINDOW_HOURS
+    hours is enforced here. The tour id is resolved to its ORIGINAL (translations
+    share the source tour) and the write is rejected for an unknown tour.
+
+    Returns the stored note dict. Raises ValueError on bad input / unknown tour /
+    rate-limit exceeded.
+    """
+    text = _validate_note_text(note_text)
+    idx = _validate_stop_index(stop_index)
+    title = None if stop_title is None else str(stop_title).strip() or None
+    lang = None if language is None else str(language).strip() or None
+    if lang is not None and len(lang) > 16:
+        lang = lang[:16]
+
+    conn = get_connection()
+    try:
+        cur = conn.cursor()
+        _ensure_stop_notes_schema(cur)
+        original_id = rating_svc.resolve_original_id(cur, tour_id)
+
+        # Reject a note on a tour that does not exist (ticket §7).
+        if not _tour_exists(cur, original_id):
+            raise ValueError("unknown tour")
+
+        # Rate limit: 10 notes per user per rolling 24 h.
+        if _count_recent_notes(cur, user_id) >= NOTE_RATE_LIMIT:
+            raise ValueError(
+                f"rate limit: at most {NOTE_RATE_LIMIT} notes per "
+                f"{NOTE_RATE_WINDOW_HOURS} hours"
+            )
+
+        status, reason = moderate_text(text)
+
+        cur.execute(
+            """
+            INSERT INTO stop_notes
+                (tour_id, stop_index, stop_title, user_id, note_text, language,
+                 note_status, status_reason)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+            RETURNING id, created_at
+            """,
+            (int(original_id), idx, title, user_id, text, lang, status, reason),
+        )
+        note_id, created_at = cur.fetchone()
+        conn.commit()
+        return {
+            "id": note_id,
+            "tour_id": original_id,
+            "stop_index": idx,
+            "stop_title": title,
+            "user_id": user_id,
+            "note_text": text,
+            "language": lang,
+            "note_status": status,
+            "status_reason": reason,
+            "date": _iso(created_at),
+        }
+    finally:
+        conn.close()
+
+
 # ─── Helpful votes ────────────────────────────────────────────────────────────
 
 def vote_helpful(user_id, review_id):
@@ -906,6 +1066,7 @@ def register_review_routes(app):
     Endpoints:
         GET  /tour/<tour_id>/reviews?sort=&band=     → approved reviews
         POST /tour/<tour_id>/review  {user_id, review_text}        → submit/replace
+        POST /tour/<tour_id>/stop/<n>/note {user_id, note_text, stop_title, language} → per-stop note (LOCAL-795)
         GET  /tour/<tour_id>/distribution            → rating distribution bands
         POST /review/<review_id>/reply  {user_id, reply_text}      → curator reply
         POST /review/<review_id>/helpful {user_id}                 → helpful vote
@@ -934,6 +1095,32 @@ def register_review_routes(app):
             return jsonify({"error": "user_id is required"}), 400
         try:
             result = submit_review(user_id, tour_id, data.get("review_text"))
+        except ValueError as ve:
+            return jsonify({"error": str(ve)}), 400
+        except Exception as e:  # noqa: BLE001
+            return jsonify({"error": str(e)}), 500
+        return jsonify({"status": "ok", **result}), 200
+
+    @app.route('/tour/<tour_id>/stop/<int:stop_index>/note', methods=['POST'])
+    def api_submit_stop_note(tour_id, stop_index):
+        # [LOCAL-795] Per-stop free-form note ("Tell us about this place"). Same
+        # auth/attestation as the review endpoints (orchestrator + user_id). Not
+        # shown publicly in this task — this is a write-only endpoint from the app.
+        data = request.get_json(silent=True)
+        if not data:
+            return jsonify({"error": "JSON body required"}), 400
+        user_id = data.get("user_id")
+        if not user_id:
+            return jsonify({"error": "user_id is required"}), 400
+        try:
+            result = submit_stop_note(
+                user_id,
+                tour_id,
+                stop_index,
+                data.get("note_text"),
+                stop_title=data.get("stop_title"),
+                language=data.get("language"),
+            )
         except ValueError as ve:
             return jsonify({"error": str(ve)}), 400
         except Exception as e:  # noqa: BLE001

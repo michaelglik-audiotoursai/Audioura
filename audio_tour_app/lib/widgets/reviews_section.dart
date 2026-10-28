@@ -20,10 +20,23 @@ class ReviewsSection extends StatefulWidget {
   /// the collapsed header before the list loads.
   final int initialCount;
 
+  /// [LOCAL-795] The tour's display name, passed to [showAddReviewDialog] when
+  /// the user taps "Write a review". Falls back to "this tour" when absent.
+  final String tourTitle;
+
+  /// [LOCAL-795] Resolves whether the user has this tour downloaded. Injectable
+  /// so widget tests can drive both states without SharedPreferences; defaults
+  /// to [TourReviewsService.isTourDownloaded]. The "Write a review" button is
+  /// shown only when this resolves true; otherwise the section shows the
+  /// hidden-state line "Download the tour to review it".
+  final Future<bool> Function(String tourId)? downloadedResolver;
+
   const ReviewsSection({
     super.key,
     required this.tourId,
     this.initialCount = 0,
+    this.tourTitle = 'this tour',
+    this.downloadedResolver,
   });
 
   @override
@@ -37,6 +50,47 @@ class _ReviewsSectionState extends State<ReviewsSection> {
   RatingDistribution _distribution = RatingDistribution.empty;
   ReviewSort _sort = ReviewSort.top;
   String? _bandFilter; // null = all bands
+
+  // [LOCAL-795] Whether the user has this tour downloaded (drives the
+  // "Write a review" button vs the "Download the tour to review it" line), and
+  // whether that check has resolved yet. Null = not yet known.
+  bool? _downloaded;
+  // [LOCAL-795] True once the user has submitted a review this session, so the
+  // button reads "Edit your review" (the server replaces an existing review).
+  bool _hasSubmitted = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _resolveDownloaded();
+  }
+
+  Future<void> _resolveDownloaded() async {
+    final resolver =
+        widget.downloadedResolver ?? TourReviewsService.isTourDownloaded;
+    final result = await resolver(widget.tourId);
+    if (!mounted) return;
+    setState(() => _downloaded = result);
+  }
+
+  Future<void> _onWriteReview() async {
+    final status = await showAddReviewDialog(
+      context,
+      tourId: widget.tourId,
+      tourTitle: widget.tourTitle,
+    );
+    if (!mounted) return;
+    if (status != null) {
+      setState(() => _hasSubmitted = true);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(status == 'approved'
+              ? 'Thanks! Your review is live.'
+              : 'Thanks! Your review is being checked.'),
+        ),
+      );
+    }
+  }
 
   Future<void> _loadIfNeeded() async {
     if (!_expanded) return;
@@ -117,6 +171,7 @@ class _ReviewsSectionState extends State<ReviewsSection> {
               ),
             )
           else ...[
+            _buildWriteReview(),
             _buildDistribution(),
             const SizedBox(height: 8),
             _buildSortRow(),
@@ -131,6 +186,52 @@ class _ReviewsSectionState extends State<ReviewsSection> {
               ..._reviews.map(_buildReviewTile),
           ],
         ],
+      ],
+    );
+  }
+
+  /// [LOCAL-795] The "Write a review" / "Edit your review" button, shown to a
+  /// user who has the tour downloaded; others see "Download the tour to review
+  /// it". A copy line under it states how notes may be used. Rendered at the top
+  /// of the expanded reviews section so there is always a way to leave a review
+  /// (not only right after a star rating).
+  Widget _buildWriteReview() {
+    final Widget action;
+    if (_downloaded == null) {
+      // Still resolving — keep the row quiet (a thin placeholder) so the layout
+      // does not jump.
+      action = const SizedBox(height: 4);
+    } else if (_downloaded == true) {
+      action = Align(
+        alignment: Alignment.centerLeft,
+        child: OutlinedButton.icon(
+          onPressed: _onWriteReview,
+          icon: const Icon(Icons.rate_review_outlined, size: 18),
+          label: Text(_hasSubmitted ? 'Edit your review' : 'Write a review'),
+        ),
+      );
+    } else {
+      action = const Padding(
+        padding: EdgeInsets.symmetric(vertical: 4),
+        child: Text(
+          'Download the tour to review it',
+          style: TextStyle(fontSize: 12, color: Color(0xFF777777)),
+        ),
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        action,
+        const SizedBox(height: 2),
+        const Text(
+          'Notes may be used to improve Audioura tours.',
+          style: TextStyle(fontSize: 11, color: Color(0xFF999999)),
+        ),
+        const SizedBox(height: 8),
+        const Divider(height: 1),
+        const SizedBox(height: 8),
       ],
     );
   }

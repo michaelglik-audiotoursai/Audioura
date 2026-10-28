@@ -11,6 +11,7 @@ import '../services/webview_console_logger.dart';
 import '../widgets/share_tour_sheet.dart';
 import '../widgets/rate_tour_dialog.dart';
 import '../services/tour_listen_service.dart';
+import '../services/tour_reviews_service.dart';
 import '../services/playback_accumulator.dart';
 import '../services/tour_pricing_service.dart';
 import '../services/downloaded_tour_meta.dart';
@@ -381,6 +382,13 @@ class _TourPlayerScreenState extends State<TourPlayerScreen> with VoiceMethods {
             icon: const Icon(Icons.ios_share),
             onPressed: _shareTour,
             tooltip: 'Share this tour',
+          ),
+          // [LOCAL-795] "Tell us about this place" — a per-stop free-form note.
+          // Acts on the stop currently playing (_currentStopIndex / name).
+          IconButton(
+            icon: const Icon(Icons.edit_note),
+            onPressed: _showStopNoteDialog,
+            tooltip: 'Tell us about this place',
           ),
           IconButton(
             icon: const Icon(Icons.refresh),
@@ -839,6 +847,116 @@ class _TourPlayerScreenState extends State<TourPlayerScreen> with VoiceMethods {
       // [LOCAL-711 / D673] The server short title stamped at download time.
       shortTitle: meta?.shortTitle,
     );
+  }
+
+  /// [LOCAL-795] "Tell us about this place" — a free-form note (<= 500 chars)
+  /// about the stop currently playing. Stored server-side with the tour id, the
+  /// stop's index + title, the user, the language and created_at, through the
+  /// same orchestrator (auth/attestation) as reviews. Not shown publicly in this
+  /// task. The dialog carries the same copy line as the reviews box. A note
+  /// needs a numeric tour id (the server keys on it); without one the note
+  /// cannot be attributed, so the control explains that rather than silently
+  /// failing.
+  Future<void> _showStopNoteDialog() async {
+    final tourId = _serverTourId ?? widget.serverTourId ?? widget.tourId;
+    final stopIndex = _currentStopIndex;
+    final stopName = _currentStopName;
+    final language = widget.originalLanguage ?? _localMeta?.originalLanguage;
+
+    if (tourId == null || int.tryParse(tourId) == null) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("This tour can't take notes yet.")),
+      );
+      return;
+    }
+
+    final controller = TextEditingController();
+    final submitted = await showDialog<String>(
+      context: context,
+      builder: (ctx) {
+        bool submitting = false;
+        return StatefulBuilder(
+          builder: (ctx, setLocal) => AlertDialog(
+            title: const Text('Tell us about this place'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (stopName != null && stopName.isNotEmpty)
+                  Text(stopName,
+                      style: const TextStyle(fontWeight: FontWeight.w600)),
+                const SizedBox(height: 8),
+                TextField(
+                  controller: controller,
+                  maxLength: 500,
+                  maxLines: 4,
+                  decoration: const InputDecoration(
+                    hintText: 'What stood out about this stop? (optional)',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+                const Text(
+                  'Notes may be used to improve Audioura tours.',
+                  style: TextStyle(fontSize: 11, color: Color(0xFF777777)),
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: submitting ? null : () => Navigator.of(ctx).pop(null),
+                child: const Text('Cancel'),
+              ),
+              ElevatedButton(
+                onPressed: submitting
+                    ? null
+                    : () async {
+                        final text = controller.text.trim();
+                        if (text.isEmpty) {
+                          Navigator.of(ctx).pop(null);
+                          return;
+                        }
+                        setLocal(() => submitting = true);
+                        final status = await TourReviewsService.submitStopNote(
+                          tourId: tourId,
+                          stopIndex: stopIndex,
+                          noteText: text,
+                          stopTitle: stopName,
+                          language: language,
+                        );
+                        if (!ctx.mounted) return;
+                        Navigator.of(ctx).pop(status);
+                      },
+                child: submitting
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Text('Send'),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+
+    if (!mounted) return;
+    if (submitted != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(submitted == 'approved'
+              ? 'Thanks! Your note was saved.'
+              : 'Thanks! Your note is being checked.'),
+        ),
+      );
+    } else if (controller.text.trim().isNotEmpty) {
+      // Non-empty text that returned null means the POST failed (network / rate
+      // limit / validation). Tell the user rather than leaving it silent.
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Couldn't save your note. Try again.")),
+      );
+    }
   }
 
   void _showTourHelpDialog() {
