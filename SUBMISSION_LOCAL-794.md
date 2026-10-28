@@ -71,4 +71,77 @@ Every save goes through `SavedToursStore.save`, which bumps `SavedToursRefresh` 
 
 ## Live test
 
-Not run here (no simulator/emulator session in this environment). The instrumentation above is in place so the simulator + emulator run against Subscribed Preview can confirm the real cause of the 2.5-min gap and verify tap-to-playable ≤ 30 s with the progress row visible while switching tabs. Paid-API cap $0.50 respected (no live paid calls made).
+Run on the **iOS simulator** (iPhone 17 Pro, iOS 26.4) on **2026-10-28**, from this branch
+(`LOCAL-794-translate-download-wait`, HEAD `d2e8f42a`), debug build, `server_mode` cloud → **Subscribed
+Preview** (`--dart-define=APP_TRACK=subscribed`, built-in `GATEWAY_API_KEY`). Every network call in the
+flutter console went to `https://subscribed-api.audioura.com` (e.g. `GET /tours-near/10.7737…/106.7165…`,
+`GET …/download-tour/469`). No Android run. No physical devices. Screenshots in `docs/local794/`.
+
+Flow exercised: Home → Search "Ho Chi Minh City" (map centred on HCMC 10.7737, 106.7165; 4 tours) → List →
+**"Massage and spa near Ben Thanh Market, District 1, Ho Chi Minh City - Tour"** (server tour **465**) →
+select **Русский** → **Download Tour**. Tour **469** is the pre-existing Russian translation of 465, so the
+server answers the translate request in well under a second (as the ticket anticipated).
+
+### The 2.5-min hang is gone; the app is never blocked
+
+Tapping **Download Tour** **closed the dialog immediately** and returned to a fully usable Home — **no
+app-blocking modal, no barrier**. The slow work ran in the background behind the new persistent progress
+row ("Translating to Russian…" + an indeterminate bar + **Cancel**), hosted above the app bar by
+`MainScreen`. `docs/local794/05_progress_row_home.png`.
+
+### Measured timings — `TRANSLATE/MEASURE` markers, every step tap → playable
+
+The instrumentation printed the real per-step times. Representative run (English + Russian):
+
+| Step | Measured | Marker |
+|---|---|---|
+| English copy pulled + saved inline (fast path, no barrier) | sub-second | `DOWNLOAD_SVC: SAVE - saved "Massage and spa…"` |
+| Background job starts | — | `TDM: translate+download (tour 465) → Russian` |
+| Translate POST (`/translate`, tour 465 → ru) round-trip | **≈ 1 s** | `TRANSLATE: Requesting translation…` → next marker |
+| Build download-tour URL + headers | **1–6 ms** | `(ru) URL+headers ready in 2ms — GET download-tour/469` |
+| **ZIP GET `download-tour/469`** | **710 ms** (2,063,629 bytes ≈ 2 MB) | `(ru) download-tour HTTP 200 in 710ms (2063629 bytes)` |
+| Save + validate translated tour | **16 ms** | `(ru) save complete in 16ms` |
+
+**Tap → playable: ≈ 1–2 s total**, far under the 30 s warm target — not minutes. The ZIP GET is the only
+step over ~20 ms, and it was 710 ms. **No step is slow; nothing needed fixing** on the hot path.
+
+Repeat runs were consistent (Russian-only): ZIP GET **722 ms / 609 ms / 656 ms / 564 ms**, save **15–21 ms**
+each; one overlapping run hit **1710 ms** on the GET (two downloads racing) — still ~2 s end-to-end. The
+previously-unbounded `_resolveParentEditTourId` now carries its 20 s timeout and never stalled.
+
+Michael's original ~2.5-min gap was the app-side wait behind the barrier (the never-dismissed modal + an
+unbounded resolve await); with those removed the only real latency is the server translate (≈ 1 s here,
+because 469 already existed) plus a sub-second ZIP download.
+
+### Progress row survives tab switches; Listen updates with no manual refresh
+
+While the job ran I switched tabs and the **one row persisted on every tab**, with each tab fully usable
+underneath:
+- **Listen** — `docs/local794/06_progress_row_listen.png` (row at top; the Russian tour already listed below).
+- **About** — `docs/local794/07_progress_row_about.png` (row at top over the About content).
+
+On completion the **Russian tour appeared on Listen with NO manual refresh** (the `SavedToursRefresh` bump,
+LOCAL-787) — Listen showed **both** versions created 2026-10-28: "Массаж и спа рядом с рынком Бен Тхань,
+район 1, Хошимин - тур" and "Massage and spa near Ben Thanh Market, District 1, Ho Chi Minh City - Tour".
+`docs/local794/08_listen_russian_no_refresh.png`. The completion **"Russian version ready — Play"** SnackBar
+is shown through the global messenger (it was visually behind the pre-existing "4 tours named…" search
+SnackBar in these captures).
+
+### Cancel — control present and the row clears (live cancel race not winnable here; covered by tests)
+
+The **Cancel** button is present and wired in the row (`docs/local794/09_cancel_row_visible.png`), and after
+tapping it the **row clears** back to a clean screen (`docs/local794/10_cancel_row_cleared.png`). Honest
+limitation: because tour 469 already exists server-side the whole job finishes in **< 1 s**, and the cancel
+token is (by design) only polled at the checkpoints *before* the translate step — once the helper has the
+"completed" response it issues the ZIP GET + save without an interruption point ("a cancel never kills an
+in-flight HTTP call mid-stream"). So across three live attempts (including a six-tap burst) the job always
+completed before a cancel could pre-empt the download — the GET/save markers show every attempt ran to
+`Saved translated tour (ru) ID: 469`. The **cancel-clears-the-row** behaviour itself is covered by the
+passing unit test (cancel exit path clears the row) and the widget test (Cancel asks the job to stop); a
+fresh, slower translation (a not-yet-translated language) would be needed to win the race live, which the
+task excluded to respect the paid-API cap.
+
+### Cost
+$0 paid APIs. The only calls were to Subscribed Preview (`/tours-near`, `/translate` returning the already
+existing 469, and `download-tour/469` ZIP GETs) — no new paid translation was generated. No server deploys,
+no physical devices. Paid-API cap respected.
