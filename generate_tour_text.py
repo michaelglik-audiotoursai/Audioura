@@ -14830,6 +14830,68 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
             excluded_count = 0
             print(f"\nPHASE 4: skipped (tour_category='{tour_category}', no type-verification required)")
 
+        # -------- [LOCAL-791B item 2] Off-category stop guard --------
+        # A CATEGORY request ("Pagodas and temples of HCMC", "churches of Rome")
+        # asks for places of ONE class; a stop of another class is off-category and
+        # must be rejected — whatever path proposed it. Field defect (Mac e2e): the
+        # pagodas-and-temples tour returned Tao Dan Park. The guard is a NO-OP for a
+        # non-category request and WIDENS for a mix ("temples and parks"). A place
+        # the user named by hand is always kept.
+        try:
+            from category_match_guard import (requested_categories as _rc791b,
+                                               filter_off_category as _foc791b)
+            _req_cats_791b = _rc791b(user_request) or _rc791b(location)
+            if _req_cats_791b:
+                _anchors_791b = list(intent.get('named_places') or []) if intent else []
+                try:
+                    from area_resolver import extract_named_places_from_clause as _enp791b
+                    _anchors_791b += _enp791b(location) or []
+                except Exception:
+                    pass
+                _before_791b = len(poi_list)
+                print(f"  [LOCAL-791B] off-category guard active — requested "
+                      f"categories {sorted(_req_cats_791b)}; checking "
+                      f"{_before_791b} stop(s)")
+                poi_list = _foc791b(poi_list, user_request,
+                                    log=print, named_anchors=_anchors_791b)
+                _dropped_791b = _before_791b - len(poi_list)
+                if _dropped_791b > 0:
+                    print(f"\n! [LOCAL-791B] off-category guard dropped "
+                          f"{_dropped_791b} stop(s) (requested categories: "
+                          f"{sorted(_req_cats_791b)})")
+                else:
+                    print(f"  [LOCAL-791B] off-category guard: all "
+                          f"{_before_791b} stop(s) on-category")
+        except Exception as _oc_err:
+            print(f"  [LOCAL-791B] off-category guard skipped (non-fatal): {_oc_err}")
+
+        # -------- [LOCAL-791B item 1] English title, local name in parentheses --
+        # Give each foreign-place stop its ENGLISH name with the local name in
+        # parentheses ("Jade Emperor Pagoda (Chùa Ngọc Hoàng)"). A place the user
+        # NAMED keeps exactly the user's wording; a stop carrying Wikidata labels
+        # (label_en / label_local or a per-language labels dict) is formatted
+        # tour-language-first; otherwise the cleaned Serper English title is kept
+        # with any distinct local name in parentheses. The base tour is generated
+        # in English, so tour_language='en' here; the downstream translation path
+        # localises the primary name for other-language tours.
+        try:
+            from place_title_naming import title_for_candidate as _tfc791b
+            _anchors_title_791b = list(intent.get('named_places') or []) if intent else []
+            try:
+                from area_resolver import extract_named_places_from_clause as _enp_t791b
+                _anchors_title_791b += _enp_t791b(location) or []
+            except Exception:
+                pass
+            for _p791b in poi_list:
+                _new_title_791b = _tfc791b(_p791b, tour_language="en",
+                                           named_anchors=_anchors_title_791b)
+                if _new_title_791b and _new_title_791b != _p791b.get("name"):
+                    print(f"  [LOCAL-791B] title '{_p791b.get('name')}' → "
+                          f"'{_new_title_791b}'")
+                    _p791b["name"] = _new_title_791b
+        except Exception as _tt_err:
+            print(f"  [LOCAL-791B] titling skipped (non-fatal): {_tt_err}")
+
         excluded_names = {p["name"] for p in poi_list_before_verification if p not in poi_list}
 
         # Build forbidden name set BEFORE PHASE 3C so PHASE 3C rejects flow into Part C.
@@ -15183,6 +15245,15 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
 
                 # Verify the new stops too (same PHASE 4 logic)
                 survived, _ = _verify_against_intent(new_stops)
+                # [LOCAL-791B item 2] Replenish candidates must also match the
+                # requested category — a replacement park cannot sneak into a
+                # pagodas-and-temples tour.
+                try:
+                    if '_req_cats_791b' in dir() and _req_cats_791b:
+                        survived = _foc791b(survived, user_request, log=print,
+                                            named_anchors=_anchors_791b)
+                except Exception as _ocr_err:
+                    print(f"   [LOCAL-791B] Part C off-category guard skipped: {_ocr_err}")
                 # Also apply PHASE 3C address check to replacements (skip for walking tours)
                 if tour_category == 'walking':
                     pass  # GEO-CHECK handles proximity for walking tours

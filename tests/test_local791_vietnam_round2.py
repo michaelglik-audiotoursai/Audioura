@@ -4,7 +4,7 @@ One unit test per defect from the Vietnam round-2 ticket (tours 461–468 on the
 Subscribed Preview), each using the EXACT strings the ticket names. Pure, offline
 (every network seam is stubbed/injected); run with:
 
-    python3 -m pytest test_local791_vietnam_round2.py -q
+    python3 -m pytest tests/test_local791_vietnam_round2.py -q
 
 Defects:
   1  dining parser drops the city; "street food" read as a cuisine
@@ -24,7 +24,7 @@ import sys
 
 import pytest
 
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 
 # ─────────────────────────── Defect 1 ───────────────────────────────────────
