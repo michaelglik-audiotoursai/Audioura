@@ -48,7 +48,8 @@ top of +21 on either system."*
 | 81 | Android | 2.4.33 | `200839ac` (subscribed; `APP_TRACK=subscribed`; app code identical at 3ef61d29) | **LIVE on Play Internal testing** 2026-10-26 (Michael uploaded by hand; wdvrdaz6cz): Billing 8.0.0, upload key B3:AB:E5…3A:64, emulator fresh install banner `AUDIOURA v2.4.33+81`, 0 Null check, traffic only to api-gateway-subscribed. Carries LOCAL-774/780/781/785 app parts | 2026-10-26 |
 | 82 | iOS | 2.4.34 | `0fdbffd5` (subscribed) | **uploaded to TestFlight** 2026-10-26 ~21:4x by LEAD: + LOCAL-781 named save error, LOCAL-779/779B server-side only | 2026-10-26 |
 | 83 | iOS | 2.4.35 | `200839ac` (subscribed) | **uploaded to TestFlight** 2026-10-26 ~21:5x by LEAD: + LOCAL-785 FailureReporter (app), 783 server-side | 2026-10-26 |
-| 84 | — | — | — | **NEXT** | — |
+| 84 | iOS | 2.4.36 | `79cd51bf` (subscribed; APP_TRACK=subscribed) | **uploaded to TestFlight** 2026-10-28 07:32 by LEAD (D729, Michael travelling): LOCAL-787 Listen refresh, LOCAL-789 grey map + OSM UA + place aliases, LOCAL-793 Home search picks a place + zoom-out, LOCAL-794 background translate-download (no app-blocking spinner). Manual export, same profile 4d428427. altool warning 90068: deployment target iOS 14 → must be 15 by April 2027 | 2026-10-28 |
+| 85 | — | — | — | **NEXT** | — |
 
 ## Why 20 and 21 differ across platforms
 
