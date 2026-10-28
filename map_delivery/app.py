@@ -1251,6 +1251,165 @@ def _search_like_pattern(pattern):
     return p.replace('*', '%')
 
 
+# ─── [LOCAL-798] Token-based tour-name search ────────────────────────────────
+#
+# Michael, iPhone 84, 2026-10-28: name search "Mui Ne seafood*" found nothing,
+# yet tour 466 "Seafood restaurants in Mui Ne, Vietnam - Tour" exists. The old
+# WHERE matched the WHOLE query as one contiguous ILIKE substring
+# (`tour_name ILIKE '%mui ne seafood%'`), so the words had to appear adjacent and
+# in that order — a different word order or an interleaving word never matched.
+#
+# Fix: split the query into words and require EVERY word to appear in tour_name
+# OR request_string (AND across words, any order). Case- and diacritic-
+# insensitive, so "Mũi Né" == "Mui Ne". When the Postgres `unaccent()` function
+# exists we fold in SQL (precise); otherwise we bound the candidate set with the
+# ASCII words in SQL and fold the rest in Python (`_token_match_py`). This layer
+# only engages for MULTI-WORD queries; a single word (and the LOCAL-680 `*`
+# wildcard contract) keeps the exact `_search_like_pattern` behaviour.
+
+import re
+import unicodedata as _unicodedata
+
+# Stop-words dropped from a name search. Deliberately small: the common English
+# connectors a listener types in a place/venue name ("Seafood IN Mui Ne",
+# "Temple OF the Tooth", "cafe NEAR the port") plus the literal word "tour",
+# which almost every stored tour_name/request_string already carries and so
+# would never discriminate between results.
+_SEARCH_STOP_WORDS = frozenset({
+    'a', 'an', 'the', 'of', 'in', 'on', 'at', 'to', 'for', 'and', 'or',
+    'near', 'by', 'with', 'from', 'tour', 'tours',
+})
+
+
+def _fold_text(s):
+    """Lower-case and strip diacritics: "Mũi Né" → "mui ne".
+
+    NFKD decomposition splits an accented letter into base + combining mark; we
+    drop the marks (Unicode category 'Mn') and lower-case. Pure-ASCII text is
+    unchanged. Used both to fold query tokens and, in the no-`unaccent()`
+    fallback, to fold candidate rows in Python.
+    """
+    if not s:
+        return ''
+    decomposed = _unicodedata.normalize('NFKD', str(s))
+    stripped = ''.join(ch for ch in decomposed
+                       if not _unicodedata.combining(ch))
+    return stripped.lower()
+
+
+def _tokenize_search(pattern):
+    """Split a search string into folded content words for token matching.
+
+    Steps: strip a trailing `*` wildcard, fold diacritics + lower-case, split on
+    any non-alphanumeric run (so punctuation and commas vanish), drop stop-words
+    and empties. Returns the ordered, de-duplicated list of tokens.
+
+        "Mui Ne seafood*"   → ['mui', 'ne', 'seafood']
+        "MŨI NÉ Seafood*"   → ['mui', 'ne', 'seafood']
+        "Seafood restaurants in Mui Ne, Vietnam - Tour"
+                            → ['seafood', 'restaurants', 'mui', 'ne', 'vietnam']
+        "the of in"         → []   (all stop-words)
+    """
+    folded = _fold_text((pattern or '').strip())
+    # A '*' is the app's wildcard, not a word character; fold already lower-cased
+    # it away from letters, but it survives as punctuation and the split drops it.
+    raw = re.split(r'[^a-z0-9]+', folded)
+    tokens = []
+    seen = set()
+    for w in raw:
+        if not w or w in _SEARCH_STOP_WORDS:
+            continue
+        if w not in seen:
+            seen.add(w)
+            tokens.append(w)
+    return tokens
+
+
+_HAS_UNACCENT = None
+
+
+def _has_unaccent(cur):
+    """True if the Postgres `unaccent()` function is callable on this DB. Probed
+    once + cached. When present we fold accents in SQL (precise, set-based);
+    when absent we fall back to a Python fold over a bounded candidate set, so a
+    DB without the unaccent extension never 500s and still matches "Mui Ne"."""
+    global _HAS_UNACCENT
+    if _HAS_UNACCENT is None:
+        try:
+            cur.execute("SELECT unaccent('x')")
+            cur.fetchone()
+            _HAS_UNACCENT = True
+        except Exception:
+            # Roll back the aborted probe so the connection stays usable.
+            try:
+                cur.connection.rollback()
+            except Exception:
+                pass
+            _HAS_UNACCENT = False
+        print(f"unaccent() available: {_HAS_UNACCENT}")
+        sys.stdout.flush()
+    return _HAS_UNACCENT
+
+
+def _is_ascii_token(tok):
+    """True when a folded token is pure ASCII — safe to constrain in SQL even
+    without unaccent(), because a query word a listener typed without accents
+    ("seafood", "mui", "ne") matches the stored column via a plain LOWER() LIKE."""
+    return all(ord(c) < 128 for c in tok)
+
+
+def _token_where_sql(cur, tokens, name_col, req_col):
+    """Build the (sql_fragment, params) enforcing a token-AND search.
+
+    Every token must appear in name_col OR req_col. With unaccent() the match is
+    fully diacritic-insensitive in SQL. Without it, only the ASCII tokens are
+    constrained here (a superset of the true matches); a diacritic token that
+    cannot be matched accent-blind in SQL is left to the Python post-filter. The
+    fragment is prefixed with ' AND (...)' per token, ready to splice after the
+    existing WHERE conditions. Returns ('', []) when there is nothing to add.
+
+    Each token contributes at most one LIKE pair (name OR request), so the SQL
+    arg count is deterministic and the clause composes with the track filter.
+    """
+    frag = ""
+    params = []
+    use_unaccent = _has_unaccent(cur)
+    for tok in tokens:
+        like = f'%{tok}%'
+        if use_unaccent:
+            # Fold both sides: unaccent(lower(col)) LIKE unaccent(lower(tok)).
+            # tok is already folded (lower, no accents) so it is its own unaccent,
+            # but we wrap it too so a stray accent in a non-ASCII locale is safe.
+            cond = (f"(unaccent(LOWER({name_col})) LIKE unaccent(%s) "
+                    f"OR unaccent(LOWER({req_col})) LIKE unaccent(%s))")
+            frag += " AND " + cond
+            params += [like, like]
+        elif _is_ascii_token(tok):
+            cond = (f"(LOWER({name_col}) LIKE %s OR LOWER({req_col}) LIKE %s)")
+            frag += " AND " + cond
+            params += [like, like]
+        # else: diacritic token, no unaccent → enforced in Python only.
+    return frag, params
+
+
+def _token_match_py(tokens, name, request_string):
+    """Authoritative token-AND check in Python, used when unaccent() is absent.
+
+    Folds the candidate's name + request_string and confirms EVERY token is a
+    substring of one of them. Mirrors the SQL contract exactly, so the same rows
+    match whether or not the DB has the unaccent extension."""
+    hay = _fold_text(name or '') + '\n' + _fold_text(request_string or '')
+    return all(tok in hay for tok in tokens)
+
+
+def _words_in_name(tokens, name):
+    """How many of the search tokens appear in the (folded) tour_name. Used for
+    the LOCAL-798 ranking: rows with ALL words in the name rank first, then rows
+    with MORE words in the name, then (caller) newest."""
+    folded = _fold_text(name or '')
+    return sum(1 for tok in tokens if tok in folded)
+
+
 def _parse_min_rating(args):
     """Parse the optional ?min_rating=<float> query param. Returns a float or
     None (absent/blank/invalid → no filter)."""
@@ -2883,6 +3042,28 @@ def search_tours():
         
         # [LOCAL-680] '*' anchors the match (Boston* = starts with); no '*' = contains.
         sql_pattern = _search_like_pattern(pattern)
+        # [LOCAL-798] Token search for a MULTI-WORD query: each word must appear
+        # in tour_name OR request_string (AND across words, any order), case- and
+        # diacritic-insensitive. A single word (and the LOCAL-680 '*' wildcard
+        # contract) keeps the historic single-ILIKE behaviour untouched.
+        _tokens = _tokenize_search(pattern)
+        _token_search = len(_tokens) >= 2
+        if _token_search:
+            _name_clause, _name_params = _token_where_sql(
+                cur, _tokens, 't.tour_name', 't.request_string')
+            _search_where = "(TRUE" + _name_clause + ")"
+            _search_params = _name_params
+            # unaccent() absent → the SQL clause is only a superset (ASCII tokens
+            # bound the candidates); confirm every token in Python. Fetch a wider
+            # candidate window so the final 50, after ranking, are the true best.
+            _needs_py_filter = not _has_unaccent(cur)
+            _row_limit = 200
+        else:
+            # Historic path: whole-pattern ILIKE, exactly as before.
+            _search_where = "(t.tour_name ILIKE %s OR t.request_string ILIKE %s)"
+            _search_params = [sql_pattern, sql_pattern]
+            _needs_py_filter = False
+            _row_limit = 50
         # [LOCAL-670] Optional server-side rating filter.
         min_rating = _parse_min_rating(request.args)
         # [LOCAL-677] Optional Free/Paid filter.
@@ -2919,14 +3100,20 @@ def search_tours():
             ) sv ON sv.tour_id = t.original_tour_id
             {_ratings_join(cur)}
             {_ORIGINAL_LANGUAGE_JOIN}
-            WHERE (t.tour_name ILIKE %s OR t.request_string ILIKE %s)
+            WHERE {_search_where}
             AND t.lat IS NOT NULL AND t.lng IS NOT NULL
             AND (t.is_test IS NOT TRUE){_track_clause}
             ORDER BY t.number_requested DESC
-            LIMIT 50
-        """, [sql_pattern, sql_pattern] + _track_params)
+            LIMIT {_row_limit}
+        """, _search_params + _track_params)
         
         tours = cur.fetchall()
+        # [LOCAL-798] When unaccent() is unavailable the SQL clause only bounded
+        # the candidates by the ASCII tokens; enforce the full diacritic-folded
+        # token-AND here so "Mũi Né" matches "Mui Ne" on any DB. (No-op on the
+        # historic single-word path and whenever unaccent() did the folding.)
+        if _needs_py_filter:
+            tours = [t for t in tours if _token_match_py(_tokens, t[1], t[2])]
         editor = _editor_scores(cur)  # [LOCAL-685]
         # [LOCAL-701 / D663 §3; LOCAL-753 / D707] Batch community tags: a
         # members-only tour is shown only to an active member/owner (D707); a
@@ -3010,6 +3197,15 @@ def search_tours():
                     search_result['community_name'] = _ct_names[_ct_cid]
                     search_result['community_visibility'] = _ct_vis
                     search_result['badge'] = 'community'
+                # [LOCAL-798] Internal ranking inputs for a multi-word (name)
+                # search: how many query words hit the tour_name, whether ALL did,
+                # and created_at for the "newest" tiebreak. Stripped before the
+                # response so the payload shape is unchanged.
+                if _token_search:
+                    _win = _words_in_name(_tokens, tour_name)
+                    search_result['_rank_all_in_name'] = 1 if _win == len(_tokens) else 0
+                    search_result['_rank_words_in_name'] = _win
+                    search_result['_rank_created_at'] = created_at
                 search_results.append(search_result)
         
         # [LOCAL-689] Personal match_percent + reasons for every result when
@@ -3029,8 +3225,35 @@ def search_tours():
         elif _wants_top_rated(request.args):
             search_results.sort(key=lambda x: (-x.get('rank_score', RANK_PRIOR_SCORE),
                                                -x['popularity'], x['distance_km']))
+        elif _token_search:
+            # [LOCAL-798] Default order for a multi-word name search: tours with
+            # ALL query words in the name first, then those with MORE words in the
+            # name, then the newest (created_at desc), then popularity as a final
+            # tiebreak. A name search is global, so distance is NOT a sort key
+            # here (it stays in the payload for the client to use if it wishes).
+            def _created_key(x):
+                c = x.get('_rank_created_at')
+                try:
+                    return c.timestamp() if hasattr(c, 'timestamp') else float(c or 0)
+                except Exception:
+                    return 0.0
+            search_results.sort(key=lambda x: (
+                -x.get('_rank_all_in_name', 0),
+                -x.get('_rank_words_in_name', 0),
+                -_created_key(x),
+                -x['popularity']))
         else:
             search_results.sort(key=lambda x: (-x['popularity'], x['distance_km']))
+
+        # [LOCAL-798] Strip the internal ranking keys and apply the 50-row cap
+        # here. The token path fetched a wider candidate window so ranking could
+        # choose the true best 50; the historic path already fetched <=50.
+        for _r in search_results:
+            _r.pop('_rank_all_in_name', None)
+            _r.pop('_rank_words_in_name', None)
+            _r.pop('_rank_created_at', None)
+        if _token_search:
+            search_results = search_results[:50]
         
         cur.close()
         conn.close()
