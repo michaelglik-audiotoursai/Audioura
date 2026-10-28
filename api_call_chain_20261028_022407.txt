@@ -1,0 +1,63 @@
+
+======================================================================
+CALL #001 | 02:24:07.730 | GENERATE_TOUR_TEXT_FUNCTION_ENTRY
+======================================================================
+  location: coffee shops in Jamaica Plain, Boston
+  tour_type: 
+  total_stops_parameter: 3
+  output_file: None
+
+======================================================================
+CALL #002 | 02:24:07.738 | TOTAL_STOPS_FINALIZED
+======================================================================
+  location: coffee shops in Jamaica Plain, Boston
+  total_stops_final: 3
+  source: parameter
+
+======================================================================
+CALL #003 | 02:24:09.273 | GENERATING_PROMPT
+======================================================================
+  location: coffee shops in Jamaica Plain, Boston
+  user_request: coffee shops in Jamaica Plain, Boston
+  total_stops: 3
+
+======================================================================
+CALL #004 | 02:24:09.281 | PHASE_3A_REQUEST
+======================================================================
+  location: coffee shops in Jamaica Plain, Boston
+  total_stops: 3
+  poi_type_hint: coffee shops
+
+======================================================================
+CALL #005 | 02:24:13.166 | OPENAI_API_CALL
+======================================================================
+  total_stops_requested: 3
+  stop_count_in_prompt: False
+  http_status: 200
+  prompt_first_500_chars: You are a knowledgeable local guide for coffee shops in Jamaica Plain, Boston.
+List exactly 6 specific, real, well-known coffee shops relevant to: coffee shops in Jamaica Plain, Boston.
+
+Requirements:
+- Use REAL, SPECIFIC names of actual establishments or landmarks.
+- NEVER use generic placeholders like 'Restaurant 1', 'Stop 1', 'Location A'.
+- Include a complete street address with ZIP code where applicable.
+
+GEOGRAPHIC SCOPE — ALL stops MUST be located within: Jamaica Plain, Boston.
+- Do NOT i
+  prompt_last_300_chars: opic ("politics and current affairs", "local history and culture") — name the real place that embodies it.
+
+Return ONLY a JSON array, no other text, no markdown fences:
+[{"name": "...", "address": "...", "reason": "Brief reason why this landmark is notable — a specific date, person, or event"}, ...]
+  stops_found_in_response: 0
+  stop_markers_in_response:
+    []
+  response_first_500_chars: [
+    {"name": "Jamaica Plain Coffee", "address": "673 Centre St, Jamaica Plain, MA 02130", "reason": "A local favorite known for its cozy atmosphere and community events, offering a range of locally roasted coffees."},
+    {"name": "Tres Gatos", "address": "470 Centre St, Jamaica Plain, MA 02130", "reason": "A unique combination of a restaurant, bar, and bookstore, famous for its coffee and brunch offerings."},
+    {"name": "The Coffee Shop", "address": "25 South St, Jamaica Plain, MA 02130", "
+
+======================================================================
+CALL #006 | 02:24:51.705 | PHASE_3B_REQUEST
+======================================================================
+  location: coffee shops in Jamaica Plain, Boston
+  stop_count: 3

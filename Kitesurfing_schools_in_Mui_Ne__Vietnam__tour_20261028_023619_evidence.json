@@ -1,0 +1,207 @@
+{
+  "landmarks": {
+    "Kiteboarding Asia": {
+      "status": "UNVERIFIED",
+      "reason": "not in discovered landmarks"
+    },
+    "Surfpoint Kiteboarding School": {
+      "status": "UNVERIFIED",
+      "reason": "not in discovered landmarks"
+    },
+    "Mui Ne Kitesurfing School": {
+      "status": "UNVERIFIED",
+      "reason": "not in discovered landmarks"
+    },
+    "WindChimes Kitesurfing School": {
+      "status": "UNVERIFIED",
+      "reason": "not in discovered landmarks"
+    },
+    "Vietnam Kitesurfing Center": {
+      "status": "UNVERIFIED",
+      "reason": "not in discovered landmarks"
+    },
+    "Kite Club Mui Ne": {
+      "status": "VERIFIED",
+      "canonical_name": "Sailing Club Resort Mui Ne",
+      "qid": "Q117325544",
+      "type": "built structure",
+      "coordinates": "10.928336, 108.290873"
+    }
+  },
+  "claim_provenance": {
+    "counts": {
+      "sourced": 4,
+      "unsourced": 17,
+      "total": 21,
+      "corpus": 4,
+      "grounded": 0,
+      "parametric": 17
+    },
+    "per_stop": {
+      "Vietnam Kiteboarding School": {
+        "sourced": 1,
+        "unsourced": 7,
+        "total": 8
+      },
+      "Surfpoint Kiteboarding School": {
+        "sourced": 2,
+        "unsourced": 4,
+        "total": 6
+      },
+      "C2Sky Kite Center": {
+        "sourced": 1,
+        "unsourced": 6,
+        "total": 7
+      }
+    },
+    "claims": [
+      {
+        "stop": "Vietnam Kiteboarding School",
+        "text": "Founded in 2007 by Mr. Hai, the Vietnam Kiteboarding School stands as a beacon of innovation in Mui Mr. Hai was one of the first local instructors to receive certification from the International Kiteboarding Organization (IKO), marking a pivotal moment for Vietnamese water sports.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Vietnam Kiteboarding School",
+        "text": "The school has been the backdrop for dramatic stories, such as the harrowing incident in January 2025.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Vietnam Kiteboarding School",
+        "text": "An experienced Russian kitesurfer went missing after being caught in treacherous weather conditions off Ham Tien beach.",
+        "class": "corpus",
+        "source": "knowledge_fallback:gemini",
+        "evidence": "In January 2025, an experienced Russian kitesurfer went missing in the late afternoon after getting caught in bad weather and rough chop off Ham Tien beach, drifting five nautical miles out into open "
+      },
+      {
+        "stop": "Vietnam Kiteboarding School",
+        "text": "At 1:30 AM, local fishermen, skilled in the ways of the sea, found him 1.5 miles off Ong Dia beach and brought him safely back.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Vietnam Kiteboarding School",
+        "text": "This rescue reflected the enduring community spirit and sea expertise of Mui Ne's local fishing community.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Vietnam Kiteboarding School",
+        "text": "In early 2026, a separate event unfolded on Nguyen Dinh Chieu road, showcasing the sometimes volatile intersection of local and international cultures.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Vietnam Kiteboarding School",
+        "text": "The incident sparked a dramatic 70-kilometer motorized police pursuit, putting the town in the international spotlight and highlighting the challenges that can arise in a bustling tourist destination.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Vietnam Kiteboarding School",
+        "text": "Today, the Vietnam Kiteboarding School not only teaches the sport but also serves as a symbol of resilience and community.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Surfpoint Kiteboarding School",
+        "text": "Look towards the horizon, where Surfpoint Kiteboarding School stands as a testament to the evolution of sport and culture in this vibrant coastal town.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Surfpoint Kiteboarding School",
+        "text": "Surfpoint Kiteboarding School was co-founded in 2009 by Phong, a local who began his journey as a beach boy in 2003, and Peter, a European physical education instructor.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Surfpoint Kiteboarding School",
+        "text": "By 2006 and 2007, he had swept the 'King of Mui Ne' competitions, cementing his status in the kitesurfing community.",
+        "class": "corpus",
+        "source": "knowledge_fallback:gemini",
+        "evidence": "Phong started as a beach boy in 2003, taught himself to ride, became an instructor, and by 2006 and 2007, he famously swept the 'King of Mui Ne' competitions."
+      },
+      {
+        "stop": "Surfpoint Kiteboarding School",
+        "text": "The main beach strip of Mui Ne is more than just a playground for kitesurfers; it is a cultural melting pot.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Surfpoint Kiteboarding School",
+        "text": "Schools here cater to diverse linguistic groups, with some focusing exclusively on Russian-speaking tourists.",
+        "class": "corpus",
+        "source": "knowledge_fallback:gemini",
+        "evidence": "Mui Ne's main beach strip involves a cultural and linguistic divide between kite schools, with some schools catering exclusively to Russian-speaking tourists."
+      },
+      {
+        "stop": "Surfpoint Kiteboarding School",
+        "text": "The nearby Cham ruins stand as silent witnesses to centuries past, reminding visitors of the historical depth beneath the sands.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "C2Sky Kite Center",
+        "text": "As you stand on the wind-beaten sands of Mui Ne, envision over a hundred kites dancing in the sky each December to February.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "C2Sky Kite Center",
+        "text": "Here at the C2Sky Kite Center, distinguished by its strictly certified International Kiteboarding Organization (IKO) status, there's more at stake in the swift tailwinds than leisure.",
+        "class": "corpus",
+        "source": "knowledge_fallback:gemini",
+        "evidence": "C2Sky Kite Center has historically operated as one of the few strictly certified International Kiteboarding Organization (IKO) schools on Mui Ne beach."
+      },
+      {
+        "stop": "C2Sky Kite Center",
+        "text": "Unlike the Surfpoint Kiteboarding School you visited earlier, this center focuses on safety.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "C2Sky Kite Center",
+        "text": "The dance you supported in Surfpoint now finds a moments' mediation, as practitioners unite movement, breath, and balance, reinforcing the cyclic nature of strength and serenity that the sea demands.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "C2Sky Kite Center",
+        "text": "As you ascend the nearby dune, the horizon opens into an ever-expanding canvas, where the lineage of the Cham people melds with today's kitesurfers—a continuum of mastery and storytelling carried by the wind.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "C2Sky Kite Center",
+        "text": "This tour highlights the vibrant interplay of community, culture, and adventure that defines the kitesurfing scene in Mui Ne.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "C2Sky Kite Center",
+        "text": "That's 3 stops in all.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      }
+    ]
+  }
+}

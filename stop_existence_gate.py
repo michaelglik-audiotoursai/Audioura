@@ -1123,6 +1123,151 @@ def _text_contradicts_scope(text: str, city_signals: Set[str]) -> bool:
     return False
 
 
+# ──── [LOCAL-788B] GENERIC-WORD WIKIPEDIA ARTICLE IS NOT EVIDENCE ─────────────
+# The LOCAL-788B field defect: the stop "Sultan's Kebab" was "VERIFIED" by the
+# Wikipedia article *Kebab* — a generic article about the FOOD, not the
+# establishment — with the log line
+#   [VERIFIED] "Sultan's Kebab" — wikipedia_article: 'Kebab' is about the establishment+city
+# A Wikipedia article whose title is a bare generic word (Kebab, Cafe, Bakery,
+# Pizza, Restaurant …) can never be evidence that a NAMED place exists: the
+# article does not name the place at all. Existence of a place requires the
+# article TITLE to carry the place's own DISTINCTIVE name token(s) — the words
+# that make it that place rather than a food/category. "Sultan's Kebab" has the
+# distinctive token "sultan"/"sultans" (and the apostrophe form); the article
+# title "Kebab" contains none of them, so it is rejected. "Stardust" resolving to
+# a "Stardust" article does carry the distinctive token and is fine.
+
+# Bare category / cuisine / dining words that, standing alone, describe a food or
+# a venue CLASS — never a specific establishment. A Wikipedia article whose title
+# consists only of these is a generic article, not evidence of a named place.
+_GENERIC_PLACE_WORDS = frozenset({
+    # venue classes
+    'restaurant', 'restaurants', 'cafe', 'cafes', 'coffee', 'coffeehouse',
+    'coffeeshop', 'bar', 'bars', 'pub', 'pubs', 'bakery', 'bakeries', 'bistro',
+    'brasserie', 'diner', 'eatery', 'eateries', 'pizzeria', 'steakhouse', 'grill',
+    'tavern', 'taverna', 'inn', 'house', 'shop', 'shops', 'store', 'stores',
+    'market', 'deli', 'gym', 'gyms', 'spa', 'salon', 'studio', 'brewery', 'winery',
+    'distillery', 'club', 'lounge', 'kitchen', 'food', 'foods', 'dining',
+    'cuisine', 'bakeshop', 'patisserie', 'creamery', 'parlor', 'parlour',
+    # dishes / cuisine words (the "Kebab" case)
+    'kebab', 'kebabs', 'shawarma', 'falafel', 'hummus', 'gyro', 'gyros', 'pizza',
+    'pasta', 'sushi', 'ramen', 'pho', 'taco', 'tacos', 'burrito', 'burger',
+    'burgers', 'bbq', 'barbecue', 'noodle', 'noodles', 'dumpling', 'dumplings',
+    'curry', 'biryani', 'tapas', 'mezze', 'paella', 'tandoori', 'dim', 'sum',
+    'ice', 'cream', 'donut', 'doughnut', 'bagel', 'sandwich', 'soup', 'salad',
+    # cuisine adjectives
+    'middle', 'eastern', 'mediterranean', 'lebanese', 'turkish', 'persian',
+    'arab', 'arabic', 'syrian', 'israeli', 'egyptian', 'moroccan', 'armenian',
+    'levantine', 'italian', 'sicilian', 'mexican', 'chinese', 'cantonese',
+    'szechuan', 'japanese', 'thai', 'indian', 'french', 'greek', 'korean',
+    'vietnamese', 'spanish', 'american', 'seafood', 'vegan', 'vegetarian',
+    'halal', 'kosher',
+    # filler
+    'the', 'a', 'an', 'of', 'and', 'le', 'la', 'les', 'el', 'il', 'and',
+})
+
+
+def _distinctive_name_tokens(name: str) -> Set[str]:
+    """[LOCAL-788B] The DISTINCTIVE tokens of a place name — the words that make it
+    THIS place, not a food/category. Accent-folded, lowercased, with generic venue/
+    cuisine/dish words removed. "Sultan's Kebab" → {'sultan', 'sultans'};
+    "Cafe Jaffa" → {'jaffa'}; "Al Wadi" → {'wadi'} (also 'al' is 2 chars → dropped);
+    "Stardust" → {'stardust'}. A name that is ENTIRELY generic ("Kebab House")
+    yields an empty set."""
+    if not name:
+        return set()
+    folded = _strip_accents(name).lower()
+    toks: Set[str] = set()
+    for raw in re.split(r"[^a-z0-9']+", folded):
+        if not raw:
+            continue
+        # keep an apostrophe form and a stripped form (sultan's → sultan, sultans)
+        bare = raw.replace("'", "")
+        for t in {raw, bare}:
+            if len(t) < 3:
+                continue
+            if t in _GENERIC_PLACE_WORDS:
+                continue
+            toks.add(t)
+    return toks
+
+
+def _article_title_has_distinctive_token(stop_title: str, article_title: str) -> bool:
+    """[LOCAL-788B] Does a Wikipedia ARTICLE TITLE carry the place's distinctive
+    name token(s)? Evidence that a NAMED place exists requires the article to be
+    about THAT place, not a generic food/category word.
+
+    Returns True only when the article title contains at least one of the stop's
+    distinctive (non-generic) tokens. "Sultan's Kebab" vs article "Kebab" → False
+    (the only shared token, 'kebab', is generic). "Stardust" vs article "Stardust"
+    → True. A stop whose name is ENTIRELY generic ("Kebab House") has no
+    distinctive token, so NO article title can vouch for it → False (such a place
+    must be proved on the MAP, never by a generic Wikipedia article)."""
+    stop_toks = _distinctive_name_tokens(stop_title)
+    if not stop_toks:
+        return False
+    art_folded = _strip_accents(article_title or "").lower()
+    art_toks = {t for t in re.split(r"[^a-z0-9']+", art_folded) if t}
+    art_toks |= {t.replace("'", "") for t in list(art_toks)}
+    return bool(stop_toks & art_toks)
+
+
+# ──── [LOCAL-788B] PLACE-TYPE TOUR DETECTION ─────────────────────────────────
+# A PLACE-TYPE tour is one whose stops are real-world PLACES sourced from the map
+# (restaurants, gyms, cafés, shops, "things in/near <area>", "… near me"), as
+# opposed to a museum's catalogued works. The LOCAL-788B field defect shipped
+# fabricated restaurants because the app sent tour_type "" and the dining path
+# trusted LLM names verified by a generic Wikipedia article. Place-type detection
+# must NOT depend on the app-sent tour_type: it keys off the poi_type /
+# tour_category / request text so a "" tour_type still routes to places-first +
+# ENFORCE. Museum / facility / landmark-history tours are NOT place-type (they
+# keep their own corpus/venue-page grounding).
+_NEAR_ME_RE = re.compile(r'\bnear\s+(?:me|here|us|by)\b', re.IGNORECASE)
+_THINGS_IN_AREA_RE = re.compile(
+    r'\b(?:in|near|around|close\s+to|by)\s+[A-Z0-9]', re.IGNORECASE)
+
+
+def is_place_type_tour(tour_category: Optional[str] = None,
+                       tour_type: Optional[str] = None,
+                       poi_type: Optional[str] = None,
+                       request_text: Optional[str] = None) -> bool:
+    """[LOCAL-788B] Is this a PLACE-TYPE tour whose stops must come from the map?
+
+    True for dining, business/activity, "near me", and "<things> in/near <area>"
+    requests — regardless of the tour_type the app sent (the app sends ""). False
+    for museum / facility / landmark-history tours, which ground on their own
+    corpus or venue page.
+
+    Signals (any one is enough):
+      1. poi_type classifies as 'dining' or 'business'
+         (``classify_business_vs_landmark``).
+      2. tour_category is 'restaurant' (the dining template).
+      3. The request/poi_type names a "near me" ("… restaurants near me").
+    A bare 'walking'/'landmark' tour is NOT place-type here — walking has its own
+    LOCAL-662 ENFORCE path; this is specifically the maps-sourced business/dining/
+    near-me class the LOCAL-788B defect lives in.
+    """
+    cat = (tour_category or '').strip().lower()
+    if cat in ('museum', 'facility'):
+        return False
+    if cat == 'restaurant':
+        return True
+    pt = poi_type
+    if isinstance(pt, (list, tuple)):
+        pt = ' or '.join(str(x) for x in pt)
+    pt = (pt or '').strip()
+    if pt:
+        kind = classify_business_vs_landmark(pt)
+        if kind in ('dining', 'business'):
+            return True
+    req = (request_text or '')
+    if _NEAR_ME_RE.search(req):
+        # "near me" is a device-anchored place request (gyms/restaurants/coffee
+        # near me) — a place-type tour even when the poi_type came back generic.
+        return True
+    return False
+
+
 def _check_dining_existence(
     stop_title: str, venue_name: str, db_conn
 ) -> Tuple[bool, str]:
@@ -1187,6 +1332,17 @@ def _check_dining_existence(
         has_stop = word_hits >= max(1, len(_stop_words) // 2) if _stop_words else False
         if not has_stop:
             return False
+        # [LOCAL-788B] The snippet must name the place's DISTINCTIVE token, not just
+        # a generic word. The field defect: a snippet about the FOOD "Kebab" matched
+        # "Sultan's Kebab" on the shared generic word 'kebab' and counted as
+        # evidence. A place whose name is wholly generic ("Kebab House") has no
+        # distinctive token and can never be proved by a Wikipedia snippet — it must
+        # be found on the MAP.
+        _distinct = _distinctive_name_tokens(stop_title)
+        if not _distinct:
+            return False
+        if not any(d in s for d in _distinct):
+            return False
         has_city = any(sig in s for sig in _city_signals) if _city_signals else False
         if not has_city:
             return False
@@ -1246,14 +1402,22 @@ def _check_dining_existence(
             # scope (Bitterne Park, Southampton, UK for a West Roxbury request).
             _contradicts = _text_contradicts_scope(full_text_normalized, _city_signals)
 
-            if has_city and is_dining and not _contradicts:
+            # [LOCAL-788B] The article the stop-title query resolved to must be
+            # ABOUT this place (its title carries a distinctive name token), not a
+            # generic food/category article (Kebab, Cafe …) that merely mentions a
+            # city. A generic-word article is never evidence a named place exists.
+            _dist_ok = _article_title_has_distinctive_token(stop_title, title_returned)
+            if has_city and is_dining and not _contradicts and _dist_ok:
                 return True, f"wikipedia_summary: '{title_returned}' is dining+city"
             # [LOCAL-788 item 5] A title match alone is NOT enough — it matches the
             # NAME, not the PLACE. A standalone article accepted on name only is how
             # a UK "Kebab House" verified a West Roxbury stop. Require the scope's
             # own location in the text AND no contradicting place.
+            # [LOCAL-788B] AND the article title must carry the place's DISTINCTIVE
+            # name token — a generic-word article (Kebab, Cafe …) is never evidence.
             if (is_dining and _title_match(stop_title, title_returned)
-                    and has_city and not _contradicts):
+                    and has_city and not _contradicts
+                    and _article_title_has_distinctive_token(stop_title, title_returned)):
                 return True, f"wikipedia_summary: '{title_returned}' is a restaurant in scope"
     except Exception as e:
         logger.debug(f"[EXISTENCE-GATE] Wikipedia summary check failed for {stop_title!r}: {e}")
@@ -1323,8 +1487,11 @@ def _check_dining_existence(
 
                                 if _article_is_about_stop:
                                     # Article IS the restaurant — just need city mention
+                                    # [LOCAL-788B] but a generic-word article title
+                                    # (Kebab, Cafe …) that _title_match accepted on a
+                                    # shared generic token is NOT the place's article.
                                     art_has_city = any(sig in art_text for sig in _city_signals)
-                                    if art_has_city:
+                                    if art_has_city and _article_title_has_distinctive_token(stop_title, r_title):
                                         return True, f"wikipedia_article: '{r_title}' is about the establishment+city"
                                 else:
                                     # Article is about something ELSE (e.g. Six Flags).
@@ -1387,12 +1554,15 @@ def _check_dining_existence(
             # [LOCAL-788 item 5] Same place-not-name rule on fr.wiki.
             _contradicts_fr = _text_contradicts_scope(full_text_fr_normalized, _city_signals)
 
-            if has_city_fr and is_dining_fr and not _contradicts_fr:
+            if has_city_fr and is_dining_fr and not _contradicts_fr \
+                    and _article_title_has_distinctive_token(stop_title, title_fr):
                 return True, f"wikipedia_fr_summary: '{title_fr}' is dining+city (fr.wiki)"
             # A title match alone is NOT enough (it matches the name, not the place):
             # require the scope's location in the text and no contradiction.
+            # [LOCAL-788B] AND a distinctive name token in the article title.
             if (is_dining_fr and _title_match(stop_title, title_fr)
-                    and has_city_fr and not _contradicts_fr):
+                    and has_city_fr and not _contradicts_fr
+                    and _article_title_has_distinctive_token(stop_title, title_fr)):
                 return True, f"wikipedia_fr_summary: '{title_fr}' is a restaurant in scope (fr.wiki)"
 
         # French Wikipedia search (snippet-based)
@@ -1448,8 +1618,9 @@ def _check_dining_existence(
 
                                     if _article_is_about_stop_fr:
                                         # Article IS the restaurant — city mention suffices
+                                        # [LOCAL-788B] but not a generic-word article title.
                                         art_has_city = any(sig in art_text_fr for sig in _city_signals)
-                                        if art_has_city:
+                                        if art_has_city and _article_title_has_distinctive_token(stop_title, r_title_fr):
                                             return True, f"wikipedia_fr_article: '{r_title_fr}' is about establishment+city"
                                     else:
                                         # Article is about something else — require full
@@ -1489,7 +1660,8 @@ def _check_dining_existence(
                 wd_label = wd_r.get("label", "")
                 wd_desc = wd_r.get("description", "").lower()
                 wd_desc_normalized = _strip_accents(wd_desc)
-                if _title_match(stop_title, wd_label):
+                if (_title_match(stop_title, wd_label)
+                        and _article_title_has_distinctive_token(stop_title, wd_label)):
                     # Check if description mentions the city or restaurant-related terms
                     if _city_signals and any(sig in wd_desc_normalized for sig in _city_signals):
                         return True, f"wikidata: '{wd_label}' (QID:{wd_r.get('id','?')}) description mentions city"
@@ -1510,7 +1682,8 @@ def _check_dining_existence(
                 wd_label = wd_r.get("label", "")
                 wd_desc = wd_r.get("description", "").lower()
                 wd_desc_normalized = _strip_accents(wd_desc)
-                if _title_match(stop_title, wd_label):
+                if (_title_match(stop_title, wd_label)
+                        and _article_title_has_distinctive_token(stop_title, wd_label)):
                     if _city_signals and any(sig in wd_desc_normalized for sig in _city_signals):
                         return True, f"wikidata_fr: '{wd_label}' (QID:{wd_r.get('id','?')}) description mentions city"
                     if any(sig in wd_desc for sig in ('restaurant', 'chef', 'michelin', 'cuisine',
@@ -3212,7 +3385,9 @@ def _log_gate_startup():
 _WALKING_ENFORCE_CATEGORIES = frozenset({'walking', 'specialized'})
 
 
-def get_gate_mode_for_category(tour_category: Optional[str]) -> str:
+def get_gate_mode_for_category(tour_category: Optional[str],
+                               poi_type: Optional[str] = None,
+                               request_text: Optional[str] = None) -> str:
     """Resolve the EFFECTIVE gate mode for a specific tour category (LOCAL-662).
 
     Starts from the global mode (``get_gate_mode``). For a WALKING-class tour
@@ -3222,8 +3397,16 @@ def get_gate_mode_for_category(tour_category: Optional[str]) -> str:
     stack becomes ``enforce`` for a walking tour, so an unverified outdoor stop
     is actually dropped rather than merely logged.
 
-    Museum / dining / any other category returns the global mode unchanged, so
-    the museum canary stays byte-for-byte identical.
+    [LOCAL-788B] A PLACE-TYPE tour (dining, business/activity, "near me",
+    "<things> in/near <area>") is ALSO raised to ``enforce``. Its stops are
+    real-world places that must come from the map; the LOCAL-788B field defect
+    shipped two fabricated restaurants precisely because a dining tour ran under
+    the shared-stack ``log_only`` and an UNVERIFIED stop was delivered anyway.
+    Like walking, a place-type tour has no venue page to ground against, so an
+    unverified stop is dropped and replenished from the map — never shipped. The
+    override reads ``is_place_type_tour`` (poi_type / tour_category / request
+    text), so it fires even when the app sent tour_type "". Museum / facility
+    tours keep the global mode (they ground on their own corpus / venue page).
 
     A caller can disable the walking override alone with
     ``WALKING_EXISTENCE_GATE_ENFORCE=0`` (the global mode then applies to walking
@@ -3233,6 +3416,13 @@ def get_gate_mode_for_category(tour_category: Optional[str]) -> str:
     if base == 'off':
         return 'off'  # explicit kill-switch wins
     cat = (tour_category or '').strip().lower()
+    # [LOCAL-788B] Place-type tours enforce (unless the walking override is turned
+    # off, which also governs the place-type override so one switch covers both).
+    if is_place_type_tour(tour_category=tour_category, poi_type=poi_type,
+                          request_text=request_text):
+        if os.environ.get('WALKING_EXISTENCE_GATE_ENFORCE', '1').strip() != '0':
+            return 'enforce'
+        return base
     if cat not in _WALKING_ENFORCE_CATEGORIES:
         return base
     if os.environ.get('WALKING_EXISTENCE_GATE_ENFORCE', '1').strip() == '0':

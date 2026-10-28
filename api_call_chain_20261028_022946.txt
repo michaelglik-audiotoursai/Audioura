@@ -1,0 +1,62 @@
+
+======================================================================
+CALL #001 | 02:29:46.459 | GENERATE_TOUR_TEXT_FUNCTION_ENTRY
+======================================================================
+  location: Kitesurfing schools in Mui Ne, Vietnam
+  tour_type: 
+  total_stops_parameter: 3
+  output_file: None
+
+======================================================================
+CALL #002 | 02:29:46.465 | TOTAL_STOPS_FINALIZED
+======================================================================
+  location: Kitesurfing schools in Mui Ne, Vietnam
+  total_stops_final: 3
+  source: parameter
+
+======================================================================
+CALL #003 | 02:29:48.715 | GENERATING_PROMPT
+======================================================================
+  location: Kitesurfing schools in Mui Ne, Vietnam
+  user_request: Kitesurfing schools in Mui Ne, Vietnam
+  total_stops: 3
+
+======================================================================
+CALL #004 | 02:29:48.722 | PHASE_3A_REQUEST
+======================================================================
+  location: Kitesurfing schools in Mui Ne, Vietnam
+  total_stops: 3
+  poi_type_hint: kitesurfing schools
+
+======================================================================
+CALL #005 | 02:29:53.336 | OPENAI_API_CALL
+======================================================================
+  total_stops_requested: 3
+  stop_count_in_prompt: False
+  http_status: 200
+  prompt_first_500_chars: You are a knowledgeable local guide for Kitesurfing schools in Mui Ne, Vietnam.
+List exactly 6 specific, real, well-known kitesurfing schools relevant to: Kitesurfing schools in Mui Ne, Vietnam.
+
+Requirements:
+- Use REAL, SPECIFIC names of actual establishments or landmarks.
+- NEVER use generic placeholders like 'Restaurant 1', 'Stop 1', 'Location A'.
+- Include a complete street address with ZIP code where applicable.
+
+GEOGRAPHIC SCOPE — ALL stops MUST be located within: Mui Ne, Vietnam.
+- Do NO
+  prompt_last_300_chars: opic ("politics and current affairs", "local history and culture") — name the real place that embodies it.
+
+Return ONLY a JSON array, no other text, no markdown fences:
+[{"name": "...", "address": "...", "reason": "Brief reason why this landmark is notable — a specific date, person, or event"}, ...]
+  stops_found_in_response: 0
+  stop_markers_in_response:
+    []
+  response_first_500_chars: [
+    {"name": "Kiteboarding Asia", "address": "97 Nguyen Dinh Chieu, Ham Tien, Mui Ne, Phan Thiet, Binh Thuan, Vietnam", "reason": "Established in 2005, Kiteboarding Asia is known for its professional instructors and a variety of kitesurfing courses suitable for all levels."},
+    {"name": "Surfpoint Kiteboarding School", "address": "92 Nguyen Dinh Chieu, Ham Tien, Mui Ne, Phan Thiet, Binh Thuan, Vietnam", "reason": "Founded in 2006, Surfpoint offers personalized kitesurfing lessons and is reco
+
+======================================================================
+CALL #006 | 02:31:18.462 | PHASE_3B_REQUEST
+======================================================================
+  location: Kitesurfing schools in Mui Ne, Vietnam
+  stop_count: 1

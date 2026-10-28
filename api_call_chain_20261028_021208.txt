@@ -1,0 +1,69 @@
+
+======================================================================
+CALL #001 | 02:12:08.183 | GENERATE_TOUR_TEXT_FUNCTION_ENTRY
+======================================================================
+  location: middle eastern restaurants near me, west Roxbury, MA
+  tour_type: 
+  total_stops_parameter: 2
+  output_file: None
+
+======================================================================
+CALL #002 | 02:12:08.199 | TOTAL_STOPS_FINALIZED
+======================================================================
+  location: middle eastern restaurants near me, west Roxbury, MA
+  total_stops_final: 2
+  source: parameter
+
+======================================================================
+CALL #003 | 02:12:09.984 | GENERATING_PROMPT
+======================================================================
+  location: middle eastern restaurants near me, west Roxbury, MA
+  user_request: middle eastern restaurants near me, west Roxbury, MA
+  total_stops: 2
+
+======================================================================
+CALL #004 | 02:12:09.996 | PHASE_3A_REQUEST
+======================================================================
+  location: middle eastern restaurants near me, west Roxbury, MA
+  total_stops: 2
+  poi_type_hint: restaurants
+
+======================================================================
+CALL #005 | 02:12:14.141 | OPENAI_API_CALL
+======================================================================
+  total_stops_requested: 2
+  stop_count_in_prompt: True
+  http_status: 200
+  prompt_first_500_chars: You are a knowledgeable local guide for middle eastern restaurants near me, west Roxbury, MA.
+List exactly 5 specific, real, well-known restaurants relevant to: middle eastern restaurants near me, west Roxbury, MA.
+
+Requirements:
+- Use REAL, SPECIFIC names of actual establishments or landmarks.
+- NEVER use generic placeholders like 'Restaurant 1', 'Stop 1', 'Location A'.
+- Include a complete street address with ZIP code where applicable.
+
+CRITICAL CONSTRAINT — THIS IS A RESTAURANT/DINING TOUR:
+-
+  prompt_last_300_chars: current affairs", "local history and culture") — name the real place that embodies it.
+
+Return ONLY a JSON array, no other text, no markdown fences:
+[{"name": "...", "address": "...", "reason": "Founded in 1927 by the Acchiardo family; known for handmade ravioli and slow-cooked daube niçoise"}, ...]
+  stops_found_in_response: 0
+  stop_markers_in_response:
+    []
+  response_first_500_chars: [
+    {
+        "name": "Foul & Falafel",
+        "address": "208 Washington St, West Roxbury, MA 02132",
+        "reason": "Established in 2011, Foul & Falafel is known for its authentic Middle Eastern dishes, particularly the foul medames, a traditional Egyptian dish made from fava beans."
+    },
+    {
+        "name": "Shawarma King",
+        "address": "1816 Centre St, West Roxbury, MA 02132",
+        "reason": "Opened in 2006, Shawarma King is celebrated for its shawarma, which is marinated 
+
+======================================================================
+CALL #006 | 02:12:49.800 | PHASE_3B_REQUEST
+======================================================================
+  location: middle eastern restaurants near me, west Roxbury, MA
+  stop_count: 2
