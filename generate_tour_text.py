@@ -14842,10 +14842,23 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
                                                filter_off_category as _foc791b)
             _req_cats_791b = _rc791b(user_request) or _rc791b(location)
             if _req_cats_791b:
+                # [LOCAL-791C item 1] The anchor set MUST include the request's
+                # PARENTHETICAL / route named anchors — "Pagodas and temples of HCMC
+                # (Jade Emperor Pagoda, Thien Hau Temple)" names its stops in the
+                # parenthesis, and those live in named_anchors(user_request), NOT in
+                # intent.named_places (restaurant/venue only) nor in
+                # extract_named_places_from_clause ("including X" only). The 791B
+                # build passed only the latter two — an EMPTY list for this request —
+                # so the user's own pagodas were treated as un-named and could be
+                # renamed/dropped. Union all three sources.
                 _anchors_791b = list(intent.get('named_places') or []) if intent else []
                 try:
                     from area_resolver import extract_named_places_from_clause as _enp791b
                     _anchors_791b += _enp791b(location) or []
+                except Exception:
+                    pass
+                try:
+                    _anchors_791b += named_anchors(user_request).get('anchors') or []
                 except Exception:
                     pass
                 _before_791b = len(poi_list)
@@ -14876,19 +14889,115 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
         # localises the primary name for other-language tours.
         try:
             from place_title_naming import title_for_candidate as _tfc791b
+            # [LOCAL-791C item 1] Same full anchor set as the off-category guard:
+            # the request's parenthetical / route anchors are user wording and MUST
+            # be recognised so a named pagoda keeps EXACTLY the user's title.
             _anchors_title_791b = list(intent.get('named_places') or []) if intent else []
             try:
                 from area_resolver import extract_named_places_from_clause as _enp_t791b
                 _anchors_title_791b += _enp_t791b(location) or []
             except Exception:
                 pass
+            try:
+                _anchors_title_791b += named_anchors(user_request).get('anchors') or []
+            except Exception:
+                pass
+            # [LOCAL-791C item 3] Strip a trailing architectural FEATURE word from a
+            # walking-stop title ("Notre-Dame Cathedral Basilica facade" → "Notre-Dame
+            # Cathedral Basilica"); a stop whose WHOLE title is a feature word is not a
+            # place and is rejected. A walking stop is a PLACE, not a part of one.
+            try:
+                from walking_stop_title import strip_feature_word as _sfw791c, \
+                    is_bare_feature_word as _ibfw791c
+            except Exception:
+                _sfw791c = _ibfw791c = None
+            _kept_791c = []
             for _p791b in poi_list:
+                # A hand-named anchor keeps the user's EXACT wording, verbatim, and is
+                # never reformatted or feature-stripped — the listener chose the name.
+                _is_anchor_791c = bool(_p791b.get("_anchor")
+                                       or _p791b.get("user_explicit"))
+                _orig_name_791c = _p791b.get("name")
+                # Item 3: feature-word handling (walking stops only; anchors exempt).
+                if (tour_category == 'walking' and not _is_anchor_791c
+                        and _sfw791c is not None):
+                    if _ibfw791c(_orig_name_791c):
+                        print(f"  [LOCAL-791C] reject feature-only stop "
+                              f"'{_orig_name_791c}'")
+                        continue
+                    _stripped_791c = _sfw791c(_orig_name_791c)
+                    if _stripped_791c and _stripped_791c != _orig_name_791c:
+                        print(f"  [LOCAL-791C] feature-word strip "
+                              f"'{_orig_name_791c}' → '{_stripped_791c}'")
+                        _p791b["name"] = _stripped_791c
+                        _orig_name_791c = _stripped_791c
+                # Item 1: naming. Anchors keep the user's EXACT wording — and are
+                # actively RESTORED to it: an upstream map/Serper resolution may have
+                # already reformatted the inserted anchor ("Jade Emperor Pagoda" →
+                # "Ngoc Hoang Pagoda (Jade Emperor Pagoda)") before this block. Match
+                # the poi to the user's anchor wording and set the title back to it.
+                if _is_anchor_791c:
+                    try:
+                        from place_title_naming import anchor_for_title as _aft791c
+                        # Restore to the user's EXACT anchor wording — by exact match,
+                        # then by CONTAINMENT. Old Saigon live case: the anchor
+                        # "Notre-Dame Cathedral" was resolved to a candidate titled
+                        # "Notre-Dame Cathedral Basilica facade" (a longer form with a
+                        # trailing feature word); containment restores the stop to the
+                        # user's wording so the "facade" sub-part is never the title.
+                        _verbatim_791c = _aft791c(_orig_name_791c, _anchors_title_791b)
+                        # Gloss-aware: an upstream rename may have put the user's
+                        # anchor INTO the parenthetical ("Ngọc Hoàng Pagoda (Jade
+                        # Emperor Pagoda)"). Match the anchor against the gloss too.
+                        if not _verbatim_791c:
+                            import re as _re791c
+                            _m = _re791c.search(r"\(([^)]*)\)", _orig_name_791c or "")
+                            if _m:
+                                _verbatim_791c = _aft791c(_m.group(1),
+                                                          _anchors_title_791b)
+                    except Exception:
+                        _verbatim_791c = None
+                    if _verbatim_791c and _verbatim_791c != _p791b.get("name"):
+                        print(f"  [LOCAL-791C] anchor title restored "
+                              f"'{_p791b.get('name')}' → '{_verbatim_791c}'")
+                        _p791b["name"] = _verbatim_791c
+                    elif (not _verbatim_791c and tour_category == 'walking'
+                          and _sfw791c is not None):
+                        # NO user-wording match at all (exact or containment). An
+                        # anchor is still a PLACE, not a part of one: strip a trailing
+                        # feature word so a venue-parts title ("… Basilica facade")
+                        # does not ship as the stop title. (When _verbatim_791c equals
+                        # the current name — the title already IS the user's wording,
+                        # e.g. "City Hall" — we do nothing; never strip "Hall" off a
+                        # civic landmark the listener named.)
+                        _anc_stripped = _sfw791c(_p791b.get("name"))
+                        if _anc_stripped and _anc_stripped != _p791b.get("name"):
+                            print(f"  [LOCAL-791C] anchor feature-word strip "
+                                  f"'{_p791b.get('name')}' → '{_anc_stripped}'")
+                            _p791b["name"] = _anc_stripped
+                    _kept_791c.append(_p791b)
+                    continue
                 _new_title_791b = _tfc791b(_p791b, tour_language="en",
                                            named_anchors=_anchors_title_791b)
                 if _new_title_791b and _new_title_791b != _p791b.get("name"):
                     print(f"  [LOCAL-791B] title '{_p791b.get('name')}' → "
                           f"'{_new_title_791b}'")
                     _p791b["name"] = _new_title_791b
+                _kept_791c.append(_p791b)
+            poi_list = _kept_791c
+            # [LOCAL-791C item 3] Dedupe stops that became identical once the feature
+            # suffix was stripped ("Notre-Dame Cathedral Basilica" vs "… facade"),
+            # and near-identical names ("Notre-Dame Cathedral Basilica" vs "Saigon
+            # Notre-Dame Basilica") via the LOCAL-790/791 identity key. Keep order.
+            try:
+                from walking_stop_title import dedupe_place_titles as _dpt791c
+                _before_dedupe_791c = len(poi_list)
+                poi_list = _dpt791c(poi_list, log=print)
+                if len(poi_list) < _before_dedupe_791c:
+                    print(f"  [LOCAL-791C] title dedupe removed "
+                          f"{_before_dedupe_791c - len(poi_list)} duplicate stop(s)")
+            except Exception as _dd_err:
+                print(f"  [LOCAL-791C] title dedupe skipped (non-fatal): {_dd_err}")
         except Exception as _tt_err:
             print(f"  [LOCAL-791B] titling skipped (non-fatal): {_tt_err}")
 
@@ -17013,7 +17122,30 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
         # leg over the hard limit is unarguably too far to walk.
         # ADVISORY: never raises ValueError, never removes all stops.
         # Touchpoint 4: graduated distance tiers by transport_mode (KIRO_REVIEW_08)
-        if tour_category == 'walking' and transport_mode != 'country_scale':
+        #
+        # [LOCAL-791C item 1] A PLURAL-CATEGORY-OF-AREA request ("Pagodas and
+        # temples of HCMC", "churches of Rome") names a CLASS of places spread
+        # across a whole city — dispersion is inherent to the request, and the
+        # listener who asks for the pagodas OF HCMC expects them city-wide, not
+        # within one 1.75 km walk. At LOCAL-790 this same request delivered 5
+        # dispersed pagodas (Giac Lam among them); the 791B build then let GEO-CHECK
+        # strip the far pagodas and shipped "4 of 5". For this request shape the
+        # per-leg walk limit is the wrong gate: skip the dispersed-stop removal so
+        # every on-category pagoda is kept and N stops are delivered. (The pin snap
+        # still fixes each coordinate; the route is simply not required to be one
+        # continuous walk.) Narrow by design — a plain neighbourhood walking tour is
+        # unaffected and still trimmed for dispersion.
+        _plural_category_area = False
+        try:
+            _plural_category_area = _is_plural_category_area_request(location, tour_type)
+        except Exception:
+            _plural_category_area = False
+        if tour_category == 'walking' and _plural_category_area:
+            print(f"   GEO-CHECK: skipped dispersed-stop removal — plural-category "
+                  f"city-wide request ('{location[:60]}'); on-category stops are "
+                  f"kept city-wide (LOCAL-791C item 1: deliver N).")
+        if (tour_category == 'walking' and transport_mode != 'country_scale'
+                and not _plural_category_area):
             pts = [(p, _parse_coords(p.get('coordinates', ''))) for p in poi_list]
             pts_valid = [(p, c) for p, c in pts if c]
             if len(pts_valid) >= 3:
@@ -17036,8 +17168,13 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
                 outliers = [o for o in outliers if id(o) not in seen_ids and not seen_ids.add(id(o))]
                 # Protect user-explicit stops from GEO-CHECK removal — the user knows
                 # their named stops may be far apart (regional/driving tour); honor the request.
-                if _explicit_stop_names:
-                    protected = [o for o in outliers if _normalize_name(o['name']) in _explicit_stop_names]
+                # [LOCAL-791C item 1] Match on the _anchor / user_explicit FLAG as well
+                # as the name set: an inserted named anchor carries the flag directly,
+                # and a reformatted title must not slip past a name-only test.
+                if _explicit_stop_names or any(o.get('_anchor') or o.get('user_explicit') for o in outliers):
+                    protected = [o for o in outliers
+                                 if _normalize_name(o['name']) in (_explicit_stop_names or set())
+                                 or o.get('_anchor') or o.get('user_explicit')]
                     if protected:
                         for p in protected:
                             print(f"   GEO-CHECK: KEPT '{p['name']}' (user-explicit stop, distance check bypassed)")
@@ -18045,10 +18182,23 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
                     _wl_total_limit = _TRANSPORT_TOTAL_HARD_KM.get(
                         transport_mode, WALKING_TOTAL_HARD_KM)
                     _wl_initial = set(_gp_initial)
+                    # [LOCAL-791C item 1] A hand-named anchor (the user asked for
+                    # "Jade Emperor Pagoda" / "Thien Hau Temple" by name) is a STOP
+                    # regardless of walking distance — the category tour's named
+                    # pagodas can legitimately sit kilometres apart, and LOCAL-576
+                    # already exempts anchors from scope/distance filtering. The D558
+                    # walking-limit refusal treated an inserted anchor as an ordinary
+                    # "added" candidate and dropped BOTH named pagodas (max leg 6.6 km
+                    # > 1.75 km), delivering 3 of 5 — the exact regression. Keep every
+                    # anchor in the unconditional-keep set.
+                    def _wl_is_anchor(p):
+                        return bool(p.get('_anchor') or p.get('user_explicit'))
                     _wl_orig = [p for p in poi_list
-                                if p.get('name', '') in _wl_initial]
+                                if p.get('name', '') in _wl_initial
+                                or _wl_is_anchor(p)]
                     _wl_added = [p for p in poi_list
-                                 if p.get('name', '') not in _wl_initial]
+                                 if p.get('name', '') not in _wl_initial
+                                 and not _wl_is_anchor(p)]
 
                     def _wl_route_ok(cand_list):
                         """(ok, max_leg_km, total_km) for a candidate stop list,
@@ -25691,6 +25841,58 @@ REWRITE RULES (all mandatory):
                   f"marker after the sweep (kept, announced): {_sweep_missing}")
     except Exception as _sweep_err:
         print(f"  [LOCAL-591] coordinate sweep error (non-fatal): {_sweep_err}")
+
+    # -------- [LOCAL-791C item 2] PIN SNAP --------
+    # Walking-stop coordinates are LLM-written and the 791B pin_proof table measured
+    # them 0.5–6 km off (Giac Lam 2304 m, Xa Loi 5956 m). For EVERY stop with an
+    # IN-SCOPE reference — the SAME Serper-Places / Nominatim / Wikidata P625 lookups
+    # pin_proof uses — snap the stop to the reference when the shipped pin is > 150 m
+    # away, logging '[LOCAL-791C] pin snap <title> <m>'. A stop is left unsnapped only
+    # when no in-scope reference exists (also logged). Runs here, after the stop set
+    # and names are final and the sweep guaranteed coordinates, before packing.
+    try:
+        from pin_snap import snap_poi_coordinates as _snap791c
+        _pin_scope_791c = ""
+        try:
+            _pin_scope_791c = _scope_from_request(location, intent) or location
+        except Exception:
+            _pin_scope_791c = location
+        _pin_center_791c = None
+        try:
+            _pin_center_791c = _sweep_anchor
+        except Exception:
+            _pin_center_791c = None
+        if _pin_center_791c is None:
+            # Resolve a scope centre so the reference lookup's scope-sanity bound is
+            # active (a bare name must not snap to a same-name place in another
+            # city). Try the resolved scope first, then the fuller request/location.
+            try:
+                from geocode_stops import geocode as _pc_geocode, \
+                    location_hint as _pc_hint
+                for _cand_scope in (_pin_scope_791c, _pc_hint(location) if _pc_hint else None,
+                                    location, (intent.get('geographic_scope') if intent else None)):
+                    if not _cand_scope:
+                        continue
+                    try:
+                        _pin_center_791c = _pc_geocode(_cand_scope)
+                    except Exception:
+                        _pin_center_791c = None
+                    if _pin_center_791c:
+                        break
+            except Exception:
+                _pin_center_791c = None
+        print(f"  [LOCAL-791C] pin snap: scope={_pin_scope_791c!r} "
+              f"center={_pin_center_791c} threshold=150m target=100m")
+        poi_list, _snap_rows_791c = _snap791c(
+            poi_list, scope=_pin_scope_791c, scope_center=_pin_center_791c,
+            log=print)
+        _n_snapped_791c = sum(1 for r in _snap_rows_791c if r.get("snapped"))
+        _n_noref_791c = sum(1 for r in _snap_rows_791c if r.get("reference") is None)
+        print(f"  [LOCAL-791C] pin snap complete — {_n_snapped_791c} snapped, "
+              f"{_n_noref_791c} left unsnapped (no in-scope reference), "
+              f"{len(_snap_rows_791c)} total stop(s)")
+    except Exception as _snap_err_791c:
+        print(f"  [LOCAL-791C] pin snap skipped (non-fatal): {_snap_err_791c}")
 
     # PHASE 6: Assemble the complete tour
     _phase_timer.start('packing')

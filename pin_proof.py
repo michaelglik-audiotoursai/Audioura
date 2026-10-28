@@ -165,7 +165,7 @@ def reference_for_name(name: str,
                        scope_center: Optional[Tuple[float, float]] = None,
                        serper_fn: Optional[Callable] = None,
                        nominatim_fn: Optional[Callable] = None,
-                       max_reference_km: float = 50.0,
+                       max_reference_km: float = 15.0,
                        ) -> Optional[Tuple[float, float, str]]:
     """Independent reference coordinate for a stop NAME.
 

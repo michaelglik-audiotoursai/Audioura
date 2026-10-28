@@ -44,6 +44,7 @@ __all__ = [
     "format_place_title",
     "title_for_candidate",
     "is_named_anchor",
+    "anchor_for_title",
     "LANG_LOCAL",
 ]
 
@@ -138,6 +139,46 @@ def is_named_anchor(name: str, named_anchors: Optional[List[str]]) -> Optional[s
         if _bare(anchor) == nk:
             return _clean(anchor)
     return None
+
+
+def anchor_for_title(name: str, named_anchors: Optional[List[str]]) -> Optional[str]:
+    """Return the user's EXACT anchor wording for ``name`` by EXACT match first,
+    then by CONTAINMENT, else None.
+
+    The exact path is ``is_named_anchor``. The containment path handles the Old
+    Saigon live case (LOCAL-791C): the model resolved the anchor "Notre-Dame
+    Cathedral" to a candidate titled "Notre-Dame Cathedral Basilica facade" — a
+    longer form with a trailing feature word. The user's anchor is a token-subset
+    of the candidate, so we restore the stop to the user's own wording ("Notre-Dame
+    Cathedral"), never shipping the "facade" sub-part as the title. Containment is
+    whole-word and direction-aware: the user's anchor must be contained in the
+    candidate (not the reverse), so a short candidate is never relabelled to a
+    longer anchor it does not match."""
+    exact = is_named_anchor(name, named_anchors)
+    if exact:
+        return exact
+    if not name or not named_anchors:
+        return None
+
+    def _bare_words(s: str) -> List[str]:
+        return [w for w in _norm_cmp(
+            re.sub(r"\s*\([^)]*\)\s*", " ", s or "")).split() if w]
+
+    cand_words = _bare_words(name)
+    if not cand_words:
+        return None
+    cand_set = set(cand_words)
+    best: Optional[str] = None
+    best_len = 0
+    for anchor in named_anchors:
+        aw = _bare_words(anchor)
+        if not aw or len(aw) < 2:
+            # A single-word anchor is too weak for containment (would grab any
+            # title sharing one common word); require the exact path for those.
+            continue
+        if set(aw) <= cand_set and len(aw) > best_len:
+            best, best_len = _clean(anchor), len(aw)
+    return best
 
 
 def _labels_for_language(cand: Dict, lang: str) -> str:
