@@ -18,7 +18,9 @@ import '../renewal_logic.dart';
 import '../widgets/renewal_sheet.dart';
 import '../services/communities_service.dart';
 import '../services/pass_expiry_warning.dart';
+import '../services/translate_download_manager.dart';
 import '../widgets/pass_expiry_warning_dialog.dart';
+import '../widgets/translate_download_progress_banner.dart';
 import 'community_page_screen.dart';
 
 /// [LOCAL-761 / D710 as amended] Keys on the persistent bottom bar and the
@@ -571,11 +573,29 @@ class MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
         // bottomNavigationBar, OUTSIDE the stack, so any screen pushed inside a
         // tab keeps it visible. A single NotificationListener drives auto-hide
         // for whatever scrollable is on top in any tab.
-        body: NotificationListener<ScrollNotification>(
-          onNotification: _onScrollNotification,
-          child: IndexedStack(
-            index: _selectedIndex,
-            children: List.generate(kTabCount, _buildTabNavigator),
+        //
+        // [LOCAL-794] The translate-download progress row is a SafeArea-topped
+        // banner above the tab stack (outside every per-tab Navigator), so a
+        // background translate-download shows one persistent row that survives
+        // tab switches — replacing the old app-blocking modal spinner. It
+        // renders nothing when no job is active.
+        body: SafeArea(
+          bottom: false,
+          child: Column(
+            children: [
+              TranslateDownloadProgressBanner(
+                controller: TranslateDownloadController.instance,
+              ),
+              Expanded(
+                child: NotificationListener<ScrollNotification>(
+                  onNotification: _onScrollNotification,
+                  child: IndexedStack(
+                    index: _selectedIndex,
+                    children: List.generate(kTabCount, _buildTabNavigator),
+                  ),
+                ),
+              ),
+            ],
           ),
         ),
         bottomNavigationBar: AnimatedSlide(
