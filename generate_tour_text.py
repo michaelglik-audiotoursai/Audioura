@@ -5170,6 +5170,17 @@ _J = _jss.attach_to_module(__name__, {
     # (_apply_delivery_hours_guard). Empty list when every named place verified or
     # none was named → no-op. Set once per generation (walking path).
     "_LAST_NAMED_PLACE_ANNOUNCEMENTS": list,
+    # [LOCAL-799 / D562] Inputs for the FINAL-stop reconciliation of the
+    # named-place announcement. The LOCAL-751 decision ran too early (against the
+    # discovered-landmark set, before replenish/dedup/renaming), so on tour 467 it
+    # announced "could not confirm" for places that DID ship as stops. These slots
+    # carry the raw named places, any coordinate resolved for them, and the walking
+    # scope, so _apply_delivery_hours_guard can reconcile against the FINAL stop
+    # list (_LAST_POI_LIST) and announce only the genuinely-uncovered names, in
+    # ONE sentence placed after the welcome. Reset per run on the walking path.
+    "_LAST_NAMED_PLACES": list,
+    "_LAST_NAMED_PLACE_COORDS": dict,
+    "_LAST_WALK_SCOPE": lambda: "",
 })
 
 # [LOCAL-582] Module-level: how the LAST generation was delivered.
@@ -9679,25 +9690,57 @@ def _apply_delivery_hours_guard(result):
                           "into the Orientation opening.", flush=True)
         except Exception as _swe:  # pragma: no cover
             _import_logger.error(f"[LOCAL-744] disclosure injection skipped: {_swe}")
-        # [LOCAL-751 B2 / D562] NAMED-PLACE ANNOUNCEMENTS. A place the listener
-        # named that could not be confirmed is announced in the Orientation on
-        # EVERY delivery path, never silently dropped. The walking path stashed the
-        # sentences on _J._LAST_NAMED_PLACE_ANNOUNCEMENTS (empty → no-op). Reuse the
-        # same idempotent Orientation splice as the filming disclosure.
+        # [LOCAL-799 / D562] NAMED-PLACE ANNOUNCEMENT, reconciled against the
+        # FINAL stop list. A place the listener named is never silently dropped,
+        # but it is announced ONLY when no FINAL stop covers it — the LOCAL-751
+        # decision ran too early (against the discovered-landmark set, before
+        # replenish/dedup/renaming) and announced "could not confirm" for places
+        # that DID ship as stops (tour 467: Fairy Stream / Red Sand Dunes /
+        # fishing village were all stops; only White Sand Dunes was missing).
+        # Here, after every other guard has settled the text and _LAST_POI_LIST
+        # holds the final stops:
+        #   1. Reconcile each named place against the FINAL stops (normalized
+        #      token match or 300 m geocode); a covered name is NOT announced.
+        #   2. For an uncovered name, try places_search once (LOCAL-790/788B) so a
+        #      transient Overpass/Wikidata failure does not yield a false negative.
+        #   3. Announce the genuinely-uncovered names in ONE natural sentence,
+        #      placed AFTER the welcome — never inside a stop's Orientation line.
         try:
-            _np_ann = list(getattr(_J, "_LAST_NAMED_PLACE_ANNOUNCEMENTS", []) or [])
-            if _np_ann and final:
-                import screen_work_tour as _swt_np
-                _np_text = " ".join(s.strip() for s in _np_ann if s and s.strip()).strip()
-                if _np_text:
+            _np_names = list(getattr(_J, "_LAST_NAMED_PLACES", []) or [])
+            if _np_names and final:
+                import area_resolver as _ar799
+                _final_pois = list(getattr(_J, "_LAST_POI_LIST", []) or [])
+                _np_coords = dict(getattr(_J, "_LAST_NAMED_PLACE_COORDS", {}) or {})
+                _np_scope = (getattr(_J, "_LAST_WALK_SCOPE", "") or "")
+                # places_search rescue is OPTIONAL: only wire it when Serper is
+                # actually configured, so the offline tests and the museum canary
+                # never make a network call here.
+                _ps_fn = None
+                try:
+                    import places_search as _ps799
+                    if _ps799.serper_places_enabled():
+                        _ps_fn = _ps799.places_search
+                except Exception:
+                    _ps_fn = None
+                _uncovered = _ar799.reconcile_named_place_announcement(
+                    _np_names, _final_pois, name_coords=_np_coords,
+                    places_search_fn=_ps_fn, scope=_np_scope)
+                _np_sentence = _ar799.build_named_place_intro_sentence(_uncovered)
+                if _np_sentence:
+                    import screen_work_tour as _swt_np
                     _before_np = final
-                    final = _swt_np.inject_orientation_disclosure(final, _np_text)
+                    final = _swt_np.inject_named_place_after_welcome(final, _np_sentence)
                     if final != _before_np:
-                        print("  [LOCAL-751] spliced named-place announcement(s) into "
-                              "the Orientation opening (D562 — never silently dropped).",
-                              flush=True)
+                        print(f"  [LOCAL-799] named-place reconciliation: "
+                              f"{len(_np_names)} named, {len(_uncovered)} uncovered "
+                              f"({_uncovered}) — one sentence placed after the "
+                              f"welcome (D562, never silently dropped).", flush=True)
+                else:
+                    print(f"  [LOCAL-799] named-place reconciliation: all "
+                          f"{len(_np_names)} named place(s) covered by final stops "
+                          f"— no announcement.", flush=True)
         except Exception as _npe:  # pragma: no cover
-            _import_logger.error(f"[LOCAL-751] named-place announcement injection skipped: {_npe}")
+            _import_logger.error(f"[LOCAL-799] named-place reconciliation skipped: {_npe}")
         if final != text and out_file:
             # Rewrite the delivered file so the service (which reads the file,
             # not the return value) ships the cleaned text on every path.
@@ -14691,6 +14734,9 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
                 # existence gate — exactly the D562 violation this ticket forbids.
                 # The deterministic source closes that gap.
                 _J._LAST_NAMED_PLACE_ANNOUNCEMENTS = []
+                # [LOCAL-799] Reset the FINAL-stop reconciliation inputs too.
+                _J._LAST_NAMED_PLACES = []
+                _J._LAST_NAMED_PLACE_COORDS = {}
                 _walk_named_places = []
                 _seen_np = set()
 
@@ -14721,6 +14767,11 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
                 if _walk_named_places:
                     print(f"  [LOCAL-751] named places to protect (D562): "
                           f"{_walk_named_places}")
+                # [LOCAL-799] Stash the raw named places so the delivery guard can
+                # reconcile them against the FINAL stop list (not the early
+                # candidate pool). The announcement decision moves to the guard;
+                # apply_named_place_policy below still does the KEEP/INSERT work.
+                _J._LAST_NAMED_PLACES = list(_walk_named_places)
 
                 # [LOCAL-779] Resolve the AREA off the clean geographic scope, not
                 # the raw request. "walking tour: gyms near me, west Roxbury, MA"
@@ -14732,6 +14783,9 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
                 if _area_input and _area_input != _location_normalized:
                     print(f"  [LOCAL-779] area resolver input: {_area_input!r} "
                           f"(stripped poi/near-me from {_location_normalized!r})")
+                # [LOCAL-799] Remember the scope so the guard's places_search
+                # rescue binds to the right town (LOCAL-786/790).
+                _J._LAST_WALK_SCOPE = (_area_input or _location_normalized or "")
                 _area = resolve_area(_area_input or _location_normalized)
                 if _area and _area.resolved:
                     # Check cache first
@@ -14781,6 +14835,22 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
                                 poi_list, _walk_named_places, _area, _landmarks, _new_poi)
                             if _np_announce:
                                 _J._LAST_NAMED_PLACE_ANNOUNCEMENTS = list(_np_announce)
+                            # [LOCAL-799] Capture any coordinate a named place
+                            # resolves to among the discovered landmarks, so the
+                            # delivery-guard reconciliation can use the 300 m
+                            # geocode signal as well as the token match.
+                            try:
+                                from area_resolver import _match_stop_to_landmark as _m799
+                                _coords799 = {}
+                                for _nm799 in _walk_named_places:
+                                    _lm799 = _m799(_nm799, _landmarks)
+                                    if _lm799 and (_lm799.lat or _lm799.lng):
+                                        _coords799[_nm799] = (_lm799.lat, _lm799.lng)
+                                if _coords799:
+                                    _J._LAST_NAMED_PLACE_COORDS = _coords799
+                            except Exception as _c799e:
+                                print(f"  [LOCAL-799] named-place coord capture "
+                                      f"skipped (non-fatal): {_c799e}")
 
                         _pre_d1v2_candidates = list(poi_list)  # For unified fill compatibility
                         
