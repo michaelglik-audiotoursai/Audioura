@@ -1613,6 +1613,16 @@ def orchestrate_tour_async(job_id, location, tour_type, total_stops, user_id=Non
         _last_progress_at = datetime.now()
         _POLL_TIMEOUT = 30  # seconds; status endpoint is trivial, this measures event-loop busy-ness
         _poll_failure_start_1 = None
+        # [LOCAL-775 / D718] A 404 "Job not found" from the generator is no longer
+        # fatal on sight. tour-generator-subscribed briefly ran 2 instances during
+        # a revision rollout (Cloud Run can exceed maxScale for a moment); our poll
+        # landed on the instance that did not own the job and got a 404, so the
+        # orchestrator failed a tour the OTHER instance was still generating
+        # (~$0.35 metered, no tour stored). The generator now shares job status
+        # through the generator_jobs table, so the owning status reappears within a
+        # rollover gap. Tolerate 404s for up to 60 s before giving up.
+        _GEN_404_GRACE = timedelta(seconds=60)
+        _gen_404_start = None
         while True:
             poll_count += 1
             _now = datetime.now()
@@ -1662,6 +1672,9 @@ def orchestrate_tour_async(job_id, location, tour_type, total_stops, user_id=Non
             if status_response.status_code == 200:
                 status_data = status_response.json()
                 print(f"Status data: {status_data}")
+                # [LOCAL-775] A good 200 clears any in-progress 404 grace window:
+                # the owning instance (or a shared-DB read) is answering again.
+                _gen_404_start = None
                 
                 if status_data["status"] == "completed":
                     tour_file = status_data.get("output_file")
@@ -1697,6 +1710,30 @@ def orchestrate_tour_async(job_id, location, tour_type, total_stops, user_id=Non
                         _last_progress_marker = _marker
                         _last_progress_at = datetime.now()
                     time.sleep(10)
+            elif status_response.status_code == 404:
+                # [LOCAL-775 / D718] "Job not found". With the generator_jobs
+                # table any instance should know this job, so a 404 means we hit a
+                # brief rollover gap (a new instance that has not yet read the row,
+                # or the owner going away mid-rollout). Retry for up to 60 s before
+                # failing, instead of throwing away a tour the generator may still
+                # be producing. _gen_404_start resets on the next good 200.
+                _now_404 = datetime.now()
+                if _gen_404_start is None:
+                    _gen_404_start = _now_404
+                _waited_404 = _now_404 - _gen_404_start
+                if _waited_404 > _GEN_404_GRACE:
+                    raise Exception(
+                        f"Text generation job {job_id_1} returned 404 'Job not found' "
+                        f"for {_waited_404.total_seconds():.0f}s (> "
+                        f"{_GEN_404_GRACE.total_seconds():.0f}s grace). No generator "
+                        f"instance knows this job — giving up."
+                    )
+                print(
+                    f"[LOCAL-775] Text-gen status 404 for job {job_id_1}; tolerating "
+                    f"rollover gap ({_waited_404.total_seconds():.0f}s/"
+                    f"{_GEN_404_GRACE.total_seconds():.0f}s), will retry."
+                )
+                time.sleep(5)
             else:
                 error_msg = f"Error checking text generation status: {status_response.text}"
                 print(f"ERROR: {error_msg}")
