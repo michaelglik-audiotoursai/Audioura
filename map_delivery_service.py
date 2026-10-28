@@ -554,6 +554,148 @@ def search_tours():
         sys.stdout.flush()
         return jsonify({'error': str(e)}), 500
 
+# [LOCAL-793] Server-side geocoder fallback for the Home place search.
+#
+# The app's client geocoder asks Nominatim for several results and prefers a
+# PLACE over a POI (so "Saigon Vietnam" no longer opens a Paris restaurant).
+# When Nominatim returns NO place -- a typo like "Hi Chi Minh, Vietnam", or
+# only far POIs -- the app calls THIS endpoint, which resolves the free text
+# server-side where the paid key lives (never shipped in the app):
+#
+#   1. Serper Places (metered via serper_meter.serper_post, ~$0.001/query) when
+#      a key is configured. Serper's index is typo-tolerant, so "Hi Chi Minh"
+#      resolves to Ho Chi Minh City. We take the first result's coordinates.
+#   2. Nominatim fallback (free) with a real User-Agent and a larger result set,
+#      preferring a place class, when Serper is not configured or finds nothing.
+#
+# Response: {"lat": .., "lng": .., "name": ".."} on success, or 404 when the
+# place cannot be resolved. Only ONE paid query per lookup (cap-friendly).
+@app.route('/geocode', methods=['GET'])
+def geocode_place():
+    query = (request.args.get('q') or request.args.get('query') or '').strip()
+    print(f"Geocoding place: '{query}'")
+    sys.stdout.flush()
+    if not query:
+        return jsonify({'error': 'missing q'}), 400
+
+    # 1. Serper Places (metered, typo-tolerant). Guarded + fail-open.
+    try:
+        result = _geocode_via_serper(query)
+        if result is not None:
+            return jsonify(result)
+    except Exception as e:
+        print(f"GEOCODE: serper path error: {e}")
+        sys.stdout.flush()
+
+    # 2. Nominatim fallback (free).
+    try:
+        result = _geocode_via_nominatim(query)
+        if result is not None:
+            return jsonify(result)
+    except Exception as e:
+        print(f"GEOCODE: nominatim path error: {e}")
+        sys.stdout.flush()
+
+    return jsonify({'error': 'not found', 'q': query}), 404
+
+
+def _geocode_via_serper(query):
+    """Resolve `query` to {lat,lng,name} via the metered Serper Places door, or
+    None when no key is configured / nothing is found. One metered query."""
+    try:
+        from serper_meter import serper_post
+    except Exception:
+        return None
+    key = os.environ.get('SERP_API_KEY') or os.environ.get('SERPER_API_KEY')
+    if not key:
+        return None
+    status, body = serper_post(
+        'https://google.serper.dev/places',
+        {'q': query, 'num': 5},
+        api_key=key,
+    )
+    if status != 200 or not body:
+        return None
+    try:
+        data = json.loads(body.decode('utf-8', 'ignore'))
+    except Exception:
+        return None
+    places = data.get('places') or []
+    for p in places:
+        lat = p.get('latitude')
+        lng = p.get('longitude')
+        if lat is None or lng is None:
+            continue
+        try:
+            lat = float(lat)
+            lng = float(lng)
+        except (TypeError, ValueError):
+            continue
+        name = p.get('address') or p.get('title') or query
+        print(f"GEOCODE: serper '{query}' -> {name} ({lat},{lng})")
+        sys.stdout.flush()
+        return {'lat': lat, 'lng': lng, 'name': name}
+    return None
+
+
+def _geocode_via_nominatim(query):
+    """Resolve `query` to {lat,lng,name} via Nominatim, preferring a PLACE class
+    over a POI. Server-side so a real User-Agent is used. None when nothing
+    usable comes back."""
+    url = (
+        'https://nominatim.openstreetmap.org/search'
+        '?q=' + requests.utils.quote(query) +
+        '&format=json&limit=8&accept-language=en'
+    )
+    resp = requests.get(
+        url,
+        headers={
+            'User-Agent': 'com.audioura.audiotours/1.0 (support@audioura.com)',
+            'Accept-Language': 'en',
+        },
+        timeout=12,
+    )
+    if resp.status_code != 200:
+        return None
+    rows = resp.json()
+    if not isinstance(rows, list) or not rows:
+        return None
+    _place_types = {
+        'country', 'state', 'region', 'province', 'county', 'city', 'town',
+        'municipality', 'village', 'hamlet', 'suburb', 'neighbourhood',
+        'quarter', 'borough', 'district', 'locality',
+    }
+
+    def _is_place(r):
+        klass = str(r.get('class') or r.get('category') or '').lower()
+        typ = str(r.get('type') or '').lower()
+        if klass == 'place' and typ in _place_types:
+            return True
+        if klass == 'boundary' and typ == 'administrative':
+            return True
+        return typ == 'administrative'
+
+    def _importance(r):
+        try:
+            return float(r.get('importance') or 0.0)
+        except (TypeError, ValueError):
+            return 0.0
+
+    places = [r for r in rows if _is_place(r)]
+    pool = places if places else rows
+    pool = sorted(pool, key=_importance, reverse=True)
+    best = pool[0]
+    try:
+        lat = float(best['lat'])
+        lng = float(best['lon'])
+    except (KeyError, TypeError, ValueError):
+        return None
+    name = best.get('display_name') or query
+    print(f"GEOCODE: nominatim '{query}' -> {name} ({lat},{lng})")
+    sys.stdout.flush()
+    return {'lat': lat, 'lng': lng, 'name': name}
+
+
 @app.route('/tour/<int:tour_id>/version', methods=['GET'])
 def get_tour_version(tour_id):
     """Get tour version information for update checking"""
