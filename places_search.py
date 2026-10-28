@@ -116,6 +116,93 @@ def _strip_accents(s: str) -> str:
                    if not unicodedata.combining(c))
 
 
+# [LOCAL-791 defects 6 & 10] A map listing's `title` is a raw Google Maps label,
+# NOT a clean place name. Two kinds of noise ride in it and, uncleaned, become the
+# stop's spoken title:
+#
+#   defect 10 — a GOOGLE CATEGORY SUFFIX after a colon: "Stardust: Inspired
+#               Mediterranean , Persian" (West Roxbury, Mac e2e). The ": <list>"
+#               tail is the venue's Google categories, not part of its name, so it
+#               is stripped — leaving "Stardust". A stray " ," left by the split is
+#               tidied.
+#
+#   defect 6  — a bracketed TAG LIST in a script other than the place's own and
+#               the tour language: "An Spa - Healing & Relax (Massage Mũi Né -
+#               샴푸와 컨디셔너, 마사지)" (Korean marketing keywords). A parenthetical
+#               whose content is MOSTLY a foreign (non-Latin) script is marketing
+#               noise and is dropped — leaving "An Spa - Healing & Relax".
+#
+# Conservative: a parenthetical in the SAME script as the name (a Latin gloss, a
+# Vietnamese local name) is kept, and a short category list is only cut when it
+# follows a colon (so a real name containing a colon keeps its first clause, which
+# is the name). Pure, deterministic, no network.
+
+# A run of ONE OR MORE non-Latin letters (CJK, Hangul, Arabic, Cyrillic, Thai …).
+# Latin (incl. Vietnamese diacritics) is NFKD-stripped to ASCII first, so only a
+# genuinely different script survives as a "foreign" letter here.
+_NON_LATIN_LETTER_RE = re.compile(
+    r"[\u0400-\u04FF\u0590-\u05FF\u0600-\u06FF\u0E00-\u0E7F"
+    r"\u1100-\u11FF\u3040-\u30FF\u3130-\u318F\uAC00-\uD7AF"
+    r"\u4E00-\u9FFF\u3400-\u4DBF]")
+
+
+def _is_mostly_foreign_script(text: str) -> bool:
+    """True when `text`'s LETTERS are mostly a non-Latin script (CJK, Hangul,
+    Arabic, Cyrillic, Thai …). Vietnamese and other Latin-with-diacritics text is
+    NOT foreign (it folds to ASCII letters). Used to spot a marketing tag list in
+    another language inside a parenthetical."""
+    foreign = len(_NON_LATIN_LETTER_RE.findall(text or ""))
+    latin = sum(1 for c in (text or "") if c.isascii() and c.isalpha())
+    if foreign == 0:
+        return False
+    return foreign >= latin
+
+
+def clean_place_title(title: str) -> str:
+    """Clean a raw map-listing title into a stop title (defects 6 & 10).
+
+    1. Drop any parenthetical / bracketed group whose content is MOSTLY a foreign
+       (non-Latin) script — a marketing tag list in another language.
+    2. Strip a trailing ": <category list>" Google-category suffix.
+    3. Tidy stray " ," / doubled spaces / leftover punctuation.
+
+    Returns the cleaned name; never returns empty (falls back to the original
+    stripped title if cleaning would empty it)."""
+    raw = (title or "").strip()
+    if not raw:
+        return raw
+    out = raw
+
+    # 1. Foreign-script bracketed tag lists: ( … ), [ … ], 【 … 】.
+    def _drop_foreign_bracket(m: "re.Match") -> str:
+        inner = m.group(1)
+        return "" if _is_mostly_foreign_script(inner) else m.group(0)
+    out = re.sub(r"\(([^()]*)\)", _drop_foreign_bracket, out)
+    out = re.sub(r"\[([^\[\]]*)\]", _drop_foreign_bracket, out)
+    out = re.sub(r"\u3010([^\u3010\u3011]*)\u3011", _drop_foreign_bracket, out)
+
+    # 2. Google category suffix after a colon: keep the name (first clause). Only
+    #    when the tail reads as a category list (contains a comma, or is short), so
+    #    a real titled work "Blue: A Study" is not truncated unless it looks like a
+    #    Maps category tail.
+    cm = re.match(r"^(?P<name>[^:]+):\s*(?P<tail>.+)$", out)
+    if cm:
+        name = cm.group("name").strip()
+        tail = cm.group("tail").strip()
+        # A Maps category tail is a COMMA-joined list of category words with no
+        # sentence punctuation — "Inspired Mediterranean , Persian". Requiring a
+        # comma keeps a real colon-titled work safe ("Blue: A Study of Light",
+        # "Nocturne: Blue and Gold" are never truncated — their tail has no comma).
+        if name and "," in tail and not re.search(r"[.!?]", tail):
+            out = name
+
+    # 3. Tidy: collapse " ," / " ;" spacing, doubled spaces, trailing separators.
+    out = re.sub(r"\s+([,;])", r"\1", out)
+    out = re.sub(r"[,;\-\s]+$", "", out)
+    out = re.sub(r"\s{2,}", " ", out).strip()
+    return out or raw
+
+
 # ──────────────────── Serper Places → OSM jsonv2 shape ──────────────────────
 def _parse_address_components(address: str) -> Dict[str, str]:
     """Best-effort split of a Serper `address` string into the OSM address sub-dict
@@ -155,6 +242,13 @@ def _normalize_serper_place(p: Dict) -> Optional[Dict]:
 
     Returns None for a result with no usable name or coordinates."""
     name = (p.get("title") or p.get("name") or "").strip()
+    if not name:
+        return None
+    # [LOCAL-791 defects 6 & 10] Clean the raw Maps label into a stop title: drop
+    # a foreign-script marketing tag list ("An Spa … (… 샴푸와 컨디셔너, 마사지)") and a
+    # trailing ": <category list>" Google-category suffix ("Stardust: Inspired
+    # Mediterranean , Persian" → "Stardust"), before the name becomes the title.
+    name = clean_place_title(name)
     if not name:
         return None
     try:

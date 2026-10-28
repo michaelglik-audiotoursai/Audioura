@@ -1266,6 +1266,13 @@ def _scope_from_request(location, intent=None):
     """
     if intent and (intent.get('geographic_scope') or '').strip():
         _gs = intent['geographic_scope'].strip()
+        # [LOCAL-791 defect 8] A parenthetical anchor list in the LLM's
+        # geographic_scope ("Ho Chi Minh City (Notre-Dame Cathedral, …)") carries
+        # internal commas that break the area resolver — strip it (the names are
+        # protected as named_places).
+        _gs = re.sub(r'\s*\([^)]*\)', ' ', _gs)
+        _gs = re.sub(r'\s*\([^)]*$', ' ', _gs)
+        _gs = re.sub(r'\s{2,}', ' ', _gs).strip(' ,:;')
         # [LOCAL-790] PHASE 1 sometimes returns a bare numbered-district scope
         # ("District 1 and 3") with NO city, so resolve_area reads "District 1 and
         # 3" as a city and fails (the HCMC colonial-architecture field case). When
@@ -1274,7 +1281,12 @@ def _scope_from_request(location, intent=None):
         # union bbox engage on "District 1 and 3, Ho Chi Minh City".
         if re.match(r'^\s*(?:districts?|qu\u1eadn|quan|arrondissements?|wards?)\s+\d',
                     _gs, flags=re.IGNORECASE) and ',' not in _gs:
-            _loc_parts = [p.strip() for p in (location or '').split(',') if p.strip()]
+            # [LOCAL-791 defect 8] Strip the parenthetical anchor list from the
+            # request FIRST, so the city tail is the real city ("Ho Chi Minh City")
+            # and not a stop name trapped in "(...)" ("City Hall)").
+            _loc_clean = re.sub(r'\s*\([^)]*\)', ' ', location or '')
+            _loc_clean = re.sub(r'\s*\([^)]*$', ' ', _loc_clean)
+            _loc_parts = [p.strip() for p in _loc_clean.split(',') if p.strip()]
             _city_tail = _loc_parts[-1] if _loc_parts else ''
             # Only append a tail that looks like a place (not a filler/poi word) and
             # is not itself the district clause.
@@ -1286,6 +1298,16 @@ def _scope_from_request(location, intent=None):
     s = (location or '').strip()
     if not s:
         return s
+    # [LOCAL-791 defect 8] Strip a parenthetical anchor list before the comma split
+    # — "Old Saigon walking tour, District 1, Ho Chi Minh City (Notre-Dame
+    # Cathedral, Central Post Office, Opera House, City Hall)" has internal commas
+    # inside "(...)" that tore the scope apart (the city became "City Hall)" and
+    # area resolution failed, running the tour unverified). The names in the
+    # parenthesis are the stops the listener wants; they are captured separately as
+    # named_places, so removing them from the AREA scope loses nothing.
+    s = re.sub(r'\s*\([^)]*\)', ' ', s)
+    s = re.sub(r'\s*\([^)]*$', ' ', s)          # unbalanced trailing "("
+    s = re.sub(r'\s{2,}', ' ', s).strip(' ,:;')
     s = re.sub(r'^\s*[\w\s-]*?tour\s*:\s*', '', s, flags=re.IGNORECASE).strip()
     parts = [p.strip() for p in s.split(',') if p.strip()]
     if not parts:
@@ -4524,7 +4546,39 @@ def _classify_tour_category(location, tour_type):
     walking_keywords = ['city', 'downtown', 'neighborhood', 'district', 'street', 'avenue', 'center', 'town']
     if any(keyword in location_lower for keyword in walking_keywords):
         return 'walking'
-    
+
+    # [LOCAL-791 defect 2] BUSINESS / ACTIVITY-PROVIDER detection — a request whose
+    # SUBJECT is a kind of business/activity provider ("kitesurfing schools",
+    # "dive shops", "yoga studios", "surfboard rentals", "gyms", "cooking classes
+    # centre") is a PLACES request whose stops come from the map, not a walking
+    # tour. The HCMC-field "Kitesurfing schools in Mui Ne" arrived with an empty
+    # tour_type, matched none of the food/museum/specialized/walking keywords, and
+    # fell through to the walking default — so MAPS-FIRST / places_search were
+    # never reached and the run died "no stops could be generated". Routing it to
+    # 'restaurant' puts it on the same maps-first/places path dining uses (the
+    # business branch there is gated by classify_business_vs_landmark=='business').
+    # Checked AFTER the museum/specialized/walking keyword scans so "art center",
+    # "botanical garden" and an explicit walking request are never caught here.
+    try:
+        from stop_existence_gate import classify_business_vs_landmark as _cbl_cat
+        if _cbl_cat(location) == 'business':
+            print("   [LOCAL-791] activity/business provider request → places path "
+                  "(category='restaurant')")
+            return 'restaurant'
+    except Exception:
+        pass
+    # An explicit activity-provider shape "<activity> schools/shops/studios/
+    # rentals/centres/academies/clubs/lessons/classes [in|of|near …]" is a places
+    # request even when the leading word is not itself a known business keyword.
+    if re.search(
+            r'\b\w+(?:ing|surf|dive|yoga|kite|board)?\s+'
+            r'(?:schools?|shops?|studios?|rentals?|centres?|centers?|academies|'
+            r'academy|clubs?|lessons?|classes|courses?|outfitters?)\b',
+            location_lower):
+        print("   [LOCAL-791] activity-provider phrase → places path "
+              "(category='restaurant')")
+        return 'restaurant'
+
     # Default to walking tour
     return 'walking'
 
@@ -9138,6 +9192,20 @@ def _apply_delivery_hours_guard(result):
                       f"opener(s) from delivered text", flush=True)
         except Exception as _dpe:  # pragma: no cover
             _import_logger.error(f"[LOCAL-660] text dangling-pronoun guard skipped: {_dpe}")
+        # 1e-iii. [LOCAL-791 defect 7] SAFETY/SCAM note placement. Tour 467 (Red
+        #     Canyon) opened a stop with a scam warning ("Their smiles are
+        #     welcoming, but their true intent becomes clear when they later demand
+        #     a 'guide fee'…") before the place was ever introduced. A safety/scam
+        #     note is a practical TIP that belongs AFTER the place is introduced —
+        #     move such an opening sentence to the end of the stop, framed as a tip.
+        try:
+            import safety_note_order as _sno_txt
+            final, _n_safe = _sno_txt.reorder_safety_notes_in_text(final)
+            if _n_safe:
+                print(f"  [LOCAL-791] moved {_n_safe} opening safety/scam note(s) to "
+                      f"the end of their stop, framed as a tip", flush=True)
+        except Exception as _sne:  # pragma: no cover
+            _import_logger.error(f"[LOCAL-791] safety-note order guard skipped: {_sne}")
         # 2. Drop duplicated paragraphs (e.g. the twice-printed orientation block).
         try:
             import paragraph_dedupe as _pd
@@ -14823,11 +14891,13 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
             # 'middle eastern restaurants near me, west Roxbury, MA'"). The scope is
             # the intent's geographic_scope ("west Roxbury, MA") when present, else
             # the request with the poi_type/"near me" clause stripped.
-            _p3c_scope = ''
-            if intent and (intent.get('geographic_scope') or '').strip():
-                _p3c_scope = intent['geographic_scope'].strip()
-            if not _p3c_scope:
-                _p3c_scope = _scope_from_request(location, intent)
+            # [LOCAL-791 defect 1] Always route through _scope_from_request so a
+            # bare numbered-district geographic_scope ("District 1") gets its parent
+            # city appended ("District 1, Ho Chi Minh City"). Reading
+            # intent['geographic_scope'] directly dropped the city, and the maps
+            # address guard then searched the ambiguous "District 1" and matched
+            # nothing in scope — the HCMC dining no_matching_places_in_area defect.
+            _p3c_scope = _scope_from_request(location, intent)
             print(f"   PHASE 3C: scope for address guard = {_p3c_scope!r} "
                   f"(was whole request {location!r})")
             location_rejects = []
@@ -17743,6 +17813,35 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
                     print(f"  [D559] Coordinates established for {_gp_hi}/{len(poi_list)} "
                           f"stop(s); the rest keep the model's value and are marked low "
                           f"confidence")
+
+                    # [LOCAL-791 defect 3] INHERITED / CLUSTERED pin repair. Tour
+                    # 461 shipped every pin clustered around the first stop — the
+                    # Opera House, Ben Thanh and the War Remnants Museum all landing
+                    # within tens of metres of one another, each ~0.6–0.7 km from
+                    # its real position — because a stop had inherited a neighbour's
+                    # (or the area centre's) coordinate instead of being geocoded
+                    # from its own name/address. A stop's coordinate must come from
+                    # a geocode of THAT place: when a stop sits within 50 m of an
+                    # earlier stop AND its own geocode proves it belongs > 200 m
+                    # away, take the geocode. Softer cousin of the centroid-collapse
+                    # check below (which needs an EXACT shared axis); this catches
+                    # the near-identical inherited point. Runs AFTER resolve_poi so
+                    # a coordinate the agreement rule already corrected is tested in
+                    # its corrected position.
+                    try:
+                        from geocode_stops import repair_inherited_coordinates
+                        _inh = repair_inherited_coordinates(
+                            poi_list, location, tour_anchor=_gp_anchor)
+                        if _inh.get('action') == 'corrected':
+                            print(f"  [LOCAL-791] inherited-pin repair: "
+                                  f"{_inh.get('reason','')}")
+                            for _c in _inh.get('corrected', []):
+                                print(f"  [LOCAL-791]   '{_c['name'][:36]}' {_c['before']} "
+                                      f"-> {_c['after']} (clustered with stop "
+                                      f"{_c['clustered_with']}, geocode {_c['moved_m']} m away)")
+                    except Exception as _inh_err:
+                        print(f"  [LOCAL-791] inherited-pin repair error (non-fatal): "
+                              f"{_inh_err}")
 
                     # [LOCAL-481] CENTROID COLLAPSE (tour 423). If two or more stops
                     # share a latitude OR longitude to 4 dp they were not

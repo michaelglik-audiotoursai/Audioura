@@ -200,6 +200,15 @@ _BUSINESS_KEYWORDS = (
     'bookstore', 'bookshop', 'bookshops', 'bookstores',
     'market', 'grocery', 'deli', 'delis', 'creamery',
     'studio', 'studios',
+    # [LOCAL-791 defect 2] Activity/service providers — a "<activity> school /
+    # rental / academy / club" is a named commercial POI that lives on the map,
+    # not on Wikidata. The HCMC-field "Kitesurfing schools in Mui Ne" request died
+    # as a walking tour because none of these routed it to the places path. Kept
+    # to UNAMBIGUOUS provider nouns (a bare "centre"/"center" is deliberately left
+    # out — "art center"/"city center" are not businesses — and is handled by the
+    # activity-provider subject detector in _classify_tour_category instead).
+    'school', 'schools', 'academy', 'academies', 'rental', 'rentals',
+    'outfitter', 'outfitters',
 )
 
 # OSM category / type tokens that mark a BUSINESS. Broader than dining — it must
@@ -2186,6 +2195,13 @@ _GENERIC_DINING_WORDS = {
     'eateries', 'bistro', 'bistros', 'brasserie', 'cafe', 'cafes', 'café', 'cafés',
     'cuisine', 'tour', 'tours', 'near', 'me', 'in', 'of', 'the', 'and', 'or',
     'places', 'place', 'spot', 'spots', 'best', 'top', 'good', 'great',
+    # [LOCAL-791 defect 1] "street food" is a FOOD STYLE / serving format, not a
+    # cuisine to split on — "Vietnamese restaurants and street food" is a request
+    # for Vietnamese dining, cuisine "vietnamese", never cuisine "street". These
+    # style/format words carry no cuisine constraint of their own.
+    'street', 'streetfood', 'stalls', 'stall', 'hawker', 'vendor', 'vendors',
+    'takeaway', 'takeout', 'snacks', 'snack', 'bites', 'local', 'authentic',
+    'traditional',
 }
 
 

@@ -702,17 +702,90 @@ def _haversine_m(a: Tuple[float, float], b: Tuple[float, float]) -> float:
     return 2 * r * math.asin(min(1.0, math.sqrt(h)))
 
 
+# [LOCAL-791 defects 5 & 11] Cross-language PLACE-TYPE folding. Two stops name the
+# SAME place in different languages/translations:
+#   defect 5  — "Chợ Bình Tây" (Vietnamese) == "Binh Tay Market" (English): fold
+#               the place-class word (Chợ ↔ Market) and strip diacritics so the
+#               distinctive core ("binh tay") matches.
+#   defect 11 — "Thien Hau Temple" == "Ba Thien Hau Pagoda" (= Chùa Bà Thiên Hậu):
+#               fold Temple ↔ Pagoda ↔ Chùa, drop the honorific "Ba"/"Bà", strip
+#               diacritics → both reduce to "thien hau".
+# These class words and honorifics carry NO distinguishing identity for a place —
+# a title compare that keeps them (the LOCAL-790 _tokens fallback) cannot see the
+# two are one place, so both shipped. We fold them to a canonical class token (or
+# drop the honorific) and compare the DISTINCTIVE remainder.
+
+# Place-class words that name the KIND of place, in several languages. Each maps
+# to a canonical token so "Market"/"Chợ"/"Cho" all become "market", and
+# "Temple"/"Pagoda"/"Chùa"/"Chua" all become "temple". Diacritics are stripped
+# before lookup, so only the folded ASCII forms need to be listed.
+_PLACE_CLASS_FOLD = {
+    "market": "market", "cho": "market", "marche": "market", "mercado": "market",
+    "mercato": "market", "markt": "market",
+    "temple": "temple", "pagoda": "temple", "pagode": "temple", "chua": "temple",
+    "den": "temple", "mieu": "temple", "shrine": "temple",
+    "church": "church", "nha tho": "church", "iglesia": "church",
+    "eglise": "church", "chiesa": "church", "kirche": "church",
+    "cathedral": "church", "basilica": "church",
+    "pagoda ": "temple",
+}
+
+# Honorifics / titles carried by a place name that add no distinguishing identity
+# and may appear on one language's form only ("Bà"/"Ba" in "Ba Thien Hau Pagoda").
+_PLACE_HONORIFICS = {
+    "ba", "ong", "duc", "thanh", "saint", "st", "san", "santa", "santo",
+    "sainte", "ste", "the", "of", "and", "a", "an",
+}
+
+
+def _fold_place_tokens(name: str) -> Set[str]:
+    """[LOCAL-791] The DISTINCTIVE token set of a place name, language-folded:
+    accents stripped, place-class words canonicalised (Market/Chợ → "market",
+    Temple/Pagoda/Chùa → "temple"), honorifics (Ba/Bà, Saint, …) and glue dropped.
+
+    "Chợ Bình Tây"        → {"binh", "tay", "market"}
+    "Binh Tay Market"     → {"binh", "tay", "market"}
+    "Thien Hau Temple"    → {"thien", "hau", "temple"}
+    "Ba Thien Hau Pagoda" → {"thien", "hau", "temple"}
+    """
+    toks = _tokens(name)  # lowercase, accents stripped, punctuation → space
+    out: Set[str] = set()
+    for t in toks:
+        if not t or t in _PLACE_HONORIFICS:
+            continue
+        out.add(_PLACE_CLASS_FOLD.get(t, t))
+    return out
+
+
+def _distinctive_tokens(name: str) -> Set[str]:
+    """The folded tokens of a place name MINUS the generic place-class tokens —
+    the proper-noun core that identifies THIS place ("binh tay", "thien hau").
+    Used for the 'shared distinctive token' half of the 150 m proximity rule."""
+    folded = _fold_place_tokens(name)
+    _class_tokens = set(_PLACE_CLASS_FOLD.values())
+    return {t for t in folded if t not in _class_tokens and len(t) >= 2}
+
+
 def dedupe_by_location_or_qid(
     poi_list: Sequence[Dict],
     radius_m: float = 60.0,
+    near_radius_m: float = 150.0,
 ) -> Tuple[List[Dict], List[Tuple[str, str]]]:
-    """[LOCAL-790] Collapse a place/walking candidate pool by identity:
+    """[LOCAL-790/791] Collapse a place/walking candidate pool by identity:
 
       (a) same Wikidata QID (on either side) → same place, OR
       (b) geocoded points within ``radius_m`` metres of each other → same place
           (a single building cannot be two stops), OR
-      (c) same normalised TITLE (the stop_title_dedup fallback, so a plain repeat
-          still collapses even without coordinates or a QID).
+      (c) [LOCAL-791 defect 5] same LANGUAGE-FOLDED title — place-class words folded
+          (Market↔Chợ, Temple↔Pagoda↔Chùa), honorifics (Ba/Bà) dropped, diacritics
+          stripped — so "Chợ Bình Tây" == "Binh Tay Market" and "Thien Hau Temple"
+          == "Ba Thien Hau Pagoda" collapse even without coordinates or a QID, OR
+      (d) [LOCAL-791 defect 11] geocoded points within ``near_radius_m`` (150 m) AND
+          at least ONE shared DISTINCTIVE token (the proper-noun core, place-class
+          words and honorifics removed) → same place. Catches a pair the 60 m rule
+          misses because the two listings geocode a little apart, e.g. "Thien Hau
+          Temple" and "Ba Thien Hau Pagoda" (both Chùa Bà Thiên Hậu in Cholon), OR
+      (e) same plain normalised TITLE (the original stop_title_dedup fallback).
 
     Keeps the FIRST occurrence of each place in order. Returns
     ``(deduped_list, dropped)`` where ``dropped`` is ``[(dup_name, kept_name), …]``
@@ -721,18 +794,22 @@ def dedupe_by_location_or_qid(
     merges two genuinely different places that happen to lack coordinates.
     """
     kept: List[Dict] = []
-    kept_meta: List[Dict] = []  # parallel: {'qid','coords','norm'}
+    kept_meta: List[Dict] = []  # parallel: {'qid','coords','norm','folded','distinct'}
     dropped: List[Tuple[str, str]] = []
 
     for cand in poi_list or []:
         if not isinstance(cand, dict):
             kept.append(cand)
-            kept_meta.append({"qid": "", "coords": None, "norm": ""})
+            kept_meta.append({"qid": "", "coords": None, "norm": "",
+                              "folded": "", "distinct": set()})
             continue
         qid = _norm_qid(cand.get("qid", "") or cand.get("wikidata_qid", ""))
         coords = _coords_of(cand)
         name = (cand.get("name") or cand.get("title") or "").strip()
         norm = " ".join(sorted(_tokens(name))) if name else ""
+        folded_set = _fold_place_tokens(name)
+        folded = " ".join(sorted(folded_set)) if folded_set else ""
+        distinct = _distinctive_tokens(name)
 
         match_idx = None
         for i, meta in enumerate(kept_meta):
@@ -745,7 +822,20 @@ def dedupe_by_location_or_qid(
                 if _haversine_m(coords, meta["coords"]) <= radius_m:
                     match_idx = i
                     break
-            # (c) title fallback (only when neither side had a QID/coords match).
+            # (c) [LOCAL-791 defect 5] language-folded title identity (translit /
+            #     translation). Requires at least one distinctive token so two bare
+            #     "Temple" / "Market" titles are NOT merged on the class word alone.
+            if folded and meta["folded"] and folded == meta["folded"] and distinct:
+                match_idx = i
+                break
+            # (d) [LOCAL-791 defect 11] near (<=150 m) AND >=1 shared distinctive
+            #     token → same place (geocodes a little apart, shared proper core).
+            if (coords and meta["coords"] and distinct and meta["distinct"]
+                    and (distinct & meta["distinct"])
+                    and _haversine_m(coords, meta["coords"]) <= near_radius_m):
+                match_idx = i
+                break
+            # (e) plain title fallback (no QID/coords/fold match).
             if norm and meta["norm"] and norm == meta["norm"]:
                 match_idx = i
                 break
@@ -765,6 +855,7 @@ def dedupe_by_location_or_qid(
             continue
 
         kept.append(cand)
-        kept_meta.append({"qid": qid, "coords": coords, "norm": norm})
+        kept_meta.append({"qid": qid, "coords": coords, "norm": norm,
+                          "folded": folded, "distinct": distinct})
 
     return kept, dropped

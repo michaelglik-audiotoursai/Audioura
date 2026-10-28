@@ -195,6 +195,87 @@ def _norm(text: str) -> str:
     return " ".join(t.lower().split())
 
 
+# ─────────────────────────────────────────────────────────────────────────────
+# [LOCAL-791 defect 4] GENERIC WORD / HEADING / HEADLINE reject. A stop title must
+# be a PROPER NAME of a place or exhibit. Three shapes are never a stop:
+#   (a) a bare GENERIC common word — a room/feature/adjective that names no place
+#       ("Balcony", "Interesting", "View", "Entrance"). Matched only when the WHOLE
+#       title (after a leading article) is one generic word, so a real place that
+#       merely CONTAINS one ("Balcony Bar", "The Interesting House Museum") is safe.
+#   (b) a NEWS HEADLINE — a sentence-shaped line (many words, often with a verb and
+#       a trailing ellipsis) scraped from a news page ("Khai mạc Hội thảo Quốc tế
+#       …"). Identified by sentence shape: long, ends in an ellipsis, or reads as a
+#       clause rather than a name.
+#   (c) a HEADING — an all-lower / generic section heading not already in the nav
+#       label set.
+# Conservative: tuned so a real multi-word proper name of a place is never caught.
+# ─────────────────────────────────────────────────────────────────────────────
+
+# Bare generic common words — a room, a feature, an adjective, a direction. None
+# names a place on its own. Kept to the words the field runs actually shipped plus
+# their obvious siblings; a title is rejected ONLY when it is EXACTLY one of these
+# (after a leading article), never when it contains one.
+_GENERIC_WORD_TITLES = frozenset({
+    # the field-run junk
+    "balcony", "interesting",
+    # rooms / features that are not a place by themselves
+    "entrance", "exit", "lobby", "foyer", "hall", "hallway", "corridor",
+    "terrace", "patio", "courtyard", "garden", "yard", "roof", "rooftop",
+    "basement", "attic", "staircase", "stairs", "elevator", "lift", "toilet",
+    "toilets", "restroom", "restrooms", "bathroom", "parking", "car park",
+    "view", "views", "viewpoint", "overview", "area", "room", "rooms", "space",
+    "spaces", "building", "buildings", "floor", "wall", "walls", "window",
+    "windows", "door", "doors", "gate", "fence", "bridge",
+    # bare adjectives / fillers
+    "interesting", "beautiful", "amazing", "nice", "lovely", "stunning",
+    "historic", "historical", "famous", "popular", "local", "traditional",
+    "modern", "old", "new", "scenic", "various", "miscellaneous", "other",
+    "others", "more", "misc", "general", "overview", "introduction", "intro",
+    "untitled", "unknown", "none", "test", "sample", "example", "placeholder",
+})
+
+# Words that make a title read as a sentence/clause rather than a proper name:
+# auxiliary / common finite verbs. Their presence (with enough words) signals a
+# headline, not a name. English only — a foreign headline is caught by the
+# length/ellipsis signals below.
+_HEADLINE_VERB_RE = re.compile(
+    r"(?i)\b(?:is|are|was|were|has|have|had|will|would|can|could|should|"
+    r"announce[sd]?|open(?:s|ed|ing)?|launch(?:es|ed|ing)?|host(?:s|ed|ing)?|"
+    r"hold[s]?|held|unveil(?:s|ed)?|celebrat(?:es|ed)|mark(?:s|ed)|"
+    r"present(?:s|ed)?|reveal(?:s|ed)?|say[s]?|said|report(?:s|ed)?)\b")
+
+
+def _is_generic_or_headline_title(title: str) -> bool:
+    """[LOCAL-791 defect 4] True when ``title`` is a bare generic word, a heading,
+    or a news headline — never a proper name of a place/exhibit. Pure."""
+    t = (title or "").strip()
+    if not t:
+        return True
+
+    # (a) bare generic word (after a leading article), ignoring trailing punctuation.
+    bare = _norm(t)
+    if bare in _GENERIC_WORD_TITLES:
+        return True
+
+    words = t.split()
+    n_words = len(words)
+
+    # (b) NEWS HEADLINE / sentence shape.
+    #   * a trailing ellipsis is the classic scraped-headline tell ("Khai mạc Hội
+    #     thảo Quốc tế …") — reject at 4+ words so a short name ending in "…" from
+    #     a truncated list is only cut when it is clearly a clause.
+    if re.search(r"(?:\u2026|\.\.\.)\s*$", t) and n_words >= 4:
+        return True
+    #   * a long, sentence-shaped line with a finite verb is a headline, not a name.
+    if n_words >= 6 and _HEADLINE_VERB_RE.search(t):
+        return True
+    #   * ends with sentence punctuation and is long (a scraped sentence).
+    if n_words >= 8 and re.search(r"[.!?]\s*$", t):
+        return True
+
+    return False
+
+
 def is_junk_page_title(title: str, venue_name: str = "") -> bool:
     """True when ``title`` is a web-page / CMS / navigation title, never a stop.
 
@@ -269,6 +350,15 @@ def is_junk_page_title(title: str, venue_name: str = "") -> bool:
     #    conservative — a real work that merely starts with a verb-like word
     #    ("Explosion") is not caught.
     if _is_call_to_action_title(t):
+        return True
+
+    # 6. [LOCAL-791 defect 4] GENERIC WORD / HEADING / HEADLINE. A stop title must
+    #    be a PROPER NAME of a place or exhibit. The HCMC field run shipped stops
+    #    that are none of those: a bare common word ("Balcony" — a café terrace,
+    #    461; "Interesting", 463), a page/section heading, and a news headline
+    #    ("Khai mạc Hội thảo Quốc tế …", 463). These slipped past rules 1–5 because
+    #    they carry no chrome separator, are not nav labels, and are not CTAs.
+    if _is_generic_or_headline_title(t):
         return True
 
     return False
