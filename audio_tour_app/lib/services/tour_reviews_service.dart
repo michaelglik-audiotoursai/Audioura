@@ -119,6 +119,42 @@ extension ReviewSortParam on ReviewSort {
 }
 
 class TourReviewsService {
+  /// [LOCAL-795] True when the tour [tourId] is one the user has downloaded,
+  /// decided from the local `saved_tours` list (the same list My Tours reads).
+  /// A record counts as a match when its `server_tour_id` OR `tour_id` equals
+  /// [tourId] (compared as strings, the way those ids are stored). Best-effort:
+  /// any read/parse failure resolves to false so the UI shows the hidden-state
+  /// "Download the tour to review it" rather than erroring.
+  static Future<bool> isTourDownloaded(String tourId) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final raw = prefs.getStringList('saved_tours') ?? const [];
+      return savedToursContainTour(raw, tourId);
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// PURE: does any saved_tours JSON record in [raw] match [tourId] on its
+  /// `server_tour_id` or `tour_id`? Extracted so it is unit-testable without
+  /// SharedPreferences. A record that fails to parse is skipped.
+  static bool savedToursContainTour(List<String> raw, String tourId) {
+    final want = tourId.trim();
+    if (want.isEmpty) return false;
+    for (final s in raw) {
+      try {
+        final m = jsonDecode(s) as Map<String, dynamic>;
+        for (final k in const ['server_tour_id', 'tour_id']) {
+          final v = m[k];
+          if (v != null && v.toString() == want) return true;
+        }
+      } catch (_) {
+        // skip an unparseable record
+      }
+    }
+    return false;
+  }
+
   /// Fetch approved reviews for [tourId]. Returns an empty list on any failure
   /// so the UI degrades to "no reviews yet" rather than erroring.
   static Future<List<TourReview>> fetchReviews(
@@ -192,6 +228,46 @@ class TourReviewsService {
       if (response.statusCode == 200) {
         final body = jsonDecode(response.body) as Map<String, dynamic>;
         return body['review_status']?.toString() ?? 'pending';
+      }
+      return null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// [LOCAL-795] Submit a free-form per-stop note ("Tell us about this place").
+  ///
+  /// POSTs to the orchestrator (same auth/attestation as reviews) at
+  /// /tour/<tourId>/stop/<stopIndex>/note with the current user, the note text
+  /// (<= 500), and the stop's title + the playback language for context. Unlike
+  /// a review, a note needs no prior rating.
+  ///
+  /// Returns the server's note status ('pending' | 'approved' | 'rejected') on
+  /// success, or null on failure (network error, rate limit, validation 400).
+  static Future<String?> submitStopNote({
+    required String tourId,
+    required int stopIndex,
+    required String noteText,
+    String? stopTitle,
+    String? language,
+  }) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final userId = prefs.getString('user_id') ?? 'unknown';
+      final response = await Endpoints.post(
+        Service.orchestrator,
+        '/tour/$tourId/stop/$stopIndex/note',
+        body: {
+          'user_id': userId,
+          'note_text': noteText,
+          if (stopTitle != null && stopTitle.isNotEmpty) 'stop_title': stopTitle,
+          if (language != null && language.isNotEmpty) 'language': language,
+        },
+        timeout: const Duration(seconds: 10),
+      );
+      if (response.statusCode == 200) {
+        final body = jsonDecode(response.body) as Map<String, dynamic>;
+        return body['note_status']?.toString() ?? 'pending';
       }
       return null;
     } catch (_) {
