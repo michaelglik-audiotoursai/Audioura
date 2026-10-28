@@ -75,6 +75,14 @@ routes:
     methods: [GET, POST]
     auth: api_key
 
+  # [LOCAL-793] Server-side geocoder fallback for the Home place search (typos
+  # like "Hi Chi Minh" and names Nominatim mis-ranks). Key lives on the server.
+  - public_path: /geocode
+    backend: map-delivery
+    upstream: /geocode
+    methods: [GET]
+    auth: api_key
+
   - public_path: /tour-by-code/<code>
     backend: map-delivery
     upstream: /tour-by-code/{code}

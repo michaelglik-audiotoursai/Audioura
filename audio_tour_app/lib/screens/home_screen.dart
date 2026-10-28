@@ -33,6 +33,8 @@ import '../utils/share_code.dart';
 import '../utils/downloaded_message.dart';
 import '../utils/organiser_audio_notices.dart';
 import '../utils/search_dispatch.dart';
+import '../utils/place_geocoder.dart';
+import '../utils/map_zoom.dart';
 import '../services/deep_link_service.dart';
 import '../services/communities_service.dart';
 import '../services/community_tour_service.dart';
@@ -52,6 +54,25 @@ import '../widgets/first_layout_tile_layer.dart';
 import '../widgets/tour_buy_sheet.dart';
 import '../widgets/download_action_plan.dart';
 import '../services/tour_preview_player.dart';
+
+/// [LOCAL-793] A resolved place search: where to move the map, and the clean
+/// place NAME that was actually matched (shown in the Home banner so a wrong
+/// match — e.g. a Paris restaurant for "Saigon Vietnam" — is visible at once,
+/// instead of echoing the raw typed text).
+class GeoResult {
+  final LatLng location;
+  final String name;
+  const GeoResult({required this.location, required this.name});
+}
+
+/// [LOCAL-793] The closest tour to a point and its distance (km), from the
+/// recover-empty-view lookup.
+class _NearestTour {
+  final Map<String, dynamic> tour;
+  final double distanceKm;
+  const _NearestTour({required this.tour, required this.distanceKm});
+}
+
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
 
@@ -382,26 +403,114 @@ class _HomeScreenState extends State<HomeScreen> {
     await prefs.setStringList('location_history', historyJson);
   }
   
-  Future<LatLng?> _geocodeLocation(String query) async {
+  /// [LOCAL-793] Resolve a typed place name to a coordinate AND the clean
+  /// place name that was actually matched.
+  ///
+  /// Two fixes over the old `limit=1`, take-result[0] call (which opened
+  /// "Saigon Vietnam" on a Paris restaurant and a "Hi Chi Minh" typo on a bus
+  /// stop):
+  ///   1. Ask Nominatim for several results (`limit=8`, `accept-language=en`,
+  ///      a real User-Agent per the Nominatim usage policy) and prefer a PLACE
+  ///      — a city/town/suburb/administrative area — over any POI
+  ///      ([pickBestPlace]). A restaurant can never win when a city matches.
+  ///   2. When Nominatim returns NO place (a typo like "Hi Chi Minh", or only
+  ///      far POIs), fall back to the server geocoder ([_geocodeViaServer]),
+  ///      which uses the paid Serper places index server-side (no API key in
+  ///      the app) and copes with typos.
+  ///
+  /// Returns the resolved [GeoResult] (coordinate + display name for the Home
+  /// banner), or null when nothing resolves.
+  Future<GeoResult?> _geocodeLocation(String query) async {
+    final nominatim = await _geocodeViaNominatim(query);
+    if (nominatim != null) return nominatim;
+    // No usable PLACE from Nominatim — try the typo-tolerant server geocoder.
+    final server = await _geocodeViaServer(query);
+    if (server != null) return server;
+    return null;
+  }
+
+  /// Query Nominatim for up to 8 results and pick the best PLACE (falling back
+  /// to the best POI only when NO candidate is a place). Returns null on error,
+  /// an empty response, or when the only matches are POIs — in the POI-only
+  /// case the caller tries the server geocoder, which is better at place names.
+  Future<GeoResult?> _geocodeViaNominatim(String query) async {
     try {
-      // Simple geocoding using OpenStreetMap Nominatim API
       final encodedQuery = Uri.encodeComponent(query);
       final response = await http.get(
-        Uri.parse('https://nominatim.openstreetmap.org/search?q=$encodedQuery&format=json&limit=1'),
-        headers: {'User-Agent': 'AudioTours/1.0'},
+        Uri.parse('https://nominatim.openstreetmap.org/search'
+            '?q=$encodedQuery&format=json&limit=8&accept-language=en'
+            '&addressdetails=0'),
+        // Nominatim usage policy: a real, identifying User-Agent with contact.
+        headers: const {
+          'User-Agent':
+              'com.audioura.audiotours/1.0 (support@audioura.com)',
+          'Accept-Language': 'en',
+        },
       ).timeout(Duration(seconds: 10));
-      
+
       if (response.statusCode == 200) {
-        final data = json.decode(response.body) as List;
-        if (data.isNotEmpty) {
-          final result = data[0];
-          final lat = double.parse(result['lat']);
-          final lon = double.parse(result['lon']);
-          return LatLng(lat, lon);
+        final data = json.decode(response.body);
+        if (data is List && data.isNotEmpty) {
+          final candidates = parseNominatim(data);
+          // A PLACE is required here; if the only matches are POIs, return null
+          // so the server geocoder gets a chance (it handles "Saigon"/typos).
+          final hasPlace = candidates.any(isPlace);
+          final best = pickBestPlace(candidates);
+          if (best != null && hasPlace) {
+            await DebugLogHelper.addDebugLog(
+                'HOME: Nominatim place "${best.displayName}" '
+                '(${best.klass}/${best.type}) for "$query"');
+            return GeoResult(
+              location: LatLng(best.lat, best.lon),
+              name: best.displayName.isNotEmpty ? best.displayName : query,
+            );
+          }
+          await DebugLogHelper.addDebugLog(
+              'HOME: Nominatim returned only POIs for "$query"; '
+              'trying server geocoder');
         }
       }
     } catch (e) {
-      await DebugLogHelper.addDebugLog('HOME: Geocoding error: $e');
+      await DebugLogHelper.addDebugLog('HOME: Nominatim geocoding error: $e');
+    }
+    return null;
+  }
+
+  /// [LOCAL-793] Server-side geocoder fallback. Calls map-delivery `/geocode`,
+  /// which resolves a free-text place name (typo-tolerant) using the paid
+  /// Serper places index — the key lives on the server, never in the app.
+  /// Returns null on any error or when the server finds nothing.
+  Future<GeoResult?> _geocodeViaServer(String query) async {
+    try {
+      final uri = await Endpoints.url(
+          Service.mapDelivery, '/geocode?q=${Uri.encodeComponent(query)}');
+      final response = await http
+          .get(uri, headers: await Endpoints.apiHeaders(Service.mapDelivery))
+          .timeout(const Duration(seconds: 12));
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        final lat = (data is Map) ? data['lat'] : null;
+        final lng = (data is Map) ? (data['lng'] ?? data['lon']) : null;
+        if (lat != null && lng != null) {
+          final dLat = lat is num ? lat.toDouble() : double.tryParse('$lat');
+          final dLng = lng is num ? lng.toDouble() : double.tryParse('$lng');
+          if (dLat != null && dLng != null) {
+            final name = '${(data as Map)['name'] ??
+                data['display_name'] ?? query}';
+            await DebugLogHelper.addDebugLog(
+                'HOME: Server geocoder resolved "$query" → "$name"');
+            return GeoResult(
+              location: LatLng(dLat, dLng),
+              name: name.isNotEmpty ? name : query,
+            );
+          }
+        }
+      } else {
+        await DebugLogHelper.addDebugLog(
+            'HOME: Server geocoder status ${response.statusCode} for "$query"');
+      }
+    } catch (e) {
+      await DebugLogHelper.addDebugLog('HOME: Server geocoding error: $e');
     }
     return null;
   }
@@ -1439,15 +1548,21 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _dispatchTextSearch(SearchDispatch dispatch) async {
     final query = dispatch.query;
     final nameOnly = dispatch.tourNameOnly;
-    final results = await Future.wait([
-      _searchTours(query),
-      // A trailing-`*` name search skips the geocoder entirely.
-      nameOnly ? Future<LatLng?>.value(null) : _geocodeLocation(query),
-    ]);
+    // Run the tour-name search and (unless name-only) the place geocoder
+    // concurrently. Kept as separate typed futures so the geocoder's
+    // [GeoResult] carries the resolved place NAME through to the banner.
+    final toursFuture = _searchTours(query);
+    final placeFuture = nameOnly
+        ? Future<GeoResult?>.value(null)
+        : _geocodeLocation(query);
+    final tours = await toursFuture;
+    final place = await placeFuture;
     if (!mounted) return;
 
-    final tours = results[0] as List<Map<String, dynamic>>;
-    final place = results[1] as LatLng?;
+    // [LOCAL-793] Show the RESOLVED place name in the banner, not the raw typed
+    // text, so a wrong match ("Saigon Vietnam" → a Paris restaurant) is visible
+    // at once. Falls back to the typed query when the geocoder gave no name.
+    final placeName = place?.name ?? query;
 
     final outcome = resolveTextSearch(
       tourCount: tours.length,
@@ -1457,13 +1572,13 @@ class _HomeScreenState extends State<HomeScreen> {
 
     switch (outcome) {
       case TextSearchOutcome.toursAndPlace:
-        await _presentFoundToursWithPlace(tours, place!, query);
+        await _presentFoundToursWithPlace(tours, place!.location, placeName);
         return;
       case TextSearchOutcome.toursOnly:
         _presentFoundTours(tours);
         return;
       case TextSearchOutcome.placeOnly:
-        await _useCustomLocation(place!, query);
+        await _useCustomLocation(place!.location, placeName);
         return;
       case TextSearchOutcome.nothing:
         ScaffoldMessenger.of(context).showSnackBar(
@@ -1539,11 +1654,97 @@ class _HomeScreenState extends State<HomeScreen> {
     
     // Load tours for new location
     await _loadNearbyTours();
+
+    // [LOCAL-793] Never show a false "0 tours in this map area" when a tour is
+    // close by. If nothing loaded into the view, look within ~50 km for the
+    // nearest tour and either zoom out to include it or tell the listener how
+    // far the nearest tour is (so a search that lands a few km off a city still
+    // shows its tours — Michael's "Hi Chi Minh" → "0 tours" bug).
+    if (mounted && _loadedTours.isEmpty) {
+      await _showNearestToursIfAny(location);
+    }
     
     if (!mounted) return; // [LOCAL-773] setState after await.
     setState(() {
       _isLoading = false;
     });
+  }
+
+  /// [LOCAL-793] After a relocation left the view empty, find the nearest tour
+  /// within [kMaxZoomOutRadiusKm] and act on [decideZoomOut]: zoom out to show
+  /// it, or announce "Nearest tours: N km away" with a button to go there.
+  Future<void> _showNearestToursIfAny(LatLng center) async {
+    final nearest = await _nearestTourWithin(center, kMaxZoomOutRadiusKm);
+    if (!mounted) return;
+    final decision = decideZoomOut(
+      tourInView: false,
+      nearestTourKm: nearest?.distanceKm,
+    );
+    switch (decision.action) {
+      case ZoomOutAction.keep:
+        return;
+      case ZoomOutAction.zoomToShow:
+        // Zoom out so the nearby tour is on screen, then reload the view's
+        // tours so the pins and the List reflect the wider area.
+        _mapController.move(center, decision.zoom!);
+        await _loadNearbyTours();
+        return;
+      case ZoomOutAction.announceDistance:
+        final km = decision.nearestKm!;
+        final tour = nearest!.tour;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Nearest tours: $km km away'),
+            action: SnackBarAction(
+              label: 'Show',
+              onPressed: () {
+                final lat = (tour['lat'] as num).toDouble();
+                final lng = (tour['lng'] as num).toDouble();
+                _mapController.move(LatLng(lat, lng), 13.0);
+                _loadNearbyTours();
+              },
+            ),
+            duration: const Duration(seconds: 8),
+          ),
+        );
+        return;
+    }
+  }
+
+  /// [LOCAL-793] Ask map-delivery for the tours within [radiusKm] of [center]
+  /// and return the closest one with its distance, or null when none exist in
+  /// that radius. Used only to recover from an empty relocated view.
+  Future<_NearestTour?> _nearestTourWithin(LatLng center, double radiusKm) async {
+    try {
+      final uri = await Endpoints.url(
+          Service.mapDelivery,
+          '/tours-near/${center.latitude}/${center.longitude}'
+          '?radius=${radiusKm.toStringAsFixed(1)}${_filterQueryParams()}');
+      final response = await http
+          .get(uri, headers: await Endpoints.apiHeaders(Service.mapDelivery))
+          .timeout(const Duration(seconds: 10));
+      if (response.statusCode != 200) return null;
+      final data = json.decode(response.body);
+      final tours = (data is Map ? data['tours'] : null) as List?;
+      if (tours == null || tours.isEmpty) return null;
+      _NearestTour? best;
+      for (final t in tours) {
+        if (t is! Map) continue;
+        final tour = Map<String, dynamic>.from(t);
+        final lat = tour['lat'];
+        final lng = tour['lng'];
+        if (lat is! num || lng is! num) continue;
+        final km = _calculateDistance(
+            center.latitude, center.longitude, lat.toDouble(), lng.toDouble());
+        if (best == null || km < best.distanceKm) {
+          best = _NearestTour(tour: tour, distanceKm: km);
+        }
+      }
+      return best;
+    } catch (e) {
+      await DebugLogHelper.addDebugLog('HOME: nearest-tour lookup error: $e');
+      return null;
+    }
   }
   
   void _resetToCurrentLocation() async {
