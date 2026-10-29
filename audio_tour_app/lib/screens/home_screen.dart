@@ -380,7 +380,14 @@ class _HomeScreenState extends State<HomeScreen> {
     final customLat = prefs.getDouble('custom_location_lat');
     final customLng = prefs.getDouble('custom_location_lng');
     final customName = prefs.getString('custom_location_name');
-    
+    // [LOCAL-789B] Whether the saved label is a geocoder-RESOLVED place name.
+    // Locations saved before LOCAL-793 stored the RAW typed text (e.g. the typo
+    // "Hi Chi Minh, Vietnam"), which then showed verbatim in the banner and
+    // could sit on a wrong coordinate. New saves set this true (see
+    // _saveCustomLocation); a legacy save has it absent/false and is re-resolved
+    // once below.
+    final resolved = prefs.getBool('custom_location_resolved') ?? false;
+
     if (customLat != null && customLng != null && customName != null) {
       if (!mounted) return; // [LOCAL-773] setState after await: Home may be gone.
       setState(() {
@@ -388,6 +395,40 @@ class _HomeScreenState extends State<HomeScreen> {
         _isUsingCustomLocation = true;
         _customLocationName = customName;
       });
+      // [LOCAL-789B] One-time heal of a legacy (pre-LOCAL-793) raw label: send
+      // it through the SAME geocoder a Home search uses and, if it resolves to a
+      // place, replace the banner text (and the coordinate) with the resolved
+      // one and persist it as resolved so this never runs again. On any failure
+      // we keep the saved value untouched — the banner is no worse than before.
+      if (!resolved) {
+        await _reResolveLegacyCustomLocation(customName);
+      }
+    }
+  }
+
+  /// [LOCAL-789B] Re-resolve a legacy custom-location label (saved before
+  /// LOCAL-793 as raw typed text) exactly once, so the Home banner shows a real
+  /// resolved place name instead of e.g. the typo "Hi Chi Minh, Vietnam".
+  /// Non-destructive: if geocoding returns nothing the saved location is left
+  /// as-is. Marks the entry resolved on success so it is never re-resolved.
+  Future<void> _reResolveLegacyCustomLocation(String savedName) async {
+    try {
+      final result = await _geocodeLocation(savedName);
+      if (!mounted || result == null) return;
+      setState(() {
+        _displayLocation = result.location;
+        _customLocationName = result.name;
+      });
+      _safeMapMove(result.location, 13.0);
+      await _saveCustomLocation(); // persists the resolved name + flag
+      await DebugLogHelper.addDebugLog(
+          'HOME: re-resolved legacy custom location "$savedName" → '
+          '"${result.name}"');
+      if (!mounted) return;
+      await _loadNearbyTours();
+    } catch (e) {
+      await DebugLogHelper.addDebugLog(
+          'HOME: legacy custom-location re-resolve failed for "$savedName": $e');
     }
   }
   
@@ -397,10 +438,15 @@ class _HomeScreenState extends State<HomeScreen> {
       await prefs.setDouble('custom_location_lat', _displayLocation!.latitude);
       await prefs.setDouble('custom_location_lng', _displayLocation!.longitude);
       await prefs.setString('custom_location_name', _customLocationName);
+      // [LOCAL-789B] Every save here comes from a geocoder-resolved GeoResult
+      // name (_useCustomLocation) or a just-re-resolved legacy label, so mark it
+      // resolved — a later cold start then trusts the banner text as-is.
+      await prefs.setBool('custom_location_resolved', true);
     } else {
       await prefs.remove('custom_location_lat');
       await prefs.remove('custom_location_lng');
       await prefs.remove('custom_location_name');
+      await prefs.remove('custom_location_resolved');
     }
   }
   
@@ -4768,6 +4814,12 @@ class _HomeScreenState extends State<HomeScreen> {
                 // never stays grey; user agent is the real app id (OSM throttles
                 // generic com.example agents, slowing tiles).
                 FirstLayoutTileLayer(
+                  // [LOCAL-789B] Pass the shared controller so the layer reloads
+                  // tiles after the size settles via an imperceptible camera
+                  // nudge (zoom ± 1e-4) — the pinch-equivalent — instead of a
+                  // key rebuild that disposed the TileLayer's network client and
+                  // cancelled every in-flight tile (the fully-grey-on-entry bug).
+                  mapController: _mapController,
                   externalReset: _mapSizeReset.stream,
                   builder: (reset) => TileLayer(
                     urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
