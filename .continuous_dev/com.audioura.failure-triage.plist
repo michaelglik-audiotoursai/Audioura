@@ -12,11 +12,11 @@
   Runs failure_triage.py once a night at 02:30 (StartCalendarInterval) against
   the Mac development DB (the development-postgres-2-1 container, exposed on
   localhost:5433). The tool is READ-ONLY on the database (it SETs the session
-  READ ONLY and issues SELECTs only); it writes reports/failure_triage_<date>.md
+  READ ONLY and issues SELECTs only); it writes reports/failure_triage_{date}.md
   and up to three drafts/new_kiro_session_is_required_DRAFT-*.md under the
-  WorkingDirectory. No --llm here, so the nightly run makes NO paid-API call and
-  costs nothing; LEAD can add <string>--llm</string> to the ProgramArguments to
-  enable the capped (≤ $0.02/night, $0.05 absolute) classify of new unknowns.
+  WorkingDirectory. No LLM flag here, so the nightly run makes NO paid-API call
+  and costs nothing; LEAD can add an "llm" ProgramArguments entry (the long flag)
+  to enable the capped (max $0.02/night, $0.05 absolute) classify of new unknowns.
 
   NOTE: launchd does not expand '~'. The absolute paths below assume the user is
   'micha' (home /Users/micha) and that this repo is checked out at the path in
