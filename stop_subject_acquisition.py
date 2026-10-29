@@ -484,6 +484,15 @@ def _wiki_search_and_fetch(query: str, lang: str = 'en') -> Optional[Dict]:
                 continue
             extract = pdata.get('extract', '')
             if extract and len(extract) > 200:
+                # [LOCAL-809] A disambiguation stub is never a stop subject's
+                # corpus.
+                try:
+                    from disambiguation_guard import is_disambiguation_text as _idt
+                    if _idt(extract, best_title):
+                        logger.info(f"  [LOCAL-809] disambiguation page rejected as corpus: {best_title!r}")
+                        continue
+                except Exception:
+                    pass
                 url = f"https://{lang}.wikipedia.org/wiki/{quote(best_title.replace(' ', '_'), safe='/:@')}"
                 return {
                     'text': extract,

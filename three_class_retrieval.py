@@ -810,6 +810,15 @@ def retrieve_outdoor_stop_facts(
                             continue
                         extract = pdata.get("extract", "")
                         if extract and len(extract) > 100:
+                            # [LOCAL-809] Never accept a disambiguation stub as
+                            # corpus ("Belvedere may refer to:").
+                            try:
+                                from disambiguation_guard import is_disambiguation_text as _idt
+                                if _idt(extract, topic.strip()):
+                                    print(f"  [LOCAL-809] disambiguation page rejected as corpus: {topic.strip()!r}")
+                                    continue
+                            except Exception:
+                                pass
                             return extract
             except Exception:
                 continue
@@ -873,6 +882,14 @@ def retrieve_outdoor_stop_facts(
                             continue
                         extract = pdata.get("extract", "")
                         if extract and len(extract) > 100:
+                            # [LOCAL-809] Reject a disambiguation stub as corpus.
+                            try:
+                                from disambiguation_guard import is_disambiguation_text as _idt
+                                if _idt(extract, best_title):
+                                    print(f"  [LOCAL-809] disambiguation page rejected as corpus: {best_title!r}")
+                                    continue
+                            except Exception:
+                                pass
                             return extract
             except Exception:
                 continue
