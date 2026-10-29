@@ -1,0 +1,19 @@
+# [LOCAL-807C] Override for the server-half proof ONLY.
+#
+# The server-half proof (docs/local807c/server_proof.py) runs a script INSIDE
+# the user-api-807 container against its own throwaway postgres-807, so it does
+# not need the host 5003 port the base compose publishes for the simulator.
+# Host 5003 is held by the shared dev stack (project "audioura", a different
+# worktree); dropping the 5003 binding here lets the throwaway proof stack come
+# up WITHOUT stopping or touching that shared stack. The non-conflicting ports
+# 50807 (user-api) and 55807 (postgres) remain for optional inspection.
+#
+#   docker compose -p local807c \
+#     -f docker-compose.local807-proof.yml \
+#     -f docker-compose.local807c-serverhalf-override.yml up -d --build
+#
+# Throwaway DB (no volume): `down -v` leaves nothing behind.
+services:
+  user-api-807:
+    ports: !reset
+      - "50807:5000"

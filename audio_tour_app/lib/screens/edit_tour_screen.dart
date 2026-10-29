@@ -10,6 +10,7 @@ import '../services/saved_tours_store.dart';
 import '../utils/tour_error_resolver.dart';
 import 'edit_stop_screen.dart';
 import 'plan_screen.dart';
+import 'plans_screen.dart';
 
 /// LOCAL-475 — the edit screen and its caller must agree on the return type.
 ///
@@ -626,6 +627,26 @@ class _EditTourScreenState extends State<EditTourScreen> {
         Widget? actionButton;
         switch (action) {
           case TourRefusalAction.buyPack:
+            // [LOCAL-807C] Buy opens the one-page PlansScreen (passes + pack).
+            actionButton = SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: () {
+                  Navigator.pop(dialogContext);
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const PlansScreen()),
+                  );
+                },
+                icon: const Icon(Icons.workspace_premium_outlined),
+                label: Text(refusalActionLabel(action)),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.indigo,
+                  foregroundColor: Colors.white,
+                ),
+              ),
+            );
+            break;
           case TourRefusalAction.yourPlan:
             actionButton = SizedBox(
               width: double.infinity,
