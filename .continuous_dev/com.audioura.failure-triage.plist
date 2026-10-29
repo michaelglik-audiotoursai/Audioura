@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  [LOCAL-804 / D723] launchd agent for the nightly failure triage.
+
+  This is a FILE ONLY — it is NOT installed by this task. LEAD installs it:
+
+      cp .continuous_dev/com.audioura.failure-triage.plist \
+         ~/Library/LaunchAgents/com.audioura.failure-triage.plist
+      launchctl load -w ~/Library/LaunchAgents/com.audioura.failure-triage.plist
+
+  Runs failure_triage.py once a night at 02:30 (StartCalendarInterval) against
+  the Mac development DB (the development-postgres-2-1 container, exposed on
+  localhost:5433). The tool is READ-ONLY on the database (it SETs the session
+  READ ONLY and issues SELECTs only); it writes reports/failure_triage_<date>.md
+  and up to three drafts/new_kiro_session_is_required_DRAFT-*.md under the
+  WorkingDirectory. No --llm here, so the nightly run makes NO paid-API call and
+  costs nothing; LEAD can add <string>--llm</string> to the ProgramArguments to
+  enable the capped (≤ $0.02/night, $0.05 absolute) classify of new unknowns.
+
+  NOTE: launchd does not expand '~'. The absolute paths below assume the user is
+  'micha' (home /Users/micha) and that this repo is checked out at the path in
+  WorkingDirectory; adjust if deploying elsewhere. The DB_* env points at the
+  Mac DB on localhost:5433.
+-->
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.audioura.failure-triage</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/usr/bin/python3</string>
+        <string>failure_triage.py</string>
+        <string>--days</string>
+        <string>7</string>
+    </array>
+
+    <key>EnvironmentVariables</key>
+    <dict>
+        <!-- The Mac development DB (development-postgres-2-1 → localhost:5433). -->
+        <key>DB_HOST</key>
+        <string>localhost</string>
+        <key>DB_PORT</key>
+        <string>5433</string>
+        <key>DB_NAME</key>
+        <string>audiotours</string>
+        <key>DB_USER</key>
+        <string>admin</string>
+        <key>DB_PASSWORD</key>
+        <string>password123</string>
+        <key>PATH</key>
+        <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
+    </dict>
+
+    <!-- Where reports/ and drafts/ are written. Point at the live checkout. -->
+    <key>WorkingDirectory</key>
+    <string>/Users/micha/Audioura</string>
+
+    <!-- 02:30 every day. -->
+    <key>StartCalendarInterval</key>
+    <dict>
+        <key>Hour</key>
+        <integer>2</integer>
+        <key>Minute</key>
+        <integer>30</integer>
+    </dict>
+
+    <!-- A nightly batch job: run at the scheduled time, do not keep alive. -->
+    <key>RunAtLoad</key>
+    <false/>
+
+    <key>StandardOutPath</key>
+    <string>/Users/micha/Audioura/.continuous_dev/failure-triage.log</string>
+    <key>StandardErrorPath</key>
+    <string>/Users/micha/Audioura/.continuous_dev/failure-triage.log</string>
+</dict>
+</plist>
