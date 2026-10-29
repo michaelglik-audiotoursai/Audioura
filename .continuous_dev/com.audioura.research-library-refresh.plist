@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  [LOCAL-806 / P6] launchd agent for the research-library refresh.
+
+  This is a FILE ONLY — it is NOT installed by this task. LEAD installs it when
+  the pilot graduates to a running library:
+
+      cp .continuous_dev/com.audioura.research-library-refresh.plist \
+         ~/Library/LaunchAgents/com.audioura.research-library-refresh.plist
+      launchctl load -w ~/Library/LaunchAgents/com.audioura.research-library-refresh.plist
+
+  Runs research_library_refresh.py --apply once a day at 03:30
+  (StartCalendarInterval). It SCANS the research-library DB for pre-researched
+  stops whose `fresh_until` is within 7 days of expiry (or already past) and
+  RE-RESEARCHES the pilot place behind them, advancing their fresh_until so a
+  customer request there keeps getting a fast, cheap library hit instead of
+  falling back to full research. The scan is read-only; the re-research write is
+  capped exactly like the builder (TEST_GEMINI_MAX_USD / COST_HARD_LIMIT_USD) and
+  goes ONLY to the isolated library DB — the script hard-refuses the live 5433 DB.
+
+  IMPORTANT: DATABASE_URL below points at the ISOLATED research-library DB, NOT
+  the live Mac dev DB on 5433. Set it to wherever LEAD stands the library DB up
+  (the pilot used a local806-postgres container seeded from a schema dump). Do
+  NOT point this at localhost:5433 — the script will refuse and exit.
+
+  NOTE: launchd does not expand '~'. The absolute paths assume user 'micha'
+  (home /Users/micha) and this repo checked out at WorkingDirectory; adjust if
+  deploying elsewhere.
+-->
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.audioura.research-library-refresh</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/usr/bin/python3</string>
+        <string>research_library_refresh.py</string>
+        <string>--lead-days</string>
+        <string>7</string>
+        <string>--apply</string>
+    </array>
+
+    <key>EnvironmentVariables</key>
+    <dict>
+        <!-- The ISOLATED research-library DB (NOT the live 5433 dev DB). Replace
+             the host/db with wherever LEAD stands the library up. -->
+        <key>DATABASE_URL</key>
+        <string>postgresql://admin:password123@local806-postgres:5432/audiotours</string>
+        <!-- Cheap arm: Gemini credit is depleted, so research is Serper-only. -->
+        <key>RESEARCH_BACKEND</key>
+        <string>serper</string>
+        <key>NARRATION_MODEL</key>
+        <string>gpt-4.1-mini</string>
+        <!-- Hard paid-API caps for one nightly refresh run. -->
+        <key>TEST_GEMINI_MAX_USD</key>
+        <string>2.00</string>
+        <key>COST_HARD_LIMIT_USD</key>
+        <string>2.00</string>
+        <key>PATH</key>
+        <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
+    </dict>
+
+    <!-- The live checkout (where the scripts and tests/ live). -->
+    <key>WorkingDirectory</key>
+    <string>/Users/micha/Audioura</string>
+
+    <!-- 03:30 every day (after the 02:30 nightly failure triage). -->
+    <key>StartCalendarInterval</key>
+    <dict>
+        <key>Hour</key>
+        <integer>3</integer>
+        <key>Minute</key>
+        <integer>30</integer>
+    </dict>
+
+    <!-- A nightly batch job: run at the scheduled time, do not keep alive. -->
+    <key>RunAtLoad</key>
+    <false/>
+
+    <key>StandardOutPath</key>
+    <string>/Users/micha/Audioura/.continuous_dev/research-library-refresh.log</string>
+    <key>StandardErrorPath</key>
+    <string>/Users/micha/Audioura/.continuous_dev/research-library-refresh.log</string>
+</dict>
+</plist>

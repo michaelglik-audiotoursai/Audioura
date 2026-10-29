@@ -140,6 +140,56 @@
       "ground_truth": "The stop 'Pulpit' is located at 573 Washington St, Newton, MA 02458, which is outside the bounds of 'Our Lady Help of Christians Catholic Church, Newton, MA'.",
       "source": "phase_5_6_high_conf",
       "recorded": "2026-09-18"
+    },
+    {
+      "name": "Robert Gould Shaw Memorial",
+      "aliases": [],
+      "scope": "Boston Common",
+      "expect": "outside",
+      "actual_location": "",
+      "ground_truth": "The Robert Gould Shaw Memorial is located on the Boston Common's edge, specifically on the Boston Public Garden side, not inside Boston Common itself.",
+      "source": "phase_5_6_high_conf",
+      "recorded": "2026-10-29"
+    },
+    {
+      "name": "The Massachusetts State House",
+      "aliases": [],
+      "scope": "Boston Common",
+      "expect": "outside",
+      "actual_location": "",
+      "ground_truth": "The Massachusetts State House is located at 24 Beacon St, Boston, MA 02133, which is adjacent to but not inside Boston Common.",
+      "source": "phase_5_6_high_conf",
+      "recorded": "2026-10-29"
+    },
+    {
+      "name": "Union Oyster House",
+      "aliases": [],
+      "scope": "Faneuil Hall Marketplace, Boston, MA",
+      "expect": "outside",
+      "actual_location": "",
+      "ground_truth": "Union Oyster House is located near Faneuil Hall Marketplace but is a separate building and not within the bounds of Faneuil Hall Marketplace itself.",
+      "source": "phase_5_6_high_conf",
+      "recorded": "2026-10-29"
+    },
+    {
+      "name": "Salty Dog Seafood Grille & Bar",
+      "aliases": [],
+      "scope": "Faneuil Hall Marketplace, Boston, MA",
+      "expect": "outside",
+      "actual_location": "",
+      "ground_truth": "Salty Dog Seafood Grille & Bar is located on the Boston waterfront but outside the boundaries of Faneuil Hall Marketplace.",
+      "source": "phase_5_6_high_conf",
+      "recorded": "2026-10-29"
+    },
+    {
+      "name": "The Boston Public Garden",
+      "aliases": [],
+      "scope": "Boston Common",
+      "expect": "outside",
+      "actual_location": "",
+      "ground_truth": "The Boston Public Garden is a separate park adjacent to but distinct from Boston Common, located across Charles Street.",
+      "source": "phase_5_6_high_conf",
+      "recorded": "2026-10-29"
     }
   ]
 }

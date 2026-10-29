@@ -29947,13 +29947,34 @@ RULES:
                             _research_per_stop = _research_total / _n_stops
                 except Exception:
                     _research_per_stop = 0.0
+                # [LOCAL-806] RESEARCH LIBRARY. When RESEARCH_LIBRARY_FRESH_DAYS
+                # is set in the environment (ONLY the research-library builder sets
+                # it — build_research_library.py / research_library_refresh.py),
+                # this delivery is a PRE-RESEARCH write for a popular destination:
+                # stamp every pooled stop with fresh_until = NOW()+N days so a
+                # later customer request here is served from the stored research
+                # while fresh (and re-researched past it). Unset (every real
+                # customer generation) → fresh_days=None → fresh_until NULL →
+                # byte-for-byte the pre-806 behaviour. The library row lands under
+                # the SAME (identity, tour_type) key a customer read uses, so it is
+                # found on reuse.
+                _lib_fresh_days = None
+                try:
+                    _raw_fd = os.environ.get("RESEARCH_LIBRARY_FRESH_DAYS", "").strip()
+                    if _raw_fd:
+                        _fd_i = int(_raw_fd)
+                        _lib_fresh_days = _fd_i if _fd_i > 0 else None
+                except (TypeError, ValueError):
+                    _lib_fresh_days = None
                 _pool_written = _pool.store_delivered_tour(
                     location, tour_type, complete_tour, _db_url,
                     qid=_pool_qid, sources=_pool_sources,
                     research_cost_usd_per_stop=_research_per_stop,
+                    fresh_days=_lib_fresh_days,
                 )
                 print(f"  [LOCAL-590] POOL STORE: {_pool_written} stop(s) pooled for {location} / {tour_type}"
-                      f" (research ${_research_per_stop:.4f}/stop)")
+                      f" (research ${_research_per_stop:.4f}/stop"
+                      f"{f', fresh_until +{_lib_fresh_days}d' if _lib_fresh_days else ''})")
             except ImportError:
                 _import_logger.error("[LOCAL-590] MISSING: stop_pool_store — stop pooling DISABLED")
             except Exception as _pool_store_err:
