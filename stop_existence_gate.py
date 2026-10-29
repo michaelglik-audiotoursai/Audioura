@@ -2061,6 +2061,7 @@ def business_replenish_candidates(
     needed: int,
     exclude: Optional[Set[str]] = None,
     device_coords: Optional[Tuple[float, float]] = None,
+    scope_bbox: Optional[List[float]] = None,
 ) -> List[Dict]:
     """[LOCAL-779] Replenish a BUSINESS tour from a maps/places search directly.
 
@@ -2071,6 +2072,10 @@ def business_replenish_candidates(
     carries a real address and coordinates, and is ranked by distance to the device
     (when the request said "near me" and the app sent coordinates) or to the scope
     centre otherwise.
+
+    [LOCAL-802] ``scope_bbox`` overrides the geocoded scope bbox — the stop-count
+    WIDENING pass passes a ×2-grown bbox here so a second, wider search can bind to
+    the enlarged box (still within the city) before the tour delivers fewer stops.
 
     Pure w.r.t. the network seam: all OSM calls go through ``_nominatim_request``,
     which the tests monkeypatch. Raises nothing — a failed search yields [].
@@ -2104,8 +2109,9 @@ def business_replenish_candidates(
                               scope_center=(None if device_coords
                                             else _geocode_scope_center(_scope)),
                               near=device_coords,
-                              scope_bbox=(None if device_coords
-                                          else _geocode_scope_bbox(_scope)))
+                              scope_bbox=(scope_bbox if scope_bbox is not None
+                                          else (None if device_coords
+                                                else _geocode_scope_bbox(_scope))))
         results = resp.json() or []
     except RuntimeError as e:
         logger.warning(f"[LOCAL-779] business replenish search failed: {e}")
@@ -2377,6 +2383,7 @@ def dining_replenish_candidates(
     exclude: Optional[Set[str]] = None,
     device_coords: Optional[Tuple[float, float]] = None,
     cuisine: Optional[str] = None,
+    scope_bbox: Optional[List[float]] = None,
 ) -> List[Dict]:
     """[LOCAL-779B] Replenish a RESTAURANT tour from a maps/places search directly.
 
@@ -2431,8 +2438,9 @@ def dining_replenish_candidates(
                               scope_center=(None if device_coords
                                             else _geocode_scope_center(_scope)),
                               near=device_coords,
-                              scope_bbox=(None if device_coords
-                                          else _geocode_scope_bbox(_scope)))
+                              scope_bbox=(scope_bbox if scope_bbox is not None
+                                          else (None if device_coords
+                                                else _geocode_scope_bbox(_scope))))
         results = resp.json() or []
     except RuntimeError as e:
         logger.warning(f"[LOCAL-779B] dining replenish search failed: {e}")
@@ -2780,6 +2788,7 @@ def replenish_with_escalation(
     user_id: Optional[str] = None,
     request_text: Optional[str] = None,
     allow_grounding: bool = True,
+    scope_bbox: Optional[List[float]] = None,
 ) -> List[Dict]:
     """[LOCAL-784/D722] Replenish a business/dining tour via the escalation ladder.
 
@@ -2814,18 +2823,22 @@ def replenish_with_escalation(
         if kind == "dining":
             return dining_replenish_candidates(_pt, _scope, needed, exclude=_excl,
                                                device_coords=device_coords,
-                                               cuisine=_cuisine)
+                                               cuisine=_cuisine,
+                                               scope_bbox=scope_bbox)
         return business_replenish_candidates(_pt, _scope, needed, exclude=_excl,
-                                             device_coords=device_coords)
+                                             device_coords=device_coords,
+                                             scope_bbox=scope_bbox)
 
     def _replenish(serper_on: bool) -> List[Dict]:
         if kind == "dining":
             fn = lambda: dining_replenish_candidates(
                 _pt, _scope, needed, exclude=set(_excl),
-                device_coords=device_coords, cuisine=_cuisine)
+                device_coords=device_coords, cuisine=_cuisine,
+                scope_bbox=scope_bbox)
         else:
             fn = lambda: business_replenish_candidates(
-                _pt, _scope, needed, exclude=set(_excl), device_coords=device_coords)
+                _pt, _scope, needed, exclude=set(_excl), device_coords=device_coords,
+                scope_bbox=scope_bbox)
         return _run_with_serper(serper_on, fn)
 
     scope_center = None

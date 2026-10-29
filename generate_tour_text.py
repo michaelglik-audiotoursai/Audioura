@@ -9237,6 +9237,26 @@ def _apply_delivery_hours_guard(result):
                       f"from delivered text (every-path guard)", flush=True)
         except Exception as _de:  # pragma: no cover
             _import_logger.error(f"[LOCAL-616] paragraph dedupe skipped: {_de}")
+        # 2a. [LOCAL-802] Off-domain digression scrub (EVERY path). The narration
+        #     LLM, given a thin seafood/spa theme, free-associated to a mass-
+        #     extinction (d3 Permian–Triassic) or a reality-TV race (b1 "The Race")
+        #     and wove it SENTENCE BY SENTENCE into the stop body — content no
+        #     retrieved-passage gate sees (the model generated it from its own
+        #     knowledge). Remove any delivered sentence that carries an off-domain
+        #     marker (geological epoch / extinction event / reality competition /
+        #     42,000-km race). Operates on the whole delivered text; never empties
+        #     a stop. A no-op for a tour that genuinely discusses none of these.
+        try:
+            import local802_relevance_gate as _l802s
+            _final_scrub, _l802_dropped = _l802s.scrub_off_domain_sentences(
+                final, stop_title='(delivered tour)', log=print)
+            if _l802_dropped:
+                final = _final_scrub
+                print(f"  [LOCAL-802] scrubbed {len(_l802_dropped)} off-domain "
+                      f"digression sentence(s) from delivered text "
+                      f"(every-path guard)", flush=True)
+        except Exception as _l802se:  # pragma: no cover
+            _import_logger.error(f"[LOCAL-802] off-domain scrub skipped: {_l802se}")
         # 2b. [LOCAL-618 #4] If — after the fold — the tour still speaks NO hours
         #     (the venue published none, so there was nothing to fold), say the
         #     honest line once. The fresh museum path does not always build the
@@ -14827,12 +14847,58 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
                         except Exception as _dd_err:
                             print(f"  [LOCAL-790] location/QID dedupe skipped (non-fatal): {_dd_err}")
 
+                        # [LOCAL-802] SAME-BUILDING dedupe. The r2 Arnold Arboretum
+                        # tour shipped the Visitor Center AND the Hunnewell Building
+                        # as two stops with contradictory founding dates — they are
+                        # the SAME building (the Visitor Center IS the Hunnewell
+                        # Building). LOCAL-790 above collapses by QID / <=60 m, but
+                        # these two geocode ~130 m apart and share no name token, so
+                        # it misses them; the bridge is the Wikidata ALIAS carried on
+                        # the stop ("Hunnewell Building" is an alias of the Visitor
+                        # Center) or a located-in relation. Order-preserving; never
+                        # empties the tour.
+                        try:
+                            import local802_relevance_gate as _l802b
+                            poi_list, _sb_removed = _l802b.dedupe_same_building_stops(
+                                poi_list, log=print)
+                            if _sb_removed:
+                                print(f"  [LOCAL-802] same-building dedupe removed "
+                                      f"{len(_sb_removed)} stop(s): {_sb_removed}")
+                        except Exception as _sb_err:
+                            print(f"  [LOCAL-802] same-building dedupe skipped "
+                                  f"(non-fatal): {_sb_err}")
+
                         # [LOCAL-751 B2 / D562] A place the listener NAMED is kept
                         # when it verifies against the discovered landmarks, and
                         # announced (never silently dropped) when it does not.
                         if _walk_named_places:
+                            # [LOCAL-802 addendum 5] For place-anchor tours
+                            # (walking/driving/nature) a named place discovery
+                            # missed is GEOCODED in scope and, if it exists, becomes
+                            # a stop (not merely announced). Supply places_search as
+                            # the geocoder and the resolved scope/centre/bbox.
+                            _np_geocode = False
+                            _np_ps_fn = None
+                            _np_scope = _J._LAST_WALK_SCOPE or (_area.city_name or "")
+                            _np_center = None
+                            _np_bbox = None
+                            try:
+                                import local802_relevance_gate as _l802a5
+                                if _l802a5.is_place_anchor_tour_category(tour_category):
+                                    import places_search as _ps_a5
+                                    _np_ps_fn = _ps_a5.places_search
+                                    _np_geocode = True
+                                    if _area.center_lat or _area.center_lng:
+                                        _np_center = (_area.center_lat, _area.center_lng)
+                                    _np_bbox = getattr(_area, 'union_bbox', None)
+                            except Exception as _a5e:
+                                print(f"  [LOCAL-802] named-place geocode setup "
+                                      f"skipped (non-fatal): {_a5e}")
                             poi_list, _np_announce = apply_named_place_policy(
-                                poi_list, _walk_named_places, _area, _landmarks, _new_poi)
+                                poi_list, _walk_named_places, _area, _landmarks, _new_poi,
+                                places_search_fn=_np_ps_fn, scope=_np_scope,
+                                scope_center=_np_center, scope_bbox=_np_bbox,
+                                geocode_to_stop=_np_geocode)
                             if _np_announce:
                                 _J._LAST_NAMED_PLACE_ANNOUNCEMENTS = list(_np_announce)
                             # [LOCAL-799] Capture any coordinate a named place
@@ -15328,6 +15394,61 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
                                   f"-- {_p3cc.get('address','')} -- {_p3cc['evidence']}")
                         print(f"   [LOCAL-779B] after maps top-up: "
                               f"{len(poi_list)}/{total_stops} in-scope stop(s)")
+
+                        # [LOCAL-802] STOP-COUNT WIDENING. b1 (Ben Thanh massage)
+                        # delivered 1 of 3 requested stops. When the places path
+                        # still finds fewer in-scope places than requested, WIDEN
+                        # the search ONCE — grow the scope's bounding box ×2 about
+                        # its centre (still within the city, capped) — before
+                        # delivering fewer. The honest "we found K" intro line
+                        # (actionable_failure / the shortfall announcement) still
+                        # fires if the wider search is also short.
+                        if len(poi_list) < total_stops:
+                            try:
+                                import local802_relevance_gate as _l802w
+                                from stop_existence_gate import _geocode_scope_bbox as _gsb802
+                                _base_bbox = _gsb802(_p3c_scope)
+                                _wide_bbox = _l802w.widen_bbox(_base_bbox, factor=2.0) \
+                                    if _base_bbox else None
+                                if _wide_bbox:
+                                    _need2 = total_stops - len(poi_list)
+                                    _excl2 = set(_normalize_name(p['name']).lower() for p in poi_list)
+                                    _excl2 |= set(n.lower() for n in forbidden_norms)
+                                    _excl2 |= set(p['name'].lower() for p in poi_list)
+                                    print(f"   [LOCAL-802] stop-count widening: "
+                                          f"have {len(poi_list)}/{total_stops} — "
+                                          f"retrying maps search once with bbox ×2 "
+                                          f"(within {_p3c_scope!r})")
+                                    _wide_cands = _p3c_escalate(
+                                        _p3c_kind, _p3c_poi_type, _p3c_scope, _need2,
+                                        exclude=_excl2, cuisine=_p3c_cuisine,
+                                        user_id=(user_id if 'user_id' in dir() else None),
+                                        request_text=(user_request if 'user_request' in dir() else location),
+                                        scope_bbox=_wide_bbox)
+                                    _wide_added = 0
+                                    for _wc in _wide_cands:
+                                        if len(poi_list) >= total_stops:
+                                            break
+                                        if _wc['name'].lower() in (p['name'].lower() for p in poi_list):
+                                            continue
+                                        _wcp = _new_poi(_wc['name'], _wc.get('address', ''))
+                                        _wcp['coordinates'] = _wc['coordinates']
+                                        _wcp['latitude'] = _wc['lat']
+                                        _wcp['longitude'] = _wc['lng']
+                                        _wcp['coords_source'] = _p3c_src
+                                        _wcp['confirmation'] = 'knowledge'
+                                        _wcp['_maps_verified'] = True
+                                        poi_list.append(_wcp)
+                                        forbidden_norms.add(_normalize_name(_wc['name']))
+                                        _wide_added += 1
+                                        print(f"     [LOCAL-802] widened maps stop: "
+                                              f"{_wc['name']!r} -- {_wc.get('address','')}")
+                                    print(f"   [LOCAL-802] after widening: "
+                                          f"{len(poi_list)}/{total_stops} in-scope "
+                                          f"stop(s) (+{_wide_added} from the wider box)")
+                            except Exception as _w802_err:
+                                print(f"   [LOCAL-802] stop-count widening skipped "
+                                      f"(non-fatal): {_w802_err}")
                 except Exception as _p3c_err:
                     print(f"   [LOCAL-779B] PHASE 3C maps top-up skipped (non-fatal): {_p3c_err}")
 
@@ -19127,6 +19248,33 @@ Exempt: navigation directions ("Turn left", "Continue past").
 
     # PHASE 5: Generate detailed descriptions for each POI (parallelized)
     _phase_timer.start('narration')
+
+    # [LOCAL-802] FINAL same-building dedupe for place-anchor tours (walking /
+    # driving / nature). This runs on the FINAL stop list — after replenishment /
+    # unified-fill — because the r2 Arnold Arboretum duplicate (Visitor Center +
+    # Hunnewell Building, the SAME building) was INTRODUCED by replenishment, long
+    # after the early verify_landmarks dedupe. Their delivered coordinates were
+    # fabricated ~2 km apart, so the coords rule misses them; the bridge is the
+    # Visitor Center's Wikidata alias "Hunnewell Building", which
+    # enrich_and_dedupe_same_building looks up by name and stamps before the
+    # pure dedupe collapses them. Guarded to place-anchor categories; never empties
+    # the tour (a merge only ever removes a true duplicate).
+    try:
+        import local802_relevance_gate as _l802fb
+        if _l802fb.is_place_anchor_tour_category(tour_category) and len(poi_list) > 1:
+            import area_resolver as _ar_fb
+            _fb_city = location.split(',', 1)[1].strip() if ',' in (location or '') else (location or '')
+            _before_fb = len(poi_list)
+            poi_list, _fb_removed = _ar_fb.enrich_and_dedupe_same_building(
+                poi_list, city=_fb_city, log=print)
+            if _fb_removed:
+                print(f"  [LOCAL-802] FINAL same-building dedupe removed "
+                      f"{len(_fb_removed)} stop(s): {_fb_removed} "
+                      f"({_before_fb} → {len(poi_list)})", flush=True)
+    except Exception as _fb_err:
+        print(f"  [LOCAL-802] final same-building dedupe skipped (non-fatal): "
+              f"{_fb_err}", flush=True)
+
     print(f"\nPHASE 5: Generating detailed descriptions for each POI (parallel)...")
 
     # -------- [LOCAL-382/LOCAL-387] Exhibition thesis / venue purpose framing detection --------
@@ -19304,6 +19452,12 @@ Exempt: navigation directions ("Turn left", "Continue past").
                     'collaborator': _co,
                     'local_title': _s_poi.get('local_title', ''),
                     'donor': _do,
+                    # [LOCAL-802] carry the tour category + full location so the
+                    # story-candidate relevance gate can judge off-topic passages
+                    # (the Permian / reality-TV digressions) on the places/walking
+                    # path too, not only museum snippets.
+                    'tour_category': tour_category,
+                    'tour_location': location,
                 }
 
             # Prefetch the primary search for every worthy stop, concurrently.
@@ -21152,6 +21306,45 @@ MANDATORY INCLUSION — work this surprising detail into the description natural
                                   f"foreign museum — kept as-is (never empty a stop)")
                     except Exception as _ff668_err:
                         print(f"  [LOCAL-668] foreign-museum filter skipped: {_ff668_err}")
+
+                # [LOCAL-802] RELEVANCE GATE on injected snippets/passages. The P1
+                # cheap-arm runs let a Permian–Triassic extinction fact into a Mui
+                # Ne seafood stop (d3) and a reality-TV "The Race" digression into a
+                # Ben Thanh spa stop (b1): injected passages that mention NEITHER the
+                # stop, its place, nor its theme/category. This is the every-category
+                # choke point (the LOCAL-668 drop above is museum-only). A snippet
+                # that shares no distinctive token with the stop, the place/venue, or
+                # the tour category's theme vocabulary is dropped and logged. Never
+                # empties a stop's evidence — if every snippet would be dropped, the
+                # list is kept as-is (a thin-but-on-topic stop is better than none,
+                # and over-eager drops would regress richer tours).
+                if _stop_snippets:
+                    try:
+                        import local802_relevance_gate as _l802
+                        _l802_place = location or ''
+                        try:
+                            if _museum_venue_name:
+                                _l802_place = f"{_museum_venue_name}, {location}"
+                        except NameError:
+                            pass
+                        _l802_kept, _l802_dropped = _l802.filter_injected_passages(
+                            _stop_snippets,
+                            stop_title=poi_name or '',
+                            place=_l802_place,
+                            category=tour_category,
+                            extra_terms=[artist] if artist else None,
+                            log=print,
+                        )
+                        if _l802_dropped and _l802_kept:
+                            _stop_snippets = _l802_kept
+                            print(f"  [LOCAL-802] Stop {stop_num}: dropped "
+                                  f"{len(_l802_dropped)} off-topic passage(s); "
+                                  f"{len(_stop_snippets)} on-topic remain")
+                        elif _l802_dropped and not _l802_kept:
+                            print(f"  [LOCAL-802] Stop {stop_num}: every passage "
+                                  f"scored off-topic — kept as-is (never empty a stop)")
+                    except Exception as _l802_err:
+                        print(f"  [LOCAL-802] relevance gate skipped (non-fatal): {_l802_err}")
 
                 # These are concrete, checkable facts — numbers, named materials,
                 # named techniques, named literary forms — that the prose MUST prefer
