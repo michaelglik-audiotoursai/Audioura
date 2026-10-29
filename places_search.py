@@ -204,6 +204,54 @@ def clean_place_title(title: str) -> str:
 
 
 # ──────────────────── Serper Places → OSM jsonv2 shape ──────────────────────
+# [LOCAL-805B] Address comma-parts that are NOT a town name. A Serper address is
+# a free-text, locale-shaped string; the part after the street is only sometimes
+# the town. Vietnamese addresses carry an extra segment between the street and the
+# ward — "12 Đặng Trần Côn, P, Bến Thành, …" (the "P" is a truncated "Phường"
+# ward marker) and "114 Lê Thị Hồng Gấm, Street, Bến Thành, …" (a literal
+# "Street" tail on the road). Taking the second part blindly then read the town as
+# "p" / "street", and the town-name mismatch guard dropped a genuinely in-scope
+# spa. These tokens are street-type words and admin-unit prefixes — never a town —
+# so the locality parser skips them and takes the first real locality part.
+_ADDR_NON_TOWN_TOKENS = frozenset((
+    # Street-type words (English + common abbreviations).
+    "street", "st", "road", "rd", "avenue", "ave", "av", "boulevard", "blvd",
+    "lane", "ln", "drive", "dr", "way", "court", "ct", "place", "pl", "square",
+    "sq", "alley", "highway", "hwy", "route", "rt", "parkway", "pkwy",
+    # Vietnamese admin-unit prefixes that ride in as their own comma-part: a bare
+    # "P" / "P." / "Phường" (ward), "Q"/"Quận" alone (district w/o a number),
+    # "TP"/"Thành Phố" (city) prefix, "X"/"Xã" (commune), "TT" (town).
+    "p", "phuong", "q", "quan", "tp", "x", "xa", "tt",
+))
+
+
+def _is_locality_part(part: str) -> bool:
+    """[LOCAL-805B] True when a comma-part of an address reads as a genuine
+    locality (town / ward / city) rather than noise — a pure number/postcode, a
+    street-type word, or a bare single-letter admin-unit prefix ("P", "Q")."""
+    folded = _strip_accents(part or "").lower().strip()
+    if not folded:
+        return False
+    if not any(ch.isalpha() for ch in folded):  # pure number / postcode
+        return False
+    if len(folded) <= 1:  # a truncated single-letter prefix ("P")
+        return False
+    if folded in _ADDR_NON_TOWN_TOKENS:  # street-type word or admin prefix
+        return False
+    return True
+
+
+def _first_locality_part(parts: List[str]) -> str:
+    """[LOCAL-805B] The first genuine locality comma-part AFTER the leading street
+    part (index 0), skipping noise segments. "" when none. "12 Đặng Trần Côn, P,
+    Bến Thành, Hồ Chí Minh 700000, Vietnam" → "Bến Thành"; "678 Washington St,
+    Norwood, MA 02062" → "Norwood" (unchanged)."""
+    for cand in parts[1:]:
+        if _is_locality_part(cand):
+            return cand.strip()
+    return ""
+
+
 def _parse_address_components(address: str) -> Dict[str, str]:
     """Best-effort split of a Serper `address` string into the OSM address sub-dict
     fields the gate reads (road, house_number, city, state, suburb). Serper gives a
@@ -226,9 +274,14 @@ def _parse_address_components(address: str) -> Dict[str, str]:
     else:
         out["road"] = street
     # Middle parts: city / suburb. Last part often "MA 02132" → state (+ postcode).
+    # [LOCAL-805B] Pick the first GENUINE locality part after the street, skipping
+    # a noise segment ("P" ward prefix, a literal "Street" tail) so a Vietnamese
+    # address does not set city="p"/"street". Falls back to parts[1] only if no
+    # part reads as a locality (keeps the old behaviour for a bare two-part string).
     if len(parts) >= 2:
-        out["city"] = parts[1]
-        out["suburb"] = parts[1]
+        _loc = _first_locality_part(parts) or parts[1]
+        out["city"] = _loc
+        out["suburb"] = _loc
     if len(parts) >= 3:
         tail = parts[-1]
         sm = re.match(r"^([A-Za-z .]+?)\s*(\d{4,6})?$", tail)
@@ -602,24 +655,41 @@ def _scope_town(scope: str) -> str:
     return _strip_accents(locality).lower().strip()
 
 
+# [LOCAL-805B] (`_ADDR_NON_TOWN_TOKENS`, `_is_locality_part`, `_first_locality_part`
+# are defined above, next to `_parse_address_components`, and reused here.)
+
+
 def _address_town(rec: Dict) -> str:
-    """The town named in a record's address, normalised. Reads the OSM-shaped
-    address sub-dict first (city/town/suburb), then falls back to parsing the
-    display_name / raw Serper address string. "" when no town is discernible."""
+    """The town/locality named in a record's address, normalised. Reads the
+    OSM-shaped address sub-dict first (city/town/suburb), then falls back to
+    parsing the display_name / raw Serper address string. "" when no town is
+    discernible.
+
+    [LOCAL-805B] The raw-address fallback no longer takes the second comma-part
+    blindly. A Serper address like "12 Đặng Trần Côn, P, Bến Thành, Hồ Chí Minh
+    700000, Vietnam" has a noise segment ("P" — a truncated ward prefix) between
+    the street and the real locality, and "…, Street, Bến Thành, …" has a literal
+    "Street" tail on the road part; reading parts[1] returned "p" / "street" as the
+    "town", and the town-name mismatch guard then dropped an in-scope place. The
+    parser now skips the leading street part AND any non-town noise segment
+    (street-type words, bare admin-unit prefixes, pure numbers/postcodes), and
+    returns the first genuine locality part — "Bến Thành" in both cases. For a
+    clean US address ("678 Washington St, Norwood, MA 02062") the first non-noise
+    part after the street is still "Norwood" (unchanged). The structured-address
+    read (`_parse_address_components`) applies the same skip, so a record whose
+    `address.city` was set from the noise segment no longer reports it here."""
     addr = rec.get("address") or {}
     for key in ("city", "town", "municipality", "village"):
         v = addr.get(key)
-        if v:
+        if v and _is_locality_part(str(v)):
             return _strip_accents(v).lower().strip()
-    # Serper's raw address ("678 Washington St, Norwood, MA 02062"): the town is the
-    # second comma-part. Use display_name if the structured address had nothing.
+    # Serper's raw address ("678 Washington St, Norwood, MA 02062" / "12 Đặng Trần
+    # Côn, P, Bến Thành, Hồ Chí Minh 700000, Vietnam"). Skip the leading street
+    # part, then take the first comma-part that is a real locality.
     raw = rec.get("_serper_address") or rec.get("display_name") or ""
     parts = [p.strip() for p in str(raw).split(",") if p.strip()]
-    if len(parts) >= 2:
-        # Skip a leading street part; the town is the part before the state/zip.
-        cand = parts[1]
-        return _strip_accents(cand).lower().strip()
-    return ""
+    loc = _first_locality_part(parts)
+    return _strip_accents(loc).lower().strip() if loc else ""
 
 
 def _scope_tokens(scope: str):
