@@ -344,6 +344,28 @@ class GooglePlayApiClient:
         if resp.status_code >= 400:
             raise GoogleApiError(resp.status_code, resp.text)
 
+    # ── Subscriptions v2 (LOCAL-807): the authoritative subscription state ────
+    def get_subscription_v2(self, package_name=None, token=None) -> dict:
+        """GET purchases.subscriptionsv2.get — the authoritative state of an
+        auto-renewing subscription, looked up by its purchase token (LOCAL-807).
+        Returns the raw SubscriptionPurchaseV2 dict (subscriptionState,
+        lineItems[].expiryTime/productId, canceledStateContext, ...). The RTDN
+        handler reads expiryTime and subscriptionState from it.
+
+        LIVE only once the audioura-play-verify service account is granted the
+        subscriptions permission (currently 403 — D733 §3); until then
+        GOOGLE_SUBS_ENABLED gates the endpoint and this is exercised by tests
+        with a mocked client only."""
+        pkg = package_name or self.package_name
+        if not token:
+            raise GoogleApiError('missing_token', 'A purchase token is required.')
+        url = (f'{GOOGLE_API_BASE}/androidpublisher/v3/applications/'
+               f'{pkg}/purchases/subscriptionsv2/tokens/{token}')
+        resp = self._session.get(url, timeout=30)
+        if resp.status_code >= 400:
+            raise GoogleApiError(resp.status_code, resp.text)
+        return resp.json()
+
     # ── Refunds: the voided-purchases list (used by the voided poller) ────────
     def list_voided_purchases(self, package_name=None, start_time_millis=None,
                               token=None, max_results=1000) -> dict:
