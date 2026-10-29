@@ -29,7 +29,9 @@ DEFAULT_EXPORT = os.path.join(HERE, "catalog", "export")
 # Six from the original LOCAL-808 review; four (844, 850, 852, 853) added by the LOCAL-808B
 # re-score of LEAD's re-made tours (same keep rule: score >= 7.5 AND every pin <= 150 m).
 KEEP_SCORES = {844: 7.5, 845: 7.5, 846: 8.5, 848: 8.5, 850: 8.0,
-               852: 7.5, 853: 8.0, 856: 7.5, 858: 8.0, 859: 7.5}
+               852: 7.5, 853: 8.0, 856: 7.5, 858: 8.0, 859: 7.5,
+               # LEAD 2026-10-29 18:1x: re-pinned by LOCAL-815 (pin_proof 5/5 <= 100 m); 808B score 7.5, pins were the only reason to drop.
+               857: 7.5, 860: 7.5}
 
 # Catalog policy constants (free official catalog tours on the subscribed track).
 TRACK = "subscribed"
