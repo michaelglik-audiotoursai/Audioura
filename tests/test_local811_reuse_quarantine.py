@@ -145,13 +145,16 @@ def _stub_venue_works(monkeypatch, works=_BELVEDERE_WORKS, parents=()):
 class TestReuseMuseumQuarantine:
     def test_foreign_and_shop_and_disambig_moved_good_kept(self, conn, monkeypatch):
         good = "The Kiss"                       # in the Belvedere → kept
-        monet = "Portrait of Père Paul"         # Monet, held elsewhere → wrong_collection
+        # [LOCAL-811B] Monet's "Portrait of Père Paul" IS in the Belvedere (LEAD
+        # correction), so a truly foreign work is used: Leonardo's "Mona Lisa"
+        # (Louvre, Q19675) — a unique painting that cannot be in the Belvedere.
+        mona = "Mona Lisa"                      # Leonardo, Louvre → wrong_collection
         shop = "Starry Night Mug — The Met Store"  # merchandise → shop/junk
         disambig = "Belvedere Palace"           # disambiguation body
 
         _insert(conn, good, artist="Gustav Klimt",
                 narration="Klimt painted this between 1907 and 1908.")
-        _insert(conn, monet, artist="Claude Monet", narration="A Monet portrait.")
+        _insert(conn, mona, artist="Leonardo da Vinci", narration="Leonardo's portrait.")
         _insert(conn, shop, narration="A ceramic mug.")
         _insert(conn, disambig,
                 narration="Belvedere may refer to: a palace, a place, a ship.")
@@ -160,13 +163,13 @@ class TestReuseMuseumQuarantine:
         schema = _current_schema(conn)
         _route_rej_connect(monkeypatch, schema)
 
-        # The Monet row must carry a foreign P195 for the wrong_collection reject —
-        # supply it the way a freshly-researched stop_record would (via rows).
+        # The Mona Lisa row must carry a foreign P195 for the wrong_collection reject
+        # — supply it the way a freshly-researched stop_record would (via rows).
         rows = [
             {"title": good, "artist": "Gustav Klimt",
              "narration": "Klimt painted this between 1907 and 1908."},
-            {"title": monet, "artist": "Claude Monet", "narration": "A Monet portrait.",
-             "stop_record": {"collection_qids": ["Q23402"]}},
+            {"title": mona, "artist": "Leonardo da Vinci", "narration": "Leonardo's portrait.",
+             "stop_record": {"collection_qids": ["Q19675"], "instance_of": ["Q3305213"]}},
             {"title": shop, "narration": "A ceramic mug.",
              "sources": ["https://store.metmuseum.org/products/x"]},
             {"title": disambig,
@@ -179,7 +182,7 @@ class TestReuseMuseumQuarantine:
 
         kept_titles = [r["title"] for r in kept]
         assert good in kept_titles
-        assert monet not in kept_titles
+        assert mona not in kept_titles
         assert shop not in kept_titles
         assert disambig not in kept_titles
 
@@ -215,9 +218,9 @@ class TestReuseMuseumQuarantine:
         # After the move, a reuse read (get_pool_stops) must never return the
         # quarantined stop — the N>K path then researches the remainder fresh.
         good = "The Kiss"
-        monet = "Portrait of Père Paul"
+        mona = "Mona Lisa"  # [LOCAL-811B] Louvre — truly foreign to the Belvedere
         _insert(conn, good, artist="Gustav Klimt", narration="Klimt.")
-        _insert(conn, monet, artist="Claude Monet", narration="Monet.")
+        _insert(conn, mona, artist="Leonardo da Vinci", narration="Leonardo.")
 
         schema = _current_schema(conn)
         _route_rej_connect(monkeypatch, schema)
@@ -225,8 +228,8 @@ class TestReuseMuseumQuarantine:
 
         rows = [
             {"title": good, "artist": "Gustav Klimt", "narration": "Klimt."},
-            {"title": monet, "artist": "Claude Monet", "narration": "Monet.",
-             "stop_record": {"collection_qids": ["Q23402"]}},
+            {"title": mona, "artist": "Leonardo da Vinci", "narration": "Leonardo.",
+             "stop_record": {"collection_qids": ["Q19675"], "instance_of": ["Q3305213"]}},
         ]
         orch._auto_reject_museum_stops(rows, _LOCATION, _TOUR_TYPE, _DB_URL,
                                        qid=_VENUE_QID)
@@ -246,4 +249,4 @@ class TestReuseMuseumQuarantine:
         stops = pool.get_pool_stops(_LOCATION, _TOUR_TYPE, _DB_URL, qid=_VENUE_QID)
         titles = [s["title"] for s in stops]
         assert good in titles
-        assert monet not in titles
+        assert mona not in titles

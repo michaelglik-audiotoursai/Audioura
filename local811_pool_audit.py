@@ -31,6 +31,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import sys
 from collections import defaultdict
 from typing import Dict, List, Optional, Tuple
@@ -153,6 +154,49 @@ def _is_art_museum(venue_name: str, works) -> bool:
         return True
 
 
+def _is_contained(identity: str, venue_name: str, tour_type: str,
+                  qid: Optional[str]) -> bool:
+    """[LOCAL-811B] True when a pooled venue group is a CONTAINED (museum/facility)
+    tour, False for a walking / neighbourhood pool.
+
+    The LEAD rule (item 4): the room/space-title reject must apply ONLY to
+    contained tours, never to walking/neighbourhood pools (Salem Witch Trials
+    Memorial, Salem Common, Salem Maritime NHS, Salem Willows Park …). The audit
+    groups the whole pool by (venue_identity, tour_type); here we reuse the
+    orchestrator's own classification so the audit judges a group exactly as the
+    live reuse path would.
+
+    A QID-keyed identity is a resolved single venue → treated as contained (the
+    pool keys a museum/facility under its QID; a walking pool is keyed by the
+    location string, not a QID). A location-string identity is classified by the
+    generator's own ``_classify_tour_category`` against the location + tour_type;
+    'museum'/'facility' → contained, everything else (walking/restaurant/
+    specialized) → not contained. Any failure defaults to contained=True so the
+    museum checks are never silently disabled on a real museum pool."""
+    try:
+        from stop_pool_orchestrator import _is_contained as _orch_is_contained
+        from generate_tour_text import _classify_tour_category
+    except Exception:
+        # Without the classifier, a QID identity is a resolved venue (contained);
+        # a bare location string is treated as not contained only when it is
+        # obviously a walking request, else default contained.
+        loc = identity if (identity and not identity.startswith("qid:")) else venue_name
+        return not bool(re.search(r"(?i)\bwalk(?:ing)?\b", loc or "")) if loc else True
+
+    # Best location text we have for the classifier: the location-string identity,
+    # else the venue name.
+    loc = identity if (identity and not identity.startswith("qid:")) else venue_name
+    try:
+        cat = _classify_tour_category(loc or venue_name or "", tour_type or "")
+    except Exception:
+        cat = (tour_type or "").strip().lower()
+    # A QID-keyed pool is a resolved museum/facility venue; keep it contained even
+    # if the (often empty) location text would not classify as museum.
+    if qid:
+        return True
+    return bool(_orch_is_contained(cat))
+
+
 def audit(conn, only_qid: Optional[str] = None) -> List[Tuple[Dict, str]]:
     """Run the LOCAL-809 checks over every pooled museum row. Returns the list of
     ``(row, reason)`` failures. Groups rows by (venue_identity, tour_type) so the
@@ -172,13 +216,15 @@ def audit(conn, only_qid: Optional[str] = None) -> List[Tuple[Dict, str]]:
         venue_name = _venue_name_from_identity(identity)
         works, parents = _venue_works(qid)
         is_art = _is_art_museum(venue_name, works)
+        contained = _is_contained(identity, venue_name, tour_type, qid)
         kept, rejected = pmc.split_pooled_museum_stops(
             group, venue_name=venue_name, venue_qid=(qid or ""),
-            parent_qids=parents, sparql_works=works, is_art_museum=is_art)
+            parent_qids=parents, sparql_works=works, is_art_museum=is_art,
+            contained=contained)
         label = identity or "(no identity)"
         _mem = "n" if not works else f"{len(works)} works"
         print(f"\n== venue {label} | tour_type={tour_type!r} | qid={qid or '-'} "
-              f"| membership-set={_mem} | rows={len(group)} | "
+              f"| contained={contained} | membership-set={_mem} | rows={len(group)} | "
               f"fail={len(rejected)} ==")
         for r, reason in rejected:
             print(f"   FAIL  {r.get('title','')!r:60}  {reason}")

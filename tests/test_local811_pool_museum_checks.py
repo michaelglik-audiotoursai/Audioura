@@ -42,29 +42,37 @@ def _check(row, works=_BELVEDERE_WORKS, venue="Belvedere Museum, Vienna, Austria
 
 
 class TestBelvedereForeignWorks:
-    def test_monet_pere_paul_wrong_collection(self):
-        # Monet's work carries a P195 that is some OTHER museum → wrong_collection.
-        monet = {
-            "title": "Portrait of Père Paul", "artist": "Claude Monet",
-            "narration": "A portrait Monet painted in 1882.",
-            "stop_record": {"collection_qids": ["Q23402"],  # Musée d'Orsay
-                            "creator": "Claude Monet", "instance_of": ["Q3305213"]},
+    # [LOCAL-811B] The original fixtures asserted Monet's "Portrait of Père Paul"
+    # and Van Gogh's "The Plain of Auvers" are foreign to the Belvedere. That was
+    # WRONG — both ARE in the Österreichische Galerie Belvedere (LEAD correction).
+    # A truly foreign work is used instead: Leonardo's "Mona Lisa" (Q12418), a
+    # UNIQUE painting (P31=painting) whose single P195 is the Louvre (Q19675) — it
+    # is not, and cannot be, in the Belvedere. This still exercises the
+    # wrong_collection reject on a genuinely foreign, UNIQUE work.
+    def test_mona_lisa_foreign_wrong_collection(self):
+        mona = {
+            "title": "Mona Lisa", "artist": "Leonardo da Vinci",
+            "narration": "Leonardo's portrait, painted c. 1503-1519.",
+            "stop_record": {"collection_qids": ["Q19675"],  # Louvre
+                            "creator": "Leonardo da Vinci",
+                            "instance_of": ["Q3305213"]},   # painting (unique)
         }
-        ok, reason = _check(monet)
+        ok, reason = _check(mona)
         assert ok is False
         assert reason.startswith("wrong_collection"), reason
 
-    def test_van_gogh_plain_of_auvers_wrong_collection(self):
-        vg = {
-            "title": "Plain of Auvers", "artist": "Vincent van Gogh",
-            "narration": "Van Gogh painted this in 1890.",
-            "stop_record": {"collection_qids": ["Q153306"],  # some other museum
-                            "creator": "Vincent van Gogh",
-                            "instance_of": ["Q3305213"]},
+    def test_belvedere_own_monet_is_kept(self):
+        # Monet's "Portrait of Père Paul" IS in the Belvedere: with the venue's own
+        # P195 it must be KEPT, proving the guard does not reject a work the museum
+        # actually holds.
+        monet = {
+            "title": "Portrait of Père Paul", "artist": "Claude Monet",
+            "narration": "A portrait Monet painted in 1882, held at the Belvedere.",
+            "stop_record": {"collection_qids": [_BELVEDERE_QID],
+                            "creator": "Claude Monet", "instance_of": ["Q3305213"]},
         }
-        ok, reason = _check(vg)
-        assert ok is False
-        assert reason.startswith("wrong_collection"), reason
+        ok, reason = _check(monet)
+        assert ok is True, reason
 
 
 class TestDisambiguationPassageRejected:
@@ -152,16 +160,17 @@ class TestSplit:
     def test_split_keeps_good_rejects_bad(self):
         good = {"title": "The Kiss", "artist": "Gustav Klimt",
                 "narration": "Klimt, 1907-08."}
-        monet = {"title": "Portrait of Père Paul", "artist": "Claude Monet",
-                 "narration": "x",
-                 "stop_record": {"collection_qids": ["Q23402"]}}
+        mona = {"title": "Mona Lisa", "artist": "Leonardo da Vinci",
+                "narration": "x",
+                "stop_record": {"collection_qids": ["Q19675"],  # Louvre
+                                "instance_of": ["Q3305213"]}}
         disamb = {"title": "Something", "narration": "X may refer to: a, b, c."}
         kept, rejected = pmc.split_pooled_museum_stops(
-            [good, monet, disamb], venue_name="Belvedere Museum",
+            [good, mona, disamb], venue_name="Belvedere Museum",
             venue_qid=_BELVEDERE_QID, sparql_works=_BELVEDERE_WORKS)
         assert [r["title"] for r in kept] == ["The Kiss"]
         reasons = {r["title"]: reason for r, reason in rejected}
-        assert reasons["Portrait of Père Paul"].startswith("wrong_collection")
+        assert reasons["Mona Lisa"].startswith("wrong_collection")
         assert reasons["Something"] == "disambiguation_text"
 
 
@@ -206,3 +215,154 @@ class TestStripDisambiguationLines:
                      "V kan verwijzen naar: a, b."):
             cleaned, n = dg.strip_disambiguation_lines(lead)
             assert n == 1, (lead, cleaned)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# [LOCAL-811B] LEAD review of reports/local811_pool_audit_apply.txt — the first
+# 811 audit over-rejected real artworks. These lock in the four corrections.
+# ─────────────────────────────────────────────────────────────────────────────
+
+import junk_title_guard as jtg
+
+
+class TestIssue1CommerceIsWordOrUrlNotSubstring:
+    """Commerce/junk detection must be word/URL based, never a substring of an
+    artwork title; a quoted title is normal (LEAD item 1)."""
+
+    def test_the_shop_girl_is_kept(self):
+        # Tissot's "The Shop Girl" — "shop" is a substring, not a shop.
+        assert jtg.is_junk_page_title("The Shop Girl") is False
+        row = {"title": "The Shop Girl", "artist": "James Tissot",
+               "narration": "A Tissot painting of a London shop interior."}
+        ok, reason = pmc.check_pooled_museum_stop(
+            row, venue_name="Art Gallery of Ontario", sparql_works=[])
+        assert ok is True, reason
+
+    def test_lady_of_shalott_quote_is_kept(self):
+        # Waterhouse's '"I am half sick of shadows," said the Lady of Shalott' —
+        # a quoted line of verse, not a scraped news headline.
+        t = '"I am half sick of shadows," said the Lady of Shalott'
+        assert jtg.is_junk_page_title(t) is False
+        ok, reason = pmc.check_pooled_museum_stop(
+            {"title": t, "narration": "A Waterhouse painting."},
+            venue_name="Tate Britain", sparql_works=[])
+        assert ok is True, reason
+
+    def test_guillemet_quoted_title_is_kept(self):
+        # A balanced French-quote pair wrapping a span is a quoted title, not a
+        # breadcrumb — "Pendule « L'Amitié voilant les heures »".
+        t = "Pendule « L’Amitié voilant les heures »"
+        assert jtg.is_junk_page_title(t) is False
+        ok, reason = pmc.check_pooled_museum_stop(
+            {"title": t, "narration": "A gilt-bronze mantel clock."},
+            venue_name="Musée Marmottan Monet", sparql_works=[])
+        assert ok is True, reason
+
+    def test_real_commerce_still_rejected(self):
+        # The genuine signals the LEAD lists must still bite.
+        assert jtg.is_junk_page_title("Gift Shop") is True
+        assert jtg.is_junk_page_title("Visit our online shop") is True
+        assert jtg.is_junk_page_title(
+            "Explore this painting in our virtual tour") is True
+        assert jtg.is_junk_page_title(
+            "Profile « The ALBERTINA Museum Vienna") is True        # breadcrumb
+        assert jtg.is_junk_page_title(
+            "BU Masters Show 2026 | Traces: Pursuing Process") is True  # pipe
+        assert jtg.is_shop_product_title("Wall Calendar 2027") is True
+        assert jtg.is_commerce_url(
+            "https://store.metmuseum.org/products/x") is True
+
+
+class TestIssue2MultiplesAndEditionsKept:
+    """A cast/print/edition, a work with >=2 P195 values, or a site-listed work
+    is KEPT; reject on P195 only when the work is UNIQUE with a single foreign
+    P195 (LEAD item 2)."""
+
+    def test_age_of_bronze_cast_is_kept(self):
+        # Rodin's "The Age of Bronze" is a bronze cast (P31 sculpture) held in
+        # many collections; one foreign P195 must not reject it.
+        row = {"title": "The Age of Bronze", "artist": "Auguste Rodin",
+               "narration": "A life-size bronze figure by Rodin.",
+               "stop_record": {"collection_qids": ["Q23402"],
+                               "creator": "Auguste Rodin",
+                               "instance_of": ["Q860861"]}}  # sculpture
+        ok, reason = pmc.check_pooled_museum_stop(
+            row, venue_name="Rodin Museum", venue_qid="Q840886", sparql_works=[])
+        assert ok is True, reason
+
+    def test_print_by_title_word_is_kept(self):
+        row = {"title": "The Great Wave (woodcut print)", "artist": "Hokusai",
+               "narration": "A colour woodblock print.",
+               "stop_record": {"collection_qids": ["Q23402"], "creator": "Hokusai"}}
+        ok, reason = pmc.check_pooled_museum_stop(
+            row, venue_name="Some Museum", venue_qid="Q840886", sparql_works=[])
+        assert ok is True, reason
+
+    def test_two_p195_values_kept(self):
+        row = {"title": "A Shared Work", "artist": "X",
+               "narration": "y",
+               "stop_record": {"collection_qids": ["Q23402", "Q111111"],
+                               "instance_of": ["Q3305213"]}}  # unique painting…
+        ok, reason = pmc.check_pooled_museum_stop(
+            row, venue_name="Some Museum", venue_qid="Q840886", sparql_works=[])
+        assert ok is True, reason  # …but two P195 → kept
+
+    def test_unique_painting_single_foreign_p195_still_rejected(self):
+        # The one case that MUST still reject: a unique work whose single P195 is
+        # another museum (Mona Lisa at the Belvedere).
+        row = {"title": "Mona Lisa", "artist": "Leonardo da Vinci",
+               "narration": "y",
+               "stop_record": {"collection_qids": ["Q19675"],   # Louvre
+                               "instance_of": ["Q3305213"]}}     # unique painting
+        ok, reason = pmc.check_pooled_museum_stop(
+            row, venue_name="Belvedere", venue_qid=_BELVEDERE_QID, sparql_works=[])
+        assert ok is False
+        assert reason.startswith("wrong_collection"), reason
+
+    def test_site_listed_overrides_foreign_p195(self):
+        # If the venue's own SPARQL/site set lists the title, a stale foreign P195
+        # must not reject it.
+        works = [{"label_en": "Ophelia", "collection_qids": ["Q860861X"],
+                  "instance_of": ["Q3305213"]}]
+        row = {"title": "Ophelia", "artist": "John Everett Millais",
+               "narration": "y",
+               "stop_record": {"collection_qids": ["Q23402"],
+                               "instance_of": ["Q3305213"]}}
+        ok, reason = pmc.check_pooled_museum_stop(
+            row, venue_name="Tate Britain", venue_qid="Q842858",
+            sparql_works=works, site_titles=["Ophelia"])
+        assert ok is True, reason
+
+
+class TestIssue4RoomTitleOnlyForContainedTours:
+    """room_or_space_title (and venue_itself_title) must apply ONLY to contained
+    (museum/facility) tours, never to walking/neighbourhood pools (LEAD item 4)."""
+
+    _SALEM = ["Salem Witch Trials Memorial", "Salem Common",
+              "Salem Maritime National Historic Site", "Salem Willows Park",
+              "Salem Witch Museum"]
+
+    def test_walking_pool_keeps_named_places(self):
+        for t in self._SALEM:
+            ok, reason = pmc.check_pooled_museum_stop(
+                {"title": t, "narration": "A Salem stop."},
+                venue_name="Salem", contained=False, sparql_works=[])
+            assert ok is True, (t, reason)
+
+    def test_contained_tour_still_rejects_a_room(self):
+        ok, reason = pmc.check_pooled_museum_stop(
+            {"title": "Gallery 5", "narration": "x"},
+            venue_name="Some Museum", contained=True, sparql_works=[])
+        assert ok is False
+        assert reason == "room_or_space_title", reason
+
+    def test_split_respects_contained_flag(self):
+        rows = [{"title": t, "narration": "x"} for t in self._SALEM]
+        kept_walk, rej_walk = pmc.split_pooled_museum_stops(
+            rows, venue_name="Salem", contained=False, sparql_works=[])
+        assert len(kept_walk) == len(self._SALEM) and not rej_walk
+        kept_mus, rej_mus = pmc.split_pooled_museum_stops(
+            rows, venue_name="Salem", contained=True, sparql_works=[])
+        # On a contained tour those same titles read as spaces → all rejected.
+        assert not kept_mus and len(rej_mus) == len(self._SALEM)
+        assert all(r == "room_or_space_title" for _, r in rej_mus)

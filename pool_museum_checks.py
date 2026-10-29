@@ -39,6 +39,7 @@ title", "not_in_collection", "disambiguation_text", "event_or_architecture_title
 """
 from __future__ import annotations
 
+import re
 from typing import Dict, List, Optional, Sequence, Tuple
 
 __all__ = [
@@ -151,6 +152,96 @@ def enrich_row_for_membership(row: Dict, sparql_by_title: Optional[Dict[str, Dic
     return e
 
 
+# [LOCAL-811B] P31 classes that mark a work as a MULTIPLE — a cast, print,
+# impression or edition that exists, by its nature, in several collections. A
+# bronze CAST of a Rodin, a Dürer/Hokusai PRINT, an etching impression, or a
+# photographic print is held by many museums at once, so a single foreign P195 on
+# the Wikidata item does NOT prove a particular museum's copy is "not in this
+# collection". The LEAD rule: reject on P195 only when the work is UNIQUE and its
+# single P195 is another museum; keep casts/prints/editions. These QIDs are the
+# print/sculpture-cast/photograph classes a museum catalogues as a multiple.
+_MULTIPLE_INSTANCE_QIDS = frozenset({
+    "Q11060274",   # print (etching/engraving/woodcut — issued in an edition)
+    "Q18887969",   # copper engraving print
+    "Q18218093",   # etching print
+    "Q18219090",   # woodcut print
+    "Q1396354",    # color woodcut
+    "Q23657281",   # drypoint print
+    "Q133067",     # engraving (general)
+    "Q189207",     # etching (medium alias)
+    "Q11835431",   # lithograph (print)
+    "Q22669539",   # aquatint (print)
+    "Q860861",     # sculpture (bronzes are cast in editions — Rodin, Degas)
+    "Q179700",     # statue (cast)
+    "Q22669857",   # tapestry (woven in sets/editions)
+    "Q125191",     # photograph (printed in editions)
+    "Q11060274",   # dup (print)
+    "Q15123870",   # lithograph (alt)
+    "Q18761202",   # (watercolour is unique — intentionally NOT here)
+})
+# Remove the deliberately-excluded unique class if a dup slipped in.
+_MULTIPLE_INSTANCE_QIDS = frozenset(
+    q for q in _MULTIPLE_INSTANCE_QIDS if q != "Q18761202")
+
+# Title/medium words that mark a multiple when P31 is absent (a pooled row rarely
+# carries P31). "cast", "edition", "impression", "print", "proof" — the museum
+# label words for a copy of a multiple. Matched case-insensitively as whole words.
+_MULTIPLE_WORD_RE = re.compile(
+    r"(?i)\b(cast|casting|edition|impression|proof|replica|"
+    r"print|etching|engraving|woodcut|lithograph|aquatint|drypoint|"
+    r"photograph|photogravure)\b")
+
+
+def _is_multiple_or_edition(enriched: Dict) -> bool:
+    """[LOCAL-811B] True when the (enriched) pooled row looks like an instance of a
+    MULTIPLE — a cast, print, impression or edition — so a single foreign P195 must
+    NOT reject it. Signals (any one): a multiple/edition P31 class, or a
+    cast/edition/print/impression word in the title or an artist/medium field.
+    Pure; conservative — a unique painting/drawing carries none of these."""
+    if not isinstance(enriched, dict):
+        return False
+    try:
+        from artwork_selection_guard import _qids as _q
+        for q in _q(enriched.get("instance_of")):
+            if q in _MULTIPLE_INSTANCE_QIDS:
+                return True
+    except Exception:
+        pass
+    for k in ("title", "medium", "type_specialty", "artist"):
+        v = enriched.get(k)
+        if isinstance(v, str) and _MULTIPLE_WORD_RE.search(v):
+            return True
+    return False
+
+
+def _p195_count(enriched: Dict) -> int:
+    """Number of distinct P195 (collection) QIDs on the (enriched) row."""
+    if not isinstance(enriched, dict):
+        return 0
+    try:
+        from artwork_selection_guard import _qid_norm
+        qids = {_qid_norm(c) for c in (enriched.get("collection_qids") or [])}
+        qids.discard("")
+        return len(qids)
+    except Exception:
+        return len(enriched.get("collection_qids") or [])
+
+
+def _title_is_site_listed(enriched: Dict, site_titles: Sequence[str],
+                          sparql_works: Sequence[Dict]) -> bool:
+    """[LOCAL-811B] True when the venue's OWN site (or SPARQL set) lists this title
+    — the museum itself says the work is here, which overrides a stale/foreign
+    Wikidata P195. Reuses the fresh-path title matcher so the two paths agree."""
+    try:
+        from artwork_selection_guard import _collection_title_set, _entry_is_collection_confirmed
+        allowed = _collection_title_set(sparql_works or [], site_titles or [])
+        if not allowed:
+            return False
+        return _entry_is_collection_confirmed(enriched, allowed)
+    except Exception:
+        return False
+
+
 def check_pooled_museum_stop(
     row: Dict,
     *,
@@ -160,6 +251,7 @@ def check_pooled_museum_stop(
     sparql_works: Sequence[Dict] = (),
     site_titles: Sequence[str] = (),
     is_art_museum: bool = True,
+    contained: bool = True,
     sparql_by_title: Optional[Dict[str, Dict]] = None,
 ) -> Tuple[bool, str]:
     """Run the LOCAL-809 checks on ONE pooled museum stop. Returns ``(ok, reason)``.
@@ -242,9 +334,29 @@ def check_pooled_museum_stop(
             # Only the definitive signals reject a pooled row; a soft title-miss
             # ("not_in_collection") is kept (unreliable for pooled data).
             if _reason.startswith("wrong_collection"):
-                return False, _reason
-            if _reason.startswith("wrong_museum"):
-                return False, _reason
+                # [LOCAL-811B] A single foreign P195 does NOT prove a MULTIPLE is
+                # not here. Per the LEAD rule, reject on P195 only when the work is
+                # UNIQUE with a SINGLE foreign P195. Keep it when it is an instance
+                # of a multiple (cast/print/impression/edition), carries >= 2 P195
+                # values (held by several collections), or the venue's own site /
+                # SPARQL set lists the title. Rodin's "The Age of Bronze" (a bronze
+                # cast whose Wikidata P195 names one museum) is kept here.
+                if (_is_multiple_or_edition(enriched)
+                        or _p195_count(enriched) >= 2
+                        or _title_is_site_listed(enriched, site_titles, sparql_works)):
+                    pass  # a multiple / multi-P195 / site-listed work — keep
+                else:
+                    return False, _reason
+            elif _reason.startswith("wrong_museum"):
+                # The curated known-home map is a hard, single-home masterpiece
+                # signal (Ophelia → Tate), but a multiple with that title (a
+                # print/cast edition) is still spared on the same rule.
+                if (_is_multiple_or_edition(enriched)
+                        or _p195_count(enriched) >= 2
+                        or _title_is_site_listed(enriched, site_titles, sparql_works)):
+                    pass
+                else:
+                    return False, _reason
             # else: not_in_collection title-miss — keep.
     except Exception:
         pass
@@ -268,7 +380,22 @@ def check_pooled_museum_stop(
         _kept, _dropped = enforce_artworks_only(
             [enriched], venue_name=venue_name, is_art_museum=False)
         if _dropped:
-            return False, (_dropped[0].get("_reject_reason") or "not_an_artwork")
+            _areason = _dropped[0].get("_reject_reason") or "not_an_artwork"
+            # [LOCAL-811B] The room/space and venue-itself rejects are MUSEUM
+            # (contained) concepts — a stop inside one building. A walking /
+            # neighbourhood pool's stops ARE places: "Salem Witch Trials Memorial",
+            # "Salem Common", "Salem Maritime National Historic Site", "Salem
+            # Willows Park" are legitimate outdoor stops, not museum rooms. Per the
+            # LEAD rule, apply `room_or_space_title` (and the sibling
+            # `venue_itself_title`) ONLY to contained tours; for a non-contained
+            # pool these two rejects are ignored (the stop is kept). The commerce,
+            # disambiguation, event/non-artwork-class and collection rejects still
+            # apply to every reused stop.
+            if not contained and _areason in ("room_or_space_title",
+                                              "venue_itself_title"):
+                pass  # outdoor/walking pool — a named place, not a museum space
+            else:
+                return False, _areason
     except Exception:
         pass
 
@@ -284,13 +411,19 @@ def split_pooled_museum_stops(
     sparql_works: Sequence[Dict] = (),
     site_titles: Sequence[str] = (),
     is_art_museum: bool = True,
+    contained: bool = True,
 ) -> Tuple[List[Dict], List[Tuple[Dict, str]]]:
     """Split pooled rows into ``(kept, rejected)`` by :func:`check_pooled_museum_stop`.
 
     ``kept`` preserves input order. ``rejected`` is a list of ``(row, reason)``
     pairs so the caller can quarantine each row with its own reason and log the
     before/after exactly as the ticket asks. Pure; delegates every decision to the
-    per-stop checker."""
+    per-stop checker.
+
+    ``contained`` (default True) is passed through to each check: for a
+    non-contained (walking / neighbourhood) pool the room/space and venue-itself
+    rejects are skipped, so a named outdoor place ("Salem Common") is never moved
+    out as a "room_or_space_title" (LOCAL-811B LEAD item 4)."""
     kept: List[Dict] = []
     rejected: List[Tuple[Dict, str]] = []
     _by_title = _sparql_by_title(sparql_works)
@@ -299,7 +432,7 @@ def split_pooled_museum_stops(
             row, venue_name=venue_name, venue_qid=venue_qid,
             parent_qids=parent_qids, sparql_works=sparql_works,
             site_titles=site_titles, is_art_museum=is_art_museum,
-            sparql_by_title=_by_title)
+            contained=contained, sparql_by_title=_by_title)
         if ok:
             kept.append(row)
         else:

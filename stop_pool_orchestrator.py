@@ -382,7 +382,8 @@ def _auto_reject_museum_stops(rows, location, tour_type, db_url, qid=None):
 
     kept, rejected = pmc.split_pooled_museum_stops(
         rows, venue_name=venue, venue_qid=(qid or ""),
-        parent_qids=parent_qids, sparql_works=works, is_art_museum=is_art)
+        parent_qids=parent_qids, sparql_works=works, is_art_museum=is_art,
+        contained=True)  # [LOCAL-811B] only CONTAINED tours reach this call
 
     if not rejected:
         return kept

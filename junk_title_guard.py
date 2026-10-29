@@ -153,7 +153,12 @@ _CTA_OBJECT_RE = re.compile(
     r"(?i)\b("
     r"virtual\s+tours?|online\s+(?:collection|shop|store|tours?|exhibition)|"
     r"e[-\s]?newsletter|newsletter\s+sign\s*up|mailing\s+list|"
-    r"gift\s+shop|museum\s+shop|online\s+shop|the\s+shop|"
+    r"gift\s+shop|museum\s+shop|online\s+shop|"
+    # [LOCAL-811B] "the shop" as a BARE object was dropped: it is a substring of
+    # real artwork titles ("The Shop Girl", Tissot), and the LEAD rule forbids a
+    # commerce match on a substring of a title. The genuine website-feature "shop"
+    # CTAs are covered by "gift/museum/online shop" above and the imperative
+    # "shop the collection/catalogue" below — never a bare "the shop".
     r"buy\s+tickets?|book\s+tickets?|book\s+(?:now|online|your\s+visit)|"
     r"download\s+the\s+app|mobile\s+app|audio\s+guide\s+app|"
     r"shop\s+the\s+(?:catalogue|catalog|collection)|"
@@ -413,6 +418,16 @@ def _is_generic_or_headline_title(title: str) -> bool:
     words = t.split()
     n_words = len(words)
 
+    # [LOCAL-811B] QUOTED-TITLE exemption. A title that carries a quoted span is a
+    # normal artwork title — a line of verse or speech the work is named for, e.g.
+    # Waterhouse's '"I am half sick of shadows," said the Lady of Shalott'. The
+    # LEAD rule is explicit: quoted titles are normal. A quote mark means the
+    # sentence-shape signals below (a finite verb like "said", trailing sentence
+    # punctuation) are the TITLE's own wording, not a scraped news headline, so
+    # those two heuristics are skipped. The trailing-ellipsis tell (a truncated
+    # scrape) still applies — an ellipsis is not quotation.
+    _has_quote = bool(re.search(r"[\"'\u2018\u2019\u201c\u201d\u00ab\u00bb]", t))
+
     # (b) NEWS HEADLINE / sentence shape.
     #   * a trailing ellipsis is the classic scraped-headline tell ("Khai mạc Hội
     #     thảo Quốc tế …") — reject at 4+ words so a short name ending in "…" from
@@ -420,10 +435,10 @@ def _is_generic_or_headline_title(title: str) -> bool:
     if re.search(r"(?:\u2026|\.\.\.)\s*$", t) and n_words >= 4:
         return True
     #   * a long, sentence-shaped line with a finite verb is a headline, not a name.
-    if n_words >= 6 and _HEADLINE_VERB_RE.search(t):
+    if not _has_quote and n_words >= 6 and _HEADLINE_VERB_RE.search(t):
         return True
     #   * ends with sentence punctuation and is long (a scraped sentence).
-    if n_words >= 8 and re.search(r"[.!?]\s*$", t):
+    if not _has_quote and n_words >= 8 and re.search(r"[.!?]\s*$", t):
         return True
 
     return False
@@ -469,9 +484,24 @@ def is_junk_page_title(title: str, venue_name: str = "",
     # real titles use it ("Rain, Steam and Speed – The Great Western Railway", "Nocturne: Blue
     # and Gold – Old Battersea Bridge", "Landscape – Capriccio"), and rejecting them cost the NG
     # 2 of 3 stops in Bench R3. A dash is chrome only when one side is a section label, the
-    # venue, or a site brand. Guillemets and pipes stay unconditional.
-    if re.search(r"[«»]|\|", t):
+    # venue, or a site brand. A pipe stays unconditional (never a quote mark).
+    if "|" in t:
         return True
+    # [LOCAL-811B] Guillemets « » are breadcrumb GLUE in a page <title>
+    # ("Profile « The ALBERTINA Museum Vienna") but are also French QUOTATION marks
+    # wrapping an artwork's own title ("Pendule « L'Amitié voilant les heures »").
+    # The LEAD rule (item 1) is explicit — a quoted title is normal and must not be
+    # rejected as chrome. Distinguish the two by SHAPE: a BALANCED pair (an opening
+    # « followed later by a closing ») that WRAPS a span, with real title text left
+    # OUTSIDE the quotes, is a quoted title → keep. A separator guillemet (an
+    # unbalanced « or », or a pair with nothing outside it) is breadcrumb chrome →
+    # reject.
+    if "«" in t or "»" in t:
+        _o, _c = t.find("«"), t.rfind("»")
+        _balanced_wrap = (_o != -1 and _c != -1 and _c > _o)
+        _outside = (t[:_o] + t[_c + 1:]).strip() if _balanced_wrap else ""
+        if not (_balanced_wrap and _outside):
+            return True  # a bare/separator guillemet — page chrome
     _dash = re.split(r"\s[-–—]\s", t)
     if len(_dash) > 1:
         _vn = _norm(venue_name)

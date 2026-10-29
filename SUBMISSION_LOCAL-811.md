@@ -173,3 +173,136 @@ Changed:
 The only removal performed is LOCAL-792's verified `move_to_rejected` on
 `stop_pool`, on the Mac dev DB in the audit's `--apply` step (with before/after
 counts). `audio_tours` was never modified.
+
+
+---
+
+## 811B
+
+**Bounce (not merged).** LEAD review of `reports/local811_pool_audit_apply.txt`
+(the 35 rows the first audit moved out of the Mac `stop_pool`) found the checks
+over-rejected real artworks. This round fixes the four over-rejections, restores
+every row wrongly moved, re-audits, and locks each fix with a unit test. DB-only
+on the Mac dev DB; paid-API cap `$0` (venue works read cache-first — every lookup
+in the restore/audit was a LOCAL-810 `venue_works_cache` HIT, no WDQS/paid call).
+
+### Issue 1 — commerce/junk detection must be word/URL based, never a substring
+`junk_title_guard.py`:
+- Tissot's **"The Shop Girl"** was rejected because `_CTA_OBJECT_RE` carried a
+  bare `the shop` alternative that matched the substring "The Shop" in the title.
+  Removed it — the genuine website-feature cases stay covered by `gift shop` /
+  `museum shop` / `online shop` and the imperative `shop the collection/catalogue`,
+  none of which is a substring of a work title.
+- Waterhouse's **'"I am half sick of shadows," said the Lady of Shalott'** was
+  rejected by the news-headline heuristic (a finite verb "said" at ≥6 words).
+  Quoted titles are normal (LEAD): `_is_generic_or_headline_title` now skips the
+  finite-verb and trailing-sentence-punctuation signals when the title carries a
+  quotation mark. The trailing-ellipsis scrape tell still applies.
+- **`Pendule « L'Amitié voilant les heures »`** (a mantel clock) was rejected by
+  the unconditional guillemet rule. Guillemets are both breadcrumb glue
+  (`Profile « The ALBERTINA Museum Vienna`) and French quotation marks. The rule
+  now treats a BALANCED `«…»` pair that wraps a span (with real title text outside)
+  as a quoted title (keep); a bare/separator guillemet or an empty wrap is still
+  chrome. The pipe `|` stays unconditional.
+
+### Issue 2 — keep multiples (casts / prints / editions)
+`pool_museum_checks.py` (pooled path only; the fresh LOCAL-632
+`enforce_collection_membership` is unchanged): Rodin's **"The Age of Bronze"** was
+rejected because its single P195 names one museum. A bronze cast, a print, an
+impression or an edition exists in many collections, so a single foreign P195 does
+not prove a given museum's copy is foreign. The `wrong_collection` / `wrong_museum`
+reject is now spared when the work is a MULTIPLE (P31 print/engraving/woodcut/
+lithograph/aquatint/drypoint/sculpture/statue/tapestry/photograph, or a cast/
+edition/impression/print word in the title/medium), OR carries ≥2 distinct P195
+values, OR the venue's own site/SPARQL set lists the title. Only a UNIQUE work with
+a SINGLE foreign P195 is rejected (e.g. the *Mona Lisa* at the Belvedere).
+
+### Issue 3 — the ticket's own wrong evidence
+LOCAL-811 claimed Monet's *Portrait of Père Paul* and Van Gogh's *The Plain of
+Auvers* are foreign to the Belvedere. Both ARE in the Österreichische Galerie
+Belvedere. The test fixtures asserting they are foreign were removed:
+`TestBelvedereForeignWorks` now uses a truly foreign work, Leonardo's **Mona Lisa**
+(P195 = Louvre, a unique painting), and a companion test confirms the Belvedere's
+own Monet *is kept*. The `TestSplit` and DB-backed reuse-quarantine fixtures were
+switched to the Mona Lisa for the same reason.
+
+### Issue 4 — `room_or_space_title` only for contained tours
+`room_or_space_title` (and the sibling `venue_itself_title`) are MUSEUM concepts —
+a stop inside one building. A walking/neighbourhood pool's stops ARE places
+("Salem Witch Trials Memorial", "Salem Common", "Salem Maritime National Historic
+Site", "Salem Willows Park"). `check_pooled_museum_stop` / `split_pooled_museum_stops`
+now take `contained: bool = True`; when `contained=False` those two rejects are
+ignored (the stop is kept) while commerce / disambiguation / event / non-artwork-
+class / collection rejects still apply. The orchestrator already gates this path on
+`contained` (it now passes `contained=True` explicitly). The audit
+(`local811_pool_audit.py`) now classifies each venue group with the generator's own
+`_classify_tour_category` (a QID-keyed identity is a resolved museum → contained;
+a walking/neighbourhood location string → not contained) and threads the flag — so
+the one-off audit judges a group exactly as the live reuse path would.
+
+### Issue 5 — restore the wrongly-moved rows
+`local811_pool_restore.py` (new) re-runs the LEAD-corrected
+`check_pooled_museum_stop` on every `rejected_by = 'local811_pool_audit'` row
+(rebuilt from the preserved `stop_record_json` / `sources_json`), with the same
+cache-first venue works and the same `contained` classification, and restores the
+rows the corrected logic now KEEPS via the verified LOCAL-792
+`restore_from_rejected` (copy-before-delete, one transaction). This is the ticket's
+"restore reasons 1–3 and walking-pool rows under 4" expressed as: restore iff the
+fixed logic no longer rejects it.
+
+Counts on the Mac DB:
+
+| table | before restore | after restore |
+|---|---|---|
+| `stop_pool` | 958 | **973** (+15) |
+| `stop_pool_rejected` | 36 | **21** (−15) |
+
+(Net `stop_pool`: 993 − 35 moved by the first apply + 15 restored = 973.)
+
+The 15 restored map to the LEAD items: issue 1 — *The Shop Girl*, the *Lady of
+Shalott* quote, the *Pendule* clock; issue 2 — *The Age of Bronze* (cast),
+*Ophelia* @Q180788 and *Résurrection* @Q3329265 (both site-listed in the venue's
+own works); issue 4 — nine Salem walking/biking room-titles. The 20 that stay
+rejected are the LEAD's item 6 ("rightly rejected"): the virtual-tour CTAs,
+"Collection Guide", "The artist is in his studio.", the `|`-separated exhibition
+titles (BU Masters Show …), the Austrian State Treaty event, the Albertina
+breadcrumb, *Ophelia* at the National Gallery (genuinely foreign there), and the
+room/presentation titles on CONTAINED museum pools (Kunsthalle Bremen, Salem Witch
+Museum Q113541747).
+
+Re-ran the audit dry-run on the restored 973-row pool: **0 failures**. Reports:
+`reports/local811b_pool_audit_dryrun.txt`, `reports/local811b_pool_restore_apply.txt`.
+
+### Tests
+`tests/test_local811_pool_museum_checks.py` (+12 tests, 29 pass):
+`TestIssue1CommerceIsWordOrUrlNotSubstring`, `TestIssue2MultiplesAndEditionsKept`,
+`TestIssue4RoomTitleOnlyForContainedTours`, and the rewritten
+`TestBelvedereForeignWorks`. The DB-backed `tests/test_local811_reuse_quarantine.py`
+(3 pass, transient schema) was updated to the Mona Lisa. The directly-related guard
+suite (junk-title / artwork / room / quarantine / 626 / 791 / 792 / 602) passes
+(112 tests). The broader suite's unrelated failures
+(`test_local604_plan`, `test_local606_replace_on_change`, `test_local85_venue_coherence`,
+`test_local67_entitlement_gate`) are pre-existing on the clean base (verified by
+`git stash`) and import none of the modules changed here.
+
+### Files (811B)
+New:
+- `local811_pool_restore.py`
+- `reports/local811b_pool_audit_dryrun.txt`
+- `reports/local811b_pool_restore_apply.txt`
+
+Changed:
+- `junk_title_guard.py` — commerce `the shop` substring removed; quoted-title
+  exemption in the headline heuristic; balanced-guillemet quoted title kept.
+- `pool_museum_checks.py` — `contained` flag; multiple/edition + ≥2-P195 +
+  site-listed sparing of the collection reject.
+- `local811_pool_audit.py` — `_is_contained` classification threaded into the
+  split.
+- `stop_pool_orchestrator.py` — passes `contained=True` on the (contained-only)
+  reuse-check call.
+- `tests/test_local811_pool_museum_checks.py`,
+  `tests/test_local811_reuse_quarantine.py` — issue 1–4 tests; Mona Lisa fixtures.
+
+The only DB mutations were LOCAL-792's verified `move_to_rejected` /
+`restore_from_rejected` on `stop_pool` (with before/after counts). `audio_tours`
+was never touched.
