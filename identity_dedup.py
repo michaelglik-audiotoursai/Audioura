@@ -728,13 +728,35 @@ _PLACE_CLASS_FOLD = {
     "eglise": "church", "chiesa": "church", "kirche": "church",
     "cathedral": "church", "basilica": "church",
     "pagoda ": "temple",
+    # [LOCAL-813 Cause B] Cross-language place-class words for a named landmark so a
+    # local-language stop title and its English geocoder match share an identity
+    # core. "Museu de Fado" and "Fado Museum" both → {"fado", "museum"} and match;
+    # without this the class words ("museu" vs "museum") stayed distinct and the
+    # name-match refused a correct snap (Museu de Fado shipped 230 m off).
+    "museum": "museum", "museu": "museum", "musee": "museum", "museo": "museum",
+    "muzeum": "museum", "muzej": "museum", "bao tang": "museum",
+    "garden": "garden", "jardin": "garden", "giardino": "garden",
+    "jardim": "garden", "garten": "garden",
+    "theatre": "theatre", "theater": "theatre", "teatro": "theatre",
+    "teatr": "theatre", "nha hat": "theatre",
+    "palace": "palace", "palais": "palace", "palazzo": "palace",
+    "palacio": "palace", "palast": "palace", "cung": "palace",
+    "castle": "castle", "castelo": "castle", "castello": "castle",
+    "chateau": "castle", "castillo": "castle", "schloss": "castle",
+    "gate": "gate", "mon": "gate", "porte": "gate", "porta": "gate",
+    "puerta": "gate", "tor": "gate",
 }
 
 # Honorifics / titles carried by a place name that add no distinguishing identity
 # and may appear on one language's form only ("Bà"/"Ba" in "Ba Thien Hau Pagoda").
+# [LOCAL-813 Cause B] The Romance-language articles/prepositions (de/do/da/del/…)
+# are glue that only one language's form carries ("Museu de Fado" vs "Fado
+# Museum"): dropping them lets the proper-noun cores match across languages.
 _PLACE_HONORIFICS = {
     "ba", "ong", "duc", "thanh", "saint", "st", "san", "santa", "santo",
     "sainte", "ste", "the", "of", "and", "a", "an",
+    "de", "do", "da", "dos", "das", "del", "della", "di", "du", "des",
+    "la", "le", "les", "el", "il", "lo", "y", "e",
 }
 
 

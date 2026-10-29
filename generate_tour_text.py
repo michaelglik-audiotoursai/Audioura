@@ -26567,12 +26567,41 @@ REWRITE RULES (all mandatory):
             _pin_bbox_803 = _gsb803(_pin_scope_791c) if _pin_scope_791c else None
         except Exception:
             _pin_bbox_803 = None
+        # [LOCAL-813 Cause C] MUSEUM BUILDING PIN. A museum/gallery tour's stops are
+        # artwork titles with no place identity of their own; they share the ONE
+        # building-level pin of the museum. Resolve the museum building's
+        # authoritative Wikidata P625 ONCE (from the venue name / scope) and pass it
+        # as the snap's venue fallback, so an artwork stop with no own reference (or
+        # a wrong same-name geocode — Belvedere → "Lower Belvedere") lands on the
+        # real building instead of an LLM guess 1,379 m away. Best-effort: a miss
+        # leaves the fallback None and the snap behaves exactly as before.
+        _pin_venue_fallback_813 = None
+        try:
+            if tour_category == 'museum':
+                _museum_name_813 = ((intent.get('venue_name') if intent else None)
+                                    or _pin_scope_791c or location)
+                if _museum_name_813:
+                    from wikidata_landmark_lookup import lookup as _wd_lookup_813
+                    _mb = _wd_lookup_813(
+                        _museum_name_813, scope=_pin_scope_791c,
+                        scope_center=_pin_center_791c, scope_bbox=_pin_bbox_803,
+                        tour_language="en")
+                    if _mb:
+                        _pin_venue_fallback_813 = (float(_mb[0]), float(_mb[1]))
+                        print(f"  [LOCAL-813] museum building pin for "
+                              f"{_museum_name_813!r}: {_pin_venue_fallback_813} "
+                              f"({_mb[2] if len(_mb) > 2 else 'wikidata_p625'})")
+        except Exception as _mb_err:
+            print(f"  [LOCAL-813] museum building pin lookup skipped "
+                  f"(non-fatal): {_mb_err}")
         print(f"  [LOCAL-791C] pin snap: scope={_pin_scope_791c!r} "
               f"center={_pin_center_791c} bbox={_pin_bbox_803} "
+              f"venue_fallback={_pin_venue_fallback_813} "
               f"threshold=150m target=100m")
         poi_list, _snap_rows_791c = _snap791c(
             poi_list, scope=_pin_scope_791c, scope_center=_pin_center_791c,
             scope_bbox=_pin_bbox_803, tour_language="en",
+            venue_fallback_coordinate=_pin_venue_fallback_813,
             log=print)
         _n_snapped_791c = sum(1 for r in _snap_rows_791c if r.get("snapped"))
         _n_noref_791c = sum(1 for r in _snap_rows_791c if r.get("reference") is None)

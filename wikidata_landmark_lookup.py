@@ -130,6 +130,27 @@ def _in_bbox(pt: Tuple[float, float],
     return south <= lat <= north and west <= lng <= east
 
 
+# [LOCAL-813 Cause A] Degrees to pad a geocoded neighbourhood bbox by before the
+# in-scope test. ~0.02° ≈ 2 km at mid latitudes — enough to admit a landmark on
+# the very edge of a razor-tight Nominatim neighbourhood box (Eikan-dō Zenrin-ji
+# sat ~380 m north of the "Higashiyama, Kyoto" box), far too small to admit a
+# same-name place in another city (that is the metro-radius guard's job).
+_BBOX_PAD_DEG = float(os.environ.get("LANDMARK_BBOX_PAD_DEG", "0.02"))
+
+
+def _pad_bbox(bbox: Optional[List[float]], pad_deg: float) -> Optional[List[float]]:
+    """Return ``bbox`` = [south, north, west, east] grown by ``pad_deg`` on every
+    side, or the input unchanged when it is missing/malformed/pad<=0."""
+    if not bbox or len(bbox) < 4 or pad_deg <= 0:
+        return bbox
+    try:
+        south, north, west, east = (float(bbox[0]), float(bbox[1]),
+                                     float(bbox[2]), float(bbox[3]))
+    except (TypeError, ValueError):
+        return bbox
+    return [south - pad_deg, north + pad_deg, west - pad_deg, east + pad_deg]
+
+
 # ──────────────────────── live Wikidata fetch layer ─────────────────────────
 
 def _default_fetch(action: str, params: Dict) -> Optional[Dict]:
@@ -420,10 +441,23 @@ def lookup(name: str,
 
     def _in_scope(pt: Tuple[float, float]) -> bool:
         if scope_bbox:
-            if _in_bbox(pt, scope_bbox):
+            # [LOCAL-813 Cause A] The scope bbox is the GEOCODER's extent for the
+            # named neighbourhood ("Higashiyama, Kyoto"), and Nominatim draws it
+            # razor-tight — Eikan-dō Zenrin-ji (a genuine Higashiyama temple) sits
+            # ~380 m north of the box's north edge and was rejected, so the stop
+            # fell to the generic geocoder and shipped 343 m off. A landmark on the
+            # NEIGHBOURHOOD EDGE is still in scope: pad the box by a small margin
+            # (~2 km) before the test. The identity guard against a same-name place
+            # in ANOTHER city stays the metro-radius test below (and pin_snap's own
+            # centroid / scope-sanity bounds), which a 2 km pad never reaches.
+            if _in_bbox(pt, _pad_bbox(scope_bbox, _BBOX_PAD_DEG)):
                 return True
-            # A bbox was given but the point is outside it → reject (identity
-            # guard). Do NOT silently widen to the radius; the bbox is the scope.
+            # Still outside even the padded box. When a scope centre is known, fall
+            # back to the metro-radius identity test rather than a hard reject —
+            # the box can be mis-sized (a point geocode returns a tiny box), and the
+            # radius is the real cross-city guard. With no centre, reject.
+            if scope_center:
+                return _haversine_km(pt, scope_center) <= _METRO_RADIUS_KM
             return False
         if scope_center:
             return _haversine_km(pt, scope_center) <= _METRO_RADIUS_KM
