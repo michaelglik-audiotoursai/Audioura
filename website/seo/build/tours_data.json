@@ -11,7 +11,7 @@
     "kind": "walking",
     "lat": 48.8867,
     "lng": 2.3431,
-    "duration_min": 60,
+    "listen_min": 12,
     "distance_km": 1.2,
     "stops_count": 5,
     "stops": [
@@ -66,7 +66,7 @@
   {
     "source_id": 845,
     "slug": "louvre-museum-audio-tour",
-    "h1": "Louvre Museum audio tour — 5 masterpieces in 60 minutes",
+    "h1": "Louvre Museum audio tour — 5 masterpieces, narrated",
     "short_title": "Louvre Museum — Museum Tour",
     "city": "Paris",
     "city_slug": "paris",
@@ -75,7 +75,7 @@
     "kind": "museum",
     "lat": 48.861111111111114,
     "lng": 2.3358333333333334,
-    "duration_min": 60,
+    "listen_min": 10,
     "distance_km": null,
     "stops_count": 5,
     "stops": [
@@ -139,7 +139,7 @@
     "kind": "walking",
     "lat": 41.8925,
     "lng": 12.4853,
-    "duration_min": 75,
+    "listen_min": 12,
     "distance_km": 1.0,
     "stops_count": 5,
     "stops": [
@@ -194,7 +194,7 @@
   {
     "source_id": 848,
     "slug": "british-museum-audio-tour",
-    "h1": "British Museum audio tour — 5 world treasures in an hour",
+    "h1": "British Museum audio tour — 5 world treasures",
     "short_title": "British Museum — Museum Tour",
     "city": "London",
     "city_slug": "london",
@@ -203,7 +203,7 @@
     "kind": "museum",
     "lat": 51.519444444444446,
     "lng": -0.12694444444444444,
-    "duration_min": 60,
+    "listen_min": 11,
     "distance_km": null,
     "stops_count": 5,
     "stops": [
@@ -267,7 +267,7 @@
     "kind": "museum",
     "lat": 40.779444444444444,
     "lng": -73.96333333333334,
-    "duration_min": 60,
+    "listen_min": 12,
     "distance_km": null,
     "stops_count": 5,
     "stops": [
@@ -331,7 +331,7 @@
     "kind": "walking",
     "lat": 41.3803,
     "lng": 2.1734,
-    "duration_min": 60,
+    "listen_min": 10,
     "distance_km": 0.9,
     "stops_count": 5,
     "stops": [
@@ -395,7 +395,7 @@
     "kind": "walking",
     "lat": 41.4036,
     "lng": 2.1744,
-    "duration_min": 90,
+    "listen_min": 11,
     "distance_km": 4.5,
     "stops_count": 5,
     "stops": [
@@ -459,7 +459,7 @@
     "kind": "walking",
     "lat": 41.0085,
     "lng": 28.979,
-    "duration_min": 75,
+    "listen_min": 11,
     "distance_km": 1.0,
     "stops_count": 5,
     "stops": [
@@ -523,7 +523,7 @@
     "kind": "walking",
     "lat": 50.0871,
     "lng": 14.421,
-    "duration_min": 75,
+    "listen_min": 11,
     "distance_km": 1.3,
     "stops_count": 5,
     "stops": [
@@ -587,7 +587,7 @@
     "kind": "museum",
     "lat": 43.76833333333333,
     "lng": 11.255277777777778,
-    "duration_min": 60,
+    "listen_min": 10,
     "distance_km": null,
     "stops_count": 5,
     "stops": [

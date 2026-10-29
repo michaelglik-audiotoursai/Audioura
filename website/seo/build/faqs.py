@@ -14,12 +14,25 @@ from tours_data.json.
 import re
 
 
+def _fmt_km(km):
+    return ("%.1f" % km).rstrip("0").rstrip(".")
+
+
 def _duration_answer(t):
-    return ("The %s tour covers %d stops and takes about %d minutes at an easy "
-            "pace. Because it's self-guided you can pause, linger or pick it up "
-            "again whenever you like." %
-            (t["short_title"].split(" — ")[0], t["stops_count"],
-             t["duration_min"]))
+    name = t["short_title"].split(" — ")[0]
+    lm = t.get("listen_min")
+    if lm:
+        listen = ("about %d minute%s of narration"
+                  % (lm, "" if lm == 1 else "s"))
+    else:
+        listen = "narration for every stop"
+    walk = ""
+    if t.get("distance_km"):
+        walk = (" The stops are spread over roughly a %s km walk, so your total "
+                "time depends on how long you linger." % _fmt_km(t["distance_km"]))
+    return ("The %s tour has %d stops with %s. Because it's self-guided you can "
+            "pause, linger or pick it up again whenever you like.%s"
+            % (name, t["stops_count"], listen, walk))
 
 
 def _selfguided_answer(t):

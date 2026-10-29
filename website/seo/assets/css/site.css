@@ -21,6 +21,15 @@
 
 html { -webkit-text-size-adjust: 100%; scroll-behavior: smooth; }
 
+/* Phone-width overflow safety (LOCAL-812B): nothing may be wider than the
+   viewport. Replaced elements shrink to fit so the body never scrolls sideways.
+   We deliberately do NOT use overflow-x:hidden — that would only mask overflow
+   and make the scrollWidth<=innerWidth check pass trivially; the layout is
+   fixed at the source (fluid type, wrapping, max-width media). */
+html, body { max-width: 100%; }
+img, audio, video, iframe, svg, table { max-width: 100%; }
+audio { width: 100%; }
+
 body {
   margin: 0;
   font-family: "Avenir Next", "Segoe UI", system-ui, -apple-system, Roboto,
@@ -94,9 +103,17 @@ a:hover { text-decoration: underline; }
 
 /* Hero / headings */
 main { padding-bottom: 48px; }
-h1 { font-size: 2rem; line-height: 1.2; margin: 18px 0 10px; }
-h2 { font-size: 1.5rem; margin: 40px 0 12px; }
-h3 { font-size: 1.15rem; margin: 0 0 6px; }
+/* Fluid type + wrapping so long / unbreakable titles (e.g. French artwork
+   names) never push past the viewport on narrow phones (LOCAL-812B). */
+h1 { font-size: clamp(1.5rem, 7vw, 2rem); line-height: 1.2; margin: 18px 0 10px; }
+h2 { font-size: clamp(1.25rem, 5vw, 1.5rem); margin: 40px 0 12px; }
+h3 { font-size: clamp(1.05rem, 4vw, 1.15rem); margin: 0 0 6px; }
+h1, h2, h3, h4, .lede, .breadcrumb, .pill, p, li, summary, td, th {
+  overflow-wrap: anywhere;
+}
+/* break-word only where genuinely long unbreakable tokens appear (titles,
+   addresses, URLs) — not in numeric table cells where it would split prices. */
+h1, h2, h3, h4, .stops h3, .faq summary, .lede, p, li { word-break: break-word; }
 .lede { font-size: 1.12rem; color: var(--muted); max-width: 62ch; }
 
 .meta-row {
@@ -247,6 +264,9 @@ h3 { font-size: 1.15rem; margin: 0 0 6px; }
   font-size: 0.96rem;
 }
 .price-table th { background: var(--indigo-2); }
+/* Prices are short ($2.99–$79.99); keep each on one line so narrow phones
+   don't split "$2.99" into "$2.9 / 9". Column stays well within the viewport. */
+.price-table td:nth-child(2) { white-space: nowrap; }
 
 /* Footer */
 .site-footer {
@@ -268,7 +288,7 @@ h3 { font-size: 1.15rem; margin: 0 0 6px; }
 }
 
 @media (min-width: 680px) {
-  h1 { font-size: 2.5rem; }
+  h1 { font-size: clamp(2rem, 4.5vw, 2.5rem); }
   body { font-size: 19px; }
 }
 

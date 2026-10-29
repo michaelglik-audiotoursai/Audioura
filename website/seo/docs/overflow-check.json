@@ -1,0 +1,82 @@
+{
+  "widths": [
+    360,
+    390,
+    430
+  ],
+  "results": [
+    {
+      "page": "louvre",
+      "w": 360,
+      "iw": 360,
+      "sw": 360,
+      "ok": true,
+      "worst": null
+    },
+    {
+      "page": "louvre",
+      "w": 390,
+      "iw": 390,
+      "sw": 390,
+      "ok": true,
+      "worst": null
+    },
+    {
+      "page": "louvre",
+      "w": 430,
+      "iw": 430,
+      "sw": 430,
+      "ok": true,
+      "worst": null
+    },
+    {
+      "page": "paris-hub",
+      "w": 360,
+      "iw": 360,
+      "sw": 360,
+      "ok": true,
+      "worst": null
+    },
+    {
+      "page": "paris-hub",
+      "w": 390,
+      "iw": 390,
+      "sw": 390,
+      "ok": true,
+      "worst": null
+    },
+    {
+      "page": "paris-hub",
+      "w": 430,
+      "iw": 430,
+      "sw": 430,
+      "ok": true,
+      "worst": null
+    },
+    {
+      "page": "pricing",
+      "w": 360,
+      "iw": 360,
+      "sw": 360,
+      "ok": true,
+      "worst": null
+    },
+    {
+      "page": "pricing",
+      "w": 390,
+      "iw": 390,
+      "sw": 390,
+      "ok": true,
+      "worst": null
+    },
+    {
+      "page": "pricing",
+      "w": 430,
+      "iw": 430,
+      "sw": 430,
+      "ok": true,
+      "worst": null
+    }
+  ],
+  "failures": 0
+}

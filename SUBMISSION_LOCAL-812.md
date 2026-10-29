@@ -108,3 +108,98 @@ Staged `git add` by path only — no `git add -A`. The catalog ZIPs are not
 committed. No edits to DECISIONS.md, CLAUDE.md, BACKLOG.md, WORK_QUEUE,
 `.continuous_dev/`, SUBSCRIBED_COMMUNICATION_01.MD, `legal/`,
 GCLOUD_STORIED_START_HERE.md, or TRAVEL_PROJECTS.md.
+
+
+---
+
+## 812B — bounce fixes: phone overflow + honest durations
+
+LEAD review of `docs/tour-page-phone.png` (Louvre) found two problems. Both are
+fixed; the whole site was regenerated and re-checked. Paid-API spend this round:
+**$0** (no Serper or other metered calls).
+
+### 1. Horizontal overflow at phone width — fixed
+
+The H1, intro, sample box, stop titles (long French artwork names) and FAQ ran
+past the right edge. Fixed at the source in `assets/css/site.css`:
+
+- **Fluid type** — `h1/h2/h3` now use `clamp()` (e.g. `h1: clamp(1.5rem, 7vw,
+  2rem)`) so headings shrink on narrow phones instead of forcing width. Desktop
+  bump is also `clamp()`-capped.
+- **Wrapping** — `overflow-wrap: anywhere` on text elements, plus
+  `word-break: break-word` on titles/paragraphs so an unbreakable token (like
+  "La Décollation de saint Jean-Baptiste") wraps rather than overflowing.
+- **No fixed-width elements** — `html, body { max-width: 100% }`,
+  `max-width: 100%` on `img/audio/video/iframe/svg/table`, and `box-sizing:
+  border-box` (already global). Short price values in the pricing table use
+  `white-space: nowrap` so "$2.99" is never split.
+- I deliberately did **not** use `overflow-x: hidden` — that would only *mask*
+  overflow and make the check below pass trivially. The layout is fixed, not
+  clipped.
+
+**Check (`build/check_overflow.js`, headless Chrome):** each of the 3 pages is
+loaded at **360 / 390 / 430 CSS px** and asserts
+`document.documentElement.scrollWidth <= window.innerWidth` (and that no element
+extends past the right edge). **All 9 page×width combinations pass** —
+`scrollWidth == innerWidth` everywhere, `failures: 0`. Evidence:
+`docs/overflow-check.json`. New 390 px screenshots: `docs/tour-page-phone.png`,
+`docs/pricing-page-phone.png`.
+
+### 2. Honest duration — fixed
+
+The pages invented tour durations ("5 masterpieces in 60 minutes", "~60 min").
+The real narration is far shorter. `build/extract_tours.py` now **measures** the
+listening time with `ffprobe`: it sums every `audio_*.mp3` inside each tour's
+catalog ZIP and rounds to the nearest minute → `listen_min` (the old hand-written
+`duration_min` is gone). Measured values:
+
+| Tour | Real listening (ffprobe) |
+|---|---|
+| Montmartre (844) | 12 min |
+| **Louvre (845)** | **10 min** |
+| Colosseum & Forum (846) | 12 min |
+| British Museum (848) | 11 min |
+| Met (850) | 12 min |
+| Gothic Quarter (852) | 10 min |
+| Gaudí (853) | 11 min |
+| Sultanahmet (856) | 11 min |
+| Prague Old Town (858) | 11 min |
+| Uffizi (859) | 10 min |
+
+The generator now shows **"≈ 10 min listening"** from the real audio and, for
+walking tours, a **separate** **"≈ X km walk"** figure — listening time and
+walking distance are different things and are never conflated. The intro, meta
+description and FAQ say so explicitly (e.g. Louvre: *"The narration runs about 10
+minutes of listening"*; Montmartre: *"That's about 12 minutes of listening; the
+walk between the 5 stops is about 1.2 km"*). Invented durations were removed from
+H1/title/meta — the Louvre H1 is now *"Louvre Museum audio tour — 5 masterpieces,
+narrated"* and the British Museum's drops *"in an hour"*. A grep for the old
+duration strings (`in 60 minutes`, `in an hour`, `~60 min`, `takes about N
+minutes`, …) across `tours/` and `pricing/` returns **nothing**.
+
+### Re-checks
+
+- **Lighthouse (mobile, `lighthouse@12`)** re-run on the same 3 pages — unchanged
+  and still above target: Louvre **100/100/100/96**, Paris hub
+  **100/98/100/96**, Pricing **100/98/100/96** (Perf / A11y / SEO / Best
+  Practices). Reports: `docs/lighthouse/*.report.html`; summary
+  `docs/LIGHTHOUSE.md`.
+- **JSON-LD** — `build/validate_jsonld.py`: 20 pages / 49 blocks, all valid.
+- **Meta descriptions** — all 10 remain 138–160 chars.
+
+### Files changed (812B)
+- `website/seo/assets/css/site.css` — overflow/fluid-type fixes.
+- `website/seo/build/extract_tours.py` — ffprobe `listen_min`; invented durations
+  removed from `TOUR_META`.
+- `website/seo/build/generate_site.py`, `build/faqs.py` — use `listen_min` +
+  separate walk distance; honest H1/meta/intro/FAQ.
+- `website/seo/build/check_overflow.js` — the new scrollWidth check (added).
+- `website/seo/build/tours_data.json` — regenerated (`listen_min`).
+- `website/seo/tours/**`, `pricing/index.html`, `sitemap.xml` region —
+  regenerated HTML.
+- `website/seo/docs/` — new `overflow-check.json`, refreshed phone screenshots,
+  re-run Lighthouse reports, updated `LIGHTHOUSE.md`.
+
+Everything stays under `website/seo/` (+ this file). Still staged by path only —
+no `git add -A`; no edits to the protected files. Catalog ZIPs remain
+uncommitted.

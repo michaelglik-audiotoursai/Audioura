@@ -167,18 +167,46 @@ def tour_url(t):
     return "/tours/%s/%s/" % (t["city_slug"], t["slug"])
 
 
+def _fmt_km(km):
+    return ("%.1f" % km).rstrip("0").rstrip(".")
+
+
+def _listen_phrase(t):
+    """'about 10 minutes of listening' — real audio length, or '' if unknown."""
+    lm = t.get("listen_min")
+    if not lm:
+        return ""
+    return "about %d minute%s of listening" % (lm, "" if lm == 1 else "s")
+
+
 def meta_description(t):
-    """120–160 char meta description, informed by keyword research."""
-    kind = "museum" if t["kind"] == "museum" else "walking"
-    if kind == "museum":
-        base = ("Free self-guided audio tour of %s — %d masterpieces narrated "
-                "in about %d minutes. Listen hands-free in the Audioura app."
-                % (t["place_query"], t["stops_count"], t["duration_min"]))
+    """120–160 char meta description, informed by keyword research.
+
+    LOCAL-812B: the minutes we quote are the REAL narration length
+    (t['listen_min'], measured by ffprobe), never an invented tour duration. For
+    walking tours the walk distance is given as a SEPARATE figure.
+    """
+    listen = _listen_phrase(t)
+    if t["kind"] == "museum":
+        if listen:
+            base = ("Free self-guided audio tour of %s — %d masterpieces, %s. "
+                    "Listen hands-free in the Audioura app."
+                    % (t["place_query"], t["stops_count"], listen))
+        else:
+            base = ("Free self-guided audio tour of %s — %d masterpieces "
+                    "narrated stop by stop. Listen hands-free in the Audioura "
+                    "app." % (t["place_query"], t["stops_count"]))
     else:
-        base = ("Free self-guided %s audio tour — %d stops in about %d minutes. "
-                "Hear %s's stories hands-free in the Audioura app."
-                % (t["city"], t["stops_count"], t["duration_min"],
-                   t["city"]))
+        walk = (" over a %s km walk" % _fmt_km(t["distance_km"])
+                if t["distance_km"] else "")
+        if listen:
+            base = ("Free self-guided %s audio tour — %d stops%s, %s. Hear "
+                    "%s's stories hands-free in the Audioura app."
+                    % (t["city"], t["stops_count"], walk, listen, t["city"]))
+        else:
+            base = ("Free self-guided %s audio tour — %d stops%s, narrated "
+                    "stop by stop. Hear %s's stories hands-free in the Audioura "
+                    "app." % (t["city"], t["stops_count"], walk, t["city"]))
     # trim to <=160 on a word boundary
     if len(base) > 160:
         base = base[:160].rsplit(" ", 1)[0].rstrip(",.;:") + "."
@@ -285,25 +313,32 @@ def tour_jsonld(t, faq, sample_url, canonical):
 
 
 def intro_paragraph(t):
+    listen = _listen_phrase(t)
     if t["kind"] == "museum":
+        tail = ((" The narration runs %s — listen at your own pace."
+                 % listen) if listen
+                else " Listen at your own pace.")
         return ("This free, self-guided audio tour walks you through %d of the "
                 "most remarkable works at %s. Press play at the first stop and "
                 "let Audioura narrate each piece — its history, its maker and "
-                "why it matters — while you look, not at your phone. The whole "
-                "route takes about %d minutes."
-                % (t["stops_count"], t["place_query"], t["duration_min"]))
+                "why it matters — while you look, not at your phone.%s"
+                % (t["stops_count"], t["place_query"], tail))
     dist = (" over roughly %s km" % _fmt_km(t["distance_km"])
             if t["distance_km"] else "")
+    # Listening time and walking distance are different things — state both.
+    if listen and t["distance_km"]:
+        tail = (" That's %s; the walk between the %d stops is about %s km, so "
+                "allow extra time to stroll and linger."
+                % (listen, t["stops_count"], _fmt_km(t["distance_km"])))
+    elif listen:
+        tail = " The narration runs %s; walk between stops at your own pace." % listen
+    else:
+        tail = " Walk between stops at your own pace."
     return ("This free, self-guided %s audio tour links %d landmarks%s through "
             "%s. Audioura guides you stop to stop by voice and tells each "
             "place's story as you arrive, so you can keep your eyes on the "
-            "city. Allow about %d minutes at an easy pace."
-            % (t["city"], t["stops_count"], dist, t["city"],
-               t["duration_min"]))
-
-
-def _fmt_km(km):
-    return ("%.1f" % km).rstrip("0").rstrip(".")
+            "city.%s"
+            % (t["city"], t["stops_count"], dist, t["city"], tail))
 
 
 def render_tour(t):
@@ -325,12 +360,15 @@ def render_tour(t):
     parts.append('<main id="main"><div class="wrap">\n')
     parts.append("<h1>%s</h1>\n" % esc(t["h1"]))
 
-    # meta pills
-    pills = ['<span class="pill"><strong>%d</strong> stops</span>' % t["stops_count"],
-             '<span class="pill"><strong>~%d</strong> min</span>' % t["duration_min"]]
+    # meta pills — listening time (real audio) and walk distance are separate
+    pills = ['<span class="pill"><strong>%d</strong> stops</span>'
+             % t["stops_count"]]
+    if t.get("listen_min"):
+        pills.append('<span class="pill">&#8776; <strong>%d</strong> min '
+                     'listening</span>' % t["listen_min"])
     if t["distance_km"]:
-        pills.append('<span class="pill"><strong>%s</strong> km</span>'
-                     % _fmt_km(t["distance_km"]))
+        pills.append('<span class="pill">&#8776; <strong>%s</strong> km walk'
+                     '</span>' % _fmt_km(t["distance_km"]))
     pills.append('<span class="pill">Self-guided</span>')
     pills.append('<span class="pill">%s, %s</span>'
                  % (esc(t["city"]), esc(t["country"])))
@@ -437,9 +475,11 @@ def render_city(city):
 
 
 def _tour_card(t):
-    bits = ["%d stops" % t["stops_count"], "~%d min" % t["duration_min"]]
+    bits = ["%d stops" % t["stops_count"]]
+    if t.get("listen_min"):
+        bits.append("\u2248 %d min listening" % t["listen_min"])
     if t["distance_km"]:
-        bits.append("%s km" % _fmt_km(t["distance_km"]))
+        bits.append("\u2248 %s km walk" % _fmt_km(t["distance_km"]))
     return ("""  <a class="card" href="{url}">
     <img class="card-art" src="/assets/og/{slug}.png" alt="" width="1200"
          height="630" loading="lazy">
