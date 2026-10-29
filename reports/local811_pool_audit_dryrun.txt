@@ -1,0 +1,216 @@
+=== LOCAL-811 stop_pool museum audit — DRY RUN (report only) ===
+db: localhost:5433/audiotours
+stop_pool rows BEFORE: 993
+stop_pool rows read: 993
+== venue loc:albertina vienna austria | tour_type='museum' | qid=- | membership-set=n | rows=2 | fail=1 ==
+   FAIL  'Profile « The ALBERTINA Museum Vienna'                       shop_or_junk_title
+== venue loc:alfama walking tour lisbon portugal | tour_type='' | qid=- | membership-set=n | rows=8 | fail=0 ==
+== venue loc:arnold arboretum boston | tour_type='' | qid=- | membership-set=n | rows=2 | fail=0 ==
+== venue loc:art and architectual tour in boston athenaeum boston ma | tour_type='' | qid=- | membership-set=n | rows=5 | fail=0 ==
+== venue loc:art and architecture tour in boston athenaeum boston massachusetts | tour_type='' | qid=- | membership-set=n | rows=3 | fail=0 ==
+== venue loc:art institute of chicago chicago il usa | tour_type='museum' | qid=- | membership-set=n | rows=6 | fail=0 ==
+== venue loc:asakusa and senso-ji walking tour tokyo japan | tour_type='' | qid=- | membership-set=n | rows=6 | fail=0 ==
+== venue loc:ateneum helsinki finland | tour_type='museum' | qid=- | membership-set=n | rows=5 | fail=0 ==
+== venue loc:beacon hill architecture walk boston | tour_type='' | qid=- | membership-set=n | rows=5 | fail=0 ==
+== venue loc:belvedere vienna | tour_type='walking' | qid=- | membership-set=n | rows=3 | fail=1 ==
+   FAIL  'Austrian State Treaty'                                       event_or_architecture_title
+== venue loc:biking tour of real locations mentioned in salem tv show episode 2 of season 1 salem ma | tour_type='biking' | qid=- | membership-set=n | rows=3 | fail=2 ==
+   FAIL  'Salem Witch Trials Memorial'                                 room_or_space_title
+   FAIL  'Salem Maritime National Historic Site'                       room_or_space_title
+== venue loc:coffee shops in harvard square cambridge ma | tour_type='walking' | qid=- | membership-set=n | rows=3 | fail=0 ==
+== venue loc:coffee shops in jamaica plain boston | tour_type='' | qid=- | membership-set=n | rows=4 | fail=0 ==
+== venue loc:coffee shops in jamaica plain boston | tour_type='walking' | qid=- | membership-set=n | rows=3 | fail=0 ==
+== venue loc:colosseum and roman forum walking tour rome italy | tour_type='' | qid=- | membership-set=n | rows=5 | fail=0 ==
+== venue loc:fitzwilliam museum cambridge uk | tour_type='museum' | qid=- | membership-set=n | rows=1 | fail=0 ==
+== venue loc:freedom trail walking tour boston ma | tour_type='' | qid=- | membership-set=n | rows=6 | fail=0 ==
+== venue loc:frick collection new york usa | tour_type='museum' | qid=- | membership-set=n | rows=3 | fail=0 ==
+== venue loc:galleria borghese rome italy | tour_type='museum' | qid=- | membership-set=n | rows=3 | fail=0 ==
+== venue loc:gaudi architecture walking tour barcelona spain | tour_type='' | qid=- | membership-set=n | rows=7 | fail=0 ==
+== venue loc:gemaldegalerie berlin germany | tour_type='museum' | qid=- | membership-set=n | rows=2 | fail=0 ==
+== venue loc:getty center los angeles usa | tour_type='museum' | qid=- | membership-set=n | rows=3 | fail=0 ==
+== venue loc:gothic quarter walking tour barcelona spain | tour_type='' | qid=- | membership-set=n | rows=7 | fail=0 ==
+== venue loc:griffin museum of photography winchester ma | tour_type='museum' | qid=- | membership-set=n | rows=7 | fail=4 ==
+   FAIL  'BU Masters Show 2026 | Traces: Pursuing Process'             shop_or_junk_title
+   FAIL  'Tabitha Soren | An Artist Life'                              shop_or_junk_title
+   FAIL  'Lua Kobayashi |The Persistence of Memories'                  shop_or_junk_title
+   FAIL  'Homage | Robert Frank: The Americans'                        shop_or_junk_title
+== venue loc:groeningemuseum bruges belgium | tour_type='museum' | qid=- | membership-set=n | rows=6 | fail=0 ==
+== venue loc:harvard art museum tour in cambridge ma | tour_type='museum' | qid=- | membership-set=n | rows=7 | fail=0 ==
+== venue loc:harvard art museums cambridge ma | tour_type='museum' | qid=- | membership-set=n | rows=6 | fail=0 ==
+== venue loc:higashiyama temples walking tour kyoto japan | tour_type='' | qid=- | membership-set=n | rows=9 | fail=0 ==
+== venue loc:history of jamaica plain boston | tour_type='' | qid=- | membership-set=n | rows=5 | fail=0 ==
+== venue loc:italian restaurants in the north end boston | tour_type='' | qid=- | membership-set=n | rows=4 | fail=0 ==
+== venue loc:italian restaurants in the north end boston | tour_type='dining' | qid=- | membership-set=n | rows=5 | fail=0 ==
+== venue loc:kitesurfing schools in mui ne vietnam | tour_type='' | qid=- | membership-set=n | rows=3 | fail=0 ==
+== venue loc:kroller-muller museum otterlo netherlands | tour_type='museum' | qid=- | membership-set=n | rows=3 | fail=0 ==
+== venue loc:kunsthalle bremen bremen germany | tour_type='museum' | qid=- | membership-set=n | rows=5 | fail=1 ==
+   FAIL  'Ein Saal im Museum der Monumente'                            room_or_space_title
+== venue loc:kunsthaus zurich zurich switzerland | tour_type='museum' | qid=- | membership-set=n | rows=9 | fail=0 ==
+== venue loc:kunsthistorisches museum vienna austria | tour_type='museum' | qid=- | membership-set=n | rows=3 | fail=0 ==
+== venue loc:lower manhattan history walking tour new york ny | tour_type='' | qid=- | membership-set=n | rows=4 | fail=0 ==
+== venue loc:massage and spa near ben thanh market ho chi minh city | tour_type='' | qid=- | membership-set=n | rows=2 | fail=0 ==
+== venue loc:massart art museum boston ma | tour_type='museum' | qid=- | membership-set=n | rows=5 | fail=0 ==
+== venue loc:mcmullen museum of art boston college boston ma | tour_type='museum' | qid=- | membership-set=n | rows=19 | fail=0 ==
+== venue loc:metropolitan museum of art new york usa | tour_type='museum' | qid=- | membership-set=n | rows=3 | fail=0 ==
+== venue loc:middle eastern restaurants near me west roxbury ma | tour_type='' | qid=- | membership-set=n | rows=4 | fail=0 ==
+== venue loc:middle eastern restaurants near me west roxbury ma | tour_type='dining' | qid=- | membership-set=n | rows=10 | fail=0 ==
+== venue loc:middle eastern restaurants near me west roxbury ma | tour_type='walking' | qid=- | membership-set=n | rows=2 | fail=0 ==
+== venue loc:montmartre walking tour paris france | tour_type='' | qid=- | membership-set=n | rows=7 | fail=0 ==
+== venue loc:musee des augustins toulouse france | tour_type='museum' | qid=- | membership-set=n | rows=2 | fail=0 ==
+== venue loc:musee des beaux-arts de lyon lyon france | tour_type='museum' | qid=- | membership-set=n | rows=8 | fail=0 ==
+== venue loc:musee fabre montpellier france | tour_type='museum' | qid=- | membership-set=n | rows=4 | fail=0 ==
+== venue loc:musee granet aix-en-provence france | tour_type='museum' | qid=- | membership-set=n | rows=4 | fail=0 ==
+== venue loc:musee jacquemart-andre paris france | tour_type='museum' | qid=- | membership-set=n | rows=3 | fail=0 ==
+== venue loc:musee marmottan monet paris france | tour_type='museum' | qid=- | membership-set=n | rows=3 | fail=1 ==
+   FAIL  'Pendule « L’Amitié voilant les heures »'                     shop_or_junk_title
+== venue loc:musee rodin paris france | tour_type='museum' | qid=- | membership-set=n | rows=3 | fail=0 ==
+== venue loc:museo correr venice italy | tour_type='museum' | qid=- | membership-set=n | rows=3 | fail=0 ==
+== venue loc:museo de bellas artes de bilbao bilbao spain | tour_type='museum' | qid=- | membership-set=n | rows=5 | fail=0 ==
+== venue loc:museo nacional de escultura valladolid spain | tour_type='museum' | qid=- | membership-set=n | rows=3 | fail=0 ==
+== venue loc:museo reina sofia madrid spain | tour_type='museum' | qid=- | membership-set=n | rows=3 | fail=0 ==
+== venue loc:museu nacional dart de catalunya barcelona spain | tour_type='museum' | qid=- | membership-set=n | rows=5 | fail=0 ==
+== venue loc:museum folkwang essen germany | tour_type='museum' | qid=- | membership-set=n | rows=2 | fail=0 ==
+== venue loc:museum of fine arts boston ma | tour_type='museum' | qid=- | membership-set=n | rows=8 | fail=0 ==
+== venue loc:museum of fine arts boston usa | tour_type='museum' | qid=- | membership-set=n | rows=3 | fail=1 ==
+   FAIL  'The artist is in his studio.'                                shop_or_junk_title
+== venue loc:museum of fine arts budapest hungary | tour_type='museum' | qid=- | membership-set=n | rows=4 | fail=0 ==
+== venue loc:national gallery london united kingdom | tour_type='museum' | qid=- | membership-set=n | rows=13 | fail=1 ==
+   FAIL  'Ophelia'                                                     wrong_museum (known home of 'Ophelia' is not loc:national gallery london united kingdom)
+== venue loc:national gallery of ireland dublin ireland | tour_type='museum' | qid=- | membership-set=n | rows=5 | fail=0 ==
+== venue loc:neue pinakothek munich germany | tour_type='museum' | qid=- | membership-set=n | rows=3 | fail=0 ==
+== venue loc:old quarter walking tour hanoi vietnam | tour_type='' | qid=- | membership-set=n | rows=5 | fail=0 ==
+== venue loc:old saigon walking tour district 1 ho chi minh city | tour_type='' | qid=- | membership-set=n | rows=5 | fail=0 ==
+== venue loc:old town and charles bridge walking tour prague czech republic | tour_type='' | qid=- | membership-set=n | rows=5 | fail=0 ==
+== venue loc:old town walking tour nice france | tour_type='' | qid=- | membership-set=n | rows=7 | fail=0 ==
+== venue loc:pagodas and temples of ho chi minh city | tour_type='walking' | qid=- | membership-set=n | rows=4 | fail=0 ==
+== venue loc:pagodas and temples of ho chi minh city (jade emperor pagoda thien hau temple) | tour_type='' | qid=- | membership-set=n | rows=5 | fail=0 ==
+== venue loc:philadelphia museum of art philadelphia usa | tour_type='museum' | qid=- | membership-set=n | rows=3 | fail=0 ==
+== venue loc:pinacoteca di brera milan italy | tour_type='museum' | qid=- | membership-set=n | rows=3 | fail=0 ==
+== venue loc:rijksmuseum twenthe enschede netherlands | tour_type='museum' | qid=- | membership-set=n | rows=3 | fail=0 ==
+== venue loc:salem tv series filming locations shreveport louisiana | tour_type='' | qid=- | membership-set=n | rows=5 | fail=0 ==
+== venue loc:salem witch trials walking tour salem ma | tour_type='' | qid=- | membership-set=n | rows=6 | fail=3 ==
+   FAIL  'Salem Witch Trials Memorial'                                 room_or_space_title
+   FAIL  'The Salem Witch Trials Memorial'                             room_or_space_title
+   FAIL  'Salem Witch Museum'                                          room_or_space_title
+== venue loc:san marco walking tour venice italy | tour_type='' | qid=- | membership-set=n | rows=6 | fail=0 ==
+== venue loc:scenic drive along cape ann massachusetts by car | tour_type='' | qid=- | membership-set=n | rows=7 | fail=0 ==
+== venue loc:seafood restaurants in mui ne vietnam | tour_type='' | qid=- | membership-set=n | rows=3 | fail=0 ==
+== venue loc:state hermitage museum saint petersburg russia | tour_type='museum' | qid=- | membership-set=n | rows=3 | fail=0 ==
+== venue loc:sultanahmet walking tour istanbul turkey | tour_type='' | qid=- | membership-set=n | rows=5 | fail=0 ==
+== venue loc:tate modern london united kingdom | tour_type='museum' | qid=- | membership-set=n | rows=3 | fail=0 ==
+== venue loc:the courtauld gallery london united kingdom | tour_type='museum' | qid=- | membership-set=n | rows=20 | fail=0 ==
+== venue loc:the episode 1 of season 1 biking tour salem ma | tour_type='' | qid=- | membership-set=n | rows=4 | fail=3 ==
+   FAIL  'Salem Willows Park'                                          room_or_space_title
+   FAIL  'Salem Common'                                                room_or_space_title
+   FAIL  'Salem Witch Museum'                                          room_or_space_title
+== venue loc:the frick collection new york ny usa | tour_type='museum' | qid=- | membership-set=n | rows=8 | fail=0 ==
+== venue loc:the walters art museum baltimore md united states | tour_type='museum' | qid=- | membership-set=n | rows=3 | fail=0 ==
+== venue loc:trevi fountain pantheon and piazza navona walking tour rome italy | tour_type='' | qid=- | membership-set=n | rows=4 | fail=0 ==
+== venue loc:uffizi gallery florence italy | tour_type='museum' | qid=- | membership-set=n | rows=24 | fail=0 ==
+== venue loc:van gogh museum amsterdam | tour_type='walking' | qid=- | membership-set=n | rows=3 | fail=0 ==
+== venue loc:vietnam national fine arts museum hanoi vietnam | tour_type='' | qid=- | membership-set=n | rows=5 | fail=0 ==
+== venue loc:vietnam national fine arts museum hanoi vietnam | tour_type='museum' | qid=- | membership-set=n | rows=4 | fail=0 ==
+== venue loc:vietnamese restaurants and street food district 1 ho chi minh city | tour_type='' | qid=- | membership-set=n | rows=4 | fail=0 ==
+== venue loc:walking tour in boston dedicated to massachusetts politics and current affairs boston ma | tour_type='walking' | qid=- | membership-set=n | rows=71 | fail=0 ==
+== venue loc:walking tour: gyms near me west roxbury ma | tour_type='walking' | qid=- | membership-set=n | rows=3 | fail=0 ==
+== venue loc:walters art museum baltimore maryland usa | tour_type='museum' | qid=- | membership-set=n | rows=4 | fail=0 ==
+== venue loc:watertown city hall watertown ma | tour_type='walking' | qid=- | membership-set=n | rows=2 | fail=0 ==
+== venue loc:westminster walking tour london uk | tour_type='' | qid=- | membership-set=n | rows=7 | fail=0 ==
+== venue loc:witchcraft biking tour in boston area dalem ma | tour_type='biking' | qid=- | membership-set=n | rows=2 | fail=1 ==
+   FAIL  'Salem Witch Trials Memorial'                                 room_or_space_title
+== venue loc:zz_isolated_orch_30eec019 | tour_type='museum' | qid=- | membership-set=n | rows=5 | fail=0 ==
+== venue loc:zz_isolated_orch_9141f9aa | tour_type='museum' | qid=- | membership-set=n | rows=7 | fail=0 ==
+== venue loc:zz_isolated_orch_dd6c23ec | tour_type='museum' | qid=- | membership-set=n | rows=5 | fail=0 ==
+== venue loc:zz_isolated_walk_9ef80fce | tour_type='walking' | qid=- | membership-set=n | rows=6 | fail=0 ==
+== venue qid:Q112081342 | tour_type='' | qid=Q112081342 | membership-set=n | rows=1 | fail=0 ==
+== venue qid:Q112081342 | tour_type='museum' | qid=Q112081342 | membership-set=n | rows=1 | fail=0 ==
+== venue qid:Q113541747 | tour_type='' | qid=Q113541747 | membership-set=n | rows=4 | fail=2 ==
+   FAIL  'Rare Salem Witch Trials Artifacts'                           room_or_space_title
+   FAIL  'The 1692 Salem Witch Trials Presentation'                    room_or_space_title
+== venue qid:Q1140507 | tour_type='museum' | qid=Q1140507 | membership-set=196 works | rows=3 | fail=0 ==
+== venue qid:Q1201549 | tour_type='museum' | qid=Q1201549 | membership-set=296 works | rows=3 | fail=0 ==
+== venue qid:Q12110695 | tour_type='museum' | qid=Q12110695 | membership-set=293 works | rows=61 | fail=2 ==
+   FAIL  'Explore this sculpture in our virtual tour'                  shop_or_junk_title
+   FAIL  'Explore this painting in our virtual tour'                   shop_or_junk_title
+== venue qid:Q125634 | tour_type='museum' | qid=Q125634 | membership-set=125 works | rows=2 | fail=0 ==
+== venue qid:Q127064 | tour_type='museum' | qid=Q127064 | membership-set=140 works | rows=5 | fail=0 ==
+== venue qid:Q1327919 | tour_type='museum' | qid=Q1327919 | membership-set=299 works | rows=3 | fail=0 ==
+== venue qid:Q1368396 | tour_type='museum' | qid=Q1368396 | membership-set=30 works | rows=3 | fail=0 ==
+== venue qid:Q1421440 | tour_type='museum' | qid=Q1421440 | membership-set=299 works | rows=1 | fail=0 ==
+== venue qid:Q1464509 | tour_type='museum' | qid=Q1464509 | membership-set=298 works | rows=6 | fail=0 ==
+== venue qid:Q1465805 | tour_type='museum' | qid=Q1465805 | membership-set=297 works | rows=3 | fail=0 ==
+== venue qid:Q1470912 | tour_type='museum' | qid=Q1470912 | membership-set=121 works | rows=3 | fail=0 ==
+== venue qid:Q1505892 | tour_type='museum' | qid=Q1505892 | membership-set=285 works | rows=3 | fail=0 ==
+== venue qid:Q1519002 | tour_type='museum' | qid=Q1519002 | membership-set=293 works | rows=4 | fail=0 ==
+== venue qid:Q1563354 | tour_type='' | qid=Q1563354 | membership-set=12 works | rows=6 | fail=0 ==
+== venue qid:Q1592523 | tour_type='museum' | qid=Q1592523 | membership-set=51 works | rows=3 | fail=0 ==
+== venue qid:Q160236 | tour_type='' | qid=Q160236 | membership-set=n | rows=9 | fail=0 ==
+== venue qid:Q1700481 | tour_type='museum' | qid=Q1700481 | membership-set=298 works | rows=6 | fail=0 ==
+== venue qid:Q1743116 | tour_type='museum' | qid=Q1743116 | membership-set=298 works | rows=3 | fail=0 ==
+== venue qid:Q1760539 | tour_type='museum' | qid=Q1760539 | membership-set=287 works | rows=6 | fail=1 ==
+   FAIL  'Collection Guide'                                            shop_or_junk_title
+== venue qid:Q180788 | tour_type='museum' | qid=Q180788 | membership-set=294 works | rows=27 | fail=1 ==
+   FAIL  'Ophelia'                                                     wrong_museum (known home of 'Ophelia' is not this venue)
+== venue qid:Q1889944 | tour_type='museum' | qid=Q1889944 | membership-set=286 works | rows=3 | fail=0 ==
+== venue qid:Q190804 | tour_type='' | qid=Q190804 | membership-set=294 works | rows=4 | fail=0 ==
+== venue qid:Q190804 | tour_type='museum' | qid=Q190804 | membership-set=294 works | rows=2 | fail=0 ==
+== venue qid:Q19362502 | tour_type='museum' | qid=Q19362502 | membership-set=24 works | rows=3 | fail=0 ==
+== venue qid:Q19675 | tour_type='' | qid=Q19675 | membership-set=169 works | rows=5 | fail=0 ==
+== venue qid:Q1976985 | tour_type='museum' | qid=Q1976985 | membership-set=289 works | rows=3 | fail=0 ==
+== venue qid:Q2018379 | tour_type='museum' | qid=Q2018379 | membership-set=293 works | rows=5 | fail=0 ==
+== venue qid:Q210081 | tour_type='museum' | qid=Q210081 | membership-set=296 works | rows=6 | fail=0 ==
+== venue qid:Q250195 | tour_type='museum' | qid=Q250195 | membership-set=104 works | rows=3 | fail=0 ==
+== venue qid:Q2711480 | tour_type='museum' | qid=Q2711480 | membership-set=261 works | rows=2 | fail=0 ==
+== venue qid:Q2756351 | tour_type='museum' | qid=Q2756351 | membership-set=1 works | rows=28 | fail=0 ==
+== venue qid:Q303139 | tour_type='' | qid=Q303139 | membership-set=282 works | rows=7 | fail=0 ==
+== venue qid:Q3329265 | tour_type='museum' | qid=Q3329265 | membership-set=3 works | rows=7 | fail=1 ==
+   FAIL  'Résurrection'                                                wrong_collection (P195=Q1895953 excludes Q3329265; P276 location ignored)
+== venue qid:Q3373790 | tour_type='' | qid=Q3373790 | membership-set=75 works | rows=6 | fail=0 ==
+== venue qid:Q3654706 | tour_type='' | qid=Q3654706 | membership-set=12 works | rows=5 | fail=0 ==
+== venue qid:Q3654706 | tour_type='museum' | qid=Q3654706 | membership-set=12 works | rows=4 | fail=0 ==
+== venue qid:Q3783572 | tour_type='museum' | qid=Q3783572 | membership-set=297 works | rows=13 | fail=0 ==
+== venue qid:Q4134126 | tour_type='' | qid=Q4134126 | membership-set=n | rows=5 | fail=0 ==
+== venue qid:Q49131 | tour_type='walking' | qid=Q49131 | membership-set=n | rows=10 | fail=0 ==
+== venue qid:Q49132 | tour_type='walking' | qid=Q49132 | membership-set=3 works | rows=6 | fail=0 ==
+== venue qid:Q49133 | tour_type='' | qid=Q49133 | membership-set=295 works | rows=6 | fail=1 ==
+   FAIL  'The artist is in his studio.'                                shop_or_junk_title
+== venue qid:Q49133 | tour_type='museum' | qid=Q49133 | membership-set=295 works | rows=7 | fail=0 ==
+== venue qid:Q49135 | tour_type='' | qid=Q49135 | membership-set=298 works | rows=4 | fail=0 ==
+== venue qid:Q511 | tour_type='museum' | qid=Q511 | membership-set=253 works | rows=5 | fail=0 ==
+== venue qid:Q51252 | tour_type='' | qid=Q51252 | membership-set=292 works | rows=5 | fail=0 ==
+== venue qid:Q51252 | tour_type='museum' | qid=Q51252 | membership-set=292 works | rows=28 | fail=0 ==
+== venue qid:Q568666 | tour_type='' | qid=Q568666 | membership-set=n | rows=6 | fail=0 ==
+== venue qid:Q6373 | tour_type='' | qid=Q6373 | membership-set=298 works | rows=5 | fail=0 ==
+== venue qid:Q650519 | tour_type='museum' | qid=Q650519 | membership-set=58 works | rows=3 | fail=0 ==
+== venue qid:Q657415 | tour_type='museum' | qid=Q657415 | membership-set=n | rows=6 | fail=0 ==
+== venue qid:Q670250 | tour_type='museum' | qid=Q670250 | membership-set=134 works | rows=3 | fail=2 ==
+   FAIL  'The Shop Girl'                                               shop_or_junk_title
+   FAIL  '"I am half sick of shadows" said the Lady of Shalott'        shop_or_junk_title
+== venue qid:Q673833 | tour_type='museum' | qid=Q673833 | membership-set=125 works | rows=3 | fail=0 ==
+== venue qid:Q685038 | tour_type='museum' | qid=Q685038 | membership-set=292 works | rows=5 | fail=0 ==
+== venue qid:Q693591 | tour_type='museum' | qid=Q693591 | membership-set=170 works | rows=5 | fail=1 ==
+   FAIL  'Ein Saal im Museum der Monumente'                            room_or_space_title
+== venue qid:Q7020161 | tour_type='walking' | qid=Q7020161 | membership-set=n | rows=2 | fail=0 ==
+== venue qid:Q754507 | tour_type='museum' | qid=Q754507 | membership-set=298 works | rows=5 | fail=0 ==
+== venue qid:Q812889 | tour_type='walking' | qid=Q812889 | membership-set=7 works | rows=3 | fail=0 ==
+== venue qid:Q820892 | tour_type='museum' | qid=Q820892 | membership-set=206 works | rows=3 | fail=0 ==
+== venue qid:Q840886 | tour_type='museum' | qid=Q840886 | membership-set=297 works | rows=4 | fail=1 ==
+   FAIL  'The Age of Bronze'                                           wrong_collection (P195=Q23402 excludes Q840886; P276 location ignored)
+== venue qid:Q954222 | tour_type='museum' | qid=Q954222 | membership-set=183 works | rows=3 | fail=0 ==
+== venue qid:Q95569 | tour_type='museum' | qid=Q95569 | membership-set=292 works | rows=3 | fail=0 ==
+== venue qid:Q965780 | tour_type='museum' | qid=Q965780 | membership-set=76 works | rows=3 | fail=0 ==
+== venue qid:Q99108607 | tour_type='museum' | qid=Q99108607 | membership-set=n | rows=7 | fail=4 ==
+   FAIL  'BU Masters Show 2026 | Traces: Pursuing Process'             shop_or_junk_title
+   FAIL  'Lua Kobayashi |The Persistence of Memories'                  shop_or_junk_title
+   FAIL  'Tabitha Soren | An Artist Life'                              shop_or_junk_title
+   FAIL  'Homage | Robert Frank: The Americans'                        shop_or_junk_title
+--- 35 pooled museum stop(s) FAIL the LOCAL-809 checks ---
+DRY RUN: no rows moved. Re-run with --apply to quarantine them.
+
+=== APPLY RESULT (Mac dev DB development-postgres-2-1 / audiotours) ===
+stop_pool rows BEFORE: 993
+rows moved out to stop_pool_rejected (verified copy-before-delete): 35
+stop_pool rows AFTER:  958   (delta=35)
+re-audit AFTER apply:  0 pooled museum stop(s) fail the LOCAL-809 checks
+(full MOVED list: reports/local811_pool_audit_apply.txt)
+Only stop_pool / stop_pool_rejected were touched; audio_tours untouched.

@@ -1,0 +1,45 @@
+=== LOCAL-811B stop_pool RESTORE — APPLY (restore wrongly-moved rows) ===
+Context: LEAD review of reports/local811_pool_audit_apply.txt found the first
+audit over-rejected real artworks (issues 1-4). This restore re-runs the
+LEAD-corrected pool_museum_checks on every 'local811_pool_audit' rejected row
+and restores the rows the corrected logic now KEEPS, via the verified LOCAL-792
+restore_from_rejected (copy-before-delete, one transaction). Mac DB only;
+stop_pool / stop_pool_rejected only; venue works read cache-first (no paid API).
+
+stop_pool          BEFORE restore: 958   AFTER: 973   (restored +15)
+stop_pool_rejected BEFORE restore:  36   AFTER:  21   (-15)
+
+Prior apply (reports/local811_pool_audit_apply.txt): 993 -> 958 (35 moved).
+Net stop_pool after 811B restore: 973 (993 - 35 + 15 = 973; 20 remain correctly rejected).
+
+--- 15 RESTORED (corrected checks now KEEP; reason mapped to LEAD item) ---
+Issue 1 (quoted / substring, not commerce):
+   The Shop Girl                                        (was shop_or_junk_title)
+   "I am half sick of shadows" said the Lady of Shalott (was shop_or_junk_title)
+   Pendule « L'Amitié voilant les heures »              (was shop_or_junk_title; guillemets are French quotes)
+Issue 2 (multiple / >=2 P195 / site-listed):
+   The Age of Bronze    Q840886  (bronze sculpture/cast; single foreign P195 spared)
+   Ophelia              Q180788  (site-listed in the venue's own works -> kept)
+   Résurrection         Q3329265 (site-listed in the venue's own works -> kept)
+Issue 4 (room/space title on WALKING/neighbourhood pools -> not contained):
+   Salem Witch Trials Memorial            (x3 across biking/walking pools)
+   The Salem Witch Trials Memorial
+   Salem Maritime National Historic Site
+   Salem Witch Museum                     (x2)
+   Salem Willows Park
+   Salem Common
+
+--- 20 CORRECTLY STILL REJECTED (LEAD item 6 + contained-tour rooms) ---
+   Explore this painting/sculpture in our virtual tour  (CTA)        x2
+   Collection Guide                                     (page chrome)
+   The artist is in his studio.                         (CTA/non-exhibit) x2
+   BU Masters Show 2026 | Traces: Pursuing Process      (exhibition pipe) [Griffin + Q99108607]
+   Homage | Robert Frank: The Americans                 (exhibition pipe) x2
+   Lua Kobayashi |The Persistence of Memories           (exhibition pipe) x2
+   Tabitha Soren | An Artist Life                       (exhibition pipe) x2
+   Austrian State Treaty                                (event_or_architecture_title)
+   Profile « The ALBERTINA Museum Vienna                (breadcrumb chrome)
+   Ophelia  (loc:national gallery london)               (wrong_museum; NG is not Ophelia's home)
+   Ein Saal im Museum der Monumente                     (room_or_space_title; contained museum) x2
+   Rare Salem Witch Trials Artifacts                    (room_or_space_title; Q113541747 contained museum)
+   The 1692 Salem Witch Trials Presentation             (room_or_space_title; Q113541747 contained museum)
