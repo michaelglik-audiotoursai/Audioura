@@ -2166,6 +2166,14 @@ def business_replenish_candidates(
                          f"{result_city or _scope} [category={category}/{osm_type}]"),
             "verified": True,
             "_dist": (_haversine_km_local(origin, (lat, lng)) if origin else 0.0),
+            # [LOCAL-800] Customer-voice fields off the SAME Places record (no
+            # extra call). Absent on a Nominatim record; the paragraph omits the
+            # item or makes the single reviews call downstream.
+            "_serper_rating": r.get("_serper_rating"),
+            "_serper_rating_count": r.get("_serper_rating_count"),
+            "_serper_price_level": r.get("_serper_price_level"),
+            "_serper_website": r.get("_serper_website"),
+            "_serper_category": r.get("_serper_category"),
         })
         exclude.add(name.lower())
 
@@ -2506,6 +2514,15 @@ def dining_replenish_candidates(
                          f"{(', cuisine=' + _listing_cuisine) if _listing_cuisine else ''}]"),
             "verified": True,
             "_dist": (_haversine_km_local(origin, (lat, lng)) if origin else 0.0),
+            # [LOCAL-800] Carry the customer-voice fields straight off the SAME
+            # Places record so the "What people say" paragraph is built with NO
+            # extra Serper call. Absent keys stay absent (Nominatim records have
+            # none; the paragraph then omits the item or makes the one reviews call).
+            "_serper_rating": r.get("_serper_rating"),
+            "_serper_rating_count": r.get("_serper_rating_count"),
+            "_serper_price_level": r.get("_serper_price_level"),
+            "_serper_website": r.get("_serper_website"),
+            "_serper_category": r.get("_serper_category"),
         })
         exclude.add(name.lower())
 

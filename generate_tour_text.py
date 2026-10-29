@@ -11242,6 +11242,20 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
             "confirmation": "",
         }
 
+    def _carry_customer_voice_fields(poi, cand):
+        """[LOCAL-800] Copy the customer-voice fields a maps/places candidate carries
+        (Serper rating / review count / price band / website / category) onto the
+        poi dict, so the customer-voice pass can reuse them with NO extra Serper
+        call. A no-op for a candidate that carries none (e.g. a Nominatim record).
+        Returns the poi for chaining."""
+        if not isinstance(poi, dict) or not isinstance(cand, dict):
+            return poi
+        for _k in ("_serper_rating", "_serper_rating_count", "_serper_price_level",
+                   "_serper_website", "_serper_category", "_serper_cid"):
+            if cand.get(_k) is not None and poi.get(_k) is None:
+                poi[_k] = cand.get(_k)
+        return poi
+
     # Determine poi_type hint for prompts
     if intent and intent.get('poi_type'):
         raw = intent['poi_type']
@@ -15388,6 +15402,7 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
                             _p3cp['coords_source'] = _p3c_src
                             _p3cp['confirmation'] = 'knowledge'
                             _p3cp['_maps_verified'] = True
+                            _carry_customer_voice_fields(_p3cp, _p3cc)
                             poi_list.append(_p3cp)
                             forbidden_norms.add(_normalize_name(_p3cc['name']))
                             print(f"     [LOCAL-779B] maps stop: {_p3cc['name']!r} "
@@ -15438,6 +15453,7 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
                                         _wcp['coords_source'] = _p3c_src
                                         _wcp['confirmation'] = 'knowledge'
                                         _wcp['_maps_verified'] = True
+                                        _carry_customer_voice_fields(_wcp, _wc)
                                         poi_list.append(_wcp)
                                         forbidden_norms.add(_normalize_name(_wc['name']))
                                         _wide_added += 1
@@ -16186,6 +16202,7 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
                         _ep['coords_source'] = _empty_src
                         _ep['confirmation'] = 'knowledge'
                         _ep['_maps_verified'] = True
+                        _carry_customer_voice_fields(_ep, _ec)
                         poi_list.append(_ep)
                         forbidden_norms.add(_normalize_name(_ec['name']))
                         print(f"    [LOCAL-779B] maps-first stop: {_ec['name']!r} "
@@ -16292,6 +16309,7 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
                         _bp['coords_source'] = 'business_maps'
                         _bp['confirmation'] = 'knowledge'
                         _bp['_maps_verified'] = True
+                        _carry_customer_voice_fields(_bp, _bc)
                         poi_list.append(_bp)
                         _rep_tried.add(_bc['name'].lower())
                         forbidden_norms.add(_normalize_name(_bc['name']))
@@ -16346,6 +16364,7 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
                         _dp['coords_source'] = 'dining_maps'
                         _dp['confirmation'] = 'knowledge'
                         _dp['_maps_verified'] = True
+                        _carry_customer_voice_fields(_dp, _dc)
                         poi_list.append(_dp)
                         _rep_tried.add(_dc['name'].lower())
                         forbidden_norms.add(_normalize_name(_dc['name']))
@@ -17990,6 +18009,7 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
                             _mnew['longitude'] = _mc.get('lng')
                         _mnew['coords_source'] = 'dining_maps'
                         _mnew['_maps_verified'] = True
+                        _carry_customer_voice_fields(_mnew, _mc)
                         poi_list.append(_mnew)
                         print(f"  [LOCAL-788]   D545 ADDED (map) '{_mcn[:44]}' — "
                               f"{_mc.get('evidence', _mc.get('address',''))[:70]}")
@@ -18084,6 +18104,95 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
         except Exception as _rp_err:
             print(f"  [D538] Restaurant practicals error (non-fatal): {_rp_err}")
 
+
+    # -------- [LOCAL-800] CUSTOMER VOICE — "What people say" for place stops ----
+    # Michael, tour 469 (Russian, massage & spa near Ben Thanh Market): a day spa
+    # is "acceptable with stories; not really interesting" — it rarely has history
+    # or a famous visitor, so the story-first narration has little true to say. The
+    # interesting, useful thing about a BUSINESS is what its customers say: the
+    # Google rating and how many left it, roughly what it costs, how long it has
+    # been open, the treatments/dishes reviewers keep naming, the top praise and
+    # the one recurring complaint.
+    #
+    # This pass attaches a SOURCED customer-voice paragraph to each place-type stop
+    # (dining and business/activity — the LOCAL-788B places path). It reuses the
+    # Serper Places record ALREADY fetched for the stop (rating / review count /
+    # price band / website, carried on the poi by _carry_customer_voice_fields) and
+    # makes AT MOST ONE extra Serper call per stop for review snippets (~$0.001).
+    # Museums/facilities are excluded (they have their own object-focused content).
+    # Built ONLY from sourced data — never invents a number, a name or a quote;
+    # omits any item with no source; a complaint needs >= 2 agreeing snippets; no
+    # rating AND no review count -> no paragraph. See customer_voice.py.
+    if tour_category not in ('museum', 'facility'):
+        try:
+            import customer_voice as _cv800
+            _cv800_scope = ''
+            try:
+                _cv800_scope = _scope_from_request(location, intent)
+            except Exception:
+                _cv800_scope = location
+            # Only a PLACE-type stop gets the paragraph. Three ways a stop qualifies:
+            #   (1) the WHOLE tour is a places/business/dining tour (restaurant
+            #       category, or a poi_type that classifies business/dining) — every
+            #       stop is a place, however it was sourced (LLM name verified on the
+            #       map, or a maps refill);
+            #   (2) the stop came from the maps places path (_maps_verified /
+            #       coords_source), or
+            #   (3) it already carries a Serper rating.
+            # A user-named landmark on a landmark/history tour is NOT re-shaped as a
+            # business (it has its own story), so a plain landmark tour is excluded.
+            _cv800_tour_is_places = (tour_category == 'restaurant')
+            if not _cv800_tour_is_places:
+                try:
+                    from stop_existence_gate import classify_business_vs_landmark as _cv800_cls
+                    _cv800_pt = ''
+                    if intent and intent.get('poi_type'):
+                        _cv800_rpt = intent['poi_type']
+                        _cv800_pt = (" or ".join(_cv800_rpt)
+                                     if isinstance(_cv800_rpt, list) else _cv800_rpt)
+                    _cv800_tour_is_places = _cv800_cls(_cv800_pt) in ('business', 'dining')
+                except Exception:
+                    _cv800_tour_is_places = False
+            _cv800_allow_search = (os.environ.get('LOCAL800_DISABLE_REVIEW_SEARCH', '')
+                                   .strip() != '1')
+            _cv800_n = 0
+            for _cv800_poi in poi_list:
+                _is_place = bool(_cv800_tour_is_places
+                                 or _cv800_poi.get('_maps_verified')
+                                 or _cv800_poi.get('_serper_rating') is not None
+                                 or _cv800_poi.get('coords_source') in
+                                 ('dining_maps', 'business_maps'))
+                if not _is_place:
+                    continue
+                try:
+                    _cv800_facts = _cv800.collect_facts(
+                        _cv800_poi, _cv800_poi.get('name', ''), _cv800_scope,
+                        allow_search=_cv800_allow_search, api_key=api_key)
+                except Exception as _cv800_fe:
+                    print(f"  [LOCAL-800] customer-voice collect failed for "
+                          f"{_cv800_poi.get('name','')[:40]!r} (non-fatal): {_cv800_fe}")
+                    continue
+                if not _cv800_facts.get('usable'):
+                    continue
+                _cv800_poi['_customer_voice'] = _cv800_facts
+                # Store the facts with the stop's sources (evidence/provenance).
+                try:
+                    _cv800_poi.setdefault('_sources', {}).update(
+                        _cv800.facts_for_sources(_cv800_facts))
+                except Exception:
+                    pass
+                _cv800_line = _cv800.log_line(_cv800_facts)
+                if _cv800_line:
+                    print(f"  {_cv800_line}")
+                    _cv800_n += 1
+            if _cv800_n:
+                print(f"  [LOCAL-800] customer-voice paragraphs attached to "
+                      f"{_cv800_n} place stop(s)")
+        except ImportError as _cv800_err:
+            _import_logger.error(f"[LOCAL-800] MISSING: customer_voice — place stops "
+                                 f"will ship with no 'what people say' paragraph: {_cv800_err}")
+        except Exception as _cv800_err:
+            print(f"  [LOCAL-800] customer-voice pass skipped (non-fatal): {_cv800_err}")
 
 
     # -------- [D556] REPLENISH + LORE for every OTHER tour type --------
@@ -20678,6 +20787,21 @@ Exempt: navigation directions ("Turn left", "Continue past").
                         "compressed into a headline, which is the failure this stop exists "
                         "to avoid. Do NOT pad with atmosphere to reach it — if the material "
                         "genuinely supports only one episode, write that one fully and stop.\n")
+            # [LOCAL-800] "What people say" — the customer-voice paragraph, for any
+            # place-type stop (dining and business/activity) that acquired one in
+            # the LOCAL-800 pass above. Built only from sourced Serper data; the
+            # block forbids the writer from adding to its numbers/items/quotes. For
+            # a business with little history of its own, this is the most useful,
+            # interesting thing the stop can say (Michael, tour 469 spa feedback).
+            if tour_category != 'museum':
+                try:
+                    import customer_voice as _cv800b
+                    _cv800_block = _cv800b.customer_voice_prompt_block(
+                        poi.get('_customer_voice'))
+                    if _cv800_block:
+                        _practicals_block += _cv800_block
+                except Exception:
+                    pass
             description_prompt = f"""Create a detailed description for the stop "{poi_name}" on a {tour_category} tour{_mode_context} of {location}.
 {_visited_line}{_claims_line}{_practicals_block}
 Start with an orientation section that explains how the visitor arrives at this stop and what they should look for.
