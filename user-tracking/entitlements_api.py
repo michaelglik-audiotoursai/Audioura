@@ -90,6 +90,15 @@ _APPLE_IAP_ENV_EXPECTED = (
 GOOGLE_PACKAGE_NAME = os.getenv('GOOGLE_PACKAGE_NAME', APPLE_BUNDLE_ID)
 GOOGLE_PLAY_SA_JSON = os.getenv('GOOGLE_PLAY_SA_JSON', '')
 
+# [LOCAL-807] Auto-renewing subscriptions. The Google RTDN endpoint +
+# subscriptionsv2.get are gated behind this flag: the code and its tests ship
+# now, but live Google verification only turns on once the audioura-play-verify
+# service account is granted the subscriptions permission (currently 403 —
+# D733 §3). Defaults OFF so a deployment never attempts an unauthorised Play
+# call by accident. The Apple notifications endpoint has no such gate (Apple
+# verification is fully working offline).
+GOOGLE_SUBS_ENABLED = os.getenv('GOOGLE_SUBS_ENABLED', '').lower() in ('true', '1', 'yes')
+
 # A sentinel returned by the Google verify path when no service account is
 # configured, so the HTTP layer answers 503 google_verify_unconfigured. A
 # TEST may inject a fake Google API client here to exercise the google path
@@ -373,7 +382,8 @@ def _get_device_state(cur, user_id):
     return dict(zip(_DEV_COLS, row))
 
 
-_PLAN_COLS = ['plan_id', 'tours_per_day', 'tours_per_month', 'fresh_per_pack',
+_PLAN_COLS = ['plan_id', 'tours_per_day', 'tours_per_month', 'tours_per_week',
+              'fresh_per_pack',
               'edits_per_pack', 'ops_per_pack', 'max_stops', 'max_new_stops_per_edit',
               'by_reference_only', 'referrals_allowed', 'referral_period', 'seat_cap',
               'can_sell', 'price_usd', 'inactivity_days', 'display_name', 'hidden']
@@ -381,7 +391,8 @@ _PLAN_COLS = ['plan_id', 'tours_per_day', 'tours_per_month', 'fresh_per_pack',
 
 def _get_plan(cur, level):
     cur.execute("""
-        SELECT plan_id, tours_per_day, tours_per_month, fresh_per_pack,
+        SELECT plan_id, tours_per_day, tours_per_month, tours_per_week,
+               fresh_per_pack,
                edits_per_pack, ops_per_pack, max_stops, max_new_stops_per_edit,
                by_reference_only, referrals_allowed, referral_period, seat_cap,
                can_sell, price_usd, inactivity_days, display_name, hidden
@@ -470,6 +481,21 @@ def _allowances_left(cur, state, plan):
                     (state['user_id'],))
         used_month = cur.fetchone()[0]
         out['tours_this_month_left'] = max(0, plan['tours_per_month'] - used_month)
+    # [LOCAL-807B] Weekly subscription allowance. The Weekly plan (sub_week)
+    # grants tours_per_week with tours_per_month NULL and tours_per_day=999, so
+    # neither branch above fires and the plans screen showed NO "N new tours
+    # left" for a Weekly subscriber — the exact line D734's "Your plan" banner
+    # needs. Count the SAME delivered tours, scoped to the current week
+    # (date_trunc('week') = Monday per ISO) with the same orchestrator/completed
+    # predicate the gate uses, so display and gate agree.
+    if plan.get('tours_per_week') is not None:
+        cur.execute("""SELECT COUNT(*) FROM tour_requests
+                       WHERE secret_id=%s AND source='orchestrator'
+                         AND status='completed'
+                         AND started_at >= date_trunc('week', CURRENT_DATE)""",
+                    (state['user_id'],))
+        used_week = cur.fetchone()[0]
+        out['tours_this_week_left'] = max(0, plan['tours_per_week'] - used_week)
     if plan['fresh_per_pack'] is not None:
         out['fresh_left'] = max(0, plan['fresh_per_pack'] - state['fresh_used'])
     if plan['edits_per_pack'] is not None:
@@ -1725,5 +1751,215 @@ def l2_claim():
             "error_code": l2_seats.CLAIM_BAD_CODE,
             "message": "That code is not valid.",
         }), 400
+    finally:
+        conn.close()
+
+
+# ───────────────────────────────────────────────────────────────────────────
+# [LOCAL-807] Auto-renewing subscriptions — store server notifications and the
+# app-reported subscription purchase.
+#
+# The notification endpoints are STORE-to-SERVER webhooks (Apple ASSN v2,
+# Google RTDN), so they are NOT behind the X-API-Key gate the app uses — the
+# store calls them directly. Their authenticity comes from the signed JWS
+# (Apple, pinned to Apple Root CA G3) and the Pub/Sub + subscriptionsv2 lookup
+# (Google). Every event is applied idempotently (dedupe by notification uuid).
+# ───────────────────────────────────────────────────────────────────────────
+@entitlements_bp.route('/iap/apple/notifications', methods=['POST'])
+def apple_notifications():
+    """Apple App Store Server Notifications v2. Body: {"signedPayload": "<JWS>"}.
+
+    Verifies the signed payload (and its nested transaction/renewal JWS) against
+    the pinned Apple Root CA G3, maps the notificationType to a lifecycle status
+    (SUBSCRIBED, DID_RENEW, DID_FAIL_TO_RENEW, GRACE_PERIOD_EXPIRED, EXPIRED,
+    REFUND, REVOKE, DID_CHANGE_RENEWAL_STATUS), and applies it idempotently.
+    Returns 200 on success/duplicate so Apple stops re-delivering; a forged
+    payload returns 401 (content fault), a malformed body 400."""
+    import subscription_notifications as sn
+    body = request.get_json(silent=True) or {}
+    try:
+        root_pem = _load_apple_root_ca()
+        event = sn.parse_apple_notification(
+            body, root_ca_pem=root_pem, expected_bundle_id=APPLE_BUNDLE_ID)
+    except sn.SubscriptionNotificationError as e:
+        # 200 for a handled-but-ignored type (unknown notificationType) so Apple
+        # does not retry forever; the real error codes carry their http_status.
+        logger.info(f"[LOCAL-807] apple notification not applied: {e.code}")
+        return jsonify({"status": "ignored", "reason": e.code}), e.http_status
+
+    conn = _get_db()
+    try:
+        cur = conn.cursor()
+        result = sn.apply_event(cur, event,
+                                user_id_hint=body.get('user_id'))
+        conn.commit()
+        cur.close()
+        return jsonify({"status": "ok", **result}), 200
+    except Exception as e:  # noqa: BLE001
+        conn.rollback()
+        logger.error(f"[LOCAL-807] apple notification apply error: {e}")
+        # 500 so Apple retries a genuine server-side failure.
+        return jsonify({"error": "apply_failed"}), 500
+    finally:
+        conn.close()
+
+
+@entitlements_bp.route('/iap/google/rtdn', methods=['POST'])
+def google_rtdn():
+    """Google Real-time developer notifications (Pub/Sub push). Body:
+    {"message": {"data": "<base64 JSON>", "messageId": "..."}}.
+
+    GATED behind GOOGLE_SUBS_ENABLED (D733 §3): until the audioura-play-verify
+    service account has the subscriptions permission, this returns 503
+    google_subs_disabled and never attempts a Play call. When enabled it decodes
+    the RTDN, fetches the authoritative state via subscriptionsv2.get, maps the
+    Google notificationType to a lifecycle status, and applies it idempotently."""
+    import subscription_notifications as sn
+    if not GOOGLE_SUBS_ENABLED:
+        return jsonify({"error": "google_subs_disabled"}), 503
+
+    body = request.get_json(silent=True) or {}
+    client = _google_api_client()
+    if client is None:
+        return jsonify({"error": "google_verify_unconfigured"}), 503
+
+    try:
+        event = sn.parse_google_rtdn(
+            body, api_client=client, package_name=GOOGLE_PACKAGE_NAME)
+    except sn.SubscriptionNotificationError as e:
+        logger.info(f"[LOCAL-807] google rtdn not applied: {e.code}")
+        return jsonify({"status": "ignored", "reason": e.code}), e.http_status
+
+    conn = _get_db()
+    try:
+        cur = conn.cursor()
+        result = sn.apply_event(cur, event, user_id_hint=body.get('user_id'))
+        conn.commit()
+        cur.close()
+        return jsonify({"status": "ok", **result}), 200
+    except Exception as e:  # noqa: BLE001
+        conn.rollback()
+        logger.error(f"[LOCAL-807] google rtdn apply error: {e}")
+        return jsonify({"error": "apply_failed"}), 500
+    finally:
+        conn.close()
+
+
+@entitlements_bp.route('/subscriptions/verify', methods=['POST'])
+def subscriptions_verify():
+    """[LOCAL-807] The app reports an auto-renewing subscription purchase it just
+    made, so the server grants the level immediately (without waiting for the
+    first server notification). Body:
+        {store, user_id, product_id, signed_transaction}   (Apple JWS), or
+        {store:'google', user_id, product_id, purchase_token}.
+
+    Apple: verify the StoreKit 2 JWS offline (type='Auto-Renewable Subscription'),
+    read the originalTransactionId + expiresDate, upsert the subscription row and
+    set the device level. Google: gated by GOOGLE_SUBS_ENABLED; verify the token
+    with subscriptionsv2.get. Idempotent on the original transaction id."""
+    import subscription_notifications as sn
+    err = _require_api_key()
+    if err:
+        return err
+    data = request.get_json(silent=True) or {}
+    store = data.get('store')
+    user_id = data.get('user_id')
+    product_id = data.get('product_id') or data.get('product')
+    signed_transaction = data.get('signed_transaction')
+    purchase_token = data.get('purchase_token')
+    if not all([store, user_id, product_id]):
+        return jsonify({"error": "missing_fields",
+                        "message": "store, user_id and product_id are required."}), 400
+
+    if store == 'apple':
+        if not signed_transaction:
+            return jsonify({"error": "apple_missing_signed_transaction"}), 400
+        try:
+            from apple_jws_verifier import (
+                verify_signed_transaction, JwsVerificationError)
+        except Exception as e:  # pragma: no cover
+            return jsonify({"error": f"apple_verifier_unavailable:{e}"}), 500
+        try:
+            root_pem = _load_apple_root_ca()
+            verified = verify_signed_transaction(
+                signed_transaction,
+                root_ca_pem=root_pem,
+                expected_bundle_id=APPLE_BUNDLE_ID,
+                expected_product_id=product_id,
+                # A subscription's type is 'Auto-Renewable Subscription', not
+                # 'Consumable' — do not enforce the consumable type here.
+                required_type='Auto-Renewable Subscription',
+                expected_environment=_APPLE_IAP_ENV_EXPECTED,
+            )
+        except JwsVerificationError as e:
+            return jsonify({"error": f"apple_{e.code}"}), 402
+        except Exception as e:  # noqa: BLE001
+            return jsonify({"error": f"apple_error:{e}"}), 500
+
+        p = verified.raw_payload or {}
+        original_txn = (p.get('originalTransactionId')
+                        or verified.transaction_id)
+        expires = p.get('expiresDate')
+        period_end = None
+        if expires is not None:
+            try:
+                period_end = datetime.utcfromtimestamp(float(expires) / 1000.0)
+            except (TypeError, ValueError, OSError, OverflowError):
+                period_end = None
+        event = sn.SubscriptionEvent(
+            store='apple',
+            notification_uuid=f'app_verify:{original_txn}:{verified.transaction_id}',
+            notification_type='APP_REPORTED_PURCHASE',
+            target_status=sn.STATUS_ACTIVE,
+            original_transaction_id=str(original_txn),
+            product_id=product_id,
+            period_end=period_end,
+            auto_renew=True,
+            event_at=datetime.utcnow(),
+            raw_summary={'source': 'app', 'productId': product_id},
+        )
+    elif store == 'google':
+        if not GOOGLE_SUBS_ENABLED:
+            return jsonify({"error": "google_subs_disabled"}), 503
+        client = _google_api_client()
+        if client is None:
+            return jsonify({"error": "google_verify_unconfigured"}), 503
+        if not purchase_token:
+            return jsonify({"error": "google_missing_purchase_token"}), 400
+        try:
+            state = client.get_subscription_v2(GOOGLE_PACKAGE_NAME, purchase_token)
+        except Exception as e:  # noqa: BLE001
+            return jsonify({"error": f"google_subs_get_failed:{e}"}), 402
+        period_end = None
+        line_items = state.get('lineItems') or []
+        if line_items:
+            period_end = sn._parse_rfc3339(line_items[0].get('expiryTime'))
+        event = sn.SubscriptionEvent(
+            store='google',
+            notification_uuid=f'app_verify:{purchase_token}',
+            notification_type='APP_REPORTED_PURCHASE',
+            target_status=sn.STATUS_ACTIVE,
+            original_transaction_id=str(purchase_token),
+            product_id=product_id,
+            period_end=period_end,
+            auto_renew=True,
+            event_at=datetime.utcnow(),
+            raw_summary={'source': 'app', 'productId': product_id},
+        )
+    else:
+        return jsonify({"error": f"unsupported_store:{store}"}), 400
+
+    conn = _get_db()
+    try:
+        cur = conn.cursor()
+        result = sn.apply_event(cur, event, user_id_hint=user_id)
+        conn.commit()
+        payload = _me_payload(cur, user_id)
+        cur.close()
+        return jsonify({"status": "ok", "result": result, "entitlements": payload}), 200
+    except Exception as e:  # noqa: BLE001
+        conn.rollback()
+        logger.error(f"[LOCAL-807] subscriptions/verify apply error: {e}")
+        return jsonify({"error": "apply_failed"}), 500
     finally:
         conn.close()

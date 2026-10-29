@@ -72,6 +72,52 @@ extension IapProductIds on IapProduct {
 /// All store ids we query/sell.
 const Set<String> kIapStoreIds = {'audioura.pack.l3', 'audioura.round.l4'};
 
+/// [LOCAL-807] Auto-renewing subscriptions + the Day pass (D734). The four
+/// subscription store ids are the SAME on Apple and Google, and match the
+/// StoreKit config file (Audioura.storekit) and the plans.store_product_id rows
+/// in migration 060. The server maps each to a level via /subscriptions/verify,
+/// and the store server notifications keep the lifecycle in sync afterwards.
+///
+/// Day is a NON-renewing pass (24h); Week/Month/Year AUTO-RENEW. The prices and
+/// the "N new tours" copy are NOT hard-coded here — the plans screen reads the
+/// live store price and the server-sent allowance. Only the ids live in code.
+enum IapSubscription { day, weekly, monthly, annual }
+
+extension IapSubscriptionIds on IapSubscription {
+  /// Store product id (Apple + Google), matching Audioura.storekit and
+  /// plans.store_product_id (migration 060).
+  String get storeId {
+    switch (this) {
+      case IapSubscription.day:
+        return 'audioura.sub.day';
+      case IapSubscription.weekly:
+        return 'audioura.sub.weekly';
+      case IapSubscription.monthly:
+        return 'audioura.sub.monthly';
+      case IapSubscription.annual:
+        return 'audioura.sub.annual';
+    }
+  }
+
+  /// True for the three AUTO-RENEWING options; false for the Day pass (which is
+  /// non-renewing). The plans screen shows the auto-renewal terms only when
+  /// this is true.
+  bool get autoRenews => this != IapSubscription.day;
+}
+
+/// The four subscription store ids the app sells.
+const Set<String> kSubscriptionStoreIds = {
+  'audioura.sub.day',
+  'audioura.sub.weekly',
+  'audioura.sub.monthly',
+  'audioura.sub.annual',
+};
+
+/// True iff [storeId] is one of our subscription/day-pass products. Used to
+/// route a purchase to /subscriptions/verify instead of /purchases/verify.
+bool isSubscriptionProduct(String storeId) =>
+    kSubscriptionStoreIds.contains(storeId);
+
 /// Map a StoreKit product id back to the server product key. Returns null for
 /// an unknown id (defensive — never grant on something we didn't sell).
 String? serverProductForStoreId(String storeId) {
@@ -475,6 +521,103 @@ class IapService {
     }
 
     return _pending!.future;
+  }
+
+  // ─── [LOCAL-807] Auto-renewing subscriptions + Day pass ─────────────────────
+
+  /// Buy a subscription (Day pass or an auto-renewing Week/Month/Year). Mirrors
+  /// [buy] but uses buyNonConsumable — the correct in_app_purchase call for a
+  /// subscription or non-renewing subscription product — and routes the grant
+  /// to /subscriptions/verify (see [_verifyAndGrant], which branches on
+  /// [isSubscriptionProduct]). Resolves once the store+server flow reaches a
+  /// terminal state.
+  Future<IapResult> buySubscription(IapSubscription sub) async {
+    if (Platform.isAndroid && !kAndroidBillingEnabled) {
+      return const IapResult(IapResultStatus.unavailable,
+          'Subscriptions are not available on Android yet.');
+    }
+
+    bool available;
+    try {
+      available = await _iap.isAvailable().timeout(const Duration(seconds: 8));
+    } catch (e) {
+      await DebugLogHelper.addDebugLog('IAP: isAvailable failed: $e');
+      available = false;
+    }
+    if (!available) {
+      return const IapResult(IapResultStatus.unavailable,
+          'The store is not available on this device.');
+    }
+
+    await _ensureListening();
+
+    final response = await _iap.queryProductDetails({sub.storeId}).timeout(
+        const Duration(seconds: 20),
+        onTimeout: () => ProductDetailsResponse(
+            productDetails: const [], notFoundIDs: [sub.storeId]));
+    if (response.error != null ||
+        response.productDetails.isEmpty ||
+        response.notFoundIDs.contains(sub.storeId)) {
+      await DebugLogHelper.addDebugLog(
+          'IAP: subscription not found: ${sub.storeId} '
+          'err=${response.error?.message} notFound=${response.notFoundIDs}');
+      return const IapResult(IapResultStatus.unavailable,
+          'This plan isn\u2019t available on this store yet. Please try again '
+          'later.');
+    }
+
+    final details = response.productDetails.first;
+
+    if (_hasLivePending()) {
+      return const IapResult(
+          IapResultStatus.failed, 'Another purchase is already in progress.');
+    }
+    _pending = Completer<IapResult>();
+    _pendingSince = DateTime.now();
+    _pendingStoreId = sub.storeId;
+
+    final param = PurchaseParam(productDetails: details);
+    try {
+      // A subscription (and a non-renewing subscription) is bought with
+      // buyNonConsumable — NOT buyConsumable.
+      await _iap.buyNonConsumable(purchaseParam: param);
+    } catch (e) {
+      await DebugLogHelper.addDebugLog('IAP: buyNonConsumable threw: $e');
+      _pendingStoreId = null;
+      final c = _pending;
+      _pending = null;
+      if (c != null && !c.isCompleted) {
+        return IapResult(IapResultStatus.failed, 'Could not start purchase: $e');
+      }
+    }
+
+    return _pending!.future;
+  }
+
+  /// Ask the store to re-deliver the user's existing purchases (including an
+  /// active subscription), so a reinstalled/other device restores entitlement.
+  /// The purchase stream handles each restored item through the same verify
+  /// path; this just triggers it. Returns true if the call was dispatched.
+  Future<bool> restoreSubscriptions() async {
+    try {
+      await _ensureListening();
+      await _iap.restorePurchases();
+      return true;
+    } catch (e) {
+      await DebugLogHelper.addDebugLog('IAP: restorePurchases error: $e');
+      return false;
+    }
+  }
+
+  /// The platform URL that opens the store's "Manage subscriptions" page, so
+  /// the user can cancel or change their plan. Apple and Google each have a
+  /// single deep link; the plans screen opens it with url_launcher.
+  String manageSubscriptionsUrl() {
+    if (Platform.isAndroid) {
+      return 'https://play.google.com/store/account/subscriptions';
+    }
+    // iOS: the system Manage Subscriptions page.
+    return 'https://apps.apple.com/account/subscriptions';
   }
 
   // ─── [LOCAL-677] Curator paid tours ────────────────────────────────────────
@@ -969,7 +1112,13 @@ class IapService {
   /// failed server verify is left unfinished so the next launch retries — but at
   /// most one server attempt per transaction id per app start, to avoid a loop.
   Future<void> _handlePurchasedOrRestored(PurchaseDetails p) async {
-    final bool isPack = serverProductForStoreId(p.productID) != null;
+    // [LOCAL-807] A subscription/Day-pass product (like a pack) has an implicit
+    // context — the product itself maps to a level — so it is treated exactly
+    // like a pack here: always finished on a verified grant, never blocked for
+    // "missing context".
+    final bool isSubscription = isSubscriptionProduct(p.productID);
+    final bool isPack =
+        isSubscription || serverProductForStoreId(p.productID) != null;
     final String txnId = p.purchaseID ?? '';
 
     // Resolve the context for this product: in-memory (a buy() in this session)
@@ -1081,7 +1230,12 @@ class IapService {
     final bool isPassPurchase =
         isCommunityPassProduct(p.productID) && ctx.communityId != null;
 
-    final serverProduct = (isTourPurchase || isPassPurchase)
+    // [LOCAL-807] An auto-renewing subscription / Day pass: verified at
+    // /subscriptions/verify (not /purchases/verify), which maps the store
+    // product to a level and records the subscription for the lifecycle.
+    final bool isSubscriptionPurchase = isSubscriptionProduct(p.productID);
+
+    final serverProduct = (isTourPurchase || isPassPurchase || isSubscriptionPurchase)
         ? p.productID
         : serverProductForStoreId(p.productID);
     if (serverProduct == null) {
@@ -1105,6 +1259,51 @@ class IapService {
     final transactionId = p.purchaseID ?? '';
 
     final bool isGoogle = Platform.isAndroid;
+
+    // [LOCAL-807] Subscriptions take a different endpoint and body shape.
+    if (isSubscriptionPurchase) {
+      final subBody = <String, dynamic>{
+        'user_id': userId,
+        'store': isGoogle ? 'google' : 'apple',
+        'product_id': p.productID,
+      };
+      if (isGoogle) {
+        subBody['purchase_token'] = verificationData;
+      } else {
+        subBody['signed_transaction'] = verificationData;
+      }
+      try {
+        final override = verifyPostOverride;
+        final resp = override != null
+            ? await override(subBody)
+            : await Endpoints.post(
+                Service.userDb,
+                '/subscriptions/verify',
+                body: subBody,
+                timeout: const Duration(seconds: 30),
+              );
+        if (resp.statusCode == 200) {
+          await DebugLogHelper.addDebugLog(
+              'IAP: server granted subscription ${p.productID} for $transactionId');
+          return const IapResult(IapResultStatus.granted);
+        }
+        String? msg;
+        try {
+          final decoded = jsonDecode(resp.body);
+          if (decoded is Map && decoded['message'] is String) {
+            msg = decoded['message'] as String;
+          }
+        } catch (_) {}
+        await DebugLogHelper.addDebugLog(
+            'IAP: subscription verify non-200 ${resp.statusCode}: ${resp.body}');
+        return IapResult(IapResultStatus.failed,
+            msg ?? 'The subscription could not be verified.');
+      } catch (e) {
+        await DebugLogHelper.addDebugLog('IAP: subscription verify error: $e');
+        return IapResult(IapResultStatus.failed,
+            'Could not reach the server to verify your subscription: $e');
+      }
+    }
 
     final body = <String, dynamic>{
       'user_id': userId,

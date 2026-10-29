@@ -37,6 +37,9 @@
             ReferencedContainer = "container:Runner.xcodeproj">
          </BuildableReference>
       </MacroExpansion>
+      <StoreKitConfigurationFileReference
+         identifier = "Audioura.storekit">
+      </StoreKitConfigurationFileReference>
       <Testables>
          <TestableReference
             skipped = "NO"
@@ -73,6 +76,9 @@
             ReferencedContainer = "container:Runner.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
+      <StoreKitConfigurationFileReference
+         identifier = "Audioura.storekit">
+      </StoreKitConfigurationFileReference>
    </LaunchAction>
    <ProfileAction
       buildConfiguration = "Profile"

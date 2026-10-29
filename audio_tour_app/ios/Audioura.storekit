@@ -2,6 +2,21 @@
   "identifier": "A0A0A0A0-0000-4000-8000-000000000598",
   "nonRenewingSubscriptions": [
     {
+      "displayPrice": "2.99",
+      "familyShareable": false,
+      "internalID": "F001F001-0807-4000-8000-000000000807",
+      "localizations": [
+        {
+          "description": "A 24-hour Day pass: 3 new tours plus unlimited catalog downloads and translations. Non-renewing — nothing renews automatically; buy again for another day.",
+          "displayName": "Day pass ($2.99)",
+          "locale": "en_US"
+        }
+      ],
+      "productID": "audioura.sub.day",
+      "referenceName": "Day pass $2.99 (LOCAL-807)",
+      "type": "NonRenewingSubscription"
+    },
+    {
       "displayPrice": "1.00",
       "familyShareable": false,
       "internalID": "E001E001-0000-4000-8000-000000000704",
@@ -1179,7 +1194,81 @@
     "_developerTeamID": "0000000000",
     "_lastSynchronizedDate": 0
   },
-  "subscriptionGroups": [],
+  "subscriptionGroups": [
+    {
+      "id": "A0807001-0807-4000-8000-000000000807",
+      "localizations": [],
+      "name": "Audioura",
+      "subscriptions": [
+        {
+          "adHocOffers": [],
+          "codeOffers": [],
+          "displayPrice": "4.99",
+          "familyShareable": false,
+          "groupNumber": 1,
+          "internalID": "A0807011-0807-4000-8000-000000000807",
+          "introductoryOffer": null,
+          "localizations": [
+            {
+              "description": "5 new tours a week, plus unlimited catalog downloads and translations. Auto-renews weekly until cancelled.",
+              "displayName": "Weekly ($4.99)",
+              "locale": "en_US"
+            }
+          ],
+          "productID": "audioura.sub.weekly",
+          "recurringSubscriptionPeriod": "P1W",
+          "referenceName": "Weekly $4.99 (LOCAL-807)",
+          "subscriptionGroupID": "A0807001-0807-4000-8000-000000000807",
+          "type": "RecurringSubscription",
+          "winbackOffers": []
+        },
+        {
+          "adHocOffers": [],
+          "codeOffers": [],
+          "displayPrice": "9.99",
+          "familyShareable": false,
+          "groupNumber": 1,
+          "internalID": "A0807012-0807-4000-8000-000000000807",
+          "introductoryOffer": null,
+          "localizations": [
+            {
+              "description": "10 new tours a month, plus unlimited catalog downloads and translations. Auto-renews monthly until cancelled.",
+              "displayName": "Monthly ($9.99)",
+              "locale": "en_US"
+            }
+          ],
+          "productID": "audioura.sub.monthly",
+          "recurringSubscriptionPeriod": "P1M",
+          "referenceName": "Monthly $9.99 (LOCAL-807)",
+          "subscriptionGroupID": "A0807001-0807-4000-8000-000000000807",
+          "type": "RecurringSubscription",
+          "winbackOffers": []
+        },
+        {
+          "adHocOffers": [],
+          "codeOffers": [],
+          "displayPrice": "79.99",
+          "familyShareable": false,
+          "groupNumber": 1,
+          "internalID": "A0807013-0807-4000-8000-000000000807",
+          "introductoryOffer": null,
+          "localizations": [
+            {
+              "description": "10 new tours a month, plus unlimited catalog downloads and translations, billed yearly. Auto-renews annually until cancelled.",
+              "displayName": "Annual ($79.99)",
+              "locale": "en_US"
+            }
+          ],
+          "productID": "audioura.sub.annual",
+          "recurringSubscriptionPeriod": "P1Y",
+          "referenceName": "Annual $79.99 (LOCAL-807)",
+          "subscriptionGroupID": "A0807001-0807-4000-8000-000000000807",
+          "type": "RecurringSubscription",
+          "winbackOffers": []
+        }
+      ]
+    }
+  ],
   "version": {
     "major": 4,
     "minor": 0

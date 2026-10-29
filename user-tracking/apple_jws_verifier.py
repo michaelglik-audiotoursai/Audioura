@@ -273,6 +273,80 @@ def _parse_signed_date(payload: dict) -> Optional[datetime.datetime]:
         return None
 
 
+def verify_and_decode_jws(jws: str, root_ca_pem: bytes) -> dict:
+    """[LOCAL-807] Verify ANY Apple-signed JWS offline and return its decoded
+    payload dict. This is the chain-pin + ES256-signature core shared by
+    verify_signed_transaction and the App Store Server Notifications v2 path:
+
+      * the x5c chain is pinned to the bundled Apple Root CA G3 and checked for
+        the leaf/intermediate purpose OIDs, exact length, and temporal validity
+        at signedDate (exactly as verify_signed_transaction);
+      * the ES256 signature is verified over header.payload with the leaf key;
+      * the decoded payload is returned WITHOUT any transaction-specific claim
+        checks (bundleId / productId / type / environment / revocation), so the
+        caller applies whatever claim rules fit the payload kind.
+
+    An ASSN v2 notification is a `signedPayload` JWS whose payload carries nested
+    `signedTransactionInfo` and `signedRenewalInfo` JWS strings; each is verified
+    with THIS function (same Apple chain), then its claims are read. A signed
+    transaction's own claim checks still live in verify_signed_transaction, which
+    now delegates its crypto here so the two can never diverge.
+
+    Raises JwsVerificationError with a stable `.code` on any failure. Performs
+    NO network and NO DB access.
+    """
+    if not jws or jws.count('.') != 2:
+        raise JwsVerificationError('malformed_jws', 'Expected a compact JWS with 3 parts.')
+
+    header_b64, payload_b64, signature_b64 = jws.split('.')
+
+    try:
+        header = json.loads(_b64url_decode(header_b64))
+    except Exception as e:
+        raise JwsVerificationError('bad_header', f'Could not decode JWS header: {e}')
+
+    alg = header.get('alg')
+    if alg != 'ES256':
+        raise JwsVerificationError('bad_alg', f"Unexpected alg '{alg}', expected ES256.")
+
+    x5c = header.get('x5c')
+    if not isinstance(x5c, list) or not x5c:
+        raise JwsVerificationError('no_x5c', 'JWS header has no x5c certificate chain.')
+
+    try:
+        x5c_der = [base64.b64decode(c) for c in x5c]
+    except Exception as e:
+        raise JwsVerificationError('bad_x5c', f'Could not base64-decode x5c: {e}')
+
+    # Peek at signedDate for the cert-validity reference time ONLY (untrusted
+    # until the signature verifies — tampering with it fails the check below).
+    try:
+        _early_payload = json.loads(_b64url_decode(payload_b64))
+    except Exception:
+        _early_payload = {}
+    valid_at = _parse_signed_date(_early_payload) if isinstance(_early_payload, dict) else None
+
+    # Chain + root pin + OIDs + chain-length + validity.
+    leaf = _verify_chain(x5c_der, root_ca_pem, valid_at=valid_at)
+
+    # Signature over header.payload.
+    try:
+        signature_raw = _b64url_decode(signature_b64)
+    except Exception as e:
+        raise JwsVerificationError('bad_signature', f'Could not decode signature: {e}')
+    signing_input = f'{header_b64}.{payload_b64}'.encode('ascii')
+    _verify_jws_signature(signing_input, signature_raw, leaf)
+
+    # Payload (only trusted AFTER the signature verified).
+    try:
+        payload = json.loads(_b64url_decode(payload_b64))
+    except Exception as e:
+        raise JwsVerificationError('bad_payload', f'Could not decode payload: {e}')
+    if not isinstance(payload, dict):
+        raise JwsVerificationError('bad_payload', 'JWS payload is not a JSON object.')
+    return payload
+
+
 def verify_signed_transaction(
     jws: str,
     root_ca_pem: bytes,
@@ -301,59 +375,10 @@ def verify_signed_transaction(
     Returns a VerifiedTransaction on success. Raises JwsVerificationError with a
     stable `.code` on any failure. Performs NO network and NO DB access.
     """
-    if not jws or jws.count('.') != 2:
-        raise JwsVerificationError('malformed_jws', 'Expected a compact JWS with 3 parts.')
-
-    header_b64, payload_b64, signature_b64 = jws.split('.')
-
-    # --- header + x5c ---
-    try:
-        header = json.loads(_b64url_decode(header_b64))
-    except Exception as e:
-        raise JwsVerificationError('bad_header', f'Could not decode JWS header: {e}')
-
-    alg = header.get('alg')
-    if alg != 'ES256':
-        raise JwsVerificationError('bad_alg', f"Unexpected alg '{alg}', expected ES256.")
-
-    x5c = header.get('x5c')
-    if not isinstance(x5c, list) or not x5c:
-        raise JwsVerificationError('no_x5c', 'JWS header has no x5c certificate chain.')
-
-    try:
-        # x5c entries are STANDARD base64 (with padding) of DER certs.
-        x5c_der = [base64.b64decode(c) for c in x5c]
-    except Exception as e:
-        raise JwsVerificationError('bad_x5c', f'Could not base64-decode x5c: {e}')
-
-    # [LOCAL-598B] Peek at signedDate for the cert-validity reference time ONLY.
-    # This is read before the signature is verified, so it is NOT trusted for
-    # any grant decision — if an attacker alters signedDate the signature check
-    # below fails. Using the signing time (rather than "now") means a cert that
-    # was valid when Apple signed is still accepted after it later expires,
-    # matching Apple's own library; absent a usable signedDate we use now.
-    try:
-        _early_payload = json.loads(_b64url_decode(payload_b64))
-    except Exception:
-        _early_payload = {}
-    valid_at = _parse_signed_date(_early_payload) if isinstance(_early_payload, dict) else None
-
-    # --- chain + root pin + OIDs + chain-length + validity ---
-    leaf = _verify_chain(x5c_der, root_ca_pem, valid_at=valid_at)
-
-    # --- signature over header.payload ---
-    try:
-        signature_raw = _b64url_decode(signature_b64)
-    except Exception as e:
-        raise JwsVerificationError('bad_signature', f'Could not decode signature: {e}')
-    signing_input = f'{header_b64}.{payload_b64}'.encode('ascii')
-    _verify_jws_signature(signing_input, signature_raw, leaf)
-
-    # --- payload claims (only trusted AFTER the signature verified) ---
-    try:
-        payload = json.loads(_b64url_decode(payload_b64))
-    except Exception as e:
-        raise JwsVerificationError('bad_payload', f'Could not decode payload: {e}')
+    # [LOCAL-807] Crypto (chain pin + ES256 signature + decode) is shared with
+    # the notifications path via verify_and_decode_jws, so the two can never
+    # diverge. The transaction-specific claim checks stay here.
+    payload = verify_and_decode_jws(jws, root_ca_pem)
 
     bundle_id = payload.get('bundleId')
     if bundle_id != expected_bundle_id:

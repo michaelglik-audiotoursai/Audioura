@@ -1,0 +1,65 @@
+# docker-compose.local807-proof.yml  (LOCAL-807B — LIVE proof)
+#
+# Minimal own-stack for the LOCAL-807 live test: a dedicated Postgres and the
+# user-tracking service (which hosts the entitlements + subscription routes),
+# built from THIS worktree so the live run measures the LOCAL-807 code, not the
+# running development stack's image. Brought up with `-p local807` on
+# non-conflicting host ports so it never touches the running dev stack or the
+# live DB.
+#
+#   docker compose -p local807 -f docker-compose.local807-proof.yml up -d --build
+#   ... exercise /subscriptions/verify, /entitlements/me, /iap/apple/notifications ...
+#   docker compose -p local807 -f docker-compose.local807-proof.yml down -v
+#
+# THROWAWAY DB: the Postgres has no volume, so `down -v` (or just `down`) leaves
+# nothing behind. The schema is built at init time from docs/local807/sql:
+#   00_base_schema.sql  — the minimal plans/device_entitlement/purchases tables
+#                         the subscription routes read (migration 003 + 012
+#                         structure, trimmed to what 060 and the routes need;
+#                         no users/communities/etc. — those routes are not run).
+#   01_migration_060.sql — a copy of migration/sql/060_auto_renew_subscriptions.sql
+#                          (additive; applied on top of the base).
+# Postgres runs *.sql in /docker-entrypoint-initdb.d in lexical order, so the
+# base lands before 060.
+#
+# LOCAL ONLY env (same flags as docker-compose.subscribed-local.yml's user-api-2):
+#   IAP_VERIFY_MODE=per_store, APPLE_IAP_ENVIRONMENT=Sandbox so the iOS simulator
+#   StoreKit sandbox JWS is verified as Apple; ALLOW_UNAUTHENTICATED_ENTITLEMENTS
+#   so the Mac-Mini run needs no gateway key; IAP_ALLOW_STUB_STORE so a local
+#   test hook can drive a grant without real money. GOOGLE_SUBS_ENABLED stays
+#   OFF (default). None of these are ever set on GCloud.
+
+services:
+  postgres-807:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: audiotours
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: password123
+    ports:
+      - "55807:5432"
+    volumes:
+      - ./docs/local807/sql:/docker-entrypoint-initdb.d:ro
+    restart: unless-stopped
+
+  user-api-807:
+    build:
+      context: ./user-tracking
+    ports:
+      - "50807:5000"
+      # LOCAL-807B live run: the DEBUG app in local mode reaches userDb on the
+      # fixed host port 5003 (lib/config/endpoints.dart _localPorts). Published
+      # here so the iOS simulator (localhost == the Mac host) hits THIS branch's
+      # user-api. The dev stack's user-api-2 must be stopped for the run so 5003
+      # is free, then restarted afterwards (reversible; dev DB untouched).
+      - "5003:5000"
+    environment:
+      DATABASE_URL: postgresql://admin:password123@postgres-807:5432/audiotours
+      IAP_VERIFY_MODE: per_store
+      IAP_ALLOW_STUB_STORE: "true"
+      APPLE_IAP_ENVIRONMENT: Sandbox
+      APPLE_BUNDLE_ID: com.audioura.audiotours
+      ALLOW_UNAUTHENTICATED_ENTITLEMENTS: "true"
+    depends_on:
+      - postgres-807
+    restart: unless-stopped
