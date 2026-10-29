@@ -604,9 +604,32 @@ def _ensure_table(conn) -> None:
             cur.execute("""
                 ALTER TABLE stop_pool ADD COLUMN IF NOT EXISTS news_generated_at TIMESTAMPTZ
             """)
+            # [LOCAL-806] Additive migration: the RESEARCH LIBRARY freshness date.
+            # A stop that was pre-researched for a popular destination (the P6
+            # pilot — pre-build the research half of the pipeline and keep it) is
+            # stamped with a `fresh_until` date (museums/landmarks 90 days,
+            # businesses 30 days). The reader (get_pool_stops) IGNORES a row whose
+            # fresh_until is in the PAST — it is not served stale; the refresh
+            # script (research_library_refresh.py) re-researches it instead. A row
+            # with fresh_until = NULL (every ordinary delivered-tour stop) is never
+            # aged out by this clause — today's behaviour is byte-for-byte
+            # unchanged for it. This is orthogonal to news_generated_at (LOCAL-655,
+            # a 7-day clock for dated news items): a stop can carry either, both or
+            # neither. Never DELETE/DROP (ticket LOCAL-806).
+            cur.execute("""
+                ALTER TABLE stop_pool ADD COLUMN IF NOT EXISTS fresh_until TIMESTAMPTZ
+            """)
             cur.execute("""
                 CREATE INDEX IF NOT EXISTS idx_stop_pool_key
                 ON stop_pool (pool_key)
+            """)
+            # [LOCAL-806] Partial index on fresh_until so the refresh script's
+            # "rows nearing/after fresh_until" scan and the reader's freshness
+            # filter are cheap. Only library rows (fresh_until NOT NULL) are
+            # indexed, so ordinary pooled stops add nothing to it.
+            cur.execute("""
+                CREATE INDEX IF NOT EXISTS idx_stop_pool_fresh_until
+                ON stop_pool (fresh_until) WHERE fresh_until IS NOT NULL
             """)
             cur.execute("RELEASE SAVEPOINT stop_pool_ddl")
         except psycopg2.Error as _ddl_err:
@@ -638,6 +661,7 @@ def store_delivered_tour(
     story_elements_by_title: Optional[Dict[str, dict]] = None,
     research_cost_usd_per_stop: float = 0.0,
     records_by_title: Optional[Dict[str, dict]] = None,
+    fresh_days: Optional[int] = None,
 ) -> int:
     """Parse a delivered tour and UPSERT each stop into the pool.
 
@@ -661,6 +685,15 @@ def store_delivered_tour(
     the greater of 0 so a later $0 re-pool never erases a real original cost). A
     later pool/cache delivery reports `research_cost_reused` by summing this
     column over the stops it reuses.
+
+    [LOCAL-806] `fresh_days`, when given, stamps every stop written in this call
+    with `fresh_until = NOW() + fresh_days days` — the RESEARCH LIBRARY freshness
+    date. The research-library builder passes 90 for museums/landmarks and 30 for
+    businesses; the reader (`get_pool_stops`) then serves the row only while
+    `fresh_until` is in the future and the refresh script re-researches it as it
+    nears expiry. When `fresh_days` is None (every ordinary delivered-tour write)
+    `fresh_until` is left NULL and the row is never aged out by the library
+    clause — behaviour is byte-for-byte unchanged for ordinary deliveries.
     """
     identity = venue_identity(location, qid)
     pool_key = _pool_key(identity, tour_type)
@@ -670,6 +703,17 @@ def store_delivered_tour(
         return 0
 
     sources_json_default = json.dumps(sources) if sources else None
+    # [LOCAL-806] Normalise the research-library freshness window once. None (the
+    # ordinary delivery default) leaves fresh_until NULL; a positive int N stamps
+    # fresh_until = NOW()+N days on every stop written here. A non-positive or
+    # unparseable value is treated as None (no freshness date) — fail safe.
+    _fresh_days = None
+    if fresh_days is not None:
+        try:
+            _fd = int(fresh_days)
+            _fresh_days = _fd if _fd > 0 else None
+        except (TypeError, ValueError):
+            _fresh_days = None
     written = 0
     try:
         conn = psycopg2.connect(db_url)
@@ -710,9 +754,13 @@ def store_delivered_tour(
                         address, coordinates, type_specialty, specific_examples,
                         operational_details, sources_json, story_elements_json,
                         order_seq, research_cost_usd, stop_record_json,
-                        news_generated_at, generated_at
+                        news_generated_at, fresh_until, generated_at
                     ) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,
-                              CASE WHEN %s THEN NOW() ELSE NULL END, NOW())
+                              CASE WHEN %s THEN NOW() ELSE NULL END,
+                              CASE WHEN %s::int IS NOT NULL
+                                   THEN NOW() + (%s::int || ' days')::interval
+                                   ELSE NULL END,
+                              NOW())
                     ON CONFLICT (pool_key, title_norm) DO UPDATE SET
                         title = EXCLUDED.title,
                         artist = EXCLUDED.artist,
@@ -742,6 +790,13 @@ def store_delivered_tour(
                             WHEN COALESCE(stop_pool.research_cost_usd, 0) > 0
                             THEN stop_pool.research_cost_usd
                             ELSE EXCLUDED.research_cost_usd END,
+                        -- [LOCAL-806] A re-pool carrying a library freshness date
+                        -- refreshes fresh_until; a re-pool WITHOUT one (an ordinary
+                        -- delivery over a library row) KEEPS the existing date
+                        -- (COALESCE to the stored value) so a real customer tour
+                        -- served from the library does not silently drop its
+                        -- freshness window.
+                        fresh_until = COALESCE(EXCLUDED.fresh_until, stop_pool.fresh_until),
                         generated_at = NOW()
                     """,
                     (
@@ -753,6 +808,10 @@ def store_delivered_tour(
                         sources_json_default, se_json, base_seq + seq_i,
                         float(research_cost_usd_per_stop or 0.0), rec_json,
                         _news_has,
+                        # [LOCAL-806] fresh_until: the two placeholders in the
+                        # VALUES CASE both read fresh_days (None → NULL → ordinary
+                        # delivery, never aged out; an int N → NOW() + N days).
+                        _fresh_days, _fresh_days,
                     ),
                 )
                 written += 1
@@ -834,7 +893,7 @@ def get_pool_stops(
                        address, coordinates, type_specialty, specific_examples,
                        operational_details, sources_json, story_elements_json,
                        generated_at, hit_count, title_norm, research_cost_usd,
-                       stop_record_json
+                       stop_record_json, fresh_until
                 FROM stop_pool
                 WHERE pool_key = ANY(%s)
                   -- [LOCAL-655] A stop carrying a dated news item is reusable only
@@ -843,7 +902,13 @@ def get_pool_stops(
                   -- history-only stop has news_generated_at IS NULL and is always
                   -- kept — its behaviour is unchanged.
                   AND (news_generated_at IS NULL
-                       OR news_generated_at >= NOW() - (%s || ' days')::interval)"""
+                       OR news_generated_at >= NOW() - (%s || ' days')::interval)
+                  -- [LOCAL-806] RESEARCH LIBRARY freshness. A pre-researched
+                  -- library row carries a fresh_until date; once it is in the
+                  -- PAST the row is IGNORED here (not served stale) and the
+                  -- refresh script re-researches it. An ordinary delivered-tour
+                  -- stop has fresh_until IS NULL and is always kept — unchanged.
+                  AND (fresh_until IS NULL OR fresh_until >= NOW())"""
                 + _reject_clause
                 + """
                 ORDER BY order_seq ASC, generated_at ASC, title_norm ASC
@@ -918,6 +983,11 @@ def get_pool_stops(
             "research_cost_usd": float(r[15]) if r[15] is not None else 0.0,
             # [LOCAL-644] the structured record this stop renders from on reuse.
             "stop_record": _rec,
+            # [LOCAL-806] the research-library freshness date (ISO), or None for an
+            # ordinary delivered-tour stop. A row is only ever returned here while
+            # fresh_until is NULL or in the future (the WHERE clause above), so a
+            # non-None value is always a still-fresh library row.
+            "fresh_until": r[17].isoformat() if r[17] else None,
         })
     logger.info(f"[POOL] {len(stops)} pooled stop(s) across keys {keys}")
     return stops
