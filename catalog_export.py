@@ -26,7 +26,10 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 DEFAULT_EXPORT = os.path.join(HERE, "catalog", "export")
 
 # Kept tours and their 0-10 review scores, straight from catalog/CATALOG_REVIEW.md.
-KEEP_SCORES = {845: 7.5, 846: 8.5, 848: 8.5, 856: 7.5, 858: 8.0, 859: 7.5}
+# Six from the original LOCAL-808 review; four (844, 850, 852, 853) added by the LOCAL-808B
+# re-score of LEAD's re-made tours (same keep rule: score >= 7.5 AND every pin <= 150 m).
+KEEP_SCORES = {844: 7.5, 845: 7.5, 846: 8.5, 848: 8.5, 850: 8.0,
+               852: 7.5, 853: 8.0, 856: 7.5, 858: 8.0, 859: 7.5}
 
 # Catalog policy constants (free official catalog tours on the subscribed track).
 TRACK = "subscribed"
