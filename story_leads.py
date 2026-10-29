@@ -276,6 +276,57 @@ def _count_grounding_queries(web_search_queries) -> None:
     _enforce_grounding_cap()
 
 
+# ── [LOCAL-814] Gemini circuit breaker hooks ──────────────────────────────────
+# A depleted Gemini prepaid credit returns 402 on EVERY call, and the two HTTP
+# sites below were retrying it on every tour (329 402s in one day). The breaker
+# remembers an account is dry for 30 min (2 min for a 429) so a caller skips
+# Gemini and uses its non-Gemini fallback instead of hammering a dead credit.
+# All three helpers are best-effort and never raise into a Gemini call; if the
+# breaker module is unavailable the behaviour is exactly as before.
+def _breaker():
+    try:
+        import gemini_breaker
+        return gemini_breaker
+    except Exception:
+        return None
+
+
+def _gemini_breaker_open() -> bool:
+    """True when the breaker says to skip Gemini. Never raises."""
+    b = _breaker()
+    if b is None:
+        return False
+    try:
+        return bool(b.is_open())
+    except Exception:
+        return False
+
+
+def _gemini_note_status(status_code, body: str = '') -> None:
+    """Report a Gemini HTTP status to the breaker (402/429 trip it). Never raises."""
+    b = _breaker()
+    if b is None:
+        return
+    try:
+        b.note_response(status_code, body)
+    except Exception:
+        pass
+
+
+def _gemini_note_error(err: BaseException) -> None:
+    """Report a requests exception to the breaker, tripping it when the error
+    names a 402/429. Never raises."""
+    b = _breaker()
+    if b is None:
+        return
+    try:
+        status = b.status_from_error(err)
+        if status:
+            b.note_response(status, str(err))
+    except Exception:
+        pass
+
+
 # ── providers ────────────────────────────────────────────────────────────────
 
 @_sub_timed('story_leads_openai')
@@ -318,6 +369,12 @@ def _gemini(prompt: str, model: str = None, grounded: bool = False) -> str:
     key = os.environ.get('GEMINI_API_KEY') or os.environ.get('GOOGLE_API_KEY')
     if not key:
         return ''
+    # [LOCAL-814] If the breaker is open (Gemini credit depleted or rate
+    # limited), skip the call and let the caller fall back. Checked AFTER the key
+    # short-circuit so a keyless no-op is unchanged, and BEFORE the grounding
+    # counter so a skipped call is not counted as billable.
+    if _gemini_breaker_open():
+        return ''
     # [LOCAL-533] A grounded request is a billable Google-Search request; count it
     # here, where the key exists and we are about to issue it. Ungrounded calls
     # (grounded=False) are free of the per-request grounding charge and not counted.
@@ -346,6 +403,11 @@ def _gemini(prompt: str, model: str = None, grounded: bool = False) -> str:
               },
               **({'tools': [{'google_search': {}}]} if grounded else {})},
         timeout=90)
+    # [LOCAL-814] Trip the breaker on a credit/rate-limit status before raising,
+    # so the NEXT caller skips Gemini. Then preserve the original behaviour
+    # (raise_for_status) so this call's own error path is unchanged.
+    _gemini_note_status(getattr(r, 'status_code', 200),
+                        getattr(r, 'text', '') or '')
     r.raise_for_status()
     d = r.json()
     # [LOCAL-609] Meter this Gemini call: Flash input/output TOKENS (always) plus
@@ -428,6 +490,13 @@ def gemini_with_sources(prompt: str, model: str = None,
     if not key:
         out['error'] = 'no GEMINI_API_KEY'
         return out
+    # [LOCAL-814] If the breaker is open (Gemini credit depleted / rate limited),
+    # skip the call and return an honest-empty result with an error so the caller
+    # (research_with_sources, venue_research, the D511 loop) falls back to its
+    # non-Gemini path instead of hammering a dead credit.
+    if _gemini_breaker_open():
+        out['error'] = 'gemini breaker open (credit depleted / rate limited)'
+        return out
     try:
         # [LOCAL-533] Count the grounded request at the point it is issued. The
         # key check above has already returned for keyless calls, so we only get
@@ -445,9 +514,16 @@ def gemini_with_sources(prompt: str, model: str = None,
             if getattr(r, "status_code", 200) not in (429, 500, 502, 503, 504) or _attempt == 3:
                 break
             _tm.sleep((2, 5, 10)[_attempt] + _rnd.uniform(0, 1.5))
+        # [LOCAL-814] Trip the breaker on a credit/rate-limit status so the next
+        # caller skips Gemini. (429 here is post-retry: all attempts throttled.)
+        _gemini_note_status(getattr(r, "status_code", 200),
+                            getattr(r, "text", "") or "")
         r.raise_for_status()
         d = r.json()
     except Exception as e:
+        # [LOCAL-814] If the failure names a 402/429 (e.g. raise_for_status on a
+        # 402, or a requests error carrying the status), trip the breaker too.
+        _gemini_note_error(e)
         out['error'] = f'{type(e).__name__}: {e}'
         return out
 
@@ -973,7 +1049,18 @@ def available_providers() -> List[str]:
     out = []
     if os.environ.get('OPENAI_API_KEY'):
         out.append('openai')
-    if os.environ.get('GEMINI_API_KEY') or os.environ.get('GOOGLE_API_KEY'):
+    # [LOCAL-814] On the cheap (serper) arm — or when the breaker is open — the
+    # Gemini prepaid credit is depleted, so the leads fan-out must NOT offer a
+    # Gemini provider. Every grounded path already honours RESEARCH_BACKEND=serper
+    # via research_with_sources, but the LEAD step (run → PROVIDERS[...]) called
+    # `_gemini` directly regardless of the backend. That is the source of the
+    # 237+57 ungrounded 402s on the serper arm. Dropping gemini here leaves openai
+    # only: the caller sees < 2 model families and skips the fan-out gracefully
+    # (its existing behaviour), issuing ZERO Gemini calls. When the backend is
+    # the default (gemini) and the breaker is closed, behaviour is unchanged.
+    _skip_gemini = (research_backend() == 'serper') or _gemini_breaker_open()
+    if not _skip_gemini and (os.environ.get('GEMINI_API_KEY')
+                             or os.environ.get('GOOGLE_API_KEY')):
         out.append('gemini')
         out.append('gemini_grounded')
     return out
@@ -1154,6 +1241,12 @@ def verify(lead: Dict, work: str, subject: str) -> Dict:
 def run(subject: str, work: str, venue: str, providers: List[str] = None,
         verify_top: int = 6) -> Dict:
     providers = providers or available_providers()
+    # [LOCAL-814] Honour the serper arm / an open breaker even when a caller
+    # passes an explicit provider list: a depleted Gemini credit must not be
+    # called from the LEAD step. This is the belt to available_providers()'s
+    # braces — together they guarantee ZERO Gemini calls on the serper arm.
+    if (research_backend() == 'serper') or _gemini_breaker_open():
+        providers = [p for p in providers if provider_family(p) != 'gemini']
     prompt = LEAD_PROMPT.format(subject=subject, work=work, venue=venue)
     raw, leads = {}, []
     for p in providers:
