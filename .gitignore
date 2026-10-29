@@ -89,3 +89,7 @@ canary/venue_pool.jsonl.tmp
 canary/tried_venues.jsonl
 .local721_live/
 .local722_live/
+
+# LOCAL-808 catalog export bundle: kept-tour ZIPs + manifest are produced on disk for
+# GCloud_Storied but must NOT be committed (3-4 MB audio ZIPs each).
+catalog/export/
