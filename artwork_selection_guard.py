@@ -604,10 +604,19 @@ def enforce_artworks_only(
 
         # 1b. [LOCAL-632] web-page / CMS / nav title (a scraped page <title> or
         # section label such as "Profile « The ALBERTINA Museum Vienna") → reject
-        # at intake, whatever the class says.
-        if _is_junk is not None and title and _is_junk(title, venue_name):
-            _reject(entry, "junk_page_title")
-            continue
+        # at intake, whatever the class says. [LOCAL-809] Also pass the candidate's
+        # source URL so a store/shop/product page (store.metmuseum.org, …/shop/,
+        # …/products/…) and shop-product titles (Calendar/Print/Tote/Mug/…) are
+        # rejected here — the Met Store merchandise written up as exhibits.
+        if _is_junk is not None and title:
+            _src = ""
+            for _uk in ("source_url", "detail_url", "url", "page_url"):
+                if entry.get(_uk):
+                    _src = str(entry.get(_uk))
+                    break
+            if _is_junk(title, venue_name, source_url=_src):
+                _reject(entry, "shop_or_junk_page_title")
+                continue
 
         has_artwork_class = is_artwork_instance(inst)
 

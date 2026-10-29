@@ -36,7 +36,8 @@ from __future__ import annotations
 import re
 from typing import Dict, List, Optional, Sequence, Tuple
 
-__all__ = ["is_junk_page_title", "filter_out_junk_titles"]
+__all__ = ["is_junk_page_title", "filter_out_junk_titles",
+           "is_commerce_url", "is_shop_product_title"]
 
 # ─────────────────────────────────────────────────────────────────────────────
 # 1. Page-chrome SEPARATORS. A venue's page <title> is almost always a breadcrumb
@@ -160,6 +161,153 @@ _CTA_OBJECT_RE = re.compile(
     r")\b")
 
 
+# ─────────────────────────────────────────────────────────────────────────────
+# [LOCAL-809] SHOP / COMMERCE reject. A gift-shop PRODUCT is never an exhibit.
+#
+# Met Store (tour 850, score 3.0): stops 2 and 3 were store merchandise written
+# up as exhibits — "Empire State Building Custom Print" and "Wall Calendar 2027 —
+# The Met Store". They reached the tour because the candidate came from a store /
+# shop page on the museum's commerce subdomain, and nothing rejected either the
+# product TITLE (a calendar, a print, a poster) or the SOURCE URL
+# (store.metmuseum.org / …/shop/ / …/products/…).
+#
+# Two deterministic, venue-agnostic signatures identify shop merchandise without
+# touching a real artwork title:
+#
+#   (a) COMMERCE SOURCE URL — the candidate's page URL is a store/shop/product
+#       page: a ``store.``/``shop.`` host, or a ``/shop/`` ``/store/``
+#       ``/products/`` ``/product/`` ``/cart``/``/basket``/``/checkout`` path, or
+#       a query that carries a product/SKU/variant id. A page under commerce is a
+#       catalogue of things-to-BUY, not things-to-look-at.
+#
+#   (b) SHOP-PRODUCT TITLE — the title names a retail product type a museum shop
+#       sells (calendar, print, poster, tote, mug, gift, …) or carries a price /
+#       "add to cart" / SKU token. "Wall Calendar 2027", "Empire State Building
+#       Custom Print", "Van Gogh Tote Bag", "Starry Night Mug — $24.95".
+#
+# Both are kept tight so a real work is never caught: a PRINT as an original
+# artwork medium (etching/engraving/woodcut) lives in the SPARQL works set with a
+# P31 print class and a creator and is admitted by artwork_selection_guard BEFORE
+# any title test; this title rule only bites a retail "… Print"/"Fine Art Print"/
+# "Custom Print" product-name shape, and a one-word title "Print" is NOT matched.
+
+# (a) Commerce SOURCE-URL signatures.
+_COMMERCE_HOST_RE = re.compile(r"(?i)^(?:https?://)?(?:www\.)?(?:store|shop|shops|"
+                               r"webshop|eshop|e-shop|boutique|giftshop)\.")
+_COMMERCE_PATH_RE = re.compile(
+    r"(?i)/(?:shop|store|stores|products?|product-category|collections?/[^/]+/products|"
+    r"cart|basket|checkout|catalog(?:ue)?|merchandise|gift[-_]?shop|boutique)(?:/|$|\?)")
+_COMMERCE_QUERY_RE = re.compile(
+    r"(?i)[?&](?:add-to-cart|sku|product_id|productid|variant|variant_id|pid)=")
+
+
+def is_commerce_url(url: str) -> bool:
+    """[LOCAL-809] True when ``url`` is a store/shop/product page — a commerce
+    source that can only yield merchandise, never an exhibit. Pure; venue-agnostic.
+
+    Matches a ``store.``/``shop.`` host, a ``/shop/`` ``/store/`` ``/products/`` …
+    path segment, a cart/checkout path, or an add-to-cart/SKU/variant query. An
+    ordinary content URL on the museum's main domain (``/collection/…``,
+    ``/exhibitions/…``, ``/art/…``) is NOT matched."""
+    u = (url or "").strip()
+    if not u:
+        return False
+    if _COMMERCE_HOST_RE.search(u):
+        return True
+    if _COMMERCE_PATH_RE.search(u):
+        return True
+    if _COMMERCE_QUERY_RE.search(u):
+        return True
+    return False
+
+
+# (b) Retail PRODUCT-TYPE nouns a museum shop sells. Matched only as a product-
+# name shape (see _is_shop_product_title), never as a bare single word, so a work
+# whose title merely contains one ("The Printmaker", a painting; "Posterity") is
+# safe. "poster" excludes the art-history sense via the product-name requirement.
+#
+# STRONG nouns are retail-specific enough that a product-name shape (noun + a
+# qualifier) is a shop item: "Wall Calendar 2027", "Custom Print", "Van Gogh Tote
+# Bag", "Starry Night Mug". WEAK nouns (hat, cap, tie, bag, socks, scarf, tee …)
+# also appear in real artwork titles ("Self-Portrait with a Straw Hat", "The Blue
+# Boy"), so they count ONLY alongside an explicit retail signal (price / add-to-
+# cart / SKU / shop brand), never on the product-name shape alone.
+_SHOP_PRODUCT_NOUN_RE = re.compile(
+    r"(?i)\b("
+    r"calendars?|wall\s+calendar|desk\s+calendar|"
+    r"posters?|art\s+print|fine[-\s]?art\s+print|custom\s+print|giclee\s+print|"
+    r"printed\s+(?:tote|mug|scarf|t-?shirt)|"
+    r"tote\s+bags?|totes?|backpacks?|"
+    r"mugs?|tumblers?|coaster(?:s|\s+set)?|"
+    r"hoodie|sweatshirts?|"
+    r"notebooks?|journals?|stationery|magnets?|stickers?|"
+    r"keychains?|keyrings?|bookmarks?|jigsaw\s+puzzles?|puzzles?|playing\s+cards?|"
+    r"ornaments?|figurines?|snow\s+globe|"
+    r"gift\s+(?:set|card|box|wrap|guide)|holiday\s+gift|"
+    r"mousepad|phone\s+case|"
+    r"reproduction\s+print|boxed\s+(?:set|notecards?)|note\s*cards?|greeting\s+cards?"
+    r")\b")
+
+# WEAK apparel/accessory nouns — real art titles use them, so they only indicate
+# merchandise together with an explicit retail signal below.
+_SHOP_WEAK_NOUN_RE = re.compile(
+    r"(?i)\b(bags?|pouch(?:es)?|t-?shirts?|tee|scarf|scarves|tie|socks?|cap|hat|"
+    r"apron|umbrella|water\s+bottles?|pencils?|pens?|jewel(?:le)?ry|earrings?|"
+    r"necklaces?|bracelets?|brooch(?:es)?|cufflinks?)\b")
+
+# A price token, "add to cart", a SKU/item number — plain retail signals in a
+# title or its scraped line. Any one marks merchandise.
+_SHOP_PRICE_RE = re.compile(
+    r"(?i)(?:[$£€¥]\s?\d[\d.,]*|\b\d+[.,]\d{2}\s?(?:usd|eur|gbp|dollars?|euros?)\b)")
+_SHOP_CART_RE = re.compile(
+    r"(?i)\b(add\s+to\s+(?:cart|bag|basket)|in\s+stock|out\s+of\s+stock|"
+    r"sold\s+out|buy\s+now|shop\s+now|free\s+shipping|"
+    r"sku[:#]?\s*\w+|item\s*(?:no\.?|number|#)\s*\w+)\b")
+
+# The retail descriptor that, combined with a shop noun, confirms a product NAME
+# rather than a chance occurrence of the noun ("Wall Calendar 2027", "Custom
+# Print", "Van Gogh Tote Bag", "The Met Store" brand suffix).
+_SHOP_BRAND_SUFFIX_RE = re.compile(
+    r"(?i)\b(?:the\s+)?(?:met|museum|gallery|gift|online)\s+(?:store|shop)\b")
+
+
+def is_shop_product_title(title: str) -> bool:
+    """[LOCAL-809] True when ``title`` names a museum-shop PRODUCT — merchandise,
+    never an exhibit. Pure; venue-agnostic.
+
+    Rejects on any of:
+      * a PRICE token, an "add to cart"/stock phrase, or a SKU/item number
+        anywhere ("Starry Night Mug — $24.95", "Add to cart", "SKU 80012345");
+      * a store/shop BRAND suffix ("… — The Met Store", "Museum Shop");
+      * a STRONG retail PRODUCT-TYPE noun (calendar/print/poster/tote/mug/gift/…)
+        used as a product name — the title is more than the bare noun (it carries
+        a qualifier such as a year, "custom", "wall", a subject);
+      * a WEAK apparel/accessory noun (hat/tie/cap/bag/socks/…) ONLY when an
+        explicit retail signal (price/cart/SKU/brand) is also present.
+
+    Conservative: a bare one-word product noun ("Print", "Bag") is NOT rejected
+    here, a weak noun on its own is NOT rejected ("Self-Portrait with a Straw
+    Hat", "The Blue Boy" are safe), and an original-artwork PRINT from the SPARQL
+    works set is admitted by class/creator upstream before any title test runs."""
+    t = (title or "").strip()
+    if not t:
+        return False
+    _retail_signal = bool(_SHOP_PRICE_RE.search(t) or _SHOP_CART_RE.search(t)
+                          or _SHOP_BRAND_SUFFIX_RE.search(t))
+    if _retail_signal:
+        return True
+    m = _SHOP_PRODUCT_NOUN_RE.search(t)
+    if m:
+        # Require the title to be a PRODUCT NAME, not just the bare noun: there
+        # must be at least one more meaningful token besides the matched noun
+        # (a year, "custom"/"wall", a subject, a brand). A lone product noun is
+        # left to the generic-word rule so a real work is never caught here.
+        _rest = (t[:m.start()] + t[m.end():]).strip(" -–—:,·|")
+        if _rest and len(_rest) >= 2:
+            return True
+    return False
+
+
 def _is_call_to_action_title(title: str) -> bool:
     """[LOCAL-721] True when ``title`` is website call-to-action / link text, not a
     work: an imperative visitor instruction ("Explore this painting in our virtual
@@ -281,7 +429,8 @@ def _is_generic_or_headline_title(title: str) -> bool:
     return False
 
 
-def is_junk_page_title(title: str, venue_name: str = "") -> bool:
+def is_junk_page_title(title: str, venue_name: str = "",
+                       source_url: str = "") -> bool:
     """True when ``title`` is a web-page / CMS / navigation title, never a stop.
 
     Rejects (deterministic, pure), per the LOCAL-632 rule set:
@@ -303,6 +452,18 @@ def is_junk_page_title(title: str, venue_name: str = "") -> bool:
     t = (title or "").strip()
     if not t:
         return True  # an empty title can never be a stop
+
+    # 0. [LOCAL-809] SHOP / COMMERCE. A gift-shop product is never an exhibit.
+    #    Reject when the candidate's SOURCE URL is a store/shop/product page
+    #    (store.metmuseum.org, …/shop/, …/products/…), or when the TITLE names a
+    #    shop product (calendar/print/poster/tote/mug/gift/…) or carries a price /
+    #    "add to cart" / SKU. This catches the Met Store merchandise written up as
+    #    exhibits ("Empire State Building Custom Print", "Wall Calendar 2027 — The
+    #    Met Store") at candidate intake, whatever else the title looks like.
+    if source_url and is_commerce_url(source_url):
+        return True
+    if is_shop_product_title(t):
+        return True
 
     # 1. page-chrome separator anywhere. [LEAD 2026-10-08] A spaced DASH alone is NOT chrome:
     # real titles use it ("Rain, Steam and Speed – The Great Western Railway", "Nocturne: Blue
@@ -410,12 +571,14 @@ def filter_out_junk_titles(
     venue_name: str = "",
     *,
     title_key: str = "title",
+    url_keys: Sequence[str] = ("source_url", "detail_url", "url", "page_url"),
 ) -> Tuple[List, List]:
     """Return (kept, dropped): candidates split by ``is_junk_page_title``.
 
     ``candidates`` is a list of dicts (``title_key`` or ``name`` selects the
-    title) or bare strings. Each dropped dict is a shallow copy carrying a
-    ``_reject_reason`` key so a caller can print the before/after list. Order-
+    title; ``url_keys`` selects an optional source URL for the [LOCAL-809]
+    commerce check) or bare strings. Each dropped dict is a shallow copy carrying
+    a ``_reject_reason`` key so a caller can print the before/after list. Order-
     preserving and pure.
     """
     kept: List = []
@@ -423,9 +586,15 @@ def filter_out_junk_titles(
     for c in candidates or []:
         if isinstance(c, dict):
             title = (c.get(title_key) or c.get("name") or "").strip()
+            src = ""
+            for _uk in url_keys:
+                if c.get(_uk):
+                    src = str(c.get(_uk))
+                    break
         else:
             title = str(c or "").strip()
-        if is_junk_page_title(title, venue_name):
+            src = ""
+        if is_junk_page_title(title, venue_name, source_url=src):
             if isinstance(c, dict):
                 d = dict(c)
                 d["_reject_reason"] = "junk_page_title"

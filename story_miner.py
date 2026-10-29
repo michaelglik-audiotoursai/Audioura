@@ -1688,6 +1688,15 @@ def fetch_venue_narrative_corpus(
                         if pid != '-1' and not pdata.get('missing'):
                             extract = pdata.get('extract', '')
                             if extract and len(extract) > 500:
+                                # [LOCAL-809] Never build a museum's corpus from a
+                                # disambiguation stub ("Belvedere may refer to:").
+                                try:
+                                    from disambiguation_guard import is_disambiguation_text as _idt
+                                    if _idt(extract, local_title):
+                                        print(f"  [LOCAL-809] disambiguation page rejected as corpus: {local_title!r}")
+                                        continue
+                                except Exception:
+                                    pass
                                 local_url = f"https://{language}.wikipedia.org/wiki/{local_title.replace(' ', '_')}"
                                 pages.append({"url": local_url, "text": extract, "title": f"Wikipedia {language.upper()}: {local_title}"})
                                 source_urls.append(local_url)

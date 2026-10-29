@@ -703,6 +703,13 @@ def _fetch_via_action_api(topic: str) -> str:
                         continue
                     extract = page_data.get("extract", "")
                     if extract and len(extract) > 200:
+                        try:
+                            from disambiguation_guard import is_disambiguation_text as _idt
+                            if _idt(extract, topic):
+                                logger.info(f"[LOCAL-809] disambiguation page rejected as corpus: {topic!r}")
+                                continue
+                        except Exception:
+                            pass
                         logger.info(f"Wikipedia ({wiki_host}): full article for '{topic}' = {len(extract)} chars")
                         return extract
             elif isinstance(pages, dict):
@@ -711,6 +718,13 @@ def _fetch_via_action_api(topic: str) -> str:
                         continue
                     extract = page_data.get("extract", "")
                     if extract and len(extract) > 200:
+                        try:
+                            from disambiguation_guard import is_disambiguation_text as _idt
+                            if _idt(extract, topic):
+                                logger.info(f"[LOCAL-809] disambiguation page rejected as corpus: {topic!r}")
+                                continue
+                        except Exception:
+                            pass
                         logger.info(f"Wikipedia ({wiki_host}): full article for '{topic}' = {len(extract)} chars")
                         return extract
         except _req.Timeout:

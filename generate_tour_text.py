@@ -5588,6 +5588,17 @@ def _apply_artwork_guards(documented, sparql_works, venue_name, n_stops,
             print(f"  {_tag} [LOCAL-630 item 1] collection-membership dropped "
                   f"{len(_mem_dropped)}: "
                   f"{[(e.get('title'), e.get('_reject_reason')) for e in _mem_dropped]}")
+            # [LOCAL-809] Per-work rejection line in the ticket's exact format:
+            #   [LOCAL-809] not in collection <title> <found collection>
+            # <found collection> is the work's own P195 collection QIDs when it
+            # carries a collection that excludes the venue (the Monet/Van Gogh
+            # "not in the Belvedere" case), else the reject reason.
+            for _e in _mem_dropped:
+                _t809 = (_e.get('title') or _e.get('label_en')
+                         or _e.get('name') or '').strip()
+                _found = ','.join(_e.get('collection_qids') or []) \
+                    or (_e.get('_reject_reason') or 'unknown')
+                print(f"  [LOCAL-809] not in collection {_t809} {_found}")
         enriched = _mem_kept
     except Exception as _mem_err:  # pragma: no cover
         print(f"  {_tag} [LOCAL-630 item 1] collection-membership skipped "
