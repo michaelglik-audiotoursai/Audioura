@@ -353,6 +353,30 @@ def normalise_stop_headers(tour_text: str) -> str:
     #     "Specific Examples: <short list>." on ONE line; the voice step drops
     #     metadata lines whole, so the story was never spoken (11 s audio).
     out = split_story_off_field_lines(out)
+    # (5) [LOCAL-801] Strip the stop-count ARTIFACTS that made the default
+    #     (gpt-4.1) arm deliver "6 stops for 5": a STRAY PREVIEW HEADER
+    #     ("Stop N: <title> — it is roughly … away.") the model mis-rendered as a
+    #     header, and a HEADERLESS stop body spliced after a Directions line
+    #     (a copy of the next stop with no "Stop N:" of its own). Both inflate
+    #     count_delivered_stops and duplicate a stop. Then repair a mid-clause
+    #     text collision (the d1 "J.P. Licks.P. Licks.P. Licks" garble).
+    #
+    #     dedupe_real_stops=False here: this is the UNIVERSAL counting choke
+    #     point, so it must only remove the artifacts — it must NOT drop a
+    #     legitimately repeated real title (a museum's two views of the same
+    #     wall, LOCAL-639). Same-title dedup of real delivered stops stays in the
+    #     delivery path (stop_title_dedup / LOCAL-722). Running here means the
+    #     delivered count, the "That's N stops" sentence (rebuilt from this count)
+    #     and the text all agree. Pure/idempotent; a clean tour is unchanged.
+    try:
+        from stop_dedup_collision_guard import (
+            dedupe_and_fix_stop_count as _dedup801,
+            repair_collisions as _collide801,
+        )
+        out, _r801 = _dedup801(out, requested_stops=None, dedupe_real_stops=False)
+        out, _c801 = _collide801(out)
+    except Exception as _e801:  # pragma: no cover - never let the guard break finalize
+        print(f"  [LOCAL-801] guard skipped (non-fatal): {_e801}")
     # Collapse any 3+ newline run the re-breaks may create.
     out = re.sub(r'\n{3,}', '\n\n', out)
     return out
