@@ -282,6 +282,141 @@ def _auto_reject_junk_titles(rows, location, tour_type, db_url, qid=None):
     return kept
 
 
+# ── [LOCAL-811] Run the LOCAL-809 museum-source checks on reused stops ────────
+
+def _venue_works_for_membership(qid):
+    """[LOCAL-811] The venue's authoritative work set for the collection-membership
+    check on reused stops, read CHEAPLY: the LOCAL-810 per-QID venue_works_cache
+    FIRST (a HIT is free — no WDQS call). On a cache miss, one bounded
+    count-only ``fetch_venue_works`` runs (the same LOCAL-810 query the fresh path
+    uses, which returns [] rather than paying for the fallback chain when WDQS is
+    unavailable) and its clean result is cached for next time.
+
+    Returns ``(works, derived_parent_qids)``. ``works`` is [] when no QID or
+    nothing is available — the caller then SKIPS the membership arm (title/body
+    arms still run), never rejecting a stop on a missing reference set. Best-effort
+    and non-fatal."""
+    if not qid:
+        return [], ()
+    works = []
+    try:
+        import venue_resolver as _vr
+        works = _vr.venue_works_cache_get(qid) or []
+        if not works:
+            # Cache miss: one bounded fetch (count-only semantics — no corpus args,
+            # so a WDQS failure returns [] and pays for no fallback). Result cached.
+            try:
+                works = _vr.fetch_venue_works(qid) or []
+            except Exception as _fe:
+                logger.info(f"[LOCAL-811] venue-works fetch skipped ({_fe}); "
+                            f"membership arm disabled for this reuse")
+                works = []
+    except Exception as _ve:
+        logger.info(f"[LOCAL-811] venue_resolver unavailable ({_ve}); "
+                    f"membership arm disabled for this reuse")
+        return [], ()
+
+    # Derive the venue's OWN collection holders (parent / sibling collections) the
+    # same way the fresh path does, so a work held by a legitimate parent/sibling
+    # collection is not wrongly rejected. Both derivations are best-effort.
+    parents = set()
+    try:
+        from collections import Counter as _Ctr
+        _p195 = _Ctr(q for w in (works or [])
+                     for q in set((w or {}).get('collection_qids') or []))
+        _thr = max(3, int(0.10 * max(1, len(works or []))))
+        for _q, _c in _p195.items():
+            if _c >= _thr and _q != qid:
+                parents.add(_q)
+    except Exception:
+        pass
+    try:
+        import venue_resolver as _vr2
+        for _rq in (_vr2.fetch_collection_holder_qids(qid) or ()):
+            if _rq:
+                parents.add(_rq)
+    except Exception:
+        pass
+    return works, tuple(parents)
+
+
+def _auto_reject_museum_stops(rows, location, tour_type, db_url, qid=None):
+    """[LOCAL-811] Run the LOCAL-809 museum-source checks on every REUSED museum
+    stop and MOVE the failures out of the pool (same mechanism as LOCAL-792).
+
+    The LOCAL-809 checks — no shop/product merchandise, a work must be in THIS
+    museum's collection, no Wikipedia disambiguation stub text — only ran on FRESH
+    research. A stop delivered once and pooled is reused verbatim on the next
+    identical request WITHOUT those checks, so the Belvedere's Monet/Van Gogh (held
+    elsewhere), a "Belvedere may refer to:" line, and Met Store items came back
+    (the ticket's evidence). This is the reuse-path equivalent of
+    ``generate_tour_text._apply_artwork_guards``: a reused stop that fails is
+    dropped from THIS tour AND quarantined (copied to ``stop_pool_rejected``, then
+    removed from ``stop_pool`` via the verified ``move_to_rejected``), its
+    rejection reason recorded. The existing N>K path then researches the remainder
+    fresh, exactly as if the bad stop had never been pooled.
+
+    Called ONLY for a CONTAINED art/museum tour (the caller gates on
+    ``contained``). Returns the kept rows. Best-effort and non-fatal: a guard or DB
+    failure returns the rows unchanged and leaves the pool untouched — an automatic
+    quarantine must never empty a tour over a guard bug (mirrors LOCAL-792)."""
+    if not rows:
+        return rows
+    try:
+        import pool_museum_checks as pmc
+    except Exception as e:
+        logger.info(f"[LOCAL-811] pool museum checks unavailable ({e}); no auto-reject")
+        return list(rows)
+
+    venue = _venue_name(location)
+    works, parent_qids = _venue_works_for_membership(qid)
+
+    # is_art_museum mirrors the fresh path's classifier; default True for a
+    # contained museum when the generator helper is unavailable.
+    is_art = True
+    try:
+        from generate_tour_text import _is_art_museum as _iam
+        is_art = bool(_iam(venue, works))
+    except Exception:
+        pass
+
+    kept, rejected = pmc.split_pooled_museum_stops(
+        rows, venue_name=venue, venue_qid=(qid or ""),
+        parent_qids=parent_qids, sparql_works=works, is_art_museum=is_art)
+
+    if not rejected:
+        return kept
+
+    for r, reason in rejected:
+        _title = r.get('title', '')
+        print(f"  [LOCAL-811] AUTO-REJECT reused museum stop {_title!r} "
+              f"({reason}) — moving out of pool")
+        # Per-work rejection line in the LOCAL-809 ticket format for the
+        # not-in-collection case, so the pooled path logs read like the fresh one.
+        if str(reason).startswith(("not_in_collection", "wrong_collection",
+                                   "wrong_museum")):
+            print(f"  [LOCAL-809] not in collection {_title} {reason}")
+
+    # Quarantine each failing row with its OWN reason (mined vs pooled handled like
+    # LOCAL-792): a mined-only row records its source tour id; a pooled row none.
+    try:
+        import stop_pool_rejected as _rej
+        for r, reason in rejected:
+            _src = r.get("_mined_source_tour_id")
+            _rej.auto_reject_rows(
+                db_url, [r], location, tour_type,
+                reason=f"auto:local811:{reason}",
+                rejected_by="auto:pool_museum_checks",
+                qid=qid,
+                source_tour_id=int(_src) if _src else None)
+    except Exception as e:
+        logger.warning(f"[LOCAL-811] auto-reject quarantine skipped ({e})")
+
+    print(f"  [LOCAL-811] auto-rejected {len(rejected)} museum stop(s) that failed "
+          f"the LOCAL-809 checks from this tour ({len(kept)} kept)")
+    return kept
+
+
 def _classify(location: str, tour_type: str) -> str:
     """Classify via the generator's own classifier; fall back to tour_type.
 
@@ -512,6 +647,26 @@ def maybe_generate_with_pool(
     tour_category = _classify(location, tour_type)
     contained = _is_contained(tour_category)
     header_cat, display_cat = _header_categories(tour_category, tour_type)
+
+    # [LOCAL-811] Run the LOCAL-809 museum-source checks on every REUSED stop of a
+    # CONTAINED museum tour, before it counts toward K — the pooled-path equivalent
+    # of the fresh path's _apply_artwork_guards. A reused stop that is shop/product
+    # merchandise, a work NOT in this museum's collection (the Belvedere's Monet/Van
+    # Gogh), or a Wikipedia disambiguation stub is INCORRECT CONTENT: it is MOVED
+    # out of the pool (verified move_to_rejected) and dropped from this tour, with
+    # its reason recorded. If K then falls below N, the existing N>K path researches
+    # the remainder fresh — exactly as if the bad stop had never been pooled. Only
+    # CONTAINED (museum/facility) tours run this; an outdoor/walking tour's stops
+    # are places, governed by the LOCAL-788 scope check below, not the museum gate.
+    # Best-effort: any failure leaves pooled_rows (and the pool) unchanged.
+    if contained:
+        try:
+            pooled_rows = _auto_reject_museum_stops(
+                pooled_rows, location, tour_type, db_url, qid=qid)
+            K = len(pooled_rows)
+        except Exception as _mm_err:
+            logger.warning(f"[LOCAL-811] museum reuse checks skipped ({_mm_err}); "
+                           f"pool unchanged")
 
     # [LOCAL-788] Reuse re-validation. Every pooled/mined stop that is a PLACE
     # (has coordinates) must pass the SAME LOCAL-786 scope test as a new lookup

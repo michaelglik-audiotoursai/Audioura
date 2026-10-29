@@ -9955,6 +9955,24 @@ def _apply_delivery_hours_guard(result):
                           f"— no announcement.", flush=True)
         except Exception as _npe:  # pragma: no cover
             _import_logger.error(f"[LOCAL-799] named-place reconciliation skipped: {_npe}")
+        # 3z. [LOCAL-811] Universal disambiguation-line guard. Drop any sentence or
+        #     paragraph that IS a Wikipedia disambiguation line ("X may refer to:",
+        #     "X may also refer to", and the DE/FR/IT/ES/NL equivalents), wherever
+        #     it came from — a pooled stop stored before LOCAL-809, a cached
+        #     delivery, or a fresh path that let one through. The Belvedere tour
+        #     opened with "Belvedere may refer to:" (the ticket's evidence); the
+        #     LOCAL-809 entity/text guards only DECIDE a whole extract is a stub at
+        #     intake, so this final, every-path text pass removes an individual
+        #     disambiguation line that nonetheless reached the delivered text.
+        #     Deterministic, idempotent, non-fatal; keeps real prose.
+        try:
+            import disambiguation_guard as _dg_txt
+            final, _n_disambig = _dg_txt.strip_disambiguation_lines(final)
+            if _n_disambig:
+                print(f"  [LOCAL-811] dropped {_n_disambig} Wikipedia disambiguation "
+                      f"line(s) from delivered text (every-path guard)", flush=True)
+        except Exception as _dge:  # pragma: no cover
+            _import_logger.error(f"[LOCAL-811] disambiguation-line guard skipped: {_dge}")
         if final != text and out_file:
             # Rewrite the delivered file so the service (which reads the file,
             # not the return value) ships the cleaned text on every path.

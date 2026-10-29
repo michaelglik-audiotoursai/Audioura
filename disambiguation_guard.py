@@ -29,7 +29,7 @@ from __future__ import annotations
 
 import re
 
-__all__ = ["is_disambiguation_text"]
+__all__ = ["is_disambiguation_text", "strip_disambiguation_lines"]
 
 # "X may refer to", "X may also refer to", "X can refer to", "X refers to:" — the
 # canonical disambiguation lead, across the live-venue languages (EN, DE, FR, IT,
@@ -92,3 +92,141 @@ def is_disambiguation_text(text: str, title: str = "") -> bool:
         return True
 
     return False
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# [LOCAL-811] Text-level line/sentence drop. The ticket's fix 2: a final guard for
+# ALL tours drops any sentence/paragraph that IS a Wikipedia disambiguation line
+# ("X may refer to:", "X may also refer to", and the DE/FR/IT/ES/NL equivalents),
+# wherever it came from — pooled reuse, fresh research, or a cached delivery that
+# predates the LOCAL-809 entity/text guards. ``is_disambiguation_text`` above
+# DECIDES a whole extract is a stub (so the corpus is never accepted); this REMOVES
+# an individual disambiguation line that nonetheless reached the delivered text.
+# ─────────────────────────────────────────────────────────────────────────────
+
+# A "may refer to"/"steht für:"/… CLAUSE anywhere in a sentence or line (NOT
+# anchored to a lead window — a delivered body may carry the stub line mid-text).
+# Same phrase set as _MAY_REFER_RE, reused directly.
+_DISAMBIG_LINE_RE = _MAY_REFER_RE
+
+# Sentence splitter: keep it simple and deterministic. A disambiguation lead is a
+# short declarative line; splitting on sentence punctuation + newlines isolates it
+# from surrounding real prose so only the stub clause is removed.
+_SENTENCE_SPLIT_RE = re.compile(r"(?<=[.!?:])\s+|\n")
+
+
+# A WHOLE-paragraph disambiguation stub BEGINS with "<Short Name> may refer to"
+# (or a marker) as its very first clause — the title plus the clause IS the lead,
+# with no real sentence before it. Anchored at the start so a stop body that only
+# CONTAINS the clause after a genuine sentence does not match (it falls to the
+# sentence-level removal, which drops just the stub sentence). The name before the
+# clause is short (a title, not prose): up to ~40 characters, no sentence-ending
+# punctuation.
+_STUB_LEAD_RE = re.compile(
+    r"(?is)^\s*[^.!?\n]{0,40}?(?:"
+    r"may\s+(?:also\s+)?refer\s+to|can\s+refer\s+to|refers?\s+to\s*:|"
+    r"steht\s+f[üu]r\s*:|kann\s+sich\s+beziehen\s+auf|"
+    r"peut\s+(?:faire\s+r[ée]f[ée]rence\s+[àa]|d[ée]signer)|"
+    r"pu[òo]\s+riferirsi\s+a|puede\s+referirse\s+a|hace\s+referencia\s+a|"
+    r"kan\s+verwijzen\s+naar"
+    r")")
+
+
+def _line_is_disambiguation(fragment: str) -> bool:
+    """True when a single sentence/line IS a disambiguation stub line — a terse
+    "<Name> may refer to" / marker line where the clause is the line's OWN opening
+    statement, not a real sentence that uses the words deep in explanatory prose.
+
+    Two signals, both conservative:
+      * a STUB-LEAD shape (``_STUB_LEAD_RE``): a short name (<= ~40 chars, no
+        sentence punctuation) immediately followed by the "may refer to" clause —
+        "Belvedere may refer to:". A real sentence ("In art-historical usage the
+        term baroque may refer to a sweeping movement …") has substantial prose
+        before the clause and does NOT match; or
+      * an explicit disambiguation MARKER ("(disambiguation)", "Begriffsklärung",
+        …) in a short fragment.
+
+    The length bound alone is not enough (a real sentence can be short), so the
+    decisive test is the anchored stub-lead shape."""
+    f = (fragment or "").strip()
+    if not f:
+        return False
+    if len(f) > 200:
+        return False
+    if _STUB_LEAD_RE.search(f):
+        return True
+    if _DISAMBIG_MARKER_RE.search(f) and len(f) <= 120:
+        return True
+    return False
+
+
+def strip_disambiguation_lines(text: str):
+    """[LOCAL-811] Remove any Wikipedia DISAMBIGUATION line from ``text``, wherever
+    it appears, and return ``(cleaned_text, dropped_count)``.
+
+    Operates paragraph by paragraph, then sentence by sentence within a paragraph:
+      * a WHOLE paragraph that is itself a disambiguation stub (its text passes
+        ``is_disambiguation_text`` — e.g. "Belvedere may refer to:" followed by a
+        list) is dropped entirely;
+      * otherwise each sentence/line is tested with ``_line_is_disambiguation`` and
+        a matching one is dropped, leaving the rest of the paragraph intact.
+
+    Deterministic, offline, idempotent (a second pass drops nothing). Non-fatal by
+    construction — it only removes; it never rewrites surrounding prose. A real
+    article sentence that uses "may refer to" inside a long explanation is NOT a
+    stub line (it exceeds the length bound / is not the sentence's own statement)
+    and is kept. Returns the input unchanged (0 dropped) on empty text."""
+    if not text or not isinstance(text, str):
+        return text, 0
+
+    dropped = 0
+    # Split into paragraphs on blank lines, preserving the blank-line separators so
+    # the rejoin keeps the document's paragraph spacing.
+    paragraphs = re.split(r"(\n\s*\n)", text)
+    out_parts = []
+    for part in paragraphs:
+        # Separator chunks (the captured \n\s*\n) pass through untouched.
+        if re.fullmatch(r"\n\s*\n", part or ""):
+            out_parts.append(part)
+            continue
+        para = part
+        stripped = para.strip()
+        if not stripped:
+            out_parts.append(para)
+            continue
+        # Whole-paragraph stub: drop it ONLY when the paragraph BEGINS as a terse
+        # disambiguation stub — "Belvedere may refer to:" as its own opening clause
+        # (the title + "may refer to" IS the lead), optionally followed by a short
+        # list. A real stop body that merely contains the stub clause after one or
+        # more genuine sentences ("Welcome to the Belvedere. Belvedere may refer
+        # to: …") does NOT begin as a stub, so it falls through to the sentence-
+        # level removal below and only the stub sentence is dropped — the stop body
+        # is never wiped. ~60 chars in is where a "<Name> may refer to" lead sits.
+        _head = stripped[:60]
+        if (len(stripped) <= 300
+                and (_STUB_LEAD_RE.search(stripped)
+                     or _DISAMBIG_MARKER_RE.search(_head))
+                and is_disambiguation_text(stripped)):
+            dropped += 1
+            out_parts.append("")
+            continue
+        # Sentence/line level: drop only the disambiguation fragment(s).
+        if _DISAMBIG_LINE_RE.search(para) or _DISAMBIG_MARKER_RE.search(para):
+            fragments = _SENTENCE_SPLIT_RE.split(para)
+            kept_fragments = []
+            any_dropped = False
+            for frag in fragments:
+                if _line_is_disambiguation(frag):
+                    dropped += 1
+                    any_dropped = True
+                    continue
+                kept_fragments.append(frag)
+            if any_dropped:
+                para = " ".join(f.strip() for f in kept_fragments if f.strip())
+        out_parts.append(para)
+
+    cleaned = "".join(out_parts)
+    # Collapse any runs of 3+ newlines left by a dropped whole paragraph to the
+    # normal paragraph gap; never touch intra-paragraph single newlines.
+    cleaned = re.sub(r"\n{3,}", "\n\n", cleaned)
+    return cleaned, dropped
