@@ -174,7 +174,9 @@ def test_classify_each_class():
                  message="openai 429")) == "external"
     assert f(_ev(exception_type="ReadTimeout",
                  message="overpass timeout")) == "external"
-    assert f(_ev(http_status=402, message="gemini out of credit")) == "external"
+    # LOCAL-804B: a 402 "out of credit" is now the dedicated `budget` class, not
+    # the generic `external` — the fix is to top up / raise the cap, not retry.
+    assert f(_ev(http_status=402, message="gemini out of credit")) == "budget"
     assert f(_ev(error_code="no_results_found",
                  message="no results")) == "user_confusion"
     assert f(_ev(error_code="free_tier_limit")) == "expected"
@@ -347,6 +349,225 @@ def test_llm_cap_blocks_calls_when_zero_budget():
                                      caller=caller)
     assert spent == 0.0
     assert groups[0]["class"] == "unknown"  # unchanged
+
+
+# ===========================================================================
+# LOCAL-804B — the four review fixes, each with fixtures.
+# ===========================================================================
+
+# ---------------------------------------------------------------------------
+# A. Test-traffic exclusion (test/TEST/p1- ids, LOCAL-NNN harnesses) +
+#    --include-tests.
+# ---------------------------------------------------------------------------
+
+def test_looks_like_test_id_prefixes_and_harness():
+    f = ft._looks_like_test_id
+    # Prefixes.
+    assert f("test-local365-type")
+    assert f("TEST-123")
+    assert f("test_local156_fe633157")
+    assert f("p1-probe-99")
+    # Embedded LOCAL-NNN harness ids.
+    assert f("local365")
+    assert f("run-local-156")
+    assert f("LOCAL_804")
+    # Real ids are NOT test traffic.
+    assert not f("0a36d3be-1d15-41a6-8058-c22d4aebce62")
+    assert not f("tour_1a16bdc56b2")
+    assert not f(None)
+    assert not f("")
+
+
+def test_is_test_event_checks_all_id_fields():
+    # A real production failure (no synthetic id anywhere).
+    assert not ft.is_test_event(_ev(tour_id="0a36d3be-1d15-41a6-8058-c22d",
+                                    user_id=None))
+    # tour_id test prefix.
+    assert ft.is_test_event(_ev(tour_id="test-local365-type"))
+    # user_id harness id (the real-looking tour_id must not rescue it).
+    assert ft.is_test_event(_ev(tour_id="0a36d3be-1d15-41a6", 
+                                user_id="test_local156_fe633157"))
+    # job_id harness id.
+    assert ft.is_test_event(_ev(job_id="local365", tour_id="x"))
+    # explicit is_test flag.
+    assert ft.is_test_event(_ev(is_test=True))
+
+
+def test_filter_test_events_default_and_include():
+    evs = [
+        _ev(tour_id="test-local365-type", error_code="exhibition_closed"),
+        _ev(tour_id="test-local365-type", error_code="exhibition_closed"),
+        _ev(user_id="test_local156_fe633157", error_code="generation_failed"),
+        _ev(tour_id="0a36d3be-1d15-41a6-8058-c22d", exception_type="KeyError"),
+    ]
+    kept, excluded = ft.filter_test_events(evs)
+    assert excluded == 3
+    assert len(kept) == 1
+    assert kept[0]["tour_id"] == "0a36d3be-1d15-41a6-8058-c22d"
+    # include_tests keeps everything but still reports the count.
+    kept2, excluded2 = ft.filter_test_events(evs, include_tests=True)
+    assert excluded2 == 3
+    assert len(kept2) == 4
+
+
+def test_run_excludes_test_traffic_by_default():
+    # Mirror the first report: 74 test `exhibition_closed` + 1 real crash.
+    evs = [_ev(tour_id="test-local365-type", service="generator",
+               error_code="exhibition_closed",
+               message="The exhibition closed", triage="ux", ts=NOW)
+           for _ in range(74)]
+    evs.append(_ev(tour_id="df91b3c1-real", exception_type="ValueError",
+                   message="real crash", ts=NOW))
+    res_default = ft.run(days=7, events=list(evs), now=NOW, dry_run=True)
+    # The 74 test events are gone; only the real crash remains.
+    assert res_default["event_count"] == 1
+    assert res_default["excluded_tests"] == 74
+    assert "test/harness events excluded" in res_default["report_md"]
+    # With include_tests the test traffic is back.
+    res_incl = ft.run(days=7, events=list(evs), now=NOW, dry_run=True,
+                      include_tests=True)
+    assert res_incl["event_count"] == 75
+    assert res_incl["excluded_tests"] == 74
+    assert "test traffic INCLUDED" in res_incl["report_md"]
+
+
+# ---------------------------------------------------------------------------
+# B. Budget / external root-cause lookup from paid_api_calls.
+# ---------------------------------------------------------------------------
+
+def test_budget_hint_classifies_budget():
+    f = ft.classify_event
+    assert f(_ev(message="Intent analysis error: DAILY_PAID_LIMIT_USD reached")
+             ) == "budget"
+    assert f(_ev(http_status=402, message="gemini out of credit")) == "budget"
+    assert f(_ev(message="insufficient_quota from provider")) == "budget"
+
+
+def test_enrich_root_causes_attributes_budget_to_reasonless_failure():
+    # A reasonless generation failure at NOW, and a 402 refusal 2 min earlier.
+    fail = _ev(source="generator_jobs", service="generator",
+               error_code="generation_failed",
+               message="no stops could be generated", ts=NOW)
+    refusals = [{"ts": NOW - timedelta(minutes=2), "kind": "gemini",
+                 "status": 402, "detail_text": "out of credit"}]
+    ft.enrich_root_causes([fail], refusals)
+    assert fail.get("root_cause") == "budget"
+    assert "budget" in fail["root_cause_detail"].lower()
+    # classify now returns budget, NOT our_bug.
+    assert ft.classify_event(fail) == "budget"
+
+
+def test_enrich_root_causes_window_is_bounded():
+    # A refusal far outside the window must NOT be attributed.
+    fail = _ev(source="generator_jobs", error_code="generation_failed",
+               message="no stops", ts=NOW)
+    refusals = [{"ts": NOW - timedelta(hours=3), "kind": "gemini",
+                 "status": 402, "detail_text": "out of credit"}]
+    ft.enrich_root_causes([fail], refusals)
+    assert fail.get("root_cause") is None
+    # Without a budget cause it falls back to our_bug (generation_failed).
+    assert ft.classify_event(fail) == "our_bug"
+
+
+def test_budget_does_not_override_a_real_exception():
+    # A row that names its own exception is NOT reasonless; a nearby refusal
+    # must not steal it into budget.
+    fail = _ev(source="failure_events", exception_type="KeyError",
+               message="missing key", ts=NOW)
+    refusals = [{"ts": NOW, "kind": "gemini", "status": 402,
+                 "detail_text": "out of credit"}]
+    ft.enrich_root_causes([fail], refusals)
+    assert fail.get("root_cause") is None
+    assert ft.classify_event(fail) == "our_bug"
+
+
+def test_budget_group_wins_and_gets_ops_owner():
+    fail = _ev(source="generator_jobs", error_code="generation_failed",
+               message="no stops", ts=NOW)
+    ft.enrich_root_causes([fail], [{"ts": NOW, "kind": "gemini", "status": 402,
+                                    "detail_text": "out of credit"}])
+    groups = ft.group_events([fail])
+    ft.rank_groups(groups, NOW, set())
+    assert groups[0]["class"] == "budget"
+    report = ft.render_report(groups, NOW, days=7)
+    assert "Budget / credit" in report
+    assert "ops/budget" in report
+
+
+# ---------------------------------------------------------------------------
+# C. tour_request_failed requires client-side evidence before user_confusion.
+# ---------------------------------------------------------------------------
+
+def _treq(**kw):
+    base = dict(source="tour_requests", service="orchestrator",
+                surface="generate", error_code="tour_request_failed",
+                message="tour request failed", platform="server", ts=NOW)
+    base.update(kw)
+    return _ev(**base)
+
+
+def test_tour_request_failed_without_evidence_is_unknown():
+    ev = _treq(tour_id="abc-123", request_text="Boston Common")
+    evidence = ft.build_confusion_evidence([ev])
+    assert ft.classify_event(ev, evidence) == "unknown"
+
+
+def test_tour_request_failed_with_client_report_is_user_confusion():
+    treq = _treq(tour_id="abc-123", request_text="Boston Common")
+    # A client FailureReporter event (service='app') for the same tour.
+    client = _ev(source="failure_events", service="app", platform="android",
+                 surface="generate", error_code="tour_request_failed",
+                 message="could not make tour", tour_id="abc-123", ts=NOW)
+    evidence = ft.build_confusion_evidence([treq, client])
+    assert ft.classify_event(treq, evidence) == "user_confusion"
+
+
+def test_tour_request_failed_with_retry_is_user_confusion():
+    # The same request appears twice (a user retry) → confusion signal.
+    a = _treq(tour_id="t1", request_text="Arnold Arboretum, Boston")
+    b = _treq(tour_id="t2", request_text="Arnold Arboretum, Boston")
+    evidence = ft.build_confusion_evidence([a, b])
+    assert ft.classify_event(a, evidence) == "user_confusion"
+    assert ft.classify_event(b, evidence) == "user_confusion"
+
+
+def test_client_signal_detection():
+    assert ft._is_client_signal(_ev(service="app", platform="server"))
+    assert ft._is_client_signal(_ev(service="generator", platform="ios"))
+    assert not ft._is_client_signal(_ev(service="generator", platform="server"))
+    assert not ft._is_client_signal(_ev(service="orchestrator",
+                                        platform="unknown"))
+
+
+# ---------------------------------------------------------------------------
+# D. The launchd plist FILE meets the spec (02:30 daily, Mac DB, reports/).
+# ---------------------------------------------------------------------------
+
+def test_plist_file_meets_spec():
+    import plistlib
+    path = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                        ".continuous_dev",
+                        "com.audioura.failure-triage.plist")
+    assert os.path.exists(path), "plist FILE must exist"
+    with open(path, "rb") as f:
+        pl = plistlib.load(f)
+    # Runs failure_triage.py.
+    args = pl["ProgramArguments"]
+    assert any("failure_triage.py" in a for a in args)
+    # No --llm (nightly run must make NO paid call; cap $0).
+    assert "--llm" not in args
+    # 02:30 daily.
+    sci = pl["StartCalendarInterval"]
+    assert sci["Hour"] == 2 and sci["Minute"] == 30
+    # Mac dev DB on localhost:5433.
+    env = pl["EnvironmentVariables"]
+    assert env["DB_HOST"] == "localhost"
+    assert str(env["DB_PORT"]) == "5433"
+    # It is a FILE only — NOT installed under LaunchAgents by this task.
+    home_agent = os.path.expanduser(
+        "~/Library/LaunchAgents/com.audioura.failure-triage.plist")
+    # (We only assert the source file exists; we never install it.)
+    assert path != home_agent
 
 
 if __name__ == "__main__":

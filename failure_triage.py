@@ -115,11 +115,19 @@ except Exception:  # pragma: no cover - defensive import fallback
 # Classes, severity, owners (D723's five-class vocabulary).
 # ---------------------------------------------------------------------------
 
-CLASSES = ("our_bug", "external", "user_confusion", "expected", "unknown")
+# LOCAL-804B adds `budget` to D723's five classes: a failure whose real root
+# cause is the shared stack refusing a paid call because the daily paid-API
+# budget / credit ran out (DAILY_PAID_LIMIT_USD, a provider 402 "out of
+# credit"). It LOOKS like our_bug ("no stops could be generated") but WE did not
+# break — the generator was starved of its paid dependency. Owner is budget/ops,
+# not engineering, so it must not float to the top as a defect to code-fix.
+CLASSES = ("our_bug", "external", "budget", "user_confusion", "expected",
+           "unknown")
 
 _SEVERITY = {
     "our_bug": 3,
     "external": 2,
+    "budget": 2,
     "user_confusion": 1,
     "expected": 0,
     "unknown": 1,
@@ -129,6 +137,8 @@ _SEVERITY = {
 _OWNER = {
     "our_bug": "LEAD → engineering (fix the defect)",
     "external": "LEAD → resilience (retry/fallback/budget on the provider)",
+    "budget": "LEAD → ops/budget (raise or reset DAILY_PAID_LIMIT_USD / top up "
+              "the provider credit — NOT an engineering defect)",
     "user_confusion": "LEAD → product/UI (make the interface guide the user)",
     "expected": "none (working as intended)",
     "unknown": "LEAD (triage by hand)",
@@ -165,6 +175,75 @@ _EXTERNAL_EXC_HINTS = (
     "timeout", "connectionerror", "connectionrefused", "socket", "readtimeout",
     "connecttimeout", "sslerror", "httperror", "clientexception", "gaierror",
 )
+
+# Substrings that name the daily paid-budget / credit refusal specifically (the
+# `budget` class). These sit INSIDE the external family but get their own owner:
+# the fix is to top up / raise the cap, not to retry harder or to code a
+# fallback. DAILY_PAID_LIMIT_USD is the shared stack's own cap; a provider 402
+# "out of credit" is the account running dry.
+_BUDGET_HINTS = (
+    "daily_paid_limit", "daily_paid_limit_usd", "paid limit", "paid-api limit",
+    "budget reached", "budget exceeded", "over budget", "out of credit",
+    "insufficient_quota", "insufficient quota", "quota exhausted",
+    "payment required",
+)
+
+
+# ---------------------------------------------------------------------------
+# Test-traffic detection (LOCAL-804B). The live Mac DB is also where the test
+# suites (LOCAL-NNN run_* harnesses, p1-* probes) write their failures — and in
+# the first report those DOMINATED (74 of 91 events were `exhibition_closed`
+# from tour `test-local365-type`). They are not production failures and must be
+# excluded by default; `--include-tests` keeps them for a deliberate audit.
+#
+# A row is test traffic when its user_id / tour_id / job_id looks synthetic:
+#   * a `test` / `TEST` / `test_` / `test-` prefix (test-local365-type,
+#     test_local156_fe633157),
+#   * a `p1-` prefix (the p1 probe ids),
+#   * a bare LOCAL-NNN / local-NNN / localNNN harness id anywhere in it (the
+#     run_localNNN_* harnesses tag their traffic with their ticket).
+# ---------------------------------------------------------------------------
+
+_TEST_ID_PREFIXES = ("test", "p1-")
+# A LOCAL-NNN harness id embedded anywhere (local365, local-156, LOCAL_804, …).
+_HARNESS_ID_RE = re.compile(r"\blocal[-_]?\d{2,}\b", re.IGNORECASE)
+
+
+def _looks_like_test_id(value):
+    """True if one id string is a synthetic test/harness id."""
+    if not value:
+        return False
+    s = str(value).strip()
+    if not s:
+        return False
+    low = s.lower()
+    for p in _TEST_ID_PREFIXES:
+        if low.startswith(p):
+            return True
+    if _HARNESS_ID_RE.search(low):
+        return True
+    return False
+
+
+def is_test_event(ev):
+    """True if a normalised event is test / harness traffic, not a real user
+    failure. Checks the user_id, tour_id and job_id (any one matching is
+    enough), plus an explicit `is_test` flag if a source ever carries one."""
+    if ev.get("is_test"):
+        return True
+    for key in ("user_id", "tour_id", "job_id"):
+        if _looks_like_test_id(ev.get(key)):
+            return True
+    return False
+
+
+def filter_test_events(events, include_tests=False):
+    """Return (kept_events, excluded_count). With include_tests=True nothing is
+    dropped (the count is still reported for transparency)."""
+    excluded = sum(1 for ev in events if is_test_event(ev))
+    if include_tests:
+        return list(events), excluded
+    return [ev for ev in events if not is_test_event(ev)], excluded
 
 
 # ---------------------------------------------------------------------------
@@ -270,7 +349,8 @@ def _rows_to_dicts(cur, rows):
 def read_failure_events(conn, since_dt):
     sql = """
         SELECT ts, service, surface, error_code, exception_type, http_status,
-               message, request_text, tour_id, user_id, triage, triage_source
+               message, request_text, tour_id, user_id, job_id, platform,
+               triage, triage_source
         FROM failure_events
         WHERE ts >= %(since)s
     """
@@ -289,7 +369,7 @@ def read_lookup_escalations(conn, since_dt):
     found" that even the dearer tiers could not rescue. A user-confusion signal:
     the user asked for something we could not satisfy as phrased."""
     sql = """
-        SELECT ts, kind, category, scope, request
+        SELECT ts, kind, category, scope, request, user_id
         FROM lookup_escalations
         WHERE ts >= %(since)s AND tier_found = 'none'
     """
@@ -309,7 +389,9 @@ def read_lookup_escalations(conn, since_dt):
                        f"/{r.get('category') or '?'}",
             "request_text": r.get("request"),
             "tour_id": None,
-            "user_id": None,
+            "user_id": r.get("user_id"),
+            "job_id": None,
+            "platform": "server",
             "triage": "absence",
             "triage_source": "auto",
             "ts": r.get("ts"),
@@ -346,6 +428,8 @@ def read_generator_jobs(conn, since_dt):
             "request_text": r.get("location"),
             "tour_id": None,
             "user_id": None,
+            "job_id": (str(r["job_id"]) if r.get("job_id") else None),
+            "platform": "server",
             "triage": None,  # classify from error_code/status below
             "triage_source": "auto",
             "ts": r.get("ts"),
@@ -380,6 +464,8 @@ def read_tour_requests(conn, since_dt):
             "request_text": r.get("request_string"),
             "tour_id": (str(r["tour_id"]) if r.get("tour_id") else None),
             "user_id": None,
+            "job_id": (str(r["tour_id"]) if r.get("tour_id") else None),
+            "platform": "server",
             "triage": None,
             "triage_source": "auto",
             "ts": r.get("ts"),
@@ -388,12 +474,142 @@ def read_tour_requests(conn, since_dt):
     return out
 
 
+# ---------------------------------------------------------------------------
+# Root-cause lookup (LOCAL-804B). A `failure_events` / `generator_jobs` /
+# `tour_requests` row often records only the SYMPTOM ("no stops could be
+# generated", a reasonless "failed") while the real cause sat in a sibling
+# table: the shared stack refused the paid calls because DAILY_PAID_LIMIT_USD
+# was reached, or a provider returned 402 "out of credit". The first report
+# mis-filed those as `our_bug`. Here we read the paid-API ledger for budget /
+# credit refusals and correlate them to reasonless failures by time, so the
+# generation failures that were really a starved budget are classed `budget`,
+# not a defect for engineering.
+#
+# These reads stay READ-ONLY and make NO paid call (they only read the ledger
+# the meters already wrote).
+# ---------------------------------------------------------------------------
+
+# How close (in seconds) a reasonless failure must sit to a budget-refusal
+# paid_api_call to be attributed to it. A generation attempt spans a few
+# minutes; a window of 15 min on each side links the refusal to the failure it
+# caused without reaching across unrelated runs.
+_BUDGET_CORRELATION_WINDOW_S = 15 * 60
+
+
+def read_paid_budget_refusals(conn, since_dt):
+    """Budget / credit refusals from the paid-API ledger: a 402 (payment
+    required / out of credit) or any row whose detail names the daily paid
+    limit. Returns a sorted list of {ts, kind, status, detail_text}. A refusal
+    is the durable DB trace of DAILY_PAID_LIMIT_USD / a provider 402 — the thing
+    that actually stopped the tour. Best-effort: if the table is missing or the
+    query errors, returns []."""
+    sql = """
+        SELECT ts, kind, status, service, caller, COALESCE(detail::text, '')
+        FROM paid_api_calls
+        WHERE ts >= %(since)s
+          AND (status = 402
+               OR status = 429
+               OR detail::text ILIKE '%%daily_paid_limit%%'
+               OR detail::text ILIKE '%%out of credit%%'
+               OR detail::text ILIKE '%%insufficient_quota%%'
+               OR detail::text ILIKE '%%payment required%%')
+        ORDER BY ts
+    """
+    out = []
+    try:
+        cur = conn.cursor()
+        cur.execute(sql, {"since": since_dt})
+        for ts, kind, status, service, caller, detail_text in cur.fetchall():
+            out.append({
+                "ts": _as_utc(ts),
+                "kind": kind,
+                "status": status,
+                "service": service,
+                "caller": caller,
+                "detail_text": detail_text or "",
+            })
+        cur.close()
+    except Exception:
+        try:
+            conn.rollback()
+        except Exception:
+            pass
+        return []
+    return out
+
+
+def _is_reasonless_failure(ev):
+    """True for a failure whose recorded detail does not itself explain WHY —
+    the ones worth a root-cause lookup. A generation_failed / reasonless tour
+    request / a generator job error with only 'failed'. We never override a row
+    that already names an exception type or an explicit external/expected code;
+    those speak for themselves."""
+    src = ev.get("source")
+    code = (ev.get("error_code") or "").strip().lower()
+    if ev.get("exception_type"):
+        return False
+    if src in ("generator_jobs", "tour_requests"):
+        return True
+    if src == "failure_events" and code in ("generation_failed", ""):
+        return True
+    return False
+
+
+def _nearest_budget_refusal(ts, refusals):
+    """Return the budget-refusal dict within the correlation window of ts, or
+    None. refusals must be sorted by ts."""
+    if ts is None or not refusals:
+        return None
+    best = None
+    best_gap = None
+    for r in refusals:
+        rts = r.get("ts")
+        if rts is None:
+            continue
+        gap = abs((ts - rts).total_seconds())
+        if gap <= _BUDGET_CORRELATION_WINDOW_S and (best_gap is None
+                                                    or gap < best_gap):
+            best, best_gap = r, gap
+    return best
+
+
+def enrich_root_causes(events, refusals):
+    """Annotate reasonless failures with a budget root cause when a paid-API
+    budget/credit refusal sits within the correlation window. Adds
+    ev['root_cause']='budget' and a short ev['root_cause_detail'] used by the
+    classifier and the report. Mutates and returns the list. No-op when there
+    are no refusals."""
+    if not refusals:
+        return events
+    for ev in events:
+        if ev.get("root_cause"):
+            continue
+        if not _is_reasonless_failure(ev):
+            continue
+        hit = _nearest_budget_refusal(_as_utc(ev.get("ts")), refusals)
+        if hit is not None:
+            ev["root_cause"] = "budget"
+            prov = hit.get("kind") or "provider"
+            st = hit.get("status")
+            ev["root_cause_detail"] = (
+                f"paid-API budget/credit refusal ({prov}"
+                f"{' ' + str(st) if st else ''}) within "
+                f"{_BUDGET_CORRELATION_WINDOW_S // 60} min — "
+                f"DAILY_PAID_LIMIT_USD / out-of-credit, not a code defect")
+    return events
+
+
 def read_all(conn, since_dt):
     events = []
     events += read_failure_events(conn, since_dt)
     events += read_lookup_escalations(conn, since_dt)
     events += read_generator_jobs(conn, since_dt)
     events += read_tour_requests(conn, since_dt)
+    # Root-cause enrichment: attribute reasonless failures to a budget/credit
+    # refusal recorded in the paid-API ledger, so they are not mis-filed as
+    # our_bug.
+    refusals = read_paid_budget_refusals(conn, since_dt)
+    enrich_root_causes(events, refusals)
     return events
 
 
@@ -401,10 +617,89 @@ def read_all(conn, since_dt):
 # Classification (rule-based).
 # ---------------------------------------------------------------------------
 
-def classify_event(ev):
+def _is_client_signal(ev):
+    """True if an event is a CLIENT-side failure report, not a server trace. The
+    app's FailureReporter records with service='app' (user-tracking
+    /client-failure), and client rows carry a real device platform
+    (android/ios), never 'server'. Either marks genuine client evidence."""
+    service = (ev.get("service") or "").strip().lower()
+    platform = (ev.get("platform") or "").strip().lower()
+    if service == "app":
+        return True
+    if platform and platform not in ("server", "", "unknown"):
+        return True
+    return False
+
+
+def build_confusion_evidence(events):
+    """Pre-scan all events for the CLIENT-SIDE evidence that LOCAL-804B requires
+    before a reasonless `tour_request_failed` may be called user_confusion:
+
+      * a client FailureReporter event (service='app' / a device platform) for
+        the same tour/user — the user actually saw and reported a failure, or
+      * a RETRY of the same request — the same request_text or tour_id appears
+        more than once, i.e. the user tried again (a confusion signal), not a
+        one-off server death.
+
+    Returns a dict of sets used by classify_event:
+      {'client_tours', 'client_users', 'retry_requests', 'retry_tours'}.
+    Without one of these a `tour_request_failed` is `unknown`, never a guessed
+    user_confusion."""
+    client_tours, client_users = set(), set()
+    req_counts, tour_counts = {}, {}
+    for ev in events:
+        if _is_client_signal(ev):
+            if ev.get("tour_id"):
+                client_tours.add(str(ev["tour_id"]))
+            if ev.get("user_id"):
+                client_users.add(str(ev["user_id"]))
+        # Count request-string / tour recurrence to detect a user retry. Only
+        # the user-facing request sources count toward a "retry".
+        if ev.get("source") in ("tour_requests", "generator_jobs",
+                                 "failure_events"):
+            rt = _normalise_message(ev.get("request_text")) if ev.get(
+                "request_text") else None
+            if rt:
+                req_counts[rt] = req_counts.get(rt, 0) + 1
+            tid = str(ev["tour_id"]) if ev.get("tour_id") else None
+            if tid:
+                tour_counts[tid] = tour_counts.get(tid, 0) + 1
+    return {
+        "client_tours": client_tours,
+        "client_users": client_users,
+        "retry_requests": {k for k, c in req_counts.items() if c >= 2},
+        "retry_tours": {k for k, c in tour_counts.items() if c >= 2},
+    }
+
+
+def _has_confusion_evidence(ev, evidence):
+    """True if there is client-side evidence that this reasonless request
+    failure was a user confusion (a client report for it, or a retry of it)."""
+    if not evidence:
+        return False
+    tid = str(ev["tour_id"]) if ev.get("tour_id") else None
+    uid = str(ev["user_id"]) if ev.get("user_id") else None
+    if tid and tid in evidence.get("client_tours", ()):
+        return True
+    if uid and uid in evidence.get("client_users", ()):
+        return True
+    if tid and tid in evidence.get("retry_tours", ()):
+        return True
+    rt = _normalise_message(ev.get("request_text")) if ev.get(
+        "request_text") else None
+    if rt and rt in evidence.get("retry_requests", ()):
+        return True
+    return False
+
+
+def classify_event(ev, evidence=None):
     """Return a D723 class for one normalised event. First matching rule wins;
-    the order encodes precedence (LEAD override > stored triage > error_code >
-    http/exception > source default)."""
+    the order encodes precedence (budget root-cause > LEAD override > stored
+    triage > error_code > http/exception > source default).
+
+    `evidence` is the optional dict from build_confusion_evidence; when given it
+    gates a reasonless `tour_request_failed` to user_confusion ONLY with a
+    client-side signal, else `unknown`."""
     error_code = (ev.get("error_code") or "").strip().lower()
     exc = (ev.get("exception_type") or "").strip().lower()
     message = (ev.get("message") or "").lower()
@@ -420,6 +715,17 @@ def classify_event(ev):
                                  or "limit" in error_code):
         return "expected"
 
+    # 0b. A budget / credit refusal is the REAL root cause (LOCAL-804B): a row
+    #     the ledger-lookup attributed to DAILY_PAID_LIMIT_USD / a provider 402,
+    #     or whose own message names the paid-budget refusal. This beats the
+    #     generation_failed → our_bug rule so a starved budget is not mis-filed
+    #     as a defect for engineering.
+    if ev.get("root_cause") == "budget":
+        return "budget"
+    hay_budget = " ".join([error_code, message, service])
+    if any(h in hay_budget for h in _BUDGET_HINTS):
+        return "budget"
+
     # 1. A LEAD override is authoritative.
     if stored_source == "lead" and stored in _STORED_TRIAGE_TO_CLASS:
         return _STORED_TRIAGE_TO_CLASS[stored]
@@ -427,9 +733,15 @@ def classify_event(ev):
     # 2. Strongest content signals: explicit codes.
     if error_code in ("generation_failed",):
         return "our_bug"
+    if error_code == "tour_request_failed":
+        # LOCAL-804B: a reasonless "tour request failed" is only user_confusion
+        # with a client-side signal (a FailureReporter event for it, or a user
+        # retry). Without evidence it is `unknown` — a guess is not a class.
+        if _has_confusion_evidence(ev, evidence):
+            return "user_confusion"
+        return "unknown"
     if error_code in ("no_results_found", "no_matching_places_in_area",
-                      "exhibition_not_found", "by_reference_no_material",
-                      "tour_request_failed"):
+                      "exhibition_not_found", "by_reference_no_material"):
         # The user asked for something we could not satisfy as phrased / that is
         # genuinely not there — a clearer interface is the fix.
         return "user_confusion"
@@ -459,10 +771,13 @@ def classify_event(ev):
     if stored in _STORED_TRIAGE_TO_CLASS and stored != "unknown":
         return _STORED_TRIAGE_TO_CLASS[stored]
 
-    # 7. Source defaults: a generator/tour-request failure with no detail still
-    #    means the user got no tour.
-    if ev.get("source") in ("generator_jobs", "tour_requests"):
+    # 7. Source defaults: a reasonless generator job failure with no detail
+    #    still means the user got no tour (our_bug). A reasonless tour_request
+    #    is handled above (evidence-gated); do not double-default it here.
+    if ev.get("source") == "generator_jobs":
         return "our_bug"
+    if ev.get("source") == "tour_requests":
+        return "unknown"
 
     return "unknown"
 
@@ -490,15 +805,21 @@ def _as_utc(dt):
     return dt.astimezone(timezone.utc)
 
 
-def group_events(events):
+def group_events(events, evidence=None):
     """Group normalised events by triage_signature. Each group carries count,
     first/last seen, the newest example, the set of surfaces/sources, and a
-    per-group class (the mode of its events' classes, our_bug-biased)."""
+    per-group class (the mode of its events' classes, our_bug-biased).
+
+    `evidence` is the optional client-confusion evidence dict; when not given it
+    is computed from `events` so a reasonless tour_request_failed is still
+    gated. Pass a prepared dict to control it in tests."""
+    if evidence is None:
+        evidence = build_confusion_evidence(events)
     groups = {}
     for ev in events:
         ev = dict(ev)
         ev["ts"] = _as_utc(ev.get("ts"))
-        ev["_class"] = classify_event(ev)
+        ev["_class"] = classify_event(ev, evidence)
         sig = triage_signature(ev.get("source"), ev.get("service"),
                                ev.get("error_code"), ev.get("exception_type"),
                                ev.get("message"))
@@ -531,11 +852,16 @@ def group_events(events):
             g["services"].add(ev["service"])
         g["class_votes"][ev["_class"]] = g["class_votes"].get(ev["_class"], 0) + 1
 
-    # Resolve each group's class: our_bug wins any tie (a real defect hiding in a
-    # mixed group must not be masked), then by vote count, then severity.
+    # Resolve each group's class. A budget root cause wins first: the whole
+    # point of LOCAL-804B is that a starved-budget failure must NOT be filed as
+    # an engineering defect. After that our_bug wins any tie (a real defect
+    # hiding in a mixed group must not be masked), then by vote count, then
+    # severity.
     for g in groups.values():
         votes = g["class_votes"]
-        if votes.get("our_bug"):
+        if votes.get("budget"):
+            g["class"] = "budget"
+        elif votes.get("our_bug"):
             g["class"] = "our_bug"
         else:
             g["class"] = max(votes.items(),
@@ -662,10 +988,13 @@ def _example_line(g):
     exc = f" · exc={ex['exception_type']}" if ex.get("exception_type") else ""
     msg = redact(ex.get("message"), 200)
     tour = f" · tour={ex['tour_id']}" if ex.get("tour_id") else ""
-    return f"error_code={code}{exc}{tour}\n      message: {msg or '—'}"
+    rc = (f"\n      root cause: {ex['root_cause_detail']}"
+          if ex.get("root_cause_detail") else "")
+    return f"error_code={code}{exc}{tour}\n      message: {msg or '—'}{rc}"
 
 
-def render_report(groups, now, days, top=15):
+def render_report(groups, now, days, top=15, excluded_tests=0,
+                  include_tests=False):
     ranked = groups[:top]
     total_events = sum(g["count"] for g in groups)
     lines = []
@@ -674,7 +1003,8 @@ def render_report(groups, now, days, top=15):
                  f"{'s' if days != 1 else ''})")
     lines.append("")
     lines.append(f"_Generated {now.strftime('%Y-%m-%d %H:%M UTC')} by "
-                 f"failure_triage.py (LOCAL-804, D723). Read-only; no DB writes._")
+                 f"failure_triage.py (LOCAL-804/804B, D723). Read-only; no DB "
+                 f"writes._")
     lines.append("")
     lines.append(f"- **{len(groups)}** distinct failure signatures, "
                  f"**{total_events}** events total.")
@@ -686,6 +1016,17 @@ def render_report(groups, now, days, top=15):
     new_ct = sum(1 for g in groups if g.get("is_new"))
     lines.append(f"- **{new_ct}** signatures are new since the last run "
                  f"(floated to the top).")
+    # LOCAL-804B: be explicit about test traffic so the reader knows the counts
+    # above are production, not the test-suite noise that dominated the first
+    # report.
+    if include_tests:
+        lines.append(f"- **test traffic INCLUDED** (--include-tests): "
+                     f"{excluded_tests} test/harness events are part of the "
+                     f"counts above.")
+    else:
+        lines.append(f"- {excluded_tests} test/harness events excluded "
+                     f"(test/TEST/p1- ids, LOCAL-NNN harnesses); run with "
+                     f"`--include-tests` to audit them.")
     lines.append("")
     lines.append("## Top failure groups")
     lines.append("")
@@ -705,6 +1046,31 @@ def render_report(groups, now, days, top=15):
         lines.append(f"- suggested owner: {_OWNER.get(g['class'], 'LEAD')}")
         lines.append(f"- example: {_example_line(g)}")
         lines.append("")
+
+    # Budget section (LOCAL-804B) — failures whose real root cause was the daily
+    # paid-API budget / credit running out, NOT a defect. Surfaced separately so
+    # LEAD routes them to ops/budget, not engineering.
+    budget = [g for g in groups if g["class"] == "budget"]
+    budget.sort(key=lambda g: (g["score"], g["count"]), reverse=True)
+    lines.append("## Budget / credit — paid-API cap, not a defect")
+    lines.append("")
+    if not budget:
+        lines.append("_No budget/credit-caused failures in this window._")
+    else:
+        lines.append("These failures looked like defects but the root-cause "
+                     "lookup tied them to a paid-API budget/credit refusal "
+                     "(`DAILY_PAID_LIMIT_USD` / a provider 402 in "
+                     "`paid_api_calls`). The fix is to raise/reset the cap or "
+                     "top up credit — do NOT open an engineering defect.")
+        lines.append("")
+        lines.append("| signature | count | surface | root cause |")
+        lines.append("| --- | --- | --- | --- |")
+        for g in budget[:15]:
+            surfaces = ", ".join(sorted(s for s in g["surfaces"] if s)) or "—"
+            rc = g["example"].get("root_cause_detail") or "budget/credit refusal"
+            lines.append(f"| `{g['signature']}` | {g['count']} | {surfaces} | "
+                         f"{rc} |")
+    lines.append("")
 
     # User-confusion section — the screens/actions, for UI fixes (Michael).
     uc = [g for g in groups if g["class"] == "user_confusion"]
@@ -840,9 +1206,12 @@ def save_seen(path, seen, groups):
 # ---------------------------------------------------------------------------
 
 def run(days=7, db_url=None, out_dir=".", use_llm=False, dry_run=False,
-        top=15, now=None, events=None):
+        top=15, now=None, events=None, include_tests=False):
     """Produce the report + drafts. Returns a result dict (paths, counts, cost).
-    `events` can be injected (tests) to bypass the DB entirely."""
+    `events` can be injected (tests) to bypass the DB entirely.
+
+    LOCAL-804B: test / harness traffic is excluded by default (the Mac DB is
+    shared with the test suites); `include_tests=True` keeps it for an audit."""
     now = now or datetime.now(timezone.utc)
     since_dt = now - timedelta(days=days)
 
@@ -855,6 +1224,12 @@ def run(days=7, db_url=None, out_dir=".", use_llm=False, dry_run=False,
                 conn.close()
             except Exception:
                 pass
+
+    # Exclude test / harness traffic by default (LOCAL-804B). The evidence for
+    # user_confusion is built from the KEPT events only, so a test row cannot
+    # vouch for a production failure.
+    events, excluded_tests = filter_test_events(events,
+                                                 include_tests=include_tests)
 
     groups = group_events(events)
 
@@ -871,7 +1246,9 @@ def run(days=7, db_url=None, out_dir=".", use_llm=False, dry_run=False,
         # Re-rank: an LLM relabel can change severity/score.
         rank_groups(groups, now, seen)
 
-    report_md = render_report(groups, now, days, top=top)
+    report_md = render_report(groups, now, days, top=top,
+                              excluded_tests=excluded_tests,
+                              include_tests=include_tests)
 
     # Top-3 our_bug groups → draft files.
     our_bugs = [g for g in groups if g["class"] == "our_bug"][:3]
@@ -901,6 +1278,8 @@ def run(days=7, db_url=None, out_dir=".", use_llm=False, dry_run=False,
         "now": now,
         "days": days,
         "event_count": len(events),
+        "excluded_tests": excluded_tests,
+        "include_tests": include_tests,
         "group_count": len(groups),
         "new_count": sum(1 for g in groups if g.get("is_new")),
         "report_path": report_path,
@@ -929,20 +1308,28 @@ def main(argv=None):
                     help="one cheap gpt-4.1-mini classify per NEW unknown group "
                          "(≤ $0.02/night, $0.05 absolute cap). Off by default; "
                          "with it off NO network call is made.")
+    ap.add_argument("--include-tests", action="store_true",
+                    help="include test / harness traffic (test/TEST/p1- ids, "
+                         "LOCAL-NNN run_* harnesses). Off by default: the shared "
+                         "Mac DB is also where the test suites write, and that "
+                         "noise dominated the first report.")
     ap.add_argument("--dry-run", action="store_true",
                     help="compute and print the report to stdout; write nothing.")
     args = ap.parse_args(argv)
 
     try:
         res = run(days=args.days, db_url=args.db_url, out_dir=args.out_dir,
-                  use_llm=args.llm, dry_run=args.dry_run, top=args.top)
+                  use_llm=args.llm, dry_run=args.dry_run, top=args.top,
+                  include_tests=args.include_tests)
     except Exception as e:
         print(f"[D723] failure_triage: {type(e).__name__}: {e}", file=sys.stderr)
         return 2
 
     if args.dry_run:
         print(res["report_md"])
-    print(f"[D723] failure_triage: {res['event_count']} events → "
+    print(f"[D723] failure_triage: {res['event_count']} events "
+          f"({res['excluded_tests']} test/harness "
+          f"{'kept' if res['include_tests'] else 'excluded'}) → "
           f"{res['group_count']} groups ({res['new_count']} new). "
           f"report={res['report_path']} drafts={len(res['drafts'])} "
           f"llm_cost=${res['llm_cost_usd']:.4f}"
