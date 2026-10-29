@@ -184,6 +184,13 @@ class Landmark:
     lng: float = 0.0
     type_label: str = ""  # monument, park, church, etc.
     wikipedia_url: str = ""
+    # [LOCAL-802] Same-building dedupe signals, populated best-effort from
+    # Wikidata: the landmark's aliases/also-known-as (so "Arnold Arboretum
+    # Visitor Center" carries "Hunnewell Building") and its located-in / part-of
+    # QIDs (P276 location, P131 admin). Two stops are the same building when one's
+    # alias names the other, or one is located-in the other's entity.
+    aliases: List[str] = field(default_factory=list)
+    located_in: List[str] = field(default_factory=list)
 
 
 def resolve_area(location_string: str) -> Optional[AreaResolution]:
@@ -402,7 +409,22 @@ def discover_landmarks(area: AreaResolution) -> List[Landmark]:
     if before_final != len(landmarks):
         print(f"  [LOCAL-294] Final QID enforcement: dropped {before_final - len(landmarks)} "
               f"landmarks without QID")
-    
+
+    # [LOCAL-802] Enrich landmarks with Wikidata aliases + located-in QIDs for
+    # same-building dedupe (one batch call). Best-effort — a failure leaves the
+    # fields empty and the dedupe falls back to its QID/coords signals.
+    try:
+        _alias_qids = [lm.qid for lm in landmarks if lm.qid]
+        if _alias_qids:
+            _alias_map = _fetch_aliases_and_location(_alias_qids)
+            for lm in landmarks:
+                _am = _alias_map.get(lm.qid)
+                if _am:
+                    lm.aliases = _am.get("aliases", []) or []
+                    lm.located_in = _am.get("located_in", []) or []
+    except Exception as _al_err:
+        print(f"  [LOCAL-802] alias/located-in enrichment skipped (non-fatal): {_al_err}")
+
     return landmarks
 
 
@@ -1356,6 +1378,66 @@ def _fetch_p31_types(qids: List[str]) -> Dict[str, List[str]]:
     return qid_to_types
 
 
+def _fetch_aliases_and_location(qids: List[str]) -> Dict[str, Dict]:
+    """[LOCAL-802] Batch-fetch Wikidata ALIASES and LOCATED-IN QIDs for a list of
+    QIDs, for same-building dedupe.
+
+    Returns ``{qid: {"aliases": [str, ...], "located_in": [qid, ...]}}``.
+
+      * aliases — English ``aliases`` plus the entity's English label (so a stop
+        whose NAME is a work's alias, e.g. "Hunnewell Building" vs the "Arnold
+        Arboretum Visitor Center", is bridged).
+      * located_in — P276 (location) and P131 (located in admin. entity) target
+        QIDs, so a stop located in another stop's building collapses.
+
+    Best-effort: a failed/throttled batch simply yields no entry for those QIDs
+    (the dedupe then relies on its other signals). No raise."""
+    if not qids:
+        return {}
+    out: Dict[str, Dict] = {}
+    for batch_start in range(0, len(qids), 50):
+        batch = qids[batch_start:batch_start + 50]
+        ids_str = "|".join(batch)
+        try:
+            resp = requests.get(
+                _WIKIDATA_API,
+                params={
+                    "action": "wbgetentities",
+                    "ids": ids_str,
+                    "props": "aliases|labels|claims",
+                    "languages": "en",
+                    "format": "json",
+                },
+                headers={"User-Agent": _USER_AGENT},
+                timeout=15,
+            )
+            if resp.status_code != 200:
+                continue
+            entities = resp.json().get("entities", {})
+            for qid, entity in entities.items():
+                aliases = []
+                label = (entity.get("labels", {}).get("en", {}) or {}).get("value", "")
+                if label:
+                    aliases.append(label)
+                for al in entity.get("aliases", {}).get("en", []) or []:
+                    v = al.get("value") if isinstance(al, dict) else None
+                    if v:
+                        aliases.append(v)
+                located = []
+                claims = entity.get("claims", {})
+                for prop in ("P276", "P131"):
+                    for claim in claims.get(prop, []):
+                        tgt = (claim.get("mainsnak", {}).get("datavalue", {})
+                               .get("value", {}))
+                        tqid = tgt.get("id") if isinstance(tgt, dict) else None
+                        if tqid:
+                            located.append(tqid)
+                out[qid] = {"aliases": aliases, "located_in": located}
+        except Exception:
+            continue
+    return out
+
+
 def _filter_by_p31_type(landmarks: List[Landmark]) -> List[Landmark]:
     """Filter landmarks by P31 (instance of) type.
 
@@ -1751,6 +1833,13 @@ def verify_landmarks(poi_list: List[Dict], area: AreaResolution, landmarks: List
                 poi['wikidata_lat'] = matched_landmark.lat
                 poi['wikidata_lng'] = matched_landmark.lng
             poi['wikidata_qid'] = matched_landmark.qid
+            # [LOCAL-802] Carry the Wikidata aliases + located-in QIDs onto the
+            # stop so same-building dedupe can bridge alias names ("Hunnewell
+            # Building" == "Arnold Arboretum Visitor Center") and located-in.
+            if getattr(matched_landmark, 'aliases', None):
+                poi['aliases'] = list(matched_landmark.aliases)
+            if getattr(matched_landmark, 'located_in', None):
+                poi['located_in'] = list(matched_landmark.located_in)
             evidence_log[stop_name] = {
                 "status": "VERIFIED",
                 "canonical_name": matched_landmark.name,
@@ -1881,7 +1970,10 @@ def build_named_place_announcement(name: str) -> str:
             f"so it is not part of this tour.")
 
 
-def apply_named_place_policy(poi_list, named_places, area, landmarks, new_poi_fn):
+def apply_named_place_policy(poi_list, named_places, area, landmarks, new_poi_fn,
+                             places_search_fn=None, scope=None,
+                             scope_center=None, scope_bbox=None,
+                             geocode_to_stop=False):
     """Keep user-named places that verify; announce the ones that do not (D562).
 
     For each name in ``named_places`` (intent `named_places` — places the listener
@@ -1976,6 +2068,68 @@ def apply_named_place_policy(poi_list, named_places, area, landmarks, new_poi_fn
                   f"as a user-explicit stop (LOCAL-791C: a named place that exists "
                   f"is a stop)")
             continue
+
+        # [LOCAL-802 addendum 5] GEOCODE-TO-STOP. For place-anchor tours
+        # (walking/driving/nature), a named place the listener gave that discovery
+        # did not surface and that is not already a candidate is GEOCODED in scope;
+        # if the map carries it, it BECOMES a stop (not merely announced as
+        # missing). The 467 driving run lost "Red Sand Dunes" and "fishing village"
+        # — both real — because discovery missed them; a geocode in scope recovers
+        # them as stops. Only runs when the caller opts in (geocode_to_stop) and
+        # supplies a places_search_fn; otherwise the original announce behaviour is
+        # unchanged. A natural-feature name must geocode to a same-kind place, not
+        # a hotel/resort borrowing the name (addendum 4).
+        if geocode_to_stop and places_search_fn is not None:
+            try:
+                _hits = places_search_fn(
+                    name, scope=scope or (area.city_name or ""),
+                    scope_center=scope_center, scope_bbox=scope_bbox)
+            except TypeError:
+                try:
+                    _hits = places_search_fn(name)
+                except Exception:
+                    _hits = None
+            except Exception:
+                _hits = None
+            _chosen = None
+            if _hits:
+                try:
+                    import local802_relevance_gate as _l802np
+                    _is_nat = bool(_l802np.natural_feature_kind(name))
+                except Exception:
+                    _l802np = None
+                    _is_nat = False
+                for _h in _hits:
+                    if not isinstance(_h, dict):
+                        continue
+                    # Addendum 4: a natural feature is not covered by a commercial
+                    # borrow-the-name venue.
+                    if _is_nat and _l802np is not None:
+                        _hn = _h.get('name') or name
+                        if _l802np.stop_kind({'name': _hn,
+                                              'type': _h.get('type', '')}) == 'commercial':
+                            continue
+                    _chosen = _h
+                    break
+            if _chosen:
+                poi = new_poi_fn(name)
+                poi['user_explicit'] = True
+                poi['_anchor'] = True
+                poi['verified'] = True
+                _lat = _chosen.get('latitude', _chosen.get('lat'))
+                _lng = _chosen.get('longitude', _chosen.get('lng'))
+                if _lat is not None and _lng is not None:
+                    poi['latitude'] = _lat
+                    poi['longitude'] = _lng
+                    poi['coordinates'] = f"{_lat},{_lng}"
+                poi['coords_source'] = 'named_place_geocode'
+                poi['confirmation'] = 'knowledge'
+                poi_list.insert(0, poi)
+                print(f"  [LOCAL-802] Named place '{name}' geocoded in scope "
+                      f"{scope or area.city_name!r} — INSERTED as a stop "
+                      f"(addendum 5: a named place that exists is a stop)")
+                continue
+
         announcements.append(build_named_place_announcement(name))
         print(f"  [LOCAL-751] Named place '{name}' could not be confirmed in "
               f"{area.city_name or 'the area'!r} — ANNOUNCED (not silently dropped)")
@@ -2066,7 +2220,13 @@ def _named_place_is_covered(name: str, final_pois, name_coord=None) -> bool:
         like the walking-path matcher.
       * GEOCODE within ``_NAMED_PLACE_COVER_METERS`` — when the named place has a
         coordinate (resolved upstream) and a stop carries one.
-    """
+
+    [LOCAL-802 addendum 4] FALSE-COVERAGE guard: when ``name`` is a named NATURAL
+    FEATURE (dunes, stream, canyon, …), a stop of a DIFFERENT KIND — a
+    hotel/resort/restaurant/shop that merely borrows the feature's name ("Mui Ne
+    Sand Dunes Resort") — does NOT cover it. The feature is covered only by a
+    same-kind stop. This applies to BOTH the token and the geocode signals (a
+    resort geocoded near the real dunes must not count either)."""
     nn = _normalize_landmark_name(name)
     if not nn:
         return False
@@ -2074,8 +2234,21 @@ def _named_place_is_covered(name: str, final_pois, name_coord=None) -> bool:
     if not n_tokens:
         return False
 
+    # [LOCAL-802 addendum 4] Is this named place a natural feature? If so, a
+    # commercial venue stop can never cover it.
+    try:
+        import local802_relevance_gate as _l802c
+        _is_natural = bool(_l802c.natural_feature_kind(name))
+    except Exception:
+        _l802c = None
+        _is_natural = False
+
     for poi in final_pois or []:
         stop_name = poi.get('name', '') if isinstance(poi, dict) else str(poi)
+        # Same-kind guard: a commercial stop never covers a named natural feature.
+        if _is_natural and _l802c is not None:
+            if not _l802c.natural_feature_covered_by(name, poi):
+                continue
         sn = _normalize_landmark_name(stop_name)
         if sn:
             s_tokens = set(sn.split())
@@ -2320,3 +2493,101 @@ def cache_put_area(area: AreaResolution, landmarks: List[Landmark], tier: str):
         
     except Exception as e:
         print(f"  [area_cache] Write error (non-fatal): {e}")
+
+
+# ============================================================
+# [LOCAL-802] Same-building enrichment + dedupe for the FINAL walking/nature
+# stop list. The r2 Arnold Arboretum tour shipped BOTH "The Arnold Arboretum
+# Visitor Center" and "Hunnewell Building" — the SAME building — because the two
+# stops came from REPLENISHMENT (not from verify_landmarks), so neither carried a
+# Wikidata alias, and their DELIVERED coordinates were fabricated ~2 km apart, so
+# the coords rule could not see they are one place. The true bridge is the
+# Visitor Center's Wikidata entity, whose English aliases include "Hunnewell
+# Building" (and whose P625 is the single building point). This enricher looks up
+# each stop's Wikidata entity BY NAME once (alias + coords), stamps them, and then
+# runs the pure same_building dedupe — catching the alias bridge the coords miss.
+# ============================================================
+
+def _wikidata_name_lookup(name: str, city: str = "") -> Optional[Dict]:
+    """Best-effort: resolve a place NAME to its Wikidata entity's aliases + P625.
+
+    Returns ``{"qid", "aliases": [str], "lat", "lng"}`` or None. One search +
+    one wbgetentities call; a failure yields None (the caller then relies on the
+    stop's own fields). Not cached here — the caller dedupes a handful of stops."""
+    q = (name or "").strip()
+    if len(q) < 3:
+        return None
+    try:
+        query = f"{q} {city}".strip() if city else q
+        cands = _search_entities(query)
+        cands = _filter_disambiguation_pages(cands)
+        if not cands:
+            return None
+        qid = cands[0][0]
+        resp = requests.get(
+            _WIKIDATA_API,
+            params={"action": "wbgetentities", "ids": qid,
+                    "props": "aliases|labels|claims", "languages": "en",
+                    "format": "json"},
+            headers={"User-Agent": _USER_AGENT}, timeout=10,
+        )
+        if resp.status_code != 200:
+            return None
+        ent = resp.json().get("entities", {}).get(qid, {})
+        aliases = []
+        label = (ent.get("labels", {}).get("en", {}) or {}).get("value", "")
+        if label:
+            aliases.append(label)
+        for al in ent.get("aliases", {}).get("en", []) or []:
+            v = al.get("value") if isinstance(al, dict) else None
+            if v:
+                aliases.append(v)
+        lat = lng = 0.0
+        for claim in ent.get("claims", {}).get("P625", []):
+            val = claim.get("mainsnak", {}).get("datavalue", {}).get("value", {})
+            lat = val.get("latitude", 0.0) or 0.0
+            lng = val.get("longitude", 0.0) or 0.0
+            if lat or lng:
+                break
+        return {"qid": qid, "aliases": aliases, "lat": lat, "lng": lng}
+    except Exception:
+        return None
+
+
+def enrich_and_dedupe_same_building(poi_list, city: str = "", log=None):
+    """[LOCAL-802] Enrich the FINAL stop list with Wikidata aliases/coords (by
+    name, for stops that carry none) and collapse same-building duplicates.
+
+    Each stop missing both an ``aliases`` list and a Wikidata QID is looked up by
+    name once; its alias list and (true) Wikidata coordinates are stamped. Then
+    ``local802_relevance_gate.dedupe_same_building_stops`` runs on the enriched
+    list — so "Hunnewell Building" collapses into "The Arnold Arboretum Visitor
+    Center" via the alias bridge even though their delivered coordinates were far
+    apart. Returns ``(deduped, removed_names)``. Network best-effort; a lookup
+    failure simply leaves a stop un-enriched (never a false merge)."""
+    try:
+        import local802_relevance_gate as _l802
+    except Exception:
+        return list(poi_list or []), []
+
+    for p in poi_list or []:
+        if not isinstance(p, dict):
+            continue
+        if p.get("aliases") or p.get("wikidata_qid") or p.get("qid"):
+            continue
+        info = _wikidata_name_lookup(p.get("name") or p.get("title") or "", city)
+        if not info:
+            continue
+        if info.get("aliases"):
+            p["aliases"] = info["aliases"]
+        if info.get("qid"):
+            p["wikidata_qid"] = info["qid"]
+        if info.get("lat") or info.get("lng"):
+            # Stamp the TRUE Wikidata point under a dedicated key so the dedupe can
+            # use it without overwriting the delivered (display) coordinates.
+            p["wikidata_lat"] = info["lat"]
+            p["wikidata_lng"] = info["lng"]
+        if log:
+            log(f"  [LOCAL-802] enriched '{p.get('name')}' with Wikidata "
+                f"aliases={info.get('aliases')[:3]} qid={info.get('qid')}")
+    return _l802.dedupe_same_building_stops(poi_list, log=log)

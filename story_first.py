@@ -685,25 +685,23 @@ _PERSON_NAME_PATTERN = re.compile(
 )
 
 
-def prefilter_candidates(candidates: List[str], stop_name: str = '') -> List[str]:
+def prefilter_candidates(candidates: List[str], stop_name: str = '',
+                         place: str = '', category: str = '') -> List[str]:
     """[LOCAL-443-B] Zero-cost structural pre-filter BEFORE any LLM call.
 
     Drops candidates that structurally cannot be stories:
       1. < 3 sentences (cannot have setup → struggle → resolution)
       2. No person-name-shaped token (stories need named people)
       3. SHA-duplicate within the stop (same text re-fetched from different sources)
+      4. [LOCAL-802] OFF-TOPIC: the candidate mentions NEITHER the stop, its place,
+         nor the tour's theme/category. The cheap-arm b1 (Ben Thanh spa) run let a
+         reality-TV digression ("HaMerotz LaMillion / The Race, 42,000 km") into a
+         spa stop as a 3-sentence, person-named candidate that passed the
+         structural filter; this gate drops it before it can become a story. Only
+         applied when a place or category anchor is supplied (so museum-snippet
+         behaviour and the no-context tests are unchanged).
 
     Target: ≤ PREFILTER_MAX_CANDIDATES survive to reach gpt-4o-mini.
-
-    When _PREFILTER_DISABLED is True, this returns all candidates unchanged
-    (for D242 #1 neutralisation proof that volume explodes without it).
-
-    Args:
-        candidates: raw candidate texts
-        stop_name: for logging
-
-    Returns:
-        Filtered list of candidate texts (order preserved, deduped)
     """
     if _PREFILTER_DISABLED:
         # Neutralisation: return all candidates, log the volume
@@ -714,9 +712,17 @@ def prefilter_candidates(candidates: List[str], stop_name: str = '') -> List[str
     if not candidates:
         return []
 
+    # [LOCAL-802] Prepare the relevance gate (optional import; never blocks).
+    _l802 = None
+    if place or category:
+        try:
+            import local802_relevance_gate as _l802
+        except Exception:
+            _l802 = None
+
     sha_seen = set()
     filtered = []
-    rejected_reasons = {'short': 0, 'no_name': 0, 'duplicate': 0}
+    rejected_reasons = {'short': 0, 'no_name': 0, 'duplicate': 0, 'off_topic': 0}
 
     for text in candidates:
         if not text or not text.strip():
@@ -741,6 +747,14 @@ def prefilter_candidates(candidates: List[str], stop_name: str = '') -> List[str
         if not _PERSON_NAME_PATTERN.search(text):
             rejected_reasons['no_name'] += 1
             continue
+
+        # 4. [LOCAL-802] Off-topic relevance gate (stop / place / theme / category).
+        if _l802 is not None:
+            if not _l802.passage_is_relevant(text, stop_title=stop_name,
+                                             place=place, category=category):
+                rejected_reasons['off_topic'] += 1
+                print(_l802.off_topic_drop_log_line(stop_name, text))
+                continue
 
         filtered.append(text)
 
@@ -1381,7 +1395,17 @@ def story_first_pipeline(stop_data: Dict, fact_sheet: str = '',
 
     # ── Step 2c (LOCAL-443-B): Pre-filter before LLM ──
     _t = time.time()
-    unique_candidates = prefilter_candidates(candidate_texts, stop_name=stop_name)
+    # [LOCAL-802] Give the pre-filter the place + category so it can drop
+    # off-topic candidates (reality-TV / Permian-style digressions) that pass the
+    # structural filter. place = full tour location (city + venue), category =
+    # the tour category.
+    _l802_place = (stop_data.get('tour_location')
+                   or stop_data.get('venue_name')
+                   or stop_data.get('venue_city') or '')
+    _l802_category = stop_data.get('tour_category') or ''
+    unique_candidates = prefilter_candidates(
+        candidate_texts, stop_name=stop_name,
+        place=_l802_place, category=_l802_category)
     _mark('3_prefilter', _t)
 
     print(f"    Pre-filter: {prefilter_input_count} raw → {len(unique_candidates)} "
