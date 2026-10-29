@@ -29,6 +29,10 @@ import '../screens/debug_log_viewer_screen.dart';
 class Allowances {
   final int? toursTodayLeft;
   final int? toursThisMonthLeft;
+  // [LOCAL-807B] Weekly subscription remaining allowance (sub_week). The server
+  // emits this only for a weekly plan; present so the plans "Your plan" banner
+  // can show "N new tours left" for a Weekly subscriber.
+  final int? toursThisWeekLeft;
   final int? freshLeft;
   final int? editsLeft;
   final int? opsLeft;
@@ -36,6 +40,7 @@ class Allowances {
   const Allowances({
     this.toursTodayLeft,
     this.toursThisMonthLeft,
+    this.toursThisWeekLeft,
     this.freshLeft,
     this.editsLeft,
     this.opsLeft,
@@ -49,6 +54,7 @@ class Allowances {
     return Allowances(
       toursTodayLeft: asInt(json['tours_today_left']),
       toursThisMonthLeft: asInt(json['tours_this_month_left']),
+      toursThisWeekLeft: asInt(json['tours_this_week_left']),
       freshLeft: asInt(json['fresh_left']),
       editsLeft: asInt(json['edits_left']),
       opsLeft: asInt(json['ops_left']),
@@ -58,6 +64,7 @@ class Allowances {
   bool get isEmpty =>
       toursTodayLeft == null &&
       toursThisMonthLeft == null &&
+      toursThisWeekLeft == null &&
       freshLeft == null &&
       editsLeft == null &&
       opsLeft == null;

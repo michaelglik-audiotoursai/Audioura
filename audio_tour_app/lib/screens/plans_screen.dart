@@ -268,9 +268,12 @@ class _PlansScreenState extends State<PlansScreen> {
     final renewText =
         renews != null ? PassExpiryFormat.formatDate(renews) : null;
     final a = _ent.allowances;
-    // "3 of 5 new tours left" — prefer the weekly count, else monthly.
+    // "3 of 5 new tours left" — prefer the weekly count (Weekly plan), then the
+    // monthly, then the daily, so whichever period the active subscription uses
+    // is shown (LOCAL-807B: sub_week reports tours_this_week_left).
     String? leftText;
-    final left = a.toursThisMonthLeft ?? a.toursTodayLeft;
+    final left =
+        a.toursThisWeekLeft ?? a.toursThisMonthLeft ?? a.toursTodayLeft;
     if (left != null) leftText = '$left new tours left';
 
     final parts = <String>[_ent.displayName];
@@ -544,8 +547,13 @@ class _PlansScreenState extends State<PlansScreen> {
 
   // ─── Restore + Manage links ──────────────────────────────────────────────
   Widget _bottomLinks() {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
+    // LOCAL-807B live-run fix: a plain Row overflowed by 17px on a 390pt-wide
+    // iPhone (the two labels + icons are wider than the screen). Wrap lets the
+    // second link fall to the next line on a narrow device instead of clipping.
+    return Wrap(
+      alignment: WrapAlignment.center,
+      spacing: 8,
+      runSpacing: 4,
       children: [
         TextButton.icon(
           key: const Key('plans_restore'),
@@ -553,7 +561,6 @@ class _PlansScreenState extends State<PlansScreen> {
           icon: const Icon(Icons.restore, size: 18),
           label: const Text('Restore purchases'),
         ),
-        const SizedBox(width: 8),
         TextButton.icon(
           key: const Key('plans_manage'),
           onPressed: _manage,

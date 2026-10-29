@@ -161,6 +161,17 @@ ON CONFLICT (plan_id) DO UPDATE SET
     sub_period = EXCLUDED.sub_period,
     auto_renews = EXCLUDED.auto_renews;
 
+-- Human display names for the subscription levels, so the plans screen's active
+-- banner reads "Weekly — renews … · 5 new tours left" and not the raw plan_id
+-- (display_name is read by entitlements_api._me_payload / _visible_levels,
+-- migration 016). Guarded UPDATEs — they only touch the rows seeded above, and
+-- re-asserting them is idempotent. LOCAL-807B live-run fix: the seeds set every
+-- other number but left display_name NULL, so the banner showed "sub_week".
+UPDATE plans SET display_name = 'Day pass' WHERE plan_id = 'sub_day';
+UPDATE plans SET display_name = 'Weekly'   WHERE plan_id = 'sub_week';
+UPDATE plans SET display_name = 'Monthly'  WHERE plan_id = 'sub_month';
+UPDATE plans SET display_name = 'Annual'   WHERE plan_id = 'sub_year';
+
 -- ───────────────────────────────────────────────────────────────────────────
 -- 3. The auto-renewing subscription state table. One row per subscription
 --    (keyed by the store's ORIGINAL transaction id / purchase token), holding

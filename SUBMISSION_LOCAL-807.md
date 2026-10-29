@@ -206,3 +206,119 @@ titles/prices are mirrored in App Store Connect and the Play Console listing.
   `user-tracking/test_local807_subscription_routes.py` (new),
   `audio_tour_app/test/plans_screen_local807_test.dart` (new),
   `audio_tour_app/test/iap_subscription_products_local807_test.dart` (new).
+
+
+## Live test (LOCAL-807B — run on the Mac Mini, 2026-10-29)
+
+The "Live (not run here)" gap above is now closed. The server ran from **this
+branch** in its own containers (`-p local807`) against a **throwaway DB** with
+migration 060 applied, and a DEBUG app build ran on the **iOS simulator**
+(iPhone 17, iOS 26.4) pointed at that container. No live DB was written; no paid
+API was called ($0).
+
+### How it was run
+- **Server (own stack, throwaway DB):** `docker-compose.local807-proof.yml`
+  (`-p local807`) — a dedicated Postgres on host port 55807 and the
+  `user-tracking` user-api (built from this worktree) on 50807 **and** 5003.
+  The schema is built at init from `docs/local807/sql/`:
+  `00_base_schema.sql` (the minimal `plans` + `device_entitlement` + `purchases`
+  + allowance tables the subscription routes read, lifted column-for-column from
+  migrations 003/012/015/016/022) then `01_migration_060.sql` (a **verbatim copy
+  of `migration/sql/060`**). Migration 060 applied cleanly: the four `sub_*`
+  plan rows seeded with the right prices/periods/allowances, and the
+  `auto_renew_subscriptions` + `subscription_notifications` tables created.
+  The dev stack's user-api was briefly stopped to free host port 5003 for the
+  run and **restored afterwards** (verified healthy on 5003).
+- **App:** `flutter run -t lib/main_plans_proof.dart -d <iPhone-17-sim>
+  --dart-define=DEBUG_SERVER_IP=127.0.0.1`. `main_plans_proof.dart` is a tiny
+  proof harness (modelled on the existing `main_wallet_proof.dart`) that sets
+  `server_mode=local` and launches `PlansScreen` directly — the new reveal
+  screen is not yet wired into the app's menus, so a direct-launch harness is
+  the only way to drive it live. On the iOS simulator `127.0.0.1` is the Mac
+  host, so the app reached the LOCAL-807 container on `:5003`.
+- The app **built and ran** on the simulator (`flutter build ios --simulator
+  --debug` → `Built Runner.app`), and the plans screen's active-plan banner
+  showed **live data from the LOCAL-807 server** ("Weekly · renews 5 Nov 2026 ·
+  N new tours left"), proving the whole app→container→DB path end to end.
+
+### Screenshots — `docs/local807/`
+1. `01_plans_first_view.png` — first view, no active subscription: the gentle
+   "Choose a plan…" prompt and the two choices (Pass / Tour pack).
+2. `02_pass_revealed_month.png` — "Pass" revealed: segmented Day·Week·Month·Year,
+   Month = "10 new tours a month · $9.99", the **auto-renewal terms**, and the
+   Terms of Use / Privacy Policy links.
+3. `03_pass_revealed_weekly.png` — Week selected: "5 new tours a week · $4.99",
+   auto-renewal terms + links.
+4. `04_tour_pack_revealed.png` — "Tour pack" revealed: the one-time 5-tour pack,
+   "$10", "nothing renews automatically" — **no renewal terms**.
+5. `05_weekly_subscribe_attempt.png` — Weekly "Subscribe — $4.99" tapped (see the
+   StoreKit-sheet note below).
+6. `06_restore_purchases.png` — "Restore purchases" tapped → "Restoring your
+   purchases…" (the app calls `restorePurchases()` on the store).
+7. `07_day_pass_no_renewal.png` — the **Day pass**: "3 new tours · $2.99", "The
+   Day pass lasts 24 hours and does NOT renew" — **no auto-renewal terms, no
+   Terms/Privacy block** (the exact D734 rule: terms only for the auto-renewing
+   options).
+8. `08_active_plan_weekly_banner.png` — the active-plan banner: "Weekly · renews
+   5 Nov 2026 · N new tours left" — the server grant + weekly allowance + display
+   name through the real app.
+
+### Server side — subscription row + allowance decrement (`docs/local807/server_proof.py`)
+Run inside the proof container, the hook calls the **real** entitlement-mapping
+code — `subscription_notifications.apply_event`, the exact post-verification
+core `/subscriptions/verify` runs after it checks the Apple JWS — with a crafted
+ACTIVE Weekly event. Verified output:
+- `auto_renew_subscriptions` row created: `status=active`, `period_end` = +7 days,
+  `previous_level=l1`, keyed on the original transaction id;
+- the device driven to `level=sub_week`, `anniversary_at` = `period_end`;
+- `/entitlements/me` then reports `tours_this_week_left: 5`;
+- inserting **one** delivered `tour_requests` row (`source='orchestrator',
+  status='completed'` — the exact rows the allowance gate counts; **no real
+  generation, $0**) decrements it to **4**.
+
+### Fixes the live run surfaced (and only these)
+1. **The scheme never referenced the StoreKit config.** `ios/Audioura.storekit`
+   existed but `Runner.xcscheme` had no `StoreKitConfigurationFileReference`, so
+   nothing told the simulator to load it. Added it to the Launch and Test
+   actions (`identifier = "Audioura.storekit"`).
+2. **A Weekly subscriber saw no "N new tours left".** `entitlements_api._allowances_left`
+   handled `tours_per_day`/`tours_per_month` but **not `tours_per_week`** (and
+   `_PLAN_COLS`/`_get_plan` did not even select it), so the Weekly plan — whose
+   allowance is weekly — produced no "tours left" line on the plans banner, the
+   exact copy D734 asks for. Added the `tours_per_week` column to the plan read
+   and a weekly branch to `_allowances_left` (counts the same
+   orchestrator/completed `tour_requests`, scoped to `date_trunc('week')`,
+   emitting `tours_this_week_left`). The Flutter `Allowances` model gained
+   `toursThisWeekLeft` and the banner now prefers week → month → day.
+3. **The subscription-level rows had no display name.** The migration-060 seeds
+   set every number but left `display_name` NULL, so the banner read "sub_week"
+   instead of "Weekly". Added idempotent `UPDATE`s to migration 060 (Day pass /
+   Weekly / Monthly / Annual).
+4. **The bottom links overflowed by 17 px** on a 390-pt-wide iPhone (two
+   `TextButton`s in a `Row`). Changed to a `Wrap` so the second link falls to a
+   new line instead of clipping.
+
+### One honest limitation (tooling, not a code defect)
+`flutter run` / `simctl launch` do **not** apply an Xcode scheme's StoreKit
+configuration file — that is only loaded by an Xcode Run/Test session. So under
+`flutter run` the simulator's StoreKit returns `notFound` for the products and
+the **native purchase sheet cannot appear**; the app handles this gracefully
+(the red "This plan isn't available on this store yet" snackbar in
+`05_weekly_subscribe_attempt.png`). Separately, StoreKit *configuration-file*
+testing signs its transactions with Xcode's local test certificate, which does
+not chain to the pinned **Apple Root CA G3**, so `/subscriptions/verify` would
+reject a simulator JWS by design (`root_not_apple`) — the real server-side JWS
+grant is only exercisable on a real device + App Store sandbox. The simulator
+therefore proves the **client/StoreKit half** (the whole reveal flow, prices,
+the terms-only-for-auto-renewing rule, the Day-pass copy, restore, and the
+graceful not-available handling); the **server half** (grant → subscription row
+→ level → allowance decrement) is proven independently by `server_proof.py`
+above, and the buy→`/subscriptions/verify` wiring by the 13 green widget/unit
+tests and the valid `.storekit`.
+
+### Regression check after the fixes
+- `cd user-tracking && python3 -m pytest -q` → **73 passed** (incl. the 598
+  Apple-JWS suite — the verifier is untouched by these fixes).
+- `flutter test` on the 807 + IAP + plan suites → **88 passed**.
+- `flutter analyze` on the changed Dart files → clean (only the pre-existing
+  `enableStoreKit2` deprecation).

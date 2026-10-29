@@ -382,7 +382,8 @@ def _get_device_state(cur, user_id):
     return dict(zip(_DEV_COLS, row))
 
 
-_PLAN_COLS = ['plan_id', 'tours_per_day', 'tours_per_month', 'fresh_per_pack',
+_PLAN_COLS = ['plan_id', 'tours_per_day', 'tours_per_month', 'tours_per_week',
+              'fresh_per_pack',
               'edits_per_pack', 'ops_per_pack', 'max_stops', 'max_new_stops_per_edit',
               'by_reference_only', 'referrals_allowed', 'referral_period', 'seat_cap',
               'can_sell', 'price_usd', 'inactivity_days', 'display_name', 'hidden']
@@ -390,7 +391,8 @@ _PLAN_COLS = ['plan_id', 'tours_per_day', 'tours_per_month', 'fresh_per_pack',
 
 def _get_plan(cur, level):
     cur.execute("""
-        SELECT plan_id, tours_per_day, tours_per_month, fresh_per_pack,
+        SELECT plan_id, tours_per_day, tours_per_month, tours_per_week,
+               fresh_per_pack,
                edits_per_pack, ops_per_pack, max_stops, max_new_stops_per_edit,
                by_reference_only, referrals_allowed, referral_period, seat_cap,
                can_sell, price_usd, inactivity_days, display_name, hidden
@@ -479,6 +481,21 @@ def _allowances_left(cur, state, plan):
                     (state['user_id'],))
         used_month = cur.fetchone()[0]
         out['tours_this_month_left'] = max(0, plan['tours_per_month'] - used_month)
+    # [LOCAL-807B] Weekly subscription allowance. The Weekly plan (sub_week)
+    # grants tours_per_week with tours_per_month NULL and tours_per_day=999, so
+    # neither branch above fires and the plans screen showed NO "N new tours
+    # left" for a Weekly subscriber — the exact line D734's "Your plan" banner
+    # needs. Count the SAME delivered tours, scoped to the current week
+    # (date_trunc('week') = Monday per ISO) with the same orchestrator/completed
+    # predicate the gate uses, so display and gate agree.
+    if plan.get('tours_per_week') is not None:
+        cur.execute("""SELECT COUNT(*) FROM tour_requests
+                       WHERE secret_id=%s AND source='orchestrator'
+                         AND status='completed'
+                         AND started_at >= date_trunc('week', CURRENT_DATE)""",
+                    (state['user_id'],))
+        used_week = cur.fetchone()[0]
+        out['tours_this_week_left'] = max(0, plan['tours_per_week'] - used_week)
     if plan['fresh_per_pack'] is not None:
         out['fresh_left'] = max(0, plan['fresh_per_pack'] - state['fresh_used'])
     if plan['edits_per_pack'] is not None:
