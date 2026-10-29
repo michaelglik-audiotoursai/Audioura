@@ -60,6 +60,9 @@ from typing import Optional
 __all__ = [
     "is_open", "note_response", "trip", "reset", "state",
     "window_for_status", "status_from_error",
+    # LOCAL-814B — the canonical choke-point API every Gemini caller uses:
+    # allow() before the request, record_failure(status, body) after.
+    "allow", "record_failure",
 ]
 
 # ── tunables (env-overridable; safe defaults from the ticket) ─────────────────
@@ -220,6 +223,36 @@ def trip(reason: str, window_s: float, status: int = 0) -> None:
         # Still refresh the DB flag so siblings keep seeing the open state, but
         # without re-logging or re-recording.
         _write_flag(new_until, reason, status)
+
+
+# ── LOCAL-814B canonical choke-point API ───────────────────────────────────────
+# The ticket asks every Gemini call site to call allow() BEFORE the request and
+# record_failure(status, body) AFTER it. These are the intention-revealing names
+# for the two primitives above, so a caller reads as a guard rather than a
+# predicate:
+#
+#     if not gemini_breaker.allow():
+#         return fallback()
+#     r = requests.post(GEMINI_URL, ...)
+#     gemini_breaker.record_failure(r.status_code, r.text)
+#
+# allow() == "the breaker is closed, Gemini may be called" == not is_open().
+# record_failure() == note_response(): a 402/429 trips the breaker, anything else
+# (including a 200) is a harmless no-op, so it is safe to call after EVERY
+# response. Both are best-effort and never raise into the caller.
+def allow(now: Optional[float] = None) -> bool:
+    """True when a caller MAY issue a Gemini request (the breaker is closed).
+    False means skip Gemini and use the non-Gemini fallback. The inverse of
+    is_open(); never raises."""
+    return not is_open(now)
+
+
+def record_failure(status_code: int, body: str = "") -> None:
+    """Record the outcome of a Gemini request so a 402 (credit) / 429 (rate
+    limit) trips the breaker for the next caller. A success (200) or any other
+    status is ignored, so this is safe to call after every response. Alias of
+    note_response(); never raises."""
+    note_response(status_code, body)
 
 
 def reset() -> None:

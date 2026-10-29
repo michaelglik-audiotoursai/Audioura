@@ -1,0 +1,33 @@
+# docker-compose.local814-proof.yml — LOCAL-814B OWN isolated generation stack.
+#
+# Separate project (-p local814), OWN postgres volume, spare port (58434). Never
+# touches the shared audioura-* containers, Michael's development-postgres-2-1, or
+# any other LOCAL-* stack. The postgres is seeded at first init from the LOCAL-778
+# schema (stop_pool + audio_tours + plans) in this stack's OWN volume.
+#
+# UP:   docker compose -p local814 -f docker-compose.local814-proof.yml up -d
+# DOWN: docker compose -p local814 -f docker-compose.local814-proof.yml down -v
+#
+# The live tour is run as a ONE-SHOT generator container on this stack's network
+# (see run_local814_container.py), with the REAL (depleted) Gemini key from .env.
+# The point is to prove the LOCAL-814 breaker: on the DEFAULT arm (Gemini research
+# ON) the first 402 trips the breaker and the tour still completes via fallbacks,
+# and on the RESEARCH_BACKEND=serper arm Gemini is never called at all.
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: local814-postgres
+    environment:
+      POSTGRES_DB: audiotours
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: password123
+      POSTGRES_INITDB_ARGS: "--auth-host=md5 --auth-local=md5"
+      POSTGRES_HOST_AUTH_METHOD: md5
+    ports:
+      - "58434:5432"
+    volumes:
+      - local814_pg:/var/lib/postgresql/data
+      - ./local778-initdb:/docker-entrypoint-initdb.d:ro
+
+volumes:
+  local814_pg:

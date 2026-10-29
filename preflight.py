@@ -22,6 +22,21 @@ GEMINI_MODEL = 'gemini-flash-latest'      # what story_leads actually calls
 TIMEOUT = 20
 
 
+# ── LOCAL-814B: feed the Gemini probe result into the process-wide breaker ─────
+# The Gemini probe is a KEY-HEALTH check: it must ALWAYS run (it is the thing that
+# detects "OUT OF CREDITS"), so it is NOT gated by the breaker. But when the probe
+# itself gets a 402/429 that is authoritative account state, so it trips the
+# breaker — a batch that starts after a failed probe then skips Gemini from the
+# first stop instead of re-discovering the 402 on the first real call. Imported
+# softly and fail-open: a missing/broken breaker never breaks the probe.
+def _gemini_breaker_record(status_code, body=''):
+    try:
+        import gemini_breaker
+        gemini_breaker.record_failure(int(status_code), body or '')
+    except Exception:
+        pass
+
+
 def _quota_from_headers(headers):
     """Surface whatever the service says about what is left.
 
@@ -79,11 +94,25 @@ def check_gemini():
     k = os.environ.get('GEMINI_API_KEY') or os.environ.get('GOOGLE_API_KEY')
     if not k:
         return False, 'GEMINI_API_KEY missing from the environment'
-    return _probe(urllib.request.Request(
+    req = urllib.request.Request(
         f'https://generativelanguage.googleapis.com/v1beta/models/'
         f'{GEMINI_MODEL}:generateContent?key={k}',
         data=json.dumps({'contents': [{'parts': [{'text': 'ok'}]}]}).encode(),
-        headers={'Content-Type': 'application/json'}))
+        headers={'Content-Type': 'application/json'})
+    ok, msg = _probe(req)
+    # [LOCAL-814B] A failed Gemini probe carries authoritative account state. If
+    # it was a 402 (credit) or 429 (rate limit), trip the process-wide breaker so
+    # the batch that follows skips Gemini from the first stop. The probe itself is
+    # never gated by the breaker — it is the detector, so it always runs. Parsed
+    # from the probe's own message, which already names the HTTP status and the
+    # "OUT OF CREDITS" refusal; fail-open.
+    if not ok:
+        low = (msg or '').lower()
+        if 'out of credits' in low or 'http 402' in low or '402' in low:
+            _gemini_breaker_record(402, msg or '')
+        elif 'rate limited' in low or 'http 429' in low or '429' in low:
+            _gemini_breaker_record(429, msg or '')
+    return ok, msg
 
 
 def check_serper():

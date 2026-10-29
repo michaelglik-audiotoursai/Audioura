@@ -65,8 +65,13 @@ class _FakeResp:
 
 
 def _clean_breaker_env():
+    # Clear breaker tunables AND the provider keys some classes set, so this test
+    # module never LEAKS a fake GEMINI_API_KEY/OPENAI_API_KEY into a later test
+    # module whose probes behave differently when a (fake) key is present.
     for k in ("GEMINI_BREAKER_DISABLE", "GEMINI_BREAKER_402_MINUTES",
-              "GEMINI_BREAKER_429_MINUTES", "DATABASE_URL", "DB_HOST", "DB_NAME"):
+              "GEMINI_BREAKER_429_MINUTES", "DATABASE_URL", "DB_HOST", "DB_NAME",
+              "GEMINI_API_KEY", "GOOGLE_API_KEY", "OPENAI_API_KEY",
+              "RESEARCH_BACKEND"):
         os.environ.pop(k, None)
 
 
@@ -314,6 +319,195 @@ class LeadsPathSerperRouting(unittest.TestCase):
                providers=["openai", "gemini"], verify_top=0)
         self.assertEqual(self.calls["gemini"], 0)
         self.assertEqual(self.calls["openai"], 1)
+
+
+# ── D. process-wide coverage: EVERY Gemini caller goes through the breaker ─────
+# [LOCAL-814B] The ticket is a PROCESS-WIDE breaker: every module that reaches
+# Gemini must route to its fallback when the breaker is open. The LEAD review's
+# grep named these modules. There are two legitimate ways to be covered:
+#   (1) the module makes its OWN direct generativelanguage POST and guards it with
+#       the breaker (story_leads, escalating_lookup, preflight), OR
+#   (2) the module reaches Gemini only THROUGH story_leads (gemini_with_sources /
+#       research_with_sources / _gemini), inheriting story_leads' guard.
+# A third group reaches Gemini not at all (artist_life_research writes with
+# OpenAI). The static test below asserts this invariant from the source itself, so
+# a NEW direct Gemini POST added to any of these modules without a breaker guard
+# fails the build.
+GEMINI_POST = "generativelanguage.googleapis.com"
+BREAKER_TOKENS = ("gemini_breaker", "is_open", "allow(", "note_response",
+                  "record_failure", "_gemini_breaker_open", "_gemini_allowed",
+                  "_gemini_breaker_record")
+STORY_LEADS_ROUTES = ("gemini_with_sources", "research_with_sources",
+                      "story_leads")
+
+# module -> how it is expected to be covered.
+#   "direct"      : owns a generativelanguage POST, must carry a breaker guard.
+#   "story_leads" : reaches Gemini only via story_leads (inherits the guard).
+#   "none"        : does not call Gemini at runtime (OpenAI / comments only).
+GREP_LIST_COVERAGE = {
+    "generate_tour_text.py": "story_leads",
+    "artist_life_research.py": "none",       # writes with serper_research._openai_chat
+    "claim_provenance.py": "story_leads",     # consumes gemini_with_sources output
+    "fast_pipeline.py": "story_leads",        # via venue_preflight -> gemini_with_sources
+    "escalating_lookup.py": "direct",         # tier-C grounded POST
+    "l2_by_reference.py": "story_leads",
+    "preflight.py": "direct",                 # key-health probe POST
+    "restaurant_practicals.py": "story_leads",
+}
+
+
+class EveryCallerGoesThroughBreaker(unittest.TestCase):
+    """Static invariant over the LEAD grep list: no module reaches Gemini without
+    the breaker (either its own guard, or story_leads' guard)."""
+
+    def _src(self, name):
+        path = os.path.join(ROOT, name)
+        self.assertTrue(os.path.exists(path), f"{name} not found at repo root")
+        with open(path, "r", encoding="utf-8") as f:
+            return f.read()
+
+    def test_direct_posters_carry_a_breaker_guard(self):
+        for name, mode in GREP_LIST_COVERAGE.items():
+            if mode != "direct":
+                continue
+            src = self._src(name)
+            self.assertIn(GEMINI_POST, src,
+                          f"{name} is marked 'direct' but has no Gemini POST")
+            self.assertTrue(any(t in src for t in BREAKER_TOKENS),
+                            f"{name} issues a direct Gemini POST but does not "
+                            f"reference the breaker — add allow()/record_failure()")
+
+    def test_story_leads_routed_modules_do_not_post_directly(self):
+        # A module expected to go THROUGH story_leads must NOT have grown its own
+        # un-guarded direct Gemini POST (which would bypass story_leads' breaker).
+        for name, mode in GREP_LIST_COVERAGE.items():
+            if mode not in ("story_leads", "none"):
+                continue
+            src = self._src(name)
+            if GEMINI_POST in src:
+                self.assertTrue(any(t in src for t in BREAKER_TOKENS),
+                                f"{name} grew a direct Gemini POST without a "
+                                f"breaker guard")
+            else:
+                # It must at least reach Gemini via story_leads (story_leads
+                # modules) — 'none' modules need no such reference.
+                if mode == "story_leads":
+                    self.assertTrue(any(t in src for t in STORY_LEADS_ROUTES),
+                                    f"{name} is marked 'story_leads' but names "
+                                    f"no story_leads research entry point")
+
+    def test_no_unaccounted_direct_gemini_poster(self):
+        # Guard against a NEW module (outside the grep list) quietly adding a
+        # direct Gemini POST. Scan the repo root; every direct poster must either
+        # be in the known-direct set or be the replay bake-off harness (a manual,
+        # offline model benchmark that has no fallback to route to, documented in
+        # SUBMISSION_LOCAL-814.md).
+        import glob
+        known_direct = {n for n, m in GREP_LIST_COVERAGE.items() if m == "direct"}
+        known_direct.add("story_leads.py")      # the primary choke point
+        allowed_unguarded = {"replay_harness.py"}  # offline bake-off, documented
+        offenders = []
+        for path in glob.glob(os.path.join(ROOT, "*.py")):
+            name = os.path.basename(path)
+            if name in known_direct or name in allowed_unguarded:
+                continue
+            with open(path, "r", encoding="utf-8", errors="ignore") as f:
+                src = f.read()
+            if GEMINI_POST in src and not any(t in src for t in BREAKER_TOKENS):
+                offenders.append(name)
+        self.assertEqual(offenders, [],
+                         f"new direct Gemini POST without a breaker guard: "
+                         f"{offenders}")
+
+
+class EscalatingLookupBreakerBehaviour(unittest.TestCase):
+    """[LOCAL-814B] Behaviour: an open breaker makes escalating_lookup's tier-C
+    Gemini step skip the HTTP POST; a 402 FROM tier C trips the breaker."""
+
+    def setUp(self):
+        _clean_breaker_env()
+        gb.reset()
+        import escalating_lookup as el
+        self.el = el
+        os.environ["GEMINI_API_KEY"] = "fake-key"
+        self.post_calls = []
+        import requests
+        self._orig_post = requests.post
+        self._requests = requests
+
+    def tearDown(self):
+        self._requests.post = self._orig_post
+        gb.reset()
+        os.environ.pop("GEMINI_API_KEY", None)
+        _clean_breaker_env()
+
+    def test_open_breaker_skips_tier_c_post(self):
+        def _boom(*a, **k):
+            self.post_calls.append(a[0] if a else k.get("url"))
+            raise AssertionError("tier C must not POST when the breaker is open")
+        self._requests.post = _boom
+        gb.note_response(402, "prepayment credits are depleted")
+        self.assertTrue(gb.is_open())
+        out = self.el._tier_c_gemini("cafe", "Boston, MA", 3)
+        self.assertEqual(out, [])
+        self.assertEqual(self.post_calls, [], "no Gemini POST while breaker open")
+
+    def test_tier_c_402_trips_breaker(self):
+        def _fake_402(*a, **k):
+            self.post_calls.append(a[0] if a else k.get("url"))
+            return _FakeResp(status_code=402,
+                             text="prepayment credits are depleted")
+        self._requests.post = _fake_402
+        self.assertFalse(gb.is_open())
+        out = self.el._tier_c_gemini("cafe", "Boston, MA", 3)
+        self.assertEqual(out, [])
+        self.assertEqual(len(self.post_calls), 1, "one real POST (the 402)")
+        self.assertTrue(gb.is_open(), "a tier-C 402 must trip the breaker")
+        # The next tier-C call now skips the POST entirely.
+        before = len(self.post_calls)
+        self.assertEqual(self.el._tier_c_gemini("bar", "Boston, MA", 3), [])
+        self.assertEqual(len(self.post_calls), before,
+                         "no further Gemini POST once the breaker is open")
+
+
+class PreflightProbeFeedsBreaker(unittest.TestCase):
+    """[LOCAL-814B] The Gemini key-health probe is never GATED by the breaker (it
+    is the detector), but a failed credit/rate-limit probe TRIPS it."""
+
+    def setUp(self):
+        _clean_breaker_env()
+        gb.reset()
+        import preflight as pf
+        self.pf = pf
+        self._orig_probe = pf._probe
+        os.environ["GEMINI_API_KEY"] = "fake-key"
+
+    def tearDown(self):
+        self.pf._probe = self._orig_probe
+        gb.reset()
+        os.environ.pop("GEMINI_API_KEY", None)
+        _clean_breaker_env()
+
+    def test_credit_probe_trips_breaker(self):
+        self.pf._probe = lambda req: (
+            False, "OUT OF CREDITS — add funds before running a batch")
+        ok, _ = self.pf.check_gemini()
+        self.assertFalse(ok)
+        self.assertTrue(gb.is_open(), "a failed credit probe trips the breaker")
+
+    def test_rate_limit_probe_trips_breaker_short(self):
+        self.pf._probe = lambda req: (False, "rate limited (transient)")
+        ok, _ = self.pf.check_gemini()
+        self.assertFalse(ok)
+        st = gb.state()
+        self.assertTrue(st["open"])
+        self.assertLessEqual(st["seconds_left"], 2 * 60 + 1)  # 429 = short window
+
+    def test_healthy_probe_does_not_trip(self):
+        self.pf._probe = lambda req: (True, "HTTP 200")
+        ok, _ = self.pf.check_gemini()
+        self.assertTrue(ok)
+        self.assertFalse(gb.is_open(), "a healthy probe never trips the breaker")
 
 
 if __name__ == "__main__":

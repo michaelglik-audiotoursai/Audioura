@@ -93,6 +93,59 @@ __all__ = [
     "geohash5",
 ]
 
+
+# ── LOCAL-814B: process-wide Gemini breaker ───────────────────────────────────
+# Tier C issues a DIRECT grounded-Gemini POST (it does NOT go through
+# story_leads), so it is the one Gemini caller outside story_leads that needs the
+# breaker wired at its own call site. The breaker is imported softly and used
+# fail-open: a missing or broken breaker must never block the ladder, which is
+# allowed to degrade to "no tier C" exactly as it does when the key is absent.
+def _gemini_breaker():
+    try:
+        import gemini_breaker
+        return gemini_breaker
+    except Exception:
+        return None
+
+
+def _gemini_allowed() -> bool:
+    """True when tier C may call Gemini (breaker closed / absent). Never raises."""
+    b = _gemini_breaker()
+    if b is None:
+        return True
+    try:
+        return bool(b.allow())
+    except Exception:
+        return True
+
+
+def _gemini_record(status_code, body: str = "") -> None:
+    """Report a tier-C Gemini HTTP status to the breaker (402/429 trip it).
+    Never raises."""
+    b = _gemini_breaker()
+    if b is None:
+        return
+    try:
+        b.record_failure(int(status_code), body or "")
+    except Exception:
+        pass
+
+
+def _gemini_record_error(err: BaseException) -> None:
+    """Report a requests exception to the breaker, tripping it when the error
+    names a 402/429 (the POST may raise before a response object exists).
+    Never raises."""
+    b = _gemini_breaker()
+    if b is None:
+        return
+    try:
+        status = b.status_from_error(err)
+        if status:
+            b.record_failure(status, str(err))
+    except Exception:
+        pass
+
+
 # ── Tunables (env-overridable; safe defaults) ────────────────────────────────
 
 # Per-request escalation budget. The dearer tiers (b, c) are only attempted while
@@ -461,6 +514,14 @@ def _tier_c_gemini(category: str, scope: str, limit: int) -> List[Dict]:
     if not key:
         logger.info("[D722] tier c skipped: no GEMINI_API_KEY/GOOGLE_API_KEY")
         return []
+    # [LOCAL-814B] If the process-wide breaker is open (Gemini credit depleted or
+    # rate limited), skip the call and let the ladder degrade to "no tier C" — the
+    # same outcome as a missing key or a tier-C failure. Checked AFTER the key
+    # short-circuit so a keyless build is unchanged.
+    if not _gemini_allowed():
+        logger.info("[D722] tier c skipped: gemini breaker open "
+                    "(credit depleted / rate limited)")
+        return []
     model = os.environ.get("GEMINI_MODEL", "gemini-flash-latest")
     prompt = _TIER_C_PROMPT.format(category=category or "places", scope=scope,
                                    limit=max(1, limit))
@@ -476,8 +537,14 @@ def _tier_c_gemini(category: str, scope: str, limit: int) -> List[Dict]:
                   "tools": [{"google_search": {}}]},
             timeout=_GEMINI_TIMEOUT_S)
     except Exception as e:
+        # [LOCAL-814B] A requests error that names a 402/429 trips the breaker so
+        # the next caller skips Gemini; otherwise it is an ordinary tier-C miss.
+        _gemini_record_error(e)
         logger.warning(f"[D722] tier c Gemini request failed: {type(e).__name__}: {e}")
         return []
+    # [LOCAL-814B] Record the response status BEFORE acting on it, so a 402/429
+    # trips the breaker regardless of how this call then handles it.
+    _gemini_record(getattr(r, "status_code", 200), getattr(r, "text", "") or "")
     if r.status_code != 200:
         logger.warning(f"[D722] tier c Gemini HTTP {r.status_code}")
         return []
