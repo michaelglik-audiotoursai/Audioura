@@ -6564,7 +6564,27 @@ def _verify_works_v2(poi_list, venue_name, exhibition_scope=None):
     sparql_works = [] if not _cache_hit else sparql_works
     if _venue_entity and _venue_entity.qid and not _cache_hit:
         try:
-            sparql_works = fetch_venue_works(_venue_entity.qid, _language, venue_name=_venue_entity.name)
+            # [LOCAL-810] Pass the model's proposed work titles + the venue's site
+            # URL + Wikipedia title so that, if the bounded WDQS query times out /
+            # 429s, fetch_venue_works can fall back (per-candidate P195/P276 checks,
+            # the museum site, Wikipedia highlights) instead of returning 0 titles
+            # and clean-failing the whole tour (the LOCAL-809 Met run).
+            _candidate_titles = []
+            for _p in (poi_list or []):
+                if isinstance(_p, dict):
+                    _nm = (_p.get("name") or _p.get("title") or "").strip()
+                elif isinstance(_p, str):
+                    _nm = _p.strip()
+                else:
+                    _nm = ""
+                if _nm:
+                    _candidate_titles.append(_nm)
+            sparql_works = fetch_venue_works(
+                _venue_entity.qid, _language,
+                venue_name=_venue_entity.name,
+                candidate_titles=_candidate_titles,
+                official_url=_base_site_url,
+                wiki_title=_wiki_title)
             sparql_titles = build_canonical_titles_from_works(sparql_works)
             print(f"  [D1v2] SPARQL source: {len(sparql_titles)} canonical titles")
         except Exception as e:

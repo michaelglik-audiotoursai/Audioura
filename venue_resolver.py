@@ -204,7 +204,45 @@ def _resolve_memo_recall(venue_string: str, city: str) -> "Optional[VenueEntity]
 
 _USER_AGENT = "Audioura/2.2 (tour-generation; contact: support@audioura.com)"
 _WIKIDATA_API = "https://www.wikidata.org/w/api.php"
-_SPARQL_ENDPOINT = "https://query.wikidata.org/sparql"
+# [LOCAL-810] The WDQS SPARQL endpoint is env-configurable so a live test can
+# point it at a black-hole host and prove the timeout fallback delivers a real
+# tour (the LOCAL-809 Met run clean-failed on four WDQS ReadTimeouts). Read at
+# call time via _sparql_endpoint() so a test can set WDQS_ENDPOINT after import.
+import os  # [LOCAL-810] used by _sparql_endpoint() and the bound-query knobs below
+
+_SPARQL_ENDPOINT_DEFAULT = "https://query.wikidata.org/sparql"
+_SPARQL_ENDPOINT = _SPARQL_ENDPOINT_DEFAULT  # module default; see _sparql_endpoint()
+
+
+def _sparql_endpoint() -> str:
+    """Return the WDQS SPARQL endpoint, env-overridable via WDQS_ENDPOINT.
+
+    [LOCAL-810] Resolved at call time (not import time) so a live run can export
+    WDQS_ENDPOINT=<black-hole host> to force the ReadTimeout path and exercise the
+    fallback chain, without editing code. Falls back to the module default
+    (which tests may monkeypatch directly) when the env is unset.
+    """
+    return os.environ.get("WDQS_ENDPOINT", "") or _SPARQL_ENDPOINT
+
+
+# [LOCAL-810] Bound the venue-works query. The "all works in a collection" query
+# is what WDQS throttles for big museums (the Met, Q160236 → ReadTimeout ×4).
+# A LIMIT with ORDER BY sitelinks (most famous first) keeps the query cheap and
+# still returns the works a tour actually opens on; a short per-attempt timeout
+# means a stalled endpoint is detected in ~20s, not 60s, so the fallback fires
+# fast enough to still deliver the tour.
+_VENUE_WORKS_LIMIT = int(os.environ.get("VENUE_WORKS_LIMIT", "300"))
+_VENUE_WORKS_TIMEOUT = int(os.environ.get("VENUE_WORKS_TIMEOUT", "20"))
+
+
+class WDQSUnavailable(Exception):
+    """[LOCAL-810] Raised when the bounded venue-works SPARQL query could not be
+    answered (ReadTimeout, 429, or 5xx after retries). It is UNKNOWN, never a
+    verified empty collection — the public fetch_venue_works catches it and runs
+    the cache + per-candidate/site/Wikipedia fallback chain so a slow WDQS never
+    fails a whole museum tour."""
+    pass
+
 
 
 # ─── [LOCAL-637] Rate-limit resilience: 429/5xx retry with backoff ───────────
@@ -1105,7 +1143,7 @@ def _fetch_venue_works_impl(venue_qid: str, language: str = "en",
     }}
     GROUP BY ?work ?workLabel ?workAltLabel ?workLabel_en
     ORDER BY DESC(?sitelinks)
-    LIMIT 400
+    LIMIT {_VENUE_WORKS_LIMIT}
     """
     
     try:
@@ -1114,13 +1152,18 @@ def _fetch_venue_works_impl(venue_qid: str, language: str = "en",
         # concluding the venue has no catalogue; a transient endpoint stall is not data.
         # [LOCAL-637] Route through the shared backoff helper so a 429 honours
         # Retry-After and the host is only marked cold (short cool-down) after the
-        # SPARQL retries are exhausted — never on the first rate limit. SPARQL keeps
-        # its longer per-attempt timeout (60 s), which the helper applies to every try.
+        # SPARQL retries are exhausted — never on the first rate limit.
+        # [LOCAL-810] The query is now bounded (LIMIT _VENUE_WORKS_LIMIT, ORDER BY
+        # sitelinks — most famous first) and the per-attempt timeout dropped to
+        # _VENUE_WORKS_TIMEOUT (20 s). The old 60 s × 4-attempt stall (LOCAL-809
+        # Met run) is what cost the whole tour; a 20 s ceiling means the caller's
+        # fallback chain fires fast. The endpoint is read via _sparql_endpoint() so
+        # a live test can point WDQS at a black-hole host (WDQS_ENDPOINT).
         resp = _request_with_backoff(
-            _SPARQL_ENDPOINT,
+            _sparql_endpoint(),
             params={"query": query, "format": "json"},
             headers={"User-Agent": _USER_AGENT, "Accept": "application/sparql-results+json"},
-            timeout=60,
+            timeout=_VENUE_WORKS_TIMEOUT,
             host_for_cold='https://www.wikidata.org',
             label=f"fetch_venue_works({venue_qid})",
         )
@@ -1131,11 +1174,17 @@ def _fetch_venue_works_impl(venue_qid: str, language: str = "en",
             # 0-work exhibition museum. A rate limit on the works query must not
             # read as "this famous collection has no documented works".
             _network_failure_count += 1
-            raise RuntimeError("SPARQL unavailable after retries")
+            # [LOCAL-810] Signal UNAVAILABLE distinctly so the public wrapper runs
+            # the cache + per-candidate fallback chain instead of failing the tour.
+            raise WDQSUnavailable(f"SPARQL unavailable after retries for {venue_qid}")
         if resp.status_code != 200:
             logger.warning(f"SPARQL error: {resp.status_code}")
             _network_failure_count += 1   # [LOCAL-661] UNKNOWN, not empty.
-            return []
+            # [LOCAL-810] 429/5xx are retryable "try again" states — treat as
+            # UNAVAILABLE so the fallback fires (a non-retryable 4xx is unusual
+            # for WDQS, but it too means we have no catalogue to show, so fall back
+            # rather than clean-fail).
+            raise WDQSUnavailable(f"SPARQL HTTP {resp.status_code} for {venue_qid}")
         
         data = resp.json()
         results = data.get("results", {}).get("bindings", [])
@@ -1234,6 +1283,9 @@ def _fetch_venue_works_impl(venue_qid: str, language: str = "en",
         print(f"  [venue_resolver] SPARQL: {len(works)} works found for {venue_qid}")
         return works
         
+    except WDQSUnavailable:
+        # [LOCAL-810] Propagate so the public wrapper can run the fallback chain.
+        raise
     except Exception as e:
         logger.warning(f"SPARQL query failed: {e}")
         return []
@@ -1246,14 +1298,442 @@ def _fetch_venue_works_impl(venue_qid: str, language: str = "en",
 # Same scoping/guarantees as resolve_venue: contextvars per-tour scope (a second
 # tour re-fetches), FAST_PIPELINE-guarded (OFF ⇒ every call runs, byte-identical),
 # every call timed so [TIMING-SUB] shows the 3→1 drop when ON.
+#
+# [LOCAL-810] This wrapper now also owns the durable per-QID cache and the
+# timeout/429 fallback chain:
+#   1. A per-QID venue_works_cache row (30-day expiry) is consulted FIRST, so a
+#      repeat tour of a big museum never re-queries the heavy collection query
+#      (a cache HIT skips WDQS entirely — the Met's 60s×4 stall never recurs).
+#   2. The bounded SPARQL runs on a miss. A clean result (even 0 works) is cached.
+#   3. On WDQSUnavailable (ReadTimeout / 429 / 5xx) the fallback chain runs:
+#        (a) per-candidate P195/P276 membership checks — one small, fast query per
+#            proposed work title, resolved to a QID and confirmed in THIS museum;
+#        (b) the museum's own site "collection/highlights" listing;
+#        (c) the Wikipedia "highlights"/"collection" section.
+#      The first source that yields works wins; each logs
+#      `[LOCAL-810] venue works fallback <qid> <source> <n>`. A museum tour fails
+#      only if ALL sources fail. Fallback results are cached so the repeat tour is
+#      instant and does not re-hit a slow endpoint.
+#
+# ``candidate_titles`` carries the model's proposed work titles (real Met works in
+# the LOCAL-809 run) so the per-candidate path has something to verify. When it is
+# empty the fallback skips straight to the site/Wikipedia sources.
+
+_VENUE_WORKS_CACHE_TTL_DAYS = int(os.environ.get("VENUE_WORKS_CACHE_TTL_DAYS", "30"))
+_VENUE_WORKS_CACHE_VERSION = 1  # bump to invalidate all rows without a DELETE
+_VENUE_WORKS_TABLE_ENSURED = False
+
+
+def _ensure_venue_works_table(conn):
+    """Create the venue_works_cache table if missing (idempotent, once/process)."""
+    global _VENUE_WORKS_TABLE_ENSURED
+    if _VENUE_WORKS_TABLE_ENSURED:
+        return
+    try:
+        with conn.cursor() as cur:
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS venue_works_cache (
+                    qid VARCHAR(20) NOT NULL,
+                    language VARCHAR(10) NOT NULL DEFAULT 'en',
+                    works_json JSONB NOT NULL,
+                    source VARCHAR(32) NOT NULL,
+                    cache_version INT NOT NULL,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    expires_at TIMESTAMP NOT NULL,
+                    PRIMARY KEY (qid, language)
+                )
+            """)
+            conn.commit()
+        _VENUE_WORKS_TABLE_ENSURED = True
+    except Exception as e:
+        print(f"  [LOCAL-810] venue_works_cache table creation failed: {e}")
+        try:
+            conn.rollback()
+        except Exception:
+            pass
+
+
+def venue_works_cache_get(qid: str, language: str = "en") -> Optional[List[Dict]]:
+    """Return cached works for a venue QID, or None on miss/expired/unconfigured.
+
+    [LOCAL-810] A HIT means the heavy collection query is skipped entirely — a
+    repeat tour of a big museum (the Met) never re-hits the endpoint that
+    ReadTimeout'd four times live.
+    """
+    if not qid:
+        return None
+    conn = _get_db_connection()
+    if not conn:
+        return None
+    try:
+        _ensure_venue_works_table(conn)
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT works_json, source, expires_at FROM venue_works_cache
+                WHERE qid = %s AND language = %s
+                  AND expires_at > NOW() AND cache_version = %s
+            """, (qid, language, _VENUE_WORKS_CACHE_VERSION))
+            row = cur.fetchone()
+            if row:
+                _works = row[0] if isinstance(row[0], list) else (row[0] or [])
+                print(f"  [LOCAL-810] venue_works_cache HIT {qid}/{language} "
+                      f"(source={row[1]}, n={len(_works)}, expires={row[2]})")
+                return list(_works)
+            print(f"  [LOCAL-810] venue_works_cache MISS {qid}/{language}")
+            return None
+    except Exception as e:
+        print(f"  [LOCAL-810] venue_works_cache read error for {qid}: {e}")
+        return None
+    finally:
+        try:
+            conn.close()
+        except Exception:
+            pass
+
+
+def venue_works_cache_put(qid: str, language: str, works: List[Dict],
+                          source: str = "sparql") -> None:
+    """Store works for a venue QID (30-day expiry). No-op when DB unconfigured.
+
+    [LOCAL-810] Both a clean SPARQL result and a fallback result are cached, so a
+    repeat tour is instant and never re-hits a slow endpoint.
+    """
+    if not qid:
+        return
+    conn = _get_db_connection()
+    if not conn:
+        return
+    try:
+        _ensure_venue_works_table(conn)
+        expires_at = datetime.utcnow() + timedelta(days=_VENUE_WORKS_CACHE_TTL_DAYS)
+        with conn.cursor() as cur:
+            cur.execute("""
+                INSERT INTO venue_works_cache
+                    (qid, language, works_json, source, cache_version, expires_at)
+                VALUES (%s, %s, %s, %s, %s, %s)
+                ON CONFLICT (qid, language) DO UPDATE SET
+                    works_json = EXCLUDED.works_json,
+                    source = EXCLUDED.source,
+                    cache_version = EXCLUDED.cache_version,
+                    created_at = CURRENT_TIMESTAMP,
+                    expires_at = EXCLUDED.expires_at
+            """, (qid, language, json.dumps(works or []), source,
+                  _VENUE_WORKS_CACHE_VERSION, expires_at))
+            conn.commit()
+        print(f"  [LOCAL-810] venue_works_cache STORED {qid}/{language} "
+              f"(source={source}, n={len(works or [])}, "
+              f"ttl={_VENUE_WORKS_CACHE_TTL_DAYS}d)")
+    except Exception as e:
+        print(f"  [LOCAL-810] venue_works_cache write error for {qid}: {e}")
+        try:
+            conn.rollback()
+        except Exception:
+            pass
+    finally:
+        try:
+            conn.close()
+        except Exception:
+            pass
+
+
+def _candidate_work_in_collection(title: str, venue_qid: str,
+                                  language: str = "en") -> Optional[Dict]:
+    """[LOCAL-810] Confirm ONE proposed work title belongs to ``venue_qid`` by a
+    small, fast per-candidate SPARQL query (P195/P276 = the museum QID).
+
+    This is the cheap query the LOCAL-809 evidence calls out ("these are fast"):
+    it resolves the title to a work entity and verifies collection membership in a
+    single bounded query, instead of pulling the museum's entire catalogue. Returns
+    a work dict compatible with build_canonical_titles_from_works on confirmation,
+    or None when the title is not a confirmed member (or the query is unavailable).
+    """
+    if not title or not venue_qid:
+        return None
+    _safe = title.replace('\\', '\\\\').replace('"', '\\"').strip()
+    if not _safe:
+        return None
+    # Match a work whose English OR local label equals the proposed title AND which
+    # is P195/P276-held by the museum. LIMIT 1 keeps it trivially cheap/fast.
+    query = f"""
+    SELECT ?work ?workLabel ?workLabel_en
+           (SAMPLE(?sitelinks) AS ?sitelinks)
+           (GROUP_CONCAT(DISTINCT ?creatorLabel; separator="||") AS ?creators)
+           (GROUP_CONCAT(DISTINCT ?instanceOf; separator="||") AS ?instanceOfs)
+    WHERE {{
+      {{ ?work wdt:P195 wd:{venue_qid}. }} UNION {{ ?work wdt:P276 wd:{venue_qid}. }}
+      ?work rdfs:label ?lbl.
+      FILTER(LCASE(STR(?lbl)) = LCASE("{_safe}"))
+      OPTIONAL {{ ?work wdt:P170 ?creator. ?creator rdfs:label ?creatorLabel.
+                 FILTER(LANG(?creatorLabel) = "{language}" || LANG(?creatorLabel) = "en") }}
+      OPTIONAL {{ ?work wikibase:sitelinks ?sitelinks. }}
+      OPTIONAL {{ ?work wdt:P31 ?instanceOf. }}
+      OPTIONAL {{ ?work rdfs:label ?workLabel_en. FILTER(LANG(?workLabel_en) = "en") }}
+      SERVICE wikibase:label {{ bd:serviceParam wikibase:language "{language},en". }}
+    }}
+    GROUP BY ?work ?workLabel ?workLabel_en
+    LIMIT 1
+    """
+    try:
+        # [LOCAL-810] A SINGLE fast attempt — no backoff retries. The ticket's
+        # premise is that these per-candidate queries are fast (a trivial WDQS
+        # query returned 200 in ~8.7 s while the heavy collection query stalled).
+        # If this one stalls too, fail fast and let the chain move to the next
+        # candidate / source rather than burning the 3-attempt backoff schedule
+        # per title (which would make the fallback slower than the bug).
+        try:
+            resp = requests.get(
+                _sparql_endpoint(),
+                params={"query": query, "format": "json"},
+                headers={"User-Agent": _USER_AGENT,
+                         "Accept": "application/sparql-results+json"},
+                timeout=_VENUE_WORKS_TIMEOUT,
+            )
+        except (requests.exceptions.Timeout,
+                requests.exceptions.ConnectionError):
+            return None
+        if resp is None or resp.status_code != 200:
+            return None
+        rows = resp.json().get("results", {}).get("bindings", [])
+        if not rows:
+            return None
+        r = rows[0]
+        work_uri = r.get("work", {}).get("value", "")
+        work_qid = work_uri.split("/")[-1] if work_uri else ""
+        label = r.get("workLabel", {}).get("value", "") or title
+        label_en = r.get("workLabel_en", {}).get("value", "") or label
+        if not work_qid:
+            return None
+        try:
+            _sitelinks = int(r.get("sitelinks", {}).get("value", "0") or "0")
+        except (TypeError, ValueError):
+            _sitelinks = 0
+        _creators = [c for c in (r.get("creators", {}).get("value", "") or "").split("||") if c]
+        _inst = [u.split("/")[-1] for u in
+                 (r.get("instanceOfs", {}).get("value", "") or "").split("||") if u]
+        return {
+            "qid": work_qid,
+            "label_en": label_en,
+            "label_local": label,
+            "display_title": strip_parenthetical_disambiguator(label_en),
+            "aliases": [],
+            "creator": _creators[0] if _creators else "",
+            "creator_qid": "",
+            "creators": _creators,
+            "sitelinks": _sitelinks,
+            "inception_year": None,
+            "instance_of": _inst,
+            "collection_qids": [venue_qid],
+        }
+    except Exception as e:
+        logger.warning(f"[LOCAL-810] per-candidate check failed for "
+                       f"{title[:40]!r}@{venue_qid}: {e}")
+        return None
+
+
+def _fallback_per_candidate(venue_qid: str, candidate_titles, language: str) -> List[Dict]:
+    """[LOCAL-810] Fallback (a): confirm each proposed work title is in THIS
+    museum's collection with a small per-candidate query. Fast and bounded."""
+    out: List[Dict] = []
+    _seen = set()
+    for _t in (candidate_titles or []):
+        _title = (_t or "").strip() if isinstance(_t, str) else ""
+        if not _title:
+            continue
+        hit = _candidate_work_in_collection(_title, venue_qid, language)
+        if hit and hit.get("qid") and hit["qid"] not in _seen:
+            _seen.add(hit["qid"])
+            out.append(hit)
+    return out
+
+
+def _works_from_titles(titles, language: str = "en") -> List[Dict]:
+    """[LOCAL-810] Wrap bare title strings (from the museum site / Wikipedia
+    highlights) as work dicts compatible with build_canonical_titles_from_works.
+    These carry no Wikidata QID (membership was established by the SOURCE, not a
+    SPARQL P195 edge), so they are a best-effort corpus, not a verified catalogue."""
+    out: List[Dict] = []
+    _seen = set()
+    for _t in (titles or []):
+        _title = (_t or "").strip() if isinstance(_t, str) else ""
+        if len(_title) < 3:
+            continue
+        _k = _title.lower()
+        if _k in _seen:
+            continue
+        _seen.add(_k)
+        out.append({
+            "qid": "",
+            "label_en": _title,
+            "label_local": _title,
+            "display_title": strip_parenthetical_disambiguator(_title),
+            "aliases": [],
+            "creator": "",
+            "creator_qid": "",
+            "creators": [],
+            "sitelinks": 0,
+            "inception_year": None,
+            "instance_of": [],
+            "collection_qids": [],
+        })
+    return out
+
+
+def _fallback_museum_site(venue_qid: str, venue_name: str, official_url: str,
+                          language: str) -> List[Dict]:
+    """[LOCAL-810] Fallback (b): mine the museum's OWN site for a highlights/
+    collection listing. Reuses the existing narrative-corpus miner, which already
+    extracts canonical titles from the official site, so no new scraper is added."""
+    if not official_url:
+        return []
+    try:
+        from story_miner import fetch_venue_narrative_corpus
+        corpus = fetch_venue_narrative_corpus(
+            venue_name=venue_name, base_site_url=official_url,
+            wikipedia_title="", language=language, venue_qid=venue_qid)
+        titles = corpus.get("canonical_titles") or set()
+        return _works_from_titles(titles, language)
+    except Exception as e:
+        logger.warning(f"[LOCAL-810] museum-site fallback failed for {venue_qid}: {e}")
+        return []
+
+
+def _fallback_wikipedia_highlights(venue_qid: str, venue_name: str,
+                                   wiki_title: str, language: str) -> List[Dict]:
+    """[LOCAL-810] Fallback (c): read the venue's Wikipedia article and pull the
+    'Highlights'/'Collection'/'Notable works' section's linked work titles."""
+    _title = (wiki_title or venue_name or "").strip()
+    if not _title:
+        return []
+    _lang = (language or "en").strip() or "en"
+    try:
+        # Fetch the section list, find a highlights/collection section, then pull
+        # the links in that section (each link is a candidate work title).
+        base = f"https://{_lang}.wikipedia.org/w/api.php"
+        sec_resp = requests.get(
+            base,
+            params={"action": "parse", "page": _title, "prop": "sections",
+                    "format": "json"},
+            headers={"User-Agent": _USER_AGENT}, timeout=15)
+        if sec_resp.status_code != 200:
+            return []
+        sections = sec_resp.json().get("parse", {}).get("sections", []) or []
+        _want = re.compile(r"(?i)(highlight|notable|collection|masterpiece|"
+                           r"selected works|key works|famous works)")
+        target_idx = None
+        for s in sections:
+            if _want.search(s.get("line", "") or ""):
+                target_idx = s.get("index")
+                break
+        titles: List[str] = []
+        if target_idx is not None:
+            link_resp = requests.get(
+                base,
+                params={"action": "parse", "page": _title, "prop": "links",
+                        "section": target_idx, "format": "json"},
+                headers={"User-Agent": _USER_AGENT}, timeout=15)
+            if link_resp.status_code == 200:
+                links = link_resp.json().get("parse", {}).get("links", []) or []
+                for l in links:
+                    _name = l.get("*") or l.get("title") or ""
+                    # ns 0 is article space; skip categories/files/templates.
+                    if l.get("ns", 0) == 0 and _name and ":" not in _name:
+                        titles.append(_name)
+        return _works_from_titles(titles, _lang)
+    except Exception as e:
+        logger.warning(f"[LOCAL-810] Wikipedia-highlights fallback failed for "
+                       f"{venue_qid}: {e}")
+        return []
+
+
+def _venue_works_fallback_chain(venue_qid: str, language: str, venue_name: str,
+                                candidate_titles, official_url: str,
+                                wiki_title: str) -> List[Dict]:
+    """[LOCAL-810] Run the fallback sources in order and return the first non-empty
+    result, logging `[LOCAL-810] venue works fallback <qid> <source> <n>`.
+
+    A museum tour fails only if ALL sources fail (returns []).
+    """
+    # (a) per-candidate P195/P276 checks — fast, and the model's candidates were
+    #     all real Met works in the LOCAL-809 evidence.
+    works = _fallback_per_candidate(venue_qid, candidate_titles, language)
+    if works:
+        print(f"  [LOCAL-810] venue works fallback {venue_qid} per_candidate {len(works)}")
+        return works
+    # (b) the museum's own site listing.
+    works = _fallback_museum_site(venue_qid, venue_name, official_url, language)
+    if works:
+        print(f"  [LOCAL-810] venue works fallback {venue_qid} museum_site {len(works)}")
+        return works
+    # (c) Wikipedia highlights.
+    works = _fallback_wikipedia_highlights(venue_qid, venue_name, wiki_title, language)
+    if works:
+        print(f"  [LOCAL-810] venue works fallback {venue_qid} wikipedia_highlights {len(works)}")
+        return works
+    print(f"  [LOCAL-810] venue works fallback {venue_qid} none 0 — all sources failed")
+    return []
+
+
+def _fetch_venue_works_cached(venue_qid: str, language: str = "en",
+                              is_modern_art_museum=None, venue_name: str = "",
+                              candidate_titles=None, official_url: str = "",
+                              wiki_title: str = "") -> List[Dict]:
+    """[LOCAL-810] Cache → bounded SPARQL → fallback chain.
+
+    1. Per-QID venue_works_cache HIT returns immediately (no WDQS call).
+    2. On a miss, the bounded SPARQL runs. A clean result (any count) is cached.
+    3. On WDQSUnavailable (timeout/429/5xx) the fallback chain runs — BUT only for
+       a corpus-building caller (one that supplied candidate_titles / official_url
+       / wiki_title). The internal ranking helpers (_fetch_works_count,
+       _is_high_confidence_candidate) call with NONE of those: they only want a
+       catalogue COUNT, already treat 0 as UNKNOWN, and must NOT (a) pay for the
+       fallback or (b) cache a broad Wikipedia/site result that would then be a
+       cache HIT for the later candidate-aware D1v2 call and rob it of the precise
+       per-candidate path. So a count-only call returns [] on WDQSUnavailable and
+       caches nothing; the corpus call runs the fallback and caches a non-empty
+       result so the repeat tour is instant.
+    """
+    if venue_qid:
+        _cached = venue_works_cache_get(venue_qid, language)
+        if _cached is not None:
+            return _cached
+    _wants_corpus = bool(candidate_titles or official_url or wiki_title)
+    try:
+        works = _fetch_venue_works_impl(venue_qid, language,
+                                        is_modern_art_museum, venue_name)
+        if venue_qid:
+            venue_works_cache_put(venue_qid, language, works, source="sparql")
+        return works
+    except WDQSUnavailable as _we:
+        if not _wants_corpus:
+            # Count-only ranking call: UNKNOWN. Do not run or cache the fallback.
+            print(f"  [LOCAL-810] WDQS unavailable for {venue_qid} ({_we}); "
+                  f"count-only call → returning [] (UNKNOWN), fallback deferred to "
+                  f"the corpus path")
+            return []
+        print(f"  [LOCAL-810] WDQS unavailable for {venue_qid} ({_we}); "
+              f"running fallback chain instead of failing the tour")
+        works = _venue_works_fallback_chain(
+            venue_qid, language, venue_name or "", candidate_titles,
+            official_url, wiki_title)
+        # Cache a non-empty fallback so the repeat tour is instant. A fully-failed
+        # fallback ([]) is NOT cached — it is UNKNOWN, and the endpoint may recover.
+        if venue_qid and works:
+            venue_works_cache_put(venue_qid, language, works, source="fallback")
+        return works
+
+
 def _fetch_venue_works_timed(venue_qid: str, language: str = "en",
-                             is_modern_art_museum=None, venue_name: str = "") -> List[Dict]:
+                             is_modern_art_museum=None, venue_name: str = "",
+                             candidate_titles=None, official_url: str = "",
+                             wiki_title: str = "") -> List[Dict]:
     if _pt is not None:
         with _pt.get_sub_timer().step("fetch_venue_works"):
-            return _fetch_venue_works_impl(venue_qid, language,
-                                           is_modern_art_museum, venue_name)
-    return _fetch_venue_works_impl(venue_qid, language,
-                                   is_modern_art_museum, venue_name)
+            return _fetch_venue_works_cached(
+                venue_qid, language, is_modern_art_museum, venue_name,
+                candidate_titles, official_url, wiki_title)
+    return _fetch_venue_works_cached(
+        venue_qid, language, is_modern_art_museum, venue_name,
+        candidate_titles, official_url, wiki_title)
 
 
 if _fp is not None:
@@ -1321,7 +1801,7 @@ def fetch_collection_holder_qids(venue_qid: str) -> Tuple[str, ...]:
     holders: Tuple[str, ...] = ()
     try:
         resp = _request_with_backoff(
-            _SPARQL_ENDPOINT,
+            _sparql_endpoint(),  # [LOCAL-810] env-configurable (WDQS_ENDPOINT)
             params={"query": query, "format": "json"},
             headers={"User-Agent": _USER_AGENT,
                      "Accept": "application/sparql-results+json"},
