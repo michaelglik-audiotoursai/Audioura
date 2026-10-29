@@ -110,19 +110,51 @@ def _default_reference(name: str, scope: str,
         return None
 
 
-def _landmark_reference(name: str
+def _landmark_reference(name: str,
+                        scope: str = "",
+                        scope_center: Optional[Tuple[float, float]] = None,
+                        scope_bbox: Optional[Sequence[float]] = None,
+                        tour_language: str = "en",
+                        landmark_fn: Optional[Callable] = None,
                         ) -> Optional[Tuple[float, float, str]]:
-    """[LOCAL-791E items 1 & 5] A Wikidata-P625 landmark-table reference, consulted
-    BEFORE the generic geocoders. Returns (lat, lng, source) or None. The table
-    name-matches strongly (the place's own distinctive tokens, local name
-    included), so "City Hall" → the People's Committee Building and "Thien Hau
-    Temple" → the Cholon temple, both by authority rather than a bare-name geocode.
+    """[LOCAL-803] A Wikidata-P625 landmark reference, consulted BEFORE the generic
+    geocoders. Returns (lat, lng, source) or None.
+
+    [LOCAL-803] PREFER a LIVE Wikidata P625 lookup (``wikidata_landmark_lookup``):
+    wbsearchentities in the tour + local language, P625, filtered to the tour's
+    scope (bbox / metro radius), cached with a TTL. This generalises the fix
+    beyond the six HCMC landmarks to ANY city. It resolves "City Hall" → the real
+    People's Committee Building and "Thien Hau Temple" → the Cholon temple by the
+    place's OWN authority, exactly as the hand-written table did, and now also
+    "Boston State House", "Nice Opera", "Hanoi Hoan Kiem Lake", etc.
+
+    FALLBACK: when the live lookup returns nothing — Wikidata unreachable, a 429
+    that never cleared, or no in-scope match — fall back to the offline
+    ``landmark_reference`` table so the original six HCMC pins never regress when
+    the network is down. (``landmark_fn`` injects the live lookup for tests.)
     """
+    # 1) Live Wikidata P625 lookup (general, cached, rate-limited).
     try:
-        from landmark_reference import lookup as _lm_lookup
-        hit = _lm_lookup(name)
+        if landmark_fn is not None:
+            hit = landmark_fn(name)
+        else:
+            from wikidata_landmark_lookup import lookup as _wd_lookup
+            hit = _wd_lookup(
+                name, scope=scope, scope_center=scope_center,
+                scope_bbox=list(scope_bbox) if scope_bbox else None,
+                tour_language=tour_language or "en")
         if hit:
             return (float(hit[0]), float(hit[1]), str(hit[2]))
+    except Exception:
+        # Any failure in the live path must not drop the stop — fall through to
+        # the offline table below.
+        pass
+    # 2) Offline table fallback (the original six HCMC landmarks).
+    try:
+        from landmark_reference import lookup as _lm_lookup
+        tbl = _lm_lookup(name)
+        if tbl:
+            return (float(tbl[0]), float(tbl[1]), str(tbl[2]))
     except Exception:
         return None
     return None
@@ -175,6 +207,9 @@ def snap_pin(title: str,
              max_centroid_km: float = 2.0,
              require_name_match: bool = True,
              use_landmark_table: bool = True,
+             scope_bbox: Optional[Sequence[float]] = None,
+             tour_language: str = "en",
+             landmark_fn: Optional[Callable] = None,
              ) -> Dict:
     """Decide the snap for ONE stop.
 
@@ -227,7 +262,10 @@ def snap_pin(title: str,
         # An injected reference_fn (unit tests / offline replays) is a vouched-for
         # door and takes precedence, so the table is skipped for it.
         if use_landmark_table and reference_fn is None:
-            lm = _landmark_reference(title)
+            lm = _landmark_reference(
+                title, scope=scope, scope_center=scope_center,
+                scope_bbox=scope_bbox, tour_language=tour_language,
+                landmark_fn=landmark_fn)
             if lm:
                 ref_pt = (float(lm[0]), float(lm[1]))
                 source = lm[2] if len(lm) > 2 else "wikidata_p625"
@@ -345,6 +383,9 @@ def snap_poi_coordinates(poi_list: List[Dict],
                          log: Optional[Callable[[str], None]] = None,
                          max_centroid_km: float = 2.0,
                          require_name_match: bool = True,
+                         scope_bbox: Optional[Sequence[float]] = None,
+                         tour_language: str = "en",
+                         landmark_fn: Optional[Callable] = None,
                          ) -> Tuple[List[Dict], List[Dict]]:
     """Snap every stop in ``poi_list`` to its reference when the shipped pin is
     more than ``threshold_m`` away AND the reference is trustworthy. Mutates each
@@ -412,7 +453,10 @@ def snap_poi_coordinates(poi_list: List[Dict],
                        reference_fn=reference_fn,
                        stops_centroid=_centroid_i,
                        max_centroid_km=_bound_i,
-                       require_name_match=_rnm)
+                       require_name_match=_rnm,
+                       scope_bbox=scope_bbox,
+                       tour_language=tour_language,
+                       landmark_fn=landmark_fn)
         rows.append(row)
         if row["snapped"] and row["new_coordinate"]:
             lat, lng = row["new_coordinate"]

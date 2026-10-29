@@ -437,6 +437,82 @@ def _curated_aliases_for(folded_name: str) -> Set[str]:
     return out
 
 
+# [LOCAL-803 ADDENDUM] Prefer a LIVE Wikidata alias lookup over the curated rows:
+# ask Wikidata for the entity's labels+aliases (every language) so a same-building
+# alias ("Hunnewell Building" ↔ "Arnold Arboretum Visitor Center") is discovered
+# at runtime for ANY building, not just the one curated pair. The curated rows
+# remain the OFFLINE FALLBACK — used when the live lookup is disabled (unit tests
+# are offline) or returns nothing (Wikidata unreachable). Gated by the same
+# LANDMARK_LIVE_LOOKUP flag the pin lookup uses, so the default/test path stays
+# pure and deterministic.
+_LIVE_ALIAS_FN: Optional[object] = None  # test/override injection seam
+
+
+def _live_wikidata_aliases(folded_name: str) -> Set[str]:
+    """Folded label+alias set for the Wikidata entity best matching ``folded_name``
+    (every language), or empty set when the live path is off / unreachable. Uses
+    the wikidata_landmark_lookup fetch seam (single in-flight, UA, 429 backoff).
+    """
+    if _LIVE_ALIAS_FN is not None:
+        try:
+            return {fold(a) for a in (_LIVE_ALIAS_FN(folded_name) or []) if a}
+        except Exception:
+            return set()
+    import os as _os
+    if str(_os.environ.get("LANDMARK_LIVE_LOOKUP", "")).strip().lower() \
+            not in ("1", "true", "yes", "on"):
+        return set()
+    try:
+        from wikidata_landmark_lookup import _default_fetch
+    except Exception:
+        return set()
+    try:
+        search = _default_fetch("wbsearchentities", {
+            "action": "wbsearchentities", "search": folded_name,
+            "language": "en", "uselang": "en", "type": "item",
+            "format": "json", "limit": 1})
+        hits = (search or {}).get("search") or []
+        if not hits:
+            return set()
+        qid = hits[0].get("id")
+        if not qid:
+            return set()
+        ent = _default_fetch("wbgetentities", {
+            "action": "wbgetentities", "ids": qid,
+            "props": "labels|aliases", "format": "json"})
+        entity = ((ent or {}).get("entities") or {}).get(qid) or {}
+        out: Set[str] = set()
+        for lab in (entity.get("labels") or {}).values():
+            v = lab.get("value")
+            if v:
+                out.add(fold(v))
+        for al_list in (entity.get("aliases") or {}).values():
+            for al in al_list or []:
+                v = al.get("value")
+                if v:
+                    out.add(fold(v))
+        return {a for a in out if a}
+    except Exception:
+        return set()
+
+
+def _building_aliases_for(folded_name: str) -> Set[str]:
+    """[LOCAL-803 ADDENDUM] Same-building aliases for a folded name: the LIVE
+    Wikidata labels/aliases when available, else the curated offline rows. The
+    live result is UNIONED with the curated rows so a curated fact is never lost,
+    and a curated group that the live set touches is pulled in whole (so the
+    bridge still closes 'Visitor Center' ↔ 'Hunnewell Building')."""
+    live = _live_wikidata_aliases(folded_name)
+    curated = _curated_aliases_for(folded_name)
+    if not live:
+        return curated
+    out = set(live) | curated
+    # If the live aliases overlap a curated group, include that whole group too.
+    for a in list(live):
+        out |= _curated_aliases_for(a)
+    return out
+
+
 # Building-type / generic words stripped before an alias-name comparison. "The
 # Arnold Arboretum Visitor Center" and "Hunnewell Building" share no token, so
 # name-only matching is not enough — the alias list and the located-in / coords
@@ -514,10 +590,12 @@ def _aliases_of(stop: Dict) -> Set[str]:
             for v in val:
                 if v:
                     out.add(fold(v))
-    # [LOCAL-802] Curated same-building alias bridge (offline, deterministic) — a
-    # stop in a known group carries every other name in that group as an alias.
+    # [LOCAL-802/803] Same-building alias bridge — a stop in a known group carries
+    # every other name in that group as an alias. [LOCAL-803] PREFER the live
+    # Wikidata labels/aliases (any building, any language); the curated rows are
+    # the offline fallback (unit tests, or Wikidata unreachable).
     for a in list(out):
-        out |= _curated_aliases_for(a)
+        out |= _building_aliases_for(a)
     return {a for a in out if a}
 
 

@@ -26219,10 +26219,24 @@ REWRITE RULES (all mandatory):
                         break
             except Exception:
                 _pin_center_791c = None
+        # [LOCAL-803] Resolve the scope bounding box so the LIVE Wikidata P625
+        # landmark lookup can reject a same-name place outside the toured area
+        # (identity guard). Best-effort: a failure leaves bbox None and the lookup
+        # falls back to the metro-radius test around the scope centre.
+        import os as _os803
+        _os803.environ.setdefault("LANDMARK_LIVE_LOOKUP", "1")
+        _pin_bbox_803 = None
+        try:
+            from stop_existence_gate import _geocode_scope_bbox as _gsb803
+            _pin_bbox_803 = _gsb803(_pin_scope_791c) if _pin_scope_791c else None
+        except Exception:
+            _pin_bbox_803 = None
         print(f"  [LOCAL-791C] pin snap: scope={_pin_scope_791c!r} "
-              f"center={_pin_center_791c} threshold=150m target=100m")
+              f"center={_pin_center_791c} bbox={_pin_bbox_803} "
+              f"threshold=150m target=100m")
         poi_list, _snap_rows_791c = _snap791c(
             poi_list, scope=_pin_scope_791c, scope_center=_pin_center_791c,
+            scope_bbox=_pin_bbox_803, tour_language="en",
             log=print)
         _n_snapped_791c = sum(1 for r in _snap_rows_791c if r.get("snapped"))
         _n_noref_791c = sum(1 for r in _snap_rows_791c if r.get("reference") is None)
