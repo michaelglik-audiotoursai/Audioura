@@ -210,6 +210,7 @@ def snap_pin(title: str,
              scope_bbox: Optional[Sequence[float]] = None,
              tour_language: str = "en",
              landmark_fn: Optional[Callable] = None,
+             venue_fallback_coordinate: Optional[Tuple[float, float]] = None,
              ) -> Dict:
     """Decide the snap for ONE stop.
 
@@ -285,7 +286,46 @@ def snap_pin(title: str,
                 except (TypeError, ValueError, IndexError):
                     ref_pt = None
 
+    # [LOCAL-813 Cause C] MUSEUM BUILDING FALLBACK. A museum/gallery tour's stops
+    # are often ARTWORK titles ("Judith I", "The Evil Mothers") with no place
+    # identity of their own — no Wikidata P625, and the generic geocoder either
+    # fails or returns a WRONG same-name building (Belvedere → "Lower Belvedere",
+    # refused above). Such a stop shares the ONE building-level pin of the museum.
+    # When the caller supplies the museum building's authoritative coordinate
+    # (``venue_fallback_coordinate`` — the museum's own Wikidata P625, resolved
+    # once from the tour venue/scope), adopt it: it is the correct single pin for
+    # an indoor exhibit, far better than an LLM-written guess (Belvedere shipped
+    # 1,379 m off the palace). Treated as an authority (the museum's own identity),
+    # so the name-match / centroid guards do not apply to it.
+    def _apply_venue_fallback(reason_prefix: str) -> Optional[Dict]:
+        if not venue_fallback_coordinate:
+            return None
+        vf = _parse_coord(venue_fallback_coordinate)
+        if not vf:
+            return None
+        out["reference"] = vf
+        out["source"] = "venue_building"
+        if not coordinate:
+            out["snapped"] = True
+            out["new_coordinate"] = vf
+            out["reason"] = f"{reason_prefix}; adopted museum building pin"
+            return out
+        d = _haversine_m(coordinate, vf)
+        out["distance_m"] = round(d, 1)
+        if d > threshold_m:
+            out["snapped"] = True
+            out["new_coordinate"] = vf
+            out["reason"] = (f"{reason_prefix}; museum building pin {d:.0f} m "
+                             f"> {threshold_m:.0f} m — snapped to building")
+        else:
+            out["reason"] = (f"{reason_prefix}; museum building pin {d:.0f} m "
+                             f"within {threshold_m:.0f} m — kept")
+        return out
+
     if not ref_pt:
+        vf_out = _apply_venue_fallback("no in-scope reference")
+        if vf_out is not None:
+            return vf_out
         out["reason"] = "no in-scope reference — left unsnapped"
         return out
 
@@ -299,6 +339,14 @@ def snap_pin(title: str,
     # defer to the stops-centroid bound below.
     if require_name_match and not authority and ref_name:
         if not _name_matches_reference(title, ref_name):
+            # [LOCAL-813 Cause C] A refused generic reference (e.g. Belvedere →
+            # "Lower Belvedere") leaves an artwork stop with no identity. Prefer
+            # the museum building pin, when known, over keeping the wrong shipped
+            # pin.
+            vf_out = _apply_venue_fallback(
+                f"reference name {ref_name!r} does not match stop — refused")
+            if vf_out is not None:
+                return vf_out
             out["reference"] = ref_pt
             out["source"] = source
             out["reason"] = (
@@ -315,6 +363,10 @@ def snap_pin(title: str,
     if (not authority and stops_centroid and max_centroid_km):
         _cd = _haversine_m(ref_pt, stops_centroid) / 1000.0
         if _cd > max_centroid_km:
+            vf_out = _apply_venue_fallback(
+                f"reference {_cd:.1f} km from stops' centroid — refused")
+            if vf_out is not None:
+                return vf_out
             out["reference"] = ref_pt
             out["source"] = source
             out["reason"] = (
@@ -327,6 +379,11 @@ def snap_pin(title: str,
     # table are trusted as-is (the place's own authority, not a name search).
     if (not authority and scope_center and max_snap_km
             and _haversine_m(ref_pt, scope_center) / 1000.0 > max_snap_km):
+        vf_out = _apply_venue_fallback(
+            f"reference {_haversine_m(ref_pt, scope_center)/1000.0:.0f} km from "
+            f"centre — off-scope")
+        if vf_out is not None:
+            return vf_out
         out["reason"] = (f"reference {_haversine_m(ref_pt, scope_center)/1000.0:.0f} km "
                          f"from centre > {max_snap_km:.0f} km — left unsnapped "
                          f"(off-scope same-name match)")
@@ -386,6 +443,7 @@ def snap_poi_coordinates(poi_list: List[Dict],
                          scope_bbox: Optional[Sequence[float]] = None,
                          tour_language: str = "en",
                          landmark_fn: Optional[Callable] = None,
+                         venue_fallback_coordinate: Optional[Tuple[float, float]] = None,
                          ) -> Tuple[List[Dict], List[Dict]]:
     """Snap every stop in ``poi_list`` to its reference when the shipped pin is
     more than ``threshold_m`` away AND the reference is trustworthy. Mutates each
@@ -456,7 +514,8 @@ def snap_poi_coordinates(poi_list: List[Dict],
                        require_name_match=_rnm,
                        scope_bbox=scope_bbox,
                        tour_language=tour_language,
-                       landmark_fn=landmark_fn)
+                       landmark_fn=landmark_fn,
+                       venue_fallback_coordinate=venue_fallback_coordinate)
         rows.append(row)
         if row["snapped"] and row["new_coordinate"]:
             lat, lng = row["new_coordinate"]
