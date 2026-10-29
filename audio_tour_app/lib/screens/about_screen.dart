@@ -497,7 +497,7 @@ class _AboutScreenState extends State<AboutScreen> {
                   const SizedBox(height: 10),
                   const Text(
                     'See your level, what you have left, your renewal date, and '
-                    'buy a pack.',
+                    'see plans — passes and the one-time pack.',
                     style: TextStyle(fontSize: 13),
                   ),
                   const SizedBox(height: 12),

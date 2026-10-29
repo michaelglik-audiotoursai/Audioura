@@ -41,6 +41,7 @@ import '../utils/user_stops.dart';
 import 'user_stops_screen.dart';
 import 'main_screen.dart';
 import 'plan_screen.dart';
+import 'plans_screen.dart';
 import 'communities_about_screen.dart';
 
 class TourGeneratorScreen extends StatefulWidget {
@@ -317,12 +318,34 @@ class _TourGeneratorScreenState extends State<TourGeneratorScreen> {
     if (ent == null) return const SizedBox.shrink();
     final line = PlanLeftSummary.generateLine(ent);
     if (line == null) return const SizedBox.shrink();
+    // [LOCAL-807C] The allowance line doubles as the "N / 0 new tours left"
+    // banner: tapping it opens the one-page PlansScreen so a member who has run
+    // out ("0 new tours left …") can get more in one tap. A small arrow hints
+    // it is tappable. The grey style is unchanged so the line reads the same.
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
-      child: Text(
-        line,
-        key: const Key('generate_tours_left_line'),
-        style: const TextStyle(fontSize: 13, color: Colors.grey),
+      child: InkWell(
+        key: const Key('generate_tours_left_banner'),
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const PlansScreen()),
+          );
+        },
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Flexible(
+              child: Text(
+                line,
+                key: const Key('generate_tours_left_line'),
+                style: const TextStyle(fontSize: 13, color: Colors.grey),
+              ),
+            ),
+            const SizedBox(width: 4),
+            const Icon(Icons.chevron_right, size: 16, color: Colors.grey),
+          ],
+        ),
       ),
     );
   }
@@ -1634,9 +1657,12 @@ class _TourGeneratorScreenState extends State<TourGeneratorScreen> {
                   child: ElevatedButton.icon(
                     onPressed: () {
                       Navigator.pop(dialogContext);
+                      // [LOCAL-807C] The Free-level refusal's Buy button opens
+                      // the one-page PlansScreen (passes + the one-time pack),
+                      // not the older plan-state PlanScreen.
                       Navigator.push(
                         context,
-                        MaterialPageRoute(builder: (_) => const PlanScreen()),
+                        MaterialPageRoute(builder: (_) => const PlansScreen()),
                       );
                     },
                     icon: const Icon(Icons.workspace_premium_outlined),
@@ -1675,7 +1701,30 @@ class _TourGeneratorScreenState extends State<TourGeneratorScreen> {
         Widget? actionButton;
         switch (action) {
           case TourRefusalAction.buyPack:
+            // [LOCAL-807C] "Buy a pack" opens the one-page PlansScreen where
+            // the passes AND the one-time pack live (D734).
+            actionButton = SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: () {
+                  Navigator.pop(dialogContext);
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const PlansScreen()),
+                  );
+                },
+                icon: const Icon(Icons.workspace_premium_outlined),
+                label: Text(refusalActionLabel(action)),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.indigo,
+                  foregroundColor: Colors.white,
+                ),
+              ),
+            );
+            break;
           case TourRefusalAction.yourPlan:
+            // "Your plan" is a plan-state refusal (renewal due / wrong level) —
+            // it opens the plan-state PlanScreen, which carries "See plans".
             actionButton = SizedBox(
               width: double.infinity,
               child: ElevatedButton.icon(

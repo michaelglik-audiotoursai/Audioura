@@ -1,0 +1,34 @@
+
+=== (1) WEEKLY auto-renewing subscription ($4.99 / week) ===
+[start] level = l1
+[apply_event] = {'applied': True, 'duplicate': False, 'status': 'active', 'user_id': 'sim-807c-weekly', 'level': 'sub_week'}
+[auto_renew_subscriptions] = ('audioura.sub.weekly', 'sub_week', 'active', datetime.datetime(2026, 11, 5, 12, 33, 17, 22491, tzinfo=datetime.timezone.utc), True)
+[after grant] level=sub_week display=Weekly anniversary_at=2026-11-05T12:33:17.022491
+[after grant] allowances_left = {'tours_this_week_left': 5}
+[after 1 tour] allowances_left = {'tours_this_week_left': 4}
+PASS: Weekly active, period_end set, device sub_week, 5 -> 4 tours.
+
+=== (2) DAY PASS — one-time / NON-renewing ($2.99 / 24h) ===
+[apply_event] = {'applied': True, 'duplicate': False, 'status': 'active', 'user_id': 'sim-807c-day', 'level': 'sub_day'}
+[auto_renew_subscriptions] = ('audioura.sub.day', 'sub_day', 'active', False)
+[after grant] level=sub_day display=Day pass
+[after grant] allowances_left = {'tours_today_left': 3}
+PASS: Day pass active, device sub_day, auto_renew=false (no renewal).
+
+=== (3) 5-TOUR PACK — one-time purchase ($10, l3) ===
+[start] level = l1
+[map] audioura.pack.l3 -> l3_pack_10 -> level l3
+[/purchases/verify] HTTP 200 {
+  "allowances_left": {},
+  "anniversary_at": "2026-11-29T12:33:17.031430",
+  "can_sell": true,
+  "display_name": "$10 Pack",
+  "granted_level": "l3",
+  "inactivity_days": null,
+  "level": "l3",
+  "l
+[after grant] level=l3 display=$10 Pack
+[after grant] allowances_left = {}
+PASS: Pack granted via /purchases/verify, device l3 ("$10 Pack").
+
+ALL THREE PROOFS OK — Weekly, Day pass (one-time), 5-tour pack.

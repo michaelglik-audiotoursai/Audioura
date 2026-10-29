@@ -7,7 +7,7 @@
 //   3. "Apply for the Free plan" — shown ONLY on Introduction (l1): the Free
 //      generation allowance (from the plan data, not hard-coded) + the queue
 //      action. Hidden on Free, paid, tester and admin;
-//   4. "Buy a pack", then "The plans" — unchanged.
+//   4. "Get more tours" (See plans + the one-time pack), then "The plans".
 //
 // Also kept from LOCAL-610:
 //   req 2  the buy buttons read "$10 Pack — …" and "Curator ($25) — …", and the
@@ -155,7 +155,7 @@ void main() {
   });
 
   group('LOCAL-735 — section order on Introduction', () {
-    testWidgets('current → Upgrade → Apply, then Buy a pack below',
+    testWidgets('current → Upgrade → Apply, then Get more tours below',
         (tester) async {
       await _pump(tester, _ent('l1'));
       // The three cards at the top of the list are all laid out in the first
@@ -167,21 +167,24 @@ void main() {
           reason: 'current plan card is above the Upgrade card');
       expect(upgrade < apply, isTrue,
           reason: 'Upgrade card is above the Apply card');
-      // "Buy a pack" is further down the (lazy) list; scroll to bring it into
-      // view and confirm it exists below the Apply card.
-      expect(find.text('Buy a pack'), findsNothing,
-          reason: 'Buy a pack sits below the fold on Introduction');
+      // [LOCAL-807C] The buy card is titled "Get more tours" now (it leads with
+      // a "See plans" button to PlansScreen, then the one-time pack). It is
+      // further down the (lazy) list; scroll to bring it into view.
+      expect(find.text('Get more tours'), findsNothing,
+          reason: 'Get more tours sits below the fold on Introduction');
       await tester.drag(find.byType(Scrollable).first, const Offset(0, -600));
       await tester.pumpAndSettle();
-      expect(find.text('Buy a pack'), findsOneWidget);
+      expect(find.text('Get more tours'), findsOneWidget);
+      // The See plans entry point to the one-page PlansScreen is present.
+      expect(find.byKey(const Key('see_plans_button')), findsOneWidget);
     });
 
-    testWidgets('on a paid level the order is current → Upgrade → Buy a pack',
+    testWidgets('on a paid level the order is current → Upgrade → Get more tours',
         (tester) async {
       await _pump(tester, _ent('l3'));
       final current = _dy(tester, find.textContaining('Current plan:'));
       final upgrade = _dy(tester, find.text('Upgrade your plan'));
-      final buy = _dy(tester, find.text('Buy a pack'));
+      final buy = _dy(tester, find.text('Get more tours'));
       expect(current < upgrade, isTrue);
       expect(upgrade < buy, isTrue);
       expect(find.text('Apply for the Free plan'), findsNothing);

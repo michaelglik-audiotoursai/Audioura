@@ -18,6 +18,7 @@ import '../services/entitlements_service.dart';
 import '../services/iap_service.dart';
 import '../services/pass_expiry_format.dart';
 import '../utils/plan_left_summary.dart';
+import 'plans_screen.dart';
 
 class PlanScreen extends StatefulWidget {
   const PlanScreen({super.key, this.initialEntitlements, this.initialStubMode});
@@ -292,22 +293,57 @@ class _PlanScreenState extends State<PlanScreen> {
     );
   }
 
+  // [LOCAL-699] Buy buttons are ALWAYS visible on BOTH iOS and Android for the
+  // $10 Pack and Curator — never gated on platform or a billing flag (the
+  // Pixel build that hid them predated kAndroidBillingEnabled going true).
+  // In stub mode the buttons run a TEST PURCHASE (see _buy / _stubMode) and
+  // the card shows a clearly-labelled banner so a tester knows no real charge
+  // is made; a missing store product on a real server surfaces a clear
+  // "not available on this store yet" message rather than failing silently.
+  //
+  // [LOCAL-807C] The auto-renewing subscriptions + Day pass + the pack all now
+  // live on the single PlansScreen (D734). A "See plans" button at the top of
+  // this card is the About → "Your plan" → "See plans" path and the one place
+  // the pack-only entry points route to. The existing one-time pack / Curator
+  // buttons stay so the LOCAL-699 TEST PURCHASE flow a tester uses is unchanged.
   Widget _buyCard() {
-    // [LOCAL-699] Buy buttons are ALWAYS visible on BOTH iOS and Android for the
-    // $10 Pack and Curator — never gated on platform or a billing flag (the
-    // Pixel build that hid them predated kAndroidBillingEnabled going true).
-    // In stub mode the buttons run a TEST PURCHASE (see _buy / _stubMode) and
-    // the card shows a clearly-labelled banner so a tester knows no real charge
-    // is made; a missing store product on a real server surfaces a clear
-    // "not available on this store yet" message rather than failing silently.
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Buy a pack',
+            const Text('Get more tours',
                 style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 4),
+            const Text(
+              'Choose a pass (by the day, week, month or year) or a one-time '
+              '5-tour pack. You can cancel an auto-renewing plan any time in '
+              'the store.',
+              style: TextStyle(fontSize: 12, color: Colors.black54),
+            ),
+            const SizedBox(height: 14),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                key: const Key('see_plans_button'),
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const PlansScreen()),
+                  );
+                },
+                icon: const Icon(Icons.local_activity_outlined),
+                label: const Text('See plans'),
+                style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.indigo,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 14)),
+              ),
+            ),
+            const Divider(height: 28),
+            const Text('Or buy a one-time pack',
+                style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
             const SizedBox(height: 4),
             const Text(
               'Packs are one-time purchases. Nothing renews automatically. '

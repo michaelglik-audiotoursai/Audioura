@@ -164,6 +164,13 @@ void main() {
 
       expect(find.byType(ErrorWidget), findsNothing);
       expect(TestWidgetsFlutterBinding.instance.takeException(), isNull);
+      // [LOCAL-807C] The buy card ("Get more tours") now leads with a "See
+      // plans" button (to PlansScreen) above the one-time pack buttons, so the
+      // pack buttons sit lower in the lazy ListView. Scroll them into view
+      // first; the point of this test is that they are still PRESENT (never
+      // gated out) on a Storied 404, not that they are above the fold.
+      await tester.drag(find.byType(Scrollable).first, const Offset(0, -600));
+      await tester.pumpAndSettle();
       // The $10 Pack and Curator buy buttons are always visible (LOCAL-699).
       expect(
           find.text('\$10 Pack — 5 new tours + 5 edits, up to 10 stops'),

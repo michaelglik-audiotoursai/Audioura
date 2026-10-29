@@ -384,25 +384,55 @@ class _PlansScreenState extends State<PlansScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // [LOCAL-807C] "Month" wrapped to two lines at iPhone width (375pt):
+            // SegmentedButton splits the row into four equal cells, and the
+            // default Material label style (14sp) plus each segment's internal
+            // padding left the 5-letter "Month"/"Week" without room, so the text
+            // wrapped. A smaller label style + tighter per-segment padding makes
+            // all four labels fit on ONE line at 375pt; maxLines:1 with an
+            // ellipsis is a defensive guard so a future wider label still never
+            // wraps (asserted by plans_segmented_no_wrap_local807c_test).
             SegmentedButton<PassOption>(
+              showSelectedIcon: false,
+              style: SegmentedButton.styleFrom(
+                textStyle: const TextStyle(
+                    fontSize: 12, fontWeight: FontWeight.w600),
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
+                visualDensity: VisualDensity.compact,
+              ),
               segments: const [
-                ButtonSegment(value: PassOption.day, label: Text('Day')),
-                ButtonSegment(value: PassOption.week, label: Text('Week')),
-                ButtonSegment(value: PassOption.month, label: Text('Month')),
-                ButtonSegment(value: PassOption.year, label: Text('Year')),
+                ButtonSegment(
+                    value: PassOption.day,
+                    label: Text('Day', maxLines: 1, overflow: TextOverflow.ellipsis)),
+                ButtonSegment(
+                    value: PassOption.week,
+                    label: Text('Week', maxLines: 1, overflow: TextOverflow.ellipsis)),
+                ButtonSegment(
+                    value: PassOption.month,
+                    label: Text('Month', maxLines: 1, overflow: TextOverflow.ellipsis)),
+                ButtonSegment(
+                    value: PassOption.year,
+                    label: Text('Year', maxLines: 1, overflow: TextOverflow.ellipsis)),
               ],
               selected: {_passOption},
               onSelectionChanged: (s) =>
                   setState(() => _passOption = s.first),
             ),
             const SizedBox(height: 16),
+            // [LOCAL-807C] The tours line + price share a spaceBetween row. At
+            // 375pt the longer copy ("10 new tours a month") plus the price
+            // overflowed, so the tours line is Expanded (it wraps if ever
+            // needed) and the price keeps its intrinsic width on the right.
             Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(_passOption.toursLine,
-                    key: const Key('pass_tours_line'),
-                    style: const TextStyle(
-                        fontSize: 16, fontWeight: FontWeight.w600)),
+                Expanded(
+                  child: Text(_passOption.toursLine,
+                      key: const Key('pass_tours_line'),
+                      style: const TextStyle(
+                          fontSize: 16, fontWeight: FontWeight.w600)),
+                ),
+                const SizedBox(width: 12),
                 Text(price,
                     key: const Key('pass_price'),
                     style: const TextStyle(
