@@ -471,9 +471,24 @@ _CITY_RADIUS_SMALL_KM = 8.0
 _CITY_RADIUS_LARGE_KM = 15.0
 _REGION_RADIUS_KM = 60.0
 _NEAR_ME_RADIUS_KM = 3.0
+# [LOCAL-805] A "<business> near <LANDMARK>" request centres on a single POINT
+# landmark (Ben Thanh Market, Boston Common, Fenway Park). The listener means
+# "walkable from that spot", so the search radius is tighter than a whole
+# neighbourhood — ~1.5 km. LOCAL-802's ×2 widening grows it to ~3 km once before
+# delivering fewer than requested.
+_LANDMARK_RADIUS_KM = 1.5
 # How far outside the bbox a record may sit and still be kept (the geocoder's bbox
 # is tight to the named area; a 500 m margin forgives a border address).
 _BBOX_MARGIN_KM = 0.5
+# Point-landmark class words: when the scope HEAD ends in one of these, the scope
+# is a single landmark to centre on (a market, square, common, park, cathedral,
+# …), NOT a residential neighbourhood. Used only to pick the tighter LANDMARK
+# radius; a known neighbourhood/region marker still wins (checked first).
+_LANDMARK_CLASS_WORDS = (
+    "market", "square", "common", "park", "cathedral", "basilica", "pagoda",
+    "temple", "tower", "monument", "plaza", "piazza", "fountain", "gardens",
+    "palace", "castle", "pier", "wharf", "bridge", "stadium", "arena",
+)
 
 # A scope whose locality token matches one of these (or whose head is two or more
 # words, the classic "West Roxbury" / "North End" / "Jamaica Plain" shape) is a
@@ -498,8 +513,10 @@ _REGION_MARKERS = (
 
 
 def _scope_precision(scope: str) -> str:
-    """Classify a scope string into NEIGHBOURHOOD / CITY / REGION.
+    """Classify a scope string into LANDMARK / NEIGHBOURHOOD / CITY / REGION.
 
+    LANDMARK: a single point landmark to centre on (Ben Thanh Market, Boston
+    Common, Fenway Park) — a "<business> near <landmark>" search centre (LOCAL-805).
     NEIGHBOURHOOD: a named city sub-area (West Roxbury, North End, Jamaica Plain) —
     detected by a known neighbourhood marker OR a multi-word locality head.
     CITY: a single-word locality (Brookline, Boston).
@@ -515,6 +532,14 @@ def _scope_precision(scope: str) -> str:
     for marker in _NEIGHBOURHOOD_MARKERS:
         if marker == head or marker in head:
             return "NEIGHBOURHOOD"
+    # [LOCAL-805] A landmark-class head ("… Market", "… Common", "… Park",
+    # "… Cathedral") is a POINT to centre a near-landmark search on — tighter than
+    # a residential neighbourhood. Checked AFTER the known-neighbourhood markers so
+    # a neighbourhood that happens to end in "Park" (e.g. "Hyde Park") stays a
+    # neighbourhood.
+    _head_words = head.split()
+    if _head_words and _head_words[-1] in _LANDMARK_CLASS_WORDS:
+        return "LANDMARK"
     words = [w for w in head.split() if w]
     if len(words) >= 2:
         return "NEIGHBOURHOOD"
@@ -524,6 +549,8 @@ def _scope_precision(scope: str) -> str:
 def _radius_for_precision(precision: str, scope: str = "") -> float:
     """Scope radius (km) for a precision level. CITY widens for a large city."""
     p = (precision or "").upper()
+    if p == "LANDMARK":
+        return _LANDMARK_RADIUS_KM
     if p == "NEIGHBOURHOOD":
         return _NEIGHBOURHOOD_RADIUS_KM
     if p == "REGION":

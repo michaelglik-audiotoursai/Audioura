@@ -1312,6 +1312,27 @@ def _scope_from_request(location, intent=None):
     parts = [p.strip() for p in s.split(',') if p.strip()]
     if not parts:
         return s
+    # [LOCAL-805] "<business subject> near|around|close to|in <LANDMARK>" — the
+    # LANDMARK is the SEARCH CENTRE, not the business phrase. "Massage and spa near
+    # Ben Thanh Market" → centre "Ben Thanh Market"; "coffee near Boston Common" →
+    # "Boston Common". Without this the whole phrase (business words + "near" +
+    # landmark) was handed to the area resolver and geocoded as nonsense, so the
+    # nearby places were never searched for at the landmark. Only fires when the
+    # SUBJECT before the connector is a business/activity provider (so "walk near
+    # Ben Thanh Market" is untouched — its subject is the walking verb), and the
+    # landmark tail is kept; any trailing city/admin segments (", District 1, Ho
+    # Chi Minh City") are preserved so the geocoder can disambiguate the landmark.
+    _conn_m = _SUBJECT_CONNECTOR_RE.search(parts[0])
+    if _conn_m and _conn_m.start() > 0:
+        _subj = parts[0][:_conn_m.start()].strip(' ,:;-')
+        _landmark = parts[0][_conn_m.end():].strip(' ,:;-')
+        _is_walk_subj = re.match(
+            r'^\s*(?:walk|walking|stroll|wander|hike|hiking|ramble|promenade|'
+            r'saunter)\b', _subj, flags=re.IGNORECASE)
+        if _landmark and not _is_walk_subj and _business_subject_of_request(parts[0]):
+            # Drop "near me" (no landmark follows it) but keep a real landmark.
+            if not re.match(r'^me\b', _landmark, flags=re.IGNORECASE):
+                parts[0] = _landmark
     _POI_FILLER = {
         'restaurant', 'restaurants', 'gym', 'gyms', 'cafe', 'cafes', 'café',
         'cafés', 'coffee', 'coffeehouse', 'coffeeshop', 'shop', 'shops', 'store',
@@ -2821,6 +2842,39 @@ def _resolve_scope_for_check(intent, location, tour_category, museum_venue_name,
     if intent and intent.get('geographic_scope') and \
             intent.get('scope_precision', '').upper() in ('BUILDING', 'DISTRICT', 'CORRIDOR'):
         scope = intent['geographic_scope']
+    # [LOCAL-805] "<business> near <LANDMARK>" — the landmark is the SEARCH CENTRE
+    # (a point with a ~1.5 km walkable radius), NOT a containment boundary. The
+    # field defect (tour 469): the LLM intent returned geographic_scope="Ben Thanh
+    # Market, District 1, Ho Chi Minh City" precision=DISTRICT, and the containment
+    # check then dropped every real spa as "near Ben Thanh Market but not INSIDE
+    # the market building", so the tour clean-failed with nearby spas rejected.
+    # When the request is a business/activity subject near a landmark, the
+    # containment scope must be the ENCLOSING AREA (the admin tail after the
+    # landmark — "District 1, Ho Chi Minh City"), never the landmark itself; if
+    # there is no enclosing area ("coffee near Boston Common"), there is no
+    # meaningful containment boundary and the radius-biased places search stands on
+    # its own, so the stop-by-stop containment check is skipped (scope='').
+    if scope and _business_subject_of_request(location):
+        _encl = _near_landmark_enclosing_area(location)
+        if _encl is not None and _norm_place(_encl) != _norm_place(scope):
+            if not quiet:
+                print(f"\n  [LOCAL-805] near-landmark request: containment scope "
+                      f"widened from the landmark '{scope}' to the enclosing area "
+                      f"'{_encl or '(none — radius only)'}' (the landmark is the "
+                      f"search centre, not a boundary).")
+            scope = _encl
+            # Rebind the extent the ONE-SCOPE invariant checks against: the tour's
+            # effective extent is now the enclosing AREA (or nothing, for a point
+            # landmark), NOT the landmark the LLM put in geographic_scope. Without
+            # this the invariant below would see scope != intent.geographic_scope
+            # and clear it, and a spa in a DIFFERENT district would no longer be
+            # rejected (only the radius would bound it). A shallow copy keeps the
+            # original intent untouched for every other reader.
+            if intent is not None:
+                intent = dict(intent)
+                intent['geographic_scope'] = _encl
+                # The area is a district-level extent (or empty → no check).
+                intent['scope_precision'] = 'DISTRICT' if _encl else ''
     # [D536] Refuse a scope that is only a named stop on the route.
     if scope and scope_is_a_waypoint(scope, location):
         _wider = (intent.get('location') or '').strip() if intent else ''
@@ -4490,6 +4544,93 @@ def _detect_worship_civic_class(location, tour_type=""):
     return _detect_venue_class(location, tour_type) == 'worship_civic'
 
 
+# [LOCAL-805] Locative connectors that separate a request's SUBJECT (what the
+# tour is of) from the place/landmark it is bounded to. "Massage and spa NEAR Ben
+# Thanh Market" — the subject is "Massage and spa", the landmark is the search
+# centre. Order matters: multi-word connectors are tried before single words so
+# "close to" / "next to" are not split on the bare "to".
+_SUBJECT_CONNECTOR_RE = re.compile(
+    r'\b(?:close\s+to|next\s+to|near\s+to|near\s+me|near|around|nearby|'
+    r'surrounding|close\s+by|by|within|inside|in|of|at|throughout|across)\b',
+    re.IGNORECASE)
+
+
+def _business_subject_of_request(location):
+    """[LOCAL-805] Is the SUBJECT of the request a business/activity provider?
+
+    The regression (LOCAL-805, since 788B/790/791): "Massage and spa near Ben
+    Thanh Market, District 1, Ho Chi Minh City" was routed WALKING because the
+    generic walking-keyword scan saw "District"/"City" and fired before the
+    LOCAL-791 business check. And a naive whole-string business check is wrong the
+    other way: "walk near Ben Thanh Market" contains "market" INSIDE the landmark
+    name and would wrongly route to the places path.
+
+    The fix keys on the SUBJECT only — the text up to the first locative connector
+    ("near", "around", "close to", "in", "of", …). The landmark that follows the
+    connector is the SEARCH CENTRE, never part of the subject, so a business word
+    trapped in the landmark name ("Market", "Spa Hotel") can't flip a walking
+    request. A request with no connector is its own subject ("gyms near me, West
+    Roxbury" → the "near me" connector leaves subject "gyms").
+
+    Returns True when the subject classifies as 'business' OR 'dining' (both ride
+    the maps-first/places path), False otherwise (including an empty/landmark-only
+    subject, so "walk near Ben Thanh Market" stays walking).
+    """
+    if not location:
+        return False
+    # Strip a leading "<tour type>:" label so "spa tour: massage near X" keys on
+    # the subject, not the label.
+    subj = re.sub(r'^\s*[\w\s-]*?:\s*', '', location, count=1).strip()
+    # The subject is everything up to the FIRST locative connector. If the string
+    # opens with a connector (rare), treat the whole string as the subject.
+    m = _SUBJECT_CONNECTOR_RE.search(subj)
+    if m and m.start() > 0:
+        subj = subj[:m.start()].strip(' ,:;-')
+    # A subject that still carries an explicit walking/transport verb is a walking
+    # request about an area, not a business ("walk", "stroll", "wander", "hike").
+    if re.match(r'^\s*(?:walk|walking|stroll|wander|hike|hiking|ramble|'
+                r'promenade|saunter)\b', subj, flags=re.IGNORECASE):
+        return False
+    if not subj:
+        return False
+    try:
+        from stop_existence_gate import classify_business_vs_landmark as _cbl
+        return _cbl(subj) in ('business', 'dining')
+    except Exception:
+        return False
+
+
+def _near_landmark_enclosing_area(location):
+    """[LOCAL-805] The ENCLOSING AREA of a "<business> near <landmark>, <area…>"
+    request — the admin tail that follows the landmark segment.
+
+    "Massage and spa near Ben Thanh Market, District 1, Ho Chi Minh City"
+        → "District 1, Ho Chi Minh City"
+    "coffee near Boston Common"                → "" (no enclosing area; radius only)
+    "walk near Ben Thanh Market"               → None (not a business subject)
+
+    Returns the enclosing-area string (possibly "") for a business-subject
+    near-landmark request, or None when the pattern does not apply. The caller uses
+    it as the containment scope so a stop is checked against the AREA, not against
+    the landmark point (which is only the search centre).
+    """
+    if not location or not _business_subject_of_request(location):
+        return None
+    # Strip a leading "<tour type>:" label, then find the first locative connector
+    # in the FIRST comma-segment (where "<subject> near <landmark>" lives).
+    s = re.sub(r'^\s*[\w\s-]*?:\s*', '', location, count=1).strip()
+    segs = [p.strip() for p in s.split(',') if p.strip()]
+    if not segs:
+        return None
+    m = _SUBJECT_CONNECTOR_RE.search(segs[0])
+    if not m or m.start() == 0:
+        return None
+    # The admin tail is every comma-segment AFTER the first (the segment that holds
+    # the landmark). "near me" has no landmark, so the tail is the whole remainder.
+    tail = [t for t in segs[1:] if t]
+    return ', '.join(tail)
+
+
 def _classify_tour_category(location, tour_type):
     """
     Detect the appropriate tour template based on location and tour_type.
@@ -4541,7 +4682,29 @@ def _classify_tour_category(location, tour_type):
     food_keywords = ['restaurant', 'food', 'dining', 'culinary', 'eat', 'cafe', 'bistro', 'eatery']
     if any(keyword in location_lower or keyword in tour_type_lower for keyword in food_keywords):
         return 'restaurant'
-    
+
+    # [LOCAL-805] BUSINESS / ACTIVITY-PROVIDER SUBJECT — runs BEFORE the museum,
+    # specialized and generic walking scans. The regression (since 788B/790/791):
+    # "Massage and spa near Ben Thanh Market, District 1, Ho Chi Minh City" routed
+    # WALKING because the walking scan saw "District"/"City" and fired first, so
+    # the places path never ran and the real spas were lost. More generally, a
+    # LANDMARK that follows "near"/"around"/"in" can carry a keyword that belongs
+    # to another scan — "park" in "bars near Fenway Park", "garden" in "cafés near
+    # the Botanic Garden", "gallery" in "coffee near the National Gallery" — and
+    # would mis-route the request. A request whose SUBJECT is a business/activity
+    # provider ("massage and spa", "coffee", "gyms", "bars", "shops") is a PLACES
+    # request whatever follows it; the landmark is the SEARCH CENTRE, not a stop.
+    # Keying on the SUBJECT (the text before the first locative connector) means a
+    # keyword trapped inside the landmark name cannot flip the request, and a
+    # genuine museum/specialized SUBJECT ("MFA", "botanical garden") still classes
+    # as 'landmark' here and falls through to its own scan below. "walk near Ben
+    # Thanh Market" has the walking verb "walk" as its subject → stays walking.
+    # 'restaurant' is the maps-first/places category dining and business share.
+    if _business_subject_of_request(location):
+        print("   [LOCAL-805] business/activity subject (near/around/in a landmark) "
+              "→ places path (category='restaurant')")
+        return 'restaurant'
+
     # Museum indicators — check location first, then tour_type as fallback
     # Only check tour_type if location doesn't suggest a different category
     museum_keywords = ['museum', 'gallery', 'mfa', 'moma', 'exhibition', 'collection', 'art center', 'cultural center']
@@ -4552,32 +4715,32 @@ def _classify_tour_category(location, tour_type):
     specialized_keywords = ['book', 'movie', 'film', 'botanical', 'garden', 'park', 'novel', 'story', 'literary', 'filming']
     if any(keyword in location_lower or keyword in tour_type_lower for keyword in specialized_keywords):
         return 'specialized'
-    
+
     # Walking tour indicators (default for cities, neighborhoods)
     walking_keywords = ['city', 'downtown', 'neighborhood', 'district', 'street', 'avenue', 'center', 'town']
     if any(keyword in location_lower for keyword in walking_keywords):
         return 'walking'
 
-    # [LOCAL-791 defect 2] BUSINESS / ACTIVITY-PROVIDER detection — a request whose
-    # SUBJECT is a kind of business/activity provider ("kitesurfing schools",
-    # "dive shops", "yoga studios", "surfboard rentals", "gyms", "cooking classes
-    # centre") is a PLACES request whose stops come from the map, not a walking
-    # tour. The HCMC-field "Kitesurfing schools in Mui Ne" arrived with an empty
-    # tour_type, matched none of the food/museum/specialized/walking keywords, and
-    # fell through to the walking default — so MAPS-FIRST / places_search were
-    # never reached and the run died "no stops could be generated". Routing it to
-    # 'restaurant' puts it on the same maps-first/places path dining uses (the
-    # business branch there is gated by classify_business_vs_landmark=='business').
-    # Checked AFTER the museum/specialized/walking keyword scans so "art center",
-    # "botanical garden" and an explicit walking request are never caught here.
-    try:
-        from stop_existence_gate import classify_business_vs_landmark as _cbl_cat
-        if _cbl_cat(location) == 'business':
-            print("   [LOCAL-791] activity/business provider request → places path "
-                  "(category='restaurant')")
-            return 'restaurant'
-    except Exception:
-        pass
+    # [LOCAL-791 defect 2 / LOCAL-805] BUSINESS / ACTIVITY-PROVIDER detection — a
+    # request whose SUBJECT is a kind of business/activity provider ("kitesurfing
+    # schools", "dive shops", "yoga studios", "surfboard rentals", "gyms", "cooking
+    # classes centre") is a PLACES request whose stops come from the map, not a
+    # walking tour. The HCMC-field "Kitesurfing schools in Mui Ne" arrived with an
+    # empty tour_type, matched none of the food/museum/specialized/walking
+    # keywords, and fell through to the walking default — so MAPS-FIRST /
+    # places_search were never reached and the run died "no stops could be
+    # generated". Routing it to 'restaurant' puts it on the same maps-first/places
+    # path dining uses (the business branch there is gated by
+    # classify_business_vs_landmark=='business').
+    # LOCAL-805: this now keys on the SUBJECT (via _business_subject_of_request),
+    # so a business word trapped inside a landmark name ("Market" in "walk near Ben
+    # Thanh Market") no longer flips a walking request to places. This is a
+    # safety-net below the walking scan; the primary business-subject route above
+    # already catches the near/around/in-a-landmark cases before the walking scan.
+    if _business_subject_of_request(location):
+        print("   [LOCAL-791] activity/business provider request → places path "
+              "(category='restaurant')")
+        return 'restaurant'
     # An explicit activity-provider shape "<activity> schools/shops/studios/
     # rentals/centres/academies/clubs/lessons/classes [in|of|near …]" is a places
     # request even when the leading word is not itself a known business keyword.
