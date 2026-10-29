@@ -285,6 +285,15 @@ def _normalize_serper_place(p: Dict) -> Optional[Dict]:
         "_serper_cid": p.get("cid"),
         "_serper_rating": p.get("rating"),
         "_serper_category": p.get("category") or p.get("type"),
+        # [LOCAL-800] Customer-voice fields, carried straight off the SAME Places
+        # response so the "What people say" paragraph (customer_voice.py) can be
+        # built with NO extra Serper call: the Google rating is already here
+        # (_serper_rating), and these add the review COUNT, the price band and the
+        # venue's own website. Each is None/absent when Serper did not provide it —
+        # the paragraph omits any item with no source and never invents a number.
+        "_serper_rating_count": p.get("ratingCount") or p.get("reviewsCount"),
+        "_serper_price_level": p.get("priceLevel"),
+        "_serper_website": p.get("website"),
         # [LOCAL-786] Carry the raw formatted address so the town-mismatch guard can
         # read the town Serper gave ("…, Norwood, MA 02062") even when the structured
         # address parse left `city` blank.
