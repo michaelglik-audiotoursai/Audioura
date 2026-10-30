@@ -2992,6 +2992,37 @@ def _geocode_city_center(venue_name: str, city_signals: Set[str]):
         return None
 
 
+def _scope_fallback_candidates(scope: str):
+    """[LOCAL-847] Ordered geocode candidates for a scope string, from the FULL
+    scope down to progressively broader comma tails.
+
+    A provider/area scope can geocode to NOTHING when its leading segment is a
+    too-specific or unknown sub-area ("Mui Ne beach area, Vietnam", "Ham Tien
+    ward, Mui Ne, Vietnam"). Rather than refuse, we fall back to the NEXT comma
+    segment (the enclosing town/ward/city) — "Mui Ne, Vietnam", then "Vietnam".
+    The last (country/state) tail is only tried as a final resort so a request
+    still resolves SOMEWHERE in-country instead of refusing outright; the caller
+    always tries the full scope first, so a resolvable precise scope is never
+    widened unnecessarily. Returns the list of candidate query strings, most
+    specific first, de-duplicated."""
+    _scope = (scope or "").strip()
+    if not _scope:
+        return []
+    parts = [p.strip() for p in _scope.split(",") if p.strip()]
+    cands = []
+    seen = set()
+    # Full scope, then drop ONE leading segment at a time (keep the tail, which is
+    # the enclosing town/city/country — never widen to something OUTSIDE the named
+    # tail). Keep at least the last segment.
+    for start in range(0, max(1, len(parts))):
+        tail = ", ".join(parts[start:])
+        key = tail.lower()
+        if tail and key not in seen:
+            seen.add(key)
+            cands.append(tail)
+    return cands
+
+
 def _geocode_scope_center(scope: str):
     """[LOCAL-783] Geocode the FULL scope string to a precise (lat, lng) centre.
 
@@ -3002,27 +3033,38 @@ def _geocode_scope_center(scope: str):
     centre is what feeds the Serper Places `ll` (the town is only honoured when a
     correct `ll` is sent — LEAD probe). Returns None when the scope is empty or
     unresolvable; raises nothing (a failed geocode just yields None, and the
-    provider then relies on the query text / falls back)."""
+    provider then relies on the query text / falls back).
+
+    [LOCAL-847] COMMA-SEGMENT FALLBACK: when the full scope does not geocode, try
+    the next comma segment (the enclosing town/ward/city), so an over-specific or
+    unknown leading segment ("Mui Ne beach area, Vietnam") resolves to its town
+    ("Mui Ne, Vietnam") instead of returning None → refusal."""
     _scope = (scope or "").strip()
     if not _scope:
         return None
-    params = {
-        "q": _scope,
-        "format": "jsonv2",
-        "limit": "1",
-        "accept-language": "en",
-    }
-    try:
-        resp = _nominatim_request(params, context=f"scope:{_scope}")
-        results = resp.json() or []
-    except RuntimeError:
-        return None
-    if not results:
-        return None
-    try:
-        return (float(results[0]["lat"]), float(results[0]["lon"]))
-    except (KeyError, ValueError, IndexError, TypeError):
-        return None
+    for _cand in _scope_fallback_candidates(_scope):
+        params = {
+            "q": _cand,
+            "format": "jsonv2",
+            "limit": "1",
+            "accept-language": "en",
+        }
+        try:
+            resp = _nominatim_request(params, context=f"scope:{_cand}")
+            results = resp.json() or []
+        except RuntimeError:
+            return None
+        if not results:
+            continue
+        try:
+            center = (float(results[0]["lat"]), float(results[0]["lon"]))
+        except (KeyError, ValueError, IndexError, TypeError):
+            continue
+        if _cand != _scope:
+            print(f"  [LOCAL-847] scope centre fallback: {_scope!r} did not "
+                  f"geocode; using enclosing segment {_cand!r}")
+        return center
+    return None
 
 
 def _geocode_scope_bbox(scope: str):
@@ -3032,27 +3074,36 @@ def _geocode_scope_bbox(scope: str):
     The bbox is the geocoder's own extent for the named area — tighter and truer
     than any fixed radius — so a West Roxbury request can drop a Norwood place that
     a radius might allow. Returns None when the scope is empty, unresolvable, or the
-    provider omits a boundingbox; the caller then falls back to the radius."""
+    provider omits a boundingbox; the caller then falls back to the radius.
+
+    [LOCAL-847] COMMA-SEGMENT FALLBACK: when the full scope does not geocode, try
+    the next comma segment (the enclosing town/ward/city) so the tour still gets a
+    true bbox for its area instead of refusing."""
     _scope = (scope or "").strip()
     if not _scope:
         return None
-    params = {
-        "q": _scope,
-        "format": "jsonv2",
-        "limit": "1",
-        "accept-language": "en",
-    }
-    try:
-        resp = _nominatim_request(params, context=f"scope-bbox:{_scope}")
-        results = resp.json() or []
-    except RuntimeError:
-        return None
-    if not results:
-        return None
-    bbox = results[0].get("boundingbox") if isinstance(results[0], dict) else None
-    if not bbox or len(bbox) < 4:
-        return None
-    return bbox
+    for _cand in _scope_fallback_candidates(_scope):
+        params = {
+            "q": _cand,
+            "format": "jsonv2",
+            "limit": "1",
+            "accept-language": "en",
+        }
+        try:
+            resp = _nominatim_request(params, context=f"scope-bbox:{_cand}")
+            results = resp.json() or []
+        except RuntimeError:
+            return None
+        if not results:
+            continue
+        bbox = results[0].get("boundingbox") if isinstance(results[0], dict) else None
+        if not bbox or len(bbox) < 4:
+            continue
+        if _cand != _scope:
+            print(f"  [LOCAL-847] scope bbox fallback: {_scope!r} did not "
+                  f"geocode; using enclosing segment {_cand!r}")
+        return bbox
+    return None
 
 
 def _check_walking_stop_existence(

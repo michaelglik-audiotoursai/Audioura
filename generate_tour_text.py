@@ -1269,6 +1269,33 @@ _GENERIC_FEATURE_TAIL_WORDS = frozenset({
     'seafront', 'shore', 'shoreline', 'coast', 'coastline', 'strand',
 })
 
+# [LOCAL-847] Generic AREA/FEATURE PHRASES (not just a single trailing feature
+# word) that, when they TRAIL a real place name, turn a town into a tiny/unknown
+# point and defeat geocoding: "Mui Ne beach area" geocodes to nothing, "Nha Trang
+# city centre" to a plaza, "Hoi An old town area" to nothing. LOCAL-843 only
+# stripped ONE trailing feature word ("beach"), so "beach area", "city centre",
+# "old town area", "district" etc. all survived and refused. Each phrase here is
+# a sequence of trailing GENERIC tokens that qualify the real place before them;
+# the widener strips the whole run (longest match first) for a provider request,
+# leaving the enclosing town/area. These are ordered longest→shortest so a
+# multi-word phrase is tried before its own tail ("beach area" before "area").
+# NB: these are the WORDS that may appear in the trailing generic run; the
+# widener below checks that at least one real (non-generic) token precedes the
+# run, so a bare "beach area, Vietnam" or "city centre, Vietnam" is left alone
+# (it has no town to fall back to).
+_GENERIC_AREA_TAIL_WORDS = frozenset({
+    # the LOCAL-843 natural-feature words (so "beach area" = feature + "area")
+    'beach', 'beaches', 'bay', 'dunes', 'lagoon', 'cove', 'waterfront',
+    'seafront', 'shore', 'shoreline', 'coast', 'coastline', 'strand',
+    'beachfront', 'oceanfront', 'riverside', 'lakeside', 'harbour', 'harbor',
+    # generic area / administrative-vicinity words
+    'area', 'areas', 'district', 'districts', 'neighbourhood', 'neighborhood',
+    'neighbourhoods', 'neighborhoods', 'quarter', 'quarters', 'zone', 'zones',
+    'region', 'vicinity', 'surroundings', 'surrounds', 'outskirts', 'environs',
+    'centre', 'center', 'downtown', 'uptown', 'midtown',
+    'town', 'old', 'new', 'city', 'inner',
+})
+
 
 def _places_arm_neutral_header(request, tour_category):
     """[LOCAL-843] The neutral machine category to write in the Tour-Category
@@ -1296,14 +1323,25 @@ def _places_arm_neutral_header(request, tour_category):
 
 
 def _widen_generic_feature_scope(scope, location):
-    """[LOCAL-843] Widen a scope whose LEADING segment ends in a generic natural
-    feature ("Mui Ne beach, Vietnam") to the enclosing area ("Mui Ne, Vietnam"),
+    """[LOCAL-843/847] Widen a scope whose LEADING segment is a real place name
+    followed by a generic AREA/FEATURE phrase ("Mui Ne beach area, Vietnam",
+    "Nha Trang city centre, Vietnam", "Hoi An old town area, Vietnam") to the
+    enclosing area ("Mui Ne, Vietnam" / "Nha Trang, Vietnam" / "Hoi An, Vietnam"),
     but ONLY for a business/activity-provider request where the feature is the
     search CENTRE, not the thing being toured.
 
-    A walking/area tour ON the beach keeps the beach (its subject). A single bare
-    feature word with no area name before it ("beach, Vietnam") is left as is.
-    Deterministic, offline; never raises. Returns the (possibly) widened scope.
+    [LOCAL-843] stripped exactly ONE trailing natural-feature word ("beach"), so
+    "beach area", "city centre", "old town area", "district", "neighbourhood",
+    "surroundings" etc. all survived and geocoded to nothing → refusal. This
+    generalises to strip the WHOLE trailing run of generic area/feature words
+    (``_GENERIC_AREA_TAIL_WORDS``) and a leading locative "near" / "around" /
+    "close to", provided a REAL (non-generic) place token remains in the head —
+    so a bare "beach area, Vietnam" or "city centre, Vietnam" (no town to fall
+    back to) is left alone, and a walking/area tour ON the beach (not a provider
+    request) is untouched (its feature is the subject). Never widens past the
+    city: only the LEADING segment's trailing qualifier run is removed; any
+    comma-separated city/admin tail (", Vietnam") is preserved. Deterministic,
+    offline; never raises. Returns the (possibly) widened scope.
     """
     try:
         s = (scope or '').strip()
@@ -1327,13 +1365,34 @@ def _widen_generic_feature_scope(scope, location):
         parts = [p.strip() for p in s.split(',') if p.strip()]
         if not parts:
             return scope
-        head_toks = parts[0].split()
-        if (len(head_toks) >= 2
-                and head_toks[-1].lower().strip('.') in _GENERIC_FEATURE_TAIL_WORDS):
-            area_head = ' '.join(head_toks[:-1]).strip(' ,:;-')
+        head = parts[0]
+        # Strip a leading locative connector that rode into the scope head
+        # ("near Mui Ne beach" → "Mui Ne beach", "around Nha Trang bay" → …).
+        head = re.sub(r'^\s*(?:near(?:\s+to)?|around|close\s+to|next\s+to|'
+                      r'nearby|by|within|in|at)\s+', '', head,
+                      flags=re.IGNORECASE).strip()
+        head_toks = head.split()
+        if len(head_toks) < 2:
+            # Nothing before a lone token to fall back to.
+            parts[0] = head or parts[0]
+            return ', '.join(parts)
+        # Peel the TRAILING run of generic area/feature words off the head.
+        i = len(head_toks)
+        while i > 0 and head_toks[i - 1].lower().strip('.,:;-') in _GENERIC_AREA_TAIL_WORDS:
+            i -= 1
+        # Keep at least ONE real (non-generic) token as the place name — if the
+        # whole head is generic ("beach area", "city centre"), there is no town to
+        # widen to, so leave it alone.
+        if 0 < i < len(head_toks):
+            area_head = ' '.join(head_toks[:i]).strip(' ,:;-')
             if area_head:
                 parts[0] = area_head
                 return ', '.join(parts)
+        # No trailing generic run, but we may still have stripped a leading
+        # connector — return that cleaned form.
+        if head != parts[0]:
+            parts[0] = head
+            return ', '.join(parts)
         return scope
     except Exception:
         return scope
