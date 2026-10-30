@@ -186,6 +186,15 @@ GEN_JOB_STALE_SECONDS = int(os.getenv('GEN_JOB_STALE_SECONDS', '1800'))
 # (resume_attempts) so it survives instance churn.
 ORCH_MAX_RESUME_ATTEMPTS = int(os.getenv('ORCH_MAX_RESUME_ATTEMPTS', '3'))
 
+# [LOCAL-846] An app "tracking" tour_requests row (source='tracking') is created
+# by the orchestrator (track_user_tour) for every generation, and is only
+# finalised if the app later sends a tour_status_update — which it frequently
+# does not (app killed, double tap, network drop). After this many seconds a
+# non-terminal tracking row whose linked orchestrator job is NOT live is swept
+# to 'failed' so it cannot show a phantom in-progress tour or block a
+# one-at-a-time check. 2 h by default, matching the ticket's threshold.
+ORCH_TRACKING_STALE_SECONDS = int(os.getenv('ORCH_TRACKING_STALE_SECONDS', str(2 * 60 * 60)))
+
 
 def _orch_jobs_store():
     """Return the orchestrator_jobs store singleton, or None if unavailable."""
@@ -876,7 +885,15 @@ def _set_tour_request_status(job_id, status):
     """[LOCAL-595B defect 2] Flip the orchestrator's tour_requests row (keyed on
     tour_id = job_id) to 'completed' or 'failed'. L2/Tester period caps count
     only 'completed' rows, so a 'failed'/'started' row never spends a daily or
-    monthly allowance. Best-effort; failure is logged, not raised."""
+    monthly allowance. Best-effort; failure is logged, not raised.
+
+    [LOCAL-846] The orchestrator ALSO creates an app-facing "tracking" row for
+    the same generation (track_user_tour → user-tracking PUT, source='tracking',
+    tour_id='tour_'+job_id[:8]). That row is only ever finalised if the app sends
+    a tour_status_update, which it frequently does not (app killed, double tap,
+    network drop) — so 27 tracking rows sat at 'started' for hours. When WE reach
+    a terminal state here, mirror it onto the linked tracking row in the SAME
+    transaction so the two rows can never diverge again."""
     try:
         import psycopg2 as _pg
         _conn = _pg.connect(
@@ -891,12 +908,33 @@ def _set_tour_request_status(job_id, status):
             UPDATE tour_requests SET status = %s, finished_at = NOW()
             WHERE tour_id = %s AND source = 'orchestrator'
         """, (status, job_id))
+        # [LOCAL-846] Mirror onto the linked tracking row. Only move a row that is
+        # still NON-terminal (status = 'started'), so an app that already reported
+        # its own terminal state is never overwritten and re-runs stay idempotent.
+        _tracking_tour_id = _tracking_tour_id_for(job_id)
+        _cur.execute("""
+            UPDATE tour_requests SET status = %s, finished_at = NOW()
+            WHERE tour_id = %s AND source = 'tracking'
+              AND status NOT IN ('completed', 'failed')
+        """, (status, _tracking_tour_id))
+        _mirrored = _cur.rowcount
         _conn.commit()
         _cur.close()
         _conn.close()
         print(f"[QUOTA] tour_requests[{job_id}] status -> {status}")
+        if _mirrored:
+            print(f"[LOCAL-846] mirrored status -> {status} onto tracking row "
+                  f"{_tracking_tour_id} ({_mirrored} row)")
     except Exception as _e:
         print(f"[QUOTA] WARNING: could not set tour_requests status={status} for {job_id}: {_e}")
+
+
+def _tracking_tour_id_for(job_id):
+    """[LOCAL-846] The app-facing tracking row's tour_id for an orchestrator
+    job_id. MUST match how the orchestrator registers it in the request path
+    (track_user_tour is called with tour_id = f"tour_{job_id[:8]}"). Centralised
+    so the writer, the mirror and the sweep all agree on the one linkage key."""
+    return f"tour_{str(job_id)[:8]}"
 
 
 def _generator_job_state(generator_job_id):
@@ -3351,6 +3389,133 @@ def _resume_one_job(job):
             pass
 
 
+def _sweep_stale_tracking_rows(stale_seconds=None, _connect=None):
+    """[LOCAL-846] Finalise app "tracking" tour_requests rows that the app never
+    closed. Three idempotent, DELETE-free rules, all keyed on the one linkage the
+    orchestrator already writes (tracking.tour_id = 'tour_'+job_id[:8]):
+
+      1. MIRROR — a tracking row still non-terminal whose linked orchestrator row
+         is already terminal ('completed'/'failed') inherits that status. This
+         catches rows written before the finalise-time mirror existed, and any
+         row whose mirror UPDATE lost its DB connection.
+      2. ORPHAN — a tracking row still 'started' for longer than stale_seconds
+         with NO terminal linked orchestrator row and no live in-flight job →
+         'failed', reason 'stale tracking row' recorded in request_string.
+      3. DUPLICATE — when several non-terminal tracking rows share one
+         (secret_id, tour_id) — the 830 double tap writing the row twice — only
+         the newest is kept 'started'; the older copies → 'failed', reason
+         'duplicate tracking row'.
+
+    Idempotent: every UPDATE is guarded on the row still being non-terminal, so a
+    second pass changes nothing. No DELETE: a superseded row is FAILED, never
+    removed. Best-effort; returns a dict of per-rule counts for tests/logging.
+    `_connect` lets tests inject a connection factory; production uses psycopg2.
+    """
+    if stale_seconds is None:
+        stale_seconds = ORCH_TRACKING_STALE_SECONDS
+    counts = {"mirrored": 0, "orphaned": 0, "duplicates": 0}
+
+    def _default_connect():
+        import psycopg2 as _pg
+        return _pg.connect(
+            host=os.getenv('DB_HOST', 'postgres-2'),
+            database=os.getenv('DB_NAME', 'audiotours'),
+            user=os.getenv('DB_USER', 'admin'),
+            password=os.getenv('DB_PASSWORD', 'password123'),
+            port=os.getenv('DB_PORT', '5432'),
+        )
+
+    connect = _connect or _default_connect
+    try:
+        _conn = connect()
+    except Exception as _e:
+        print(f"[LOCAL-846][sweep] tracking-row sweep skipped (no DB): {_e}")
+        return counts
+
+    try:
+        _cur = _conn.cursor()
+
+        # Rule 1 — MIRROR a terminal linked orchestrator row onto its tracking row.
+        # The linkage: orchestrator.tour_id (full job_id) ↔ tracking.tour_id
+        # ('tour_'+job_id[:8]). Join on the first 8 chars of the orchestrator id.
+        _cur.execute("""
+            UPDATE tour_requests AS t
+               SET status = o.status, finished_at = COALESCE(t.finished_at, NOW())
+              FROM tour_requests AS o
+             WHERE t.source = 'tracking'
+               AND t.status NOT IN ('completed', 'failed')
+               AND o.source = 'orchestrator'
+               AND o.status IN ('completed', 'failed')
+               AND t.tour_id = 'tour_' || LEFT(o.tour_id, 8)
+        """)
+        counts["mirrored"] = _cur.rowcount or 0
+
+        # Rule 3 — DUPLICATE: keep the newest non-terminal tracking row per
+        # (secret_id, tour_id); fail the older copies with a reason in
+        # request_string (append, never clobber the original request text).
+        _cur.execute("""
+            UPDATE tour_requests AS t
+               SET status = 'failed',
+                   finished_at = COALESCE(t.finished_at, NOW()),
+                   request_string = COALESCE(t.request_string, '')
+                       || ' [LOCAL-846: duplicate tracking row]'
+             WHERE t.source = 'tracking'
+               AND t.status NOT IN ('completed', 'failed')
+               AND EXISTS (
+                   SELECT 1 FROM tour_requests AS n
+                    WHERE n.source = 'tracking'
+                      AND n.secret_id IS NOT DISTINCT FROM t.secret_id
+                      AND n.tour_id IS NOT DISTINCT FROM t.tour_id
+                      AND n.id > t.id
+               )
+        """)
+        counts["duplicates"] = _cur.rowcount or 0
+
+        # Rule 2 — ORPHAN: a tracking row still 'started' past the age threshold
+        # with no terminal linked orchestrator row → 'failed, stale tracking row'.
+        # (Mirror in rule 1 already handled rows with a terminal partner, and the
+        # duplicate rule already failed superseded copies, so this leaves genuine
+        # orphans only. The age guard uses the DB clock.)
+        _cur.execute("""
+            UPDATE tour_requests AS t
+               SET status = 'failed',
+                   finished_at = COALESCE(t.finished_at, NOW()),
+                   request_string = COALESCE(t.request_string, '')
+                       || ' [LOCAL-846: stale tracking row]'
+             WHERE t.source = 'tracking'
+               AND t.status NOT IN ('completed', 'failed')
+               AND t.started_at < NOW() - (%s || ' seconds')::interval
+               AND NOT EXISTS (
+                   SELECT 1 FROM tour_requests AS o
+                    WHERE o.source = 'orchestrator'
+                      AND o.status IN ('completed', 'failed')
+                      AND t.tour_id = 'tour_' || LEFT(o.tour_id, 8)
+               )
+        """, (str(int(stale_seconds)),))
+        counts["orphaned"] = _cur.rowcount or 0
+
+        _conn.commit()
+        _cur.close()
+    except Exception as _e:
+        try:
+            _conn.rollback()
+        except Exception:
+            pass
+        print(f"[LOCAL-846][sweep] tracking-row sweep error: {_e}")
+    finally:
+        try:
+            _conn.close()
+        except Exception:
+            pass
+
+    total = sum(counts.values())
+    if total:
+        print(f"[LOCAL-846][sweep] tracking rows finalised: "
+              f"mirrored={counts['mirrored']} orphaned={counts['orphaned']} "
+              f"duplicates={counts['duplicates']}")
+    return counts
+
+
 def _sweep_resumable_jobs(min_idle_seconds):
     """[LOCAL-821] One pass: find resumable jobs and finish each. Returns the
     number of jobs attempted (for tests/logging)."""
@@ -3385,6 +3550,11 @@ def _resume_and_sweep_loop():
         _sweep_resumable_jobs(min_idle_seconds=0)
     except Exception as _e:
         print(f"[LOCAL-821] resume-on-boot error: {_e}")
+    # [LOCAL-846] Also finalise any app tracking rows the app never closed.
+    try:
+        _sweep_stale_tracking_rows()
+    except Exception as _e:
+        print(f"[LOCAL-846] resume-on-boot tracking sweep error: {_e}")
     while not _SHUTTING_DOWN:
         time.sleep(ORCH_SWEEP_INTERVAL_SECONDS)
         if _SHUTTING_DOWN:
@@ -3393,6 +3563,12 @@ def _resume_and_sweep_loop():
             _sweep_resumable_jobs(min_idle_seconds=ORCH_SWEEP_MIN_IDLE_SECONDS)
         except Exception as _e:
             print(f"[LOCAL-821] sweep error: {_e}")
+        # [LOCAL-846] Tracking-row sweep runs on the same cadence as the
+        # orchestrator-job sweep; its own 2 h age guard decides what is stale.
+        try:
+            _sweep_stale_tracking_rows()
+        except Exception as _e:
+            print(f"[LOCAL-846] sweep error: {_e}")
 
 
 def _start_resume_sweep_thread():
