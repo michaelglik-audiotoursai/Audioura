@@ -26,6 +26,63 @@ import time
 from typing import Dict, List, Optional, Tuple
 
 
+# ── LOCAL-848: cheap per-phase RSS guard shims ────────────────────────────────
+# Import-safe wrappers around mem_guard so a missing/broken mem_guard degrades to
+# a silent no-op and never disturbs timing or generation.
+def _mem_sample(phase: Optional[str] = None) -> None:
+    try:
+        import mem_guard
+        mem_guard.get_tracker().sample(phase)
+    except Exception:
+        pass
+
+
+def _mem_peak_for(phase: str) -> float:
+    try:
+        import mem_guard
+        return mem_guard.get_tracker().peak_for(phase)
+    except Exception:
+        return 0.0
+
+
+def _mem_peak_overall() -> float:
+    try:
+        import mem_guard
+        return mem_guard.get_tracker().peak_overall()
+    except Exception:
+        return 0.0
+
+
+def _mem_phase_peaks() -> List[Tuple[str, float]]:
+    try:
+        import mem_guard
+        return mem_guard.get_tracker().phases()
+    except Exception:
+        return []
+
+
+def _mem_snapshot(label: str) -> None:
+    try:
+        import mem_guard
+        mem_guard.maybe_snapshot(label)
+    except Exception:
+        pass
+
+
+def _mem_release() -> None:
+    """LOCAL-848: return freed memory to the OS at a phase boundary, unless
+    explicitly disabled (LOCAL848_RELEASE=0). Behaviour-neutral. No-op if
+    mem_guard is unavailable."""
+    import os
+    if os.environ.get("LOCAL848_RELEASE", "1") in ("0", "false", "False"):
+        return
+    try:
+        import mem_guard
+        mem_guard.release_memory()
+    except Exception:
+        pass
+
+
 class PhaseTimer:
     """Lightweight phase timer for generate_tour_text boundaries.
 
@@ -48,6 +105,10 @@ class PhaseTimer:
         self._current_start = time.time()
         # LOCAL-651: attribute subsequent [TIMING-SUB] steps to this phase.
         set_current_phase(phase_name)
+        # LOCAL-848: sample RSS at the phase entry so the phase peak includes
+        # whatever was already resident, then let event_passages/narration grow it.
+        _mem_sample(phase_name)
+        _mem_snapshot(f"start:{phase_name}")
 
     def end(self, phase_name: Optional[str] = None) -> float:
         """Mark the end of a phase. Returns elapsed seconds for the phase.
@@ -72,6 +133,23 @@ class PhaseTimer:
 
         print(f"[TIMING] phase={phase_name} elapsed={elapsed:.1f}s "
               f"cumulative={cumulative:.1f}s")
+
+        # LOCAL-848: sample RSS at the phase exit and emit the cheap per-phase
+        # guard line so Cloud Run logs show the memory trend across phases. The
+        # peak is the max of the entry sample, any mid-phase samples, and this
+        # exit sample.
+        _mem_sample(phase_name)
+        _mem_snapshot(f"end:{phase_name}")
+        try:
+            _peak = _mem_peak_for(phase_name)
+            print(f"[LOCAL-848] peak RSS {phase_name} {_peak:.1f} MiB", flush=True)
+        except Exception:
+            pass
+
+        # LOCAL-848: return the phase's transient allocations (JSON, SPARQL,
+        # Serper snippets, LLM buffers) to the OS now, so RSS does not ratchet
+        # monotonically up to the 512 MiB OOM. Behaviour-neutral.
+        _mem_release()
 
         self._current_phase = None
         self._current_start = 0.0
@@ -101,6 +179,20 @@ class PhaseTimer:
 
         line = f"[TIMING] TOTAL wall={wall:.1f}s phases: {phases_str}"
         print(line)
+
+        # LOCAL-848: emit the process-wide peak + the per-phase peak table so a
+        # single grep ([LOCAL-848] peak RSS) reconstructs the whole memory trend.
+        try:
+            _overall = _mem_peak_overall()
+            _rows = _mem_phase_peaks()
+            if _overall > 0.0:
+                peak_str = ', '.join(f"{name}={mib:.1f}" for name, mib in
+                                     sorted(_rows, key=lambda x: x[1], reverse=True))
+                print(f"[LOCAL-848] peak RSS process {_overall:.1f} MiB "
+                      f"phases(MiB): {peak_str}", flush=True)
+        except Exception:
+            pass
+
         return line
 
     def get_phase_elapsed(self, phase_name: str) -> float:

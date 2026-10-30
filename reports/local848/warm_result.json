@@ -1,0 +1,11 @@
+{
+  "marks": {
+    "import": 54.0,
+    "after_req1_fresh": 226.9,
+    "after_req2_warm": 226.8
+  },
+  "ratchet_mib": -0.0,
+  "under_cap": true,
+  "flat": true,
+  "pass": true
+}

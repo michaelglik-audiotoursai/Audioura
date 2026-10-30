@@ -1,0 +1,88 @@
+{
+  "cap": 0.6,
+  "results": [
+    {
+      "location": "Rijksmuseum, Amsterdam, Netherlands",
+      "tour_type": "museum",
+      "n_stops": 5,
+      "wall_s": 974.5,
+      "baseline_rss_mib": 89.6,
+      "peak_rss_process_mib": 462.9,
+      "peak_python_traced_mib": 67.8,
+      "phase_peaks_mib": {
+        "intent": 101.4,
+        "poi_selection": 153.7,
+        "fact_sheets": 195.1,
+        "narration": 205.9,
+        "external_lookups": 271.4,
+        "story_first": 371.7,
+        "packing": 430.5,
+        "verification": 462.9
+      },
+      "top_alloc_sites": [
+        {
+          "site": "<frozen importlib._bootstrap>:228",
+          "mib": 9.27,
+          "blocks": 51093
+        },
+        {
+          "site": "linecache.py:137",
+          "mib": 7.06,
+          "blocks": 60560
+        },
+        {
+          "site": "exhibition_checklist.py:958",
+          "mib": 3.8,
+          "blocks": 65
+        },
+        {
+          "site": "<frozen importlib._bootstrap_external>:647",
+          "mib": 2.54,
+          "blocks": 26872
+        },
+        {
+          "site": "sre_compile.py:804",
+          "mib": 1.78,
+          "blocks": 1328
+        },
+        {
+          "site": "exhibition_checklist.py:865",
+          "mib": 1.75,
+          "blocks": 20651
+        },
+        {
+          "site": "exhibition_checklist.py:868",
+          "mib": 1.1,
+          "blocks": 17645
+        },
+        {
+          "site": "exhibition_checklist.py:866",
+          "mib": 1.06,
+          "blocks": 17117
+        },
+        {
+          "site": "<frozen importlib._bootstrap_external>:1569",
+          "mib": 0.33,
+          "blocks": 4527
+        },
+        {
+          "site": "re.py:210",
+          "mib": 0.24,
+          "blocks": 3595
+        }
+      ],
+      "top_alloc_by_file": {
+        "<frozen importlib._bootstrap>": 9.46,
+        "exhibition_checklist.py": 7.76,
+        "linecache.py": 7.07,
+        "<frozen importlib._bootstrap_external>": 3.19,
+        "sre_compile.py": 1.79,
+        "md.py": 0.4,
+        "generate_tour_text.py": 0.38,
+        "re.py": 0.3,
+        "story_miner.py": 0.19,
+        "venue_resolver.py": 0.18
+      }
+    }
+  ]
+}

@@ -1194,6 +1194,29 @@ def generate_tour_async(job_id, location, tour_type, total_stops=10, user_id=Non
             _clear_cancel_err(job_id)
         except ImportError:
             pass
+    finally:
+        # [LOCAL-848] Return this request's transient allocations (SPARQL JSON,
+        # Serper snippets, per-work Wikipedia extracts, LLM response buffers) to
+        # the OS now that the tour text is built. The generator is a WARM,
+        # long-lived Cloud Run container: without this, each request leaves its
+        # freed-but-unreturned heap resident in glibc's arenas, so RSS ratchets
+        # up request after request until the 512 MiB OOM killer fires mid-tour
+        # (GCloud_Storied: "531 MiB used", gens 00023-9zz / 00016-62s). The
+        # release is behaviour-neutral — it frees nothing still referenced.
+        try:
+            import mem_guard
+            if os.environ.get("LOCAL848_RELEASE", "1") in ("0", "false", "False"):
+                print(f"[LOCAL-848] post-request release DISABLED "
+                      f"(LOCAL848_RELEASE=0, job={job_id})", flush=True)
+            else:
+                _rss_before = mem_guard.read_rss_mib()
+                mem_guard.release_memory()
+                _rss_after = mem_guard.read_rss_mib()
+                print(f"[LOCAL-848] post-request release: RSS {_rss_before:.1f} -> "
+                      f"{_rss_after:.1f} MiB (job={job_id})", flush=True)
+        except Exception as _rel_err:
+            print(f"[LOCAL-848] post-request release skipped (non-fatal): "
+                  f"{_rel_err}", flush=True)
 
 @app.route('/health', methods=['GET'])
 def health_check():

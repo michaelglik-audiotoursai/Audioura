@@ -32,5 +32,12 @@ RUN echo "${GIT_SHA}" > /app/.git_sha
 RUN python build_manifest.py /app /app/.build_manifest.json
 
 ENV STORIED_MODE=true
+# [LOCAL-848] Cap glibc malloc arenas. The story_first phase runs stops in a
+# thread pool; glibc creates up to 8×CPU per-thread arenas, each retaining freed
+# blocks, so RSS balloons and never returns — a major contributor to the 512 MiB
+# Cloud Run OOM on museum tours. Capping arenas to 2 trades a little allocator
+# contention for a much flatter, lower RSS. Paired with the per-phase /
+# per-request gc.collect()+malloc_trim(0) in mem_guard (behaviour-neutral).
+ENV MALLOC_ARENA_MAX=2
 EXPOSE 5000
 CMD ["python", "generate_tour_text_service.py"]
