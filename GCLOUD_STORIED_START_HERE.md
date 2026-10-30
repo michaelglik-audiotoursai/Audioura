@@ -13,6 +13,11 @@ has lapsed twice and Michael has had to ask twice.
 
 ---
 
+# ▶️ WAVE 11 — 2026-10-30 07:25 EDT (wdvrdaz9xz) — CURRENT
+- generator **00017-869** = `4a954c70`, cheap arm ON for museum,walking,restaurant,facility,specialized (Michael typed "All five" 06:4x) [00016-62s museum-only]. orchestrator **00010-v5c** = 4a954c70, ORCH_RESUME_ENABLED=true [00009-7ht; 00007-4zv pre-resume]. Wave 10 skipped (superseded).
+- Proofs 504 kite 5/5 ($0.94, Gemini still $0.70 on places path), 505 Rijks 5/5, 506 Hanoi 5/5 ($0.14); hidden. audio_tours 398.
+- Open: orchestrator_jobs 03ec8b1a loops 'processing' after generator job died (wave 9); Michael's phone sends each request twice (LOCAL-830 app fix pending); 503 coffee tour not downloaded by app (MP3+text given to Michael).
+
 # ▶️ WAVE 8 — 2026-10-30 02:25 EDT (wdvrdaz9xq): orchestrator ROLLED BACK
 - orchestrator traffic **100% on 00007-4zv** (caa87604). 00008-7c2 (50893631, ORCH_RESUME_ENABLED=true) is at 0%: its sweep re-ran a live job and **stored Van Gogh twice** (500/501, hidden). Migrations **061 + 062** applied (orchestrator_jobs, audio_tour_versions.zip_bytes). Backup 1793339771879.
 - 279/294 were resumed and stored once (498 Met, 499 Rijks, both hidden; 499 pin in Utrecht). Catalog 481 unchanged by md5. audio_tours 393. Generator still 00016-62s (cheap museum ON).
