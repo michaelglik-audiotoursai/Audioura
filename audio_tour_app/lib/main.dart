@@ -10,6 +10,8 @@ import 'screens/onboarding_screen.dart';
 import 'screens/informational_notice_screen.dart';
 import 'services/app_sync_coordinator.dart';
 import 'services/community_background.dart';
+import 'services/pending_tour_resume_handler.dart';
+import 'services/tour_ready_message.dart';
 import 'services/community_notifications.dart';
 import 'services/community_tours_sync.dart';
 import 'services/foreground_community_messages.dart';
@@ -142,6 +144,18 @@ void main() async {
     if (!shown) {
       unawaited(CommunityNotifications.postTourUpdated(message));
     }
+  };
+  // [LOCAL-841] Wire the resume handler's "your tour is ready" surface. When a
+  // suspended-then-resumed generation's download completes, show it in-app
+  // (SnackBar + "View" → Listen) if the app is foreground, else post the quiet
+  // system notification. The tour is already saved by the time this runs, so
+  // "View" just jumps to Listen (newest highlighted). Set before start() so the
+  // very first resume pass can surface a message.
+  PendingTourResumeHandler.instance.readyRouter = (req) {
+    routeTourReadyMessage(
+      req,
+      onView: () => PendingListenOpen.instance.offer(null, null, true),
+    );
   };
   unawaited(AppSyncCoordinator.instance.start());
 
