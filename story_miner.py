@@ -2616,6 +2616,22 @@ CANONICAL_ALIASES: Dict[str, str] = {}
 # Roman numerals that should NEVER be dropped during matching
 _ROMAN_NUMERALS = {'i', 'ii', 'iii', 'iv', 'v', 'vi', 'vii', 'viii', 'ix', 'x'}
 
+# [LOCAL-826B] Medium/material/format/period words. A canonical that is a bare
+# title plus ONLY these (the LOCAL-34 bare-title enrichment: "Olympia" →
+# "Olympia (toile)") is the SAME work, not a more-specific one — so these never
+# count as a distinguishing subject in the specificity gate, and the alias-follow
+# may step from a bare resolved title to its own enriched label. A bare year is
+# treated as a descriptor too (handled with w.isdigit() at the call sites).
+_DESCRIPTOR_WORDS = {
+    # media / materials (fr + en)
+    'toile', 'huile', 'peinture', 'sculpture', 'bronze', 'marbre',
+    'bois', 'panneau', 'cuivre', 'ivoire', 'cuir', 'dore', 'doree',
+    'pastel', 'aquarelle', 'gouache', 'fusain', 'crayon', 'gravure',
+    'estampe', 'dessin', 'photographie', 'tirage', 'plaster', 'platre',
+    'oil', 'canvas', 'panel', 'paper', 'marble', 'wood',
+    'leather', 'gilded', 'painted', 'drawing', 'print', 'photograph',
+}
+
 
 def _alias_target_present_in_set(resolved_title: str,
                                  canon_norm_map: Dict[str, str]) -> Optional[str]:
@@ -2635,6 +2651,30 @@ def _alias_target_present_in_set(resolved_title: str,
     # The resolved target itself, under its own normalized form.
     if _resolved_norm in canon_norm_map:
         return canon_norm_map[_resolved_norm]
+    # [LOCAL-826B] The LOCAL-34 bare-title enrichment stores a bare famous title
+    # under a descriptor-qualified form ("Olympia" → "Olympia (toile)", "L'Angélus"
+    # → "L'Angélus (peinture)"), so the alias target ("Olympia") is absent from the
+    # set while its own enriched label IS present. On the cached path that enriched
+    # label is the only surviving form of the work, and a sibling ("Une moderne
+    # Olympia") then blocks the fuzzy specificity gate — so the famous bare title
+    # DROPS. Follow the resolved title to a canonical that is EXACTLY it plus one
+    # or more DESCRIPTOR words (medium/material/format/period), never an extra
+    # SUBJECT word (that would be a different work, e.g. "Une moderne Olympia").
+    _resolved_tokens = _resolved_norm.split()
+    if _resolved_tokens:
+        _enriched = []
+        for _cnorm, _disp in canon_norm_map.items():
+            _ctoks = _cnorm.split()
+            if len(_ctoks) <= len(_resolved_tokens):
+                continue
+            if _ctoks[:len(_resolved_tokens)] != _resolved_tokens:
+                continue  # must START with the full resolved title
+            _extra = _ctoks[len(_resolved_tokens):]
+            if all(_w in _DESCRIPTOR_WORDS or _w.isdigit() for _w in _extra):
+                _enriched.append(_cnorm)
+        if _enriched:
+            _best_e = sorted(_enriched, key=lambda k: (len(k), k))[0]
+            return canon_norm_map[_best_e]
     _candidates = []
     for _variant_norm, _target in CANONICAL_ALIASES.items():
         if _normalize(_target) != _resolved_norm:
@@ -2866,17 +2906,8 @@ def match_candidate_to_canonical(
             # canonical then carries "toile". Treating that as a distinguishing
             # subject would DROP the famous bare title against its own enriched
             # form. So descriptor words are excluded from the "extra distinctive"
-            # test; only a real subject word differentiates.
-            _DESCRIPTOR_WORDS = {
-                # media / materials (fr + en)
-                'toile', 'huile', 'peinture', 'sculpture', 'bronze', 'marbre',
-                'bois', 'panneau', 'cuivre', 'ivoire', 'cuir', 'dore', 'doree',
-                'pastel', 'aquarelle', 'gouache', 'fusain', 'crayon', 'gravure',
-                'estampe', 'dessin', 'photographie', 'tirage', 'plaster', 'platre',
-                'oil', 'canvas', 'panel', 'paper', 'bronze', 'marble', 'wood',
-                'leather', 'gilded', 'painted', 'drawing', 'print', 'photograph',
-            }
-
+            # test; only a real subject word differentiates. The set is module-
+            # level (_DESCRIPTOR_WORDS) so the alias-follow and this gate agree.
             def _is_descriptor(_w: str) -> bool:
                 # Medium/material word, or a bare year (e.g. "1863").
                 return _w in _DESCRIPTOR_WORDS or _w.isdigit()

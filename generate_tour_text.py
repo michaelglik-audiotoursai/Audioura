@@ -30667,6 +30667,51 @@ RULES:
         except Exception as _hg_err:
             print(f"  [LOCAL-632] stop-header integrity guard skipped (non-fatal): {_hg_err}")
 
+    # [LOCAL-826B] Final stop-delivery integrity check. Every "Stop N:" header
+    # must be UNIQUE, the numbers SEQUENTIAL (1..k), and every stop must carry a
+    # narration body. The Rijksmuseum 866 defect shipped two "Stop 4:" headers
+    # (one a truncated title with no body) and dropped a real narrated stop; the
+    # stop-editor/de-splice cause is fixed at source (stop_dedup_collision_guard
+    # now PROMOTES a unique lost-header stop instead of dropping it), but this is
+    # the defense-in-depth guarantee that a corrupt structure never ships
+    # silently. If any violation remains, run the LOCAL-801 dedupe/renumber guard
+    # once more (it drops duplicate/empty artifacts and renumbers 1..k), then log
+    # whatever still remains so it is visible in the generator log and tests.
+    if tour_category == 'museum' and complete_tour:
+        try:
+            from tour_conclusion import check_stop_delivery as _chk_delivery
+            _deliv_viol = _chk_delivery(complete_tour)
+            if _deliv_viol:
+                print(f"  [LOCAL-826B] stop-delivery check: "
+                      f"{len(_deliv_viol)} violation(s) before repair:")
+                for _v in _deliv_viol:
+                    print(f"    {_v}")
+                try:
+                    from stop_dedup_collision_guard import (
+                        dedupe_and_fix_stop_count as _dedup826)
+                    complete_tour, _r826 = _dedup826(
+                        complete_tour, requested_stops=None,
+                        dedupe_real_stops=True)
+                    print(f"  [LOCAL-826B] re-ran LOCAL-801 dedupe/renumber: "
+                          f"{_r826}")
+                except Exception as _rg_err:
+                    print(f"  [LOCAL-826B] dedupe repair skipped (non-fatal): "
+                          f"{_rg_err}")
+                _deliv_viol2 = _chk_delivery(complete_tour)
+                if _deliv_viol2:
+                    for _v in _deliv_viol2:
+                        print(f"  [LOCAL-826B] UNRESOLVED stop-delivery defect: {_v}")
+                else:
+                    print("  [LOCAL-826B] stop-delivery check: clean after repair")
+                if output_file:
+                    try:
+                        with open(output_file, "w", encoding="utf-8") as _df:
+                            _df.write(complete_tour)
+                    except Exception as _dw_err:
+                        print(f"  [LOCAL-826B] delivery rewrite skipped: {_dw_err}")
+        except Exception as _dc_err:
+            print(f"  [LOCAL-826B] stop-delivery check skipped (non-fatal): {_dc_err}")
+
     # [LOCAL-445-B] Final timing summary
     _phase_timer.start('verification')  # End packing, start verification marker
     _phase_timer.end('verification')  # Immediately end (verification is interspersed above)

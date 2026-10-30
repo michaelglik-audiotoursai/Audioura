@@ -425,6 +425,94 @@ def count_delivered_stops(tour_text: str) -> int:
     return len(_STOP_HEADER.findall(normalise_stop_headers(tour_text or "")))
 
 
+# ─── [LOCAL-826B] Stop-delivery integrity check ───────────────────────────────
+#
+# The Rijksmuseum 866 corruption shipped a tour with TWO "Stop 4:" headers (one a
+# truncated title with NO body, "…(Een schutter"), the Great Wave re-numbered
+# Stop 4 instead of Stop 5, and one real narrated stop silently dropped. The
+# stop-editor/de-splice interaction that caused it is fixed at source, but a
+# delivered tour must also be PROVABLY well-formed regardless of which upstream
+# pass ran. This check reads the final text and returns every structural defect:
+#   * DUPLICATE_NUMBER   — the same "Stop N" header number appears twice.
+#   * NON_SEQUENTIAL      — the header numbers are not 1, 2, 3, … k in order.
+#   * EMPTY_BODY          — a stop has a header but no narration body (only its
+#                           field lines, or nothing, before the next header).
+# Returns a list of short strings (empty when the tour is well-formed). Pure,
+# offline, idempotent; keys only on the "Stop N:" header and the house field
+# labels, so a title with any punctuation is carried through untouched.
+
+# A line that is only tour STRUCTURE, never a narration body.
+_DELIVERY_FIELD_LINE = re.compile(
+    r'(?i)^[ \t]*(?:Address|Coordinates|Orientation|Directions|Type/Specialty|'
+    r'Specific Examples|Operational Details|Museum Information):')
+
+
+def check_stop_delivery(tour_text: str) -> List[str]:
+    """Return structural stop-delivery violations in a finished tour (see above).
+
+    A stop "has a body" when, between its header and the next header (or the
+    Sources/conclusion region), there is at least one non-empty line that is NOT
+    a bare house field label and NOT the header itself — i.e. real narration, or
+    a narration-bearing Orientation value. A stop with only Address/Coordinates/
+    Directions and no prose is an empty, un-narrated shell.
+    """
+    violations: List[str] = []
+    if not tour_text:
+        return violations
+    text = normalise_stop_headers(tour_text)
+
+    end_body = len(text)
+    _src = re.search(r'(?ms)^\s*Sources:\s.*\Z', text)
+    if _src:
+        end_body = _src.start()
+
+    headers = [h for h in _STOP_HEADER.finditer(text) if h.start() < end_body]
+    if not headers:
+        return violations
+
+    nums = [int(h.group(1)) for h in headers]
+
+    # (1) Duplicate header numbers.
+    _seen = set()
+    for n in nums:
+        if n in _seen:
+            violations.append(f"DUPLICATE_NUMBER: Stop {n} appears more than once")
+        _seen.add(n)
+
+    # (2) Non-sequential numbering (must be exactly 1..k in order).
+    _expected = list(range(1, len(nums) + 1))
+    if nums != _expected:
+        violations.append(
+            f"NON_SEQUENTIAL: stop numbers {nums} are not {_expected}")
+
+    # (3) Every stop must have a narration body.
+    for i, h in enumerate(headers):
+        start = h.end()
+        end = headers[i + 1].start() if i + 1 < len(headers) else end_body
+        block = text[start:end]
+        has_body = False
+        for ln in block.splitlines():
+            s = ln.strip()
+            if not s:
+                continue
+            m = re.match(r'(?i)^(?:Orientation|Type/Specialty|Specific Examples|'
+                         r'Operational Details|Museum Information):\s*(.*)$', s)
+            if m:
+                if m.group(1).strip():   # narration lives in the field value
+                    has_body = True
+                    break
+                continue
+            if _DELIVERY_FIELD_LINE.match(s):   # Address/Coordinates/Directions
+                continue
+            has_body = True   # bare narration paragraph
+            break
+        if not has_body:
+            violations.append(
+                f"EMPTY_BODY: Stop {h.group(1)} '{h.group(2).strip()[:40]}' "
+                f"has no narration body")
+    return violations
+
+
 # [LOCAL-743] Field labels that are STRUCTURE, never speech. If any of these
 # appears inside a stop's spoken narration (e.g. a next stop's "Type/Specialty:"
 # / "Specific Examples:" / "Coordinates:" block glued onto the previous stop's

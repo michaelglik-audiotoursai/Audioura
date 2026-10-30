@@ -3035,15 +3035,31 @@ from datetime import datetime, timedelta
 
 VENUE_CACHE_TTL_DAYS = int(os.environ.get('VENUE_CACHE_TTL_DAYS', '30'))
 VENUE_CACHE_NEGATIVE_TTL_DAYS = int(os.environ.get('VENUE_CACHE_NEGATIVE_TTL_DAYS', '5'))
-CORPUS_VERSION = 7  # LOCAL-593: the page-ranker excludes policy/admin pages
-                    # (#2), the Wikipedia city-match guard no longer rejects the
-                    # correctly-resolved venue's own article (#2), and SPARQL works
-                    # carry a sitelinks prominence count (#4). Rows written by any
-                    # pre-LOCAL-593 miner (admin-page corpus, Wikipedia wrongly
-                    # dropped, sitelink-less works) must be a cache MISS — bumping
-                    # to 7 ignores them without a DELETE (the LOCAL-583 mechanism).
-                    # Fresh rows are written at v7 with the admin pages excluded,
-                    # the venue Wikipedia article included, and sitelinks present.
+CORPUS_VERSION = 8  # LOCAL-826B: a venue_corpus row written before the museum
+                    # canon fix (LOCAL-826, 112480f3) carries a STALE snapshot of
+                    # canonical_titles_json + sparql_works_json whose work set is
+                    # missing the venue's famous works — e.g. the Musée d'Orsay
+                    # (Q23402) v7 row (2026-10-08) holds 211 titles / 102 works with
+                    # NO L'Origine du monde / Olympia / La Nuit étoilée / La
+                    # Naissance de Vénus, so the cache-HIT path matches against a set
+                    # that never contained them: the famous four DROP and
+                    # "L'Église d'Auvers-sur-Oise" wrong-accepts "Chaumes de
+                    # Cordeville à Auvers-sur-Oise" (reproduced in repro_local826b.py
+                    # from the real cached rows). The 826 alias-follow + distinctive-
+                    # subject gates only work when the matchable set contains the
+                    # works; rebuilding aliases from the stale sparql_works_json
+                    # cannot re-admit works that snapshot never held. Bumping to 8
+                    # makes every pre-826 row a cache MISS (cache_get filters on
+                    # corpus_version), forcing a fresh rebuild that re-fetches works
+                    # via fetch_venue_works — now served from the refreshed
+                    # venue_works_cache (Q23402/fr: 300 works, the famous four
+                    # present) — so build_canonical_titles_from_works re-admits them
+                    # and the 826 matcher verifies all four AND keeps Église ≠
+                    # Chaumes. No DELETE (the LOCAL-583/593 mechanism).
+                    #
+                    # LOCAL-593 (still in force): the page-ranker excludes policy/
+                    # admin pages, the Wikipedia city-match guard keeps the resolved
+                    # venue's own article, and SPARQL works carry a sitelinks count.
 
 
 # TODO(S94): remove in-code password fallback; prod must use DATABASE_URL/DB_PASSWORD env only
