@@ -20,7 +20,8 @@ PG_NAME="${PROJECT}-postgres"
 TG_NAME="${PROJECT}-tg"
 ENV_FILE="/Users/micha/Audioura/.env"
 METER_DIR="/Users/micha/Audioura/meterlogs"   # host dir meter_report.py sweeps
-mkdir -p "${METER_DIR}"
+BUDGET_DIR="${HOME}/.audioura_task_budgets"    # [LOCAL-827] host whole-task ledger
+mkdir -p "${METER_DIR}" "${BUDGET_DIR}"
 
 cleanup () {
   docker rm -f "${TG_NAME}" "${PG_NAME}" >/dev/null 2>&1 || true
@@ -66,19 +67,25 @@ args+=(
   -e SERPER_RESEARCH_MODEL=gpt-4.1-mini
   -e RESEARCH_BACKEND=serper
   -e SERP_PROVIDER=serper
-  -e TASK_BUDGET_ID=LOCAL-828
-  -e TASK_BUDGET_USD=0.80
-  -e TEST_GEMINI_MAX_USD=0.80
-  -e COST_HARD_LIMIT_USD=0.80
+  -e TASK_BUDGET_ID=LOCAL-828B
+  -e TASK_BUDGET_USD=0.60
+  -e TEST_GEMINI_MAX_USD=0.60
+  -e COST_HARD_LIMIT_USD=0.60
+  -e LOCAL828_CAPTURE=/app/fixtures/local828b_research_capture.jsonl
 )
-# [LOCAL-820] THE METER CONTRACT — canonical args (keep in sync with
+# [LOCAL-820/827] THE METER CONTRACT — canonical args (keep in sync with
 # meter_container_env.docker_meter_args). The guard test asserts these are present.
+# LOCAL-827 adds the whole-task ledger mount (~/.audioura_task_budgets ->
+# /task_budgets) + AUDIOURA_TASK_BUDGET_DIR so the $0.60 cap accumulates ACROSS the
+# two tour containers, not per-run.
 args+=(
   -e PYTHONPATH=/opt/meter
   -e PAID_API_LOG=/meterlogs/paid_api_calls.jsonl
-  -e METER_SERVICE=LOCAL-828
+  -e METER_SERVICE=LOCAL-828B
+  -e AUDIOURA_TASK_BUDGET_DIR=/task_budgets
   -v "${HERE}/_meter:/opt/meter:ro"
   -v "${METER_DIR}:/meterlogs"
+  -v "${BUDGET_DIR}:/task_budgets"
 )
 [ -n "${METER_KEY_SUFFIX:-}" ] && args+=(-e "METER_KEY_SUFFIX=${METER_KEY_SUFFIX}")
 
@@ -86,7 +93,7 @@ args+=(-v "${HERE}:/app" -w /app)
 args+=(audioura-tour-generator:latest python -u run_local828_container.py)
 [ -n "${1:-}" ] && args+=("$1")
 
-echo "[local828] ===== running LOCAL-828 live, cap \$0.80, metered to ${METER_DIR} ====="
+echo "[local828] ===== running LOCAL-828B live, cap \$0.60, metered to ${METER_DIR} ====="
 "${args[@]}"
 RC=${PIPESTATUS[0]}
 

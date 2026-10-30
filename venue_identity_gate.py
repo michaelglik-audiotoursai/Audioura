@@ -448,6 +448,19 @@ _FRAGMENT_LEAD_WORDS = {
     "its", "his", "her", "their", "which", "where", "while", "when",
 }
 
+# Words that must NEVER appear ANYWHERE inside a detected venue name: they mark the
+# detector having swept a verb/clause fragment into the "name" (the live
+# "Kennedy's donation changed the museum" false drop). A real venue name is a noun
+# phrase — it has none of these verbs/connectives in the middle.
+_FRAGMENT_INTERIOR_WORDS = {
+    "is", "are", "was", "were", "been", "being", "be", "has", "have", "had",
+    "displayed", "held", "housed", "located", "shown", "exhibited", "changed",
+    "donation", "donated", "bequeathed", "acquired", "gave", "gifted", "added",
+    "became", "opened", "moved", "part", "now", "which", "where", "while", "when",
+    "that", "this", "these", "those", "its", "his", "her", "their", "surviving",
+    "collection", "holdings",
+}
+
 # Bare institution head words — a detected "name" that is ONLY these is not a venue.
 _BARE_HEAD_WORDS = {
     "museum", "museums", "gallery", "galleries", "collection", "collections",
@@ -455,39 +468,65 @@ _BARE_HEAD_WORDS = {
     "art institute", "the art institute",
 }
 
+# Geographic / institution anchor tokens that make a "<Proper> museum/gallery"
+# a real venue name rather than a person-possessive fragment. A detected name that
+# ends in a bare head word is accepted only when SOME word before the head is a
+# plausible place/institution proper noun (not merely a person's possessive).
+_INSTITUTION_HEAD_TOKENS = {
+    "museum", "museums", "gallery", "galleries", "institute", "collection",
+    "foundation", "pinacoteca", "kunstmuseum", "rijksmuseum", "academy",
+}
+
 
 def _looks_like_proper_venue_name(name: str) -> bool:
     """True when ``name`` reads as a venue's OWN proper name (precision guard).
 
-    Rejects ragged fragments the LOCAL-668 detector can return: a name that leads
-    with a lowercase word, a verb/preposition lead-in, or is just a bare
-    institution head word. A real venue name leads with a Capitalised proper noun
-    ("Louvre Abu Dhabi", "Art Institute of Chicago", "Albertina Museum")."""
+    Rejects the ragged fragments the LOCAL-668 detector can return: a name that
+    leads with a lowercase/verb word, carries a possessive ("Kennedy's …"), has a
+    verb/clause word anywhere inside ("… donation changed the museum"), or is a
+    bare head word. A real venue name is a short, clean noun phrase led by a
+    Capitalised proper noun ("Louvre Abu Dhabi", "Art Institute of Chicago",
+    "Albertina Museum", "the Met Cloisters")."""
     raw = (name or "").strip()
     if not raw:
         return False
     words = raw.split()
     if not words:
         return False
+    # A venue name is short; a long run is a swept-in clause.
+    if len(words) > 6:
+        return False
+    # No possessive — a venue is not named "X's …".
+    if "'s" in _fold(raw) or "\u2019s" in raw.lower():
+        return False
     first = words[0]
-    # Leading word must be a proper noun (Capitalised, or a known lone institution
-    # like "louvre"/"rijksmuseum" that the detector lowercased) — not a lowercase
-    # mid-sentence word and not a fragment lead-in word.
     if first.lower() in _FRAGMENT_LEAD_WORDS:
         return False
-    # Allow the detector's curated lone institutions (returned lowercased).
     _LONE = {"louvre", "rijksmuseum", "hermitage", "uffizi", "prado", "guggenheim",
              "tate", "getty", "smithsonian", "pompidou", "orsay", "moma",
              "albertina", "belvedere"}
     if first[0].islower() and first.lower() not in _LONE:
         return False
-    # Reject a bare head word with no proper-noun content.
     if _fold(raw) in _BARE_HEAD_WORDS:
         return False
-    if not venue_content_tokens(raw):
+    # No verb/clause word anywhere inside — those mark a fragment, not a name.
+    fwords = {_fold(w).strip(".,;:'\u2019") for w in words}
+    if fwords & _FRAGMENT_INTERIOR_WORDS:
+        return False
+    toks = venue_content_tokens(raw)
+    if not toks:
         # No distinctive token at all (e.g. "Art Museum") — cannot be judged a
         # specific OTHER venue.
         return False
+    # If the name ends in a bare institution head word, require a distinctive
+    # proper token OTHER than the head itself (a place/institution name), so a
+    # bare "<person> museum" swept fragment is rejected. The curated/famous path
+    # handles the real named venues; this is the open-ended detector's backstop.
+    last = _fold(words[-1]).strip(".,;:")
+    if last in _INSTITUTION_HEAD_TOKENS:
+        non_head = {t for t in toks if t not in _INSTITUTION_HEAD_TOKENS}
+        if not non_head:
+            return False
     return True
 
 

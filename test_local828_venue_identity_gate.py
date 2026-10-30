@@ -22,6 +22,7 @@ All offline, deterministic, no network/LLM/DB.
 
 Run: python3 -m pytest test_local828_venue_identity_gate.py -q
 """
+import re
 import unittest
 
 import venue_identity_gate as vig
@@ -336,3 +337,148 @@ class Degenerate(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
+
+
+# ─── 9. PRECISION on REAL research fixtures (LOCAL-828B) ──────────────────────
+#
+# The 828B bounce requires a precision test on REAL research. During the two live
+# tours (./run_local828_live.sh, cheap museum arm, LOCAL828_CAPTURE on) the gate
+# appended every passage it evaluated — text + source URL + its decision — to
+# fixtures/local828b_research_fixtures.jsonl. Here we REPLAY those real passages
+# through the gate and assert the precision properties the LEAD demanded:
+#
+#   * ZERO own-venue passages dropped,
+#   * ZERO work-history passages dropped for a city mention (a work made in /
+#     depicting / now hung in another place),
+#   * the Catharijneconvent paragraph (and the other real other-venue passages in
+#     fixtures/local828b_other_venue_fixtures.jsonl) ARE dropped,
+#   * and we report the drop count per tour, before and after.
+#
+# Offline: the fixtures are static JSONL; no network/LLM/DB.
+
+import json
+import os
+
+_FIX_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "fixtures")
+_REAL_FIX = os.path.join(_FIX_DIR, "local828b_research_fixtures.jsonl")
+_OTHER_FIX = os.path.join(_FIX_DIR, "local828b_other_venue_fixtures.jsonl")
+
+# Identities as the LIVE run bound them — deliberately THIN (the live resolver gave
+# the Met a bare request name, no aliases, domain '-'): the gate must self-enrich.
+_FIX_IDENTITIES = {
+    "Rijksmuseum": vig.build_identity(
+        venue_name="Rijksmuseum", official_url="https://www.rijksmuseum.nl",
+        city="Amsterdam"),
+    "The Met Fifth Avenue": vig.build_identity(
+        venue_name="The Met Fifth Avenue", city="New York"),
+    "Louvre": vig.build_identity(venue_name="Louvre", city="Paris"),
+    "Belvedere": vig.build_identity(venue_name="Belvedere", city="Vienna"),
+}
+
+# A city cue ("in <City>", "completed in Germany") — the signal 828(A) wrongly
+# dropped on. Used to label the work-history subset.
+_CITY_CUE_RE = re.compile(r"\bin\s+[A-Z][A-Za-z\u00c0-\u00ff]+")
+
+
+def _load_jsonl(path):
+    rows = []
+    if not os.path.exists(path):
+        return rows
+    with open(path, "r", encoding="utf-8") as fh:
+        for line in fh:
+            line = line.strip()
+            if line:
+                rows.append(json.loads(line))
+    return rows
+
+
+class RealResearchPrecision(unittest.TestCase):
+    def setUp(self):
+        self.real = _load_jsonl(_REAL_FIX)
+        self.other = _load_jsonl(_OTHER_FIX)
+
+    def test_fixtures_present_and_cover_both_tours(self):
+        self.assertTrue(self.real, "real research fixtures missing — run "
+                        "./run_local828_live.sh with LOCAL828_CAPTURE set")
+        venues = {r["venue"] for r in self.real}
+        self.assertIn("Rijksmuseum", venues)
+        self.assertIn("The Met Fifth Avenue", venues)
+
+    def test_zero_own_venue_or_work_history_drops(self):
+        """Replaying EVERY real captured passage, the gate drops NONE of them: the
+        live research for each tour was about THAT venue / its works, so a correct
+        precision-first gate removes nothing. This is the direct refutation of the
+        828(A) over-drops (own-domain pages, the venue's own works, and
+        work-history city mentions)."""
+        bad = []
+        for r in self.real:
+            ident = _FIX_IDENTITIES[r["venue"]]
+            is_other, reason, detail = vig.passage_is_other_venue(
+                r["text"], ident, url=r.get("url", ""))
+            if is_other:
+                bad.append((r["venue"], reason, detail, r["text"][:90]))
+        self.assertEqual(bad, [], f"own-venue/work-history passages wrongly "
+                         f"dropped: {bad}")
+
+    def test_work_history_city_mentions_are_kept(self):
+        """Explicitly pin the work-history-with-a-city subset (a work made in /
+        hung in another place): every one is KEPT. There must be at least one such
+        passage in the real capture, or the test is vacuous."""
+        wh = [r for r in self.real
+              if _CITY_CUE_RE.search(r["text"]) and not r["text"].lstrip().startswith("{")]
+        self.assertTrue(wh, "no work-history city-cue passage captured — fixture "
+                        "does not exercise the 828(A) city over-drop")
+        for r in wh:
+            ident = _FIX_IDENTITIES[r["venue"]]
+            is_other, reason, _ = vig.passage_is_other_venue(
+                r["text"], ident, url=r.get("url", ""))
+            self.assertFalse(is_other, f"work-history city mention wrongly dropped "
+                             f"({reason}): {r['text'][:100]}")
+
+    def test_catharijneconvent_and_real_other_venues_dropped(self):
+        """The real other-venue passages (the exact Catharijneconvent bleed +
+        curated siblings) ARE dropped, each by SUBJECT (never by a bare city)."""
+        self.assertTrue(self.other, "other-venue fixtures missing")
+        cath_seen = False
+        for r in self.other:
+            ident = _FIX_IDENTITIES[r["venue"]]
+            is_other, reason, detail = vig.passage_is_other_venue(
+                r["text"], ident, url=r.get("url", ""))
+            self.assertTrue(is_other, f"real other-venue passage NOT dropped: "
+                            f"{r['text'][:90]}")
+            self.assertIn(reason, ("subject", "domain"))
+            if "catharijneconvent" in r["text"].lower():
+                cath_seen = True
+                self.assertEqual(reason, "subject")
+        self.assertTrue(cath_seen, "the Catharijneconvent fixture must be present")
+
+    def test_report_drop_counts_before_and_after(self):
+        """Report (and sanity-check) the per-tour drop count. 'Before' = the 828(A)
+        over-dropping behaviour as recorded in the submission logs; 'after' = this
+        precision-first gate replayed on the same real passages = 0 own-venue drops.
+        Printed for the submission; asserted only that AFTER is 0 for real research
+        and that the other-venue fixtures all drop."""
+        per_tour = {}
+        for r in self.real:
+            ident = _FIX_IDENTITIES[r["venue"]]
+            is_other, _, _ = vig.passage_is_other_venue(
+                r["text"], ident, url=r.get("url", ""))
+            slot = per_tour.setdefault(r["venue"], {"evaluated": 0, "dropped": 0})
+            slot["evaluated"] += 1
+            if is_other:
+                slot["dropped"] += 1
+        other_drops = 0
+        for r in self.other:
+            ident = _FIX_IDENTITIES[r["venue"]]
+            is_other, _, _ = vig.passage_is_other_venue(
+                r["text"], ident, url=r.get("url", ""))
+            if is_other:
+                other_drops += 1
+        print("\n[LOCAL-828B precision] real-research drop counts (after):")
+        for v, s in sorted(per_tour.items()):
+            print(f"    {v}: evaluated={s['evaluated']} dropped={s['dropped']}")
+        print(f"    other-venue fixtures dropped: {other_drops}/{len(self.other)}")
+        for v, s in per_tour.items():
+            self.assertEqual(s["dropped"], 0,
+                             f"{v} dropped {s['dropped']} own/work-history passages")
+        self.assertEqual(other_drops, len(self.other))

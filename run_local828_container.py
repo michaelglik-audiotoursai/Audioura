@@ -37,7 +37,7 @@ import time
 sys.path.insert(0, os.path.join(
     os.path.dirname(os.path.abspath(__file__)), "tests"))
 
-HARD_CAP_USD = float(os.environ.get("TASK_BUDGET_USD", "0.80") or "0.80")
+HARD_CAP_USD = float(os.environ.get("TASK_BUDGET_USD", "0.60") or "0.60")
 METER_LOG = os.environ.get("PAID_API_LOG", "/meterlogs/paid_api_calls.jsonl")
 
 # Cheap museum arm — the ticket's exact env (defaults so an in-process run matches
@@ -62,13 +62,16 @@ TOURS = [
 
 _STOP_HEADER_RE = re.compile(r"(?mi)^Stop\s+\d+:\s*(.+)$")
 
-# Other-venue subjects that must NOT survive in each tour's delivered text. These
-# are the known sibling/foreign venues for the two requested venues; if any name
-# appears in the delivered narration the gate failed to catch its passage.
+# Other-venue SUBJECTS that must NOT survive in each tour's delivered text. 828B:
+# key on actual OTHER-INSTITUTION NAMES, never on a bare city — a work made in,
+# depicting, or once hung in another city is legitimate (an Orsay work that hung
+# in the Louvre, a Rembrandt from Leiden). "Catharijneconvent" / "Met Cloisters"
+# are the real other-venue bleeds; a bare "Utrecht"/"Fort Tryon" is not, on its own,
+# a failure.
 _FORBIDDEN_BY_VENUE = {
-    "Rijksmuseum": ["Catharijneconvent", "Utrecht", "Van Gogh Museum",
-                    "Stedelijk", "Mauritshuis"],
-    "The Met Fifth Avenue": ["Met Cloisters", "The Cloisters", "Fort Tryon"],
+    "Rijksmuseum": ["Catharijneconvent", "Van Gogh Museum", "Stedelijk Museum",
+                    "Mauritshuis"],
+    "The Met Fifth Avenue": ["Met Cloisters", "The Cloisters"],
 }
 
 

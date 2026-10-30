@@ -217,3 +217,157 @@ single tour. Each tour on its own is the table above (max $0.2534).
   research.
 - `about_museum_stop.py` — About-section sentence scrub when an identity is bound.
 - `generate_tour_text.py` — build + bind the venue identity for museum tours.
+
+
+---
+
+## 828B — precision-first rework (bounce of 828(A))
+
+### Why 828(A) was bounced
+
+The first cut dropped the venue's OWN material:
+
+- the Rijksmuseum's own `rijksmuseum.nl/en/stories/...` page and the
+  artsandculture `the-night-watch-rijksmuseum` story were dropped;
+- Met passages naming the venue's OWN works under its full name —
+  "…print is part of the Metropolitan Museum", "The Harvesters has been at The
+  Metropolitan Museum…" — were dropped, because the live-bound identity carried
+  **no aliases and no official domain** (`name='The Met Fifth Avenue' domain=-`)
+  and the LOCAL-668 foreign-museum detector returned ragged fragments
+  ("with the others displayed in museums", "print is part of the Metropolitan
+  Museum") that were treated as venue names;
+- Wikipedia pages ABOUT THE WORKS (Washington Crossing the Delaware, The
+  Harvesters) were dropped by a **standalone CITY rule** that fired on any
+  "in <City>" phrase — a painting made in Düsseldorf, a crossing at Trenton —
+  which would gut the art history on every museum tour.
+
+23 + 12 over-drops across the two bounce logs.
+
+### The fix: precision first
+
+`venue_identity_gate.py` now drops a passage ONLY when its **SUBJECT** is another
+venue. Concretely:
+
+1. **SUBJECT** — the passage is about a concretely, **fully-named** OTHER
+   institution. Sources: a curated shared-name separate-institution list (Louvre
+   Abu Dhabi, Louvre-Lens, the Met Cloisters), a curated famous-venue table, and
+   LOCAL-668's detector — but the detector's hit is accepted only when it reads as
+   a **real venue name** (`_looks_like_proper_venue_name`): ≤6 words, no
+   possessive, no verb/clause word inside, led by a proper noun, not a bare head
+   word. Ragged fragments and works-that-mention-a-museum are never a venue.
+2. **DOMAIN** — only a **known** OTHER venue's official domain (curated map, or the
+   named other-venue's domain). **Never** wikipedia / wikidata / artsandculture /
+   britannica / news / the venue's own domain. A Google `/goto?url=` redirect is
+   an **unknown** host, not a foreign one (`domain_of` returns '' for it).
+3. **CITY** — there is **no standalone city rule**. A city is only ever a property
+   of an OTHER venue already named as the subject ("The Catharijneconvent in
+   Utrecht…"). A city where a work was made, depicts, or now hangs is never a drop.
+
+Root-cause fix for the thin identity: `build_identity` **self-enriches** from a
+curated famous-venue table (aliases + official domain + city), so a bare
+`"The Met Fifth Avenue"` request is recognised as the Metropolitan Museum of Art
+and its own works are kept.
+
+Own name / any alias → never dropped. The module stays pure (no network/LLM/DB).
+
+### Precision test on REAL research
+
+During the two live tours the gate recorded every passage it evaluated (text +
+URL + decision) via `LOCAL828_CAPTURE` into
+`fixtures/local828b_research_fixtures.jsonl` — **68 real passages (38 Rijksmuseum
++ 30 Met)**. `fixtures/local828b_other_venue_fixtures.jsonl` holds 4 real
+other-venue passages that must drop, including the exact Catharijneconvent bleed.
+`test_local828_venue_identity_gate.py::RealResearchPrecision` replays them:
+
+```
+[LOCAL-828B precision] real-research drop counts (after):
+    Rijksmuseum: evaluated=38 dropped=0
+    The Met Fifth Avenue: evaluated=30 dropped=0
+    other-venue fixtures dropped: 4/4
+```
+
+- **zero** own-venue passages dropped,
+- **zero** work-history passages dropped for a city mention — explicitly pinned:
+  "Washington Crossing the Delaware … completed in Germany" and "The Harvesters
+  has been at The Metropolitan Museum of Art in New York City since 1919" are
+  **kept** (828(A) dropped both),
+- the **Catharijneconvent** paragraph (and the Louvre Abu Dhabi / Art Institute of
+  Chicago / Albertina siblings) are dropped, each by **subject**.
+
+Before → after, same real passages: Rijks 2 own-venue drops → 0; Met 10 own/work
+drops → 0; other-venue still 4/4.
+
+### Tests
+
+`test_local828_venue_identity_gate.py` — **37 pass** (the standalone
+city-contradiction class replaced by `CityIsNotAStandaloneDrop`; added
+`RealResearchPrecision`). Regressions **214 passed / 3 skipped** across
+828 / 668 / 585 / 802 / 823 / 826 / 811 / 813 / 827; meter guards 819 / 820 / 822
+**61 pass**.
+
+### Live — BUDGET ENFORCED (`TASK_BUDGET_ID=LOCAL-828B`, cap $0.60)
+
+`subscribed` merged first so the LOCAL-827 whole-task ledger mount
+(`~/.audioura_task_budgets → /task_budgets`, `AUDIOURA_TASK_BUDGET_DIR`) and the
+meter-log cap apply across both tour containers. Cheap museum arm, pool off,
+`gpt-4.1-mini` + serper. Log: `submission_artifacts/local828b_live.log`.
+
+| Tour | Delivered | Other-venue paragraph | Ledger |
+|------|-----------|-----------------------|--------|
+| The Met Fifth Avenue, New York | **5/5** | none | $0.2188 |
+| Rijksmuseum, Amsterdam, Netherlands | 3/5 (see below) | none | $0.2518 |
+
+**Whole-task ledger: $0.4706 / $0.60 — under budget.**
+
+**Drop lines (whole run): exactly one**, and it was a residual false positive the
+gate then fixed:
+
+```
+[LOCAL-828] other-venue passage dropped Kennedy’s donation changed the museum  <google /goto url>
+```
+
+"Kennedy's donation changed the museum's holdings…" is the Met's OWN donation
+story, not another venue. `names_foreign_museum` had swept the clause into a
+"name". The `_looks_like_proper_venue_name` guard was tightened (reject
+possessives, interior verb/clause words, >6-word runs, a bare person+head) and the
+captured fixtures re-replayed: **0 drops**. No other-venue drop line fired on the
+Met; the Catharijneconvent bleed from the original bug did not recur.
+
+### The Rijksmuseum 3/5 — NOT the venue-identity gate
+
+The Met shipped 5/5. The Rijksmuseum shipped 3/5 — but the gate dropped **0**
+Rijksmuseum research passages (the capture file proves it: `dropped=0`), so it
+removed no evidence. The original **828(A) Rijksmuseum run also delivered 3/5**
+(`submission_artifacts/local828_rijksmuseum_tour.txt`, 3 stop headers). The LEAD's
+hypothesis — the gate dropped the Rijks own-domain/artsandculture passages, costing
+two stops — is therefore **disproven**: with precision-first the gate keeps every
+Rijks passage and the tour still delivers 3/5.
+
+The 3/5 is produced downstream by the **D511 / LOCAL-487 story-quality gate**
+("5 stop(s) have NO VALID STORY by Michael's bar: 3+ consecutive sentences, one
+person, an action and something at stake" — log lines 1283–1286) plus the
+LOCAL-826 museum-canon pass, both independent of venue identity. That is a
+story-gate / canon concern, not a venue-research-scope concern — the same boundary
+the ticket draws for the false "N exhibitions on view" line (LOCAL-826B's job, not
+828's). A gate-off re-run to re-confirm the 3/5 was not re-executed because the
+$0.60 ledger ($0.129 headroom) does not fit another ~$0.25 tour; the 0-drop
+capture already establishes the gate is not the cause.
+
+### Files (828B)
+
+**Modified**
+- `venue_identity_gate.py` — precision-first rework (subject-only drops; curated
+  famous-venue table + self-enriching identity; proper-venue-name guard; curated
+  other-venue domain map; standalone city rule removed; `LOCAL828_CAPTURE` hook).
+- `test_local828_venue_identity_gate.py` — `CityIsNotAStandaloneDrop` +
+  `RealResearchPrecision` (real-fixture replay).
+- `run_local828_container.py` — cap $0.60; forbidden-term check keyed on
+  other-institution names (never a bare city).
+- `run_local828_live.sh` — `TASK_BUDGET_ID=LOCAL-828B`, cap $0.60, LOCAL-827 ledger
+  mount, `LOCAL828_CAPTURE` wired.
+
+**New**
+- `fixtures/local828b_research_fixtures.jsonl` — 68 real captured research passages.
+- `fixtures/local828b_other_venue_fixtures.jsonl` — 4 real other-venue must-drop
+  passages (incl. the exact Catharijneconvent bleed), with provenance.
+- `submission_artifacts/local828b_live.log` — the budget-enforced live run.
