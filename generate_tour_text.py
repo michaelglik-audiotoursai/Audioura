@@ -1258,6 +1258,87 @@ def _compute_route_order(poi_list):
 _LOCAL779B_DINING_REPLENISH_MARKER = True
 
 
+# [LOCAL-843] Generic natural-feature words that, as the TRAILING word of a
+# search scope, turn a town name into a tiny point. "Mui Ne beach" geocodes to a
+# ~11 m hotel ("Mui ne Beach hotel") whose bbox excludes nearly every provider in
+# town; "Mui Ne" resolves to the ward (a ~13 km box). For a business/activity-
+# provider request the search CENTRE must be the enclosing town/area, so the
+# trailing generic-feature word is stripped when a real area name precedes it.
+_GENERIC_FEATURE_TAIL_WORDS = frozenset({
+    'beach', 'beaches', 'bay', 'dunes', 'lagoon', 'cove', 'waterfront',
+    'seafront', 'shore', 'shoreline', 'coast', 'coastline', 'strand',
+})
+
+
+def _places_arm_neutral_header(request, tour_category):
+    """[LOCAL-843] The neutral machine category to write in the Tour-Category
+    header for the places/business arm, so the INTERNAL 'restaurant' label never
+    leaks to the listener/metadata on a non-food tour.
+
+    Returns 'places' when ``tour_category`` is 'restaurant' AND the request is NOT
+    about food (an activity-provider request such as "Kitesurf lessons", or any
+    non-food business); returns None otherwise (the caller keeps the original
+    category). Deterministic, offline, never raises — a food/dining tour and any
+    non-'restaurant' category are unchanged."""
+    try:
+        if (tour_category or '') != 'restaurant':
+            return None
+        from category_match_guard import (requested_activity as _ra,
+                                           is_food_request as _ifr)
+        act = _ra(request or '')
+        if act and not act.get('is_food'):
+            return 'places'
+        if not _ifr(request or ''):
+            return 'places'
+        return None
+    except Exception:
+        return None
+
+
+def _widen_generic_feature_scope(scope, location):
+    """[LOCAL-843] Widen a scope whose LEADING segment ends in a generic natural
+    feature ("Mui Ne beach, Vietnam") to the enclosing area ("Mui Ne, Vietnam"),
+    but ONLY for a business/activity-provider request where the feature is the
+    search CENTRE, not the thing being toured.
+
+    A walking/area tour ON the beach keeps the beach (its subject). A single bare
+    feature word with no area name before it ("beach, Vietnam") is left as is.
+    Deterministic, offline; never raises. Returns the (possibly) widened scope.
+    """
+    try:
+        s = (scope or '').strip()
+        if not s:
+            return scope
+        # Only a provider/business request treats the feature as a search centre.
+        _is_provider = False
+        try:
+            from category_match_guard import requested_activity as _ra843
+            _act843 = _ra843(location) or _ra843(scope)
+            _is_provider = bool(_act843 and not _act843.get('is_food'))
+        except Exception:
+            _is_provider = False
+        if not _is_provider:
+            try:
+                _is_provider = bool(_business_subject_of_request(location or ''))
+            except Exception:
+                _is_provider = False
+        if not _is_provider:
+            return scope
+        parts = [p.strip() for p in s.split(',') if p.strip()]
+        if not parts:
+            return scope
+        head_toks = parts[0].split()
+        if (len(head_toks) >= 2
+                and head_toks[-1].lower().strip('.') in _GENERIC_FEATURE_TAIL_WORDS):
+            area_head = ' '.join(head_toks[:-1]).strip(' ,:;-')
+            if area_head:
+                parts[0] = area_head
+                return ', '.join(parts)
+        return scope
+    except Exception:
+        return scope
+
+
 def _scope_from_request(location, intent=None):
     """[LOCAL-779] Best-effort clean geographic scope from a tour request string.
 
@@ -1302,7 +1383,7 @@ def _scope_from_request(location, intent=None):
                     and not re.match(r'^\s*(?:districts?|qu\u1eadn|quan)\b',
                                      _city_tail, flags=re.IGNORECASE)):
                 return f"{_gs}, {_city_tail}"
-        return _gs
+        return _widen_generic_feature_scope(_gs, location)
     s = (location or '').strip()
     if not s:
         return s
@@ -1366,7 +1447,7 @@ def _scope_from_request(location, intent=None):
         toks.pop(0)
     parts[0] = ' '.join(toks)
     out = ', '.join([p for p in parts if p]).strip(' ,:;')
-    return out if out else (location or '')
+    return _widen_generic_feature_scope(out, location) if out else (location or '')
 
 
 def _address_matches_location(address, loc):
@@ -18696,7 +18777,7 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
               f"breached at {_ccb.phase}, ${_ccb.cost:.4f} > ${_ccb.limit:.4f}")
         _partial_header = (
             f"Step-by-Step Audio Guided Tour: {location}\n"
-            f"Tour-Category: {tour_category}\n"
+            f"Tour-Category: {_places_arm_neutral_header(location, tour_category) or tour_category}\n"
             f"[PARTIAL TOUR — generation stopped at {_ccb.phase} due to cost ceiling "
             f"(${_ccb.cost:.4f} > ${_ccb.limit:.4f})]\n\n"
         )
@@ -20204,7 +20285,7 @@ Exempt: navigation directions ("Turn left", "Continue past").
               f"assembling partial tour with {len(poi_list)} stops (no descriptions)")
         _partial_header = (
             f"Step-by-Step Audio Guided Tour: {location}\n"
-            f"Tour-Category: {tour_category}\n"
+            f"Tour-Category: {_places_arm_neutral_header(location, tour_category) or tour_category}\n"
             f"[PARTIAL TOUR — generation stopped before Phase 5 due to cost ceiling "
             f"(${total_cost:.4f} > ${_PHASE_COST_HARD_LIMIT:.4f})]\n\n"
         )
@@ -24976,7 +25057,7 @@ Write the story FIRST, then add physical description if space allows.
         print(f"[LOCAL-326] Assembling partial tour: {_n_completed}/{len(poi_list)} stops have descriptions")
         _partial_header = (
             f"Step-by-Step Audio Guided Tour: {location}\n"
-            f"Tour-Category: {tour_category}\n"
+            f"Tour-Category: {_places_arm_neutral_header(location, tour_category) or tour_category}\n"
             f"[PARTIAL TOUR — {_n_completed} of {len(poi_list)} stops generated; "
             f"cost ceiling reached during Phase 5 (${total_cost:.4f} > ${_PHASE_COST_HARD_LIMIT:.4f})]\n\n"
         )
@@ -25828,6 +25909,183 @@ REWRITE RULES (all mandatory):
                 print(f"\n  [LOCAL-458] entity gate SKIPPED: corpus=0 chars (retrieval returned no page text)")
             else:
                 print(f"\n  [LOCAL-458] entity gate SKIPPED: no exhibition scope (unscoped museum tour)")
+
+    # -------- [LOCAL-843] PHASE 5.158a2: Places/business-arm person gate --------
+    # WHY (LEAD, GCloud_Storied wave 16 — "Kitesurf lessons at Mui Ne beach"):
+    # a kite-school stop shipped an INVENTED person story — "Duc fused
+    # kiteboarding and seafood". The LOCAL-378/385 person gate above fires ONLY
+    # for exhibition-scoped MUSEUM tours (it needs an exhibition checklist +
+    # page_text), and the story pass (which NEVER invents) runs only for
+    # tour_category=='museum'. So on the places/business arm NOTHING checked that
+    # a person named in the prose actually appears in the stop's retrieved
+    # material — an LLM-invented proprietor with a fabricated "fusion" claim
+    # sailed through every gate.
+    #
+    # This gate closes that hole with the SAME deterministic primitives the
+    # museum gate uses (extract_person_names / check_person_grounded /
+    # remove_person_from_text), but with the per-stop RETRIEVED MATERIAL as the
+    # grounding corpus (the stop name/address, its stop_corpus passages, and any
+    # research/evidence text the poi carries). A person named in the description
+    # or orientation who is absent from that stop's own corpus is UNGROUNDED, and
+    # the sentence naming them is dropped. No corpus for a stop → that stop is
+    # skipped (never drop on a non-answer, D162). Scope: the places/business arm
+    # only (NOT museum — it has its own gate; NOT walking/facility, which do not
+    # research per-venue proprietor prose). Best-effort: any error is non-fatal.
+    if tour_category == 'restaurant':
+        print(f"\n  [LOCAL-843] PHASE 5.158a2: Places/business-arm person gate...")
+        try:
+            from prose_entity_grounding_gate import (
+                extract_person_names as _peg843_extract,
+                check_person_grounded as _peg843_grounded,
+                remove_person_from_text as _peg843_remove)
+            try:
+                from text_fold import fold as _fold843
+            except Exception:
+                import unicodedata as _ud843
+                def _fold843(_s):
+                    _n = _ud843.normalize('NFKD', (_s or '').lower())
+                    return ''.join(_c for _c in _n if not _ud843.combining(_c))
+            # [LOCAL-843] A single-token proper-noun SUBJECT performing an action
+            # ("Duc fused kiteboarding and seafood") is the fabrication shape the
+            # museum person gate (which requires a MULTI-word name) cannot see.
+            # Flag a sentence whose FIRST token is a capitalised, alphabetic name
+            # (not a common sentence opener, not the start of a multi-word name
+            # handled above) followed by an action verb, when that name is absent
+            # from the stop's corpus and the stop's own name. Conservative: it
+            # acts only on the subject-did-something shape, so "Lessons run
+            # daily", "Visitors gather", "The school opened" are never touched.
+            _NOT_NAME_843 = frozenset({
+                "the", "a", "an", "this", "that", "these", "those", "today",
+                "lessons", "here", "its", "it", "they", "we", "you", "visitors",
+                "guests", "students", "staff", "owners", "founded", "established",
+                "located", "set", "situated", "inside", "outside", "near", "at",
+                "on", "in", "with", "for", "from", "every", "each", "most",
+                "many", "some", "both", "their", "his", "her", "our", "your",
+                "originally", "now", "later", "once", "nearby", "beyond",
+            })
+            _ACTION_VERB_843 = re.compile(
+                r"^(?:[a-z]{3,}ed|[a-z]{3,}s|founded|built|opened|fused|blended|"
+                r"combined|created|started|ran|runs|teaches|taught|pioneered|"
+                r"invented|launched|turned|merged|transformed|brought|made|"
+                r"began|grew|left|moved|offers|offered|began|became)$")
+
+            def _ungrounded_subject_sentences_843(_text, _corpus_fold, _stop_fold):
+                from prose_entity_grounding_gate import _split_sentences as _ss843
+                _flag = []
+                for _s in _ss843(_text):
+                    _toks = _s.strip().split()
+                    if len(_toks) < 2:
+                        continue
+                    _head = _toks[0].strip(",.;:'\"")
+                    if not _head[:1].isupper() or not _head.isalpha():
+                        continue
+                    if _head.lower() in _NOT_NAME_843:
+                        continue
+                    # Multi-word name → handled by extract_person_names above.
+                    if _toks[1][:1].isupper():
+                        continue
+                    if not _ACTION_VERB_843.match(_toks[1].strip(",.;:").lower()):
+                        continue
+                    _hf = _fold843(_head)
+                    if _hf and (_hf in _corpus_fold or _hf in _stop_fold):
+                        continue
+                    _flag.append(_s)
+                return _flag
+
+            _GATED_FIELDS_843 = ('description', 'orientation')
+            _peg843_detected = 0
+            _peg843_ungrounded = 0
+            _peg843_dropped = 0
+            _peg843_stops = 0
+            _peg843_names = []
+            for _poi843 in poi_list:
+                _name843 = (_poi843.get('name') or '').strip()
+                # Build this stop's grounding corpus from everything retrieved for
+                # it: the stop name + address (the proprietor's own business name
+                # may legitimately be a person — "Jibe's"), its stop_corpus
+                # passages, and any research/evidence/why text on the poi.
+                _corpus843_parts = [_name843, _poi843.get('address') or '']
+                try:
+                    _sc843 = (_stop_corpus_data.get(_name843)
+                              if '_stop_corpus_data' in dir() and _stop_corpus_data
+                              else None)
+                    if _sc843 and _sc843.get('passages'):
+                        _corpus843_parts.extend(str(p) for p in _sc843['passages'])
+                except Exception:
+                    pass
+                for _k843 in ('_research', 'evidence', '_replenish_why',
+                              'specific_examples', 'reviews_text'):
+                    _v843 = _poi843.get(_k843)
+                    if isinstance(_v843, str) and _v843.strip():
+                        _corpus843_parts.append(_v843)
+                    elif isinstance(_v843, (list, tuple)):
+                        _corpus843_parts.extend(str(x) for x in _v843 if x)
+                _corpus843 = '\n'.join(p for p in _corpus843_parts if p).strip()
+                # No corpus → cannot judge grounding → skip (never drop on a
+                # non-answer).
+                if not _corpus843:
+                    continue
+                _stop_touched843 = False
+                _corpus843_fold = _fold843(_corpus843)
+                _stop843_fold = _fold843(_name843)
+                for _fld843 in _GATED_FIELDS_843:
+                    _text843 = _poi843.get(_fld843) or ''
+                    if not _text843 or _text843.startswith('['):
+                        continue
+                    _persons843 = _peg843_extract(_text843)
+                    for _person843 in _persons843:
+                        _peg843_detected += 1
+                        # The stop's OWN name grounds a person (a business named
+                        # after its owner). check_person_grounded folds accents
+                        # and matches surname, so "Duc" in a corpus naming "Duc"
+                        # is grounded; an invented "Duc" absent from all retrieved
+                        # text is not.
+                        if _peg843_grounded(_person843, _corpus843):
+                            continue
+                        _peg843_ungrounded += 1
+                        if _person843 not in _peg843_names:
+                            _peg843_names.append(_person843)
+                        _cleaned843, _drops843 = _peg843_remove(_text843, _person843)
+                        if _drops843:
+                            _text843 = _cleaned843
+                            _poi843[_fld843] = _cleaned843
+                            _peg843_dropped += len(_drops843)
+                            _stop_touched843 = True
+                            for _d843 in _drops843:
+                                print(f"    [LOCAL-843] ungrounded person "
+                                      f"{_person843!r} — dropped: \"{_d843[:90]}\"")
+                    # Single-token subject-action fabrication ("Duc fused …").
+                    _sub_flagged843 = _ungrounded_subject_sentences_843(
+                        _text843, _corpus843_fold, _stop843_fold)
+                    for _sent843 in _sub_flagged843:
+                        _peg843_detected += 1
+                        _peg843_ungrounded += 1
+                        _head843 = _sent843.strip().split()[0].strip(",.;:'\"")
+                        if _head843 not in _peg843_names:
+                            _peg843_names.append(_head843)
+                        # Remove exactly the flagged sentence from the field.
+                        _new843 = _text843.replace(_sent843, '').strip()
+                        _new843 = re.sub(r'\s{2,}', ' ', _new843)
+                        if _new843 != _text843:
+                            _text843 = _new843
+                            _poi843[_fld843] = _new843
+                            _peg843_dropped += 1
+                            _stop_touched843 = True
+                            print(f"    [LOCAL-843] ungrounded subject "
+                                  f"{_head843!r} — dropped: \"{_sent843[:90]}\"")
+                if _stop_touched843:
+                    _peg843_stops += 1
+            print(f"  [LOCAL-843] Places person gate summary: "
+                  f"detected={_peg843_detected}, ungrounded={_peg843_ungrounded}, "
+                  f"sentences_dropped={_peg843_dropped}, stops_affected={_peg843_stops}")
+            if _peg843_names:
+                print(f"    Ungrounded: {_peg843_names}")
+        except ImportError as _peg843_err:
+            print(f"  [LOCAL-843] WARNING: prose_entity_grounding_gate not "
+                  f"importable — places person gate skipped ({_peg843_err})")
+        except Exception as _peg843_err:
+            print(f"  [LOCAL-843] ERROR: places person gate failed "
+                  f"(non-fatal): {_peg843_err}")
 
     _sfp.sub_start('role_claim_5_158b')
     # -------- [LOCAL-458] PHASE 5.158b: Role-claim gate --------
@@ -28005,6 +28263,39 @@ REWRITE RULES (all mandatory):
     else:
         _display_category = tour_category.replace('_', ' ').title()
 
+    # [LOCAL-843] CATEGORY-LABEL LEAK FIX. 'restaurant' is the INTERNAL name of the
+    # places/business arm (dining and non-food businesses share it). For a tour
+    # whose request is NOT about food — an activity-provider request ("Kitesurf
+    # lessons", "Scuba diving courses") or any non-food business — the word
+    # "restaurant" must never reach the listener: not the spoken/displayed title
+    # ("- Restaurant Tour"), not the machine-readable header ("Tour-Category:
+    # restaurant", which the app surfaces as metadata and an icon). Use the
+    # request's OWN activity words as the display label (e.g. "Kitesurf") and a
+    # neutral "places" machine category; a genuine food/dining request is
+    # unchanged. Computed once; applied to both the title and the header below.
+    _req843 = (user_request if ('user_request' in dir() and user_request) else location)
+    _neutral_label_843 = None          # display label override
+    _neutral_header_843 = None         # header/machine category override
+    if tour_category == 'restaurant':
+        try:
+            from category_match_guard import (requested_activity as _ra843h,
+                                               is_food_request as _ifr843h)
+            _act843h = _ra843h(_req843)
+            _is_food_843 = bool(_ifr843h(_req843))
+            if _act843h and not _act843h.get('is_food'):
+                # Activity-provider, non-food → label with the activity itself.
+                _neutral_label_843 = (_act843h.get('activity') or 'places').strip().title()
+                _neutral_header_843 = 'places'
+            elif not _is_food_843:
+                # A non-food business/places tour with no activity phrase → neutral.
+                _neutral_label_843 = 'Places'
+                _neutral_header_843 = 'places'
+        except Exception as _nl843_err:
+            print(f"  [LOCAL-843] neutral-label computation skipped (non-fatal): "
+                  f"{_nl843_err}")
+    if _neutral_label_843:
+        _display_category = _neutral_label_843
+
     if tour_type.lower() in location.lower():
         # If tour type is already in the location name, don't repeat it
         tour_title = f"Step-by-Step Audio Guided Tour: {location}"
@@ -28024,6 +28315,10 @@ REWRITE RULES (all mandatory):
         _header_category = 'animal'
     elif tour_category == 'walking' and transport_mode == 'country_scale':
         _header_category = 'road_trip'
+    # [LOCAL-843] Never emit the internal 'restaurant' label for a non-food
+    # places/business tour — use the neutral machine category computed above.
+    if _neutral_header_843:
+        _header_category = _neutral_header_843
     complete_tour = tour_title + "\n" + f"Tour-Category: {_header_category}" + "\n\n"
 
     # -------- [LOCAL-11] Venue-identity mining (free path — no new API calls) --------

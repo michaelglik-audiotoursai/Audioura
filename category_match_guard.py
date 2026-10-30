@@ -486,6 +486,13 @@ _ACTIVITY_SYNONYMS: "Dict[str, Tuple[str, ...]]" = {
                      "kite", "kiting"),
     "kitesurfing": ("kitesurfing", "kitesurf", "kiteboarding", "kiteboard",
                     "kite", "kiting"),
+    # [LOCAL-843] "Kitesurf lessons" folds the activity head to "kitesurf",
+    # which was NOT a key here (only kiteboarding/kitesurfing/kite were), so the
+    # token set collapsed to the single literal {"kitesurf"} and a real school
+    # named "Mui Ne KITE School" / "KITEBOARDING Mui Ne" failed the on-category
+    # match → yield loss. Give "kitesurf" its own full-family entry.
+    "kitesurf": ("kitesurf", "kitesurfing", "kiteboarding", "kiteboard",
+                 "kite", "kiting"),
     "windsurfing": ("windsurf", "windsurfing"),
     "surfing": ("surf", "surfing", "surfboard"),
     "surf": ("surf", "surfing", "surfboard"),
@@ -613,6 +620,25 @@ def requested_activity(request: str) -> Optional[Dict]:
             if aw in _ACTIVITY_SYNONYMS:
                 tokens.update(_ACTIVITY_SYNONYMS[aw])
                 matched_known = True
+        # [LOCAL-843] STEM fallback: a compound activity word that is not an exact
+        # key ("kitesurf", "windsurf", "paddleboard") still belongs to a known
+        # family. If no exact key matched, union every family that shares a stem
+        # with an activity word — a family token that is a prefix of the word, or
+        # whose word is a prefix of a family token (≥4 chars, so "ski"/"sup" short
+        # tokens do not over-match). This keeps the on-category match wide enough
+        # to recognise a provider named with any synonym of the activity.
+        if not matched_known:
+            for aw in activity_words:
+                if len(aw) < 4:
+                    continue
+                for _key, _syns in _ACTIVITY_SYNONYMS.items():
+                    for _tok in _syns:
+                        if len(_tok) < 4:
+                            continue
+                        if aw.startswith(_tok) or _tok.startswith(aw):
+                            tokens.update(_syns)
+                            matched_known = True
+                            break
         # "scuba diving" → head "diving" is known; "bike" → known. If neither
         # word is in the table, take the activity words as literal tokens (still a
         # provider request, matched by name containment).

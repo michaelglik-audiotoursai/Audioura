@@ -490,6 +490,42 @@ def venue_still_operating(name, city, timeout=45):
                     succ = str(d.get('successor', '') or '').strip()
                     when = str(d.get('changed_on', '') or '').strip()
                     detail = str(d.get('reason', '') or '').strip()
+                    # [LOCAL-843] ABSENCE OF CONFIRMATION IS NOT CLOSURE. The
+                    # model answers `false` in two very different situations: it
+                    # FOUND the place closed/rebranded (positive evidence — a
+                    # successor name, a change date, or closure language), OR it
+                    # merely COULD NOT CONFIRM the place is open ("no sources
+                    # confirm it is still operating under that exact name"). The
+                    # second is an UNKNOWN wearing a `false`, and the docstring's
+                    # own rule is that absence of evidence must never delete a
+                    # stop. The field defect: real, map-sourced Mui Ne kite
+                    # schools (Muine Kitesurf School, Surfpoint, Palm Kite Club)
+                    # were dropped on exactly this "cannot confirm" phrasing,
+                    # taking the kite tour from 5 providers to 2. So: keep the
+                    # stop when there is NO successor, NO change date, and the
+                    # reason reads as a non-finding rather than a closure.
+                    _low = detail.lower()
+                    _no_positive_closure = (not succ) and (not when)
+                    _non_finding = any(p in _low for p in (
+                        'no source', 'no information', 'no current information',
+                        'no data', 'cannot confirm', "can't confirm",
+                        'could not confirm', 'unable to confirm', 'not confirm',
+                        'no evidence', 'unclear', 'unknown', 'no listing',
+                        'no results', 'not find', 'no mention', 'no record',
+                        'insufficient', 'not available',
+                    ))
+                    # A closure word in the reason is positive evidence even with
+                    # no successor/date, so it must NOT be rescued.
+                    _has_closure_word = any(p in _low for p in (
+                        'closed', 'shut', 'ceased', 'defunct', 'out of business',
+                        'no longer', 'rebrand', 'renamed', 'replaced', 'demolished',
+                        'permanently',
+                    ))
+                    if _no_positive_closure and _non_finding and not _has_closure_word:
+                        print(f"  [LOCAL-843] venue_still_operating: keeping "
+                              f"{name!r} — 'false' is absence-of-confirmation, "
+                              f"not closure evidence (reason: {detail[:90]!r})")
+                        return True, ''
                     bits = [b for b in (detail, f"now: {succ}" if succ else '',
                                         f"changed {when}" if when else '') if b]
                     return False, ' — '.join(bits)[:220]

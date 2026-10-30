@@ -514,6 +514,14 @@ def _tier_c_gemini(category: str, scope: str, limit: int) -> List[Dict]:
     if not key:
         logger.info("[D722] tier c skipped: no GEMINI_API_KEY/GOOGLE_API_KEY")
         return []
+    # [LOCAL-843] Defense-in-depth: never issue a DIRECT grounded-Gemini provider
+    # lookup when the active RESEARCH_BACKEND is not 'gemini' (the cheap/serper
+    # arm). The ladder already blocks tier c via grounding_blocked, but a direct
+    # caller must also honour the selector so no code path bills Gemini on the
+    # cheap arm.
+    if _tier_c_gemini_disallowed_by_backend():
+        logger.info("[LOCAL-843] tier c skipped: RESEARCH_BACKEND not 'gemini'")
+        return []
     # [LOCAL-814B] If the process-wide breaker is open (Gemini credit depleted or
     # rate limited), skip the call and let the ladder degrade to "no tier C" — the
     # same outcome as a missing key or a tier-C failure. Checked AFTER the key
@@ -682,7 +690,8 @@ def escalating_lookup(
 
     # ── Tier c: Gemini grounded + re-verify ───────────────────────────────────
     tier_c_results: List[Dict] = []
-    grounding_blocked = (not allow_grounding) or _grounding_guard_active()
+    grounding_blocked = ((not allow_grounding) or _grounding_guard_active()
+                         or _tier_c_gemini_disallowed_by_backend())
     if verify is not None and not grounding_blocked and _budget_ok(spent, _EST_TIER_C_USD):
         spent += _EST_TIER_C_USD
         try:
@@ -720,8 +729,14 @@ def escalating_lookup(
         results_by_tier["c"] = _names(tier_c_results)
     else:
         if grounding_blocked:
-            logger.info("[D722] tier c skipped: grounding forbidden "
-                        "(by-reference build) or disabled by caller")
+            if _tier_c_gemini_disallowed_by_backend():
+                logger.info("[LOCAL-843] tier c (direct grounded Gemini) skipped: "
+                            "RESEARCH_BACKEND is not 'gemini' — provider discovery "
+                            "stays on tier b (Serper), honest shortfall over a "
+                            "billed Gemini top-up")
+            else:
+                logger.info("[D722] tier c skipped: grounding forbidden "
+                            "(by-reference build) or disabled by caller")
         elif verify is None:
             logger.info("[D722] tier c skipped: no verify callable supplied")
         else:
@@ -855,6 +870,26 @@ def _grounding_guard_active() -> bool:
     try:
         import l2_by_reference as l2
         return bool(l2.grounding_is_forbidden())
+    except Exception:
+        return False
+
+
+def _tier_c_gemini_disallowed_by_backend() -> bool:
+    """[LOCAL-843] True when the active RESEARCH_BACKEND is NOT gemini, so the
+    tier-C DIRECT grounded-Gemini provider lookup must be skipped.
+
+    Tier C is the one Gemini caller on the places/business arm that does NOT route
+    through story_leads (LOCAL-834 moved the per-stop practicals through the
+    backend selector; this is the remaining direct Gemini). On the cheap arm
+    (``RESEARCH_BACKEND=serper``, which the cheap-arm gate activates for the
+    places category) provider discovery must stay on tier B (Serper Places) and
+    deliver an honest shortfall rather than top up with a billed Gemini call —
+    the field defect was $0.16 of Gemini on a cheap-arm kite tour. When the
+    backend is the default 'gemini' this returns False and tier C is unchanged.
+    Fail-open to allowed (False) if the selector is unavailable."""
+    try:
+        import story_leads as _sl
+        return _sl.research_backend() != "gemini"
     except Exception:
         return False
 
