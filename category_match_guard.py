@@ -54,6 +54,8 @@ __all__ = [
     "requested_activity",
     "candidate_is_activity_provider",
     "filter_off_category_activity",
+    # LOCAL-845 — cheap Serper Places category resolver for the unknown tail.
+    "serper_category_resolver",
 ]
 
 
@@ -676,6 +678,13 @@ _FOOD_VENUE_WORDS = (
     "sandwich", "burger", "ice cream", "dessert", "juice bar", "smoothie",
     "brewery", "brewpub", "taproom", "winery", "teahouse", "tea house",
     "snack", "street food", "canteen", "buffet", "banh mi",
+    # [LOCAL-845] Local-language food words so a venue named only in its own
+    # language still reads as food. Vietnamese: "nhà hàng" (restaurant — folds to
+    # "nha hang"), "quán" (eatery/bar — "quan"); "nha hang" catches a field
+    # defect where "Nhà hàng Nha Trang Xưa" (a heritage-house RESTAURANT) was kept
+    # on a scuba-diving-courses tour because its carried name/type had no English
+    # food word. These are folded (accent-stripped, lowercased) before matching.
+    "nha hang", "quan",
 )
 
 
@@ -715,8 +724,11 @@ def _text_has_any(blob: str, words: Sequence[str]) -> bool:
     return False
 
 
-def candidate_is_activity_provider(cand: Dict,
-                                   activity: Dict) -> Optional[bool]:
+def candidate_is_activity_provider(
+        cand: Dict,
+        activity: Dict,
+        category_resolver: Optional[Callable[[str], Optional[str]]] = None,
+) -> Optional[bool]:
     """Is ``cand`` a provider of the requested activity?
 
     * True  — the candidate's name or Serper/OSM type carries the activity word
@@ -728,7 +740,18 @@ def candidate_is_activity_provider(cand: Dict,
               signal.
     * None  — no signal either way (kept by the caller: we never drop a place we
               cannot classify).
-    """
+
+    [LOCAL-845] ``category_resolver`` — an optional callable ``name -> category
+    text`` the caller supplies to resolve a candidate whose carried fields give
+    NO class signal (the field defect: "Nhà hàng Nha Trang Xưa" reached the guard
+    with a name/type that carried no English food word, classified as UNKNOWN,
+    and was kept on a scuba-courses tour). When the first pass is about to return
+    None (unknown), the resolver is called ONCE with the candidate's title; its
+    returned category text is re-classified. A restaurant/café/bar result →
+    off-category (False); anything still unknown → None (kept — never drop on no
+    evidence). The resolver is only ever called on the unknown tail, so a stop
+    already decided by its own name/type costs nothing. The caller is responsible
+    for the resolver being cheap (≤ one 24 h-cached Serper Places lookup)."""
     if not activity:
         return None
     title = _candidate_title(cand)
@@ -778,6 +801,40 @@ def candidate_is_activity_provider(cand: Dict,
     if _text_has_any(blob, _GENERIC_LANDMARK_WORDS):
         return False
 
+    # [LOCAL-845] UNKNOWN tail — no signal from the candidate's own name/type.
+    # Before keeping it (the old behaviour, which let a restaurant with no English
+    # food word survive a non-food provider tour), give the caller's resolver ONE
+    # chance to supply the place's real category. A restaurant/café/bar result is
+    # off-category; anything still unknown is kept (never drop on no evidence).
+    if category_resolver is not None:
+        try:
+            resolved = category_resolver(title)
+        except Exception:
+            resolved = None
+        if resolved:
+            res_blob = _fold(resolved)
+            # Food/drink type → off-category (the Nha Trang Xua case: resolver
+            # returns "Vietnamese restaurant").
+            if _is_food_venue("", res_blob):
+                return False
+            try:
+                res_cls = classify_place(title, resolved)
+            except Exception:
+                res_cls = None
+            if res_cls == "restaurant":
+                return False
+            # A resolved activity word / provider noun promotes to a provider.
+            if _text_has_any(res_blob, tokens):
+                return True
+            if (res_cls not in _GENERIC_LANDMARK_CLASSES
+                    and _text_has_any(res_blob, _PROVIDER_NOUNS)):
+                return True
+            # A resolved generic-landmark class/word → off-category.
+            if res_cls in _GENERIC_LANDMARK_CLASSES:
+                return False
+            if _text_has_any(res_blob, _GENERIC_LANDMARK_WORDS):
+                return False
+
     # No signal either way → UNKNOWN (kept).
     return None
 
@@ -787,6 +844,7 @@ def filter_off_category_activity(
         request: str,
         log: Optional[Callable[[str], None]] = None,
         named_anchors: Optional[Sequence[str]] = None,
+        category_resolver: Optional[Callable[[str], Optional[str]]] = None,
 ) -> Tuple[List[Dict], int]:
     """[LOCAL-835] Keep only providers of the requested activity on the FRESH
     places path.
@@ -796,6 +854,13 @@ def filter_off_category_activity(
     landmark with no activity signal; keep the activity's providers and any
     candidate we cannot classify. A candidate the user NAMED by hand is always
     kept. Returns ``(kept, dropped_count)``.
+
+    [LOCAL-845] ``category_resolver`` — optional ``name -> category text`` passed
+    through to ``candidate_is_activity_provider`` for the UNKNOWN tail only (a
+    candidate whose own name/type gives no class signal). The caller supplies a
+    cheap resolver (one 24 h-cached Serper Places lookup) so a restaurant that
+    reached the guard without an English food word (the "Nhà hàng Nha Trang Xưa"
+    field defect) is classified off-category instead of being kept on no evidence.
 
     NO-OP (rows unchanged, dropped=0) when the request is not a provider request,
     or is a food provider request (cooking classes keep food venues). Best-effort:
@@ -822,7 +887,8 @@ def filter_off_category_activity(
             kept.append(cand)
             continue
         try:
-            verdict = candidate_is_activity_provider(cand, activity)
+            verdict = candidate_is_activity_provider(
+                cand, activity, category_resolver=category_resolver)
         except Exception:
             verdict = None
         if verdict is False:
@@ -837,3 +903,63 @@ def filter_off_category_activity(
             continue
         kept.append(cand)
     return kept, dropped
+
+
+# ── [LOCAL-845] Cheap Serper Places category resolver for the unknown tail ────
+def serper_category_resolver(
+        scope: str,
+        log: Optional[Callable[[str], None]] = None,
+) -> Callable[[str], Optional[str]]:
+    """Build a ``name -> category text`` resolver backed by ONE Serper Places
+    lookup per name, scoped to ``scope``.
+
+    Passed as ``category_resolver`` to ``filter_off_category_activity`` so the
+    activity guard can classify a candidate whose own carried name/type gave NO
+    class signal (the "Nhà hàng Nha Trang Xưa" field defect — a restaurant kept on
+    a scuba-courses tour because its name had no English food word). Only the
+    UNKNOWN tail reaches the resolver, so a stop already decided by its own fields
+    costs nothing.
+
+    Cheap by construction: ``places_search.places_search`` caches identical
+    (query, ll) for 24 h, so a name already verified on the map during generation
+    is a CACHE HIT and bills nothing; otherwise it is the ONE extra lookup the
+    ticket allows (≤ one Places call, priced ≈ $0.002). Returns the resolved
+    Serper category text (e.g. "Vietnamese restaurant"), or None when Serper is
+    off / nothing matched. Never raises. An in-process memo avoids a second lookup
+    for the same name within one tour."""
+    emit = log or print
+    memo: Dict[str, Optional[str]] = {}
+
+    def _resolve(name: str) -> Optional[str]:
+        key = _fold(name)
+        if not key:
+            return None
+        if key in memo:
+            return memo[key]
+        resolved: Optional[str] = None
+        try:
+            import places_search as _ps
+            if _ps.serper_places_enabled():
+                scope_center = None
+                try:
+                    from stop_existence_gate import _geocode_scope_center as _gsc
+                    scope_center = _gsc(scope)
+                except Exception:
+                    scope_center = None
+                recs = _ps.places_search(name, scope, limit=1,
+                                         scope_center=scope_center)
+                if recs:
+                    cat = (recs[0].get("_serper_category")
+                           or recs[0].get("category") or "")
+                    resolved = str(cat).strip() or None
+                    if resolved:
+                        emit(f"[LOCAL-845] category resolve {name!r} -> "
+                             f"{resolved!r} (1 Serper Places lookup)")
+        except Exception as _err:
+            emit(f"[LOCAL-845] category resolve skipped for {name!r} "
+                 f"(non-fatal): {_err}")
+            resolved = None
+        memo[key] = resolved
+        return resolved
+
+    return _resolve

@@ -7214,6 +7214,14 @@ def _verify_works_v2(poi_list, venue_name, exhibition_scope=None):
     # (prevents truncated site extractions from polluting the canonical set)
     # Uses normalized comparison (accent-stripped, punctuation-stripped) for matching
     from story_miner import _normalize as _norm_for_dedup
+    from story_miner import is_distinct_shorter_work as _distinct_shorter845
+    # [LOCAL-845] A real SPARQL work must never be pruned as a "substring" of a
+    # longer sibling. The bare famous "Olympia" (Manet) is a non-prefix substring
+    # of "A Modern Olympia" / "Une moderne Olympia" (Cézanne); the old prune
+    # deleted it from the matchable set, so the candidate "Olympia" DROPPED on the
+    # live path. A left-anchored truncation of a SITE EXTRACTION is still pruned;
+    # a distinct shorter work (the longer adds a distinctive SUBJECT word, and the
+    # shorter is not its prefix) is kept.
     _to_remove = set()
     _norm_map = {t: _norm_for_dedup(t) for t in canonical_titles}
     for t in canonical_titles:
@@ -7222,6 +7230,12 @@ def _verify_works_v2(poi_list, venue_name, exhibition_scope=None):
             if t != other:
                 _no = _norm_map[other]
                 if len(_nt) < len(_no) and _nt in _no:
+                    # [LOCAL-845] Keep a DISTINCT shorter work (the longer adds a
+                    # distinctive SUBJECT word and the shorter is not its prefix —
+                    # "Olympia" vs "A Modern Olympia"); only prune a left-anchored
+                    # truncation of a site extraction.
+                    if _distinct_shorter845(_nt, _no):
+                        continue
                     _to_remove.add(t)
                     break
     if _to_remove:
@@ -15946,8 +15960,19 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
                 print(f"  [LOCAL-835] activity-provider guard active — request "
                       f"'{_act835['activity']} {_act835['trigger']}'; checking "
                       f"{_before_835} stop(s)")
+                # [LOCAL-845] Resolve the UNKNOWN tail (a candidate whose carried
+                # name/type gives no class signal) with ONE cheap, 24 h-cached
+                # Serper Places lookup, so a restaurant that arrived without an
+                # English food word (the "Nhà hàng Nha Trang Xưa" field defect) is
+                # classified off-category instead of kept on no evidence.
+                try:
+                    from category_match_guard import serper_category_resolver as _scr845
+                    _resolver845 = _scr845(location, log=print)
+                except Exception:
+                    _resolver845 = None
                 poi_list, _dropped_835 = _foca835(
-                    poi_list, user_request, log=print, named_anchors=_anchors_835)
+                    poi_list, user_request, log=print, named_anchors=_anchors_835,
+                    category_resolver=_resolver845)
                 if _dropped_835 > 0:
                     print(f"\n! [LOCAL-835] activity-provider guard dropped "
                           f"{_dropped_835} off-category stop(s) "
@@ -20419,8 +20444,18 @@ Exempt: navigation directions ("Turn left", "Continue past").
             except Exception:
                 pass
             _before_835f = len(poi_list)
+            # [LOCAL-845] Same cheap 24 h-cached Serper resolver as the discovery
+            # pass: classify the UNKNOWN tail (a stop whose carried name/type gave
+            # no class signal) so a restaurant with no English food word is caught
+            # here too, as the last net before narration.
+            try:
+                from category_match_guard import serper_category_resolver as _scr845f
+                _resolver845f = _scr845f(location, log=print)
+            except Exception:
+                _resolver845f = None
             poi_list, _dropped_835f = _foca835f(
-                poi_list, user_request, log=print, named_anchors=_anchors_835f)
+                poi_list, user_request, log=print, named_anchors=_anchors_835f,
+                category_resolver=_resolver845f)
             if _dropped_835f > 0:
                 print(f"\n! [LOCAL-835B] FINAL pre-narration guard dropped "
                       f"{_dropped_835f} off-category stop(s) "

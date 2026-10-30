@@ -2633,6 +2633,82 @@ _DESCRIPTOR_WORDS = {
 }
 
 
+# [LOCAL-845] Shared "distinct shorter work" decision. A SUBJECT word is a
+# content word that is NOT a stopword and NOT a descriptor (medium/material/
+# format/period/year). Two titles where one is a substring of the other are the
+# SAME work only when the extra words are all non-subject (a truncation or a
+# descriptor-enriched form); when the longer adds a distinctive SUBJECT word the
+# shorter is a DIFFERENT, more-specific-sibling work ("Olympia" vs "A Modern
+# Olympia" / "Une moderne Olympia").
+_SUBJECT_STOP_WORDS = {
+    'the', 'and', 'for', 'with', 'from', 'that', 'this', 'are', 'was', 'his',
+    'her', 'its', 'who', 'which', 'their', 'not', 'but', 'all', 'can', 'will',
+    'les', 'des', 'une', 'dans', 'sur', 'par', 'pour', 'avec', 'son', 'ses',
+    'est', 'sont', 'qui', 'que', 'aux', 'der', 'die', 'das', 'und', 'ein',
+    'eine', 'mit', 'von', 'den', 'dem', 'del', 'della', 'dei', 'con', 'gli',
+    'per', 'una', 'los', 'las', 'por', 'a', 'an', 'of', 'le', 'la', 'de', 'du',
+    'et', 'au', 'il', 'el', 'lo', 'in', 'on', 'at', 'to',
+}
+
+
+def _is_subject_word(word: str) -> bool:
+    """A SUBJECT (meaning-bearing) content word: ≥3 chars, not a stopword, not a
+    descriptor (medium/material/format/period) and not a bare year/number.
+    'modern'/'moderne' are subject words; 'toile'/'oil'/'1863' are not."""
+    if not word or word.isdigit():
+        return False
+    if word in _ROMAN_NUMERALS:
+        return True
+    if len(word) < 3:
+        return False
+    if word in _SUBJECT_STOP_WORDS or word in _DESCRIPTOR_WORDS:
+        return False
+    return True
+
+
+def is_distinct_shorter_work(shorter_norm: str, longer_norm: str) -> bool:
+    """True when ``shorter_norm`` (a normalized title that is a substring of
+    ``longer_norm``) is a DISTINCT, more-specific-sibling work that must NOT be
+    pruned as a truncation of the longer one.
+
+    [LOCAL-845] The D1v2 canonical set is built from ``site_wiki_titles |
+    sparql_titles`` and then pruned of titles whose normalized form is a substring
+    of a longer title — the intent is to drop truncated SITE EXTRACTIONS ("The
+    Adoration" cut from "The Adoration of the Magi"). But the bare famous work
+    "Olympia" (Manet) is a substring of the sibling works "A Modern Olympia" and
+    "Une moderne Olympia" (Cézanne), so the prune DELETED "Olympia" from the
+    matchable set — and the candidate "Olympia" then had nothing to match but the
+    longer siblings, which the specificity gate correctly rejects, so it DROPPED
+    on the live path (while the LOCAL-826B fixture, which replaced "Olympia" with
+    "Olympia (toile)", never exercised this prune).
+
+    A genuine truncation is a shorter form whose words are ALL contained in the
+    longer and which adds only NON-SUBJECT words (stopwords, descriptors): "The
+    Adoration" → "The Adoration of the Magi" adds the subject word "magi", but it
+    is a PREFIX, i.e. a left-anchored truncation, so still prunable. A DISTINCT
+    sibling is one where the longer title adds a SUBJECT word AND the shorter is
+    not a left-anchored prefix of the longer (the famous bare title sits at the
+    END — "… olympia" — with a distinguishing qualifier before it). Keep those.
+    """
+    s = (shorter_norm or "").strip()
+    l = (longer_norm or "").strip()
+    if not s or not l or s == l:
+        return False
+    s_toks = s.split()
+    l_toks = l.split()
+    if len(s_toks) >= len(l_toks):
+        return False
+    # Left-anchored prefix ("the adoration" ⊂ "the adoration of the magi") is a
+    # truncation of a site extraction — prunable, NOT a distinct work.
+    if l_toks[:len(s_toks)] == s_toks:
+        return False
+    # Words the longer title adds beyond the shorter's own tokens.
+    extra = [w for w in l_toks if w not in set(s_toks)]
+    # A distinct sibling: the longer adds at least one SUBJECT word ("modern"/
+    # "moderne") — a different, more-specific work. Keep the shorter.
+    return any(_is_subject_word(w) for w in extra)
+
+
 def _alias_target_present_in_set(resolved_title: str,
                                  canon_norm_map: Dict[str, str]) -> Optional[str]:
     """[LOCAL-826 Bug 1] An alias resolves to ``resolved_title`` (a work's English
