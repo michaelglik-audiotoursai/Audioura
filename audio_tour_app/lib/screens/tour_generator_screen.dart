@@ -4,6 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 import 'dart:async';
 import 'dart:io';
+import 'dart:math';
 import 'package:path_provider/path_provider.dart';
 import 'package:archive/archive.dart';
 import 'package:permission_handler/permission_handler.dart';
@@ -82,6 +83,19 @@ class _TourGeneratorScreenState extends State<TourGeneratorScreen> {
   final TextEditingController _tourRequestController = TextEditingController();
   final TextEditingController _stopCountController = TextEditingController(text: '10');
   bool _isGenerating = false;
+  // [LOCAL-830] Synchronous in-flight guard. `_isGenerating` is only set true
+  // AFTER several awaits (SharedPreferences, the duplicate-check round trip and
+  // its dialog), so a second tap — or a Flutter button double-fire — arriving
+  // during that window slipped past the `if (_isGenerating) return` guard and
+  // sent a SECOND /generate-complete-tour ~1 s later (GCloud_Storied 2026-10-30:
+  // the phone sent two requests 1 s apart; only one tour saved). This flag is
+  // flipped true SYNCHRONOUSLY at the very first line of each generate handler,
+  // before any await, and cleared in a finally, so only the first tap proceeds.
+  bool _generateInFlight = false;
+  // [LOCAL-830] Idempotency key sent with the request so the server treats a
+  // duplicate submission within its window as the SAME job (belt-and-braces with
+  // the in-flight guard: covers a retried HTTP request or a process relaunch).
+  String? _clientRequestId;
   String _progress = '';
   List<Map<String, dynamic>> _pendingTours = [];
   List<Map<String, dynamic>> _backgroundTours = [];
@@ -580,8 +594,34 @@ class _TourGeneratorScreenState extends State<TourGeneratorScreen> {
     }
   }
 
+  /// [LOCAL-830] A fresh client request id (idempotency key) for one
+  /// user-initiated generation. Timestamp + a 64-bit secure-random nonce, hex —
+  /// unique per attempt and stable for its lifetime, so a retry of the same
+  /// submission reuses it while a new user tap gets a new one.
+  String _newClientRequestId() {
+    final rnd = Random.secure();
+    final a = rnd.nextInt(0xFFFFFFFF).toRadixString(16).padLeft(8, '0');
+    final b = rnd.nextInt(0xFFFFFFFF).toRadixString(16).padLeft(8, '0');
+    final ts = DateTime.now().microsecondsSinceEpoch.toRadixString(16);
+    return 'cli-$ts-$a$b';
+  }
+
   Future<void> _generateTour() async {
     if (_isGenerating) return; // re-entry guard
+    // [LOCAL-830] Synchronous double-submit guard — see `_generateInFlight`.
+    // Flipped true BEFORE any await so a second tap during the pre-request awaits
+    // (duplicate check + dialog) cannot start a second request. Cleared in the
+    // finally below once the submission has been started (or has failed).
+    if (_generateInFlight) return;
+    _generateInFlight = true;
+    try {
+      await _generateTourInner();
+    } finally {
+      _generateInFlight = false;
+    }
+  }
+
+  Future<void> _generateTourInner() async {
     final rawInput = _tourRequestController.text.trim();
     if (rawInput.isEmpty) {
       _showError('Please enter a tour request');
@@ -642,6 +682,10 @@ class _TourGeneratorScreenState extends State<TourGeneratorScreen> {
       _isGenerating = true;
       _progress = 'Starting tour generation...';
     });
+    // [LOCAL-830] Fresh idempotency key for THIS user-initiated generation. Sent
+    // as client_request_id so the orchestrator can collapse a duplicate
+    // submission (retry/relaunch) within its window into the same job.
+    _clientRequestId = _newClientRequestId();
 
     try {
       Map<String, dynamic> tourData = _parseTourRequest(sanitizedInput);
@@ -663,6 +707,11 @@ class _TourGeneratorScreenState extends State<TourGeneratorScreen> {
       // Include narrative tone from onboarding (Storied personalization)
       final tone = prefs.getString('narrative_tone') ?? 'general';
       tourData['narrative_tone'] = tone;
+      // [LOCAL-830] Idempotency key — the server treats a duplicate within its
+      // window as the same job, so a double submit never produces two tours.
+      if (_clientRequestId != null) {
+        tourData['client_request_id'] = _clientRequestId;
+      }
       
       // Step 1: Start tour generation
       final response = await http.post(
@@ -2368,6 +2417,18 @@ class _TourGeneratorScreenState extends State<TourGeneratorScreen> {
 
   Future<void> _generateTourBackground() async {
     if (_isGenerating) return;
+    // [LOCAL-830] Synchronous double-submit guard (same window as _generateTour:
+    // the duplicate-check awaits run before the request is sent).
+    if (_generateInFlight) return;
+    _generateInFlight = true;
+    try {
+      await _generateTourBackgroundInner();
+    } finally {
+      _generateInFlight = false;
+    }
+  }
+
+  Future<void> _generateTourBackgroundInner() async {
     final rawInput = _tourRequestController.text.trim();
     if (rawInput.isEmpty) {
       _showError('Please enter a tour request');
@@ -2410,6 +2471,9 @@ class _TourGeneratorScreenState extends State<TourGeneratorScreen> {
       if (!confirmed) return;
     }
 
+    // [LOCAL-830] Fresh idempotency key for this background generation.
+    _clientRequestId = _newClientRequestId();
+
     try {
       Map<String, dynamic> tourData = _parseTourRequest(sanitizedInput);
       tourData['total_stops'] = stopCount; // Add custom stop count
@@ -2428,6 +2492,10 @@ class _TourGeneratorScreenState extends State<TourGeneratorScreen> {
       // Include narrative tone from onboarding (Storied personalization)
       final tone = prefs.getString('narrative_tone') ?? 'general';
       tourData['narrative_tone'] = tone;
+      // [LOCAL-830] Idempotency key — server collapses a duplicate submit.
+      if (_clientRequestId != null) {
+        tourData['client_request_id'] = _clientRequestId;
+      }
       
       // Print debug info
       await DebugLogHelper.addDebugLog('BACKGROUND: Generating tour: ${tourData["location"]}');

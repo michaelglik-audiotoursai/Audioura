@@ -1,0 +1,19 @@
+LOCAL-830 live pool-reuse category guard: Kitesurfing schools in Mui Ne, Vietnam / 5 stops
+[LOCAL-830] seeded 7 pool rows under key 'v41|loc:kitesurfing schools in mui ne vietnam|' (6 kite schools + Sandals Restaurant)
+[LOCAL-830] pool BEFORE delivery (7): ["Jibe's Beach Club", 'Muine Kitesurf School (MKS)', 'C2Sky KiteSurfing', 'Palm Kite Club Mui Ne', 'Mui Ne Kite School', 'Vietnam Kiteboarding School', 'Sandals Restaurant']
+[LOCAL-830] off-category reuse skip 'Sandals Restaurant' restaurant (request is non-food business; pool row kept)
+  [LOCAL-830] category-scoped reuse: skipped 1 off-category food stop(s) from this business/activity tour (pool unchanged)
+[COST_METER] FRESH | tour_generate | $0.000000 | user=TEST-LOCAL-830 | job=None
+[LOCAL-830] cost ledger row: 83a7ed44-a42c-45e5-b8ca-8877ce8ff7b8
+[LIVE_RUN_METER] TEST-LOCAL-830  (cap $0.60, all providers combined)
+  TOTAL             $0.0000   description='test run'
+LOCAL-830 RESULT
+  delivery_path        : pool
+    Stop 1: Jibe's Beach Club
+    Stop 2: Muine Kitesurf School (MKS)
+    Stop 3: C2Sky KiteSurfing
+    Stop 4: Palm Kite Club Mui Ne
+    Stop 5: Mui Ne Kite School
+  pool AFTER (7) : ["Jibe's Beach Club", 'Muine Kitesurf School (MKS)', 'C2Sky KiteSurfing', 'Palm Kite Club Mui Ne', 'Mui Ne Kite School', 'Vietnam Kiteboarding School', 'Sandals Restaurant']
+OK: no restaurant in the delivered kite-school tour.
+OK: Sandals row still in the pool (category-scoped reuse — skip, not delete).

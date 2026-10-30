@@ -46,6 +46,10 @@ __all__ = [
     "candidate_matches_category",
     "filter_off_category",
     "CLASS_WORDS",
+    # LOCAL-830 — business/activity off-category guard (reuse path).
+    "is_food_request",
+    "business_off_category_class",
+    "filter_off_category_business",
 ]
 
 
@@ -163,9 +167,11 @@ def classify_place(title: str = "", category_text: str = "") -> Optional[str]:
 
 def _candidate_category_text(cand: Dict) -> str:
     """Pull the best category signal a candidate carries: the raw Serper category,
-    then the OSM type/category/cuisine fields the places path writes."""
+    then the OSM type/category/cuisine fields the places path writes, then the
+    POOLED-row ``type_specialty`` / ``category_text`` fields a reused stop carries
+    (a pooled stop has no Serper record — LOCAL-830)."""
     for key in ("_serper_category", "serper_category", "category_text",
-                "osm_category"):
+                "osm_category", "type_specialty"):
         v = cand.get(key)
         if isinstance(v, str) and v.strip():
             return v.strip()
@@ -239,3 +245,164 @@ def filter_off_category(cands: List[Dict],
             continue
         kept.append(cand)
     return kept
+
+
+# ── [LOCAL-830] Business/activity off-category guard (reuse path) ─────────────
+#
+# WHY (LEAD, GCloud_Storied 2026-10-30 — tour 502 "Kitesurf schools … Mui Ne"):
+# the tour returned four kite schools AND **Sandals Restaurant**. The restaurant
+# came from the STOP POOL (reused from the previous night's run), not from fresh
+# selection. The fresh path keeps a business/places tour on-category two ways:
+#   * PHASE 4 ``_verify_against_intent`` (needs the LLM ``intent['poi_type']``),
+#   * the LOCAL-791B ``filter_off_category`` (fires only on a plural CATEGORY
+#     noun — "pagodas", "temples"; EMPTY for "kitesurf schools").
+# Neither runs on a POOLED stop at reuse time, and neither is available cheaply
+# there (``poi_type`` needs an LLM call; ``requested_categories`` is empty for a
+# business request). So the pool served an off-category restaurant.
+#
+# This guard is the DETERMINISTIC, OFFLINE check the reuse path can run: for a
+# request whose SUBJECT is a business/activity provider that is NOT about food
+# (kite school, dive shop, yoga studio, gym, surfboard rental, …), a pooled stop
+# that classifies as FOOD ("restaurant" class: restaurant/cafe/bar/bakery/…) is
+# off-category and is SKIPPED for this tour. A FOOD request ("seafood
+# restaurants", "cafes in District 1") is NOT a business-off-category request —
+# the guard is a NO-OP and restaurants are kept. Non-business requests
+# (museums, pagodas, a plain walking tour) are also a no-op here; those are
+# covered by the LOCAL-791B category guard / scope checks.
+#
+# Category-scoped reuse (ticket item 2): this NEVER deletes a pool row. The row
+# stays in the pool and is reusable for the categories it matches — it is only
+# not SERVED for this off-category request.
+
+# Food/dining words in the request SUBJECT — a request carrying any of these is
+# ABOUT food, so a restaurant is on-category and must be kept. Mirrors the dining
+# vocabulary in stop_existence_gate._DINING / generate_tour_text dining words.
+_FOOD_REQUEST_WORDS = (
+    "restaurant", "restaurants", "dining", "dine", "food", "foods", "eatery",
+    "eateries", "cuisine", "cafe", "cafes", "coffee", "coffeehouse", "bakery",
+    "bakeries", "bar", "bars", "pub", "pubs", "brewery", "breweries", "bistro",
+    "bistros", "brasserie", "diner", "diners", "grill", "steakhouse",
+    "pizzeria", "pizzerias", "noodle", "noodles", "seafood", "streetfood",
+    "street food", "breakfast", "brunch", "lunch", "dinner", "snack", "snacks",
+    "dessert", "desserts", "patisserie", "deli", "culinary",
+)
+
+# Locative connectors that END the SUBJECT of a request — everything after is the
+# search centre / area, not part of what the tour is about. Mirrors
+# generate_tour_text._SUBJECT_CONNECTOR_RE (kept local so this module stays
+# dependency-free and importable at the reuse layer).
+_SUBJECT_CONNECTOR_RE = re.compile(
+    r"\b(?:near(?:\s+me)?|around|close\s+to|next\s+to|by|in|of|within|"
+    r"at|on|along)\b",
+    re.IGNORECASE,
+)
+
+
+def _request_subject(request: str) -> str:
+    """The SUBJECT of a request — the text up to the first locative connector.
+
+    "Kitesurf schools in Mui Ne" → "kitesurf schools"; "massage near Ben Thanh
+    Market" → "massage". A string that opens with a connector, or has none, is
+    its own subject. A leading "<type>:" label is stripped."""
+    subj = re.sub(r"^\s*[\w\s-]*?:\s*", "", str(request or ""), count=1).strip()
+    m = _SUBJECT_CONNECTOR_RE.search(subj)
+    if m and m.start() > 0:
+        subj = subj[:m.start()].strip(" ,:;-")
+    return subj
+
+
+def is_food_request(request: str) -> bool:
+    """True when the request SUBJECT is about food/dining (so a restaurant stop is
+    on-category and must be kept). Deterministic and offline."""
+    subj = _fold(_request_subject(request))
+    if not subj:
+        return False
+    for w in _FOOD_REQUEST_WORDS:
+        if re.search(r"\b" + re.escape(_fold(w)) + r"\b", subj):
+            return True
+    return False
+
+
+def business_off_category_class(request: str) -> Optional[str]:
+    """When the request SUBJECT is a BUSINESS/ACTIVITY provider that is NOT about
+    food, return the place CLASS that is off-category for it ("restaurant"); else
+    None (guard is a no-op).
+
+    "Kitesurf schools in Mui Ne", "dive shops", "yoga studios", "surfboard
+    rentals", "gyms" → "restaurant" (a food stop is off-category). A food request
+    ("seafood restaurants") → None. A non-business request (museums, pagodas, a
+    plain walking tour) → None.
+
+    Uses ``stop_existence_gate.classify_business_vs_landmark`` on the subject to
+    decide business vs dining vs landmark — the SAME classifier the fresh places
+    router (``_business_subject_of_request``) uses, so the reuse path and the
+    fresh path agree on what "a business request" is. Best-effort: if the
+    classifier is unavailable, returns None (no-op)."""
+    subj = _request_subject(request)
+    if not subj:
+        return None
+    # A walking/transport verb makes it an AREA walk, not a business request.
+    if re.match(r"^\s*(?:walk|walking|stroll|wander|hike|hiking|ramble|"
+                r"promenade|saunter)\b", subj, flags=re.IGNORECASE):
+        return None
+    if is_food_request(request):
+        return None
+    try:
+        from stop_existence_gate import classify_business_vs_landmark as _cbl
+        verdict = _cbl(subj)
+    except Exception:
+        return None
+    # 'business' (NOT 'dining', NOT 'landmark') → food stops are off-category.
+    if verdict == "business":
+        return "restaurant"
+    return None
+
+
+def filter_off_category_business(
+        rows: List[Dict],
+        request: str,
+        log: Optional[Callable[[str], None]] = None,
+        named_anchors: Optional[Sequence[str]] = None,
+) -> Tuple[List[Dict], int]:
+    """[LOCAL-830] SKIP (do not delete) pooled rows that are off-category for a
+    business/activity request.
+
+    For a request whose subject is a business/activity provider that is NOT about
+    food, a row classified as FOOD ("restaurant" class) is skipped for THIS tour.
+    The row is NEVER deleted from the pool (category-scoped reuse — it stays
+    reusable for a food request). A row the user named by hand is always kept. An
+    unclassifiable row (class None) is kept (we never drop a place we cannot
+    classify). Returns ``(kept_rows, skipped_count)``.
+
+    No-op (returns the rows unchanged, skipped=0) when the request is not a
+    non-food business request. Best-effort: any error returns the rows unchanged
+    (a guard bug must never empty a tour)."""
+    emit = log or print
+    if not rows:
+        return list(rows), 0
+    try:
+        off_class = business_off_category_class(request)
+    except Exception:
+        return list(rows), 0
+    if not off_class:
+        return list(rows), 0
+
+    anchor_keys = {_fold(a) for a in (named_anchors or []) if a}
+    kept: List[Dict] = []
+    skipped = 0
+    for r in rows:
+        title = _candidate_title(r)
+        if anchor_keys and _fold(re.sub(r"\s*\([^)]*\)\s*", " ", title)) in anchor_keys:
+            kept.append(r)
+            continue
+        try:
+            cls = classify_place(title, _candidate_category_text(r))
+        except Exception:
+            cls = None
+        if cls == off_class:
+            skipped += 1
+            emit(f"[LOCAL-830] off-category reuse skip {title!r} {cls} "
+                 f"(request is non-food business; pool row kept)")
+            continue
+        kept.append(r)
+    return kept, skipped
