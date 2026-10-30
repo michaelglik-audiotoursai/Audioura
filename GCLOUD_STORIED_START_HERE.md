@@ -13,7 +13,15 @@ has lapsed twice and Michael has had to ask twice.
 
 ---
 
-# ▶️ WAVE 13 — 2026-10-30 08:42 EDT (wdvrdaza0k) — CURRENT: generator **00019-k5x** + orchestrator **00011-tjn** = `e63000db` (silent jobs go terminal, max 3 resumes). Rollback 00018-8vt / 00010-v5c. Proof 508 Ben Thanh walk stored once, $0.10, but 2/4 stops; hidden. audio_tours 400.
+# ▶️ WAVE 15 — 2026-10-30 12:13 EDT (wdvrdaza4v) — CURRENT, all `626a18c0`:
+- **Live:** generator **00021-45q** (D746 env + STORY_PASS_MODEL=gpt-4.1), orchestrator **00012-bxs**, modernized **00006-9hq** (JOB_STORE_MODE=layered + DATABASE_URL, max-instances 3).
+- **Rollback:** gen 00019-k5x, orch 00011-tjn, modernized 00004-5jx (max=1).
+- **Proofs:** 509 Ben Thanh 4/4, 510 Orsay 5/5 (story pass: NO_STORY), 511 Dong Khoi 3/3. Total $0.34; all hidden; audio_tours 403.
+- **Not yet seen:** a cross-instance /download (all calls hit one instance).
+- **Wave 14** (ce18fca3, gen 00020-2q6) failed its proof: LOCAL-805 sent "<landmark> walk" down the restaurant/places path (LOCAL-838), and modernized lost the job ("Job not found"; max=1 stop-gap 00004-5jx). Orch job 3170d075 set to error (backup AudiouraBackups\orch_job_3170d075_20261030).
+- **Laptop Cloud SQL proxy drops connections often:** runproof dies, but the server jobs carry on; poll with connect_timeout=60.
+
+# ▶️ WAVE 13 — 2026-10-30 08:42 EDT (wdvrdaza0k): generator **00019-k5x** + orchestrator **00011-tjn** = `e63000db` (silent jobs go terminal, max 3 resumes). Rollback 00018-8vt / 00010-v5c. Proof 508 Ben Thanh walk stored once, $0.10, but 2/4 stops; hidden. audio_tours 400.
 
 # ▶️ WAVE 12 — 2026-10-30 08:28 EDT (wdvrdaz9z9) generator: **00018-8vt** = `18e07ff7` (places path no longer calls Gemini; kite proof 507 $0.32, Gemini $0.05, but only 1/5 kite schools for 'Kiteboarding lessons'). Rollback 00017-869. orchestrator_jobs 03ec8b1a set to error by hand (backup AudiouraBackups\orch_job_03ec8b1a_20261030).
 
