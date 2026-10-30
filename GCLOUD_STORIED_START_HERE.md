@@ -13,6 +13,10 @@ has lapsed twice and Michael has had to ask twice.
 
 ---
 
+# ▶️ WAVE 7 — 2026-10-30 01:55 EDT (wdvrdaz9xn; overrides waves 6/5 lists below)
+- generator **00016-62s** = `dad37e92` + **cheap museum arm ON** (CHEAP_ARM_CATEGORIES=museum, NARRATION_MODEL=gpt-4.1-mini, RESEARCH_BACKEND=serper) [00015-dvg = same image, wave-4 env; 00011-47m = wave 5]. Proofs: Orsay 497 4/5 full arm ($1.31); Rijksmuseum 5/5 cheap ($0.38), NOT stored (orchestrator SIGTERM again).
+- Open: orchestrator SIGTERM loses long tours (requests 279, 294; LOCAL-821); wrong-venue paragraph in cheap-arm research; false "N exhibitions on view" line (LOCAL-826). audio_tours 389.
+
 # ▶️ WAVE 6 — 2026-10-30 00:45 EDT (wdvrdaz9xk; overrides the revision list just below)
 - generator traffic **100% on 00011-47m** (5e2d588a, wave-4 env) after a ROLLBACK at 00:5x: on 00014-dn6 (af895bd1) museum tours came out 1/5 (Orsay 496, full arm). 00014-dn6 is kept at 0% traffic. Wave 7 (dad37e92, dedupe skips museums) is pending from LEAD. Museum proofs: use clean alternate names, not a suffix. map-delivery **00005-smt** = af895bd1, /geocode live [00004-qvq].
 - D740 cheap-arm re-test FAILED again: Orsay 495 came out 1/5 because LOCAL-791E same-place dedupe drops museum works (shared pin), plus false "N exhibitions on view" line. Proofs 493–495 hidden (AudiouraBackups\wave6_proofs_hide_20261030). audio_tours 387.
