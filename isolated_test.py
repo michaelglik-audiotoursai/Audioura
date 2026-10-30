@@ -25,6 +25,10 @@ import uuid
 from pathlib import Path
 
 import continuous_dev_lib as cdl
+# [LOCAL-820] the ONE standard way to wire the paid-API meter into an isolated
+# container so its OpenAI/Gemini/Serper spend lands in ~/Audioura/meterlogs where
+# meter_report.py sums it — not inside the --rm container where it dies.
+import meter_container_env as mce
 
 WATCH_DIR = cdl.WATCH_DIR
 DOCKERFILE = "Dockerfile.generator"
@@ -101,6 +105,18 @@ def main():
             "-e", "DATABASE_URL=postgresql://admin:password123@postgres-2:5432/audiotours",
             "-e", "STORIED_MODE=true",
         ]
+        # [LOCAL-820] Meter the run to the SHARED host meterlog dir. Without this,
+        # every paid call this disposable container makes is logged to
+        # /meterlogs inside the container and dies with `--rm` — the ~16k
+        # unmetered OpenAI calls. docker_meter_args() bind-mounts
+        # ~/Audioura/meterlogs at /meterlogs, writes the canonical
+        # paid_api_calls.jsonl, sets PYTHONPATH=/opt/meter (the image already
+        # bakes _meter there, but mounting the worktree's _meter keeps the
+        # metered code in lock-step with the branch under test), and tags every
+        # row service=<task id> so meter_report.py can total this task's spend.
+        _meter_dir = str(Path(args.context).resolve() / "_meter")
+        docker_cmd += mce.docker_meter_args(task_id=args.task_id,
+                                            meter_dir=_meter_dir)
         if ENV_FILE.exists():
             docker_cmd += ["--env-file", str(ENV_FILE)]
         if host_out_dir:

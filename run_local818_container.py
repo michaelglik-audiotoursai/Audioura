@@ -24,7 +24,11 @@ At most 2 live tours. Each delivered tour is stored as ONE additive is_test row 
 the ISOLATED DB. No DELETE. Live DB never written. Capture every needed log in ONE
 run per tour.
 
-Run inside an isolated container only (OWN project; never touch audioura-*):
+Run inside an isolated container only (OWN project; never touch audioura-*).
+PREFER the wrapper ``./run_local818_live.sh [0|1]`` — it wires the meter contract
+(below) for you. The equivalent raw command, with the [LOCAL-820] meter args that
+make the run's paid-API spend land in ~/Audioura/meterlogs (NOT inside the --rm
+container, where LOCAL-818's rows died):
 
     docker network create local818_net
     docker run -d --name local818-postgres --network local818_net \
@@ -38,8 +42,18 @@ Run inside an isolated container only (OWN project; never touch audioura-*):
         -e STOP_EXISTENCE_GATE_MODE=log_only \
         -e TASK_BUDGET_ID=LOCAL-818 -e TASK_BUDGET_USD=0.70 \
         -e TEST_GEMINI_MAX_USD=0.70 -e COST_HARD_LIMIT_USD=0.70 \
+        -e PYTHONPATH=/opt/meter \
+        -e PAID_API_LOG=/meterlogs/paid_api_calls.jsonl \
+        -e METER_SERVICE=LOCAL-818 \
+        -v "$HOME/Audioura/_meter":/opt/meter:ro \
+        -v "$HOME/Audioura/meterlogs":/meterlogs \
         -v "$PWD":/app -w /app audioura-tour-generator:latest \
         python -u run_local818_container.py <0|1>
+
+The three -e meter vars + two -v meter mounts are exactly what
+``meter_container_env.docker_meter_args()`` returns; keep them in lock-step with
+that helper. Without them the baked-in meter writes to /meterlogs inside the
+container and the rows are lost with ``--rm`` (LOCAL-820).
 """
 import os as _os
 import sys as _sys
