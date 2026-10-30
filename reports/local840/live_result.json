@@ -1,0 +1,116 @@
+{
+  "cap": 0.9,
+  "per_tour_pass": 0.45,
+  "overall_pass": false,
+  "results": [
+    {
+      "location": "Orsay Museum, Paris, France",
+      "n_requested": 5,
+      "n_stops": 5,
+      "per_stop": [
+        {
+          "stop": 1,
+          "title": "L'Origine du monde",
+          "has_story": false,
+          "why": "the longest run (4 sentences, Origine) has agency=0 stakes=0 — someone is described, but nothing is risked, refused or l"
+        },
+        {
+          "stop": 2,
+          "title": "Le Déjeuner sur l'herbe (Luncheon on the Grass)",
+          "has_story": false,
+          "why": "the longest run (4 sentences, Édouard Manet) has agency=0 stakes=0 — someone is described, but nothing is risked, refuse"
+        },
+        {
+          "stop": 3,
+          "title": "Bal du moulin de la Galette",
+          "has_story": false,
+          "why": "longest qualifying run is 2 sentence(s); the bar is 3 consecutive sentences about one subject, carrying an action and a "
+        },
+        {
+          "stop": 4,
+          "title": "La Nuit étoilée (Starry Night Over the Rhône)",
+          "has_story": true,
+          "why": "Van Gogh carries 3 consecutive sentences with an action and something at stake"
+        },
+        {
+          "stop": 5,
+          "title": "L'Église d'Auvers-sur-Oise (The Church at Auvers)",
+          "has_story": false,
+          "why": "the longest run (8 sentences, This) has agency=2 stakes=0 — someone is described, but nothing is risked, refused or lost"
+        }
+      ],
+      "all_story_ok": false,
+      "no_story_lines": [
+        "[LOCAL-487] step 7a: 5 stop(s) have NO VALID STORY by Michael's bar (3+ consecutive sentences, one person, an action and something at stake)"
+      ],
+      "wsr_lines": [
+        "[LOCAL-840] Stop 4 work research: 0 passage(s) (source=none, qid=-, $0.0010)",
+        "[LOCAL-840] Stop 2 work research: 3 passage(s) (source=serper_fallback, qid=-, $0.0200)",
+        "[LOCAL-840] Stop 3 work research: 8 passage(s) (source=wikipedia, qid=Q683274, $0.0000)",
+        "[LOCAL-840] Stop 1 work research: 8 passage(s) (source=wikipedia, qid=Q334138, $0.0000)",
+        "[LOCAL-840] Stop 5 work research: 8 passage(s) (source=wikipedia, qid=Q1213917, $0.0000)",
+        "[LOCAL-840] Stop 2 work research: 3 passage(s) (source=cache, qid=-, $0.0000)",
+        "[LOCAL-840] Stop 4 work research: 0 passage(s) (source=none, qid=-, $0.0010)",
+        "[LOCAL-840] Stop 3 work research: 8 passage(s) (source=cache, qid=Q683274, $0.0000)",
+        "[LOCAL-840] Stop 5 work research: 8 passage(s) (source=cache, qid=Q1213917, $0.0000)",
+        "[LOCAL-840] Stop 1 work research: 8 passage(s) (source=cache, qid=Q334138, $0.0000)"
+      ],
+      "delivery_violations": [],
+      "tour_usd": 0.317056
+    },
+    {
+      "location": "Rijksmuseum, Amsterdam, Netherlands",
+      "n_requested": 5,
+      "n_stops": 5,
+      "per_stop": [
+        {
+          "stop": 1,
+          "title": "De grote golf bij Kanagawa (The Great Wave off Kanagawa)",
+          "has_story": false,
+          "why": "the longest run (3 sentences, The Great Wave) has agency=0 stakes=0 — someone is described, but nothing is risked, refus"
+        },
+        {
+          "stop": 2,
+          "title": "De Nachtwacht (The Night Watch)",
+          "has_story": false,
+          "why": "the longest run (3 sentences, Wilhelmus de Rijk) has agency=1 stakes=0 — someone is described, but nothing is risked, re"
+        },
+        {
+          "stop": 3,
+          "title": "Het melkmeisje (The Milkmaid)",
+          "has_story": true,
+          "why": "The Milkmaid carries 5 consecutive sentences with an action and something at stake"
+        },
+        {
+          "stop": 4,
+          "title": "Het Joodse Bruidje (The Jewish Bride)",
+          "has_story": false,
+          "why": "the longest run (4 sentences, Het Joodse) has agency=0 stakes=0 — someone is described, but nothing is risked, refused o"
+        },
+        {
+          "stop": 5,
+          "title": "Gezicht op huizen in Delft, bekend als ‘Het straatje’ (The Little Street)",
+          "has_story": false,
+          "why": "the longest run (6 sentences, This) has agency=1 stakes=0 — someone is described, but nothing is risked, refused or lost"
+        }
+      ],
+      "all_story_ok": false,
+      "no_story_lines": [
+        "[LOCAL-487] step 7a: 3 stop(s) have NO VALID STORY by Michael's bar (3+ consecutive sentences, one person, an action and something at stake)"
+      ],
+      "wsr_lines": [
+        "[LOCAL-840] Stop 1 work research: 0 passage(s) (source=none, qid=-, $0.0010)",
+        "[LOCAL-840] Stop 4 work research: 0 passage(s) (source=none, qid=-, $0.0100)",
+        "[LOCAL-840] Stop 2 work research: 8 passage(s) (source=wikipedia, qid=Q219831, $0.0000)",
+        "[LOCAL-840] Stop 5 work research: 8 passage(s) (source=wikipedia, qid=Q586035, $0.0000)",
+        "[LOCAL-840] Stop 3 work research: 8 passage(s) (source=wikipedia, qid=Q167605, $0.0000)",
+        "[LOCAL-840] Stop 5 work research: 8 passage(s) (source=cache, qid=Q586035, $0.0000)",
+        "[LOCAL-840] Stop 3 work research: 8 passage(s) (source=cache, qid=Q167605, $0.0000)",
+        "[LOCAL-840] Stop 4 work research: 0 passage(s) (source=none, qid=-, $0.0100)"
+      ],
+      "delivery_violations": [],
+      "tour_usd": 0.306431
+    }
+  ],
+  "metered_total": 0.7540837400000002
+}

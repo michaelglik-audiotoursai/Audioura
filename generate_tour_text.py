@@ -23006,6 +23006,45 @@ satisfy this requirement. Your text will be REJECTED if "{_414_artist_surname}" 
                         _sp_t = _sp_s.get('snippet') if isinstance(_sp_s, dict) else str(_sp_s)
                         if _sp_t:
                             _sp_material.append(_sp_t)
+                    # [LOCAL-840] PER-WORK STORY RESEARCH. The LOCAL-837 submission
+                    # proved the ceiling was not the story pass but the MATERIAL:
+                    # `_stop_snippets` are Serper snippets, and for these works
+                    # those snippets are PROVENANCE AND METADATA ("Legs Gustave
+                    # Caillebotte", "Gift of H.W.A. Deterding", "oil on canvas",
+                    # stock-image captions), on which works_mode correctly returns
+                    # NO_STORY. So before the pass runs, fetch the work's OWN
+                    # Wikipedia article (Wikidata QID, EN + local language), keep
+                    # the human-event passages (creation, theft, damage, rescue,
+                    # restoration) and DROP the provenance/metadata lines, and put
+                    # those passages FIRST as the primary material. Wikipedia is
+                    # free; a single bounded Serper+extract fallback fires only
+                    # when Wikipedia is thin, capped ≤ $0.03/stop. Cached per QID.
+                    # Opt-in and reversible: WORK_STORY_RESEARCH=0 restores the
+                    # snippet-only material exactly as before. Additive — on any
+                    # failure the Serper snippets above remain and the pass still
+                    # answers NO_STORY rather than inventing.
+                    if (os.environ.get('WORK_STORY_RESEARCH', '1') or '1').strip() != '0':
+                        try:
+                            from work_story_research import museum_work_research
+                            _wsr = museum_work_research(
+                                title=poi.get('name', '') or '',
+                                artist=poi.get('artist', '') or artist or '',
+                                location=location or '',
+                                venue=_museum_venue_name or '')
+                            _wsr_passages = _wsr.get('passages') or []
+                            if _wsr_passages:
+                                # Wikipedia event passages FIRST (primary); the
+                                # existing Serper snippets remain as backup.
+                                _seen_sp = {m.lower()[:120] for m in _wsr_passages}
+                                _sp_material = _wsr_passages + [
+                                    m for m in _sp_material
+                                    if m.lower()[:120] not in _seen_sp]
+                            print(f"  [LOCAL-840] Stop {stop_num} work research: "
+                                  f"{len(_wsr_passages)} passage(s) "
+                                  f"(source={_wsr.get('source')}, qid={_wsr.get('qid') or '-'}, "
+                                  f"${_wsr.get('cost', 0.0):.4f})")
+                        except Exception as _wsr_err:
+                            print(f"  [LOCAL-840] work research skipped (non-fatal): {_wsr_err}")
                     # [D498] Step 3a: filled slot-by-slot from `story_pass`'s own
                     # vocabulary, so the producer cannot drift from the consumer.
                     # `_sp_sources` maps each slot to where production holds it;
