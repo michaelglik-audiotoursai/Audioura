@@ -2875,6 +2875,28 @@ def _resolve_scope_for_check(intent, location, tour_category, museum_venue_name,
                 intent['geographic_scope'] = _encl
                 # The area is a district-level extent (or empty → no check).
                 intent['scope_precision'] = 'DISTRICT' if _encl else ''
+    # [LOCAL-816] A scope that is really a LIST OF NAMED ANCHORS ("Trevi Fountain,
+    # Pantheon and Piazza Navona, Rome") is the STOP LIST, not a containable area.
+    # Judged against it, every on-category replenishment candidate is "outside",
+    # so a walking tour that dropped one stop can never refill and ships 4 of 5
+    # with a needless shortfall apology (847 Rome centro). Widen the containment
+    # scope to the enclosing area (the admin tail — "Rome"), exactly as LOCAL-805
+    # widens a near-landmark scope: the named anchors are seeds, not a boundary.
+    # Keep the intent copy in step so the ONE-SCOPE invariant below does not then
+    # clear the widened scope for differing from the (stale) geographic_scope.
+    if scope:
+        _anchor_encl = _anchor_list_enclosing_area(scope, location, intent)
+        if _anchor_encl and _norm_place(_anchor_encl) != _norm_place(scope):
+            if not quiet:
+                print(f"\n  [LOCAL-816] named-anchor scope: containment scope widened "
+                      f"from the anchor list '{scope}' to the enclosing area "
+                      f"'{_anchor_encl}' (the named places are the tour's stops, not "
+                      f"its boundary) — so replenishment can reach N.")
+            scope = _anchor_encl
+            if intent is not None:
+                intent = dict(intent)
+                intent['geographic_scope'] = _anchor_encl
+                intent['scope_precision'] = 'DISTRICT'
     # [D536] Refuse a scope that is only a named stop on the route.
     if scope and scope_is_a_waypoint(scope, location):
         _wider = (intent.get('location') or '').strip() if intent else ''
@@ -4629,6 +4651,125 @@ def _near_landmark_enclosing_area(location):
     # the landmark). "near me" has no landmark, so the tail is the whole remainder.
     tail = [t for t in segs[1:] if t]
     return ', '.join(tail)
+
+
+# [LOCAL-816] Split a scope string into its comma / "and" / "&" segments, in order.
+_ANCHOR_SEG_SPLIT_RE = re.compile(r'\s*(?:,|\band\b|&)\s*', re.IGNORECASE)
+
+
+def _anchor_list_enclosing_area(scope, location, intent):
+    """[LOCAL-816] The ENCLOSING AREA of a scope that is really a LIST OF NAMED
+    ANCHORS, or None when the scope is an ordinary single area.
+
+    A request phrased "Trevi Fountain, Pantheon and Piazza Navona walking tour,
+    Rome" names three STOPS up front, and the LLM intent put those three stops —
+    joined — into geographic_scope ("Trevi Fountain, Pantheon and Piazza Navona,
+    Rome"). That is not a containable area: it is the stop list. Used as the
+    PHASE 5.6 / D558 containment scope it rejects EVERY on-category replenishment
+    candidate ("the Spanish Steps are not inside 'Trevi Fountain, Pantheon and
+    Piazza Navona'"), so a tour that dropped one stop (dedup, off-category, a bad
+    pin, the existence gate) can never refill and ships 4 of 5 with the honest-but-
+    needless shortfall apology — the catalog defect on 847 Rome centro. Central
+    Rome plainly has more than five real places; the scope, not the city, was the
+    limit.
+
+    This recognises that shape and returns the enclosing AREA (the admin tail that
+    follows the anchors — "Rome") so the containment check is run against the real
+    area and replenishment can reach N. Mirrors the LOCAL-805 near-landmark
+    widening exactly: the named things are search seeds, not a boundary.
+
+    The anchor list is recognised STRUCTURALLY from the listener's own request —
+    "<A>, <B> and <C> [walking] tour, <City>" — the same deterministic, phrasing-
+    based approach as named_anchors (the names are not matched against a gazetteer;
+    the grammar of the request is the signal). It fires ONLY when the scope IS that
+    leading list, so a legitimate single/two-part AREA ("Lower Manhattan, New
+    York", "Westminster, London", "Asakusa, Tokyo", "Beacon Hill, Boston") is never
+    mistaken for an anchor list and widened away.
+
+    Returns the enclosing-area string when the request's leading list is two or
+    more anchors followed by an area (either in the scope's own tail or the
+    request's city tail); None otherwise.
+    """
+    if not scope:
+        return None
+    # The leading anchor list + enclosing area, read STRUCTURALLY from the request.
+    anchors, city_tail = _leading_anchor_list(location)
+    if len(anchors) < 2:
+        return None
+    # Only widen when the SCOPE is really that anchor list — i.e. the scope's
+    # leading segments are the request's leading anchors. This guards a genuine
+    # area scope that merely happens to differ from the request text.
+    scope_segs = [s.strip() for s in _ANCHOR_SEG_SPLIT_RE.split(scope) if s and s.strip()]
+    if not scope_segs:
+        return None
+    anchor_norms = {_norm_place(a) for a in anchors}
+    lead = 0
+    for s in scope_segs:
+        if _norm_place(s) in anchor_norms:
+            lead += 1
+        else:
+            break
+    if lead < 2:
+        return None
+    if lead < len(scope_segs):
+        # The scope itself carries the enclosing area as its tail
+        # ("Trevi Fountain, Pantheon and Piazza Navona, Rome" → "Rome").
+        return ', '.join(seg for seg in scope_segs[lead:] if seg)
+    # The scope is ENTIRELY the anchor list, with no area tail of its own (the
+    # field case: the LLM put only the stops in geographic_scope, no city). The
+    # enclosing area is the city the request names after the anchors.
+    return city_tail or None
+
+
+# [LOCAL-816] The tour-type / transport phrase that separates a leading anchor
+# list from the request's city tail: "... walking tour, <City>".
+_LEADING_TOUR_KEYWORD_RE = re.compile(
+    r'\b(?:self[\s-]?guided\s+)?'
+    r'(?:walking|walk|biking|bike|cycling|cycle|driving|drive|bus|boat|ferry|'
+    r'guided|audio|history|historical|food|art|architecture|sightseeing|'
+    r'heritage|cultural)?\s*tour\b',
+    re.IGNORECASE)
+
+
+def _leading_anchor_list(location):
+    """[LOCAL-816] Structurally split "<A>, <B> and <C> [walking] tour, <City>" into
+    its leading anchor list and the trailing city.
+
+    Returns (anchors, city_tail):
+      "Trevi Fountain, Pantheon and Piazza Navona walking tour, Rome"
+          -> (["Trevi Fountain", "Pantheon", "Piazza Navona"], "Rome")
+      "Westminster walking tour, London"   -> ([], "London")   # one anchor only
+      "Asakusa and Senso-ji walking tour, Tokyo"
+          -> (["Asakusa", "Senso-ji"], "Tokyo")
+
+    anchors is [] (never mistaken for a list) when the head before the tour
+    keyword is a single place. The names are copied verbatim from the request;
+    nothing is matched against a gazetteer.
+    """
+    if not location:
+        return [], None
+    s = location.strip()
+    # Strip a leading "<label>:" ("walking tour: ...") but NOT a trailing
+    # "... tour" (that is the separator we key on).
+    s = re.sub(r'^\s*[\w\s-]*?:\s*', '', s, count=1).strip()
+    m = _LEADING_TOUR_KEYWORD_RE.search(s)
+    if not m:
+        return [], None
+    head = s[:m.start()].strip(' ,.;')     # the anchor list sits before "tour"
+    tail = s[m.end():].strip(' ,.;')       # the city sits after "tour,"
+    if not head:
+        return [], (tail.split(',')[-1].strip() if tail else None) or None
+    # Split the head on commas / "and" / "&" into ordered anchors.
+    anchors = [a.strip() for a in _ANCHOR_SEG_SPLIT_RE.split(head)
+               if a and len(a.strip()) > 2]
+    # The city is the LAST comma-segment of the tail (drop any region suffix noise
+    # but keep a two-part "City, Country" area intact enough for the resolver).
+    city = None
+    if tail:
+        tparts = [t.strip() for t in tail.split(',') if t.strip()]
+        if tparts:
+            city = tparts[-1]
+    return anchors, city
 
 
 def _classify_tour_category(location, tour_type):
