@@ -178,34 +178,154 @@ def _segments(text: str) -> List[Dict]:
 # (1) De-splice: remove a headerless body glued after a Directions line
 # ─────────────────────────────────────────────────────────────────────────────
 
-def _desplice_segment(seg: str) -> Tuple[str, bool]:
-    """Within a single stop segment, cut a headerless duplicate body that was
-    spliced after the Directions line.
+# The "<cue> <Name>" hand-off a Directions line ends with. The <Name> is the
+# stop the orphan body belongs to (w1: "Continue to Park Street Church"; Rijks:
+# "Proceed to A Militiaman Holding a Berkemeyer, Known as the 'Merry Drinker'
+# (Een schutter …)"). Used to re-title an orphan body that is a UNIQUE stop whose
+# header was lost, so it is promoted (not dropped). Cue list mirrors the
+# deterministic museum/outdoor hand-offs.
+_HANDOFF_NAME = re.compile(
+    r'(?i)(?:Continue through|Continue to|Proceed to|Next:|'
+    r'Head towards|Your final stop(?:\s+in\s+[^:]+)?:)\s*(.+?)\s*$')
+
+
+def _handoff_title(directions_line: str) -> str:
+    """Return the next-stop NAME a Directions hand-off line announces, or ''.
+
+    "Directions: Proceed to A Militiaman … ('De vrolijke drinker')." →
+    "A Militiaman … ('De vrolijke drinker')". The trailing sentence period and a
+    "next is "/"next:" lead-in are trimmed."""
+    m = _HANDOFF_NAME.search(directions_line or "")
+    if not m:
+        return ""
+    name = m.group(1).strip()
+    name = re.sub(r'(?i)^next\s+is\s+', '', name).strip()
+    name = name.rstrip('.').strip()
+    # Strip surrounding single quotes a hand-off sometimes wraps the name in.
+    if len(name) >= 2 and name[0] in "'\u2018\u2019" and name[-1] in "'\u2018\u2019":
+        name = name[1:-1].strip()
+    return name
+
+
+def _desplice_segment(seg: str) -> Tuple[str, str, bool]:
+    """Within a single stop segment, split off a headerless body that was spliced
+    after the Directions line.
 
     The segment legitimately ends with ONE ``Directions:`` hand-off line and no
     house field labels after it. A SPLICE re-opens house field labels
     (Address/Coordinates/Type/Specialty/Specific Examples/Orientation) AFTER a
     Directions line with no "Stop N:" header of its own — that is a copy of the
     next stop glued into this one's tail (w1: Park Street Church's body after
-    Stop 1's Directions; w4: Independence Palace's body after Stop 1's). Find the
-    FIRST Directions line that is followed by such a field block, keep that
-    hand-off line, and drop everything after it (the whole spliced tail,
-    including any second Directions line the spliced body carried).
+    Stop 1's Directions; w4: Independence Palace's body after Stop 1's; Rijks
+    866: the Merry Drinker's whole narrated body after Stop 3's Directions). Find
+    the FIRST Directions line that is followed by such a field block and separate
+    the kept hand-off from the orphan tail.
 
-    Returns ``(new_seg, changed)``.
+    Returns ``(kept_seg, orphan_tail, changed)``. The CALLER decides the orphan's
+    fate: drop it when it only duplicates a FOLLOWING real stop (the w1/w4
+    symptom), or PROMOTE it to its own "Stop N:" block when it is a unique
+    narrated stop whose header a late pass lost (Rijks 866) — deleting a real,
+    paid, narrated stop is never acceptable.
     """
     for d in re.finditer(r'(?im)^[ \t]*Directions:[^\n]*$', seg):
         tail = seg[d.end():]
         if _FIELD_LABEL.search(tail):
-            # Orphan field block after this hand-off → splice. Cut it.
             kept = seg[:d.end()].rstrip() + "\n\n"
-            return kept, True
-    return seg, False
+            return kept, tail, True
+    return seg, "", False
 
 
 # ─────────────────────────────────────────────────────────────────────────────
 # (1) Drop stray preview headers + de-splice + dedupe real stops + renumber
 # ─────────────────────────────────────────────────────────────────────────────
+
+def _orphan_body_text(orphan_tail: str) -> str:
+    """Comparable text of an orphan/stop body: the field-label PREFIX is dropped
+    but the field VALUE is kept (museum narration lives inside the Orientation
+    value), and bare narration paragraphs are kept, normalised for a duplicate
+    comparison. Address/Coordinates/Directions carry no narration and are dropped
+    entirely so an address string cannot dominate the overlap."""
+    kept = []
+    for ln in (orphan_tail or "").splitlines():
+        s = ln.strip()
+        if not s:
+            continue
+        if re.match(r'(?i)^(?:Address|Coordinates|Directions):', s):
+            continue
+        # Keep the value of a narration-bearing field label; keep bare prose.
+        m = re.match(r'(?i)^(?:Orientation|Type/Specialty|Specific Examples|'
+                     r'Operational Details|Museum Information):\s*(.*)$', s)
+        kept.append(m.group(1) if m else s)
+    return re.sub(r'\s+', ' ', " ".join(kept)).strip().lower()
+
+
+def _orphan_duplicates_following(orphan_tail: str,
+                                 handoff_title: str,
+                                 following_segs: List[Dict]) -> bool:
+    """True when the orphan body spliced after a Directions line merely DUPLICATES
+    a FOLLOWING real stop — the w1/w4 symptom, where the next stop is also emitted
+    with its own "Stop N:" header, so dropping the orphan loses nothing.
+
+    False when the orphan is a UNIQUE narrated stop whose header a late pass lost
+    (Rijks 866: the Merry Drinker body, with no matching "Stop N:" elsewhere) — the
+    caller must PROMOTE it, never drop it.
+
+    A match is by the hand-off title naming a following real stop, or by heavy
+    narration overlap with a following segment's body (title lost on both sides)."""
+    _ht = _norm_title(handoff_title)
+    for fs in following_segs:
+        if _ht and (_ht == fs['title'] or _titles_equivalent(_ht, fs['title'])):
+            return True
+    _ob = _orphan_body_text(orphan_tail)
+    if len(_ob) >= 40:
+        _ob_tokens = set(_ob.split())
+        for fs in following_segs:
+            _fb = _orphan_body_text(fs['seg'])
+            if not _fb:
+                continue
+            if _ob in _fb or _fb in _ob:
+                return True
+            # Heavy token overlap (same narration re-emitted with minor edits):
+            # Jaccard over the shorter side ≥ 0.6 means the orphan is that stop.
+            _fb_tokens = set(_fb.split())
+            _inter = len(_ob_tokens & _fb_tokens)
+            _denom = max(1, min(len(_ob_tokens), len(_fb_tokens)))
+            if _inter / _denom >= 0.6:
+                return True
+    return False
+
+
+def _promote_orphan_to_stop(orphan_tail: str, handoff_title: str) -> str:
+    """Build a self-contained "Stop:" block from an orphan body whose header was
+    lost, titled by the Directions hand-off that announced it. The number is a
+    placeholder (0); the caller renumbers every survivor 1..k afterwards."""
+    body = orphan_tail.lstrip("\n")
+    title = (handoff_title or "").strip() or "This stop"
+    return f"Stop 0: {title}\n\n" + body
+
+
+def _orphan_has_narration_body(orphan_tail: str) -> bool:
+    """True when the orphan carries a REAL narration body — a bare prose
+    paragraph (not a field label) of some substance — so it is a lost-header
+    stop worth PROMOTING (Rijks 866: the Merry Drinker's two-sentence body).
+
+    False for a glued FIELD-PREVIEW fragment that has no prose of its own: the
+    tour-716 case where only "Type/Specialty: …" / "Specific Examples: … — it is
+    about a minute's walk away." follow a Directions line. Those carry no
+    narration, only a distance preview of the NEXT stop, and must be dropped.
+    """
+    for ln in (orphan_tail or "").splitlines():
+        s = ln.strip()
+        if not s:
+            continue
+        if _FIELD_LABEL.match(s):
+            continue          # a house field label line — structure, not prose
+        # A bare prose paragraph. Require a couple of real sentences' worth of
+        # text so a one-line fragment / distance preview never reads as a body.
+        if len(s) >= 80 and _PREVIEW_HEADER_TAIL.search(s) is None:
+            return True
+    return False
+
 
 def dedupe_and_fix_stop_count(text: str,
                               requested_stops: Optional[int] = None,
@@ -215,8 +335,11 @@ def dedupe_and_fix_stop_count(text: str,
 
     Steps (all deterministic, offline, idempotent):
       1. Drop STRAY PREVIEW HEADERS — "Stop N: <title> — it is roughly … away."
-      2. DE-SPLICE each surviving segment — cut a headerless field block that
-         was glued after its Directions line.
+      2. DE-SPLICE each surviving segment — separate a headerless field block
+         glued after its Directions line. The orphan is DROPPED only when it
+         duplicates a following real stop (w1/w4); when it is a UNIQUE narrated
+         stop whose header was lost (Rijks 866), it is PROMOTED to its own
+         "Stop N:" block so the real, paid stop is never silently deleted.
       3. DEDUPE real stops by normalised title OR (contained title + coordinates
          within 60 m) — keep the first occurrence, drop later copies. Skipped
          when ``dedupe_real_stops`` is False (used by the universal
@@ -249,8 +372,9 @@ def dedupe_and_fix_stop_count(text: str,
 
     kept: List[Dict] = []
     seen_titles: Dict[str, Optional[Tuple[float, float]]] = {}
+    promoted = 0
 
-    for s in segs:
+    for _si, s in enumerate(segs):
         # (1) Stray preview header? Its value carries a distance/hand-off tail
         #     and it is NOT a self-contained stop (no real body of its own, or a
         #     real stop of the same title follows). Drop it.
@@ -260,13 +384,31 @@ def dedupe_and_fix_stop_count(text: str,
                   f"{s['title_raw'][:60]!r}")
             continue
 
-        # (2) De-splice a headerless duplicate body glued after Directions.
-        new_seg, changed = _desplice_segment(s['seg'])
-        if changed:
+        # (2) De-splice a headerless body glued after Directions. The orphan is
+        #     DROPPED only when it duplicates a following real stop (w1/w4); a
+        #     UNIQUE narrated stop whose header was lost is PROMOTED to its own
+        #     "Stop N:" block (Rijks 866) — a real, paid stop is never deleted.
+        _promoted_seg = None
+        while True:
+            new_seg, orphan_tail, changed = _desplice_segment(s['seg'])
+            if not changed:
+                break
             despliced += 1
-            print(f"  [LOCAL-801] de-spliced headerless body after Directions "
-                  f"in stop {s['title_raw'][:40]!r}")
             s = dict(s, seg=new_seg)
+            # The Directions hand-off that the orphan was glued after names the
+            # orphan stop; recover it from the kept segment's LAST Directions line.
+            _dirs = re.findall(r'(?im)^[ \t]*Directions:[^\n]*$', new_seg)
+            _ht = _handoff_title(_dirs[-1]) if _dirs else ""
+            if _orphan_duplicates_following(orphan_tail, _ht, segs[_si + 1:]):
+                print(f"  [LOCAL-801] de-spliced duplicate body after Directions "
+                      f"in stop {s['title_raw'][:40]!r}")
+            elif _orphan_has_narration_body(orphan_tail):
+                _promoted_seg = _promote_orphan_to_stop(orphan_tail, _ht)
+                promoted += 1
+                print(f"  [LOCAL-801] promoted lost-header stop from spliced body "
+                      f"after Directions in {s['title_raw'][:30]!r}: "
+                      f"{(_ht or 'This stop')[:40]!r}")
+                break  # one orphan promoted per splice; it becomes its own seg
 
         # (3) Duplicate of an already-kept stop?
         #
@@ -299,6 +441,17 @@ def dedupe_and_fix_stop_count(text: str,
         if title:
             seen_titles[title] = coord
 
+        # A promoted orphan becomes its own segment, inserted right after its
+        # parent so order and numbering stay correct.
+        if _promoted_seg is not None:
+            _pseg = _segments(_promoted_seg)
+            if _pseg:
+                _ps = _pseg[0]
+                if not (_ps['title'] and _ps['title'] in seen_titles):
+                    kept.append(_ps)
+                    if _ps['title']:
+                        seen_titles[_ps['title']] = _ps['coord']
+
     # (4) Cap to requested (never more) — keep the FIRST ``requested`` stops.
     trimmed = 0
     if requested_stops is not None and requested_stops > 0 and len(kept) > requested_stops:
@@ -312,10 +465,10 @@ def dedupe_and_fix_stop_count(text: str,
     # this stays a strict no-op on clean text (required: count_delivered_stops
     # and the service's _header_formatting_defect both key on
     # normalise_stop_headers(text) == text for a clean tour).
-    if not (dropped_preview or despliced or dropped_duplicate or trimmed):
+    if not (dropped_preview or despliced or dropped_duplicate or trimmed or promoted):
         return text, {
             'dropped_preview': 0, 'despliced': 0, 'dropped_duplicate': 0,
-            'renumbered': False, 'count': len(kept),
+            'promoted': 0, 'renumbered': False, 'count': len(kept),
         }
 
     # Rebuild with renumbered headers (only when something was removed).
@@ -339,6 +492,7 @@ def dedupe_and_fix_stop_count(text: str,
         'dropped_preview': dropped_preview,
         'despliced': despliced,
         'dropped_duplicate': dropped_duplicate,
+        'promoted': promoted,
         'renumbered': renumbered,
         'count': len(kept),
     }
