@@ -134,20 +134,15 @@ class TourCreatorTest(unittest.TestCase):
     # ── helpers ───────────────────────────────────────────────────────────
     def _store(self, user_id, tour_content, zip_name, payload,
                stops_count=4, lat=None, lng=None, is_test=True,
-               job_id=None, tour_name=None, store_mode="regenerate"):
+               job_id=None, tour_name=None):
         zip_path = os.path.join(self._tmp, zip_name)
         _make_zip(zip_path, payload)
-        # [LOCAL-821] This suite covers the creator-scoped VERSIONING (replace)
-        # mechanism, which now lives behind the explicit regenerate path; the
-        # default serve path never rewrites an existing tour. Cross-creator /
-        # NULL-creator cases INSERT regardless of mode (no match → new row), so
-        # defaulting to regenerate here keeps every case's intent intact.
         return orch.store_audio_tour(
             tour_name or self.tour_name, "req:" + (tour_name or self.tour_name),
             zip_path, lat, lng, tour_content=tour_content,
             stops_count=stops_count, is_test=is_test,
             job_id=job_id or ("job-" + uuid.uuid4().hex[:8]),
-            user_id=user_id, store_mode=store_mode,
+            user_id=user_id,
         )
 
     def _rows_for_name(self, name=None):

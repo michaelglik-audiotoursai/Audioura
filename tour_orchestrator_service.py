@@ -826,8 +826,11 @@ def _release_generation_reservation(user_id, job_id, reason):
 # [LOCAL-606] The columns captured in a version snapshot. Centralised so the
 # ensure-table DDL, the snapshot INSERT in store_audio_tour and the restore
 # helper (restore_tour_version.py) all agree on the exact set.
+# [LOCAL-821B] zip_bytes added: when the ZIP lives in the DB column
+# audio_tours.audio_tour (GCloud), the OLD bytes are archived here so a restore
+# brings back audio, not just text — otherwise the replace is irreversible.
 AUDIO_TOUR_VERSION_COLUMNS = (
-    "tour_content", "zip_filename", "stops_count", "lat", "lng",
+    "tour_content", "zip_filename", "stops_count", "lat", "lng", "zip_bytes",
 )
 
 
@@ -876,11 +879,26 @@ def _ensure_versioning_objects(cur):
             stops_count INTEGER,
             lat DOUBLE PRECISION,
             lng DOUBLE PRECISION,
+            zip_bytes BYTEA,
             replaced_at TIMESTAMP WITHOUT TIME ZONE DEFAULT CURRENT_TIMESTAMP,
             replaced_by_job VARCHAR(128),
             CONSTRAINT uq_audio_tour_versions_tour_version UNIQUE (tour_id, version_no)
         )
     """)
+
+    # [LOCAL-821B] Additive zip_bytes column for tables created before 821B.
+    # On GCloud the ZIP lives in the DB column audio_tours.audio_tour, not a
+    # file on disk; archiving the old TEXT alone left the replace irreversible
+    # (the 465 defect). Keep the OLD bytes here so a restore brings back audio
+    # too. Nullable: rows archived before this column (or where the ZIP was a
+    # renamed file on disk) simply carry NULL and fall back to the disk file.
+    cur.execute("""
+        SELECT column_name FROM information_schema.columns
+        WHERE table_name = 'audio_tour_versions' AND column_name = 'zip_bytes'
+    """)
+    if cur.fetchone() is None:
+        print("[LOCAL-821B] Adding audio_tour_versions.zip_bytes column...")
+        cur.execute("ALTER TABLE audio_tour_versions ADD COLUMN zip_bytes BYTEA")
 
 
 def _rename_superseded_zip(old_zip_filename, version_no):
@@ -961,7 +979,7 @@ def _record_pool_provenance(audio_tour_id, location, request_string, tour_name,
         print(f"  [LOCAL-766] provenance record skipped (non-fatal): {_prov_err}")
 
 
-def store_audio_tour(tour_name, request_string, zip_path, lat, lng, tour_content=None, stops_count=None, is_test=None, tour_kind=None, job_id=None, user_id=None, track=None, tour_type=None, location=None, store_mode='serve'):
+def store_audio_tour(tour_name, request_string, zip_path, lat, lng, tour_content=None, stops_count=None, is_test=None, tour_kind=None, job_id=None, user_id=None, track=None, tour_type=None, location=None):
     """Store the audio tour in the database with original tour content.
 
     [LOCAL-727 / bug 432] ``track`` is the deployment track that produced this
@@ -971,20 +989,16 @@ def store_audio_tour(tour_name, request_string, zip_path, lat, lng, tour_content
     GCloud DB. When None it falls back to the ``TOUR_TRACK`` env var; any other
     value is normalised to 'beta' (LOCAL-737).
 
-    [LOCAL-821] ``store_mode`` controls what happens when an existing tour with
-    the SAME (name, creator, track) is found and the new text DIFFERS from it:
-      * 'serve' (DEFAULT — every normal serving/generation request): NEVER
-        rewrites an existing tour's stops. A new request either serves the
-        existing tour unchanged (byte-identical text → cache hit, action
-        'already_exists') or, when the text differs, INSERTS A NEW, SEPARATE
-        tour under a disambiguated name (action 'inserted'). This is the
-        LOCAL-821 fix: a proof/serving request that happened to resolve to an
-        existing tour's name (e.g. tour 465) can no longer overwrite its content.
-      * 'regenerate' (EXPLICIT admin regenerate path ONLY): keeps the LOCAL-606
-        / D622 replace-on-change behaviour — archives the old content to
-        audio_tour_versions FIRST (reversible), then replaces the row's
-        content/zip/stops and flags its translations stale (action 'replaced').
-    A byte-identical match is a cache hit in BOTH modes (unchanged).
+    [LOCAL-606 / D622] When an existing tour with the SAME (name, creator, track)
+    is found and the new text DIFFERS from it, the stale content is REPLACED,
+    keeping a reversible version: the OLD content/zip/stops/lat/lng go to
+    audio_tour_versions FIRST, the old ZIP is renamed on disk (and, when the ZIP
+    lives in the DB column audio_tours.audio_tour, its OLD BYTES are archived in
+    the version row too — LOCAL-821B), then the row's content/zip/stops are
+    overwritten and its translations flagged stale (action 'replaced'). The tour
+    id and share codes are kept, so curator links keep pointing at the improved
+    tour. A byte-identical match is a cache hit (action 'already_exists',
+    number_requested incremented, no replacement).
 
     Returns:
         dict with keys:
@@ -996,13 +1010,8 @@ def store_audio_tour(tour_name, request_string, zip_path, lat, lng, tour_content
         but the richer dict carries the distinction between "stored OK" and
         "already exists" that LOCAL-156 needs.
     """
-    # [LOCAL-821] Normalise store_mode; anything unknown is the safe 'serve'.
-    store_mode = (store_mode or 'serve').strip().lower()
-    if store_mode not in ('serve', 'regenerate'):
-        store_mode = 'serve'
     print(f"\n==== STORING AUDIO TOUR IN DATABASE: {datetime.now().isoformat()} ====")
     print(f"Tour name: {tour_name}")
-    print(f"Store mode: {store_mode}")
     print(f"Request string: {request_string}")
     print(f"ZIP path: {zip_path}")
     print(f"Coordinates: lat={lat}, lng={lng}")
@@ -1240,7 +1249,7 @@ def store_audio_tour(tour_name, request_string, zip_path, lat, lng, tour_content
         # identical requests (the versioning case) are then handled one at a time.
         print(f"Checking if tour already exists (case-insensitive, creator- and track-scoped, matching index)...")
         cur.execute(
-            "SELECT id, tour_content, zip_filename, stops_count, lat, lng "
+            "SELECT id, tour_content, zip_filename, stops_count, lat, lng, audio_tour "
             "FROM audio_tours "
             "WHERE lower(tour_name) = lower(%s) AND creator_user_id = %s "
             "AND track = %s AND original_tour_id IS NULL "
@@ -1277,7 +1286,7 @@ def store_audio_tour(tour_name, request_string, zip_path, lat, lng, tour_content
         # links keep working and point at the improved tour.
         if existing_tour:
             (existing_id, old_content, old_zip, old_stops,
-             old_lat, old_lng) = existing_tour
+             old_lat, old_lng, old_zip_bytes) = existing_tour
 
             # Normalise for the byte-identical comparison. Treat NULL stored
             # content as "no content yet" → always a replacement so a row that
@@ -1310,29 +1319,13 @@ def store_audio_tour(tour_name, request_string, zip_path, lat, lng, tour_content
                                existing_tour_id=existing_id,
                                version_no=_current_version)
 
-            # [LOCAL-821] The text DIFFERS from the stored tour (not a cache hit).
-            # What happens next depends on store_mode:
-            #   * serve (default): a new request must NEVER rewrite an existing
-            #     tour's stops. Disambiguate the name and fall through to the
-            #     NEW-INSERT path — the existing tour (e.g. 465) is left exactly
-            #     as it was. We release the FOR UPDATE lock first.
-            #   * regenerate (explicit admin path): take the LOCAL-606 / D622
-            #     replace-on-change path below (archive old version first).
-            _do_replace = (store_mode == 'regenerate')
-            if not _do_replace:
-                print(f"[LOCAL-821] serve mode: existing tour id={existing_id} has "
-                      f"DIFFERENT text; NOT replacing. Inserting a new, separate "
-                      f"tour (existing tour left unchanged).")
-                conn.commit()  # release the FOR UPDATE row lock on the existing row
-                _disambig = (job_id or request_string or 'new')
-                tour_name = f"{tour_name} [{str(_disambig)[:8]}]"
-                existing_tour = None
-
-            # --- Replacement path (text differs or stored content was NULL) ---
-            # [LOCAL-821] Entered ONLY in store_mode='regenerate'. In serve mode
-            # _do_replace is False and control falls past this whole block to the
-            # NEW-INSERT path, so an existing tour is never overwritten.
-            if _do_replace:
+            # [LOCAL-606 / D622] The text DIFFERS from the stored tour (not a
+            # cache hit). Replace-on-change is the default behaviour: the stale
+            # content is archived to audio_tour_versions FIRST (reversible), then
+            # the row's content/zip/stops are overwritten in place. The tour id
+            # and share codes are kept, so a curator's edit updates THEIR tour and
+            # listeners never see a duplicate.
+            if True:  # replacement path (text differs or stored content was NULL)
                 print(f"[LOCAL-606] Tour id={existing_id} regenerated with DIFFERENT text "
                       f"(old_len={len(_old_text) if _old_text is not None else 'NULL'}, "
                       f"new_len={len(_new_text)}). Replacing stored content; archiving old version.")
@@ -1363,15 +1356,26 @@ def store_audio_tour(tour_name, request_string, zip_path, lat, lng, tour_content
                     archived_zip = _rename_superseded_zip(old_zip, next_version)
 
                     # Archive the OLD content first — reversibility invariant.
+                    # [LOCAL-821B] Also archive the OLD ZIP bytes when the ZIP
+                    # lived in the DB column audio_tours.audio_tour (GCloud). On
+                    # a filesystem deployment the old ZIP is the renamed file on
+                    # disk and old_zip_bytes is NULL; the restore then falls back
+                    # to the archived file. psycopg2.Binary(None) is not valid,
+                    # so pass NULL through unchanged when there are no bytes.
+                    _old_zip_bytes_param = (
+                        psycopg2.Binary(old_zip_bytes)
+                        if old_zip_bytes is not None else None
+                    )
                     cur.execute(
                         """
                         INSERT INTO audio_tour_versions
                             (tour_id, version_no, tour_content, zip_filename,
-                             stops_count, lat, lng, replaced_by_job)
-                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                             stops_count, lat, lng, zip_bytes, replaced_by_job)
+                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
                         """,
                         (existing_id, next_version, old_content, archived_zip,
-                         old_stops, old_lat, old_lng, str(_job_id)[:128])
+                         old_stops, old_lat, old_lng, _old_zip_bytes_param,
+                         str(_job_id)[:128])
                     )
 
                     # Replace the row's content/zip/stops_count; set lat/lng only if
@@ -1652,7 +1656,7 @@ def link_stop_metrics_to_tour(tour_id, job_id):
         return -1
 
 
-def orchestrate_tour_async(job_id, location, tour_type, total_stops, user_id=None, request_string=None, language='en', persona=None, is_test=None, stops=None, mode=None, resume_generator_job_id=None, store_mode='serve'):
+def orchestrate_tour_async(job_id, location, tour_type, total_stops, user_id=None, request_string=None, language='en', persona=None, is_test=None, stops=None, mode=None, resume_generator_job_id=None):
     """Orchestrate the complete tour generation pipeline asynchronously.
 
     [LOCAL-821] When resume_generator_job_id is set, this is a RESUME of a job
@@ -2324,7 +2328,7 @@ def orchestrate_tour_async(job_id, location, tour_type, total_stops, user_id=Non
         # this is belt-and-braces; resolving it here keeps the two call paths in
         # lockstep and makes the chosen track visible at the call site.
         _store_track = normalize_track(os.getenv('TOUR_TRACK', 'beta'))
-        store_result = store_audio_tour(tour_name, request_string or location, zip_path, lat, lng, tour_content, stops_count=ACTIVE_JOBS[job_id].get("actual_stops"), is_test=is_test, tour_kind=ACTIVE_JOBS[job_id].get("tour_kind"), job_id=job_id, user_id=user_id, track=_store_track, tour_type=tour_type, location=location, store_mode=store_mode)
+        store_result = store_audio_tour(tour_name, request_string or location, zip_path, lat, lng, tour_content, stops_count=ACTIVE_JOBS[job_id].get("actual_stops"), is_test=is_test, tour_kind=ACTIVE_JOBS[job_id].get("tour_kind"), job_id=job_id, user_id=user_id, track=_store_track, tour_type=tour_type, location=location)
         
         # [LOCAL-156] store_audio_tour now returns a dict:
         #   {"success": bool, "action": str, "existing_tour_id": int|None, "error": str|None}
@@ -2917,7 +2921,6 @@ def _resume_one_job(job):
                 stops=params.get('stops'),
                 mode=params.get('mode'),
                 resume_generator_job_id=gen_jid,
-                store_mode=params.get('store_mode') or 'serve',
             )
         else:
             # generator job failed or is unknown → this request cannot be
@@ -3094,135 +3097,6 @@ def health_check():
         "service": "tour_orchestrator",
         "cost_ceiling": _ceiling_stats,
     })
-
-# ───────────────────────────────────────────────────────────────────────────
-# [LOCAL-821] Admin-only explicit regenerate.
-# ───────────────────────────────────────────────────────────────────────────
-# The normal serving/generation path (store_mode='serve') NEVER rewrites an
-# existing tour's stops — a new request creates a new tour or serves the
-# existing one unchanged. The ONLY way to replace an existing tour's content is
-# this endpoint, which runs the generation pipeline with store_mode='regenerate'
-# so store_audio_tour archives the previous content to audio_tour_versions FIRST
-# (reversible) and then replaces the row. It is fail-closed admin-gated: without
-# ADMIN_API_KEY configured the surface is 503, and a wrong/absent key is 401 —
-# the app only ever holds the gateway key, so no app user can reach it.
-import hmac as _hmac_admin
-
-ADMIN_API_KEY = os.getenv('ADMIN_API_KEY', '')
-
-
-def _require_admin_key():
-    """Return a (json, status) error tuple if the caller is not an admin, else
-    None. Mirrors user-tracking/communities_api._require_admin_key: fail-closed
-    when unset, constant-time compare of the X-API-Key header."""
-    if not ADMIN_API_KEY:
-        return jsonify({"error": "admin_not_configured"}), 503
-    client_key = request.headers.get('X-API-Key', '')
-    if not client_key or not _hmac_admin.compare_digest(client_key, ADMIN_API_KEY):
-        return jsonify({"error": "unauthorized"}), 401
-    return None
-
-
-@app.route('/admin/regenerate-tour', methods=['POST'])
-def admin_regenerate_tour():
-    """[LOCAL-821] Explicitly regenerate an existing tour, REPLACING its content
-    (the previous content is archived to audio_tour_versions first).
-
-    Admin-only. Body: {"tour_id": <int>} — the audio_tours row to regenerate.
-    The original request parameters (request_string, creator, track) are read
-    from that row so the regeneration reproduces the same tour identity; the
-    store then takes the LOCAL-606 replace path because store_mode='regenerate'.
-    Runs the generation pipeline in a background thread exactly like /generate,
-    and returns the new orchestrator job_id to poll."""
-    _auth_err = _require_admin_key()
-    if _auth_err is not None:
-        return _auth_err
-    if not request.is_json:
-        return jsonify({"error": "Request must be JSON"}), 400
-    data = request.get_json(silent=True) or {}
-    tour_id = data.get('tour_id')
-    if not tour_id:
-        return jsonify({"error": "tour_id is required"}), 400
-
-    # Read the existing tour so the regeneration keeps its identity (name key:
-    # creator + track + name). original_tour_id IS NULL → only originals, never a
-    # translation row.
-    try:
-        import psycopg2 as _pg
-        _conn = _pg.connect(
-            host=os.getenv('DB_HOST', 'postgres-2'),
-            database=os.getenv('DB_NAME', 'audiotours'),
-            user=os.getenv('DB_USER', 'admin'),
-            password=os.getenv('DB_PASSWORD', 'password123'),
-            port=os.getenv('DB_PORT', '5432')
-        )
-        _cur = _conn.cursor()
-        _cur.execute(
-            "SELECT tour_name, request_string, creator_user_id, track, tour_kind "
-            "FROM audio_tours WHERE id = %s AND original_tour_id IS NULL",
-            (tour_id,)
-        )
-        _row = _cur.fetchone()
-        _cur.close()
-        _conn.close()
-    except Exception as _e:
-        return jsonify({"error": f"could not read tour {tour_id}: {_e}"}), 500
-    if not _row:
-        return jsonify({"error": f"tour {tour_id} not found (or not an original)"}), 404
-    _tour_name, _request_string, _creator_user_id, _track, _tour_kind = _row
-
-    # Parameters for the regeneration. location/tour_type default from the
-    # caller when provided, else fall back to the stored request string so the
-    # same place is regenerated.
-    location = data.get('location') or _request_string or _tour_name
-    tour_type = data.get('tour_type', '')
-    total_stops = int(data.get('total_stops', 0)) or None
-    language = data.get('language', 'en')
-
-    job_id = str(uuid.uuid4())
-    ACTIVE_JOBS[job_id] = {
-        "status": "queued",
-        "progress": "Admin regenerate queued",
-        "location": location,
-        "tour_type": tour_type,
-        "total_stops": total_stops,
-        "user_id": _creator_user_id,
-        "request_string": _request_string or location,
-        "language": language,
-        "persona": None,
-        "is_test": None,
-        "stops": None,
-        "mode": None,
-        "created_at": datetime.now().isoformat(),
-        "admin_regenerate_of": tour_id,
-    }
-
-    # Durable record so an admin regenerate also survives SIGTERM — and resumes
-    # as a regenerate (store_mode carried in params).
-    _orch_store_admin = _orch_jobs_store()
-    if _orch_store_admin is not None:
-        _orch_store_admin.create(
-            job_id,
-            location=location, tour_type=tour_type, total_stops=total_stops,
-            user_id=_creator_user_id, request_string=(_request_string or location),
-            language=language, store_mode='regenerate',
-        )
-
-    print(f"[LOCAL-821] ADMIN regenerate of tour {tour_id} as job {job_id} "
-          f"(store_mode=regenerate)")
-    thread = threading.Thread(
-        target=orchestrate_tour_async,
-        args=(job_id, location, tour_type, total_stops, _creator_user_id,
-              (_request_string or location), language, None, None, None, None),
-        kwargs={"store_mode": "regenerate"},
-    )
-    thread.daemon = True
-    thread.start()
-    _ACTIVE_GENERATION_THREADS.append(thread)
-    _ACTIVE_GENERATION_THREADS[:] = [t for t in _ACTIVE_GENERATION_THREADS if t.is_alive()]
-
-    return jsonify({"job_id": job_id, "status": "queued",
-                    "regenerating_tour_id": tour_id, "mode": "regenerate"})
 
 
 @app.route('/generate-complete-tour', methods=['POST'])

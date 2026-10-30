@@ -65,14 +65,14 @@ services:
       # resumed orchestrator can re-attach to the result from any instance.
       - JOB_STORE_MODE=layered
       # Budget caps (belt-and-braces alongside the meter ledger).
-      - TASK_BUDGET_ID=LOCAL-821
-      - TASK_BUDGET_USD=0.60
-      - COST_HARD_LIMIT_USD=0.60
-      - TEST_GEMINI_MAX_USD=0.60
-      # [LOCAL-820] meter contract — spend tagged service=LOCAL-821.
+      - TASK_BUDGET_ID=LOCAL-821B
+      - TASK_BUDGET_USD=0.40
+      - COST_HARD_LIMIT_USD=0.40
+      - TEST_GEMINI_MAX_USD=0.40
+      # [LOCAL-820] meter contract — spend tagged service=LOCAL-821B.
       - PYTHONPATH=/opt/meter
       - PAID_API_LOG=/meterlogs/paid_api_calls.jsonl
-      - METER_SERVICE=LOCAL-821
+      - METER_SERVICE=LOCAL-821B
     volumes:
       - ./tours:/app/tours
       - ./_meter:/opt/meter:ro
@@ -134,15 +134,13 @@ services:
       - ORCH_SWEEP_INTERVAL_SECONDS=15
       - ORCH_SWEEP_MIN_IDLE_SECONDS=10
       - ORCH_JOB_LEASE_SECONDS=600
-      # [LOCAL-821] admin regenerate endpoint key (the only path that replaces).
-      - ADMIN_API_KEY=local821-admin-key
       # Budget caps.
-      - TASK_BUDGET_ID=LOCAL-821
-      - TASK_BUDGET_USD=0.60
+      - TASK_BUDGET_ID=LOCAL-821B
+      - TASK_BUDGET_USD=0.40
       # [LOCAL-820] meter contract.
       - PYTHONPATH=/opt/meter
       - PAID_API_LOG=/meterlogs/paid_api_calls.jsonl
-      - METER_SERVICE=LOCAL-821
+      - METER_SERVICE=LOCAL-821B
     volumes:
       - ./tours:/app/tours
       - ./_meter:/opt/meter:ro

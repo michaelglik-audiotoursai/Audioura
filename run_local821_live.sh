@@ -37,7 +37,7 @@ mkdir -p "${LOCAL821_METER_DIR}"
 ORCH_PORT=55102
 USER_ID="local821-tester"
 REQUEST='Public art walk near Salem Common, Salem, MA'
-PSQL=(docker exec -i "${PROJECT}-postgres-2-1" psql -U admin -d audiotours -tA)
+PSQL=(docker exec -i -e PGPASSWORD=password123 "${PROJECT}-postgres-2-1" psql -U admin -d audiotours -tA)
 
 say () { echo; echo "######## [local821] $* ########"; }
 

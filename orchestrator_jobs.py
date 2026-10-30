@@ -64,7 +64,7 @@ DEFAULT_LEASE_SECONDS = int(os.getenv('ORCH_JOB_LEASE_SECONDS', '900'))  # 15 mi
 PARAM_KEYS = (
     'location', 'tour_type', 'total_stops', 'user_id', 'request_string',
     'language', 'persona', 'is_test', 'stops', 'mode',
-    'community_id', 'community_visibility', 'store_mode',
+    'community_id', 'community_visibility',
 )
 
 

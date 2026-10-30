@@ -159,7 +159,7 @@ class TrackNameKeyTest(unittest.TestCase):
     # ── helpers ───────────────────────────────────────────────────────────
     def _store(self, *, track, user_id, tour_content, zip_name, payload,
                storied_mode=False, stops_count=4, lat=None, lng=None,
-               is_test=True, job_id=None, store_mode="regenerate"):
+               is_test=True, job_id=None):
         """Store a tour as if the given deployment track produced it.
 
         The unfixed code reads the track from TOUR_TRACK; a fixed code may also
@@ -173,7 +173,7 @@ class TrackNameKeyTest(unittest.TestCase):
         kwargs = dict(
             tour_content=tour_content, stops_count=stops_count,
             is_test=is_test, job_id=job_id or ("job-" + uuid.uuid4().hex[:8]),
-            user_id=user_id, store_mode=store_mode,
+            user_id=user_id,
         )
         if _STORE_ACCEPTS_TRACK:
             kwargs["track"] = track

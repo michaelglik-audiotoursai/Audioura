@@ -93,7 +93,6 @@ class OrchestratorJobsStoreTest(unittest.TestCase):
         self.store.create(
             self.job_id, location="Met Museum", tour_type="", total_stops=5,
             user_id="u1", request_string="Met Museum", language="en",
-            store_mode="serve",
         )
         self.store.set_generator_job_id(self.job_id, "gen-123")
         row = self.store.get(self.job_id)
@@ -101,7 +100,6 @@ class OrchestratorJobsStoreTest(unittest.TestCase):
         self.assertEqual(row["status"], "processing")
         self.assertEqual(row["generator_job_id"], "gen-123")
         self.assertEqual(row["location"], "Met Museum")
-        self.assertEqual(row["store_mode"], "serve")
 
         # It is resumable (min_idle 0 so a just-written row qualifies).
         resumable_ids = {j["job_id"] for j in self.store.list_resumable(min_age_seconds=0)}
@@ -201,7 +199,7 @@ class ResumeFlowTest(unittest.TestCase):
         for name, val in self._saved.items():
             setattr(orch, name, val)
 
-    def _job_row(self, gen_jid="gen-abc", store_mode="serve"):
+    def _job_row(self, gen_jid="gen-abc"):
         return {
             "job_id": "job-" + uuid.uuid4().hex[:8],
             "generator_job_id": gen_jid,
@@ -209,7 +207,7 @@ class ResumeFlowTest(unittest.TestCase):
             "params": {
                 "location": "Met Museum", "tour_type": "", "total_stops": 3,
                 "user_id": "u1", "request_string": "Met Museum",
-                "language": "en", "store_mode": store_mode,
+                "language": "en",
             },
         }
 
@@ -239,7 +237,6 @@ class ResumeFlowTest(unittest.TestCase):
         _, kwargs = calls[0]
         self.assertEqual(kwargs.get("resume_generator_job_id"), "gen-abc",
                          "resume must re-attach to the EXISTING generator job (skip /generate)")
-        self.assertEqual(kwargs.get("store_mode"), "serve")
         self.assertEqual(store._row["status"], "completed")
 
     def test_3_resume_is_idempotent_when_already_stored(self):
