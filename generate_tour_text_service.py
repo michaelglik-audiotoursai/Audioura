@@ -1337,12 +1337,23 @@ def cancel_job(job_id):
         return jsonify({"job_id": job_id, "cancelled": False, "error": str(_c_err)}), 500
 
     # Best-effort: reflect the request in the job's status for observability.
+    # [LOCAL-833] Flip a still-running job to a TERMINAL 'error' here, not just a
+    # progress string. The orchestrator cancels a job when it gives up on it
+    # (stall / absolute cap); if the job is left 'processing' it stays
+    # non-terminal and the orchestrator's sweep re-polls it forever (the defect).
+    # The async worker's own cancellation checkpoint also writes 'error' before
+    # the next spend, but that only fires if the thread is still alive — a job
+    # whose instance was recycled never reaches it, so we make the terminal write
+    # here too. Idempotent: a job already completed/error is left untouched.
     try:
         if job_id in ACTIVE_JOBS:
             _j = ACTIVE_JOBS[job_id]
             if _j.get("status") not in ("completed", "error"):
-                ACTIVE_JOBS.update(job_id, cancel_requested=True,
-                                   progress="Cancellation requested by orchestrator")
+                ACTIVE_JOBS.update(
+                    job_id, status="error", cancel_requested=True,
+                    error="Generation cancelled: the orchestrator abandoned this request.",
+                    error_code="cancelled",
+                    progress="Cancellation requested by orchestrator")
     except Exception as _cu_err:
         _svc_logger.error(f"[LOCAL-622] cancel status update failed for {job_id}: {_cu_err}")
 
@@ -1458,9 +1469,68 @@ def list_jobs():
     
     return jsonify({"jobs": jobs})
 
+
+# [LOCAL-833] Generator-side stale-job sweep.
+# ---------------------------------------------------------------------------
+# A job whose Cloud Run instance was recycled mid-generation leaves a
+# generator_jobs row stuck at 'processing' forever (evidence: ac864a08). The
+# read path (GeneratorJobsStore.get) already flips such a row to 'error' when
+# something polls it, but nothing may ever poll a truly abandoned job again. This
+# daemon is the generator's own safety net: every GEN_JOB_SWEEP_INTERVAL_SECONDS
+# it flips every non-terminal row older than GEN_JOB_STALE_SECONDS to 'error', so
+# a silent job becomes terminal on its own. Opt-in via GEN_JOB_SWEEP_ENABLED so a
+# pure-local run with no DB is unaffected; it no-ops when the store has no
+# sweep_stale (e.g. MemoryJobStore).
+GEN_JOB_SWEEP_ENABLED = os.getenv('GEN_JOB_SWEEP_ENABLED', 'true').lower() == 'true'
+GEN_JOB_SWEEP_INTERVAL_SECONDS = int(os.getenv('GEN_JOB_SWEEP_INTERVAL_SECONDS', '300'))
+
+
+def _gen_stale_sweep_loop():
+    """Daemon: periodically flip stale non-terminal generator jobs to error."""
+    import time as _time
+    sweep = getattr(ACTIVE_JOBS, 'sweep_stale', None)
+    if sweep is None:
+        print("[LOCAL-833] generator store has no sweep_stale — stale sweep disabled "
+              "(likely MemoryJobStore / no DB).")
+        return
+    print(f"[LOCAL-833] generator stale-sweep started "
+          f"(interval={GEN_JOB_SWEEP_INTERVAL_SECONDS}s, "
+          f"stale>{_env_stale_minutes()} min).")
+    while True:
+        _time.sleep(GEN_JOB_SWEEP_INTERVAL_SECONDS)
+        try:
+            flipped = sweep()
+            if flipped:
+                print(f"[LOCAL-833] generator stale-sweep flipped {flipped} job(s) to error.")
+        except Exception as _e:
+            print(f"[LOCAL-833] generator stale-sweep error: {_e}")
+
+
+def _env_stale_minutes():
+    try:
+        from job_store import GEN_JOB_STALE_SECONDS as _s
+        return _s // 60
+    except Exception:
+        return int(os.getenv('GEN_JOB_STALE_SECONDS', '1800')) // 60
+
+
+def _start_gen_stale_sweep_thread():
+    """Start the generator stale-sweep daemon if enabled. Returns the thread or None."""
+    if not GEN_JOB_SWEEP_ENABLED:
+        print("[LOCAL-833] generator stale-sweep disabled (GEN_JOB_SWEEP_ENABLED=false).")
+        return None
+    t = threading.Thread(target=_gen_stale_sweep_loop, name='gen-stale-sweep', daemon=True)
+    t.start()
+    return t
+
+
 if __name__ == '__main__':
     # Ensure tours directory exists
     ensure_tours_directory()
+
+    # [LOCAL-833] Start the stale-job sweep so a silent (recycled-instance) job
+    # becomes terminal on its own, even if nothing ever polls its /status again.
+    _start_gen_stale_sweep_thread()
     
     print(f"Starting Modified Tour Text Generator Service...")
     print(f"Tours directory: {TOURS_DIR}")
