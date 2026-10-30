@@ -2707,7 +2707,7 @@ def scope_is_a_waypoint(scope_name, request_text):
 
 
 def replenish_to_count(poi_list, want, scope, headers, propose, make_poi,
-                       seen=None, max_rounds=3, on_add=None):
+                       seen=None, max_rounds=3, on_add=None, request_text=None):
     """[D558] Propose -> validate -> substitute -> repeat, until the count is met.
 
     Michael, 2026-08-30: "make sure that the stops we obtain by replenishment are
@@ -2804,6 +2804,52 @@ def replenish_to_count(poi_list, want, scope, headers, propose, make_poi,
             rejected += n_in - len(fresh)
             print(f"  [D558] Replenishment scope check: {len(fresh)}/{n_in} "
                   f"candidate(s) inside '{scope}'")
+
+        # [LOCAL-835B] The generic replenish (D556 for non-restaurant tours, the
+        # LOCAL-576 pre-writing replenish, the LOCAL-818 refill, and any future
+        # caller) proposes "places to visit" and would REFILL an activity-provider
+        # tour's freed slots with landmarks — the kite-lessons re-run saw this path
+        # add Red Sand Dunes, Fairy Stream, Mui Ne Fishing Village and Po Shanu
+        # Cham Towers right after the earlier guards removed the food stops.
+        #
+        # STRICT here, on purpose: the generic proposer returns a bare {name, why}
+        # with NO Serper/OSM category, so a landmark like "Fairy Stream" classifies
+        # as UNKNOWN (None) and the normal guard (which keeps unknowns — never drop
+        # a place we cannot classify) would let it pad the tour. But a candidate
+        # from the "places to visit" proposer is padding BY CONSTRUCTION: the real
+        # providers already came from the maps-first PROVIDER discovery. So for an
+        # activity-provider request we keep ONLY a candidate the guard positively
+        # recognises as a provider (verdict True) and drop both the off-category
+        # (False) and the unrecognised (None) — honest shortfall over padding.
+        # No-op for a non-provider / food request (the whole tour replenishes
+        # normally). Best-effort: any error leaves the candidates unchanged.
+        if fresh and request_text:
+            try:
+                from category_match_guard import (
+                    requested_activity as _ra835rc,
+                    candidate_is_activity_provider as _cap835rc)
+                _act835rc = _ra835rc(request_text)
+                if _act835rc and not _act835rc.get("is_food"):
+                    _kept_rc, _drop_rc = [], 0
+                    for _c835rc in fresh:
+                        _v835rc = _cap835rc(_c835rc, _act835rc)
+                        if _v835rc is True:
+                            _kept_rc.append(_c835rc)
+                        else:
+                            _drop_rc += 1
+                            _nm835rc = (_c835rc.get("name")
+                                        or _c835rc.get("title") or "?")
+                            print(f"  [LOCAL-835B] replenish guard dropped "
+                                  f"{_nm835rc!r} (not a recognised "
+                                  f"'{_act835rc['activity']} {_act835rc['trigger']}' "
+                                  f"provider — generic 'places to visit' padding; "
+                                  f"honest shortfall over padding)")
+                    if _drop_rc > 0:
+                        rejected += _drop_rc
+                        fresh = _kept_rc
+            except Exception as _rc835_err:
+                print(f"  [LOCAL-835B] replenish guard skipped (non-fatal): "
+                      f"{_rc835_err}")
 
         for poi in fresh:
             if len(poi_list) >= want:
@@ -11613,12 +11659,46 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
                         if not _p4_scope:
                             _p4_scope = _scope_from_request(location, intent)
                         if _p4_vis(poi["name"], _p4_scope) is True:
-                            poi['_maps_verified'] = True
-                            survivors.append(poi)
-                            _p4_map_saved = True
-                            print(f"   OK Kept {poi['name']} — [LOCAL-788B] "
-                                  f"places_search confirms it in {_p4_scope!r} "
-                                  f"(LLM exclusion overridden: {verification['reason']})")
+                            # [LOCAL-835B] The map override proves the place EXISTS;
+                            # it does NOT prove the place is the PROVIDER the request
+                            # asked for. For an activity-provider request ("Kiteboarding
+                            # lessons in Mui Ne"), the LLM correctly EXCLUDED Sea Horse
+                            # Resort / Joe's Cafe / Pogo Beach Bar as off-category — and
+                            # places_search confirming the resort/cafe/bar exists must
+                            # not resurrect it. Run the SAME activity guard here, on the
+                            # single candidate, BEFORE honouring the map override: if the
+                            # candidate is off-category for the provider request (verdict
+                            # False), the override is NOT applied and the LLM's exclusion
+                            # stands. No-op for non-provider / food requests, so every
+                            # real dining/business map override still wins.
+                            _p4_oc_block = False
+                            try:
+                                from category_match_guard import (
+                                    requested_activity as _ra835b,
+                                    candidate_is_activity_provider as _cap835b)
+                                _req835b = (user_request if 'user_request' in dir()
+                                            else location)
+                                _act835b = _ra835b(_req835b) or _ra835b(location)
+                                if _act835b and not _act835b.get("is_food"):
+                                    _v835b = _cap835b(poi, _act835b)
+                                    if _v835b is False:
+                                        _p4_oc_block = True
+                                        print(f"   [LOCAL-835B] map override REFUSED for "
+                                              f"{poi['name']!r} — off-category for provider "
+                                              f"request '{_act835b['activity']} "
+                                              f"{_act835b['trigger']}' (places_search proves "
+                                              f"it exists, not that it is a provider); LLM "
+                                              f"exclusion stands")
+                            except Exception as _oc835b_err:
+                                print(f"   [LOCAL-835B] provider override check skipped "
+                                      f"(non-fatal): {_oc835b_err}")
+                            if not _p4_oc_block:
+                                poi['_maps_verified'] = True
+                                survivors.append(poi)
+                                _p4_map_saved = True
+                                print(f"   OK Kept {poi['name']} — [LOCAL-788B] "
+                                      f"places_search confirms it in {_p4_scope!r} "
+                                      f"(LLM exclusion overridden: {verification['reason']})")
                 except Exception as _p4_err:
                     print(f"   [LOCAL-788B] PHASE 4 map override skipped (non-fatal): {_p4_err}")
                 if _p4_map_saved:
@@ -15842,6 +15922,31 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
                         _extract_cuisine_qualifier as _p3c_ecq,
                         _cuisine_from_request as _p3c_cfr)
                     _p3c_kind = _p3c_cls(_p3c_poi_type)
+                    # [LOCAL-835B] An ACTIVITY-PROVIDER request ("Kiteboarding
+                    # lessons", "Scuba diving courses") classifies as 'landmark'
+                    # ("lessons"/"courses" are not business keywords), so the
+                    # maps-first PROVIDER discovery below is skipped and the tour
+                    # falls back to the LLM's restaurant proposals + the D545
+                    # restaurant replenish — exactly the path that padded tour 868
+                    # with Sandals Restaurant / The Bar / Jibe's Beach Club once the
+                    # activity guard (correctly) removed the LLM food stops. Treat a
+                    # provider request as a BUSINESS kind so the escalation ladder
+                    # actually searches "<activity> in <scope>" on the map and finds
+                    # the real kite schools / dive centres; the activity guard then
+                    # keeps only providers. No-op for a food/non-provider request.
+                    try:
+                        from category_match_guard import requested_activity as _ra835k
+                        _act835k = _ra835k(user_request) or _ra835k(location)
+                        if (_act835k and not _act835k.get("is_food")
+                                and _p3c_kind not in ('business', 'dining')):
+                            print(f"   [LOCAL-835B] provider request "
+                                  f"'{_act835k['activity']} {_act835k['trigger']}' "
+                                  f"→ maps-first PROVIDER discovery (kind "
+                                  f"'landmark'→'business')")
+                            _p3c_kind = 'business'
+                    except Exception as _k835_err:
+                        print(f"   [LOCAL-835B] provider-kind override skipped "
+                              f"(non-fatal): {_k835_err}")
                     if _p3c_kind in ('business', 'dining'):
                         _p3c_need = total_stops - len(poi_list)
                         _p3c_exclude = set(_normalize_name(p['name']).lower() for p in poi_list)
@@ -18496,6 +18601,30 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
                         'dining', (_d545_pt or 'restaurants'), _d545_scope,
                         _d545_need, exclude=set(_rp_seen), cuisine=_d545_cuisine,
                         user_id=user_id, request_text=user_request)
+                    # [LOCAL-835B] The D545 replenish ladder runs under
+                    # tour_category=='restaurant' and asks the MAP for 'dining'
+                    # candidates with cuisine=<the activity> — so for a request that
+                    # is really an activity-provider request misclassified as a
+                    # restaurant tour ("Kiteboarding lessons in Mui Ne" →
+                    # cuisine='kiteboarding lessons'), the ladder returns restaurants
+                    # and bars (Sandals Restaurant, The Bar, Jibe's Beach Club) and
+                    # the loop below ADDs them. Run the SAME activity guard the fresh
+                    # path runs, on each candidate BEFORE it can be ADDED: a food /
+                    # drink venue or a generic landmark is off-category for the
+                    # provider request and is dropped (honest shortfall over padding).
+                    # No-op for a genuine restaurant/dining request, so the real D545
+                    # Monaco replenish is untouched.
+                    try:
+                        from category_match_guard import \
+                            filter_off_category_activity as _foca835d
+                        _d545_cands, _dropd835 = _foca835d(
+                            list(_d545_cands or []), user_request, log=print)
+                        if _dropd835 > 0:
+                            print(f"  [LOCAL-835B] D545 places-first replenish guard "
+                                  f"dropped {_dropd835} off-category maps candidate(s)")
+                    except Exception as _fd835_err:
+                        print(f"  [LOCAL-835B] D545 places-first replenish guard "
+                              f"skipped (non-fatal): {_fd835_err}")
                     for _mc in _d545_cands:
                         if len(poi_list) >= _rp_want:
                             break
@@ -18537,6 +18666,24 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
                 _cands = propose_replacements(location, list(_rp_seen), _need, api_key)
                 print(f"  [D545] Replenish round {_rp_round}: need {_need}, "
                       f"proposed {len(_cands)}")
+                # [LOCAL-835B] The LLM propose_replacements round is the path that
+                # ADDED 'Sandals Restaurant', 'The Bar' and "Jibe's Beach Club" to a
+                # kiteboarding-lessons tour (LEAD proof, tour 868). It proposes
+                # restaurants because the whole D545 block runs as a restaurant tour.
+                # Drop every off-category proposal BEFORE the add loop with the same
+                # activity guard the fresh path uses — a provider request keeps only
+                # providers; a real dining request is a no-op.
+                try:
+                    from category_match_guard import \
+                        filter_off_category_activity as _foca835l
+                    _cands, _dropl835 = _foca835l(
+                        list(_cands or []), user_request, log=print)
+                    if _dropl835 > 0:
+                        print(f"  [LOCAL-835B] D545 LLM replenish guard dropped "
+                              f"{_dropl835} off-category proposal(s)")
+                except Exception as _fl835_err:
+                    print(f"  [LOCAL-835B] D545 LLM replenish guard skipped "
+                          f"(non-fatal): {_fl835_err}")
                 for _c in _cands:
                     if len(poi_list) >= _rp_want:
                         break
@@ -18772,7 +18919,7 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
             _gp_added, _gp_rejected, _gp_round = replenish_to_count(
                 poi_list, _gp_want, _gp_scope, headers,
                 propose=_gp_propose, make_poi=_new_poi,
-                seen=_gp_seen, on_add=_gp_on_add)
+                seen=_gp_seen, on_add=_gp_on_add, request_text=user_request)
 
             # Lore for every stop, not only replenished ones — the Cimiez tour had
             # no story retrieval at all.
@@ -18976,7 +19123,8 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
                                     replenish_to_count(
                                         poi_list, _cc_want, _gp_scope, headers,
                                         propose=_gp_propose, make_poi=_new_poi,
-                                        seen=_cc_seen, on_add=_gp_on_add)
+                                        seen=_cc_seen, on_add=_gp_on_add,
+                                        request_text=user_request)
                                     # Newly added stops carry no coordinate yet.
                                     # Fetch and resolve them so routing can place
                                     # them, exactly as the D558 path does above.
@@ -19851,7 +19999,8 @@ Exempt: navigation directions ("Turn left", "Continue past").
 
                     _lr576_added, _lr576_rej, _lr576_rounds = replenish_to_count(
                         poi_list, _lr576_want, _lr576_scope, headers,
-                        propose=_lr576_propose, make_poi=_new_poi, seen=_lr576_seen)
+                        propose=_lr576_propose, make_poi=_new_poi, seen=_lr576_seen,
+                        request_text=user_request)
                     print(f"  [LOCAL-576] Replenished {_lr576_added} stop(s) in "
                           f"{_lr576_rounds} round(s); {_lr576_rej} rejected for scope. "
                           f"Now {len(poi_list)}/{_lr576_want}.")
@@ -19865,6 +20014,51 @@ Exempt: navigation directions ("Turn left", "Continue past").
             else:
                 print(f"  [LOCAL-576] Pre-writing scope check: all {_lr576_before} "
                       f"stop(s) within '{_lr576_scope}'.")
+
+    # ============================================================
+    # [LOCAL-835B] FINAL pre-narration activity-provider pass.
+    # ============================================================
+    # One guard, every path — this is the LAST net, run on the FULL stop list
+    # immediately before a single description is written. Every earlier ADD/KEEP
+    # path (initial discovery, the 788B map override, the D545/788 replenish
+    # ladder, the 576 pre-writing replenish, pool reuse) has its own on-category
+    # check, but a stop can still arrive here from a path a future change adds, or
+    # from the 576 replenish just above. For an activity-provider request this
+    # drops any remaining food/drink venue or generic landmark that is not a
+    # provider of the requested activity, so a kiteboarding-lessons tour reaches
+    # narration with kite schools only — or the honest shortfall. It NEVER pads
+    # (removal only), a hand-named anchor is always kept, and it is a strict no-op
+    # for a non-provider or a food request. Best-effort: a guard error leaves the
+    # list untouched (a bug must never empty a tour).
+    try:
+        from category_match_guard import (requested_activity as _ra835f,
+                                           filter_off_category_activity as _foca835f)
+        _act835f = _ra835f(user_request) or _ra835f(location)
+        if _act835f and not _act835f.get("is_food") and poi_list:
+            _anchors_835f = list(intent.get('named_places') or []) if intent else []
+            try:
+                from area_resolver import extract_named_places_from_clause as _enp835f
+                _anchors_835f += _enp835f(location) or []
+            except Exception:
+                pass
+            try:
+                _anchors_835f += named_anchors(user_request).get('anchors') or []
+            except Exception:
+                pass
+            _before_835f = len(poi_list)
+            poi_list, _dropped_835f = _foca835f(
+                poi_list, user_request, log=print, named_anchors=_anchors_835f)
+            if _dropped_835f > 0:
+                print(f"\n! [LOCAL-835B] FINAL pre-narration guard dropped "
+                      f"{_dropped_835f} off-category stop(s) "
+                      f"(request '{_act835f['activity']} {_act835f['trigger']}') — "
+                      f"delivering {len(poi_list)} provider(s); no padding")
+            else:
+                print(f"  [LOCAL-835B] FINAL pre-narration guard: all "
+                      f"{_before_835f} stop(s) are on-category providers")
+    except Exception as _ac835f_err:
+        print(f"  [LOCAL-835B] FINAL pre-narration guard skipped (non-fatal): "
+              f"{_ac835f_err}")
 
     # PHASE 5: Generate detailed descriptions for each POI (parallelized)
     _phase_timer.start('narration')
@@ -19940,7 +20134,8 @@ Exempt: navigation directions ("Turn left", "Continue past").
                       f"inside '{_l818_scope}' before writing.", flush=True)
                 _l818_added, _l818_rej, _l818_rounds = replenish_to_count(
                     poi_list, _l818_want, _l818_scope, headers,
-                    propose=_l818_propose, make_poi=_new_poi, seen=_l818_seen)
+                    propose=_l818_propose, make_poi=_new_poi, seen=_l818_seen,
+                    request_text=user_request)
                 print(f"  [LOCAL-818] Refilled {_l818_added} stop(s) in "
                       f"{_l818_rounds} round(s); {_l818_rej} rejected for scope. "
                       f"Now {len(poi_list)}/{_l818_want}.", flush=True)
