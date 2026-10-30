@@ -13,7 +13,14 @@ has lapsed twice and Michael has had to ask twice.
 
 ---
 
-# ▶️ WAVE 16 — 2026-10-30 13:26 EDT (wdvrdaza5b) — CURRENT generator **00022-kbx** = `2478ad45` (LOCAL-835B providers, LOCAL-838 walk wins), env = wave 15. Rollback 00021-45q. Proofs 512 kite 2/5 providers-only + honest shortfall ($0.35), 513 Dong Xuan walk 4/4 ($0.11); hidden. audio_tours 405. Orchestrator/modernized as wave 15 (modernized max 3 kept per LEAD).
+# ▶️ 2026-10-30 16:20 EDT: CURRENT = wave 16 generator **00022-kbx** (wave 18 rolled back)
+- **Wave 18** (wdvrdaza7f, 2532fc1c, gen 00023-9zz at 0%) FAILED. The kite proof was a clean refusal ("Mui Ne beach area" scope + Surf Bar drop → LOCAL-847). The Rijks proof hit a **generator OOM, 512 MiB** (also seen at 08:02Z on 00016-62s); memory decision is LEAD's.
+- **Cleanup:** orch a4fe9300 → error, request 313 → failed (backup AudiouraBackups\orch_job_a4fe9300_20261030). Request 300 (tracking duplicate) → failed (backup tour_request_300_20261030); the admin entitlement had nothing reserved.
+- **Android 89** (2.4.41, 2532fc1c, LOCAL-841 resume + LOCAL-830) is built and signed at `C:dev-wtab89udioura-subscribed-2.4.41+89.aab` (sha256 2670bc8f…). Michael uploads it to Play Internal INSTEAD of 86. iOS 88 has the same fix.
+- **Coffee tour bug** (pending poll lost on background) filed as ClickUp wdvrdaza7q; LEAD fixed it as LOCAL-841.
+- Session renamed **GCloud_Storied_1** by Michael (same session).
+
+# ▶️ WAVE 16 — 2026-10-30 13:26 EDT (wdvrdaza5b): generator **00022-kbx** = `2478ad45` (LOCAL-835B providers, LOCAL-838 walk wins), env = wave 15. Rollback 00021-45q. Proofs 512 kite 2/5 providers-only + honest shortfall ($0.35), 513 Dong Xuan walk 4/4 ($0.11); hidden. audio_tours 405. Orchestrator/modernized as wave 15 (modernized max 3 kept per LEAD).
 
 # ▶️ WAVE 15 — 2026-10-30 12:13 EDT (wdvrdaza4v), all `626a18c0`:
 - **Live:** generator **00021-45q** (D746 env + STORY_PASS_MODEL=gpt-4.1), orchestrator **00012-bxs**, modernized **00006-9hq** (JOB_STORE_MODE=layered + DATABASE_URL, max-instances 3).
