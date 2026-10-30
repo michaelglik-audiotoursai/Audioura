@@ -114,6 +114,31 @@ def cheap_arm_categories() -> List[str]:
     return _parse_categories(os.environ.get(CHEAP_ARM_CATEGORIES_ENV, ""))
 
 
+# [LOCAL-834] Category aliases: the generator's classifier returns the five
+# categories 'facility'/'restaurant'/'walking'/'museum'/'specialized', but for a
+# specialized tour it REMAPS 'specialized' -> 'book' before binding the gate
+# (generate_tour_text.py: `if tour_category == 'specialized': tour_category =
+# 'book'`). So the value the gate actually sees for a specialized/book tour is
+# 'book', which is NOT the word LEAD lists in CHEAP_ARM_CATEGORIES (that lists
+# 'specialized'). Without this alias a book tour would fall to production defaults
+# (D664: an unknown category gets production defaults) even though the cheap arm
+# is meant to be ON for it. Normalising 'book' -> 'specialized' makes the gate see
+# the CLASSIFIER'S category on the specialized/book path too, matching every other
+# path. This is a pure widening: it only affects a tour whose bound category is a
+# known alias, and the alias target is the classifier's own name.
+_CATEGORY_ALIASES = {
+    "book": "specialized",
+}
+
+
+def _normalize_category(category: str) -> str:
+    """Map a bound tour category to the classifier category the env names. Today
+    only 'book' (the generator's remap of 'specialized') is aliased; everything
+    else is returned unchanged."""
+    c = (category or "").strip().lower()
+    return _CATEGORY_ALIASES.get(c, c)
+
+
 def gate_active() -> bool:
     """True when CHEAP_ARM_CATEGORIES is set to at least one category — i.e. the
     controlled envs are category-gated rather than global."""
@@ -126,11 +151,15 @@ def cheap_arm_active(category: Optional[str] = None) -> bool:
     * Gate UNSET → True (the controlled envs apply to EVERYTHING, as today).
     * Gate SET   → True only when ``category`` (default: the current contextvar
       category) is in the configured list.
+
+    [LOCAL-834] The bound category is normalised through :func:`_normalize_category`
+    first, so the generator's 'specialized' -> 'book' remap still matches a
+    CHEAP_ARM_CATEGORIES list that names 'specialized'.
     """
     if not gate_active():
         return True
     cat = (category if category is not None else tour_category()) or ""
-    return cat.strip().lower() in cheap_arm_categories()
+    return _normalize_category(cat) in cheap_arm_categories()
 
 
 # ── the one hook every controlled env read uses ──────────────────────────────
