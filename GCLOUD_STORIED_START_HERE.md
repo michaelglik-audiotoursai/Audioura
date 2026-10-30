@@ -13,7 +13,9 @@ has lapsed twice and Michael has had to ask twice.
 
 ---
 
-# ▶️ WAVE 15 — 2026-10-30 12:13 EDT (wdvrdaza4v) — CURRENT, all `626a18c0`:
+# ▶️ WAVE 16 — 2026-10-30 13:26 EDT (wdvrdaza5b) — CURRENT generator **00022-kbx** = `2478ad45` (LOCAL-835B providers, LOCAL-838 walk wins), env = wave 15. Rollback 00021-45q. Proofs 512 kite 2/5 providers-only + honest shortfall ($0.35), 513 Dong Xuan walk 4/4 ($0.11); hidden. audio_tours 405. Orchestrator/modernized as wave 15 (modernized max 3 kept per LEAD).
+
+# ▶️ WAVE 15 — 2026-10-30 12:13 EDT (wdvrdaza4v), all `626a18c0`:
 - **Live:** generator **00021-45q** (D746 env + STORY_PASS_MODEL=gpt-4.1), orchestrator **00012-bxs**, modernized **00006-9hq** (JOB_STORE_MODE=layered + DATABASE_URL, max-instances 3).
 - **Rollback:** gen 00019-k5x, orch 00011-tjn, modernized 00004-5jx (max=1).
 - **Proofs:** 509 Ben Thanh 4/4, 510 Orsay 5/5 (story pass: NO_STORY), 511 Dong Khoi 3/3. Total $0.34; all hidden; audio_tours 403.
