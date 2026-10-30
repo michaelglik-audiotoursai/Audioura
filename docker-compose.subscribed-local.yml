@@ -44,6 +44,26 @@ services:
       - /Users/micha/Audioura/listener_role.token:/run/meter_role_token:ro   # LOCAL-723: proof-of-listener token; mounted ONLY into listener services. NOT inside _meter, so test containers that mount _meter do not get it.
       - /Users/micha/Audioura/meterlogs:/meterlogs
       - /Users/micha/Audioura/tours:/app/tours   # ONE tour store for every service (2026-10-19: ./tours resolved to the checkout when compose ran from it)
+  coordinates-fromai:
+    # LOCAL-820: audioura-coordinates-fromai-1 has an OPENAI_API_KEY (master sets it)
+    # but master gives it NO meter — so every OpenAI call it makes was unmetered
+    # (part of the ~16k unlogged calls). Give it the SAME meter wiring as
+    # tour-generator: install the network meter (PYTHONPATH=/opt/meter from the
+    # mounted _meter), write the canonical shared log, and bind-mount
+    # ~/Audioura/meterlogs so the rows land on the host. It is listener-facing
+    # (it serves the app's coordinate requests), so stamp role='listener' exactly
+    # like the other serving services — proof = METER_ROLE_TOKEN env == the
+    # contents of the token file bind-mounted ONLY into listener services.
+    environment:
+      - PYTHONPATH=/opt/meter
+      - PAID_API_LOG=/meterlogs/paid_api_calls.jsonl
+      - METER_ROLE=listener
+      - METER_ROLE_TOKEN=${METER_ROLE_TOKEN}       # LEAD sets this in ~/Audioura/.env; must match the token file's contents.
+      - METER_ROLE_TOKEN_FILE=/run/meter_role_token
+    volumes:
+      - /Users/micha/audioura-subscribed-local/_meter:/opt/meter:ro
+      - /Users/micha/Audioura/listener_role.token:/run/meter_role_token:ro   # LOCAL-723/820: proof-of-listener token; mounted ONLY into listener services.
+      - /Users/micha/Audioura/meterlogs:/meterlogs
   tour-orchestrator:
     build: {context: /Users/micha/audioura-subscribed-local, dockerfile: Dockerfile.orchestrator}
     environment:
