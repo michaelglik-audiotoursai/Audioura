@@ -14,6 +14,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../services/tour_status_service.dart';
 import '../services/background_tour_monitor.dart';
+import '../services/pending_tour_requests_store.dart';
 import '../services/saved_tours_store.dart';
 import '../config.dart';
 import '../config/endpoints.dart';
@@ -778,6 +779,29 @@ class _TourGeneratorScreenState extends State<TourGeneratorScreen> {
       
       // Add user tracking for foreground generation with the job ID and stop count
       await TourStatusService.trackTourRequest(sanitizedInput, jobId, stopCount: stopCount);
+
+      // [LOCAL-841] Persist this in-flight request the MOMENT the POST returns a
+      // job id. The foreground poll loop below dies if iOS suspends the app
+      // mid-generation (mounted == false), which is exactly how Michael's coffee
+      // tour (503) was generated + stored on the cloud yet never downloaded. With
+      // this entry on disk, PendingTourResumeHandler finishes the download on the
+      // next app start / resume. Best-effort: a storage hiccup must never block
+      // generation, so a failure here is logged and swallowed.
+      try {
+        await PendingTourRequestsStore.add(
+          await SharedPreferences.getInstance(),
+          PendingTourRequest(
+            jobId: jobId,
+            title: (tourData['location'] ?? sanitizedInput).toString(),
+            startedAt: DateTime.now().toUtc(),
+            clientRequestId: _clientRequestId,
+            languages: List<String>.from(_selectedLanguages),
+            stopCount: stopCount.toString(),
+          ),
+        );
+      } catch (e) {
+        await DebugLogHelper.addDebugLog('PENDING_PERSIST: failed to store $jobId: $e');
+      }
       
       // Step 2: Poll for completion and auto-download
       await _pollAndAutoDownload(jobId, tourData['location'], _selectedLanguages);
@@ -928,11 +952,23 @@ class _TourGeneratorScreenState extends State<TourGeneratorScreen> {
 
               // Update tour request status to completed AFTER download
               await TourStatusService.updateTourStatus(jobId, 'completed');
+              // [LOCAL-841] The foreground path downloaded it — drop the pending
+              // entry so the resume handler does not re-download it later.
+              try {
+                await PendingTourRequestsStore.remove(
+                    await SharedPreferences.getInstance(), jobId);
+              } catch (_) {}
               return;
 
             } else if (status['status'] == 'error' || status['status'] == 'failed') {
               done = true;
               await TourStatusService.updateTourStatus(jobId, 'failed');
+              // [LOCAL-841] Terminal failure — drop the pending entry; there is
+              // nothing to resume.
+              try {
+                await PendingTourRequestsStore.remove(
+                    await SharedPreferences.getInstance(), jobId);
+              } catch (_) {}
 
               // [LOCAL-581] Resolve the server's own words first. The resolver
               // (message precedence error > message > user_error.message >

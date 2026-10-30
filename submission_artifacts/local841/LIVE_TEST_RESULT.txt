@@ -1,0 +1,31 @@
+LOCAL-841 — LIVE iOS simulator test (iPhone 17, iOS 26), app pointed at the local
+Mac stack (--dart-define=DEBUG_SERVER_IP=127.0.0.1), orchestrator on :5002.
+
+Test: integration_test/local841_resume_live_headless_test.dart
+Flow: a real 1-stop tour is generated on the live stack while the app is
+"backgrounded" (AppLifecycleState.paused); on resume the REAL
+PendingTourResumeHandler downloads it from the live /download endpoint and it
+appears on the REAL Listen page (MyToursScreen) — within 30 s.
+
+Authoritative run (job 5a44535d-affa-48be-97bd-1b0a2c27b4f4, final_tour_id 872):
+
+  00:00 +0: LIVE: a backgrounded generation is resumed and shows on Listen < 30 s
+  RESUME: downloaded + saved "A short coffee walk near Union Square San Francisco
+          - Restaurant Tour" (id 872, job 5a44535d-affa-48be-97bd-1b0a2c27b4f4)
+  RESUME: pass done — downloaded=1 failed=0 stale=0 kept=0
+  LOCAL841TEST downloaded=1 elapsed=0s
+  LISTEN: Loading 1 tours from storage
+  LISTEN: Loaded 1 valid tours (0 skipped)
+  LOCAL841TEST PASS: tour on Listen after resume
+  00:03 +1: All tests passed!
+
+Reproduced across multiple fresh jobs (6c321774, 5a44535d) and via the real app
+(flutter run) which auto-resumed on launch — see real_app_resume.log.
+
+Note on screenshots: an OS-level location-permission prompt overlays the
+foreground app/test-runner on this freshly-provisioned simulator, and this
+sandbox lacks the accessibility/screen-recording permissions needed to dismiss
+it programmatically, so a screenshot of the populated Listen row could not be
+captured. The populated Listen state is instead proven by the test above
+(LISTEN: Loaded 1 valid tours + empty-state assertion findsNothing after resume).
+01_app_launched.png / 02_after_resume_home.png show the real app on the local stack.

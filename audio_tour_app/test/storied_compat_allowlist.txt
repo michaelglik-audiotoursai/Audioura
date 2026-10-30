@@ -23,6 +23,7 @@ screens/home_screen.dart | CORE map/tours-near/search/share-code/download/resolv
 screens/tour_generator_screen.dart | CORE generate/status/download + news; non-200 handled as a structured refusal, decode guarded by try/catch.
 services/background_service.dart | CORE /status + /download polling for a backgrounded generate; wrapped in try/catch, acts only on 200.
 services/background_tour_monitor.dart | CORE /status + /download polling; try/catch, acts only on 200.
+services/pending_tour_resume_handler.dart | CORE /status + /download resume of a suspended foreground generate (LOCAL-841); every call in try/catch, acts only on 200, 404/stale handled.
 services/tour_translation_helper.dart | CORE download of a translated tour + translate POST; try/catch, 200-gated.
 services/tour_download_service.dart | CORE /download-tour + /tour/<id>/resolve — the single download+save path lifted from home_screen (LOCAL-713); every call in try/catch, 200-gated, 402 handled.
 services/tour_rating_service.dart | CORE POST/GET /tour/<id>/rating; typed catches (Socket/Timeout/Client) -> null, outbox-queued offline.

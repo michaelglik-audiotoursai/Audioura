@@ -6,6 +6,7 @@ import 'package:flutter/widgets.dart';
 import 'outbox_service.dart';
 import 'community_tours_sync.dart';
 import 'foreground_community_messages.dart';
+import 'pending_tour_resume_handler.dart';
 
 /// Drives the offline outbox's sync triggers (LOCAL-670C) AND the community-
 /// tours sync-on-open baseline (LOCAL-713 / D675 §4):
@@ -52,6 +53,12 @@ class AppSyncCoordinator with WidgetsBindingObserver {
   void _syncAll() {
     unawaited(OutboxService.instance.flush());
     unawaited(CommunityToursSync.instance.run());
+    // [LOCAL-841] Resume any in-flight tour generation the app was waiting on
+    // when it was suspended/killed (Michael's coffee-tour 503). Runs on app
+    // start, on resume and when connectivity returns — the same triggers the
+    // other syncs use. Self-gating (an in-flight pass no-ops) and never blocks
+    // the UI; it quietly finishes completed downloads and shows them on Listen.
+    unawaited(PendingTourResumeHandler.instance.run());
   }
 
   /// [LOCAL-750 C] Run the community sync NOW (e.g. the Communities hub or a
