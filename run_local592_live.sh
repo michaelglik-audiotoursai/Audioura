@@ -40,6 +40,20 @@ args=(
   -e COST_HARD_LIMIT_USD=1.00
   -v "${OUT_DIR}:/app/tours"
 )
+# [LOCAL-820] THE METER CONTRACT — the canonical args from
+# meter_container_env.docker_meter_args(task_id="LOCAL-592", meter_dir=_meter,
+# host_meter_dir=~/Audioura/meterlogs). Without these the baked-in paid-API
+# meter writes to /meterlogs inside the --rm container and the rows die with it.
+METER_DIR="/Users/micha/Audioura/meterlogs"
+mkdir -p "${METER_DIR}"
+args+=(
+  -e PYTHONPATH=/opt/meter
+  -e PAID_API_LOG=/meterlogs/paid_api_calls.jsonl
+  -e METER_SERVICE=LOCAL-592
+  -v "${HERE}/_meter:/opt/meter:ro"
+  -v "${METER_DIR}:/meterlogs"
+)
+[ -n "${METER_KEY_SUFFIX:-}" ] && args+=(-e "METER_KEY_SUFFIX=${METER_KEY_SUFFIX}")
 # Own env-file (the audioura-tour-generator-1 container's env = project .env),
 # so OPENAI_API_KEY etc. are present. Never reuse an audioura-* container.
 [ -f "${ENV_FILE}" ] && args+=(--env-file "${ENV_FILE}")

@@ -60,7 +60,10 @@ args+=(
   -e STOP_EXISTENCE_GATE_MODE=log_only
   -e TEST_GEMINI_MAX_USD=1.00
   -e COST_HARD_LIMIT_USD=1.00
-  -e PAID_API_LOG=/meterlogs/paid_api_calls_local799.jsonl
+  -e PAID_API_LOG=/meterlogs/paid_api_calls.jsonl
+  -e PYTHONPATH=/opt/meter
+  -e METER_SERVICE=LOCAL-799
+  -v "${HERE}/_meter:/opt/meter:ro"
   -v "${METER_DIR}:/meterlogs"
   -v "${HERE}:/app" -w /app
 )
