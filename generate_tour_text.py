@@ -19737,6 +19737,92 @@ Exempt: navigation directions ("Turn left", "Continue past").
         print(f"  [LOCAL-802] final same-building dedupe skipped (non-fatal): "
               f"{_fb_err}", flush=True)
 
+    # ============================================================
+    # [LOCAL-818] FINAL REPLENISH — refill after a LATE drop.
+    # ============================================================
+    # Westminster / Lower Manhattan / Asakusa reach the LOCAL-576 pre-writing scope
+    # check with a VALID district scope, so that gate refills correctly; but a stop
+    # is then dropped AFTER the last network replenish — by the LOCAL-802 FINAL
+    # same-building dedupe directly above, or by any other late drop on this path
+    # (a pin refusal, a junk guard, a D538 closure removal) — and nothing refills
+    # the count. The tour ships 4 of 5 with the needless D616 shortfall apology,
+    # even though the district plainly has more than five real places (LOCAL-816
+    # "what is NOT fixed").
+    #
+    # So: after ALL late drops have run — right before a single description is
+    # written — compare the stop count to what the listener asked for, and if we
+    # are short, run ONE more on-category replenish round inside the SAME scope
+    # (the one the originals were validated against). This mirrors the LOCAL-576
+    # replenish exactly: same resolver, same proposer, same validation. It never
+    # fabricates a shortfall: replenish_to_count only adds real candidates that
+    # pass the same containment check, so if the pool has no real in-scope place
+    # left the count simply stays as-is (honest D616) rather than padding.
+    #
+    # Museums/facilities are excluded (their own venue guard owns containment and
+    # _resolve_scope_for_check returns '' for them, which skips this entirely).
+    # Named anchors are exempt inside _validate_stops_within_scope, so this never
+    # touches a place the listener named.
+    try:
+        _l818_want = _requested_stop_count_original or 0
+        if (tour_category not in ('museum', 'facility')
+                and _l818_want and len(poi_list) < _l818_want and poi_list):
+            _l818_scope = _resolve_scope_for_check(intent, location, tour_category,
+                                                   _museum_venue_name, quiet=True)
+            if _l818_scope:
+                from restaurant_practicals import propose_replacements as _l818_propose_fn
+                _l818_before = len(poi_list)
+                _l818_seen = {(p.get('name') or '').lower() for p in poi_list}
+
+                def _l818_propose(_need, _seen):
+                    return _l818_propose_fn(location, list(_seen), _need, api_key,
+                                            kind='places to visit')
+
+                print(f"\n  [LOCAL-818] Post-drop refill: {_l818_before}/"
+                      f"{_l818_want} after late drops — replenishing on-category "
+                      f"inside '{_l818_scope}' before writing.", flush=True)
+                _l818_added, _l818_rej, _l818_rounds = replenish_to_count(
+                    poi_list, _l818_want, _l818_scope, headers,
+                    propose=_l818_propose, make_poi=_new_poi, seen=_l818_seen)
+                print(f"  [LOCAL-818] Refilled {_l818_added} stop(s) in "
+                      f"{_l818_rounds} round(s); {_l818_rej} rejected for scope. "
+                      f"Now {len(poi_list)}/{_l818_want}.", flush=True)
+                # A refilled stop carries no coordinate yet — fetch + resolve so
+                # routing can place it, exactly as the LOCAL-481 / D558 paths do.
+                if _l818_added:
+                    _l818_new = [p for p in poi_list if not p.get('coordinates')]
+                    try:
+                        _l818_coord_fn = _fetch_coords
+                    except NameError:
+                        _l818_coord_fn = None
+                    if _l818_new and _l818_coord_fn:
+                        try:
+                            with tour_executor(max_workers=min(len(_l818_new), 5)) as _l818_ex:
+                                _l818_futs = {_l818_ex.submit(_l818_coord_fn, _p): _p
+                                              for _p in _l818_new}
+                                for _lf in as_completed(_l818_futs):
+                                    _lp, _lcoord, _ltok = _lf.result()
+                                    if _lcoord:
+                                        _lp['coordinates'] = _lcoord
+                                        total_tokens += _ltok
+                                        total_cost += _tour_llm_cost(_ltok)
+                        except Exception as _l818_ce:
+                            print(f"  [LOCAL-818] coord fetch for refilled stop(s) "
+                                  f"skipped (non-fatal): {_l818_ce}", flush=True)
+                    # Replenished stops were appended to the end — re-pin the order
+                    # so a named start/end anchor keeps its position.
+                    try:
+                        _l818_order_info = _lr576_order_info
+                    except NameError:
+                        _l818_order_info = None
+                    try:
+                        if _l818_order_info and _l818_order_info.get('anchors'):
+                            poi_list = _order_by_anchors(poi_list, _l818_order_info)
+                    except Exception:
+                        pass
+    except Exception as _l818_err:
+        print(f"  [LOCAL-818] post-drop refill skipped (non-fatal): "
+              f"{_l818_err}", flush=True)
+
     print(f"\nPHASE 5: Generating detailed descriptions for each POI (parallel)...")
 
     # -------- [LOCAL-382/LOCAL-387] Exhibition thesis / venue purpose framing detection --------

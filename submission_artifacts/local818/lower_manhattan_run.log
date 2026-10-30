@@ -1,0 +1,1082 @@
+[LOCAL-818] single-tour mode: index 1
+=== LOCAL-818 isolated live run (cheap arm: gpt-4.1-mini + serper) ===
+host  : 627239f1bbbc
+TASK_BUDGET_ID=LOCAL-818 TASK_BUDGET_USD=0.70  cache_off=1 pool_off=1 STORIED_MODE=true RESEARCH_BACKEND=serper
+audio_tours rows BEFORE: 1
+
+=== TOUR [lower-manhattan-NEWYORK] 'Lower Manhattan history walking tour, New York' tour_type='walking' (5 stops) ===
+  [LOCAL-818] classified category = 'walking'
+  [LOCAL-767] GEMINI key present=True
+
+======================================================================
+CALL #001 | 01:32:11.596 | GENERATE_TOUR_TEXT_FUNCTION_ENTRY
+======================================================================
+  location: Lower Manhattan history walking tour, New York
+  tour_type: walking
+  total_stops_parameter: 5
+  output_file: None
+
+  [LOCAL-245] Stop-existence gate mode: LOG_ONLY
+
+======================================================================
+CALL #002 | 01:32:11.603 | TOTAL_STOPS_FINALIZED
+======================================================================
+  location: Lower Manhattan history walking tour, New York
+  total_stops_final: 5
+  source: parameter
+
+
+PHASE 1: Analyzing tour intent with AI...
+  [BLOCKER1] Stripped 'tour' from location: 'Lower Manhattan history walking tour, New York' → 'Lower Manhattan history walking , New York'
+  [LOCAL-46] Stripped transport words: 'Lower Manhattan history walking , New York' → 'Lower Manhattan history , New York'
+  [Bug2Fix/D536] tour_type='walking' not prepended (pre_category='specialized'); intent sees the ORIGINAL request, not the stripped one
+Intent analysis response: ```json
+{
+    "poi_type": "historical landmarks",
+    "location": "Lower Manhattan, New York",
+    "theme_type": "STANDARD",
+    "theme_name": null,
+    "requirements": null,
+    "business_hours_relevant": false,
+    "accessibility_mentioned": false,
+    "needs_research": false,
+    "venue_name": null,
+    "geographic_scope": "Lower Manhattan",
+    "named_places": [],
+    "scope_precision": "DISTRICT",
+    "transport_mode": "on_foot",
+    "country_scope": null
+}
+```
+  [INTENT] Stripped LLM fences from response
+  [TRANSPORT] mode=on_foot, country_scope=None (keyword=on_foot, intent=on_foot)
+✅ Intent Analysis Results:
+   POI Type: historical landmarks
+   Location: Lower Manhattan, New York
+   Requirements: None
+   Business Hours Relevant: False
+   Accessibility Mentioned: False
+   Venue Name: None
+[LOCAL-664] cheap arm: ON for category=walking (categories=UNSET; gate unset — controlled envs apply to all tours)
+  [LOCAL-655] no current-affairs intent (category='walking') — news research NOT run
+[TIMING] phase=intent elapsed=1.9s cumulative=1.9s
+[LOCAL-474] tour_type='walking' → category='walking' (source=explicit)
+
+Detected tour category: WALKING
+Using walking template for Lower Manhattan history walking tour, New York - walking
+
+======================================================================
+CALL #003 | 01:32:13.500 | GENERATING_PROMPT
+======================================================================
+  location: Lower Manhattan history walking tour, New York
+  user_request: Lower Manhattan history walking tour, New York
+  total_stops: 5
+
+
+PHASE 3A: Fetching 5 candidate POI(s) for Lower Manhattan history walking tour, New York...
+  [S17] scope_constraint injected: precision=DISTRICT, scope='Lower Manhattan'
+  [LOCAL-290] Asking for 8 candidates (N=5 + margin for gate filtering)
+
+======================================================================
+CALL #004 | 01:32:13.505 | PHASE_3A_REQUEST
+======================================================================
+  location: Lower Manhattan history walking tour, New York
+  total_stops: 5
+  poi_type_hint: historical landmarks
+
+[LOCAL-197] llm_cost() called with total_tokens (deprecated) by /app/generate_tour_text.py:13554. Caller should supply input_tokens and output_tokens separately.
+[LOCAL-197] llm_cost() called with total_tokens (deprecated) by /app/generate_tour_text.py:13555. Caller should supply input_tokens and output_tokens separately.
+PHASE 3A API call cost: $0.0002 (799 tokens)
+
+======================================================================
+CALL #005 | 01:32:17.669 | OPENAI_API_CALL
+======================================================================
+  total_stops_requested: 5
+  stop_count_in_prompt: True
+  http_status: 200
+  prompt_first_500_chars: You are a knowledgeable local guide for Lower Manhattan history walking tour, New York.
+List exactly 8 specific, real, well-known historical landmarks relevant to: Lower Manhattan history walking tour, New York.
+
+Requirements:
+- Use REAL, SPECIFIC names of actual establishments or landmarks.
+- NEVER use generic placeholders like 'Restaurant 1', 'Stop 1', 'Location A'.
+- Include a complete street address with ZIP code where applicable.
+
+GEOGRAPHIC SCOPE — ALL stops MUST be located within: Lower M
+  prompt_last_300_chars: opic ("politics and current affairs", "local history and culture") — name the real place that embodies it.
+
+Return ONLY a JSON array, no other text, no markdown fences:
+[{"name": "...", "address": "...", "reason": "Brief reason why this landmark is notable — a specific date, person, or event"}, ...]
+  stops_found_in_response: 0
+  stop_markers_in_response:
+    []
+  response_first_500_chars: [
+    {"name": "Federal Hall National Memorial", "address": "26 Wall St, New York, NY 10005", "reason": "Site of George Washington's first presidential inauguration in 1789."},
+    {"name": "The Charging Bull", "address": "26 Broadway, New York, NY 10004", "reason": "Symbol of financial optimism and resilience, installed in 1989."},
+    {"name": "Trinity Church", "address": "75 Broadway, New York, NY 10006", "reason": "Historic church founded in 1697, known for its role in early American history
+
+  [LOCAL-329] Captured 8 substantive selection reason(s)
+OK PHASE 3A parsed 8 candidate POI(s):
+   - Federal Hall National Memorial @ 26 Wall St, New York, NY 10005
+   - The Charging Bull @ 26 Broadway, New York, NY 10004
+   - Trinity Church @ 75 Broadway, New York, NY 10006
+   - Wall Street @ Wall St, New York, NY 10005
+   - The New York Stock Exchange @ 11 Wall St, New York, NY 10005
+   - Battery Park @ State St & Battery Pl, New York, NY 10004
+   - One World Trade Center @ 285 Fulton St, New York, NY 10007
+   - 9/11 Memorial & Museum @ 180 Greenwich St, New York, NY 10007
+  [LOCAL-779] area resolver input: 'Lower Manhattan' (stripped poi/near-me from 'Lower Manhattan history , New York')
+  [area_resolver] Parsed: city='Lower Manhattan', neighborhood=''
+  [area_resolver] City resolved: Lower Manhattan → Q11253 (40.7075, -74.0119)
+  [area_resolver] Resolved: center=(40.7075, -74.0119), radius=2.0km, lang=en
+  [LOCAL-294] P31 type filter: excluded 7 entities:
+    EXCLUDED: Wall Street station (IRT Lexington Avenue Line) (Q2183775) — P31=Q928830
+    EXCLUDED: Rector Street station (BMT Broadway Line) (Q2580615) — P31=Q928830
+    EXCLUDED: Rector Street station (IRT Sixth Avenue Line) (Q7303219) — P31=Q928830
+    EXCLUDED: Rector Street station (IRT Broadway–Seventh Avenue Line) (Q2415223) — P31=Q928830
+    EXCLUDED: Broad Street station (BMT Nassau Street Line) (Q768988) — P31=Q928830
+    EXCLUDED: China Chalet (Q110269520) — P31=Q11707
+    EXCLUDED: Rector Street station (IRT Ninth Avenue Line) (Q7303217) — P31=Q928830
+  [LOCAL-294] Unknown P31 types encountered (kept, not excluded):
+    UNKNOWN TYPE: Q738570 — first seen on: Lower Manhattan
+    UNKNOWN TYPE: Q179700 — first seen on: Statue of John Watts
+    UNKNOWN TYPE: Q11303 — first seen on: Manhattan Life Insurance Building
+    UNKNOWN TYPE: Q18761864 — first seen on: 1 Wall Street
+    UNKNOWN TYPE: Q1021645 — first seen on: 65 Broadway
+    UNKNOWN TYPE: Q19860854 — first seen on: Mortimer Building
+    UNKNOWN TYPE: Q43229 — first seen on: Trinity Church (Manhattan)
+    UNKNOWN TYPE: Q10882966 — first seen on: New York Stock Exchange Building
+    UNKNOWN TYPE: Q23002054 — first seen on: King's College (New York City)
+    UNKNOWN TYPE: Q1743327 — first seen on: King's College (New York City)
+    UNKNOWN TYPE: Q11691 — first seen on: New York Stock Exchange
+    UNKNOWN TYPE: Q4502142 — first seen on: Money to Burn (performance art)
+    UNKNOWN TYPE: Q1577547 — first seen on: Empire Building (Manhattan)
+    UNKNOWN TYPE: Q5278332 — first seen on: Stock Exchange Luncheon Club
+    UNKNOWN TYPE: Q476807 — first seen on: New York Armory Raid
+    UNKNOWN TYPE: Q1967454 — first seen on: Federal Hall
+    UNKNOWN TYPE: Q1497364 — first seen on: Trinity and United States Realty Buildings
+    UNKNOWN TYPE: Q179057 — first seen on: Wall Street bombing
+    UNKNOWN TYPE: Q838718 — first seen on: Great New York City Fire of 1845
+  [LOCAL-294] P31 filter result: 50 → 43 kept, 7 excluded, 19 unknown types logged
+  [landmark_discovery] SPARQL coordinate query: 43 landmarks
+    [LOCAL-293] Wikipedia headings: 10 candidates → 0 resolved with QID + in-area coords
+  [landmark_discovery] Wikipedia extraction: +0 new names (total: 43)
+  [area_cache] STORED Q11253: 43 landmarks (tier=rich, TTL=30d)
+  [verify_landmarks] 4/8 stops verified against 43 discovered landmarks (tier: rich)
+  [LOCAL-790] same place collapsed: 'The New York Stock Exchange' = 'Wall Street' (QID or <=60m)
+  [WALK-D1] Verified 3 stops, tier=rich
+
+PHASE 4.5: Validating AI knowledge for Lower Manhattan history walking tour, New York...
+OK Knowledge validation passed: Knowledge validation passed
+
+PHASE 4: skipped (tour_category='walking', no type-verification required)
+   PHASE 3C: skipped for walking tours (GEO-CHECK handles proximity)
+  [LOCAL-212] Coverage selection error (non-fatal): relation "stop_corpus" does not exist
+LINE 1: ..., passages_json, source_pages, passage_roles FROM stop_corpu...
+                                                             ^
+
+  [LOCAL-662] EXISTENCE-GATE: forcing ENFORCE for 'walking' tour (global mode LOG_ONLY); unverified stops will be dropped/replaced, else N−1 with honest shortfall
+[EXISTENCE-GATE] stop_corpus geographic check failed: relation "stop_corpus" does not exist
+LINE 3:         FROM stop_corpus
+                     ^
+
+[EXISTENCE-GATE] stop_corpus geographic check failed: relation "stop_corpus" does not exist
+LINE 3:         FROM stop_corpus
+                     ^
+
+[EXISTENCE-GATE] stop_corpus geographic check failed: relation "stop_corpus" does not exist
+LINE 3:         FROM stop_corpus
+                     ^
+
+[EXISTENCE-GATE] stop_corpus geographic check failed: relation "stop_corpus" does not exist
+LINE 3:         FROM stop_corpus
+                     ^
+
+  [EXISTENCE-GATE] LOG_ONLY — 7/7 stops verified (100%), 0 would be dropped
+    [VERIFIED] 'Federal Hall National Memorial' — venue_corpus canonical_title(geo): 'Federal Hall' at 'Lower Manhattan walking ar
+    [VERIFIED] 'The Charging Bull' — wikipedia_en_article: 'Charging Bull' exists in region
+    [VERIFIED] 'Trinity Church' — venue_corpus canonical_title(geo): 'Trinity Church (Manhattan)' at 'Lower Manhat
+    [VERIFIED] 'Wall Street' — venue_corpus canonical_title(geo): '1 Wall Street' at 'Lower Manhattan walking a
+    [VERIFIED] 'Battery Park' — wikipedia_en_summary: 'The Battery (Manhattan)' exists and mentions region
+    [VERIFIED] 'One World Trade Center' — wikipedia_en_summary: 'One World Trade Center' exists and mentions region
+    [VERIFIED] '9/11 Memorial & Museum' — wikipedia_en_article: 'National September 11 Memorial & Museum' exists in region
+    [HARVEST] Error (non-fatal): relation "stop_corpus" does not exist
+LINE 1: SELECT stop_title, passage_count FROM stop_corpus WHERE LOWE...
+                                              ^
+
+    [INTERPRETIVE] Error (non-fatal): relation "stop_corpus" does not exist
+LINE 1: ...T passages_json, source_pages, passage_count FROM stop_corpu...
+                                                             ^
+
+  [ROUTE-ORDER] Computed route for 3 stops with coords (2 without): 0.22km total
+[LOCAL-329] Failed to persist selection reasons: relation "stop_corpus" does not exist
+LINE 1: SELECT passage_count FROM stop_corpus WHERE venue_name = 'Lo...
+                                  ^
+
+  [LOCAL-329] Persistence error (non-fatal): relation "stop_corpus" does not exist
+LINE 1: SELECT passage_count FROM stop_corpus WHERE venue_name = 'Lo...
+                                  ^
+
+
+PHASE 3B: Requesting structured details and walking directions for 5 stop(s)...
+
+======================================================================
+CALL #006 | 01:32:45.821 | PHASE_3B_REQUEST
+======================================================================
+  location: Lower Manhattan history walking tour, New York
+  stop_count: 5
+
+PHASE 3B API call cost: $0.0003 (1197 tokens)
+[LOCAL-197] llm_cost() called with total_tokens (deprecated) by /app/generate_tour_text.py:17149. Caller should supply input_tokens and output_tokens separately.
+[LOCAL-197] llm_cost() called with total_tokens (deprecated) by /app/generate_tour_text.py:17150. Caller should supply input_tokens and output_tokens separately.
+OK PHASE 3B: ordered 5 stop(s) with structured details and directions
+  [LOCAL-355] Querying OSM for venue facts (city: York, hint: auto)
+  [LOCAL-788] overpass fallback https://overpass-api.de/api/interpreter 502
+[OSM-VENUE] Overpass HTTP 502 for 'Federal Hall National Memorial' on https://overpass-api.de/api/interpreter
+  [LOCAL-788] overpass fallback https://overpass.kumi.systems/api/interpreter ReadTimeout
+[OSM-VENUE] Overpass ReadTimeout for 'Federal Hall National Memorial' on https://overpass.kumi.systems/api/interpreter
+[OSM-VENUE] Overpass ReadTimeout for 'Federal Hall National Memorial' on https://overpass.private.coffee/api/interpreter
+  [LOCAL-788] overpass fallback https://overpass.private.coffee/api/interpreter ReadTimeout
+[TIMING-SUB] phase=poi_selection step=fetch_osm_venue_facts elapsed=20.85s
+  [LOCAL-355] Federal Hall National Memorial: no practical facts in OSM
+  [LOCAL-788] overpass fallback https://overpass-api.de/api/interpreter ReadTimeout
+[OSM-VENUE] Overpass ReadTimeout for 'The Charging Bull' on https://overpass-api.de/api/interpreter
+  [LOCAL-788] overpass fallback https://overpass.kumi.systems/api/interpreter ReadTimeout
+[OSM-VENUE] Overpass ReadTimeout for 'The Charging Bull' on https://overpass.kumi.systems/api/interpreter
+[OSM-VENUE] Overpass ReadTimeout for 'The Charging Bull' on https://overpass.private.coffee/api/interpreter
+  [LOCAL-788] overpass fallback https://overpass.private.coffee/api/interpreter ReadTimeout
+[TIMING-SUB] phase=poi_selection step=fetch_osm_venue_facts elapsed=30.75s
+  [LOCAL-355] The Charging Bull: no practical facts in OSM
+[OSM-VENUE] Overpass ReadTimeout for 'Wall Street' on https://overpass-api.de/api/interpreter
+  [LOCAL-788] overpass fallback https://overpass-api.de/api/interpreter ReadTimeout
+[OSM-VENUE] Overpass ReadTimeout for 'Wall Street' on https://overpass.kumi.systems/api/interpreter
+  [LOCAL-788] overpass fallback https://overpass.kumi.systems/api/interpreter ReadTimeout
+[OSM-VENUE] Overpass ReadTimeout for 'Wall Street' on https://overpass.private.coffee/api/interpreter
+  [LOCAL-788] overpass fallback https://overpass.private.coffee/api/interpreter ReadTimeout
+[TIMING-SUB] phase=poi_selection step=fetch_osm_venue_facts elapsed=30.75s
+  [LOCAL-355] Wall Street: no practical facts in OSM
+[OSM-VENUE] Overpass ReadTimeout for 'Battery Park' on https://overpass-api.de/api/interpreter
+  [LOCAL-788] overpass fallback https://overpass-api.de/api/interpreter ReadTimeout
+  [LOCAL-788] overpass fallback https://overpass.kumi.systems/api/interpreter ReadTimeout
+[OSM-VENUE] Overpass ReadTimeout for 'Battery Park' on https://overpass.kumi.systems/api/interpreter
+[OSM-VENUE] Overpass ReadTimeout for 'Battery Park' on https://overpass.private.coffee/api/interpreter
+  [LOCAL-788] overpass fallback https://overpass.private.coffee/api/interpreter ReadTimeout
+[TIMING-SUB] phase=poi_selection step=fetch_osm_venue_facts elapsed=30.76s
+  [LOCAL-355] Battery Park: no practical facts in OSM
+[OSM-VENUE] Overpass ReadTimeout for 'Trinity Church' on https://overpass-api.de/api/interpreter
+  [LOCAL-788] overpass fallback https://overpass-api.de/api/interpreter ReadTimeout
+[OSM-VENUE] Overpass ReadTimeout for 'Trinity Church' on https://overpass.kumi.systems/api/interpreter
+  [LOCAL-788] overpass fallback https://overpass.kumi.systems/api/interpreter ReadTimeout
+  [LOCAL-788] overpass fallback https://overpass.private.coffee/api/interpreter ReadTimeout
+[TIMING-SUB] phase=poi_selection step=fetch_osm_venue_facts elapsed=21.44s
+  [LOCAL-355] Trinity Church: no practical facts in OSM
+  [LOCAL-622] OSM lookup budget: spent=134.5s / limit=120s, skipped=0
+[OSM-VENUE] Overpass ReadTimeout for 'Trinity Church' on https://overpass.private.coffee/api/interpreter
+   Coords cluster detected: 2 stops share '40.7074, -74.0113', refetching...
+   Cluster refetch OK 'Wall Street': 40.7074, -74.0113
+   Cluster refetch OK 'Federal Hall National Memorial': 40.7074, -74.0113
+[LOCAL-197] llm_cost() called with total_tokens (deprecated) by /app/generate_tour_text.py:17741. Caller should supply input_tokens and output_tokens separately.
+   GEO-CHECK: all 5 stops within walking distance (max leg 0.66 km, total 1.53 km, limit 12 km)
+Extracted first POI coordinates: (40.7074, -74.0113)
+
+=== Extracted POI Information ===
+1. Federal Hall National Memorial
+   Address: 26 Wall St, New York, NY 10005
+   Coordinates: 40.7074, -74.0113
+   Directions: From the Wall Street subway station, exit and head east on Wall St towards Broad...
+2. The Charging Bull
+   Address: 26 Broadway, New York, NY 10004
+   Coordinates: 40.7062, -74.0122
+   Directions: Exit Federal Hall and head south on Broad St. Turn left onto Wall St and walk un...
+3. Wall Street
+   Address: Wall St, New York, NY 10005
+   Coordinates: 40.7074, -74.0113
+   Directions: From the Charging Bull, head back north on Broadway and turn left onto Wall St. ...
+4. Battery Park
+   Address: State St & Battery Pl, New York, NY 10004
+   Coordinates: 40.7033, -74.0170
+   Directions: From Wall Street, head south on Wall St and continue onto State St. Turn left on...
+5. Trinity Church
+   Address: 75 Broadway, New York, NY 10006
+   Coordinates: 40.7074, -74.0132
+   Directions: Exit Battery Park and head north on State St. Turn right onto Broadway and walk ...
+================================
+
+[TIMING-SUB] phase=poi_selection step=serp_search elapsed=2.56s
+  [LOCAL-427] HTTP 200 from https://www.nps.gov/feha/ (attempt 1)
+  [LOCAL-427] HTTP 200 from https://www.google.com/goto?url=CAESyQEB6zswFW16TDChd9ZgZ2MTIvtWSp6DwaZQTd0vjvvIzrJzh2QU-V2JVjBtAYwe55AvWU9UybPsMHVqgOLpWl2mXlmXjC-Jo-csNkeGF6wAt0vE7fG-eugbu3vlPyJ5T1NG5PlumiXAxxkkCebQGVdfENFWqpX-CMSUAslnnqlPeFi9AlG2N5uYDN-pNj-GgH6WFxKXfNRaciYOLV3tH69JHpiGrGUmAWd66MAn2nHHv2FbqiIQ141BHi-KrfVPdUlWeLolxuwcsCA (attempt 1)
+  [LOCAL-427] HTTP 200 from https://www.google.com/goto?url=CAESbwHrOzAVDAXQwNU2PLFtfPZ8KEq-x76u7vI4cjwb2frYOHAnO-YwbSgsP2jYycNarG4PGCAggCqawiXRuczQ9Qb_iJqO3vITzzsHYeh0q1Ab-FQrcRBhklQsrFtMw4lpquQ5pynz7xzF9FOkhtEaFA (attempt 1)
+  [LOCAL-427] HTTP 200 from https://www.google.com/goto?url=CAESeQHrOzAVWyMMMxwfGH8ncrfI9hQIBftuJPIZ04JWKMqhn762xMLjKW1al2BfHS9BQIA-JD0AI9_GgEODCG3ZcVkK9E8r1U5ZFJJacea9pg0QfGzW_OjUUDni6K6OHWDHuICHEO4Dn57IOBnon2vqTpy2MKSre3Vp3-c (attempt 1)
+  [LOCAL-427] HTTP 200 from https://www.google.com/goto?url=CAEStQEB6zswFUBtKvl80a9rSdQ6YzjaepPYFv84HTC--cdB-fIM7m8BfdfUYhCVFxrwpVMlF1QmCQH6chRuAvQbXbZMto-wy80rh3M5-QeO8HDLlsmsAYqCjHdM_HA48wal8shPSxplHLA4lvBnhuFXQ3acZMW7I1BmG8boUT9EKAnmr59-GA79IccICcB64fu2i2cWJy2ZtG39A3w-RHU9mxUX4xmDSXYo4qmN3-V6_kyN_GXBpBC2 (attempt 1)
+  [LOCAL-427] HTTP 200 from https://www.google.com/goto?url=CAES0QEB6zswFTVGVLrrWzw5uC4D_UWHgPjmEooK8lMc67OQsSVou-Xacshm2Ml6rV68wYQKoS-DhGOmlJ_FgIEEffsP7czugl3I-DO9HryHRaWgMLavkoiGqFZUIpVANNm5fwVgeWvuAP2Bnh1qWamlcfxGwW38pfI6Rst2aoDazfSaY45YZi44uBS9HQMnmsh13Qxd9nNtC_PEWOnhZz4OLW_yIFC81VsfY0X8F12hW_otdu3eOlwFkLLy80bY8pu5mBRXWw-bSxtyLt-qDPCdOqTttw (attempt 1)
+  [LOCAL-427] HTTP 200 from https://www.google.com/goto?url=CAESZgHrOzAVLHX96bDRndtw5emkCUSjcGsO3dsmTkEeM1InDrG3JbT0Mxmc974rfY3edy5-kFNMWP0ioaqjf-OdKEqFyetKaXlZbsQsv0KjiAhddkZyesvZ_mIWVIeaALMzGYAyJLD0lQ (attempt 1)
+[TIMING-SUB] phase=poi_selection step=serper_research elapsed=11.94s
+[TIMING-SUB] phase=poi_selection step=fetch_stop_knowledge elapsed=13.11s
+  [D556] +3 story fact(s) for 'Federal Hall National Memorial' via gemini (3 high)
+[TIMING-SUB] phase=poi_selection step=serp_search elapsed=1.25s
+  [LOCAL-427] HTTP 200 from https://www.facebook.com/anewztv/videos/people-in-lower-manhattan-were-seen-fleeing-for-safety-after-a-vehicle-caught-fi/853355733907546/ (attempt 1)
+  [LOCAL-427] HTTP 200 from https://abc7.com/post/car-catches-fire-explodes-new-yorks-charging-bull-statue-lower-manhattan/19137930/ (attempt 1)
+  [LOCAL-427] HTTP 200 from https://www.youtube.com/watch?v=y_aQqRolj-Q (attempt 1)
+  [LOCAL-427] HTTP 200 from https://abc7ny.com/post/car-catches-fire-explodes-charging-bull-statue-lower-manhattan/19136622/ (attempt 1)
+  [LOCAL-427] HTTP 200 from https://www.instagram.com/reel/DYkT9EXCbvF/?hl=en (attempt 1)
+  [LOCAL-427] HTTP 200 from https://www.bbc.com/news/videos/cj3pvglp3vzo (attempt 1)
+  [LOCAL-427] HTTP 200 from https://dailydispatch.com/fire-news/new-york/car-catches-fire-and-explodes-near-charging-bull-statue-in-lower-manhattan/ (attempt 1)
+  [LOCAL-427] HTTP 200 from https://www.instagram.com/reel/DYlU2PMEuZp/?hl=en (attempt 1)
+[TIMING-SUB] phase=poi_selection step=serper_research elapsed=11.38s
+[TIMING-SUB] phase=poi_selection step=fetch_stop_knowledge elapsed=12.59s
+  [D556] +4 story fact(s) for 'The Charging Bull' via gemini (4 high)
+[TIMING-SUB] phase=poi_selection step=serp_search elapsed=1.67s
+  [LOCAL-427] HTTP 200 from https://www.google.com/goto?url=CAESngEB6zswFXUTto7TmTX5Rxwr_SUihOETsd50qteYfSglGvZ-8-MFNHp-WHuTS4KGBAo1LAxp64ksqEAczcomARINLKWujRv9GHkG4dwk-aSkT60COZdc2DolW-cGabugIw5KKAaHzh1a9p-IuNoapflDG7uYkJA8JXadeW9VkyWmYXcPrFtRgQbdkpoVCf9ScQ542IlgXrTnh-2WZtp8gQ (attempt 1)
+  [LOCAL-427] HTTP 200 from https://www.facebook.com/FOX5NY/videos/developing-at-least-5-people-were-spotted-climbing-out-of-a-manhole-on-east-82nd/1048525771564434/ (attempt 1)
+  [LOCAL-427] HTTP 200 from https://www.google.com/goto?url=CAESmAEB6zswFcqxlydlyZFzIvV5PMLVaG-zrCJ-qGe46Dg91tXCzcXFjIXcb7WQznz_kVQzoOl6vGY6YHjQ7XWQG9wEOEx192dT-CpneQOn8Y3OS35iNR3hMqdycpzuCIQ7NlJw3J4OjhyX-IGp3HLbBs2G0vfsZzzoWI19ovyzm-BOnREIKhYQGn1MbGM18wd9swa4c8nSwKRU0w (attempt 1)
+  [LOCAL-427] HTTP 200 from https://www.instagram.com/reel/DYku22pgVRT/?hl=en (attempt 1)
+  [LOCAL-427] HTTP 200 from https://southstreetseaportmuseum.org/ (attempt 1)
+  [LOCAL-427] HTTP 200 from https://www.google.com/goto?url=CAESaAHrOzAVU99bpf5v6k4UOSAiEePCmSovVRK4VHj-qij2FMWc-iKs1joSZShMwiQk3NIWdmmQHXD1Lf4HYK2QL35AtZUi5_5AMq6XW8qaHo-gRICWSte8WeOWX3lUOdx4hFsBSG9S-S3C (attempt 1)
+  [LOCAL-427] HTTP 200 from https://www.youtube.com/watch?v=YMOXMJG0xAU (attempt 1)
+  [LOCAL-427] HTTP 200 from https://www.google.com/goto?url=CAESVgHrOzAVH-MOmfKbTGZpbnFiQ9lN27NQgIoF39x4FU6ZzgyIWusW0hwzgWbEkljIAuK4kgYfrKCf3RS8P8YEgqULsxevDeNPW9LeZ-gRxs5AJAA9dvQ- (attempt 1)
+[TIMING-SUB] phase=poi_selection step=serper_research elapsed=6.81s
+[TIMING-SUB] phase=poi_selection step=serp_search elapsed=1.97s
+[TIMING-SUB] phase=poi_selection step=serp_search elapsed=3.27s
+[TIMING-SUB] phase=poi_selection step=fetch_stop_knowledge elapsed=13.37s
+  [D556] +3 story fact(s) for 'Wall Street' via openai+web(16) (3 high)
+[TIMING-SUB] phase=poi_selection step=serp_search elapsed=2.88s
+  [LOCAL-427] HTTP 200 from https://www.facebook.com/CBSNewYork/posts/a-young-boy-died-and-four-others-were-critically-injured-after-a-lithium-ion-bat/1627540339403445/ (attempt 1)
+  [LOCAL-427] HTTP 200 from https://www.instagram.com/p/DdJtWTnlqaz/ (attempt 1)
+  [LOCAL-427] HTTP 200 from https://www.google.com/goto?url=CAESdQHrOzAVhIoJzbuN8AfKcw7TPUxlbG9lqegWKceJa-AS-hk9DIp9Tj7pA7k2tFJSDzid1a3IHeMuwy9h61fwHA_2oREa4xdi-Smr6f4ZKQvc4aKtKYCbpelBsm-4GuUh2QMCpKgp5UEUv7id4K1zHYMh19XILA (attempt 1)
+  [LOCAL-427] HTTP 200 from https://www.google.com/goto?url=CAESwgEB6zswFQjZ5GdsfNAFgylklRG2axpWVzZiuXHWxztlBX5x1WgXz7hsHXtHyLQgy6RmYXQDvrRZRjWJ7duLyP6LwQEhRIjfAd5_iIc7s25ijSA-qriwkmGEpakzBs3x5hBaHHPomfS0jDcEBZqwAtGyrEpxlMG9GHUZHlpDdxSXzlQeXl7ygytOR4d23-o_0TkTOBue-U64NMz82Up4mtxops7m363XGB82-LsZ-Yl9FVt6PKuyJPc_zFkZrYQr0SA0sw (attempt 1)
+  [LOCAL-427] HTTP 200 from https://www.google.com/goto?url=CAESoQEB6zswFW7X-eIgbEx0wQvmpgXgaIxQCxxdjUItrD3lF1OKQtj_Z0ksAfkQah7kAeCXQ0zxPNorueam7OlbB1UjoQ5aNKHAdvdmHXs3oiZlfDkd35LKlfkhI7La1UDLByR-3bFy-yUoC7o0o1JctwAt72qle_deSle5Dr2sO46vyu-DMQHL_ZGwEMhyBxOG4rtmOXfbSic_iVvFAiTAILDzEQ (attempt 1)
+  [LOCAL-427] HTTP 200 from https://www.google.com/goto?url=CAESwQEB6zswFQag_cQzKW7G3jzBbFHGIO43nIJh5212DPWK-BgVs2_Yz2AH04jRCYawlLAGzCcP9MgKoX-dLPwWF4EZ7LAvnAwTHydsKK8GvDUNyCxYe4sDdN4OUwuYjRQZkDJ_WQJnJ1MsTZo7kOqXYTjyrxFbWs981HaVyDOD-9OQoGmobjdCI8Y9QC7RSAX0UVZjesnnHm0mYxbEqPXkoiBC8Pbnc2fKapFlx6vJgGTS4zlHNhYshOI81ctOeFk63FV3 (attempt 1)
+  [LOCAL-427] HTTP 200 from https://www.google.com/goto?url=CAESXgHrOzAV84S2sEyKLzBCQzsC-6Y6zCzwSS5oIeaQ43Adh-t_cAYC_xwp8a9tA8rCZ8f94HG-J_5XtcFy0ZrYiQwrrh0c5eUlTbneHetDkexY30d5XK1yOQ1k0Ggrmjg (attempt 1)
+  [LOCAL-427] HTTP 200 from https://www.google.com/goto?url=CAESowEB6zswFfltyfWP3UBqq3ANJfBmUXFRsm1xw6CsxxxEOgUd3sPVSlyyotjfNJPVGsf8x5zlfNTU-zQH3IjC48UcRP7DS45UlV9eqoHSZVCvrU7Md6mq1a8QvgW0aPDLcoRjGkZ3ScvDSf1dZLJ1puXHs94jdkxDlsS44-iJMM3fzYWVLO0rredLoDsSZHeo0fPfsP2UIuR76ov-ZH-UPFpRkNAk (attempt 1)
+[TIMING-SUB] phase=poi_selection step=serper_research elapsed=11.70s
+[TIMING-SUB] phase=poi_selection step=serp_search elapsed=2.99s
+[TIMING-SUB] phase=poi_selection step=serp_search elapsed=1.02s
+[TIMING-SUB] phase=poi_selection step=fetch_stop_knowledge elapsed=17.11s
+  [D556] +3 story fact(s) for 'Battery Park' via openai+web(15) (3 high)
+[TIMING-SUB] phase=poi_selection step=serp_search elapsed=0.76s
+  [LOCAL-427] HTTP 200 from https://trinitychurchnyc.org/visit-history (attempt 1)
+  [LOCAL-427] HTTP 200 from https://www.facebook.com/ABC7NY/videos/for-more-than-three-centuries-trinity-church-has-stood-in-the-heart-of-lower-man/776060472123910/ (attempt 1)
+  [LOCAL-427] HTTP 200 from https://www.facebook.com/groups/616688483753195/posts/835816505173724/ (attempt 1)
+  [LOCAL-427] HTTP 200 from https://en.wikipedia.org/wiki/Trinity_Church_(Manhattan) (attempt 1)
+  [LOCAL-427] HTTP 200 from https://www.reddit.com/r/rva/comments/1wpwi4b/trinity_episcopal_story/ (attempt 1)
+  [LOCAL-427] HTTP 200 from https://911groundzero.com/blog/5-facts-about-st-pauls-chapel/ (attempt 1)
+  [LOCAL-427] HTTP 200 from https://www.trinitynewyork.org/ (attempt 1)
+[TIMING-SUB] phase=poi_selection step=serper_research elapsed=5.70s
+[TIMING-SUB] phase=poi_selection step=fetch_stop_knowledge elapsed=7.07s
+  [D556] +5 story fact(s) for 'Trinity Church' via gemini (5 high)
+WARNING:root:[GEOCODE] CENTROID COLLAPSE: 3 stops share lat=40.7074 exactly while the other axis varies (3 stop(s) affected)
+  [D559] coord CORRECTED 'Federal Hall National Memorial' -> 40.707322, -74.010253 (by_name + by_address agree within 0 m)
+  [D559] coord CORRECTED 'The Charging Bull' -> 40.705313, -74.012911 (by_address + model agree within 115 m)
+  [D559] coord CORRECTED 'Wall Street' -> 40.705809, -74.008434 (by_name + by_address agree within 0 m)
+  [D559] coord CORRECTED 'Battery Park' -> 40.702786, -74.015773 (by_name + model agree within 118 m)
+  [D559] coord CORRECTED 'Trinity Church' -> 40.708053, -74.012207 (by_name + by_address agree within 36 m)
+  [D559] Coordinates established for 5/5 stop(s); the rest keep the model's value and are marked low confidence
+  [ROUTE-ORDER] Computed route for 5 stops with coords (0 without): 1.09km total
+  [D558] Route re-ordered after replenishment: Wall Street -> Federal Hall Natio -> Trinity Church -> The Charging Bull -> Battery Park
+  [D558] Cleared 5 stale direction(s) — their preceding stop changed
+[TIMING] phase=poi_selection elapsed=256.3s cumulative=258.2s
+
+[Storied] STORIED_MODE=true — generating spine + fact sheets...
+  [LOCAL-186] Disambiguated fetch hit: 'Wall Street Lower Manhattan history' → 43276 chars
+  [LOCAL-47] Wall Street: tier=rich, facts=8
+  [LOCAL-186] Disambiguated fetch hit: 'Federal Hall National Memorial Lower Manhattan history' → 35617 chars
+  [LOCAL-47] Federal Hall National Memorial: tier=rich, facts=8
+  [LOCAL-186] Disambiguated fetch hit: 'Trinity Church Lower Manhattan history' → 19489 chars
+  [LOCAL-47] Trinity Church: tier=rich, facts=8
+  [LOCAL-186] Disambiguated fetch hit: 'The Charging Bull Lower Manhattan history' → 17704 chars
+  [LOCAL-47] The Charging Bull: tier=rich, facts=8
+  [LOCAL-186] Disambiguated fetch hit: 'Battery Park Lower Manhattan history' → 40432 chars
+  [LOCAL-47] Battery Park: tier=rich, facts=8
+  [LOCAL-37] Three-class retrieval: 5 stops processed, 0 with category
+  [LOCAL-47] Outdoor retrieval tiers: {'rich': 5}
+  [SQ-S6b] Insufficient data for thread discovery (elements=0, stops=5)
+  [SQ-S6b] Thread discovery: mode=mosaic, threads=0
+  [§3] No story elements available — spine will use invented arc (mode=invented)
+SPINE_COST: category=walking venue=Lower Manhattan history walkin model=gpt-4o tokens=1567 (in=861 out=706) cost=$0.0092 latency=4.9s
+[COST_METER] FRESH | spine_generate | $0.009213 | user=None | job=None
+  [LOCAL-278] Spine cost folded into total: $0.0092
+  [LOCAL-111] Spine quality: 4/4 | {'climax_position': True, 'unique_emotional_beats': True, 'valid_callbacks': True, 'closing_revelation_length': True}
+  [Storied] Spine generated: 5 arc entries (mode=invented)
+  [LOCAL-183] stop_corpus fetch error (non-fatal): relation "stop_corpus" does not exist
+LINE 1: ..., passages_json, source_pages, passage_roles FROM stop_corpu...
+                                                             ^
+
+  [LOCAL-198] Corpus gate: ENABLED — checking stop coverage...
+  [CORPUS-GATE] stop='Wall Street' verdict=EMPTY action=PASSED_VIA_SNIPPETS (direct snippets override)
+  [CORPUS-GATE] stop='Federal Hall National Memorial' verdict=EMPTY action=PASSED_VIA_SNIPPETS (direct snippets override)
+  [CORPUS-GATE] stop='Trinity Church' verdict=EMPTY action=PASSED_VIA_SNIPPETS (direct snippets override)
+  [CORPUS-GATE] stop='The Charging Bull' verdict=EMPTY action=PASSED_VIA_SNIPPETS (direct snippets override)
+  [CORPUS-GATE] stop='Battery Park' verdict=EMPTY action=PASSED_VIA_SNIPPETS (direct snippets override)
+  [LOCAL-198] Corpus gate: 0 PASSED, 0 CREATOR_ONLY, 0 EMPTY, 0 SHORTENED
+WARNING:rag_retriever:DB-first lookup failed for 'Wall Street': relation "stop_corpus" does not exist
+LINE 3:             FROM stop_corpus
+                         ^
+
+WARNING:rag_retriever:DB-first lookup failed for 'Federal Hall National Memorial': relation "stop_corpus" does not exist
+LINE 3:             FROM stop_corpus
+                         ^
+
+WARNING:rag_retriever:DB-first lookup failed for 'Battery Park': relation "stop_corpus" does not exist
+LINE 3:             FROM stop_corpus
+                         ^
+
+WARNING:rag_retriever:DB-first lookup failed for 'The Charging Bull': relation "stop_corpus" does not exist
+LINE 3:             FROM stop_corpus
+                         ^
+
+WARNING:rag_retriever:DB-first lookup failed for 'Trinity Church': relation "stop_corpus" does not exist
+LINE 3:             FROM stop_corpus
+                         ^
+
+WARNING:cost_rates:[LOCAL-197] llm_cost() called with total_tokens (deprecated) by /app/fact_extractor.py:220. Caller should supply input_tokens and output_tokens separately.
+  [Storied] Fact sheets: 5/5 generated
+  [S25] Story types assigned: ['culture', 'history', 'architecture', 'culture', 'history']
+  [LOCAL-188] Style constraints ACTIVE (declarative prose rules injected)
+
+  [LOCAL-576] Pre-writing scope check against 'Lower Manhattan' (5 stop(s), want 5)...
+   OK 'Federal Hall National Memorial' — inside 'Lower Manhattan': 26 Wall St, New York, NY 10005 is located within the geographic boundaries of Lower Manhattan as confirmed by OpenStreetMap. (conf=high)
+   OK 'Trinity Church' — inside 'Lower Manhattan': 75 Broadway, New York, NY 10006 is located within the commonly accepted boundaries of Lower Manhattan. (conf=high)
+   OK 'The Charging Bull' — inside 'Lower Manhattan': 26 Broadway is located in the Financial District, which is part of Lower Manhattan. (conf=high)
+   OK 'Battery Park' — inside 'Lower Manhattan': Battery Park at State St & Battery Pl is located at the southern tip of Manhattan, which is within the boundaries of Lower Manhattan. (conf=high)
+  [LOCAL-576] Pre-writing scope check: all 5 stop(s) within 'Lower Manhattan'.
+[TIMING] phase=fact_sheets elapsed=18.7s cumulative=276.8s
+  [LOCAL-802] enriched 'Trinity Church' with Wikidata aliases=['Trinity Church', 'Trinity Church Wall Street', 'Trinity Wall Street Church'] qid=Q866896
+
+PHASE 5: Generating detailed descriptions for each POI (parallel)...
+[TIMING] phase=narration elapsed=2.0s cumulative=278.8s
+[TIMING] phase=external_lookups elapsed=0.0s cumulative=278.8s
+
+Generating description for Stop 1: Wall Street by , ...
+
+Generating description for Stop 2: Federal Hall National Memorial by , ...
+
+Generating description for Stop 3: Trinity Church by , ...
+
+Generating description for Stop 4: The Charging Bull by , ...
+
+Generating description for Stop 5: Battery Park by , ...
+  [LOCAL-381] stop='Federal Hall National Memorial' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-381] stop='Battery Park' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-381] stop='Wall Street' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-381] stop='The Charging Bull' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-381] stop='Trinity Church' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-411] Stop 2 snippet ranking: input=3 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=5 output=3 usable=3 (t1t2=0, t3=0, market=0)
+    Top scores: [('Federal Hall National Memorial', 12, ''), ('Federal Hall National Memorial', 12, ''), ('Federal Hall National Memorial', 8, '')]
+  [LOCAL-402] Stop 2: injected 3 snippets as reference material
+  [LOCAL-411] Stop 2 prompt size: before_snippets=13255 after=19553 (+6298 from snippets+instructions, facts_first=no)
+  [LOCAL-411] Stop 5 snippet ranking: input=3 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=5 output=3 usable=3 (t1t2=0, t3=0, market=0)
+    Top scores: [('Battery Park', 16, ''), ('Battery Park', 14, ''), ('Battery Park', 6, '')]
+  [LOCAL-402] Stop 5: injected 3 snippets as reference material
+  [LOCAL-411] Stop 5 prompt size: before_snippets=14843 after=21095 (+6252 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (21095)
+  [LOCAL-411] Stop 1 snippet ranking: input=3 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=5 output=3 usable=3 (t1t2=0, t3=0, market=0)
+    Top scores: [('Wall Street', 12, ''), ('Wall Street', 11, ''), ('Wall Street', 10, '')]
+  [LOCAL-402] Stop 1: injected 3 snippets as reference material
+  [LOCAL-411] Stop 1 prompt size: before_snippets=12780 after=19022 (+6242 from snippets+instructions, facts_first=no)
+  [LOCAL-411] Stop 4 snippet ranking: input=4 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=5 output=4 usable=4 (t1t2=0, t3=0, market=0)
+    Top scores: [('The Charging Bull', 11, ''), ('The Charging Bull', 6, ''), ('The Charging Bull', 6, '')]
+[LOCAL-802] off-topic passage dropped The Charging Bull The vehicle appeared to be affiliated
+[LOCAL-802] off-topic passage dropped The Charging Bull Firefighters extinguished the flames shortly before
+[LOCAL-802] off-topic passage dropped The Charging Bull The cause of the fire remains
+  [LOCAL-802] Stop 4: dropped 3 off-topic passage(s); 1 on-topic remain
+  [LOCAL-402] Stop 4: injected 1 snippets as reference material
+  [LOCAL-411] Stop 4 prompt size: before_snippets=15032 after=20907 (+5875 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (20907)  [LOCAL-411] Stop 3 snippet ranking: input=5 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=5 output=5 usable=5 (t1t2=0, t3=0, market=0)
+    Top scores: [('Trinity Church', 12, ''), ('Trinity Church', 12, ''), ('Trinity Church', 12, '')]
+[LOCAL-802] off-topic passage dropped Trinity Church St. Paul’s Chapel became a refuge
+  [LOCAL-802] Stop 3: dropped 1 off-topic passage(s); 4 on-topic remain
+  [LOCAL-402] Stop 3: injected 4 snippets as reference material
+  [LOCAL-411] Stop 3 prompt size: before_snippets=13136 after=19520 (+6384 from snippets+instructions, facts_first=no)
+
+  [LOCAL-408] Prompt dump written to: /app/prompt_dump_stop1.txt
+Stop 3 API call cost: $0.0236 (4966 tokens, model=gpt-4o)
+WARNING:cost_rates:[LOCAL-197] llm_cost() called with total_tokens (deprecated) by /app/generate_tour_text.py:22904. Caller should supply input_tokens and output_tokens separately.
+Stop 4 API call cost: $0.0248 (5213 tokens, model=gpt-4o)
+  [LOCAL-569] Stop 3 attempt 1/5 story_count=1 words=294
+Stop 3 description word count: 294 words
+  [LOCAL-407] Stop 3: snippets injected but no candidate specifics extracted
+  [LOCAL-569] Stop 4 attempt 1/5 story_count=0 words=274
+Stop 4 description word count: 274 words
+  [LOCAL-407] Stop 4: snippets injected but no candidate specifics extracted
+  [LOCAL-414] Stop 4: SCRUBBED banned phrases from output: ['a testament to', 'stands as a testament']
+Stop 1 API call cost: $0.0228 (4800 tokens, model=gpt-4o)
+  [LOCAL-569] Stop 1 attempt 1/5 story_count=1 words=283
+Stop 1 description word count: 283 words
+  [LOCAL-407] Stop 1: snippets injected but no candidate specifics extracted
+Stop 5 API call cost: $0.0250 (5267 tokens, model=gpt-4o)
+  [LOCAL-569] Stop 5 attempt 1/5 story_count=0 words=308
+Stop 5 description word count: 308 words
+  [LOCAL-407] Stop 5: snippets injected but no candidate specifics extracted
+  [LOCAL-414] Stop 5: SCRUBBED banned phrases from output: ['a testament to']
+Stop 2 API call cost: $0.0233 (4904 tokens, model=gpt-4o)
+  [LOCAL-569] Stop 2 attempt 1/5 story_count=0 words=289
+Stop 2 description word count: 289 words
+  [LOCAL-407] Stop 2: snippets injected but no candidate specifics extracted
+
+  [LOCAL-439] STORY GATE: checking story-units per stop (D394)...
+    ✓ PASS stop='Wall Street': story_units=1, entities_ok=True, thesis_ok=True
+      interest: emotional=3, new_info=2, deduction=1, total=4
+    ✓ PASS stop='Federal Hall National Memorial': story_units=1, entities_ok=True, thesis_ok=True
+      interest: emotional=3, new_info=2, deduction=1, total=4
+    ✗ FAIL stop='Trinity Church': story_units=0, entities_ok=True, thesis_ok=True
+      → story_units=0: no candidate story-unit of ≥3 sentences passes classification (need at least 1 with named person, real actions, arc)
+    ✓ PASS stop='The Charging Bull': story_units=1, entities_ok=True, thesis_ok=True
+      interest: emotional=3, new_info=2, deduction=1, total=4
+    ✗ FAIL stop='Battery Park': story_units=0, entities_ok=True, thesis_ok=True
+      → story_units=0: no candidate story-unit of ≥3 sentences passes classification (need at least 1 with named person, real actions, arc)
+  [LOCAL-439] Classification cost: $0.002523 (input=10328, output=1623)
+  [LOCAL-439] STORY GATE: SOME STOPS FAILED (informational — does not block delivery)
+
+  [LOCAL-192] PHASE 5.1: Style validation + per-paragraph retry...
+WARNING:cost_rates:[LOCAL-197] llm_cost() called with total_tokens (deprecated) by /app/generate_tour_text.py:24364. Caller should supply input_tokens and output_tokens separately.
+  [LOCAL-192] Stop 1 para 2: retry FIXED (R10_UNFULFILLED_PROMISE)
+  [LOCAL-192] Stop 1 para 4: retry FIXED (R10_UNFULFILLED_PROMISE)
+  [LOCAL-192] Stop 2 para 2: retry FIXED (R1_IMPERATIVE)
+  [LOCAL-192] Stop 2 para 4: retry IMPROVED (3→2 errors)
+  [LOCAL-192] Stop 3 para 1: retry FIXED (R10_UNFULFILLED_PROMISE)
+  [LOCAL-192] Stop 3 para 2: retry FIXED (R10_UNFULFILLED_PROMISE)
+  [LOCAL-192] Stop 3 para 3: retry FIXED (R3_SUGGESTIVE_EXPLORATION, R10_UNFULFILLED_PROMISE)
+  [LOCAL-192] Stop 3 para 4: retry IMPROVED (3→2 errors)
+  [LOCAL-192] Stop 4 para 1: retry FAILED — keeping original (R10_UNFULFILLED_PROMISE)
+  [LOCAL-192] Stop 5 para 1: retry FIXED (R10_UNFULFILLED_PROMISE)
+  [LOCAL-192] Stop 5 para 2: retry FAILED — keeping original (R10_UNFULFILLED_PROMISE)
+  [LOCAL-192] Stop 5 para 3: retry FIXED (R10_UNFULFILLED_PROMISE, R1_IMPERATIVE)
+  [LOCAL-192] Style retry summary: 12 paragraphs retried, 10 fixed/improved, 2 kept original
+  [LOCAL-192] Retry cost: $0.0016 (5675 tokens)
+
+  [LOCAL-255] PHASE 5.13: R1 imperative rewrite...
+  [LOCAL-255] Stop 2 'Federal Hall National Memorial': 1 rewritten, 0 deleted
+  [LOCAL-255] Stop 4 'The Charging Bull': 1 rewritten, 0 deleted
+  [LOCAL-255] R1 summary: 2 rewritten, 0 deleted, 2 stops affected, LLM tokens: 0 ($0.0000)
+
+  [LOCAL-251] PHASE 5.14: R7 hallucinated-sensory deletion...
+  [LOCAL-251] Stop 2 'Federal Hall National Memorial': 1 sentence(s) deleted, 0 paragraph(s) emptied
+  [LOCAL-251] Stop 5 'Battery Park': 1 sentence(s) deleted, 0 paragraph(s) emptied
+  [LOCAL-251] R7 summary: 2 sentences deleted, 0 paragraphs emptied, 2 stops affected
+
+  [LOCAL-261] PHASE 5.141: R2 question deletion...
+  [LOCAL-261] R2 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-261] PHASE 5.142: R3 suggestive-exploration deletion...
+  [LOCAL-261] R3 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-261] PHASE 5.143: R4 prescribed-feeling deletion...
+  [LOCAL-261] R4 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-261] PHASE 5.144: R8 prompt-leakage deletion...
+  [LOCAL-261] R8 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-216] PHASE 5.15: R9 generic-sentence deletion...
+  [LOCAL-216] R9 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-235] PHASE 5.155: R10 unfulfilled-promise deletion...
+  [LOCAL-235] Stop 2 'Federal Hall National Memorial': 1 sentence(s) deleted, 0 paragraph(s) emptied
+  [LOCAL-235] Stop 3 'Trinity Church': 1 sentence(s) deleted, 0 paragraph(s) emptied
+  [LOCAL-235] Stop 4 'The Charging Bull': 1 sentence(s) deleted, 0 paragraph(s) emptied
+  [LOCAL-235] Stop 5 'Battery Park': 1 sentence(s) deleted, 0 paragraph(s) emptied
+  [LOCAL-235] R10 summary: 4 sentences deleted, 0 paragraphs emptied, 4 stops affected
+
+  [LOCAL-472] PHASE 5.152: Stop-specificity gate...
+  [LOCAL-472] Stop-specificity gate summary:
+    Stops checked: 5
+    Paragraphs checked: 20
+    Transferable (high, removed): 4
+    Transferable (low conf, kept): 0
+    Last-paragraph protected: 0
+    Ungrounded named entities: 15
+    [LOCAL-652] Foreign work/artist sentences removed: 9
+    Stops affected: 3
+    [LOCAL-472] REMOVED transferable paragraph stop='Wall Street' conf=high reason='Generic scene-setting applicable to any old town street.': "Just ahead, the narrative of American independence awaits, interwoven with the rhythm of commerce that pulses through th"
+    [LOCAL-472] REMOVED transferable paragraph stop='Federal Hall National Memorial' conf=high reason='Generic scene-setting applicable to any historic church.': "As you stand here, the breeze carries the echoes of those events, entwined with the hustle of modern New York."
+    [LOCAL-472] REMOVED transferable paragraph stop='The Charging Bull' conf=high reason='Generic description fits any historic church.': "The sculpture's sheer size—11 feet tall and 16 feet long—dominates its surroundings, drawing thousands of visitors daily"
+    [LOCAL-472] REMOVED transferable paragraph stop='The Charging Bull' conf=high reason='Generic description applicable to any historic church.': "The bull is more than a mere sculpture; it is a reflection of a community's heartbeat, an emblem of both triumph and unp"
+    [LOCAL-652] REMOVED foreign work/artist sentence stop='Wall Street' entities=['Het Cingel', 'New Amsterdam'] (1 sentence(s)) in: "Wall Street stretches just under 2,000 feet from Broadway to the East River, yet these eight blocks have been the epicen"
+    [LOCAL-652] REMOVED foreign work/artist sentence stop='Wall Street' entities=['Tennessee Claflin'] (1 sentence(s)) in: "A pivotal chapter in this story unfolded on February 5, 1870. Sisters Victoria Woodhull and Tennessee Claflin, hailing f"
+    [LOCAL-652] REMOVED foreign work/artist sentence stop='Federal Hall National Memorial' entities=['Evacuation Day'] (1 sentence(s)) in: "The site also commemorates another pivotal moment: Evacuation Day, when British troops withdrew from New York City in 17"
+    [LOCAL-652] REMOVED foreign work/artist sentence stop='Trinity Church' entities=['United States'] (1 sentence(s)) in: "The current building, completed in 1846, was an engineering marvel of its time. Standing as the tallest building in the "
+    [LOCAL-652] REMOVED foreign work/artist sentence stop='Trinity Church' entities=['Aaron Burr'] (1 sentence(s)) in: "The churchyard is hallowed ground, home to the resting place of Alexander Hamilton, a pivotal figure in American history"
+    [LOCAL-652] REMOVED foreign work/artist sentence stop='The Charging Bull' entities=['Black Monday'] (1 sentence(s)) in: "Crafted by Italian artist Arturo Di Modica, this 7,100-pound bronze sculpture emerged in December 1989, in the aftermath"
+    [LOCAL-652] REMOVED foreign work/artist sentence stop='The Charging Bull' entities=['One Tuesday', 'Metropolitan Transportation Authority'] (1 sentence(s)) in: "The Charging Bull has also witnessed moments of unexpected drama. One Tuesday evening, a car parked nearby, affiliated w"
+    [LOCAL-652] REMOVED foreign work/artist sentence stop='Battery Park' entities=['West Side Highway', 'New York State', 'Lower Manhattan'] (2 sentence(s)) in: "Battery Park City, a planned community, stretches along the Hudson River waterfront. It is separated from the Financial "
+    [LOCAL-472] UNGROUNDED entity stop='Wall Street' entity='Het Cingel' reason='No specific person or work is linked to Het Cingel.' in: "Wall Street stretches just under 2,000 feet from Broadway to the East River, yet these eight blocks "
+    [LOCAL-472] UNGROUNDED entity stop='Wall Street' entity='New Amsterdam' reason='No specific person or work is mentioned with a concrete link to the stop.' in: "Wall Street stretches just under 2,000 feet from Broadway to the East River, yet these eight blocks "
+    [LOCAL-472] UNGROUNDED entity stop='Wall Street' entity='Tennessee Claflin' reason='No concrete link to Wall Street is provided.' in: "A pivotal chapter in this story unfolded on February 5, 1870. Sisters Victoria Woodhull and Tennesse"
+    [LOCAL-472] UNGROUNDED entity stop='Federal Hall National Memorial' entity='Evacuation Day' reason='It does not specify a concrete link between Evacuation Day and Federal Hall National Memorial.' in: "The site also commemorates another pivotal moment: Evacuation Day, when British troops withdrew from"
+    [LOCAL-472] UNGROUNDED entity stop='Federal Hall National Memorial' entity='New York' reason='It does not specify a concrete link to Federal Hall National Memorial.' in: "As you stand here, the breeze carries the echoes of those events, entwined with the hustle of modern"
+    [LOCAL-472] UNGROUNDED entity stop='Trinity Church' entity='United States' reason='No specific person or work is mentioned with a concrete link to Trinity Church.' in: "The current building, completed in 1846, was an engineering marvel of its time. Standing as the tall"
+    [LOCAL-472] UNGROUNDED entity stop='Trinity Church' entity='Aaron Burr' reason='It does not specify Burr's direct connection to Trinity Church.' in: "The churchyard is hallowed ground, home to the resting place of Alexander Hamilton, a pivotal figure"
+    [LOCAL-472] UNGROUNDED entity stop='Trinity Church' entity='Lower Manhattan' reason='No specific person or work is mentioned with a concrete link to Trinity Church.' in: "Trinity Church stands as a monument to both its past and the continuous evolution of Lower Manhattan"
+    [LOCAL-472] UNGROUNDED entity stop='Trinity Church' entity='New York' reason='No concrete link to Trinity Church is provided.' in: "Trinity Church stands as a monument to both its past and the continuous evolution of Lower Manhattan"
+    [LOCAL-472] UNGROUNDED entity stop='The Charging Bull' entity='Black Monday' reason='It does not specify how "Black Monday" directly relates to "The Charging Bull."' in: "Crafted by Italian artist Arturo Di Modica, this 7,100-pound bronze sculpture emerged in December 19"
+    [LOCAL-472] UNGROUNDED entity stop='The Charging Bull' entity='One Tuesday' reason='No person, book, film, or work is mentioned with a concrete link to the stop.' in: "The Charging Bull has also witnessed moments of unexpected drama. One Tuesday evening, a car parked "
+    [LOCAL-472] UNGROUNDED entity stop='The Charging Bull' entity='Metropolitan Transportation Authority' reason='No concrete link to the stop is provided.' in: "The Charging Bull has also witnessed moments of unexpected drama. One Tuesday evening, a car parked "
+    [LOCAL-472] UNGROUNDED entity stop='Battery Park' entity='West Side Highway' reason='No specific person or entity is linked to the West Side Highway.' in: "Battery Park City, a planned community, stretches along the Hudson River waterfront. It is separated"
+    [LOCAL-472] UNGROUNDED entity stop='Battery Park' entity='New York State' reason='No specific link to New York State is provided.' in: "Battery Park City, a planned community, stretches along the Hudson River waterfront. It is separated"
+    [LOCAL-472] UNGROUNDED entity stop='Battery Park' entity='Lower Manhattan' reason='No specific person or work is mentioned with a concrete link to Battery Park.' in: "Battery Park City, a planned community, stretches along the Hudson River waterfront. It is separated"
+
+  [LOCAL-263] PHASE 5.156: Unsupported-claim gate...
+  [LOCAL-263] Unsupported-claim gate summary:
+    Sentences removed: 0
+    Sentences kept (substantiated): 0
+    By type: PROMISE=0, SENSORY=0, FEELING=0, QUALITY=0
+    Escalation calls: 0
+    Stops affected: 0
+    Deletion rate: 0.0% (0/44)
+
+  [LOCAL-269] PHASE 5.157: Unglossed-reference gate...
+  [LOCAL-269] Unglossed-reference gate summary (LOCAL-287: compose, not splice):
+    References detected: 18
+    Glossed (composed): 4
+    Suppressed (already explained): 0
+    Degraded (name dropped): 5
+    Guard failures: 0
+    Known (skipped): 9
+    Triage: 2289 tokens, $0.0005, 6.1s
+    Gloss: 1194 tokens, $0.0003, 4.2s
+    Compose: 2028 tokens, $0.0003, 3.1s
+    Total added cost: $0.0011
+    Stops affected: 5
+    Glosses applied:
+      • East River → DEGRADED (name dropped)
+      • American → DEGRADED (name dropped)
+      • Washington → "the first President inaugurated here" [source: model]
+      • Congress → DEGRADED (name dropped)
+      • Great New York City Fire → "the fire that destroyed lower Manhattan" [source: model]
+      • Ease → DEGRADED (name dropped)
+      • Di Modica → "the sculptor of the charging bull" [source: model]
+      • Norman → DEGRADED (name dropped)
+      • Brookfield Place → "a complex of office buildings and retail space" [source: model]
+
+  [LOCAL-402] Temporal coherence gate SKIPPED (non-museum tour)
+
+  [LOCAL-229] PHASE 5.16: CONTRADICTED claim block (D100 enforcement)...
+  [LOCAL-229] CONTRADICTED block summary: 0 group(s) blocked, 0 stop(s) affected
+
+PHASE 5.5a: Post-description knowledge validation (all tour types)...
+OK Post-description validation passed: Knowledge validation passed
+
+PHASE 5.6: skipped — the pre-writing scope check already ran (LOCAL-576; a second pass after writing can only remove a stop too late to replace).
+OK PHASE 5.7: Dangling-reference scrub complete (5 stops)
+  [LOCAL-627] PHASE 5.7a: Truncated-snippet safety check — 4 stop(s) cleaned
+
+  [LOCAL-318] PHASE 5.7b: Dangling-demonstrative scrub...
+  [LOCAL-318] Dangling-demonstrative scrub summary:
+    Detected: 7
+    Repaired (name substituted): 0
+    Deleted (unrepairable): 7
+    Stops affected: 4
+    [1] DELETED: 'These narratives' in: These narratives are woven into the fabric of Wall Street, a place where the pas
+    [2] DELETED: 'This act' in: This act of departure was more than a military retreat; it was the final step in
+    [3] DELETED: 'This catastrophic' in: This catastrophic event forced the congregation to seek refuge at St. Paul’s Cha
+    [3] DELETED: 'This architectural' in: This architectural achievement reflected the economic prowess burgeoning around 
+    [4] DELETED: 'This daring' in: This daring act was meant to symbolize America's financial resilience and optimi
+    [4] DELETED: 'This incident' in: This incident unfolded around 5:42 p.m., causing a stir among onlookers who had 
+    [4] DELETED: 'This episode' in: This episode, while disruptive, underscored the enduring presence and resilience
+OK PHASE 5.7b: Dangling-demonstrative scrub complete
+
+PHASE 5.9: Audio-native cleanup (LOCAL-41)...
+  [LOCAL-41] Stripped 0 trailing question(s), removed 0 'broader context' instance(s)
+
+  [D498] step 7c: most valuable stop is 1 'Wall Street' (index 43) — allowance 5 -> 7 sentences on regeneration, story currently 0 sentence(s) — no story pass result, cannot judge
+
+  [LOCAL-487] step 7a: 5 stop(s) have NO VALID STORY by Michael's bar (3+ consecutive sentences, one person, an action and something at stake)
+    stop 1 'Wall Street': the longest run (4 sentences, Wall Street) has agency=0 stakes=0 — someone is described, but nothing is risked
+    stop 2 'Federal Hall National Memorial': longest qualifying run is 2 sentence(s); the bar is 3 consecutive sentences about one subject, carrying an act
+    stop 3 'Trinity Church': the longest run (3 sentences, Trinity Church) has agency=0 stakes=0 — someone is described, but nothing is ris
+    stop 4 'The Charging Bull': longest qualifying run is 2 sentence(s); the bar is 3 consecutive sentences about one subject, carrying an act
+    stop 5 'Battery Park': longest qualifying run is 2 sentence(s); the bar is 3 consecutive sentences about one subject, carrying an act
+    [LOCAL-487] cap=1: retrying only the weakest — stop 4 'The Charging Bull' (index 15)
+  [D534] No cross-stop repetition in the drafts
+
+  [LOCAL-474] PHASE 5.17: retry 'Wall Street' — 283w → 165w after gates, 7 sentence(s) removed
+    removed: "Wall Street stretches just under 2,000 feet from Broadway to the East River, yet these eight blocks "
+    removed: "Originally known as Het Cingel, meaning "the Belt" in Dutch, it marked the northern boundary of New "
+    removed: "The air here vibrates with a legacy of ambition that has shaped global economies."
+    removed: "Sisters Victoria Woodhull and Tennessee Claflin, hailing from Ohio, defied societal norms by opening"
+    removed: "These narratives are woven into the fabric of Wall Street, a place where the past and present conver"
+    removed: "From its origins as a protective barrier to its current status as a global financial hub, Wall Stree"
+    removed: "Just ahead, the narrative of American independence awaits, interwoven with the rhythm of commerce th"
+    [LOCAL-491] step 7b: no unused fact left on the matrix — retrying without a rotation
+
+  [LOCAL-474] PHASE 5.17: retry 'Federal Hall National Memorial' — 289w → 180w after gates, 9 sentence(s) removed
+    removed: "Federal Hall was not just the stage for Washington's inauguration."
+    removed: "It was the very heart of America’s nascent government."
+    removed: "The First United States Congress convened here, laying down the legislative foundation of the new re"
+    removed: "Imagine the debates and decisions that resonated through the corridors, shaping a nation still findi"
+    removed: "The site also commemorates another pivotal moment: Evacuation Day, when British troops withdrew from"
+    removed: "This act of departure was more than a military retreat; it was the final step in securing American i"
+    removed: "As you stand here, the breeze carries the echoes of those events, entwined with the hustle of modern"
+    removed: "Federal Hall, now a National Memorial, is more than stone and history; it is a living testament to t"
+    removed: "Look towards the spires of Trinity Church in the distance, and let the whispers of the past guide yo"
+    [LOCAL-491] step 7b: no unused fact left on the matrix — retrying without a rotation
+
+  [LOCAL-474] PHASE 5.17: retry 'Trinity Church' — 294w → 124w after gates, 11 sentence(s) removed
+    removed: "Trinity Church, a cornerstone of New York City's history, is not just a place of worship but a livin"
+    removed: "Originally built in 1698, the church was destroyed during the Great New York City Fire of 1776 amids"
+    removed: "This catastrophic event forced the congregation to seek refuge at St. Paul’s Chapel, which you passe"
+    removed: "This transition highlights the enduring spirit of the parish community, which has long played a vita"
+    removed: "Standing as the tallest building in the United States until 1869, its towering spire was a beacon of"
+    removed: "This architectural achievement symbolized not just ecclesiastical authority but also the economic pr"
+    removed: "The churchyard is a hallowed ground, where you will find the resting place of Alexander Hamilton, a "
+    removed: "Hamilton, whose life was cut short in a duel with Aaron Burr, played a crucial role in shaping the e"
+    removed: "His grave offers a tangible connection to the stories of early American leadership and the challenge"
+    removed: "As you continue your journey, let the gravestones and the church's towering spire serve as reminders"
+    removed: "Peer down Broadway, where the energy and optimism of New York continue to unfold."
+    [LOCAL-491] step 7b: no unused fact left on the matrix — retrying without a rotation
+
+  [LOCAL-474] PHASE 5.17: retry 'The Charging Bull' — 223w → 41w after gates, 12 sentence(s) removed
+    removed: "Crafted by Italian artist Arturo Di Modica, this 7,100-pound bronze sculpture emerged in December 19"
+    removed: "Di Modica, without permission, placed the bull outside the New York Stock Exchange late one night."
+    removed: "This daring act was meant to symbolize America's financial resilience and optimism."
+    removed: "The bull's powerful stance and piercing eyes embody the unyielding spirit of Wall Street, a theme yo"
+    removed: "The sculpture's sheer size—11 feet tall and 16 feet long—dominates its surroundings, drawing thousan"
+    removed: "This ceaseless influx of people adds a vibrant rhythm to the area, echoing the relentless energy tha"
+    removed: "However, the Charging Bull has also witnessed moments of unexpected drama."
+    removed: "One Tuesday evening, a car parked nearby, affiliated with the Metropolitan Transportation Authority,"
+    removed: "This incident unfolded around 5:42 p.m., causing a stir among onlookers who had gathered to marvel a"
+    removed: "This episode, while disruptive, underscored the enduring presence and resilience of the bull amidst "
+    removed: "The bull is more than a mere sculpture; it is a reflection of a community's heartbeat, an emblem of "
+    removed: "It stands as a constant amid the ever-shifting tides of the financial world."
+    [LOCAL-491] step 7b: no unused fact left on the matrix — retrying without a rotation
+
+  [LOCAL-474] PHASE 5.17: retry 'Battery Park' — 243w → 117w after gates, 9 sentence(s) removed
+    removed: "This park, with its lush gardens and historical significance, is more than just a place of leisure."
+    removed: "Each footfall on the park's paths today echoes their stories, as they set forth from this point to w"
+    removed: "Among the park's many historical markers, the World War II Coast Guard Memorial stands as a solemn t"
+    removed: "Designed by Norman M. Thomas and installed in 1955, this memorial honors the courage and sacrifice o"
+    removed: "Its presence here links past and present, commemorating a chapter in the relentless pursuit of peace"
+    removed: "As you take in the surroundings, notice that Battery Park City, a planned community, stretches along"
+    removed: "Separated from the Financial District and Tribeca by the West Side Highway, it stands on state-owned"
+    removed: "Although primarily residential, the neighborhood also houses office buildings like Brookfield Place "
+    removed: "This juxtaposition of history and modernity underscores the dynamic nature of Lower Manhattan, where"
+    [LOCAL-491] step 7b: no unused fact left on the matrix — retrying without a rotation
+
+  [LOCAL-526] PHASE 5.17: regenerating 5 eligible stop(s) concurrently (max_workers=5)
+
+Generating description for Stop 1: Wall Street by , ...
+
+Generating description for Stop 2: Federal Hall National Memorial by , ...
+
+Generating description for Stop 3: Trinity Church by , ...  [LOCAL-381] stop='Federal Hall National Memorial' matched_work=False medium='' work_identity_chars=0
+
+  [LOCAL-411] Stop 2 snippet ranking: input=3 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=5 output=3 usable=3 (t1t2=0, t3=0, market=0)
+    Top scores: [('Federal Hall National Memorial', 12, ''), ('Federal Hall National Memorial', 12, ''), ('Federal Hall National Memorial', 8, '')]
+  [LOCAL-402] Stop 2: injected 3 snippets as reference material
+  [LOCAL-411] Stop 2 prompt size: before_snippets=13255 after=19553 (+6298 from snippets+instructions, facts_first=no)
+Generating description for Stop 4: The Charging Bull by , ...
+
+
+Generating description for Stop 5: Battery Park by , ...
+  [LOCAL-381] stop='Wall Street' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-411] Stop 1 snippet ranking: input=3 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=5 output=3 usable=3 (t1t2=0, t3=0, market=0)
+    Top scores: [('Wall Street', 12, ''), ('Wall Street', 11, ''), ('Wall Street', 10, '')]  [LOCAL-381] stop='Trinity Church' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-411] Stop 3 snippet ranking: input=5 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=5 output=5 usable=5 (t1t2=0, t3=0, market=0)  [LOCAL-381] stop='Battery Park' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-411] Stop 5 snippet ranking: input=3 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=5 output=3 usable=3 (t1t2=0, t3=0, market=0)
+    Top scores: [('Battery Park', 16, ''), ('Battery Park', 14, ''), ('Battery Park', 6, '')]
+
+  [LOCAL-402] Stop 5: injected 3 snippets as reference material
+  [LOCAL-411] Stop 5 prompt size: before_snippets=14843 after=21095 (+6252 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (21095)
+
+  [LOCAL-402] Stop 1: injected 3 snippets as reference material
+  [LOCAL-411] Stop 1 prompt size: before_snippets=12780 after=19022 (+6242 from snippets+instructions, facts_first=no)
+  [LOCAL-381] stop='The Charging Bull' matched_work=False medium='' work_identity_chars=0
+    Top scores: [('Trinity Church', 12, ''), ('Trinity Church', 12, ''), ('Trinity Church', 12, '')]
+[LOCAL-802] off-topic passage dropped Trinity Church St. Paul’s Chapel became a refuge
+  [LOCAL-802] Stop 3: dropped 1 off-topic passage(s); 4 on-topic remain  [LOCAL-411] Stop 4 snippet ranking: input=4 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=5 output=4 usable=4 (t1t2=0, t3=0, market=0)
+    Top scores: [('The Charging Bull', 11, ''), ('The Charging Bull', 6, ''), ('The Charging Bull', 6, '')]
+[LOCAL-802] off-topic passage dropped The Charging Bull The vehicle appeared to be affiliated
+[LOCAL-802] off-topic passage dropped The Charging Bull Firefighters extinguished the flames shortly before
+  [LOCAL-402] Stop 3: injected 4 snippets as reference material
+  [LOCAL-411] Stop 3 prompt size: before_snippets=13136 after=19520 (+6384 from snippets+instructions, facts_first=no)
+
+[LOCAL-802] off-topic passage dropped The Charging Bull The cause of the fire remains
+  [LOCAL-802] Stop 4: dropped 3 off-topic passage(s); 1 on-topic remain
+  [LOCAL-402] Stop 4: injected 1 snippets as reference material
+  [LOCAL-411] Stop 4 prompt size: before_snippets=15032 after=20907 (+5875 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (20907)
+  [LOCAL-408] Prompt dump written to: /app/prompt_dump_stop1.txt
+Stop 3 API call cost: $0.0262 (5518 tokens, model=gpt-4o)
+  [LOCAL-569] Stop 3 attempt 1/5 story_count=1 words=294
+Stop 3 description word count: 294 words
+  [LOCAL-407] Stop 3: snippets injected but no candidate specifics extracted
+  [LOCAL-414] Stop 3: SCRUBBED banned phrases from output: ['a testament to']
+Stop 4 API call cost: $0.0278 (5847 tokens, model=gpt-4o)
+  [LOCAL-569] Stop 4 attempt 1/5 story_count=0 words=261
+Stop 4 description word count: 261 words
+  [LOCAL-407] Stop 4: snippets injected but no candidate specifics extracted
+  [LOCAL-414] Stop 4: SCRUBBED banned phrases from output: ['a testament to']
+Stop 1 API call cost: $0.0249 (5239 tokens, model=gpt-4o)
+  [LOCAL-569] Stop 1 attempt 1/5 story_count=0 words=293
+Stop 1 description word count: 293 words
+  [LOCAL-407] Stop 1: snippets injected but no candidate specifics extracted
+  [LOCAL-414] Stop 1: SCRUBBED banned phrases from output: ['a testament to']
+Stop 2 API call cost: $0.0254 (5337 tokens, model=gpt-4o)
+  [LOCAL-569] Stop 2 attempt 1/5 story_count=0 words=283
+Stop 2 description word count: 283 words
+  [LOCAL-407] Stop 2: snippets injected but no candidate specifics extracted
+  [LOCAL-414] Stop 2: SCRUBBED banned phrases from output: ['a testament to']
+Stop 5 API call cost: $0.0274 (5768 tokens, model=gpt-4o)
+  [LOCAL-569] Stop 5 attempt 1/5 story_count=1 words=302
+Stop 5 description word count: 302 words
+  [LOCAL-407] Stop 5: snippets injected but no candidate specifics extracted
+  [LOCAL-414] Stop 5: SCRUBBED banned phrases from output: ['a testament to']
+  [LOCAL-526] PHASE 5.17 regeneration wall: 4.9s for 5 stop(s) at max_workers=5
+    [LOCAL-474] regenerated and re-gated: 264w (was 165w)
+    [LOCAL-474] regenerated and re-gated: 233w (was 180w)
+    [LOCAL-474] regenerated and re-gated: 242w (was 124w)
+    [LOCAL-474] regenerated and re-gated: 234w (was 41w)
+    [LOCAL-474] regenerated and re-gated: 275w (was 117w)
+      [PERSON-CAP] stop 3: 'states' already carries two stops — cut: The new Trinity Church, constructed between 1839 and 1846, emerged as a symbol o
+  [D534] no repeated sentences left after the retries
+
+  [LOCAL-474] retry summary: 5 eligible, 5 retried, 5 improved, 0 kept original
+  [LOCAL-487] triggers: 2 hollowed by gates, 1 storyless (step 7a — Michael's bar, independent of length), 0 top-value (step 7c — larger allowance), 0 repeating an earlier stop (D534), 5 thin enough for another story (D534, floor=300w). Triggers overlap and are counted separately; they do not sum to 'eligible'.
+  [LOCAL-474] each regenerated stop was re-gated before being accepted; a retry can only replace text it beats after gating.
+
+PHASE 5.10: Anti-preaching cleanup (LOCAL-44)...
+  [LOCAL-44] Stripped 1 preaching closer(s)
+
+  [LOCAL-444] Obligation audit DISABLED by L444_OBLIGATION_AUDIT=false
+[TIMING-SUB] phase=story_first step=serp_search elapsed=2.75s
+  [LOCAL-427] HTTP 200 from https://www.youtube.com/watch?v=ALMGu1NrPis (attempt 1)
+  [LOCAL-427] HTTP 200 from https://www.google.com/goto?url=CAESbgHrOzAVpN6lB9KoM76EGNDdRgnupzFoojIWOjWTGazfGlzgcGDmSW-al-aSzHt2aWqlyOP4bhSosB-heMhFjTC0NpZwpYsG25mnMsHSJk0Kjbm3DwhWfxxYNPwmVi6b0NnCoWNTIJg7BO-i4UTe (attempt 1)
+  [LOCAL-427] HTTP 200 from https://www.vibenyctours.com/post/the-complete-lower-manhattan-walking-tour-guide?srsltid=AYCX9vKuZ1p1WnlENg7IIOVPqoHxDjzgZiW4xSjNVXjp0MUAp2SY6cwP (attempt 1)
+  [LOCAL-459] R5: Fetched 2161 chars from https://www.vibenyctours.com/post/the-complete-low
+  [LOCAL-427] HTTP 200 from https://www.google.com/goto?url=CAES4QEB6zswFc4-b5P_jg1NzsKjqmj8BEIg7zCWcDv4Lbxhjvk4GtZUJd2fJ67ggkHWq1CqsIZKoLwzBQkBQFulCQ1M9GLbGcqgMEx4VzIgdVad-fv5R8MX8NEAvhC8SnzY_7iGt79-lLE3tr-HMF0C_RgLGDBqXDj-fEczzfLhWc4eaDkGBdITR2lKPgtliGXwEvzYFedB4LBN3hAh4aYzvgcrIA9tBKu1PDZLWQqN7wAH3aM6becmwN61yjuppmLaqwBOqMlj6eLEvTW2K7vG1E8niBNnv-Hoy2AMEZ8eoBUe9bw (attempt 1)
+  [LOCAL-427] HTTP 200 from https://www.google.com/goto?url=CAESZgHrOzAVOxCw_P08GPPEqKJWfHzClzvUh5vEa3yQ_XpAiiQ6SeHf59O0UYU6mWcVigruMN7eJRHAlqAua_h2OVlrfP2bgpBveYJQQ4f1rt2T_8AmhvfQ9L9Mu8IVMfbrvlgOFCH_NQ (attempt 1)
+  [LOCAL-427] HTTP 200 from https://www.google.com/goto?url=CAESzgEB6zswFbrb1cXAuJdf1amHkx-ftQQ4mkxgEAk-1QXCNIkXQze1YjIxrgbZZ0hup39koSvQzAkBYRl8L-lxygXU9WepwAxGoTcqLYj1SMR4BPxhchs3aeZId2wHqONDnQjXBDKwkmH7DYEL7JN1hVqepDMu3J4fhJFJLYB5E40y6BRRO5pqUemNEipk1Isa_TlLL646rWf0yuqLx7i5f7qSpermBP1FPc4ae8MdLOI6WBogsunvWaeZLyGPrLIjRAJz0kO5SZXbjmpkLlu7yg (attempt 1)
+  [LOCAL-427] HTTP 200 from https://www.google.com/goto?url=CAESiQEB6zswFc0GyfF6K8pGa9WE6sCnmsBjfwMJAaHLC7qLUhTpR9ntglmpr4QQMGpeS6k7VbC7zjpnKccJ3NjKskyP7D1he5ziP5GDE9kwqH1390FRtcv-aAFFftp2Yhw4_bUAPsv_2VxwWUUHQNNspUJd9lc3X-BOJCn7lOjJTrsP52OWSuFLviKX0Q (attempt 1)
+  [D512] verb discovery: query='Lower Manhattan history walking tour, New York construction proc' -> 2 new verb(s): established, guided
+  [D512] _AGENCY_VERB widened by 2 discovered verb(s)
+
+  [LOCAL-485] PHASE 5.21: Story valuation index (report only, never gates)...
+     #  stop                                      idx  hist  detl   soc
+     1  Wall Street                                38    26     0    45
+     2  Federal Hall National Memorial             45    24     0    65
+     3  Trinity Church                             48    37    12    72
+     4  The Charging Bull                          31    39    12    60
+     5  Battery Park                               40    27     0    65
+    [LOCAL-485] index mean 40.4 over 5 stop(s), range 31-48
+    [LOCAL-485] weakest: 'The Charging Bull' at 31
+  [LOCAL-791C] pin snap: scope='Lower Manhattan' center=(40.7135482, -74.0054261) bbox=['40.7035482', '40.7235482', '-74.0154261', '-73.9954261'] venue_fallback=None threshold=150m target=100m
+[LOCAL-791C] pin ok Wall Street 70m within threshold
+[LOCAL-791C] pin ok Federal Hall National Memorial 14m within threshold
+[LOCAL-791C] pin ok Trinity Church 5m within threshold
+[LOCAL-791C] pin ok The Charging Bull 54m within threshold
+[LOCAL-791C] pin ok Battery Park 96m within threshold
+  [LOCAL-791C] pin snap complete — 0 snapped, 0 left unsnapped (no in-scope reference), 5 total stop(s)
+[TIMING] phase=story_first elapsed=123.9s cumulative=402.6s
+
+PHASE 6: Assembling the complete tour...
+[TIMING-SUB] phase=packing step=packing_prolog_llm elapsed=1.58s
+  [R2] Prolog saved for Stop 1 (106 words)
+
+  [LOCAL-244] PHASE 5.9: Prolog gating (R9, R10, subject routine)...
+  [LOCAL-244] Prolog before gates: 106 words
+  [LOCAL-244] Prolog R9: 0 deletions
+  [LOCAL-286] Prolog R7: 0 deletions
+  [LOCAL-244] Prolog R10: 1 sentence(s) deleted
+  [LOCAL-244] Prolog subject: 0 expanded, 0 deleted, cost=$0.0000
+  [LOCAL-244] Prolog after gates: 77 words (delta: -29)
+  [LOCAL-244] Prolog deletions (1):
+    [R10_UNFULFILLED_PROMISE] "Each step reveals stories etched into the very fabric of this neighborhood, showcasing a history tha..."
+
+  [LOCAL-246] PHASE 5.95: Orientation gating (R9, R10)...
+    Stop 2 orientation R7: 1 sentence(s) deleted
+    Stop 5 orientation R7: 1 sentence(s) deleted
+    Stop 5 orientation R10: 1 sentence(s) deleted
+  [LOCAL-246] Orientation gating summary:
+    Words before: 256
+    Words after:  185
+    Delta: -71
+    Stops affected: 2/5
+    Deletions (3):
+      [Stop 2][R7_HALLUCINATED_SENSORY] "Here, the echoes of history reverberate through time, anchored in the robust Greek Revival architect..."
+      [Stop 5][R7_HALLUCINATED_SENSORY] "Before you lies Battery Park, an expanse where the city's relentless pace yields to the soft murmur ..."
+      [Stop 5][R10_UNFULFILLED_PROMISE] "As you leave the bustling streets and towering edifices of Wall Street, the air begins to carry the ..."
+
+  [LOCAL-270] PHASE 5.96: Composing Part 4 (forward connection) from delivered narrations...
+    Stops with delivered content: 5/5
+[TIMING-SUB] phase=packing step=packing_rank_facts_llm elapsed=2.18s
+    [LOCAL-276] Intrigue ranking completed: 2.2s, $0.0102, 1519 tokens
+    [LOCAL-276] Ranked 5 stops:
+      [Wall Street] (reversal): Breaking barriers, they opened the first female-owned stock brokerage on Wall St...
+      [Federal Hall National Memorial] (dated_event): In 1789, beneath the expansive skies of a new nation, George Washington ascended...
+      [Trinity Church] (dated_event): This catastrophic event occurred during the Revolutionary War, a time when the c...
+      [The Charging Bull] (cause): Di Modica, determined to offer a symbol of strength and resilience, dropped the ...
+      [Battery Park] (reversal): In the 19th century, this park transformed into a threshold of new beginnings....
+    [LOCAL-276] 5 intriguing / 0 excluded (celebrity_trivia)
+    [LOCAL-276] Using ranked facts for composition (5 stops)
+[TIMING-SUB] phase=packing step=packing_part4_preview_llm elapsed=0.99s
+    Part 4 LLM cost: $0.0031 (552 tokens) [attempt 1]
+    ✓ Part 4 composed and verified (31 words):
+      "You will learn about George Washington's oath of office in 1789 at Federal Hall National Memorial and the illegal installation of the Charging Bull sculpture in 1989 at The Charging Bull."
+      Stops referenced: 2
+    Part 4 total cost: $0.0031
+  [LOCAL-618 #1] Orientation pre-tell guard: dropped 3 sentence(s) carrying later-stop facts
+  [LOCAL-627 #7] Orientation phantom-name guard: no phantom names
+
+  [LOCAL-286] PHASE 5.97: Prolog-body deduplication (≥8 word overlap)...
+  [LOCAL-286] Deduplication: 0 sentence(s) removed from stop bodies
+
+  [LOCAL-292] Empty stop removal gate: PASSED (all 5 stops have narration)
+  [LOCAL-394] Stop count invariant: OK (5 selected == 5 delivered)
+  [D536] Listener asked for 5 stop(s), delivering 5 — request met
+  DEBUG - POI 1 content includes:
+    Specific Examples: True
+    Operational Details: True
+    Walking Directions: False
+WARNING:cost_rates:[LOCAL-197] llm_cost() called with total_tokens (deprecated) by /app/generate_tour_text.py:28609. Caller should supply input_tokens and output_tokens separately.
+  [T4] Transition to Stop 2: Start your stroll on Wall Street, taking in the bustling atm...
+  DEBUG - POI 2 content includes:
+    Specific Examples: True
+    Operational Details: True
+    Walking Directions: False
+  [T4] Transition to Stop 3: From Federal Hall National Memorial, stroll down Wall Street...
+  DEBUG - POI 3 content includes:
+    Specific Examples: True
+    Operational Details: True
+    Walking Directions: False
+  [T4] Transition to Stop 4: From Trinity Church, stroll down Wall Street, soaking in the...
+  DEBUG - POI 4 content includes:
+    Specific Examples: True
+    Operational Details: True
+    Walking Directions: False
+  [T4] Transition to Stop 5: Start by facing The Charging Bull and then head south on Bro...
+  DEBUG - POI 5 content includes:
+    Specific Examples: True
+    Operational Details: True
+    Walking Directions: False
+  [LOCAL-280] Recap composition: 0.7s, $0.0022, 385 tokens
+  [LOCAL-280] Recap built: 30 words, 2 composed clauses (0 D177 rejected, 0 navigation rejected)
+    [Wall Street] (reversal): "Breaking barriers, they opened the first female-owned stock brokerage on Wall St..."
+      → composed: "the first female-owned stock brokerage opened on Wall Street"
+    [Battery Park] (reversal): "In the 19th century, this park transformed into a threshold of new beginnings...."
+      → composed: "Battery Park transformed into a threshold of new beginnings in the 19th century"
+    D177 verified: all 2 source facts present in delivered text
+  [LOCAL-280] Recap added: "That's 5 stops and 1 kilometres — the first female-owned stock brokerage opened on Wall Street and Battery Park transformed into a threshold of new beginnings in the 19th century."
+  [LOCAL-273] Part 1 error: relation "stop_corpus" does not exist
+LINE 2:                 SELECT stop_title FROM stop_corpus
+                                               ^
+
+  [LOCAL-275] Part 2 error: column "lat" does not exist
+LINE 2:             SELECT id, tour_name, lat, lng FROM audio_tours
+                                          ^
+
+  [LOCAL-275] Closing offer fallback (no verification passed)
+  [EPILOG] Journey epilog added to last stop
+  [S27] No cross-stop repetition detected
+  [D533] REPEATED FACT removed from stop 1 (twice in the same stop, kp/('financial', 'institutions')): Businesses and financial institutions started to mushroom along this street, set
+  [D533] REPEATED FACT removed from stop 3 (first told at stop 2, kp/('free', 'admission')): Operational Details: Open daily from 8 AM - 6 PM, free admission, donations welc
+  [D533] REPEATED FACT kept in stop 4 (kp/('bustling', 'financial')) — sentence not in stop block
+  [D533] REPEATED FACT removed from stop 4 (twice in the same stop, kp/('financial', 'district')): The bull's fierce expression and dynamic posture reflect the unyielding energy o
+  [D533] REPEATED FACT removed from stop 5 (first told at stop 2, kp/('free', 'admission')): Operational Details: Open daily from 6 AM - 1 AM, free admission, popular for pi
+  [D533] REPEATED FACT removed from stop 5 (first told at stop 2, kp/('would', 'shape')): Battery Park served as a gateway to a new world, welcoming waves of people who w
+  [D533] 5 repeated fact(s) removed, 1 kept
+  [D533] Person-year role guard: no corpus available — check SKIPPED
+  [LOCAL-615] No duplicated paragraphs
+  [LOCAL-617] Conclusion de-dup: removed redundant 'This tour covered …' line (recap kept)
+
+  [LOCAL-36] Practical Facts Gate:
+    Claims found: 2
+    Verified: 0
+    Dropped: 2
+    AUDIT: hours | Open daily 9 AM - 5 PM, free admission, can get busy during weekends | (no source) | DROPPED — no source content
+    AUDIT: admission | Open 24/7, free to visit, often crowded with tourists | (no source) | DROPPED — no source content
+  [LOCAL-36] PRACTICAL FACTS GATE: 2 claim(s) dropped
+  [LOCAL-618 #2] grammar/splice lint: 8 flagged, 7 dropped, 0 rewritten ({'verbless': 8})
+  [LOCAL-618 #2] grammar/splice lint: 8 flagged, 7 dropped, 0 rewritten by_code={'verbless': 8}
+
+  [LOCAL-260] PROLOG STRUCTURE VALIDATION: 5 error(s), 0 warning(s)
+    [ERROR] Part 1: PART1_MISSING — Part 1 (Tour name and transportation mode) is not present.
+    [ERROR] Part 2: PART2_MISSING — Part 2 (Directions and physicality expectation (route substance)) is not present.
+    [ERROR] Part 3: PART3_MISSING — Part 3 (Purpose / intrigue with sourced facts) is not present.
+    [ERROR] Part 4: PART4_MISSING — Part 4 (Forward connection to stops) is not present.
+    [ERROR] Part 0: DUPLICATE_TOUR_DESCRIPTION — Tour contains 2 tour-level descriptions (must be exactly 1). Passages found:
+  [1] "As you step away from the echoing footsteps and financial hum of Wall Street, where you paused a mom..."
+  [2] "A creation of Italian artist Arturo Di Modica, Charging Bull is more than merely a tourist attractio..."
+
+=== Word Count Statistics ===
+Stop 1: Wall Street - 283 words
+Stop 2: Federal Hall National Memorial - 289 words
+Stop 3: Trinity Church - 294 words
+Stop 4: The Charging Bull - 274 words
+Stop 5: Battery Park - 308 words
+===========================
+
+  [LOCAL-540] scorer ran on assembled tour (10879 chars, 5/5 stops)
+  [LOCAL-540] no defects — tour is clean
+[LOCAL-628] stop 1: rejected(length -26%)
+[LOCAL-628] stop 2: edited
+[LOCAL-628] stop 3: rejected(claim_check unsupported=1 contradicted=0)
+[LOCAL-628] stop 4: edited
+[LOCAL-628] stop 5: rejected(claim_check unsupported=1 contradicted=0)
+[LOCAL-628] editor pass complete: 2 edited, 3 kept original
+[TIMING-SUB] phase=packing step=packing_stop_editor_llm elapsed=9.29s
+[TIMING-SUB] phase=packing step=packing_conclusion_llm elapsed=0.83s
+  [LOCAL-619B] thematic conclusion built from final text: 5 delivered stop(s), venue='Lower Manhattan history walking tour'
+
+Total API cost: $0.2777 (40664 tokens)
+Grounding:      $0.0000 (0 queries, 0 requests)
+Tour total:     $0.2777
+Provenance:     7/46 factual sentences sourced, 39 unsourced (7 corpus, 0 grounded, 39 parametric)
+CACHE STORE: Lower Manhattan history walking tour, New York / walking / 5
+  [venue_resolver] Name variants: ['Lower Manhattan history walking tour']
+  [venue_resolver] No Wikidata candidates for 'Lower Manhattan history walking tour, New York'
+[TIMING-SUB] phase=packing step=resolve_venue elapsed=1.56s
+  [LOCAL-590] POOL STORE: 5 stop(s) pooled for Lower Manhattan history walking tour, New York / walking (research $0.0501/stop)
+
+Tour text generated successfully!
+  [LOCAL-230] Network failures: 0 (all API calls succeeded)
+Saved to: Lower_Manhattan_history_walking_tour__New_York_walking_tour_20261030_013916.txt
+  [C5-5] Evidence persisted: Lower_Manhattan_history_walking_tour__New_York_walking_tour_20261030_013916_evidence.json
+
+Preview of the generated tour:
+
+Step-by-Step Audio Guided Tour: Lower Manhattan history walking tour, New York
+Tour-Category: walking
+
+Stop 1: Wall Street
+
+Address:
+
+Coordinates: 40.705809, -74.008434
+
+Type/Specialty: Financial District
+
+Specific Examples: The New York Stock Exchange, historic buildings, financial institutions.
+
+Orientation: As you traverse this landscape, you will uncover a fascinating blend of financial empires, revolutionary fervor, and enduring symbols of resilience, all layered over a city that has consta...
+
+[TIMING] phase=packing elapsed=21.9s cumulative=424.5s
+[TIMING] phase=verification elapsed=0.0s cumulative=424.5s
+[TIMING] TOTAL wall=424.5s phases: poi_selection=256.3s, story_first=123.9s, packing=21.9s, fact_sheets=18.7s, narration=2.0s, intent=1.9s, external_lookups=0.0s, verification=0.0s
+  [LOCAL-627 #9] dropped 1 previous-stop recap / extra-bridge sentence(s) from delivered text
+  [LOCAL-634] dropped 2 callback(s) to an artist/work not delivered in this tour
+  [LOCAL-650B] theme-stop detector: clean (no theme/topic stops in delivered text)
+  [LOCAL-650 fix2] walking directions: corrected 0 wrong-target line(s), added 4 approximate distance(s) — each hand-off now names the correct next stop
+  [LOCAL-743] stop count agrees: 5 rendered header(s) == 5 splitter block(s)
+  [LOCAL-619B] thematic conclusion already present and count OK (5 stop(s)); preserved (every-path guard)
+  --- STOPS ---
+  STOP 1: Wall Street
+  STOP 2: Federal Hall National Memorial
+  STOP 3: Trinity Church
+  STOP 4: The Charging Bull
+  STOP 5: Battery Park
+  shortfall-apology present: False
+  stored is_test row id=2; delivered 5/5 stop(s) in 425s
+[COST_METER] FRESH | tour_generate | $0.250407 | user=TEST-LOCAL-818 | job=None
+
+[LOCAL-818] cost ledger row: e769e9bb-d3a2-42da-9ada-34a6a7f66cf1
+[LIVE_RUN_METER] TEST-LOCAL-818  (cap $0.70, all providers combined)
+  openai            $0.2404
+  gemini_grounding  $0.0000  (requests=0, queries=0)
+  gemini_tokens     $0.0000
+  serper            $0.0100
+  preflight         $0.0000
+  TOTAL             $0.2504   description='test run'
+
+audio_tours rows AFTER: 2  (delta=1)
+=== LOCAL-818 SUMMARY ===
+  [lower-manhattan-NEWYORK] 5/5 stops cat=walking  -> PASS

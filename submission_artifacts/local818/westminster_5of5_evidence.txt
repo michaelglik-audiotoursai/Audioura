@@ -1,0 +1,11 @@
+=== westminster: STOPS + verdict ===
+996:Total API cost: $0.2386 (38114 tokens)
+998:Tour total:     $0.2386
+1040:  STOP 1: Westminster Abbey
+1041:  STOP 2: Westminster Bridge
+1042:  STOP 3: Trafalgar Square
+1043:  STOP 4: The Cenotaph
+1044:  STOP 5: 10 Downing Street
+1045:  shortfall-apology present: False
+1046:  stored is_test row id=1; delivered 5/5 stop(s) in 358s
+1060:  [westminster-LONDON] 5/5 stops cat=walking  -> PASS

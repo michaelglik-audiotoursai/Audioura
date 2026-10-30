@@ -1,0 +1,1060 @@
+[LOCAL-818] single-tour mode: index 0
+=== LOCAL-818 isolated live run (cheap arm: gpt-4.1-mini + serper) ===
+host  : dbf5bdd24ec9
+TASK_BUDGET_ID=LOCAL-818 TASK_BUDGET_USD=0.70  cache_off=1 pool_off=1 STORIED_MODE=true RESEARCH_BACKEND=serper
+audio_tours rows BEFORE: 0
+
+=== TOUR [westminster-LONDON] 'Westminster walking tour, London' tour_type='walking' (5 stops) ===
+  [LOCAL-818] classified category = 'walking'
+  [LOCAL-767] GEMINI key present=True
+
+======================================================================
+CALL #001 | 01:25:40.375 | GENERATE_TOUR_TEXT_FUNCTION_ENTRY
+======================================================================
+  location: Westminster walking tour, London
+  tour_type: walking
+  total_stops_parameter: 5
+  output_file: None
+
+  [LOCAL-245] Stop-existence gate mode: LOG_ONLY
+
+======================================================================
+CALL #002 | 01:25:40.381 | TOTAL_STOPS_FINALIZED
+======================================================================
+  location: Westminster walking tour, London
+  total_stops_final: 5
+  source: parameter
+
+
+PHASE 1: Analyzing tour intent with AI...
+  [BLOCKER1] Stripped 'tour' from location: 'Westminster walking tour, London' → 'Westminster walking , London'
+  [LOCAL-46] Stripped transport words: 'Westminster walking , London' → 'Westminster , London'
+  [Bug2Fix/D536] tour_type='walking' not prepended (pre_category='walking'); intent sees the ORIGINAL request, not the stripped one
+Intent analysis response: ```json
+{
+    "poi_type": "landmarks",
+    "location": "London",
+    "theme_type": "STANDARD",
+    "theme_name": null,
+    "requirements": null,
+    "business_hours_relevant": false,
+    "accessibility_mentioned": false,
+    "needs_research": false,
+    "venue_name": null,
+    "geographic_scope": "Westminster",
+    "named_places": [],
+    "scope_precision": "DISTRICT",
+    "transport_mode": "on_foot",
+    "country_scope": null
+}
+```
+  [INTENT] Stripped LLM fences from response
+  [TRANSPORT] mode=on_foot, country_scope=None (keyword=on_foot, intent=on_foot)
+✅ Intent Analysis Results:
+   POI Type: landmarks
+   Location: London
+   Requirements: None
+   Business Hours Relevant: False
+   Accessibility Mentioned: False
+   Venue Name: None
+[LOCAL-664] cheap arm: ON for category=walking (categories=UNSET; gate unset — controlled envs apply to all tours)
+  [LOCAL-655] no current-affairs intent (category='walking') — news research NOT run
+[TIMING] phase=intent elapsed=1.5s cumulative=1.5s
+[LOCAL-474] tour_type='walking' → category='walking' (source=explicit)
+
+Detected tour category: WALKING
+Using walking template for Westminster walking tour, London - walking
+
+======================================================================
+CALL #003 | 01:25:41.928 | GENERATING_PROMPT
+======================================================================
+  location: Westminster walking tour, London
+  user_request: Westminster walking tour, London
+  total_stops: 5
+
+
+PHASE 3A: Fetching 5 candidate POI(s) for Westminster walking tour, London...
+  [S17] scope_constraint injected: precision=DISTRICT, scope='Westminster'
+  [LOCAL-290] Asking for 8 candidates (N=5 + margin for gate filtering)
+
+======================================================================
+CALL #004 | 01:25:41.936 | PHASE_3A_REQUEST
+======================================================================
+  location: Westminster walking tour, London
+  total_stops: 5
+  poi_type_hint: landmarks
+
+[LOCAL-197] llm_cost() called with total_tokens (deprecated) by /app/generate_tour_text.py:13554. Caller should supply input_tokens and output_tokens separately.
+[LOCAL-197] llm_cost() called with total_tokens (deprecated) by /app/generate_tour_text.py:13555. Caller should supply input_tokens and output_tokens separately.
+PHASE 3A API call cost: $0.0002 (876 tokens)
+
+======================================================================
+CALL #005 | 01:25:45.595 | OPENAI_API_CALL
+======================================================================
+  total_stops_requested: 5
+  stop_count_in_prompt: True
+  http_status: 200
+  prompt_first_500_chars: You are a knowledgeable local guide for Westminster walking tour, London.
+List exactly 8 specific, real, well-known landmarks relevant to: Westminster walking tour, London.
+
+Requirements:
+- Use REAL, SPECIFIC names of actual establishments or landmarks.
+- NEVER use generic placeholders like 'Restaurant 1', 'Stop 1', 'Location A'.
+- Include a complete street address with ZIP code where applicable.
+
+GEOGRAPHIC SCOPE — ALL stops MUST be located within: Westminster.
+- Do NOT include well-known landm
+  prompt_last_300_chars: opic ("politics and current affairs", "local history and culture") — name the real place that embodies it.
+
+Return ONLY a JSON array, no other text, no markdown fences:
+[{"name": "...", "address": "...", "reason": "Brief reason why this landmark is notable — a specific date, person, or event"}, ...]
+  stops_found_in_response: 0
+  stop_markers_in_response:
+    []
+  response_first_500_chars: [
+    {"name": "Westminster Abbey", "address": "20 Deans Yard, Westminster, London SW1P 3PA, UK", "reason": "A UNESCO World Heritage Site, this Gothic church has been the site of royal ceremonies since 1066."},
+    {"name": "Houses of Parliament", "address": "Parliament Square, Westminster, London SW1A 0AA, UK", "reason": "Home to the UK Parliament, this iconic building features the famous Big Ben clock tower, completed in 1859."},
+    {"name": "Westminster Bridge", "address": "Westminster Bridg
+
+   ! [LOCAL-22] Rejected corrupted name from PHASE 3A: 'St. James's Park'
+  [LOCAL-329] Captured 7 substantive selection reason(s)
+OK PHASE 3A parsed 7 candidate POI(s):
+   - Westminster Abbey @ 20 Deans Yard, Westminster, London SW1P 3PA, UK
+   - Houses of Parliament @ Parliament Square, Westminster, London SW1A 0AA, UK
+   - Westminster Bridge @ Westminster Bridge, Westminster, London SE1 7UT, UK
+   - Trafalgar Square @ Trafalgar Square, Westminster, London WC2N 5DN, UK
+   - The Cenotaph @ Whitehall, Westminster, London SW1A 2ET, UK
+   - Churchill War Rooms @ Clive Steps, King Charles St, Westminster, London SW1A 2AQ, UK
+   - The Queen's Walk @ The Queen's Walk, Westminster, London SE1 7PB, UK
+  [LOCAL-779] area resolver input: 'Westminster' (stripped poi/near-me from 'Westminster , London')
+  [area_resolver] Parsed: city='Westminster', neighborhood=''
+  [area_resolver] City resolved: Westminster → Q179351 (51.4975, -0.1372)
+  [area_resolver] Resolved: center=(51.4975, -0.1372), radius=2.0km, lang=en
+  [LOCAL-294] Unknown P31 types encountered (kept, not excluded):
+    UNKNOWN TYPE: Q25550691 — first seen on: Westminster City Hall
+    UNKNOWN TYPE: Q3917681 — first seen on: Embassy of South Korea, London
+    UNKNOWN TYPE: Q5307555 — first seen on: Buckingham Gate drill halls
+    UNKNOWN TYPE: Q212198 — first seen on: The Albert
+    UNKNOWN TYPE: Q3914 — first seen on: Blewcoat School
+    UNKNOWN TYPE: Q79007 — first seen on: Buckingham Gate
+    UNKNOWN TYPE: Q4671329 — first seen on: Westminster City School
+    UNKNOWN TYPE: Q159334 — first seen on: Westminster City School
+    UNKNOWN TYPE: Q1713379 — first seen on: Westminster City School
+    UNKNOWN TYPE: Q699386 — first seen on: GLA Land and Property
+    UNKNOWN TYPE: Q1021645 — first seen on: Windsor House, London
+    UNKNOWN TYPE: Q54888260 — first seen on: Quilon Restaurant
+    UNKNOWN TYPE: Q3343298 — first seen on: Acas
+    UNKNOWN TYPE: Q9046617 — first seen on: Metropolitan Borough of Westminster
+    UNKNOWN TYPE: Q2659904 — first seen on: Wellington House
+    UNKNOWN TYPE: Q2418495 — first seen on: Westminster Cathedral Choir School
+    UNKNOWN TYPE: Q269770 — first seen on: Westminster Cathedral Choir School
+    UNKNOWN TYPE: Q708676 — first seen on: Westminster Cathedral Choir School
+    UNKNOWN TYPE: Q56242215 — first seen on: Westminster Cathedral
+    UNKNOWN TYPE: Q1570262 — first seen on: Westminster Cathedral
+    UNKNOWN TYPE: Q40357 — first seen on: Tothill Fields Bridewell
+    UNKNOWN TYPE: Q179700 — first seen on: Our Lady of Westminster
+    UNKNOWN TYPE: Q105390172 — first seen on: Archdiocese of Westminster
+    UNKNOWN TYPE: Q132510 — first seen on: Strutton Ground Market
+    UNKNOWN TYPE: Q131263 — first seen on: Wellington Barracks
+    UNKNOWN TYPE: Q27686 — first seen on: St. Ermin's Hotel
+    UNKNOWN TYPE: Q34442 — first seen on: Broadway, London
+    UNKNOWN TYPE: Q1640962 — first seen on: Broadway, London
+    UNKNOWN TYPE: Q22713629 — first seen on: Grey Coat Hospital
+    UNKNOWN TYPE: Q1076486 — first seen on: Westminster Pit
+    UNKNOWN TYPE: Q41253 — first seen on: Westminster Theatre
+    UNKNOWN TYPE: Q19860854 — first seen on: Westminster Theatre
+    UNKNOWN TYPE: Q8719053 — first seen on: The Venue (Victoria Street, London)
+    UNKNOWN TYPE: Q14562709 — first seen on: St James's Park tube station
+    UNKNOWN TYPE: Q55491 — first seen on: St James's Park tube station
+    UNKNOWN TYPE: Q12143816 — first seen on: High Commission of Eswatini, London
+    UNKNOWN TYPE: Q115154402 — first seen on: The Guards Museum
+    UNKNOWN TYPE: Q7308408 — first seen on: The Guards Museum
+    UNKNOWN TYPE: Q2772772 — first seen on: The Guards Museum
+    UNKNOWN TYPE: Q18142 — first seen on: Portland House
+    UNKNOWN TYPE: Q11303 — first seen on: Portland House
+    UNKNOWN TYPE: Q43229 — first seen on: Confederation of Passenger Transport
+  [LOCAL-294] P31 filter result: 50 → 50 kept, 0 excluded, 42 unknown types logged
+  [landmark_discovery] SPARQL coordinate query: 50 landmarks
+    [LOCAL-293] Wikipedia headings: 17 candidates → 2 resolved with QID + in-area coords
+  [landmark_discovery] Wikipedia extraction: +1 new names (total: 51)
+  [area_cache] STORED Q179351: 51 landmarks (tier=rich, TTL=30d)
+  [verify_landmarks] 0/7 stops verified against 51 discovered landmarks (tier: rich)
+  [WALK-D1] Verified 0 stops, tier=rich
+
+PHASE 4.5: Validating AI knowledge for Westminster walking tour, London...
+OK Knowledge validation passed: Knowledge validation passed
+
+PHASE 4: skipped (tour_category='walking', no type-verification required)
+   PHASE 3C: skipped for walking tours (GEO-CHECK handles proximity)
+  [LOCAL-212] Coverage selection error (non-fatal): relation "stop_corpus" does not exist
+LINE 1: ..., passages_json, source_pages, passage_roles FROM stop_corpu...
+                                                             ^
+
+  [LOCAL-662] EXISTENCE-GATE: forcing ENFORCE for 'walking' tour (global mode LOG_ONLY); unverified stops will be dropped/replaced, else N−1 with honest shortfall
+[EXISTENCE-GATE] stop_corpus geographic check failed: relation "stop_corpus" does not exist
+LINE 3:         FROM stop_corpus
+                     ^
+
+[EXISTENCE-GATE] stop_corpus geographic check failed: relation "stop_corpus" does not exist
+LINE 3:         FROM stop_corpus
+                     ^
+
+[EXISTENCE-GATE] stop_corpus geographic check failed: relation "stop_corpus" does not exist
+LINE 3:         FROM stop_corpus
+                     ^
+
+[EXISTENCE-GATE] stop_corpus geographic check failed: relation "stop_corpus" does not exist
+LINE 3:         FROM stop_corpus
+                     ^
+
+[EXISTENCE-GATE] stop_corpus geographic check failed: relation "stop_corpus" does not exist
+LINE 3:         FROM stop_corpus
+                     ^
+
+  [EXISTENCE-GATE] LOG_ONLY — 7/7 stops verified (100%), 0 would be dropped
+    [VERIFIED] 'Westminster Abbey' — venue_corpus canonical_title(geo): 'Westminster Pit' at 'Westminster walking are
+    [VERIFIED] 'Houses of Parliament' — wikipedia_en_summary: 'Palace of Westminster' exists and mentions region
+    [VERIFIED] 'Westminster Bridge' — venue_corpus canonical_title(geo): 'Westminster Pit' at 'Westminster walking are
+    [VERIFIED] 'Trafalgar Square' — wikipedia_en_summary: 'Trafalgar Square' exists and mentions region
+    [VERIFIED] 'The Cenotaph' — wikipedia_en_summary: 'The Cenotaph' exists and mentions region
+    [VERIFIED] 'Churchill War Rooms' — wikipedia_en_summary: 'Churchill War Rooms' exists and mentions region
+    [VERIFIED] "The Queen's Walk" — wikipedia_en_summary: 'Queen's Walk' exists and mentions region
+    [HARVEST] Error (non-fatal): relation "stop_corpus" does not exist
+LINE 1: SELECT stop_title, passage_count FROM stop_corpus WHERE LOWE...
+                                              ^
+
+    [INTERPRETIVE] Error (non-fatal): relation "stop_corpus" does not exist
+LINE 1: ...T passages_json, source_pages, passage_count FROM stop_corpu...
+                                                             ^
+
+  [ROUTE-ORDER] Only 0 stops with coordinates — skipping algorithmic routing
+[LOCAL-329] Failed to persist selection reasons: relation "stop_corpus" does not exist
+LINE 1: SELECT passage_count FROM stop_corpus WHERE venue_name = 'We...
+                                  ^
+
+  [LOCAL-329] Persistence error (non-fatal): relation "stop_corpus" does not exist
+LINE 1: SELECT passage_count FROM stop_corpus WHERE venue_name = 'We...
+                                  ^
+
+
+PHASE 3B: Requesting structured details and walking directions for 5 stop(s)...
+
+======================================================================
+CALL #006 | 01:26:00.223 | PHASE_3B_REQUEST
+======================================================================
+  location: Westminster walking tour, London
+  stop_count: 5
+
+[LOCAL-197] llm_cost() called with total_tokens (deprecated) by /app/generate_tour_text.py:17149. Caller should supply input_tokens and output_tokens separately.
+[LOCAL-197] llm_cost() called with total_tokens (deprecated) by /app/generate_tour_text.py:17150. Caller should supply input_tokens and output_tokens separately.
+PHASE 3B API call cost: $0.0003 (1207 tokens)
+OK PHASE 3B: ordered 5 stop(s) with structured details and directions
+  [LOCAL-355] Querying OSM for venue facts (city: London, hint: auto)
+  [LOCAL-788] overpass fallback https://overpass-api.de/api/interpreter ReadTimeout
+[OSM-VENUE] Overpass ReadTimeout for 'Westminster Abbey' on https://overpass-api.de/api/interpreter
+[OSM-VENUE] Overpass ReadTimeout for 'Westminster Abbey' on https://overpass.kumi.systems/api/interpreter
+  [LOCAL-788] overpass fallback https://overpass.kumi.systems/api/interpreter ReadTimeout
+[OSM-VENUE] Overpass ReadTimeout for 'Westminster Abbey' on https://overpass.private.coffee/api/interpreter
+  [LOCAL-788] overpass fallback https://overpass.private.coffee/api/interpreter ReadTimeout
+[TIMING-SUB] phase=poi_selection step=fetch_osm_venue_facts elapsed=30.79s
+  [LOCAL-355] Westminster Abbey: no practical facts in OSM
+[OSM-VENUE] Overpass ReadTimeout for 'Houses of Parliament' on https://overpass-api.de/api/interpreter
+  [LOCAL-788] overpass fallback https://overpass-api.de/api/interpreter ReadTimeout
+  [LOCAL-788] overpass fallback https://overpass.kumi.systems/api/interpreter ReadTimeout
+[OSM-VENUE] Overpass ReadTimeout for 'Houses of Parliament' on https://overpass.kumi.systems/api/interpreter
+[OSM-VENUE] Overpass ReadTimeout for 'Houses of Parliament' on https://overpass.private.coffee/api/interpreter
+  [LOCAL-788] overpass fallback https://overpass.private.coffee/api/interpreter ReadTimeout
+[TIMING-SUB] phase=poi_selection step=fetch_osm_venue_facts elapsed=30.77s
+  [LOCAL-355] Houses of Parliament: no practical facts in OSM
+  [LOCAL-788] overpass fallback https://overpass-api.de/api/interpreter ReadTimeout
+[OSM-VENUE] Overpass ReadTimeout for 'Westminster Bridge' on https://overpass-api.de/api/interpreter
+[OSM-VENUE] Overpass ReadTimeout for 'Westminster Bridge' on https://overpass.kumi.systems/api/interpreter
+  [LOCAL-788] overpass fallback https://overpass.kumi.systems/api/interpreter ReadTimeout
+[OSM-VENUE] Overpass ReadTimeout for 'Westminster Bridge' on https://overpass.private.coffee/api/interpreter
+  [LOCAL-788] overpass fallback https://overpass.private.coffee/api/interpreter ReadTimeout
+[TIMING-SUB] phase=poi_selection step=fetch_osm_venue_facts elapsed=30.76s
+  [LOCAL-355] Westminster Bridge: no practical facts in OSM
+[OSM-VENUE] Overpass ReadTimeout for 'Trafalgar Square' on https://overpass-api.de/api/interpreter
+  [LOCAL-788] overpass fallback https://overpass-api.de/api/interpreter ReadTimeout
+  [LOCAL-788] overpass fallback https://overpass.kumi.systems/api/interpreter ReadTimeout
+[OSM-VENUE] Overpass ReadTimeout for 'Trafalgar Square' on https://overpass.kumi.systems/api/interpreter
+  [LOCAL-788] overpass fallback https://overpass.private.coffee/api/interpreter ReadTimeout
+[TIMING-SUB] phase=poi_selection step=fetch_osm_venue_facts elapsed=30.77s
+[OSM-VENUE] Overpass ReadTimeout for 'Trafalgar Square' on https://overpass.private.coffee/api/interpreter
+  [LOCAL-355] Trafalgar Square: no practical facts in OSM
+[TIMING-SUB] phase=poi_selection step=fetch_osm_venue_facts elapsed=0.00s
+  [LOCAL-355] The Cenotaph: no practical facts in OSM
+  [LOCAL-622] OSM lookup budget: spent=123.1s / limit=120s, skipped=1
+[LOOKUP-BUDGET] External-lookup budget exhausted after 123.1s (limit 120s). Skipping optional osm lookup for 'The Cenotaph' and any further optional lookups this tour.
+   GEO-CHECK: all 5 stops within walking distance (max leg 1.10 km, total 2.53 km, limit 12 km)
+Extracted first POI coordinates: (51.4994, -0.127)
+
+=== Extracted POI Information ===
+1. Westminster Abbey
+   Address: 20 Deans Yard, Westminster, London SW1P 3PA, UK
+   Coordinates: 51.4994, -0.1270
+   Directions: From Westminster Station, exit and walk towards the Abbey along Victoria Street,...
+2. Houses of Parliament
+   Address: Parliament Square, Westminster, London SW1A 0AA, UK
+   Coordinates: 51.4995, -0.1248
+   Directions: Exit Westminster Abbey and turn left onto Deans Yard, continue straight onto Par...
+3. Westminster Bridge
+   Address: Westminster Bridge, Westminster, London SE1 7UT, UK
+   Coordinates: 51.5007, -0.1195
+   Directions: From the Houses of Parliament, head south towards the river, cross the road to W...
+4. Trafalgar Square
+   Address: Trafalgar Square, Westminster, London WC2N 5DN, UK
+   Coordinates: 51.5089, -0.1283
+   Directions: Walk north along Westminster Bridge, turn left onto York Road, and continue to t...
+5. The Cenotaph
+   Address: Whitehall, Westminster, London SW1A 2ET, UK
+   Coordinates: 51.5009, -0.1280
+   Directions: From Trafalgar Square, head down Whitehall, passing the iconic government buildi...
+================================
+
+[TIMING-SUB] phase=poi_selection step=serp_search elapsed=1.33s
+  [LOCAL-427] HTTP 200 from https://www.westminster-abbey.org/history/history-of-westminster-abbey (attempt 1)
+  [LOCAL-427] HTTP 200 from https://www.youtube.com/watch?v=FxBvZlg50MI (attempt 1)
+  [LOCAL-427] HTTP 200 from https://en.wikipedia.org/wiki/Westminster_Abbey (attempt 1)
+  [LOCAL-427] HTTP 200 from https://lookuplondon.substack.com/p/10-surprising-details-inside-westminster (attempt 1)
+  [LOCAL-427] HTTP 200 from https://www.youtube.com/watch?v=I8nYhEvzXjo (attempt 1)
+  [LOCAL-427] HTTP 200 from https://www.historic-uk.com/HistoryMagazine/DestinationsUK/Westminster-Abbey/ (attempt 1)
+  [LOCAL-427] HTTP 200 from https://www.alisonchino.com/a-story-about-westminster-abbey/ (attempt 1)
+[TIMING-SUB] phase=poi_selection step=serper_research elapsed=7.58s
+[TIMING-SUB] phase=poi_selection step=fetch_stop_knowledge elapsed=9.44s
+  [D556] +5 story fact(s) for 'Westminster Abbey' via gemini (4 high)
+[TIMING-SUB] phase=poi_selection step=serp_search elapsed=1.20s
+  [LOCAL-427] HTTP 200 from https://www.facebook.com/ukparliament/videos/stories-from-parliament-the-fire-of-1834/10153695732647733/ (attempt 1)
+  [LOCAL-427] HTTP 200 from https://abc11.com/post/photos-fatal-attack-outside-uk-parliament/1812833/ (attempt 1)
+  [LOCAL-427] HTTP 200 from https://www.youtube.com/watch?v=kRt8wreJJE0 (attempt 1)
+  [LOCAL-427] HTTP 200 from https://www.theguardian.com/uk-news/2025/mar/16/fire-could-burn-down-parliament-and-asbestos-is-rife-surveys-show (attempt 1)
+  [LOCAL-427] HTTP 200 from https://en.wikipedia.org/wiki/Palace_of_Westminster (attempt 1)
+  [LOCAL-427] HTTP 200 from https://time.com/5622155/british-parliament-falling-down/ (attempt 1)
+[TIMING-SUB] phase=poi_selection step=serper_research elapsed=6.46s
+[TIMING-SUB] phase=poi_selection step=fetch_stop_knowledge elapsed=7.88s
+  [D556] +4 story fact(s) for 'Houses of Parliament' via gemini (4 high)
+[TIMING-SUB] phase=poi_selection step=serp_search elapsed=1.18s
+  [LOCAL-427] HTTP 200 from https://www.facebook.com/IslingtonGazette/posts/westminster-bridge-was-shut-for-16-hours-after-an-overnight-standoff-emergency-s/1751421956375982/ (attempt 1)
+  [LOCAL-427] HTTP 200 from https://www.independent.co.uk/topic/westminster-bridge (attempt 1)
+  [LOCAL-427] HTTP 200 from https://www.facebook.com/londonbeautifullife/videos/westminster-bridge-is-on-shut-downwestminster-westminsterbridge-london/982071087723383/ (attempt 1)
+  [LOCAL-427] HTTP 200 from https://www.nbcnews.com/news/world/american-hailed-hero-during-inquest-westminster-bridge-terror-attack-n908351 (attempt 1)
+  [LOCAL-427] HTTP 200 from https://www.bbc.com/news/uk-45485404 (attempt 1)
+  [LOCAL-427] HTTP 200 from https://en.wikipedia.org/wiki/2017_Westminster_attack (attempt 1)
+  [LOCAL-427] HTTP 200 from https://www.facebook.com/StubbsReels/posts/westminster-bridge-closed-someone-jumped-into-the-river-everyone-police-incident/1394075466042709/ (attempt 1)
+  [LOCAL-427] HTTP 200 from https://www.standard.co.uk/news/london/westminster-bridge-closed-met-police-respond-ongoing-incident-b1301365.html (attempt 1)
+[TIMING-SUB] phase=poi_selection step=serper_research elapsed=6.56s
+[TIMING-SUB] phase=poi_selection step=fetch_stop_knowledge elapsed=7.79s
+  [D556] +3 story fact(s) for 'Westminster Bridge' via gemini (3 high)
+[TIMING-SUB] phase=poi_selection step=serp_search elapsed=1.28s
+  [LOCAL-427] HTTP 200 from https://en.wikipedia.org/wiki/Trafalgar_Square (attempt 1)
+  [LOCAL-427] HTTP 200 from https://www.storyhunt.io/en/articles/trafalgar-square?srsltid=AYCX9vLsVHvvilTWfsO3_Xf1RyG2cyheGa4IkbckNsDv05QavzLy1j-q (attempt 1)
+  [LOCAL-427] HTTP 200 from https://artsandculture.google.com/story/defining-moments-in-the-history-of-trafalgar-square/AgVBwo0_gblwKA?hl=en (attempt 1)
+  [LOCAL-427] HTTP 200 from https://www.facebook.com/groups/1953460481760645/posts/2438076816632340/ (attempt 1)
+  [LOCAL-427] HTTP 200 from https://essentialldn.com/2026/06/27/trafalgar-square/ (attempt 1)
+  [LOCAL-427] HTTP 200 from https://www.london.gov.uk/who-we-are/city-halls-buildings-and-squares/trafalgar-square (attempt 1)
+[TIMING-SUB] phase=poi_selection step=serper_research elapsed=11.30s
+[TIMING-SUB] phase=poi_selection step=fetch_stop_knowledge elapsed=13.02s
+  [D556] +5 story fact(s) for 'Trafalgar Square' via gemini (5 high)
+[TIMING-SUB] phase=poi_selection step=serp_search elapsed=0.75s
+  [LOCAL-427] HTTP 200 from https://www.facebook.com/dcmsgovuk/videos/the-cenotaph-is-at-the-centre-of-events-in-london-today-but-how-did-this-monumen/1088264468973167/ (attempt 1)
+  [LOCAL-427] HTTP 200 from https://www.english-heritage.org.uk/visit/places/the-cenotaph/ (attempt 1)
+  [LOCAL-427] HTTP 200 from https://www.instagram.com/reel/DQ7Hrjuj6KB/ (attempt 1)
+  [LOCAL-427] HTTP 200 from https://www.youtube.com/shorts/f-q4mHesvXk (attempt 1)
+  [LOCAL-427] HTTP 200 from https://www.royal.uk/centenary-grave-unknown-warrior-and-cenotaph (attempt 1)
+  [LOCAL-427] HTTP 200 from https://www.facebook.com/TheStoicEnglish/posts/the-government-built-the-cenotaph-to-be-thrown-away-after-a-week-the-mothers-of-/1092701390425311/ (attempt 1)
+  [LOCAL-427] HTTP 200 from https://www.historyextra.com/period/modern/the-cenotaph-london/ (attempt 1)
+[TIMING-SUB] phase=poi_selection step=serper_research elapsed=8.15s
+[TIMING-SUB] phase=poi_selection step=fetch_stop_knowledge elapsed=9.38s
+  [D556] +4 story fact(s) for 'The Cenotaph' via gemini (4 high)
+[TIMING] phase=poi_selection elapsed=196.0s cumulative=197.5s
+
+[Storied] STORIED_MODE=true — generating spine + fact sheets...
+  [LOCAL-186] Disambiguated fetch hit: 'Westminster Abbey London' → 59528 chars
+  [LOCAL-47] Westminster Abbey: tier=rich, facts=8
+  [LOCAL-186] Disambiguated fetch hit: 'Houses of Parliament Westminster' → 61838 chars
+  [LOCAL-47] Houses of Parliament: tier=rich, facts=8
+  [LOCAL-186] Disambiguated fetch hit: 'Westminster Bridge London' → 6016 chars
+  [LOCAL-47] Westminster Bridge: tier=rich, facts=8
+  [LOCAL-186] Disambiguated fetch hit: 'Trafalgar Square Westminster' → 29361 chars
+  [LOCAL-47] Trafalgar Square: tier=rich, facts=8
+  [LOCAL-186] Disambiguated fetch hit: 'The Cenotaph Westminster' → 50122 chars
+  [LOCAL-47] The Cenotaph: tier=rich, facts=8
+  [LOCAL-37] Three-class retrieval: 5 stops processed, 0 with category
+  [LOCAL-47] Outdoor retrieval tiers: {'rich': 5}
+  [SQ-S6b] Insufficient data for thread discovery (elements=0, stops=5)
+  [SQ-S6b] Thread discovery: mode=mosaic, threads=0
+  [§3] No story elements available — spine will use invented arc (mode=invented)
+SPINE_COST: category=walking venue=Westminster walking tour, Lond model=gpt-4o tokens=1582 (in=859 out=723) cost=$0.0094 latency=6.7s
+[COST_METER] FRESH | spine_generate | $0.009378 | user=None | job=None
+  [LOCAL-278] Spine cost folded into total: $0.0094
+  [LOCAL-111] Spine quality: 3/4 | {'climax_position': False, 'unique_emotional_beats': True, 'valid_callbacks': True, 'closing_revelation_length': True}
+  [Storied] Spine generated: 5 arc entries (mode=invented)
+  [LOCAL-183] stop_corpus fetch error (non-fatal): relation "stop_corpus" does not exist
+LINE 1: ..., passages_json, source_pages, passage_roles FROM stop_corpu...
+                                                             ^
+
+  [LOCAL-198] Corpus gate: ENABLED — checking stop coverage...
+  [CORPUS-GATE] stop='Westminster Abbey' verdict=EMPTY action=PASSED_VIA_SNIPPETS (direct snippets override)
+  [CORPUS-GATE] stop='Houses of Parliament' verdict=EMPTY action=PASSED_VIA_SNIPPETS (direct snippets override)
+  [CORPUS-GATE] stop='Westminster Bridge' verdict=EMPTY action=PASSED_VIA_SNIPPETS (direct snippets override)
+  [CORPUS-GATE] stop='Trafalgar Square' verdict=EMPTY action=PASSED_VIA_SNIPPETS (direct snippets override)
+  [CORPUS-GATE] stop='The Cenotaph' verdict=EMPTY action=PASSED_VIA_SNIPPETS (direct snippets override)
+  [LOCAL-198] Corpus gate: 0 PASSED, 0 CREATOR_ONLY, 0 EMPTY, 0 SHORTENED
+DB-first lookup failed for 'Houses of Parliament': relation "stop_corpus" does not exist
+LINE 3:             FROM stop_corpus
+                         ^
+
+DB-first lookup failed for 'The Cenotaph': relation "stop_corpus" does not exist
+LINE 3:             FROM stop_corpus
+                         ^
+
+DB-first lookup failed for 'Westminster Bridge': relation "stop_corpus" does not exist
+LINE 3:             FROM stop_corpus
+                         ^
+
+DB-first lookup failed for 'Trafalgar Square': relation "stop_corpus" does not exist
+LINE 3:             FROM stop_corpus
+                         ^
+
+DB-first lookup failed for 'Westminster Abbey': relation "stop_corpus" does not exist
+LINE 3:             FROM stop_corpus
+                         ^
+
+[LOCAL-197] llm_cost() called with total_tokens (deprecated) by /app/fact_extractor.py:220. Caller should supply input_tokens and output_tokens separately.
+  [Storied] Fact sheets: 5/5 generated
+  [S25] Story types assigned: ['culture', 'history', 'architecture', 'culture', 'history']
+  [LOCAL-188] Style constraints ACTIVE (declarative prose rules injected)
+
+  [LOCAL-576] Pre-writing scope check against 'Westminster' (5 stop(s), want 5)...
+   X SCOPE-CHECK REMOVED 'Houses of Parliament' — outside 'Westminster': [not-a-place] 'Houses of Parliament' is a category ('houses') inside a place, not a specific stop — which house? (conf=high)
+   OK 'Westminster Bridge' — inside 'Westminster': check error: Unterminated string starting at: line 4 column 13 (char 63) (conf=low)
+   OK 'Trafalgar Square' — inside 'Westminster': Trafalgar Square is a well-known public square located within the City of Westminster in London. (conf=high)
+   OK 'The Cenotaph' — inside 'Westminster': The Cenotaph is a war memorial located on Whitehall, which is within the City of Westminster in London. (conf=high)
+  [LOCAL-576] Pre-writing scope check removed 1 out-of-scope stop(s) BEFORE any description was written — replenishing to 5.
+  [D556] Replenish round 1: need 1, proposed 3
+   X SCOPE-CHECK REMOVED 'Houses of Parliament' — outside 'Westminster': [not-a-place] 'Houses of Parliament' is a category ('houses') inside a place, not a specific stop — which house? (conf=high)
+  [D558] Replenishment scope check: 0/1 candidate(s) inside 'Westminster'
+  [D556] Replenish round 2: need 1, proposed 3
+  [LOCAL-662B] Replenish: rejected corrupted/truncated name "St. James's Park"
+   OK '10 Downing Street' — inside 'Westminster': 10 Downing Street is located in the City of Westminster, London. (conf=high)
+  [D558] Replenishment scope check: 1/1 candidate(s) inside 'Westminster'
+  [D556]   ADDED '10 Downing Street' — the official residence of the British Prime Minister since 1
+  [LOCAL-576] Replenished 1 stop(s) in 2 round(s); 2 rejected for scope. Now 5/5.
+[TIMING] phase=fact_sheets elapsed=23.6s cumulative=221.1s
+
+PHASE 5: Generating detailed descriptions for each POI (parallel)...
+[TIMING] phase=narration elapsed=1.3s cumulative=222.5s
+[TIMING] phase=external_lookups elapsed=0.0s cumulative=222.5s
+
+Generating description for Stop 1: Westminster Abbey by , ...
+
+Generating description for Stop 2: Westminster Bridge by , ...
+
+Generating description for Stop 3: Trafalgar Square by , ...
+
+Generating description for Stop 4: The Cenotaph by , ...
+
+Generating description for Stop 5: 10 Downing Street by , ...
+  [LOCAL-381] stop='10 Downing Street' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-381] stop='Trafalgar Square' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-381] stop='The Cenotaph' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-381] stop='Westminster Abbey' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-381] stop='Westminster Bridge' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-411] Stop 3 snippet ranking: input=5 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=5 output=5 usable=5 (t1t2=0, t3=0, market=0)
+    Top scores: [('Trafalgar Square', 9, ''), ('Trafalgar Square', 8, ''), ('Trafalgar Square', 8, '')]
+[LOCAL-802] off-topic passage dropped Trafalgar Square The four giant bronze lions at
+[LOCAL-802] off-topic passage dropped Trafalgar Square George IV moved the King’s Mews
+  [LOCAL-802] Stop 3: dropped 2 off-topic passage(s); 3 on-topic remain
+  [LOCAL-402] Stop 3: injected 3 snippets as reference material
+  [LOCAL-411] Stop 3 prompt size: before_snippets=15006 after=21256 (+6250 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (21256)
+  [LOCAL-411] Stop 2 snippet ranking: input=3 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=5 output=3 usable=3 (t1t2=0, t3=0, market=0)
+    Top scores: [('Westminster Bridge', 8, ''), ('Westminster Bridge', 8, ''), ('Westminster Bridge', 8, '')]
+  [LOCAL-402] Stop 2: injected 3 snippets as reference material
+  [LOCAL-411] Stop 2 prompt size: before_snippets=14803 after=21098 (+6295 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (21098)
+  [LOCAL-411] Stop 4 snippet ranking: input=4 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=5 output=4 usable=4 (t1t2=0, t3=0, market=0)
+    Top scores: [('The Cenotaph', 10, ''), ('The Cenotaph', 7, ''), ('The Cenotaph', 7, '')]
+[LOCAL-802] off-topic passage dropped The Cenotaph The idea of commemorating the unknown
+  [LOCAL-802] Stop 4: dropped 1 off-topic passage(s); 3 on-topic remain
+  [LOCAL-402] Stop 4: injected 3 snippets as reference material
+  [LOCAL-411] Stop 4 prompt size: before_snippets=15091 after=21383 (+6292 from snippets+instructions, facts_first=no)  [LOCAL-411] Stop 1 snippet ranking: input=5 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=5 output=5 usable=5 (t1t2=0, t3=0, market=0)
+    Top scores: [('Westminster Abbey', 13, ''), ('Westminster Abbey', 8, ''), ('Westminster Abbey', 6, '')]
+  [LOCAL-402] Stop 1: injected 5 snippets as reference material
+  [LOCAL-411] Stop 1 prompt size: before_snippets=14494 after=20900 (+6406 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (20900)
+
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (21383)
+  [LOCAL-408] Prompt dump written to: /app/prompt_dump_stop1.txt
+[LOCAL-197] llm_cost() called with total_tokens (deprecated) by /app/generate_tour_text.py:22904. Caller should supply input_tokens and output_tokens separately.
+Stop 3 API call cost: $0.0257 (5414 tokens, model=gpt-4o)
+  [LOCAL-569] Stop 3 attempt 1/5 story_count=0 words=315
+Stop 3 description word count: 315 words
+  [LOCAL-407] Stop 3: snippets injected but no candidate specifics extracted
+  [LOCAL-414] Stop 3: SCRUBBED banned phrases from output: ['a testament to']
+Stop 5 API call cost: $0.0120 (2530 tokens, model=gpt-4o)
+  [LOCAL-569] Stop 5 attempt 1/5 story_count=1 words=310
+Stop 5 description word count: 310 words
+  [LOCAL-414] Stop 5: SCRUBBED banned phrases from output: ['a testament to']
+Stop 1 API call cost: $0.0251 (5282 tokens, model=gpt-4o)
+  [LOCAL-569] Stop 1 attempt 1/5 story_count=0 words=290
+Stop 1 description word count: 290 words
+  [LOCAL-407] Stop 1: snippets injected but no candidate specifics extracted
+  [LOCAL-414] Stop 1: SCRUBBED banned phrases from output: ['a testament to']
+Stop 2 API call cost: $0.0249 (5247 tokens, model=gpt-4o)
+  [LOCAL-569] Stop 2 attempt 1/5 story_count=1 words=290
+Stop 2 description word count: 290 words
+  [LOCAL-407] Stop 2: snippets injected but no candidate specifics extracted
+Stop 4 API call cost: $0.0256 (5398 tokens, model=gpt-4o)
+  [LOCAL-569] Stop 4 attempt 1/5 story_count=4 words=303
+Stop 4 description word count: 303 words
+  [LOCAL-407] Stop 4: snippets injected but no candidate specifics extracted
+
+  [LOCAL-439] STORY GATE: checking story-units per stop (D394)...
+    ✓ PASS stop='Westminster Abbey': story_units=1, entities_ok=True, thesis_ok=True
+      interest: emotional=2, new_info=2, deduction=0, total=4
+    ✓ PASS stop='Westminster Bridge': story_units=1, entities_ok=True, thesis_ok=True
+      interest: emotional=4, new_info=3, deduction=1, total=6
+    ✗ FAIL stop='Trafalgar Square': story_units=0, entities_ok=True, thesis_ok=True
+      → story_units=0: no candidate story-unit of ≥3 sentences passes classification (need at least 1 with named person, real actions, arc)
+    ✓ PASS stop='The Cenotaph': story_units=1, entities_ok=True, thesis_ok=True
+      interest: emotional=3, new_info=3, deduction=1, total=5
+    ✗ FAIL stop='10 Downing Street': story_units=0, entities_ok=True, thesis_ok=True
+      → story_units=0: no candidate story-unit of ≥3 sentences passes classification (need at least 1 with named person, real actions, arc)
+  [LOCAL-439] Classification cost: $0.002696 (input=11148, output=1707)
+  [LOCAL-439] STORY GATE: SOME STOPS FAILED (informational — does not block delivery)
+
+  [LOCAL-192] PHASE 5.1: Style validation + per-paragraph retry...
+[LOCAL-197] llm_cost() called with total_tokens (deprecated) by /app/generate_tour_text.py:24364. Caller should supply input_tokens and output_tokens separately.
+  [LOCAL-192] Stop 1 para 2: retry IMPROVED (3→2 errors)
+  [LOCAL-192] Stop 1 para 3: retry IMPROVED (2→1 errors)
+  [LOCAL-192] Stop 2 para 1: retry FIXED (R10_UNFULFILLED_PROMISE)
+  [LOCAL-192] Stop 2 para 2: retry FIXED (R10_UNFULFILLED_PROMISE)
+  [LOCAL-192] Stop 2 para 3: retry FIXED (R1_IMPERATIVE)
+  [LOCAL-192] Stop 2 para 4: retry IMPROVED (3→1 errors)
+  [LOCAL-192] Stop 3 para 4: retry FIXED (R10_UNFULFILLED_PROMISE)
+  [LOCAL-192] Stop 3 para 5: retry FIXED (R1_IMPERATIVE, R10_UNFULFILLED_PROMISE)
+  [LOCAL-192] Style retry summary: 8 paragraphs retried, 8 fixed/improved, 0 kept original
+  [LOCAL-192] Retry cost: $0.0012 (4076 tokens)
+
+  [LOCAL-255] PHASE 5.13: R1 imperative rewrite...
+  [LOCAL-255] Stop 2 'Westminster Bridge': 1 rewritten, 0 deleted
+  [LOCAL-255] R1 summary: 1 rewritten, 0 deleted, 1 stops affected, LLM tokens: 0 ($0.0000)
+
+  [LOCAL-251] PHASE 5.14: R7 hallucinated-sensory deletion...
+  [LOCAL-251] R7 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-261] PHASE 5.141: R2 question deletion...
+  [LOCAL-261] R2 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-261] PHASE 5.142: R3 suggestive-exploration deletion...
+  [LOCAL-261] R3 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-261] PHASE 5.143: R4 prescribed-feeling deletion...
+  [LOCAL-261] R4 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-261] PHASE 5.144: R8 prompt-leakage deletion...
+  [LOCAL-261] R8 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-216] PHASE 5.15: R9 generic-sentence deletion...
+  [LOCAL-216] Stop 4 'The Cenotaph': 1 sentence(s) deleted, 0 paragraph(s) emptied
+  [LOCAL-216] R9 summary: 1 sentences deleted, 0 paragraphs emptied, 1 stops affected
+
+  [LOCAL-235] PHASE 5.155: R10 unfulfilled-promise deletion...
+  [LOCAL-235] Stop 1 'Westminster Abbey': 2 sentence(s) deleted, 0 paragraph(s) emptied
+  [LOCAL-235] Stop 2 'Westminster Bridge': 1 sentence(s) deleted, 0 paragraph(s) emptied
+  [LOCAL-235] R10 summary: 3 sentences deleted, 0 paragraphs emptied, 2 stops affected
+
+  [LOCAL-472] PHASE 5.152: Stop-specificity gate...
+  [LOCAL-472] Stop-specificity gate summary:
+    Stops checked: 5
+    Paragraphs checked: 20
+    Transferable (high, removed): 3
+    Transferable (low conf, kept): 0
+    Last-paragraph protected: 0
+    Ungrounded named entities: 8
+    [LOCAL-652] Foreign work/artist sentences removed: 6
+    Stops affected: 3
+    [LOCAL-472] REMOVED transferable paragraph stop='Westminster Abbey' conf=high reason='Generic scene-setting about political power.': "Just outside, the heart of political power is located nearby, contributing to the rich narrative of this remarkable area"
+    [LOCAL-472] REMOVED transferable paragraph stop='Westminster Bridge' conf=high reason='Generic scene-setting applicable to any historic church.': "As you cross, the currents of history and modernity swirl beneath Westminster Bridge, shaping the city and its narrative"
+    [LOCAL-472] REMOVED transferable paragraph stop='Trafalgar Square' conf=high reason='Generic scene-setting applicable to any old town street.': "As you absorb the vibrant energy of Trafalgar Square, its role as both a historical landmark and a living space for civi"
+    [LOCAL-652] REMOVED foreign work/artist sentence stop='Westminster Bridge' entities=['On March'] (1 sentence(s)) in: "This location, however, is not just about connecting landmarks; it has borne witness to modern tragedies. On March 22, 2"
+    [LOCAL-652] REMOVED foreign work/artist sentence stop='The Cenotaph' entities=['Unknown Warrior', 'In November', 'Brigadier General'] (3 sentence(s)) in: "The story of the Unknown Warrior adds another layer of solemnity. In November 1920, four unknown soldiers were brought f"
+    [LOCAL-652] REMOVED foreign work/artist sentence stop='10 Downing Street' entities=['British Prime Minister'] (1 sentence(s)) in: "Standing here at 10 Downing Street, you are at the official residence and office of the British Prime Minister, a place "
+    [LOCAL-652] REMOVED foreign work/artist sentence stop='10 Downing Street' entities=['Winston Churchill', 'Margaret Thatcher', 'Boris Johnson'] (1 sentence(s)) in: "The building is an architectural amalgamation, with its iconic black door that has witnessed the comings and goings of f"
+    [LOCAL-472] UNGROUNDED entity stop='Westminster Bridge' entity='On March' reason='It mentions a person who died but does not specify a concrete link to the stop.' in: "This location, however, is not just about connecting landmarks; it has borne witness to modern trage"
+    [LOCAL-472] UNGROUNDED entity stop='The Cenotaph' entity='Unknown Warrior' reason='No concrete link to the stop is provided.' in: "The story of the Unknown Warrior adds another layer of solemnity. In November 1920, four unknown sol"
+    [LOCAL-472] UNGROUNDED entity stop='The Cenotaph' entity='In November' reason='No concrete link to The Cenotaph is established.' in: "The story of the Unknown Warrior adds another layer of solemnity. In November 1920, four unknown sol"
+    [LOCAL-472] UNGROUNDED entity stop='The Cenotaph' entity='Brigadier General' reason='No concrete link to The Cenotaph is provided.' in: "The story of the Unknown Warrior adds another layer of solemnity. In November 1920, four unknown sol"
+    [LOCAL-472] UNGROUNDED entity stop='10 Downing Street' entity='British Prime Minister' reason='It does not specify a direct action or relationship involving the British Prime Minister at this stop.' in: "Standing here at 10 Downing Street, you are at the official residence and office of the British Prim"
+    [LOCAL-472] UNGROUNDED entity stop='10 Downing Street' entity='Winston Churchill' reason='It does not specify Churchill's role or actions at 10 Downing Street.' in: "The building is an architectural amalgamation, with its iconic black door that has witnessed the com"
+    [LOCAL-472] UNGROUNDED entity stop='10 Downing Street' entity='Margaret Thatcher' reason='It does not specify her role or actions at 10 Downing Street.' in: "The building is an architectural amalgamation, with its iconic black door that has witnessed the com"
+    [LOCAL-472] UNGROUNDED entity stop='10 Downing Street' entity='Boris Johnson' reason='It does not specify Boris Johnson's role or actions at 10 Downing Street.' in: "The building is an architectural amalgamation, with its iconic black door that has witnessed the com"
+
+  [LOCAL-263] PHASE 5.156: Unsupported-claim gate...
+  [LOCAL-263] Unsupported-claim gate summary:
+    Sentences removed: 0
+    Sentences kept (substantiated): 0
+    By type: PROMISE=0, SENSORY=0, FEELING=0, QUALITY=0
+    Escalation calls: 0
+    Stops affected: 0
+    Deletion rate: 0.0% (0/46)
+
+  [LOCAL-269] PHASE 5.157: Unglossed-reference gate...
+    [LOCAL-634] 1 provenance-sentence reference(s) degraded rather than namesake-glossed: ['Originally']
+  [LOCAL-269] Unglossed-reference gate summary (LOCAL-287: compose, not splice):
+    References detected: 19
+    Glossed (composed): 3
+    Suppressed (already explained): 3
+    Degraded (name dropped): 7
+    Guard failures: 0
+    Known (skipped): 6
+    Triage: 2492 tokens, $0.0006, 6.1s
+    Gloss: 1410 tokens, $0.0003, 4.8s
+    Compose: 1769 tokens, $0.0003, 2.4s
+    Total added cost: $0.0012
+    Stops affected: 5
+    Glosses applied:
+      • British → DEGRADED (name dropped)
+      • English → DEGRADED (name dropped)
+      • High Altar → "the most important altar in a church" [source: model]
+      • Edward → SUPPRESSED (already explained)
+      • Commons → DEGRADED (name dropped)
+      • House of Commons → SUPPRESSED (already explained)
+      • Admiral Lord Horatio Nelson → SUPPRESSED (already explained)
+      • Nelson → "the monument honoring a naval hero" [source: model]
+      • Sir Edwin Landseer → "the artist known for animal depictions" [source: model]
+      • Armistice Day → DEGRADED (name dropped)
+      • British Empire → DEGRADED (name dropped)
+      • Originally → DEGRADED (name dropped)
+      • British → DEGRADED (name dropped)
+
+  [LOCAL-402] Temporal coherence gate SKIPPED (non-museum tour)
+
+  [LOCAL-229] PHASE 5.16: CONTRADICTED claim block (D100 enforcement)...
+  [LOCAL-229] CONTRADICTED block summary: 0 group(s) blocked, 0 stop(s) affected
+
+PHASE 5.5a: Post-description knowledge validation (all tour types)...
+OK Post-description validation passed: Knowledge validation passed
+
+PHASE 5.6: skipped — the pre-writing scope check already ran (LOCAL-576; a second pass after writing can only remove a stop too late to replace).
+OK PHASE 5.7: Dangling-reference scrub complete (5 stops)
+  [LOCAL-627] PHASE 5.7a: Truncated-snippet safety check — 3 stop(s) cleaned
+
+  [LOCAL-318] PHASE 5.7b: Dangling-demonstrative scrub...
+  [LOCAL-318] Dangling-demonstrative scrub summary:
+    Detected: 6
+    Repaired (name substituted): 0
+    Deleted (unrepairable): 6
+    Stops affected: 4
+    [1] DELETED: 'This sacred space' in: This sacred space has witnessed the coronations of 40 English and British monarc
+    [1] DELETED: 'This unusual' in: This unusual interment reflects a layer of humanity and humility in the celebrat
+    [2] DELETED: 'This incident' in: This incident serves as a reminder of the vulnerabilities present in public spac
+    [3] DELETED: 'This redevelopment' in: This redevelopment introduced modern facilities, such as a café and improved acc
+    [3] DELETED: 'This demonstration' in: This demonstration echoed the square’s long-standing role as a public forum wher
+    [4] DELETED: 'This act' in: This act, inspired by Reverend David Railton, who had seen a grave marked "An Un
+OK PHASE 5.7b: Dangling-demonstrative scrub complete
+
+PHASE 5.9: Audio-native cleanup (LOCAL-41)...
+  [LOCAL-41] Stripped 0 trailing question(s), removed 0 'broader context' instance(s)
+
+  [LOCAL-477] stripped markdown from 1 prose field(s) — these are spoken aloud
+
+  [D498] step 7c: most valuable stop is 3 'Trafalgar Square' (index 52) — allowance 5 -> 7 sentences on regeneration, story currently 0 sentence(s) — no story pass result, cannot judge
+
+  [LOCAL-487] step 7a: 4 stop(s) have NO VALID STORY by Michael's bar (3+ consecutive sentences, one person, an action and something at stake)
+    stop 1 'Westminster Abbey': the longest run (3 sentences, Edward) has agency=1 stakes=0 — someone is described, but nothing is risked, ref
+    stop 2 'Westminster Bridge': longest qualifying run is 2 sentence(s); the bar is 3 consecutive sentences about one subject, carrying an act
+    stop 4 'The Cenotaph': longest qualifying run is 2 sentence(s); the bar is 3 consecutive sentences about one subject, carrying an act
+    stop 5 '10 Downing Street': longest qualifying run is 1 sentence(s); the bar is 3 consecutive sentences about one subject, carrying an act
+    [LOCAL-487] cap=1: retrying only the weakest — stop 4 'The Cenotaph' (index 38)
+  [D534] Stop 3 repeats 1 thing(s) said earlier — will regenerate with them banned
+      already told: Edward founded the original abbey in the 1040s, laying the foundation for this architectural marvel,
+
+  [LOCAL-474] PHASE 5.17: retry 'Westminster Abbey' — 272w → 148w after gates, 11 sentence(s) removed
+    removed: "This sacred space has witnessed the coronations of 40 English and British monarchs, beginning with W"
+    removed: "The echoes of these ceremonies still resonate, each one a pivotal moment shaping the course of Briti"
+    removed: "Venture to the Poet’s Corner, where the stories of literary giants intertwine with the silence of th"
+    removed: "Here lies Ben Jonson, the renowned playwright and contemporary of Shakespeare, albeit in an unusual "
+    removed: "In 1637, impoverished and facing financial difficulties, Jonson was buried upright in a small grave "
+    removed: "This peculiar interment was likely due to the costs associated with a traditional burial plot, addin"
+    removed: "Just a short distance away lies the shrine of Edward the Confessor, an Anglo-Saxon king whose pious "
+    removed: "His bones, interred behind the High Altar, are a silent witness to nearly a millennium of British hi"
+    removed: "Edward's legacy extends beyond his reign; his founding of the original abbey in the 1040s laid the f"
+    removed: "Westminster Abbey stands as a living chronicle of British life and death, its stones imbued with sto"
+    removed: "As you step outside, the heart of political power awaits just ahead, offering another chapter in the"
+    [LOCAL-491] step 7b: no unused fact left on the matrix — retrying without a rotation
+
+  [LOCAL-474] PHASE 5.17: retry 'Westminster Bridge' — 290w → 164w after gates, 8 sentence(s) removed
+    removed: "Westminster Bridge, with its verdant hue mirroring the House of Commons' leather seats, provides mor"
+    removed: "It is a conduit between the storied architecture of Westminster and the modern allure of the London "
+    removed: "On March 22, 2017, Khalid Masood drove a car into pedestrians on this very bridge, claiming the live"
+    removed: "This incident is etched into the fabric of the bridge, a poignant reminder of vulnerability amid the"
+    removed: "Another episode unfolded here in October 2020, when the bridge was closed for 16 hours due to a high"
+    removed: "The tension of that day added yet another layer to the bridge's complex narrative, highlighting the "
+    removed: "In the context of your Westminster walking tour, the bridge serves as a physical and metaphorical li"
+    removed: "As you cross, consider the currents of history and modernity that swirl beneath Westminster Bridge, "
+    [LOCAL-491] step 7b: no unused fact left on the matrix — retrying without a rotation
+
+  [LOCAL-474] PHASE 5.17: retry 'Trafalgar Square' — 274w → 196w after gates, 6 sentence(s) removed
+    removed: "Beneath the column, the sculpted bronze lions, added in 1868 by Sir Edwin Landseer, serve as guardia"
+    removed: "This redevelopment introduced modern facilities, such as a café and improved access, blending the sq"
+    removed: "This demonstration echoed the square’s long-standing role as a public forum where voices resonate ag"
+    removed: "Here, the spirit of free expression thrives, reflecting the dynamic pulse of London’s community."
+    removed: "As you absorb the vibrant energy of Trafalgar Square, consider its role as both a historical landmar"
+    removed: "This is more than a site of remembrance; it is a place where London's past and present converge, sha"
+    [LOCAL-491] step 7b: no unused fact left on the matrix — retrying without a rotation
+
+  [LOCAL-474] PHASE 5.17: retry 'The Cenotaph' — 303w → 140w after gates, 7 sentence(s) removed
+    removed: "Created by the renowned architect Sir Edwin Lutyens, this war memorial was unveiled on Armistice Day"
+    removed: "Initially, this memorial was but a temporary structure of wood and plaster, erected in 1919 for the "
+    removed: "The story of the Unknown Warrior adds another layer of solemnity."
+    removed: "In November 1920, four unknown soldiers were brought from various battlefields to St Pol, France."
+    removed: "It was Brigadier General L Wyatt who made the poignant selection of one to be interred in Westminste"
+    removed: "This act, inspired by Reverend David Railton, who had seen a grave marked "An Unknown British Soldie"
+    removed: "As you stand here, the weight of history is palpable, echoing through the very stones, connecting yo"
+    [LOCAL-491] step 7b: no unused fact left on the matrix — retrying without a rotation
+
+  [LOCAL-474] PHASE 5.17: retry '10 Downing Street' — 290w → 225w after gates, 4 sentence(s) removed
+    removed: "Standing here at 10 Downing Street, you are at the official residence and office of the British Prim"
+    removed: "Originally constructed in the late 17th century by Sir George Downing, after whom the street is name"
+    removed: "The building is an architectural amalgamation, with its iconic black door that has witnessed the com"
+    removed: "10 Downing Street stands as a symbol of governance and history, a place where the echoes of past lea"
+    [LOCAL-491] step 7b: no unused fact left on the matrix — retrying without a rotation
+
+  [LOCAL-526] PHASE 5.17: regenerating 5 eligible stop(s) concurrently (max_workers=5)
+
+Generating description for Stop 1: Westminster Abbey by , ...
+
+Generating description for Stop 2: Westminster Bridge by , ...
+
+Generating description for Stop 3: Trafalgar Square by , ...
+  [LOCAL-381] stop='Westminster Abbey' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-411] Stop 1 snippet ranking: input=5 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=5 output=5 usable=5 (t1t2=0, t3=0, market=0)
+
+Generating description for Stop 4: The Cenotaph by , ...
+Generating description for Stop 5: 10 Downing Street by , ...
+    Top scores: [('Westminster Abbey', 13, ''), ('Westminster Abbey', 8, ''), ('Westminster Abbey', 6, '')]
+  [LOCAL-402] Stop 1: injected 5 snippets as reference material
+  [LOCAL-411] Stop 1 prompt size: before_snippets=14494 after=20900 (+6406 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (20900)
+  [LOCAL-381] stop='Westminster Bridge' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-411] Stop 2 snippet ranking: input=3 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=5 output=3 usable=3 (t1t2=0, t3=0, market=0)
+    Top scores: [('Westminster Bridge', 8, ''), ('Westminster Bridge', 8, ''), ('Westminster Bridge', 8, '')]
+
+  [LOCAL-381] stop='10 Downing Street' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-381] stop='Trafalgar Square' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-411] Stop 3 snippet ranking: input=5 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=5 output=5 usable=5 (t1t2=0, t3=0, market=0)  [LOCAL-402] Stop 2: injected 3 snippets as reference material
+  [LOCAL-411] Stop 2 prompt size: before_snippets=14803 after=21098 (+6295 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (21098)
+
+    Top scores: [('Trafalgar Square', 9, ''), ('Trafalgar Square', 8, ''), ('Trafalgar Square', 8, '')]
+[LOCAL-802] off-topic passage dropped Trafalgar Square The four giant bronze lions at
+[LOCAL-802] off-topic passage dropped Trafalgar Square George IV moved the King’s Mews  [LOCAL-381] stop='The Cenotaph' matched_work=False medium='' work_identity_chars=0
+
+  [LOCAL-411] Stop 4 snippet ranking: input=4 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=5 output=4 usable=4 (t1t2=0, t3=0, market=0)  [LOCAL-802] Stop 3: dropped 2 off-topic passage(s); 3 on-topic remain
+  [LOCAL-402] Stop 3: injected 3 snippets as reference material
+  [LOCAL-411] Stop 3 prompt size: before_snippets=15006 after=21256 (+6250 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (21256)
+
+    Top scores: [('The Cenotaph', 10, ''), ('The Cenotaph', 7, ''), ('The Cenotaph', 7, '')]
+[LOCAL-802] off-topic passage dropped The Cenotaph The idea of commemorating the unknown
+  [LOCAL-802] Stop 4: dropped 1 off-topic passage(s); 3 on-topic remain
+  [LOCAL-402] Stop 4: injected 3 snippets as reference material
+  [LOCAL-411] Stop 4 prompt size: before_snippets=15091 after=21383 (+6292 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (21383)
+  [LOCAL-408] Prompt dump written to: /app/prompt_dump_stop1.txt
+Stop 3 API call cost: $0.0284 (5986 tokens, model=gpt-4o)
+  [LOCAL-569] Stop 3 attempt 1/5 story_count=1 words=311
+Stop 3 description word count: 311 words
+  [LOCAL-407] Stop 3: snippets injected but no candidate specifics extracted
+  [LOCAL-414] Stop 3: SCRUBBED banned phrases from output: ['a testament to', 'stands as a testament']
+Stop 5 API call cost: $0.0138 (2909 tokens, model=gpt-4o)
+  [LOCAL-569] Stop 5 attempt 1/5 story_count=0 words=262
+Stop 5 description word count: 262 words
+  [LOCAL-414] Stop 5: SCRUBBED banned phrases from output: ['a testament to']
+Stop 1 API call cost: $0.0279 (5879 tokens, model=gpt-4o)
+  [LOCAL-569] Stop 1 attempt 1/5 story_count=1 words=327
+Stop 1 description word count: 327 words
+  [LOCAL-407] Stop 1: snippets injected but no candidate specifics extracted
+  [LOCAL-414] Stop 1: SCRUBBED banned phrases from output: ['a testament to']
+Stop 2 API call cost: $0.0274 (5757 tokens, model=gpt-4o)
+  [LOCAL-569] Stop 2 attempt 1/5 story_count=1 words=273
+Stop 2 description word count: 273 words
+  [LOCAL-407] Stop 2: snippets injected but no candidate specifics extracted
+Stop 4 API call cost: $0.0282 (5940 tokens, model=gpt-4o)
+  [LOCAL-569] Stop 4 attempt 1/5 story_count=3 words=275
+Stop 4 description word count: 275 words
+  [LOCAL-407] Stop 4: snippets injected but no candidate specifics extracted
+  [LOCAL-526] PHASE 5.17 regeneration wall: 5.2s for 5 stop(s) at max_workers=5
+    [LOCAL-474] regenerated and re-gated: 299w (was 148w)
+    [LOCAL-474] regenerated and re-gated: 273w (was 164w)
+    [LOCAL-474] regenerated and re-gated: 287w (was 196w)
+    [LOCAL-487] retry judged on the story bar, not on length: cleared=False
+    [LOCAL-474] retry not better after re-gating — keeping the original gated text
+    [LOCAL-474] regenerated and re-gated: 247w (was 225w)
+  [D534] no repeated sentences left after the retries
+
+  [LOCAL-474] retry summary: 5 eligible, 5 retried, 4 improved, 1 kept original
+  [LOCAL-487] triggers: 0 hollowed by gates, 1 storyless (step 7a — Michael's bar, independent of length), 0 top-value (step 7c — larger allowance), 1 repeating an earlier stop (D534), 5 thin enough for another story (D534, floor=300w). Triggers overlap and are counted separately; they do not sum to 'eligible'.
+  [LOCAL-474] each regenerated stop was re-gated before being accepted; a retry can only replace text it beats after gating.
+
+PHASE 5.10: Anti-preaching cleanup (LOCAL-44)...
+  [LOCAL-44] Stripped 0 preaching closer(s)
+
+  [LOCAL-444] Obligation audit DISABLED by L444_OBLIGATION_AUDIT=false
+[TIMING-SUB] phase=story_first step=serp_search elapsed=0.95s
+  [LOCAL-427] HTTP 200 from https://www.youtube.com/watch?v=D51iYPWyi9A (attempt 1)
+  [LOCAL-427] HTTP 200 from https://www.walks.com/our-walks/old-westminster-walking-tour/ (attempt 1)
+  [LOCAL-459] R5: Fetched 2559 chars from https://www.walks.com/our-walks/old-westminster-wa
+  [LOCAL-427] HTTP 200 from https://walklondon.com/london-walks/westminster-walk-london.htm (attempt 1)
+  [LOCAL-459] R5: Fetched 1984 chars from https://walklondon.com/london-walks/westminster-wa
+  [LOCAL-427] HTTP 200 from https://thesuitelifeoftravel.com/walking-the-footsteps-of-rick-steves-in-london-england/ (attempt 1)
+  [LOCAL-459] R5: Fetched 1790 chars from https://thesuitelifeoftravel.com/walking-the-foots
+  [LOCAL-427] HTTP 200 from https://open.spotify.com/episode/0yWMZyK1D3KTKlZVgHzLYn (attempt 1)
+  [LOCAL-459] R5: Fetched 3003 chars from https://open.spotify.com/episode/0yWMZyK1D3KTKlZVg
+  [LOCAL-427] HTTP 200 from https://open-city.org.uk/events/westminster-51 (attempt 1)
+  [LOCAL-459] R5: Fetched 3003 chars from https://open-city.org.uk/events/westminster-51
+  [LOCAL-427] HTTP 200 from https://citywonders.com/london-tours/westminster-abbey-changing-of-the-guard-private-tour (attempt 1)
+  [LOCAL-459] R5: Fetched 1687 chars from https://citywonders.com/london-tours/westminster-a
+  [D512] verb discovery: query='Westminster walking tour, London construction process how it was' -> 6 new verb(s): guided, parade, visited, moved, extended, curated
+  [D512] _AGENCY_VERB widened by 6 discovered verb(s)
+
+  [LOCAL-485] PHASE 5.21: Story valuation index (report only, never gates)...
+     #  stop                                      idx  hist  detl   soc
+     1  Westminster Abbey                          40    48     0    69
+     2  Westminster Bridge                         45    48    26    65
+     3  Trafalgar Square                           38    35    27    69
+     4  The Cenotaph                               38    27     0    38
+     5  10 Downing Street                          35    28     0    77
+    [LOCAL-485] index mean 39.2 over 5 stop(s), range 35-45
+    [LOCAL-485] weakest: '10 Downing Street' at 35
+
+  [LOCAL-591] COORDINATE SWEEP: 1 delivered stop(s) have no coordinates (added after the geocoding phase) — geocoding before packing: ['10 Downing Street']
+   [LOCAL-591] coord sweep OK '10 Downing Street': 51.5034, -0.1270
+  [LOCAL-591] COORDINATE SWEEP complete: 1 geocoded, 0 still without a marker.
+[LOCAL-197] llm_cost() called with total_tokens (deprecated) by /app/generate_tour_text.py:26739. Caller should supply input_tokens and output_tokens separately.
+  [LOCAL-791C] pin snap: scope='Westminster' center=(51.5004439, -0.1265398) bbox=['51.4904439', '51.5104439', '-0.1365398', '-0.1165398'] venue_fallback=None threshold=150m target=100m
+[LOCAL-791C] pin ok Westminster Abbey 25m within threshold
+[LOCAL-791C] pin snap Westminster Bridge 170m → 51.500833,-0.121944 (wikidata_p625)
+[LOCAL-791C] pin ok Trafalgar Square 95m within threshold
+[LOCAL-791C] pin snap The Cenotaph 240m → 51.502694,-0.126083 (wikidata_p625)
+[LOCAL-791C] pin ok 10 Downing Street 54m within threshold
+  [LOCAL-791C] pin snap complete — 2 snapped, 0 left unsnapped (no in-scope reference), 5 total stop(s)
+[TIMING] phase=story_first elapsed=110.7s cumulative=333.2s
+
+PHASE 6: Assembling the complete tour...
+[TIMING-SUB] phase=packing step=packing_prolog_llm elapsed=1.32s
+  [R2] Prolog saved for Stop 1 (88 words)
+
+  [LOCAL-244] PHASE 5.9: Prolog gating (R9, R10, subject routine)...
+  [LOCAL-244] Prolog before gates: 88 words
+  [LOCAL-244] Prolog R9: 0 deletions
+  [LOCAL-286] Prolog R7: 1 sentence(s) deleted
+  [LOCAL-244] Prolog R10: 0 deletions
+  [LOCAL-244] Prolog subject: 0 expanded, 0 deleted, cost=$0.0000
+  [LOCAL-244] Prolog after gates: 58 words (delta: -30)
+  [LOCAL-244] Prolog deletions (1):
+    [R7_HALLUCINATED_SENSORY] "Amidst its imposing edifices, the echoes of pivotal moments resonate with the whispers of forgotten ..."
+
+  [LOCAL-246] PHASE 5.95: Orientation gating (R9, R10)...
+    Stop 2 orientation R7: 2 sentence(s) deleted
+    Stop 5 orientation R7: 1 sentence(s) deleted
+  [LOCAL-246] Orientation gating summary:
+    Words before: 279
+    Words after:  228
+    Delta: -51
+    Stops affected: 2/5
+    Deletions (3):
+      [Stop 2][R7_HALLUCINATED_SENSORY] "Listen to the rhythmic hum of traffic and the distant chime of Big Ben's clock tower."
+      [Stop 2][R7_HALLUCINATED_SENSORY] "Stand at the midpoint of Westminster Bridge, where the River Thames flows beneath your feet."
+      [Stop 5][R7_HALLUCINATED_SENSORY] "The sound of footsteps on the cobblestones and the hum of city life create a backdrop for this histo..."
+
+  [LOCAL-270] PHASE 5.96: Composing Part 4 (forward connection) from delivered narrations...
+    Stops with delivered content: 5/5
+[TIMING-SUB] phase=packing step=packing_rank_facts_llm elapsed=2.90s
+    [LOCAL-276] Intrigue ranking completed: 2.9s, $0.0113, 1632 tokens
+    [LOCAL-276] Ranked 5 stops:
+      [Westminster Abbey] (dated_event): Picture the scene in 1066, when William, having triumphed at the Battle of Hasti...
+      [Westminster Bridge] (dated_event): On March 22, 2017, this bridge was the site of a tragic attack....
+      [Trafalgar Square] (dated_event): Nelson's Column, erected between 1840 and 1843, marks the square's dedication to...
+      [The Cenotaph] (mystery): Its name, derived from the Greek for 'empty tomb,' suggests a resting place for ...
+      [10 Downing Street] (cause): During World War II, Winston Churchill, the wartime Prime Minister, used the und...
+    [LOCAL-276] 5 intriguing / 0 excluded (celebrity_trivia)
+    [LOCAL-276] Using ranked facts for composition (5 stops)
+[TIMING-SUB] phase=packing step=packing_part4_preview_llm elapsed=0.82s
+    Part 4 LLM cost: $0.0034 (602 tokens) [attempt 1]
+    ✓ Part 4 composed and verified (27 words):
+      "You will witness the coronation of William in 1066 at Westminster Abbey and learn about the tragic attack that occurred on March 22, 2017, at Westminster Bridge."
+      Stops referenced: 2
+    Part 4 total cost: $0.0034
+  [LOCAL-618 #1] Orientation pre-tell guard: dropped 3 sentence(s) carrying later-stop facts
+  [LOCAL-627 #7] Orientation phantom-name guard: no phantom names
+
+  [LOCAL-286] PHASE 5.97: Prolog-body deduplication (≥8 word overlap)...
+  [LOCAL-286] Deduplication: 0 sentence(s) removed from stop bodies
+
+  [LOCAL-292] Empty stop removal gate: PASSED (all 5 stops have narration)
+  [LOCAL-394] Stop count invariant: OK (5 selected == 5 delivered)
+  [D536] Listener asked for 5 stop(s), delivering 5 — request met
+  DEBUG - POI 1 content includes:
+    Specific Examples: True
+    Operational Details: True
+    Walking Directions: True
+[LOCAL-197] llm_cost() called with total_tokens (deprecated) by /app/generate_tour_text.py:28609. Caller should supply input_tokens and output_tokens separately.
+  [T4] Transition to Stop 2: From Westminster Abbey, stroll down College Green and take i...
+  DEBUG - POI 2 content includes:
+    Specific Examples: True
+    Operational Details: True
+    Walking Directions: True
+  [T4] Transition to Stop 3: Start by walking off Westminster Bridge and head towards the...
+  DEBUG - POI 3 content includes:
+    Specific Examples: True
+    Operational Details: True
+    Walking Directions: True
+  [T4] Transition to Stop 4: From Trafalgar Square, stroll down Whitehall, taking in the ...
+  DEBUG - POI 4 content includes:
+    Specific Examples: True
+    Operational Details: True
+    Walking Directions: True
+  [T4] Transition to Stop 5: From The Cenotaph, stroll along Whitehall, taking in the imp...
+  DEBUG - POI 5 content includes:
+    Specific Examples: False
+    Operational Details: False
+    Walking Directions: False
+  [LOCAL-280] Recap: D177 FAILED for 'The Cenotaph': fact not in delivered text
+    Fact: "Its name, derived from the Greek for 'empty tomb,' suggests a resting place for ..."
+  [LOCAL-280] Recap composition: 0.6s, $0.0025, 434 tokens
+  [LOCAL-280] Recap built: 29 words, 2 composed clauses (1 D177 rejected, 0 navigation rejected)
+    [10 Downing Street] (cause): "During World War II, Winston Churchill, the wartime Prime Minister, used the und..."
+      → composed: "10 Downing Street, where Winston Churchill held meetings during World War II"
+    [Westminster Abbey] (dated_event): "Picture the scene in 1066, when William, having triumphed at the Battle of Hasti..."
+      → composed: "Westminster Abbey, the site of William's coronation in 1066"
+    D177 verified: all 2 source facts present in delivered text
+  [LOCAL-280] Recap added: "That's 5 stops and 2 kilometres — 10 Downing Street, where Winston Churchill held meetings during World War II and Westminster Abbey, the site of William's coronation in 1066."
+  [LOCAL-273] Part 1 error: relation "stop_corpus" does not exist
+LINE 2:                 SELECT stop_title FROM stop_corpus
+                                               ^
+
+  [LOCAL-275] Part 2 error: column "lat" does not exist
+LINE 2:             SELECT id, tour_name, lat, lng FROM audio_tours
+                                          ^
+
+  [LOCAL-275] Closing offer fallback (no verification passed)
+  [EPILOG] Journey epilog added to last stop
+  [S27] No cross-stop repetition detected
+  [D533] REPEATED FACT removed from stop 1 (twice in the same stop, 1066/beginning): Picture the scene in 1066, when William, having triumphed at the Battle of Hasti
+  [D533] 1 repeated fact(s) removed, 0 kept
+  [D533] Person-year role guard: no corpus available — check SKIPPED
+  [LOCAL-615] No duplicated paragraphs
+  [LOCAL-617] Conclusion de-dup: removed redundant 'This tour covered …' line (recap kept)
+
+  [LOCAL-36] Practical Facts Gate:
+    Claims found: 3
+    Verified: 0
+    Dropped: 3
+    AUDIT: hours | Open Monday to Saturday 9:30 AM - 3:30 PM, Sunday services only | (no source) | DROPPED — no source content
+    AUDIT: admission | tickets £24 for adults, discounts for students and seniors | (no source) | DROPPED — no source content
+    AUDIT: admission | free to visit | (no source) | DROPPED — no source content
+  [LOCAL-36] PRACTICAL FACTS GATE: 3 claim(s) dropped
+  [LOCAL-618 #2] grammar/splice lint: 8 flagged, 5 dropped, 0 rewritten ({'verbless': 8})
+  [LOCAL-618 #2] grammar/splice lint: 8 flagged, 5 dropped, 0 rewritten by_code={'verbless': 8}
+
+  [LOCAL-260] PROLOG STRUCTURE VALIDATION: 5 error(s), 0 warning(s)
+    [ERROR] Part 1: PART1_MISSING — Part 1 (Tour name and transportation mode) is not present.
+    [ERROR] Part 3: PART3_MISSING — Part 3 (Purpose / intrigue with sourced facts) is not present.
+    [ERROR] Part 4: PART4_MISSING — Part 4 (Forward connection to stops) is not present.
+    [ERROR] Part 2: PART2_INSUFFICIENT_SUBSTANCE — Part 2 has only 1 route indicator(s) (endpoints); need at least 2 of: endpoints, distance, terrain, duration.
+    [ERROR] Part 0: DUPLICATE_TOUR_DESCRIPTION — Tour contains 5 tour-level descriptions (must be exactly 1). Passages found:
+  [1] "The spirit of Westminster is woven from the threads of power and ceremony, where history's grand tap..."
+  [2] "From here, look to the east to see the modern silhouette of the London Eye, and to the west for the ..."
+  [3] "Westminster Bridge, painted in a verdant hue, acts as a lifeline between Westminster and Lambeth, em..."
+  [4] "As you stand here, take a moment to look around at the expansive Trafalgar Square, a vibrant conflue..."
+  [5] "As you approach 10 Downing Street from nearby Trafalgar Square, the spot you passed earlier, you'll ..."
+
+=== Word Count Statistics ===
+Stop 1: Westminster Abbey - 290 words
+Stop 2: Westminster Bridge - 290 words
+Stop 3: Trafalgar Square - 315 words
+Stop 4: The Cenotaph - 303 words
+Stop 5: 10 Downing Street - 310 words
+===========================
+
+  [LOCAL-540] scorer ran on assembled tour (11823 chars, 5/5 stops)
+  [LOCAL-540] no defects — tour is clean
+[LOCAL-628] stop 1: edited
+[LOCAL-628] stop 2: edited
+[LOCAL-628] stop 3: edited
+[LOCAL-628] stop 4: edited
+[LOCAL-628] stop 5: edited
+[LOCAL-628] editor pass complete: 5 edited, 0 kept original
+[TIMING-SUB] phase=packing step=packing_stop_editor_llm elapsed=10.28s
+[LOCAL-641] orientation mismatch: Stop 2 ('Westminster Bridge') Orientation names foreign stop work 'Westminster Abbey' and not its own; leaving text unchanged (root cause fixed in _overall_from_new).
+[TIMING-SUB] phase=packing step=packing_conclusion_llm elapsed=1.50s
+  [LOCAL-619B] thematic conclusion built from final text: 5 delivered stop(s), venue='Westminster walking tour'
+
+Total API cost: $0.2386 (38114 tokens)
+Grounding:      $0.0000 (0 queries, 0 requests)
+Tour total:     $0.2386
+Provenance:     5/46 factual sentences sourced, 41 unsourced (5 corpus, 0 grounded, 41 parametric)
+CACHE STORE: Westminster walking tour, London / walking / 5
+  [venue_resolver] Name variants: ['Westminster walking tour']
+  [venue_resolver] No Wikidata candidates for 'Westminster walking tour, London'
+[TIMING-SUB] phase=packing step=resolve_venue elapsed=1.53s
+  [LOCAL-590] POOL STORE: 5 stop(s) pooled for Westminster walking tour, London / walking (research $0.0498/stop)
+  [LOCAL-630 item 7] stripped editor marker from delivered tour_content (kept in cache/pool for idempotence)
+
+Tour text generated successfully!
+  [LOCAL-230] Network failures: 0 (all API calls succeeded)
+Saved to: Westminster_walking_tour__London_walking_tour_20261030_013138.txt
+  [C5-5] Evidence persisted: Westminster_walking_tour__London_walking_tour_20261030_013138_evidence.json
+
+Preview of the generated tour:
+
+Step-by-Step Audio Guided Tour: Westminster walking tour, London
+Tour-Category: walking
+
+Stop 1: Westminster Abbey
+
+Address: 20 Deans Yard, Westminster, London SW1P 3PA, UK
+
+Coordinates: 51.4994, -0.1270
+
+Type/Specialty: Historical church and UNESCO World Heritage Site
+
+Specific Examples: Royal tombs, Poets' Corner, stunning Gothic architecture
+
+Orientation: The spirit of Westminster is woven from the threads of power and ceremony, where history's grand tapestries hang alongside the stories of t...
+
+[TIMING] phase=packing elapsed=25.0s cumulative=358.2s
+[TIMING] phase=verification elapsed=0.0s cumulative=358.2s
+[TIMING] TOTAL wall=358.2s phases: poi_selection=196.0s, story_first=110.7s, packing=25.0s, fact_sheets=23.6s, intent=1.5s, narration=1.3s, external_lookups=0.0s, verification=0.0s
+  [LOCAL-634] dropped 1 callback(s) to an artist/work not delivered in this tour
+  [LOCAL-627 #2] hours not spoken, but preflight did not confirm they are unpublished — saying nothing (not a false claim)
+  [LOCAL-650B] theme-stop detector: clean (no theme/topic stops in delivered text)
+  [LOCAL-650 fix2] walking directions: corrected 0 wrong-target line(s), added 4 approximate distance(s) — each hand-off now names the correct next stop
+  [LOCAL-743] stop count agrees: 5 rendered header(s) == 5 splitter block(s)
+[LOCAL-641] orientation mismatch: Stop 2 ('Westminster Bridge') Orientation names foreign stop work 'Westminster Abbey' and not its own; leaving text unchanged (root cause fixed in _overall_from_new).
+  [LOCAL-619B] thematic conclusion already present and count OK (5 stop(s)); preserved (every-path guard)
+  --- STOPS ---
+  STOP 1: Westminster Abbey
+  STOP 2: Westminster Bridge
+  STOP 3: Trafalgar Square
+  STOP 4: The Cenotaph
+  STOP 5: 10 Downing Street
+  shortfall-apology present: False
+  stored is_test row id=1; delivered 5/5 stop(s) in 358s
+[COST_METER] FRESH | tour_generate | $0.248960 | user=TEST-LOCAL-818 | job=None
+
+[LOCAL-818] cost ledger row: 150c2a9b-c1ab-4d38-8a8a-8f0a084bdbfe
+[LIVE_RUN_METER] TEST-LOCAL-818  (cap $0.70, all providers combined)
+  openai            $0.2430
+  gemini_grounding  $0.0000  (requests=0, queries=0)
+  gemini_tokens     $0.0000
+  serper            $0.0060
+  preflight         $0.0000
+  TOTAL             $0.2490   description='test run'
+
+audio_tours rows AFTER: 1  (delta=?)
+=== LOCAL-818 SUMMARY ===
+  [westminster-LONDON] 5/5 stops cat=walking  -> PASS

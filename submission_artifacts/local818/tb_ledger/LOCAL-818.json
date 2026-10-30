@@ -1,0 +1,16 @@
+{
+  "budget_usd": 0.7,
+  "runs": [
+    {
+      "note": "westminster-LONDON 5/5 (isolated container run 1)",
+      "ts": "2026-10-30T01:31:59Z",
+      "usd": 0.249
+    },
+    {
+      "note": "TEST-LOCAL-818",
+      "ts": "2026-10-30T01:39:16Z",
+      "usd": 0.250407
+    }
+  ],
+  "task_id": "LOCAL-818"
+}
