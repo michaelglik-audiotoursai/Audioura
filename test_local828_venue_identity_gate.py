@@ -198,23 +198,45 @@ class BelvedereSameInstitution(unittest.TestCase):
         self.assertEqual(reason, "subject")
 
 
-# ─── 5. city contradiction ────────────────────────────────────────────────────
+# ─── 5. city is NOT a standalone drop reason (828B precision) ─────────────────
+#
+# LOCAL-828B BOUNCE: the 828(A) standalone city rule dropped any passage with an
+# "in <City>" phrase whose city was not the venue's — gutting the art history on
+# every museum tour (a Van Gogh painted in Arles, a Rembrandt from Leiden,
+# Washington crossing at Trenton). There is NO standalone city reason now. A city
+# is only ever a property of an OTHER venue already named as the subject.
 
-class CityContradiction(unittest.TestCase):
-    def test_other_city_without_our_city_contradicts(self):
-        # A passage that names only another city (no institution head word the
-        # subject detector catches, no venue name) is dropped on city grounds.
+class CityIsNotAStandaloneDrop(unittest.TestCase):
+    def test_work_made_in_another_city_kept(self):
+        # A work made in another city is KEPT — the subject is the work, not a venue.
+        txt = ("Starry Night Over the Rhone was painted by Van Gogh in Arles in "
+               "1888.")
+        is_other, reason, _ = vig.passage_is_other_venue(txt, RIJKS)
+        self.assertFalse(is_other, f"work-history must be kept, got {reason}")
+
+    def test_rembrandt_from_leiden_kept(self):
+        txt = "Rembrandt was born in Leiden in 1606 and later worked in Amsterdam."
+        is_other, reason, _ = vig.passage_is_other_venue(txt, RIJKS)
+        self.assertFalse(is_other, f"artist-history must be kept, got {reason}")
+
+    def test_bare_other_city_phrase_kept(self):
+        # A bare "in <City>" with no named other venue is KEPT (no subject venue).
         txt = ("The collection was assembled in Utrecht over several centuries by "
                "local benefactors.")
-        self.assertTrue(vig.passage_city_contradicts(txt, RIJKS))
+        is_other, reason, _ = vig.passage_is_other_venue(txt, RIJKS)
+        self.assertFalse(is_other, f"bare city must be kept, got {reason}")
 
-    def test_our_city_present_not_contradiction(self):
-        txt = "The works were gathered in Amsterdam from private collections."
-        self.assertFalse(vig.passage_city_contradicts(txt, RIJKS))
+    def test_other_venue_with_its_city_dropped(self):
+        # A city attached to a NAMED other venue IS dropped — via subject.
+        txt = ("Museum Catharijneconvent in Utrecht is the national museum of "
+               "Christian art and heritage in the Netherlands.")
+        is_other, reason, _ = vig.passage_is_other_venue(txt, RIJKS)
+        self.assertTrue(is_other)
+        self.assertEqual(reason, "subject")
 
-    def test_no_city_cue_not_contradiction(self):
-        txt = "Rembrandt painted with dramatic light and shadow."
-        self.assertFalse(vig.passage_city_contradicts(txt, RIJKS))
+    def test_city_contradicts_helper_removed(self):
+        # The standalone city rule is gone — the helper no longer exists.
+        self.assertFalse(hasattr(vig, "passage_city_contradicts"))
 
 
 # ─── 6. research-result (supports) scrub shape ────────────────────────────────
