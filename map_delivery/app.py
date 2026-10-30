@@ -58,6 +58,25 @@ except Exception:
     except Exception:
         _failure_log = None
 
+# [LOCAL-793 / LOCAL-824] The metered Serper door for the server-side /geocode
+# fallback. serper_meter.serper_post() makes the request AND writes exactly one
+# paid_api_calls row (it finds the meter via /opt/meter on PYTHONPATH in
+# containers). The module lives at the repo root; it is COPY'd into this image by
+# the Dockerfile (see map_delivery/Dockerfile) and reached via the repo-root
+# sys.path fallback in host/test runs — the same belt-and-suspenders pattern as
+# safe_headers and failure_log above. A missing module leaves serper_post None so
+# /geocode simply falls back to Nominatim (fail-open, never 500s on import).
+try:
+    from serper_meter import serper_post as _serper_post
+except Exception:
+    try:
+        _sys_parent = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        if _sys_parent not in sys.path:
+            sys.path.insert(0, _sys_parent)
+        from serper_meter import serper_post as _serper_post
+    except Exception:  # pragma: no cover - container/host without the module
+        _serper_post = None
+
 
 def _record_failure(**kw):
     if _failure_log is None:
@@ -3626,6 +3645,205 @@ def how_we_score():
     return resp
 
 
+# ─── [LOCAL-793 / LOCAL-824] Server-side geocoder fallback for the Home search ─
+#
+# PARITY FIX (LOCAL-824): LOCAL-793 added /geocode to the root
+# map_delivery_service.py (the Mac dev monolith) but NOT to this file, which is
+# what Cloud Run's map-delivery image actually runs (build context
+# ./map_delivery, Dockerfile CMD python app.py) — so GET /geocode returned 404 on
+# the cloud. This is the same endpoint, same behaviour, ported here.
+#
+# The app's client geocoder asks Nominatim for several results and prefers a
+# PLACE over a POI (so "Saigon Vietnam" no longer opens a Paris restaurant).
+# When Nominatim returns NO place -- a typo like "Hi Chi Minh, Vietnam", or
+# only far POIs -- the app calls THIS endpoint, which resolves the free text
+# server-side where the paid key lives (never shipped in the app):
+#
+#   1. Serper Places (metered via serper_meter.serper_post, ~$0.001/query) when
+#      a key is configured. Serper's index is typo-tolerant, so "Hi Chi Minh"
+#      resolves to Ho Chi Minh City. We take the first result's coordinates.
+#   2. Nominatim fallback (free, stdlib urllib so no new image dependency) with a
+#      real User-Agent and a larger result set, preferring a place class, when
+#      Serper is not configured or finds nothing.
+#
+# CAP: at most ONE paid Serper query per lookup (num=5, first usable result).
+# CACHE: a small bounded in-process LRU (_GEOCODE_CACHE) keyed on the folded
+# query returns a previously resolved place WITHOUT a second paid call, so a
+# repeated lookup for the same place costs $0. The cache is per-process and
+# resets on restart (no stale global state), which is all the cap needs.
+#
+# Response: {"lat": .., "lng": .., "name": ".."} on success, or 404 when the
+# place cannot be resolved.
+import urllib.parse as _urlparse
+import urllib.request as _urlrequest
+from collections import OrderedDict as _OrderedDict
+
+_GEOCODE_CACHE = _OrderedDict()   # folded query -> {lat,lng,name}
+_GEOCODE_CACHE_MAX = 256
+
+
+def _geocode_cache_key(query):
+    return ' '.join((query or '').lower().split())
+
+
+@app.route('/geocode', methods=['GET'])
+def geocode_place():
+    query = (request.args.get('q') or request.args.get('query') or '').strip()
+    print(f"Geocoding place: '{query}'")
+    sys.stdout.flush()
+    if not query:
+        return jsonify({'error': 'missing q'}), 400
+
+    # 0. Cache: a repeat lookup for the same place never re-spends (cap-friendly).
+    _key = _geocode_cache_key(query)
+    _cached = _GEOCODE_CACHE.get(_key)
+    if _cached is not None:
+        _GEOCODE_CACHE.move_to_end(_key)
+        print(f"GEOCODE: cache hit '{query}' -> {_cached.get('name')}")
+        sys.stdout.flush()
+        return jsonify(_cached)
+
+    # 1. Serper Places (metered, typo-tolerant). Guarded + fail-open.
+    try:
+        result = _geocode_via_serper(query)
+        if result is not None:
+            _geocode_cache_put(_key, result)
+            return jsonify(result)
+    except Exception as e:
+        print(f"GEOCODE: serper path error: {e}")
+        sys.stdout.flush()
+
+    # 2. Nominatim fallback (free).
+    try:
+        result = _geocode_via_nominatim(query)
+        if result is not None:
+            _geocode_cache_put(_key, result)
+            return jsonify(result)
+    except Exception as e:
+        print(f"GEOCODE: nominatim path error: {e}")
+        sys.stdout.flush()
+
+    return jsonify({'error': 'not found', 'q': query}), 404
+
+
+def _geocode_cache_put(key, result):
+    try:
+        _GEOCODE_CACHE[key] = result
+        _GEOCODE_CACHE.move_to_end(key)
+        while len(_GEOCODE_CACHE) > _GEOCODE_CACHE_MAX:
+            _GEOCODE_CACHE.popitem(last=False)
+    except Exception:
+        pass
+
+
+def _geocode_via_serper(query):
+    """Resolve `query` to {lat,lng,name} via the metered Serper Places door, or
+    None when no key is configured / nothing is found. One metered query."""
+    if _serper_post is None:
+        return None
+    key = os.environ.get('SERP_API_KEY') or os.environ.get('SERPER_API_KEY')
+    if not key:
+        return None
+    status, body = _serper_post(
+        'https://google.serper.dev/places',
+        {'q': query, 'num': 5},
+        api_key=key,
+    )
+    if status != 200 or not body:
+        return None
+    try:
+        data = json.loads(body.decode('utf-8', 'ignore'))
+    except Exception:
+        return None
+    places = data.get('places') or []
+    for p in places:
+        lat = p.get('latitude')
+        lng = p.get('longitude')
+        if lat is None or lng is None:
+            continue
+        try:
+            lat = float(lat)
+            lng = float(lng)
+        except (TypeError, ValueError):
+            continue
+        name = p.get('address') or p.get('title') or query
+        print(f"GEOCODE: serper '{query}' -> {name} ({lat},{lng})")
+        sys.stdout.flush()
+        return {'lat': lat, 'lng': lng, 'name': name}
+    return None
+
+
+def _geocode_via_nominatim(query):
+    """Resolve `query` to {lat,lng,name} via Nominatim, preferring a PLACE class
+    over a POI. Server-side so a real User-Agent is used. None when nothing
+    usable comes back. Uses stdlib urllib (no new image dependency) — the root
+    monolith used requests, but the shape of the call is identical."""
+    url = (
+        'https://nominatim.openstreetmap.org/search'
+        '?q=' + _urlparse.quote(query) +
+        '&format=json&limit=8&accept-language=en'
+    )
+    req = _urlrequest.Request(
+        url,
+        headers={
+            'User-Agent': 'com.audioura.audiotours/1.0 (support@audioura.com)',
+            'Accept-Language': 'en',
+        },
+    )
+    try:
+        with _urlrequest.urlopen(req, timeout=12) as resp:
+            status = getattr(resp, 'status', 200) or 200
+            if status != 200:
+                return None
+            raw = resp.read()
+    except Exception:
+        return None
+    try:
+        rows = json.loads(raw.decode('utf-8', 'ignore'))
+    except Exception:
+        return None
+    if not isinstance(rows, list) or not rows:
+        return None
+    _place_types = {
+        'country', 'state', 'region', 'province', 'county', 'city', 'town',
+        'municipality', 'village', 'hamlet', 'suburb', 'neighbourhood',
+        'quarter', 'borough', 'district', 'locality',
+    }
+
+    def _is_place(r):
+        klass = str(r.get('class') or r.get('category') or '').lower()
+        typ = str(r.get('type') or '').lower()
+        if klass == 'place' and typ in _place_types:
+            return True
+        if klass == 'boundary' and typ == 'administrative':
+            return True
+        return typ == 'administrative'
+
+    def _importance(r):
+        try:
+            return float(r.get('importance') or 0.0)
+        except (TypeError, ValueError):
+            return 0.0
+
+    places = [r for r in rows if _is_place(r)]
+    pool = places if places else rows
+    # [LOCAL-824 LEAD] Keep Nominatim's own relevance order among PLACE rows: sorting places by
+    # 'importance' sent "Mui Ne" (ward Mũi Né, rank 1) to Meizhou, China (bigger, rank 2).
+    # Importance only breaks ties when no place row came back.
+    if not places:
+        pool = sorted(pool, key=_importance, reverse=True)
+    best = pool[0]
+    try:
+        lat = float(best['lat'])
+        lng = float(best['lon'])
+    except (KeyError, TypeError, ValueError):
+        return None
+    name = best.get('display_name') or query
+    print(f"GEOCODE: nominatim '{query}' -> {name} ({lat},{lng})")
+    sys.stdout.flush()
+    return {'lat': lat, 'lng': lng, 'name': name}
+
+
 if __name__ == '__main__':
     print("Starting Map Delivery Service...")
     print("Endpoints:")
@@ -3637,6 +3855,7 @@ if __name__ == '__main__':
     print("  GET /tour/<tour_id>/score-explanation - Why this score (public)")
     print("  POST /tour/<tour_id>/rescore-request - Guide's one free re-score after an edit")
     print("  GET /how-we-score - Public 'How Audioura scores tours' page")
+    print("  GET /geocode?q=<place> - Server-side place geocoder (Serper→Nominatim)")
     sys.stdout.flush()
     
     app.run(host='0.0.0.0', port=5005, debug=True)
