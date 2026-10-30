@@ -75,6 +75,18 @@ from cost_rates import (  # noqa: E402
     grounding_query_cost,
 )
 
+# [LOCAL-817] WHOLE-TASK budget ledger. The per-run cap above (TEST_GEMINI_MAX_USD)
+# never limited the SUM across a task's re-runs, so a debugged task overspent its
+# task-file "Paid-API cap $X TOTAL across all runs" every time. task_budget reads
+# TASK_BUDGET_ID/TASK_BUDGET_USD + a per-task JSON ledger and enforces the total:
+# refuse-to-start when spent_so_far + reserve > budget, abort mid-run at the
+# grounding counter, and record this run's spend on exit. Imported softly so a
+# harness without the module behaves exactly as before.
+try:
+    import task_budget  # noqa: E402
+except Exception:  # pragma: no cover - module always ships beside this one
+    task_budget = None
+
 DEFAULT_TEST_GEMINI_MAX_USD = 1.00
 TEST_RUN_DESCRIPTION = "test run"
 
@@ -142,11 +154,35 @@ class LiveRunMeter:
         the cap. Set False only in a unit test that drives the accumulators by hand.
     """
 
-    def __init__(self, task_id, cap_usd=None, job_id=None, install_cap=True):
+    def __init__(self, task_id, cap_usd=None, job_id=None, install_cap=True,
+                 task_budget_id=None, task_budget_usd=None, reserve_usd=None):
         self.task_id = task_id
         self.user_id = _normalise_task_id(task_id)
         self.cap_usd = resolve_cap_usd(cap_usd)
         self.job_id = job_id
+
+        # [LOCAL-817] WHOLE-TASK budget. Resolve the task id + total budget for the
+        # append-only ledger. An explicit arg wins; else the env (TASK_BUDGET_ID /
+        # TASK_BUDGET_USD). When the id or budget is absent the whole-task cap is
+        # OFF and only the per-run cap above applies — exactly the pre-817
+        # behaviour. ``reserve_usd`` is the headroom a run is assumed to need when
+        # it has spent nothing measurable yet, so a near-exhausted budget refuses
+        # the next run before it starts rather than only mid-run.
+        self._tb = task_budget
+        if task_budget is not None:
+            self.task_budget_id = (task_budget_id
+                                   if task_budget_id is not None
+                                   else task_budget.task_id_from_env())
+            self.task_budget_usd = (task_budget_usd
+                                    if task_budget_usd is not None
+                                    else task_budget.budget_usd_from_env())
+            self.reserve_usd = (float(reserve_usd) if reserve_usd is not None
+                                else task_budget.DEFAULT_RESERVE_USD)
+        else:
+            self.task_budget_id = None
+            self.task_budget_usd = None
+            self.reserve_usd = 0.0
+        self._run_recorded_to_task_ledger = False
 
         # Per-provider dollar accumulators (the LOCAL-609 breakdown).
         self.openai_usd = 0.0
@@ -163,8 +199,33 @@ class LiveRunMeter:
         self._recorded = False     # guards against a double ledger write
         self._installed = False
 
+        # [LOCAL-817] Refuse to START when the task's recorded total plus the
+        # reserve for THIS run already exceeds the whole-task budget. Done before
+        # the cap is installed so no grounded work happens on an over-budget task.
+        # Only when the cap is being installed (a real run); a hand-driven unit
+        # test (install_cap=False) skips the start check.
         if install_cap:
+            self._check_refuse_to_start()
             self.install_cap()
+
+    def _whole_task_cap_on(self):
+        """True when the whole-task budget is active (module present, id + budget
+        both resolved)."""
+        return bool(self._tb is not None
+                    and self.task_budget_id
+                    and self.task_budget_usd is not None)
+
+    def _check_refuse_to_start(self):
+        """[LOCAL-817] Raise task_budget.BudgetExceeded when
+        spent_so_far(task) + reserve > budget, i.e. there is not even a run's
+        reserve of headroom left. No-op when the whole-task cap is off."""
+        if not self._whole_task_cap_on():
+            return
+        self._tb.check_task_budget(
+            pending_usd=self.reserve_usd,
+            task_id=self.task_budget_id,
+            budget_usd=self.task_budget_usd,
+        )
 
     # ── cap enforcement ──────────────────────────────────────────────────────
     def combined_spend_usd(self):
@@ -199,6 +260,18 @@ class LiveRunMeter:
         before a grounded request is issued and right after a response's queries
         are counted."""
         spend = self.combined_spend_usd()
+        # [LOCAL-817] WHOLE-TASK budget abort, checked FIRST: if the task's already
+        # recorded total PLUS this run's spend so far would cross the whole-task
+        # budget, stop now — at the same grounding counter — before the next
+        # grounded query is issued. Raised as BudgetExceeded so it is distinct from
+        # the per-run TEST_GEMINI_MAX_USD cap below and the submission can report
+        # the task ran out of budget mid-run.
+        if self._whole_task_cap_on():
+            self._tb.check_task_budget(
+                pending_usd=spend,
+                task_id=self.task_budget_id,
+                budget_usd=self.task_budget_usd,
+            )
         if spend >= self.cap_usd:
             self._capped = True
             import story_leads
@@ -360,17 +433,45 @@ class LiveRunMeter:
         return round(self.openai_usd + grounding + self.gemini_tokens_usd
                      + self.serper_usd, 6)
 
+    def record_task_budget(self):
+        """[LOCAL-817] Append THIS run's spend to the whole-task JSON ledger so the
+        next run's refuse-to-start and mid-run abort see the updated total. No-op
+        when the whole-task cap is off. Idempotent within a run. Best-effort:
+        task_budget.record_run never raises into the caller."""
+        if self._run_recorded_to_task_ledger:
+            return
+        if not self._whole_task_cap_on():
+            return
+        self._run_recorded_to_task_ledger = True
+        try:
+            self._tb.record_run(
+                self.task_budget_id,
+                self.total_usd(),
+                note=self.user_id + (f" job={self.job_id}" if self.job_id else ""),
+                capped=self._capped,
+            )
+        except Exception as e:  # pragma: no cover - defensive, record_run is fail-open
+            logger.error("[LIVE_RUN_METER] could not append to task budget ledger: %s", e)
+
     def record(self, operation_type="tour_generate", cache_hit=False):
         """Write ONE cost_ledger row for this run and return its id (or None).
 
         user_id = 'TEST-<LOCAL-NNN>', description = 'test run', breakdown = the
         LOCAL-609 fields. Never raises: a metering failure must not break the run
         (the whole bug was runs that produced no row — a crash here would recreate
-        it). Idempotent: a second call is a no-op returning None."""
+        it). Idempotent: a second call is a no-op returning None.
+
+        [LOCAL-817] Also appends this run's total to the whole-task JSON ledger
+        (independently of the DB row, so the total is kept even when the shared DB
+        is unreachable from an isolated run)."""
         if self._recorded:
             logger.info("[LIVE_RUN_METER] record() already called for %s", self.user_id)
             return None
         self._recorded = True
+        # Append to the whole-task ledger FIRST and independently of the DB write:
+        # the next run's cap must see this run's spend even if the shared cost
+        # ledger DB is unreachable from this isolated container.
+        self.record_task_budget()
         try:
             from cost_meter import record_operation
             return record_operation(
