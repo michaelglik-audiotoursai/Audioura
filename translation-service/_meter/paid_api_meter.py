@@ -8,8 +8,45 @@ Never raises into the caller.
 import json, os, sys, time, threading, traceback, socket
 
 LOG = os.environ.get("PAID_API_LOG", "/meterlogs/paid_api_calls.jsonl")
-SERVICE = os.environ.get("METER_SERVICE", os.path.basename(sys.argv[0]) if sys.argv else "?")
+
+
+def _default_service():
+    """The `service` tag for every row this process writes. Precedence:
+      1. METER_SERVICE                — explicit override (shared stack, harnesses)
+      2. TASK_BUDGET_ID               — [LOCAL-819] a Kiro task's id. Every isolated
+         task container already sets TASK_BUDGET_ID for the whole-task budget
+         (LOCAL-817); reusing it here means each task's rows carry service=<task id>
+         with ZERO per-runner wiring, so meter_report.py can total one task's spend
+         across all its runs — "one sum covers everything".
+      3. the script basename          — last-resort, legible default.
+    Never raises."""
+    try:
+        svc = (os.environ.get("METER_SERVICE") or "").strip()
+        if svc:
+            return svc
+        tb = (os.environ.get("TASK_BUDGET_ID") or "").strip()
+        if tb:
+            return tb
+        return os.path.basename(sys.argv[0]) if sys.argv else "?"
+    except Exception:
+        return "?"
+
+
+SERVICE = _default_service()
 _lock = threading.Lock()
+
+
+def _key_suffix():
+    """[LOCAL-819] A NON-SENSITIVE tag identifying WHICH paid-API key a row was
+    billed to, so meter_report.py can total per key and line up with the provider
+    usage page (which is per-key). The meter deliberately never logs a key; a
+    caller/container sets METER_KEY_SUFFIX to the key's LAST FEW characters only
+    (e.g. 'k9sA' for the mac-mini key) — a 4-char suffix is not the key and cannot
+    reconstruct it. Returns '' when unset. Never raises."""
+    try:
+        return (os.environ.get("METER_KEY_SUFFIX") or "").strip()[-8:]
+    except Exception:
+        return ""
 _INSTALLED = False  # guard so install() patches each HTTP client at most once
 
 
@@ -205,6 +242,36 @@ def _openai_cost(model, usage):
     cached = ((usage.get("prompt_tokens_details") or usage.get("input_tokens_details") or {}) .get("cached_tokens") or 0)
     return ((pt - cached) * i + cached * c + ct * o) / 1e6, key
 
+def _openai_tokens(usage):
+    """[LOCAL-819] (tokens_in, tokens_out) for an OpenAI response usage block, as
+    plain ints for the top-level tokens_in/tokens_out row fields. Accepts both the
+    chat/completions shape (prompt_tokens/completion_tokens) and the responses API
+    shape (input_tokens/output_tokens). Never raises -> (0, 0)."""
+    try:
+        ti = usage.get("prompt_tokens")
+        if ti is None:
+            ti = usage.get("input_tokens")
+        to = usage.get("completion_tokens")
+        if to is None:
+            to = usage.get("output_tokens")
+        return int(ti or 0), int(to or 0)
+    except Exception:
+        return 0, 0
+
+
+def _anthropic_tokens(usage):
+    """[LOCAL-819] (tokens_in, tokens_out) for an Anthropic /v1/messages usage
+    block. Anthropic reports input_tokens as UNCACHED input only; cache reads are a
+    separate counter, so tokens_in folds cache_read_input_tokens back in to reflect
+    the input actually processed. Never raises -> (0, 0)."""
+    try:
+        ti = (usage.get("input_tokens") or 0) + (usage.get("cache_read_input_tokens") or 0)
+        to = usage.get("output_tokens") or 0
+        return int(ti), int(to)
+    except Exception:
+        return 0, 0
+
+
 def _anthropic_cost(model, usage):
     """[LOCAL-712] $ for one Anthropic /v1/messages call, read from the response
     `usage` block. Anthropic reports input_tokens (UNCACHED only — cache reads
@@ -304,7 +371,7 @@ def _record_boto(url, kind, status, operation, params, response):
            "status": status, "rate_tag": RATE_TAG, "service": SERVICE,
            "caller": _caller(), "url": (url or "").split("?")[0][-120:],
            "operation": operation, "job": os.environ.get("METER_JOB", ""),
-           "role": _meter_role(), "usd": None}
+           "role": _meter_role(), "key_suffix": _key_suffix(), "usd": None}
     try:
         chars = _boto_billed_chars(kind, params, response)
         usd, model = _boto_cost(kind, chars, params)
@@ -325,7 +392,7 @@ def _record(url, status, body, req_body=None):
     if not kind: return
     rec = {"ts": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()), "kind": kind, "status": status, "rate_tag": RATE_TAG,
            "service": SERVICE, "caller": _caller(), "url": (url or "").split("?")[0][-120:],
-           "job": os.environ.get("METER_JOB", ""), "role": _meter_role(), "usd": None}
+           "job": os.environ.get("METER_JOB", ""), "role": _meter_role(), "key_suffix": _key_suffix(), "usd": None}
     try:
         d = json.loads(body) if isinstance(body, (bytes, str)) and body else {}
     except Exception:
@@ -335,7 +402,15 @@ def _record(url, status, body, req_body=None):
             model = d.get("model") or ((req_body or {}).get("model") if isinstance(req_body, dict) else "")
             usage = d.get("usage") or {}
             usd, key = _openai_cost(model, usage)
-            rec.update(model=model, usage=usage, usd=usd if status == 200 else 0.0, rate_key=key)
+            # [LOCAL-819] Record the real token counts as TOP-LEVEL tokens_in /
+            # tokens_out, not only nested inside `usage`. Every reporting tool
+            # (meter_report.py, reconcile_paid_api.py) and Gemini rows already use
+            # the top-level fields; before this, all 19,609 OpenAI rows showed
+            # tokens_in/out = 0 because the counts lived only under usage.* . usd
+            # is still computed from the same usage block, so the $ is unchanged.
+            ti, to = _openai_tokens(usage)
+            rec.update(model=model, usage=usage, tokens_in=ti, tokens_out=to,
+                       usd=usd if status == 200 else 0.0, rate_key=key)
         elif kind == "anthropic":
             # Anthropic /v1/messages: the response carries `model` and a `usage`
             # block {input_tokens, output_tokens, cache_read_input_tokens?}. On an
@@ -344,7 +419,13 @@ def _record(url, status, body, req_body=None):
             model = d.get("model") or ((req_body or {}).get("model") if isinstance(req_body, dict) else "")
             usage = d.get("usage") or {}
             usd, key = _anthropic_cost(model, usage)
-            rec.update(model=model, usage=usage, usd=usd if status == 200 else 0.0, rate_key=key)
+            # [LOCAL-819] Same fix for Anthropic rows: surface tokens_in/out at the
+            # top level. input_tokens is Anthropic's UNCACHED input; cache reads are
+            # a separate counter, folded into tokens_in so the row's token total
+            # matches what was processed.
+            ti, to = _anthropic_tokens(usage)
+            rec.update(model=model, usage=usage, tokens_in=ti, tokens_out=to,
+                       usd=usd if status == 200 else 0.0, rate_key=key)
         elif kind == "gemini":
             um = d.get("usageMetadata") or {}
             q = 0
