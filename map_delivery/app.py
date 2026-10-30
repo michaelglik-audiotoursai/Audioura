@@ -3827,7 +3827,11 @@ def _geocode_via_nominatim(query):
 
     places = [r for r in rows if _is_place(r)]
     pool = places if places else rows
-    pool = sorted(pool, key=_importance, reverse=True)
+    # [LOCAL-824 LEAD] Keep Nominatim's own relevance order among PLACE rows: sorting places by
+    # 'importance' sent "Mui Ne" (ward Mũi Né, rank 1) to Meizhou, China (bigger, rank 2).
+    # Importance only breaks ties when no place row came back.
+    if not places:
+        pool = sorted(pool, key=_importance, reverse=True)
     best = pool[0]
     try:
         lat = float(best['lat'])

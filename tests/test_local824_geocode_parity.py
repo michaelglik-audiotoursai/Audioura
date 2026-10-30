@@ -190,3 +190,58 @@ class GeocodeRouteTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
+
+
+def test_nominatim_keeps_rank_order_among_places_mui_ne():
+    """LEAD 2026-10-30: the live Nominatim answer for 'Mui Ne' — rank 1 is the ward in Vietnam (importance
+    0.39), rank 2 is Meizhou, China (0.56). Sorting places by importance picked China."""
+    import json as _json, importlib, sys as _sys, os as _os
+    _sys.path.insert(0, _os.path.join(_os.path.dirname(__file__), '..', 'map_delivery'))
+    _sys.path.insert(0, _os.path.join(_os.path.dirname(__file__), '..'))
+    rows = [
+        {"display_name": "Phường Mũi Né, Tỉnh Lâm Đồng, Việt Nam", "class": "boundary", "type": "administrative",
+         "importance": 0.39, "lat": "10.95", "lon": "108.28"},
+        {"display_name": "梅州市, 广东省, 中国", "class": "boundary", "type": "administrative",
+         "importance": 0.56, "lat": "24.29", "lon": "116.11"},
+    ]
+    import importlib.util as _iu
+    _root = _os.path.join(_os.path.dirname(__file__), '..')
+    checked = 0
+    for modname, path in (("local824_md_app", _os.path.join(_root, "map_delivery", "app.py")),
+                          ("local824_md_root", _os.path.join(_root, "map_delivery_service.py"))):
+        spec = _iu.spec_from_file_location(modname, path)
+        m = _iu.module_from_spec(spec)
+        spec.loader.exec_module(m)
+        fn = getattr(m, "_geocode_via_nominatim", None) or getattr(m, "_geocode_via_nominatim_place", None)
+        if fn is None:
+            continue
+        checked += 1
+
+        class _Resp:
+            def __init__(self, b): self.b = b
+            def read(self): return self.b
+            def __enter__(self): return self
+            def __exit__(self, *a): return False
+            # requests-style
+            status_code = 200
+            def json(self): return rows
+            text = ""
+        payload = _json.dumps(rows).encode()
+        import urllib.request as _ur
+        orig_open = _ur.urlopen
+        _ur.urlopen = lambda *a, **k: _Resp(payload)
+        orig_get = None
+        try:
+            import requests as _rq
+            orig_get = _rq.get
+            _rq.get = lambda *a, **k: _Resp(payload)
+        except Exception:
+            _rq = None
+        try:
+            got = fn("Mui Ne")
+        finally:
+            _ur.urlopen = orig_open
+            if _rq is not None and orig_get is not None:
+                _rq.get = orig_get
+        assert got and "Mũi Né" in got["name"], (modname, got)
+    assert checked >= 1, "no geocoder function found — test would be vacuous"
