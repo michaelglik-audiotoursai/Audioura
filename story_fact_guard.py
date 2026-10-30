@@ -72,6 +72,38 @@ def split_sentences(text: str) -> List[str]:
     return [p.replace('\x00', '.').strip() for p in parts if p.strip()]
 
 
+# [LOCAL-831] A "Stop N:" header line, and the house field lines (Address,
+# Coordinates, Directions, …). The role-mismatch guard DELETES whole sentences;
+# split_sentences does not break on a newline, so a stop body that ends with no
+# final '.' glues onto the next "Stop N:" header and its Address block, and a
+# Dutch postal code in that address ("1071 DJ Amsterdam") was read as a
+# (person='DJ Amsterdam', year=1071) pair — the removal then deleted the whole
+# stop block, header and all (live Rijks 866 run: "removed: Stop 3: Het
+# melkmeisje"). Role mismatches live in NARRATION, never in a header or an
+# address, so the guard reads narration only and never spans a header.
+_HEADER_LINE = re.compile(r'(?mi)^\s*Stop\s+\d+\s*:')
+_FIELD_LINE = re.compile(
+    r'(?mi)^\s*(?:Address|Coordinates|Directions|Orientation|Type/Specialty|'
+    r'Specific Examples|Operational Details|Museum Information|Sources)\s*:')
+
+
+def _narration_only(tour_text: str) -> str:
+    """Drop "Stop N:" headers and house field lines, keep narration paragraphs.
+
+    Each stop body is isolated between its lines so a trailing body with no final
+    period can never run on into the next header or an address — the span the
+    role-mismatch guard would otherwise treat as one deletable 'sentence'.
+    """
+    kept = []
+    for ln in (tour_text or '').split('\n'):
+        if _HEADER_LINE.match(ln) or _FIELD_LINE.match(ln):
+            # A boundary: keep an empty line so sentences never cross it.
+            kept.append('')
+            continue
+        kept.append(ln)
+    return '\n'.join(kept)
+
+
 def corpus_roles_for_year(person: str, year: str, corpus: str) -> List[str]:
     """Which roles does the CORPUS give this (person, year) pair?
 
@@ -110,9 +142,13 @@ def find_role_mismatches(tour_text: str, corpus: str) -> List[Dict]:
     findings = []
     if not tour_text or not corpus:
         return findings
-    for sent in split_sentences(tour_text):
+    for sent in split_sentences(_narration_only(tour_text)):
         years = _YEAR_RE.findall(sent)
         if not years:
+            continue
+        # [LOCAL-831] Defensive: a candidate that still carries a header is never
+        # a narration sentence — never offer it for removal.
+        if _HEADER_LINE.search(sent):
             continue
         sf = _fold(sent)
         action = next((a for a in _ACTION_MARKERS if re.search(rf'\b{a}\b', sf)), None)
@@ -151,6 +187,14 @@ def repair_role_mismatches(tour_text: str, corpus: str) -> Tuple[str, List[Dict]
     out = tour_text
     for f in findings:
         s = f['sentence']
+        # [LOCAL-831] Never remove a span that carries a "Stop N:" header: doing
+        # so deletes a whole stop (the live Rijks 866 "removed: Stop 3:" defect).
+        # find_role_mismatches already reads narration only, so this is a second,
+        # independent guarantee at the point of mutation.
+        if _HEADER_LINE.search(s):
+            f['repaired'] = False
+            f['refused'] = 'candidate contains a Stop N: header'
+            continue
         if s in out:
             # Collapse the whitespace the removal leaves behind.
             out = out.replace(' ' + s, '', 1) if (' ' + s) in out else out.replace(s, '', 1)

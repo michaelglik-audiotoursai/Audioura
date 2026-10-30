@@ -974,6 +974,30 @@ def generate_tour_async(job_id, location, tour_type, total_stops=10, user_id=Non
                         os.unlink(temp_path)
                     return
 
+        # [LOCAL-831] FINAL stop-delivery repair — the LAST text transform on the
+        # SERVICE delivery path, after the whole BLOCKER4c QA loop has settled.
+        # The QA loop's own correctives (G4 sentence removal, LOCAL-722 duplicate-
+        # stop drop) edit tour_text AFTER generate_tour_text already finalized it,
+        # so a drop here can re-open a numbering gap. Re-run the gap-closing
+        # renumber + delivery check on the settled text and write it back to
+        # temp_path, which is what shutil.copy2 delivers to output_path. Any
+        # residual is logged as [LOCAL-831] DELIVERY DEFECT.
+        if tour_text:
+            try:
+                from tour_conclusion import finalize_stop_delivery as _l831_svc_final
+                _l831_repaired = _l831_svc_final(
+                    tour_text, venue_name=location or "",
+                    requested_stops=total_stops,
+                    log=lambda m: print(m, flush=True))
+                if _l831_repaired != tour_text:
+                    tour_text = _l831_repaired
+                    if os.path.exists(temp_path):
+                        with open(temp_path, 'w', encoding='utf-8') as _l831_wb:
+                            _l831_wb.write(tour_text)
+            except Exception as _l831_svc_err:
+                print(f"[LOCAL-831] service delivery repair skipped (non-fatal): "
+                      f"{_l831_svc_err}", flush=True)
+
         # Create a safe filename for the output
         safe_location = ''.join(c if c.isalnum() else '_' for c in location)
         safe_tour_type = ''.join(c if c.isalnum() else '_' for c in tour_type)

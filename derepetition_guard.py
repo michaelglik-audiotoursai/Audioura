@@ -876,6 +876,53 @@ _ANAPHORIC_OPENER = re.compile(
     re.IGNORECASE)
 
 
+# [LOCAL-831] A "Stop N:" header LINE. The de-repetition guard removes repeated
+# SENTENCES from a stop body; it must never touch a header. The live Rijks 866
+# run (2026-08-26) shipped stops numbered [1, 2, 4, 5]: a whole stop block —
+# header AND body — was deleted while a repeated fact was stripped. Removing a
+# header silently drops a paid stop and breaks the 1..k numbering the listener
+# hears, which is a far worse harm than a fact told twice. These three
+# invariants make that structurally impossible:
+#   * a removal candidate that CONTAINS a "Stop N:" header is refused;
+#   * a removal that would leave the stop body with fewer than the first two
+#     complete sentences is refused (never empty / gut a body);
+#   * the stop count before and after is asserted equal by the caller's repair.
+_STOP_HEADER_LINE = re.compile(r'(?mi)^\s*Stop\s+\d+\s*:')
+
+# [LOCAL-831] The minimum number of complete sentences a stop body must RETAIN
+# after a de-repetition removal. The worst harm the live Rijks 866 run showed was
+# a body (and its header) deleted to nothing; the floor exists to make that
+# impossible. A body is never reduced below this many narration sentences, and a
+# body already at or below it is never touched at all — so a thin stop keeps its
+# repeated sentence rather than lose its only narration.
+#
+# The floor is 1 (never EMPTY a body), not 2, on purpose: the legitimate
+# cross-stop / near-duplicate strip (LOCAL-668) removes the one re-told sentence
+# from a two-sentence thin-museum body and leaves the stop's own distinct
+# sentence standing — the body is not emptied, and keeping the verbatim repeat
+# would make the listener hear the identical technique explanation at two
+# adjacent stops, which is exactly the harm D533/LOCAL-668 removes. A removal
+# that would leave zero narration sentences (the whole-stop deletion) is refused.
+_MIN_BODY_SENTENCES = 1
+
+
+def _body_sentence_count(block: str) -> int:
+    """Count complete narration sentences in a stop BODY (header excluded).
+
+    The block passed here is already the post-header text (see ``_stop_blocks``),
+    but we drop any stray header line and the house field lines defensively so a
+    body made only of an Address/Coordinates block never counts as narration.
+    """
+    lines = []
+    for ln in (block or '').split('\n'):
+        if _STOP_HEADER_LINE.match(ln):
+            continue
+        if _FACT_SKIP_LINE.match(ln):
+            continue
+        lines.append(ln)
+    return len([s for s in _ss_split('\n'.join(lines)) if len(s.strip()) > 20])
+
+
 def strip_repeated_facts(tour_text: str, min_remaining_words: int = 60):
     """Delete later re-tellings of a fact already told at an earlier stop.
 
@@ -905,8 +952,24 @@ def strip_repeated_facts(tour_text: str, min_remaining_words: int = 60):
         if sent not in block:
             actions.append(dict(r, removed=False, reason='sentence not in stop block'))
             continue
+        # [LOCAL-831] A removal candidate that carries a "Stop N:" header is
+        # never a narration sentence — it is a header (or a header glued to prose
+        # by an upstream lost-newline). Removing it deletes a whole stop and
+        # breaks the 1..k numbering. Refuse; keep the repeat instead.
+        if _STOP_HEADER_LINE.search(sent):
+            actions.append(dict(r, removed=False,
+                                reason='candidate contains a Stop N: header — never removed'))
+            continue
         if len(block.split()) - len(sent.split()) < min_remaining_words:
             actions.append(dict(r, removed=False, reason='stop would fall below minimum'))
+            continue
+        # [LOCAL-831] Never empty a body: a stop must keep at least one complete
+        # narration sentence. If removing this one would leave none, the repeated
+        # sentence is kept — a fact told twice is a smaller harm than a stop with
+        # no narration left (the live Rijks 866 whole-stop deletion).
+        if _body_sentence_count(block.replace(sent, '', 1)) < _MIN_BODY_SENTENCES:
+            actions.append(dict(r, removed=False,
+                                reason=f'body would fall below {_MIN_BODY_SENTENCES} sentence(s)'))
             continue
         # Would removing this sentence orphan the one after it?
         _tail = block.split(sent, 1)[1] if sent in block else ''

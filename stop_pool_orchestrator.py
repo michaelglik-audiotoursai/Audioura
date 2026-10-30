@@ -1405,6 +1405,21 @@ def _emit_result(output_file, result):
     Michael asked for the dedupe log lines in the live run. The pure assembly
     module records what it dropped on the AssemblyResult; the orchestrator (which
     owns stdout for a generation) prints them here, next to the write."""
+    # [LOCAL-831] FINAL stop-delivery repair — the LAST text transform on the
+    # POOL REUSE path, mirroring the one in generate_tour_text before its write.
+    # Every pool delivery (first-tour, N<=K served-from-pool, and N>K assemble)
+    # funnels through _emit_result right before the file is written AND before
+    # store_delivered_tour pools result.tour_text, so repairing here closes a
+    # numbering gap on reuse and keeps the written file and the pooled rows
+    # consistent. Mutating result.tour_text makes the store see the repaired text.
+    try:
+        from tour_conclusion import finalize_stop_delivery as _l831_finalize
+        result.tour_text = _l831_finalize(
+            result.tour_text, requested_stops=None,
+            log=lambda m: print(m, flush=True))
+    except Exception as _l831_e:
+        print(f"  [LOCAL-831] pool-path delivery repair skipped (non-fatal): "
+              f"{_l831_e}", flush=True)
     _write(output_file, result.tour_text)
     _dropped = getattr(result, "dedupe_dropped", 0)
     print(f"  [LOCAL-607] cross-stop fact dedupe: {_dropped} sentence(s) removed")
