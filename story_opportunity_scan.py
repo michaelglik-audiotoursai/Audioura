@@ -192,7 +192,26 @@ _STAKES = re.compile(
     # consequence. Stop 1 stayed SILENCE with that sentence sitting in its corpus.
     r'destroyed|destroy|pulped|burned|burnt|abandoned|scrapped|cancelled|'
     r'canceled|unfinished|incomplete|posthumous(?:ly)?|left\s+half|'
-    r'started\s+over|began\s+again|withdrew|withdrawn|lost)\b', re.IGNORECASE)
+    r'started\s+over|began\s+again|withdrew|withdrawn|lost|'
+    # [LOCAL-832B] The grounded stories the story pass actually writes for art
+    # objects on the cheap arm carry their consequence in a vocabulary this list
+    # did not cover, so a real eventful story — "he broke with the static group
+    # portrait, and the guardsmen complained that faces were hidden"; "Van Gogh
+    # left it to the Orsay after his death"; "Caillebotte bequeathed it" — scored
+    # stakes=0 and was reported as exposition. These are transfers of fate,
+    # fractures with convention, and named reactions: a consequence paid, not a
+    # motive narrated. ADDITIVE ONLY (the D512 "widening never narrows" property):
+    # every marker above still matches; this can only make the scanner see more
+    # stakes, never fewer. Kept to words that name an OUTCOME, not a state —
+    # "bequeathed"/"left to" is the end of one ownership and the start of another,
+    # the same shape as "donated" being too weak on its own (a bare gift still
+    # does not match: "gift"/"gifted"/"donated" are deliberately NOT here).
+    r'bequeathed|left\s+(?:it|them|this|the\s+\w+)\s+to|'
+    r'broke\s+with|departed\s+from|complained|condemned|sentenced|'
+    r'executed|exiled|banished|martyred|imprisoned|seized|confiscated|'
+    r'looted|smuggled|rescued|hidden|concealed|'
+    r'after\s+his\s+death|after\s+her\s+death|never\s+again|'
+    r'the\s+only\s+time|would\s+never)\b', re.IGNORECASE)
 
 
 def _fold(t: str) -> str:

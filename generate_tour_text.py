@@ -25845,7 +25845,72 @@ REWRITE RULES (all mandatory):
                       f"story currently {_cur_sent} sentence(s)"
                       f"{' — no story pass result, cannot judge' if not _sp_res else ''}")
 
+        # -------- [LOCAL-832B] STORY-SURVIVAL REPAIR (before the step-7a scan) --------
+        # The story pass (LOCAL-490) wrote a finished, fact-checked story for each
+        # museum stop and the narration prompt was handed it with permission to
+        # "adjust wording to flow into the surrounding text". On the cheap arm the
+        # narration model takes that permission and INTERLEAVES the story with
+        # physical description; the ~15 deletion gates between generation and here
+        # (5.1–5.16, 5.158 grounding, …) then trim further. By the time step 7a
+        # reads the delivered prose, the longest CONSECUTIVE run about one subject
+        # has dropped below 3 and the agency/stakes verbs have scattered out of it,
+        # so a stop whose pass wrote a real story scans agency=0 stakes=0 and ships
+        # storyless. Traced on 828B/832B: the pass wrote "Rembrandt … broke with
+        # the static group portrait, and the guardsmen complained" (clears the
+        # bar); the delivered Night Watch scans as a 3-sentence run with no load.
+        #
+        # This runs RIGHT BEFORE the step-7a scan — after every deletion gate, so
+        # it repairs the SAME text the scan judges (an earlier placement cleared at
+        # generation and was re-flattened by the gates that run after it). When the
+        # pass story CLEARS the bar on its own but the delivered prose does NOT,
+        # the pass story is re-seated as its own leading block, then RE-GATED with
+        # the same deterministic offline gates so nothing ungated ships. It never
+        # manufactures a story: it only re-places one already written and judged
+        # ok, and only when that story clears Michael's bar — a stop whose pass
+        # story is itself weak is left for the LOCAL-832 reserve refill or the
+        # honest shortfall. Deterministic, no LLM/network, no spend. Museum path
+        # only; off with DISABLE_STORY_SURVIVAL=1.
+        if (tour_category == 'museum'
+                and os.environ.get('DISABLE_STORY_SURVIVAL', '').strip() != '1'):
+            try:
+                from story_survival import repair_description, survival_log_line
+                _ss_fired = 0
+                for _si, _spoi in enumerate(poi_list):
+                    _sdesc = _spoi.get('description') or ''
+                    if not _sdesc or _sdesc.startswith('['):
+                        continue
+                    _sres = repair_description(_sdesc, _spoi.get('_story_pass'))
+                    if _sres.changed:
+                        # Re-gate the re-seated block with the deterministic
+                        # offline gates (the grounded pass story is expected to
+                        # pass; this guarantees nothing ungated reaches delivery).
+                        _regated = _regate_prose(_sres.description, _spoi)
+                        # Keep the repair only if the re-gated text still clears
+                        # the bar — a gate that trimmed the block back to storyless
+                        # means the repair did not take, so do not ship longer-for-
+                        # nothing.
+                        from story_survival import clears_bar as _ss_clears
+                        if _regated and not _regated.startswith('[') and _ss_clears(_regated):
+                            _spoi['description'] = _regated
+                            _spoi['word_count'] = len(_regated.split())
+                            _ss_fired += 1
+                            print("  " + survival_log_line(
+                                f"stop {_si + 1} '{_spoi.get('name', '')[:34]}'", _sres))
+                        else:
+                            print(f"  [LOCAL-832B] story-survival stop {_si + 1} "
+                                  f"'{_spoi.get('name', '')[:34]}': prepend did not "
+                                  f"survive re-gating — left unchanged")
+                    else:
+                        print("  " + survival_log_line(
+                            f"stop {_si + 1} '{_spoi.get('name', '')[:34]}'", _sres))
+                if _ss_fired:
+                    print(f"  [LOCAL-832B] story-survival: re-seated the pass story "
+                          f"on {_ss_fired} stop(s) the narration merge had dissolved")
+            except Exception as _ss_err:
+                print(f"  [LOCAL-832B] story-survival skipped (non-fatal): {_ss_err}")
+
         _no_story_stops = set()
+        _all_storyless_stops = set()  # [LOCAL-832] full set, before the 7a cap
         try:
             from story_opportunity_scan import measure as _sos_measure, verdict as _sos_verdict
             for _vi, _vpoi in enumerate(poi_list):
@@ -25866,6 +25931,14 @@ REWRITE RULES (all mandatory):
                 for _vi in sorted(_no_story_stops):
                     _why = (poi_list[_vi].get('_story_verdict') or {}).get('why', '')
                     print(f"    stop {_vi + 1} '{poi_list[_vi].get('name', '')[:38]}': {_why[:110]}")
+
+                # [LOCAL-832] The retry cap below narrows `_no_story_stops` to the
+                # single worst stop (step 7a spends ONE generation). The story-gate
+                # REFILL that runs after 7a must still see EVERY stop the bar
+                # rejected — on the 828B Rijksmuseum run all 5 were storyless and
+                # the cap retried 1, which is why 4 shipped storyless. Snapshot the
+                # full set here, before the cap mutates it.
+                _all_storyless_stops = set(_no_story_stops)
 
                 # CAP THE SPEND. Measured 2026-08-19 00:3x: the bar rejects
                 # EVERY stop of a current production tour — a finding in its own
@@ -26293,6 +26366,301 @@ REWRITE RULES (all mandatory):
                 print(f"    [LOCAL-474] retry failed (non-fatal): {_rt_err}")
             finally:
                 _rpoi.pop('_local474_forbidden', None)
+
+        # -------- [LOCAL-832] STORY-GATE REFILL: replace a still-storyless stop --------
+        # Step 7a above REGENERATES a storyless stop (rotating facts, forbidding
+        # rejected claims) and keeps the result only if it now clears Michael's
+        # bar — otherwise it keeps the original STORYLESS prose. Nothing swaps the
+        # stop for a DIFFERENT work, so a famous museum could ship 3/5 (LOCAL-828 /
+        # 828B, Rijksmuseum) because two works resisted a story while hundreds of
+        # other verified works (789 canonical Rijks titles) went untried. That is
+        # never honest.
+        #
+        # So: a stop STILL storyless after step 7a is REPLACED by the next verified
+        # work from the reserve (prominence = yield order, the same reserve
+        # LOCAL-632's count reconcile draws from) that is not already a stop. The
+        # replacement is narrated from the ALREADY-FETCHED venue corpus (no new
+        # research fetch — _generate_description reads the same closure the first
+        # pass used), re-gated, and judged on the SAME bar that rejected the
+        # original. Only a replacement that CLEARS the bar is kept; a rejected
+        # candidate frees its slot for the next reserve work, up to 2 rounds. The
+        # honest shortfall is the truth only once the reserve is exhausted.
+        #
+        # Cost cap: one generation per storyless stop per round, bounded by both
+        # the number of storyless stops and the remaining reserve. Disabled by
+        # DISABLE_STORY_REFILL=1 or when DISABLE_STORY_RETRY already turned 5.17
+        # off. Museum path only.
+        _refill_disabled = os.environ.get('DISABLE_STORY_REFILL', '').strip() == '1'
+        if (tour_category == 'museum' and _museum_venue_name
+                and _museum_verified_reserve and _all_storyless_stops
+                and not _refill_disabled and not _phase5_ceiling_breached):
+            try:
+                from museum_story_refill import (
+                    plan_refill_round, refill_log_line, DEFAULT_ROUNDS,
+                    research_can_clear_bar, DEFAULT_MAX_CONSECUTIVE_FAILURES)
+                from story_opportunity_scan import (
+                    measure as _mr_measure, verdict as _mr_verdict)
+
+                def _mr_is_storyless(_text):
+                    if not _text or _text.startswith('['):
+                        return False  # a failed/placeholder draft is not "storyless"
+                    try:
+                        return bool(_mr_verdict(_mr_measure(_text)).get(
+                            'needs_additional_story'))
+                    except Exception:
+                        return False
+
+                # [LOCAL-832B] Assemble a candidate reserve work's ALREADY-FETCHED
+                # research — the same material its narration would draw on — so the
+                # pre-check below can decide, WITHOUT spending a narration call,
+                # whether the work could carry a story at all. Snippets keyed by
+                # the work title first (LOCAL-410), then the stop-corpus passages
+                # (LOCAL-183); never a new fetch.
+                def _mr_research_for(_title):
+                    _parts = []
+                    try:
+                        _snips = _J._DIRECT_SNIPPETS_PER_STOP.get(_title, []) or []
+                        for _s in _snips:
+                            _t = _s.get('snippet') if isinstance(_s, dict) else str(_s)
+                            if _t:
+                                _parts.append(_t)
+                    except Exception:
+                        pass
+                    try:
+                        _scd = (_stop_corpus_data or {}).get(_title)
+                        if _scd and _scd.get('passages'):
+                            for _p in _scd['passages']:
+                                _pt = _p.get('text') if isinstance(_p, dict) else str(_p)
+                                if _pt:
+                                    _parts.append(_pt)
+                    except Exception:
+                        pass
+                    return "\n".join(_parts)
+
+
+                # Re-judge: which of the step-7a storyless set are STILL storyless
+                # now (step 7a may have fixed some)? Worst-first by the step-5
+                # index, exactly as step 7a's own cap ranks them, so the scarce
+                # reserve goes to the weakest stops first.
+                _mr_still = [i for i in sorted(
+                    _all_storyless_stops,
+                    key=lambda i: (poi_list[i].get('_story_index', 999), i))
+                    if _mr_is_storyless(poi_list[i].get('description') or '')]
+
+                _mr_rounds = int(os.environ.get('STORY_REFILL_ROUNDS', '')
+                                 or DEFAULT_ROUNDS)
+                _mr_tried = []       # reserve titles proposed in any round
+                _mr_swaps = 0
+                _mr_extra_cost0 = total_cost   # [LOCAL-832B] measure refill spend
+                # [LOCAL-832B] Abort the refill after this many CONSECUTIVE candidate
+                # failures — an arm-level signal that the cheap arm cannot source a
+                # story for this venue, so every further narration call is spend with
+                # no expected yield. Counts failures across rounds; a KEPT swap
+                # resets it. STORY_REFILL_MAX_FAILS overrides for a measurement.
+                _mr_max_fails = int(os.environ.get('STORY_REFILL_MAX_FAILS', '')
+                                    or DEFAULT_MAX_CONSECUTIVE_FAILURES)
+                _mr_consec_fails = 0
+                _mr_aborted = False
+                _mr_precheck_skipped = 0
+                if _mr_still:
+                    print(f"\n  [LOCAL-832] story-gate refill: {len(_mr_still)} "
+                          f"stop(s) still have NO VALID STORY after step 7a — "
+                          f"replacing from the verified reserve "
+                          f"({len(_museum_verified_reserve)} work(s)), "
+                          f"up to {_mr_rounds} round(s); pre-checking candidate "
+                          f"research, aborting after {_mr_max_fails} consecutive "
+                          f"failures")
+
+                for _mr_round in range(_mr_rounds):
+                    if not _mr_still or _phase5_ceiling_breached or _mr_aborted:
+                        break
+                    _mr_plan = plan_refill_round(
+                        _mr_still, poi_list, _museum_verified_reserve,
+                        tried_titles=_mr_tried)
+                    _mr_tried = _mr_plan.tried_after
+                    if not _mr_plan.has_work:
+                        print(f"    [LOCAL-832] round {_mr_round + 1}: the reserve "
+                              f"is exhausted — no untried verified work left for "
+                              f"{len(_mr_still)} storyless stop(s)")
+                        break
+
+                    # Build the fresh replacement POIs and narrate them
+                    # concurrently from the SAME venue corpus the first pass used
+                    # (no new research fetch). The slot index is the stop being
+                    # replaced, so the 'already-visited' prompt context stays
+                    # correct.
+                    #
+                    # [LOCAL-832B] PRE-CHECK each candidate's research with the
+                    # cheap opportunity scan BEFORE spending a narration call: a
+                    # work whose already-fetched research cannot even contain the
+                    # shape of a story will not produce one when narrated (the
+                    # narrator may use only the material it is given). Candidates
+                    # that fail the pre-check are skipped here, costing nothing;
+                    # their slot carries to the honest shortfall.
+                    _mr_work = []
+                    _mr_precheck_still = []
+                    for _a in _mr_plan.assignments:
+                        _rsch = _mr_research_for(_a.new_title)
+                        if not research_can_clear_bar(
+                                _rsch, scan=(_mr_measure, _mr_verdict)):
+                            _mr_precheck_skipped += 1
+                            _mr_precheck_still.append(_a.stop_index)
+                            print(f"      [LOCAL-832B] pre-check: "
+                                  f"'{_a.new_title[:40]}' research cannot carry a "
+                                  f"story — skipped, no narration call spent")
+                            continue
+                        _np = _new_poi(_a.new_title)
+                        _np['stop_number'] = poi_list[_a.stop_index].get(
+                            'stop_number', _a.stop_index + 1)
+                        _mr_work.append((_a, _np))
+
+                    if not _mr_work:
+                        # Every candidate this round failed the pre-check; those
+                        # slots stay storyless. With the default single round this
+                        # is the honest shortfall.
+                        _mr_still = _mr_precheck_still + [
+                            i for i in _mr_plan.unfilled
+                            if i not in _mr_precheck_still]
+                        print(f"    [LOCAL-832] round {_mr_round + 1}: no candidate "
+                              f"passed the research pre-check — no narration spent")
+                        continue
+
+                    print(f"    [LOCAL-832] round {_mr_round + 1}: trying "
+                          f"{len(_mr_work)} replacement(s) — "
+                          + "; ".join(f"'{_a.old_title[:28]}' → '{_a.new_title[:28]}'"
+                                      for _a, _ in _mr_work))
+
+
+                    _mr_results = {}
+                    _mr_mw = min(len(_mr_work), 5)
+                    with tour_executor(max_workers=_mr_mw) as _mr_ex:
+                        _mr_futs = {
+                            _mr_ex.submit(_generate_description,
+                                          (_a.stop_index, _np, None, None, None)): _a
+                            for _a, _np in _mr_work
+                        }
+                        for _mr_f in as_completed(_mr_futs):
+                            _a = _mr_futs[_mr_f]
+                            try:
+                                _mr_results[_a.stop_index] = ('ok', _mr_f.result())
+                            except Exception as _mr_e:
+                                _mr_results[_a.stop_index] = ('err', _mr_e)
+
+                    # Serial apply in stop order — mutate state deterministically.
+                    _mr_next_still = []
+                    for _a, _np in sorted(_mr_work, key=lambda w: w[0].stop_index):
+                        _si = _a.stop_index
+                        _out, _pay = _mr_results.get(
+                            _si, ('err', RuntimeError('no result')))
+                        _kept = False
+                        if _out == 'ok':
+                            _r = _pay
+                            _new_desc = _regate_prose(_r[2] or '', _np)
+                            if _new_desc and not _new_desc.startswith('['):
+                                if not _mr_is_storyless(_new_desc):
+                                    # Replacement clears the bar — swap the stop.
+                                    # Start from the OLD stop so the replacement
+                                    # inherits every structural/bookkeeping field
+                                    # the rest of the pipeline expects on a stop
+                                    # (coordinates, address, stop_number, …); then
+                                    # overlay the new work's identity and content.
+                                    # Omitting this shipped a POI with no
+                                    # 'word_count' and crashed the Word Count
+                                    # Statistics print (KeyError) on the Orsay run.
+                                    _old_poi = poi_list[_si]
+                                    _merged = dict(_old_poi)
+                                    _merged['name'] = _np.get('name', _a.new_title)
+                                    _merged['description'] = _new_desc
+                                    _merged['word_count'] = len(_new_desc.split())
+                                    _merged['orientation'] = (
+                                        _r[1] if _r[1] else _old_poi.get(
+                                            'orientation', ''))
+                                    _merged['_story_verdict'] = {
+                                        'needs_additional_story': False}
+                                    # Drop stale per-work metadata carried from the
+                                    # replaced work so no gate reads the old work's
+                                    # artist/credit on the new stop.
+                                    for _stale in ('artist', 'year', 'english_title',
+                                                   'credit_line', 'medium',
+                                                   'publisher', 'printed_by',
+                                                   'printer', '_story_pass',
+                                                   '_focus_fact', '_focus_tried',
+                                                   '_story_index'):
+                                        if _stale in _np:
+                                            _merged[_stale] = _np.get(_stale)
+                                        else:
+                                            _merged.pop(_stale, None)
+                                    total_cost += _r[5] if len(_r) > 5 else 0
+                                    poi_list[_si] = _merged
+                                    _mr_swaps += 1
+                                    _kept = True
+                                    _mr_consec_fails = 0  # [LOCAL-832B] a kept swap resets the abort counter
+                                    print(refill_log_line(
+                                        _museum_venue_name, _a.old_title,
+                                        _a.new_title))
+                                    print(f"      [LOCAL-832] kept: stop {_si + 1} "
+                                          f"now '{_a.new_title[:40]}' "
+                                          f"({len(_new_desc.split())}w, clears the "
+                                          f"bar)")
+                                else:
+                                    total_cost += _r[5] if len(_r) > 5 else 0
+                                    print(f"      [LOCAL-832] rejected: "
+                                          f"'{_a.new_title[:40]}' is also storyless "
+                                          f"— slot stays open for the next reserve "
+                                          f"work")
+                            else:
+                                print(f"      [LOCAL-832] rejected: "
+                                      f"'{_a.new_title[:40]}' produced no usable "
+                                      f"draft")
+                        else:
+                            print(f"      [LOCAL-832] replacement generation failed "
+                                  f"(non-fatal): {_pay}")
+                        if not _kept:
+                            _mr_next_still.append(_si)
+                            # [LOCAL-832B] A narrated candidate that was not kept is
+                            # a consecutive failure; two in a row aborts the refill.
+                            _mr_consec_fails += 1
+                            if _mr_consec_fails >= _mr_max_fails:
+                                _mr_aborted = True
+                                print(f"      [LOCAL-832B] abort: {_mr_consec_fails} "
+                                      f"consecutive candidate(s) failed — the cheap "
+                                      f"arm cannot source a story for this venue; "
+                                      f"stopping the refill (no more narration spend)")
+                                break
+                        if not _phase5_ceiling_breached and total_cost > _PHASE_COST_HARD_LIMIT:
+                            _phase5_ceiling_breached = True
+                            print(f"      [LOCAL-832] cost ceiling reached "
+                                  f"(${total_cost:.4f}) — stopping refill")
+                    # Stops not filled this round (plan.unfilled) remain storyless
+                    # and carry into the next round too, in case earlier rejects
+                    # freed reserve works — but once the plan reports the reserve
+                    # exhausted the loop above breaks.
+                    _mr_still = _mr_next_still + [
+                        i for i in (_mr_precheck_still + _mr_plan.unfilled)
+                        if i not in _mr_next_still]
+
+                if _mr_swaps:
+                    print(f"  [LOCAL-832] story-gate refill: replaced {_mr_swaps} "
+                          f"storyless stop(s) with verified reserve work(s)")
+                # [LOCAL-832B] The extra spend the refill cost, reported explicitly.
+                _mr_extra = total_cost - _mr_extra_cost0
+                print(f"  [LOCAL-832B] story-gate refill spend: +${_mr_extra:.4f} "
+                      f"({_mr_swaps} swap(s) kept, {_mr_precheck_skipped} candidate(s) "
+                      f"skipped by research pre-check with no narration call"
+                      f"{', refill ABORTED on consecutive failures' if _mr_aborted else ''})")
+                if _mr_still:
+                    # Honest shortfall: these stops stay, storyless, because the
+                    # reserve could not supply a verified work that tells a story.
+                    print(f"  [LOCAL-832] story-gate refill: {len(_mr_still)} "
+                          f"stop(s) remain storyless — the verified reserve is "
+                          f"exhausted of untried works that clear the bar "
+                          f"(stops {sorted(i + 1 for i in _mr_still)})")
+            except ImportError as _mr_imp:
+                print(f"  [LOCAL-832] story-gate refill unavailable "
+                      f"({_mr_imp}) — storyless stops ship as-is")
+            except Exception as _mr_err:
+                print(f"  [LOCAL-832] story-gate refill skipped (non-fatal): "
+                      f"{_mr_err}")
 
         # [2026-09-18] The retries are capped, so what D534 flagged is not all fixed.
         # On CHURCH_tour_3 it reported "Stop 2 / 3 / 4 repeat ... will regenerate with
