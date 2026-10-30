@@ -274,6 +274,74 @@ INSTANCE_ID = (
     or 'unknown'
 )
 
+# [LOCAL-833] A generator job whose status is non-terminal but whose updated_at
+# has not advanced for this many seconds is treated as STALE and flipped to
+# 'error'. Evidence: GCloud_Storied wave 9, generator job ac864a08 went silent
+# after 07:54Z (its Cloud Run instance was recycled mid-job — the worker thread
+# died with the instance) yet generator_jobs.status stayed 'processing' forever,
+# so the orchestrator re-polled a dead job every sweep cycle with no way out.
+#
+# A silent job is one the generator_jobs table shows has not been written to in
+# GEN_JOB_STALE_SECONDS; the live worker thread writes progress (or at minimum
+# the pipeline's start/end markers) within that window, and the generator's
+# /status heartbeat_at proves liveness WHILE the thread is alive on the owning
+# instance, so a genuinely running tour is never marked stale. The default is a
+# generous 30 minutes — well beyond any observed generation time (the biggest
+# museum measured ~5 min) and comfortably above the orchestrator's own 40-minute
+# absolute poll cap, so staleness only ever fires on a truly dead job.
+GEN_JOB_STALE_SECONDS = int(os.getenv('GEN_JOB_STALE_SECONDS', '1800'))  # 30 min
+
+# Non-terminal generator statuses that are eligible to be marked stale.
+_GEN_NONTERMINAL = ('queued', 'processing')
+
+
+def _parse_iso(ts):
+    """Parse an ISO-8601 timestamp string (as GeneratorJobsStore.get emits) into
+    a naive datetime, or return None. Best-effort — a malformed value never
+    raises, it just means 'cannot judge staleness', so the job is left alone."""
+    if not ts:
+        return None
+    try:
+        from datetime import datetime as _dt
+        s = str(ts)
+        # Drop a trailing 'Z' and any timezone offset so comparison is naive-vs-naive
+        # (updated_at is stored without a timezone).
+        if s.endswith('Z'):
+            s = s[:-1]
+        return _dt.fromisoformat(s)
+    except Exception:
+        return None
+
+
+def _fmt_duration(seconds):
+    """[LOCAL-833] Human threshold text: '30 s' under a minute, else '30 min'."""
+    try:
+        s = int(seconds)
+    except Exception:
+        return f"{seconds}"
+    return f"{s} s" if s < 60 else f"{s // 60} min"
+
+
+def _is_stale_job(job, stale_seconds=None):
+    """[LOCAL-833] Return (True, age_seconds, updated_iso) when `job` is a
+    non-terminal generator job whose updated_at is older than stale_seconds;
+    (False, …) otherwise. Pure function — no I/O — so it is trivially testable
+    and callable from both the read path and the sweep."""
+    stale_seconds = GEN_JOB_STALE_SECONDS if stale_seconds is None else stale_seconds
+    if not job:
+        return (False, None, None)
+    status = (job.get('status') or '').strip().lower()
+    if status not in _GEN_NONTERMINAL:
+        return (False, None, None)
+    updated = _parse_iso(job.get('updated_at'))
+    if updated is None:
+        return (False, None, None)
+    from datetime import datetime as _dt
+    age = (_dt.now() - updated).total_seconds()
+    if age > stale_seconds:
+        return (True, age, job.get('updated_at'))
+    return (False, age, job.get('updated_at'))
+
 # Flat generator fields that are real columns on generator_jobs. Everything else
 # a caller passes splits into the result/error JSONB blobs (see _split_fields).
 _GENERATOR_COLUMNS = ('status', 'progress', 'location', 'tour_type', 'total_stops')
@@ -439,11 +507,20 @@ class GeneratorJobsStore:
         try:
             self._ensure_table(conn)
             cur = conn.cursor()
+            # [LOCAL-833] Compute staleness in SQL, against the DB clock, so it is
+            # correct regardless of the Python process timezone (updated_at is a
+            # DB TIMESTAMP; comparing it to a local datetime.now() silently
+            # skewed by hours). `is_stale` is true only for a non-terminal job
+            # whose updated_at has not advanced for GEN_JOB_STALE_SECONDS;
+            # `age_seconds` is for the log line.
             cur.execute("""
                 SELECT job_id, status, progress, location, tour_type, total_stops,
-                       result, error, instance_id, created_at, updated_at
+                       result, error, instance_id, created_at, updated_at,
+                       (status IN ('queued','processing')
+                          AND updated_at < NOW() - (%s || ' seconds')::interval) AS is_stale,
+                       EXTRACT(EPOCH FROM (NOW() - updated_at)) AS age_seconds
                 FROM generator_jobs WHERE job_id = %s
-            """, (job_id,))
+            """, (str(int(GEN_JOB_STALE_SECONDS)), job_id))
             row = cur.fetchone()
             cur.close()
             if not row:
@@ -465,6 +542,23 @@ class GeneratorJobsStore:
                 if blob:
                     data = blob if isinstance(blob, dict) else json.loads(blob)
                     result.update(data)
+            # [LOCAL-833] Stale-on-read: a non-terminal job whose updated_at has
+            # not advanced for GEN_JOB_STALE_SECONDS had its worker thread die
+            # with a recycled instance (ac864a08). Flip it to 'error' here so the
+            # very next /status poll returns a TERMINAL job the orchestrator can
+            # finish, instead of 'processing' forever. The write is guarded so a
+            # read never fails because of it.
+            is_stale = bool(row[11])
+            if is_stale:
+                age_min = (float(row[12]) / 60.0) if row[12] is not None else 0.0
+                reason = (f"stale: no progress since {result['updated_at']} "
+                          f"({age_min:.1f} min, > {_fmt_duration(GEN_JOB_STALE_SECONDS)} threshold); "
+                          f"worker instance likely recycled mid-job")
+                logger.warning(f"[LOCAL-833] generator_jobs {job_id} marked error — {reason}")
+                self._mark_stale(job_id, reason)
+                result['status'] = 'error'
+                result['error'] = reason
+                result['error_code'] = 'stale'
             return result
         except Exception as db_err:
             logger.warning(f"[LOCAL-775] generator_jobs get failed for {job_id}: {db_err}")
@@ -478,6 +572,100 @@ class GeneratorJobsStore:
     def delete(self, job_id):
         """Not used by the generator (jobs age out via the created_at index)."""
         return None
+
+    def _mark_stale(self, job_id, reason):
+        """[LOCAL-833] Flip a stale non-terminal job to 'error' with a reason.
+
+        The UPDATE is conditional: it fires ONLY while the row is still
+        non-terminal AND still older than GEN_JOB_STALE_SECONDS, so a job that
+        completed (or had progress written) between the read and this write is
+        never clobbered — the row's own updated_at is the race guard, decided
+        inside Postgres. Best-effort; a DB error is logged and swallowed."""
+        try:
+            conn = self._get_conn()
+        except Exception as conn_err:
+            logger.warning(f"[LOCAL-833] generator_jobs _mark_stale skipped (no DB): {conn_err}")
+            return
+        try:
+            self._ensure_table(conn)
+            cur = conn.cursor()
+            cur.execute(
+                """
+                UPDATE generator_jobs
+                SET status = 'error',
+                    error = error || %s::jsonb,
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE job_id = %s
+                  AND status IN ('queued', 'processing')
+                  AND updated_at < NOW() - (%s || ' seconds')::interval
+                """,
+                (json.dumps({'error': reason, 'error_code': 'stale'}),
+                 job_id, str(int(GEN_JOB_STALE_SECONDS))),
+            )
+            conn.commit()
+            cur.close()
+        except Exception as db_err:
+            logger.warning(f"[LOCAL-833] generator_jobs _mark_stale failed for {job_id}: {db_err}")
+            try:
+                conn.rollback()
+            except Exception:
+                pass
+        finally:
+            try:
+                conn.close()
+            except Exception:
+                pass
+
+    def sweep_stale(self, stale_seconds=None, limit=200):
+        """[LOCAL-833] Flip every stale non-terminal job to 'error' in one pass.
+
+        A single set-based UPDATE (no per-row read) marks all non-terminal jobs
+        whose updated_at is older than the threshold. This is the generator's own
+        safety net so a silent job becomes terminal even if NOTHING ever polls
+        its /status again (the read-path stale check only fires on a read).
+        Returns the number of rows flipped. Best-effort; returns 0 on any error.
+        """
+        stale_seconds = GEN_JOB_STALE_SECONDS if stale_seconds is None else stale_seconds
+        reason = (f"stale: no progress for > {_fmt_duration(stale_seconds)} "
+                  f"(generator sweep); worker instance likely recycled mid-job")
+        try:
+            conn = self._get_conn()
+        except Exception as conn_err:
+            logger.warning(f"[LOCAL-833] generator_jobs sweep_stale skipped (no DB): {conn_err}")
+            return 0
+        try:
+            self._ensure_table(conn)
+            cur = conn.cursor()
+            cur.execute(
+                """
+                UPDATE generator_jobs
+                SET status = 'error',
+                    error = error || %s::jsonb,
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE status IN ('queued', 'processing')
+                  AND updated_at < NOW() - (%s || ' seconds')::interval
+                """,
+                (json.dumps({'error': reason, 'error_code': 'stale'}),
+                 str(int(stale_seconds))),
+            )
+            flipped = cur.rowcount
+            conn.commit()
+            cur.close()
+            if flipped:
+                logger.warning(f"[LOCAL-833] generator sweep flipped {flipped} stale job(s) to error.")
+            return flipped
+        except Exception as db_err:
+            logger.warning(f"[LOCAL-833] generator_jobs sweep_stale failed: {db_err}")
+            try:
+                conn.rollback()
+            except Exception:
+                pass
+            return 0
+        finally:
+            try:
+                conn.close()
+            except Exception:
+                pass
 
     def items(self):
         """All known jobs as (job_id, dict) pairs — best-effort, capped."""
@@ -559,6 +747,13 @@ class LayeredJobStore:
     def delete(self, job_id):
         self._memory.delete(job_id)
         self._db.delete(job_id)
+
+    def sweep_stale(self, stale_seconds=None, limit=200):
+        """[LOCAL-833] Delegate to the DB layer's stale sweep. The memory cache
+        needs no sweep — its entries are per-instance and the owning instance's
+        live thread keeps them fresh; the DB table is where a recycled
+        instance's silent row lives on. Best-effort via the DB layer."""
+        return self._db.sweep_stale(stale_seconds=stale_seconds, limit=limit)
 
     def list_active(self):
         return self._memory.list_active()

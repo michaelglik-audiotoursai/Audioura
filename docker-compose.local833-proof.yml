@@ -1,0 +1,153 @@
+# docker-compose.local833-proof.yml — LOCAL-833 OWN isolated orchestration stack.
+#
+# Separate project (-p local833), OWN postgres volume, spare ports (559xx).
+# NEVER touches the shared audioura-* containers or the live DB. Reuses the
+# LOCAL-821/829 stack shape; every service builds from THIS worktree so the live
+# run measures the LOCAL-833 code (generator stale rule + orchestrator terminal
+# disposition + resume-attempt cap).
+#
+# UP:   docker compose -p local833 -f docker-compose.local833-proof.yml up -d --build
+# DOWN: docker compose -p local833 -f docker-compose.local833-proof.yml down -v
+#
+# The proof (run_local833_live.sh): kill the GENERATOR mid-job (not the
+# orchestrator), then prove the silent generator job goes 'error', the
+# orchestrator_jobs row goes terminal ('error'), tour_requests is 'failed' with
+# the reserved pack unit refunded (device_entitlement.fresh_used back to its
+# pre-request value), and the resume/sweep goes QUIET (no endless re-take).
+#
+# Short staleness windows so the proof runs in seconds, not the 30-minute
+# production default: GEN_JOB_STALE_SECONDS=30, GEN_JOB_SWEEP_INTERVAL_SECONDS=15.
+#
+# Meter contract (PYTHONPATH=/opt/meter) is wired on the services that make paid
+# calls; spend lands under service=LOCAL-833 and TASK_BUDGET_ID/USD caps it at
+# $0.30.
+services:
+  postgres-2:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: audiotours
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: password123
+      POSTGRES_INITDB_ARGS: "--auth-host=md5 --auth-local=md5"
+      POSTGRES_HOST_AUTH_METHOD: md5
+    ports:
+      - "55933:5432"
+    volumes:
+      - local833_pg:/var/lib/postgresql/data
+      - ./local821-initdb:/docker-entrypoint-initdb.d:ro
+
+  tour-generator:
+    build:
+      context: .
+      dockerfile: Dockerfile.generator
+    ports:
+      - "55900:5000"
+    environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - SERP_API_KEY=${SERP_API_KEY}
+      - SERP_PROVIDER=${SERP_PROVIDER:-serper}
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - STORIED_MODE=true
+      - ATTESTATION_MODE=log_only
+      - DATABASE_URL=postgresql://admin:password123@postgres-2:5432/audiotours
+      - DB_HOST=postgres-2
+      - DB_PORT=5432
+      - DB_NAME=audiotours
+      - DB_USER=admin
+      - DB_PASSWORD=password123
+      - PYTHONUNBUFFERED=1
+      - JOB_STORE_MODE=layered
+      # [LOCAL-833] Short staleness windows so the silent (killed) generator job
+      # becomes terminal in seconds. Production default is 1800 s.
+      - GEN_JOB_STALE_SECONDS=30
+      - GEN_JOB_SWEEP_ENABLED=true
+      - GEN_JOB_SWEEP_INTERVAL_SECONDS=15
+      - TASK_BUDGET_ID=LOCAL-833
+      - TASK_BUDGET_USD=0.30
+      - COST_HARD_LIMIT_USD=0.30
+      - TEST_GEMINI_MAX_USD=0.30
+      - PYTHONPATH=/opt/meter
+      - PAID_API_LOG=/meterlogs/paid_api_calls.jsonl
+      - METER_SERVICE=LOCAL-833
+    volumes:
+      - ./tours:/app/tours
+      - ./_meter:/opt/meter:ro
+      - ${LOCAL833_METER_DIR:-./local833-meterlogs}:/meterlogs
+    depends_on:
+      - postgres-2
+
+  tour-generation-modernized-1:
+    build:
+      context: .
+      dockerfile: Dockerfile.modernized
+    ports:
+      - "55921:5021"
+    volumes:
+      - ./tours:/app/tours
+
+  coordinates-fromai:
+    build:
+      context: ./coordinates_fromAI
+    ports:
+      - "55906:5004"
+    environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+
+  user-api-2:
+    build:
+      context: ./user-tracking
+    ports:
+      - "55903:5000"
+    depends_on:
+      - postgres-2
+    environment:
+      DATABASE_URL: postgresql://admin:password123@postgres-2:5432/audiotours
+      GATEWAY_API_KEY: ""
+      ALLOW_UNAUTHENTICATED_ENTITLEMENTS: "true"
+
+  tour-orchestrator:
+    build:
+      context: .
+      dockerfile: Dockerfile.orchestrator
+    ports:
+      - "55902:5002"
+    environment:
+      - TOUR_GENERATOR_URL=http://tour-generator:5000
+      - MODERNIZED_URL=http://tour-generation-modernized-1:5021
+      - USER_API_URL=http://user-api-2:5000
+      - COORDINATES_URL=http://coordinates-fromai:5004
+      - DB_HOST=postgres-2
+      - DB_NAME=audiotours
+      - DB_USER=admin
+      - DB_PASSWORD=password123
+      - DB_PORT=5432
+      - TOUR_TEST_MODE_ALLOW_REQUEST=true
+      - TOUR_TRACK=subscribed
+      - PYTHONUNBUFFERED=1
+      # [LOCAL-833] resume + sweep ON with a tight cadence so the sweep gets
+      # several chances to (wrongly) re-take the cancelled row — and the proof
+      # shows it does NOT, because the row is terminal.
+      - ORCH_RESUME_ENABLED=true
+      - ORCH_SWEEP_INTERVAL_SECONDS=10
+      - ORCH_SWEEP_MIN_IDLE_SECONDS=20
+      - ORCH_JOB_LEASE_SECONDS=60
+      # The orchestrator's own staleness backstop mirrors the generator's.
+      - GEN_JOB_STALE_SECONDS=30
+      - ORCH_MAX_RESUME_ATTEMPTS=3
+      - TASK_BUDGET_ID=LOCAL-833
+      - TASK_BUDGET_USD=0.30
+      - PYTHONPATH=/opt/meter
+      - PAID_API_LOG=/meterlogs/paid_api_calls.jsonl
+      - METER_SERVICE=LOCAL-833
+    volumes:
+      - ./tours:/app/tours
+      - ./_meter:/opt/meter:ro
+      - ${LOCAL833_METER_DIR:-./local833-meterlogs}:/meterlogs
+    depends_on:
+      - tour-generator
+      - tour-generation-modernized-1
+      - user-api-2
+      - coordinates-fromai
+
+volumes:
+  local833_pg:

@@ -148,9 +148,17 @@ class OrchestratorJobsStore:
                 error             TEXT,
                 lease_owner       VARCHAR(128),
                 lease_expires_at  TIMESTAMP,
+                resume_attempts   INTEGER NOT NULL DEFAULT 0,
                 created_at        TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
                 updated_at        TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
             )
+        """)
+        # [LOCAL-833] resume_attempts was added after the table shipped; add it to
+        # an existing table so the self-healing DDL converges whether or not a
+        # migration ran. Idempotent.
+        cur.execute("""
+            ALTER TABLE orchestrator_jobs
+            ADD COLUMN IF NOT EXISTS resume_attempts INTEGER NOT NULL DEFAULT 0
         """)
         cur.execute("""
             CREATE INDEX IF NOT EXISTS idx_orchestrator_jobs_status_updated
@@ -283,7 +291,8 @@ class OrchestratorJobsStore:
             cur.execute(
                 """
                 SELECT job_id, generator_job_id, status, params, error,
-                       lease_owner, lease_expires_at, created_at, updated_at
+                       lease_owner, lease_expires_at, created_at, updated_at,
+                       resume_attempts
                 FROM orchestrator_jobs WHERE job_id = %s
                 """,
                 (job_id,),
@@ -321,6 +330,8 @@ class OrchestratorJobsStore:
             'lease_expires_at': row[6].isoformat() if row[6] else None,
             'created_at': row[7].isoformat() if row[7] else None,
             'updated_at': row[8].isoformat() if row[8] else None,
+            # [LOCAL-833] present only when the SELECT asked for it (10th column).
+            'resume_attempts': row[9] if len(row) > 9 and row[9] is not None else 0,
         }
         # Merge params up to the flat shape orchestrate_tour_async wants.
         for k in PARAM_KEYS:
@@ -348,7 +359,8 @@ class OrchestratorJobsStore:
             cur.execute(
                 """
                 SELECT job_id, generator_job_id, status, params, error,
-                       lease_owner, lease_expires_at, created_at, updated_at
+                       lease_owner, lease_expires_at, created_at, updated_at,
+                       resume_attempts
                 FROM orchestrator_jobs
                 WHERE status NOT IN ('completed', 'error')
                   AND (lease_expires_at IS NULL OR lease_expires_at < NOW())
@@ -401,7 +413,8 @@ class OrchestratorJobsStore:
                   AND status NOT IN ('completed', 'error')
                   AND (lease_expires_at IS NULL OR lease_expires_at < NOW())
                 RETURNING job_id, generator_job_id, status, params, error,
-                          lease_owner, lease_expires_at, created_at, updated_at
+                          lease_owner, lease_expires_at, created_at, updated_at,
+                          resume_attempts
                 """,
                 (owner, str(int(lease_seconds)), job_id),
             )
@@ -612,6 +625,48 @@ class OrchestratorJobsStore:
                 conn.rollback()
             except Exception:
                 pass
+        finally:
+            try:
+                conn.close()
+            except Exception:
+                pass
+
+    def increment_resume_attempts(self, job_id):
+        """[LOCAL-833] Atomically bump resume_attempts and return the NEW count
+        (or None on error). Called at the top of each resume so the count
+        reflects every attempt, and the sweep can mark a row terminal once it has
+        failed to deliver ORCH_MAX_RESUME_ATTEMPTS times — the cap that stops a
+        stubborn row being re-taken forever. The RETURNING gives the caller the
+        post-increment value in one round-trip."""
+        try:
+            conn = self._get_conn()
+        except Exception as conn_err:
+            logger.warning(f"[LOCAL-833] orchestrator_jobs increment_resume_attempts skipped (no DB): {conn_err}")
+            return None
+        try:
+            self._ensure_table(conn)
+            cur = conn.cursor()
+            cur.execute(
+                """
+                UPDATE orchestrator_jobs
+                SET resume_attempts = resume_attempts + 1,
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE job_id = %s
+                RETURNING resume_attempts
+                """,
+                (job_id,),
+            )
+            row = cur.fetchone()
+            conn.commit()
+            cur.close()
+            return row[0] if row else None
+        except Exception as db_err:
+            logger.warning(f"[LOCAL-833] orchestrator_jobs increment_resume_attempts failed for {job_id}: {db_err}")
+            try:
+                conn.rollback()
+            except Exception:
+                pass
+            return None
         finally:
             try:
                 conn.close()

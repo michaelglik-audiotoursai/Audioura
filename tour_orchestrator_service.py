@@ -171,6 +171,21 @@ ORCH_SWEEP_INTERVAL_SECONDS = int(os.getenv('ORCH_SWEEP_INTERVAL_SECONDS', '120'
 # alone. Resume-on-boot uses 0 (anything non-terminal is fair game at startup).
 ORCH_SWEEP_MIN_IDLE_SECONDS = int(os.getenv('ORCH_SWEEP_MIN_IDLE_SECONDS', '300'))
 
+# [LOCAL-833] The orchestrator's independent view of generator-job staleness: a
+# generator job still reporting 'processing'/'queued' whose updated_at has not
+# advanced for this long is treated as 'error' (its worker died with a recycled
+# instance). Mirrors the generator's own GEN_JOB_STALE_SECONDS default (1800 s)
+# so the two sides agree; both read the same env var.
+GEN_JOB_STALE_SECONDS = int(os.getenv('GEN_JOB_STALE_SECONDS', '1800'))
+
+# [LOCAL-833] A resumable orchestrator_jobs row is retried at most this many
+# times before it is marked a terminal 'error'. Without a cap, a row that keeps
+# failing to deliver (e.g. a generator job that is reachable but never
+# completes) would be re-taken by the sweep every cycle forever — the endless
+# re-sweep the evidence describes. The count is persisted on the row
+# (resume_attempts) so it survives instance churn.
+ORCH_MAX_RESUME_ATTEMPTS = int(os.getenv('ORCH_MAX_RESUME_ATTEMPTS', '3'))
+
 
 def _orch_jobs_store():
     """Return the orchestrator_jobs store singleton, or None if unavailable."""
@@ -232,6 +247,20 @@ def _cancel_generation_job(text_job_id, reason=""):
         print(f"[LOCAL-622] Cancel request returned {resp.status_code}: {resp.text[:200]}")
     except Exception as _cancel_err:
         print(f"[LOCAL-622] Cancel request failed (non-fatal): {_cancel_err}")
+
+
+class GeneratorGiveUpError(Exception):
+    """[LOCAL-833] Raised when the orchestrator DELIBERATELY gives up on a
+    generator job (a real no-progress stall or the absolute poll cap) and has
+    asked the generator to stop.
+
+    This is distinct from a transient poll error or this instance being torn
+    down: a give-up is a terminal decision, so the exception handler marks the
+    orchestrator_jobs row 'error' immediately (and the generator's own stale
+    rule / cancel flips its generator_jobs row to 'error' too), instead of
+    leaving the row resumable for the sweep to re-take forever. That endless
+    re-sweep of a cancelled-but-non-terminal row is exactly the LOCAL-833
+    defect."""
 
 
 # Configure unbuffered logging
@@ -831,7 +860,28 @@ def _generator_job_state(generator_job_id):
             return 'missing'
         data = resp.json()
         status = (data.get('status') or '').strip().lower()
-        if status in ('completed', 'processing', 'queued', 'error'):
+        if status in ('completed', 'error'):
+            return status
+        if status in ('processing', 'queued'):
+            # [LOCAL-833] A job that still reports 'processing'/'queued' but whose
+            # updated_at has not advanced for GEN_JOB_STALE_SECONDS had its worker
+            # die with a recycled instance (ac864a08 went silent after 07:54Z and
+            # stayed 'processing' forever). Treat it as 'error' so the resume marks
+            # it terminal instead of re-polling a dead job every sweep. The
+            # generator's own stale-on-read/sweep normally flips the row first;
+            # this is the orchestrator's independent backstop. heartbeat_at proves
+            # a LIVE worker on the owning instance, so its presence vetoes
+            # staleness (a slow-but-alive tour is never killed here).
+            if data.get('heartbeat_at'):
+                return status
+            updated = _parse_gen_updated_at(data.get('updated_at'))
+            if updated is not None:
+                age = (datetime.now() - updated).total_seconds()
+                if age > GEN_JOB_STALE_SECONDS:
+                    print(f"[LOCAL-833] generator job {generator_job_id} is stale "
+                          f"(no progress for {age / 60:.1f} min, status={status}) — "
+                          f"treating as 'error'.")
+                    return 'error'
             return status
         # Unknown/blank status from a known job — treat as still processing so we
         # do not throw away a job that may yet finish.
@@ -839,6 +889,22 @@ def _generator_job_state(generator_job_id):
     except Exception as _e:
         print(f"[LOCAL-821] _generator_job_state({generator_job_id}) failed: {_e}")
         return 'missing'
+
+
+def _parse_gen_updated_at(ts):
+    """[LOCAL-833] Parse the generator's ISO updated_at into a naive datetime, or
+    None. Best-effort — a bad value just means staleness can't be judged here (the
+    generator's own sweep is the primary mechanism), so the caller keeps the
+    reported status."""
+    if not ts:
+        return None
+    try:
+        s = str(ts)
+        if s.endswith('Z'):
+            s = s[:-1]
+        return datetime.fromisoformat(s)
+    except Exception:
+        return None
 
 
 def _tour_already_stored_for_job(job_id):
@@ -875,6 +941,44 @@ def _tour_already_stored_for_job(job_id):
     except Exception as _e:
         print(f"[LOCAL-821] _tour_already_stored_for_job({job_id}) check skipped: {_e}")
         return False
+
+
+def _tour_request_is_terminal(job_id):
+    """[LOCAL-833] Return the tour_requests terminal status ('completed' or
+    'failed') for this orchestrator job, or None if the row is still non-terminal
+    (or missing / DB unreachable).
+
+    The sweep uses this to retire a durable record whose request the orchestrator
+    ALREADY failed on a give-up (tour_requests → 'failed') but whose
+    orchestrator_jobs row was left non-terminal — the exact endless-re-sweep case
+    in the evidence (tour_requests 298 'failed', orchestrator_jobs 03ec8b1a never
+    terminal). Best-effort read; a missing row / DB error returns None so a
+    genuinely live request is still resumed."""
+    try:
+        import psycopg2 as _pg
+        _conn = _pg.connect(
+            host=os.getenv('DB_HOST', 'postgres-2'),
+            database=os.getenv('DB_NAME', 'audiotours'),
+            user=os.getenv('DB_USER', 'admin'),
+            password=os.getenv('DB_PASSWORD', 'password123'),
+            port=os.getenv('DB_PORT', '5432')
+        )
+        _cur = _conn.cursor()
+        _cur.execute(
+            "SELECT status FROM tour_requests "
+            "WHERE tour_id = %s AND source = 'orchestrator' "
+            "ORDER BY id DESC LIMIT 1",
+            (job_id,)
+        )
+        _row = _cur.fetchone()
+        _cur.close()
+        _conn.close()
+        if _row and _row[0] in ('completed', 'failed'):
+            return _row[0]
+        return None
+    except Exception as _e:
+        print(f"[LOCAL-833] _tour_request_is_terminal({job_id}) check skipped: {_e}")
+        return None
 
 
 def _release_generation_reservation(user_id, job_id, reason):
@@ -1969,7 +2073,7 @@ def orchestrate_tour_async(job_id, location, tour_type, total_stops, user_id=Non
                            if _stalled_for > _POLL_STALL_LIMIT
                            else f"absolute {_POLL_ABSOLUTE_CAP.total_seconds() / 60:.0f}-minute cap")
                 _cancel_generation_job(job_id_1, reason=_reason)
-                raise Exception(
+                raise GeneratorGiveUpError(
                     f"Text-generation abandoned after {poll_count} polls — {_reason}. "
                     f"The generator job was asked to stop. (ran "
                     f"{_ran_for.total_seconds() / 60:.1f} min, last progress "
@@ -3033,18 +3137,33 @@ def orchestrate_tour_async(job_id, location, tour_type, total_stops, user_id=Non
         # non-terminal so the sweep re-attaches and finishes the tour. This is
         # the heart of the fix — a tour the generator actually produced is never
         # lost to an orchestrator-side give-up.
+        #
+        # [LOCAL-833] EXCEPTION to the above: a GeneratorGiveUpError is a
+        # DELIBERATE give-up — the orchestrator hit a real stall / the absolute
+        # cap and asked the generator to STOP. That is terminal: the generator
+        # job will not advance (it was cancelled and, if it went silent, its own
+        # stale rule flips it to 'error'), so leaving the row resumable is exactly
+        # the endless re-sweep this task closes. Mark the record 'error' now and
+        # release the lease, so the row goes terminal and the sweep leaves it
+        # alone. The reservation was already released and tour_requests set
+        # 'failed' above, so the record simply matches that terminal disposition.
         if _orch_store:
-            _gen_jid = ACTIVE_JOBS.get(job_id, {}).get("text_job_id") or resume_generator_job_id
-            _gen_state = _generator_job_state(_gen_jid) if _gen_jid else 'missing'
-            if _gen_state in ('completed', 'processing', 'queued'):
-                print(f"[LOCAL-821] exception for job {job_id} but generator job "
-                      f"{_gen_jid} is '{_gen_state}' — leaving record resumable.")
-                # [LOCAL-829] Release under the owner THIS run holds (live path
-                # minted its own owner; resume was handed one), so the release
-                # actually matches lease_owner and the row becomes resumable.
-                _orch_store.release_lease(job_id, owner=_lease_owner)
-            else:
+            if isinstance(e, GeneratorGiveUpError):
+                print(f"[LOCAL-833] deliberate give-up for job {job_id} — "
+                      f"marking durable record 'error' (no resume).")
                 _orch_store.mark_error(job_id, reason=str(e))
+            else:
+                _gen_jid = ACTIVE_JOBS.get(job_id, {}).get("text_job_id") or resume_generator_job_id
+                _gen_state = _generator_job_state(_gen_jid) if _gen_jid else 'missing'
+                if _gen_state in ('completed', 'processing', 'queued'):
+                    print(f"[LOCAL-821] exception for job {job_id} but generator job "
+                          f"{_gen_jid} is '{_gen_state}' — leaving record resumable.")
+                    # [LOCAL-829] Release under the owner THIS run holds (live path
+                    # minted its own owner; resume was handed one), so the release
+                    # actually matches lease_owner and the row becomes resumable.
+                    _orch_store.release_lease(job_id, owner=_lease_owner)
+                else:
+                    _orch_store.mark_error(job_id, reason=str(e))
 
 def _resume_one_job(job):
     """[LOCAL-821] Finish a single non-terminal orchestrator job on this instance.
@@ -3086,8 +3205,39 @@ def _resume_one_job(job):
             store.mark_completed(job_id)
             return
 
+        # [LOCAL-833] If the tour_requests row is ALREADY terminal (the
+        # orchestrator cancelled/failed it on a give-up, but the durable record
+        # was left non-terminal), the request will never be delivered — mark the
+        # record 'error' and stop, so the sweep never re-takes it. This is the
+        # direct fix for the evidence: tour_requests 298 went 'failed' at 09:15
+        # but orchestrator_jobs 03ec8b1a stayed non-terminal and was re-swept
+        # forever.
+        _req_terminal = _tour_request_is_terminal(job_id)
+        if _req_terminal:
+            reason = f"tour_requests already terminal ('{_req_terminal}') — request will not be delivered"
+            print(f"[LOCAL-833][sweep] job {job_id} {reason}; marking record error (no resume).")
+            store.mark_error(job_id, reason=reason)
+            return
+
+        # [LOCAL-833] Resume-attempt cap. Bump the persisted counter FIRST; once a
+        # row has been attempted ORCH_MAX_RESUME_ATTEMPTS times it is a terminal
+        # 'error' — a stubborn row that never delivers is not re-taken forever.
+        # getattr-guarded so a store build without the counter (older image) still
+        # resumes rather than crashing; the DB-backed store always has it.
+        _inc = getattr(store, 'increment_resume_attempts', None)
+        attempts = _inc(job_id) if callable(_inc) else None
+        if attempts is not None and attempts > ORCH_MAX_RESUME_ATTEMPTS:
+            reason = (f"exceeded max resume attempts "
+                      f"({attempts - 1} >= {ORCH_MAX_RESUME_ATTEMPTS})")
+            print(f"[LOCAL-833][sweep] job {job_id} {reason} — marking record error (no resume).")
+            _set_tour_request_status(job_id, 'failed')
+            _release_generation_reservation(user_id, job_id, reason='max_resume_attempts')
+            store.mark_error(job_id, reason=reason)
+            return
+
         gen_state = _generator_job_state(gen_jid) if gen_jid else 'missing'
-        print(f"[LOCAL-821][sweep] resuming job {job_id}: generator={gen_jid} state={gen_state}")
+        print(f"[LOCAL-821][sweep] resuming job {job_id}: generator={gen_jid} "
+              f"state={gen_state} attempt={attempts}/{ORCH_MAX_RESUME_ATTEMPTS}")
 
         if gen_state in ('completed', 'processing', 'queued'):
             # Re-attach to the existing generator job and run the normal delivery
@@ -3113,8 +3263,12 @@ def _resume_one_job(job):
                 lease_owner=leased.get('lease_owner'),
             )
         else:
-            # generator job failed or is unknown → this request cannot be
-            # delivered. Terminal failure with the reason; give back allowance.
+            # [LOCAL-833] generator job failed / missing / STALE → this request
+            # cannot be delivered. Terminal failure with the reason; give back
+            # allowance. 'error' now also covers a silent 'processing' job whose
+            # updated_at went stale (_generator_job_state maps it to 'error'), so
+            # a dead-but-not-cancelled generator job is no longer re-polled
+            # forever either.
             reason = (f"generator job {gen_jid} is '{gen_state}'" if gen_jid
                       else "no generator job id recorded (died before /generate returned)")
             print(f"[LOCAL-821][sweep] job {job_id} unrecoverable — {reason}")
@@ -3125,9 +3279,10 @@ def _resume_one_job(job):
         print(f"[LOCAL-821][sweep] error resuming job {job_id}: {_e}")
         print(traceback.format_exc())
         # Leave the record non-terminal but release our lease so a later sweep
-        # (or another instance) can retry.
+        # (or another instance) can retry. The resume-attempt cap above bounds
+        # how many times this can happen before the row is marked terminal.
         try:
-            store.release_lease(job_id)
+            store.release_lease(job_id, owner=leased.get('lease_owner'))
         except Exception:
             pass
 
