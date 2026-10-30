@@ -30508,6 +30508,35 @@ RULES:
             _import_logger.error(
                 f"[LOCAL-643] structured render failed, keeping legacy string: {_ss_e}")
 
+    # ─── [LOCAL-831] FINAL stop-delivery repair — the LAST text transform ──────
+    # This is the single, universal choke point that runs on EVERY delivery path
+    # (museum, walking/outdoor, places/restaurant, and the stop-pool reuse path,
+    # which all funnel through _generate_tour_text_impl and this write). It must
+    # be the LAST transformation before the file is written and the record is
+    # stored, because the live Rijks 866 run shipped a tour numbered [1, 2, 4, 5]:
+    # a D533 guard deleted a whole stop upstream and the earlier LOCAL-826B check
+    # could not repair the gap (its LOCAL-801 repair only renumbers when IT
+    # removed an artifact — here nothing was removed, so the gap survived). The
+    # gap-closing renumber here fixes that EVEN WHEN no artifact was removed, and
+    # any violation that still remains is logged as [LOCAL-831] DELIVERY DEFECT
+    # and left for the honest shortfall line, which keys on count_delivered_stops.
+    if complete_tour:
+        try:
+            from tour_conclusion import finalize_stop_delivery as _l831_finalize
+            _l831_venue = location
+            if '_museum_venue_name' in dir() and _museum_venue_name:
+                _l831_venue = _museum_venue_name
+            _l831_mode = "museum" if tour_category == 'museum' else "outdoor"
+            complete_tour = _l831_finalize(
+                complete_tour,
+                venue_name=_l831_venue,
+                requested_stops=total_stops,
+                mode=_l831_mode,
+                log=lambda m: print(m, flush=True))
+        except Exception as _l831_e:
+            print(f"  [LOCAL-831] final delivery repair skipped (non-fatal): {_l831_e}",
+                  flush=True)
+
     # Save to file if output_file is provided
     if not output_file:
         # Create default filename based on location and tour type
@@ -30736,29 +30765,28 @@ RULES:
     # whatever still remains so it is visible in the generator log and tests.
     if tour_category == 'museum' and complete_tour:
         try:
-            from tour_conclusion import check_stop_delivery as _chk_delivery
+            from tour_conclusion import (check_stop_delivery as _chk_delivery,
+                                         finalize_stop_delivery as _fin_delivery)
             _deliv_viol = _chk_delivery(complete_tour)
             if _deliv_viol:
                 print(f"  [LOCAL-826B] stop-delivery check: "
                       f"{len(_deliv_viol)} violation(s) before repair:")
                 for _v in _deliv_viol:
                     print(f"    {_v}")
-                try:
-                    from stop_dedup_collision_guard import (
-                        dedupe_and_fix_stop_count as _dedup826)
-                    complete_tour, _r826 = _dedup826(
-                        complete_tour, requested_stops=None,
-                        dedupe_real_stops=True)
-                    print(f"  [LOCAL-826B] re-ran LOCAL-801 dedupe/renumber: "
-                          f"{_r826}")
-                except Exception as _rg_err:
-                    print(f"  [LOCAL-826B] dedupe repair skipped (non-fatal): "
-                          f"{_rg_err}")
+                # [LOCAL-831] Use the gap-closing finalize (renumber 1..k even
+                # when no artifact was removed) instead of LOCAL-801's dedupe,
+                # which could not close the Rijks 866 [1,2,4,5] gap. It logs each
+                # repair action and a [LOCAL-831] DELIVERY DEFECT line for any
+                # residual.
+                _l831_venue = location
+                if '_museum_venue_name' in dir() and _museum_venue_name:
+                    _l831_venue = _museum_venue_name
+                complete_tour = _fin_delivery(
+                    complete_tour, venue_name=_l831_venue,
+                    requested_stops=total_stops, mode="museum",
+                    log=lambda m: print(m, flush=True))
                 _deliv_viol2 = _chk_delivery(complete_tour)
-                if _deliv_viol2:
-                    for _v in _deliv_viol2:
-                        print(f"  [LOCAL-826B] UNRESOLVED stop-delivery defect: {_v}")
-                else:
+                if not _deliv_viol2:
                     print("  [LOCAL-826B] stop-delivery check: clean after repair")
                 if output_file:
                     try:

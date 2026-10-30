@@ -47,7 +47,7 @@ from __future__ import annotations
 import os
 import re
 import logging
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
 
 logger = logging.getLogger(__name__)
 
@@ -548,6 +548,160 @@ def check_stop_delivery(tour_text: str) -> List[str]:
                 f"FRAGMENT_BODY: Stop {h.group(1)} '{_title[:40]}' "
                 f"body is a fragment (no complete sentence)")
     return violations
+
+
+# ─── [LOCAL-831] Gap-closing renumber + final delivery repair ─────────────────
+#
+# The live Rijks 866 run (2026-08-26) shipped a tour numbered [1, 2, 4, 5]: a
+# D533 guard deleted a whole stop block (header + body) while stripping a
+# repeated fact, and the LOCAL-826B delivery check — which DID flag
+# NON_SEQUENTIAL — could not repair it. Its repair, LOCAL-801's
+# ``dedupe_and_fix_stop_count``, only renumbers when IT removed an artifact
+# (preview header, spliced body, duplicate, over-count trim); here the stop was
+# already gone, so nothing was removed and the renumber branch never ran
+# (report ``renumbered: False``). The gap shipped.
+#
+# ``renumber_stops_sequential`` closes that gap unconditionally: it rewrites the
+# surviving ``Stop N:`` header NUMBERS to 1..k in document order, touching only
+# the integer in each header and nothing else — titles, bodies, field lines and
+# the Sources region are byte-for-byte preserved. It is a strict no-op on a
+# clean 1..k tour (so ``normalise_stop_headers(text) == text`` invariants hold),
+# and it is idempotent.
+
+def renumber_stops_sequential(tour_text: str) -> Tuple[str, bool]:
+    """Rewrite surviving ``Stop N:`` header numbers to 1..k in order.
+
+    Closes a numbering GAP ([1, 2, 4, 5] → [1, 2, 3, 4]) left when an upstream
+    pass deleted a whole stop, WITHOUT removing or adding any stop. Only the
+    header's leading integer changes; the title and body are untouched. Returns
+    ``(new_text, changed)``; ``changed`` is False when the text already numbers
+    1..k (a strict no-op).
+    """
+    if not tour_text:
+        return tour_text or "", False
+
+    # Renumber headers only up to the Sources/conclusion region, so a stray
+    # "Stop N:" inside a Sources citation (rare) is never renumbered.
+    end_body = len(tour_text)
+    _src = re.search(r'(?ms)^\s*Sources:\s.*\Z', tour_text)
+    if _src:
+        end_body = _src.start()
+
+    counter = {'n': 0}
+    changed = {'v': False}
+
+    def _sub(m):
+        if m.start() >= end_body:
+            return m.group(0)
+        counter['n'] += 1
+        new_num = counter['n']
+        if int(m.group(1)) != new_num:
+            changed['v'] = True
+        # Preserve the exact title text group(2) verbatim.
+        return f"Stop {new_num}: {m.group(2)}"
+
+    out = _STOP_HEADER.sub(_sub, tour_text)
+    if not changed['v']:
+        # Strict no-op: a clean 1..k tour is returned byte-for-byte, so the
+        # ``normalise_stop_headers(text) == text`` invariants other gates rely on
+        # are never perturbed by a cosmetic re-spacing of the header line.
+        return tour_text, False
+    return out, changed['v']
+
+
+def repair_stop_delivery(tour_text: str,
+                         venue_name: str = "",
+                         requested_stops: Optional[int] = None,
+                         mode: str = "museum") -> Tuple[str, List[str], List[str]]:
+    """[LOCAL-831] Make the tour's stop structure PROVABLY well-formed.
+
+    This is the LAST text transformation before a tour is written to a file and
+    stored, on EVERY delivery path (museum, walking/outdoor, places, pool reuse).
+    It runs the structural check, applies deterministic repairs, and returns the
+    honest residual.
+
+    Repairs applied, in order (all offline, deterministic, idempotent):
+      1. ``normalise_stop_headers`` — re-break any glued header, drop the
+         stop-count artifacts (LOCAL-801 preview/splice/collision) so the header
+         set is the true set of delivered stops.
+      2. ``renumber_stops_sequential`` — close any numbering GAP so the headers
+         read 1..k in order, EVEN WHEN no artifact was removed (the Rijks 866
+         case this ticket is for).
+
+    After the repair the check is re-run. Any violation that REMAINS is a real
+    defect the deterministic repairs cannot fix (e.g. an EMPTY_BODY /
+    FRAGMENT_BODY): it is returned so the caller can (a) log
+    ``[LOCAL-831] DELIVERY DEFECT <kind>`` and (b) carry the honest shortfall
+    sentence for the REAL delivered count. Renumbering a gap is NOT a shortfall
+    by itself — it just makes the count the tour already has honest — so a
+    shortfall line is only warranted when the delivered count is below
+    ``requested_stops``; the caller owns that sentence via
+    ``about_museum_stop.build_shortfall_sentence``.
+
+    Returns ``(repaired_text, residual_violations, actions)`` where ``actions``
+    is a short human-readable log of what the repair did.
+    """
+    actions: List[str] = []
+    if not tour_text:
+        return tour_text or "", [], actions
+
+    out = normalise_stop_headers(tour_text)
+    if out != tour_text:
+        actions.append("normalise_stop_headers rewrote glued/artifact headers")
+
+    out2, renumbered = renumber_stops_sequential(out)
+    if renumbered:
+        _before = [int(m.group(1)) for m in _STOP_HEADER.finditer(out)]
+        _after = [int(m.group(1)) for m in _STOP_HEADER.finditer(out2)]
+        actions.append(f"renumbered stops {_before} -> {_after}")
+        out = out2
+    else:
+        out = out2
+
+    residual = check_stop_delivery(out)
+    return out, residual, actions
+
+
+def finalize_stop_delivery(tour_text: str,
+                           venue_name: str = "",
+                           requested_stops: Optional[int] = None,
+                           mode: str = "museum",
+                           log=print) -> str:
+    """[LOCAL-831] Convenience wrapper: repair, log, and return the final text.
+
+    The ONE call a delivery path makes as its last text transform before write /
+    store. It applies ``repair_stop_delivery``, logs each repair action and —
+    for any violation that survives — a ``[LOCAL-831] DELIVERY DEFECT <kind>``
+    line so the residual is visible in the generator log and tests. It does not
+    raise; a finished tour always comes back.
+    """
+    try:
+        out, residual, actions = repair_stop_delivery(
+            tour_text, venue_name=venue_name,
+            requested_stops=requested_stops, mode=mode)
+    except Exception as _e:  # pragma: no cover - never let the final guard break delivery
+        try:
+            log(f"  [LOCAL-831] delivery repair skipped (non-fatal): {_e}")
+        except Exception:
+            pass
+        return tour_text
+    for _a in actions:
+        try:
+            log(f"  [LOCAL-831] delivery repair: {_a}")
+        except Exception:
+            pass
+    for _v in residual:
+        _kind = _v.split(":", 1)[0].strip()
+        try:
+            log(f"  [LOCAL-831] DELIVERY DEFECT {_kind}: {_v}")
+        except Exception:
+            pass
+    if not residual and actions:
+        try:
+            log("  [LOCAL-831] stop-delivery: well-formed after repair")
+        except Exception:
+            pass
+    return out
 
 
 # [LOCAL-743] Field labels that are STRUCTURE, never speech. If any of these
