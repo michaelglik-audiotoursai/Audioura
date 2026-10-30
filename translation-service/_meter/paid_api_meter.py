@@ -140,6 +140,13 @@ OPENAI = {  # longest key wins
     "text-embedding-ada-002": (0.10, 0.0, 0.10),
 }
 GEMINI_IN, GEMINI_OUT, GROUNDING_PER_QUERY, SERPER_PER_QUERY = 0.75, 3.75, 0.014, 0.001
+# [LOCAL-783] Serper Places (https://google.serper.dev/places) returns the full
+# page (~20 businesses), which the Serper credit rule prices at 2 credits
+# ($0.002) — "> 10 results = 2 credits" (serper.dev credit model + Scrapingdog/
+# Medium benchmark, read 2026-10-26; base $0.001/credit at the $50/50k tier).
+# A /places call bills twice a /search call; priced separately so the ledger
+# never under-counts the bulk place search / refill that LOCAL-783 added.
+SERPER_PLACES_PER_QUERY = 0.002
 # [LOCAL-712 / D674] Anthropic (Claude) $ per 1M tokens: (input, output, cache_read).
 # Base-token list prices, standard tier. Source:
 # https://docs.anthropic.com/en/docs/about-claude/pricing (read 2026-10-18).
@@ -363,7 +370,11 @@ def _record(url, status, body, req_body=None):
             rec.update(model=url.split("/models/")[-1].split(":")[0] if "/models/" in url else "",
                        tokens_in=pin, tokens_out=pout, search_queries=q, usd=usd if status == 200 else 0.0)
         elif kind == "serper":
-            rec.update(usd=SERPER_PER_QUERY if status == 200 else 0.0)
+            # [LOCAL-783] The Places endpoint bills 2 credits ($0.002); every other
+            # Serper endpoint (search, news, scholar) bills 1 credit ($0.001).
+            _is_places = "/places" in (url or "")
+            _rate = SERPER_PLACES_PER_QUERY if _is_places else SERPER_PER_QUERY
+            rec.update(usd=_rate if status == 200 else 0.0)
     except Exception as e:
         rec["meter_error"] = str(e)[:120]
     try:
@@ -586,6 +597,127 @@ def check_daily_limit():
             % (total, limit, day_str))
 
 
+# --------------------------------------------------------------------------- #
+# Whole-task paid-API budget  (LOCAL-817)
+#
+# The daily limit above caps a CALENDAR DAY's listener spend. It does NOT cap a
+# single Kiro task's TOTAL spend across its (often many) debugging re-runs, which
+# is what a task file means by "Paid-API cap $X TOTAL across all runs". On
+# 2026-10-29 that gap let tasks overspend 3x (LOCAL-810 $2.88 vs $1.00, …). This
+# is the raw-door half of the fix: EVERY paid call that passes through this meter
+# — including calls made OUTSIDE tests/live_run_meter.LiveRunMeter — refuses to go
+# out once the task's recorded total has reached TASK_BUDGET_USD.
+#
+# Self-contained on purpose: this module ships to containers via /opt/meter with
+# nothing else on the path, so it must NOT import the repo-root task_budget.py. It
+# reads the SAME env contract (TASK_BUDGET_ID / TASK_BUDGET_USD) and the SAME
+# append-only JSON ledger (~/.audioura_task_budgets/<id>.json, dir overridable
+# with AUDIOURA_TASK_BUDGET_DIR) that task_budget.py and LiveRunMeter use, so the
+# two halves agree. The ledger is written by LiveRunMeter at the end of each run;
+# this door only READS the recorded total.
+#
+# FAIL-OPEN like the daily limit: any error reading the env or the ledger -> allow
+# (a meter bug must never block a tour). The cap is OFF when TASK_BUDGET_ID is
+# unset or TASK_BUDGET_USD is unset/negative. A budget of exactly $0 is a real cap
+# (no paid spend allowed) — used by the LOCAL-817 $0 test.
+# --------------------------------------------------------------------------- #
+TASK_BUDGET_ID_ENV = "TASK_BUDGET_ID"
+TASK_BUDGET_USD_ENV = "TASK_BUDGET_USD"
+TASK_BUDGET_DIRNAME = ".audioura_task_budgets"
+
+
+class TaskBudgetExceeded(Exception):
+    """[LOCAL-817] Raised instead of sending a paid request once the task's
+    recorded TOTAL paid-API spend (the ~/.audioura_task_budgets/<id>.json ledger)
+    has reached TASK_BUDGET_USD. Callers already handle paid-API failures, so the
+    tour fails cleanly with an honest error rather than overspending."""
+
+
+def _task_budget_id():
+    """Active task id, or None when the whole-task cap is off. Never raises."""
+    try:
+        raw = os.environ.get(TASK_BUDGET_ID_ENV)
+        if raw is None:
+            return None
+        raw = raw.strip()
+        return raw or None
+    except Exception:
+        return None
+
+
+def _task_budget_usd():
+    """Whole-task budget in USD, or None when off (unset/blank/unparseable/<0).
+    $0 is kept (a real zero-spend cap). Never raises."""
+    try:
+        raw = os.environ.get(TASK_BUDGET_USD_ENV)
+        if raw is None or str(raw).strip() == "":
+            return None
+        val = float(raw)
+        return val if val >= 0 else None
+    except Exception:
+        return None
+
+
+def _task_budget_dir():
+    try:
+        override = os.environ.get("AUDIOURA_TASK_BUDGET_DIR")
+        if override:
+            return override
+        return os.path.join(os.path.expanduser("~"), TASK_BUDGET_DIRNAME)
+    except Exception:
+        return TASK_BUDGET_DIRNAME
+
+
+def _task_budget_ledger_path(task_id):
+    safe = "".join(c if (c.isalnum() or c in "-_.") else "_" for c in str(task_id).strip()) or "task"
+    return os.path.join(_task_budget_dir(), safe + ".json")
+
+
+def _task_budget_spent(task_id):
+    """Sum of recorded run dollars for ``task_id`` from the JSON ledger. A missing
+    or unreadable ledger reads as $0 (fail-open). Never raises."""
+    try:
+        with open(_task_budget_ledger_path(task_id)) as f:
+            data = json.load(f)
+        total = 0.0
+        for run in (data.get("runs") or []):
+            try:
+                total += float(run.get("usd") or 0.0)
+            except (TypeError, ValueError):
+                continue
+        return total
+    except Exception:
+        return 0.0
+
+
+def check_task_budget():
+    """[LOCAL-817] Enforce TASK_BUDGET_USD before a paid request. Raises
+    TaskBudgetExceeded when the task's recorded total has reached the budget;
+    returns None (allow) otherwise. Fails OPEN on any error. No-op when the
+    whole-task cap is off.
+
+    Called immediately before sending any paid request (by every client patch in
+    install(), alongside check_daily_limit). The precise spent+current accounting
+    for an IN-PROGRESS run lives in LiveRunMeter's grounding guard; this raw-door
+    check is the belt-and-suspenders catch for paid calls made OUTSIDE
+    LiveRunMeter — it refuses once the recorded total has reached the budget."""
+    task_id = _task_budget_id()
+    if not task_id:
+        return  # cap off
+    budget = _task_budget_usd()
+    if budget is None:
+        return  # cap off
+    try:
+        spent = _task_budget_spent(task_id)
+    except Exception:
+        return  # fail-open: never block on a ledger read error
+    if spent >= budget:
+        raise TaskBudgetExceeded(
+            "TASK_BUDGET_USD reached: task %s recorded paid-API spend "
+            "$%.4f >= budget $%g. Refusing paid request (whole-task cap, "
+            "LOCAL-817)." % (task_id, spent, budget))
+
+
 def install():
     # Idempotent: patching each HTTP client more than once would stack wrappers
     # and record (and limit-check) every paid call N times. sitecustomize and
@@ -603,6 +735,7 @@ def install():
             # or fails open; non-paid hosts are never checked.
             if _host_kind(request.url):
                 check_daily_limit()
+                check_task_budget()
             resp = _orig(self, request, **kw)
             try:
                 if _host_kind(request.url) and not _is_explicit(request.url):
@@ -626,6 +759,7 @@ def install():
                 return _orig_open(req, *a, **kw)
             # Enforce the daily limit BEFORE sending the paid request.
             check_daily_limit()
+            check_task_budget()
             try:
                 resp = _orig_open(req, *a, **kw)
             except Exception as e:
@@ -689,6 +823,7 @@ def install():
             url = str(getattr(request, "url", ""))
             if _host_kind(url):
                 check_daily_limit()
+                check_task_budget()
             resp = _orig_httpx_send(self, request, stream=stream, **kw)
             try:
                 if _host_kind(url) and not _is_explicit(url):
@@ -705,6 +840,7 @@ def install():
             url = str(getattr(request, "url", ""))
             if _host_kind(url):
                 check_daily_limit()
+                check_task_budget()
             resp = await _orig_httpx_asend(self, request, stream=stream, **kw)
             try:
                 if _host_kind(url) and not _is_explicit(url):
@@ -732,6 +868,7 @@ def install():
             url = str(str_or_url)
             if _host_kind(url):
                 check_daily_limit()
+                check_task_budget()
             resp = await _orig_aiohttp_request(self, method, str_or_url, **kw)
             try:
                 if _host_kind(url) and not _is_explicit(url):
@@ -813,6 +950,7 @@ def install():
             # fail open). Non-paid AWS services are never checked or recorded.
             if kind:
                 check_daily_limit()
+                check_task_budget()
             try:
                 response = _orig_make_api_call(self, operation_name, api_params)
             except Exception as e:
