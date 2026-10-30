@@ -544,6 +544,74 @@ ACTIVE_JOBS = {}  # Track running jobs
 _ACTIVE_GENERATION_THREADS = []  # Track in-flight generation threads for graceful shutdown
 _SHUTTING_DOWN = False  # Signal that shutdown is in progress
 
+# [LOCAL-830] Idempotency for /generate-complete-tour. The phone sends a
+# client_request_id with each generation; a duplicate SUBMISSION of the same id
+# within the window (a double tap that slipped the client's in-flight guard, a
+# retried HTTP request, a relaunch) must map to the SAME job — not a second,
+# separately-billed generation. Field evidence (GCloud_Storied 2026-10-30): the
+# phone sent two /generate-complete-tour requests 1 s apart; only one tour saved,
+# but the second request still ran work. Kept in-process (the orchestrator is a
+# single service): {client_request_id: (job_id, created_monotonic)}, pruned by
+# age. Thread-safe via a lock since generation runs on worker threads.
+_IDEMPOTENCY_WINDOW_SECONDS = 60
+_CLIENT_REQUEST_JOBS = {}  # client_request_id -> (job_id, created_monotonic)
+_CLIENT_REQUEST_LOCK = threading.Lock()
+
+
+def _prune_client_request_jobs(now=None):
+    """Drop idempotency entries older than the window (called under the lock)."""
+    import time as _t
+    now = now if now is not None else _t.monotonic()
+    stale = [k for k, (_jid, ts) in _CLIENT_REQUEST_JOBS.items()
+             if now - ts > _IDEMPOTENCY_WINDOW_SECONDS]
+    for k in stale:
+        _CLIENT_REQUEST_JOBS.pop(k, None)
+
+
+def _reserve_idempotent_job(client_request_id, new_job_id):
+    """Atomically either (a) return an EXISTING job_id already registered for this
+    client_request_id within the window (duplicate submission), or (b) register
+    new_job_id and return None (this is the first submission).
+
+    One lock acquisition does the prune + lookup + insert, so two requests racing
+    with the same id cannot both get "first" — exactly one reserves the job, the
+    other is told the existing job_id. A falsy id reserves nothing (returns None),
+    so idempotency is simply off when the client sends no key."""
+    if not client_request_id:
+        return None
+    import time as _t
+    with _CLIENT_REQUEST_LOCK:
+        now = _t.monotonic()
+        _prune_client_request_jobs(now)
+        entry = _CLIENT_REQUEST_JOBS.get(client_request_id)
+        if entry:
+            return entry[0]
+        _CLIENT_REQUEST_JOBS[client_request_id] = (new_job_id, now)
+        return None
+
+
+def _idempotent_job_for(client_request_id):
+    """Return an existing job_id for this client_request_id if one was created
+    within the window, else None. Prunes stale entries. No-op for a falsy id."""
+    if not client_request_id:
+        return None
+    import time as _t
+    with _CLIENT_REQUEST_LOCK:
+        _prune_client_request_jobs(_t.monotonic())
+        entry = _CLIENT_REQUEST_JOBS.get(client_request_id)
+        return entry[0] if entry else None
+
+
+def _register_client_request_job(client_request_id, job_id):
+    """Record client_request_id -> job_id so a duplicate submission within the
+    window returns this same job. No-op for a falsy id."""
+    if not client_request_id:
+        return
+    import time as _t
+    with _CLIENT_REQUEST_LOCK:
+        _prune_client_request_jobs(_t.monotonic())
+        _CLIENT_REQUEST_JOBS[client_request_id] = (job_id, _t.monotonic())
+
 
 def _graceful_shutdown(signum, frame):
     """Handle SIGTERM (Cloud Run shutdown signal) by waiting for in-flight generations."""
@@ -3243,6 +3311,24 @@ def generate_complete_tour():
     user_id = sanitize_input(data.get('user_id'))
     request_string = sanitize_input(data.get('request_string'))
     language = data.get('language', 'en')  # Default to English
+    # [LOCAL-830] Idempotency key from the app. Reserve a job_id for this
+    # client_request_id ATOMICALLY: if the id was already seen within the window
+    # (a double tap / retry / relaunch that slipped the client's in-flight guard),
+    # return that SAME job and start no second generation. Field evidence
+    # (GCloud_Storied 2026-10-30): the phone sent two /generate-complete-tour
+    # requests 1 s apart. The reserved id becomes this request's job_id below.
+    client_request_id = sanitize_input(data.get('client_request_id'))
+    _reserved_job_id = None
+    if client_request_id:
+        _reserved_job_id = str(uuid.uuid4())
+        _existing_job = _reserve_idempotent_job(client_request_id, _reserved_job_id)
+        if _existing_job:
+            print(f"[LOCAL-830] duplicate client_request_id={client_request_id} "
+                  f"within {_IDEMPOTENCY_WINDOW_SECONDS}s → returning existing "
+                  f"job_id={_existing_job} (no second job)")
+            sys.stdout.flush()
+            return jsonify({"job_id": _existing_job, "status": "queued",
+                            "language": language, "idempotent_reuse": True})
     # [LOCAL-701 / D663 §3] Optional "generate FOR a community" fields. When the
     # organiser picks "For: my community <name>" on the Generate tab, the app
     # sends the community id and the chosen visibility. The tour is generated by
@@ -3451,7 +3537,9 @@ def generate_complete_tour():
         }), 429
 
     # Generate job ID FIRST (needed for usage recording)
-    job_id = str(uuid.uuid4())
+    # [LOCAL-830] Reuse the job_id reserved under client_request_id (if any) so the
+    # id registered for idempotency is the SAME one this request runs and returns.
+    job_id = _reserved_job_id or str(uuid.uuid4())
     print(f"Generated job ID: {job_id}")
     sys.stdout.flush()
 

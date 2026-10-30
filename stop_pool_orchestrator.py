@@ -680,6 +680,37 @@ def maybe_generate_with_pool(
     pooled_rows, _pool_rejected = _revalidate_pooled_scope(
         pooled_rows, location, tour_type, contained)
     K = len(pooled_rows)
+
+    # [LOCAL-830] Category-scoped reuse — on-category check for a BUSINESS/ACTIVITY
+    # request, applied to POOLED stops exactly as the fresh path applies it to new
+    # ones. Field defect (GCloud_Storied tour 502 "Kitesurf schools … Mui Ne"): a
+    # pooled **Sandals Restaurant** row was reused into a kite-school tour. The
+    # fresh path keeps a business tour on-category (PHASE 4 _verify_against_intent
+    # on the LLM poi_type, and the LOCAL-791B category guard), but neither runs on a
+    # reused stop — and neither is available cheaply here. This guard is the
+    # deterministic, offline equivalent: for a request whose SUBJECT is a
+    # business/activity provider that is NOT about food (kite school, dive shop,
+    # yoga studio, gym, …), a pooled stop that classifies as FOOD ("restaurant"
+    # class) is off-category and SKIPPED for this tour. A FOOD request ("seafood
+    # restaurants", "cafes") is a no-op — restaurants stay on-category and are kept.
+    # SKIP-ONLY: the row is NEVER deleted from the pool (category-scoped reuse — it
+    # stays reusable for a food request); it is only not served here. If K then
+    # falls below N, the existing N>K path researches the remainder fresh, exactly
+    # as if the off-category stop had never been pooled. Best-effort: any failure
+    # leaves pooled_rows unchanged (never empties a tour over a guard bug).
+    if not contained:
+        try:
+            from category_match_guard import filter_off_category_business as _focb830
+            pooled_rows, _oc830 = _focb830(pooled_rows, location, log=print)
+            if _oc830:
+                print(f"  [LOCAL-830] category-scoped reuse: skipped {_oc830} "
+                      f"off-category food stop(s) from this business/activity tour "
+                      f"(pool unchanged)")
+            K = len(pooled_rows)
+        except Exception as _oc_err:
+            logger.warning(f"[LOCAL-830] business off-category reuse check skipped "
+                           f"({_oc_err}); pool unchanged")
+
     print(f"  [LOCAL-590] pool: venue={identity} type={tour_type} category={tour_category} "
           f"contained={contained} requested={N} pooled={K} reuse_first={reuse_first}"
           f"{(' rejected=' + str(_pool_rejected)) if _pool_rejected else ''}")
