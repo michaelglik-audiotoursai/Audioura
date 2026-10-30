@@ -71,6 +71,7 @@ This file is a tool. It does nothing on import.
 from __future__ import annotations
 
 import argparse
+import contextlib
 import io
 import os
 import re
@@ -261,6 +262,36 @@ def derive_scope(request_string: str,
     return scope, scope_center, scope_bbox
 
 
+@contextlib.contextmanager
+def _landmark_live_lookup():
+    """[LOCAL-820] Turn the live Wikidata landmark lookup ON (LANDMARK_LIVE_LOOKUP=1)
+    for the duration of the ``with`` block ONLY, then restore the prior value.
+
+    Why this exists: this tool needs the live lookup while it resolves a museum
+    building pin, but it must NOT leave ``LANDMARK_LIVE_LOOKUP`` set in the process
+    env afterwards. The old ``os.environ.setdefault("LANDMARK_LIVE_LOOKUP", "1")``
+    did exactly that, and in a single pytest process it leaked into
+    ``local802_relevance_gate`` — whose same-building alias bridge then fired for
+    every later test, over-merging distinct stops (``test_local818_district_refill``
+    failed the moment it ran after ``test_local815_repin_tours``). Scoping the env
+    change here fixes that at the source for every caller and every test order.
+
+    A value already present is left untouched for the block and restored exactly
+    (an explicit ``LANDMARK_LIVE_LOOKUP=0`` from the environment wins)."""
+    key = "LANDMARK_LIVE_LOOKUP"
+    had = key in os.environ
+    prev = os.environ.get(key)
+    if not had:
+        os.environ[key] = "1"
+    try:
+        yield
+    finally:
+        if had:
+            os.environ[key] = prev  # restore the caller's explicit value
+        else:
+            os.environ.pop(key, None)  # remove what we set; no leak
+
+
 def derive_museum_fallback(scope: str,
                            scope_center: Optional[Tuple[float, float]],
                            scope_bbox: Optional[Sequence[float]],
@@ -276,11 +307,17 @@ def derive_museum_fallback(scope: str,
         venue = (request_string or tour_name or scope or "").strip()
         if not venue:
             return None
-        os.environ.setdefault("LANDMARK_LIVE_LOOKUP", "1")
-        from wikidata_landmark_lookup import lookup as _wd_lookup
-        hit = _wd_lookup(venue, scope=scope, scope_center=scope_center,
-                         scope_bbox=list(scope_bbox) if scope_bbox else None,
-                         tour_language="en")
+        # [LOCAL-820] Enable the live Wikidata lookup ONLY for the duration of this
+        # call. The previous `os.environ.setdefault("LANDMARK_LIVE_LOOKUP", "1")`
+        # permanently mutated the process env; in a single pytest process that leak
+        # flipped local802_relevance_gate's same-building alias bridge ON for every
+        # later test, over-merging distinct stops (test_local818_district_refill
+        # failed when run after test_local815_repin_tours). Scope it instead.
+        with _landmark_live_lookup():
+            from wikidata_landmark_lookup import lookup as _wd_lookup
+            hit = _wd_lookup(venue, scope=scope, scope_center=scope_center,
+                             scope_bbox=list(scope_bbox) if scope_bbox else None,
+                             tour_language="en")
         if hit:
             mb = (float(hit[0]), float(hit[1]))
             log(f"    [museum] building pin for {venue!r}: {mb} "
@@ -335,9 +372,6 @@ class ApiBudget:
     def note_serper_call(self) -> None:
         self.serper_calls += 1
         self.spent_usd += self._price
-
-
-import contextlib  # noqa: E402
 
 
 @contextlib.contextmanager
