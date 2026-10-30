@@ -1,0 +1,8 @@
+# Dockerfile.fake-generator-local839 — zero-cost generator stand-in for the
+# LOCAL-839 end-to-end orchestrator proof (see fake_generator_local839.py).
+FROM python:3.9-slim
+WORKDIR /app
+RUN pip install --no-cache-dir flask==2.3.3
+COPY fake_generator_local839.py /app/
+EXPOSE 5000
+CMD ["python", "fake_generator_local839.py"]

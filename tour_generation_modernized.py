@@ -80,6 +80,22 @@ def _strip_nav_fields_for_tts(text):
 
 from job_store import get_job_store
 
+# [LOCAL-839] Multi-instance safety for the modernized (voice/ZIP) service.
+# ----------------------------------------------------------------------------
+# On Cloud Run the modernized service can run on >1 instance. With the default
+# in-memory store the orchestrator's /status poll (and, worse, its /download)
+# can land on an instance that never saw the job → "Job not found" 404 and the
+# (already paid-for) tour is lost (GCloud_Storied wave 14, job d7d98f2f).
+#
+# The fix reuses the SAME layered store the tour-generator already uses
+# (LOCAL-775): memory cache in front of the generator_jobs table, keyed by
+# service_name — here 'tour-generation-modernized'. Set JOB_STORE_MODE=layered
+# (and the DB_* env) in the deployment and every instance reads the job from the
+# shared table. JOB_STORE_MODE is read by get_job_store from the env, so leaving
+# it 'memory' keeps the exact single-instance behaviour for local Docker.
+JOB_STORE_MODE = os.getenv('JOB_STORE_MODE', 'memory')
+
+
 def _get_auth_token(target_url):
     """Get identity token for Cloud Run service-to-service auth."""
     if not target_url.startswith('https://'):
@@ -101,7 +117,10 @@ app = Flask(__name__)
 CORS(app)
 
 TOURS_DIR = "/app/tours"
-ACTIVE_JOBS = get_job_store('tour-generation-modernized')
+# [LOCAL-839] Keyed by service_name so the row lives in the same generator_jobs
+# table (LOCAL-775) under 'tour-generation-modernized'; mode comes from
+# JOB_STORE_MODE ('layered' on Cloud Run, 'memory' for local Docker).
+ACTIVE_JOBS = get_job_store('tour-generation-modernized', mode=JOB_STORE_MODE)
 
 # Inter-service URLs
 POLLY_TTS_URL = os.getenv('POLLY_TTS_URL', 'http://polly-tts-1:5018')
@@ -211,6 +230,50 @@ self.addEventListener('install', function(event) {
 });
 '''
 
+# [LOCAL-839] The ZIP never larger than this is stored inline (base64) in the
+# shared job store so another instance can serve /download. A 3-stop walking
+# tour ZIP is a few MB; the cap is a guard against an unexpectedly huge ZIP
+# bloating the generator_jobs row. Overridable for tuning.
+MODERNIZED_ZIP_STORE_MAX_BYTES = int(os.getenv('MODERNIZED_ZIP_STORE_MAX_BYTES', str(64 * 1024 * 1024)))
+
+
+def _store_zip_in_job_store(job_id, zip_filename):
+    """[LOCAL-839] Persist the finished ZIP's bytes (base64) into the shared job
+    store result, so an instance that never created the job can still serve
+    GET /download/<job_id>.
+
+    This is the instance-surviving ZIP handoff (option b in the task): the
+    modernized service writes the ZIP to the SAME layered store LOCAL-775 added
+    (memory cache + generator_jobs table), and /download reads it from there
+    when the local TOURS_DIR copy is absent. No new infrastructure — it reuses
+    the result JSONB the store already round-trips across instances.
+
+    Best-effort: a store/encode error is logged and swallowed so it never fails
+    an otherwise-complete generation. On the memory store this is a harmless
+    no-op extra field; on the layered store it is what makes /download
+    multi-instance safe. A ZIP over the size cap is skipped (local-file path
+    still serves it on the owning instance).
+    """
+    try:
+        zip_path = os.path.join(TOURS_DIR, zip_filename)
+        size = os.path.getsize(zip_path)
+        if size > MODERNIZED_ZIP_STORE_MAX_BYTES:
+            print(f"[LOCAL-839] ZIP for job {job_id} is {size} bytes (> "
+                  f"{MODERNIZED_ZIP_STORE_MAX_BYTES} cap); not stored inline — "
+                  f"download served from the owning instance only.")
+            return
+        with open(zip_path, 'rb') as f:
+            zip_b64 = base64.b64encode(f.read()).decode('ascii')
+        # Stored under result.* (non-column key) via the layered store's upsert,
+        # so it survives across instances in generator_jobs.result.
+        ACTIVE_JOBS.update(job_id, zip_b64=zip_b64, zip_filename=zip_filename)
+        print(f"[LOCAL-839] Stored ZIP for job {job_id} in job store "
+              f"({size} bytes, base64 {len(zip_b64)} chars) for cross-instance download.")
+    except Exception as store_err:  # noqa: BLE001
+        print(f"[LOCAL-839] Could not store ZIP in job store for {job_id} "
+              f"(non-fatal, local file still served): {store_err}")
+
+
 def generate_modernized_tour_async(job_id, tour_file_path, user_id=None, orchestrator_job_id=None):
     """Generate modernized tour from existing tour text file"""
     try:
@@ -283,7 +346,11 @@ def generate_modernized_tour_async(job_id, tour_file_path, user_id=None, orchest
         # Step 3: Create modernized ZIP
         ACTIVE_JOBS.update(job_id, progress="Creating modernized tour ZIP...")
         zip_filename = create_modernized_tour_zip(modernized_data, job_id)
-        
+
+        # [LOCAL-839] Store the ZIP bytes (base64) in the shared job store so a
+        # DIFFERENT instance can serve /download. See _store_zip_in_job_store.
+        _store_zip_in_job_store(job_id, zip_filename)
+
         ACTIVE_JOBS.update(job_id, status="completed",
                           progress="Modernized tour created successfully!",
                           output_zip=zip_filename, modernized=True)
@@ -365,7 +432,10 @@ def process_modernized_tour_async(job_id, tour_data):
         ACTIVE_JOBS.update(job_id, status="processing", progress="Creating modernized tour structure...")
         
         zip_filename = create_modernized_tour_zip(tour_data, job_id)
-        
+
+        # [LOCAL-839] Make the ZIP retrievable from any instance.
+        _store_zip_in_job_store(job_id, zip_filename)
+
         ACTIVE_JOBS.update(job_id, status="completed",
                           progress="Modernized tour created successfully!",
                           output_zip=zip_filename, modernized=True)
@@ -463,26 +533,58 @@ def process_tour():
 
 @app.route('/download/<job_id>', methods=['GET'])
 def download_tour(job_id):
-    """Download the modernized tour ZIP"""
+    """Download the modernized tour ZIP.
+
+    [LOCAL-839] Instance-surviving download: serve the local TOURS_DIR copy when
+    present (the owning instance), otherwise reconstruct the ZIP from the bytes
+    the completing instance stored in the shared job store (zip_b64). This is
+    what lets a DIFFERENT Cloud Run instance answer /download instead of 404ing
+    because the file lives only on the instance that generated it.
+    """
     if job_id not in ACTIVE_JOBS:
         return jsonify({"error": "Job not found"}), 404
     
     job = ACTIVE_JOBS[job_id]
     if job["status"] != "completed":
         return jsonify({"error": "Job not completed"}), 400
-    
-    zip_path = os.path.join(TOURS_DIR, job["output_zip"])
-    if not os.path.exists(zip_path):
+
+    output_zip = job.get("output_zip") or job.get("zip_filename")
+    if not output_zip:
         return jsonify({"error": "File not found"}), 404
-    
-    return send_file(zip_path, as_attachment=True, download_name=job["output_zip"])
+
+    # Prefer the local file on the owning instance (no copy, no decode).
+    zip_path = os.path.join(TOURS_DIR, output_zip)
+    if os.path.exists(zip_path):
+        return send_file(zip_path, as_attachment=True, download_name=output_zip)
+
+    # Not local — another instance generated this job. Rebuild from the shared
+    # store and serve it from memory. This is the cross-instance handoff.
+    zip_b64 = job.get("zip_b64")
+    if zip_b64:
+        try:
+            import io
+            zip_bytes = base64.b64decode(zip_b64)
+            print(f"[LOCAL-839] Serving /download/{job_id} from job store "
+                  f"({len(zip_bytes)} bytes) — file not on this instance.")
+            return send_file(io.BytesIO(zip_bytes), as_attachment=True,
+                             download_name=output_zip, mimetype='application/zip')
+        except Exception as decode_err:  # noqa: BLE001
+            print(f"[LOCAL-839] Failed to serve stored ZIP for {job_id}: {decode_err}")
+            return jsonify({"error": "Stored ZIP could not be read"}), 500
+
+    return jsonify({"error": "File not found"}), 404
 
 @app.route('/status/<job_id>', methods=['GET'])
 def get_job_status(job_id):
     if job_id not in ACTIVE_JOBS:
         return jsonify({"error": "Job not found"}), 404
-    
-    return jsonify(ACTIVE_JOBS[job_id])
+
+    # [LOCAL-839] The job dict carries the base64 ZIP (zip_b64) for the
+    # cross-instance /download path; it must NOT be returned in /status (it would
+    # bloat every poll response by megabytes). Strip it from the status view.
+    job = dict(ACTIVE_JOBS[job_id])
+    job.pop("zip_b64", None)
+    return jsonify(job)
 
 if __name__ == '__main__':
     os.makedirs(TOURS_DIR, exist_ok=True)

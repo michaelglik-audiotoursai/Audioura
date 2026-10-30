@@ -1,0 +1,529 @@
+
+######## [local839e] building + starting the end-to-end stack (real orchestrator, fake generator) ########
+ Image local839e-tour-generation-modernized-1 Building 
+ Image local839e-tour-orchestrator Building 
+ Image local839e-coordinates-fromai Building 
+ Image local839e-tour-generation-modernized-2 Building 
+ Image local839e-polly-tts-1 Building 
+ Image local839e-tour-generator Building 
+ Image local839e-user-api-2 Building 
+#1 [internal] load local bake definitions
+#1 reading from stdin 3.83kB done
+#1 DONE 0.0s
+
+#2 [coordinates-fromai internal] load build definition from Dockerfile
+#2 transferring dockerfile: 732B done
+#2 DONE 0.0s
+
+#3 [user-api-2 internal] load build definition from Dockerfile
+#3 transferring dockerfile: 376B done
+#3 DONE 0.0s
+
+#4 [tour-generation-modernized-1 internal] load build definition from Dockerfile.modernized
+#4 transferring dockerfile: 735B 0.1s done
+#4 DONE 0.1s
+
+#5 [polly-tts-1 internal] load build definition from Dockerfile.polly-tts
+#5 transferring dockerfile: 1.76kB 0.1s done
+#5 DONE 0.1s
+
+#6 [tour-generator internal] load build definition from Dockerfile.fake-generator-local839
+#6 transferring dockerfile: 390B 0.1s done
+#6 DONE 0.1s
+
+#7 [tour-orchestrator internal] load build definition from Dockerfile.orchestrator
+#7 transferring dockerfile: 4.23kB 0.1s done
+#7 DONE 0.1s
+
+#8 [tour-orchestrator internal] load metadata for docker.io/library/python:3.9-slim
+#8 DONE 0.4s
+
+#9 [coordinates-fromai internal] load .dockerignore
+#9 transferring context: 2B done
+#9 DONE 0.0s
+
+#10 [user-api-2 internal] load metadata for docker.io/library/python:3.11-slim
+#10 DONE 0.4s
+
+#11 [user-api-2 internal] load .dockerignore
+#11 transferring context: 2B done
+#11 DONE 0.0s
+
+#12 [tour-orchestrator 1/9] FROM docker.io/library/python:3.9-slim@sha256:2d97f6910b16bd338d3060f261f53f144965f755599aab1acda1e13cf1731b1b
+#12 resolve docker.io/library/python:3.9-slim@sha256:2d97f6910b16bd338d3060f261f53f144965f755599aab1acda1e13cf1731b1b done
+#12 DONE 0.0s
+
+#13 [user-api-2 1/7] FROM docker.io/library/python:3.11-slim@sha256:673719e071ecf27434fd2635bbd8d00f49f4fdd81f243143438a42ced8bedf60
+#13 resolve docker.io/library/python:3.11-slim@sha256:673719e071ecf27434fd2635bbd8d00f49f4fdd81f243143438a42ced8bedf60 0.0s done
+#13 DONE 0.0s
+
+#14 [coordinates-fromai internal] load build context
+#14 transferring context: 100B done
+#14 DONE 0.0s
+
+#15 [user-api-2 internal] load build context
+#15 transferring context: 1.49kB done
+#15 DONE 0.0s
+
+#16 [coordinates-fromai 3/9] RUN apt-get update && apt-get install -y     gcc     curl     && rm -rf /var/lib/apt/lists/*
+#16 CACHED
+
+#17 [coordinates-fromai 4/9] COPY requirements.txt .
+#17 CACHED
+
+#18 [coordinates-fromai 8/9] RUN echo "unknown" > /app/.git_sha
+#18 CACHED
+
+#19 [coordinates-fromai 5/9] RUN pip install --no-cache-dir -r requirements.txt
+#19 CACHED
+
+#20 [coordinates-fromai 2/9] WORKDIR /app
+#20 CACHED
+
+#21 [coordinates-fromai 6/9] COPY app.py .
+#21 CACHED
+
+#22 [coordinates-fromai 7/9] COPY build_manifest.py .
+#22 CACHED
+
+#23 [coordinates-fromai 9/9] RUN python build_manifest.py /app /app/.build_manifest.json
+#23 CACHED
+
+#24 [user-api-2 6/7] RUN echo "unknown" > /app/.git_sha
+#24 CACHED
+
+#25 [user-api-2 5/7] COPY . .
+#25 CACHED
+
+#26 [user-api-2 4/7] RUN pip install -r requirements.txt
+#26 CACHED
+
+#27 [user-api-2 3/7] COPY requirements.txt .
+#27 CACHED
+
+#28 [user-api-2 2/7] WORKDIR /app
+#28 CACHED
+
+#29 [user-api-2 7/7] RUN python build_manifest.py /app /app/.build_manifest.json
+#29 CACHED
+
+#30 [tour-generation-modernized-1 internal] load .dockerignore
+#30 transferring context: 2.05kB 0.1s done
+#30 DONE 0.1s
+
+#31 [user-api-2] exporting to image
+#31 exporting layers done
+#31 exporting manifest sha256:f6f74748014e10c92cf35fb14b0cad116feea34c06d3b545492549895ff7dbb8 done
+#31 exporting config sha256:45653a114682c35bc7ca69ffb247aabb1718a771fa698f6ab782ac1a30c5010e done
+#31 exporting attestation manifest sha256:dce015d71ef3e4b1e9eec721410443849ffdfcb94c79a55f2a63068737834ee0 0.0s done
+#31 exporting manifest list sha256:7d408b76aa4b2afe94442fd63647d78e9760584d0f1cc6782f7b5abb6e2f298f done
+#31 naming to docker.io/library/local839e-user-api-2:latest done
+#31 unpacking to docker.io/library/local839e-user-api-2:latest done
+#31 DONE 0.1s
+
+#32 [coordinates-fromai] exporting to image
+#32 exporting layers done
+#32 exporting manifest sha256:f23b9417328013ab8caa3fde90a0064c18d23ea9332276e4d1d6cbf3bbf3aff9 done
+#32 exporting config sha256:f7f4d5b78e545fe9d985929702ff0d8c2e5b75174608f9fd91a7a58ed18dd12f done
+#32 exporting attestation manifest sha256:ec53251a5633ef3d5b95fe1dbe23386160a2dae1bdb206f2e0adcd91eb01555b 0.0s done
+#32 exporting manifest list sha256:4a4543d6d26a4bc231f66bf8ecec0403dc98345e66de50f414ab9d662fdde9b4 done
+#32 naming to docker.io/library/local839e-coordinates-fromai:latest done
+#32 unpacking to docker.io/library/local839e-coordinates-fromai:latest done
+#32 DONE 0.1s
+
+#33 [tour-generation-modernized-2 internal] load build context
+#33 ...
+
+#34 [user-api-2] resolving provenance for metadata file
+#34 DONE 0.0s
+
+#35 [coordinates-fromai] resolving provenance for metadata file
+#35 DONE 0.0s
+
+#33 [tour-generation-modernized-2 internal] load build context
+#33 transferring context: 406B 0.2s done
+#33 DONE 0.2s
+
+#36 [tour-generator internal] load build context
+#36 transferring context: 2.70kB 0.2s done
+#36 DONE 0.2s
+
+#37 [polly-tts-1 internal] load build context
+#37 transferring context: 177.47kB 0.2s done
+#37 DONE 0.2s
+
+#38 [tour-generator 3/4] RUN pip install --no-cache-dir flask==2.3.3
+#38 CACHED
+
+#20 [tour-generator 2/9] WORKDIR /app
+#20 CACHED
+
+#39 [tour-generator 4/4] COPY fake_generator_local839.py /app/
+#39 CACHED
+
+#40 [polly-tts-1  4/13] RUN pip install flask boto3 requests psycopg2-binary
+#40 CACHED
+
+#41 [polly-tts-1  5/13] COPY polly_tts_service.py .
+#41 CACHED
+
+#42 [polly-tts-1  9/13] COPY cost_meter.py .
+#42 CACHED
+
+#43 [polly-tts-1 12/13] RUN echo "unknown" > /app/.git_sha
+#43 CACHED
+
+#44 [polly-tts-1 11/13] COPY build_manifest.py .
+#44 CACHED
+
+#45 [polly-tts-1  3/13] WORKDIR /app
+#45 CACHED
+
+#46 [polly-tts-1  7/13] COPY pronunciation_lexicon.json .
+#46 CACHED
+
+#47 [polly-tts-1  8/13] COPY kokoro_engine.py .
+#47 CACHED
+
+#48 [polly-tts-1  2/13] COPY _meter/ /opt/meter/
+#48 CACHED
+
+#49 [polly-tts-1  6/13] COPY vietnamese_name_aid.py .
+#49 CACHED
+
+#50 [polly-tts-1 10/13] COPY cost_rates.py .
+#50 CACHED
+
+#51 [tour-generation-modernized-2 12/13] RUN echo "unknown" > /app/.git_sha
+#51 CACHED
+
+#52 [tour-generation-modernized-2  3/13] WORKDIR /app
+#52 CACHED
+
+#53 [tour-generation-modernized-2  6/13] COPY tour_generation_modernized.py /app/
+#53 CACHED
+
+#54 [tour-generation-modernized-2 10/13] COPY spoken_text_hygiene.py /app/
+#54 CACHED
+
+#55 [tour-generation-modernized-2  2/13] COPY _meter/ /opt/meter/
+#55 CACHED
+
+#56 [tour-generation-modernized-2  8/13] COPY job_store.py /app/
+#56 CACHED
+
+#57 [tour-generation-modernized-2  7/13] COPY tour_html_map.py /app/
+#57 CACHED
+
+#58 [tour-generation-modernized-2  4/13] COPY requirements-modernized.txt .
+#58 CACHED
+
+#59 [tour-generation-modernized-2 11/13] RUN mkdir -p /app/tours
+#59 CACHED
+
+#60 [tour-generation-modernized-2  5/13] RUN pip install --no-cache-dir -r requirements-modernized.txt
+#60 CACHED
+
+#61 [tour-generation-modernized-2  9/13] COPY build_manifest.py /app/
+#61 CACHED
+
+#62 [polly-tts-1 13/13] RUN python build_manifest.py /app /app/.build_manifest.json
+#62 CACHED
+
+#63 [tour-generation-modernized-1 13/13] RUN python build_manifest.py /app /app/.build_manifest.json
+#63 CACHED
+
+#64 [tour-orchestrator internal] load build context
+#64 transferring context: 1.70kB 0.3s done
+#64 DONE 0.3s
+
+#65 [tour-generation-modernized-1] exporting to image
+#65 exporting layers done
+#65 exporting manifest sha256:8bf2d779fa4089fea90211b81159807d1e1470e8d432b7c8fbfc43f5f5e26fdc 0.0s done
+#65 exporting config sha256:5a875c98785e7ebe78d710e65e611e999327ab750ee73845cdd130a65515ca9e done
+#65 exporting attestation manifest sha256:4b712759a92999796918eff5e8f58f5f26d2851796440ef84c5c62b405e37dd4
+#65 exporting attestation manifest sha256:4b712759a92999796918eff5e8f58f5f26d2851796440ef84c5c62b405e37dd4 0.0s done
+#65 exporting manifest list sha256:f88f4ad5d27d645669cf782dc4f67ac5ef18c2c37bb708ee207a61d8f294bfdf 0.0s done
+#65 naming to docker.io/library/local839e-tour-generation-modernized-1:latest done
+#65 unpacking to docker.io/library/local839e-tour-generation-modernized-1:latest 0.0s done
+#65 DONE 0.1s
+
+#66 [tour-generator] exporting to image
+#66 exporting layers done
+#66 exporting manifest sha256:5521b0eaecaeef60260564f6135b22f91ffbfe1e7f8bea8ee4ad5a163648db36 done
+#66 exporting config sha256:7788f239b8f783d6d020fa573d86da99b641c9f49cbcba59e661266fc1837621 done
+#66 exporting attestation manifest sha256:f0cd60f3ebac73d381fe730023ed672724741b58c8143f90679504955ade96a2 0.0s done
+#66 exporting manifest list sha256:1da8b12f5b432e7ba2269c7f76538588961ea9b4e805c94191fe6197f19c6667 0.0s done
+#66 naming to docker.io/library/local839e-tour-generator:latest done
+#66 unpacking to docker.io/library/local839e-tour-generator:latest done
+#66 DONE 0.1s
+
+#67 [tour-orchestrator 40/45] COPY tour_short_title.py /app/
+#67 CACHED
+
+#68 [tour-orchestrator 21/45] COPY cost_meter.py /app/
+#68 CACHED
+
+#69 [tour-orchestrator 32/45] COPY community_tours_service.py /app/
+#69 CACHED
+
+#70 [tour-orchestrator 17/45] COPY payment_provider.py /app/
+#70 CACHED
+
+#71 [tour-orchestrator 30/45] COPY tour_pricing_service.py /app/
+#71 CACHED
+
+#72 [tour-orchestrator 42/45] COPY stop_pool_sources.py /app/
+#72 CACHED
+
+#73 [tour-orchestrator 44/45] RUN echo "unknown" > /app/.git_sha
+#73 CACHED
+
+#74 [tour-orchestrator 20/45] COPY pricing.py /app/
+#74 CACHED
+
+#75 [tour-orchestrator 33/45] COPY geocode_stops.py /app/
+#75 CACHED
+
+#76 [tour-orchestrator 19/45] COPY wallet_ledger.py /app/
+#76 CACHED
+
+#77 [tour-orchestrator 25/45] COPY failure_log.py /app/
+#77 CACHED
+
+#78 [tour-orchestrator 38/45] COPY user_quality_index.py /app/
+#78 CACHED
+
+#79 [tour-orchestrator 11/45] COPY subscription_levels.py /app/
+#79 CACHED
+
+#80 [tour-orchestrator  8/45] COPY swipe_preference_service.py /app/
+#80 CACHED
+
+#81 [tour-orchestrator  4/45] COPY requirements_orchestrator.txt /app/requirements.txt
+#81 CACHED
+
+#82 [tour-orchestrator 13/45] COPY l2_seat_job.py /app/
+#82 CACHED
+
+#83 [tour-orchestrator 15/45] COPY wallet_api.py /app/
+#83 CACHED
+
+#84 [tour-orchestrator  6/45] COPY tour_orchestrator_service.py /app/
+#84 CACHED
+
+#85 [tour-orchestrator 31/45] COPY recovery_code_service.py /app/
+#85 CACHED
+
+#86 [tour-orchestrator 37/45] COPY tour_rubric_scorer.py /app/
+#86 CACHED
+
+#87 [tour-orchestrator 27/45] COPY swipe_preference_service.py /app/
+#87 CACHED
+
+#88 [tour-orchestrator 10/45] COPY entitlements.py /app/
+#88 CACHED
+
+#89 [tour-orchestrator 12/45] COPY l2_seats.py /app/
+#89 CACHED
+
+#90 [tour-orchestrator 39/45] COPY user_stops_flag.py /app/
+#90 CACHED
+
+#91 [tour-orchestrator 26/45] COPY quality_guardrails.py /app/
+#91 CACHED
+
+#92 [tour-orchestrator 36/45] COPY tour_evaluator.py /app/
+#92 CACHED
+
+#93 [tour-orchestrator  5/45] RUN pip install --no-cache-dir -r requirements.txt
+#93 CACHED
+
+#94 [tour-orchestrator  3/45] WORKDIR /app
+#94 CACHED
+
+#95 [tour-orchestrator 16/45] COPY tier_change.py /app/
+#95 CACHED
+
+#96 [tour-orchestrator 29/45] COPY tour_reviews_service.py /app/
+#96 CACHED
+
+#97 [tour-orchestrator 28/45] COPY tour_rating_service.py /app/
+#97 CACHED
+
+#98 [tour-orchestrator 23/45] COPY build_manifest.py /app/
+#98 CACHED
+
+#99 [tour-orchestrator 24/45] COPY safe_headers.py /app/
+#99 CACHED
+
+#100 [tour-orchestrator 34/45] COPY price_tiers.py /app/
+#100 CACHED
+
+#101 [tour-orchestrator 43/45] COPY stop_pool_store.py /app/
+#101 CACHED
+
+#102 [tour-orchestrator  2/45] COPY _meter/ /opt/meter/
+#102 CACHED
+
+#103 [tour-orchestrator 18/45] COPY fake_payment_provider.py /app/
+#103 CACHED
+
+#104 [tour-orchestrator 35/45] COPY tour_scoring_service.py /app/
+#104 CACHED
+
+#105 [tour-orchestrator 14/45] COPY cost_ceiling_monitor.py /app/
+#105 CACHED
+
+#106 [tour-orchestrator  7/45] COPY orchestrator_jobs.py /app/
+#106 CACHED
+
+#107 [tour-orchestrator 41/45] COPY tour_content_rating.py /app/
+#107 CACHED
+
+#108 [tour-orchestrator  9/45] COPY tests/db_connection.py /app/tests/db_connection.py
+#108 CACHED
+
+#109 [tour-orchestrator 22/45] COPY cost_rates.py /app/
+#109 CACHED
+
+#110 [tour-orchestrator 45/45] RUN python build_manifest.py /app /app/.build_manifest.json
+#110 CACHED
+
+#111 [polly-tts-1] exporting to image
+#111 exporting layers done
+#111 exporting manifest sha256:623fb771422ccb7a3d5ec2fff368b66cf613d5dc46193f3fe9d20ac15cdc6c36 0.0s done
+#111 exporting config sha256:18e9e963c962aa4ad1621c02915773bfd3af3d7ed32a7dea57649dee1d19b519 done
+#111 exporting attestation manifest sha256:dabd590923deb0eab90d495248a5c7442aba64cd4df4ea66cc008d64dab821f0 0.0s done
+#111 exporting manifest list sha256:5473d05ba7e99cc943bfb0c1cdb59ff863a8067f9afb27a533afa6cb5cb54e86 0.0s done
+#111 naming to docker.io/library/local839e-polly-tts-1:latest done
+#111 unpacking to docker.io/library/local839e-polly-tts-1:latest 0.0s done
+#111 DONE 0.1s
+
+#112 [tour-generation-modernized-2] exporting to image
+#112 exporting layers done
+#112 exporting manifest sha256:1c8da034a4ba4b8661566d20171781d076a72fbb5345f34de8703cdca583463c 0.0s done
+#112 exporting config sha256:026a5471ec17f6c2b2235e007aaca24b1f9b9c0910176f1764dcddc7de6ed468 done
+#112 exporting attestation manifest sha256:95066988c0eb1c0269a39f1eba97447fcadc675c6435e59b6b7aa08760638570 0.0s done
+#112 exporting manifest list sha256:553ef8c15a12d9c8c4bc76603c643b2c13c78bcc3d187b45bb370e92dd20216f 0.0s done
+#112 naming to docker.io/library/local839e-tour-generation-modernized-2:latest done
+#112 unpacking to docker.io/library/local839e-tour-generation-modernized-2:latest 0.0s done
+#112 DONE 0.1s
+
+#113 [tour-generator] resolving provenance for metadata file
+#113 DONE 0.0s
+
+#114 [tour-orchestrator] exporting to image
+#114 exporting layers 0.0s done
+#114 exporting manifest sha256:5567f31a2d51130002199fdc415000b13f2205e8e6526fc89ad8a558e7eaba85 done
+#114 exporting config sha256:9ffe2c88965e8514c52478d1b58d7eb88c2fff40127c127eda2fc9404fa81578 done
+#114 exporting attestation manifest sha256:95335b4e782c6875cd71e0099cdb8c98ad8dbc2b02c6af33054f92e6aaf2256e 0.0s done
+#114 exporting manifest list sha256:7e9fe51bcd8726e056caf234834e96cf961ed26a8b1c945f17f45edaa89f1967 0.0s done
+#114 naming to docker.io/library/local839e-tour-orchestrator:latest done
+#114 unpacking to docker.io/library/local839e-tour-orchestrator:latest 0.0s done
+#114 DONE 0.1s
+
+#115 [polly-tts-1] resolving provenance for metadata file
+#115 DONE 0.0s
+
+#116 [tour-generation-modernized-2] resolving provenance for metadata file
+#116 DONE 0.0s
+
+#117 [tour-generation-modernized-1] resolving provenance for metadata file
+#117 DONE 0.0s
+
+#118 [tour-orchestrator] resolving provenance for metadata file
+#118 DONE 0.0s
+ Image local839e-tour-orchestrator Built 
+ Image local839e-tour-generation-modernized-1 Built 
+ Image local839e-polly-tts-1 Built 
+ Image local839e-tour-generation-modernized-2 Built 
+ Image local839e-tour-generator Built 
+ Image local839e-coordinates-fromai Built 
+ Image local839e-user-api-2 Built 
+ Network local839e_default Creating 
+ Network local839e_default Created 
+ Volume local839e_local839e_pg Creating 
+ Volume local839e_local839e_pg Created 
+ Container local839e-coordinates-fromai-1 Creating 
+ Container local839e-postgres-2-1 Creating 
+ Container local839e-tour-generator-1 Creating 
+ Container local839e-polly-tts-1-1 Creating 
+ Container local839e-tour-generator-1 Created 
+ Container local839e-coordinates-fromai-1 Created 
+ Container local839e-postgres-2-1 Created 
+ Container local839e-tour-generation-modernized-2-1 Creating 
+ Container local839e-tour-generation-modernized-1-1 Creating 
+ Container local839e-user-api-2-1 Creating 
+ Container local839e-polly-tts-1-1 Created 
+ Container local839e-user-api-2-1 Created 
+ Container local839e-tour-generation-modernized-2-1 Created 
+ Container local839e-tour-generation-modernized-1-1 Created 
+ Container local839e-modernized-lb-1 Creating 
+ Container local839e-modernized-lb-1 Created 
+ Container local839e-tour-orchestrator-1 Creating 
+ Container local839e-tour-orchestrator-1 Created 
+ Container local839e-tour-generator-1 Starting 
+ Container local839e-coordinates-fromai-1 Starting 
+ Container local839e-postgres-2-1 Starting 
+ Container local839e-polly-tts-1-1 Starting 
+ Container local839e-tour-generator-1 Started 
+ Container local839e-coordinates-fromai-1 Started 
+ Container local839e-postgres-2-1 Started 
+ Container local839e-tour-generation-modernized-2-1 Starting 
+ Container local839e-tour-generation-modernized-1-1 Starting 
+ Container local839e-user-api-2-1 Starting 
+ Container local839e-polly-tts-1-1 Started 
+ Container local839e-tour-generation-modernized-2-1 Started 
+ Container local839e-user-api-2-1 Started 
+ Container local839e-tour-generation-modernized-1-1 Started 
+ Container local839e-modernized-lb-1 Starting 
+ Container local839e-modernized-lb-1 Started 
+ Container local839e-tour-orchestrator-1 Starting 
+ Container local839e-tour-orchestrator-1 Started 
+
+######## [local839e] waiting for postgres ########
+
+######## [local839e] waiting for orchestrator :55702 ########
+
+######## [local839e] 1. submitting ONE 3-stop walking tour: Salem Common public art walk ########
+  response: {"job_id":"acd993e8-845d-4237-b332-254dfbfdc0b7","language":"en","status":"queued"}
+
+######## [local839e] 1. orchestrator job_id=acd993e8-845d-4237-b332-254dfbfdc0b7 ########
+
+######## [local839e] 2. waiting for the orchestrator job to complete ########
+    [t=1] orchestrator /status = processing
+    [t=2] orchestrator /status = processing
+    [t=3] orchestrator /status = completed
+
+######## [local839e] 3. stored EXACTLY ONCE in audio_tours ########
+  audio_tours rows=1 (expect 1) id=1 stops=3 zip_bytes=179768
+
+######## [local839e] 4. audio plays: validate the stored ZIP (DB bytes) and the on-disk copy ########
+  base64 chars pulled from DB: 239692
+  [db] ZIP members: ['index.html', 'audio_1.mp3', 'audio_2.mp3', 'audio_3.mp3', 'audio_1.txt', 'audio_2.txt', 'audio_3.txt', 'manifest.json', 'service-worker.js', 'tour_content.txt']
+    [db] audio_1.mp3: 75549 bytes audio_header=True
+    [db] audio_2.mp3: 66765 bytes audio_header=True
+    [db] audio_3.mp3: 61293 bytes audio_header=True
+  [disk] ZIP members: ['index.html', 'audio_1.mp3', 'audio_2.mp3', 'audio_3.mp3', 'audio_1.txt', 'audio_2.txt', 'audio_3.txt', 'manifest.json', 'service-worker.js']
+    [disk] audio_1.mp3: 75549 bytes audio_header=True
+    [disk] audio_2.mp3: 66765 bytes audio_header=True
+    [disk] audio_3.mp3: 61293 bytes audio_header=True
+  AUDIO results: {'db': True, 'disk': True}
+
+######## [local839e] 5. cross-instance handoff + cleanup evidence ########
+  instance A tours dir: Salem Common Public Art Walk - Walking Tour_9991d482.zip 
+  instance B tours dir: 
+  instance A: stored-ZIP=1 served-from-store=0
+  instance B: stored-ZIP=0 served-from-store=0
+  orchestrator 'Cleared stale inline ZIP' log lines=1
+  generator_jobs rows still carrying zip_b64=0 (expect 0 after cleanup)
+
+######## [local839e] VERDICT ########
+  PASS: ONE 3-stop walking tour, through the REAL orchestrator and TWO
+        modernized instances (round-robin), stored exactly once; stored
+        ZIP holds 3 real MP3 files (audio plays); cross-instance
+        /download-from-store=0; orchestrator cleaned the inline ZIP
+        blob (zip_b64 rows now 0).
+
+######## [local839e] tearing down project local839e (down -v — OWN volume only) ########
