@@ -50,7 +50,8 @@ top of +21 on either system."*
 | 83 | iOS | 2.4.35 | `200839ac` (subscribed) | **uploaded to TestFlight** 2026-10-26 ~21:5x by LEAD: + LOCAL-785 FailureReporter (app), 783 server-side | 2026-10-26 |
 | 84 | iOS | 2.4.36 | `79cd51bf` (subscribed; APP_TRACK=subscribed) | **uploaded to TestFlight** 2026-10-28 07:32 by LEAD (D729, Michael travelling): LOCAL-787 Listen refresh, LOCAL-789 grey map + OSM UA + place aliases, LOCAL-793 Home search picks a place + zoom-out, LOCAL-794 background translate-download (no app-blocking spinner). Manual export, same profile 4d428427. altool warning 90068: deployment target iOS 14 → must be 15 by April 2027 | 2026-10-28 |
 | 85 | iOS | 2.4.37 | `ca627033` (subscribed; APP_TRACK=subscribed) | **uploaded to TestFlight** 2026-10-28 20:1x by LEAD (D729): LOCAL-789B Home map loads on entry (reset-storm fix), LOCAL-795 Write a review button + stop notes (notes need wdvrdaz72d), LOCAL-787/793/794 as in 84 | 2026-10-28 |
-| 86 | — | — | — | **NEXT** | — |
+| 86 | Android | 2.4.38 | `efb9b977`-era subscribed (built by GCloud_Storied from `5e2d588a`, APP_TRACK=subscribed) | **built + signed** 2026-10-29 by GCloud_Storied on the laptop (`C:\adev-wt\aab86\audioura-subscribed-2.4.38+86.aab`, 51.3 MB, sha256 cbe45dc3…, upload key B3:AB:E5…3A:64). Play API upload blocked (play-publisher 403) → Michael uploads by hand to Internal testing | 2026-10-29 |
+| 87 | — | — | — | **NEXT** | — |
 
 ## Why 20 and 21 differ across platforms
 
