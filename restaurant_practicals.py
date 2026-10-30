@@ -142,20 +142,47 @@ def _extract(name, city, evidence, api_key, model=None, timeout=45):
 
 
 def _gemini(name, city, timeout=45):
-    """Step 3 — Gemini with sources, only when the first two came back thin."""
-    if not os.environ.get('GEMINI_API_KEY'):
-        return None
+    """Step 3 — grounded research with sources, only when the first two came back
+    thin.
+
+    [LOCAL-834] This step is grounded web research, so it MUST go through
+    story_leads.research_with_sources — the ONE selector that honours
+    RESEARCH_BACKEND. On the cheap arm (RESEARCH_BACKEND=serper, gated to this
+    tour's category by CHEAP_ARM_CATEGORIES) the question is answered by Serper +
+    page fetch + a cheap model instead of a billable grounded Gemini request;
+    with the default backend research_with_sources == gemini_with_sources, so the
+    behaviour is byte-for-byte unchanged. Before this change the step called
+    gemini_with_sources DIRECTLY, so a places/business tour ("Kitesurfing schools
+    in Mui Ne") still paid Gemini per stop even with the cheap arm ON for its
+    category (category='restaurant' — the maps-first/places category). The result
+    shape is identical ({text, sources}), so this is a drop-in swap."""
+    # [LOCAL-834] Decide the backend first. On the Serper arm the step uses
+    # Serper + a cheap model and needs NO Gemini key; only the default (gemini)
+    # backend requires GEMINI_API_KEY, exactly as before.
+    _backend = 'gemini'
     try:
-        from story_leads import gemini_with_sources
+        from story_leads import research_backend as _rb
+        _backend = _rb()
     except Exception:
+        _backend = 'gemini'
+    if _backend != 'serper' and not os.environ.get('GEMINI_API_KEY'):
         return None
     try:
-        res = gemini_with_sources(
+        from story_leads import research_with_sources as _ask
+    except Exception:
+        # Fail SAFE to the direct Gemini asker rather than losing the step.
+        try:
+            from story_leads import gemini_with_sources as _ask
+        except Exception:
+            return None
+    try:
+        res = _ask(
             f"{_EXTRACT_SYSTEM}\n\nRestaurant: {name}\nCity: {city}\n\n"
             f"Search the web for its current opening days and hours, reservation policy, what a "
             f"visitor should expect to pay for lunch or dinner (or a typical main course), the "
             f"TYPE OF FOOD served, and whether it is still open. Leave a field empty rather than "
-            f"guess. Return only the JSON.")
+            f"guess. Return only the JSON.",
+            grounded=True)
         text = res.get('text', '') if isinstance(res, dict) else str(res)
         m = re.search(r'\{.*\}', text, re.S)
         if not m:
@@ -419,10 +446,29 @@ def venue_still_operating(name, city, timeout=45):
 
     Returns (still_operating: bool, detail: str). Unknown answers return True —
     absence of evidence must never delete a stop.
+
+    [LOCAL-834] This is grounded web research ("is it still open today?"), so it
+    goes through story_leads.research_with_sources — the ONE selector that honours
+    RESEARCH_BACKEND. On the cheap arm (RESEARCH_BACKEND=serper, category-gated)
+    the answer comes from Serper + a cheap model, not a billable grounded Gemini
+    request; the default backend keeps this on Gemini, byte-for-byte as before.
+    Before this change it called gemini_with_sources directly, so a places/
+    business tour still paid Gemini here even with the cheap arm ON.
     """
-    if os.environ.get('GEMINI_API_KEY'):
+    _backend = 'gemini'
+    try:
+        from story_leads import research_backend as _rb
+        _backend = _rb()
+    except Exception:
+        _backend = 'gemini'
+    # On the Serper arm this step needs no Gemini key; only the default (gemini)
+    # backend requires it, exactly as before.
+    if _backend == 'serper' or os.environ.get('GEMINI_API_KEY'):
         try:
-            from story_leads import gemini_with_sources
+            try:
+                from story_leads import research_with_sources as _ask
+            except Exception:
+                from story_leads import gemini_with_sources as _ask
             # Normalised name: the D539 suite caught 'Le Vistamar Monaco' and
             # 'Vistamar Hotel Hermitage' getting a different verdict from
             # 'Le Vistamar'. Strip the city and any trailing venue qualifier so
@@ -432,9 +478,10 @@ def venue_still_operating(name, city, timeout=45):
             _city_word = (city or '').split(',')[0].strip()
             if _city_word:
                 _q = re.sub(rf'\s+{re.escape(_city_word)}$', '', _q, flags=re.I).strip()
-            res = gemini_with_sources(
+            res = _ask(
                 f"{_OPERATING_SYSTEM}\n\nRestaurant: {_q}\nCity: {city}\n\n"
-                f"Is it still open under this exact name today? Return only the JSON.")
+                f"Is it still open under this exact name today? Return only the JSON.",
+                grounded=True)
             text = res.get('text', '') if isinstance(res, dict) else str(res)
             m = re.search(r'\{.*\}', text, re.S)
             if m:
