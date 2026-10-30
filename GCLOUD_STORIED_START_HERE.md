@@ -13,6 +13,10 @@ has lapsed twice and Michael has had to ask twice.
 
 ---
 
+# ▶️ WAVE 6 — 2026-10-30 00:45 EDT (wdvrdaz9xk; overrides the revision list just below)
+- generator **00014-dn6** = `af895bd1`, env as wave 4, cheap arm OFF [00012-lf5 same image; 00011-47m = 5e2d588a]. map-delivery **00005-smt** = af895bd1, /geocode live [00004-qvq].
+- D740 cheap-arm re-test FAILED again: Orsay 495 came out 1/5 because LOCAL-791E same-place dedupe drops museum works (shared pin), plus false "N exhibitions on view" line. Proofs 493–495 hidden (AudiouraBackups\wave6_proofs_hide_20261030). audio_tours 387.
+
 # ▶️ LATEST STATE — 2026-10-30 00:10 EDT (supersedes "State at shutdown" below; the steps below still apply)
 Michael typed **"Go 1 2 3"** on the laptop 10-29 21:3x (gateway; D732 cheap museum env; Android 86 to Play Internal). Full log: ClickUp wdvrdaz9vq.
 - **Subscribed Preview revisions now** (rollback in brackets): generator **00011-47m** = `5e2d588a`, env as wave 4 [00010-gz4 had D732 env; 00009-8t8 = e51d089f; 00008-lsv = caa87604];
