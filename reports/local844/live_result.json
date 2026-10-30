@@ -1,0 +1,179 @@
+{
+  "cap": 0.7,
+  "per_tour_pass": 0.45,
+  "overall_pass": false,
+  "results": [
+    {
+      "location": "Orsay Museum, Paris, France",
+      "n_requested": 5,
+      "n_stops": 5,
+      "per_stop": [
+        {
+          "stop": 1,
+          "title": "L'Origine du monde",
+          "has_story": false,
+          "why": "the longest run (3 sentences, Gustave Courbet) has agency=0 stakes=0 — someone is described, but nothing is risked, refu",
+          "stake_sentence": null
+        },
+        {
+          "stop": 2,
+          "title": "Le Déjeuner sur l'herbe (Luncheon on the Grass)",
+          "has_story": false,
+          "why": "the longest run (3 sentences, Le Déjeuner) has agency=0 stakes=1 — someone is described, but nothing is risked, refused ",
+          "stake_sentence": null
+        },
+        {
+          "stop": 3,
+          "title": "Bal du moulin de la Galette",
+          "has_story": false,
+          "why": "the longest run (4 sentences, Renoir) has agency=1 stakes=0 — someone is described, but nothing is risked, refused or lo",
+          "stake_sentence": null
+        },
+        {
+          "stop": 4,
+          "title": "La Nuit étoilée (Starry Night Over the Rhône)",
+          "has_story": false,
+          "why": "the longest run (3 sentences, Vincent van Gogh) has agency=0 stakes=0 — someone is described, but nothing is risked, ref",
+          "stake_sentence": null
+        },
+        {
+          "stop": 5,
+          "title": "L'Église d'Auvers-sur-Oise (The Church at Auvers)",
+          "has_story": false,
+          "why": "the longest run (5 sentences, Vincent van Gogh) has agency=2 stakes=0 — someone is described, but nothing is risked, ref",
+          "stake_sentence": null
+        }
+      ],
+      "all_story_ok": false,
+      "no_story_lines": [
+        "[LOCAL-487] step 7a: 4 stop(s) have NO VALID STORY by Michael's bar (3+ consecutive sentences, one person, an action and something at stake)"
+      ],
+      "wsr_lines": [
+        "[LOCAL-840] Stop 4 work research: 0 passage(s) (source=none, qid=-, $0.0010)",
+        "[LOCAL-840] Stop 1 work research: 8 passage(s) (source=wikipedia, qid=Q334138, $0.0000)",
+        "[LOCAL-840] Stop 3 work research: 8 passage(s) (source=wikipedia, qid=Q683274, $0.0000)",
+        "[LOCAL-840] Stop 5 work research: 8 passage(s) (source=wikipedia, qid=Q1213917, $0.0000)",
+        "[LOCAL-840] Stop 2 work research: 8 passage(s) (source=wikipedia, qid=Q152509, $0.0000)",
+        "[LOCAL-840] Stop 4 work research: 0 passage(s) (source=none, qid=-, $0.0010)",
+        "[LOCAL-840] Stop 5 work research: 8 passage(s) (source=cache, qid=Q1213917, $0.0000)",
+        "[LOCAL-840] Stop 3 work research: 8 passage(s) (source=cache, qid=Q683274, $0.0000)",
+        "[LOCAL-840] Stop 1 work research: 8 passage(s) (source=cache, qid=Q334138, $0.0000)",
+        "[LOCAL-840] Stop 2 work research: 8 passage(s) (source=cache, qid=Q152509, $0.0000)"
+      ],
+      "gate_652_removed": [
+        "[LOCAL-652] REMOVED foreign work/artist sentence stop='L'Origine du monde' entities=['Petite Danseuse'] (1 sentence(s)) in: \"Standing before L'Origine du monde, the viewer is drawn into a confrontation with the rawness of human existence and sen\""
+      ],
+      "gate_472_removed": [
+        "[LOCAL-472] REMOVED transferable paragraph stop='L'Origine du monde' conf=high reason='Generic claims about art and human existence apply to any art museum.': \"Standing before L'Origine du monde, the viewer is drawn into a confrontation with the rawness of human existence and sen\""
+      ],
+      "gate_472_ungrounded": [
+        "[LOCAL-472] UNGROUNDED entity stop='L'Origine du monde' entity='Petite Danseuse' reason='It does not specify how \"Petite Danseuse\" relates to L'Origine du monde.' in: \"Standing before L'Origine du monde, the viewer is drawn into a confrontation with the rawness of hum\"",
+        "[LOCAL-472] UNGROUNDED entity stop='Le Dejeuner sur l'herbe' entity='Le Déjeuner' reason='No concrete link to the stop is provided.' in: \"Le Déjeuner sur l'herbe demands a viewing position close enough to observe the broad brushstrokes an\""
+      ],
+      "gate_844_grounded": [
+        "[LOCAL-844] GROUNDED-BY-RESEARCH entity stop='L'Origine du monde' entity='Musée d'Orsay' (named in this stop's work-research passages) in: \"Gustave Courbet rejected academic painting and its smooth, idealised nudes, but he also directly rec\"",
+        "[LOCAL-844] GROUNDED-BY-RESEARCH entity stop='L'Origine du monde' entity='Musée d'Orsay' (named in this stop's work-research passages) in: \"Standing before L'Origine du monde, the viewer is drawn into a confrontation with the rawness of hum\"",
+        "[LOCAL-844] GROUNDED-BY-RESEARCH entity stop='L'Origine du monde' entity='Musée d'Orsay' (named in this stop's work-research passages) in: \"This painting was acquired by the Musée d'Orsay through a dation, a legal mechanism in France allowi\"",
+        "[LOCAL-844] GROUNDED-BY-RESEARCH entity stop='Le Dejeuner sur l'herbe' entity='Salon des Refusés' (named in this stop's work-research passages) in: \"In 1863, Édouard Manet faced the rejection of Le Déjeuner sur l'herbe by the Paris Salon jury. He se\"",
+        "[LOCAL-844] GROUNDED-BY-RESEARCH entity stop='Le Dejeuner sur l'herbe' entity='Didier de Montchaux' (named in this stop's work-research passages) in: \"In 1863, Édouard Manet faced the rejection of Le Déjeuner sur l'herbe by the Paris Salon jury. He se\"",
+        "[LOCAL-844] GROUNDED-BY-RESEARCH entity stop='Bal du moulin de la Galette' entity='Gustave Caillebotte' (named in this stop's work-research passages) in: \"Pierre-Auguste Renoir struggled to paint Bal du moulin de la Galette outdoors in 1876, as the wind c\"",
+        "[LOCAL-844] GROUNDED-BY-RESEARCH entity stop='L'église d'auvers-sur-oise' entity='Vincent van Gogh' (named in this stop's work-research passages) in: \"Vincent van Gogh had just left the hospital at Saint-Rémy-de-Provence and settled in Auvers-sur-Oise\"",
+        "[LOCAL-844] GROUNDED-BY-RESEARCH entity stop='L'église d'auvers-sur-oise' entity='Van Gogh' (named in this stop's work-research passages) in: \"This oil on canvas, measuring 73 by 92 centimeters, captures the church’s looming structure through \"",
+        "[LOCAL-844] GROUNDED-BY-RESEARCH entity stop='L'église d'auvers-sur-oise' entity='Van Gogh' (named in this stop's work-research passages) in: \"Van Gogh painted this work during a period when he sought to reconcile his northern Dutch roots with\""
+      ],
+      "story_sentence_removals": [],
+      "delivery_violations": [],
+      "tour_usd": 0.344259
+    },
+    {
+      "location": "Rijksmuseum, Amsterdam, Netherlands",
+      "n_requested": 5,
+      "n_stops": 5,
+      "per_stop": [
+        {
+          "stop": 1,
+          "title": "De grote golf bij Kanagawa (The Great Wave off Kanagawa)",
+          "has_story": false,
+          "why": "the longest run (3 sentences, The Great Wave) has agency=0 stakes=0 — someone is described, but nothing is risked, refus",
+          "stake_sentence": null
+        },
+        {
+          "stop": 2,
+          "title": "De Nachtwacht (The Night Watch)",
+          "has_story": true,
+          "why": "The Night Watch carries 4 consecutive sentences with an action and something at stake",
+          "stake_sentence": "On 14 September 1975, Wilhelmus de Rijk, an unemployed school teacher, entered the Rijksmuseum and attacked The Night Watch with a bread knife, slashing several large zig-zag cuts up to 30 centimeters long into the canvas."
+        },
+        {
+          "stop": 3,
+          "title": "Het melkmeisje (The Milkmaid)",
+          "has_story": false,
+          "why": "the longest run (4 sentences, Johannes Vermeer) has agency=2 stakes=0 — someone is described, but nothing is risked, ref",
+          "stake_sentence": null
+        },
+        {
+          "stop": 4,
+          "title": "Het Joodse Bruidje (The Jewish Bride)",
+          "has_story": false,
+          "why": "the longest run (5 sentences, Rembrandt) has agency=0 stakes=0 — someone is described, but nothing is risked, refused or",
+          "stake_sentence": null
+        },
+        {
+          "stop": 5,
+          "title": "Gezicht op huizen in Delft, bekend als ‘Het straatje’ (The Little Street)",
+          "has_story": false,
+          "why": "longest qualifying run is 2 sentence(s); the bar is 3 consecutive sentences about one subject, carrying an action and a ",
+          "stake_sentence": null
+        }
+      ],
+      "all_story_ok": false,
+      "no_story_lines": [
+        "[LOCAL-487] step 7a: 3 stop(s) have NO VALID STORY by Michael's bar (3+ consecutive sentences, one person, an action and something at stake)"
+      ],
+      "wsr_lines": [
+        "[LOCAL-840] Stop 1 work research: 0 passage(s) (source=none, qid=-, $0.0010)",
+        "[LOCAL-840] Stop 4 work research: 0 passage(s) (source=none, qid=-, $0.0100)",
+        "[LOCAL-840] Stop 3 work research: 8 passage(s) (source=wikipedia, qid=Q167605, $0.0000)",
+        "[LOCAL-840] Stop 5 work research: 8 passage(s) (source=wikipedia, qid=Q586035, $0.0000)",
+        "[LOCAL-840] Stop 2 work research: 8 passage(s) (source=wikipedia, qid=Q219831, $0.0000)",
+        "[LOCAL-840] Stop 1 work research: 0 passage(s) (source=none, qid=-, $0.0010)",
+        "[LOCAL-840] Stop 4 work research: 0 passage(s) (source=none, qid=-, $0.0100)",
+        "[LOCAL-840] Stop 2 work research: 8 passage(s) (source=cache, qid=Q219831, $0.0000)",
+        "[LOCAL-840] Stop 3 work research: 8 passage(s) (source=cache, qid=Q167605, $0.0000)",
+        "[LOCAL-840] Stop 5 work research: 8 passage(s) (source=cache, qid=Q586035, $0.0000)"
+      ],
+      "gate_652_removed": [
+        "[LOCAL-652] REMOVED foreign work/artist sentence stop='The Great Wave off Kanagawa (De grote golf bij Kanagawa)' entities=['Mount Fuji'] (1 sentence(s)) in: \"This print shows a colossal wave, its claw-like crests curling with frothy foam that almost seem to grasp at the small b\"",
+        "[LOCAL-652] REMOVED foreign work/artist sentence stop='The Night Watch' entities=['Saskia van Uylenburgh'] (1 sentence(s)) in: \"This work was created at a pivotal moment, following the completion of the marriage to Saskia van Uylenburgh and during \"",
+        "[LOCAL-652] REMOVED foreign work/artist sentence stop='The Milkmaid' entities=['Walter Liedtke'] (1 sentence(s)) in: \"Art historian Walter Liedtke studied this discovery intensively and published findings that clarified how Vermeer’s evol\"",
+        "[LOCAL-652] REMOVED foreign work/artist sentence stop='The Milkmaid' entities=['Dutch Golden Age'] (1 sentence(s)) in: \"The painting belonged to a private collection before being acquired by the Rijksmuseum in the 19th century, helping anch\"",
+        "[LOCAL-652] REMOVED foreign work/artist sentence stop=''Het Joodse bruidje'' entities=['Abraham Bredius', 'Dutch Golden Age'] (2 sentence(s)) in: \"Abraham Bredius, a key art historian, championed this painting in the early 20th century, publishing research that estab\"",
+        "[LOCAL-652] REMOVED foreign work/artist sentence stop='View of Houses in Delft' entities=['Jewish Bride'] (1 sentence(s)) in: \"At the time Vermeer painted View of Houses in Delft, he was establishing his reputation locally, focusing on scenes that\"",
+        "[LOCAL-652] REMOVED foreign work/artist sentence stop='View of Houses in Delft' entities=['Golden Age'] (1 sentence(s)) in: \"The presence of this painting in the Rijksmuseum connects it intimately to the museum’s broader narrative of Dutch life \""
+      ],
+      "gate_472_removed": [
+        "[LOCAL-472] REMOVED transferable paragraph stop='The Night Watch' conf=high reason='Generic statement about a painting's honor.': \"This painting holds a place of high honor in the museum’s history.\"",
+        "[LOCAL-472] REMOVED transferable paragraph stop='The Milkmaid' conf=high reason='Generic claims about art and light apply to any art museum.': \"The refined composition encouraged Dutch artists to explore quiet domesticity with similar light effects, influencing ge\""
+      ],
+      "gate_472_ungrounded": [
+        "[LOCAL-472] UNGROUNDED entity stop='The Great Wave off Kanagawa (De grote golf bij Kanagawa)' entity='Mount Fuji' reason='Mount Fuji is mentioned but lacks a concrete link to the stop.' in: \"This print shows a colossal wave, its claw-like crests curling with frothy foam that almost seem to \"",
+        "[LOCAL-472] UNGROUNDED entity stop='The Night Watch' entity='Saskia van Uylenburgh' reason='It does not specify how Saskia van Uylenburgh relates to \"The Night Watch.\"' in: \"This work was created at a pivotal moment, following the completion of the marriage to Saskia van Uy\"",
+        "[LOCAL-472] UNGROUNDED entity stop='The Milkmaid' entity='Walter Liedtke' reason='No concrete link to \"The Milkmaid\" is provided.' in: \"Art historian Walter Liedtke studied this discovery intensively and published findings that clarifie\"",
+        "[LOCAL-472] UNGROUNDED entity stop='The Milkmaid' entity='Dutch Golden Age' reason='It does not specify how \"Dutch Golden Age\" directly relates to \"The Milkmaid.\"' in: \"The painting belonged to a private collection before being acquired by the Rijksmuseum in the 19th c\"",
+        "[LOCAL-472] UNGROUNDED entity stop=''Het Joodse bruidje'' entity='Abraham Bredius' reason='It does not specify a direct link between Bredius and the location of Het Joodse bruidje.' in: \"Abraham Bredius, a key art historian, championed this painting in the early 20th century, publishing\"",
+        "[LOCAL-472] UNGROUNDED entity stop=''Het Joodse bruidje'' entity='Dutch Golden Age' reason='No concrete link to the stop is established.' in: \"Abraham Bredius, a key art historian, championed this painting in the early 20th century, publishing\"",
+        "[LOCAL-472] UNGROUNDED entity stop='View of Houses in Delft' entity='Jewish Bride' reason='It does not specify how \"Jewish Bride\" relates to this stop.' in: \"At the time Vermeer painted View of Houses in Delft, he was establishing his reputation locally, foc\"",
+        "[LOCAL-472] UNGROUNDED entity stop='View of Houses in Delft' entity='Golden Age' reason='It does not specify how Vermeer relates to the stop.' in: \"The presence of this painting in the Rijksmuseum connects it intimately to the museum’s broader narr\""
+      ],
+      "gate_844_grounded": [
+        "[LOCAL-844] GROUNDED-BY-RESEARCH entity stop='The Night Watch' entity='Wilhelmus de Rijk' (named in this stop's work-research passages) in: \"On 14 September 1975, Wilhelmus de Rijk, an unemployed school teacher, entered the Rijksmuseum and a\"",
+        "[LOCAL-844] GROUNDED-BY-RESEARCH entity stop='View of Houses in Delft' entity='Johannes Vermeer' (named in this stop's work-research passages) in: \"Johannes Vermeer lived and worked in Delft, where he chose to paint the scene known as 'The Little S\"",
+        "[LOCAL-844] GROUNDED-BY-RESEARCH entity stop='View of Houses in Delft' entity='Ariaentgen Claes' (named in this stop's work-research passages) in: \"Johannes Vermeer lived and worked in Delft, where he chose to paint the scene known as 'The Little S\""
+      ],
+      "story_sentence_removals": [],
+      "delivery_violations": [],
+      "tour_usd": 0.290733
+    }
+  ],
+  "metered_total": 0.7102917200000003
+}

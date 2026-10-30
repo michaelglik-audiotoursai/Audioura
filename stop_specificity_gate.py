@@ -366,6 +366,59 @@ def _entity_is_foreign_work_or_artist(entity: str, delivered_grounding: set) -> 
     return not (ent_tokens & delivered_grounding)
 
 
+# ═══════════════════════════════════════════════════════════════════════════════
+# [LOCAL-844] PER-WORK RESEARCH PASSAGES as grounding evidence
+# ═══════════════════════════════════════════════════════════════════════════════
+#
+# LOCAL-842 (live) proved the real ceiling: the story pass, fed the LOCAL-840
+# per-work research passages (verbatim from the work's OWN Wikipedia article),
+# wrote a TRUE, sourced human story —
+#   "On 14 September 1975, Wilhelmus de Rijk, an unemployed school teacher,
+#    attacked The Night Watch with a bread knife…"
+# — and then TWO gates deleted it:
+#   LOCAL-652 flagged "Wilhelmus de Rijk" as a foreign work/artist (his name
+#     shares no token with the delivered stops' titles/artists), and
+#   LOCAL-472 Part 2 reported "No concrete link between Wilhelmus de Rijk and The
+#     Night Watch is established" — on a sentence that says he attacked it.
+# Both gates were blind to the same research that produced the sentence. A person
+# or event NAMED in this stop's own research passages, in connection with this
+# work, IS grounded — that is exactly the evidence the gates should weigh,
+# alongside the delivered-stop grounding they already use.
+#
+# The rule is strictly additive (ticket Do §4): an entity whose name appears in a
+# fetched passage for THIS stop is grounded and survives; an entity that appears
+# in NO passage is judged EXACTLY as today (delivered-stop grounding + the model
+# verdict). With no passages supplied the behaviour is byte-for-byte unchanged, so
+# the LOCAL-652/472 suites and every non-art tour are untouched.
+
+
+def _passage_grounding_tokens(passages: Optional[List[str]]) -> set:
+    """[LOCAL-844] Union of content tokens from this stop's per-work research
+    passages (LOCAL-840 `museum_work_research` output). Same tokeniser as the
+    delivered-stop grounding, so an entity's tokens are compared on the same
+    footing — folded, len≥4, generic words dropped."""
+    grounding: set = set()
+    for p in passages or []:
+        grounding |= _ssg_grounding_tokens(_norm(str(p or '')))
+    return grounding
+
+
+def _entity_grounded_by_passages(entity: str, passage_tokens: set) -> bool:
+    """[LOCAL-844] True when a named entity is NAMED in this stop's research
+    passages — i.e. EVERY one of the entity's distinctive tokens appears in the
+    passage token set. Requiring ALL tokens (not any) keeps the match precise:
+    "Wilhelmus de Rijk" is grounded only when both ``wilhelmus`` and ``rijk``
+    appear, so a passage that merely shares one common token does not ground an
+    unrelated name. An entity with no distinctive tokens, or with no passages to
+    test against, is NOT grounded — those are judged exactly as today."""
+    if not passage_tokens or not entity:
+        return False
+    ent_tokens = _ssg_grounding_tokens(entity)
+    if not ent_tokens:
+        return False
+    return ent_tokens <= passage_tokens
+
+
 def _split_sentences(paragraph: str) -> List[str]:
     """Split a paragraph into sentences, keeping terminal punctuation. Good enough
     for prose sentence removal (abbreviations are rare in this tour prose)."""
@@ -702,7 +755,8 @@ def check_named_entity_relationships(paragraph: str,
                                      sibling_stop_names: List[str] = None,
                                      api_key: str = None,
                                      llm_fn: Callable[[str, str, str], Optional[str]] = None,
-                                     model: str = None) -> Dict:
+                                     model: str = None,
+                                     work_research_passages: Optional[List[str]] = None) -> Dict:
     """Flag named entities (persons / works / titled entities) that carry no
     stated relationship to this stop.
 
@@ -711,15 +765,30 @@ def check_named_entity_relationships(paragraph: str,
     Detection is deterministic (reused patterns). The relationship judgement uses
     the model; with no model available it returns the detected entities but flags
     nothing (fail-safe — the caller does not act without a verdict).
+
+    [LOCAL-844] `work_research_passages` are this stop's per-work research passages
+    (LOCAL-840). An entity NAMED in those passages, in connection with this work,
+    is grounded: it is NOT submitted to the model and NEVER appears in
+    `ungrounded`. This is additive — an entity that appears in no passage is judged
+    exactly as before (the model decides), and with no passages supplied the method
+    is byte-for-byte unchanged.
     """
     para = _norm(paragraph or '').strip()
     entities = _detect_named_entities(para, stop_name, sibling_stop_names)
-    result = {'entities': entities, 'ungrounded': [], 'reason': ''}
+    result = {'entities': entities, 'ungrounded': [], 'passage_grounded': []}
+    result['reason'] = ''
     if not entities:
         return result
 
+    passage_tokens = _passage_grounding_tokens(work_research_passages)
+
     caller = llm_fn or (lambda p, k, m: _default_llm(p, k, m))
     for entity in entities:
+        # [LOCAL-844] A person/event named in this stop's research passages is
+        # grounded by that evidence — skip the model and never flag it.
+        if _entity_grounded_by_passages(entity, passage_tokens):
+            result['passage_grounded'].append(entity)
+            continue
         prompt = _RELATIONSHIP_PROMPT.format(
             stop=stop_name, entity=entity, paragraph=para,
         )
@@ -756,6 +825,14 @@ def apply_stop_specificity_gate(poi_list: List[Dict],
         delete here — an ungrounded name is a flag for the retry/rewrite path,
         not a destructive action, matching the task's "remove OR make specific".
 
+    [LOCAL-844] Each stop may carry its per-work research passages (LOCAL-840)
+    under `poi['_wsr_passages']`. Both the Part-2 relationship check and the
+    LOCAL-652 foreign-work/artist remover treat an entity NAMED in those passages
+    as grounded, so a TRUE, sourced story sentence ("Wilhelmus de Rijk attacked
+    The Night Watch…") survives. Additive: an entity in no passage is judged
+    exactly as before, and a stop with no passages behaves byte-for-byte as it
+    did pre-844.
+
     Mutates `poi_list` in place. Returns a stats dict.
     """
     stats = {
@@ -768,9 +845,11 @@ def apply_stop_specificity_gate(poi_list: List[Dict],
         'last_paragraph_protected': 0,
         'ungrounded_entities': 0,
         'foreign_entity_sentences_removed': 0,
+        'passage_grounded_entities': 0,
         'removal_log': [],
         'entity_log': [],
         'foreign_entity_log': [],
+        'passage_grounded_log': [],
     }
 
     stop_names = [p.get('name', '') for p in poi_list if p.get('name')]
@@ -786,6 +865,15 @@ def apply_stop_specificity_gate(poi_list: List[Dict],
         stop_name = poi.get('name', f'Stop {si + 1}')
         siblings = [n for n in stop_names if n and n != stop_name]
 
+        # [LOCAL-844] This stop's per-work research passages (LOCAL-840
+        # `museum_work_research` output, persisted on the poi in
+        # generate_tour_text.py). A person or event NAMED in these passages, in
+        # connection with this work, is grounded by that evidence — so both gates
+        # below see it as grounded. Absent (non-art tour, research disabled), this
+        # is [] and every entity is judged exactly as before.
+        _work_passages = (poi.get('_wsr_passages')
+                          or poi.get('_work_research_passages') or [])
+
         paragraphs = _split_paragraphs(desc)
         if not paragraphs:
             continue
@@ -798,9 +886,19 @@ def apply_stop_specificity_gate(poi_list: List[Dict],
             stats['paragraphs_checked'] += 1
 
             # Part 2 — report ungrounded named entities (non-destructive here).
+            # [LOCAL-844] The stop's research passages are passed as grounding
+            # evidence: an entity named in them is never flagged ungrounded, so it
+            # also never reaches the LOCAL-652 foreign-entity removal below.
             ent = check_named_entity_relationships(
                 para, stop_name, siblings, api_key=api_key, llm_fn=llm_fn, model=model,
+                work_research_passages=_work_passages,
             )
+            for _pg in ent.get('passage_grounded', []):
+                stats['passage_grounded_entities'] += 1
+                stats['passage_grounded_log'].append({
+                    'stop': stop_name, 'entity': _pg,
+                    'paragraph': para[:100],
+                })
             _foreign_ungrounded = []
             for u in ent['ungrounded']:
                 stats['ungrounded_entities'] += 1

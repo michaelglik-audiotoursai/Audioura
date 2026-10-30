@@ -23444,6 +23444,18 @@ satisfy this requirement. Your text will be REJECTED if "{_414_artist_surname}" 
                                 _sp_material = _wsr_passages + [
                                     m for m in _sp_material
                                     if m.lower()[:120] not in _seen_sp]
+                            # [LOCAL-844] Persist the per-work research passages on
+                            # the poi so the downstream grounding gates
+                            # (LOCAL-652 foreign-work/artist remover, LOCAL-472
+                            # ungrounded-entity gate in stop_specificity_gate.py)
+                            # can treat a person/event NAMED in this stop's own
+                            # research as grounded evidence. Without this the gates
+                            # delete TRUE, sourced story sentences (LOCAL-842: the
+                            # Night Watch de Rijk attack, Manet's Salon rejection).
+                            # Additive and bounded: on any failure the key is left
+                            # as whatever it was, and an empty list is a no-op gate
+                            # side (judged exactly as before).
+                            poi['_wsr_passages'] = _wsr_passages
                             print(f"  [LOCAL-840] Stop {stop_num} work research: "
                                   f"{len(_wsr_passages)} passage(s) "
                                   f"(source={_wsr.get('source')}, qid={_wsr.get('qid') or '-'}, "
@@ -25673,7 +25685,14 @@ REWRITE RULES (all mandatory):
                 print(f"    Ungrounded named entities: {_ssg_stats['ungrounded_entities']}")
                 print(f"    [LOCAL-652] Foreign work/artist sentences removed: "
                       f"{_ssg_stats.get('foreign_entity_sentences_removed', 0)}")
+                print(f"    [LOCAL-844] Passage-grounded entities (kept on research "
+                      f"evidence): {_ssg_stats.get('passage_grounded_entities', 0)}")
                 print(f"    Stops affected: {_ssg_stats['stops_affected']}")
+                for _pgl in _ssg_stats.get('passage_grounded_log', []):
+                    print(f"    [LOCAL-844] GROUNDED-BY-RESEARCH entity "
+                          f"stop='{_pgl['stop']}' entity='{_pgl['entity']}' "
+                          f"(named in this stop's work-research passages) "
+                          f"in: \"{_pgl['paragraph']}\"")
                 for _rl in _ssg_stats['removal_log']:
                     print(f"    [LOCAL-472] REMOVED transferable paragraph "
                           f"stop='{_rl['stop']}' conf={_rl['confidence']} "
