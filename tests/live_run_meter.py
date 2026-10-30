@@ -65,7 +65,10 @@ logger = logging.getLogger(__name__)
 # ``tests.live_run_meter``.
 _HERE = os.path.dirname(os.path.abspath(__file__))
 _ROOT = os.path.dirname(_HERE)
-for _p in (_HERE, _ROOT):
+# [LOCAL-822] Also put the repo's _meter dir on the path so the raw meter door
+# (paid_api_meter) can be imported for the container meter-mount guard below.
+_METER = os.path.join(_ROOT, "_meter")
+for _p in (_HERE, _ROOT, _METER):
     if _p not in sys.path:
         sys.path.insert(0, _p)
 
@@ -86,6 +89,16 @@ try:
     import task_budget  # noqa: E402
 except Exception:  # pragma: no cover - module always ships beside this one
     task_budget = None
+
+# [LOCAL-822] The raw meter door, imported softly. LiveRunMeter.__enter__ calls
+# its check_meter_mount() so a container run started through the harness refuses
+# BEFORE any paid call unless its meter log reaches the host (bind mount +
+# identity) — the same mechanical contract the network patches enforce. Imported
+# softly so a harness/test without the _meter dir on the path behaves as before.
+try:
+    import paid_api_meter  # noqa: E402
+except Exception:  # pragma: no cover - module ships at _meter/
+    paid_api_meter = None
 
 DEFAULT_TEST_GEMINI_MAX_USD = 1.00
 TEST_RUN_DESCRIPTION = "test run"
@@ -506,7 +519,28 @@ class LiveRunMeter:
 
     # Context-manager sugar: `with LiveRunMeter("LOCAL-613") as m: ...` records
     # and uninstalls on exit, even on exception (incl. the cap raise).
+    def check_meter_mount(self):
+        """[LOCAL-822] Refuse to enter the run when, INSIDE a container, this run
+        has not proven its meter rows will reach the host — i.e. the directory of
+        PAID_API_LOG is not a bind mount, or no identity (METER_SERVICE /
+        TASK_BUDGET_ID / METER_ROLE) is set. Delegates to the raw meter door
+        (paid_api_meter.check_meter_mount) so the harness entry and every network
+        patch enforce the SAME contract and name the SAME fix
+        (meter_container_env.docker_meter_args). Raises
+        paid_api_meter.MeterMountMissing on refusal.
+
+        Fail-open when the meter module is unavailable (a unit test or a harness
+        without _meter on the path), exactly like the whole-task budget import."""
+        if paid_api_meter is None:
+            return
+        paid_api_meter.check_meter_mount()
+
     def __enter__(self):
+        # Mechanical meter-mount contract (LOCAL-822): a container live run that
+        # would lose its rows (no host bind-mount / no identity) is refused HERE,
+        # before any paid call, so a hand-typed `docker run` through this harness
+        # cannot silently burn money whose rows die inside --rm.
+        self.check_meter_mount()
         return self
 
     def __exit__(self, exc_type, exc, tb):

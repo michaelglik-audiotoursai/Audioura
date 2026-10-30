@@ -799,6 +799,182 @@ def check_task_budget():
             "LOCAL-817)." % (task_id, spent, budget))
 
 
+# --------------------------------------------------------------------------- #
+# Container meter-mount contract  (LOCAL-822)
+#
+# LOCAL-820 wired the .sh wrappers and isolated_test.py so a container's meter
+# rows reach the HOST (bind-mount ~/Audioura/meterlogs -> /meterlogs, canonical
+# PAID_API_LOG, service tag). But the guard test for that only SCANS source
+# files — it cannot see a hand-typed ``docker run`` (LOCAL-818 launched its live
+# tours that way), so the next hand-typed run can still write its rows to
+# /meterlogs INSIDE the container, where ``--rm`` destroys them. LOCAL-818's two
+# tours left ZERO rows on the host for exactly this reason.
+#
+# LOCAL-817 solved the same class of problem for the whole-task budget by making
+# the meter itself refuse. We do the same for the meterlog mount: before any paid
+# call, when we are INSIDE a container, REFUSE unless the run has proven its rows
+# will reach the host —
+#
+#   (a) the directory holding PAID_API_LOG is a BIND MOUNT (os.path.ismount, or a
+#       /proc/self/mountinfo check), i.e. a real host dir mounted in, not an
+#       ephemeral container path that --rm will delete; AND
+#   (b) the container carries an IDENTITY so its rows are attributable:
+#       METER_SERVICE or TASK_BUDGET_ID set (the isolated-task contract), OR
+#       METER_ROLE set (the shared compose stack's identity — those services
+#       mount /meterlogs and set METER_ROLE=listener but no METER_SERVICE, so
+#       accepting METER_ROLE is what leaves the shared stack unaffected).
+#
+# The refusal names ``meter_container_env.docker_meter_args`` — the ONE helper
+# that emits the correct args — so the fix is in the error itself.
+#
+# FAIL-OPEN like the other doors: not in a container (no /.dockerenv) -> allow;
+# any error deciding mount/identity -> allow and log. The guard is OFF entirely
+# when METER_MOUNT_GUARD=0 (an escape hatch for a deliberate no-mount diagnostic).
+# A missing PAID_API_LOG env defaults to /meterlogs/... just like LOG above.
+# --------------------------------------------------------------------------- #
+MOUNT_GUARD_ENV = "METER_MOUNT_GUARD"
+
+
+class MeterMountMissing(Exception):
+    """[LOCAL-822] Raised instead of making a paid call when this container has
+    NOT proven its meter rows will reach the host: either the directory of
+    PAID_API_LOG is not a bind mount, or the container carries no identity
+    (METER_SERVICE / TASK_BUDGET_ID / METER_ROLE). The whole point is that a
+    hand-typed ``docker run`` that forgets the meterlogs bind-mount burns money
+    whose rows die inside the --rm container — so refuse, $0 spent, and tell the
+    operator to build the run with meter_container_env.docker_meter_args."""
+
+
+def _in_container():
+    """True when running inside a Docker container (``/.dockerenv`` exists). Never
+    raises -> False (fail-open: a detection error must not block a host run)."""
+    try:
+        return os.path.exists("/.dockerenv")
+    except Exception:
+        return False
+
+
+def _mount_guard_on():
+    """The guard is ON unless METER_MOUNT_GUARD is explicitly '0'/'false'/'no'.
+    Lets a deliberate diagnostic run opt out. Never raises -> True (guard on)."""
+    try:
+        raw = (os.environ.get(MOUNT_GUARD_ENV) or "").strip().lower()
+        return raw not in ("0", "false", "no", "off")
+    except Exception:
+        return True
+
+
+def _paid_api_log_path():
+    """The PAID_API_LOG path this process writes, matching the module LOG default
+    so the guard checks the SAME file the meter logs to. Never raises."""
+    try:
+        return os.environ.get("PAID_API_LOG") or LOG
+    except Exception:
+        return LOG
+
+
+def _dir_is_bind_mount(path):
+    """True when ``path`` (the directory of PAID_API_LOG) is a mount point — a
+    host directory bind-mounted into the container, so rows written there survive
+    ``docker run --rm``. Uses os.path.ismount first (works for a bind mount whose
+    target is a directory), then falls back to a /proc/self/mountinfo scan for the
+    rare case ismount misses (e.g. a bind mount onto an existing path on the same
+    device, where the classic st_dev check can be fooled). Never raises -> False
+    (fail SAFE for the mount question: an undecidable mount reads as 'not a
+    mount', which only makes the guard stricter, never looser)."""
+    try:
+        d = path or ""
+        # Normalise to the directory holding the log file.
+        d = os.path.dirname(d) or d
+        if not d:
+            return False
+        try:
+            if os.path.ismount(d):
+                return True
+        except Exception:
+            pass
+        # Fallback: /proc/self/mountinfo lists every mount point as field 5. A
+        # bind mount's target dir appears there verbatim even when os.path.ismount
+        # was fooled. Linux-only; absent on mac/host, where _in_container is False
+        # anyway so this path is not reached in the refusal case.
+        try:
+            real = os.path.realpath(d)
+            with open("/proc/self/mountinfo") as f:
+                for line in f:
+                    parts = line.split()
+                    if len(parts) >= 5:
+                        mp = parts[4]
+                        if mp == d or mp == real:
+                            return True
+        except Exception:
+            pass
+        return False
+    except Exception:
+        return False
+
+
+def _has_container_identity():
+    """True when the container carries an identity that makes its rows
+    attributable: METER_SERVICE or TASK_BUDGET_ID (the isolated-task contract), or
+    METER_ROLE (the shared compose stack's listener identity). Never raises."""
+    try:
+        for env in ("METER_SERVICE", "TASK_BUDGET_ID", METER_ROLE_ENV):
+            if (os.environ.get(env) or "").strip():
+                return True
+        return False
+    except Exception:
+        return False
+
+
+def check_meter_mount():
+    """[LOCAL-822] Enforce the container meter-mount contract before a paid call.
+
+    Raises MeterMountMissing when running INSIDE a container and the run has not
+    proven its meter rows will reach the host — i.e. the directory of PAID_API_LOG
+    is not a bind mount, OR no identity (METER_SERVICE / TASK_BUDGET_ID /
+    METER_ROLE) is set. Returns None (allow) otherwise.
+
+    Fail-OPEN: not in a container, or the guard switched off, or any error deciding
+    the mount/identity -> allow. The only hard stop is the deliberate refusal for a
+    container that would lose its rows. Called immediately before sending any paid
+    request, alongside check_daily_limit and check_task_budget."""
+    try:
+        if not _mount_guard_on():
+            return
+        if not _in_container():
+            return  # on the host — the guard does not apply
+        log_path = _paid_api_log_path()
+        mounted = _dir_is_bind_mount(log_path)
+        identified = _has_container_identity()
+    except Exception as e:
+        # Fail-open on a detection error: a guard bug must never block a tour.
+        try:
+            sys.stderr.write("[paid_api_meter] mount-guard check failed open: %s\n"
+                             % (str(e)[:200],))
+        except Exception:
+            pass
+        return
+    if mounted and identified:
+        return  # contract satisfied — rows will reach the host, attributable
+    log_dir = os.path.dirname(log_path) or log_path
+    missing = []
+    if not mounted:
+        missing.append(
+            "the directory of PAID_API_LOG (%s) is not a host bind-mount, so its "
+            "rows die inside the --rm container" % log_dir)
+    if not identified:
+        missing.append(
+            "no container identity is set (need METER_SERVICE or TASK_BUDGET_ID, "
+            "or METER_ROLE for the shared stack)")
+    raise MeterMountMissing(
+        "[LOCAL-822] refusing paid call: this container has NOT proven its meter "
+        "rows reach the host — %s. Build the run with "
+        "meter_container_env.docker_meter_args() (bind-mounts ~/Audioura/meterlogs "
+        "-> /meterlogs, sets the canonical PAID_API_LOG and METER_SERVICE=<task "
+        "id>), or set METER_MOUNT_GUARD=0 for a deliberate no-mount diagnostic."
+        % "; ".join(missing))
+
+
 def install():
     # Idempotent: patching each HTTP client more than once would stack wrappers
     # and record (and limit-check) every paid call N times. sitecustomize and
@@ -817,6 +993,7 @@ def install():
             if _host_kind(request.url):
                 check_daily_limit()
                 check_task_budget()
+                check_meter_mount()
             resp = _orig(self, request, **kw)
             try:
                 if _host_kind(request.url) and not _is_explicit(request.url):
@@ -841,6 +1018,7 @@ def install():
             # Enforce the daily limit BEFORE sending the paid request.
             check_daily_limit()
             check_task_budget()
+            check_meter_mount()
             try:
                 resp = _orig_open(req, *a, **kw)
             except Exception as e:
@@ -905,6 +1083,7 @@ def install():
             if _host_kind(url):
                 check_daily_limit()
                 check_task_budget()
+                check_meter_mount()
             resp = _orig_httpx_send(self, request, stream=stream, **kw)
             try:
                 if _host_kind(url) and not _is_explicit(url):
@@ -922,6 +1101,7 @@ def install():
             if _host_kind(url):
                 check_daily_limit()
                 check_task_budget()
+                check_meter_mount()
             resp = await _orig_httpx_asend(self, request, stream=stream, **kw)
             try:
                 if _host_kind(url) and not _is_explicit(url):
@@ -950,6 +1130,7 @@ def install():
             if _host_kind(url):
                 check_daily_limit()
                 check_task_budget()
+                check_meter_mount()
             resp = await _orig_aiohttp_request(self, method, str_or_url, **kw)
             try:
                 if _host_kind(url) and not _is_explicit(url):
@@ -1032,6 +1213,7 @@ def install():
             if kind:
                 check_daily_limit()
                 check_task_budget()
+                check_meter_mount()
             try:
                 response = _orig_make_api_call(self, operation_name, api_params)
             except Exception as e:
