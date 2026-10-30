@@ -23,8 +23,10 @@ from museum_story_refill import (
     available_reserve,
     plan_refill_round,
     refill_log_line,
+    research_can_clear_bar,
     RefillPlan,
     DEFAULT_ROUNDS,
+    DEFAULT_MAX_CONSECUTIVE_FAILURES,
 )
 
 # ---- Fixture: the five Rijksmuseum stops step 7a flagged in the 828B live log
@@ -171,28 +173,90 @@ class TestPlanRefillRound(unittest.TestCase):
         self.assertEqual(plan.unfilled, [0, 2])
 
 
-class TestTwoRoundExhaustionWalkthrough(unittest.TestCase):
-    """End-to-end selection over DEFAULT_ROUNDS, mirroring the orchestrator loop:
-    each round, a rejected candidate frees its slot, which carries to the next
-    round and draws the next untried reserve work — until the reserve runs dry.
+class TestBoundedRefillAndPrecheck(unittest.TestCase):
+    """[LOCAL-832B] The refill is now ONE round by default, each candidate is
+    research-pre-checked before a narration call is spent, and the whole refill
+    aborts after two consecutive failures. These contracts replace the old
+    two-round walkthrough: the 832 bounce showed two rounds narrating every
+    reserve work with ~zero yield at ×2 cost.
     """
 
-    def test_default_rounds_is_two(self):
-        self.assertEqual(DEFAULT_ROUNDS, 2)
+    def test_default_rounds_is_one(self):
+        self.assertEqual(DEFAULT_ROUNDS, 1)
 
-    def test_two_rounds_consume_distinct_works(self):
-        still = [0, 2]
-        tried = []
-        seen = []
-        for _ in range(DEFAULT_ROUNDS):
-            plan = plan_refill_round(still, RIJKS_STOPS, RIJKS_RESERVE,
-                                     tried_titles=tried)
-            tried = plan.tried_after
-            seen.extend(a.new_title for a in plan.assignments)
-            # Simulate: all rejected, slots carry forward.
-            still = [a.stop_index for a in plan.assignments] + plan.unfilled
-        self.assertEqual(len(seen), len(set(seen)))  # no title tried twice
-        self.assertEqual(len(seen), 4)               # 2 stops x 2 rounds
+    def test_default_max_consecutive_failures_is_two(self):
+        self.assertEqual(DEFAULT_MAX_CONSECUTIVE_FAILURES, 2)
+
+    def test_one_round_still_pairs_worst_first(self):
+        # A single round still produces a valid plan: worst-first stops paired
+        # with the next distinct reserve works, bounded to one per stop.
+        plan = plan_refill_round([0, 4], RIJKS_STOPS, RIJKS_RESERVE)
+        self.assertEqual(len(plan.assignments), 2)
+        self.assertEqual(plan.assignments[0].new_title, "Woman Reading a Letter")
+        self.assertEqual(plan.assignments[1].new_title,
+                         "Self-Portrait as the Apostle Paul")
+
+    # ---- research pre-check (pure, scan injected — no network) ----
+    _GOOD = ("Louis Broder commissioned Miro to make the lithographs for this "
+             "portfolio. Miro refused the first proofs and destroyed them because "
+             "the colors were wrong. He began again, and only the second set "
+             "survived.")
+    _BAD = "This is a painting. It is blue. It hangs in a gallery."
+
+    @staticmethod
+    def _scan():
+        from story_opportunity_scan import measure, verdict
+        return measure, verdict
+
+    def test_precheck_passes_research_that_carries_a_story(self):
+        self.assertTrue(research_can_clear_bar(self._GOOD, scan=self._scan()))
+
+    def test_precheck_rejects_research_with_no_story(self):
+        self.assertFalse(research_can_clear_bar(self._BAD, scan=self._scan()))
+
+    def test_precheck_rejects_empty_research(self):
+        self.assertFalse(research_can_clear_bar("", scan=self._scan()))
+        self.assertFalse(research_can_clear_bar(None, scan=self._scan()))
+
+    def test_precheck_accepts_list_of_passages(self):
+        self.assertTrue(research_can_clear_bar(
+            [self._GOOD, "extra context"], scan=self._scan()))
+
+    def test_precheck_scan_error_is_conservative_false(self):
+        def _boom(_):
+            raise RuntimeError("scan unavailable")
+        self.assertFalse(research_can_clear_bar(
+            self._GOOD, scan=(_boom, _boom)))
+
+    def test_abort_after_two_consecutive_failures(self):
+        # Simulate the orchestrator's abort rule: narrated candidates that are
+        # not kept increment a counter; two in a row aborts. A kept swap resets.
+        outcomes = ["fail", "fail"]  # two consecutive failures
+        consec = 0
+        aborted = False
+        for o in outcomes:
+            if o == "keep":
+                consec = 0
+            else:
+                consec += 1
+                if consec >= DEFAULT_MAX_CONSECUTIVE_FAILURES:
+                    aborted = True
+                    break
+        self.assertTrue(aborted)
+
+    def test_a_kept_swap_resets_the_abort_counter(self):
+        outcomes = ["fail", "keep", "fail"]  # never two in a row
+        consec = 0
+        aborted = False
+        for o in outcomes:
+            if o == "keep":
+                consec = 0
+            else:
+                consec += 1
+                if consec >= DEFAULT_MAX_CONSECUTIVE_FAILURES:
+                    aborted = True
+                    break
+        self.assertFalse(aborted)
 
 
 class TestRefillLogLine(unittest.TestCase):

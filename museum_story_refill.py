@@ -61,12 +61,26 @@ __all__ = [
     "RefillPlan",
     "refill_log_line",
     "DEFAULT_ROUNDS",
+    "research_can_clear_bar",
+    "DEFAULT_MAX_CONSECUTIVE_FAILURES",
 ]
 
-# [LOCAL-832] Michael's step 7: "repeat from #4", bounded. Two rounds of
-# replacement after step 7a's own retry — enough to work through the next few
-# reserve works for each storyless slot without unbounded spend.
-DEFAULT_ROUNDS = 2
+# [LOCAL-832B] Michael's step 7 says "repeat from #4", bounded — but the 832 live
+# runs showed TWO rounds of replacement narrating every reserve work with ~zero
+# yield (every candidate also storyless on the cheap arm) and costing ×2. So the
+# default is now ONE round: at most `missing` candidates, each pre-checked against
+# its research BEFORE a narration call is spent, and the whole refill aborts after
+# two CONSECUTIVE candidates fail — an arm-level signal that this arm cannot source
+# a story for this venue, not a per-work verdict. Raise STORY_REFILL_ROUNDS to go
+# back to the old multi-round behaviour for a measurement.
+DEFAULT_ROUNDS = 1
+
+# [LOCAL-832B] Abort the refill after this many CONSECUTIVE candidates fail. On
+# the cheap arm, two reserve works in a row producing no story means the arm's
+# narration floor — not this particular work — is why the stop is storyless, and
+# every further candidate is spend with no expected yield. Two, not one, so a
+# single unlucky work does not end the refill prematurely.
+DEFAULT_MAX_CONSECUTIVE_FAILURES = 2
 
 
 def normalize_title(s: Any) -> str:
@@ -219,3 +233,43 @@ def refill_log_line(venue: str, dropped: Any, added: Any) -> str:
         return str(x)
 
     return f"[LOCAL-832] story-gate refill {venue} {_fmt(dropped)} → {_fmt(added)}"
+
+
+def research_can_clear_bar(research_text: Any, *, scan=None) -> bool:
+    """[LOCAL-832B] Pure pre-check: could this candidate's RESEARCH carry a story?
+
+    Before the refill spends a NARRATION call on a reserve work, scan the work's
+    already-fetched research text with the cheap opportunity scan. If the raw
+    research does not even contain the shape of a story — three consecutive
+    sentences about one subject with an action and a consequence — then narrating
+    it cannot produce one either (the narrator may only use the material it is
+    given), so the candidate is skipped and no call is spent.
+
+    This is deliberately a CHEAP, PERMISSIVE gate, not Michael's publication bar:
+    its only job is to avoid narration calls that are hopeless. It reads the
+    research as-is; a work whose research clears the bar still goes on to be
+    narrated, re-gated and judged on the real bar by the caller.
+
+    ``scan`` is injectable as ``(measure, verdict)`` so the check is unit-testable
+    with no dependency on story_opportunity_scan. In production the caller passes
+    the real pair (or leaves it None to import them here). Any error or empty
+    research returns False — the conservative answer, since the whole point is to
+    skip spend we cannot justify.
+    """
+    text = ""
+    if isinstance(research_text, (list, tuple)):
+        text = "\n".join(str(t) for t in research_text if t)
+    else:
+        text = str(research_text or "")
+    text = text.strip()
+    if not text:
+        return False
+    try:
+        if scan is not None:
+            measure, verdict = scan
+        else:
+            from story_opportunity_scan import measure, verdict
+        return not verdict(measure(text)).get("needs_additional_story", True)
+    except Exception:
+        return False
+
