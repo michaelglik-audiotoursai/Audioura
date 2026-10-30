@@ -706,6 +706,91 @@ def _is_food_venue(name_blob: str, cat_blob: str) -> bool:
     return False
 
 
+# [LOCAL-847] The SHORT, bare activity roots. On their own in a name, these are
+# WEAK — decorative ("Kite Bar", "Surf Café", "The Dive Bar"): the venue is a
+# bar/café that merely borrows the activity word. They only make a provider when
+# combined with a provider noun ("Surf School", "Dive Centre") or a compound/
+# full activity word is present. A STRONG signal is either a compound activity
+# word (kitesurf, kiteboarding, windsurfing, diving, paddleboard, snowboarding…)
+# or a short root + a provider noun / "&"-"and" construct ("Dive & Dine").
+_SHORT_ACTIVITY_ROOTS = frozenset({
+    "kite", "surf", "dive", "sail", "yoga", "golf", "swim", "ski", "row",
+    "paddle", "kayak", "canoe", "bike", "climb", "cycle",
+})
+
+# Provider nouns that, next to a short activity root, promote a mixed venue to a
+# provider even when it also carries a food word ("Surf School & Bar", "Dive
+# Centre Café"). A superset of the module's _PROVIDER_NOUNS tuned for the in-name
+# bridge; kept local so the strong-signal test is self-contained.
+_STRONG_PROVIDER_NOUNS = (
+    "school", "schools", "academy", "academies", "club", "clubs",
+    "centre", "center", "centres", "centers", "station",
+    "rental", "rentals", "hire", "outfitter", "outfitters",
+    "instructor", "instruction", "lessons", "lesson", "course", "courses",
+    "sports", "watersports", "adventure", "adventures", "station", "shop",
+)
+
+
+def _strong_activity_provider_signal(name_blob: str, cat_blob: str,
+                                     tokens: Sequence[str],
+                                     raw_name: str = "") -> bool:
+    """[LOCAL-847] True when the candidate's NAME or TYPE carries a STRONG
+    activity-provider signal for the requested activity — strong enough to make it
+    a provider even when the name ALSO says bar/café/restaurant ("Kitesurfing Mui
+    Ne - Surf Bar", "Dive & Dine", "Surf School & Grill").
+
+    A STRONG signal is any of:
+      * a COMPOUND / full activity word among the request's synonym ``tokens``
+        (len >= 6, e.g. "kitesurf", "kiteboarding", "windsurfing", "diving",
+        "paddleboard", "snowboarding") present in the name/type — NOT a bare short
+        root ("kite", "surf", "dive") which on its own is decorative;
+      * a SHORT activity root present AND, right beside it, a provider noun
+        (school/centre/club/rental/…) or an "&"/"and"/"-" construct that marks a
+        combined venue ("Dive & Dine", "Surf School and Bar").
+
+    A plain "Kite Bar" / "The Bar" / "Surf Café" (short root, food head noun, no
+    provider noun, no "&") has NO strong signal → it stays a bar/café and is
+    dropped by the food check. ``raw_name`` is the UNFOLDED title: ``_fold`` strips
+    "&"/"-", so the combined-venue connector is detected on the raw name instead.
+    Deterministic, offline."""
+    blob = (name_blob + " " + cat_blob).strip()
+    if not blob:
+        return False
+    toks = tokens or ()
+    # (a) A compound/full activity word (not a bare short root).
+    for t in toks:
+        ft = _fold(t)
+        if len(ft) < 6:
+            continue
+        if ft in _SHORT_ACTIVITY_ROOTS:
+            continue
+        # Substring on the compound word is safe: "kitesurf"/"kiteboarding"/
+        # "diving" rarely occur spuriously; require >= 6 chars (above).
+        if ft and ft in blob:
+            return True
+    # (b) A short activity root beside a provider noun or an "&"/"and"/"-"
+    # combined-venue construct. Checked on the NAME (the type rarely has "&").
+    name = name_blob
+    short_roots = [_fold(t) for t in toks if _fold(t) in _SHORT_ACTIVITY_ROOTS]
+    short_present = any(
+        re.search(r"\b" + re.escape(r) + r"\b", name) for r in short_roots
+    )
+    if short_present:
+        if _text_has_any(blob, _STRONG_PROVIDER_NOUNS):
+            return True
+        # A combined-venue connector ("Dive & Dine", "Surf - Bar", "Kite and
+        # Surf") on the RAW name — fold strips "&"/"-", so use raw. Only when the
+        # short root is ADJACENT to the connector, so "Blue Sky Restaurant & Bar"
+        # (no activity root) never triggers.
+        raw = (raw_name or "").lower()
+        if raw and re.search(r"&|\band\b|-", raw):
+            for r in short_roots:
+                if (re.search(r"\b" + re.escape(r) + r"\b\s*(?:&|\band\b|-)", raw)
+                        or re.search(r"(?:&|\band\b|-)\s*\b" + re.escape(r) + r"\b", raw)):
+                    return True
+    return False
+
+
 def _text_has_any(blob: str, words: Sequence[str]) -> bool:
     """Whole-word (short) / substring (long) match of any ``words`` in ``blob``
     (both already folded)."""
@@ -769,6 +854,16 @@ def candidate_is_activity_provider(
     # bar; see the food check ordering below).
     has_activity_tok = _text_has_any(blob, tokens)
 
+    # [LOCAL-847] A STRONG activity-provider signal (a COMPOUND activity word, or
+    # a short activity root beside a provider noun / "&"-"and" combined-venue
+    # construct) in the name/type makes the candidate a PROVIDER even when it also
+    # says bar/café/restaurant — a mixed venue ("Kitesurfing Mui Ne - Surf Bar",
+    # "Dive & Dine", "Surf School & Grill") that teaches/rents the activity is
+    # on-category. A plain "Kite Bar" / "The Bar" / "Surf Café" (bare short root +
+    # food head, no provider noun, no "&") has NO strong signal and stays a bar.
+    has_strong_signal = _strong_activity_provider_signal(
+        name_blob, cat_blob, tokens, raw_name=title)
+
     # (2) Classify the candidate's place CLASS (food / landmark / …).
     try:
         cls = classify_place(title, cat)
@@ -777,9 +872,14 @@ def candidate_is_activity_provider(
 
     # FOOD/DRINK is off-category for a non-food provider request EVEN IF the name
     # also contains the activity word ("Kite Bar", "Surf Café"): the place is a
-    # bar/café, not a provider. A food request keeps food venues.
+    # bar/café, not a provider. A food request keeps food venues. [LOCAL-847] A
+    # STRONG activity-provider signal OVERRIDES this: a mixed venue that genuinely
+    # provides the activity (compound activity word, or short root + provider
+    # noun / "&") is kept even though it also carries a food word.
     if cls == "restaurant" or _is_food_venue(name_blob, cat_blob):
         if is_food_req:
+            return True
+        if has_strong_signal:
             return True
         return False
 
