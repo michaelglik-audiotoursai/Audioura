@@ -730,7 +730,27 @@ def research_with_sources(prompt: str, model: str = None, resolve: bool = True,
     exactly the previous behaviour.
 
     This is call-compatible with gemini_with_sources, so a call site swaps one for
-    the other with no argument changes."""
+    the other with no argument changes.
+
+    [LOCAL-828] On a MUSEUM tour with a venue identity bound
+    (venue_identity_gate.set_tour_venue_identity), the grounded research result is
+    passed through venue_identity_gate.scrub_research_result before return, so any
+    passage/support about ANOTHER museum/venue (by subject, source domain, or a
+    contradicting city) is dropped and logged. The default (no identity bound, or a
+    non-museum tour) is byte-for-byte unchanged."""
+    def _apply_venue_identity_gate(res):
+        # [LOCAL-828] Drop other-venue research on museum tours. Guarded so it is a
+        # strict no-op off the museum path and never breaks generation.
+        if not grounded:
+            return res
+        try:
+            import venue_identity_gate as _vig
+            if _vig.gate_active_for_museum():
+                return _vig.scrub_research_result(res, log=print)
+        except Exception:  # pragma: no cover - gate must never break research
+            pass
+        return res
+
     if grounded:
         _wr = walking_research_backend()
         if _wr == 'serper_plus':
@@ -738,16 +758,18 @@ def research_with_sources(prompt: str, model: str = None, resolve: bool = True,
                 import serper_plus_research
             except Exception:
                 # Fail SAFE to Gemini rather than breaking generation.
-                return gemini_with_sources(prompt, model=None, resolve=resolve,
-                                           timeout=timeout, grounded=grounded)
-            return serper_plus_research.serper_plus_research(
+                return _apply_venue_identity_gate(gemini_with_sources(
+                    prompt, model=None, resolve=resolve,
+                    timeout=timeout, grounded=grounded))
+            return _apply_venue_identity_gate(serper_plus_research.serper_plus_research(
                 prompt, model=model, resolve=resolve, timeout=timeout,
-                grounded=grounded)
+                grounded=grounded))
         if _wr == 'gemini_per_venue':
             # Keep the per-stop fallback on Gemini; the one-per-venue grounded pass
             # is run by the loop. Do NOT drop into the Serper object backend.
-            return gemini_with_sources(prompt, model=model, resolve=resolve,
-                                       timeout=timeout, grounded=grounded)
+            return _apply_venue_identity_gate(gemini_with_sources(
+                prompt, model=model, resolve=resolve,
+                timeout=timeout, grounded=grounded))
     if grounded and research_backend() == 'serper':
         # [LOCAL-692] On the cheap (serper) arm, a MUSEUM tour with
         # MUSEUM_RESEARCH=artist_life uses the artist-life backend instead of the
@@ -757,9 +779,10 @@ def research_with_sources(prompt: str, model: str = None, resolve: bool = True,
         if museum_research_backend() == 'artist_life':
             try:
                 import artist_life_research
-                return artist_life_research.artist_life_research(
-                    prompt, model=model, resolve=resolve, timeout=timeout,
-                    grounded=grounded)
+                return _apply_venue_identity_gate(
+                    artist_life_research.artist_life_research(
+                        prompt, model=model, resolve=resolve, timeout=timeout,
+                        grounded=grounded))
             except Exception:
                 pass  # fall through to the object backend below
         try:
@@ -769,14 +792,12 @@ def research_with_sources(prompt: str, model: str = None, resolve: bool = True,
             # than breaking generation.
             out = gemini_with_sources(prompt, model=None, resolve=resolve,
                                       timeout=timeout, grounded=grounded)
-            if isinstance(out, dict) and not out.get('error'):
-                return out
-            return out
-        return serper_research.serper_research(
+            return _apply_venue_identity_gate(out)
+        return _apply_venue_identity_gate(serper_research.serper_research(
             prompt, model=model, resolve=resolve, timeout=timeout,
-            grounded=grounded)
-    return gemini_with_sources(prompt, model=model, resolve=resolve,
-                               timeout=timeout, grounded=grounded)
+            grounded=grounded))
+    return _apply_venue_identity_gate(gemini_with_sources(
+        prompt, model=model, resolve=resolve, timeout=timeout, grounded=grounded))
 
 
 
