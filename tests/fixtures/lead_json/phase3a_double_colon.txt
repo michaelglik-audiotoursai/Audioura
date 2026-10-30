@@ -1,0 +1,8 @@
+[
+    {"name": "Ngọc Sơn Temple", "address": "Đảo Ngọc, Hoàn Kiếm, Hà Nội, Vietnam", "reason": "Built in the 18th century, this temple is dedicated to the legendary hero Trần Hưng Đạo and is located on an island in Hoan Kiem Lake."},
+    {"name": "The Huc Bridge", "address": "Đường Đinh Tiên Hoàng, Hoàn Kiếm, Hà Nội, Vietnam", "reason": "This iconic red wooden bridge connects the shore to Ngọc Sơn Temple and symbolizes the unity of the Vietnamese people."},
+    {"name": "Hoan Kiem Lake", "address": "Hoàn Kiếm, Hà Nội, Vietnam", "reason": "A central feature of Hanoi, this lake is steeped in legend and was the site of the ancient sword returned by the Golden Turtle God."},
+    {"name": "Turtle Tower", "address": "Đường Đinh Tiên Hoàng, Hoàn Kiếm, Hà Nội, Vietnam", "reason": "This small tower on an island in Hoan Kiem Lake is a symbol of Hanoi and commemorates the legend of the Golden Turtle."},
+    {"name": "St. Joseph's Cathedral", "address":: "40 Nhà Chung, Hàng Trống, Hoàn Kiếm, Hà Nội, Vietnam", "reason": "Built in 1886, this neo-Gothic cathedral is one of the oldest churches in Vietnam and reflects the French colonial influence on the city."}
+]
+

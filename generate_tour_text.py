@@ -12040,7 +12040,28 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
             try:
                 return json.loads(m.group(0))
             except json.JSONDecodeError:
-                return None
+                pass
+        # [LEAD 2026-10-30] Repair small model slips instead of failing the whole tour:
+        # a doubled colon ('"address":: "x"', seen live from gpt-4.1-mini), trailing commas.
+        # Last resort: keep every individually valid {...} object.
+        r = re.sub(r'("\s*):\s*:', r'\1:', t)
+        r = re.sub(r',\s*([\]}])', r'\1', r)
+        try:
+            v = json.loads(r)
+            if isinstance(v, list):
+                print("  [LEAD-JSON] repaired a malformed JSON array from the model")
+                return v
+        except json.JSONDecodeError:
+            pass
+        objs = []
+        for om in re.finditer(r'\{[^{}]*\}', r):
+            try:
+                objs.append(json.loads(om.group(0)))
+            except json.JSONDecodeError:
+                continue
+        if objs:
+            print(f"  [LEAD-JSON] salvaged {len(objs)} valid object(s) from a malformed JSON array")
+            return objs
         return None
 
     def _normalize_name(name):
