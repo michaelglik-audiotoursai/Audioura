@@ -80,7 +80,11 @@ def manifest_static_checks():
         failures.append(f"backends missing: {sorted(missing_be)}")
 
     # Every route must be api_key (no public 'none' routes on subscribed).
+    # Sole exception: Apple's server-notification webhook, verified by its signed JWS.
     for r in m.get('routes', []):
+        if (r.get('public_path') == '/iap/apple/notifications'
+                and r.get('auth') == 'apple_signed_jws'):
+            continue
         if r.get('auth', 'api_key') != 'api_key':
             failures.append(f"{r['public_path']}: auth={r.get('auth')} "
                             f"(expected api_key)")

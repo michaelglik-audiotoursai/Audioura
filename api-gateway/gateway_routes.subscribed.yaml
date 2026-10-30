@@ -384,6 +384,22 @@ routes:
     methods: [GET]
     auth: api_key
 
+  # [LOCAL-807] auto-renewing subscriptions: the app reports a new subscription purchase.
+  - public_path: /subscriptions/verify
+    backend: user-api
+    upstream: /subscriptions/verify
+    methods: [POST]
+    auth: api_key
+
+  # [LOCAL-807] App Store Server Notifications v2 (Apple calls this; it cannot send our API key).
+  # The handler verifies the signedPayload JWS chain against Apple Root CA G3 and the bundle id,
+  # so a forged call grants nothing. The ONLY non-api_key route on subscribed (test-enforced).
+  - public_path: /iap/apple/notifications
+    backend: user-api
+    upstream: /iap/apple/notifications
+    methods: [POST]
+    auth: apple_signed_jws
+
   # --- legal / document acceptance ---
   - public_path: /document-acceptance
     backend: user-api
