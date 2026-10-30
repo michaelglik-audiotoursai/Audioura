@@ -48,6 +48,21 @@ HARNESSES = [
     "run_seed_queries.py",
     "run_seed_queries_v2.py",
     "run_adjudicated_stories.py",
+    # [LOCAL-819] Additional host-run harnesses found to make paid OpenAI / Gemini
+    # / Serper calls directly on the Mac without installing the network meter, so
+    # their spend never reached paid_api_calls (part of the ~$29 Mac-key gap).
+    "run_local242_retrieval_lift.py",
+    "run_local39_live_acceptance.py",
+    "run_local413_live.py",
+    "run_local767_live.py",
+    "run_local577_palais_live.py",
+    "run_local580_live.py",
+    "run_local432_live_palais.py",
+    "run_local582_live.py",
+    "measure_local806.py",
+    "run_local576_live.py",
+    "run_local562_live_chart_house.py",
+    "run_local251_namedrop_not_delivery.py",
 ]
 
 MARKER = "meter_bootstrap"
