@@ -106,10 +106,14 @@ class ReplaceOnChangeTest(unittest.TestCase):
                lng=None, job_id="job-xxxx"):
         zip_path = os.path.join(self._tmp, zip_name)
         _make_zip(zip_path, payload)
+        # [LOCAL-821] The replace-on-change behaviour this test covers now lives
+        # ONLY behind the explicit regenerate path (store_mode='regenerate'); the
+        # default serve path never rewrites an existing tour. This helper tests
+        # the replace mechanism, so it opts in.
         return orch.store_audio_tour(
             self.tour_name, "req:" + self.tour_name, zip_path, lat, lng,
             tour_content=tour_content, stops_count=stops_count,
-            is_test=True, job_id=job_id,
+            is_test=True, job_id=job_id, store_mode="regenerate",
         )
 
     def _row(self):

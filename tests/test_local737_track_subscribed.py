@@ -216,15 +216,18 @@ class SubscribedStoreTest(unittest.TestCase):
 
     def _store(self, *, track, user_id, tour_content, zip_name, payload,
                storied_mode=False, stops_count=4, lat=None, lng=None,
-               is_test=True, job_id=None):
+               is_test=True, job_id=None, store_mode="regenerate"):
         zip_path = os.path.join(self._tmp, zip_name)
         _make_zip(zip_path, payload)
         os.environ["TOUR_TRACK"] = track
         os.environ["STORIED_MODE"] = "true" if storied_mode else "false"
+        # [LOCAL-821] Track-scoped versioning (replace) now lives behind the
+        # explicit regenerate path; different-track cases INSERT regardless (no
+        # match), so defaulting to regenerate keeps every case's intent.
         kwargs = dict(
             tour_content=tour_content, stops_count=stops_count,
             is_test=is_test, job_id=job_id or ("job-" + uuid.uuid4().hex[:8]),
-            user_id=user_id,
+            user_id=user_id, store_mode=store_mode,
         )
         if _STORE_ACCEPTS_TRACK:
             kwargs["track"] = track
