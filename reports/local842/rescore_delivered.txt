@@ -1,0 +1,50 @@
+
+==============================================================================
+BEFORE — per-stop verdicts RECORDED by the 840 live run
+(reports/local840/live_result.json)
+==============================================================================
+
+  Orsay Museum, Paris, France  →  1/5
+    stop 1 L'Origine du monde                             NO STORY
+    stop 2 Le Déjeuner sur l'herbe (Luncheon on the Grass NO STORY
+    stop 3 Bal du moulin de la Galette                    NO STORY
+    stop 4 La Nuit étoilée (Starry Night Over the Rhône)  STORY
+    stop 5 L'Église d'Auvers-sur-Oise (The Church at Auve NO STORY
+
+  Rijksmuseum, Amsterdam, Netherlands  →  1/5
+    stop 1 De grote golf bij Kanagawa (The Great Wave off NO STORY
+    stop 2 De Nachtwacht (The Night Watch)                NO STORY
+    stop 3 Het melkmeisje (The Milkmaid)                  STORY
+    stop 4 Het Joodse Bruidje (The Jewish Bride)          NO STORY
+    stop 5 Gezicht op huizen in Delft, bekend als ‘Het st NO STORY
+
+==============================================================================
+AFTER — ORSAY re-scored on delivered prose [Musée_d_Orsay__Paris__France_museum_tour_20261030_040300.txt] — re-scored on the DELIVERED 840 text
+==============================================================================
+
+  L'Origine du monde
+    BEFORE: NO STORY   AFTER: STORY   (run=3 agency=1 stakes=1 handle='Khalil')
+    stake: "This long concealment and its eventual public unveiling underline the painting’s controversial status and the evolving public discourse on sexuality and artistic freedom."
+
+  Le Déjeuner sur l'herbe (Luncheon on the Grass)
+    BEFORE: STORY   AFTER: STORY   (run=3 agency=3 stakes=2 handle='Édouard Manet')
+    stake: "The painting was initially rejected by the official Paris Salon, the dominant exhibition venue for artists, because it defied the accepted rules of composition, subject matter, and"
+
+  Bal du moulin de la Galette
+    BEFORE: NO STORY   AFTER: NO STORY   (run=2 agency=0 stakes=0 handle='Parisian')
+
+  Une moderne Olympia (A Modern Olympia)
+    BEFORE: NO STORY   AFTER: NO STORY   (run=3 agency=0 stakes=0 handle='Olympia')
+
+  La Nuit étoilée (Starry Night Over the Rhône)
+    BEFORE: NO STORY   AFTER: NO STORY   (run=5 agency=3 stakes=0 handle='Vincent van Gogh')
+
+  → BEFORE 1/5   AFTER 2/5
+
+==============================================================================
+AFTER — RIJKS Night Watch (delivered paragraph, 840 submission)
+==============================================================================
+
+  De Nachtwacht (The Night Watch)
+    BEFORE: NO STORY   AFTER: STORY   (run=3 agency=1 stakes=3 handle='Wilhelmus de Rijk')
+    stake: "On 14 September 1975, Wilhelmus de Rijk, an unemployed school teacher, attacked The Night Watch with a bread knife, slashing several large zig-zagged cuts up to 30 centimetres long"

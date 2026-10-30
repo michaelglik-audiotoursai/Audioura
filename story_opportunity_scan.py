@@ -211,7 +211,88 @@ _STAKES = re.compile(
     r'executed|exiled|banished|martyred|imprisoned|seized|confiscated|'
     r'looted|smuggled|rescued|hidden|concealed|'
     r'after\s+his\s+death|after\s+her\s+death|never\s+again|'
-    r'the\s+only\s+time|would\s+never)\b', re.IGNORECASE)
+    r'the\s+only\s+time|would\s+never|'
+    # [LOCAL-842] Harm / loss / conflict / judgement outcomes. The grounded human
+    # stories the 840 research now feeds the pass are art-crime, scandal and
+    # death events — the Night Watch "attacked … slashing several large zig-zagged
+    # cuts … left permanently scarred. De Rijk died by suicide" — and the
+    # vocabulary above (all contrast + transfer-of-fate) scored them stakes=0, so
+    # a complete human story with an action, a consequence and a stake was reported
+    # as exposition and fired the LOCAL-487 retry. These are the words real
+    # violence/loss/judgement events are written in: a stake PAID, not a figure
+    # DEPICTED (precision is enforced per-sentence in `_sentence_has_stakes`, which
+    # discounts any of these inside a sentence describing what the picture shows).
+    # LEAD ruling D752: the D511 bar is unchanged — the scanner must RECOGNISE a
+    # stake when the text states one. D512 "widening never narrows": every marker
+    # above still matches; this alternation can only make the scanner see MORE
+    # stakes, never fewer. Inflected forms are covered by the trailing optional
+    # suffixes on each root.
+    r'attack(?:ed|s|ing)?|slash(?:ed|es|ing)?|stab(?:bed|s|bing)?|'
+    r'vandalis(?:ed|es|ing)?|vandaliz(?:ed|es|ing)?|'
+    r'damag(?:ed|es|ing)?|scarred|defac(?:ed|es|ing)?|mutilat(?:ed|es|ing)?|'
+    r'stole|stolen|steal(?:s|ing)?|rob(?:bed|s|bing)?|plunder(?:ed|s|ing)?|'
+    r'burn(?:ed|s|ing|t)?|torch(?:ed|es|ing)?|'
+    r'ban(?:ned|s|ning)?|censor(?:ed|s|ing)?|suppress(?:ed|es|ing)?|'
+    r'reject(?:ed|s|ing|ion)?|refus(?:ed|es|ing|al)?|turned\s+away|'
+    r'mock(?:ed|s|ing|ery)?|ridicul(?:ed|es|ing|e)?|deride(?:d|s)?|derided|'
+    r'jeer(?:ed|s|ing)?|scandal(?:s|ous|ised|ized)?|outrage(?:d|s)?|'
+    r'notoriety|controversy|controversial|outcry|uproar|'
+    r'denounc(?:ed|es|ing)?|disgrace(?:d|s)?|'
+    r'sued|su(?:es|ing)|prosecut(?:ed|es|ing)?|charg(?:ed|es|ing)?|'
+    r'arrest(?:ed|s|ing)?|jailed|'
+    r'die(?:d|s)?|dying|kill(?:ed|s|ing)?|slain|slew|murder(?:ed|s|ing)?|'
+    r'suicide|assassinat(?:ed|es|ing)?|perished|drowned|starved|'
+    r'fled|flee(?:s|ing)?|hid|hiding|escap(?:ed|es|ing)?|'
+    r'forg(?:ed|es|ing)?|forgery|counterfeit(?:ed|s|ing)?|'
+    r'bankrupt(?:cy|ed)?|ruined|in\s+debt|to\s+pay\s+(?:his|her|their|off)\s+debts|'
+    r'sold\s+to\s+pay|evict(?:ed|s|ing)?|dispossess(?:ed|es|ing)?)\b',
+    re.IGNORECASE)
+
+# [LOCAL-842] DEPICTION CUES — the precision half of this ticket (Do-item 2).
+#
+# A stake word earns a story only when it names a REAL event the subject lived
+# through, never when it describes what the picture DEPICTS. "The painting shows a
+# dying soldier", "a stolen kiss in the foreground", "depicts the burning of Troy"
+# all carry a stake word and NO story: the dying soldier is paint, not a person who
+# carried the run. These cues mark a sentence as being ABOUT the image's content,
+# and `_sentence_has_stakes` refuses to count a stake inside one. The agent of a
+# real event is the person carrying the run, not a figure in the frame.
+#
+# Kept deliberately to the museum-prose depiction verbs and the two spatial
+# locators Michael named ("in the foreground", "in the background"), plus the
+# common "at the centre/left/right/top/bottom" and "the scene". A real event
+# sentence ("De Rijk attacked the painting", "the jury rejected it") uses none of
+# these, so the Night Watch / Lacan / Manet stories are untouched.
+_DEPICTION_CUE = re.compile(
+    r'\b(shows?|showing|depict(?:s|ed|ing)?|portray(?:s|ed|ing)?|'
+    r'represent(?:s|ed|ing)?|renders?|renderi?ng|illustrat(?:es|ed|ing)?|'
+    r'picture(?:s|d)?|paint(?:s|ed)?\s+(?:a|an|the|two|three)|'
+    r'in\s+the\s+(?:fore|back)ground|in\s+the\s+foreground|in\s+the\s+background|'
+    r'at\s+the\s+(?:centre|center|top|bottom|left|right)|'
+    r'to\s+the\s+(?:left|right)|'
+    r'the\s+scene\s+(?:shows?|depicts?|portrays?)?|this\s+scene|'
+    r'the\s+(?:composition|canvas|painting|fresco|mural|image|work)\s+'
+    r'(?:shows?|depict(?:s|ed|ing)?|portray(?:s|ed|ing)?|'
+    r'represent(?:s|ed|ing)?|captures?|features?))\b',
+    re.IGNORECASE)
+
+
+def _sentence_has_stakes(sentence: str) -> bool:
+    """Does this sentence state a real stake — not merely describe one in paint?
+
+    [LOCAL-842] The stakes vocabulary is wide (attacked, slashed, stolen, burned,
+    rejected, mocked, died …) precisely so a grounded human story is recognised.
+    The cost of that width is that the SAME words appear in descriptions of what a
+    picture shows. Precision (Do-item 2): a stake counts only in a sentence about a
+    real event. A sentence that reaches for the image's content — "shows", "depicts",
+    "in the foreground" — does not get to spend its stake word, because the figure
+    is painted, not a person who carried the run.
+    """
+    if not _STAKES.search(sentence):
+        return False
+    if _DEPICTION_CUE.search(sentence):
+        return False
+    return True
 
 
 def _fold(t: str) -> str:
@@ -387,7 +468,10 @@ def measure(text: str) -> Dict:
         # Same shape as D469 (ranker vs scorer) and D483 (grounder vs remover):
         # two halves of one instrument reading different inputs.
         h['agency'] = sum(1 for i in h['at'] if _AGENCY_VERB.search(sentences[i]))
-        h['stakes'] = sum(1 for i in h['at'] if _STAKES.search(sentences[i]))
+        # [LOCAL-842] `_sentence_has_stakes`, not a bare `_STAKES.search`: a stake
+        # word in a sentence that DEPICTS the picture ("shows a dying soldier") is
+        # not a stake the subject paid.
+        h['stakes'] = sum(1 for i in h['at'] if _sentence_has_stakes(sentences[i]))
 
         # state is assigned below, once the RUN is known — scattering a stake
         # anywhere across six sentences is not the same as putting one inside the
@@ -417,7 +501,7 @@ def measure(text: str) -> Dict:
             prev = i
         h['run'] = longest
         h['run_agency'] = sum(1 for i in best_span if _AGENCY_VERB.search(sentences[i]))
-        h['run_stakes'] = sum(1 for i in best_span if _STAKES.search(sentences[i]))
+        h['run_stakes'] = sum(1 for i in best_span if _sentence_has_stakes(sentences[i]))
         # [LOCAL-495] A story is about ONE SUBJECT held across the sentences —
         # not necessarily a person. D487: Prince requires the middle event to be
         # ACTIVE, not human, so a place, an institution or an event can carry a
@@ -464,7 +548,7 @@ def measure(text: str) -> Dict:
         'handles': sorted(handles, key=lambda h: (h['sentences'], h['agency'])),
         'longest_run': best,
         'total_agency': sum(1 for s in sentences if _AGENCY_VERB.search(s)),
-        'total_stakes': sum(1 for s in sentences if _STAKES.search(s)),
+        'total_stakes': sum(1 for s in sentences if _sentence_has_stakes(s)),
         'sentences': sentences,
     }
 

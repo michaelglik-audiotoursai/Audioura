@@ -1,0 +1,127 @@
+{
+  "cap": 0.7,
+  "per_tour_pass": 0.45,
+  "overall_pass": false,
+  "results": [
+    {
+      "location": "Orsay Museum, Paris, France",
+      "n_requested": 5,
+      "n_stops": 5,
+      "per_stop": [
+        {
+          "stop": 1,
+          "title": "L'Origine du monde",
+          "has_story": false,
+          "why": "the longest run (3 sentences, Jacques Lacan) has agency=0 stakes=1 — someone is described, but nothing is risked, refuse",
+          "stake_sentence": null
+        },
+        {
+          "stop": 2,
+          "title": "Le Déjeuner sur l'herbe (Luncheon on the Grass)",
+          "has_story": true,
+          "why": "Édouard Manet carries 3 consecutive sentences with an action and something at stake",
+          "stake_sentence": "This angle reveals the careful arrangement of the figures and the contrast between the sunlit foreground and the shadowed background, a dynamic that might be lost when viewed head-on.\n\nÉdouard Manet painted Luncheon on the Grass, drawing his composition from Marcantonio Raimondi's engraving after Raphael's Judgement of Paris and borrowing his subject from Titian's The Pastoral Concert."
+        },
+        {
+          "stop": 3,
+          "title": "Bal du moulin de la Galette",
+          "has_story": true,
+          "why": "Auguste Renoir carries 6 consecutive sentences with an action and something at stake",
+          "stake_sentence": "He had recently abandoned the studio’s rigid practices, focusing on work painted outdoors to seize the effects of natural light."
+        },
+        {
+          "stop": 4,
+          "title": "La Nuit étoilée (Starry Night Over the Rhône)",
+          "has_story": false,
+          "why": "longest qualifying run is 2 sentence(s); the bar is 3 consecutive sentences about one subject, carrying an action and a ",
+          "stake_sentence": null
+        },
+        {
+          "stop": 5,
+          "title": "L'Église d'Auvers-sur-Oise (The Church at Auvers)",
+          "has_story": false,
+          "why": "the longest run (7 sentences, Van Gogh) has agency=0 stakes=1 — someone is described, but nothing is risked, refused or ",
+          "stake_sentence": null
+        }
+      ],
+      "all_story_ok": false,
+      "no_story_lines": [
+        "[LOCAL-487] step 7a: 3 stop(s) have NO VALID STORY by Michael's bar (3+ consecutive sentences, one person, an action and something at stake)"
+      ],
+      "wsr_lines": [
+        "[LOCAL-840] Stop 4 work research: 0 passage(s) (source=none, qid=-, $0.0010)",
+        "[LOCAL-840] Stop 2 work research: 0 passage(s) (source=none, qid=-, $0.0100)",
+        "[LOCAL-840] Stop 3 work research: 8 passage(s) (source=wikipedia, qid=Q683274, $0.0000)",
+        "[LOCAL-840] Stop 1 work research: 8 passage(s) (source=wikipedia, qid=Q334138, $0.0000)",
+        "[LOCAL-840] Stop 5 work research: 8 passage(s) (source=wikipedia, qid=Q1213917, $0.0000)",
+        "[LOCAL-840] Stop 3 work research: 8 passage(s) (source=cache, qid=Q683274, $0.0000)",
+        "[LOCAL-840] Stop 5 work research: 8 passage(s) (source=cache, qid=Q1213917, $0.0000)",
+        "[LOCAL-840] Stop 4 work research: 0 passage(s) (source=none, qid=-, $0.0010)",
+        "[LOCAL-840] Stop 2 work research: 2 passage(s) (source=serper_fallback, qid=-, $0.0200)"
+      ],
+      "delivery_violations": [],
+      "tour_usd": 0.342805
+    },
+    {
+      "location": "Rijksmuseum, Amsterdam, Netherlands",
+      "n_requested": 5,
+      "n_stops": 5,
+      "per_stop": [
+        {
+          "stop": 1,
+          "title": "De grote golf bij Kanagawa (The Great Wave off Kanagawa)",
+          "has_story": false,
+          "why": "the longest run (6 sentences, The Great Wave) has agency=0 stakes=0 — someone is described, but nothing is risked, refus",
+          "stake_sentence": null
+        },
+        {
+          "stop": 2,
+          "title": "De Nachtwacht (The Night Watch)",
+          "has_story": true,
+          "why": "The Night Watch carries 4 consecutive sentences with an action and something at stake",
+          "stake_sentence": "He was thirty-six, having recently lost his wife Saskia, and was establishing himself beyond commissioned portraits by exploring narratives and psychological complexity in his work."
+        },
+        {
+          "stop": 3,
+          "title": "Het melkmeisje (The Milkmaid)",
+          "has_story": false,
+          "why": "the longest run (4 sentences, Vermeer) has agency=0 stakes=0 — someone is described, but nothing is risked, refused or l",
+          "stake_sentence": null
+        },
+        {
+          "stop": 4,
+          "title": "Het Joodse Bruidje (The Jewish Bride)",
+          "has_story": false,
+          "why": "the longest run (3 sentences, Rembrandt) has agency=0 stakes=1 — someone is described, but nothing is risked, refused or",
+          "stake_sentence": null
+        },
+        {
+          "stop": 5,
+          "title": "Gezicht op huizen in Delft, bekend als ‘Het straatje’ (The Little Street)",
+          "has_story": false,
+          "why": "the longest run (3 sentences, Johannes Vermeer) has agency=0 stakes=1 — someone is described, but nothing is risked, ref",
+          "stake_sentence": null
+        }
+      ],
+      "all_story_ok": false,
+      "no_story_lines": [
+        "[LOCAL-487] step 7a: 4 stop(s) have NO VALID STORY by Michael's bar (3+ consecutive sentences, one person, an action and something at stake)"
+      ],
+      "wsr_lines": [
+        "[LOCAL-840] Stop 1 work research: 0 passage(s) (source=none, qid=-, $0.0010)",
+        "[LOCAL-840] Stop 4 work research: 0 passage(s) (source=none, qid=-, $0.0100)",
+        "[LOCAL-840] Stop 3 work research: 8 passage(s) (source=wikipedia, qid=Q167605, $0.0000)",
+        "[LOCAL-840] Stop 2 work research: 8 passage(s) (source=wikipedia, qid=Q219831, $0.0000)",
+        "[LOCAL-840] Stop 5 work research: 8 passage(s) (source=wikipedia, qid=Q586035, $0.0000)",
+        "[LOCAL-840] Stop 1 work research: 0 passage(s) (source=none, qid=-, $0.0010)",
+        "[LOCAL-840] Stop 4 work research: 0 passage(s) (source=none, qid=-, $0.0100)",
+        "[LOCAL-840] Stop 2 work research: 8 passage(s) (source=cache, qid=Q219831, $0.0000)",
+        "[LOCAL-840] Stop 5 work research: 8 passage(s) (source=cache, qid=Q586035, $0.0000)",
+        "[LOCAL-840] Stop 3 work research: 8 passage(s) (source=cache, qid=Q167605, $0.0000)"
+      ],
+      "delivery_violations": [],
+      "tour_usd": 0.294507
+    }
+  ],
+  "metered_total": 0.7146801600000003
+}
