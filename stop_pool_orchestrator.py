@@ -711,6 +711,30 @@ def maybe_generate_with_pool(
             logger.warning(f"[LOCAL-830] business off-category reuse check skipped "
                            f"({_oc_err}); pool unchanged")
 
+        # [LOCAL-835B] Activity-provider on-category reuse check. The LOCAL-830
+        # business guard above only ever marks the FOOD ("restaurant") class
+        # off-category; a pooled stop that is a generic LANDMARK or a beach/leisure
+        # venue (a "Beach Club", a fishing village) is NOT caught by it, yet it is
+        # just as off-category for an activity-provider request ("Kiteboarding
+        # lessons in Mui Ne" must reuse kite schools, not a beach club). Run the
+        # same activity-provider guard the fresh places path runs, on the pooled
+        # rows, right after the business guard: for a provider request it SKIPS
+        # (never deletes) a food/drink venue or a generic landmark, keeping only
+        # providers and anything it cannot classify. No-op for a non-provider or a
+        # food request. Best-effort: any failure leaves pooled_rows unchanged.
+        try:
+            from category_match_guard import \
+                filter_off_category_activity as _foca835p
+            pooled_rows, _oc835p = _foca835p(pooled_rows, location, log=print)
+            if _oc835p:
+                print(f"  [LOCAL-835B] category-scoped reuse: skipped {_oc835p} "
+                      f"off-category stop(s) from this activity-provider tour "
+                      f"(pool unchanged)")
+            K = len(pooled_rows)
+        except Exception as _oc835p_err:
+            logger.warning(f"[LOCAL-835B] activity-provider off-category reuse check "
+                           f"skipped ({_oc835p_err}); pool unchanged")
+
     print(f"  [LOCAL-590] pool: venue={identity} type={tour_type} category={tour_category} "
           f"contained={contained} requested={N} pooled={K} reuse_first={reuse_first}"
           f"{(' rejected=' + str(_pool_rejected)) if _pool_rejected else ''}")

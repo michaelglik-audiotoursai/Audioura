@@ -556,6 +556,16 @@ _GENERIC_LANDMARK_WORDS = (
     "tourist attraction", "point of interest", "sightseeing", "scenic spot",
     "landmark", "attraction", "monument", "memorial", "square", "plaza",
     "harbour", "harbor", "pier", "promenade", "boardwalk",
+    # [LOCAL-835B] Lodging / leisure venues. A RESORT, hotel, guesthouse or spa
+    # is a place you STAY or relax, not a provider of the activity — off-category
+    # for an activity-provider request unless its OWN name/type carries the
+    # activity word (checked first, so "X Kite School at Y Resort" is still kept).
+    # Field defect (bounce, tour 868): the 788B map override kept "Sea Horse
+    # Resort" on a kiteboarding-lessons tour because places_search confirmed the
+    # resort exists — existence is not provider-hood.
+    "resort", "resorts", "hotel", "hotels", "motel", "hostel", "guesthouse",
+    "guest house", "homestay", "villa", "villas", "bungalow", "bungalows",
+    "lodge", "inn", "spa", "beach club", "beach resort",
 )
 
 
