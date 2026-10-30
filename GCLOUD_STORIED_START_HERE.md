@@ -13,6 +13,18 @@ has lapsed twice and Michael has had to ask twice.
 
 ---
 
+# ▶️ LATEST STATE — 2026-10-30 00:10 EDT (supersedes "State at shutdown" below; the steps below still apply)
+Michael typed **"Go 1 2 3"** on the laptop 10-29 21:3x (gateway; D732 cheap museum env; Android 86 to Play Internal). Full log: ClickUp wdvrdaz9vq.
+- **Subscribed Preview revisions now** (rollback in brackets): generator **00011-47m** = `5e2d588a`, env as wave 4 [00010-gz4 had D732 env; 00009-8t8 = e51d089f; 00008-lsv = caa87604];
+  orchestrator **00007-4zv** caa87604 [00006-c7d]; map-delivery **00004-qvq** caa87604 [00003-g2q]; user-api **00003-hvw** 5820cec6 [00002-lnj]; api-gateway **00003-x4s** 5820cec6 [00002-77f].
+- **D732 cheap arm is OFF** (removed after the Belvedere proof 474 failed: "Fußzeile" junk stop, duplicate body, gpt-4o still billed). LOCAL-823. Michael's OK covered museum only; "walking too" not answered.
+- Migrations applied 10-29: **056, 058, 059, 057, 060**. Backups 1793323547588 (pre-wave 3), 1793330761040 (pre-gateway).
+- audio_tours **384**. New: proofs 471–476 (474 hidden, lat/lng in AudiouraBackups\tour474_hide_20261029), catalog **477–488**, Vietnam remakes 489–492; 465 + 467 replaced in place (versions saved), ru 469/470 stale.
+- stop_pool: 3 rows moved to stop_pool_rejected (backup AudiouraBackups\stop_pool_reject_20261029).
+- **Open:** /geocode 404 on cloud (exists only in root map_delivery_service.py; LOCAL-824). Orchestrator SIGTERM lost the Met job, request 279 left 'started' for LOCAL-821; catalog 481 has the same request string. War Remnants 492 still carries Independence Palace (LOCAL-791).
+- **Android 86** (2.4.38+86, 5e2d588a, Flutter **3.41.6** at `eclipse-workspace\flutter-3.41.6\flutter`; 3.29.3 is too old) signed, at `C:\adev-wt\aab86\`. upload_play.sh gets **Play 403**: play-publisher@ not invited, so Michael uploads by hand. Run upload_play.sh from the build worktree (it checks pubspec).
+- Gotchas learned: gcloud logging filters with quotes break in PowerShell 5.1 (use Bash + `< /dev/null`); proof request strings must be NEW or they overwrite tours (until LOCAL-821).
+
 # ▶️ RESUME HERE — written 2026-10-27 23:15 ET, before the laptop goes off ~48 h for the Vietnam trip
 The laptop travels with Michael and works off his **phone hotspot**. Do these in order:
 
