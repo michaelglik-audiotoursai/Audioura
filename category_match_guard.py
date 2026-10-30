@@ -50,6 +50,10 @@ __all__ = [
     "is_food_request",
     "business_off_category_class",
     "filter_off_category_business",
+    # LOCAL-835 — activity-provider on-category guard (FRESH places path).
+    "requested_activity",
+    "candidate_is_activity_provider",
+    "filter_off_category_activity",
 ]
 
 
@@ -406,3 +410,394 @@ def filter_off_category_business(
             continue
         kept.append(r)
     return kept, skipped
+
+
+# ── [LOCAL-835] Activity-provider on-category guard (FRESH places path) ───────
+#
+# WHY (LEAD, GCloud_Storied wave 12 proof 507, gen 00018-8vt, cheap arm —
+# "Kiteboarding lessons in Mui Ne, Vietnam" (5)):
+# the FRESH places path (the pool did not serve this request) returned Deja Vu
+# Restaurant, Kite Bar, Sea Breeze Restaurant, Source Kiteboarding, Mui Ne
+# Fishing Village — only ONE (Source Kiteboarding) is a kite school. The three
+# gates that keep a tour on-category all MISS an activity-provider request:
+#   * LOCAL-830 ``business_off_category_class`` only ever marks the "restaurant"
+#     class off-category, AND ``classify_business_vs_landmark("kiteboarding
+#     lessons")`` is 'landmark' (neither "lessons" nor "kiteboarding" is a
+#     business keyword) — so it is a NO-OP and never even reaches the fresh path.
+#   * LOCAL-791B ``filter_off_category`` fires only on a plural CATEGORY noun
+#     ("pagodas", "temples"); "kiteboarding lessons" has none → empty → no-op.
+#   * PHASE 4 ``_verify_against_intent`` needs the LLM ``poi_type`` and does not
+#     run on the cheap arm's places path reliably.
+# So food venues (Deja Vu, Sea Breeze, Kite Bar) AND a generic landmark (Mui Ne
+# Fishing Village) all survived to narration, padding a kite-lessons tour.
+#
+# This guard is the DETERMINISTIC, OFFLINE on-category check the FRESH path runs,
+# after candidate discovery (before narration) and inside the replenish loop.
+# For an ACTIVITY-PROVIDER request (the subject is "<activity> lessons/classes/
+# courses/school/rental/hire/instructor/centre/club/academy/…") it keeps ONLY a
+# candidate that is a provider of THAT activity:
+#   * on-category — the name or the Serper/OSM type/category carries the activity
+#     word (or a known synonym: kiteboarding↔kitesurf↔kite, scuba↔dive,
+#     bike↔bicycle↔cycling, …), OR a GENERIC provider noun for a physical
+#     activity (school/academy/club/centre/rental/outfitter/"water sports");
+#   * off-category — a FOOD/DRINK venue (restaurant/bar/café class), UNLESS the
+#     request is itself about food;
+#   * off-category — a GENERIC LANDMARK with no activity signal (fishing village,
+#     beach, market, generic "tourist attraction"), UNLESS the user named it as
+#     an anchor;
+#   * UNKNOWN (None) candidates with no signal either way are KEPT only when they
+#     are not a known-off class — see ``candidate_is_activity_provider``.
+#
+# Honest shortfall over padding: the guard only ever REMOVES off-category
+# candidates. The caller delivers the on-category K it has with the honest
+# shortfall line; it never refills the gap with a food/leisure place.
+
+# Trigger nouns whose presence in the request SUBJECT marks an ACTIVITY-PROVIDER
+# request: "<activity> <trigger>". A provider offers an activity (teaches it,
+# rents the gear, guides it), as opposed to a venue you merely visit.
+_ACTIVITY_PROVIDER_TRIGGERS = (
+    "lesson", "lessons", "class", "classes", "course", "courses",
+    "school", "schools", "academy", "academies",
+    "rental", "rentals", "hire", "hires",
+    "instructor", "instructors", "instruction", "tuition", "coaching",
+    "lessons", "tour", "tours", "trip", "trips", "guide", "guides",
+    "centre", "center", "centres", "centers",
+    "club", "clubs", "outfitter", "outfitters", "rent",
+)
+
+# A bare "centre"/"center"/"club"/"tour" alone does NOT make a provider request —
+# "city center", "art center", "book club", "walking tour" are not activity
+# providers. These weak triggers only count when the word BEFORE them is a known
+# physical ACTIVITY (surf, kite, dive, yoga, …). The strong triggers below mark a
+# provider request on their own.
+_WEAK_TRIGGERS = frozenset({
+    "centre", "center", "centres", "centers", "club", "clubs",
+    "tour", "tours", "trip", "trips", "guide", "guides",
+})
+
+# Physical activities a provider teaches / rents / guides. The leading words of a
+# provider request ("kiteboarding lessons", "scuba diving courses", "bike
+# rental") are one of these. Each maps to the set of synonym tokens that a real
+# provider's NAME or TYPE uses for the same activity, so "Source Kiteboarding"
+# and "Muine Kitesurf School" both read as kite providers, and "Blue Dive
+# Center" reads as a scuba provider.
+_ACTIVITY_SYNONYMS: "Dict[str, Tuple[str, ...]]" = {
+    "kiteboarding": ("kiteboarding", "kiteboard", "kitesurf", "kitesurfing",
+                     "kite", "kiting"),
+    "kitesurfing": ("kitesurfing", "kitesurf", "kiteboarding", "kiteboard",
+                    "kite", "kiting"),
+    "windsurfing": ("windsurf", "windsurfing"),
+    "surfing": ("surf", "surfing", "surfboard"),
+    "surf": ("surf", "surfing", "surfboard"),
+    "kite": ("kite", "kiteboarding", "kiteboard", "kitesurf", "kitesurfing",
+             "kiting"),
+    "scuba": ("scuba", "dive", "diving", "divers", "freedive", "freediving",
+              "snorkel", "snorkeling", "snorkelling"),
+    "dive": ("scuba", "dive", "diving", "divers", "freedive", "freediving",
+             "snorkel", "snorkeling", "snorkelling"),
+    "diving": ("scuba", "dive", "diving", "divers", "freedive", "freediving",
+               "snorkel", "snorkeling", "snorkelling"),
+    "sailing": ("sail", "sailing", "yacht", "yachting"),
+    "kayaking": ("kayak", "kayaking", "canoe", "canoeing", "paddle",
+                 "paddling", "paddleboard", "sup"),
+    "paddleboarding": ("paddleboard", "paddleboarding", "sup", "paddle"),
+    "paddle": ("paddle", "paddleboard", "paddleboarding", "sup", "kayak",
+               "canoe"),
+    "yoga": ("yoga", "yogic"),
+    "pilates": ("pilates",),
+    "cooking": ("cooking", "cookery", "culinary", "cook"),
+    "dance": ("dance", "dancing"),
+    "dancing": ("dance", "dancing"),
+    "climbing": ("climb", "climbing", "bouldering", "boulder"),
+    "cycling": ("cycle", "cycling", "bike", "biking", "bicycle", "bicycles"),
+    "biking": ("bike", "biking", "bicycle", "bicycles", "cycle", "cycling"),
+    "bike": ("bike", "biking", "bicycle", "bicycles", "cycle", "cycling"),
+    "bicycle": ("bicycle", "bicycles", "bike", "biking", "cycle", "cycling"),
+    "motorbike": ("motorbike", "motorcycle", "scooter", "moped"),
+    "scooter": ("scooter", "moped", "motorbike", "motorcycle"),
+    "golf": ("golf", "golfing"),
+    "tennis": ("tennis",),
+    "horse": ("horse", "horseback", "equestrian", "riding"),
+    "fishing": ("fishing", "angling"),
+    "skiing": ("ski", "skiing", "snowboard", "snowboarding"),
+    "snowboarding": ("snowboard", "snowboarding", "ski", "skiing"),
+    "rafting": ("raft", "rafting"),
+    "paragliding": ("paraglide", "paragliding", "parasailing", "parasail",
+                    "paraglider"),
+    "boxing": ("boxing", "muay", "mma", "kickboxing"),
+    "muaythai": ("muay", "muaythai", "boxing", "mma"),
+    "language": ("language", "languages"),
+}
+
+# Generic PROVIDER nouns that, together with an activity subject, mark a stop as
+# a provider even when its name does not repeat the activity word. "Water sports
+# center", "dive academy", "surf outfitters". A pure dining/landmark class never
+# reaches here (it is decided first).
+_PROVIDER_NOUNS = (
+    "school", "schools", "academy", "academies", "club", "clubs",
+    "centre", "center", "centres", "centers",
+    "rental", "rentals", "hire", "outfitter", "outfitters",
+    "instructor", "instruction", "lessons", "course", "courses",
+    "sports", "sport", "watersports", "water sports", "adventure",
+    "adventures", "activities", "activity", "studio", "studios",
+)
+
+# Place classes that are a GENERIC LANDMARK (not an activity provider): a request
+# for a provider must not keep these unless the user named them as an anchor.
+_GENERIC_LANDMARK_CLASSES = frozenset({"beach", "market", "monument", "park"})
+
+# Extra generic-landmark words a provider request must drop even when
+# ``classify_place`` returns None — a "fishing village", a "viewpoint", a
+# generic "tourist attraction" is a place you VISIT, not a provider.
+_GENERIC_LANDMARK_WORDS = (
+    "fishing village", "village", "viewpoint", "view point", "lookout",
+    "sand dunes", "dunes", "waterfall", "falls", "cave", "caves", "island",
+    "lake", "river", "hill", "mountain", "canyon", "national park",
+    "tourist attraction", "point of interest", "sightseeing", "scenic spot",
+    "landmark", "attraction", "monument", "memorial", "square", "plaza",
+    "harbour", "harbor", "pier", "promenade", "boardwalk",
+)
+
+
+def requested_activity(request: str) -> Optional[Dict]:
+    """Detect an ACTIVITY-PROVIDER request and return what it asks for.
+
+    Returns ``{"activity": <leading activity word>, "tokens": <synonym tokens>,
+    "trigger": <provider trigger noun>, "is_food": <bool>}`` when the request
+    SUBJECT is "<activity> <provider-trigger>" (kiteboarding lessons, scuba diving
+    courses, bike rental, yoga classes, surf school, dive centre); ``None`` when
+    it is not a provider request (so the guard is a NO-OP).
+
+    Deterministic and offline. The activity word is the token(s) before the
+    trigger; ``tokens`` is the synonym set used to match a candidate's name/type
+    (falls back to the activity word itself for an activity not in the synonym
+    table). A food request ("cooking classes") is still detected as a provider
+    request but flagged ``is_food`` so the caller keeps food venues.
+    """
+    subj = _fold(_request_subject(request))
+    if not subj:
+        return None
+    toks = subj.split()
+    if len(toks) < 2:
+        # A one-word subject ("kiteboarding") has no trigger — not a provider
+        # request shape (it is handled by the business router / other guards).
+        return None
+
+    # Find the FIRST provider trigger in the subject and the activity before it.
+    for i in range(1, len(toks)):
+        word = toks[i]
+        if word not in _ACTIVITY_PROVIDER_TRIGGERS:
+            continue
+        # The activity is the run of words before the trigger.
+        activity_words = [t for t in toks[:i] if t]
+        if not activity_words:
+            continue
+        # A connector/stopword run is not an activity ("tours in …" handled by
+        # _request_subject already, but guard anyway).
+        activity_head = activity_words[-1]
+        # Resolve synonyms: try the last word, then the full phrase, against the
+        # synonym table; else use the activity words themselves as tokens.
+        tokens: Set[str] = set()
+        matched_known = False
+        for aw in activity_words:
+            if aw in _ACTIVITY_SYNONYMS:
+                tokens.update(_ACTIVITY_SYNONYMS[aw])
+                matched_known = True
+        # "scuba diving" → head "diving" is known; "bike" → known. If neither
+        # word is in the table, take the activity words as literal tokens (still a
+        # provider request, matched by name containment).
+        if not tokens:
+            tokens.update(w for w in activity_words if len(w) >= 3)
+
+        # A WEAK trigger (centre/club/tour) only counts when the activity is a
+        # KNOWN physical activity — "art center", "book club", "walking tour",
+        # "city tour" must NOT be treated as a provider request.
+        if word in _WEAK_TRIGGERS and not matched_known:
+            continue
+        if not tokens:
+            continue
+
+        return {
+            "activity": " ".join(activity_words),
+            "activity_head": activity_head,
+            "tokens": tuple(sorted(tokens)),
+            "trigger": word,
+            "is_food": is_food_request(request),
+        }
+    return None
+
+
+# Food/drink words on a CANDIDATE's name or Serper/OSM type that mark it as a
+# food venue for a provider request. Broader than the LOCAL-791B "restaurant"
+# CLASS_WORDS (which a shared category tour depends on and must not be widened):
+# a real Serper places `type` for food is often "Sandwich shop", "Street food",
+# "Vietnamese restaurant", "Ice cream shop", "Juice bar". These are off-category
+# for a non-food activity-provider request.
+_FOOD_VENUE_WORDS = (
+    "restaurant", "cafe", "coffee", "coffeehouse", "bar", "pub", "bistro",
+    "eatery", "diner", "food", "bakery", "patisserie", "deli", "brasserie",
+    "grill", "steakhouse", "pizzeria", "pizza", "noodle", "noodles", "seafood",
+    "sandwich", "burger", "ice cream", "dessert", "juice bar", "smoothie",
+    "brewery", "brewpub", "taproom", "winery", "teahouse", "tea house",
+    "snack", "street food", "canteen", "buffet", "banh mi",
+)
+
+
+def _is_food_venue(name_blob: str, cat_blob: str) -> bool:
+    """True when a candidate's name or type marks it as a food/drink venue."""
+    for w in _FOOD_VENUE_WORDS:
+        fw = _fold(w)
+        if not fw:
+            continue
+        if " " in fw:
+            if fw in cat_blob or fw in name_blob:
+                return True
+        elif len(fw) <= 4:
+            if (re.search(r"\b" + re.escape(fw) + r"\b", cat_blob)
+                    or re.search(r"\b" + re.escape(fw) + r"\b", name_blob)):
+                return True
+        elif fw in cat_blob or fw in name_blob:
+            return True
+    return False
+
+
+def _text_has_any(blob: str, words: Sequence[str]) -> bool:
+    """Whole-word (short) / substring (long) match of any ``words`` in ``blob``
+    (both already folded)."""
+    for w in words:
+        fw = _fold(w)
+        if not fw:
+            continue
+        if " " in fw:
+            if fw in blob:
+                return True
+        elif len(fw) <= 4:
+            if re.search(r"\b" + re.escape(fw) + r"\b", blob):
+                return True
+        elif fw in blob:
+            return True
+    return False
+
+
+def candidate_is_activity_provider(cand: Dict,
+                                   activity: Dict) -> Optional[bool]:
+    """Is ``cand`` a provider of the requested activity?
+
+    * True  — the candidate's name or Serper/OSM type carries the activity word
+              (or a synonym), OR a GENERIC provider noun (school/club/centre/
+              rental/outfitter/"water sports") — a real provider of the activity.
+    * False — the candidate is a FOOD/DRINK class (restaurant/bar/café) and the
+              request is NOT about food; OR it is a GENERIC LANDMARK (fishing
+              village, beach, market, generic tourist attraction) with no activity
+              signal.
+    * None  — no signal either way (kept by the caller: we never drop a place we
+              cannot classify).
+    """
+    if not activity:
+        return None
+    title = _candidate_title(cand)
+    cat = _candidate_category_text(cand)
+    name_blob = _fold(title)
+    cat_blob = _fold(cat)
+    blob = (name_blob + " " + cat_blob).strip()
+    tokens = activity.get("tokens") or ()
+    is_food_req = bool(activity.get("is_food"))
+
+    # (1) Strongest positive: the activity word / a synonym appears in the name or
+    # the type. "Source Kiteboarding", "Muine Kitesurf School", type "Dive
+    # center". This wins over the food/landmark checks ("Kite Bar" is caught in
+    # (2) because it has NO activity-provider token — "kite" with "bar" is still a
+    # bar; see the food check ordering below).
+    has_activity_tok = _text_has_any(blob, tokens)
+
+    # (2) Classify the candidate's place CLASS (food / landmark / …).
+    try:
+        cls = classify_place(title, cat)
+    except Exception:
+        cls = None
+
+    # FOOD/DRINK is off-category for a non-food provider request EVEN IF the name
+    # also contains the activity word ("Kite Bar", "Surf Café"): the place is a
+    # bar/café, not a provider. A food request keeps food venues.
+    if cls == "restaurant" or _is_food_venue(name_blob, cat_blob):
+        if is_food_req:
+            return True
+        return False
+
+    # On-category: the activity word / synonym is present and the place is not a
+    # food venue → a genuine provider ("Source Kiteboarding", "Jibe's … Kite").
+    if has_activity_tok:
+        return True
+
+    # A generic provider noun (school/club/centre/rental/"water sports") with no
+    # conflicting class → a provider of the activity (a water-sports centre that
+    # does not repeat "kite" in its name). Only when NOT a generic landmark class.
+    if cls not in _GENERIC_LANDMARK_CLASSES and _text_has_any(blob, _PROVIDER_NOUNS):
+        return True
+
+    # GENERIC LANDMARK — a place you visit, not a provider. Off-category for a
+    # provider request (unless named-anchor, handled by the caller).
+    if cls in _GENERIC_LANDMARK_CLASSES:
+        return False
+    if _text_has_any(blob, _GENERIC_LANDMARK_WORDS):
+        return False
+
+    # No signal either way → UNKNOWN (kept).
+    return None
+
+
+def filter_off_category_activity(
+        cands: List[Dict],
+        request: str,
+        log: Optional[Callable[[str], None]] = None,
+        named_anchors: Optional[Sequence[str]] = None,
+) -> Tuple[List[Dict], int]:
+    """[LOCAL-835] Keep only providers of the requested activity on the FRESH
+    places path.
+
+    For an ACTIVITY-PROVIDER request (``requested_activity`` is not None) that is
+    NOT about food, drop every candidate that is a food/drink venue or a generic
+    landmark with no activity signal; keep the activity's providers and any
+    candidate we cannot classify. A candidate the user NAMED by hand is always
+    kept. Returns ``(kept, dropped_count)``.
+
+    NO-OP (rows unchanged, dropped=0) when the request is not a provider request,
+    or is a food provider request (cooking classes keep food venues). Best-effort:
+    any internal error returns the rows unchanged — a guard bug must never empty a
+    tour; the honest shortfall is for when there are genuinely too few providers,
+    not when the guard crashed.
+    """
+    emit = log or print
+    if not cands:
+        return list(cands), 0
+    try:
+        activity = requested_activity(request)
+    except Exception:
+        return list(cands), 0
+    if not activity or activity.get("is_food"):
+        return list(cands), 0
+
+    anchor_keys = {_fold(a) for a in (named_anchors or []) if a}
+    kept: List[Dict] = []
+    dropped = 0
+    for cand in cands:
+        title = _candidate_title(cand)
+        if anchor_keys and _fold(re.sub(r"\s*\([^)]*\)\s*", " ", title)) in anchor_keys:
+            kept.append(cand)
+            continue
+        try:
+            verdict = candidate_is_activity_provider(cand, activity)
+        except Exception:
+            verdict = None
+        if verdict is False:
+            dropped += 1
+            try:
+                cls = classify_place(title, _candidate_category_text(cand))
+            except Exception:
+                cls = None
+            emit(f"[LOCAL-835] off-category provider drop {title!r} "
+                 f"(class={cls or '?'}; request='{activity['activity']} "
+                 f"{activity['trigger']}')")
+            continue
+        kept.append(cand)
+    return kept, dropped

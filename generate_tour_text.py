@@ -15457,6 +15457,55 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
         except Exception as _oc_err:
             print(f"  [LOCAL-791B] off-category guard skipped (non-fatal): {_oc_err}")
 
+        # -------- [LOCAL-835] Activity-provider on-category guard (FRESH path) --
+        # An ACTIVITY-PROVIDER request ("Kiteboarding lessons in Mui Ne", "yoga
+        # classes", "scuba diving courses", "bike rental") asks for PROVIDERS of
+        # that activity — a kite school, a dive centre, a bike-rental outfit. Field
+        # defect (GCloud_Storied wave 12 proof 507, cheap arm): the fresh places
+        # path for "Kiteboarding lessons in Mui Ne" returned Deja Vu Restaurant,
+        # Kite Bar, Sea Breeze Restaurant, Source Kiteboarding, Mui Ne Fishing
+        # Village — only one is a kite school. The LOCAL-791B guard is a no-op here
+        # (no plural category noun), LOCAL-830 only marks the restaurant class and
+        # its business detector does not treat "lessons" as a business, and PHASE 4
+        # needs an LLM poi_type the cheap arm did not run. This guard drops a FOOD/
+        # DRINK venue or a GENERIC LANDMARK (fishing village, beach) that is not an
+        # activity provider, keeping only providers of the requested activity. It
+        # NEVER pads: the freed slots are refilled ONLY by on-category providers
+        # from the replenish loop below (which runs the SAME guard), else the
+        # honest shortfall ships. A food request ("cooking-class" aside) and a
+        # non-provider request are no-ops. A hand-named anchor is always kept.
+        try:
+            from category_match_guard import (requested_activity as _ra835,
+                                               filter_off_category_activity as _foca835)
+            _act835 = _ra835(user_request) or _ra835(location)
+            if _act835 and not _act835.get("is_food"):
+                _anchors_835 = list(intent.get('named_places') or []) if intent else []
+                try:
+                    from area_resolver import extract_named_places_from_clause as _enp835
+                    _anchors_835 += _enp835(location) or []
+                except Exception:
+                    pass
+                try:
+                    _anchors_835 += named_anchors(user_request).get('anchors') or []
+                except Exception:
+                    pass
+                _before_835 = len(poi_list)
+                print(f"  [LOCAL-835] activity-provider guard active — request "
+                      f"'{_act835['activity']} {_act835['trigger']}'; checking "
+                      f"{_before_835} stop(s)")
+                poi_list, _dropped_835 = _foca835(
+                    poi_list, user_request, log=print, named_anchors=_anchors_835)
+                if _dropped_835 > 0:
+                    print(f"\n! [LOCAL-835] activity-provider guard dropped "
+                          f"{_dropped_835} off-category stop(s) "
+                          f"(request '{_act835['activity']} {_act835['trigger']}')"
+                          f" — slots refill from on-category providers only")
+                else:
+                    print(f"  [LOCAL-835] activity-provider guard: all "
+                          f"{_before_835} stop(s) on-category")
+        except Exception as _ac835_err:
+            print(f"  [LOCAL-835] activity-provider guard skipped (non-fatal): {_ac835_err}")
+
         # -------- [LOCAL-791B item 1] English title, local name in parentheses --
         # Give each foreign-place stop its ENGLISH name with the local name in
         # parentheses ("Jade Emperor Pagoda (Chùa Ngọc Hoàng)"). A place the user
@@ -15813,6 +15862,26 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
                             exclude=_p3c_exclude, cuisine=_p3c_cuisine,
                             user_id=(user_id if 'user_id' in dir() else None),
                             request_text=(user_request if 'user_request' in dir() else location))
+                        # [LOCAL-835] Keep replenishment ON-CATEGORY: for an
+                        # activity-provider request, a maps candidate that is a
+                        # food/drink venue or a generic landmark is off-category and
+                        # must NOT refill the gap (honest shortfall over padding).
+                        # The guard runs the SAME check as the post-discovery pass,
+                        # so a kite-lessons replenish never re-adds a restaurant or a
+                        # fishing village. No-op for non-provider / food requests.
+                        try:
+                            from category_match_guard import \
+                                filter_off_category_activity as _foca835r
+                            _p3c_cands, _dropr835 = _foca835r(
+                                list(_p3c_cands or []),
+                                (user_request if 'user_request' in dir() else location),
+                                log=print)
+                            if _dropr835 > 0:
+                                print(f"   [LOCAL-835] replenish guard dropped "
+                                      f"{_dropr835} off-category maps candidate(s)")
+                        except Exception as _fr835_err:
+                            print(f"   [LOCAL-835] replenish guard skipped "
+                                  f"(non-fatal): {_fr835_err}")
                         _p3c_src = 'dining_maps' if _p3c_kind == 'dining' else 'business_maps'
                         for _p3cc in _p3c_cands:
                             if len(poi_list) >= total_stops:
@@ -15864,6 +15933,24 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
                                         user_id=(user_id if 'user_id' in dir() else None),
                                         request_text=(user_request if 'user_request' in dir() else location),
                                         scope_bbox=_wide_bbox)
+                                    # [LOCAL-835] Widened replenishment stays
+                                    # on-category too — a wider box must not pull in
+                                    # a restaurant / landmark for an activity-provider
+                                    # request.
+                                    try:
+                                        from category_match_guard import \
+                                            filter_off_category_activity as _foca835w
+                                        _wide_cands, _dropw835 = _foca835w(
+                                            list(_wide_cands or []),
+                                            (user_request if 'user_request' in dir() else location),
+                                            log=print)
+                                        if _dropw835 > 0:
+                                            print(f"   [LOCAL-835] widened replenish "
+                                                  f"guard dropped {_dropw835} "
+                                                  f"off-category candidate(s)")
+                                    except Exception as _fw835_err:
+                                        print(f"   [LOCAL-835] widened replenish guard "
+                                              f"skipped (non-fatal): {_fw835_err}")
                                     _wide_added = 0
                                     for _wc in _wide_cands:
                                         if len(poi_list) >= total_stops:
