@@ -1,15 +1,17 @@
 #!/usr/bin/env python3
-"""run_local822_container.py — the TINY in-container probe for LOCAL-822.
+"""run_local822_container.py — the TINY in-container probe for LOCAL-822 / 822B.
 
 Makes exactly ONE paid OpenAI call with max_tokens<=5, through the network meter
-installed by PYTHONPATH=/opt/meter. The whole point of the two live runs is to
-prove the container meter-mount guard (LOCAL-822) is mechanical:
+installed by PYTHONPATH=/opt/meter. The live runs prove the container meter-mount
+guard (LOCAL-822), scoped to TASK RUNS ONLY (LOCAL-822B), is mechanical:
 
-  * WITHOUT the meterlogs bind-mount / identity  -> paid_api_meter.check_meter_mount
+  * TASK RUN WITHOUT the meterlogs bind-mount -> paid_api_meter.check_meter_mount
     raises MeterMountMissing BEFORE the request is sent. $0 spent, no row.
-  * WITH the full contract (bind-mount + METER_SERVICE=LOCAL-822)                -> the
+  * TASK RUN WITH the full contract (bind-mount + METER_SERVICE=LOCAL-822B) -> the
     call goes out and ONE row lands in ~/Audioura/meterlogs/paid_api_calls.jsonl
-    with service=LOCAL-822.
+    with service=LOCAL-822B.
+  * PRODUCTION (K_SERVICE set, no task id, no mount) -> the guard is NOT armed, so
+    the paid call GOES THROUGH — the guard can never refuse a production call.
 
 Run inside audioura-tour-generator:latest with the meter on PYTHONPATH. Prints a
 single line the wrapper greps. Never a full tour; the cheapest possible paid call.

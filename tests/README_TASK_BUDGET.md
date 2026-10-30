@@ -6,6 +6,12 @@ run harness inherits them from the environment. This is not optional — it is t
 mechanism that keeps a task's TOTAL paid-API spend inside the "Paid-API cap $X
 TOTAL across all runs" number the task file states.
 
+> **`TASK_BUDGET_ID` is what ARMS BOTH guards** — the whole-task budget
+> (LOCAL-817) *and* the container meter-mount guard (LOCAL-822/822B). Without it
+> (and without a `METER_SERVICE` that starts with `LOCAL-`) a run is treated as
+> production and neither guard applies, so the mount guard can never refuse a
+> Cloud Run / shared-stack / laptop paid call.
+
 ```bash
 export TASK_BUDGET_ID=LOCAL-816     # which task's ledger this run belongs to
 export TASK_BUDGET_USD=0.60         # the WHOLE-TASK cap in dollars (all runs summed)

@@ -800,7 +800,7 @@ def check_task_budget():
 
 
 # --------------------------------------------------------------------------- #
-# Container meter-mount contract  (LOCAL-822)
+# Container meter-mount contract  (LOCAL-822 / LOCAL-822B)
 #
 # LOCAL-820 wired the .sh wrappers and isolated_test.py so a container's meter
 # rows reach the HOST (bind-mount ~/Audioura/meterlogs -> /meterlogs, canonical
@@ -811,38 +811,52 @@ def check_task_budget():
 # tours left ZERO rows on the host for exactly this reason.
 #
 # LOCAL-817 solved the same class of problem for the whole-task budget by making
-# the meter itself refuse. We do the same for the meterlog mount: before any paid
-# call, when we are INSIDE a container, REFUSE unless the run has proven its rows
-# will reach the host —
+# the meter itself refuse. We do the same for the meterlog mount: before a paid
+# call MADE BY A TASK RUN, when we are INSIDE a container, REFUSE unless the
+# directory holding PAID_API_LOG is a BIND MOUNT (os.path.ismount, or a
+# /proc/self/mountinfo check) — a real host dir mounted in, not an ephemeral
+# container path that --rm will delete.
 #
-#   (a) the directory holding PAID_API_LOG is a BIND MOUNT (os.path.ismount, or a
-#       /proc/self/mountinfo check), i.e. a real host dir mounted in, not an
-#       ephemeral container path that --rm will delete; AND
-#   (b) the container carries an IDENTITY so its rows are attributable:
-#       METER_SERVICE or TASK_BUDGET_ID set (the isolated-task contract), OR
-#       METER_ROLE set (the shared compose stack's identity — those services
-#       mount /meterlogs and set METER_ROLE=listener but no METER_SERVICE, so
-#       accepting METER_ROLE is what leaves the shared stack unaffected).
+# [LOCAL-822B — the BOUNCE]  The first cut armed the guard for EVERY container
+# (anything with /.dockerenv). But the meter is baked into the generator image
+# with ENV PYTHONPATH=/opt/meter, so it runs in Cloud Run (GCloud Subscribed),
+# the Windows laptop's local Docker stack, AND the Mac shared stack — none of
+# which are Kiro task runs. A guard meant to catch a forgotten bind-mount on a
+# Kiro test run must NEVER be able to refuse a PRODUCTION paid call. So the guard
+# now ARMS ONLY for task runs and allows everything else:
 #
-# The refusal names ``meter_container_env.docker_meter_args`` — the ONE helper
-# that emits the correct args — so the fix is in the error itself.
+#   * ARMED when TASK_BUDGET_ID is set, OR METER_SERVICE matches ^LOCAL- (the two
+#     signals a Kiro isolated-task run always carries). With neither -> NOT armed
+#     -> ALLOW (today's behaviour for production: the shared stack, a plain image,
+#     the laptop, any future host).
+#   * NEVER armed when K_SERVICE is set — Cloud Run always sets it — belt and
+#     braces, so a Cloud Run container is allowed even if some future task env
+#     leaks in.
+#   * An armed run inside a container STILL needs the bind mount -> refuse,
+#     naming ``meter_container_env.docker_meter_args`` (the ONE helper that emits
+#     the correct args), exactly as before. That is the whole point: a Kiro task's
+#     hand-typed ``docker run`` that forgets the mount is stopped, $0 spent.
 #
-# FAIL-OPEN like the other doors: not in a container (no /.dockerenv) -> allow;
-# any error deciding mount/identity -> allow and log. The guard is OFF entirely
-# when METER_MOUNT_GUARD=0 (an escape hatch for a deliberate no-mount diagnostic).
-# A missing PAID_API_LOG env defaults to /meterlogs/... just like LOG above.
+# FAIL-OPEN like the other doors: not armed -> allow; not in a container (no
+# /.dockerenv) -> allow; any error deciding mount/arming -> allow and log. The
+# guard is OFF entirely when METER_MOUNT_GUARD=0 (an escape hatch for a deliberate
+# no-mount diagnostic). A missing PAID_API_LOG env defaults to /meterlogs/... just
+# like LOG above.
 # --------------------------------------------------------------------------- #
 MOUNT_GUARD_ENV = "METER_MOUNT_GUARD"
+CLOUD_RUN_ENV = "K_SERVICE"  # Cloud Run always sets this; its presence disarms the guard
 
 
 class MeterMountMissing(Exception):
-    """[LOCAL-822] Raised instead of making a paid call when this container has
-    NOT proven its meter rows will reach the host: either the directory of
-    PAID_API_LOG is not a bind mount, or the container carries no identity
-    (METER_SERVICE / TASK_BUDGET_ID / METER_ROLE). The whole point is that a
-    hand-typed ``docker run`` that forgets the meterlogs bind-mount burns money
-    whose rows die inside the --rm container — so refuse, $0 spent, and tell the
-    operator to build the run with meter_container_env.docker_meter_args."""
+    """[LOCAL-822] Raised instead of making a paid call when a TASK RUN inside a
+    container has NOT proven its meter rows will reach the host: the directory of
+    PAID_API_LOG is not a bind mount, so the rows die inside the --rm container.
+    The whole point is that a hand-typed ``docker run`` for a Kiro task that
+    forgets the meterlogs bind-mount burns money whose rows vanish — so refuse,
+    $0 spent, and tell the operator to build the run with
+    meter_container_env.docker_meter_args. [LOCAL-822B] Only ever raised for a
+    task run (TASK_BUDGET_ID set, or METER_SERVICE ^LOCAL-); a production
+    container — Cloud Run, the Mac shared stack, the laptop — is never refused."""
 
 
 def _in_container():
@@ -913,39 +927,78 @@ def _dir_is_bind_mount(path):
         return False
 
 
-def _has_container_identity():
-    """True when the container carries an identity that makes its rows
-    attributable: METER_SERVICE or TASK_BUDGET_ID (the isolated-task contract), or
-    METER_ROLE (the shared compose stack's listener identity). Never raises."""
+def _is_cloud_run():
+    """[LOCAL-822B] True when running on Google Cloud Run, which ALWAYS sets
+    K_SERVICE. The guard never arms on Cloud Run — belt and braces so a production
+    paid call there can never be refused even if some task env leaked in. Never
+    raises -> False."""
     try:
-        for env in ("METER_SERVICE", "TASK_BUDGET_ID", METER_ROLE_ENV):
-            if (os.environ.get(env) or "").strip():
-                return True
+        return bool((os.environ.get(CLOUD_RUN_ENV) or "").strip())
+    except Exception:
+        return False
+
+
+def _meter_service_is_task():
+    """[LOCAL-822B] True when METER_SERVICE names a Kiro task — i.e. it starts with
+    'LOCAL-' (case-insensitive). A Kiro isolated-task container tags its rows
+    service=LOCAL-NNN; the shared stack sets METER_SERVICE to a host/service name
+    that does NOT start with LOCAL-, so this stays False for production. Never
+    raises -> False."""
+    try:
+        return (os.environ.get("METER_SERVICE") or "").strip().upper().startswith("LOCAL-")
+    except Exception:
+        return False
+
+
+def _guard_armed():
+    """[LOCAL-822B] True ONLY for a Kiro task run, which is the only run the
+    mount guard applies to. Armed when TASK_BUDGET_ID is set OR METER_SERVICE
+    matches ^LOCAL- ; NEVER armed on Cloud Run (K_SERVICE set). With neither task
+    signal (the shared stack, a plain image, the laptop, any future production
+    host) the guard is NOT armed and the call is allowed — a guard for Kiro's
+    test runs must never be able to stop production. Never raises -> False
+    (fail-open: an undecidable arming reads as 'not a task run' -> allow)."""
+    try:
+        if _is_cloud_run():
+            return False
+        if (os.environ.get(TASK_BUDGET_ID_ENV) or "").strip():
+            return True
+        if _meter_service_is_task():
+            return True
         return False
     except Exception:
         return False
 
 
 def check_meter_mount():
-    """[LOCAL-822] Enforce the container meter-mount contract before a paid call.
+    """[LOCAL-822 / LOCAL-822B] Enforce the container meter-mount contract before
+    a paid call — but ONLY for a Kiro TASK RUN.
 
-    Raises MeterMountMissing when running INSIDE a container and the run has not
-    proven its meter rows will reach the host — i.e. the directory of PAID_API_LOG
-    is not a bind mount, OR no identity (METER_SERVICE / TASK_BUDGET_ID /
-    METER_ROLE) is set. Returns None (allow) otherwise.
+    Raises MeterMountMissing only when ALL of these hold: the guard is on, the run
+    is ARMED as a task run (TASK_BUDGET_ID set, or METER_SERVICE ^LOCAL-; and
+    NEVER on Cloud Run, where K_SERVICE is set), we are INSIDE a container, and the
+    directory of PAID_API_LOG is not a bind mount (so the rows would die inside the
+    --rm container). Returns None (allow) in every other case.
 
-    Fail-OPEN: not in a container, or the guard switched off, or any error deciding
-    the mount/identity -> allow. The only hard stop is the deliberate refusal for a
-    container that would lose its rows. Called immediately before sending any paid
-    request, alongside check_daily_limit and check_task_budget."""
+    [LOCAL-822B] The arming gate is the fix for the bounce: the meter is baked into
+    the generator image (PYTHONPATH=/opt/meter), so this code also runs in Cloud
+    Run, the Mac shared stack and the laptop — none of which are task runs. A guard
+    for Kiro's test runs must never refuse a PRODUCTION paid call, so a run that is
+    not armed is always allowed.
+
+    Fail-OPEN: not armed, not in a container, guard switched off, or any error
+    deciding arming/mount -> allow. The only hard stop is the deliberate refusal
+    for a TASK container that would lose its rows. Called immediately before
+    sending any paid request, alongside check_daily_limit and check_task_budget."""
     try:
         if not _mount_guard_on():
             return
+        if not _guard_armed():
+            return  # not a Kiro task run (Cloud Run / shared stack / plain image) -> allow
         if not _in_container():
             return  # on the host — the guard does not apply
         log_path = _paid_api_log_path()
         mounted = _dir_is_bind_mount(log_path)
-        identified = _has_container_identity()
     except Exception as e:
         # Fail-open on a detection error: a guard bug must never block a tour.
         try:
@@ -954,25 +1007,17 @@ def check_meter_mount():
         except Exception:
             pass
         return
-    if mounted and identified:
-        return  # contract satisfied — rows will reach the host, attributable
+    if mounted:
+        return  # contract satisfied — rows will reach the host
     log_dir = os.path.dirname(log_path) or log_path
-    missing = []
-    if not mounted:
-        missing.append(
-            "the directory of PAID_API_LOG (%s) is not a host bind-mount, so its "
-            "rows die inside the --rm container" % log_dir)
-    if not identified:
-        missing.append(
-            "no container identity is set (need METER_SERVICE or TASK_BUDGET_ID, "
-            "or METER_ROLE for the shared stack)")
     raise MeterMountMissing(
-        "[LOCAL-822] refusing paid call: this container has NOT proven its meter "
-        "rows reach the host — %s. Build the run with "
-        "meter_container_env.docker_meter_args() (bind-mounts ~/Audioura/meterlogs "
-        "-> /meterlogs, sets the canonical PAID_API_LOG and METER_SERVICE=<task "
-        "id>), or set METER_MOUNT_GUARD=0 for a deliberate no-mount diagnostic."
-        % "; ".join(missing))
+        "[LOCAL-822] refusing paid call: this task-run container has NOT proven "
+        "its meter rows reach the host — the directory of PAID_API_LOG (%s) is not "
+        "a host bind-mount, so its rows die inside the --rm container. Build the "
+        "run with meter_container_env.docker_meter_args() (bind-mounts "
+        "~/Audioura/meterlogs -> /meterlogs, sets the canonical PAID_API_LOG and "
+        "METER_SERVICE=<task id>), or set METER_MOUNT_GUARD=0 for a deliberate "
+        "no-mount diagnostic." % log_dir)
 
 
 def install():
