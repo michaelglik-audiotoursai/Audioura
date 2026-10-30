@@ -15538,6 +15538,12 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
             try:
                 from walking_stop_title import dedupe_place_titles as _dpt791c
                 _before_dedupe_791c = len(poi_list)
+                # [LEAD 2026-10-30] Never for museums/facilities: their works share the
+                # building's pin (LOCAL-813), so the ≤60 m "same place" test collapsed
+                # Orsay to 1/5 on GCloud (wave 6, tour 495). Artwork duplicates are
+                # handled by the LOCAL-722 duplicate-stop dedupe instead.
+                if tour_category in ('museum', 'facility'):
+                    raise RuntimeError("not applied to museum/facility tours")
                 poi_list = _dpt791c(poi_list, log=print)
                 if len(poi_list) < _before_dedupe_791c:
                     print(f"  [LOCAL-791C] title dedupe removed "
