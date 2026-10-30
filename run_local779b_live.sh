@@ -42,6 +42,9 @@ args=(
   -e TEST_GEMINI_MAX_USD=1.20
   -e COST_HARD_LIMIT_USD=1.20
   -e PAID_API_LOG=/meterlogs/paid_api_calls.jsonl
+  -e PYTHONPATH=/opt/meter
+  -e METER_SERVICE=LOCAL-779
+  -v "${HERE}/_meter:/opt/meter:ro"
   -v "${METER_DIR}:/meterlogs"
   -v "${HERE}:/app" -w /app
 )

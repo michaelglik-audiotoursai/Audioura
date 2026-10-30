@@ -77,3 +77,62 @@ headroom. Exit status `2` means the recorded total is already over budget.
 whose sum exceeds the budget (second refuses to start), a run crossing the budget
 mid-way (aborts at the grounding counter), raw-door refusal, ledger round-trip,
 no-env old behaviour, and the `$0` budget refusing a fake paid call end-to-end.
+
+---
+
+# Live runs MUST also meter to the shared log (LOCAL-820)
+
+The whole-task **budget** above caps spend; the **meter** records where it went.
+They are two halves of one contract and every new task needs BOTH. The budget
+without the meter is how the ~16k unmetered OpenAI calls happened: LOCAL-818's
+two live tours set `TASK_BUDGET_ID`/`TASK_BUDGET_USD` correctly but their
+`docker run` did not mount the meter, so the paid-API meter wrote its rows to
+`/meterlogs` **inside** the `--rm` container and they died with it — zero rows in
+`~/Audioura/meterlogs`, nothing for `meter_report.py` to total.
+
+## The meter contract (every isolated container carries these)
+
+An isolated `docker run` that can make a paid call MUST carry the args
+`meter_container_env.docker_meter_args()` returns:
+
+```python
+import meter_container_env as mce
+docker_cmd += mce.docker_meter_args(
+    task_id="LOCAL-NNN",                 # tags every row service=LOCAL-NNN
+    meter_dir="<worktree>/_meter",       # mounted read-only at /opt/meter
+    # host_meter_dir defaults to ~/Audioura/meterlogs
+    key_suffix="k9sA",                   # optional, last few chars of the key
+)
+```
+
+which is exactly these five signals:
+
+| # | signal | why |
+|---|--------|-----|
+| 1 | `-e PYTHONPATH=/opt/meter` | sitecustomize installs the network meter |
+| 2 | `-e PAID_API_LOG=/meterlogs/paid_api_calls.jsonl` | the ONE canonical log every sweep reads |
+| 3 | `-e METER_SERVICE=LOCAL-NNN` | tags rows so `meter_report.py` totals per task |
+| 4 | `-v ~/Audioura/meterlogs:/meterlogs` | lands rows on the HOST (they survive `--rm`) |
+| 5 | `-v <worktree>/_meter:/opt/meter:ro` | the metered code, in lock-step with the branch |
+
+In a `.sh` wrapper, carry the same five args literally — see
+`run_local818_live.sh` for the template. (`METER_SERVICE` may be omitted ONLY
+when `TASK_BUDGET_ID` is set, because the meter defaults `service` to
+`TASK_BUDGET_ID`; setting it explicitly is clearer and is what the guard test
+checks.)
+
+## Inspecting a task's metered spend
+
+```bash
+python3 meter_report.py --since 2026-10-29     # by day / service / model / key
+```
+
+Rows tagged `service=LOCAL-NNN` are this task's; the sum across all its runs is
+the task's real paid-API spend, lined up against the provider usage page.
+
+## Guard
+
+`tests/test_local820_meter_wiring.py` FAILS if the shared runner
+(`isolated_test.py`) stops using `docker_meter_args()`, or if any
+`run_local*.sh` that launches the generator image is missing a contract signal —
+so a new task cannot ship an un-metered container.
