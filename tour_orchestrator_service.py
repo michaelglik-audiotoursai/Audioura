@@ -198,6 +198,65 @@ def _orch_jobs_store():
         return None
 
 
+def _cleanup_modernized_zip_row(modernized_job_id):
+    """[LOCAL-839] After the tour is safely stored, drop the stale inline ZIP
+    bytes from the modernized job's shared-store row.
+
+    The modernized service stores the finished ZIP as base64 under
+    generator_jobs.result.zip_b64 (service_name 'tour-generation-modernized') so
+    any instance can serve /download. Once the orchestrator has stored the tour
+    in audio_tours, that inline copy is dead weight. This removes ONLY the
+    zip_b64 key from the result JSONB — a JSONB key delete (result - 'zip_b64'),
+    never a DELETE of the row or of any tour data. The job row, its status and
+    every other result field stay intact for diagnostics.
+
+    Best-effort: no DB / a missing table / any error is logged and swallowed; a
+    cleanup failure must never affect an already-delivered tour. Only touches the
+    modernized job's own row, never audio_tours.
+    """
+    if not modernized_job_id:
+        return
+    try:
+        import psycopg2
+        conn = psycopg2.connect(
+            connect_timeout=5,
+            host=os.getenv('DB_HOST', 'postgres-2'),
+            database=os.getenv('DB_NAME', 'audiotours'),
+            user=os.getenv('DB_USER', 'admin'),
+            password=os.getenv('DB_PASSWORD', 'password123'),
+            port=os.getenv('DB_PORT', '5432'),
+        )
+    except Exception as conn_err:  # noqa: BLE001
+        print(f"[LOCAL-839] zip-row cleanup skipped (no DB) for {modernized_job_id}: {conn_err}")
+        return
+    try:
+        cur = conn.cursor()
+        # Remove just the zip_b64 key; leave the row and all other data untouched.
+        cur.execute(
+            "UPDATE generator_jobs SET result = result - 'zip_b64', "
+            "updated_at = CURRENT_TIMESTAMP "
+            "WHERE job_id = %s AND result ? 'zip_b64'",
+            (modernized_job_id,),
+        )
+        cleared = cur.rowcount
+        conn.commit()
+        cur.close()
+        if cleared:
+            print(f"[LOCAL-839] Cleared stale inline ZIP (zip_b64) from modernized "
+                  f"job row {modernized_job_id} after successful store.")
+    except Exception as db_err:  # noqa: BLE001
+        print(f"[LOCAL-839] zip-row cleanup failed for {modernized_job_id} (non-fatal): {db_err}")
+        try:
+            conn.rollback()
+        except Exception:
+            pass
+    finally:
+        try:
+            conn.close()
+        except Exception:
+            pass
+
+
 def _get_auth_headers(target_url):
     """Get authorization headers for service-to-service calls on Cloud Run.
     On local Docker, returns empty dict (no auth needed).
@@ -2710,6 +2769,11 @@ def orchestrate_tour_async(job_id, location, tour_type, total_stops, user_id=Non
             return  # Do NOT fall through to "completed"
         
         # Tour stored (or already existed). Determine the english_tour_id.
+        # [LOCAL-839] The tour is now safely in audio_tours, so the inline ZIP
+        # bytes the modernized service kept in its shared-store row (for the
+        # cross-instance /download handoff) are no longer needed. Drop just that
+        # blob (result - 'zip_b64'); never DELETE the row or any tour data.
+        _cleanup_modernized_zip_row(modernized_job_id)
         if store_action == "already_exists" and store_existing_id:
             english_tour_id = store_existing_id
             print(f"[LOCAL-172] Reusing existing tour id={english_tour_id} (no new storage needed)")

@@ -1,0 +1,202 @@
+# docker-compose.local839-proof.yml — LOCAL-839 OWN isolated orchestration stack.
+#
+# Separate project (-p local839), OWN postgres volume, spare ports (558xx).
+# NEVER touches the shared audioura-* containers or the live DB. Every service
+# builds from THIS worktree so the live run measures the LOCAL-839 code.
+#
+# THE POINT OF THIS STACK: TWO modernized (voice/ZIP) instances behind an nginx
+# round-robin, each with its OWN tours dir (NO shared mount between them). So a
+# modernized job created on instance A is genuinely absent from instance B's
+# memory AND B's disk — the exact two-instance condition that produced the live
+# "Job not found" / missing-ZIP 404 (GCloud_Storied wave 14). With the layered
+# job store (JOB_STORE_MODE=layered) + the inline-ZIP handoff, whichever
+# instance the round-robin lands on can answer /status and /download, so the
+# orchestrator stores the tour ONCE and the audio plays.
+#
+# UP:   docker compose -p local839 -f docker-compose.local839-proof.yml up -d --build
+# DOWN: docker compose -p local839 -f docker-compose.local839-proof.yml down -v
+#
+# Budget: TASK_BUDGET_ID=LOCAL-839 TASK_BUDGET_USD=0.40, meter contract on the
+# services that make paid calls (PYTHONPATH=/opt/meter); spend lands under
+# service=LOCAL-839.
+services:
+  postgres-2:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: audiotours
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: password123
+      POSTGRES_INITDB_ARGS: "--auth-host=md5 --auth-local=md5"
+      POSTGRES_HOST_AUTH_METHOD: md5
+    ports:
+      - "55832:5432"
+    volumes:
+      - local839_pg:/var/lib/postgresql/data
+      - ./local821-initdb:/docker-entrypoint-initdb.d:ro
+
+  tour-generator:
+    build:
+      context: .
+      dockerfile: Dockerfile.generator
+    ports:
+      - "55800:5000"
+    environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - SERP_API_KEY=${SERP_API_KEY}
+      - SERP_PROVIDER=${SERP_PROVIDER:-serper}
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - STORIED_MODE=true
+      - TOUR_TRACK=subscribed
+      - ATTESTATION_MODE=log_only
+      - ALLOW_UNAUTHENTICATED_SHARING=true
+      - DATABASE_URL=postgresql://admin:password123@postgres-2:5432/audiotours
+      - DB_HOST=postgres-2
+      - DB_PORT=5432
+      - DB_NAME=audiotours
+      - DB_USER=admin
+      - DB_PASSWORD=password123
+      - PYTHONUNBUFFERED=1
+      - JOB_STORE_MODE=layered
+      - TASK_BUDGET_ID=LOCAL-839
+      - TASK_BUDGET_USD=0.40
+      - COST_HARD_LIMIT_USD=0.40
+      - TEST_GEMINI_MAX_USD=0.40
+      - PYTHONPATH=/opt/meter
+      - PAID_API_LOG=/meterlogs/paid_api_calls.jsonl
+      - METER_SERVICE=LOCAL-839
+    volumes:
+      - ./tours_local839_gen:/app/tours
+      - ./_meter:/opt/meter:ro
+      - ${LOCAL839_METER_DIR:-./local839-meterlogs}:/meterlogs
+    depends_on:
+      - postgres-2
+
+  # ── TWO modernized instances, SEPARATE tours dirs, SHARED postgres ──────────
+  # Both run JOB_STORE_MODE=layered with the DB env so the generator_jobs table
+  # (service_name 'tour-generation-modernized') is the shared source of truth.
+  tour-generation-modernized-1:
+    build:
+      context: .
+      dockerfile: Dockerfile.modernized
+    environment:
+      - JOB_STORE_MODE=layered
+      - DB_HOST=postgres-2
+      - DB_PORT=5432
+      - DB_NAME=audiotours
+      - DB_USER=admin
+      - DB_PASSWORD=password123
+      - POLLY_TTS_URL=http://polly-tts-1:5018
+      - INSTANCE_ID=modernized-A
+      - PYTHONUNBUFFERED=1
+    volumes:
+      - ./tours_local839_a:/app/tours   # instance A's OWN disk
+    depends_on:
+      - postgres-2
+
+  tour-generation-modernized-2:
+    build:
+      context: .
+      dockerfile: Dockerfile.modernized
+    environment:
+      - JOB_STORE_MODE=layered
+      - DB_HOST=postgres-2
+      - DB_PORT=5432
+      - DB_NAME=audiotours
+      - DB_USER=admin
+      - DB_PASSWORD=password123
+      - POLLY_TTS_URL=http://polly-tts-1:5018
+      - INSTANCE_ID=modernized-B
+      - PYTHONUNBUFFERED=1
+    volumes:
+      - ./tours_local839_b:/app/tours   # instance B's OWN disk (NOT shared with A)
+    depends_on:
+      - postgres-2
+
+  # nginx round-robin: the orchestrator's single MODERNIZED_URL fans out to A/B.
+  modernized-lb:
+    image: nginx:1.25-alpine
+    volumes:
+      - ./local839-modernized-lb.conf:/etc/nginx/conf.d/default.conf:ro
+    ports:
+      - "55821:5021"
+    depends_on:
+      - tour-generation-modernized-1
+      - tour-generation-modernized-2
+
+  polly-tts-1:
+    build:
+      context: .
+      dockerfile: Dockerfile.polly-tts
+    ports:
+      - "55818:5018"
+    environment:
+      - TTS_ENGINE=${TTS_ENGINE:-kokoro}
+      - KOKORO_URL=http://host.docker.internal:5181/render
+    env_file:
+      - /Users/micha/Audioura/.env
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  user-api-2:
+    build:
+      context: ./user-tracking
+    ports:
+      - "55803:5000"
+    environment:
+      - ALLOW_UNAUTHENTICATED_ENTITLEMENTS=true
+      - DATABASE_URL=postgresql://admin:password123@postgres-2:5432/audiotours
+      - DB_HOST=postgres-2
+      - DB_NAME=audiotours
+      - DB_USER=admin
+      - DB_PASSWORD=password123
+      - DB_PORT=5432
+      - GATEWAY_API_KEY=""
+    depends_on:
+      - postgres-2
+
+  coordinates-fromai:
+    build:
+      context: ./coordinates_fromAI
+    ports:
+      - "55806:5004"
+    environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+
+  tour-orchestrator:
+    build:
+      context: .
+      dockerfile: Dockerfile.orchestrator
+    ports:
+      - "55802:5002"
+    environment:
+      - TOUR_GENERATOR_URL=http://tour-generator:5000
+      # Single URL → nginx round-robin across modernized A and B.
+      - MODERNIZED_URL=http://modernized-lb:5021
+      - USER_API_URL=http://user-api-2:5000
+      - COORDINATES_URL=http://coordinates-fromai:5004
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - TOUR_TRACK=subscribed
+      - DB_HOST=postgres-2
+      - DB_NAME=audiotours
+      - DB_USER=admin
+      - DB_PASSWORD=password123
+      - DB_PORT=5432
+      - TOUR_TEST_MODE_ALLOW_REQUEST=true
+      - PYTHONUNBUFFERED=1
+      - TASK_BUDGET_ID=LOCAL-839
+      - TASK_BUDGET_USD=0.40
+      - PYTHONPATH=/opt/meter
+      - PAID_API_LOG=/meterlogs/paid_api_calls.jsonl
+      - METER_SERVICE=LOCAL-839
+    volumes:
+      - ./tours_local839_orch:/app/tours
+      - ./_meter:/opt/meter:ro
+      - ${LOCAL839_METER_DIR:-./local839-meterlogs}:/meterlogs
+    depends_on:
+      - tour-generator
+      - modernized-lb
+      - user-api-2
+      - coordinates-fromai
+
+volumes:
+  local839_pg:

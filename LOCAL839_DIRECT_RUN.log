@@ -1,0 +1,343 @@
+
+######## [local839d] building + starting ONLY postgres + 2 modernized + nginx + polly (no paid generator) ########
+ Image local839d-tour-generation-modernized-1 Building 
+ Image local839d-tour-generation-modernized-2 Building 
+ Image local839d-polly-tts-1 Building 
+#1 [internal] load local bake definitions
+#1 reading from stdin 1.72kB done
+#1 DONE 0.0s
+
+#2 [tour-generation-modernized-2 internal] load build definition from Dockerfile.modernized
+#2 transferring dockerfile: 735B 0.1s
+#2 transferring dockerfile: 735B 0.1s done
+#2 DONE 0.1s
+
+#3 [polly-tts-1 internal] load build definition from Dockerfile.polly-tts
+#3 transferring dockerfile: 1.76kB 0.1s done
+#3 DONE 0.1s
+
+#4 [tour-generation-modernized-1 internal] load metadata for docker.io/library/python:3.9-slim
+#4 DONE 0.5s
+
+#5 [polly-tts-1 internal] load .dockerignore
+#5 transferring context: 2.05kB 0.0s done
+#5 DONE 0.1s
+
+#6 [tour-generation-modernized-1  1/13] FROM docker.io/library/python:3.9-slim@sha256:2d97f6910b16bd338d3060f261f53f144965f755599aab1acda1e13cf1731b1b
+#6 resolve docker.io/library/python:3.9-slim@sha256:2d97f6910b16bd338d3060f261f53f144965f755599aab1acda1e13cf1731b1b done
+#6 DONE 0.0s
+
+#7 [tour-generation-modernized-2 internal] load build context
+#7 transferring context: 181.34kB 0.1s done
+#7 DONE 0.1s
+
+#8 [polly-tts-1 internal] load build context
+#8 transferring context: 177.47kB 0.1s done
+#8 DONE 0.1s
+
+#9 [tour-generation-modernized-2  2/13] COPY _meter/ /opt/meter/
+#9 DONE 0.0s
+
+#10 [tour-generation-modernized-2  3/13] WORKDIR /app
+#10 DONE 0.0s
+
+#11 [tour-generation-modernized-2  3/13] WORKDIR /app
+#11 CACHED
+
+#12 [tour-generation-modernized-2  2/13] COPY _meter/ /opt/meter/
+#12 CACHED
+
+#13 [tour-generation-modernized-1  4/13] COPY requirements-modernized.txt .
+#13 DONE 0.0s
+
+#14 [tour-generation-modernized-2  5/13] RUN pip install --no-cache-dir -r requirements-modernized.txt
+#14 1.067 Collecting flask==2.3.3
+#14 1.121   Downloading flask-2.3.3-py3-none-any.whl (96 kB)
+#14 1.137      ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 96.1/96.1 kB 6.3 MB/s eta 0:00:00
+#14 1.160 Collecting flask-cors==4.0.0
+#14 1.168   Downloading Flask_Cors-4.0.0-py2.py3-none-any.whl (14 kB)
+#14 1.203 Collecting requests==2.28.1
+#14 1.213   Downloading requests-2.28.1-py3-none-any.whl (62 kB)
+#14 1.215      ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 62.8/62.8 kB 87.1 MB/s eta 0:00:00
+#14 1.239 Collecting werkzeug==2.3.7
+#14 1.249   Downloading werkzeug-2.3.7-py3-none-any.whl (242 kB)
+#14 1.262      ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 242.2/242.2 kB 20.2 MB/s eta 0:00:00
+#14 1.342 Collecting markupsafe==2.1.3
+#14 1.351   Downloading MarkupSafe-2.1.3-cp39-cp39-manylinux_2_17_aarch64.manylinux2014_aarch64.whl (26 kB)
+#14 1.434 Collecting psycopg2-binary==2.9.9
+#14 1.446   Downloading psycopg2_binary-2.9.9-cp39-cp39-manylinux_2_17_aarch64.manylinux2014_aarch64.whl (2.9 MB)
+#14 1.516      ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 2.9/2.9 MB 40.9 MB/s eta 0:00:00
+#14 1.560 Collecting importlib-metadata>=3.6.0
+#14 1.571   Downloading importlib_metadata-8.7.1-py3-none-any.whl (27 kB)
+#14 1.586 Collecting itsdangerous>=2.1.2
+#14 1.595   Downloading itsdangerous-2.2.0-py3-none-any.whl (16 kB)
+#14 1.611 Collecting blinker>=1.6.2
+#14 1.620   Downloading blinker-1.9.0-py3-none-any.whl (8.5 kB)
+#14 1.640 Collecting Jinja2>=3.1.2
+#14 1.650   Downloading jinja2-3.1.6-py3-none-any.whl (134 kB)
+#14 1.653      ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 134.9/134.9 kB 58.3 MB/s eta 0:00:00
+#14 1.678 Collecting click>=8.1.3
+#14 1.686   Downloading click-8.1.8-py3-none-any.whl (98 kB)
+#14 1.689      ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 98.2/98.2 kB 34.5 MB/s eta 0:00:00
+#14 1.858 Collecting charset-normalizer<3,>=2
+#14 1.881   Downloading charset_normalizer-2.1.1-py3-none-any.whl (39 kB)
+#14 1.905 Collecting idna<4,>=2.5
+#14 1.913   Downloading idna-3.20-py3-none-any.whl (69 kB)
+#14 1.915      ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 69.6/69.6 kB 40.5 MB/s eta 0:00:00
+#14 1.958 Collecting urllib3<1.27,>=1.21.1
+#14 1.966   Downloading urllib3-1.26.20-py2.py3-none-any.whl (144 kB)
+#14 1.973      ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 144.2/144.2 kB 24.6 MB/s eta 0:00:00
+#14 1.997 Collecting certifi>=2017.4.17
+#14 2.010   Downloading certifi-2026.10.23-py3-none-any.whl (135 kB)
+#14 2.014      ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 135.1/135.1 kB 41.5 MB/s eta 0:00:00
+#14 2.052 Collecting zipp>=3.20
+#14 2.058   Downloading zipp-3.23.1-py3-none-any.whl (10 kB)
+#14 2.122 Installing collected packages: zipp, urllib3, psycopg2-binary, markupsafe, itsdangerous, idna, click, charset-normalizer, certifi, blinker, werkzeug, requests, Jinja2, importlib-metadata, flask, flask-cors
+#14 2.463 Successfully installed Jinja2-3.1.6 blinker-1.9.0 certifi-2026.10.23 charset-normalizer-2.1.1 click-8.1.8 flask-2.3.3 flask-cors-4.0.0 idna-3.20 importlib-metadata-8.7.1 itsdangerous-2.2.0 markupsafe-2.1.3 psycopg2-binary-2.9.9 requests-2.28.1 urllib3-1.26.20 werkzeug-2.3.7 zipp-3.23.1
+#14 2.464 WARNING: Running pip as the 'root' user can result in broken permissions and conflicting behaviour with the system package manager. It is recommended to use a virtual environment instead: https://pip.pypa.io/warnings/venv
+#14 2.532 
+#14 2.532 [notice] A new release of pip is available: 23.0.1 -> 26.0.1
+#14 2.532 [notice] To update, run: pip install --upgrade pip
+#14 DONE 2.6s
+
+#15 [tour-generation-modernized-1  6/13] COPY tour_generation_modernized.py /app/
+#15 DONE 0.0s
+
+#16 [tour-generation-modernized-2  7/13] COPY tour_html_map.py /app/
+#16 DONE 0.0s
+
+#17 [tour-generation-modernized-1  8/13] COPY job_store.py /app/
+#17 DONE 0.0s
+
+#18 [tour-generation-modernized-1  9/13] COPY build_manifest.py /app/
+#18 DONE 0.0s
+
+#19 [tour-generation-modernized-1 10/13] COPY spoken_text_hygiene.py /app/
+#19 DONE 0.0s
+
+#20 [tour-generation-modernized-2 11/13] RUN mkdir -p /app/tours
+#20 DONE 0.1s
+
+#21 [tour-generation-modernized-1 12/13] RUN echo "unknown" > /app/.git_sha
+#21 DONE 0.1s
+
+#22 [tour-generation-modernized-1 13/13] RUN python build_manifest.py /app /app/.build_manifest.json
+#22 0.170 [build_manifest] Wrote /app/.build_manifest.json: 5 files, sha=unknown
+#22 DONE 0.2s
+
+#23 [polly-tts-1  4/13] RUN pip install flask boto3 requests psycopg2-binary
+#23 1.084 Collecting flask
+#23 1.134   Downloading flask-3.1.3-py3-none-any.whl (103 kB)
+#23 1.153      ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 103.4/103.4 kB 5.5 MB/s eta 0:00:00
+#23 1.517 Collecting boto3
+#23 1.531   Downloading boto3-1.42.97-py3-none-any.whl (140 kB)
+#23 1.537      ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 140.6/140.6 kB 28.8 MB/s eta 0:00:00
+#23 1.567 Collecting requests
+#23 1.580   Downloading requests-2.32.5-py3-none-any.whl (64 kB)
+#23 1.584      ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 64.7/64.7 kB 14.6 MB/s eta 0:00:00
+#23 1.675 Collecting psycopg2-binary
+#23 1.684   Downloading psycopg2_binary-2.9.12-cp39-cp39-manylinux_2_27_aarch64.manylinux_2_28_aarch64.whl (5.9 MB)
+#23 1.907      ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 5.9/5.9 MB 26.5 MB/s eta 0:00:00
+#23 1.942 Collecting click>=8.1.3
+#23 1.951   Downloading click-8.1.8-py3-none-any.whl (98 kB)
+#23 1.958      ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 98.2/98.2 kB 15.4 MB/s eta 0:00:00
+#23 1.997 Collecting importlib-metadata>=3.6.0
+#23 2.007   Downloading importlib_metadata-8.7.1-py3-none-any.whl (27 kB)
+#23 2.035 Collecting werkzeug>=3.1.0
+#23 2.041   Downloading werkzeug-3.1.9-py3-none-any.whl (228 kB)
+#23 2.050      ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 228.7/228.7 kB 32.8 MB/s eta 0:00:00
+#23 2.069 Collecting jinja2>=3.1.2
+#23 2.080   Downloading jinja2-3.1.6-py3-none-any.whl (134 kB)
+#23 2.086      ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 134.9/134.9 kB 23.7 MB/s eta 0:00:00
+#23 2.158 Collecting markupsafe>=2.1.1
+#23 2.166   Downloading markupsafe-3.0.4-cp39-cp39-manylinux2014_aarch64.manylinux_2_17_aarch64.manylinux_2_28_aarch64.whl (21 kB)
+#23 2.182 Collecting itsdangerous>=2.2.0
+#23 2.195   Downloading itsdangerous-2.2.0-py3-none-any.whl (16 kB)
+#23 2.213 Collecting blinker>=1.9.0
+#23 2.219   Downloading blinker-1.9.0-py3-none-any.whl (8.5 kB)
+#23 2.633 Collecting botocore<1.43.0,>=1.42.97
+#23 2.668   Downloading botocore-1.42.97-py3-none-any.whl (15.0 MB)
+#23 3.039      ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 15.0/15.0 MB 39.5 MB/s eta 0:00:00
+#23 3.074 Collecting jmespath<2.0.0,>=0.7.1
+#23 3.086   Downloading jmespath-1.1.0-py3-none-any.whl (20 kB)
+#23 3.111 Collecting s3transfer<0.17.0,>=0.16.0
+#23 3.122   Downloading s3transfer-0.16.1-py3-none-any.whl (86 kB)
+#23 3.129      ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 86.8/86.8 kB 14.5 MB/s eta 0:00:00
+#23 3.299 Collecting charset_normalizer<4,>=2
+#23 3.309   Downloading charset_normalizer-3.5.2-cp39-cp39-manylinux2014_aarch64.manylinux_2_17_aarch64.manylinux_2_28_aarch64.whl (261 kB)
+#23 3.321      ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 261.4/261.4 kB 30.7 MB/s eta 0:00:00
+#23 3.347 Collecting certifi>=2017.4.17
+#23 3.361   Downloading certifi-2026.10.23-py3-none-any.whl (135 kB)
+#23 3.366      ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 135.1/135.1 kB 35.4 MB/s eta 0:00:00
+#23 3.400 Collecting urllib3<3,>=1.21.1
+#23 3.413   Downloading urllib3-2.6.3-py3-none-any.whl (131 kB)
+#23 3.418      ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 131.6/131.6 kB 32.5 MB/s eta 0:00:00
+#23 3.447 Collecting idna<4,>=2.5
+#23 3.457   Downloading idna-3.20-py3-none-any.whl (69 kB)
+#23 3.460      ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 69.6/69.6 kB 34.8 MB/s eta 0:00:00
+#23 3.471 Collecting urllib3<3,>=1.21.1
+#23 3.481   Downloading urllib3-1.26.20-py2.py3-none-any.whl (144 kB)
+#23 3.487      ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 144.2/144.2 kB 31.1 MB/s eta 0:00:00
+#23 3.508 Collecting python-dateutil<3.0.0,>=2.1
+#23 3.518   Downloading python_dateutil-2.9.0.post0-py2.py3-none-any.whl (229 kB)
+#23 3.525      ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 229.9/229.9 kB 36.0 MB/s eta 0:00:00
+#23 3.561 Collecting zipp>=3.20
+#23 3.574   Downloading zipp-3.23.1-py3-none-any.whl (10 kB)
+#23 3.672 Collecting six>=1.5
+#23 3.683   Downloading six-1.17.0-py2.py3-none-any.whl (11 kB)
+#23 3.788 Installing collected packages: zipp, urllib3, six, psycopg2-binary, markupsafe, jmespath, itsdangerous, idna, click, charset_normalizer, certifi, blinker, werkzeug, requests, python-dateutil, jinja2, importlib-metadata, flask, botocore, s3transfer, boto3
+#23 ...
+
+#24 [tour-generation-modernized-1] exporting to image
+#24 exporting layers 0.5s done
+#24 exporting manifest sha256:c1591d459557a5f37b224d480677727ffb22d1b117f4cd2035b54eba530c79b8 done
+#24 exporting config sha256:982e0ed97885743687073616a222a717199ea9c8bf7b17f7ec5d7d241d603e85 done
+#24 exporting attestation manifest sha256:d1dfa4620b5efb1c22f8bc4515d814e0a6f9585bb007ac9b405af61036e88e73 0.0s done
+#24 exporting manifest list sha256:3334f0880063dc1bd65eefd8ccbfec946fcdc74144be01937d974ff807c9af10 done
+#24 naming to docker.io/library/local839d-tour-generation-modernized-1:latest done
+#24 unpacking to docker.io/library/local839d-tour-generation-modernized-1:latest 0.2s done
+#24 DONE 0.7s
+
+#25 [tour-generation-modernized-2] exporting to image
+#25 exporting layers 0.5s done
+#25 exporting manifest sha256:80e6bd455cc31937ee423a679fdf848f0872be132a2ec6162d3d521baaa33c52 done
+#25 exporting config sha256:a1f8fe565cba431fb3e53179e121a1fe20586d800d0136e7a7da6150fadec8cc done
+#25 exporting attestation manifest sha256:5a9bedbb211a1c86ebb39566f15412678c9453952af40d1aa41318ae422fa69c done
+#25 exporting manifest list sha256:42529971fc9c731553f851898365fbe5335e2e423cd2e78b546ba11f01e1e093 done
+#25 naming to docker.io/library/local839d-tour-generation-modernized-2:latest done
+#25 unpacking to docker.io/library/local839d-tour-generation-modernized-2:latest 0.2s done
+#25 DONE 0.7s
+
+#26 [tour-generation-modernized-2] resolving provenance for metadata file
+#26 DONE 0.0s
+
+#27 [tour-generation-modernized-1] resolving provenance for metadata file
+#27 DONE 0.0s
+
+#23 [polly-tts-1  4/13] RUN pip install flask boto3 requests psycopg2-binary
+#23 4.497 Successfully installed blinker-1.9.0 boto3-1.42.97 botocore-1.42.97 certifi-2026.10.23 charset_normalizer-3.5.2 click-8.1.8 flask-3.1.3 idna-3.20 importlib-metadata-8.7.1 itsdangerous-2.2.0 jinja2-3.1.6 jmespath-1.1.0 markupsafe-3.0.4 psycopg2-binary-2.9.12 python-dateutil-2.9.0.post0 requests-2.32.5 s3transfer-0.16.1 six-1.17.0 urllib3-1.26.20 werkzeug-3.1.9 zipp-3.23.1
+#23 4.498 WARNING: Running pip as the 'root' user can result in broken permissions and conflicting behaviour with the system package manager. It is recommended to use a virtual environment instead: https://pip.pypa.io/warnings/venv
+#23 4.574 
+#23 4.574 [notice] A new release of pip is available: 23.0.1 -> 26.0.1
+#23 4.574 [notice] To update, run: pip install --upgrade pip
+#23 DONE 4.8s
+
+#28 [polly-tts-1  5/13] COPY polly_tts_service.py .
+#28 DONE 0.0s
+
+#29 [polly-tts-1  6/13] COPY vietnamese_name_aid.py .
+#29 DONE 0.0s
+
+#30 [polly-tts-1  7/13] COPY pronunciation_lexicon.json .
+#30 DONE 0.0s
+
+#31 [polly-tts-1  8/13] COPY kokoro_engine.py .
+#31 DONE 0.0s
+
+#32 [polly-tts-1  9/13] COPY cost_meter.py .
+#32 DONE 0.0s
+
+#33 [polly-tts-1 10/13] COPY cost_rates.py .
+#33 DONE 0.0s
+
+#34 [polly-tts-1 11/13] COPY build_manifest.py .
+#34 DONE 0.0s
+
+#35 [polly-tts-1 12/13] RUN echo "unknown" > /app/.git_sha
+#35 DONE 0.1s
+
+#36 [polly-tts-1 13/13] RUN python build_manifest.py /app /app/.build_manifest.json
+#36 0.184 [build_manifest] Wrote /app/.build_manifest.json: 6 files, sha=unknown
+#36 DONE 0.2s
+
+#37 [polly-tts-1] exporting to image
+#37 exporting layers 1.3s done
+#37 exporting manifest sha256:1945de5a463b39e8eb45f6e8a3a0281e3552f20f81bf5786cd7eae66c1df3958 done
+#37 exporting config sha256:ad8f7e10c3d4a582b5da60da45b903c9a343c6f1ebf6fb414db07013f197f70f done
+#37 exporting attestation manifest sha256:ff5b99e828e6d51b1ac7ec47b2f16eca769459896cef987c22d748c7f6b631e6 done
+#37 exporting manifest list sha256:f6916ecc16a12e9327f86e59a01505a206f3937305944ea8e7bf961299359f4d done
+#37 naming to docker.io/library/local839d-polly-tts-1:latest done
+#37 unpacking to docker.io/library/local839d-polly-tts-1:latest
+#37 unpacking to docker.io/library/local839d-polly-tts-1:latest 0.4s done
+#37 DONE 1.7s
+
+#38 [polly-tts-1] resolving provenance for metadata file
+#38 DONE 0.0s
+ Image local839d-tour-generation-modernized-2 Built 
+ Image local839d-polly-tts-1 Built 
+ Image local839d-tour-generation-modernized-1 Built 
+ Network local839d_default Creating 
+ Network local839d_default Created 
+ Volume local839d_local839_pg Creating 
+ Volume local839d_local839_pg Created 
+ Container local839d-polly-tts-1-1 Creating 
+ Container local839d-postgres-2-1 Creating 
+ Container local839d-postgres-2-1 Created 
+ Container local839d-tour-generation-modernized-1-1 Creating 
+ Container local839d-tour-generation-modernized-2-1 Creating 
+ Container local839d-polly-tts-1-1 Created 
+ Container local839d-tour-generation-modernized-1-1 Created 
+ Container local839d-tour-generation-modernized-2-1 Created 
+ Container local839d-modernized-lb-1 Creating 
+ Container local839d-modernized-lb-1 Created 
+ Container local839d-postgres-2-1 Starting 
+ Container local839d-polly-tts-1-1 Starting 
+ Container local839d-postgres-2-1 Started 
+ Container local839d-tour-generation-modernized-1-1 Starting 
+ Container local839d-tour-generation-modernized-2-1 Starting 
+ Container local839d-polly-tts-1-1 Started 
+ Container local839d-tour-generation-modernized-2-1 Started 
+ Container local839d-tour-generation-modernized-1-1 Started 
+ Container local839d-modernized-lb-1 Starting 
+ Container local839d-modernized-lb-1 Started 
+
+######## [local839d] waiting for postgres ########
+
+######## [local839d] waiting for the modernized round-robin :55821 ########
+
+######## [local839d] 1. POST /process (inline tour_content) through the round-robin ########
+  response: {"job_id":"88c47ed8-d3a4-46e5-95ef-5675aef06773","modernized":true,"status":"queued"}
+  served-by: X-Upstream: 172.28.0.5:5021
+
+######## [local839d] 1. modernized job_id=88c47ed8-d3a4-46e5-95ef-5675aef06773 ########
+
+######## [local839d] 2. polling /status through the round-robin until completed ########
+    [t=1] status=processing served-by=172.28.0.5:5021
+    [t=2] status=processing served-by=172.28.0.5:5021
+    [t=3] status=processing served-by=172.28.0.5:5021
+    [t=4] status=completed served-by=172.28.0.5:5021
+
+######## [local839d] 3. where did the job physically land? (which instance has the ZIP on disk) ########
+  instance A tours dir: 1 file(s): Salem Common Public Art Walk - Walking Tour_88c47ed8.zip 
+  instance B tours dir: 0 file(s): 
+
+######## [local839d] 4. GET /download repeatedly through the round-robin (force the cross-instance hop) ########
+    [dl 1] OK zip served-by=172.28.0.5:5021 (Content-Type: application/zip)
+    [dl 2] OK zip served-by=172.28.0.5:5021 (Content-Type: application/zip)
+    [dl 3] OK zip served-by=172.28.0.5:5021 (Content-Type: application/zip)
+    [dl 4] OK zip served-by=172.28.0.5:5021 (Content-Type: application/zip)
+    [dl 5] OK zip served-by=172.28.0.4:5021 (Content-Type: application/zip)
+    [dl 6] OK zip served-by=172.28.0.5:5021 (Content-Type: application/zip)
+
+######## [local839d] 5. validate the downloaded ZIP audio (audio plays) ########
+  ZIP members: ['index.html', 'audio_1.mp3', 'audio_2.mp3', 'audio_3.mp3', 'audio_1.txt', 'audio_2.txt', 'audio_3.txt', 'manifest.json', 'service-worker.js']
+    audio_1.mp3: 75549 bytes audio_header=True
+    audio_2.mp3: 66765 bytes audio_header=True
+    audio_3.mp3: 61293 bytes audio_header=True
+  AUDIO_OK=True MP3_COUNT=3
+
+######## [local839d] 6. shared layered store evidence (generator_jobs is the cross-instance source of truth) ########
+  generator_jobs.status=completed has_zip_b64=t owning_instance=modernized-A
+  instance A: stored-ZIP=1 served-from-store=0
+  instance B: stored-ZIP=0 served-from-store=1
+
+######## [local839d] VERDICT ########
+  PASS: a modernized job created on ONE instance was served by BOTH
+        instances through the round-robin; a /download was served from
+        the shared layered store (cross-instance=1); the ZIP holds
+        3 real MP3 files (audio plays). zip_b64 is in generator_jobs.
+
+######## [local839d] meter rows (service=LOCAL-839) — TTS only, well under $0.40 ########
+89
+
+######## [local839d] tearing down project local839d (down -v — OWN volume only) ########
