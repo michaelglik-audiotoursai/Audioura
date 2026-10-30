@@ -1208,6 +1208,21 @@ def build_about_stop(
         museum_name=venue_name, locality=locality,
         story_sentences=story_sentences, arch_sentences=arch_sentences,
         wiki_summary=wiki_summary, domain=domain)
+    # [LOCAL-828] Venue-identity scrub: the About story is lifted from pages that
+    # may belong to ANOTHER venue (a fetched/corpus page about a different museum).
+    # Drop any about-section sentence whose subject/city is a DIFFERENT venue, when
+    # a venue identity is bound for this (museum) tour. A no-op off the museum path
+    # or when no identity is bound; never empties the narration.
+    try:
+        import venue_identity_gate as _vig_about
+        _vig_ident = _vig_about.tour_venue_identity()
+        if _vig_ident is not None and narration.strip():
+            _scrubbed, _vig_dropped = _vig_about.filter_text_sentences(
+                narration, _vig_ident, source_url=base_site_url or "", log=print)
+            if _vig_dropped:
+                narration = _scrubbed
+    except Exception as _vig_about_err:  # pragma: no cover
+        logger.info(f"[LOCAL-828] about-section venue scrub skipped ({_vig_about_err})")
     if not narration.strip():
         return None
     if looks_like_artwork_framing(narration):

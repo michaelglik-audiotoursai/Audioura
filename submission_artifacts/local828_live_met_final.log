@@ -1,0 +1,1914 @@
+[local828] creating isolated network local828_default
+[local828] starting throwaway postgres local828-postgres (own data, never live DB)
+[local828] ===== running LOCAL-828 live, cap $0.80, metered to /Users/micha/Audioura/meterlogs =====
+======================================================================
+=== LOCAL-828 live run — venue-identity gate, cheap museum arm (gpt-4.1-mini + serper) ===
+  CHEAP_ARM_CATEGORIES='museum' NARRATION_MODEL='gpt-4.1-mini' RESEARCH_BACKEND='serper'
+  TASK_BUDGET_ID='LOCAL-828' HARD CAP=$0.80   meter log: /meterlogs/paid_api_calls.jsonl
+
+--- The Met Fifth Avenue, New York (5 stops) ---
+  ledger spent so far: $0.000 / $0.80
+[TIMING-SUB] phase=unknown step=gemini_with_sources elapsed=10.83s
+[TIMING-SUB] phase=unknown step=venue_preflight elapsed=15.66s
+  [LOCAL-603] preflight venue='The Met Fifth Avenue' status=open hours=y admission=y highlights=6
+  [LOCAL-767] GEMINI key present=True
+
+======================================================================
+CALL #001 | 06:38:28.468 | GENERATE_TOUR_TEXT_FUNCTION_ENTRY
+======================================================================
+  location: The Met Fifth Avenue, New York
+  tour_type: museum
+  total_stops_parameter: 5
+  output_file: None
+
+  [LOCAL-245] Stop-existence gate mode: LOG_ONLY
+
+======================================================================
+CALL #002 | 06:38:28.475 | TOTAL_STOPS_FINALIZED
+======================================================================
+  location: The Met Fifth Avenue, New York
+  total_stops_final: 5
+  source: parameter
+
+
+PHASE 1: Analyzing tour intent with AI...
+  [Bug2Fix/D536] tour_type='museum' not prepended (pre_category='walking'); intent sees the ORIGINAL request, not the stripped one
+Intent analysis response: ```json
+{
+    "poi_type": "museums",
+    "location": "New York",
+    "theme_type": "STANDARD",
+    "theme_name": null,
+    "requirements": null,
+    "business_hours_relevant": false,
+    "accessibility_mentioned": false,
+    "needs_research": false,
+    "venue_name": "The Metropolitan Museum of Art",
+    "geographic_scope": "The Met Fifth Avenue, New York",
+    "named_places": [],
+    "scope_precision": "BUILDING",
+    "transport_mode": "on_foot",
+    "country_scope": null
+}
+```
+  [INTENT] Stripped LLM fences from response
+  [TRANSPORT] mode=on_foot, country_scope=None (keyword=on_foot, intent=on_foot)
+✅ Intent Analysis Results:
+   POI Type: museums
+   Location: New York
+   Requirements: None
+   Business Hours Relevant: False
+   Accessibility Mentioned: False
+   Venue Name: The Metropolitan Museum of Art
+  [venue_name sanity] 'The Metropolitan Museum of Art' OK
+  [S15] Forced tour_category=museum from venue_name='The Metropolitan Museum of Art'
+[LOCAL-664] cheap arm: ON for category=museum (categories=['museum']; NARRATION_PROVIDER=(default), NARRATION_MODEL=gpt-4.1-mini, RESEARCH_BACKEND=serper)
+  [venue_resolver] Name variants: ['The Met Fifth Avenue', 'Met Fifth Avenue']
+  [venue_resolver] Candidates for variant 'The Met Fifth Avenue': ['Q89503830']
+  [venue_resolver] Augmented with article-stripped variant 'Met Fifth Avenue': ['Q89503830']
+  [venue_resolver] Single candidate Q89503830 (The Met Fifth Avenue) failed city validation for 'New York'
+    [venue_resolver] Artist inferred from name: 'Met Fifth Avenue'
+  [venue_resolver] Resolved: 'The Met Fifth Avenue' → Q89503830 (The Met Fifth Avenue)
+    URL: 
+    Coords: 40.77945081733494, -73.96324534098423
+    Language: en
+    Artist: Met Fifth Avenue ()
+[TIMING-SUB] phase=intent step=resolve_venue elapsed=3.90s
+  [LOCAL-828] venue-identity gate bound: name='The Met Fifth Avenue' qid=Q89503830 domain=- city=New York
+  [LOCAL-655] no current-affairs intent (category='museum') — news research NOT run
+[TIMING] phase=intent elapsed=5.6s cumulative=5.6s
+[LOCAL-474] tour_type='museum' → category='museum' (source=explicit)
+
+Detected tour category: MUSEUM
+Using museum template for The Met Fifth Avenue, New York - museum
+
+======================================================================
+CALL #003 | 06:38:34.090 | GENERATING_PROMPT
+======================================================================
+  location: The Met Fifth Avenue, New York
+  user_request: The Met Fifth Avenue, New York
+  total_stops: 5
+
+
+PHASE 3A: Fetching 5 candidate POI(s) for The Met Fifth Avenue, New York...
+  [Museum constraint] Venue from intent='The Metropolitan Museum of Art'
+  [venue_resolver] Name variants: ['The Metropolitan Museum of Art', 'Metropolitan Museum of Art']
+  [venue_resolver] Candidates for variant 'The Metropolitan Museum of Art': ['Q160236', 'Q29167435', 'Q15767062', 'Q16739618', 'Q42302787', 'Q29576557', 'Q29576630', 'Q28864226']
+  [venue_resolver] Augmented with article-stripped variant 'Metropolitan Museum of Art': ['Q160236', 'Q29167435', 'Q15767062', 'Q16739618', 'Q42302787', 'Q29576557', 'Q29576630', 'Q28864226']
+  [venue_resolver] Single candidate Q160236 (Metropolitan Museum of Art) failed city validation for 'New York'
+    [venue_resolver] Artist inferred from name: 'Metropolitan'
+  [venue_resolver] Resolved: 'The Metropolitan Museum of Art' → Q160236 (Metropolitan Museum of Art)
+    URL: https://www.metmuseum.org/
+    Coords: 40.779444444444444, -73.96333333333334
+    Language: en
+    Artist: Metropolitan ()
+[TIMING-SUB] phase=poi_selection step=resolve_venue elapsed=11.78s
+  [LOCAL-810] venue_works_cache MISS Q160236/en
+[LOCAL-637] fetch_venue_works(Q160236): ReadTimeout — retry 1/3 in 2.6s
+[LOCAL-637] fetch_venue_works(Q160236): ReadTimeout — retry 2/3 in 6.5s
+[LOCAL-637] fetch_venue_works(Q160236): ReadTimeout — retry 3/3 in 13.7s
+  [DEAD-HOST] Marked cold: wikimedia (ReadTimeout after 4 attempts on fetch_venue_works(Q160236))
+  [LOCAL-810] WDQS unavailable for Q160236 (SPARQL unavailable after retries for Q160236); count-only call → returning [] (UNKNOWN), fallback deferred to the corpus path
+[TIMING-SUB] phase=poi_selection step=fetch_venue_works elapsed=103.59s
+  [S17] no scope_constraint (precision='BUILDING', scope='The Met Fifth Avenue, New York')
+  [venue_resolver] Name variants: ['The Metropolitan Museum of Art', 'Metropolitan Museum of Art']
+  [venue_resolver] No Wikidata candidates for 'The Metropolitan Museum of Art'
+  [LOCAL-661] resolve_venue('The Metropolitan Museum of Art') UNKNOWN (host cold); reusing in-tour resolution Q160236 (Metropolitan Museum of Art) — a rate limit is not 'no entity'
+[TIMING-SUB] phase=poi_selection step=resolve_venue elapsed=0.00s
+  [venue_cache] MISS for Q160236
+  [LOCAL-810] venue_works_cache MISS Q160236/en
+[LOCAL-637] fetch_venue_works(Q160236): ReadTimeout — retry 1/3 in 2.6s
+[LOCAL-637] fetch_venue_works(Q160236): ReadTimeout — retry 2/3 in 5.0s
+[LOCAL-637] fetch_venue_works(Q160236): ReadTimeout — retry 3/3 in 11.3s
+  [DEAD-HOST] Marked cold: wikimedia (ReadTimeout after 4 attempts on fetch_venue_works(Q160236))
+  [LOCAL-810] WDQS unavailable for Q160236 (SPARQL unavailable after retries for Q160236); count-only call → returning [] (UNKNOWN), fallback deferred to the corpus path
+[TIMING-SUB] phase=poi_selection step=fetch_venue_works elapsed=99.49s
+  [LOCAL-30] Deterministic selection: 0 documented works (0 catalogue, 0 SPARQL; 0 site/cache canonical title(s) are NOT documented)
+  [LOCAL-661] 0 documented works for 'The Metropolitan Museum of Art' but a Wikidata 429/timeout fired during the works lookup — UNKNOWN, not empty. Keeping the collection path for resolved Q160236; NOT eligible for the exhibition site-first path on a rate limit.
+  [LOCAL-30] Documented works (0) < total_stops (5) — will use documented as base, GPT fills remainder
+  [venue_resolver] Name variants: ['The Metropolitan Museum of Art', 'Metropolitan Museum of Art']
+  [venue_resolver] No Wikidata candidates for 'The Metropolitan Museum of Art'
+  [LOCAL-661] resolve_venue('The Metropolitan Museum of Art') UNKNOWN (host cold); reusing in-tour resolution Q160236 (Metropolitan Museum of Art) — a rate limit is not 'no entity'
+[TIMING-SUB] phase=poi_selection step=resolve_venue elapsed=0.00s
+  [venue_cache] MISS for Q160236
+  [LOCAL-810] venue_works_cache MISS Q160236/en
+[LOCAL-637] fetch_venue_works(Q160236): ReadTimeout — retry 1/3 in 2.1s
+[LOCAL-637] fetch_venue_works(Q160236): ReadTimeout — retry 2/3 in 5.7s
+[LOCAL-637] fetch_venue_works(Q160236): ReadTimeout — retry 3/3 in 10.4s
+  [DEAD-HOST] Marked cold: wikimedia (ReadTimeout after 4 attempts on fetch_venue_works(Q160236))
+  [LOCAL-810] WDQS unavailable for Q160236 (SPARQL unavailable after retries for Q160236); count-only call → returning [] (UNKNOWN), fallback deferred to the corpus path
+[TIMING-SUB] phase=poi_selection step=fetch_venue_works elapsed=98.90s
+  [LOCAL-30] Deterministic selection: 0 documented works (0 catalogue, 0 SPARQL; 0 site/cache canonical title(s) are NOT documented)
+  [LOCAL-30] Documented works (0) < total_stops (5) — will use documented as base, GPT fills remainder
+  [R4] Museum tour: asking for 10 candidates (2x for D1v2 filtering)
+
+======================================================================
+CALL #004 | 06:43:47.900 | PHASE_3A_REQUEST
+======================================================================
+  location: The Met Fifth Avenue, New York
+  total_stops: 5
+  poi_type_hint: museums
+
+[LOCAL-197] llm_cost() called with total_tokens (deprecated) by /app/generate_tour_text.py:13612. Caller should supply input_tokens and output_tokens separately.
+PHASE 3A API call cost: $0.0002 (555 tokens)
+[LOCAL-197] llm_cost() called with total_tokens (deprecated) by /app/generate_tour_text.py:13613. Caller should supply input_tokens and output_tokens separately.
+
+======================================================================
+CALL #005 | 06:43:49.943 | OPENAI_API_CALL
+======================================================================
+  total_stops_requested: 5
+  stop_count_in_prompt: True
+  http_status: 200
+  prompt_first_500_chars: You are a knowledgeable local guide for The Met Fifth Avenue, New York.
+List exactly 10 specific, real, well-known museums relevant to: The Met Fifth Avenue, New York.
+
+Requirements:
+- Use REAL, SPECIFIC names of actual establishments or landmarks.
+- NEVER use generic placeholders like 'Restaurant 1', 'Stop 1', 'Location A'.
+- Include a complete street address with ZIP code where applicable.
+
+CRITICAL CONSTRAINT — THIS IS A SINGLE-VENUE MUSEUM TOUR (WORKS-FIRST):
+- List the 5 most famous, notabl
+  prompt_last_300_chars:  this museum.
+- NEVER list nearby museums or cultural institutions as stops — they are OUTSIDE this venue.
+- Prefer the museum's most iconic/signature pieces that visitors specifically come to see.
+
+Return ONLY a JSON array, no other text, no markdown fences:
+[{"name": "...", "address": "..."}, ...]
+  stops_found_in_response: 0
+  stop_markers_in_response:
+    []
+  response_first_500_chars: [
+    {"name": "Washington Crossing the Delaware", "address": "1000 5th Ave, New York, NY 10028"},
+    {"name": "The Death of Socrates", "address": "1000 5th Ave, New York, NY 10028"},
+    {"name": "The Harvesters", "address": "1000 5th Ave, New York, NY 10028"},
+    {"name": "Self-Portrait with a Straw Hat", "address": "1000 5th Ave, New York, NY 10028"},
+    {"name": "The Great Wave off Kanagawa", "address": "1000 5th Ave, New York, NY 10028"}
+]
+
+OK PHASE 3A parsed 5 candidate POI(s):
+   - Washington Crossing the Delaware @ 1000 5th Ave, New York, NY 10028
+   - The Death of Socrates @ 1000 5th Ave, New York, NY 10028
+   - The Harvesters @ 1000 5th Ave, New York, NY 10028
+   - Self-Portrait with a Straw Hat @ 1000 5th Ave, New York, NY 10028
+   - The Great Wave off Kanagawa @ 1000 5th Ave, New York, NY 10028
+  [venue_resolver] Name variants: ['The Metropolitan Museum of Art', 'Metropolitan Museum of Art']
+  [venue_resolver] No Wikidata candidates for 'The Metropolitan Museum of Art'
+  [LOCAL-661] resolve_venue('The Metropolitan Museum of Art') UNKNOWN (host cold); reusing in-tour resolution Q160236 (Metropolitan Museum of Art) — a rate limit is not 'no entity'
+[TIMING-SUB] phase=poi_selection step=resolve_venue elapsed=0.00s
+  [D1v2] Venue resolved: Q160236 → URL=https://www.metmuseum.org/, lang=en
+  [venue_cache] MISS for Q160236
+  [LOCAL-810] venue_works_cache MISS Q160236/en
+[LOCAL-637] fetch_venue_works(Q160236): ReadTimeout — retry 1/3 in 2.4s
+  [venue_resolver] [LOCAL-627 d4] rejected 3 reproduction/cast + 1 post-1990 work(s) (modern_art_museum=False)
+  [venue_resolver] SPARQL: 296 works found for Q160236
+  [LOCAL-810] venue_works_cache STORED Q160236/en (source=sparql, n=296, ttl=30d)
+[TIMING-SUB] phase=poi_selection step=fetch_venue_works elapsed=22.84s
+  [D1v2] SPARQL source: 502 canonical titles
+  [story_miner] Site crawl: 0 pages fetched (budget: 15)
+  [story_miner] Sitelink EN: 'Metropolitan Museum of Art'
+DB-first lookup failed for 'Metropolitan Museum of Art': relation "stop_corpus" does not exist
+LINE 3:             FROM stop_corpus
+                         ^
+
+  [story_miner] Wikipedia EN: 88232 chars (title: 'Metropolitan Museum of Art')
+  [T0a] Exhibit-name extraction: 45 from sections, 17 from quoted/bold/list
+  [T0a] Extracted 58 canonical titles, 0 cycle names
+  [story_miner] Corpus: 1 pages, 58 titles, 0 from Joconde
+  [D1v2] Canonical titles union: 58 site/wiki + 502 SPARQL = 560 total
+  [LOCAL-34] Will enrich bare title at stop-naming: 'Spring' → 'Spring (1969)'
+  [LOCAL-34] Will enrich bare title at stop-naming: 'posada' → 'posada (2019)'
+  [D1v2] Removed 90 substring titles (prefer longer forms)
+  [LOCAL-24] Classification: 469 works, 0 galleries, 1 excluded
+    EXCLUDED: 'Performance arts' — rule: workshop_program
+  [LOCAL-24] Cross-language dedup removed 1:
+    'Moulin Rouge: La Goulue' → alias of 'The Englishman (William Tom Warrener, 1861–1934) at the Moulin Rouge'
+  [LOCAL-24] Near-duplicate collapse removed 16:
+    'The Death of Socrates Jacques-Louis David' → collapsed into 'The Death of Socrates (Jacques-Louis David)'
+    'Portrait of Sebastián Martínez y Pérez' → collapsed into 'Portrait of Sebastian Martinez y Perez'
+    'The Last Communion of St Jerome' → collapsed into 'The Last Communion of St. Jerome'
+    'Frey children and Belizaire' → collapsed into 'Bélizaire and the Frey Children'
+    'Valentine portable typewriter' → collapsed into 'Valentine Portable Typewriter'
+    'Hours of Étienne Chevalier' → collapsed into 'Hours of Etienne Chevalier'
+    'William Hippopotamus' → collapsed into 'Hippopotamus ("William")'
+    'Hunt of Maximilian' → collapsed into 'The Hunts of Maximilian'
+    'Bain a la Grenouillere' → collapsed into 'Bain à la Grenouillère'
+    'Sous-bois à Pontaubert' → collapsed into 'Sous-bois a Pontaubert'
+    'Kanagawa-oki nami-ura' → collapsed into 'Kanagawa oki nami ura'
+    'Nedjemankh coffin' → collapsed into 'Coffin of Nedjemankh'
+    'Monteleone chariot' → collapsed into 'Monteleone Chariot'
+    'Antioch Chalice' → collapsed into 'Antioch chalice'
+    'Ho-Kan' → collapsed into 'Ho Kan'
+    'Salome' → collapsed into 'Salomé'
+  [D1v2] [LOCAL-589] chrome rejected from the canonical SET (verified-against) : 452 → 450 — dropped ['Hours of Etienne Chevalier', 'How Prints Look']
+  [LOCAL-653] rejected site-listed junk/sibling/artist title(s) from canonical SET for 'The Metropolitan Museum of Art, New York': [('American Wing', ''), ('Bury Cross', ''), ('Cloisters Cross', ''), ('Costume Institute', ''), ('Digital Underground', ''), ('Hoving Affair', ''), ('Robert Lehman Collection', ''), ('Robert Lehman Wing', ''), ('The Met Should Be Fucking Free', ''), ('The New Pay Policy Is a Mistake', '')]
+  [D1v2-LOCAL24] After filter: 440 works, 0 galleries, 1 excluded
+  [venue_resolver] Built 482 dynamic aliases from 296 works
+  [D1v2] Injected 482 dynamic aliases
+  [D1v2] Built bilingual map: 84 word pairs
+  [D1v2] artist-check skipped (no valid creator) — no artist_qid on entity
+  [D1v2] VERIFIED 'Washington Crossing the Delaware' → canonical: 'Washington Crossing the Delaware'
+  [D1v2] VERIFIED 'The Death of Socrates' → canonical: 'The Death of Socrates (Jacques-Louis David)'
+  [D1v2] VERIFIED 'The Harvesters' → canonical: 'The Harvesters'
+  [D1v2] VERIFIED 'Self-Portrait with a Straw Hat' → canonical: 'Camouflage Self-Portrait'
+  [D1v2] VERIFIED 'The Great Wave off Kanagawa' → canonical: 'The Great Wave of Kanagawa'
+  [D1v2] 5/5 works verified — tier: rich
+  [venue_cache] STORED Q160236 (tier=rich, ttl=30d, expires=2026-11-29)
+  [D1] Tier: rich (5 verified works)
+  [LOCAL-669C] highlights trigger: skipped — documented works 5 >= requested 5 (tier=rich)
+  [R4] Target reached: 5/5 stops
+  [LOCAL-16 GATE] All 5 stops cleared the gate ✓
+
+PHASE 4.5: Validating AI knowledge for The Met Fifth Avenue, New York...
+OK Knowledge validation passed: Knowledge validation passed
+
+PHASE 4: skipped (tour_category='museum', no type-verification required)
+  [LOCAL-791C] title dedupe skipped (non-fatal): not applied to museum/facility tours
+  [EXISTENCE-GATE] LOG_ONLY — 5/5 stops verified (100%), 0 would be dropped
+    [VERIFIED] 'Washington Crossing the Delaware' — venue_corpus canonical_title: 'Washington Crossing the Delaware' at 'The Metropo
+    [VERIFIED] 'The Death of Socrates (Jacques-Louis David)' — venue_corpus canonical_title: 'The Death of Socrates (Jacques-Louis David)' at '
+    [VERIFIED] 'The Harvesters' — venue_corpus canonical_title: 'The Harvesters' at 'The Metropolitan Museum of Ar
+    [VERIFIED] 'Camouflage Self-Portrait' — venue_corpus canonical_title: 'Self-Portrait with Two Pupils' at 'The Metropolit
+    [VERIFIED] 'The Great Wave of Kanagawa' — venue_corpus canonical_title: 'Under the Wave off Kanagawa' at 'The Metropolitan
+    [HARVEST] Error (non-fatal): relation "stop_corpus" does not exist
+LINE 1: SELECT stop_title, passage_count FROM stop_corpus WHERE LOWE...
+                                              ^
+
+    [INTERPRETIVE] Error (non-fatal): relation "stop_corpus" does not exist
+LINE 1: ...T passages_json, source_pages, passage_count FROM stop_corpu...
+                                                             ^
+
+  [LOCAL-669C] final gate: stamped 3 QID(s) by exact label
+  [LOCAL-669C] final gate: no duplicates (5 stop(s))
+  [LOCAL-669C] bilingual titles: set 2 '<local> (<English>)' header(s)
+
+PHASE 3B: Requesting structured details and walking directions for 5 stop(s)...
+
+======================================================================
+CALL #006 | 06:44:19.106 | PHASE_3B_REQUEST
+======================================================================
+  location: The Met Fifth Avenue, New York
+  stop_count: 5
+
+[LOCAL-197] llm_cost() called with total_tokens (deprecated) by /app/generate_tour_text.py:17213. Caller should supply input_tokens and output_tokens separately.
+[LOCAL-197] llm_cost() called with total_tokens (deprecated) by /app/generate_tour_text.py:17214. Caller should supply input_tokens and output_tokens separately.
+PHASE 3B API call cost: $0.0003 (944 tokens)
+OK PHASE 3B: ordered 5 stop(s) with structured details and directions
+  [LOCAL-27] Corpus-sourced metadata applied to 5 stops
+  [LOCAL-35] Visitor info scoped to venue section (deep path: https://en.wikipedia.org/wiki/Metropolitan_Museum_of_Art)
+  [LOCAL-35] Visitor info page found (en): https://en.wikipedia.org/wiki/Metropolitan_Museum_of_Art
+  [LOCAL-35] Extracted from https://en.wikipedia.org/wiki/Metropolitan_Museum_of_Art: closed=[], hours=0, admission='€9'
+  [LOCAL-35] Formatted result too short — omitting
+  [LOCAL-34] Visitor info extracted from corpus text (main page fallback, no provenance)
+  [LOCAL-39] Museum Information sourced from official site for stop 1
+  [LOCAL-355] Querying OSM for venue facts (city: York, hint: museum)
+  [LOCAL-788] overpass fallback https://overpass-api.de/api/interpreter ConnectionError
+[OSM-VENUE] Overpass ConnectionError for 'Washington Crossing the Delaware' on https://overpass-api.de/api/interpreter
+[OSM-VENUE] Overpass ReadTimeout for 'Washington Crossing the Delaware' on https://overpass.kumi.systems/api/interpreter
+  [LOCAL-788] overpass fallback https://overpass.kumi.systems/api/interpreter ReadTimeout
+[OSM-VENUE] Overpass ReadTimeout for 'Washington Crossing the Delaware' on https://overpass.private.coffee/api/interpreter
+  [LOCAL-788] overpass fallback https://overpass.private.coffee/api/interpreter ReadTimeout
+[TIMING-SUB] phase=poi_selection step=fetch_osm_venue_facts elapsed=20.74s
+  [LOCAL-355] Washington Crossing the Delaware: no practical facts in OSM
+  [LOCAL-788] overpass fallback https://overpass-api.de/api/interpreter ConnectionError
+[OSM-VENUE] Overpass ConnectionError for 'The Death of Socrates (Jacques-Louis David)' on https://overpass-api.de/api/interpreter
+  [LOCAL-788] overpass fallback https://overpass.kumi.systems/api/interpreter ReadTimeout
+[OSM-VENUE] Overpass ReadTimeout for 'The Death of Socrates (Jacques-Louis David)' on https://overpass.kumi.systems/api/interpreter
+  [LOCAL-788] overpass fallback https://overpass.private.coffee/api/interpreter ReadTimeout
+[TIMING-SUB] phase=poi_selection step=fetch_osm_venue_facts elapsed=20.72s
+  [LOCAL-355] The Death of Socrates (Jacques-Louis David): no practical facts in OSM
+[OSM-VENUE] Overpass ReadTimeout for 'The Death of Socrates (Jacques-Louis David)' on https://overpass.private.coffee/api/interpreter
+[OSM-VENUE] Overpass ConnectionError for 'The Harvesters' on https://overpass-api.de/api/interpreter
+  [LOCAL-788] overpass fallback https://overpass-api.de/api/interpreter ConnectionError
+  [LOCAL-788] overpass fallback https://overpass.kumi.systems/api/interpreter ReadTimeout
+[OSM-VENUE] Overpass ReadTimeout for 'The Harvesters' on https://overpass.kumi.systems/api/interpreter
+  [LOCAL-788] overpass fallback https://overpass.private.coffee/api/interpreter ReadTimeout
+[OSM-VENUE] Overpass ReadTimeout for 'The Harvesters' on https://overpass.private.coffee/api/interpreter
+[TIMING-SUB] phase=poi_selection step=fetch_osm_venue_facts elapsed=20.72s
+  [LOCAL-355] The Harvesters: no practical facts in OSM
+[OSM-VENUE] Overpass ConnectionError for 'Camouflage Self-Portrait' on https://overpass-api.de/api/interpreter
+  [LOCAL-788] overpass fallback https://overpass-api.de/api/interpreter ConnectionError
+[OSM-VENUE] Overpass ReadTimeout for 'Camouflage Self-Portrait' on https://overpass.kumi.systems/api/interpreter
+  [LOCAL-788] overpass fallback https://overpass.kumi.systems/api/interpreter ReadTimeout
+[OSM-VENUE] Overpass ReadTimeout for 'Camouflage Self-Portrait' on https://overpass.private.coffee/api/interpreter
+  [LOCAL-788] overpass fallback https://overpass.private.coffee/api/interpreter ReadTimeout
+[TIMING-SUB] phase=poi_selection step=fetch_osm_venue_facts elapsed=20.70s
+  [LOCAL-355] Camouflage Self-Portrait: no practical facts in OSM
+  [LOCAL-788] overpass fallback https://overpass-api.de/api/interpreter ConnectionError
+[OSM-VENUE] Overpass ConnectionError for 'The Great Wave of Kanagawa' on https://overpass-api.de/api/interpreter
+[OSM-VENUE] Overpass ReadTimeout for 'The Great Wave of Kanagawa' on https://overpass.kumi.systems/api/interpreter
+  [LOCAL-788] overpass fallback https://overpass.kumi.systems/api/interpreter ReadTimeout
+  [LOCAL-788] overpass fallback https://overpass.private.coffee/api/interpreter ReadTimeout
+[OSM-VENUE] Overpass ReadTimeout for 'The Great Wave of Kanagawa' on https://overpass.private.coffee/api/interpreter
+[TIMING-SUB] phase=poi_selection step=fetch_osm_venue_facts elapsed=20.75s
+  [LOCAL-355] The Great Wave of Kanagawa: no practical facts in OSM
+  [LOCAL-622] OSM lookup budget: spent=103.6s / limit=120s, skipped=0
+   Coords cluster detected: 5 stops share '40.7794, -73.9632', refetching...
+[LOCAL-197] llm_cost() called with total_tokens (deprecated) by /app/generate_tour_text.py:17805. Caller should supply input_tokens and output_tokens separately.
+   Cluster refetch OK 'The Great Wave of Kanagawa': 40.7794, -73.9626
+   Cluster refetch OK 'The Death of Socrates (Jacques-Louis David)': 40.7794, -73.9632
+   Cluster refetch OK 'The Harvesters': 40.7794, -73.9632
+   Cluster refetch OK 'Washington Crossing the Delaware': 40.7794, -73.9626
+   Cluster refetch OK 'Camouflage Self-Portrait': 40.7794, -73.9632
+Extracted first POI coordinates: (40.7794, -73.9626)
+  [D4] Museum single-coordinate: all stops set to (40.7794, -73.9626) (source: model (fallback))
+
+=== Extracted POI Information ===
+1. Washington Crossing the Delaware
+   Address: 1000 5th Ave, New York, NY 10028
+   Coordinates: 40.7794, -73.9626
+   Directions: From the nearest subway station at 86th St (Q line), walk south on 2nd Ave towar...
+2. The Death of Socrates (Jacques-Louis David)
+   Address: 1000 5th Ave, New York, NY 10028
+   Coordinates: 40.7794, -73.9626
+   Directions: Exit the room with Washington Crossing the Delaware, turn left, walk straight do...
+3. The Harvesters
+   Address: 1000 5th Ave, New York, NY 10028
+   Coordinates: 40.7794, -73.9626
+   Directions: Leave the gallery of The Death of Socrates, turn right, walk straight ahead, and...
+4. Camouflage Self-Portrait
+   Address: 1000 5th Ave, New York, NY 10028
+   Coordinates: 40.7794, -73.9626
+   Directions: Exit the Harvesters gallery, turn right, walk straight, and take the first left ...
+5. The Great Wave of Kanagawa
+   Address: 1000 5th Ave, New York, NY 10028
+   Coordinates: 40.7794, -73.9626
+   Directions: From the Camouflage Self-Portrait, exit the gallery, turn right, and walk straig...
+================================
+
+[TIMING] phase=poi_selection elapsed=458.3s cumulative=463.9s
+
+[Storied] STORIED_MODE=true — generating spine + fact sheets...
+  [§3-adapter] Extracting story elements from 1/1 corpus pages for 'The Metropolitan Museum of Art'
+    page[0] score=16125 url=https://en.wikipedia.org/wiki/Metropolitan_Museum_of_Art
+  [§3-adapter] Raw elements: 15 from 1 pages
+  [§3-adapter] After corroboration scoring: 13 elements
+  [§3-adapter] Final: 13 ranked elements (top type: dedication)
+  [§3] Updated venue_corpus.story_elements_json for Q160236 (13 elements)
+  [LOCAL-37] Three-class retrieval: 5 stops processed, 0 with category
+  [SQ-S6b] Elements per stop: s0=5, s1=5, s2=6, s3=5, s4=5
+  [SQ-S6b] Entity clusters found: 29 (≥2 stops)
+    → 20th century (eras): 5 stops, 5 elements
+    → the michael (people): 4 stops, 2 elements
+    → rockefeller wing (people): 4 stops, 2 elements
+    → 19th century (eras): 3 stops, 2 elements
+    → nelson a. rockefeller (people): 2 stops, 1 elements
+  [SQ-S6b] Theme naming: $0.0169, 2311 tokens
+  [SQ-S6b] LLM named 3 candidate themes
+  [LOCAL-652] Delivered-stop grounding tokens: ['camouflage', 'crossing', 'david', 'death', 'delaware', 'great', 'harvesters', 'jacques', 'kanagawa', 'louis', 'socrates', 'washington', 'wave']
+  [LOCAL-617] Theme 'Artistic Influence of the Rockefeller Legacy' rejected: institutional framing (donor/collection/founding), not about the works/artists
+  [LOCAL-617] Theme 'Evolution of Art Through the 20th Century' rejected: institutional framing (donor/collection/founding), not about the works/artists
+  [LOCAL-652] Theme 'Cross-Cultural Artistic Dialogues' rejected: named artist/work is on no delivered stop — neither the thread name nor any supporting element references a delivered work/artist (phantom thread)
+  [SQ-S6b] Scored themes: 0
+  [SQ-S6b] DEGRADATION → mosaic mode (no theme ≥60% coverage)
+  [SQ-S6b] Thread discovery: mode=mosaic, threads=0
+  [§3] Story elements injected into spine prompt (13 elements, mode=found)
+SPINE_COST: category=museum venue=The Metropolitan Museum of Art model=gpt-4o tokens=2069 (in=1351 out=718) cost=$0.0106 latency=5.0s
+[COST_METER] FRESH | spine_generate | $0.010558 | user=None | job=None
+  [LOCAL-278] Spine cost folded into total: $0.0106
+  [LOCAL-111] Spine quality: 4/4 | {'climax_position': True, 'unique_emotional_beats': True, 'valid_callbacks': True, 'closing_revelation_length': True}
+  [Storied] Spine generated: 5 arc entries (mode=found)
+  [LOCAL-183] stop_corpus fetch error (non-fatal): relation "stop_corpus" does not exist
+LINE 1: ..., passages_json, source_pages, passage_roles FROM stop_corpu...
+                                                             ^
+
+  [LOCAL-198] Corpus gate: ENABLED — checking stop coverage...
+  [CORPUS-GATE] stop='Washington Crossing the Delaware' verdict=EMPTY action=EMPTY_RESTRICTED
+  [CORPUS-GATE] stop='The Death of Socrates (Jacques-Louis David)' verdict=EMPTY action=EMPTY_RESTRICTED
+  [CORPUS-GATE] stop='The Harvesters' verdict=EMPTY action=EMPTY_RESTRICTED
+  [CORPUS-GATE] stop='Camouflage Self-Portrait' verdict=EMPTY action=EMPTY_RESTRICTED
+  [CORPUS-GATE] stop='The Great Wave of Kanagawa' verdict=EMPTY action=EMPTY_RESTRICTED
+  [LOCAL-198] Corpus gate: 0 PASSED, 0 CREATOR_ONLY, 5 EMPTY, 0 SHORTENED
+DB-first lookup failed for 'Washington Crossing the Delaware': relation "stop_corpus" does not exist
+LINE 3:             FROM stop_corpus
+                         ^
+
+DB-first lookup failed for 'The Great Wave of Kanagawa': relation "stop_corpus" does not exist
+LINE 3:             FROM stop_corpus
+                         ^
+
+DB-first lookup failed for 'The Harvesters': relation "stop_corpus" does not exist
+LINE 3:             FROM stop_corpus
+                         ^
+
+DB-first lookup failed for 'Camouflage Self-Portrait': relation "stop_corpus" does not exist
+LINE 3:             FROM stop_corpus
+                         ^
+
+DB-first lookup failed for 'The Death of Socrates (Jacques-Louis David)': relation "stop_corpus" does not exist
+LINE 3:             FROM stop_corpus
+                         ^
+
+DB-first lookup failed for 'The Metropolitan Museum of Art': relation "stop_corpus" does not exist
+LINE 3:             FROM stop_corpus
+                         ^
+
+DB-first lookup failed for 'The Metropolitan Museum of Art': relation "stop_corpus" does not exist
+LINE 3:             FROM stop_corpus
+                         ^
+
+DB-first lookup failed for 'Metropolitan um': relation "stop_corpus" does not exist
+LINE 3:             FROM stop_corpus
+                         ^
+
+DB-first lookup failed for 'Metropolitan um': relation "stop_corpus" does not exist
+LINE 3:             FROM stop_corpus
+                         ^
+
+[LOCAL-197] llm_cost() called with total_tokens (deprecated) by /app/fact_extractor.py:220. Caller should supply input_tokens and output_tokens separately.
+  [Storied] Fact sheets: 5/5 generated
+  [S25] Story types assigned: ['art', 'history', 'anecdote', 'art', 'history']
+  [work_stories] MISS for washington crossing the delaware
+  [work_stories] MISS for the death of socrates jacqueslouis david
+  [work_stories] MISS for the harvesters
+  [work_stories] MISS for camouflage selfportrait
+  [work_stories] MISS for the great wave of kanagawa
+  [LOCAL-37] Tour diversity: no swaps needed (naturally balanced)
+  [LOCAL-188] Style constraints ACTIVE (declarative prose rules injected)
+[TIMING] phase=fact_sheets elapsed=29.5s cumulative=493.4s
+
+PHASE 5: Generating detailed descriptions for each POI (parallel)...
+
+  [LOCAL-382] framing=venue_purpose source='dedicated to what is now called The Department of Asian Art, which spans 5,000 y'
+[TIMING] phase=narration elapsed=0.0s cumulative=493.4s
+  [D495] venue domain seeded tier1: metmuseum.org
+
+  [LOCAL-410] SERP search wiring — searching for stories on 5 stops...
+  [work_stories] MISS for the harvesters
+  [work_stories] MISS for the death of socrates jacqueslouis david
+  [work_stories] MISS for washington crossing the delaware
+  [work_stories] MISS for the great wave of kanagawa
+  [work_stories] MISS for camouflage selfportrait
+[TIMING-SUB] phase=external_lookups step=serp_search elapsed=1.73s
+[TIMING-SUB] phase=external_lookups step=serp_search elapsed=1.83s
+[TIMING-SUB] phase=external_lookups step=serp_search elapsed=1.85s
+[TIMING-SUB] phase=external_lookups step=serp_search elapsed=1.90s
+[TIMING-SUB] phase=external_lookups step=serp_search elapsed=2.34s
+[TIMING-SUB] phase=external_lookups step=serp_search elapsed=1.42s
+[TIMING-SUB] phase=external_lookups step=serp_search elapsed=1.37s
+[TIMING-SUB] phase=external_lookups step=serp_search elapsed=1.46s
+[TIMING-SUB] phase=external_lookups step=serp_search elapsed=1.78s
+[TIMING-SUB] phase=external_lookups step=serp_search elapsed=2.07s
+[TIMING-SUB] phase=external_lookups step=serp_search elapsed=1.44s
+[TIMING-SUB] phase=external_lookups step=search_stories_for_stop elapsed=4.61s
+[TIMING-SUB] phase=external_lookups step=serp_search elapsed=2.10s
+  [LOCAL-441] Batch P856 check: 1 domains, budget=20.0s, pool=10
+[TIMING-SUB] phase=external_lookups step=serp_search elapsed=2.06s
+[TIMING-SUB] phase=external_lookups step=search_stories_for_stop elapsed=5.76s
+[TIMING-SUB] phase=external_lookups step=serp_search elapsed=2.65s
+  [LOCAL-441] Batch P856 check: 2 domains, budget=20.0s, pool=10
+[TIMING-SUB] phase=external_lookups step=serp_search elapsed=2.75s
+[TIMING-SUB] phase=external_lookups step=search_stories_for_stop elapsed=7.18s
+  [DEAD-HOST] Marked cold: wikimedia (timeout/network error for artsandculture.google.com: The read operation timed out)
+  [SQ-S2] Wikidata P856 check failed for artsandculture.google.com: The read operation timed out
+  [LOCAL-441] Batch complete: 3.1s, 0 tier1, 1 unverified, 0 budget-expired
+[TIMING-SUB] phase=external_lookups step=search_stories_for_stop elapsed=8.46s
+  [SQ-S2] Wikidata P856 check failed for totallyhistory.com: The read operation timed out
+  [SQ-S2] Wikidata P856 check failed for philamuseum.org: The read operation timed out
+  [LOCAL-441] Batch complete: 3.1s, 0 tier1, 2 unverified, 0 budget-expired
+[TIMING-SUB] phase=external_lookups step=search_stories_for_stop elapsed=9.10s
+    [D500] Stop 1: placeholder cleared from ['publisher', 'credit_line', 'medium', 'artist'] — unknown, not 'Not specified'
+    [LOCAL-486] Stop 1 worthiness: score=1/4 mine=True — has specific_title
+      [LOCAL-668] foreign-museum snippets dropped for 'Washington Crossing the Delaware': 2 (kept 21)
+        ✗ names 'coinciding with the Museum' — Donors of Funds for Acquisition of Works of Art
+        ✗ names 'coinciding with the Museum' — Donors of Gifts of Works of Art
+    [D489] material kind: stop='Washington Crossing the Delaware' kind=active volume=COVERED sentences=44 active=8 staked=0 eventful=0 passive=1  <-- DISAGREE: enough material, wrong kind
+         best: "Washington Crossing the Delaware: The Met's Take."
+    [LOCAL-489] Stop 1 needs more material (eventless): 21 passages, 3149 chars, verdict=COVERED
+[TIMING-SUB] phase=external_lookups step=serp_search elapsed=1.85s
+      [LOCAL-489] +8 from: "Washington Crossing the Delaware" "The Metropolitan Museum of Art" provenance
+      [LOCAL-498] after replenishment: kind active -> active, 3149 -> 4351 chars, eventful=0 (NO CHANGE — the round bought more of the same)
+         best now: "Washington Crossing the Delaware: The Met's Take."
+    [LOCAL-488] providers ['openai'] span fewer than two model families — cross-model agreement needs two; set GEMINI_API_KEY
+    Stop 1 'Washington Crossing the Delaware': queries=3 serp_results=23 snippets=29
+      → Title: Washington Crossing the Delaware ; Artist: Emanuel Leutze (American, Schwäbisch Gmünd 1816–1868 Washington, D.C.)
+      → Washington Crossing the Delaware, 1851. Oil on canvas. Gift of John Stewart Kennedy, 1897. The Metropolitan Museum of Ar
+    [D500] Stop 2: placeholder cleared from ['publisher', 'credit_line', 'medium', 'artist'] — unknown, not 'Not specified'
+    [LOCAL-486] Stop 2 worthiness: score=1/4 mine=True — has specific_title
+      [LOCAL-668] foreign-museum snippets dropped for 'The Death of Socrates (Jacques-Louis Dav': 2 (kept 21)
+        ✗ names 'coinciding with the Museum' — Donors of Funds for Acquisition of Works of Art
+        ✗ names 'coinciding with the Museum' — Donors of Gifts of Works of Art
+    [D489] material kind: stop='The Death of Socrates (Jacques-Louis D' kind=active volume=COVERED sentences=54 active=6 staked=0 eventful=0 passive=0  <-- DISAGREE: enough material, wrong kind
+         best: "The Metropolitan Museum of Art (The MET), New York, United States of America ..."
+    [LOCAL-489] Stop 2 needs more material (eventless): 21 passages, 3185 chars, verdict=COVERED
+[TIMING-SUB] phase=external_lookups step=serp_search elapsed=3.29s
+      [LOCAL-489] +7 from: "The Death of Socrates (Jacques-Louis David)" "The Metropolitan Museum of Art"
+      [LOCAL-498] after replenishment: kind active -> active, 3185 -> 4691 chars, eventful=0 (NO CHANGE — the round bought more of the same)
+         best now: "The Metropolitan Museum of Art (The MET), New York, United States of America ..."
+    [LOCAL-488] providers ['openai'] span fewer than two model families — cross-model agreement needs two; set GEMINI_API_KEY
+    Stop 2 'The Death of Socrates (Jacques-Louis David)': queries=3 serp_results=23 snippets=28
+      → The Death of Socrates, Jacques Louis David (French, Paris 1748–1825 Brussels ... The Metropolitan Museum of Art presents
+      → Wikimedia Commons has media related to The Death of Socrates (Jacques-Louis David) . The Death of Socrates at the Metrop
+    [D500] Stop 3: placeholder cleared from ['publisher', 'credit_line', 'medium', 'artist'] — unknown, not 'Not specified'
+    [LOCAL-486] Stop 3 worthiness: score=1/4 mine=True — has specific_title
+      [LOCAL-668] foreign-museum snippets dropped for 'The Harvesters': 2 (kept 20)
+        ✗ names 'coinciding with the Museum' — Donors of Funds for Acquisition of Works of Art
+        ✗ names 'coinciding with the Museum' — Donors of Gifts of Works of Art
+    [D489] material kind: stop='The Harvesters' kind=active volume=COVERED sentences=42 active=7 staked=2 eventful=0 passive=0  <-- DISAGREE: enough material, wrong kind
+         best: "The Harvesters is an oil painting on wood completed by the Netherlandish Renaissance artist Pieter Bruegel the Elder in 1565."
+    [LOCAL-489] Stop 3 needs more material (eventless): 20 passages, 2988 chars, verdict=COVERED
+[TIMING-SUB] phase=external_lookups step=serp_search elapsed=1.58s
+      [LOCAL-489] +8 from: "The Harvesters" "The Metropolitan Museum of Art" provenance
+      [LOCAL-498] after replenishment: kind active -> active, 2988 -> 4209 chars, eventful=0 (NO CHANGE — the round bought more of the same)
+         best now: "The Harvesters is an oil painting on wood completed by the Netherlandish Renaissance artist Pieter Bruegel the"
+    [LOCAL-488] providers ['openai'] span fewer than two model families — cross-model agreement needs two; set GEMINI_API_KEY
+    Stop 3 'The Harvesters': queries=3 serp_results=22 snippets=28
+      → Title: The Harvesters · Artist: Pieter Bruegel the Elder (Netherlandish, Breda (?) ca. · Date: 1565 · Medium: Oil on oak
+      → The Harvesters is an oil painting on wood completed by the Netherlandish Renaissance artist Pieter Bruegel the Elder in 
+    [D500] Stop 4: placeholder cleared from ['publisher', 'credit_line', 'medium', 'artist'] — unknown, not 'Not specified'
+    [LOCAL-486] Stop 4 worthiness: score=1/4 mine=True — has specific_title
+      [LOCAL-668] foreign-museum snippets dropped for 'Camouflage Self-Portrait': 5 (kept 17)
+        ✗ names 'National Portrait Gallery' — Hide/Seek: "Camouflage Self-Portrait" by Andy Warhol
+        ✗ names 'National Portrait Gallery' — Hide/Seek: "Camouflage Self-Portrait" by Andy Warhol
+        ✗ names 'Wadsworth Atheneum Museum' — Warhol & Mapplethorpe
+        ✗ names 'coinciding with the Museum' — Donors of Funds for Acquisition of Works of Art
+        ✗ names 'coinciding with the Museum' — Donors of Gifts of Works of Art
+    [D489] material kind: stop='Camouflage Self-Portrait' kind=active volume=COVERED sentences=39 active=6 staked=1 eventful=0 passive=1  <-- DISAGREE: enough material, wrong kind
+         best: "In May 2022, a 80 x 80-inch green, blue, and yellow camouflage Self-Portrait sold for $18.7 ..."
+    [LOCAL-489] Stop 4 needs more material (eventless): 17 passages, 2541 chars, verdict=COVERED
+[TIMING-SUB] phase=external_lookups step=serp_search elapsed=1.79s
+      [LOCAL-489] +8 from: "Camouflage Self-Portrait" "The Metropolitan Museum of Art" provenance
+      [LOCAL-498] after replenishment: kind active -> active, 2541 -> 3817 chars, eventful=0 (NO CHANGE — the round bought more of the same)
+         best now: "In May 2022, a 80 x 80-inch green, blue, and yellow camouflage Self-Portrait sold for $18.7 ..."
+    [LOCAL-488] providers ['openai'] span fewer than two model families — cross-model agreement needs two; set GEMINI_API_KEY
+    Stop 4 'Camouflage Self-Portrait': queries=3 serp_results=22 snippets=25
+      → Camouflage Self-Portrait ... In this self-portrait Andy Warhol combines a Polaroid photo of himself with a hot pink and 
+      → ... Metropolitan Museum of Art and several other museums worldwide. ... In May 2022, a 80 x 80-inch green, blue, and yel
+    [D500] Stop 5: placeholder cleared from ['publisher', 'credit_line', 'medium', 'artist'] — unknown, not 'Not specified'
+    [LOCAL-486] Stop 5 worthiness: score=1/4 mine=True — has specific_title
+      [LOCAL-668] foreign-museum snippets dropped for 'The Great Wave of Kanagawa': 3 (kept 15)
+        ✗ names 'framed gallery' — Art History- The Great Wave of Kanagawa
+        ✗ names 'coinciding with the Museum' — Donors of Funds for Acquisition of Works of Art
+        ✗ names 'coinciding with the Museum' — Donors of Gifts of Works of Art
+    [D489] material kind: stop='The Great Wave of Kanagawa' kind=active volume=COVERED sentences=32 active=4 staked=0 eventful=0 passive=2  <-- DISAGREE: enough material, wrong kind
+         best: "The John Pritzker Family Fund has augmented the promised gift of art with support for a new research program at The Met."
+    [LOCAL-489] Stop 5 needs more material (eventless): 15 passages, 2224 chars, verdict=COVERED
+[TIMING-SUB] phase=external_lookups step=serp_search elapsed=1.91s
+      [LOCAL-489] +8 from: "The Great Wave of Kanagawa" "The Metropolitan Museum of Art" provenance
+      [LOCAL-498] after replenishment: kind active -> active, 2224 -> 3335 chars, eventful=0 (NO CHANGE — the round bought more of the same)
+         best now: "The John Pritzker Family Fund has augmented the promised gift of art with support for a new research program a"
+    [LOCAL-488] providers ['openai'] span fewer than two model families — cross-model agreement needs two; set GEMINI_API_KEY
+    Stop 5 'The Great Wave of Kanagawa': queries=3 serp_results=18 snippets=23
+      → The vivid depiction of fish swimming among crashing waves recalls an iconic print “The Great Wave of Kanagawa” from Kats
+      → Our print of The Great Wave of Kanagawa is sourced from high-resolution archive files of early impressions and printed o
+
+  [LOCAL-410] SERP search complete: 20 queries, 147 results, 133 total snippets
+  [LOCAL-411] Snippet ranking+capping enabled: cap=5/stop, 133 raw → max 25 injected
+
+  [LOCAL-410] CHAIN INSTRUMENTATION:
+    Washington Crossing the Delaware: serp_results=23 elements_extracted=- beats_injected=- (measured post-generation)
+    The Death of Socrates (Jacques-Louis David): serp_results=23 elements_extracted=- beats_injected=- (measured post-generation)
+    The Harvesters: serp_results=22 elements_extracted=- beats_injected=- (measured post-generation)
+    Camouflage Self-Portrait: serp_results=22 elements_extracted=- beats_injected=- (measured post-generation)
+    The Great Wave of Kanagawa: serp_results=18 elements_extracted=- beats_injected=- (measured post-generation)
+  [D534] Stop 1 has 29 snippet(s) but they are VENUE-level only — fetching object-level facts
+  [D533] Stop 1 'Washington Crossing the Delaware' has 29 snippet(s) — asking the knowledge fallback
+[TIMING-SUB] phase=external_lookups step=serp_search elapsed=1.47s
+[TIMING-SUB] phase=external_lookups step=serp_search elapsed=1.31s
+  [LOCAL-427] HTTP 200 from https://dictionary.cambridge.org/us/dictionary/english/high (attempt 1)
+  [LOCAL-427] HTTP 200 from https://www.youtube.com/watch?v=AfxsFsLhL04 (attempt 1)
+  [LOCAL-427] HTTP 200 from https://www.google.com/goto?url=CAESYAHrOzAVITSyjsc7xpD30_szHD3CbZcd6ehD3MHjDcdgnpHTJUGsKclj7e7t4nwj_t7_VudAnndfrYafqJEWpGycJS9xnUCHvrzAgMgbRuYIYwfH-U9XtxDB2WGta7J8cA (attempt 1)
+  [LOCAL-427] HTTP 200 from https://www.google.com/goto?url=CAESXgHrOzAVCdnZrV90Pgvmew_rXPOAYXHVyUuQHzM9mDdL7KzmSX5VLg8gb9RBvL-snmyrz2T02X4FO11c129KUz8ujkQrtUZe7f8udSgFvM3VL2BkbAsK2KE55l4--ns (attempt 1)
+  [LOCAL-427] HTTP 200 from https://www.google.com/goto?url=CAESZgHrOzAVccUrTk6HRDpn_FqCuVHECk7pbXbgcXLRDaKFJbOuZ8hrtDhFMYyM9EwMvuZF2fzVuEdPhYPjlRKA4_57bW3sgSqSuKEwRr8OQzL3c2WbrYL0P-cTNLS_NtnxHfePu1fqZA (attempt 1)
+  [LOCAL-427] HTTP 200 from https://www.google.com/goto?url=CAESZQHrOzAVfR9pAuHe4YAFnGCS5lperVcAzUAt5MfYPDA7ewekBeZ0rF6-WBPp_mAhHx4HhFlcHAURFUuabySUI-mVB9tufgja6QhhiC0Te0J61cphwLScsjUCjR_G12BWLaQh7FhL (attempt 1)
+  [LOCAL-427] HTTP 200 from https://www.google.com/goto?url=CAESigEB6zswFeWG1XUZZMrIH3SRtEs9rI556jbLUg6rdxrmTCpQxcNVv_DcYIDBTv-nKvRcLi483ohnFrzZjKhsAvnYj_BO-Yz2v2Yoc7m00G7m1W38g7P4gig83t2oeCDkoWabNveWc4xubWkSX9SZlmIZPoiRBq4ABTpWFVsPj6BvjAYy35e0z-xIbi0 (attempt 1)
+  [LOCAL-427] HTTP 200 from https://www.youtube.com/watch?v=5dP1Y9szsjs (attempt 1)
+  [LOCAL-427] HTTP 200 from https://qlab.app/docs/v5/audio/object-audio/ (attempt 1)
+  [LOCAL-427] HTTP 200 from https://www.prosoundweb.com/spotlight-an-introduction-to-object-audio-mixing-with-qlab-5-5/ (attempt 1)
+[TIMING-SUB] phase=external_lookups step=serper_research elapsed=12.57s
+[TIMING-SUB] phase=external_lookups step=fetch_stop_knowledge elapsed=12.57s
+  [D533] fallback returned nothing: model returned no facts
+  [D534] Stop 2 has 28 snippet(s) but they are VENUE-level only — fetching object-level facts
+  [D533] Stop 2 'The Death of Socrates (Jacques-Louis David)' has 28 snippet(s) — asking the knowledge fallback
+[TIMING-SUB] phase=external_lookups step=serp_search elapsed=1.42s
+[TIMING-SUB] phase=external_lookups step=serp_search elapsed=1.75s
+  [LOCAL-427] Cache HIT: https://dictionary.cambridge.org/us/dictionary/english/high (12774 chars)
+  [LOCAL-427] HTTP 200 from https://www.google.com/goto?url=CAESYAHrOzAVvgpNDvMWKgNVcucSaZEzV5uC4vG2i3E8smchfyVQYvmTfeMoCymyjLIUvfgJ5RBAOK8TTOqUjlsi6ZPRzGpAZzgWBV3aaWa3UmhJqVSV3dBmYw00njmxRryI0A (attempt 1)
+  [LOCAL-427] HTTP 200 from https://www.google.com/goto?url=CAESXgHrOzAVEEWHTbHGxc8IwVLQShvK4nQQZK5-LOwrdrDwNnvKs6GvQDBOa_kPahn1LLr_QQV2sKjFNL0f52CDyVjST9vG5GMV3yVT44OCHjq6J_luM9EPKTj92StGVDc (attempt 1)
+  [LOCAL-427] HTTP 200 from https://www.google.com/goto?url=CAESZgHrOzAVdpd079z4a7G2ZODGLTfFMRygpPBY9im2mLqEYDsFSAtrhcr1mpG-aQA5SNbY6nmR9X9Ee_Rik8TPclg_Ebl0rMXxcOV81Ch3LNLu5nc3yZWaRAzBUTwTY3gsYOVmVP3CQg (attempt 1)
+  [LOCAL-427] HTTP 200 from https://www.google.com/goto?url=CAESZQHrOzAV7XdgUdxf2oovyyb56dPPUAMaoJCf3XxlwHEh-gGqlc1tH4WX89n1jKIwWEcoTOAjAx7OgAtwHorvHgxJ1GsDghEjH3w6GllXbTLRRr152jWMX5dGM7XDQnbRghPUUEnK (attempt 1)
+  [LOCAL-427] HTTP 200 from https://www.google.com/goto?url=CAESigEB6zswFRorD2owzxtKBWlS7MW-F4lM6EqhLjo8a52DhWN4Kd657kP3nN_f6LsADK024QqddA_mV-6DsxauUBZQ2qbDaIwjkg70reRarBWqMWzRX_roWB8Rt7NndSy4F2M7ZpXxdAFLgCy8amxWJK20rAtWe1syqR6M6ytlSccuzR5xHFA0H7-6CdY (attempt 1)
+  [LOCAL-427] HTTP 200 from https://nomono.co/blog/object-based-audio?srsltid=AYCX9vJgbqC3CR9Llr8dGxbxFNejYEfBvvFkhS4OWZuzmksWd35I9oh8 (attempt 1)
+  [LOCAL-427] HTTP 200 from https://qlab.app/object-audio/ (attempt 1)
+[TIMING-SUB] phase=external_lookups step=serper_research elapsed=10.56s
+[TIMING-SUB] phase=external_lookups step=fetch_stop_knowledge elapsed=10.56s
+  [D533] fallback returned nothing: model returned no facts
+  [D534] Stop 3 has 28 snippet(s) but they are VENUE-level only — fetching object-level facts
+  [D533] Stop 3 'The Harvesters' has 28 snippet(s) — asking the knowledge fallback
+[TIMING-SUB] phase=external_lookups step=serp_search elapsed=2.24s
+[TIMING-SUB] phase=external_lookups step=serp_search elapsed=2.20s
+  [LOCAL-427] Cache HIT: https://dictionary.cambridge.org/us/dictionary/english/high (12774 chars)
+  [LOCAL-427] HTTP 200 from https://www.youtube.com/watch?v=yuEnMdokNdU (attempt 1)
+  [LOCAL-427] HTTP 200 from https://www.google.com/goto?url=CAESXQHrOzAVUs4HWyf99kh_Acsd5sDQz1l-KXQFrIOqz9lW6ai3CduBEAdqC199LhMIiAI35GdI1z5-ZrTuohHfnkwCuDkxZNgMOCiHTHAQFoBp8hPWWmXfwrU466FWYA (attempt 1)
+  [LOCAL-427] HTTP 200 from https://www.google.com/goto?url=CAEScAHrOzAVkVYYuFNF3FNkQi8VcEy-Ag69ZsLyLCBlPU8z5ukL0CifL18lM2qTWRUBDlfsQLNOcQib5XJkE3p7cZJUP5alPGzUQ3xpelJuRypETPhOJ_M2R-4Wtuerb2aBDvImALXTP8z4pNB15bxpIqg (attempt 1)
+  [LOCAL-427] HTTP 200 from https://www.google.com/goto?url=CAESZgHrOzAVGtQNSPFdXFS-y0qd-OYhOGiegL4jKZxI0RVlj2k0OdVKxM13QhpcRwnc4fojGhXdRcM39p2Ca9r4cyuHvArQmGM9pbOUtiCwnOyI63i5XcUBcQFYO0LFY38UNqqawW0ZBw (attempt 1)
+  [LOCAL-427] HTTP 200 from https://www.google.com/goto?url=CAESXgHrOzAV9svK4Q0lCaRZxpTTqFF3tEqjvsZ6EW3pwbsWCtw0I7cJmEuCNXKMg3PBt6bbBiWcmzvwIUitJeAg_qKjecjx2HvAPpud5Q10Z5eUdNI26b0ASLMW3EYoavE (attempt 1)
+  [LOCAL-427] HTTP 200 from https://www.google.com/goto?url=CAESZQHrOzAVDBnZgBQkJW4SLtkDoICP83m-2c5cU8Yro-juXet8-jsV79u45U10zAcfEuu7D7e2DgEhZeJU-PoC89fnnb44NFr18dNfEAUd4XFRKQAt6pVRemuy6DmT8BeTvQ1EmhoO (attempt 1)
+  [LOCAL-427] HTTP 200 from https://nomono.co/blog/object-based-audio?srsltid=AYCX9vK6Hxk5gnI_1LuhDA6qbv-Nla8SFsE0vM9VVaUdObfs6yqN0A_C (attempt 1)
+  [LOCAL-427] Cache HIT: https://qlab.app/object-audio/ (2489 chars)
+[TIMING-SUB] phase=external_lookups step=serper_research elapsed=12.55s
+[TIMING-SUB] phase=external_lookups step=fetch_stop_knowledge elapsed=12.55s
+  [D533] fallback returned nothing: model returned no facts
+  [D534] Stop 4 has 25 snippet(s) but they are VENUE-level only — fetching object-level facts
+  [D533] Stop 4 'Camouflage Self-Portrait' has 25 snippet(s) — asking the knowledge fallback
+[TIMING-SUB] phase=external_lookups step=serp_search elapsed=1.56s
+[TIMING-SUB] phase=external_lookups step=serp_search elapsed=1.74s
+  [LOCAL-427] Cache HIT: https://dictionary.cambridge.org/us/dictionary/english/high (12774 chars)
+  [LOCAL-427] HTTP 200 from https://www.google.com/goto?url=CAESYAHrOzAVpmmHV2PZXriZJkDRIB5cqntbVTrSTkRgM2VKm-XjdkBNQFmdYK_cX5iDmIbd6k0A5JSy6r1U9ikGzusMaMgl9s4WYRMawJNuDyaGdbqkWyXEF8-cWS7iUGCqAg (attempt 1)
+  [LOCAL-427] HTTP 200 from https://www.google.com/goto?url=CAESXgHrOzAVrO4HNV34s5QnrImr4pYESAz5cxfQBwXGn7Wzgkm_qYg1iLSoDY_vPi0HgyI89SROS-dRmR-Z5vOCt_85OA-b-ZycSAcc4n5WlYcVINXGeYlcwz04b4MQaFc (attempt 1)
+  [LOCAL-427] HTTP 200 from https://www.google.com/goto?url=CAESZgHrOzAV6vadhIAArtwscdmRpkOdwkUbfQBqPHVgvsA6EdUQlJTB_fBJ72Ks1TPaQ6HXgLgGQaY2rIeKCcBqzOtXDsv2AjlzRdUR7070D1Kh1BQ4kQG2jThmrwwo8PclLCSq1lbGLA (attempt 1)
+  [LOCAL-427] HTTP 200 from https://www.google.com/goto?url=CAESZQHrOzAVypynARfkMPJNZm3F8Dl0opN1BPdS1nsdMS1zlm5db-K1o2mWMWfMVYzOgwpc5wRVHyO6Yw8cYGdzhETQ7J1FtMfEv3tmzw4WVozXFYAddKK1J3r5GGiIDeCZUx4V9P2- (attempt 1)
+  [LOCAL-427] HTTP 200 from https://www.google.com/goto?url=CAESmQEB6zswFXJA4dgm3HnZ1BYPrU8ozy-85ZZjuNHJ3i3z3JtnbGCmo6c_Kqo-bLx9X--ssEtrYZEs6aGKjqO-1wlQ-B0mnjK-wH3bCYdsxk5Qt_6xxQEwYlXMwGSSLANLQh9i7mo5x8q1pRb9qZF5IsG4MOxvHJWdVB1mu0Yb6gIYU0vnEzk9R_C5UWeey8e-0OEVx9dBGzUKsVI (attempt 1)
+  [LOCAL-427] Cache HIT: https://qlab.app/docs/v5/audio/object-audio/ (5076 chars)
+  [LOCAL-427] Cache HIT: https://www.prosoundweb.com/spotlight-an-introduction-to-object-audio-mixing-with-qlab-5-5/ (9808 chars)
+[TIMING-SUB] phase=external_lookups step=serper_research elapsed=10.05s
+[TIMING-SUB] phase=external_lookups step=fetch_stop_knowledge elapsed=10.05s
+  [D533] fallback returned nothing: model returned no facts
+  [D534] Stop 5 has 23 snippet(s) but they are VENUE-level only — fetching object-level facts
+  [D533] Stop 5 'The Great Wave of Kanagawa' has 23 snippet(s) — asking the knowledge fallback
+[TIMING-SUB] phase=external_lookups step=serp_search elapsed=1.96s
+[TIMING-SUB] phase=external_lookups step=serp_search elapsed=2.66s
+  [LOCAL-427] Cache HIT: https://dictionary.cambridge.org/us/dictionary/english/high (12774 chars)
+  [LOCAL-427] HTTP 200 from https://www.google.com/goto?url=CAESYAHrOzAVY2Oc7VzOUDD6cp9ZeTxghhMOtjuGiznsi4xejsE2neN4twstkD5N2-JX8oPI1Kzqmhz2ClmkI-lVv4iur6sPmCTwei2to9kYuQUD3XrUlvAwa79AP3QaDcIThQ (attempt 1)
+  [LOCAL-427] HTTP 200 from https://www.google.com/goto?url=CAESXgHrOzAVpfiHDS2CVvJo_IoSsGBhRY200qYT3zbmMVhhpiLYJ9XJSFJ9fsHRchREVXRI9Ku-XLdChNuwjdBPGFE8QcTVI-qirwV-6_qPtNpbR8sb8aVPumXykUhC2x8 (attempt 1)
+  [LOCAL-427] HTTP 200 from https://www.google.com/goto?url=CAESZgHrOzAVzpm1nw3r6oxHGMxhTQwnX8-mlgGasGtgXIYVKehZfzjgHEAAu2HLaIfFxSLeAs6ZoEk8CYkcblNlc-vjXOR_Iht8kxLeH3pTubt9pdBEQoDW7X-UFU409eagOE80Lfn7RA (attempt 1)
+  [LOCAL-427] HTTP 200 from https://www.google.com/goto?url=CAESZQHrOzAV0J9Lr_moJlkm2T1rqN7foGXg8T8DorZsRMQeTwMSMpfLAWEWiApj_a2a1dTCH5xBfB8ZjL8I_T-8A6r0YJW9mwwGKltawLFewdBzNqOh4f3hbIrUwmYXAUlTXRTXtaa3 (attempt 1)
+  [LOCAL-427] HTTP 200 from https://www.google.com/goto?url=CAESmQEB6zswFaR-bV96fErlNQhIGu_GNURwOIwVF8CD60O5Zfu9UmruW7Q8iORHeT35LT1SX3JRtVbt2ii1iYoQQN0yEmQN2ZUL2utthVCRokKBkbKn74Jl9SHEpHAGo4NaNeLTzUo927lnzgRVstDNsSmI2EXXb9xW7pstIO2Zec9-p8yRySfXdlg5gxVfO2Cv-QYQKqu-oehjbto (attempt 1)
+  [LOCAL-427] Cache HIT: https://qlab.app/docs/v5/audio/object-audio/ (5076 chars)
+  [LOCAL-427] Cache HIT: https://www.prosoundweb.com/spotlight-an-introduction-to-object-audio-mixing-with-qlab-5-5/ (9808 chars)
+[TIMING-SUB] phase=external_lookups step=serper_research elapsed=12.41s
+[LOCAL-828] other-venue passage dropped The Met Fifth Avenue
+[LOCAL-828] other-venue passage dropped print is part of the Metropolitan Museum
+[LOCAL-828] other-venue passage dropped print is displayed in the museum
+[TIMING-SUB] phase=external_lookups step=fetch_stop_knowledge elapsed=12.41s
+  [D533] +3 fact(s) via gemini (0 high-confidence) — stop will be labelled aloud
+      [low] The Great Wave of Kanagawa is a woodblock print created by the Japanese artist Katsushika Hokusai around 1830-
+      [low] It is made using ink and color on paper, typical of ukiyo-e prints. [NO MATERIAL FOUND]
+      [low] This example is distinguished by its vibrant Prussian blue pigment, which was innovative at the time of its cr
+  [D533] Knowledge fallback filled 1 starved stop(s)
+[TIMING] phase=external_lookups elapsed=77.9s cumulative=571.3s
+
+Generating description for Stop 1: Washington Crossing the Delaware by , ...
+
+Generating description for Stop 2: The Death of Socrates (Jacques-Louis David) by , ...
+
+Generating description for Stop 3: The Harvesters by , ...
+
+Generating description for Stop 4: Camouflage Self-Portrait by , ...
+
+Generating description for Stop 5: The Great Wave of Kanagawa by , ...
+  [LOCAL-381] stop='Washington Crossing the Delaware' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-381] stop='The Death of Socrates (Jacques-Louis David)' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-381] stop='Camouflage Self-Portrait' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-411] Stop 4 snippet ranking: input=25 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=5 output=5 usable=5 (t1t2=3, t3=0, market=0)
+    Top scores: [('كنز اللاهون - المعرفة', 17, ''), ('Met Exhibition Celebrates Andy Warhol And His Infl', 14, 'tier1'), ('America Today', 12, '')]  [LOCAL-411] Stop 1 snippet ranking: input=29 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=5 output=5 usable=5 (t1t2=3, t3=0, market=0)
+    Top scores: [('Washington Crossing the Delaware River at ...', 17, ''), ("Washington Crossing the Delaware: The Met's Take", 15, 'tier1'), ("Washington Crossing the Delaware: The Met's Take", 15, 'tier1')]
+  [LOCAL-381] stop='The Great Wave of Kanagawa' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-411] Stop 5 snippet ranking: input=26 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=5 output=5 usable=5 (t1t2=4, t3=0, market=0)
+    Top scores: [('The Great Wave of Kanagawa', 16, ''), ('The Great Wave off Kanagawa by Katsushika Hokusai', 11, 'tier1'), ('The Great Wave off Kanagawa by Katsushika Hokusai', 11, 'tier1')]
+
+  [LOCAL-411] Stop 2 snippet ranking: input=28 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=5 output=5 usable=5 (t1t2=4, t3=0, market=0)
+    Top scores: [('The Death of Socrates - The Metropolitan Museum of', 19, ''), ('"The Death of Socrates" (1787), was created by the', 14, 'tier1'), ('"The Death of Socrates" (1787), was created by the', 14, 'tier1')]
+  [LOCAL-381] stop='The Harvesters' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-411] Stop 3 snippet ranking: input=28 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=5 output=5 usable=5 (t1t2=3, t3=0, market=0)
+    Top scores: [('Art History and Fine Arts: Museum Research', 16, ''), ("Pieter Bruegel's 'The Harvesters' at the Met", 13, 'tier1'), ('How Much Is The Harvesters Worth? | $100–300M', 12, '')]
+  [LOCAL-620] Stop 5 evidence balance: input=5 kept_rich=0 kept_story=3 dropped_boilerplate=0 output=3
+  [LOCAL-402] Stop 5: injected 3 snippets as reference material
+  [LOCAL-620] Stop 1 evidence balance: input=5 kept_rich=0 kept_story=3 dropped_boilerplate=0 output=3
+  [LOCAL-402] Stop 1: injected 3 snippets as reference material
+  [LOCAL-620] Stop 2 evidence balance: input=5 kept_rich=3 kept_story=0 dropped_boilerplate=0 output=3
+  [LOCAL-402] Stop 2: injected 3 snippets as reference material
+  [LOCAL-620] Stop 4 evidence balance: input=5 kept_rich=0 kept_story=3 dropped_boilerplate=0 output=3
+  [LOCAL-402] Stop 4: injected 3 snippets as reference material
+  [LOCAL-620] Stop 3 evidence balance: input=5 kept_rich=1 kept_story=3 dropped_boilerplate=0 output=4
+  [LOCAL-402] Stop 3: injected 4 snippets as reference material
+  [LOCAL-620] prefs: default/balanced (no user_id)
+  [LOCAL-617] Stop 5: narration contract injected (reception_evidence=False)
+  [D533] Stop 5 corpus-gate restriction LIFTED — 26 source item(s) arrived after the gate ran
+  [LOCAL-411] Stop 5 prompt size: before_snippets=10835 after=23822 (+12987 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (23822)
+  [LOCAL-620] prefs: default/balanced (no user_id)
+  [LOCAL-617] Stop 1: narration contract injected (reception_evidence=False)
+  [D533] Stop 1 corpus-gate restriction LIFTED — 29 source item(s) arrived after the gate ran
+  [LOCAL-411] Stop 1 prompt size: before_snippets=10408 after=23402 (+12994 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (23402)
+  [LOCAL-620] prefs: default/balanced (no user_id)
+  [LOCAL-617] Stop 2: narration contract injected (reception_evidence=False)
+  [D533] Stop 2 corpus-gate restriction LIFTED — 28 source item(s) arrived after the gate ran
+  [LOCAL-411] Stop 2 prompt size: before_snippets=11324 after=24367 (+13043 from snippets+instructions, facts_first=no)
+  [LOCAL-620] prefs: default/balanced (no user_id)
+  [LOCAL-617] Stop 4: narration contract injected (reception_evidence=False)
+  [D533] Stop 4 corpus-gate restriction LIFTED — 25 source item(s) arrived after the gate ran
+  [LOCAL-411] Stop 4 prompt size: before_snippets=10983 after=23937 (+12954 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (23937)  [LOCAL-411] WARNING: prompt exceeds 20K chars (24367)
+  [LOCAL-620] prefs: default/balanced (no user_id)
+  [LOCAL-617] Stop 3: narration contract injected (reception_evidence=False)
+  [D533] Stop 3 corpus-gate restriction LIFTED — 28 source item(s) arrived after the gate ran
+  [LOCAL-411] Stop 3 prompt size: before_snippets=11353 after=24480 (+13127 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (24480)
+
+  [D498] Stop 1 matrix: 3/9 slots filled — empty: ['artist', 'publisher', 'printed_by', 'medium', 'credit_line', 'focus_fact']
+  [D498] Stop 5 matrix: 3/9 slots filled — empty: ['artist', 'publisher', 'printed_by', 'medium', 'credit_line', 'focus_fact']  [D498] Stop 2 matrix: 3/9 slots filled — empty: ['artist', 'publisher', 'printed_by', 'medium', 'credit_line', 'focus_fact']
+
+  [D498] Stop 3 matrix: 3/9 slots filled — empty: ['artist', 'publisher', 'printed_by', 'medium', 'credit_line', 'focus_fact']
+  [D498] Stop 4 matrix: 3/9 slots filled — empty: ['artist', 'publisher', 'printed_by', 'medium', 'credit_line', 'focus_fact']
+  [D500] agents 0/3: hero=—, sponsor=—, builder=—  [D500] agents 0/3: hero=—, sponsor=—, builder=—
+
+  [D500] agents 0/3: hero=—, sponsor=—, builder=—
+  [D500] agents 0/3: hero=—, sponsor=—, builder=—
+  [D500] agents 0/3: hero=—, sponsor=—, builder=—
+  [LOCAL-490] Stop 5 story pass: ok=True (3 sentences), $0.0007
+    story: "Katsushika Hokusai created The Great Wave of Kanagawa around 1830-1833 during the Edo period. He carved and printed this image using the Japanese wood"
+  [LOCAL-490] Stop 4 story pass: ok=True (3 sentences), $0.0007
+    story: "The Metropolitan Museum of Art acquired Camouflage Self-Portrait in 1916 from the Rogers Fund. The museum decided to include it in a new exhibition in"
+  [LOCAL-490] Stop 1 story pass: ok=True (3 sentences), $0.0007
+    story: "Washington planned a surprise attack by crossing the Delaware River on Christmas night, 1776. His decision to lead the crossing in harsh winter condit"
+  [LOCAL-408] Prompt dump written to: /app/prompt_dump_stop1.txt
+  [LOCAL-490] Stop 3 story pass: ok=True (4 sentences), $0.0008
+    story: "Pieter Bruegel the Elder painted The Harvesters in 1565 during a time when landscapes were usually just backgrounds for religious or mythological scen"
+  [LOCAL-490] Stop 2 story pass: ok=True (3 sentences), $0.0007
+    story: "Socrates was sentenced to death by drinking poison hemlock in 399 BC. He chose to accept his punishment rather than flee or recant his teachings. Beca"
+Stop 1 API call cost: $0.0046 (6107 tokens, model=gpt-4.1-mini)
+[LOCAL-197] llm_cost() called with total_tokens (deprecated) by /app/generate_tour_text.py:22996. Caller should supply input_tokens and output_tokens separately.
+  [LOCAL-569] Stop 1 attempt 1/5 story_count=1 words=316
+  [LOCAL-432] Stop 1: STORY RETRY — story_count=1 < 3, need 2 more, retrying (attempt 2/5)
+Stop 4 API call cost: $0.0048 (6302 tokens, model=gpt-4.1-mini)
+  [LOCAL-569] Stop 4 attempt 1/5 story_count=2 words=308
+  [LOCAL-432] Stop 4: STORY RETRY — story_count=2 < 3, need 1 more, retrying (attempt 2/5)
+Stop 2 API call cost: $0.0049 (6415 tokens, model=gpt-4.1-mini)
+  [LOCAL-569] Stop 2 attempt 1/5 story_count=3 words=316
+Stop 2 description word count: 316 words
+  [LOCAL-407] Stop 2: snippets injected but no candidate specifics extracted
+Stop 3 API call cost: $0.0049 (6493 tokens, model=gpt-4.1-mini)
+  [LOCAL-569] Stop 3 attempt 1/5 story_count=2 words=341
+  [LOCAL-432] Stop 3: STORY RETRY — story_count=2 < 3, need 1 more, retrying (attempt 2/5)
+Stop 5 API call cost: $0.0048 (6337 tokens, model=gpt-4.1-mini)
+  [LOCAL-569] Stop 5 attempt 1/5 story_count=5 words=339
+Stop 5 description word count: 339 words
+  [LOCAL-407] Stop 5: snippets injected but no candidate specifics extracted
+Stop 1 API call cost: $0.0049 (6450 tokens, model=gpt-4.1-mini)
+  [LOCAL-569] Stop 1 attempt 2/5 story_count=2 words=278
+  [LOCAL-432] Stop 1: STORY RETRY — story_count=2 < 3, need 1 more, retrying (attempt 3/5)
+Stop 3 API call cost: $0.0052 (6813 tokens, model=gpt-4.1-mini)
+  [LOCAL-569] Stop 3 attempt 2/5 story_count=2 words=264
+  [LOCAL-432] Stop 3: STORY RETRY — story_count=2 < 3, need 1 more, retrying (attempt 3/5)
+Stop 4 API call cost: $0.0052 (6820 tokens, model=gpt-4.1-mini)
+  [LOCAL-569] Stop 4 attempt 2/5 story_count=6 words=378
+Stop 4 description word count: 378 words
+  [LOCAL-407] Stop 4: snippets injected but no candidate specifics extracted
+Stop 1 API call cost: $0.0052 (6805 tokens, model=gpt-4.1-mini)
+  [LOCAL-569] Stop 1 attempt 3/5 story_count=3 words=256
+Stop 1 description word count: 256 words
+  [LOCAL-407] Stop 1: snippets injected but no candidate specifics extracted
+Stop 3 API call cost: $0.0056 (7321 tokens, model=gpt-4.1-mini)
+  [LOCAL-569] Stop 3 attempt 3/5 story_count=5 words=369
+Stop 3 description word count: 369 words
+  [LOCAL-407] Stop 3: snippets injected but no candidate specifics extracted
+
+  [LOCAL-439] STORY GATE: checking story-units per stop (D394)...
+    ✓ PASS stop='Washington Crossing the Delaware': story_units=1, entities_ok=True, thesis_ok=True
+      interest: emotional=3, new_info=2, deduction=1, total=4
+    ✓ PASS stop='The Death of Socrates (Jacques-Louis David)': story_units=1, entities_ok=True, thesis_ok=True
+      interest: emotional=4, new_info=2, deduction=1, total=5
+    ✗ FAIL stop='The Harvesters': story_units=0, entities_ok=True, thesis_ok=True
+      → story_units=0: no candidate story-unit of ≥3 sentences passes classification (need at least 1 with named person, real actions, arc)
+    ✗ FAIL stop='Camouflage Self-Portrait': story_units=0, entities_ok=True, thesis_ok=True
+      → story_units=0: no candidate story-unit of ≥3 sentences passes classification (need at least 1 with named person, real actions, arc)
+    ✗ FAIL stop='The Great Wave of Kanagawa': story_units=0, entities_ok=True, thesis_ok=True
+      → story_units=0: no candidate story-unit of ≥3 sentences passes classification (need at least 1 with named person, real actions, arc)
+  [LOCAL-439] Classification cost: $0.004093 (input=17059, output=2557)
+  [LOCAL-439] STORY GATE: SOME STOPS FAILED (informational — does not block delivery)
+
+  [LOCAL-423] STORY VERIFICATION: checking claims against sources...
+    ✗ FAIL stop='Washington Crossing the Delaware': claims=2, sourced=1, unsourced=1, contradicted=0
+      → UNSOURCED: 'Leutze created this' (attribution) — no snippet contains this assertion
+      evidence (1 sourced claims):
+        claim='in 1851' ← https://www.metmuseum.org/art/collection/search/11417
+    ✗ FAIL stop='The Death of Socrates (Jacques-Louis David)': claims=0, sourced=0, unsourced=0, contradicted=0
+      → VACUOUS: 0 claims extracted — nothing was verified
+    ✓ PASS stop='The Harvesters': claims=1, sourced=1, unsourced=0, contradicted=0
+      evidence (1 sourced claims):
+        claim='in 1565' ← https://www.metmuseum.org/art/collection/search/435809
+    ✗ FAIL stop='Camouflage Self-Portrait': claims=6, sourced=5, unsourced=1, contradicted=0
+      → UNSOURCED: 'Warhol created this' (attribution) — no snippet contains this assertion
+      evidence (5 sourced claims):
+        claim='in 1916' ← https://www.google.com/goto?url=CAESjwEB6zswFUQ96NBlOjUkX82S
+        claim='Art acquired Camouflage' ← https://en.wikipedia.org/wiki/Metropolitan_Museum_of_Art
+        claim='in 2012' ← https://www.google.com/goto?url=CAESZAHrOzAVdPhlwhGZK0dR2YPL
+    ✗ FAIL stop='The Great Wave of Kanagawa': claims=2, sourced=1, unsourced=1, contradicted=0
+      → UNSOURCED: 'in 1915' (year) — no snippet contains this assertion
+      evidence (1 sourced claims):
+        claim='Katsushika Hokusai created The' ← https://www.google.com/goto?url=CAEScAHrOzAVcSXjPguBf1O_3dUz
+  [LOCAL-423] STORY VERIFICATION: SOME STOPS HAVE UNSOURCED CLAIMS
+  [LOCAL-423] Unsourced claims will be stripped from delivered text
+    [LOCAL-423] Stripped 1 sentence(s) from 'Washington Crossing the Delaware':
+      ✗ "Leutze created this painting while living in Germany, aiming to inspire democratic movements in Euro"
+    [LOCAL-423] Stripped 1 sentence(s) from 'Camouflage Self-Portrait':
+      ✗ "Warhol created this work using silkscreen ink on canvas, a technique combining photographic reproduc"
+    [LOCAL-423] Stripped 1 sentence(s) from 'The Great Wave of Kanagawa':
+      ✗ "The Great Wave’s frozen moment of imminent crash captures the awe of nature’s power balanced against"
+
+  [LOCAL-192] PHASE 5.1: Style validation + per-paragraph retry...
+[LOCAL-197] llm_cost() called with total_tokens (deprecated) by /app/generate_tour_text.py:24456. Caller should supply input_tokens and output_tokens separately.
+  [LOCAL-192] Stop 2 para 2: retry FIXED (R1_IMPERATIVE)
+  [LOCAL-192] Stop 2 para 3: retry FIXED (R10_UNFULFILLED_PROMISE)
+  [LOCAL-192] Stop 3 para 3: retry FIXED (R2_QUESTION)
+  [LOCAL-192] Style retry summary: 3 paragraphs retried, 3 fixed/improved, 0 kept original
+  [LOCAL-192] Retry cost: $0.0004 (1462 tokens)
+
+  [LOCAL-255] PHASE 5.13: R1 imperative rewrite...
+  [LOCAL-255] R1 summary: 0 rewritten, 0 deleted, 0 stops affected, LLM tokens: 0 ($0.0000)
+
+  [LOCAL-251] PHASE 5.14: R7 hallucinated-sensory deletion...
+  [LOCAL-251] R7 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-261] PHASE 5.141: R2 question deletion...
+  [LOCAL-261] R2 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-261] PHASE 5.142: R3 suggestive-exploration deletion...
+  [LOCAL-261] R3 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-261] PHASE 5.143: R4 prescribed-feeling deletion...
+  [LOCAL-261] R4 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-261] PHASE 5.144: R8 prompt-leakage deletion...
+  [LOCAL-261] R8 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-216] PHASE 5.15: R9 generic-sentence deletion...
+  [LOCAL-216] R9 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-235] PHASE 5.155: R10 unfulfilled-promise deletion...
+  [LOCAL-235] R10 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-472] PHASE 5.152: Stop-specificity gate...
+  [LOCAL-472] Stop-specificity gate summary:
+    Stops checked: 5
+    Paragraphs checked: 9
+    Transferable (high, removed): 0
+    Transferable (low conf, kept): 0
+    Last-paragraph protected: 0
+    Ungrounded named entities: 2
+    [LOCAL-652] Foreign work/artist sentences removed: 2
+    Stops affected: 0
+    [LOCAL-652] REMOVED foreign work/artist sentence stop='The Harvesters' entities=['Given The Met'] (1 sentence(s)) in: "Bruegel’s focus on peasants and their work brings an unvarnished humanity to the scene. The painting registers the relen"
+    [LOCAL-652] REMOVED foreign work/artist sentence stop='Camouflage Self-Portrait' entities=['Andy Warhol'] (1 sentence(s)) in: "The Metropolitan Museum of Art acquired Camouflage Self-Portrait in 1916 from the Rogers Fund. The museum decided to inc"
+    [LOCAL-472] UNGROUNDED entity stop='The Harvesters' entity='Given The Met' reason='No concrete link to "The Harvesters" is provided.' in: "Bruegel’s focus on peasants and their work brings an unvarnished humanity to the scene. The painting"
+    [LOCAL-472] UNGROUNDED entity stop='Camouflage Self-Portrait' entity='Andy Warhol' reason='No concrete link to the stop is provided.' in: "The Metropolitan Museum of Art acquired Camouflage Self-Portrait in 1916 from the Rogers Fund. The m"
+
+  [LOCAL-263] PHASE 5.156: Unsupported-claim gate...
+  [LOCAL-263] Unsupported-claim gate summary:
+    Sentences removed: 0
+    Sentences kept (substantiated): 0
+    By type: PROMISE=0, SENSORY=0, FEELING=0, QUALITY=0
+    Escalation calls: 0
+    Stops affected: 0
+    Deletion rate: 0.0% (0/62)
+
+  [LOCAL-269] PHASE 5.157: Unglossed-reference gate...
+  [LOCAL-479] stop='The Death of Socrates (Jacques-Louis Dav' cut orphaned dependant of a removed introduction — subject 'socrates': "Socrates was sentenced to death by drinking poison hemlock in 399 BC."
+    [LOCAL-634] 1 provenance-sentence reference(s) degraded rather than namesake-glossed: ['William Merritt Chase']
+    [LOCAL-634] 1 provenance-sentence reference(s) degraded rather than namesake-glossed: ['Rogers Fund']
+  [LOCAL-479] stop='Camouflage Self-Portrait' cut orphaned dependant of a removed introduction — subject 'museum': "The museum decided to include it in a new exhibition in 2012, highlighting its s"
+  [LOCAL-269] Unglossed-reference gate summary (LOCAL-287: compose, not splice):
+    References detected: 11
+    Glossed (composed): 3
+    Suppressed (already explained): 1
+    Degraded (name dropped): 5
+    Guard failures: 0
+    Known (skipped): 2
+    Triage: 1997 tokens, $0.0004, 5.2s
+    Gloss: 966 tokens, $0.0002, 3.2s
+    Compose: 1589 tokens, $0.0003, 1.8s
+    Total added cost: $0.0009
+    Stops affected: 4
+    Glosses applied:
+      • American Revolutionary War → DEGRADED (name dropped)
+      • Continental Army → "formed in 1775 to oppose British rule" [source: model]
+      • Emanuel Leutze → "a german-american painter known for his artwork" [source: model]
+      • European → DEGRADED (name dropped)
+      • Pieter Bruegel → "a 16th-century Flemish painter known for landscapes" [source: model]
+      • William Merritt Chase → DEGRADED (name dropped)
+      • Bruegel → DEGRADED (name dropped)
+      • Rogers Fund → DEGRADED (name dropped)
+      • Katsushika Hokusai → SUPPRESSED (already explained)
+
+  [LOCAL-458] entity gate SKIPPED: no exhibition scope (unscoped museum tour)
+
+  [LOCAL-458] entity gate SKIPPED: no exhibition scope (unscoped museum tour)
+
+  [LOCAL-385] Form-claim gate SKIPPED (no exhibition scope — unscoped museum tours are not gated)
+
+  [LOCAL-389] Numeric-claim gate SKIPPED (no exhibition scope — unscoped museum tours are not gated)
+
+  [LOCAL-402] PHASE 5.161: Temporal coherence gate (impossible relations)...
+  [LOCAL-402] Temporal coherence gate summary:
+    Relations checked: 67
+    Relations rejected: 0
+    Sentences removed: 0
+    Stops affected: 0
+
+  [LOCAL-229] PHASE 5.16: CONTRADICTED claim block (D100 enforcement)...
+  [LOCAL-229] CONTRADICTED block summary: 0 group(s) blocked, 0 stop(s) affected
+
+PHASE 5.5a: Post-description knowledge validation (all tour types)...
+OK Post-description validation passed: Knowledge validation passed
+
+PHASE 5.5b: Validating descriptions are inside 'The Metropolitan Museum of Art'...
+   Authority: 4 D1v2-verified (kept unconditionally), 0 unverified (will check)
+   Pre-filter: 0 clean, 0 suspect (will call OpenAI for suspect only)
+OK PHASE 5.5b: 5 stop(s) passed venue description validation
+OK PHASE 5.7: Dangling-reference scrub complete (5 stops)
+  [LOCAL-627] PHASE 5.7a: Truncated-snippet safety check — 1 stop(s) cleaned
+
+  [LOCAL-318] PHASE 5.7b: Dangling-demonstrative scrub...
+  [LOCAL-318] Dangling-demonstrative scrub summary:
+    Detected: 5
+    Repaired (name substituted): 0
+    Deleted (unrepairable): 5
+    Stops affected: 3
+    [2] DELETED: 'This scene' in: This scene was painted by David during a pivotal moment in his career, just befo
+    [2] DELETED: 'This tension' in: This tension reflects the timeless human struggle between principle and survival
+    [3] DELETED: 'This choice' in: This choice created one of the first true landscape paintings in Western art, al
+    [4] DELETED: 'This motif' in: This motif, borrowed from military fabric design intended for concealment, here 
+    [4] DELETED: 'This installation' in: This installation allows viewers to trace the evolution of image and nature’s po
+OK PHASE 5.7b: Dangling-demonstrative scrub complete
+
+PHASE 5.8: Type/prose contradiction check (LOCAL-27)...
+  [LOCAL-27] No type/prose contradictions detected
+
+PHASE 5.9: Audio-native cleanup (LOCAL-41)...
+  [LOCAL-41] Stripped 0 trailing question(s), removed 0 'broader context' instance(s)
+
+  [D498] step 7c: most valuable stop is 3 'The Harvesters' (index 66) — allowance 5 -> 7 sentences on regeneration, story currently 4 sentence(s)
+
+  [LOCAL-487] step 7a: 4 stop(s) have NO VALID STORY by Michael's bar (3+ consecutive sentences, one person, an action and something at stake)
+    stop 1 'Washington Crossing the Delaware': longest qualifying run is 2 sentence(s); the bar is 3 consecutive sentences about one subject, carrying an act
+    stop 2 'The Death of Socrates (Jacques-Louis D': longest qualifying run is 1 sentence(s); the bar is 3 consecutive sentences about one subject, carrying an act
+    stop 4 'Camouflage Self-Portrait': the longest run (6 sentences, Camouflage Self) has agency=0 stakes=0 — someone is described, but nothing is ri
+    stop 5 'The Great Wave of Kanagawa': the longest run (3 sentences, Katsushika Hokusai) has agency=0 stakes=0 — someone is described, but nothing is
+    [LOCAL-487] cap=1: retrying only the weakest — stop 1 'Washington Crossing the Delaware' (index 36)
+  [D534] No cross-stop repetition in the drafts
+
+  [LOCAL-474] PHASE 5.17: retry 'Washington Crossing the Delaware' — 234w → 218w after gates, 2 sentence(s) removed
+    removed: "This hazardous maneuver caught the opposing Hessian forces off guard, leading to a crucial victory t"
+    removed: "It captures a moment that foreshadowed the larger success of the Continental Army, reminding viewers"
+    [LOCAL-491] step 7b: rotating to the venue fact — institutional context; weakest, but it scopes the search
+      focus: "Washington Crossing the Delaware is held at The Metropolitan Museum of Art."
+
+  [LOCAL-474] PHASE 5.17: retry 'The Death of Socrates (Jacques-Louis David)' — 316w → 241w after gates, 7 sentence(s) removed
+    removed: "Socrates was sentenced to death by drinking poison hemlock in 399 BC."
+    removed: "David’s choice of stark, controlled lighting and carefully arranged figures conveys the gravity of S"
+    removed: "David painted this scene during a pivotal moment in his career, just before the French Revolution fu"
+    removed: "The painting’s crisp contours and dramatic composition speak to David’s mastery of form and his beli"
+    removed: "This tension evokes the timeless human struggle between principle and survival."
+    removed: "The Met, often called simply the Met within art circles, holds this painting as part of its extensiv"
+    removed: "Both works portray decisive acts that shaped history, inviting reflection on how artists capture the"
+    [LOCAL-491] step 7b: rotating to the venue fact — institutional context; weakest, but it scopes the search
+      focus: "The Death of Socrates (Jacques-Louis David) is held at The Metropolitan Museum of Art."
+
+  [LOCAL-474] PHASE 5.17: retry 'The Harvesters' — 369w → 273w after gates, 7 sentence(s) removed
+    removed: "Pieter Bruegel the Elder painted The Harvesters in 1565 during a time when landscapes usually served"
+    removed: "This choice created one of the first true landscape paintings in Western art, altering how artists a"
+    removed: "The Met’s curator of European paintings at the time, William Merritt Chase, acquired The Harvesters "
+    removed: "He organizes the composition into horizontal bands: the foreground is dominated by the laborers bend"
+    removed: "Bruegel’s focus on peasants and their work brings an unvarnished humanity to the scene."
+    removed: "Given The Met is the largest art museum in the Americas and ranks among the top five most visited gl"
+    removed: "What might a modern reflection on identity and culture look like, carried forward from Bruegel’s len"
+    [LOCAL-491] step 7b: rotating to the venue fact — institutional context; weakest, but it scopes the search
+      focus: "The Harvesters is held at The Metropolitan Museum of Art."
+
+  [LOCAL-474] PHASE 5.17: retry 'Camouflage Self-Portrait' — 351w → 243w after gates, 5 sentence(s) removed
+    removed: "The Metropolitan Museum of Art acquired Camouflage Self-Portrait in 1916 from the Rogers Fund."
+    removed: "The museum decided to include it in a new exhibition in 2012, highlighting its significance."
+    removed: "This decision allowed visitors to witness how the artist, Andy Warhol, engaged with the notion of se"
+    removed: "This motif, borrowed from military fabric design intended for concealment, here paradoxically reveal"
+    removed: "This installation allows viewers to trace the evolution of image and nature’s power, setting the sta"
+    [LOCAL-491] step 7b: rotating to the venue fact — institutional context; weakest, but it scopes the search
+      focus: "Camouflage Self-Portrait is held at The Metropolitan Museum of Art."
+
+  [LOCAL-526] PHASE 5.17: regenerating 4 eligible stop(s) concurrently (max_workers=4)
+
+Generating description for Stop 1: Washington Crossing the Delaware by , ...
+
+Generating description for Stop 2: The Death of Socrates (Jacques-Louis David) by , ...
+
+Generating description for Stop 3: The Harvesters by , ...
+
+Generating description for Stop 4: Camouflage Self-Portrait by , ...
+  [LOCAL-381] stop='Washington Crossing the Delaware' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-411] Stop 1 snippet ranking: input=29 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=5 output=5 usable=5 (t1t2=3, t3=0, market=0)
+    Top scores: [('Washington Crossing the Delaware River at ...', 17, ''), ("Washington Crossing the Delaware: The Met's Take", 15, 'tier1'), ("Washington Crossing the Delaware: The Met's Take", 15, 'tier1')]
+  [LOCAL-620] Stop 1 evidence balance: input=5 kept_rich=0 kept_story=3 dropped_boilerplate=0 output=3
+  [LOCAL-402] Stop 1: injected 3 snippets as reference material
+  [LOCAL-620] prefs: default/balanced (no user_id)
+  [LOCAL-381] stop='Camouflage Self-Portrait' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-411] Stop 4 snippet ranking: input=25 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=5 output=5 usable=5 (t1t2=3, t3=0, market=0)
+    Top scores: [('كنز اللاهون - المعرفة', 17, ''), ('Met Exhibition Celebrates Andy Warhol And His Infl', 14, 'tier1'), ('America Today', 12, '')]
+  [LOCAL-620] Stop 4 evidence balance: input=5 kept_rich=0 kept_story=3 dropped_boilerplate=0 output=3
+  [LOCAL-402] Stop 4: injected 3 snippets as reference material
+  [LOCAL-620] prefs: default/balanced (no user_id)
+  [LOCAL-617] Stop 4: narration contract injected (reception_evidence=False)
+  [LOCAL-381] stop='The Death of Socrates (Jacques-Louis David)' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-411] Stop 2 snippet ranking: input=28 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=5 output=5 usable=5 (t1t2=4, t3=0, market=0)
+    Top scores: [('The Death of Socrates - The Metropolitan Museum of', 19, ''), ('"The Death of Socrates" (1787), was created by the', 14, 'tier1'), ('"The Death of Socrates" (1787), was created by the', 14, 'tier1')]
+  [LOCAL-620] Stop 2 evidence balance: input=5 kept_rich=3 kept_story=0 dropped_boilerplate=0 output=3
+  [LOCAL-402] Stop 2: injected 3 snippets as reference material
+  [LOCAL-620] prefs: default/balanced (no user_id)
+  [LOCAL-617] Stop 2: narration contract injected (reception_evidence=False)
+  [D533] Stop 2 corpus-gate restriction LIFTED — 28 source item(s) arrived after the gate ran
+  [LOCAL-411] Stop 2 prompt size: before_snippets=11324 after=24367 (+13043 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (24367)
+  [D498] Stop 2 matrix: 4/9 slots filled — empty: ['artist', 'publisher', 'printed_by', 'medium', 'credit_line']
+  [D500] agents 0/3: hero=—, sponsor=—, builder=—
+  [LOCAL-617] Stop 1: narration contract injected (reception_evidence=False)  [LOCAL-381] stop='The Harvesters' matched_work=False medium='' work_identity_chars=0
+  [D533] Stop 4 corpus-gate restriction LIFTED — 25 source item(s) arrived after the gate ran
+  [D533] Stop 1 corpus-gate restriction LIFTED — 29 source item(s) arrived after the gate ran
+  [LOCAL-411] Stop 1 prompt size: before_snippets=10408 after=23402 (+12994 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (23402)
+  [LOCAL-411] Stop 4 prompt size: before_snippets=10983 after=23937 (+12954 from snippets+instructions, facts_first=no)  [LOCAL-411] Stop 3 snippet ranking: input=28 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=5 output=5 usable=5 (t1t2=3, t3=0, market=0)
+    Top scores: [('Art History and Fine Arts: Museum Research', 16, ''), ("Pieter Bruegel's 'The Harvesters' at the Met", 13, 'tier1'), ('How Much Is The Harvesters Worth? | $100–300M', 12, '')]
+
+  [D498] Stop 1 matrix: 4/9 slots filled — empty: ['artist', 'publisher', 'printed_by', 'medium', 'credit_line']
+  [D500] agents 0/3: hero=—, sponsor=—, builder=—
+
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (23937)  [LOCAL-620] Stop 3 evidence balance: input=5 kept_rich=1 kept_story=3 dropped_boilerplate=0 output=4
+  [LOCAL-402] Stop 3: injected 4 snippets as reference material
+  [LOCAL-620] prefs: default/balanced (no user_id)
+  [LOCAL-617] Stop 3: narration contract injected (reception_evidence=False)
+  [D533] Stop 3 corpus-gate restriction LIFTED — 28 source item(s) arrived after the gate ran
+  [LOCAL-411] Stop 3 prompt size: before_snippets=11353 after=24480 (+13127 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (24480)
+  [D498] Stop 3 matrix: 4/9 slots filled — empty: ['artist', 'publisher', 'printed_by', 'medium', 'credit_line']
+  [D500] agents 0/3: hero=—, sponsor=—, builder=—
+
+  [D498] Stop 4 matrix: 4/9 slots filled — empty: ['artist', 'publisher', 'printed_by', 'medium', 'credit_line']
+  [D500] agents 0/3: hero=—, sponsor=—, builder=—
+  [LOCAL-490] Stop 3 story pass: ok=True (3 sentences), $0.0010
+    story: "The Harvesters was painted by Pieter Bruegel the Elder around 1565, existing for centuries in private hands and documented through a long, published p"
+  [LOCAL-490] Stop 4 story pass: ok=True (5 sentences), $0.0010
+    story: "The Metropolitan Museum of Art received Camouflage Self-Portrait through the Rogers Fund. The museum accepted this work into its collection, which exp"
+  [LOCAL-490] Stop 2 story pass: ok=True (3 sentences), $0.0009
+    story: "The Death of Socrates was painted by Jacques-Louis David in 1787. David completed the painting and it entered the collection of The Metropolitan Museu"
+  [LOCAL-490] Stop 1 story pass: ok=True (5 sentences), $0.0010
+    story: "Washington Crossing the Delaware was acquired by The Metropolitan Museum of Art to preserve and display this iconic image of American history. The Met"
+  [LOCAL-408] Prompt dump written to: /app/prompt_dump_stop1.txt
+Stop 1 API call cost: $0.0050 (6534 tokens, model=gpt-4.1-mini)
+  [LOCAL-569] Stop 1 attempt 1/5 story_count=3 words=270
+Stop 1 description word count: 270 words
+  [LOCAL-407] Stop 1: snippets injected but no candidate specifics extracted
+  [LOCAL-414] Stop 1: SCRUBBED banned phrases from output: ['invites contemplation']
+Stop 2 API call cost: $0.0053 (7027 tokens, model=gpt-4.1-mini)
+  [LOCAL-569] Stop 2 attempt 1/5 story_count=4 words=465
+Stop 2 description word count: 465 words
+  [LOCAL-407] Stop 2: snippets injected but no candidate specifics extracted
+Stop 4 API call cost: $0.0052 (6886 tokens, model=gpt-4.1-mini)
+  [LOCAL-569] Stop 4 attempt 1/5 story_count=2 words=408
+  [LOCAL-432] Stop 4: STORY RETRY — story_count=2 < 3, need 1 more, retrying (attempt 2/5)
+Stop 3 API call cost: $0.0054 (7135 tokens, model=gpt-4.1-mini)
+  [LOCAL-569] Stop 3 attempt 1/5 story_count=3 words=477
+Stop 3 description word count: 477 words
+  [LOCAL-407] Stop 3: snippets injected but no candidate specifics extracted
+Stop 4 API call cost: $0.0054 (7151 tokens, model=gpt-4.1-mini)
+  [LOCAL-569] Stop 4 attempt 2/5 story_count=3 words=342
+Stop 4 description word count: 342 words
+  [LOCAL-407] Stop 4: snippets injected but no candidate specifics extracted
+  [LOCAL-526] PHASE 5.17 regeneration wall: 9.3s for 4 stop(s) at max_workers=4
+    [LOCAL-487] retry judged on the story bar, not on length: cleared=False
+    [LOCAL-474] retry not better after re-gating — keeping the original gated text
+    [LOCAL-474] regenerated and re-gated: 465w (was 241w)
+    [D498] step 7c judged on the index, not on length: 66 -> 66, accepted=False
+    [LOCAL-474] retry not better after re-gating — keeping the original gated text
+    [LOCAL-474] regenerated and re-gated: 342w (was 243w)
+  [D534] removed 1 repeated sentence(s) the capped retries could not reach:
+      stop 4: The Rogers Fund itself was established to acquire works that would expand the museum’s mod
+
+  [LOCAL-474] retry summary: 4 eligible, 4 retried, 2 improved, 2 kept original
+  [LOCAL-487] triggers: 0 hollowed by gates, 1 storyless (step 7a — Michael's bar, independent of length), 1 top-value (step 7c — larger allowance), 0 repeating an earlier stop (D534), 4 thin enough for another story (D534, floor=300w). Triggers overlap and are counted separately; they do not sum to 'eligible'.
+  [LOCAL-474] each regenerated stop was re-gated before being accepted; a retry can only replace text it beats after gating.
+
+PHASE 5.10: Anti-preaching cleanup (LOCAL-44)...
+  [LOCAL-44] Stripped 0 preaching closer(s)
+
+  [LOCAL-444] Obligation audit DISABLED by L444_OBLIGATION_AUDIT=false
+[TIMING-SUB] phase=story_first step=serp_search elapsed=1.55s
+  [LOCAL-427] HTTP 429 from https://www.metmuseum.org/perspectives/series/materials-and-techniques — retrying in 2.3s (attempt 1, 30s budget remaining)
+  [LOCAL-427] HTTP 429 from https://www.metmuseum.org/perspectives/series/materials-and-techniques — retrying in 3.3s (attempt 2, 27s budget remaining)
+  [LOCAL-427] HTTP 429 from https://www.metmuseum.org/perspectives/series/materials-and-techniques — retrying in 9.0s (attempt 3, 24s budget remaining)
+  [LOCAL-427] HTTP 429 from https://www.metmuseum.org/perspectives/series/materials-and-techniques — budget exhausted after 4 attempt(s), 30s elapsed
+  [LOCAL-427] HTTP 429 from https://www.metmuseum.org/perspectives/materials-and-techniques-printmaking-lithograph — retrying in 1.9s (attempt 1, 28s budget remaining)
+  [LOCAL-427] HTTP 429 from https://www.metmuseum.org/perspectives/materials-and-techniques-printmaking-lithograph — retrying in 3.9s (attempt 2, 27s budget remaining)
+  [LOCAL-427] HTTP 429 from https://www.metmuseum.org/perspectives/materials-and-techniques-printmaking-lithograph — retrying in 9.5s (attempt 3, 23s budget remaining)
+  [LOCAL-427] HTTP 429 from https://www.metmuseum.org/perspectives/materials-and-techniques-printmaking-lithograph — retrying in 11.4s (attempt 4, 13s budget remaining)
+  [LOCAL-427] HTTP 429 from https://www.metmuseum.org/perspectives/materials-and-techniques-printmaking-lithograph — budget exhausted after 5 attempt(s), 30s elapsed
+  [LOCAL-427] HTTP 200 from https://www.facebook.com/metmuseum/videos/insider-insightsmaking-prints-and-drawings/1660378830826671/ (attempt 1)
+  [LOCAL-427] HTTP 429 from https://www.google.com/goto?url=CAESkgEB6zswFem5AEeUybyVChKJGuhP4LiSVPGd4EqZiz_uLYCSvMPoVwtaZkGF5WutJ4XRBMnWVLQjzkffy9HxND88g0wCIbpRi8-U9BRYUwSodurCXXVGNM6VbG78cHLEyH5M_CtnthbFpeq_J8QrrCbXJ1AFhBnLkWmvZmFIlgp_Ct3g1sNUcXTfYyWgvFcOOT87Kg — retrying in 2.0s (attempt 1, 30s budget remaining)
+  [LOCAL-427] HTTP 429 from https://www.google.com/goto?url=CAESkgEB6zswFem5AEeUybyVChKJGuhP4LiSVPGd4EqZiz_uLYCSvMPoVwtaZkGF5WutJ4XRBMnWVLQjzkffy9HxND88g0wCIbpRi8-U9BRYUwSodurCXXVGNM6VbG78cHLEyH5M_CtnthbFpeq_J8QrrCbXJ1AFhBnLkWmvZmFIlgp_Ct3g1sNUcXTfYyWgvFcOOT87Kg — retrying in 5.0s (attempt 2, 27s budget remaining)
+  [LOCAL-427] HTTP 429 from https://www.google.com/goto?url=CAESkgEB6zswFem5AEeUybyVChKJGuhP4LiSVPGd4EqZiz_uLYCSvMPoVwtaZkGF5WutJ4XRBMnWVLQjzkffy9HxND88g0wCIbpRi8-U9BRYUwSodurCXXVGNM6VbG78cHLEyH5M_CtnthbFpeq_J8QrrCbXJ1AFhBnLkWmvZmFIlgp_Ct3g1sNUcXTfYyWgvFcOOT87Kg — retrying in 7.9s (attempt 3, 22s budget remaining)
+  [LOCAL-427] HTTP 429 from https://www.google.com/goto?url=CAESkgEB6zswFem5AEeUybyVChKJGuhP4LiSVPGd4EqZiz_uLYCSvMPoVwtaZkGF5WutJ4XRBMnWVLQjzkffy9HxND88g0wCIbpRi8-U9BRYUwSodurCXXVGNM6VbG78cHLEyH5M_CtnthbFpeq_J8QrrCbXJ1AFhBnLkWmvZmFIlgp_Ct3g1sNUcXTfYyWgvFcOOT87Kg — retrying in 11.8s (attempt 4, 14s budget remaining)
+  [LOCAL-427] HTTP 429 from https://www.google.com/goto?url=CAESkgEB6zswFem5AEeUybyVChKJGuhP4LiSVPGd4EqZiz_uLYCSvMPoVwtaZkGF5WutJ4XRBMnWVLQjzkffy9HxND88g0wCIbpRi8-U9BRYUwSodurCXXVGNM6VbG78cHLEyH5M_CtnthbFpeq_J8QrrCbXJ1AFhBnLkWmvZmFIlgp_Ct3g1sNUcXTfYyWgvFcOOT87Kg — budget exhausted after 5 attempt(s), 30s elapsed
+  [LOCAL-427] HTTP 200 from https://www.google.com/goto?url=CAESZgHrOzAV-xWfsfeDY0qwvd_QniLEHGu0X_GGAVGYpw-V73yKF9aFOZJsGco_qc6grltW8PbdsjWRmG4NuE5T1Ibvw11bGvUkw_ibvVUgm9-lxWDrEtsiwVKjvIerCoXhsTPw3k7qPA (attempt 1)
+  [LOCAL-427] HTTP 200 from https://www.google.com/goto?url=CAESyAEB6zswFUVy9aVZ2jMug3JygrmHN6ghFsnlDXqbB7Z_GmbC2lRMvYVjlCQyN-RHxv1lWtU96YQlrcCEuglAcQ_W4znENHWkFF1fzNbf-bBgZowtWTmHL85b2BY7k0YM8a7kBWgaeljJ3mLqhLWyayaGbZx4LWeBdBoLxze-LJSL1KybWomlDIM0pqefnp0ugARHyOjfSKNNpGXas1cqCqRjRjQP1tMRC4sG9ZnLoVFlumtBN3wBc2AFKGb0HuCkXDQqh6lAOzuQaw (attempt 1)
+  [LOCAL-459] R5: Fetched 1218 chars from https://www.google.com/goto?url=CAESyAEB6zswFUVy9a
+  [LOCAL-427] HTTP 200 from https://www.google.com/goto?url=CAESfgHrOzAVB7rqTQivr22dvCuoZyHPY5lTvEBwnT_6PUz7vVk-98-Itb6QH7Hln6pzXMoCEY6uixxOnbbUWCP8BI9-hQ8gLSiLOiyqAHCZ9_EhX1_AmgER4Uo9YgAYB3Ma8x8EZyYHzZH2VHnMI2CNTEM5WdPTi53D8dPqhQlA0A (attempt 1)
+  [LOCAL-459] R5: Fetched 1851 chars from https://www.google.com/goto?url=CAESfgHrOzAVB7rqTQ
+  [LOCAL-427] HTTP 200 from https://www.google.com/goto?url=CAEShwEB6zswFTsxg4xuX9GCXoCckG7vY5MO_k17WaD2IP2UdxJmarigNgLavVCra7ZPo6gX6xIqCQyU_KmPtpA11AGysFA3Urvk1_XLKV75ih0qCTbNQUYuR9K1A2jdtmPRHOrurNh2tSakHU2bci2SFsID5UmbkkScp05-7oa_GCi5r83eiPpY2To (attempt 1)
+  [LOCAL-459] R5: Fetched 2082 chars from https://www.google.com/goto?url=CAEShwEB6zswFTsxg4
+  [D512] verb discovery: query='The Metropolitan Museum of Art printmaking process how it is mad' -> 1 new verb(s): managed
+  [D512] _AGENCY_VERB widened by 1 discovered verb(s)
+
+  [D511] PHASE 5.20: credit_line loop — object record, seeds, challenge, adjudicate, gate
+    [D501] no object record for 'The Death of Socrates (Jacques-Louis David)' — matrix unchanged
+    [D511] 4 credit_line(s) to try (0 from the matrix, 4 from the text)
+    [D501] no object record for 'The Great Wave of Kanagawa' — matrix unchanged
+    [D501] no object record for 'The Harvesters' — matrix unchanged
+    [D511] 4 credit_line(s) to try (0 from the matrix, 4 from the text)
+    [D511] 2 credit_line(s) to try (0 from the matrix, 2 from the text)
+    [D501] no object record for 'Washington Crossing the Delaware' — matrix unchanged
+    [D511] 4 credit_line(s) to try (0 from the matrix, 4 from the text)
+    [D501] no object record for 'Camouflage Self-Portrait' — matrix unchanged
+    [D511] 4 credit_line(s) to try (0 from the matrix, 4 from the text)
+[TIMING-SUB] phase=story_first step=serp_search elapsed=1.39s
+[TIMING-SUB] phase=story_first step=serp_search elapsed=1.49s
+[TIMING-SUB] phase=story_first step=serp_search elapsed=1.50s
+[TIMING-SUB] phase=story_first step=serp_search elapsed=1.55s
+[TIMING-SUB] phase=story_first step=serp_search elapsed=2.42s
+[TIMING-SUB] phase=story_first step=serp_search elapsed=1.63s
+[TIMING-SUB] phase=story_first step=serp_search elapsed=1.50s
+[TIMING-SUB] phase=story_first step=serp_search elapsed=1.54s
+[TIMING-SUB] phase=story_first step=serp_search elapsed=1.67s
+[TIMING-SUB] phase=story_first step=serp_search elapsed=1.83s
+[TIMING-SUB] phase=story_first step=serp_search elapsed=1.39s
+  [LOCAL-427] HTTP 429 from https://www.metmuseum.org/art/collection/search/435809 — retrying in 2.0s (attempt 1, 30s budget remaining)
+[TIMING-SUB] phase=story_first step=serp_search elapsed=1.64s
+[TIMING-SUB] phase=story_first step=serp_search elapsed=1.71s
+[TIMING-SUB] phase=story_first step=serp_search elapsed=2.08s
+[TIMING-SUB] phase=story_first step=serp_search elapsed=1.56s
+  [LOCAL-427] HTTP 200 from https://commons.wikimedia.org/wiki/File:Great_Wave_off_Kanagawa2.jpg (attempt 1)
+  [LOCAL-427] HTTP 429 from https://www.metmuseum.org/art/collection/search/436105 — retrying in 1.5s (attempt 1, 29s budget remaining)
+  [LOCAL-427] HTTP 429 from https://www.metmuseum.org/art/collection/search/11417 — retrying in 2.4s (attempt 1, 29s budget remaining)
+  [LOCAL-427] HTTP 200 from https://www.reddit.com/r/postcrossing/comments/1kdnapk/what_does_the_great_wave_off_kanagawa_make_you/ (attempt 1)
+  [LOCAL-427] HTTP 200 from https://en.wikipedia.org/wiki/Self-Portraits_(1986_Warhol_series) (attempt 1)
+  [LOCAL-427] HTTP 200 from https://www.philamuseum.org/objects/87487 (attempt 1)
+  [LOCAL-427] HTTP 200 from https://www.facebook.com/JadedInJapan/posts/camouflage-self-portrait-a-1986-silkscreen-print-by-20th-century-american-pop-ar/1472522611570844/ (attempt 1)
+  [LOCAL-427] HTTP 429 from https://www.metmuseum.org/art/collection/search/435809 — retrying in 4.5s (attempt 2, 27s budget remaining)
+  [LOCAL-427] HTTP 200 from https://bombayartcompany.com/elementor-11636/ (attempt 1)
+  [LOCAL-427] HTTP 429 from https://www.metmuseum.org/art/collection/search/11417 — retrying in 4.7s (attempt 2, 25s budget remaining)
+  [LOCAL-427] HTTP 429 from https://www.metmuseum.org/art/collection/search/436105 — retrying in 3.2s (attempt 2, 26s budget remaining)
+  [LOCAL-427] HTTP 200 from https://www.google.com/goto?url=CAEScAHrOzAVJfWdy0B2PJhMW7xTCT1j_EwUfHrmggsAupjkZ4YTjS0H1hLUguq9PYmj-ASHTPjKe1kdjDmInzh35An8aT1Jm2s4dQw29bFL1zLO3ssdjPjpVVa9mYdQLhttPMrlkAmKivwe5C6Gj1euT7M (attempt 1)
+  [LOCAL-427] HTTP 200 from https://www.google.com/goto?url=CAESqAEB6zswFcIKwFFvURLwtihQ9ehrEE5QoHMpfSMG0jHB3g7QV8GPRwT8YFJhQUve6gYA0qXiwQvAnobaWLw18ozIQ2Sblj37HmBsqPzthtEwTAMMKGV7ju4lFcyt_r-D2eqDnt5_QcA2_Y4e78bW3rJpJcpVwOfW_q61P1U4vU6PThqSb-bdMe5IPX1R39IJGDC4bxsMBL9tABu2Ym6d6774Dm7NM1ZeKMw (attempt 1)
+  [LOCAL-427] HTTP 200 from https://www.google.com/goto?url=CAESZgHrOzAVhqNZo4bVRhI_Z_0BIXQpN3KnvgSaXks_QydI-GRHmu_j92ONV5FdZH1CFZUic7G473H5q4lAZPRimyXx1sQxY6VRLLQhYUajt8pu4JbZHR5ZN06ekXawVZPZbjrW5ZvTcw (attempt 1)
+  [LOCAL-427] HTTP 429 from https://www.metmuseum.org/art/collection/search/435809 — retrying in 6.2s (attempt 3, 22s budget remaining)
+  [LOCAL-427] HTTP 200 from https://www.google.com/goto?url=CAESwwEB6zswFTfjsGjU3Pq47mGNHbVJlwmE4VmM9JqKco2Zw5QQzDG1XkqpcI9s1vI4_zQ3FcHZwcmiuur-RpE2A93JJIWgtlrs6Ly_DZ6GOMyMVyz974KvlucvrW-m2GL0g8hi0KLOYzLtHwlyACVaQZ0Xto9aSmV6oJINKiZ21gF_wjwiQXuk-F8Vs0qD_EONHbFvSiQNV_MwOUt1ZQILCN7_fBTMdxiQ5HKg8dZvAer3Q6g1-a6bOH6oa_6gh5YpOoSZMNI (attempt 1)
+  [LOCAL-427] HTTP 200 from https://www.google.com/goto?url=CAESZwHrOzAV8TOtawKXZgrC26_s-HzyhndD6OdkouWL0WlM3JRGlIW42BnFYrAMJGGi4C1sg1clJn3eiwbmgPZfo4qo2L1xLOZLLc4K__Iz9g0aj8hRXxwo1C0rszA6QwejmiavtKJ4eH0 (attempt 1)
+  [LOCAL-427] HTTP 200 from https://www.google.com/goto?url=CAESlAEB6zswFRoEyRemL5sRjnLbY2zzGQqIRW-oZtKd34L7Ci4vKXWMctAuJyXH83OWcjDRrzM9awhO25H5qVw56S7lVTiaX1RQdDFvzjMeGphWGDwGcHhuPRJiTTTkep_6dtig-XgqGsmvSdd1jz9LBkz-moDtC9OguOkrRlrdx0FQXIdJEAoS7DLJGtMNrunvaqr6L_Pj (attempt 1)
+  [LOCAL-427] HTTP 200 from https://www.facebook.com/mocomuseum/posts/a-face-masked-in-camouflage-but-the-eyes-speak-volumes-warhols-self-portrait-198/1077362167766382/ (attempt 1)
+  [LOCAL-427] HTTP 429 from https://www.metmuseum.org/art/collection/search/436105 — retrying in 9.6s (attempt 3, 21s budget remaining)
+  [LOCAL-427] HTTP 200 from https://www.google.com/goto?url=CAESiAEB6zswFXRmwr6B3M0QO3k1pelMDaBUAoROZMUXXuJsXt2ryi-a20OY4Vo5hDK0ud5PzTg-LnAW8Fr9AbkOUQu1AAfZOvXEr-VOBVsaCJjG-5tHsmLjNJvb1QyQeulOCHreIDTDkqJhrT-v2duIPMEzhUVnzZ-zLXpJecoZeDy7snHBEcB_ezq9 (attempt 1)
+  [LOCAL-427] HTTP 200 from https://www.google.com/goto?url=CAESfwHrOzAV6_aJymo-Xoh8TfiRE34NrD0rGogLVS0uPFC2RsnVYP9jtrd76nzQxW9uV-URRi3EkQmMPn-FFPFe3i6kMjtmdg9scVUEHNm7vImkU0sr0poqQBjlmPLsvk-8eDHWXl6ads3xy9csfzQ7tg5bH8-O_6ofaAF2lweXp8g (attempt 1)
+  [LOCAL-427] HTTP 200 from https://www.reddit.com/r/nycART/comments/1mzcg3j/when_will_the_met_display_the_great_wave_off/ (attempt 1)
+  [LOCAL-427] HTTP 200 from https://www.google.com/goto?url=CAESbwHrOzAV8ExRGDtNCPTjk6jChoveMmATFYfEB7tmYnTzVdaBt4PVdzbDbbytafbnU97JNIcbMC9P8uS86e1Gxb2cbhjueFafeio0uSswTvG_8IaPgEE7yXREgK7zX-WY-yHGzCK48HoZLdeYau99Cw (attempt 1)
+  [LOCAL-427] HTTP 429 from https://www.metmuseum.org/art/collection/search/11417 — retrying in 7.8s (attempt 3, 19s budget remaining)
+  [LOCAL-427] HTTP 200 from https://www.facebook.com/fb-answers/hokusai-great-wave-kanagawa-metropolitan-museum/ (attempt 1)
+  [LOCAL-427] HTTP 200 from https://www.instagram.com/p/Br2t0pvlYS3/ (attempt 1)
+  [LOCAL-427] HTTP 429 from https://www.google.com/goto?url=CAEScAHrOzAV7EeYEWbGQBn_wmQWAdc5AZmhkkZcYbRDGaHhweV1U95uenDxXXumnvs3jHDlGNFPdfVmdrGoazNTRNOPWPyUE321C2yqxzkJcjf8COKnkT32hGJ-x-UVAGWfi1o0z5VCiP7s2iPoF6Iu6pM — retrying in 2.2s (attempt 1, 29s budget remaining)
+[TIMING-SUB] phase=story_first step=serper_research elapsed=17.71s
+[LOCAL-828] other-venue passage dropped The Met Fifth Avenue https://www.philamuseum.org/objects/87487
+  [LOCAL-427] HTTP 429 from https://www.metmuseum.org/art/collection/search/435809 — retrying in 11.7s (attempt 4, 16s budget remaining)
+  [LOCAL-427] HTTP 429 from https://www.google.com/goto?url=CAEScAHrOzAV7EeYEWbGQBn_wmQWAdc5AZmhkkZcYbRDGaHhweV1U95uenDxXXumnvs3jHDlGNFPdfVmdrGoazNTRNOPWPyUE321C2yqxzkJcjf8COKnkT32hGJ-x-UVAGWfi1o0z5VCiP7s2iPoF6Iu6pM — retrying in 3.3s (attempt 2, 27s budget remaining)
+[TIMING-SUB] phase=story_first step=serp_search elapsed=1.50s
+  [LOCAL-427] Cache HIT: https://www.philamuseum.org/objects/87487 (2469 chars)
+  [LOCAL-459] R5: Fetched 2469 chars from https://www.philamuseum.org/objects/87487
+  [LOCAL-427] Cache HIT: https://en.wikipedia.org/wiki/Self-Portraits_(1986_Warhol_series) (21731 chars)
+  [LOCAL-459] R5: Fetched 3003 chars from https://en.wikipedia.org/wiki/Self-Portraits_(1986
+  [LOCAL-427] HTTP 200 from https://www.facebook.com/jazzoologo/posts/by-andy-warhol-camouflage-self-portrait/28202566799374903/ (attempt 1)
+  [LOCAL-427] HTTP 200 from https://www.google.com/goto?url=CAESygEB6zswFYY7rGrtcX7-IUXxadf76g-w81SfuHdTbey881jqP0x3wlq5_DTr_1RTjv9nqUa-gdXnuizVzSXvDnqeSuIfAsHV7KeLHXqWvHh0B_kCpvQzAyXQojVYI_oblQ6lT8f4Fa81xJnFu9ZxYYkdRwGI67f0HCGx8jmGL9TbQk4xeAx-AAcgviicb838x3ax0q2tVhzKV9mqm5udM5pYbP44t656gKIRdNGdE2ob8qG13nFSsbRRg-TQk0bj20pXETtaOlS_EK2m (attempt 1)
+  [LOCAL-459] R5: Fetched 3003 chars from https://www.google.com/goto?url=CAESygEB6zswFYY7rG
+  [LOCAL-427] HTTP 429 from https://www.google.com/goto?url=CAEScAHrOzAV7EeYEWbGQBn_wmQWAdc5AZmhkkZcYbRDGaHhweV1U95uenDxXXumnvs3jHDlGNFPdfVmdrGoazNTRNOPWPyUE321C2yqxzkJcjf8COKnkT32hGJ-x-UVAGWfi1o0z5VCiP7s2iPoF6Iu6pM — retrying in 8.9s (attempt 3, 24s budget remaining)
+[TIMING-SUB] phase=story_first step=serp_search elapsed=1.61s
+  [LOCAL-427] HTTP 429 from https://www.metmuseum.org/art/collection/search/11417 — budget exhausted after 4 attempt(s), 30s elapsed
+  [LOCAL-427] HTTP 200 from https://www.facebook.com/CarnegieMuseumofArt/posts/happy-birthday-andy-warholto-celebrate-were-taking-a-look-back-at-warhols-self-p/1503950495109935/ (attempt 1)
+  [LOCAL-427] HTTP 200 from https://en.wikipedia.org/wiki/George_Washington%27s_crossing_of_the_Delaware_River (attempt 1)
+  [LOCAL-427] HTTP 429 from https://www.metmuseum.org/art/collection/search/436105 — budget exhausted after 4 attempt(s), 30s elapsed
+  [LOCAL-427] HTTP 200 from https://en.wikipedia.org/wiki/The_Death_of_Socrates (attempt 1)
+  [LOCAL-427] HTTP 200 from https://guyhepner.com/andy-warhol/camouflage/camouflage-fs-ii-406-413-2 (attempt 1)
+  [LOCAL-459] R5: Fetched 2348 chars from https://guyhepner.com/andy-warhol/camouflage/camou
+  [LOCAL-427] HTTP 200 from https://www.google.com/goto?url=CAESkQEB6zswFanCHiWwLiQaFlGxM6PMUgt8IqILu0GZuZEj3UTrG1OLIx_tY4xYuXZI-aSuRiRhDdkAzQl4djxGINh0yzliNBw1oAp_vdvnklhrbvCtBLSS7hAl_-_n3knpei22fKhyrsHS6G0mXvP3AuSoiXWgvjaXXilCxSmw0mhTkePhQU56x5GD340foRs98mQC (attempt 1)
+  [LOCAL-427] HTTP 200 from https://www.americanrevolutioninstitute.org/washington-crossing-the-delaware-primary-source-analysis/ (attempt 1)
+  [LOCAL-427] HTTP 200 from https://www.youtube.com/watch?v=Fsd7X9ahy5Q (attempt 1)
+  [LOCAL-427] HTTP 200 from https://www.google.com/goto?url=CAESjgEB6zswFet_BWu8X6H6zJKzE6R_1XDVDwAYJKNYFLIx0S4NwcSE9FSpiUbZb5PyMUKXYQo4SY81Y-LQ_enoXs3kl9IbbCpF01SkmOqSECgT3128MRRbruoabSCTqE8f1p_4BOQGyoDmSPAhZ2SqUvUQNWkUpJtG9ZR4Z39Mm8pdtC2SCRo5wTCHXbBOzsRq (attempt 1)
+  [LOCAL-427] HTTP 200 from https://www.google.com/goto?url=CAES_gEB6zswFdd7y6LDQOsZ2DZXfVJrHgl5wYCT6V_1qx9SGUAkDB3m0C26hkQbrUNyZ7Kme6HJg33qGuVnm6ldCTS91rAKAofutKW3bsk3nMROtttFh7ecCY7rtzDcTazFFb3sIv6jmjIyNKygUmq0fJi2hQ_Ay_kDwkRNp5sBqJujs27rC03_0PqmPyD1GEDCxQjm1JSCt_Gz94FFstJMPr595LYsBxSJHF2uJjs18qS7y5c8EGwqIWkQSMDaRMC8-lsR89ofaH9TSoYnoMYzfVQMw377VOkR73Cyc5DhkQFCb1RTpWOFsvq8MlzrQ4WYVNoP_ofzQE-yrKkfmWucbw (attempt 1)
+  [LOCAL-427] HTTP 200 from https://www.google.com/goto?url=CAESjgIB6zswFUQadbf8sBbjdWijGTKLIT6haqnputx3W_8bEqJkJQpojGPMHM7UF1RLpRy224VuHYHyMcQjJsmDNlowa73exrQ7AavuRRl_2juSJL8u9LgZt0LEN-43gx_Cc326r33kdd41jwPE_cVDDWZ17AhXHfVJukYXVNrViMZPbGj4lNyB3RIyrlFobUE9E08_vtQY9L1VxNEBUn5znsdmGr_4fPCWc8KSEXO6FRl-f3OxnTuSF2g42au7lWgBJP4MMEfD-K9PLOJEyAGHAipMIp95LavR6le9E-vu3kqUFUDkpbxMs5KdLgLEbX17dvBajTh1C89Zb2dNTd5Jr873oITV1qhO_jZin_sgBSk (attempt 1)
+  [LOCAL-459] R5: Fetched 3003 chars from https://www.google.com/goto?url=CAESjgIB6zswFUQadb
+  [LOCAL-427] HTTP 200 from https://www.google.com/goto?url=CAEShgEB6zswFco_TslbvMCwCx6LqsbjBHxaAcsLpLgOD0hsXuPcO8Lia3Zcp6En_tt0hD-UdkDAhewmk-FEIMS8gymDC4FKvXh-l3zyYZRheghAqxlAn39bX_R8tRioDiyjXdS4xd9TatpGf2QF-89JQyXI9spFTyOVS54c74Ll182DNAQWWewumg (attempt 1)
+  [LOCAL-427] HTTP 200 from https://www.google.com/goto?url=CAESygEB6zswFbmKCdlFNpqjSLtECNHf9VeksyY1LpaB0QqZpYeWBXC03uKcWcW4vCdVXrWBGffLcDBKeQfJo9ATL-gzA6fEi7pS7HDzI_rOoDfT2TTBL3b0jj4XI_M-L003ph9Qp74gaCmarPrwixaPi10CSPNkdv5JXbKO1p5LW-3ERssX0JUHl_Jdi0sS_ExpCL3mDeNIDOWHOS4fVNDpccPgT80OYlM2P19LXvkCIfRa-Bh_idFPpC4GggC01h_0BF7ceIzxUbkEXX4k (attempt 1)
+  [LOCAL-427] HTTP 200 from https://www.google.com/goto?url=CAESdgHrOzAVLGp-6GkFzAlkCpTvA5DUCVTOVT_JvqBkJxUIyFsyGRBMrEt7sX683ZA5Slhlio2UOnNrT4KdnsxQvQOvUxoXekFABDTLeLpW8ijqcA9DV55NfHLGRNk7NXLE5dOD2YQ1sSMJliSuVKHbF0yotmdYIpw (attempt 1)
+  [LOCAL-427] HTTP 429 from https://www.metmuseum.org/art/collection/search/435809 — budget exhausted after 5 attempt(s), 30s elapsed
+  [LOCAL-427] HTTP 200 from https://en.wikipedia.org/wiki/The_Harvesters_(painting) (attempt 1)
+  [LOCAL-427] HTTP 200 from https://www.google.com/goto?url=CAESmgEB6zswFbUMe11FoxrS5j1KffEEg9hMxyuCfDUUh13gR1tMNkAJuXv1Vu-SXWwVY7bUeVvwzO4YRyXD2eXjpoUuzcIhRiBwi8qf3inL-sMd8CEODaBiE7EcqSuR4fgOzrIrEysyoqIvRyE1Y-oW-8pvk4cY8OhCD9mvlJZ9THGf6qGwn6p3h5LPhhUYGNUTAl8Y9fiX3crSLdwc (attempt 1)
+  [LOCAL-427] HTTP 200 from https://www.google.com/goto?url=CAESZgHrOzAVHgV6UrXWHQuhxSVRGxPy7lEvUBDmpUQV-0emp5_Iii6bVdPEkIioICOvUMO3dCaptqcVykFps8PwHE08ZwD-Kha6A6qFbnnihZzrNftGgkwU-FqbPSSIBcWzzeMi15EwiQ (attempt 1)
+[TIMING-SUB] phase=story_first step=serper_research elapsed=31.89s
+[LOCAL-828] other-venue passage dropped The Met Fifth Avenue https://en.wikipedia.org/wiki/George_Washington%27s_crossing_of_the_Delaware_River
+[LOCAL-828] other-venue passage dropped The Met Fifth Avenue https://www.americanrevolutioninstitute.org/washington-crossing-the-delaware-primary-source-analysis/
+  [LOCAL-427] HTTP 429 from https://www.google.com/goto?url=CAEScAHrOzAV7EeYEWbGQBn_wmQWAdc5AZmhkkZcYbRDGaHhweV1U95uenDxXXumnvs3jHDlGNFPdfVmdrGoazNTRNOPWPyUE321C2yqxzkJcjf8COKnkT32hGJ-x-UVAGWfi1o0z5VCiP7s2iPoF6Iu6pM — retrying in 11.0s (attempt 4, 13s budget remaining)
+[TIMING-SUB] phase=story_first step=serp_search elapsed=1.30s
+  [LOCAL-427] HTTP 200 from https://www.mountvernon.org/george-washington/the-revolutionary-war/washingtons-revolutionary-war-battles/the-trenton-princeton-campaign/10-facts-about-washingtons-crossing-of-the-delaware-river (attempt 1)
+  [LOCAL-459] R5: Fetched 1944 chars from https://www.mountvernon.org/george-washington/the-
+  [LOCAL-427] HTTP 200 from https://www.nj.gov/drbc/public/outreach/crossing.html (attempt 1)
+  [LOCAL-459] R5: Fetched 2561 chars from https://www.nj.gov/drbc/public/outreach/crossing.h
+  [LOCAL-427] HTTP 200 from https://www.facebook.com/journeywithmurphy/videos/washington-crossing-the-delaware-christmas-1776/2047815435763610/ (attempt 1)
+  [LOCAL-427] HTTP 200 from https://www.google.com/goto?url=CAESlQIB6zswFQ8_DYlnegm3LIctUEAowxqDcCb5Iy5bYEkue4OQXhF3w3PruwuvDZ1ob7kxJTAvNWQLKM5TntEB_7XO-1YLAy3giMuVARrGQZm2QV5DQHooKeW8tcURAR-PxQKxxLkn9i108DB_g8jtvfxX0Ea1YSluPLINglTrWOtS29QEwWQJAwbtbEqnrAFS7JfhQdlTZoBZsonI8XNYiht4Csz0TmLqqStPFHDrAkbY6tn44tdGkJMYylLFysH5zXNKyRjD287_cdD_CGZZFg4M2URo5pRp_JAWWOWP9gQq_nqGpFubd7T9pvLZwkKV6HKbcF34r9woItZiZUqXhmX1abneBqZxDcBOl7kI31VnAA6mfUNH (attempt 1)
+  [LOCAL-459] R5: Fetched 1917 chars from https://www.google.com/goto?url=CAESlQIB6zswFQ8_DY
+  [LOCAL-427] HTTP 200 from https://www.google.com/goto?url=CAESkwEB6zswFaqaW_BFJQ75bk6LHRwtZ2KPO9FSTgyW_oCZbgT26ulZmFLrVDK-TQYhzjcxtvnoYv3q3Lqd2BowyGebKPRWIfdvsvAN_bJbj2NZl8bQDm8paLMT07b1yBejY4uzmVOsjxZvPWfRbck6BnBLmc3fEKKQrC-eikUhF59qP2P6T0_zYjMtD-YzkUVR-tLWSM8 (attempt 1)
+  [LOCAL-427] HTTP 200 from https://artsandculture.google.com/asset/the-harvesters-pieter-bruegel-the-elder/PAH1oMZ5dGBkxg?hl=en (attempt 1)
+[TIMING-SUB] phase=story_first step=gemini_with_sources elapsed=4.21s
+    [D511] 1.1                    kind=inert    idx=42  C5 X3 fail:index_d515  [old gate: eventful,index]
+  [LOCAL-427] HTTP 200 from https://www.google.com/goto?url=CAESZgHrOzAVN_Ef5j8KB6hzg-jkGC5sg1AzwlPsV-2X-6Sxw8OnMoVX8boVjQf95_nc2WkFF5iH0yehVCVjDhaEbhxSyFYqworSrO0u3gHMvJE61ius8xOPfcC8s7oWa0n23SslZDobtg (attempt 1)
+  [LOCAL-427] HTTP 200 from https://www.google.com/goto?url=CAESngEB6zswFRI9b4m_oKy38jJKbEk_MOvrMq9E4klUzynQ-2FSJa5Q-KPB-trMc9z6xG299WcEARAF7oQ3iuNWAb2R7c4f0dXUUwanbrhxVZ8uEXWhbGyNVKfxFJ9BONncrU9x2faJyC2yj7dG1ac8mOZpItZfF2EaYpg0eJd6ZYuJKItztWeCFabFd-ucfeen7lQUrdy6mbM2TYQioU8kFg (attempt 1)
+  [LOCAL-427] HTTP 429 from https://www.metmuseum.org/perspectives/the-death-of-socrates-new-discoveries — retrying in 1.7s (attempt 1, 30s budget remaining)
+[TIMING-SUB] phase=story_first step=gemini_with_sources elapsed=3.41s
+    [D511] 1.1                    kind=inert    idx=26  C2 X2 fail:index_d515  [old gate: eventful,index]
+  [LOCAL-427] HTTP 200 from https://www.youtube.com/watch?v=T-XAR-p790c (attempt 1)
+  [LOCAL-427] HTTP 429 from https://www.metmuseum.org/perspectives/the-death-of-socrates-new-discoveries — retrying in 4.1s (attempt 2, 28s budget remaining)
+  [LOCAL-427] HTTP 429 from https://www.google.com/goto?url=CAESmQEB6zswFcxueNufzhtQDmh5Xld_BpnY04HQwtL5HYyBbFExKC_budTI5LrQELZWRHBJqFAmXUL2T9ffp-ptECKQkKERRflBQXt-NwL2VzmDd_As7QBxphFqVvyDcbw6i1ORWLOWLzmVV6aliOvRXavGzefjB2yU7GrjN2632ID7kZ0nqOmG5oKvCIXu2VG9f6KHdyFNmD_iBuI — retrying in 1.9s (attempt 1, 29s budget remaining)
+[TIMING-SUB] phase=story_first step=gemini_with_sources elapsed=4.44s
+  [LOCAL-427] HTTP 429 from https://www.google.com/goto?url=CAESmQEB6zswFcxueNufzhtQDmh5Xld_BpnY04HQwtL5HYyBbFExKC_budTI5LrQELZWRHBJqFAmXUL2T9ffp-ptECKQkKERRflBQXt-NwL2VzmDd_As7QBxphFqVvyDcbw6i1ORWLOWLzmVV6aliOvRXavGzefjB2yU7GrjN2632ID7kZ0nqOmG5oKvCIXu2VG9f6KHdyFNmD_iBuI — retrying in 3.1s (attempt 2, 27s budget remaining)
+[TIMING-SUB] phase=story_first step=serp_search elapsed=1.86s
+  [LOCAL-427] Cache HIT: https://www.philamuseum.org/objects/87487 (2469 chars)
+  [LOCAL-459] R5: Fetched 2469 chars from https://www.philamuseum.org/objects/87487
+  [LOCAL-427] HTTP 200 from https://www.facebook.com/JadedInJapan/posts/camouflage-self-portrait-1986-by-20th-century-american-pop-artist-andy-warhol-19/1502746818548423/ (attempt 1)
+  [LOCAL-427] Cache HIT: https://en.wikipedia.org/wiki/Self-Portraits_(1986_Warhol_series) (21731 chars)
+  [LOCAL-459] R5: Fetched 3003 chars from https://en.wikipedia.org/wiki/Self-Portraits_(1986
+[TIMING-SUB] phase=story_first step=gemini_with_sources elapsed=4.44s
+  [LOCAL-427] HTTP 429 from https://www.metmuseum.org/perspectives/the-death-of-socrates-new-discoveries — retrying in 10.3s (attempt 3, 24s budget remaining)
+  [LOCAL-427] HTTP 200 from https://www.google.com/goto?url=CAESZwHrOzAVyvlqbrCk-3ArM4cfxyUVAwepM7iCKVUbLCY_3abJOZB8MG6SFS8Ss1rYGjlts0QoLHrOLwrhrQ_0UzZ1g0eyQ0ke7IqtTAlM2wU9W0MFpAjZ_njScCgxJHcVGScVeWDQpzQ (attempt 1)
+  [LOCAL-459] R5: Fetched 2308 chars from https://www.google.com/goto?url=CAESZwHrOzAVyvlqbr
+[TIMING-SUB] phase=story_first step=serp_search elapsed=1.45s
+  [LOCAL-427] HTTP 200 from https://en.wikipedia.org/wiki/Washington_Crossing_the_Delaware_(1851_paintings) (attempt 1)
+  [LOCAL-459] R5: Fetched 2949 chars from https://en.wikipedia.org/wiki/Washington_Crossing_
+  [LOCAL-427] HTTP 429 from https://www.google.com/goto?url=CAEScAHrOzAV7EeYEWbGQBn_wmQWAdc5AZmhkkZcYbRDGaHhweV1U95uenDxXXumnvs3jHDlGNFPdfVmdrGoazNTRNOPWPyUE321C2yqxzkJcjf8COKnkT32hGJ-x-UVAGWfi1o0z5VCiP7s2iPoF6Iu6pM — budget exhausted after 5 attempt(s), 30s elapsed
+  [LOCAL-427] HTTP 200 from https://exhibits-museums.omeka.wlu.edu/exhibits/show/washington-in-the-museums--col/washington-crossing-the-delawa (attempt 1)
+  [LOCAL-459] R5: Fetched 2194 chars from https://exhibits-museums.omeka.wlu.edu/exhibits/sh
+  [LOCAL-427] HTTP 200 from https://www.instagram.com/p/DaXxz9UR0qo/ (attempt 1)
+[TIMING-SUB] phase=story_first step=serp_search elapsed=1.44s
+  [LOCAL-427] HTTP 200 from https://www.facebook.com/warholfoundation/posts/warholwednesdayover-the-course-of-his-painting-career-warhol-produced-five-major/5464837813565972/ (attempt 1)
+  [LOCAL-427] HTTP 200 from https://www.google.com/goto?url=CAESnwEB6zswFYg7E66O8z9Vuz1kQhK3Ymhw7NapDdtnPwk90gdAWW8xlQTgJVxHuUS8spFqU5DGzkTRlx4zNeMPZAAxXy9_tTR0m0FDNlwpVKPXmg_O3sKs_r9WS3gbv64xN7AYN8IVXlMWGXSCYOeQkAo394ef8_gXMO0vJybDfzuQ_XPHg7tonuRenDBMreSTMGh5GRkbQnhBrzbFjJ1Ed8o (attempt 1)
+  [LOCAL-427] HTTP 429 from https://www.google.com/goto?url=CAESmQEB6zswFcxueNufzhtQDmh5Xld_BpnY04HQwtL5HYyBbFExKC_budTI5LrQELZWRHBJqFAmXUL2T9ffp-ptECKQkKERRflBQXt-NwL2VzmDd_As7QBxphFqVvyDcbw6i1ORWLOWLzmVV6aliOvRXavGzefjB2yU7GrjN2632ID7kZ0nqOmG5oKvCIXu2VG9f6KHdyFNmD_iBuI — retrying in 7.2s (attempt 3, 23s budget remaining)
+  [LOCAL-427] HTTP 200 from https://www.google.com/goto?url=CAESvAEB6zswFdxMTOoOkOwl08Mq-52I0Z7-_hzJ4Gn33lfMqT2GZPwIgLp-64bKc5kpNokiXNdYFbT5LbawasltZhjdsx4-UoKGiZ8M3Ku_BVp3jZOACK-7Csi2F4FFTpQE4G08RoqXwa5K99GcC2vwJe3SqOmkkt5L38dm5PVA73Qem8XP4TEFto9NNMemfm-3DQpcixKUrI7fwsJWj9n8peCPTrC9QmMogyqz_JttI_cSXOFwvBTP1qEqtt5daw (attempt 1)
+  [LOCAL-427] HTTP 200 from https://guyhepner.com/andy-warhol/self-portraits-2/self-portrait-2 (attempt 1)
+  [LOCAL-459] R5: Fetched 1923 chars from https://guyhepner.com/andy-warhol/self-portraits-2
+  [LOCAL-427] HTTP 200 from https://britishart.yale.edu/sites/default/files/inline/Yinka%20Shonibare_booklet_FINAL.pdf (attempt 1)
+  [LOCAL-427] HTTP 200 from https://www.google.com/goto?url=CAESewHrOzAVzNnFy6u5fsmXz2GOc4vSs_RvFsfdybPqmFXquB3eW3Sl3nCaZWBJylAXkD3FPV1RHEIVSouX6F9xyKSdmysfTgM6ckvPqBzTPqe06JEOF84uMk4wRZhQL7lkCNKSb6KLIePqvU4G9O6IUYxg7ycP_dsvXKacyw (attempt 1)
+  [LOCAL-459] R5: Fetched 1639 chars from https://www.google.com/goto?url=CAESewHrOzAVzNnFy6
+[TIMING-SUB] phase=story_first step=serper_research elapsed=47.88s
+[LOCAL-828] other-venue passage dropped The Met Fifth Avenue https://bombayartcompany.com/elementor-11636/
+[LOCAL-828] other-venue passage dropped The Met Fifth Avenue https://bombayartcompany.com/elementor-11636/
+[LOCAL-828] other-venue passage dropped The Met Fifth Avenue https://bombayartcompany.com/elementor-11636/
+[TIMING-SUB] phase=story_first step=serp_search elapsed=1.59s
+  [LOCAL-427] Cache HIT: https://en.wikipedia.org/wiki/Washington_Crossing_the_Delaware_(1851_paintings) (28206 chars)
+  [LOCAL-459] R5: Fetched 2949 chars from https://en.wikipedia.org/wiki/Washington_Crossing_
+  [LOCAL-427] Cache HIT: https://www.americanrevolutioninstitute.org/washington-crossing-the-delaware-primary-source-analysis/ (12675 chars)
+  [LOCAL-459] R5: Fetched 3003 chars from https://www.americanrevolutioninstitute.org/washin
+  [LOCAL-427] HTTP 200 from https://www.google.com/goto?url=CAESfAHrOzAV4QNFQG-sA-80-lhocy2Glw_GoRTOwBQUPMsVGtJ2eHBdghVdH6FEBjWXaSCC1u7iMX17a3CeYxjhcwzNPpJwUvABMkKwKewoRluVXuSPJk3-0IUiY5196jmDdpWKMGCFqAvcp38yqs8DBFKrhPtCG8dxMuqTIS0 (attempt 1)
+  [LOCAL-459] R5: Fetched 655 chars from https://www.google.com/goto?url=CAESfAHrOzAV4QNFQG
+  [LOCAL-427] HTTP 200 from https://www.facebook.com/MichenerArt/posts/when-you-think-of-washington-crossing-the-delaware-you-immediately-picture-emman/1607796591356913/ (attempt 1)
+  [LOCAL-427] HTTP 200 from https://www.google.com/goto?url=CAESoQEB6zswFXzLZhufAa4wO0_wPCzYpW9MIGKConcDNIB61K6_UgRUBEME-fYtmf48qbv8q-Npeyd79S4bYY94g3PleZ7NwGryx0U8dYo4110efeEjFyOvh21EXWrA-rjg2aOFwtUaeyN-TBuEkEO5WTjdpghIHebymC3hJJEftmmyyAEOpUta6nhBrNj3JmLaxlZTuGNlnyhrw7kA2GzD-8OvXw (attempt 1)
+  [LOCAL-459] R5: Fetched 1689 chars from https://www.google.com/goto?url=CAESoQEB6zswFXzLZh
+  [LOCAL-427] HTTP 200 from https://www.google.com/goto?url=CAES3QEB6zswFW7TdwuOVnFLebkyc4YqC1fft7fNSIZK4x6IB67XsxY8EUjAloxGy5jF9AhVdWrHWTpPlFrq4otoLnwYOC85Xu7NUXJvJ_SBvJhZ_N6Q3BUw1YQUbRpayc8eXWpBWcdlnBUrPitpMTEPqanKRlhVvj3TwCdwZj7fK7P4eOXTwd3XAkVN2r3RIRBAk9DneS5R6JRScaq8-SRvCsqf4QdWJ6G_DlUJ3KCK7Pzf749ZraM_rcHKjrQX1W0sIgTRN5Ry2Dhd9DXBF_knyaa25rWsYLz5k2z9UFEsAA (attempt 1)
+[TIMING-SUB] phase=story_first step=gemini_with_sources elapsed=3.22s
+    [D511] 5.1                    kind=none     idx=5   C0 X5 fail:index_d515  [old gate: eventful,index,confirmed]
+[TIMING-SUB] phase=story_first step=serp_search elapsed=2.34s
+  [LOCAL-427] HTTP 200 from https://www.instagram.com/popular/warhol-portrait/ (attempt 1)
+  [LOCAL-427] HTTP 429 from https://www.metmuseum.org/perspectives/the-death-of-socrates-new-discoveries — budget exhausted after 4 attempt(s), 30s elapsed
+  [LOCAL-427] HTTP 429 from https://www.google.com/goto?url=CAESmQEB6zswFcxueNufzhtQDmh5Xld_BpnY04HQwtL5HYyBbFExKC_budTI5LrQELZWRHBJqFAmXUL2T9ffp-ptECKQkKERRflBQXt-NwL2VzmDd_As7QBxphFqVvyDcbw6i1ORWLOWLzmVV6aliOvRXavGzefjB2yU7GrjN2632ID7kZ0nqOmG5oKvCIXu2VG9f6KHdyFNmD_iBuI — retrying in 14.7s (attempt 4, 15s budget remaining)
+  [LOCAL-427] HTTP 200 from https://www.google.com/goto?url=CAESZwHrOzAVCK1whI4qJOHBI3V2MFUgjhv7QhzAyRnAIWOg-TbSvNKo5yPNUC7hOZRaBfKQIaQIptGvXr4wLau3gB8RgsYs5Hyz9RAbDTfX-oVQ04rY4DWGxViZB_xORBkFQLwa1y2kwAM (attempt 1)
+  [LOCAL-459] R5: Fetched 821 chars from https://www.google.com/goto?url=CAESZwHrOzAVCK1whI
+  [LOCAL-427] HTTP 200 from https://journals.openedition.org/transatlantica/577 (attempt 1)
+  [LOCAL-459] R5: Fetched 3003 chars from https://journals.openedition.org/transatlantica/57
+[TIMING-SUB] phase=story_first step=serp_search elapsed=1.32s
+  [LOCAL-427] Cache HIT: https://en.wikipedia.org/wiki/Washington_Crossing_the_Delaware_(1851_paintings) (28206 chars)
+  [LOCAL-459] R5: Fetched 1996 chars from https://en.wikipedia.org/wiki/Washington_Crossing_
+  [LOCAL-427] HTTP 200 from https://www.facebook.com/JoeMooreKHON2/posts/did-you-knowone-of-the-most-famous-paintings-of-american-history-washington-cros/968452821769395/ (attempt 1)
+  [LOCAL-427] HTTP 200 from https://www.google.com/goto?url=CAESlgEB6zswFbq1ecItzJAxKGQDTcuNoetWc1mBSL2ysy5EBQG74sfWHBJL1bkfMve3Dl9K1cecBWJYIeX6pb80uCRJDxNKNG3KaZrDoyBJq9k9bWejdFXkb-su9-UF2upMclWytf1TXsV210KKgpuqQYSpWWIEQxTF7UHo_9H-m4Mh3xHN0-2dawGk9zcvMO_yb7UiBRM3UMA (attempt 1)
+  [LOCAL-459] R5: Fetched 2230 chars from https://www.google.com/goto?url=CAESlgEB6zswFbq1ec
+[TIMING-SUB] phase=story_first step=gemini_with_sources elapsed=4.55s
+  [LOCAL-427] HTTP 200 from https://www.google.com/goto?url=CAESrQEB6zswFcVDZcgyNM7a-DZMLEwhrzTKkub4TWS1xUvQSf4vtx0fb86fHDrTWzLIigg3_clR7kiHbwcEYLeGsoeucX7IG8CUQtbQhWslaz2cr01OBdWwHS5pQy5aV9TeQ1k56icvQ0e3CWrRVG84CUlh5vquK_oKiklRktrP3ISxeWVtAobeF2e0pFNWi-K62UKY1oPmOUZDAGhUknodqKl_-OJiQkGcPBWMmaV0jw (attempt 1)
+  [LOCAL-459] R5: Fetched 2194 chars from https://www.google.com/goto?url=CAESrQEB6zswFcVDZc
+  [LOCAL-427] HTTP 200 from https://www.google.com/goto?url=CAESZgHrOzAVlTWGDumiUoG6yf2hhTr08xYNywLBsupCuYzlzQMIotcBT6e1OQfNLp2RsiVsEW7oQycgZK6C0YcHnjAV1cmZ46fy2Kbauw64jSVfNJcSBiwwWBSn8XQAYb7kDFtQmTiTlg (attempt 1)
+  [LOCAL-427] HTTP 200 from https://www.google.com/goto?url=CAESygEB6zswFViZAS3Jnr2AXiitR14FDF5ENPIKyu5CLR6SvvAqkxNSPr2zdr2h4z1oWfnPcR7rptnZ4Ox9WnCPneTQi168tt07Kr4PrIP6BotDmn1xPw1dtL3KlTsXZsFd00B2kuosEbzad4lqaCzU2cGhi_gJ4MBhRsFSbvWMshTqfj2fPNnfTqUzsmci1z9PruYOr3Xpx-9_50h2fFILudpZ4b2Z7OovHDCd97W5DYM7eyPckG2hCvmzquAzaxQKFkftA2H8Zv5CmdIm (attempt 1)
+  [LOCAL-427] HTTP 200 from https://www.google.com/goto?url=CAESggEB6zswFZbNdUJ_x6q7GRr_xsA48RNBYNKrOe576iV5X2AWHeG-3Mr_hVYnvorrWyfIt-F6Dje2pCD1dYbtpQ79vGdoy5UxnxkQ9bH5CkVplsOmB9va4LuxX9K13FSOaomcRp7_VdflugsbmAz4ltIx8CTqIYC5vW-5ieYlMeaO-Lp- (attempt 1)
+[TIMING-SUB] phase=story_first step=gemini_with_sources elapsed=4.22s
+    [D511] 12.1                   kind=none     idx=10  C0 X6 fail:index_d515  [old gate: eventful,index,confirmed]
+    [LOCAL-468] pairwise overlap: mean=0.327, max=0.327 (DIVERSE)
+      Here, the wave domin × measuring roughly 10 = 0.327
+    [D511] examined 2 credit_line(s) (indices 5, 10), no story passed, ~$0.024, 60s
+  [LOCAL-427] HTTP 200 from https://www.google.com/goto?url=CAES1QEB6zswFWSJr-MO7VdNor4gyTuaD9cdKymI9_Qd8oNm8nA7oe9tuOXSNClal1cykeKzOnwYSf34Ruhv9nQuG0mz2hOlACWT-_gb6pWmK1n73ZbRqz58IUDzkKALhSA5xphInfcRGiekK471sHBcsfUWZg9_uBTuMw-CL9qOZKJoQ8lUgPzIWf2rpdtZnsLkKRruIPuijJGo5iUdJYX1NobHD-9DrP25e5ZZyW94OqoP5H5GszpaMV9b6oyDc78xnARjkZavo3E_RPJk7B4fUjk_MyJrM4k (attempt 1)
+  [LOCAL-427] HTTP 200 from https://www.google.com/goto?url=CAESlQEB6zswFX4576H2ca5VV_abeTO53G0m_cjo_enMKieNSdRtuDXTqXSJg4XJ19SNnLwErha2zaHTswgPfKYGQo5JD1Pv9n59mbIhPR0L3Wea6iXK50UE2BhqiSPEy8d89pO2SKx_jVGnmDqmDTUvpcs6GV_7BXjupsdZHcHvTDoEbOa7wDu1F4FjHlgUaHZ0PE1s8CSEoQ (attempt 1)
+  [LOCAL-427] HTTP 200 from https://www.google.com/goto?url=CAEShQEB6zswFYzsKOydUgpEC4b-zjvdfuFTM3mVjR36MQzWpacxxAKdUh72SziwpHPNgSJC1Tth5Sg-8yIs_JNlusyVWFrwYWirs-87SFdAry68mGe-nnRN5nBtJM71QHj-vKrXXju-4_MBwnRDLzh7pthpHxjJKye3qQ4s3SOyjr1_MOG3lGLM (attempt 1)
+  [LOCAL-427] HTTP 200 from https://www.google.com/goto?url=CAESngEB6zswFTNYNKULuPzCBh_qzxurOkUmqSCYdDgSQm8ZlS5UE8yDO3gVbdpXUd_m4TZwJFMBkZ5ZR0ZnUh5WkKWjVLb_4i__fjPhHcNQtByVpyKdPjEGsfPZV0HJRArKuFXuHLV8KsuUeQhujA0ApNUKATmrTaXdTtldKpgN8KMT5-1a37DLtffvrsR72if7OcIYZSAVmjCA-IZkX-P9CQ (attempt 1)
+  [LOCAL-427] HTTP 200 from https://www.famous-trials.com/socrates/833-home (attempt 1)
+  [LOCAL-427] HTTP 200 from https://www.google.com/goto?url=CAESZwHrOzAVwzPQdu-F9vZF4NkXz81Rok-STqPKu8wUQgTgBIOqEG94wpL465gb20B6FDA2uWrZWeIbAZCEpIb0UTik224liee602Tyf84zRd0X9R-DtKd29_9p7eC_fvt2FoSrcNwc27M (attempt 1)
+  [LOCAL-427] HTTP 200 from https://www.google.com/goto?url=CAES4QEB6zswFZexoMGn4RdQkJNpjQcK00vIMxyayuFMCRdSO6wew9dqQ7BrUOLWStL0_WD3XwpDj6zHonslSAnSPbVlefTOI0sf0tG6fb5wngV-bGGtWcD0JdeLIFN8dQ0iHWHZUeQ-mtpt0kxJY6OSW5asnNSyl_eBfLpJGEqeK22NIX732FB0Kbluk71o8BkBqecXlQ1Yq7aHkx0xpuXz5_SHUqGZW3TethZDEuJ04Q6htRxvXHXq0DtGtMcZhcB9E9nbL5OvSaCG4Gxg6yTAyRx9mk2fMdTrpF3mDGaw13FOLeM (attempt 1)
+[TIMING-SUB] phase=story_first step=serper_research elapsed=62.70s
+[LOCAL-828] other-venue passage dropped The Met Fifth Avenue https://www.google.com/goto?url=CAESngEB6zswFRI9b4m_oKy38jJKbEk_MOvrMq9E4klUzynQ-2FSJa5Q-KPB-trMc9z6xG299WcEARAF7oQ3iuNWAb2R7c4f0dXUUwanbrhxVZ8uEXWhbGyNVKfxFJ9BONncrU9x2faJyC2yj7dG1ac8mOZpItZfF2EaYpg0eJd6ZYuJKItztWeCFabFd-ucfeen7lQUrdy6mbM2TYQioU8kFg
+[TIMING-SUB] phase=story_first step=serp_search elapsed=1.67s
+  [LOCAL-427] Cache HIT: https://en.wikipedia.org/wiki/Washington_Crossing_the_Delaware_(1851_paintings) (28206 chars)
+  [LOCAL-459] R5: Fetched 2949 chars from https://en.wikipedia.org/wiki/Washington_Crossing_
+  [LOCAL-427] HTTP 200 from https://www.google.com/goto?url=CAESfQHrOzAVcsGfjJfoybqthCR-i7jvPwXMoUrF-OgvDKedIvkyylC-nuOAC687yVcNf0GCuCQQjtIXttzbzgF3ZvescIjT_X_4_TSUHxxZlAVYUER3o9QTRx6mgfE5ew98_NIfdpaaT2bC-gKsmbSCoeQFdbSpAS44n9CWIupH (attempt 1)
+  [LOCAL-459] R5: Fetched 1618 chars from https://www.google.com/goto?url=CAESfQHrOzAVcsGfjJ
+[TIMING-SUB] phase=story_first step=serp_search elapsed=1.90s
+  [LOCAL-427] Cache HIT: https://en.wikipedia.org/wiki/The_Death_of_Socrates (22486 chars)
+  [LOCAL-459] R5: Fetched 2633 chars from https://en.wikipedia.org/wiki/The_Death_of_Socrate
+  [LOCAL-427] HTTP 200 from https://www.google.com/goto?url=CAESgwEB6zswFYBIvz2LlUwVkZQ9w1nh6k5UJ3jl6oqkMcZJVU433-bLN5DPUgenh4YujVJWuvFz4yFOJATd6Wu2iKiaZwA7PKvtnd4yyd3at75qx1MX0fBgCXWJBccKLImWsq-SM2OUh8TuFSDTngiu49282-4DKsvfCEbtSMSj5jfjVE9yNQ (attempt 1)
+  [LOCAL-427] HTTP 200 from https://www.google.com/goto?url=CAESZgHrOzAV_ps-PKk5EwDFaMwxRwnXyzPcrRrtkHexkl0gx7mn6uImEH8uj6YeewbVmCW9iBTVdWOfDf-POBx_3eafgT6JpIhJjyOSyUXWoYrymqViE_-dHZ2m_vPdsJxJGXaTqexCQg (attempt 1)
+[TIMING-SUB] phase=story_first step=gemini_with_sources elapsed=6.24s
+    [D511] 2.1                    kind=inert    idx=33  C1 X9 fail:index_d515  [old gate: eventful,index,confirmed]
+  [LOCAL-427] HTTP 200 from https://www.google.com/goto?url=CAESiQEB6zswFTGxmmnjMSHaRN6VpjN6jQwTaSjLvRkz2N5WF1x00Ezj3u8lthewcSL-cIiHiBBkvpJjxUJygfu2k-dOIdF3w9BaiJnSZ8k1ng0DNTvdrTOlDdGtOibH_SqJFxzltv_iVEqdRGqHIYzhezjoegI3FDLZ-I5vPE2MnoPdpzyoekhvz3EhuA (attempt 1)
+  [LOCAL-427] HTTP 429 from https://www.google.com/goto?url=CAESmQEB6zswFcxueNufzhtQDmh5Xld_BpnY04HQwtL5HYyBbFExKC_budTI5LrQELZWRHBJqFAmXUL2T9ffp-ptECKQkKERRflBQXt-NwL2VzmDd_As7QBxphFqVvyDcbw6i1ORWLOWLzmVV6aliOvRXavGzefjB2yU7GrjN2632ID7kZ0nqOmG5oKvCIXu2VG9f6KHdyFNmD_iBuI — budget exhausted after 5 attempt(s), 30s elapsed
+  [LOCAL-427] HTTP 200 from https://www.google.com/goto?url=CAESngEB6zswFeB1KBXIuProraGY1yVoUJ0k9vYUPMmE4iMqRBD8l-xJPMhPK9SMlL4CAvpoeU2aK1OPx6YEQlTBFFoz6vDw2VzY-ziDbPGYmQng-UUkykZEnU3dP7F7fVXYNHL7jkVQUInubSYi4Ux-x2C-KvXROEwQADZEqx2jDpnTVs70jQbGZ-hVFGSxyQLxI0dsgFjn_kkl40yPBfKaEw (attempt 1)
+  [LOCAL-459] R5: Fetched 3003 chars from https://www.google.com/goto?url=CAESngEB6zswFeB1KB
+  [LOCAL-427] HTTP 200 from https://www.google.com/goto?url=CAESagHrOzAV8IrI0qAwE79ZKITJisJvEMnnwMRAbUf5QfAifa6rDQ8ekG-U4tgKb0YjymyTMNlXhSr5DUahowXB34ejLpviDODP0c8lP-w2fX5pFPbYur58p3Fjjzk9kQRUS0LImikajT3geQo (attempt 1)
+  [LOCAL-427] HTTP 429 from https://www.google.com/goto?url=CAESZQHrOzAVnOn2wloykX1RG52e4HwXq_Ym-WnpnTCqdHkzgB8SzRVLYsYPz1BXIBCrZcar7D9zyJCpSbUCVsJoIdVJRC0P0cNNtcJSX4lfJhKJq0agWD-XkmBsaH-I7r93f8SMT1t- — retrying in 2.2s (attempt 1, 28s budget remaining)
+  [LOCAL-427] HTTP 200 from https://www.google.com/goto?url=CAEShAEB6zswFdlWmNB_tpVOHVD7hdhjiBzy06m4DDD8_mXDmdwUwIFd6kH4UZQCMleFkw2ZeT80pGjevkW3kI8YlFcXtKjf14NXLEQn849qcdI1vBR128ZJYJ12FTtpNNPYECQVbEzSozJQFLp1v_QW5dgaxoPryUbPWnpXzqL5LZaaYwQOpjc (attempt 1)
+  [LOCAL-459] R5: Fetched 3003 chars from https://www.google.com/goto?url=CAEShAEB6zswFdlWmN
+[TIMING-SUB] phase=story_first step=gemini_with_sources elapsed=3.33s
+  [LOCAL-427] HTTP 429 from https://www.google.com/goto?url=CAESZQHrOzAVnOn2wloykX1RG52e4HwXq_Ym-WnpnTCqdHkzgB8SzRVLYsYPz1BXIBCrZcar7D9zyJCpSbUCVsJoIdVJRC0P0cNNtcJSX4lfJhKJq0agWD-XkmBsaH-I7r93f8SMT1t- — retrying in 2.8s (attempt 2, 26s budget remaining)
+[TIMING-SUB] phase=story_first step=serp_search elapsed=1.57s
+  [LOCAL-427] HTTP 200 from https://www.facebook.com/groups/warhol.newyork/posts/3486172368155189/ (attempt 1)
+  [LOCAL-427] Cache HIT: https://guyhepner.com/andy-warhol/self-portraits-2/self-portrait-2 (19054 chars)
+  [LOCAL-459] R5: Fetched 1923 chars from https://guyhepner.com/andy-warhol/self-portraits-2
+[TIMING-SUB] phase=story_first step=gemini_with_sources elapsed=4.69s
+    [D511] 2.1                    kind=active   idx=61  C0 X0 PASS  [old gate: eventful,confirmed]
+[TIMING-SUB] phase=story_first step=gemini_with_sources elapsed=4.62s
+    [D511] 6.1                    kind=active   idx=55  C6 X3 PASS  [old gate: eventful,index]
+  [LOCAL-427] HTTP 200 from https://pictorx.com/warhol-effects/camouflage-self-portrait-1986 (attempt 1)
+  [LOCAL-459] R5: Fetched 1328 chars from https://pictorx.com/warhol-effects/camouflage-self
+  [LOCAL-427] HTTP 200 from https://www.google.com/goto?url=CAESkQEB6zswFXebl2f9WCtx7HgSbON0w8-9R5_eZb7wJG-Hve_UBFiuzoh849arNs8Vr4EjBgNIPBI1oYz00bW5wJYv76AYJuk-hDySFq4221i_jkicFwz3A-VAGwgb0EDpkD59X06_S8J1INdMpCyUhui9JEwm5SkAOEjDaqX7alAIO-VkA-7SQYmEeEIEDO2_17lQ (attempt 1)
+  [LOCAL-427] HTTP 429 from https://www.google.com/goto?url=CAESZQHrOzAVnOn2wloykX1RG52e4HwXq_Ym-WnpnTCqdHkzgB8SzRVLYsYPz1BXIBCrZcar7D9zyJCpSbUCVsJoIdVJRC0P0cNNtcJSX4lfJhKJq0agWD-XkmBsaH-I7r93f8SMT1t- — retrying in 7.1s (attempt 3, 22s budget remaining)
+  [LOCAL-427] HTTP 200 from https://www.google.com/goto?url=CAESegHrOzAVR8R4nRYeK19FkZShURan9RWq09-vQOD6hOHYXhQBO5IICEzKMiGNFxLtmmzwN83oL0UQRn9rJD9E_N1au4rBJDtpaXHmksxYXv2BX7xwJ55kAkVJlnTVcxoF0laYSkMLQcbPtEZ8k4qjiKzl-p9_uJPtPQqs (attempt 1)
+  [LOCAL-459] R5: Fetched 2645 chars from https://www.google.com/goto?url=CAESegHrOzAVR8R4nR
+[TIMING-SUB] phase=story_first step=serp_search elapsed=1.66s
+  [LOCAL-427] Cache HIT: https://www.philamuseum.org/objects/87487 (2469 chars)
+  [LOCAL-459] R5: Fetched 2469 chars from https://www.philamuseum.org/objects/87487
+[TIMING-SUB] phase=story_first step=gemini_with_sources elapsed=4.87s
+  [LOCAL-427] HTTP 200 from https://guyhepner.com/andy-warhol/camouflage (attempt 1)
+  [LOCAL-459] R5: Fetched 2308 chars from https://guyhepner.com/andy-warhol/camouflage
+[TIMING-SUB] phase=story_first step=gemini_with_sources elapsed=5.43s
+  [LOCAL-427] HTTP 200 from https://www.google.com/goto?url=CAESygEB6zswFRKKA5w482i7wh1AxGo5DmiCOH8gpSqfZ4awEPr2oy7naI0Nd5OxR9CvvTy35gsKO6Vo6tun1UvLU007PuJ34E0i-HfRbnOABAazh50eSJNV43FUO0ZEfiAQHZXKqVmZxvTNlZAYWZ59OWeG6Ii37HQg4SMMvgO6S8Z-HeJsbtKtLlwmpJ68-ikkuwJbeknb3w4wDii0zCXFxEeUDnnW6fWvaCgRO0zMPJl5kebCb5eVZ9q594zh43gCfUtS6E867rIDKNYh (attempt 1)
+  [LOCAL-427] HTTP 200 from https://www.google.com/goto?url=CAESZwHrOzAV6kqldlVG43GTdxNBcDQD3YFNLxPPOvyV8-yTdRNl39JlQ5zQgQzi3V2t5X5H_AJiKV-LMUIyckPoM_-gydsIJzBAMFLnjdnyVUFbih2GDZTnb3PhcF8j-jVD9BKit3KNX8M (attempt 1)
+  [LOCAL-459] R5: Fetched 1161 chars from https://www.google.com/goto?url=CAESZwHrOzAV6kqldl
+[TIMING-SUB] phase=story_first step=serp_search elapsed=1.90s
+[TIMING-SUB] phase=story_first step=serp_search elapsed=1.62s
+  [LOCAL-427] Cache HIT: https://en.wikipedia.org/wiki/Washington_Crossing_the_Delaware_(1851_paintings) (28206 chars)
+  [LOCAL-459] R5: Fetched 2949 chars from https://en.wikipedia.org/wiki/Washington_Crossing_
+  [LOCAL-427] HTTP 200 from https://www.reddit.com/r/todayilearned/comments/161s13z/til_the_original_version_of_washington_crossing/ (attempt 1)
+  [LOCAL-427] HTTP 200 from https://www.ebsco.com/research-starters/history/david-paints-death-socrates/ (attempt 1)
+  [LOCAL-459] R5: Fetched 2338 chars from https://www.ebsco.com/research-starters/history/da
+  [LOCAL-427] HTTP 429 from https://www.metmuseum.org/art/collection/search/679783 — retrying in 2.5s (attempt 1, 30s budget remaining)
+  [LOCAL-427] HTTP 200 from https://www.google.com/goto?url=CAESrQEB6zswFVqw3u96-25Ov_eGp1497UnR_herzFibekNGgWc23sdQrrAZxXmZ0qcyaQNh0AHld8E_T02IjfRsG0pQPBvECNbM8n-LrgxeOAOOFmq1PBgv64smV6w7AHqCVGMoCMNCjVm_ER9aqyG0A-CSc2EXj4U4vrKM0adBoDBvuCQWoCI3Uz48aWqaAK73WuOV9zkAcy3YTZMy3tGwIkF4DkETD6nrc4nqlwl6oA (attempt 1)
+  [LOCAL-459] R5: Fetched 2194 chars from https://www.google.com/goto?url=CAESrQEB6zswFVqw3u
+  [LOCAL-427] HTTP 200 from https://www.google.com/goto?url=CAESewHrOzAV95udW4Ep70kUkgMZPQBatfo_Y7bLmLLJijcpXUg2MgxHZEYdqvJ8MQffZQy9D7DTRWnR3dpvF04ISmhqY1jFGneBHN6JhiIehOQ3DjJhmgU7nsWM0YbncYGOFkHCHbn5Aw_siuQjRLAGTHnSNQkm8yf6_2Pabg (attempt 1)
+  [LOCAL-459] R5: Fetched 3003 chars from https://www.google.com/goto?url=CAESewHrOzAV95udW4
+  [LOCAL-427] HTTP 429 from https://www.google.com/goto?url=CAESZQHrOzAVnOn2wloykX1RG52e4HwXq_Ym-WnpnTCqdHkzgB8SzRVLYsYPz1BXIBCrZcar7D9zyJCpSbUCVsJoIdVJRC0P0cNNtcJSX4lfJhKJq0agWD-XkmBsaH-I7r93f8SMT1t- — retrying in 12.1s (attempt 4, 14s budget remaining)
+  [LOCAL-427] HTTP 429 from https://www.metmuseum.org/art/collection/search/679783 — retrying in 4.1s (attempt 2, 27s budget remaining)
+[TIMING-SUB] phase=story_first step=serp_search elapsed=1.59s
+  [LOCAL-427] Cache HIT: https://en.wikipedia.org/wiki/Washington_Crossing_the_Delaware_(1851_paintings) (28206 chars)
+  [LOCAL-459] R5: Fetched 2949 chars from https://en.wikipedia.org/wiki/Washington_Crossing_
+  [LOCAL-427] Cache HIT: https://www.americanrevolutioninstitute.org/washington-crossing-the-delaware-primary-source-analysis/ (12675 chars)
+  [LOCAL-459] R5: Fetched 3003 chars from https://www.americanrevolutioninstitute.org/washin
+[TIMING-SUB] phase=story_first step=gemini_with_sources elapsed=5.36s
+    [D511] 2.2                    kind=inert    idx=30  C0 X0 fail:index_d515  [old gate: eventful,index,confirmed]
+  [LOCAL-427] HTTP 200 from https://www.google.com/goto?url=CAESyQEB6zswFY-leX3zIWIokVr0hhStq98_yKMp2onQv4Ftdws8-Q_K5e-OKMMHfMoe6cbX-lIe8Ne2NlgrzJN2SJINRaOAUMPLQqO9I8crxioiaSDRL0oSo8GRehNKU-ig3ZqrQ4yhfOdyM3lK9pwIC2NsqXxvBqRrAHZEo8E_8fdkdrjHB74XTiEICe1l3nOzRFqGZUF6O-g95mT8sarr_7j80y8EZPbTRNrkRq3gcIw_FRx5ClCc48hv8LGErXT4kL2BPpD8lzg2YRg (attempt 1)
+  [LOCAL-427] HTTP 429 from https://www.metmuseum.org/art/collection/search/679783 — retrying in 8.9s (attempt 3, 23s budget remaining)
+  [LOCAL-427] HTTP 200 from https://www.google.com/goto?url=CAESZwHrOzAVLLQgc_jeyo5PUSVzloGXwUBjTJySOztyE8zOO3DEJEBu-wCqrro6HL32TFUnIS2-FZSaxnN1UmFy7lkydoM8aPOu2VSm9dQPjkcvTwCk_PzILoqkqK8XkJO8imAZTTcPKxs (attempt 1)
+  [LOCAL-427] HTTP 200 from https://www.google.com/goto?url=CAESYwHrOzAVFjc1JF8Tg6MCiJyspj9AWD4OQK3BQl9ua1HtD-3AzpDPIdQxbDioJD4dtEDw7aQPzjbUU06s5NjfDv18CxjK9dvdmvfcibWXg0iPhl-67OIzk2zeq_we3eMTilNurw (attempt 1)
+[TIMING-SUB] phase=story_first step=gemini_with_sources elapsed=4.69s
+  [LOCAL-427] HTTP 200 from https://www.google.com/goto?url=CAES1AEB6zswFYPRq-RjkYEG2b9B98jXoC-dCLTSq1_mMkPajJn18rDdfXxC-2MmQuxMxo_b8fs__RuHfIrI7LavC28pzzLB0RYCq6uKGvWkGjEWX0vHCW41zzedbt0jXXrGJuJd7Mb7luszaZVBZtplrZkuGU1lox6-4YVhPOmDnHtzOhsjZFQz-gk-X7nOXLzGQkj8SvVoTNn0WwJ6oNu8gIAKOTeTRRqmuY7aMiPC9nLPaT_Wo5Y_gE4glfn5eRpbEnIHHGs3NgZKFp5_AHcBs72TCiljlQ (attempt 1)
+[TIMING-SUB] phase=story_first step=serp_search elapsed=1.39s
+  [LOCAL-427] Cache HIT: https://www.philamuseum.org/objects/87487 (2469 chars)
+  [LOCAL-459] R5: Fetched 2469 chars from https://www.philamuseum.org/objects/87487
+  [LOCAL-427] Cache HIT: https://en.wikipedia.org/wiki/Self-Portraits_(1986_Warhol_series) (21731 chars)
+  [LOCAL-459] R5: Fetched 3003 chars from https://en.wikipedia.org/wiki/Self-Portraits_(1986
+[TIMING-SUB] phase=story_first step=serp_search elapsed=1.45s
+  [LOCAL-427] Cache HIT: https://en.wikipedia.org/wiki/Washington_Crossing_the_Delaware_(1851_paintings) (28206 chars)
+  [LOCAL-459] R5: Fetched 2949 chars from https://en.wikipedia.org/wiki/Washington_Crossing_
+  [LOCAL-427] HTTP 200 from https://www.google.com/goto?url=CAESZwHrOzAVP_RrkCB8iZ9gRu9me967Nm2RIl7AnQnI47aqiamOGfPVazVC5jBVhUunamAG8SW1YIYBrJRLtlXUPqWEV0va_zNnQVx91PY2qf_FIeA_j7pThKypM5ONGi4D7bKTbD7wF-8 (attempt 1)
+  [LOCAL-459] R5: Fetched 2308 chars from https://www.google.com/goto?url=CAESZwHrOzAVP_RrkC
+  [LOCAL-427] HTTP 200 from https://www.google.com/goto?url=CAESdgHrOzAVSICbnAVBmi-DG4kLPwKAUDC-xGqDfDjZA3X7ulXrLxoMJRjiiCM4XjqEsynRFrmVkNp_Q5-tjYqcSwfyncJtduKfRuJzrUOW9v_eAkDbTl7zOcAHn77Vdo7hv4oJL3ovG8h0JvmHokjwjxQtiU1SrM0 (attempt 1)
+  [LOCAL-459] R5: Fetched 1639 chars from https://www.google.com/goto?url=CAESdgHrOzAVSICbnA
+[TIMING-SUB] phase=story_first step=serp_search elapsed=1.60s
+  [LOCAL-427] HTTP 200 from https://revolverwarholgallery.com/top-20-andy-warhol-paintings/ (attempt 1)
+  [LOCAL-459] R5: Fetched 2645 chars from https://revolverwarholgallery.com/top-20-andy-warh
+  [LOCAL-427] HTTP 200 from https://www.missrosen.com/tag/andy-warhol/page/2/ (attempt 1)
+  [LOCAL-427] HTTP 200 from https://www.google.com/goto?url=CAES1QEB6zswFc52rGRH9HBSFQ8JBHjlC_QYEAMVa15sMC2_tmVwU4ermk0lLPxpgVQl5U__PW_ajWUckDB0WbR9zDLYKFqVUopyeZNPwZ3oxS8XvdknAokn3lVYvrLE-DFgy6cBDQ3UwcHgkZ1vXexT6UarlpaeUGEwbfeSrxhTCNUvSG1iyfsOOkhC-QtaA3A1tEgUtY31he6HxW3C1nqku9x5V1N_Ov4lYQU_bNn4Bpwyc2PyM6W9_nab1i42C2dn2YCYtFdfX6vOG4sa5NNYu8tR6QWjKgg (attempt 1)
+  [LOCAL-427] HTTP 429 from https://www.metmuseum.org/art/collection/search/679783 — budget exhausted after 4 attempt(s), 30s elapsed
+  [LOCAL-427] Cache HIT: https://en.wikipedia.org/wiki/The_Death_of_Socrates (22486 chars)
+  [LOCAL-459] R5: Fetched 2633 chars from https://en.wikipedia.org/wiki/The_Death_of_Socrate
+  [LOCAL-427] HTTP 200 from https://www.google.com/goto?url=CAESZwHrOzAVO7SsxuNmtQteCDP22A0eWR1PrYfRRQDXhlZfX8Fc_2WWKB2tAXj21YTd7UKQq3iUl6RRd6op14HxpYF7hYDN3d2Ub4pKAEaufgP_3kG_b0I7OSuKTliDQHtdUGmi38GbRF8 (attempt 1)
+  [LOCAL-459] R5: Fetched 821 chars from https://www.google.com/goto?url=CAESZwHrOzAVO7Ssxu
+  [LOCAL-427] HTTP 200 from https://www.google.com/goto?url=CAESZwHrOzAVWFUwzDPhWRsboq9b9e-PSN8eHGuyCKlJfsVUtWVvvqLXj9qVQd6cV9cKycfmeqMH9PoIUYX3ck-oPWphgo9fPIMZ_nDJnU8WLbCjWllUu2WDCS13hlo5GlKKIJdYCHEksac (attempt 1)
+  [LOCAL-459] R5: Fetched 663 chars from https://www.google.com/goto?url=CAESZwHrOzAVWFUwzD
+  [LOCAL-427] HTTP 429 from https://www.google.com/goto?url=CAESZQHrOzAVnOn2wloykX1RG52e4HwXq_Ym-WnpnTCqdHkzgB8SzRVLYsYPz1BXIBCrZcar7D9zyJCpSbUCVsJoIdVJRC0P0cNNtcJSX4lfJhKJq0agWD-XkmBsaH-I7r93f8SMT1t- — budget exhausted after 5 attempt(s), 30s elapsed
+  [LOCAL-427] HTTP 200 from https://www.google.com/goto?url=CAESfAHrOzAVd8pakppnfK3UtkYAznHd28jWft9e10RhAwhvzOdWdM1I1rfUdKEoV5ru3IuA9l0hFl0jq-dJPj4hBvTlKDKkBJ8Yn5pKxGbUmHQPf89uuaSOmKr1ESXjJg8sxQrZI9l9dP4v6uXsqMDQBMomN7exWGnTovgP9Kw (attempt 1)
+  [LOCAL-459] R5: Fetched 655 chars from https://www.google.com/goto?url=CAESfAHrOzAVd8pakp
+[TIMING-SUB] phase=story_first step=serp_search elapsed=1.39s
+  [LOCAL-427] Cache HIT: https://en.wikipedia.org/wiki/The_Death_of_Socrates (22486 chars)
+  [LOCAL-459] R5: Fetched 2633 chars from https://en.wikipedia.org/wiki/The_Death_of_Socrate
+  [LOCAL-427] HTTP 200 from https://www.google.com/goto?url=CAESXwHrOzAVS-c8vx-c5izAZ1lU8cLuzrca5rCUzFYFnhVcMw_aKv43m3-VRxENLMjQniDhA783sYLsijfc-yC4mn5G6_mvSS-oE20oCWErZ9aIq3vwrN9N1D5Baig53iaX (attempt 1)
+  [LOCAL-459] R5: Fetched 432 chars from https://www.google.com/goto?url=CAESXwHrOzAVS-c8vx
+[TIMING-SUB] phase=story_first step=serp_search elapsed=1.91s
+  [LOCAL-427] Cache HIT: https://www.mountvernon.org/george-washington/the-revolutionary-war/washingtons-revolutionary-war-battles/the-trenton-princeton-campaign/10-facts-about-washingtons-crossing-of-the-delaware-river (16789 chars)
+  [LOCAL-459] R5: Fetched 1869 chars from https://www.mountvernon.org/george-washington/the-
+  [LOCAL-427] HTTP 200 from https://www.facebook.com/groups/1874865979439648/posts/3729143560678538/ (attempt 1)
+  [LOCAL-427] HTTP 200 from https://theframeblog.com/tag/jacques-louis-david/ (attempt 1)
+  [LOCAL-459] R5: Fetched 3003 chars from https://theframeblog.com/tag/jacques-louis-david/
+  [LOCAL-427] HTTP 200 from https://www.facebook.com/USEmbassyLilongwe/posts/-didyouknowthe-famous-painting-washington-crossing-the-delaware-1851-by-emanuel-/1314698694032486/ (attempt 1)
+  [LOCAL-427] HTTP 200 from https://billofrightsinstitute.org/essays/washington-crossing-the-delaware/ (attempt 1)
+  [LOCAL-459] R5: Fetched 2413 chars from https://billofrightsinstitute.org/essays/washingto
+  [LOCAL-427] HTTP 200 from https://www.google.com/goto?url=CAEStwEB6zswFT3px2ltMF3HBOI8ApYQJit_jpEnAnWjXvSMKOTqk-ICz61Da_2447qVQnltN_b_GZQVY1C7PymBMLO0hd6zraqsq0KmFd7WK4oe-Q7M6bxK9Q1EQ-QeU3fFzOiM_vPI5ukPUoVdSpaBbb2oTTAZ9tYhbWOLLTroheCtoSp-DOabHULDqquKxVPMyONuWcpS-8xn6CjKxDl7ItT37JxMvu1IEnUz01NMkREhYkESxecgW_0 (attempt 1)
+[TIMING-SUB] phase=story_first step=gemini_with_sources elapsed=4.33s
+    [D511] 3.1                    kind=none     idx=23  C0 X5 fail:index_d515  [old gate: eventful,index,confirmed]
+    [LOCAL-468] pairwise overlap: mean=0.082, max=0.172 (DIVERSE)
+      enriched its contemp × brought it into dial = 0.095
+      enriched its contemp × allowing viewers to  = 0.172
+      enriched its contemp × exhibition was curat = 0.021
+      brought it into dial × allowing viewers to  = 0.156
+      brought it into dial × exhibition was curat = 0.026
+      allowing viewers to  × exhibition was curat = 0.019
+    [D511] examined 4 credit_line(s) (indices 42, 33, 30, 23), no story passed, ~$0.057, 105s
+  [LOCAL-427] HTTP 200 from https://www.google.com/goto?url=CAESbAHrOzAVwBVMuS-ECbm2JIzesnlV7JuRsmZFRSDp-_0yp8qgrnf1hTh8zXMevw_sz4AXQP1YdlAPhl0FqfjBtk9NVaBOvGMFtUXxtA_b7EaX3ZROl0-86hnpwBBqMG-mDjXKp4XcNe2z9969yw (attempt 1)
+  [LOCAL-427] HTTP 200 from https://www.google.com/goto?url=CAESYwHrOzAVGW4_7gcYOrBKqKNBfMtowO51MX0Dv1PFxJuPriEmkp5EX5riJz_vkBfNtsg_UhJvYRFS5gBvjlvTAW8Wl1p8EgnKuZMuCnesdWWQyr68ILSlU1O2XZK_mkmYydDkdw (attempt 1)
+  [LOCAL-427] HTTP 200 from https://www.google.com/goto?url=CAEScwHrOzAVIPlmms7CqkioGWF2UCGc31OBLNs4Et32JJOuVtCSLupGNitZQvSYAy-kdmAeXbMWelrNMmSJe7RCVcPf4UzMcpLBq5dejlFdONJHk_orO1rKzZZPqhb6WFX_LZRZMKUrnc8w9dzRjaUFAaePE2A (attempt 1)
+  [LOCAL-427] HTTP 200 from https://www.google.com/goto?url=CAESggEB6zswFRITA4SJz9mc4ov8T2KqHvjWAobvO3Y4sZ42NwEclXVBeH2Jl83WYBAnF-fDEVmfnle8xazR2ohBgzq0e044lzDONsRs7VXynpxQLMV-iHV1nSTb634M0OlcoAStqOjL4cMS8--BdBJCsWfMJZv_zYTOPSlOxtu_Ziq3RMPs (attempt 1)
+  [LOCAL-459] R5: Fetched 2572 chars from https://www.google.com/goto?url=CAESggEB6zswFRITA4
+[TIMING-SUB] phase=story_first step=gemini_with_sources elapsed=4.68s
+    [D511] 7.1                    kind=active   idx=45  C1 X12 fail:index_d515  [old gate: eventful,index,confirmed]
+  [LOCAL-427] Timeout from https://www.google.com/goto?url=CAESngEB6zswFRjHvn_ZMgtzq9RHdVzKVMEvg_mCzIjYUuoieZ9yHZlmQSrnHhNIv5bdu5sFddaGdyFDE_z4S5_p_i7bIO3_j6QT6_VbI23kPwsUMtqvzVVDEO7XqRYUHq1a_60Zo6p80uKf5VqCzx3rbYNkJPtFSCIixm12nOS-WnDiVhviHFruBedVcdv8UYE_EQkTxoITsyC9KB8k9oPSmg — retrying in 2.0s
+[TIMING-SUB] phase=story_first step=gemini_with_sources elapsed=5.75s
+    [D511] 2.2                    kind=inert    idx=58  C2 X6 fail:no_invented_person  [old gate: eventful,index]  UNGROUNDED:Europe
+[TIMING-SUB] phase=story_first step=gemini_with_sources elapsed=4.21s
+[TIMING-SUB] phase=story_first step=gemini_with_sources elapsed=3.74s
+[TIMING-SUB] phase=story_first step=gemini_with_sources elapsed=3.47s
+    [D511] 8.1                    kind=none     idx=5   C0 X6 fail:index_d515  [old gate: eventful,index,confirmed]
+[TIMING-SUB] phase=story_first step=gemini_with_sources elapsed=2.83s
+    [D511] 3.1                    kind=none     idx=5   C0 X6 fail:index_d515  [old gate: eventful,index,confirmed]
+    [LOCAL-468] pairwise overlap: mean=0.062, max=0.150 (DIVERSE)
+      Washington's daring  × allowed him to achie = 0.083
+      Washington's daring  × emphasizing the peri = 0.089
+      Washington's daring  × embodying steadfast  = 0.008
+      allowed him to achie × emphasizing the peri = 0.150
+      allowed him to achie × embodying steadfast  = 0.018
+      emphasizing the peri × embodying steadfast  = 0.022
+    [D511] examined 4 credit_line(s) (indices 26, 61, 58, 5), STORY ACCEPTED at 61, ~$0.057, 122s
+[TIMING-SUB] phase=story_first step=gemini_with_sources elapsed=5.77s
+[TIMING-SUB] phase=story_first step=serp_search elapsed=1.40s
+  [LOCAL-427] HTTP 200 from https://en.wikipedia.org/wiki/Jacques-Louis_David (attempt 1)
+  [LOCAL-459] R5: Fetched 3003 chars from https://en.wikipedia.org/wiki/Jacques-Louis_David
+  [LOCAL-427] HTTP 200 from https://apollo-magazine.com/jacques-louis-david-drawings-radical-met/ (attempt 1)
+  [LOCAL-459] R5: Fetched 1999 chars from https://apollo-magazine.com/jacques-louis-david-dr
+  [LOCAL-427] HTTP 200 from https://dlab.epfl.ch/wikispeedia/wpcd/wp/j/Jacques-Louis_David.htm (attempt 1)
+  [LOCAL-459] R5: Fetched 523 chars from https://dlab.epfl.ch/wikispeedia/wpcd/wp/j/Jacques
+[TIMING-SUB] phase=story_first step=serp_search elapsed=1.50s
+  [LOCAL-427] HTTP 200 from https://diposit.ub.edu/bitstreams/b8034268-c6dd-4b6f-a106-e339b809cfb6/download (attempt 1)
+  [LOCAL-427] Timeout from https://www.google.com/goto?url=CAESngEB6zswFRjHvn_ZMgtzq9RHdVzKVMEvg_mCzIjYUuoieZ9yHZlmQSrnHhNIv5bdu5sFddaGdyFDE_z4S5_p_i7bIO3_j6QT6_VbI23kPwsUMtqvzVVDEO7XqRYUHq1a_60Zo6p80uKf5VqCzx3rbYNkJPtFSCIixm12nOS-WnDiVhviHFruBedVcdv8UYE_EQkTxoITsyC9KB8k9oPSmg — budget exhausted (2 attempts)
+  [LOCAL-427] HTTP 200 from https://www.google.com/goto?url=CAESXwHrOzAVdXfYYwZaKliVP4qtI8kJblj7Ry4MzG3jl4e_G15w6Wj7gcY6bEHkP_aAPg_5jScYI1y6BL6xONU754svG2X1lAZyZTmvcUGuX7NXCZACw29uHpVx6pSNfNHh&gsessionid=qeJKwXN9taIGEMWzqG9XFJze4n2VfvV8BrblPwfdVCBzZWBHU4CwgA (attempt 1)
+  [LOCAL-459] R5: Fetched 323 chars from https://www.google.com/goto?url=CAESXwHrOzAVdXfYYw
+  [LOCAL-427] HTTP 200 from https://www.google.com/goto?url=CAESagHrOzAVJ7dBxRDZ0JsF0kcHznIngGkZ4HAgmHkOabwxyywnGucLuMBUvF2pVH83-D-edLz8drHYDaF7-szsCkp7X9YgaqRosS8lKLxfbp8JFXi282hLM-lAThvQM3m2iVPmsZL6P79e-2I (attempt 1)
+  [LOCAL-427] HTTP 200 from https://www.facebook.com/ArtPassionGallery/posts/pieter-bruegel-the-elder-flemish-1525-1569-the-harvesters-oil-on-canvas-1565-119/1083530976893688/ (attempt 1)
+  [LOCAL-427] HTTP 200 from https://www.google.com/goto?url=CAES1AEB6zswFS4X_amJcv6yr0NArJgZ56I4TpFwyghEyh-R-3_V6XMIKT2LDuCdOwRP4jSrM8K4sDa58K6o_ssX15_DWsyoAWcNF-7-UA2nD9KkcP-igjNgnGYghj7Eafqd0snCnLqzwaJlKv_fd4RqcIbAoyDVHUlUpmGxGp56VcYqY5RaGhdP4q7X7M-S_JqfOzRJB-BRSUGBdCW--OhuinCPCInwY4BbJXNjdYXTzdwK27LEmSwFkwh71JLmezx6qse5zcDWPXk9dEELpxD0qRxifxZtkw&gsessionid=qeJKwXN9taIGEMWzqG9XFJze4n2VfvV8BrblPwfdVCBzZWBHU4CwgA (attempt 1)
+  [LOCAL-459] R5: Fetched 2183 chars from https://www.google.com/goto?url=CAES1AEB6zswFS4X_a
+  [LOCAL-427] HTTP 200 from https://atsunnyside.blog/2021/11/06/pieter-bruegel-the-elder-the-harvesters-1565/ (attempt 1)
+  [LOCAL-427] HTTP 200 from https://www.google.com/goto?url=CAEShgEB6zswFctagyvaocl912lH9jcZhc00IgJS7jZWCf5QATcWlbxJnH5lzrxlSrhTa5qPOAdtFrQRztqvzbOuHjlsZQLBy6K9l2VC_2OyKMkSgbG8Ih1diZuRCVPWbjNEqZtaKvWRfo2rBHwgL2U47cpsU2DJEt8Iug4x6eDrZ_mpz3xIACIwfw&gsessionid=qeJKwXN9taIGEMWzqG9XFJze4n2VfvV8BrblPwfdVCBzZWBHU4CwgA (attempt 1)
+[TIMING-SUB] phase=story_first step=serper_research elapsed=137.91s
+[LOCAL-828] other-venue passage dropped The Met Fifth Avenue https://en.wikipedia.org/wiki/The_Harvesters_(painting)
+[LOCAL-828] other-venue passage dropped with the others displayed in museums https://en.wikipedia.org/wiki/The_Harvesters_(painting)
+  [LOCAL-427] HTTP 200 from https://www.google.com/goto?url=CAESsAEB6zswFSZRoRHon9jrD9MbIk7pKJ1kwipBQsPd7_Xq9uyAKLgy74h77bdlOMGK4eUB-Ol99zYvrpRlA4QV8aOWHIq5oTltL9KN5kNvON6jF_PoZyJg9vV1BzPdreaD4IHrmqNb1XKVQBMobczBQmagPo1p1srLSgHzhudCktU7zfpgaLkjW6YUrPiSVLIb-yClK9-2ROmKYyAJUTMHXO7ECjgO86X5paVXhzPqawfcPg&gsessionid=qeJKwXN9taIGEMWzqG9XFJze4n2VfvV8BrblPwfdVCBzZWBHU4CwgA (attempt 1)
+  [LOCAL-427] HTTP 200 from https://www.google.com/goto?url=CAESlAEB6zswFWfiAEc9CvElV9ygIRoSSI3_qmckukq6VZYJ6GgmuwGnXiJl3BG3Wcx-7U9uXkHlHhgvekJoECL4xZDNvCyNk29Q4VRU4Fkc5MTqjiQ6XZFVC4iFawNt_Ke3wjsH1Rntfgvf0lRCLFie2jAiF-FqsK3oRHSszqyedb4zoF-DpGUdGPkABY6RehYdkvlmDqk3&gsessionid=qeJKwXN9taIGEMWzqG9XFJze4n2VfvV8BrblPwfdVCBzZWBHU4CwgA (attempt 1)
+[TIMING-SUB] phase=story_first step=serp_search elapsed=2.22s
+  [LOCAL-427] Cache HIT: https://en.wikipedia.org/wiki/The_Harvesters_(painting) (11917 chars)
+  [LOCAL-459] R5: Fetched 3003 chars from https://en.wikipedia.org/wiki/The_Harvesters_(pain
+  [LOCAL-427] Cache HIT: https://artsandculture.google.com/asset/the-harvesters-pieter-bruegel-the-elder/PAH1oMZ5dGBkxg?hl=en (2446 chars)
+  [LOCAL-459] R5: Fetched 1496 chars from https://artsandculture.google.com/asset/the-harves
+  [LOCAL-427] HTTP 200 from https://www.facebook.com/paintingandfineart/posts/pieter-bruegel-harvesters-1565art-painting/1188014270121597/ (attempt 1)
+  [LOCAL-427] HTTP 429 from https://www.google.com/goto?url=CAESfQHrOzAVzgzjtCL0HUp8TdC_rpd5cZJriScTGV8XFTZTprqCCzOxYJDdWt1OR_dHyaKzZhMcE4HWYNNgJz7VaTRKza1eYeigGoedFpBveyLbtTef32ABS8Xujsyztu7dRTdaFM_cCm_JDeIIUCNUPmJKGf966iqTlJfqO1SP — retrying in 2.2s (attempt 1, 29s budget remaining)
+  [LOCAL-427] HTTP 429 from https://www.google.com/goto?url=CAESfQHrOzAVzgzjtCL0HUp8TdC_rpd5cZJriScTGV8XFTZTprqCCzOxYJDdWt1OR_dHyaKzZhMcE4HWYNNgJz7VaTRKza1eYeigGoedFpBveyLbtTef32ABS8Xujsyztu7dRTdaFM_cCm_JDeIIUCNUPmJKGf966iqTlJfqO1SP — retrying in 3.4s (attempt 2, 27s budget remaining)
+[TIMING-SUB] phase=story_first step=gemini_with_sources elapsed=4.43s
+    [D511] 8.2                    kind=active   idx=37  C1 X6 fail:index_d515  [old gate: eventful,index,confirmed]
+    [LOCAL-468] pairwise overlap: mean=0.041, max=0.073 (DIVERSE)
+      suggesting a higher  × contrast with Socrat = 0.068
+      suggesting a higher  × David's choice of oi = 0.011
+      suggesting a higher  × emphasizing the phys = 0.070
+      contrast with Socrat × David's choice of oi = 0.012
+      contrast with Socrat × emphasizing the phys = 0.073
+      David's choice of oi × emphasizing the phys = 0.014
+    [D511] examined 4 credit_line(s) (indices 55, 45, 5, 37), STORY ACCEPTED at 55, ~$0.053, 144s
+  [LOCAL-427] HTTP 429 from https://www.google.com/goto?url=CAESfQHrOzAVzgzjtCL0HUp8TdC_rpd5cZJriScTGV8XFTZTprqCCzOxYJDdWt1OR_dHyaKzZhMcE4HWYNNgJz7VaTRKza1eYeigGoedFpBveyLbtTef32ABS8Xujsyztu7dRTdaFM_cCm_JDeIIUCNUPmJKGf966iqTlJfqO1SP — retrying in 8.4s (attempt 3, 23s budget remaining)
+  [LOCAL-427] HTTP 429 from https://www.google.com/goto?url=CAESfQHrOzAVzgzjtCL0HUp8TdC_rpd5cZJriScTGV8XFTZTprqCCzOxYJDdWt1OR_dHyaKzZhMcE4HWYNNgJz7VaTRKza1eYeigGoedFpBveyLbtTef32ABS8Xujsyztu7dRTdaFM_cCm_JDeIIUCNUPmJKGf966iqTlJfqO1SP — budget exhausted after 4 attempt(s), 30s elapsed
+  [LOCAL-427] HTTP 200 from https://www.google.com/goto?url=CAEScgHrOzAV2e9tXmxjydIhRnTbC-N1bH_2MBP1CJe5219SrJ-2SNqWTKQLrgOj6IJW-XsBVJ85M8Xh7ue7yiAbKa4uGQh1CrdA3cyBshglb5mMldbhAyG0yq6sg1y-3udEAt1vewpBcp9HCOTYb0GLP5fhJg (attempt 1)
+  [LOCAL-459] R5: Fetched 1985 chars from https://www.google.com/goto?url=CAEScgHrOzAV2e9tXm
+[TIMING-SUB] phase=story_first step=serp_search elapsed=1.39s
+  [LOCAL-427] HTTP 200 from https://www.thehistoryofart.org/pieter-bruegel/harvesters/ (attempt 1)
+  [LOCAL-459] R5: Fetched 1537 chars from https://www.thehistoryofart.org/pieter-bruegel/har
+  [LOCAL-427] HTTP 200 from https://www.artatlas.site/en/masterpieces/the-harvesters-pieter-brueghel-the-elder-q776175/ (attempt 1)
+  [LOCAL-459] R5: Fetched 2562 chars from https://www.artatlas.site/en/masterpieces/the-harv
+  [LOCAL-427] HTTP 500 from https://www.google.com/goto?url=CAESegHrOzAVP4cG3CpSSAMsHqjXvUR2pUzf52bksL5tsq3PTvQIAxH1nf9XpdD9xeFQOPT3bBa-jUecRvTnBM1M0iAPR2HI8DX5ORtu7Q2dkV1_vVC0TJdeXiA82vnC1VS1D8SvsskeSUOLIHp45XWRp7bla3Y09tPnqEtA — retrying in 2.2s (attempt 1, 30s budget remaining)
+  [LOCAL-427] HTTP 500 from https://www.google.com/goto?url=CAESegHrOzAVP4cG3CpSSAMsHqjXvUR2pUzf52bksL5tsq3PTvQIAxH1nf9XpdD9xeFQOPT3bBa-jUecRvTnBM1M0iAPR2HI8DX5ORtu7Q2dkV1_vVC0TJdeXiA82vnC1VS1D8SvsskeSUOLIHp45XWRp7bla3Y09tPnqEtA — retrying in 3.3s (attempt 2, 27s budget remaining)
+  [LOCAL-427] HTTP 500 from https://www.google.com/goto?url=CAESegHrOzAVP4cG3CpSSAMsHqjXvUR2pUzf52bksL5tsq3PTvQIAxH1nf9XpdD9xeFQOPT3bBa-jUecRvTnBM1M0iAPR2HI8DX5ORtu7Q2dkV1_vVC0TJdeXiA82vnC1VS1D8SvsskeSUOLIHp45XWRp7bla3Y09tPnqEtA — retrying in 6.9s (attempt 3, 23s budget remaining)
+  [LOCAL-427] HTTP 500 from https://www.google.com/goto?url=CAESegHrOzAVP4cG3CpSSAMsHqjXvUR2pUzf52bksL5tsq3PTvQIAxH1nf9XpdD9xeFQOPT3bBa-jUecRvTnBM1M0iAPR2HI8DX5ORtu7Q2dkV1_vVC0TJdeXiA82vnC1VS1D8SvsskeSUOLIHp45XWRp7bla3Y09tPnqEtA — budget exhausted after 4 attempt(s), 30s elapsed
+  [LOCAL-427] HTTP 200 from https://www.google.com/goto?url=CAEShwEB6zswFdNxYIBguuP8PoK2tLgbmYCXjOP1yj37TVBnamtJ5o-si6bITLMfBkUQXc1eq_ribKZTKvAT5ufDsL09aXdBm47SBOFUWdmTI2kVStoaipELvS9pElDDbHAJp2uIa3T9VtwjrlbIDYKiJmoZIXU675OFz5gBI_7BZyYlLC_ox7Kh0ts (attempt 1)
+  [LOCAL-459] R5: Fetched 3003 chars from https://www.google.com/goto?url=CAEShwEB6zswFdNxYI
+[TIMING-SUB] phase=story_first step=gemini_with_sources elapsed=6.26s
+    [D511] 1.1                    kind=inert    idx=41  C6 X4 fail:no_invented_person,index_d515  [old gate: eventful,index]  UNGROUNDED:Europe
+[TIMING-SUB] phase=story_first step=gemini_with_sources elapsed=3.47s
+[TIMING-SUB] phase=story_first step=serp_search elapsed=1.65s
+  [LOCAL-427] Cache HIT: https://artsandculture.google.com/asset/the-harvesters-pieter-bruegel-the-elder/PAH1oMZ5dGBkxg?hl=en (2446 chars)
+  [LOCAL-459] R5: Fetched 2379 chars from https://artsandculture.google.com/asset/the-harves
+  [LOCAL-427] HTTP 200 from https://www.instagram.com/reel/DNyokSS4ihP/?hl=en (attempt 1)
+  [LOCAL-427] HTTP 500 from https://www.getty.edu/cona/CONAFullSubject.aspx?subid=700000317 — retrying in 2.1s (attempt 1, 30s budget remaining)
+  [LOCAL-427] HTTP 500 from https://www.getty.edu/cona/CONAFullSubject.aspx?subid=700000317 — retrying in 4.9s (attempt 2, 27s budget remaining)
+  [LOCAL-427] HTTP 500 from https://www.getty.edu/cona/CONAFullSubject.aspx?subid=700000317 — retrying in 7.2s (attempt 3, 22s budget remaining)
+  [LOCAL-427] HTTP 500 from https://www.getty.edu/cona/CONAFullSubject.aspx?subid=700000317 — retrying in 14.4s (attempt 4, 15s budget remaining)
+  [LOCAL-427] HTTP 500 from https://www.getty.edu/cona/CONAFullSubject.aspx?subid=700000317 — budget exhausted after 5 attempt(s), 30s elapsed
+  [LOCAL-427] HTTP 200 from https://commons.wikimedia.org/wiki/File:The_Harvesters.jpg (attempt 1)
+  [LOCAL-459] R5: Fetched 3003 chars from https://commons.wikimedia.org/wiki/File:The_Harves
+  [LOCAL-427] HTTP 200 from https://www.google.com/goto?url=CAESYwHrOzAVcq-DBVJmhxtKoU_8mhenKFrlGxrWPGniYk0XxOmb0TpwHUvnOYgQPxkwGiYoIJXW5eBTxz5eYjRmkFNqXsRqJiqcdNj0UzJs4C6kJC-PTB4YxemrPxs6iRu10HCYBA (attempt 1)
+  [LOCAL-427] HTTP 200 from https://www.google.com/goto?url=CAESggEB6zswFaSoSh92V5KjrekNyPavjK0_gZAToRcjJJxj4kLlbkX3_mPrLtXowuyQxwS3jQAI4gnC0THpywP9X4K9SJAge1QYT3tt-Gc1fKCyTOlqh_98LOwqSb1MedWTSqFZlcIN3hM8sbQ4vy2dmNEIUt3FC6E4DQ0-CvrqmHxRygRY (attempt 1)
+  [LOCAL-427] HTTP 200 from https://www.google.com/goto?url=CAESfwHrOzAVpXj6f692A0pVfZTWQnA_t0IDgUMxR-wQYcv-jzZMPo0R47fSrfOjpwalQ70H0_g2ZGeshvugPKrt5Q7EW4ImFLtfuCpevWNThbwlAtG6WfGl9Uc5NyVh2XXvWf8LOzEJMkRK0EUbq4A4gxQlw_UglfKTlnR7-xyoiVA (attempt 1)
+  [LOCAL-459] R5: Fetched 1644 chars from https://www.google.com/goto?url=CAESfwHrOzAVpXj6f6
+[TIMING-SUB] phase=story_first step=gemini_with_sources elapsed=4.31s
+    [D511] 4.1                    kind=inert    idx=54  C1 X6 PASS  [old gate: eventful,index,confirmed]
+[TIMING-SUB] phase=story_first step=gemini_with_sources elapsed=5.64s
+[TIMING-SUB] phase=story_first step=serp_search elapsed=1.36s
+  [LOCAL-427] Cache HIT: https://en.wikipedia.org/wiki/The_Harvesters_(painting) (11917 chars)
+  [LOCAL-459] R5: Fetched 3003 chars from https://en.wikipedia.org/wiki/The_Harvesters_(pain
+  [LOCAL-427] HTTP 200 from https://app.fta.art/artwork/a8ce3c50d010618a58643a6416f0a603c9006b6f (attempt 1)
+  [LOCAL-459] R5: Fetched 1588 chars from https://app.fta.art/artwork/a8ce3c50d010618a58643a
+  [LOCAL-427] HTTP 200 from https://www.facebook.com/groups/935608920107986/posts/1485826011752938/ (attempt 1)
+  [LOCAL-427] HTTP 200 from https://www.google.com/goto?url=CAESjgEB6zswFaqGTkMgoc3KzzCtr1bOX59zp0KG-vh6J3EOLXjf0yZFnwevw4cDKHmwbBs13U9Lj4rtM8T31e5tDkw3Qfos_MP5u3wApMh5F5wB4FEGMDJVBZ0IB6drRXCBZuVCgYB0TJ-xVEulyJ7pYflpAH_-JIvzWYGKwnYgLS5mZjrHCPjdqeG6dvrXP1Ek (attempt 1)
+  [LOCAL-427] HTTP 200 from https://www.google.com/goto?url=CAESZwHrOzAVRbIcy-fXC1-kzN9Du6IN3nEyvXcAwWYt3I21DlL5YEMbMZ6OhvV6QOWus9hA6lV5AybBXikWVc0mgeNg_U-Z-_4HZ98-XsVU3xsBvrNLrjSLXUsjYjgwSlPc_G7lPFYtWY8 (attempt 1)
+[TIMING-SUB] phase=story_first step=serp_search elapsed=4.15s
+  [LOCAL-427] HTTP 200 from https://www.facebook.com/metmuseum/posts/during-my-ten-years-of-working-as-a-guard-at-the-met-no-picture-rewarded-my-atte/985043380334983/ (attempt 1)
+  [LOCAL-427] HTTP 200 from https://www.instagram.com/p/C_eDkOgvSUB/?hl=en (attempt 1)
+  [LOCAL-427] Cache HIT: https://artsandculture.google.com/asset/the-harvesters-pieter-bruegel-the-elder/PAH1oMZ5dGBkxg?hl=en (2446 chars)
+  [LOCAL-459] R5: Fetched 2379 chars from https://artsandculture.google.com/asset/the-harves
+  [LOCAL-427] HTTP 200 from https://www.google.com/goto?url=CAESZgHrOzAV1NI0Jw1kpayaHiJfE2uV_DfIoqNDcji8TBXfSrKGEmu8Eqt_ZnfKjQwenMFfIlQAo-UuH5rGY9wRr6Lir7r48MXdGeVTGjxlCUT_7J-IZS4yILoEk1hlH0szw2g_0qR62A (attempt 1)
+  [LOCAL-427] HTTP 200 from https://www.google.com/goto?url=CAESjAEB6zswFUo6U5GLsyTFCA8jkUDgspLbQo8oens4UuKTwI8qrvgIQYunTxsKQB7wjj_251kBPvfsOgAClHjR-O37blU0TIHZ0dDaRGcxO6gobhL-Tg_sYR6ausY9qfF08YbO-OI4368jmUinRCwcSl0Bbzl_P4cechE-QPsSOLcQDJZu9lKfBYztcZ7Njg (attempt 1)
+  [LOCAL-459] R5: Fetched 2488 chars from https://www.google.com/goto?url=CAESjAEB6zswFUo6U5
+  [LOCAL-427] HTTP 200 from https://www.google.com/goto?url=CAESegHrOzAVRwAijDJnlHuakn_9xx9TdWNwQ1ZqgC2SiFl6cS0k6WPFC3PyGfGeZYx_UDOcaL-G4eSqWEhc7OOxO3VoB905Pr5y5b7fB7NpW995IbuKIzkRyevAwNZR7arv3Kc2gS3M_p48dpcqVXyjv4pGA2rHm24QhRct (attempt 1)
+[TIMING-SUB] phase=story_first step=gemini_with_sources elapsed=5.02s
+    [D511] 5.1                    kind=none     idx=64  C2 X6 PASS  [old gate: eventful,confirmed]
+[TIMING-SUB] phase=story_first step=gemini_with_sources elapsed=4.73s
+[TIMING-SUB] phase=story_first step=serp_search elapsed=1.66s
+  [LOCAL-427] Cache HIT: https://artsandculture.google.com/asset/the-harvesters-pieter-bruegel-the-elder/PAH1oMZ5dGBkxg?hl=en (2446 chars)
+  [LOCAL-459] R5: Fetched 2379 chars from https://artsandculture.google.com/asset/the-harves
+  [LOCAL-427] HTTP 200 from http://janbrueghel.net/pieterbruegel/the-harvesters-august-september (attempt 1)
+  [LOCAL-459] R5: Fetched 1644 chars from http://janbrueghel.net/pieterbruegel/the-harvester
+  [LOCAL-427] HTTP 429 from https://www.metmuseum.org/art/collection/search/437326 — retrying in 2.0s (attempt 1, 30s budget remaining)
+  [LOCAL-427] HTTP 429 from https://www.metmuseum.org/art/collection/search/437326 — retrying in 5.2s (attempt 2, 28s budget remaining)
+  [LOCAL-427] HTTP 429 from https://www.metmuseum.org/art/collection/search/437326 — retrying in 9.2s (attempt 3, 22s budget remaining)
+  [LOCAL-427] HTTP 429 from https://www.metmuseum.org/art/collection/search/437326 — budget exhausted after 4 attempt(s), 30s elapsed
+  [LOCAL-427] HTTP 200 from https://www.google.com/goto?url=CAESdQHrOzAVxay_THN-YZfE01VrNwUSXTY6vgsi6bl581UI-yiKQaUMaJiAVCDvNZl0v-Nc1HPM_RseMzP2JN4ZZCjGaiJSch6iixBWjijlxn1C0Yx2kAJ_l4ZGTXj9ow_cZnbMIBvjtPJBcOB-q4Kux-e22ZKIvA (attempt 1)
+  [LOCAL-459] R5: Fetched 3003 chars from https://www.google.com/goto?url=CAESdQHrOzAVxay_TH
+[TIMING-SUB] phase=story_first step=gemini_with_sources elapsed=4.84s
+    [D511] 7.1                    kind=none     idx=37  C3 X6 fail:index_d515  [old gate: eventful,index]
+    [LOCAL-468] pairwise overlap: mean=0.200, max=0.267 (DIVERSE)
+      Elder, a 16th-centur × helping establish th = 0.184
+      Elder, a 16th-centur × measuring 119 by 162 = 0.184
+      Elder, a 16th-centur × you saw earlier      = 0.137
+      helping establish th × measuring 119 by 162 = 0.267
+      helping establish th × you saw earlier      = 0.255
+      measuring 119 by 162 × you saw earlier      = 0.174
+    [D511] examined 4 credit_line(s) (indices 41, 54, 64, 37), STORY ACCEPTED at 64, ~$0.054, 283s
+
+  [D511] stop 1: Washington Crossing the Delaware
+      [D518] dropped (anchors 0.67 emanuel,leutze | content 0.17): "Emanuel Leutze painted this work in 1851 using oil on canvas, a medium that allowed him "
+    [D518] 1 of 9 prose sentence(s) replaced by story 1
+    [D511] stop 1: 1 story published (61) from credit_lines 'allowed him to achieve luminous effects'
+
+  [D511] stop 2: The Death of Socrates (Jacques-Louis David)
+      [D518] dropped (anchors 1.00 1787 | content 0.67): "The Death of Socrates was painted by Jacques-Louis David in 1787."
+    [D518] 1 of 19 prose sentence(s) replaced by story 1
+    [D511] stop 2: 1 story published (55) from credit_lines 'suggesting a higher moral or philosophic'
+
+  [D511] stop 3: The Harvesters
+      [D518] dropped (anchors 0.80 1565,bruegel,elder,pieter | content 0.25): "Pieter Bruegel the Elder, a 16th-century Flemish painter known for landscapes, painted T"
+    [D518] 1 of 11 prose sentence(s) replaced by story 1
+    [LOCAL-466] story 2 skipped: index 54 < SECOND_MIN 55
+    [D511] stop 3: 1 story published (64) from credit_lines 'measuring 119 by 162 centimeters—a sizab'
+
+  [D511] stop 4: Camouflage Self-Portrait
+    [D511] no story passed the gate — stop keeps its descriptive text and publishes no story
+
+  [D511] stop 5: The Great Wave of Kanagawa
+    [D511] no story passed the gate — stop keeps its descriptive text and publishes no story
+
+  [D511] PHASE 5.20 summary: 3/5 stops got a gated story (0 with multiple stories), ~$0.245, [D518] 3 duplicated prose sentence(s) replaced
+
+  [LOCAL-485] PHASE 5.21: Story valuation index (report only, never gates)...
+     #  stop                                      idx  hist  detl   soc
+     1  Washington Crossing the Delaware           49    35     6    77
+     2  The Death of Socrates (Jacques-Louis Dav   53    24    28    65
+     3  The Harvesters                             66    36    46    89
+     4  Camouflage Self-Portrait                   30    19     7    65
+     5  The Great Wave of Kanagawa                 66    24    44    53
+    [LOCAL-485] index mean 52.8 over 5 stop(s), range 30-66
+    [LOCAL-485] weakest: 'Camouflage Self-Portrait' at 30
+  [LOCAL-813] museum building pin for 'The Metropolitan Museum of Art': (40.779444444444444, -73.96333333333334) (wikidata_p625)
+  [LOCAL-791C] pin snap: scope='The Met Fifth Avenue, New York' center=None bbox=None venue_fallback=(40.779444444444444, -73.96333333333334) threshold=150m target=100m
+[LOCAL-791E] snap refused Washington Crossing the Delaware reference name 'Washington Crossing Historic Park' does not match stop — refused; museum building pin 62 m within 150 m — kept
+[LOCAL-791C] pin ok The Death of Socrates (Jacques-Louis David) 62m within threshold
+[LOCAL-791E] snap refused The Harvesters reference 114.2 km from stops' centroid — refused; museum building pin 62 m within 150 m — kept
+[LOCAL-791E] snap refused Camouflage Self-Portrait reference name 'The Self-Portrait Project' does not match stop — refused; museum building pin 62 m within 150 m — kept
+[LOCAL-791E] snap refused The Great Wave of Kanagawa reference name 'The Metropolitan Museum of Art' does not match stop — refused; museum building pin 62 m within 150 m — kept
+  [LOCAL-791C] pin snap complete — 0 snapped, 0 left unsnapped (no in-scope reference), 5 total stop(s)
+[TIMING] phase=story_first elapsed=480.6s cumulative=1051.8s
+
+PHASE 6: Assembling the complete tour...
+  [LOCAL-11] Venue-identity mining: 4 facts found {'architecture': 3, 'founding': 1}
+  [LOCAL-382] Thesis block injected into prolog (338 chars)
+[TIMING-SUB] phase=packing step=packing_prolog_llm elapsed=1.74s
+  [R2] Prolog saved for Stop 1 (128 words)
+
+  [LOCAL-244] PHASE 5.9: Prolog gating (R9, R10, subject routine)...
+  [LOCAL-244] Prolog before gates: 128 words
+  [LOCAL-244] Prolog R9: 0 deletions
+  [LOCAL-286] Prolog R7: 0 deletions
+  [LOCAL-244] Prolog R10: 0 deletions
+  [LOCAL-244] Prolog subject: 0 expanded, 0 deleted, cost=$0.0000
+  [LOCAL-244] Prolog after gates: 128 words (delta: 0)
+
+  [LOCAL-246] PHASE 5.95: Orientation gating (R9, R10)...
+    Stop 3 orientation R7: 1 sentence(s) deleted
+  [LOCAL-246] Orientation gating summary:
+    Words before: 271
+    Words after:  229
+    Delta: -42
+    Stops affected: 1/5
+    Deletions (1):
+      [Stop 3][R7_HALLUCINATED_SENSORY] "From this vantage point, the rhythm of the workers' movements and the unfolding expanse of the summe..."
+
+  [LOCAL-270] PHASE 5.96: Composing Part 4 (forward connection) from delivered narrations...
+    Stops with delivered content: 5/5
+[TIMING-SUB] phase=packing step=packing_rank_facts_llm elapsed=2.76s
+    [LOCAL-276] Intrigue ranking completed: 2.8s, $0.0108, 1586 tokens
+    [LOCAL-276] Ranked 5 stops:
+      [Washington Crossing the Delaware] (cause): His choice to depict this scene was a deliberate act to symbolize courage agains...
+      [The Death of Socrates (Jacques-Louis David)] (dated_event_with_consequence): Instead, he calmly took the cup and turned his final moments into a lesson for h...
+      [The Harvesters] (reversal): Instead, Bruegel chose to place peasants harvesting grain at the center, making ...
+      [Camouflage Self-Portrait] (mystery): Here, the pattern paradoxically both obscures and accentuates his visage, sugges...
+      [The Great Wave of Kanagawa] (mystery): The wave’s claw-like fingers seem both threatening and sculptural, crafted throu...
+    [LOCAL-276] 5 intriguing / 0 excluded (celebrity_trivia)
+    [LOCAL-276] Using ranked facts for composition (5 stops)
+[TIMING-SUB] phase=packing step=packing_part4_preview_llm elapsed=1.24s
+    Part 4 LLM cost: $0.0036 (607 tokens) [attempt 1]
+    ✓ Part 4 composed and verified (46 words):
+      "In the stops ahead, you will witness the deliberate act to symbolize courage against oppression at Washington Crossing the Delaware and observe how Socrates calmly took the cup and turned his final moments into a lesson for his pupils at The Death of Socrates (Jacques-Louis David)."
+      Stops referenced: 2
+    Part 4 total cost: $0.0036
+  [LOCAL-618 #1] Orientation pre-tell guard: dropped 4 sentence(s) carrying later-stop facts
+  [LOCAL-627 #7] Orientation phantom-name guard: dropped 1 sentence(s) naming an artist/work in no delivered stop
+
+  [LOCAL-286] PHASE 5.97: Prolog-body deduplication (≥8 word overlap)...
+  [LOCAL-286] Deduplication: 0 sentence(s) removed from stop bodies
+
+  [LOCAL-292] Empty stop removal gate: PASSED (all 5 stops have narration)
+  [LOCAL-394] Stop count invariant: OK (5 selected == 5 delivered)
+  [D536] Listener asked for 5 stop(s), delivering 5 — request met
+  DEBUG - POI 1 content includes:
+    Specific Examples: False
+    Operational Details: True
+    Walking Directions: True
+  [T4] Transition to Stop 2: Continue through The Metropolitan Museum of Art — next is Th...
+  DEBUG - POI 2 content includes:
+    Specific Examples: False
+    Operational Details: False
+    Walking Directions: True
+  [T4] Transition to Stop 3: Next: The Harvesters....
+  DEBUG - POI 3 content includes:
+    Specific Examples: False
+    Operational Details: False
+    Walking Directions: True
+  [T4] Transition to Stop 4: Proceed to Camouflage Self-Portrait....
+  DEBUG - POI 4 content includes:
+    Specific Examples: False
+    Operational Details: False
+    Walking Directions: True
+  [T4] Transition to Stop 5: Your final stop in The Metropolitan Museum of Art: The Great...
+  DEBUG - POI 5 content includes:
+    Specific Examples: False
+    Operational Details: False
+    Walking Directions: True
+  [LOCAL-280] Recap composition: 0.9s, $0.0025, 427 tokens
+  [LOCAL-280] Recap built: 25 words, 2 composed clauses (0 D177 rejected, 0 navigation rejected)
+    [The Harvesters] (reversal): "Instead, Bruegel chose to place peasants harvesting grain at the center, making ..."
+      → composed: "The Harvesters, featuring peasants harvesting grain as the central subject"
+    [Camouflage Self-Portrait] (mystery): "Here, the pattern paradoxically both obscures and accentuates his visage, sugges..."
+      → composed: "Camouflage Self-Portrait, where the pattern obscures and accentuates his visage"
+    D177 verified: all 2 source facts present in delivered text
+  [LOCAL-280] Recap added: "That's 5 stops — The Harvesters, featuring peasants harvesting grain as the central subject and Camouflage Self-Portrait, where the pattern obscures and accentuates his visage."
+  [LOCAL-275] Part 2 error: relation "audio_tours" does not exist
+LINE 2:             SELECT id, tour_name, lat, lng FROM audio_tours
+                                                        ^
+
+  [LOCAL-275] Closing offer fallback (no verification passed)
+  [EPILOG] Journey epilog added to last stop
+  [S27] No cross-stop repetition detected
+  [D533] REPEATED FACT kept in stop 2 (1000/york) — sentence not in stop block
+  [D533] REPEATED FACT kept in stop 3 (1000/york) — sentence not in stop block
+  [D533] REPEATED FACT kept in stop 4 (1000/york) — sentence not in stop block
+  [D533] REPEATED FACT removed from stop 4 (first told at stop 2, kp/('engagement', 'with')): That exhibition was curated by Alteveer, who played a key role in assembling wor
+  [D533] REPEATED FACT kept in stop 5 (1000/york) — sentence not in stop block
+  [D533] REPEATED FACT kept in stop 5 (kp/('woodblock', 'printing')) — next sentence refers back to it ("Because of this process, multiple copies...")
+  [D533] REPEATED FACT removed from stop 5 (first told at stop 2, kp/('engagement', 'with')): His work here reflects not only a mastery of technique but also a deep engagemen
+  [D533] 2 repeated fact(s) removed, 5 kept
+  [D533] Person-year role guard: no mismatches (88232 chars of corpus checked)
+  [LOCAL-615] No duplicated paragraphs
+  [LOCAL-620] Story-balance stop-body policy: dropped 1 boilerplate + 4 bare-transfer sentence(s), kept 0 collector story sentence(s) across 5 stops
+  [LOCAL-623] Same-title bleed filter: no change (5 stops scanned)
+  [LOCAL-626] Object-type bleed filter: dropped 3 wrong-object-kind sentence(s) across 5 stops
+  [LOCAL-626] Date-consistency filter: dropped 1 conflicting-date sentence(s) across 5 stops
+  [LOCAL-623] Museum-motif filter: no change (5 stops scanned)
+  [LOCAL-617] Conclusion de-dup: removed redundant 'This tour covered …' line (recap kept)
+
+  [LOCAL-36] Practical Facts Gate:
+    Claims found: 1
+    Verified: 0
+    Dropped: 1
+    AUDIT: admission | Free admission | (no source) | DROPPED — no source content
+  [LOCAL-36] PRACTICAL FACTS GATE: 1 claim(s) dropped
+  [LOCAL-618 #2] grammar/splice lint: 11 flagged, 8 dropped, 1 rewritten ({'repeated_pair': 1, 'verbless': 10})
+  [LOCAL-618 #2] grammar/splice lint: 11 flagged, 8 dropped, 1 rewritten by_code={'repeated_pair': 1, 'verbless': 10}
+
+  [LOCAL-260] PROLOG STRUCTURE VALIDATION: 4 error(s), 0 warning(s)
+    [ERROR] Part 1: PART1_MISSING — Part 1 (Tour name and transportation mode) is not present.
+    [ERROR] Part 2: PART2_MISSING — Part 2 (Directions and physicality expectation (route substance)) is not present.
+    [ERROR] Part 4: PART4_MISSING — Part 4 (Forward connection to stops) is not present.
+    [ERROR] Part 0: DUPLICATE_TOUR_DESCRIPTION — Tour contains 2 tour-level descriptions (must be exactly 1). Passages found:
+  [1] "The Metropolitan Museum of Art received Camouflage Self-Portrait through the Rogers Fund, which enri..."
+  [2] "Katsushika Hokusai created The Great Wave of Kanagawa around 1830-1833 during the Edo period. He car..."
+
+=== Word Count Statistics ===
+Stop 1: Washington Crossing the Delaware - 256 words
+Stop 2: The Death of Socrates (Jacques-Louis David) - 316 words
+Stop 3: The Harvesters - 369 words
+Stop 4: Camouflage Self-Portrait - 378 words
+Stop 5: The Great Wave of Kanagawa - 339 words
+===========================
+
+  [LOCAL-540] scorer ran on assembled tour (11496 chars, 5/5 stops)
+  [LOCAL-540] defects seen: ['dangling_reference', 'unsourced_person_event']
+  [LOCAL-540]   dangling_reference [REQUIRED_CLEAN]: 1 dangling pronoun reference(s), e.g. 'His choice to depict this scene was a deliberate act to symb'
+  [LOCAL-540]   unsourced_person_event [advisory]: 1 unsourced person-event(s); "Andy Warhol" placed here in 1986 with no source: "This work, created by Andy Warhol in 1986, was subsequently included in a museum
+  [LOCAL-540] REQUIRED_CLEAN defect present (['dangling_reference']) — issuing ONE retry over 1 section(s)
+  [LOCAL-540] retry: regenerating stop (stop 1) for ['dangling_reference']
+  [LOCAL-540] retry rewrite: 1055 tokens, $0.005015 (gpt-4o)
+[LOCAL-197] llm_cost() called with total_tokens (deprecated) by /app/generate_tour_text.py:30029. Caller should supply input_tokens and output_tokens separately.
+  [LOCAL-540] rescored after retry: defects ['dangling_reference', 'unsourced_person_event'] -> ['thin', 'unsourced_person_event']
+  [LOCAL-540] retry removed: ['dangling_reference']
+  [LOCAL-540] retry cleared all REQUIRED_CLEAN defects
+[LOCAL-628] stop 1: rejected(dropped word: truncated word fragment: 'it.')
+[LOCAL-628] stop 3: rejected(length -26%)
+[LOCAL-628] stop 4: edited
+[LOCAL-628] stop 5: rejected(claim_check unsupported=1 contradicted=0)
+[LOCAL-628] editor pass complete: 1 edited, 3 kept original
+[TIMING-SUB] phase=packing step=packing_stop_editor_llm elapsed=7.54s
+[TIMING-SUB] phase=packing step=packing_conclusion_llm elapsed=2.13s
+  [LOCAL-619B] thematic conclusion built from final text: 5 delivered stop(s), venue='The Metropolitan Museum of Art'
+
+Total API cost: $0.3140 (45015 tokens)
+Grounding:      $0.0000 (0 queries, 0 requests)
+Tour total:     $0.3140
+Provenance:     4/45 factual sentences sourced, 41 unsourced (4 corpus, 0 grounded, 41 parametric)
+CACHE STORE: The Met Fifth Avenue, New York / museum / 5
+  [venue_resolver] Name variants: ['The Met Fifth Avenue', 'Met Fifth Avenue']
+  [venue_resolver] Candidates for variant 'The Met Fifth Avenue': ['Q89503830']
+  [venue_resolver] Augmented with article-stripped variant 'Met Fifth Avenue': ['Q89503830']
+  [venue_resolver] Single candidate Q89503830 (The Met Fifth Avenue) failed city validation for 'New York'
+    [venue_resolver] Artist inferred from name: 'Met Fifth Avenue'
+  [venue_resolver] Resolved: 'The Met Fifth Avenue, New York' → Q89503830 (The Met Fifth Avenue)
+    URL: 
+    Coords: 40.77945081733494, -73.96324534098423
+    Language: en
+    Artist: Met Fifth Avenue ()
+[TIMING-SUB] phase=packing step=resolve_venue elapsed=4.10s
+  [LOCAL-590] POOL STORE: 5 stop(s) pooled for The Met Fifth Avenue, New York / museum (research $0.0507/stop)
+  [LOCAL-630 item 7] stripped editor marker from delivered tour_content (kept in cache/pool for idempotence)
+
+Tour text generated successfully!
+  [LOCAL-230] ⚠ NETWORK FAILURES: 3 API call(s) failed during this generation — tour may be degraded
+Saved to: The_Met_Fifth_Avenue__New_York_museum_tour_20261030_065625.txt
+  [C5-5] Evidence persisted: The_Met_Fifth_Avenue__New_York_museum_tour_20261030_065625_evidence.json
+
+Preview of the generated tour:
+
+Step-by-step audio guided tour of The Met Fifth Avenue in New York, a museum tour.
+
+Stop 1: Washington Crossing the Delaware
+
+Address:
+
+Coordinates: 40.7794, -73.9626
+
+Orientation: Your first stop is Washington Crossing the Delaware. Standing directly across from Emanuel Leutze’s Washington Crossing the Delaware, you see the full sweep of the frozen river and the cluster of figures balancing on the precarious boat. From this vantage, the sharp contrasts of light and shadow reveal the determinati...
+
+
+========================================================================
+  [LOCAL-410] CHAIN INSTRUMENTATION (post-generation)
+========================================================================
+    Washington Crossing the Delaware: serp_results=23 snippets_injected=29 beats_in_delivered_text=0
+    The Death of Socrates (Jacques-Louis David): serp_results=23 snippets_injected=28 beats_in_delivered_text=0
+    The Harvesters: serp_results=22 snippets_injected=28 beats_in_delivered_text=0
+    Camouflage Self-Portrait: serp_results=22 snippets_injected=25 beats_in_delivered_text=0
+    The Great Wave of Kanagawa: serp_results=18 snippets_injected=23 beats_in_delivered_text=0
+========================================================================
+[TIMING] phase=packing elapsed=25.4s cumulative=1077.2s
+[TIMING] phase=verification elapsed=0.0s cumulative=1077.2s
+[TIMING] TOTAL wall=1077.2s phases: story_first=480.6s, poi_selection=458.3s, external_lookups=77.9s, fact_sheets=29.5s, packing=25.4s, intent=5.6s, narration=0.0s, verification=0.0s
+  [LOCAL-634] restored the canonical title/header line (a pass had rewritten it into a spoken sentence)
+  [LOCAL-629 item 4] spoke the preflight's known hours/admission in Stop 1 (were only in a field line)
+  [LEAD D640-1] practical facts placed as the opening paragraph (2 sentence(s))
+  [LOCAL-650B] theme-stop detector: clean (no theme/topic stops in delivered text)
+  [LOCAL-650 fix2] walking directions: corrected 1 wrong-target line(s), added 0 approximate distance(s) — each hand-off now names the correct next stop
+[D617] stop 5: stripped {'urls': 0, 'sources_blocks': 1} from spoken text
+  [LOCAL-743] stop count agrees: 5 rendered header(s) == 5 splitter block(s)
+  [LOCAL-619B] thematic conclusion already present and count OK (5 stop(s)); preserved (every-path guard)
+  --- STOPS ---
+    STOP 1: Washington Crossing the Delaware
+    STOP 2: The Death of Socrates
+    STOP 3: The Harvesters
+    STOP 4: Camouflage Self-Portrait
+    STOP 5: The Great Wave off Kanagawa
+  generated in 1093s — PASS (5 stops)
+[COST_METER] FRESH | tour_generate | $0.253422 | user=TEST-LOCAL-828 | job=None
+  [LIVE_RUN_METER] TEST-LOCAL-828  (cap $0.80, all providers combined)
+    openai            $0.1380
+    gemini_grounding  $0.0000  (requests=0, queries=0)
+    gemini_tokens     $0.0404
+    serper            $0.0750
+    preflight         $0.1090
+    TOTAL             $0.2534   description='test run'
+  --- per-model meter (this tour) ---
+    gemini/gemini-flash-latest: 39 calls  $0.4810
+    openai/gpt-4o-2024-08-06: 24 calls  $0.2643
+    serper/?: 98 calls  $0.1090
+    openai/gpt-4.1-mini-2025-04-14: 36 calls  $0.0538
+    openai/gpt-4.1-2025-04-14: 8 calls  $0.0296
+    openai/gpt-4o-mini-2024-07-18: 200 calls  $0.0240
+    openai/text-embedding-3-small: 3 calls  $0.0000
+
+======================================================================
+=== LOCAL-828 SUMMARY ===
+  The Met Fifth Avenue, New York: PASS (5 stops)
+
+  --- per-model meter (whole task) ---
+    gemini/gemini-flash-latest: 39 calls  $0.4810
+    openai/gpt-4o-2024-08-06: 24 calls  $0.2643
+    serper/?: 98 calls  $0.1090
+    openai/gpt-4.1-mini-2025-04-14: 36 calls  $0.0538
+    openai/gpt-4.1-2025-04-14: 8 calls  $0.0296
+    openai/gpt-4o-mini-2024-07-18: 200 calls  $0.0240
+    openai/text-embedding-3-small: 3 calls  $0.0000
+  metered total (status-200 rows this task): $0.9618
+
+  OVERALL: PASS
+#################### LOCAL-828 live run done (rc=0) ####################
+[local828] meter rows (service=LOCAL-828) now in /Users/micha/Audioura/meterlogs/paid_api_calls.jsonl

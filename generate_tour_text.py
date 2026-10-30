@@ -11402,6 +11402,46 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
     except Exception as _ca664_err:  # pragma: no cover - gate must never block generation
         print(f"  [LOCAL-664] cheap-arm setup skipped (non-fatal): {_ca664_err}")
 
+    # ─── [LOCAL-828] VENUE-IDENTITY GATE SCOPE ────────────────────────────────
+    # For a MUSEUM tour, bind THIS tour's venue identity (name/QID/official domain/
+    # city/aliases) into a contextvar so story_leads.research_with_sources can drop
+    # any injected research passage about ANOTHER museum/venue (the Rijksmuseum
+    # Stop-1 "Museum Catharijneconvent, Utrecht" bleed). The venue is resolved once
+    # here from the (memoized, per-tour) resolver + the request/preflight city; the
+    # contextvar propagates into the per-stop pool workers exactly as the cheap-arm
+    # category does. A non-museum tour, or an unresolved venue, binds nothing — a
+    # strict no-op (the gate keeps everything). Never blocks generation.
+    if tour_category == 'museum':
+        try:
+            import venue_identity_gate as _vig828
+            _vg_name = str(location).split(',')[0].strip() if location else ""
+            _vg_city = ""
+            if location and "," in str(location):
+                _vg_parts = [p.strip() for p in str(location).split(",")]
+                if len(_vg_parts) >= 2:
+                    _vg_city = _vg_parts[1]
+            _vg_entity = None
+            try:
+                from about_museum_stop import clean_venue_request_name as _vg_clean
+                _vg_name = _vg_clean(location) or _vg_name
+            except Exception:
+                pass
+            try:
+                from venue_resolver import resolve_venue as _vg_resolve
+                _vg_entity = _vg_resolve(_vg_name, _vg_city)
+            except Exception:
+                _vg_entity = None
+            _vg_pf = _J._LAST_VENUE_PREFLIGHT if hasattr(_J, "_LAST_VENUE_PREFLIGHT") else None
+            _vg_identity = _vig828.build_identity(
+                venue_name=_vg_name, city=_vg_city,
+                venue_entity=_vg_entity, preflight=_vg_pf)
+            _vig828.set_tour_venue_identity(_vg_identity)
+            print(f"  [LOCAL-828] venue-identity gate bound: name={_vg_identity.name!r} "
+                  f"qid={_vg_identity.qid or '-'} domain={_vg_identity.official_domain or '-'} "
+                  f"city={_vg_identity.city or '-'}")
+        except Exception as _vg828_err:  # pragma: no cover - gate must never block generation
+            print(f"  [LOCAL-828] venue-identity gate scope skipped (non-fatal): {_vg828_err}")
+
     # ─── [LOCAL-655] CURRENT-AFFAIRS INTENT ───────────────────────────────────
     # Tour 557 ("…Massachusetts politics and current affairs") ended with a false
     # "no verified developments" note because NOTHING in the pipeline searched the
