@@ -1,0 +1,12 @@
+{
+  "location": "Rijksmuseum, Amsterdam, Netherlands",
+  "n_stops": 5,
+  "wall_s": 760.3,
+  "stops_in_text": 5,
+  "raised": null,
+  "peak_rss_process_mib": 173.4,
+  "peak_target_mib": 350.0,
+  "completed": true,
+  "peak_ok": true,
+  "pass": true
+}
