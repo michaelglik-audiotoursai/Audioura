@@ -827,7 +827,15 @@ _TRANSPORT_STRIP_WORDS = {
     # From 'country_scale' mode (words that aren't geographic)
     'safari',
     # Walking/hiking variants (not in _TRANSPORT_MODE_KEYWORDS but same bug class)
-    'walking', 'hiking', 'running',
+    # [LOCAL-838] 'walk'/'stroll'/'wander'/'promenade'/'ramble'/'saunter' added:
+    # "Ben Thanh Market walk, HCMC" left the orphan verb "walk" in the normalized
+    # location, so the venue resolver looked up "Ben Thanh Market walk" (no Wikidata
+    # match) and LOCAL-836's single-anchor widening never found the anchor — the
+    # tour shipped 2/4. Stripping the walking verb for AREA RESOLUTION (intent still
+    # sees the original request, D536) lets the anchor resolve to "Ben Thanh Market"
+    # and the walkable-area widening reach 4. Same LOCAL-46 orphan-word bug class.
+    'walking', 'walk', 'hiking', 'running',
+    'stroll', 'wander', 'promenade', 'ramble', 'saunter',
     # Boat/water variants (future-proofing same pattern)
     'boat', 'kayak', 'kayaking', 'canoe', 'canoeing', 'sailing',
     # General
@@ -4803,6 +4811,17 @@ _LEADING_TOUR_KEYWORD_RE = re.compile(
     re.IGNORECASE)
 
 
+# [LOCAL-838] A trailing STANDALONE walking verb that ends the anchor segment of a
+# request with NO "tour" keyword: "Ben Thanh Market walk, Ho Chi Minh City",
+# "Hoan Kiem Lake stroll, Hanoi". It must sit at the end of the first comma-
+# segment — right before a comma or the end of string — so a LEADING verb
+# ("walk near Ben Thanh Market", subject is the verb) and the city tail are left
+# alone. Mirrors _LEADING_TOUR_KEYWORD_RE's role as the head/tail separator.
+_TRAILING_WALK_VERB_RE = re.compile(
+    r'\s+(?:walk|walking|stroll|wander|ramble|saunter)\s*(?=,|$)',
+    re.IGNORECASE)
+
+
 def _leading_anchor_list(location):
     """[LOCAL-816] Structurally split "<A>, <B> and <C> [walking] tour, <City>" into
     its leading anchor list and the trailing city.
@@ -4826,7 +4845,15 @@ def _leading_anchor_list(location):
     s = re.sub(r'^\s*[\w\s-]*?:\s*', '', s, count=1).strip()
     m = _LEADING_TOUR_KEYWORD_RE.search(s)
     if not m:
-        return [], None
+        # [LOCAL-838] Fallback separator: a trailing STANDALONE walking verb with
+        # no "tour" keyword — "Ben Thanh Market walk, Ho Chi Minh City". Without
+        # this the anchor list is empty, LOCAL-836's single-anchor widening never
+        # runs, and the walk ships 2/4. The verb must be the last token of the
+        # FIRST comma-segment (the head that holds the anchor), so "walk near X"
+        # (verb leads) and a city tail ("…, Ho Chi Minh City") are untouched.
+        m = _TRAILING_WALK_VERB_RE.search(s)
+        if not m:
+            return [], None
     head = s[:m.start()].strip(' ,.;')     # the anchor list sits before "tour"
     tail = s[m.end():].strip(' ,.;')       # the city sits after "tour,"
     if not head:
@@ -4980,6 +5007,76 @@ def _single_anchor_enclosing_area(scope, location, intent):
     return city_tail or ''
 
 
+# [LOCAL-838] WALKING PRECEDENCE over the 805 business-subject routing.
+#
+# Field defect (wave 14, gen 00020-2q6, cheap env): "Ben Thanh Market walk, Ho
+# Chi Minh City" arrived with tour_type=walking, but LOCAL-805's business-subject
+# routing classified the SUBJECT ("Ben Thanh Market" — a market, so a business)
+# and sent the request down the PLACES path as category='restaurant', overriding
+# the app's explicit walking type. LOCAL-836's walkable-area widening never ran
+# and the tour shipped 2/4 (a market plus a Bánh Bèo stall).
+#
+# Two signals must BEAT the 805/791 business-subject branch:
+#   1. An explicit app tour_type that names a MODE of getting around on an
+#      itinerary (walking / driving / biking / museum / …). The app sent it; it is
+#      the listener's declared intent, not a guess from the text.
+#   2. A WALKING WORD in the request itself (walk, walking tour, stroll,
+#      promenade, wander, …) in any of en/vi/fr/de/es/ru. "Ben Thanh Market walk"
+#      is a walk that STARTS at a market, not a request for businesses.
+#
+# 805 still owns the request when its SUBJECT asks for businesses with NO walking
+# signal — "coffee near Ben Thanh Market", "spas near X", "kite schools" — those
+# carry neither an explicit walking tour_type nor a walking word, so this guard
+# does not touch them and they stay on the places path.
+
+# Explicit app tour_type values that each map to a place-based (non-business)
+# category. The app sends one of these when the listener picked a mode; it must
+# win over a business-subject guess made from the free-text location.
+_EXPLICIT_WALKING_TOUR_TYPES = {
+    'walking', 'walk', 'driving', 'drive', 'biking', 'bike', 'cycling', 'bicycle',
+}
+
+# Walking words in six languages (en/vi/fr/de/es/ru). A match anywhere in the
+# request text means the listener asked to go ON FOOT — a walk, not a business
+# search — so the request stays on the walking (place-based) path even when its
+# subject would otherwise class as a business. Kept narrow: only verbs/nouns that
+# unambiguously mean "walk/stroll", never a bare "tour".
+_WALKING_WORD_RE = re.compile(
+    r'(?:'
+    # English
+    r'\bwalk(?:s|ing)?\b|\bstroll(?:s|ing)?\b|\bpromenade\b|\bwander(?:s|ing)?\b'
+    r'|\bramble\b|\bsaunter\b|\bon\s+foot\b'
+    # Vietnamese ("đi bộ" = walk; "dạo"/"tản bộ" = stroll)
+    r'|đi\s*bộ|\bdạo\b|tản\s*bộ'
+    # French ("marche" = walk; "balade"/"promenade"/"flâner" = stroll)
+    r'|\bmarche\b|\bbalade\b|\bflân(?:er|erie)\b|se\s+promener'
+    # German ("spaziergang"/"spazieren" = walk; "wandern" = hike; "bummel" = stroll)
+    r'|spaziergang|spazieren|\bwandern\b|\bbummel(?:n)?\b'
+    # Spanish ("caminar"/"caminata" = walk; "paseo"/"pasear" = stroll)
+    r'|camina(?:r|ta)|\bpaseo\b|\bpasear\b'
+    # Russian ("прогулка" = walk; "гулять" = to walk; "пешеход"/"пешая"/"пешком" = on foot)
+    r'|прогулк|гуля|пешеход|пеш(?:ая|ком|его|ую)'
+    r')',
+    re.IGNORECASE)
+
+
+def _request_has_walking_signal(location, tour_type):
+    """[LOCAL-838] True when the request carries an explicit walking/transport
+    tour_type OR a walking word (en/vi/fr/de/es/ru) — either of which beats the
+    805 business-subject routing and keeps the request on the walking path.
+
+    Returns False for a business-near-landmark request that names no walking
+    signal ("coffee near Ben Thanh Market", "spas near X"), so 805 still owns it.
+    """
+    tt = (tour_type or '').strip().lower()
+    if tt in _EXPLICIT_WALKING_TOUR_TYPES:
+        return True
+    if _WALKING_WORD_RE.search(tour_type or ''):
+        return True
+    if _WALKING_WORD_RE.search(location or ''):
+        return True
+    return False
+
 
 def _classify_tour_category(location, tour_type):
     """
@@ -5032,6 +5129,22 @@ def _classify_tour_category(location, tour_type):
     food_keywords = ['restaurant', 'food', 'dining', 'culinary', 'eat', 'cafe', 'bistro', 'eatery']
     if any(keyword in location_lower or keyword in tour_type_lower for keyword in food_keywords):
         return 'restaurant'
+
+    # [LOCAL-838] WALKING PRECEDENCE — runs BEFORE the LOCAL-805/791 business-
+    # subject branches. An explicit app tour_type (walking/driving/biking/museum…)
+    # or a walking word in the request (walk/stroll/promenade/wander… in
+    # en/vi/fr/de/es/ru) is the listener's declared ON-FOOT intent and beats the
+    # 805 business-subject routing. The field defect: "Ben Thanh Market walk, Ho
+    # Chi Minh City" with tour_type=walking was routed category='restaurant' by
+    # 805 (the market is a business) and shipped 2/4. 805 still owns a request
+    # whose SUBJECT asks for businesses with NO walking signal ("coffee near Ben
+    # Thanh Market", "spas near X", "kite schools") — those reach the branch below
+    # untouched. This sits BELOW facility/worship/food detection so LOCAL-480/485
+    # venue-class routing and the restaurant scan are unaffected.
+    if _request_has_walking_signal(location, tour_type):
+        print("   [LOCAL-838] explicit walking tour_type or walking word in request "
+              "→ walking path (beats 805 business-subject routing)")
+        return 'walking'
 
     # [LOCAL-805] BUSINESS / ACTIVITY-PROVIDER SUBJECT — runs BEFORE the museum,
     # specialized and generic walking scans. The regression (since 788B/790/791):
@@ -11536,7 +11649,16 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
                 else:
                     print(f"  [S15] venue_name='{intent['venue_name']}' overridden — location contains explicit non-museum phrase")
             # Touchpoint 1: suppress tour_type when pre_category or transport_mode gives a strong signal
-            _effective_tour_type = "" if (_pre_category in ('restaurant', 'specialized', 'facility') or transport_mode != 'on_foot') else tour_type
+            # [LOCAL-838] ...but NEVER suppress an explicit walking signal. When
+            # the app sent a walking/driving/biking tour_type, or the request text
+            # itself carries a walking word (en/vi/fr/de/es/ru), that declared
+            # on-foot intent must reach _classify_tour_category so it beats the 805
+            # business-subject routing — otherwise _pre_category=='restaurant' (the
+            # market subject) would blank the type and the walk ships as places.
+            _effective_tour_type = (
+                tour_type if _request_has_walking_signal(location, tour_type)
+                else ("" if (_pre_category in ('restaurant', 'specialized', 'facility')
+                             or transport_mode != 'on_foot') else tour_type))
             tour_category = _classify_tour_category(location, _effective_tour_type)
             if tour_category == 'specialized':
                 tour_category = 'book'
@@ -11544,7 +11666,14 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
         print("⚠️ Intent analysis failed, using fallback detection")
         intent = None
         # Touchpoint 1: suppress tour_type when pre_category or transport_mode gives a strong signal
-        _effective_tour_type = "" if (_pre_category in ('restaurant', 'specialized', 'facility') or transport_mode != 'on_foot') else tour_type
+        # [LOCAL-838] ...but NEVER suppress an explicit walking signal (see the
+        # intent-ok branch above): an explicit walking/driving/biking tour_type or
+        # a walking word in the request must reach _classify_tour_category so it
+        # beats the 805 business-subject routing.
+        _effective_tour_type = (
+            tour_type if _request_has_walking_signal(location, tour_type)
+            else ("" if (_pre_category in ('restaurant', 'specialized', 'facility')
+                         or transport_mode != 'on_foot') else tour_type))
         tour_category = _classify_tour_category(location, _effective_tour_type)
         if tour_category == 'specialized':
             tour_category = 'book'
