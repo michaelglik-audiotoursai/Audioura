@@ -479,6 +479,19 @@ def _is_mostly_ascii(s: str) -> bool:
     return sum(1 for c in letters if ord(c) < 128) / len(letters) >= 0.8
 
 
+# [LOCAL-826C] A delivered stop header must stay short enough that the downstream
+# F3 corruption guard (generate_tour_text._F3_MAX_TITLE_WORDS = 15 words) never
+# word-truncates it into a fragment. Cap one notch under F3's word ceiling and add
+# a char ceiling; kept in step with place_title_naming._MAX_TITLE_WORDS/CHARS.
+_MAX_HEADER_WORDS_826C = 14
+_MAX_HEADER_CHARS_826C = 90
+
+
+def _title_too_long_826c(title: str) -> bool:
+    t = " ".join((title or "").split())
+    return len(t.split()) > _MAX_HEADER_WORDS_826C or len(t) > _MAX_HEADER_CHARS_826C
+
+
 def bilingual_display_title(
     cand: Dict,
     qid_labels: Optional[Dict[str, Dict[str, str]]] = None,
@@ -529,7 +542,26 @@ def bilingual_display_title(
     # 'en' the native one (mislabelled), swap so the native title leads.
     if _is_mostly_ascii(local) and not _is_mostly_ascii(en):
         local, en = en, local
-    return f"{local} ({en})"
+    combined = f"{local} ({en})"
+    # [LOCAL-826C] Cap the delivered header. A long bilingual title (the
+    # Rijksmuseum "Merry Drinker": "A Militiaman Holding a Berkemeyer, Known as
+    # the 'Merry Drinker' (Een schutter die een berkenmeier vasthoudt, …)") is
+    # word-truncated downstream by the F3 corruption guard into a fragment,
+    # losing the stop's title and body (tour 866). When the combined title is too
+    # long, ship ONE complete title rather than a parenthesised pair that will be
+    # cut: prefer the ASCII/English side (recognisable to an English listener and
+    # F3-safe), falling back to whichever single side is itself short enough.
+    if _title_too_long_826c(combined):
+        en_ascii = en if _is_mostly_ascii(en) else local
+        other = local if en_ascii is en else en
+        if not _title_too_long_826c(en_ascii):
+            return en_ascii
+        if not _title_too_long_826c(other):
+            return other
+        # Both single titles are still over the cap — return the shorter one so a
+        # 150-char header can never be delivered.
+        return en_ascii if len(en_ascii) <= len(other) else other
+    return combined
 
 
 @dataclass

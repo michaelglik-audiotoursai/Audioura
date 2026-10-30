@@ -45,6 +45,7 @@ __all__ = [
     "title_for_candidate",
     "is_named_anchor",
     "anchor_for_title",
+    "shorten_long_title",
     "LANG_LOCAL",
 ]
 
@@ -112,7 +113,36 @@ def format_place_title(primary: str, local: str = "") -> str:
     # longer official English form that embeds the transliteration), don't repeat.
     if lk and lk in pk:
         return primary
-    return f"{primary} ({local})"
+    # [LOCAL-826C] Cap the delivered title: keep the local name in parentheses
+    # ONLY while the combined "English (Local)" title stays short. The Rijksmuseum
+    # "Merry Drinker" shipped a 21-word bilingual title — "A Militiaman Holding a
+    # Berkemeyer, Known as the 'Merry Drinker' (Een schutter die een berkenmeier
+    # vasthoudt, bekend als 'De vrolijke drinker')" — which the downstream F3
+    # corruption guard (word ceiling) then WORD-TRUNCATED into the fragment
+    # "…(Een schutter", losing the stop's title and body (tour 866). The English
+    # title alone is a complete, recognisable name; the parenthetical gloss is
+    # dropped when adding it would push the title past the cap, so a 150-char
+    # header can never reach F3. The English name is NEVER itself truncated here.
+    combined = f"{primary} ({local})"
+    if _title_is_too_long(combined):
+        return primary
+    return combined
+
+
+# [LOCAL-826C] A delivered stop title must stay short enough that the downstream
+# F3 corruption guard (generate_tour_text._F3_MAX_TITLE_WORDS = 15 words) never
+# word-truncates it into a fragment. We cap one notch UNDER F3's ceiling on words
+# and add a character ceiling so a long single-language gloss is also dropped.
+_MAX_TITLE_WORDS = 14
+_MAX_TITLE_CHARS = 90
+
+
+def _title_is_too_long(title: str) -> bool:
+    """True when ``title`` is long enough that keeping a parenthetical local-name
+    gloss risks a downstream truncation. Measured on words (F3's axis) and chars
+    (TTS / rendering). Pure, deterministic."""
+    t = _clean(title)
+    return len(t.split()) > _MAX_TITLE_WORDS or len(t) > _MAX_TITLE_CHARS
 
 
 def is_named_anchor(name: str, named_anchors: Optional[List[str]]) -> Optional[str]:
@@ -260,3 +290,35 @@ def title_for_candidate(cand: Dict,
 
     # Last resort: whatever name we have (possibly just the local one).
     return format_place_title(name, local_label) or name
+
+
+def shorten_long_title(title: str) -> str:
+    """[LOCAL-826C] Return a sensibly SHORT display title for ``title``.
+
+    When a bilingual title is too long ("A Militiaman Holding a Berkemeyer, Known
+    as the 'Merry Drinker' (Een schutter die een berkenmeier vasthoudt, bekend als
+    'De vrolijke drinker')"), the downstream F3 corruption guard word-truncates it
+    into a fragment ("…(Een schutter") — losing the stop's title and body (tour
+    866). This shortener prevents that at the header: it drops a trailing
+    parenthetical local-name gloss first, keeping the LEADING name whole (a
+    complete, recognisable title), and only returns the original when it is
+    already short. It NEVER cuts a title mid-word or mid-phrase.
+
+    Pure, deterministic, idempotent. A short title is returned unchanged.
+    """
+    t = _clean(title)
+    if not t or not _title_is_too_long(t):
+        return t
+    # Drop a trailing "(…)" gloss and see whether the lead name is short enough.
+    lead = _clean(re.sub(r"\s*\([^)]*\)\s*$", "", t))
+    if lead and lead != t and not _title_is_too_long(lead):
+        return lead
+    # The lead name (gloss dropped, or no gloss at all) is still long. If a
+    # parenthetical gloss leads instead ("(Local) English"), try the tail.
+    tail = _clean(re.sub(r"^\s*\([^)]*\)\s*", "", t))
+    if tail and tail != t and not _title_is_too_long(tail):
+        return tail
+    # Still too long with no helpful parenthetical split: prefer the de-glossed
+    # lead over the raw string (never shorter than dropping the gloss), but do NOT
+    # word-truncate — a complete-though-long title beats a mid-phrase fragment.
+    return lead or t

@@ -28553,10 +28553,27 @@ RULES:
         # (e.g. "Whaam!", "No. 14", "Where Do We Come From? What Are We?").
         # D1v2-verified titles are exempt — the corpus already vouched for them.
         _f3_is_verified = poi.get('verified', True)  # True or absent = verified (D1v2 default)
-        if f3_name_is_corrupt(poi_name, _f3_is_verified):
-            print(f"  [F3] ⚠️ NAME TOO LONG/CORRUPT at stop {stop_num}: '{poi_name[:80]}'")
-            # Truncate to first 12 words if corrupted
-            _clean_name = ' '.join(poi_name.split()[:12]).rstrip('.,;:!?')
+        # [LOCAL-826C] Evaluate the header title actually being rendered
+        # (display_title or name), not just the raw name, and when it is too long,
+        # SHORTEN it by dropping a parenthetical local-name gloss — keeping the
+        # leading English title whole — rather than word-truncating it into a
+        # fragment. The Rijksmuseum "Merry Drinker" shipped a 21-word bilingual
+        # title that the old `' '.join(split()[:12])` cut at "…(Een schutter",
+        # losing the stop's title and body (tour 866). A genuinely corrupt
+        # (sentence-shaped) unverified name still falls back to a word-bounded
+        # trim, but the gloss-drop is tried first so a real long title survives.
+        if f3_name_is_corrupt(_header_title, _f3_is_verified):
+            print(f"  [F3] ⚠️ NAME TOO LONG/CORRUPT at stop {stop_num}: '{_header_title[:80]}'")
+            try:
+                from place_title_naming import shorten_long_title as _slt826c
+                _clean_name = _slt826c(_header_title)
+            except Exception:
+                _clean_name = _header_title
+            # If dropping the gloss did not bring it under F3's ceiling (a genuine
+            # injected sentence with no parenthetical), word-trim as a last resort.
+            if f3_name_is_corrupt(_clean_name, False):
+                _clean_name = ' '.join(_clean_name.split()[:12]).rstrip('.,;:!?')
+            print(f"  [F3] shortened stop {stop_num} title → '{_clean_name}'")
             poi_header = f"Stop {stop_num}: {_clean_name}"
             if artist and artist.lower() != "unknown artist":
                 poi_header += f" by {artist}"

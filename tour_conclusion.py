@@ -446,6 +446,18 @@ _DELIVERY_FIELD_LINE = re.compile(
     r'(?i)^[ \t]*(?:Address|Coordinates|Orientation|Directions|Type/Specialty|'
     r'Specific Examples|Operational Details|Museum Information):')
 
+# [LOCAL-826C] A placeholder title is the fallback cue a lost Directions hand-off
+# degraded to ("This stop", "Next stop") — never a real name. A delivered stop
+# must never carry one as its header.
+_PLACEHOLDER_HEADER_TITLES = {
+    "this stop", "next stop", "the next stop", "the stop"}
+
+# [LOCAL-826C] A sentence-ending mark (optionally with a closing quote/paren),
+# used to count whole sentences in a stop body. A FRAGMENT_BODY is a stop whose
+# narration is under two complete sentences — the truncated-title artifact that
+# shipped as "A Militiaman Holding a Berkemeyer, … (Een schutter" (tour 866).
+_DELIVERY_SENTENCE_END = re.compile(r'[.!?][\'"\u2019\u201d)]*(?:\s|$)')
+
 
 def check_stop_delivery(tour_text: str) -> List[str]:
     """Return structural stop-delivery violations in a finished tour (see above).
@@ -491,6 +503,7 @@ def check_stop_delivery(tour_text: str) -> List[str]:
         end = headers[i + 1].start() if i + 1 < len(headers) else end_body
         block = text[start:end]
         has_body = False
+        _narration_parts: List[str] = []   # [LOCAL-826C] prose for sentence count
         for ln in block.splitlines():
             s = ln.strip()
             if not s:
@@ -500,16 +513,40 @@ def check_stop_delivery(tour_text: str) -> List[str]:
             if m:
                 if m.group(1).strip():   # narration lives in the field value
                     has_body = True
-                    break
+                    _narration_parts.append(m.group(1).strip())
                 continue
             if _DELIVERY_FIELD_LINE.match(s):   # Address/Coordinates/Directions
                 continue
             has_body = True   # bare narration paragraph
-            break
+            _narration_parts.append(s)
+        _title = h.group(2).strip()
+
+        # [LOCAL-826C] PLACEHOLDER_TITLE — "This stop"/"Next stop" is a lost
+        # hand-off cue, never a real stop name.
+        _title_key = re.sub(r'\s+', ' ', _title).strip().lower().rstrip('.')
+        if _title_key in _PLACEHOLDER_HEADER_TITLES:
+            violations.append(
+                f"PLACEHOLDER_TITLE: Stop {h.group(1)} is titled '{_title[:40]}'")
+
         if not has_body:
             violations.append(
-                f"EMPTY_BODY: Stop {h.group(1)} '{h.group(2).strip()[:40]}' "
+                f"EMPTY_BODY: Stop {h.group(1)} '{_title[:40]}' "
                 f"has no narration body")
+            continue
+
+        # [LOCAL-826C] FRAGMENT_BODY — a stop whose narration carries NO complete
+        # sentence is a title fragment, not a narrated stop (the tour 866
+        # "A Militiaman Holding a Berkemeyer, … (Een schutter" artifact, which has
+        # no sentence-ending mark at all). A terse but COMPLETE single sentence is
+        # a valid body, so the bar is "at least one sentence ending"; the
+        # promotion guard (stop_dedup_collision_guard) additionally refuses to
+        # promote an under-two-sentence orphan at the source.
+        _narration = " ".join(_narration_parts).strip()
+        _n_ends = len(_DELIVERY_SENTENCE_END.findall(_narration))
+        if _n_ends < 1:
+            violations.append(
+                f"FRAGMENT_BODY: Stop {h.group(1)} '{_title[:40]}' "
+                f"body is a fragment (no complete sentence)")
     return violations
 
 
