@@ -2897,6 +2897,32 @@ def _resolve_scope_for_check(intent, location, tour_category, museum_venue_name,
                 intent = dict(intent)
                 intent['geographic_scope'] = _anchor_encl
                 intent['scope_precision'] = 'DISTRICT'
+    # [LOCAL-836] A scope that is really a SINGLE NAMED POINT-FEATURE anchor
+    # ("Ben Thanh Market", "Hoan Kiem Lake") is the tour's SEARCH CENTRE, not a
+    # containable area. Judged against it, every real nearby landmark (the Opera
+    # House, Bitexco, the Post Office) is "near the point but not INSIDE it" and
+    # rejected, so a tour in one of the densest walkable districts on earth ships
+    # 2 of 4. This is the case BETWEEN LOCAL-805 (needs a locative connector) and
+    # LOCAL-816 (needs >= 2 anchors): one leading anchor, no connector. Widen the
+    # containment scope to the enclosing area (the admin tail, or the request's
+    # city) exactly as those do; a '' result means a point with no enclosing area,
+    # so the stop-by-stop check is skipped and the ~1.5 km radius stands alone. A
+    # genuine DISTRICT anchor (Westminster, Lower Manhattan, Asakusa) is not a
+    # point feature and is left untouched.
+    if scope:
+        _single_encl = _single_anchor_enclosing_area(scope, location, intent)
+        if _single_encl is not None and _norm_place(_single_encl) != _norm_place(scope):
+            if not quiet:
+                print(f"\n  [LOCAL-836] single point-feature anchor: containment scope "
+                      f"widened from the anchor '{scope}' to the enclosing area "
+                      f"'{_single_encl or '(none — radius only)'}' (the named place is "
+                      f"the tour's search centre, not its boundary) — so nearby "
+                      f"landmarks can be discovered and replenishment can reach N.")
+            scope = _single_encl
+            if intent is not None:
+                intent = dict(intent)
+                intent['geographic_scope'] = _single_encl
+                intent['scope_precision'] = 'DISTRICT' if _single_encl else ''
     # [D536] Refuse a scope that is only a named stop on the route.
     if scope and scope_is_a_waypoint(scope, location):
         _wider = (intent.get('location') or '').strip() if intent else ''
@@ -4770,6 +4796,143 @@ def _leading_anchor_list(location):
         if tparts:
             city = tparts[-1]
     return anchors, city
+
+
+# [LOCAL-836] POINT-FEATURE class words — the final noun of a NAMED LANDMARK /
+# POINT OF INTEREST, the thing a "<X> walking tour, <City>" centres on. A point
+# feature cannot CONTAIN a multi-stop walkable tour, so when it is handed to the
+# containment check as the scope it rejects every nearby landmark. These are the
+# generic class nouns a listener appends to a specific place ("Ben Thanh MARKET",
+# "Hoan Kiem LAKE", "Sydney Opera HOUSE", "Notre-Dame CATHEDRAL"), broadened well
+# past the Boston-centric places_search._LANDMARK_CLASS_WORDS so it also covers
+# the two field cases (lake, opera house) and common global landmark classes.
+# This set is LOCAL to the single-anchor widening; it deliberately does NOT touch
+# the places_search radius classifier (its LOCAL-805 canary must stay exact).
+_POINT_FEATURE_CLASS_WORDS = frozenset({
+    # water / natural features
+    'lake', 'pond', 'reservoir', 'bay', 'harbour', 'harbor', 'waterfront',
+    'river', 'canal', 'falls', 'waterfall', 'beach', 'dunes', 'canyon', 'gorge',
+    'cave', 'grotto', 'spring', 'springs', 'peak', 'hill', 'mount', 'mountain',
+    'island', 'cape', 'lagoon', 'delta',
+    # squares / open civic spaces
+    'square', 'plaza', 'piazza', 'common', 'green', 'promenade', 'boardwalk',
+    'esplanade', 'quay', 'pier', 'wharf', 'dock', 'marina',
+    # built landmarks
+    'market', 'bazaar', 'tower', 'skyscraper', 'bridge', 'gate', 'gateway',
+    'arch', 'fountain', 'monument', 'memorial', 'statue', 'obelisk', 'column',
+    'cathedral', 'basilica', 'church', 'chapel', 'abbey', 'minster', 'temple',
+    'pagoda', 'shrine', 'mosque', 'synagogue', 'palace', 'castle', 'citadel',
+    'fort', 'fortress', 'tomb', 'mausoleum', 'palazzo',
+    # cultural venues
+    'museum', 'gallery', 'library', 'theatre', 'theater', 'opera', 'house',
+    'auditorium', 'hall', 'pavilion', 'conservatory', 'aquarium', 'planetarium',
+    'stadium', 'arena', 'amphitheatre', 'amphitheater', 'colosseum',
+    # transport / parks
+    'station', 'terminal', 'park', 'gardens', 'zoo', 'cemetery',
+})
+
+
+def _anchor_is_point_feature(anchor, intent=None):
+    """[LOCAL-836] True when ``anchor`` is a NAMED POINT FEATURE (a landmark / POI),
+    not a containable administrative area (a district / neighbourhood / city).
+
+    A point feature is the SEARCH CENTRE of a walking tour, never its boundary:
+    "Ben Thanh Market", "Hoan Kiem Lake", "Sydney Opera House", "Notre-Dame
+    Cathedral". It is recognised STRUCTURALLY by its generic class noun (the last
+    word of the head segment) — the same deterministic idiom as LOCAL-805's
+    landmark-class detector, broadened for global coverage. A genuine district
+    ("Westminster", "Lower Manhattan", "Asakusa", "Beacon Hill") carries no such
+    class word and returns False, so it is never widened away.
+
+    Guards (a point-feature class word does NOT override these):
+      * a known neighbourhood / region marker (e.g. "Hyde Park" the London
+        district, "West Roxbury") stays an area — False;
+      * the places_search precision classifier calling it a NEIGHBOURHOOD by a
+        known-district head is respected.
+    """
+    if not anchor:
+        return False
+    head = anchor.split(',')[0].strip()
+    low = _strip_accents(head).lower() if '_strip_accents' in globals() else head.lower()
+    if not low:
+        return False
+    # A place the request already flags as a plain area (via the LLM intent's
+    # named_places that match a district) is left to the district path.
+    try:
+        import places_search as _ps
+        # Known neighbourhood / region markers win over a trailing class word
+        # ("Hyde Park" stays a neighbourhood), mirroring _scope_precision's order.
+        for _m in getattr(_ps, '_REGION_MARKERS', ()):
+            if _m in low:
+                return False
+        for _m in getattr(_ps, '_NEIGHBOURHOOD_MARKERS', ()):
+            if _m == low or _m in low:
+                return False
+    except Exception:
+        pass
+    words = [w for w in re.split(r'[^0-9A-Za-z]+', low) if w]
+    if not words:
+        return False
+    return words[-1] in _POINT_FEATURE_CLASS_WORDS
+
+
+def _single_anchor_enclosing_area(scope, location, intent):
+    """[LOCAL-836] The ENCLOSING AREA of a scope that is really a SINGLE NAMED
+    POINT-FEATURE anchor, or None when the scope is an ordinary area / not a
+    single-anchor request.
+
+    A request phrased "Ben Thanh Market walking tour, Ho Chi Minh City" names ONE
+    stop — a point feature — up front, and the LLM intent echoes it into
+    geographic_scope ("Ben Thanh Market, District 1, Ho Chi Minh City" precision
+    DISTRICT, or the bare "Ben Thanh Market" precision BUILDING). That is not a
+    containable area: it is a seed point. Used as the D558 containment scope it
+    rejects EVERY nearby on-category replenishment candidate ("the Opera House is
+    near Ben Thanh Market but not INSIDE the market"), so a tour in one of the
+    densest walkable districts on earth ships 2 of 4 with a needless shortfall.
+
+    This recognises that shape and returns the enclosing AREA so the containment
+    check runs against the real walkable area (~1.5 km) and replenishment can reach
+    N. It mirrors LOCAL-805 (near-landmark widening) and LOCAL-816 (anchor-LIST
+    widening) exactly; it covers the case BETWEEN them: a SINGLE leading anchor
+    with no locative connector (so LOCAL-805 does not fire) and < 2 anchors (so
+    LOCAL-816 does not fire).
+
+    Returns:
+      * the enclosing-area string (the scope's admin tail if it has one, else the
+        city the request names after the anchor) — the containment scope to use;
+      * '' when the point anchor has NO enclosing area at all (radius only — the
+        stop-by-stop check is skipped, like LOCAL-805's point-landmark case);
+      * None when this is not a single point-feature anchor (a genuine district, a
+        multi-anchor list → LOCAL-816, or an empty/garbled scope) — leave as is.
+    """
+    if not scope:
+        return None
+    anchors, city_tail = _leading_anchor_list(location)
+    # Exactly ONE leading anchor. >= 2 is LOCAL-816's job; 0 is not an anchor shape.
+    if len(anchors) != 1:
+        return None
+    anchor = anchors[0]
+    # The anchor must be a POINT FEATURE, not a containable district.
+    if not _anchor_is_point_feature(anchor, intent):
+        return None
+    # Only widen when the SCOPE really IS that anchor (its leading segment is the
+    # anchor the request names) — guards a genuine area scope that merely differs
+    # from the request text.
+    scope_segs = [s.strip() for s in scope.split(',') if s and s.strip()]
+    if not scope_segs:
+        return None
+    if _norm_place(scope_segs[0]) != _norm_place(anchor):
+        return None
+    if len(scope_segs) > 1:
+        # The scope carries the enclosing area as its tail
+        # ("Ben Thanh Market, District 1, Ho Chi Minh City" → "District 1, Ho Chi
+        # Minh City").
+        return ', '.join(seg for seg in scope_segs[1:] if seg)
+    # The scope is ENTIRELY the anchor point (BUILDING intent, no tail): the
+    # enclosing area is the city the request names after the anchor, or '' (radius
+    # only) when the request names none.
+    return city_tail or ''
+
 
 
 def _classify_tour_category(location, tour_type):
