@@ -52,7 +52,8 @@ top of +21 on either system."*
 | 85 | iOS | 2.4.37 | `ca627033` (subscribed; APP_TRACK=subscribed) | **uploaded to TestFlight** 2026-10-28 20:1x by LEAD (D729): LOCAL-789B Home map loads on entry (reset-storm fix), LOCAL-795 Write a review button + stop notes (notes need wdvrdaz72d), LOCAL-787/793/794 as in 84 | 2026-10-28 |
 | 86 | Android | 2.4.38 | `efb9b977`-era subscribed (built by GCloud_Storied from `5e2d588a`, APP_TRACK=subscribed) | **built + signed** 2026-10-29 by GCloud_Storied on the laptop (`C:\adev-wt\aab86\audioura-subscribed-2.4.38+86.aab`, 51.3 MB, sha256 cbe45dc3…, upload key B3:AB:E5…3A:64). Play API upload blocked (play-publisher 403) → Michael uploads by hand to Internal testing | 2026-10-29 |
 | 87 | iOS | 2.4.39 | `4a954c70` (subscribed; APP_TRACK=subscribed) | **uploaded to TestFlight** 2026-10-30 05:5x by LEAD (D729): LOCAL-825 iOS 15 deployment target, LOCAL-830 Generate double-tap guard + client_request_id, plus everything since 85 | 2026-10-30 |
-| 88 | — | — | — | **NEXT** | — |
+| 88 | iOS | 2.4.40 | `526fee34` (subscribed; APP_TRACK=subscribed) | **uploaded to TestFlight** 2026-10-30 14:2x by LEAD (D729): LOCAL-841 pending generations resume on launch/resume (tour finished while backgrounded reaches Listen) | 2026-10-30 |
+| 89 | — | — | — | **NEXT** | — |
 
 ## Why 20 and 21 differ across platforms
 
