@@ -5020,10 +5020,17 @@ def _assemble_overview_tour_text(venue_name, location, tour_type, overview,
     _shortfall = ""
     try:
         from about_museum_stop import build_shortfall_sentence
+        # [LOCAL-826 Bug 3] A 1-stop OVERVIEW for an N-stop ask is a shortfall WE
+        # chose (we delivered an orientation, not per-work stops), not the venue
+        # having only N exhibitions on view. Even when the site advertises
+        # exhibitions, "<Venue> currently has N exhibitions on view, so this tour
+        # has 1 stop" falsely blames the venue (GCloud 494/495/496). Use the
+        # neutral honest line: count_is_sourced=False.
         _shortfall = build_shortfall_sentence(
             venue_name=_vn,
             exhibitions_on_view=len(getattr(overview, 'exhibitions', []) or []),
-            delivered_stops=1, requested_stops=requested_stops)
+            delivered_stops=1, requested_stops=requested_stops,
+            count_is_sourced=False)
     except Exception:
         _shortfall = ""
     if _shortfall:
@@ -28432,9 +28439,16 @@ RULES:
         try:
             from about_museum_stop import build_shortfall_sentence as _bss
             if tour_category in ('museum', 'facility'):
-                # Verified-works museum (checklist/partial/catalogue): count the
-                # distinct delivered works as the "exhibitions" number so the museum
-                # phrasing is honest; name the venue.
+                # [LOCAL-826 Bug 3] This path is NOT the site-first exhibition
+                # harvest (that source is excluded above and owned by the
+                # orchestrator). The shortfall here is a verified-WORKS museum
+                # delivering fewer works than asked — the loss is OUR filters /
+                # dedupe / verification, not the venue having only K exhibitions on
+                # view. Counting delivered works and calling them "exhibitions on
+                # view" is the false attribution GCloud tours 494/495/496 shipped
+                # ("…currently has 1 exhibition on view, so this tour has 1 stop…").
+                # Pass count_is_sourced=False so the builder emits the NEUTRAL
+                # honest line ("We could confirm K stops at <venue>, …").
                 _sf_venue = (_museum_venue_name or venue_name or location
                              or 'this museum')
                 _inline_shortfall = _bss(
@@ -28442,7 +28456,8 @@ RULES:
                     exhibitions_on_view=_sf_delivered,
                     delivered_stops=_sf_delivered,
                     requested_stops=_sf_asked,
-                    mode='museum')
+                    mode='museum',
+                    count_is_sourced=False)
             else:
                 # Outdoor (walking/biking/driving) and any other non-museum type:
                 # the route phrasing, no museum vocabulary.

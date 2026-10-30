@@ -1879,7 +1879,8 @@ def _compose_visiting_sentences(facts: str, venue_name: str, domain: str,
 def build_shortfall_sentence(venue_name: str, exhibitions_on_view: int,
                              delivered_stops: int,
                              requested_stops: Optional[int],
-                             mode: str = "museum") -> str:
+                             mode: str = "museum",
+                             count_is_sourced: bool = True) -> str:
     """[LOCAL-600 / D616; LOCAL-612] One plain sentence telling the listener,
     honestly, why a tour delivers fewer stops than they asked for.
 
@@ -1939,6 +1940,19 @@ def build_shortfall_sentence(venue_name: str, exhibitions_on_view: int,
 
     # mode == "museum" (default): the D616 exhibition phrasing, unchanged.
     vn = _venue_core(venue_name) or (venue_name or "").strip() or "This museum"
+    # [LOCAL-826 Bug 3] "N exhibitions on view" is a factual claim ABOUT THE VENUE:
+    # it must be made ONLY when ``exhibitions_on_view`` genuinely came from the
+    # venue's own on-view exhibition list (count_is_sourced=True). When the
+    # shortfall was caused by OUR OWN pipeline — dedupe (LOCAL-791/813, fixed in
+    # dad37e92), canonical-title filters, verification drops — the venue may well
+    # have more on view than we delivered, so blaming it ("currently has 1
+    # exhibition on view, so this tour has 1 stop…") is FALSE (GCloud tours
+    # 494/495/496). In that case emit the NEUTRAL honest line: state only what we
+    # could confirm, attributing the gap to nothing we cannot stand behind.
+    if not count_is_sourced:
+        confirmed_word = "stop" if delivered == 1 else "stops"
+        return (f"We could confirm {delivered} {confirmed_word} at {vn}, so "
+                + tail)
     # "has 1 exhibition on view" / "has 3 exhibitions on view"
     if shows >= 1:
         show_clause = (f"{vn} currently has {shows} "
