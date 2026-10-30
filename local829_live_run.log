@@ -1,0 +1,605 @@
+
+######## [local829] building + starting the isolated stack ########
+ Image local829-coordinates-fromai Building 
+ Image local829-user-api-2 Building 
+ Image local829-tour-orchestrator Building 
+ Image local829-tour-generator Building 
+ Image local829-tour-generation-modernized-1 Building 
+#1 [internal] load local bake definitions
+#1 reading from stdin 2.74kB done
+#1 DONE 0.0s
+
+#2 [coordinates-fromai internal] load build definition from Dockerfile
+#2 transferring dockerfile: 732B done
+#2 DONE 0.0s
+
+#3 [user-api-2 internal] load build definition from Dockerfile
+#3 transferring dockerfile: 376B done
+#3 DONE 0.0s
+
+#4 [tour-generator internal] load build definition from Dockerfile.generator
+#4 transferring dockerfile: 1.76kB 0.0s done
+#4 DONE 0.0s
+
+#5 [tour-orchestrator internal] load build definition from Dockerfile.orchestrator
+#5 transferring dockerfile: 4.23kB 0.0s done
+#5 DONE 0.0s
+
+#6 [tour-generation-modernized-1 internal] load build definition from Dockerfile.modernized
+#6 transferring dockerfile: 735B 0.0s done
+#6 DONE 0.0s
+
+#7 [tour-orchestrator internal] load metadata for docker.io/library/python:3.9-slim
+#7 DONE 0.3s
+
+#8 [coordinates-fromai internal] load .dockerignore
+#8 transferring context: 2B done
+#8 DONE 0.0s
+
+#9 [user-api-2 internal] load metadata for docker.io/library/python:3.11-slim
+#9 DONE 0.3s
+
+#10 [user-api-2 internal] load .dockerignore
+#10 transferring context: 2B done
+#10 DONE 0.0s
+
+#11 [tour-generator 1/9] FROM docker.io/library/python:3.9-slim@sha256:2d97f6910b16bd338d3060f261f53f144965f755599aab1acda1e13cf1731b1b
+#11 resolve docker.io/library/python:3.9-slim@sha256:2d97f6910b16bd338d3060f261f53f144965f755599aab1acda1e13cf1731b1b done
+#11 DONE 0.0s
+
+#12 [user-api-2 1/7] FROM docker.io/library/python:3.11-slim@sha256:673719e071ecf27434fd2635bbd8d00f49f4fdd81f243143438a42ced8bedf60
+#12 resolve docker.io/library/python:3.11-slim@sha256:673719e071ecf27434fd2635bbd8d00f49f4fdd81f243143438a42ced8bedf60 done
+#12 DONE 0.0s
+
+#13 [coordinates-fromai internal] load build context
+#13 transferring context: 100B done
+#13 DONE 0.0s
+
+#14 [user-api-2 internal] load build context
+#14 transferring context: 1.49kB done
+#14 DONE 0.0s
+
+#15 [coordinates-fromai 6/9] COPY app.py .
+#15 CACHED
+
+#16 [coordinates-fromai 3/9] RUN apt-get update && apt-get install -y     gcc     curl     && rm -rf /var/lib/apt/lists/*
+#16 CACHED
+
+#17 [coordinates-fromai 5/9] RUN pip install --no-cache-dir -r requirements.txt
+#17 CACHED
+
+#18 [coordinates-fromai 8/9] RUN echo "unknown" > /app/.git_sha
+#18 CACHED
+
+#19 [coordinates-fromai 4/9] COPY requirements.txt .
+#19 CACHED
+
+#20 [coordinates-fromai 2/9] WORKDIR /app
+#20 CACHED
+
+#21 [coordinates-fromai 7/9] COPY build_manifest.py .
+#21 CACHED
+
+#22 [user-api-2 4/7] RUN pip install -r requirements.txt
+#22 CACHED
+
+#23 [user-api-2 2/7] WORKDIR /app
+#23 CACHED
+
+#24 [user-api-2 6/7] RUN echo "unknown" > /app/.git_sha
+#24 CACHED
+
+#25 [user-api-2 3/7] COPY requirements.txt .
+#25 CACHED
+
+#26 [user-api-2 5/7] COPY . .
+#26 CACHED
+
+#27 [coordinates-fromai 9/9] RUN python build_manifest.py /app /app/.build_manifest.json
+#27 CACHED
+
+#28 [user-api-2 7/7] RUN python build_manifest.py /app /app/.build_manifest.json
+#28 CACHED
+
+#29 [tour-orchestrator internal] load .dockerignore
+#29 transferring context: 2.05kB 0.0s done
+#29 DONE 0.0s
+
+#30 [coordinates-fromai] exporting to image
+#30 exporting layers done
+#30 exporting manifest sha256:63653b1d05fd44e248b636acc19dc910382f311dad08352a83d842c9235a87f9 done
+#30 exporting config sha256:ec9c315ff21b0f79741911bad68a42794f74d87d9611ed0c69b111b4c26488d0 done
+#30 exporting attestation manifest sha256:3d64c4f821cf48ca73aa1df77416042240158af27bd5be81d42b18e63eec0d29 done
+#30 exporting manifest list sha256:78a2795c05d867eab7f6373896cc104acd87b4b1fd6a9a2cd2b65b55f3961452 done
+#30 naming to docker.io/library/local829-coordinates-fromai:latest done
+#30 unpacking to docker.io/library/local829-coordinates-fromai:latest done
+#30 DONE 0.1s
+
+#31 [user-api-2] exporting to image
+#31 exporting layers done
+#31 exporting manifest sha256:cd670fcb61003b56a0217f10e4690d3dc7406c5efe3a2becd838656b31d6c25f done
+#31 exporting config sha256:acf9582de6dfec82fd11cb1b5aaca9c96f3e0e432f2a7a581e985d384577214a done
+#31 exporting attestation manifest sha256:b5a9a3785b3066d7cbf9f7aae8e098948b793cc146cf9151147d1bebe422539f 0.0s done
+#31 exporting manifest list sha256:55dfd8a4f5c48bb11f6ac0bf1cf5334319e31d22ebf4eab4ce580dfdfd01d8f8 done
+#31 naming to docker.io/library/local829-user-api-2:latest done
+#31 unpacking to docker.io/library/local829-user-api-2:latest done
+#31 DONE 0.1s
+
+#32 [tour-generation-modernized-1 internal] load build context
+#32 transferring context: 497B 0.2s done
+#32 DONE 0.2s
+
+#33 [user-api-2] resolving provenance for metadata file
+#33 DONE 0.0s
+
+#34 [coordinates-fromai] resolving provenance for metadata file
+#34 DONE 0.0s
+
+#35 [tour-generation-modernized-1  3/13] WORKDIR /app
+#35 CACHED
+
+#36 [tour-generation-modernized-1  5/13] RUN pip install --no-cache-dir -r requirements-modernized.txt
+#36 CACHED
+
+#37 [tour-generation-modernized-1  2/13] COPY _meter/ /opt/meter/
+#37 CACHED
+
+#38 [tour-generation-modernized-1 11/13] RUN mkdir -p /app/tours
+#38 CACHED
+
+#39 [tour-generation-modernized-1  9/13] COPY build_manifest.py /app/
+#39 CACHED
+
+#40 [tour-generation-modernized-1 12/13] RUN echo "unknown" > /app/.git_sha
+#40 CACHED
+
+#41 [tour-generation-modernized-1  4/13] COPY requirements-modernized.txt .
+#41 CACHED
+
+#42 [tour-generation-modernized-1  7/13] COPY tour_html_map.py /app/
+#42 CACHED
+
+#43 [tour-generation-modernized-1  8/13] COPY job_store.py /app/
+#43 CACHED
+
+#44 [tour-generation-modernized-1 10/13] COPY spoken_text_hygiene.py /app/
+#44 CACHED
+
+#45 [tour-generation-modernized-1  6/13] COPY tour_generation_modernized.py /app/
+#45 CACHED
+
+#46 [tour-generation-modernized-1 13/13] RUN python build_manifest.py /app /app/.build_manifest.json
+#46 CACHED
+
+#47 [tour-orchestrator internal] load build context
+#47 transferring context: 1.05MB 0.2s done
+#47 DONE 0.2s
+
+#48 [tour-generation-modernized-1] exporting to image
+#48 exporting layers done
+#48 exporting manifest sha256:c7205472489f44358bf197d69e510e3c94190968aea731bb605ee0ab7d4ec94a done
+#48 exporting config sha256:918b7f7f7eceba7f780ce7b73d475d157406653b70f8e47139b541c8dfaeb594 done
+#48 exporting attestation manifest sha256:697180d24236f724f8fc44b7be5a9d5d683e26becd597dce562f33abeb1da84e 0.0s done
+#48 exporting manifest list sha256:cbf6fb829b5cc681d1e91f9cae881fe7a9a02253fa7691092cb578e5eb3ed7b1 done
+#48 naming to docker.io/library/local829-tour-generation-modernized-1:latest done
+#48 unpacking to docker.io/library/local829-tour-generation-modernized-1:latest done
+#48 DONE 0.0s
+
+#49 [tour-orchestrator  3/45] WORKDIR /app
+#49 CACHED
+
+#50 [tour-orchestrator 13/45] COPY l2_seat_job.py /app/
+#50 CACHED
+
+#51 [tour-orchestrator 42/45] COPY stop_pool_sources.py /app/
+#51 CACHED
+
+#52 [tour-orchestrator 44/45] RUN echo "unknown" > /app/.git_sha
+#52 CACHED
+
+#53 [tour-orchestrator 37/45] COPY tour_rubric_scorer.py /app/
+#53 CACHED
+
+#54 [tour-orchestrator 21/45] COPY cost_meter.py /app/
+#54 CACHED
+
+#55 [tour-orchestrator 39/45] COPY user_stops_flag.py /app/
+#55 CACHED
+
+#56 [tour-orchestrator 27/45] COPY swipe_preference_service.py /app/
+#56 CACHED
+
+#57 [tour-orchestrator 14/45] COPY cost_ceiling_monitor.py /app/
+#57 CACHED
+
+#58 [tour-orchestrator 16/45] COPY tier_change.py /app/
+#58 CACHED
+
+#59 [tour-orchestrator 24/45] COPY safe_headers.py /app/
+#59 CACHED
+
+#60 [tour-orchestrator  4/45] COPY requirements_orchestrator.txt /app/requirements.txt
+#60 CACHED
+
+#61 [tour-orchestrator 23/45] COPY build_manifest.py /app/
+#61 CACHED
+
+#62 [tour-orchestrator 25/45] COPY failure_log.py /app/
+#62 CACHED
+
+#63 [tour-orchestrator 36/45] COPY tour_evaluator.py /app/
+#63 CACHED
+
+#64 [tour-orchestrator 31/45] COPY recovery_code_service.py /app/
+#64 CACHED
+
+#65 [tour-orchestrator 15/45] COPY wallet_api.py /app/
+#65 CACHED
+
+#66 [tour-orchestrator 35/45] COPY tour_scoring_service.py /app/
+#66 CACHED
+
+#67 [tour-orchestrator 12/45] COPY l2_seats.py /app/
+#67 CACHED
+
+#68 [tour-orchestrator 11/45] COPY subscription_levels.py /app/
+#68 CACHED
+
+#69 [tour-orchestrator 32/45] COPY community_tours_service.py /app/
+#69 CACHED
+
+#70 [tour-orchestrator 26/45] COPY quality_guardrails.py /app/
+#70 CACHED
+
+#71 [tour-orchestrator 18/45] COPY fake_payment_provider.py /app/
+#71 CACHED
+
+#72 [tour-orchestrator  5/45] RUN pip install --no-cache-dir -r requirements.txt
+#72 CACHED
+
+#73 [tour-orchestrator  9/45] COPY tests/db_connection.py /app/tests/db_connection.py
+#73 CACHED
+
+#74 [tour-orchestrator 40/45] COPY tour_short_title.py /app/
+#74 CACHED
+
+#75 [tour-orchestrator 38/45] COPY user_quality_index.py /app/
+#75 CACHED
+
+#76 [tour-orchestrator 30/45] COPY tour_pricing_service.py /app/
+#76 CACHED
+
+#77 [tour-orchestrator 20/45] COPY pricing.py /app/
+#77 CACHED
+
+#78 [tour-orchestrator 34/45] COPY price_tiers.py /app/
+#78 CACHED
+
+#79 [tour-orchestrator  7/45] COPY orchestrator_jobs.py /app/
+#79 CACHED
+
+#80 [tour-orchestrator  8/45] COPY swipe_preference_service.py /app/
+#80 CACHED
+
+#81 [tour-orchestrator 17/45] COPY payment_provider.py /app/
+#81 CACHED
+
+#82 [tour-orchestrator 22/45] COPY cost_rates.py /app/
+#82 CACHED
+
+#83 [tour-orchestrator 29/45] COPY tour_reviews_service.py /app/
+#83 CACHED
+
+#84 [tour-orchestrator  6/45] COPY tour_orchestrator_service.py /app/
+#84 CACHED
+
+#85 [tour-orchestrator 43/45] COPY stop_pool_store.py /app/
+#85 CACHED
+
+#86 [tour-orchestrator  2/45] COPY _meter/ /opt/meter/
+#86 CACHED
+
+#87 [tour-orchestrator 19/45] COPY wallet_ledger.py /app/
+#87 CACHED
+
+#88 [tour-orchestrator 10/45] COPY entitlements.py /app/
+#88 CACHED
+
+#89 [tour-orchestrator 41/45] COPY tour_content_rating.py /app/
+#89 CACHED
+
+#90 [tour-orchestrator 28/45] COPY tour_rating_service.py /app/
+#90 CACHED
+
+#91 [tour-orchestrator 33/45] COPY geocode_stops.py /app/
+#91 CACHED
+
+#92 [tour-orchestrator 45/45] RUN python build_manifest.py /app /app/.build_manifest.json
+#92 CACHED
+
+#93 [tour-orchestrator] exporting to image
+#93 exporting layers done
+#93 exporting manifest sha256:b2047e90f399fb17ca076ab120797f30ff3e91553da9ce59712e349c36a8328e done
+#93 exporting config sha256:1612ea57acc512a06b6a6a747b821b1af081655d69bd63fe708c8ac5d58f0ff4 done
+#93 exporting attestation manifest sha256:ef04ee9a18a924d194f728793f27b2346be19897c8e702894d745d01ba366688 done
+#93 exporting manifest list sha256:9e450a876097933d229695966d6fcfac00f0a60153af2507e8f9299fd3757953 done
+#93 naming to docker.io/library/local829-tour-orchestrator:latest
+#93 naming to docker.io/library/local829-tour-orchestrator:latest done
+#93 unpacking to docker.io/library/local829-tour-orchestrator:latest 0.0s done
+#93 DONE 0.1s
+
+#94 [tour-generation-modernized-1] resolving provenance for metadata file
+#94 DONE 0.0s
+
+#95 [tour-generator internal] load build context
+#95 transferring context: 16.33MB 0.6s done
+#95 DONE 0.6s
+
+#96 [tour-generator  9/14] COPY tests/db_connection.py tests/stop_anchor_detector_v2.py /app/
+#96 CACHED
+
+#97 [tour-generator  3/14] WORKDIR /app
+#97 CACHED
+
+#98 [tour-generator  6/14] COPY *.py /app/
+#98 CACHED
+
+#99 [tour-generator 11/14] COPY tests/known_closed_venues.json /app/tests/
+#99 CACHED
+
+#100 [tour-generator  4/14] COPY requirements_generator.txt /app/requirements.txt
+#100 CACHED
+
+#101 [tour-generator 12/14] COPY tests/known_out_of_scope.json /app/tests/
+#101 CACHED
+
+#102 [tour-generator  8/14] COPY templates/ /app/templates/
+#102 CACHED
+
+#103 [tour-generator  7/14] COPY *.json /app/
+#103 CACHED
+
+#104 [tour-generator  5/14] RUN pip install --no-cache-dir -r requirements.txt
+#104 CACHED
+
+#105 [tour-generator 10/14] COPY tests/live_run_meter.py /app/
+#105 CACHED
+
+#106 [tour-generator  2/14] COPY _meter/ /opt/meter/
+#106 CACHED
+
+#107 [tour-generator 13/14] RUN echo "unknown" > /app/.git_sha
+#107 CACHED
+
+#108 [tour-generator 14/14] RUN python build_manifest.py /app /app/.build_manifest.json
+#108 CACHED
+
+#109 [tour-generator] exporting to image
+#109 exporting layers done
+#109 exporting manifest sha256:b8db1377618688db8236b80368c970b50ecf33933e8bdba559e7fe2ab9d525e2 done
+#109 exporting config sha256:0afc7748a4060f1d29d8634c9d19b9b632286e97dab2558823a8be611844430c done
+#109 exporting attestation manifest sha256:4cecbd93607ae844605837fa9e1cfd98171225f2bf73ced54ddaf02ce6408485 done
+#109 exporting manifest list sha256:cf39fca1a089fa581d0ee927e952e8dd56aba7ee18f18dac1540a2fb480754d4 done
+#109 naming to docker.io/library/local829-tour-generator:latest done
+#109 unpacking to docker.io/library/local829-tour-generator:latest done
+#109 DONE 0.0s
+
+#110 [tour-orchestrator] resolving provenance for metadata file
+#110 DONE 0.0s
+
+#111 [tour-generator] resolving provenance for metadata file
+#111 DONE 0.0s
+ Image local829-tour-generation-modernized-1 Built 
+ Image local829-tour-generator Built 
+ Image local829-user-api-2 Built 
+ Image local829-tour-orchestrator Built 
+ Image local829-coordinates-fromai Built 
+ Network local829_default Creating 
+ Network local829_default Created 
+ Volume local829_local829_pg Creating 
+ Volume local829_local829_pg Created 
+ Container local829-coordinates-fromai-1 Creating 
+ Container local829-tour-generation-modernized-1-1 Creating 
+ Container local829-postgres-2-1 Creating 
+ Container local829-tour-generation-modernized-1-1 Created 
+ Container local829-coordinates-fromai-1 Created 
+ Container local829-postgres-2-1 Created 
+ Container local829-tour-generator-1 Creating 
+ Container local829-user-api-2-1 Creating 
+ Container local829-user-api-2-1 Created 
+ Container local829-tour-generator-1 Created 
+ Container local829-tour-orchestrator-1 Creating 
+ Container local829-tour-orchestrator-1 Created 
+ Container local829-coordinates-fromai-1 Starting 
+ Container local829-tour-generation-modernized-1-1 Starting 
+ Container local829-postgres-2-1 Starting 
+ Container local829-postgres-2-1 Started 
+ Container local829-tour-generator-1 Starting 
+ Container local829-user-api-2-1 Starting 
+ Container local829-coordinates-fromai-1 Started 
+ Container local829-tour-generation-modernized-1-1 Started 
+ Container local829-tour-generator-1 Started 
+ Container local829-user-api-2-1 Started 
+ Container local829-tour-orchestrator-1 Starting 
+ Container local829-tour-orchestrator-1 Started 
+
+######## [local829] waiting for postgres ########
+
+######## [local829] waiting for orchestrator :55802 ########
+
+######## [local829] (A) submitting 3-stop walking tour: Public art walk near Salem Common, Salem, MA ########
+  response: {"job_id":"8166c2d6-5bad-4367-842f-e5bba4e52ea8","language":"en","status":"queued"}
+
+######## [local829] (A) job_id=8166c2d6-5bad-4367-842f-e5bba4e52ea8; letting the sweep fire during generation (min_idle=30s, interval=10s) ########
+    [t=1] orchestrator_jobs(status,has_owner,lease_future)=processing|t|t
+    [t=2] orchestrator_jobs(status,has_owner,lease_future)=processing|t|t
+    [t=3] orchestrator_jobs(status,has_owner,lease_future)=processing|t|t
+    [t=4] orchestrator_jobs(status,has_owner,lease_future)=processing|t|t
+    [t=5] orchestrator_jobs(status,has_owner,lease_future)=processing|t|t
+    [t=6] orchestrator_jobs(status,has_owner,lease_future)=processing|t|t
+    [t=7] orchestrator_jobs(status,has_owner,lease_future)=processing|t|t
+    [t=8] orchestrator_jobs(status,has_owner,lease_future)=processing|t|t
+
+######## [local829] (A) waiting for the live job to complete ########
+
+######## [local829] (A) RESULT ########
+1|Public art walk near Salem Common, Salem, MA - walking Tour|2|1
+  tour_requests.status=    [t=1] status=started
+    [t=2] status=started
+    [t=3] status=started
+    [t=4] status=started
+    [t=5] status=started
+    [t=6] status=started
+    [t=7] status=started
+    [t=8] status=started
+    [t=9] status=started
+    [t=10] status=started
+    [t=11] status=started
+    [t=12] status=started
+    [t=13] status=started
+    [t=14] status=started
+    [t=15] status=started
+    [t=16] status=started
+    [t=17] status=started
+    [t=18] status=started
+    [t=19] status=started
+    [t=20] status=started
+    [t=21] status=started
+    [t=22] status=started
+    [t=23] status=started
+    [t=24] status=started
+    [t=25] status=started
+    [t=26] status=started
+    [t=27] status=started
+    [t=28] status=started
+    [t=29] status=started
+    [t=30] status=started
+    [t=31] status=started
+    [t=32] status=started
+    [t=33] status=started
+    [t=34] status=started
+    [t=35] status=started
+    [t=36] status=started
+    [t=37] status=started
+    [t=38] status=started
+    [t=39] status=started
+    [t=40] status=started
+    [t=41] status=started
+    [t=42] status=started
+    [t=43] status=started
+    [t=44] status=completed
+completed
+  stored tour count = 1 (expect exactly 1)
+8166c2d6-5bad-4367-842f-e5bba4e52ea8|completed|
+  '[LOCAL-829] store already claimed' hits for the live job = 0 (0 ideal; a loser is still harmless — one store either way)
+
+######## [local829] (B) submitting 3-stop walking tour: Historic houses walk near Marblehead, MA ########
+  response: {"job_id":"b1c9ec50-02ba-4c80-bc02-57539a75f433","language":"en","status":"queued"}
+
+######## [local829] (B) waiting for generation in flight (generator_job_id persisted) ########
+  generator_job_id=08203f42-bd90-4b6a-91ad-c5438bd38447
+
+######## [local829] (B) KILLING the orchestrator mid-generation (docker kill) ########
+local829-tour-orchestrator-1 Exited (137) 3 seconds ago
+
+######## [local829] (B) starting a FRESH orchestrator on the SAME DB volume (resume-on-boot) ########
+ Container local829-user-api-2-1 Running 
+ Container local829-postgres-2-1 Running 
+ Container local829-tour-generator-1 Running 
+ Container local829-tour-generation-modernized-1-1 Running 
+ Container local829-coordinates-fromai-1 Running 
+ Container local829-tour-orchestrator-1 Starting 
+ Container local829-tour-orchestrator-1 Started 
+
+######## [local829] (B) waiting for the resumed job to complete ########
+
+######## [local829] (B) RESULT ########
+2|Historic houses walk near Marblehead, MA - walking Tour|3|1
+  tour_requests.status=    [t=1] status=started
+    [t=2] status=started
+    [t=3] status=started
+    [t=4] status=started
+    [t=5] status=started
+    [t=6] status=started
+    [t=7] status=started
+    [t=8] status=started
+    [t=9] status=started
+    [t=10] status=started
+    [t=11] status=started
+    [t=12] status=started
+    [t=13] status=started
+    [t=14] status=started
+    [t=15] status=started
+    [t=16] status=started
+    [t=17] status=started
+    [t=18] status=started
+    [t=19] status=started
+    [t=20] status=started
+    [t=21] status=started
+    [t=22] status=started
+    [t=23] status=started
+    [t=24] status=started
+    [t=25] status=started
+    [t=26] status=started
+    [t=27] status=started
+    [t=28] status=started
+    [t=29] status=started
+    [t=30] status=started
+    [t=31] status=started
+    [t=32] status=started
+    [t=33] status=started
+    [t=34] status=started
+    [t=35] status=started
+    [t=36] status=started
+    [t=37] status=started
+    [t=38] status=started
+    [t=39] status=started
+    [t=40] status=started
+    [t=41] status=started
+    [t=42] status=started
+    [t=43] status=started
+    [t=44] status=started
+    [t=45] status=started
+    [t=46] status=started
+    [t=47] status=started
+    [t=48] status=started
+    [t=49] status=started
+    [t=50] status=started
+    [t=51] status=started
+    [t=52] status=started
+    [t=53] status=started
+    [t=54] status=started
+    [t=55] status=started
+    [t=56] status=started
+    [t=57] status=started
+    [t=58] status=started
+    [t=59] status=started
+    [t=60] status=started
+    [t=61] status=started
+    [t=62] status=started
+    [t=63] status=started
+    [t=64] status=started
+    [t=65] status=started
+    [t=66] status=started
+    [t=67] status=started
+    [t=68] status=started
+    [t=69] status=started
+    [t=70] status=started
+    [t=71] status=started
+    [t=72] status=started
+    [t=73] status=started
+    [t=74] status=started
+    [t=75] status=started
+    [t=76] status=completed
+completed
+  stored tour count = 1 (expect exactly 1)
+
+######## [local829] VERDICT ########
+  FAIL(A): live job did not complete
+  FAIL(B): resumed job did not complete
+  PROOF FAILED — see above.
+
+######## [local829] meter rows (service=LOCAL-829) in /Users/micha/Audioura/meterlogs/paid_api_calls.jsonl ########
+162
+
+######## [local829] tearing down project local829 (down -v — OWN volume only) ########

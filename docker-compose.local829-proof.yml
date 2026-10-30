@@ -1,0 +1,152 @@
+# docker-compose.local829-proof.yml — LOCAL-829 OWN isolated orchestration stack.
+#
+# Separate project (-p local829), OWN postgres volume, spare ports (558xx).
+# NEVER touches the shared audioura-* containers or the live DB. Reuses the
+# LOCAL-821 stack shape; every service builds from THIS worktree so the live run
+# measures the LOCAL-829 code (the live-path lease + idempotent store-claim).
+#
+# UP:   docker compose -p local829 -f docker-compose.local829-proof.yml up -d --build
+# DOWN: docker compose -p local829 -f docker-compose.local829-proof.yml down -v
+#
+# The proof (run_local829_live.sh):
+#   (A) THE 829 DEFECT — live job swept while still LIVE on the same instance.
+#       1. POST a short 3-stop walking tour to /generate-complete-tour.
+#       2. The single orchestrator runs resume+sweep ON with a 30 s min-idle and
+#          a 10 s sweep interval, so the periodic sweep FIRES several times while
+#          the tour is still generating (a normal 3-stop tour runs past 30 s).
+#       3. Prove the sweep NEVER resumes the live job (the live path holds and
+#          renews its lease) and the tour is stored EXACTLY once (one audio_tours
+#          row).
+#   (B) THE 821 KILL TEST still holds — kill the orchestrator mid-generation,
+#       bring a fresh one up on the same DB, prove the tour is stored ONCE.
+#
+# Meter contract (meter_container_env) is wired on the services that make paid
+# calls (generator + orchestrator); spend lands in the shared meterlog under
+# service=LOCAL-829, and TASK_BUDGET_ID/USD caps it at $0.50.
+services:
+  postgres-2:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: audiotours
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: password123
+      POSTGRES_INITDB_ARGS: "--auth-host=md5 --auth-local=md5"
+      POSTGRES_HOST_AUTH_METHOD: md5
+    ports:
+      - "55833:5432"
+    volumes:
+      - local829_pg:/var/lib/postgresql/data
+      - ./local821-initdb:/docker-entrypoint-initdb.d:ro
+
+  tour-generator:
+    build:
+      context: .
+      dockerfile: Dockerfile.generator
+    ports:
+      - "55800:5000"
+    environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - SERP_API_KEY=${SERP_API_KEY}
+      - SERP_PROVIDER=${SERP_PROVIDER:-serper}
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - STORIED_MODE=true
+      - ATTESTATION_MODE=log_only
+      - DATABASE_URL=postgresql://admin:password123@postgres-2:5432/audiotours
+      - DB_HOST=postgres-2
+      - DB_PORT=5432
+      - DB_NAME=audiotours
+      - DB_USER=admin
+      - DB_PASSWORD=password123
+      - PYTHONUNBUFFERED=1
+      - JOB_STORE_MODE=layered
+      - TASK_BUDGET_ID=LOCAL-829
+      - TASK_BUDGET_USD=0.50
+      - COST_HARD_LIMIT_USD=0.50
+      - TEST_GEMINI_MAX_USD=0.50
+      - PYTHONPATH=/opt/meter
+      - PAID_API_LOG=/meterlogs/paid_api_calls.jsonl
+      - METER_SERVICE=LOCAL-829
+    volumes:
+      - ./tours:/app/tours
+      - ./_meter:/opt/meter:ro
+      - ${LOCAL829_METER_DIR:-./local829-meterlogs}:/meterlogs
+    depends_on:
+      - postgres-2
+
+  tour-generation-modernized-1:
+    build:
+      context: .
+      dockerfile: Dockerfile.modernized
+    ports:
+      - "55821:5021"
+    volumes:
+      - ./tours:/app/tours
+
+  coordinates-fromai:
+    build:
+      context: ./coordinates_fromAI
+    ports:
+      - "55806:5004"
+    environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+
+  user-api-2:
+    build:
+      context: ./user-tracking
+    ports:
+      - "55803:5000"
+    depends_on:
+      - postgres-2
+    environment:
+      DATABASE_URL: postgresql://admin:password123@postgres-2:5432/audiotours
+      GATEWAY_API_KEY: ""
+      ALLOW_UNAUTHENTICATED_ENTITLEMENTS: "true"
+
+  tour-orchestrator:
+    build:
+      context: .
+      dockerfile: Dockerfile.orchestrator
+    ports:
+      - "55802:5002"
+    environment:
+      - TOUR_GENERATOR_URL=http://tour-generator:5000
+      - MODERNIZED_URL=http://tour-generation-modernized-1:5021
+      - USER_API_URL=http://user-api-2:5000
+      - COORDINATES_URL=http://coordinates-fromai:5004
+      - DB_HOST=postgres-2
+      - DB_NAME=audiotours
+      - DB_USER=admin
+      - DB_PASSWORD=password123
+      - DB_PORT=5432
+      - TOUR_TEST_MODE_ALLOW_REQUEST=true
+      - TOUR_TRACK=subscribed
+      - PYTHONUNBUFFERED=1
+      # [LOCAL-829] resume + sweep ON, with a 30 s min-idle and a 10 s sweep
+      # interval, so a normal 3-stop tour runs PAST min_idle while live and the
+      # sweep fires repeatedly during generation — the exact condition that
+      # double-stored in GCloud wave 8. The live path's lease (renewed every
+      # poll) must keep the sweep off its row.
+      - ORCH_RESUME_ENABLED=true
+      - ORCH_SWEEP_INTERVAL_SECONDS=10
+      - ORCH_SWEEP_MIN_IDLE_SECONDS=30
+      # Lease >= 3x the ~10 s renew cadence; generous so a slow poll never drops
+      # it. Still shorter than a normal generation is long, so a truly dead
+      # instance's lease expires and the sweep can take over.
+      - ORCH_JOB_LEASE_SECONDS=120
+      - TASK_BUDGET_ID=LOCAL-829
+      - TASK_BUDGET_USD=0.50
+      - PYTHONPATH=/opt/meter
+      - PAID_API_LOG=/meterlogs/paid_api_calls.jsonl
+      - METER_SERVICE=LOCAL-829
+    volumes:
+      - ./tours:/app/tours
+      - ./_meter:/opt/meter:ro
+      - ${LOCAL829_METER_DIR:-./local829-meterlogs}:/meterlogs
+    depends_on:
+      - tour-generator
+      - tour-generation-modernized-1
+      - user-api-2
+      - coordinates-fromai
+
+volumes:
+  local829_pg:
